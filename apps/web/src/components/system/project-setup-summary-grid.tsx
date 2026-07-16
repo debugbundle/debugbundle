@@ -231,9 +231,9 @@ function renderAnalyticsSummaryBlock(
     return (
       <SetupSummaryBlock
         label="Analytics"
-        value="Solo+ only"
+        value="Unavailable"
         badge={{ label: "Unavailable", variant: "outline" }}
-        description="Product analytics capture and aggregate usage insights are not available on the Free plan."
+        description="Product analytics availability could not be resolved for this project."
       />
     );
   }

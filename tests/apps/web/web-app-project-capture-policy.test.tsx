@@ -43,6 +43,10 @@ async function chooseSelectOption(
   await user.click(await screen.findByRole("option", { name: optionName }));
 }
 
+async function openCapturePolicySettings(): Promise<void> {
+  fireEvent.click(await screen.findByRole("button", { name: "Capture policy" }));
+}
+
 describe("web app — project capture policy settings", () => {
   it("lets owners update capture policy from the project settings page", async () => {
     const user = userEvent.setup();
@@ -133,6 +137,7 @@ describe("web app — project capture policy settings", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
+    await openCapturePolicySettings();
 
     const capturePolicyHeading = await screen.findByRole("heading", { name: /capture policy/i, level: 3 });
     const projectDetailsHeading = await screen.findByRole("heading", { name: /project details/i, level: 3 });
@@ -233,6 +238,7 @@ describe("web app — project capture policy settings", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
+    await openCapturePolicySettings();
 
     const saveButton = expectButton(await screen.findByRole("button", { name: /save capture policy/i }));
     const pathRulesInput = await screen.findByLabelText(/^path rules$/i);
@@ -301,6 +307,7 @@ describe("web app — project capture policy settings", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
+    await openCapturePolicySettings();
 
     expect(await screen.findByRole("heading", { name: /capture policy/i, level: 3 })).toBeInTheDocument();
     expect(screen.getByText(/only project owners and admins can change capture settings/i)).toBeInTheDocument();
@@ -388,6 +395,7 @@ describe("web app — project capture policy settings", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
+    await openCapturePolicySettings();
 
     const requestSelect = await findSelectTrigger(/^request events$/i);
     const saveButton = expectButton(await screen.findByRole("button", { name: /save capture policy/i }));
@@ -496,6 +504,7 @@ describe("web app — project capture policy settings", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
+    await openCapturePolicySettings();
 
     await findSelectTrigger(/^client error incidents$/i);
     const saveButton = expectButton(screen.getByRole("button", { name: /save capture policy/i }));

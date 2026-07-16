@@ -61,8 +61,8 @@ describe("tier capabilities", () => {
     expect(getTierCapabilities("team").cloud_improvement_bundles).toBe(true);
   });
 
-  it("should gate AnalyticsBundle for Solo and Team tiers", (): void => {
-    expect(getTierCapabilities("free").analytics_bundle).toBe(false);
+  it("should expose AnalyticsBundle on every hosted tier", (): void => {
+    expect(getTierCapabilities("free").analytics_bundle).toBe(true);
     expect(getTierCapabilities("solo").analytics_bundle).toBe(true);
     expect(getTierCapabilities("team").analytics_bundle).toBe(true);
   });
@@ -102,6 +102,12 @@ describe("tier capabilities", () => {
     expect(team.bundle_retention_days).toBeGreaterThan(solo.bundle_retention_days);
     expect(solo.raw_event_retention_days).toBeGreaterThan(free.raw_event_retention_days);
     expect(team.raw_event_retention_days).toBeGreaterThan(solo.raw_event_retention_days);
+    expect(solo.analytics_hourly_retention_days).toBeGreaterThan(
+      free.analytics_hourly_retention_days
+    );
+    expect(team.analytics_hourly_retention_days).toBeGreaterThan(
+      solo.analytics_hourly_retention_days
+    );
   });
 
   it("should match finalized tiers.md project and member limits", (): void => {
@@ -120,6 +126,9 @@ describe("tier capabilities", () => {
     expect(TIER_CAPABILITIES.solo.raw_event_retention_days).toBe(14);
     expect(TIER_CAPABILITIES.team.bundle_retention_days).toBe(90);
     expect(TIER_CAPABILITIES.team.raw_event_retention_days).toBe(30);
+    expect(TIER_CAPABILITIES.free.analytics_hourly_retention_days).toBe(7);
+    expect(TIER_CAPABILITIES.solo.analytics_hourly_retention_days).toBe(30);
+    expect(TIER_CAPABILITIES.team.analytics_hourly_retention_days).toBe(90);
   });
 
   it("should include allowance bucket fields on all tiers", (): void => {
@@ -148,12 +157,12 @@ describe("tier capabilities", () => {
     expect(TIER_CAPABILITIES.free.monthly_remote_activations).toBe(0);
     expect(TIER_CAPABILITIES.free.monthly_alert_deliveries).toBe(25);
     expect(TIER_CAPABILITIES.free.monthly_webhook_deliveries).toBe(100);
-    expect(TIER_CAPABILITIES.free.monthly_analytics_events).toBe(0);
-    expect(TIER_CAPABILITIES.free.monthly_analytics_sessions).toBe(0);
-    expect(TIER_CAPABILITIES.free.monthly_analytics_journey_samples).toBe(0);
-    expect(TIER_CAPABILITIES.free.monthly_analytics_bundle_generations).toBe(0);
-    expect(TIER_CAPABILITIES.free.max_analytics_saved_funnels).toBe(0);
-    expect(TIER_CAPABILITIES.free.max_analytics_custom_dimensions).toBe(0);
+    expect(TIER_CAPABILITIES.free.monthly_analytics_events).toBe(5_000);
+    expect(TIER_CAPABILITIES.free.monthly_analytics_sessions).toBe(1_000);
+    expect(TIER_CAPABILITIES.free.monthly_analytics_journey_samples).toBe(100);
+    expect(TIER_CAPABILITIES.free.monthly_analytics_bundle_generations).toBe(3);
+    expect(TIER_CAPABILITIES.free.max_analytics_saved_funnels).toBe(1);
+    expect(TIER_CAPABILITIES.free.max_analytics_custom_dimensions).toBe(1);
     // Solo per-slot
     expect(TIER_CAPABILITIES.solo.monthly_bundle_requests).toBe(250);
     expect(TIER_CAPABILITIES.solo.monthly_raw_ingested_events).toBe(3_500);
@@ -166,7 +175,7 @@ describe("tier capabilities", () => {
     expect(TIER_CAPABILITIES.solo.monthly_analytics_journey_samples).toBe(1_000);
     expect(TIER_CAPABILITIES.solo.monthly_analytics_bundle_generations).toBe(25);
     expect(TIER_CAPABILITIES.solo.max_analytics_saved_funnels).toBe(10);
-    expect(TIER_CAPABILITIES.solo.max_analytics_custom_dimensions).toBe(0);
+    expect(TIER_CAPABILITIES.solo.max_analytics_custom_dimensions).toBe(3);
     // Team per-slot
     expect(TIER_CAPABILITIES.team.monthly_bundle_requests).toBe(1_000);
     expect(TIER_CAPABILITIES.team.monthly_raw_ingested_events).toBe(10_000);

@@ -18,6 +18,7 @@ const analyticsSettings = {
   journey_sample_rate: 0.1,
   raw_retention_days: 7,
   sample_retention_days: 30,
+  hourly_retention_days: 90,
   aggregate_retention_months: 24,
   max_saved_funnels: 10,
   max_custom_dimensions: 8,
@@ -138,10 +139,10 @@ describe("web app - project overview", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows analytics as unavailable on Free projects", async () => {
+  it("shows analytics as available but off on Free projects", async () => {
     installProjectOverviewFetch({
       plan: "free",
-      analyticsAvailable: false,
+      analyticsAvailable: true,
       analyticsEnabled: false
     });
 
@@ -152,7 +153,9 @@ describe("web app - project overview", () => {
       .getByText(/^analytics$/i)
       .closest("div.rounded-lg");
     expect(analyticsCard).not.toBeNull();
-    expect(within(analyticsCard as HTMLDivElement).getByText(/^solo\+ only$/i)).toBeInTheDocument();
-    expect(within(analyticsCard as HTMLDivElement).getByText(/^unavailable$/i)).toBeInTheDocument();
+    expect(within(analyticsCard as HTMLDivElement).getByText(/^off$/i)).toBeInTheDocument();
+    expect(
+      within(analyticsCard as HTMLDivElement).getByText(/^strict privacy$/i)
+    ).toBeInTheDocument();
   });
 });

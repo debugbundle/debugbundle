@@ -1,12 +1,36 @@
-import { createHash } from "node:crypto";
-
 import type {
   AnalyticsBundleSeverity,
   AnalyticsOpportunityRecord
 } from "../../shared-types/src/index.js";
 import type { Queryable } from "./types.js";
+import {
+  buildAnalyticsOpportunityEvaluationWindow as buildEvaluationWindow,
+  roundOpportunityRatio as roundRatio,
+  toOpportunityInteger as toNonNegativeInteger,
+  toOpportunityString as toNonEmptyString,
+  upsertAnalyticsOpportunity,
+  type AnalyticsOpportunityEvaluationInput,
+  type AnalyticsOpportunityEvaluationResult
+} from "./analytics-opportunity-recording.js";
+import {
+  evaluateAnalyticsDeployConversionOpportunities,
+  evaluateAnalyticsIncidentImpactOpportunities,
+  evaluateAnalyticsRouteExitOpportunities,
+  resolveStaleAnalyticsOpportunities
+} from "./analytics-opportunity-regression-evaluator.js";
 
-const ANALYTICS_OPPORTUNITY_LOOKBACK_DAYS = 7;
+export {
+  evaluateAnalyticsDeployConversionOpportunities,
+  evaluateAnalyticsIncidentImpactOpportunities,
+  evaluateAnalyticsRouteExitOpportunities,
+  resolveStaleAnalyticsOpportunities
+} from "./analytics-opportunity-regression-evaluator.js";
+
+export type {
+  AnalyticsOpportunityEvaluationInput,
+  AnalyticsOpportunityEvaluationResult
+} from "./analytics-opportunity-recording.js";
+
 const FUNNEL_DROPOFF_MIN_SESSIONS = 20;
 const FUNNEL_DROPOFF_MIN_DROPOFFS = 10;
 const FUNNEL_DROPOFF_MIN_RATE = 0.4;
@@ -23,17 +47,6 @@ const MARKER_FRICTION_ACTION_KEYS = [
 const MARKER_FRICTION_MIN_EVENTS = 20;
 const MARKER_FRICTION_MIN_UNIQUE_SESSIONS = 10;
 const MARKER_FRICTION_LIMIT = 5;
-
-export interface AnalyticsOpportunityEvaluationInput {
-  project_id: string;
-  occurred_at: string;
-  service?: string | undefined;
-  environment?: string | undefined;
-}
-
-export interface AnalyticsOpportunityEvaluationResult {
-  opportunities_created_or_updated: number;
-}
 
 export interface AnalyticsOpportunityEvaluator {
   evaluateProjectOpportunities(
@@ -104,8 +117,6 @@ interface MarkerFrictionCandidate {
   unique_sessions: number;
 }
 
-type AnalyticsOpportunityKind = "funnel_dropoff" | "journey_friction";
-
 export function createPostgresAnalyticsOpportunityEvaluator(
   db: Queryable
 ): AnalyticsOpportunityEvaluator {
@@ -114,12 +125,19 @@ export function createPostgresAnalyticsOpportunityEvaluator(
       const funnelDropoffResult = await evaluateAnalyticsFunnelDropoffOpportunities(db, input);
       const journeyFrictionResult = await evaluateAnalyticsJourneyFrictionOpportunities(db, input);
       const markerFrictionResult = await evaluateAnalyticsMarkerFrictionOpportunities(db, input);
+      const routeExitResult = await evaluateAnalyticsRouteExitOpportunities(db, input);
+      const incidentImpactResult = await evaluateAnalyticsIncidentImpactOpportunities(db, input);
+      const deployConversionResult = await evaluateAnalyticsDeployConversionOpportunities(db, input);
+      await resolveStaleAnalyticsOpportunities(db, input);
 
       return {
         opportunities_created_or_updated:
           funnelDropoffResult.opportunities_created_or_updated +
           journeyFrictionResult.opportunities_created_or_updated +
-          markerFrictionResult.opportunities_created_or_updated
+          markerFrictionResult.opportunities_created_or_updated +
+          routeExitResult.opportunities_created_or_updated +
+          incidentImpactResult.opportunities_created_or_updated +
+          deployConversionResult.opportunities_created_or_updated
       };
     }
   };
@@ -189,26 +207,81 @@ async function readFunnelDropoffCandidates(
 ): Promise<FunnelDropoffCandidate[]> {
   const result = await db.query<FunnelDropoffCandidateRow>(
     `
+      WITH funnel_steps AS (
+        SELECT
+          definition.funnel_key,
+          step.value->>'step_key' AS step_key,
+          (step.ordinality - 1)::integer AS step_order,
+          jsonb_array_length(definition.steps)::integer AS step_count
+        FROM analytics_funnel_definitions definition
+        CROSS JOIN LATERAL jsonb_array_elements(definition.steps)
+          WITH ORDINALITY AS step(value, ordinality)
+        WHERE definition.project_id = $1::uuid
+          AND definition.archived_at IS NULL
+      ),
+      rollups AS (
+        SELECT
+          service,
+          environment,
+          funnel_key,
+          step_key,
+          COALESCE(SUM(sessions_entered), 0)::bigint AS sessions_entered,
+          COALESCE(SUM(sessions_completed), 0)::bigint AS sessions_completed
+        FROM analytics_funnel_rollups
+        WHERE project_id = $1::uuid
+          AND bucket_granularity = 'day'
+          AND bucket_start >= $2::timestamptz
+          AND bucket_start < $3::timestamptz
+          AND ($4::text IS NULL OR service = $4)
+          AND ($5::text IS NULL OR environment = $5)
+        GROUP BY service, environment, funnel_key, step_key
+      ),
+      joined AS (
+        SELECT
+          rollups.service,
+          rollups.environment,
+          steps.funnel_key,
+          steps.step_key,
+          steps.step_order,
+          steps.step_count,
+          COALESCE(rollups.sessions_entered, 0)::bigint AS sessions_entered,
+          COALESCE(rollups.sessions_completed, 0)::bigint AS sessions_completed
+        FROM funnel_steps steps
+        JOIN rollups
+          ON rollups.funnel_key = steps.funnel_key
+         AND rollups.step_key = steps.step_key
+      ),
+      completion AS (
+        SELECT
+          service,
+          environment,
+          funnel_key,
+          step_key,
+          step_order,
+          sessions_entered,
+          CASE
+            WHEN step_order = step_count - 1 THEN sessions_completed
+            ELSE LEAD(sessions_entered, 1, 0) OVER (
+              PARTITION BY service, environment, funnel_key
+              ORDER BY step_order ASC
+            )
+          END::bigint AS sessions_completed
+        FROM joined
+      )
       SELECT
         service,
         environment,
         funnel_key,
         step_key,
-        MIN(step_order)::integer AS step_order,
-        COALESCE(SUM(sessions_entered), 0)::bigint AS sessions_entered,
-        COALESCE(SUM(sessions_completed), 0)::bigint AS sessions_completed,
-        COALESCE(SUM(dropoffs), 0)::bigint AS dropoffs
-      FROM analytics_funnel_rollups
-      WHERE project_id = $1::uuid
-        AND bucket_granularity = 'day'
-        AND bucket_start >= $2::timestamptz
-        AND bucket_start < $3::timestamptz
-        AND ($4::text IS NULL OR service = $4)
-        AND ($5::text IS NULL OR environment = $5)
-      GROUP BY service, environment, funnel_key, step_key
-      HAVING COALESCE(SUM(sessions_entered), 0) >= $6
-        AND COALESCE(SUM(dropoffs), 0) >= $7
-        AND COALESCE(SUM(dropoffs), 0)::numeric / NULLIF(COALESCE(SUM(sessions_entered), 0), 0) >= $8
+        step_order,
+        sessions_entered,
+        sessions_completed,
+        GREATEST(sessions_entered - sessions_completed, 0)::bigint AS dropoffs
+      FROM completion
+      WHERE sessions_entered >= $6
+        AND GREATEST(sessions_entered - sessions_completed, 0) >= $7
+        AND GREATEST(sessions_entered - sessions_completed, 0)::numeric
+          / NULLIF(sessions_entered, 0) >= $8
       ORDER BY dropoffs DESC, sessions_entered DESC, funnel_key ASC, step_order ASC, step_key ASC
       LIMIT $9
     `,
@@ -436,136 +509,6 @@ async function upsertMarkerFrictionOpportunity(
   });
 }
 
-async function upsertAnalyticsOpportunity(
-  db: Queryable,
-  input: {
-    projectId: string;
-    service: string;
-    environment: string;
-    kind: AnalyticsOpportunityKind;
-    severity: AnalyticsBundleSeverity;
-    confidence: AnalyticsOpportunityRecord["confidence"];
-    fingerprint: string;
-    title: string;
-    summary: string;
-    evidence: Record<string, unknown>;
-    detectedAt: string;
-  }
-): Promise<void> {
-  await db.query<{ id: string }>(
-    `
-      INSERT INTO analytics_opportunities (
-        id,
-        project_id,
-        service,
-        environment,
-        kind,
-        status,
-        severity,
-        confidence,
-        fingerprint,
-        title,
-        summary,
-        evidence,
-        related_incident_ids,
-        related_deploy_ids,
-        first_detected_at,
-        last_detected_at,
-        bundle_status
-      )
-      VALUES (
-        $1::uuid,
-        $2::uuid,
-        $3,
-        $4,
-        $5,
-        'open',
-        $6,
-        $7,
-        $8,
-        $9,
-        $10,
-        $11::jsonb,
-        '{}'::uuid[],
-        '{}'::text[],
-        $12::timestamptz,
-        $12::timestamptz,
-        'not_requested'
-      )
-      ON CONFLICT (project_id, fingerprint)
-      DO UPDATE SET
-        service = EXCLUDED.service,
-        environment = EXCLUDED.environment,
-        severity = EXCLUDED.severity,
-        confidence = EXCLUDED.confidence,
-        title = EXCLUDED.title,
-        summary = EXCLUDED.summary,
-        evidence = EXCLUDED.evidence,
-        status = CASE
-          WHEN analytics_opportunities.status = 'snoozed'
-            AND (
-              analytics_opportunities.snoozed_until IS NULL
-              OR analytics_opportunities.snoozed_until > EXCLUDED.last_detected_at
-            )
-            THEN analytics_opportunities.status
-          ELSE 'open'
-        END,
-        resolved_at = CASE
-          WHEN analytics_opportunities.status = 'snoozed'
-            AND (
-              analytics_opportunities.snoozed_until IS NULL
-              OR analytics_opportunities.snoozed_until > EXCLUDED.last_detected_at
-            )
-            THEN analytics_opportunities.resolved_at
-          ELSE NULL
-        END,
-        snoozed_until = CASE
-          WHEN analytics_opportunities.status = 'snoozed'
-            AND (
-              analytics_opportunities.snoozed_until IS NULL
-              OR analytics_opportunities.snoozed_until > EXCLUDED.last_detected_at
-            )
-            THEN analytics_opportunities.snoozed_until
-          ELSE NULL
-        END,
-        last_detected_at = GREATEST(analytics_opportunities.last_detected_at, EXCLUDED.last_detected_at),
-        updated_at = now()
-      RETURNING id::text AS id
-    `,
-    [
-      stableUuidFromFingerprint(input.fingerprint),
-      input.projectId,
-      input.service,
-      input.environment,
-      input.kind,
-      input.severity,
-      input.confidence,
-      input.fingerprint,
-      input.title,
-      input.summary,
-      JSON.stringify(input.evidence),
-      input.detectedAt
-    ]
-  );
-}
-
-function buildEvaluationWindow(occurredAt: string): { from: string; to: string } | null {
-  const parsed = Date.parse(occurredAt);
-  if (Number.isNaN(parsed)) {
-    return null;
-  }
-
-  const anchor = new Date(parsed);
-  const dayStart = Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), anchor.getUTCDate());
-  const from = new Date(dayStart - (ANALYTICS_OPPORTUNITY_LOOKBACK_DAYS - 1) * 24 * 60 * 60 * 1000);
-  const to = new Date(dayStart + 24 * 60 * 60 * 1000);
-
-  return {
-    from: from.toISOString(),
-    to: to.toISOString()
-  };
-}
-
 function mapFunnelDropoffCandidate(row: FunnelDropoffCandidateRow): FunnelDropoffCandidate {
   const sessionsEntered = toNonNegativeInteger(row.sessions_entered);
   const dropoffs = toNonNegativeInteger(row.dropoffs);
@@ -779,37 +722,4 @@ function getMarkerFrictionConfidence(
   const sessionWeight = Math.min(0.2, candidate.unique_sessions / 100);
   const eventWeight = Math.min(0.25, candidate.event_count / 200);
   return roundRatio(0.5 + sessionWeight + eventWeight);
-}
-
-function stableUuidFromFingerprint(fingerprint: string): string {
-  const bytes = Buffer.from(createHash("sha256").update(fingerprint).digest().subarray(0, 16));
-  const versionByte = bytes.at(6);
-  const variantByte = bytes.at(8);
-  if (versionByte === undefined || variantByte === undefined) {
-    throw new Error("analytics_opportunity_fingerprint_hash_invalid");
-  }
-  bytes[6] = (versionByte & 0x0f) | 0x40;
-  bytes[8] = (variantByte & 0x3f) | 0x80;
-  const hex = bytes.toString("hex");
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
-
-function toNonEmptyString(value: unknown, fallback: string): string {
-  return typeof value === "string" && value.trim().length > 0 ? value : fallback;
-}
-
-function toNonNegativeInteger(value: unknown): number {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return Math.max(0, Math.trunc(value));
-  }
-  if (typeof value === "string") {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? Math.max(0, Math.trunc(parsed)) : 0;
-  }
-
-  return 0;
-}
-
-function roundRatio(value: number): number {
-  return Math.round(value * 10000) / 10000;
 }

@@ -30,14 +30,7 @@ import {
 } from "../ui/alert-dialog.js";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle
-} from "../ui/card.js";
+import { CollapsibleCard } from "../ui/collapsible-card.js";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "../ui/field.js";
 import { Input } from "../ui/input.js";
@@ -293,15 +286,35 @@ export function ProjectCaptureRulesCard({
 
   return (
     <>
-      <Card>
-        <CardHeader className="gap-1">
-          <CardTitle>Capture rules</CardTitle>
-          <CardDescription>
-            Review which noisy patterns are being demoted, sampled, or dropped before they keep
-            reopening incidents.
-          </CardDescription>
-          {showPreviewOnly ? null : (
-            <CardAction className="max-sm:col-span-full max-sm:col-start-1 max-sm:row-start-3 max-sm:row-span-1 max-sm:mt-3">
+      <CollapsibleCard
+        title="Capture rules"
+        description="Review which noisy patterns are being demoted, sampled, or dropped before they keep reopening incidents."
+        contentClassName="space-y-6"
+      >
+        <div className="rounded-lg border border-border/80 bg-background/60 p-4 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 font-medium text-foreground">
+            <ShieldAlertIcon className="size-4" />
+            Manage known browser noise
+          </div>
+          <p className="mt-2 leading-6">
+            {showPreviewOnly
+              ? "Members can review project capture rules here. Owners and admins create and manage these rules from incident detail pages and project settings."
+              : "Create rules from noisy incident suggestions or define a manual rule here when you already know the exact structured condition to demote, sample, or drop."}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {showPreviewOnly ? null : (
+              <Button type="button" size="sm" onClick={() => setIsCreateOpen(true)}>
+                <PlusIcon data-icon="inline-start" />
+                Create rule
+              </Button>
+            )}
+            <Button asChild type="button" variant="outline" size="sm">
+              <Link to={`/projects/${projectId}/incidents`}>
+                <LinkIcon data-icon="inline-start" />
+                Review incidents
+              </Link>
+            </Button>
+            {showPreviewOnly ? null : (
               <Button
                 type="button"
                 variant="outline"
@@ -312,161 +325,134 @@ export function ProjectCaptureRulesCard({
                 <RotateCcwIcon data-icon="inline-start" />
                 {isRefreshing ? "Refreshing..." : "Refresh rules"}
               </Button>
-            </CardAction>
-          )}
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="rounded-lg border border-border/80 bg-background/60 p-4 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2 font-medium text-foreground">
-              <ShieldAlertIcon className="size-4" />
-              Manage known browser noise
-            </div>
-            <p className="mt-2 leading-6">
-              {showPreviewOnly
-                ? "Members can review project capture rules here. Owners and admins create and manage these rules from incident detail pages and project settings."
-                : "Create rules from noisy incident suggestions or define a manual rule here when you already know the exact structured condition to demote, sample, or drop."}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {showPreviewOnly ? null : (
-                <Button type="button" size="sm" onClick={() => setIsCreateOpen(true)}>
-                  <PlusIcon data-icon="inline-start" />
-                  Create rule
-                </Button>
-              )}
-              <Button asChild type="button" variant="outline" size="sm">
-                <Link to={`/projects/${projectId}/incidents`}>
-                  <LinkIcon data-icon="inline-start" />
-                  Review incidents
-                </Link>
-              </Button>
-            </div>
+            )}
           </div>
+        </div>
 
-          {errorMessage === null ? null : (
-            <div className="rounded-lg border border-destructive/25 bg-destructive/5 p-3 text-sm text-destructive">
-              {errorMessage}
-            </div>
-          )}
+        {errorMessage === null ? null : (
+          <div className="rounded-lg border border-destructive/25 bg-destructive/5 p-3 text-sm text-destructive">
+            {errorMessage}
+          </div>
+        )}
 
-          {isLoading ? (
-            <div className="space-y-3">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ) : sortedRules.length === 0 ? (
-            <Empty className="min-h-[11rem] justify-center border border-dashed border-border/80 bg-background/50">
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <ShieldOffIcon />
-                </EmptyMedia>
-                <EmptyTitle>No capture rules yet</EmptyTitle>
-                <EmptyDescription>
-                  Create one from a recurring incident or define a manual matcher when the noisy
-                  pattern is already known.
-                </EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          ) : (
-            <div className="space-y-4">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Rule</TableHead>
-                    <TableHead>Matcher</TableHead>
-                    <TableHead>Action</TableHead>
-                    <TableHead>Matches</TableHead>
-                    <TableHead>Last matched</TableHead>
-                    {showPreviewOnly ? null : <TableHead className="text-right">Actions</TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {visibleRules.map((rule) => (
-                    <TableRow key={rule.id}>
-                      <TableCell className="align-top">
-                        <div className="flex min-w-0 flex-col gap-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-medium text-foreground">{rule.name}</span>
-                            <Badge variant={rule.enabled ? "success" : "outline"}>
-                              {rule.enabled ? "enabled" : "disabled"}
-                            </Badge>
-                            {rule.expires_at === null ? null : (
-                              <Badge variant="outline">expires {formatDate(rule.expires_at)}</Badge>
-                            )}
-                          </div>
-                          {rule.description === null ? null : (
-                            <p className="max-w-xl whitespace-normal text-sm leading-6 text-muted-foreground">
-                              {rule.description}
-                            </p>
+        {isLoading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        ) : sortedRules.length === 0 ? (
+          <Empty className="min-h-[11rem] justify-center border border-dashed border-border/80 bg-background/50">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <ShieldOffIcon />
+              </EmptyMedia>
+              <EmptyTitle>No capture rules yet</EmptyTitle>
+              <EmptyDescription>
+                Create one from a recurring incident or define a manual matcher when the noisy
+                pattern is already known.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : (
+          <div className="space-y-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Rule</TableHead>
+                  <TableHead>Matcher</TableHead>
+                  <TableHead>Action</TableHead>
+                  <TableHead>Matches</TableHead>
+                  <TableHead>Last matched</TableHead>
+                  {showPreviewOnly ? null : <TableHead className="text-right">Actions</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {visibleRules.map((rule) => (
+                  <TableRow key={rule.id}>
+                    <TableCell className="align-top">
+                      <div className="flex min-w-0 flex-col gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium text-foreground">{rule.name}</span>
+                          <Badge variant={rule.enabled ? "success" : "outline"}>
+                            {rule.enabled ? "enabled" : "disabled"}
+                          </Badge>
+                          {rule.expires_at === null ? null : (
+                            <Badge variant="outline">expires {formatDate(rule.expires_at)}</Badge>
                           )}
                         </div>
-                      </TableCell>
-                      <TableCell className="align-top">
-                        <div className="max-w-sm whitespace-normal break-words text-sm leading-6 text-muted-foreground [overflow-wrap:anywhere]">
-                          {formatMatcherSummary(rule)}
+                        {rule.description === null ? null : (
+                          <p className="max-w-xl whitespace-normal text-sm leading-6 text-muted-foreground">
+                            {rule.description}
+                          </p>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <div className="max-w-sm whitespace-normal break-words text-sm leading-6 text-muted-foreground [overflow-wrap:anywhere]">
+                        {formatMatcherSummary(rule)}
+                      </div>
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <Badge variant={getActionVariant(rule.action)}>
+                        {rule.action === "sample"
+                          ? `sample ${formatSampleRate(rule.sample_rate)}`
+                          : rule.action}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="align-top text-muted-foreground">
+                      {rule.hit_count.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="align-top text-muted-foreground">
+                      {rule.last_matched_at === null ? "Never" : formatDate(rule.last_matched_at)}
+                    </TableCell>
+                    {showPreviewOnly ? null : (
+                      <TableCell className="align-top text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={isTogglingRuleId === rule.id}
+                            onClick={() => void handleToggleEnabled(rule)}
+                          >
+                            {rule.enabled ? "Pause" : "Enable"}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setEditingRule(rule);
+                              setDraft(buildDraft(rule));
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setPendingDeleteRule(rule)}
+                          >
+                            Delete
+                          </Button>
                         </div>
                       </TableCell>
-                      <TableCell className="align-top">
-                        <Badge variant={getActionVariant(rule.action)}>
-                          {rule.action === "sample"
-                            ? `sample ${formatSampleRate(rule.sample_rate)}`
-                            : rule.action}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="align-top text-muted-foreground">
-                        {rule.hit_count.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="align-top text-muted-foreground">
-                        {rule.last_matched_at === null ? "Never" : formatDate(rule.last_matched_at)}
-                      </TableCell>
-                      {showPreviewOnly ? null : (
-                        <TableCell className="align-top text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              disabled={isTogglingRuleId === rule.id}
-                              onClick={() => void handleToggleEnabled(rule)}
-                            >
-                              {rule.enabled ? "Pause" : "Enable"}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setEditingRule(rule);
-                                setDraft(buildDraft(rule));
-                              }}
-                            >
-                              Edit
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setPendingDeleteRule(rule)}
-                            >
-                              Delete
-                            </Button>
-                          </div>
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              <CursorPaginationControls
-                page={rulesPage}
-                hasNextPage={rulesPage < rulesPageCount}
-                isLoading={isLoading || isRefreshing}
-                onPreviousPage={() => setRulesPage((current) => Math.max(1, current - 1))}
-                onNextPage={() => setRulesPage((current) => Math.min(rulesPageCount, current + 1))}
-              />
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <CursorPaginationControls
+              page={rulesPage}
+              hasNextPage={rulesPage < rulesPageCount}
+              isLoading={isLoading || isRefreshing}
+              onPreviousPage={() => setRulesPage((current) => Math.max(1, current - 1))}
+              onNextPage={() => setRulesPage((current) => Math.min(rulesPageCount, current + 1))}
+            />
+          </div>
+        )}
+      </CollapsibleCard>
 
       <Dialog
         open={editingRule !== null}

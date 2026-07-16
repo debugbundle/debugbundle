@@ -52,9 +52,11 @@ export async function runWorkerProcessStep<Result extends { processed: boolean; 
 }
 
 export interface ClaimTrackingWorkerQueue extends WorkerQueue {
+  acquireLease(key: string, ttlSeconds: number): Promise<boolean>;
   ackClaimedJobs(): Promise<void>;
   close(): Promise<void>;
   dropClaimedJobs(): void;
+  releaseLease(key: string): Promise<void>;
 }
 
 export function createClaimTrackingWorkerQueue(queue: RedisQueueClient): ClaimTrackingWorkerQueue {

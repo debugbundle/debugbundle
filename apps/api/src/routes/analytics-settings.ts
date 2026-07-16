@@ -15,7 +15,7 @@ import { requireRateLimitedProjectAccess } from "../api-helpers.js";
 import { recordAuditLog, resolveAuditActorType } from "../audit-logging.js";
 import { ProjectParamsSchema } from "../schemas.js";
 
-function buildDefaultSettings(): AnalyticsSettings {
+function buildDefaultSettings(capabilities: TierCapabilities): AnalyticsSettings {
   return {
     enabled: false,
     privacy_mode: "strict",
@@ -27,9 +27,10 @@ function buildDefaultSettings(): AnalyticsSettings {
     journey_sample_rate: 0,
     raw_retention_days: 1,
     sample_retention_days: 7,
+    hourly_retention_days: capabilities.analytics_hourly_retention_days,
     aggregate_retention_months: 12,
-    max_saved_funnels: 3,
-    max_custom_dimensions: 0,
+    max_saved_funnels: capabilities.max_analytics_saved_funnels,
+    max_custom_dimensions: capabilities.max_analytics_custom_dimensions,
     approved_custom_dimensions: []
   };
 }
@@ -49,7 +50,8 @@ function buildResponse(input: {
 function hasCustomDimensionUpdate(update: AnalyticsSettingsUpdate): boolean {
   return (
     (update.max_custom_dimensions !== undefined && update.max_custom_dimensions > 0) ||
-    (update.approved_custom_dimensions !== undefined && update.approved_custom_dimensions.length > 0)
+    (update.approved_custom_dimensions !== undefined &&
+      update.approved_custom_dimensions.length > 0)
   );
 }
 
@@ -78,12 +80,17 @@ function exceedsTierAnalyticsSettingsLimits(input: {
       update.max_saved_funnels > capabilities.max_analytics_saved_funnels) ||
     (update.max_custom_dimensions !== undefined &&
       update.max_custom_dimensions > capabilities.max_analytics_custom_dimensions) ||
+    (update.hourly_retention_days !== undefined &&
+      update.hourly_retention_days > capabilities.analytics_hourly_retention_days) ||
     (update.approved_custom_dimensions !== undefined &&
       update.approved_custom_dimensions.length > capabilities.max_analytics_custom_dimensions)
   );
 }
 
-export function registerAnalyticsSettingsRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
+export function registerAnalyticsSettingsRoutes(
+  app: FastifyInstance,
+  dependencies: ApiDependencies
+): void {
   app.get("/v1/projects/:id/analytics-settings", async (request, reply) => {
     const parsedParams = ProjectParamsSchema.safeParse(request.params);
     if (!parsedParams.success) {
@@ -99,15 +106,18 @@ export function registerAnalyticsSettingsRoutes(app: FastifyInstance, dependenci
     }
 
     const accessMode: AnalyticsSettingsResponse["access_mode"] =
-      auth.access.effective_role === "owner" || auth.access.effective_role === "admin" ? "manage" : "preview";
-    const analyticsAvailable = getTierCapabilities(auth.access.organization_plan).analytics_bundle;
+      auth.access.effective_role === "owner" || auth.access.effective_role === "admin"
+        ? "manage"
+        : "preview";
+    const capabilities = getTierCapabilities(auth.access.organization_plan);
+    const analyticsAvailable = capabilities.analytics_bundle;
 
     if (dependencies.analyticsSettingsManagement === undefined) {
       return reply.status(200).send(
         buildResponse({
           accessMode,
           analyticsAvailable,
-          settings: buildDefaultSettings()
+          settings: buildDefaultSettings(capabilities)
         })
       );
     }
@@ -157,7 +167,10 @@ export function registerAnalyticsSettingsRoutes(app: FastifyInstance, dependenci
       return reply.status(403).send({ error: "upgrade_required" });
     }
 
-    if (hasCustomDimensionUpdate(parsedBody.data) && auth.access.organization_plan !== "team") {
+    if (
+      hasCustomDimensionUpdate(parsedBody.data) &&
+      capabilities.max_analytics_custom_dimensions === 0
+    ) {
       return reply.status(403).send({ error: "upgrade_required" });
     }
 
@@ -170,10 +183,11 @@ export function registerAnalyticsSettingsRoutes(app: FastifyInstance, dependenci
     }
 
     if (requiresCurrentCustomDimensionSettings(parsedBody.data)) {
-      const currentSettings = await dependencies.analyticsSettingsManagement.getAnalyticsSettingsForProject({
-        organization_id: auth.access.organization_id,
-        project_id: parsedParams.data.id
-      });
+      const currentSettings =
+        await dependencies.analyticsSettingsManagement.getAnalyticsSettingsForProject({
+          organization_id: auth.access.organization_id,
+          project_id: parsedParams.data.id
+        });
       if (currentSettings === null) {
         return reply.status(404).send({ error: "project_not_found" });
       }
@@ -184,13 +198,22 @@ export function registerAnalyticsSettingsRoutes(app: FastifyInstance, dependenci
       if (!mergedSettings.success) {
         return reply.status(400).send({ error: "invalid_payload" });
       }
+      if (
+        exceedsTierAnalyticsSettingsLimits({
+          capabilities,
+          update: mergedSettings.data
+        })
+      ) {
+        return reply.status(403).send({ error: "upgrade_required" });
+      }
     }
 
-    const settings = await dependencies.analyticsSettingsManagement.updateAnalyticsSettingsForProject({
-      organization_id: auth.access.organization_id,
-      project_id: parsedParams.data.id,
-      update: parsedBody.data
-    });
+    const settings =
+      await dependencies.analyticsSettingsManagement.updateAnalyticsSettingsForProject({
+        organization_id: auth.access.organization_id,
+        project_id: parsedParams.data.id,
+        update: parsedBody.data
+      });
     if (settings === null) {
       await recordAuditLog(dependencies.auditLogging, {
         organization_id: auth.access.organization_id,

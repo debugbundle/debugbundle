@@ -8,7 +8,6 @@ import {
   AppliedAnalyticsFilterList,
   type AppliedAnalyticsFilter
 } from "../components/system/analytics-filter-panel.js";
-import { PlanUpgradeCallout } from "../components/system/plan-upgrade-callout.js";
 import {
   ProjectScopeSelect,
   useProjectScopeOptions
@@ -157,10 +156,9 @@ export function ProjectAnalyticsLayout(): JSX.Element {
 
   if (!settings.analytics_available) {
     return (
-      <PlanUpgradeCallout
-        title="Upgrade to Solo or Team to unlock product analytics"
-        description="Product analytics capture, aggregate metrics, journey evidence, and analytics bundles are available on paid plans."
-      />
+      <Notice title="Product analytics unavailable">
+        Product analytics availability could not be resolved for this project.
+      </Notice>
     );
   }
 

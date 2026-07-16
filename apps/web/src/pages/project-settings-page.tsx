@@ -138,24 +138,31 @@ export function ProjectSettingsPage(): JSX.Element {
 
   return (
     <div className="space-y-4">
-      <ProjectCapturePolicyCard projectId={project.project_id} organizationPlan={project.organization_plan} canEdit={canManageProject} />
-      <ProjectCaptureRulesCard
-        projectId={project.project_id}
-        environmentDefault={project.environment_default}
-        canEdit={canManageProject}
-      />
-      <ProjectImprovementSettingsCard
-        projectId={project.project_id}
-        organizationPlan={project.organization_plan}
-        canEdit={canManageProject}
-      />
-      <ProjectAnalyticsSettingsCard
-        projectId={project.project_id}
-        organizationPlan={project.organization_plan}
-        canEdit={canManageProject}
-      />
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] xl:items-start">
+        <div className="space-y-4">
+          <ProjectCapturePolicyCard projectId={project.project_id} organizationPlan={project.organization_plan} canEdit={canManageProject} />
+          <ProjectCaptureRulesCard
+            projectId={project.project_id}
+            environmentDefault={project.environment_default}
+            canEdit={canManageProject}
+          />
+          <ProjectImprovementSettingsCard
+            projectId={project.project_id}
+            organizationPlan={project.organization_plan}
+            canEdit={canManageProject}
+          />
+          <ProjectAnalyticsSettingsCard
+            projectId={project.project_id}
+            organizationPlan={project.organization_plan}
+            canEdit={canManageProject}
+          />
+          <ProjectWeeklyReportSettingsCard
+            projectId={project.project_id}
+            organizationPlan={project.organization_plan}
+            canEdit={canManageProject}
+          />
+        </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-4">
           <Card>
             <CardHeader>
@@ -178,14 +185,6 @@ export function ProjectSettingsPage(): JSX.Element {
               </div>
             </CardContent>
           </Card>
-          <ProjectWeeklyReportSettingsCard
-            projectId={project.project_id}
-            organizationPlan={project.organization_plan}
-            canEdit={canManageProject}
-          />
-        </div>
-
-        <div className="space-y-4">
         {effectiveRole === "member" ? null : (
         <Card className="border-destructive/25 bg-destructive/5">
           <CardHeader>

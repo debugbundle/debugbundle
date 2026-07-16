@@ -28,6 +28,7 @@ export const ANALYTICS_SETTINGS_MCP_TOOL_CATALOG = [
         journey_sample_rate: z.number().min(0).max(1).optional(),
         raw_retention_days: z.number().int().min(1).max(30).optional(),
         sample_retention_days: z.number().int().min(1).max(365).optional(),
+        hourly_retention_days: z.number().int().min(1).max(365).optional(),
         aggregate_retention_months: z.number().int().min(1).max(120).optional(),
         max_saved_funnels: z.number().int().min(0).max(100).optional(),
         max_custom_dimensions: z.number().int().min(0).max(20).optional(),

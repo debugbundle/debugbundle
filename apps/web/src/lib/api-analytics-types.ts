@@ -26,6 +26,7 @@ export interface ProjectAnalyticsSettings {
   journey_sample_rate: number;
   raw_retention_days: number;
   sample_retention_days: number;
+  hourly_retention_days: number;
   aggregate_retention_months: number;
   max_saved_funnels: number;
   max_custom_dimensions: number;
@@ -307,6 +308,7 @@ export type ProjectAnalyticsBundleResponse =
 
 export interface ProjectAnalyticsBundleCreateInput {
   analysisKind: AnalyticsBundleAnalysisKind;
+  opportunityId?: string;
   last?: "7d" | "30d" | "90d";
   from?: string;
   to?: string;

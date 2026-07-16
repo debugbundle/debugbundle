@@ -63,7 +63,7 @@ describe("analytics opportunity store", () => {
         "2026-07-08T00:00:00.000Z",
         "2026-07-07T00:00:00.000Z",
         OPPORTUNITY_ID,
-        1
+        2
       ]);
 
       return { rows: [opportunityRow] };
@@ -116,7 +116,7 @@ describe("analytics opportunity store", () => {
         bundle_updated_at: "2026-07-07T00:02:00.000Z",
         bundle_failure_reason: null
       }],
-      next_cursor: `2026-07-07T00:00:00.000Z|${OPPORTUNITY_ID}`
+      next_cursor: null
     });
   });
 
@@ -128,7 +128,7 @@ describe("analytics opportunity store", () => {
       expect(params).toEqual([
         ORGANIZATION_ID,
         PROJECT_ID,
-        10
+        11
       ]);
 
       return { rows: [] };
@@ -155,7 +155,7 @@ describe("analytics opportunity store", () => {
         ORGANIZATION_ID,
         "2026-07-07T00:00:00.000Z",
         OPPORTUNITY_ID,
-        1
+        2
       ]);
       return { rows: [opportunityRow] };
     });
@@ -172,8 +172,30 @@ describe("analytics opportunity store", () => {
       })
     ).resolves.toMatchObject({
       opportunities: [{ opportunity_id: OPPORTUNITY_ID, project_name: "Marketing site" }],
+      next_cursor: null
+    });
+  });
+
+  it("uses the last visible opportunity as the cursor only when another row exists", async (): Promise<void> => {
+    const overflowRow = {
+      ...opportunityRow,
+      opportunity_id: "66666666-6666-4666-8666-666666666666",
+      last_detected_at: "2026-07-06T00:00:00.000Z"
+    };
+    const queryMock = vi.fn().mockResolvedValue({ rows: [opportunityRow, overflowRow] });
+    const store = createPostgresAnalyticsOpportunityStore({ query: queryMock as Queryable["query"] });
+
+    await expect(
+      store.listAnalyticsOpportunitiesForProject({
+        organization_id: ORGANIZATION_ID,
+        project_id: PROJECT_ID,
+        limit: 1
+      })
+    ).resolves.toMatchObject({
+      opportunities: [{ opportunity_id: OPPORTUNITY_ID }],
       next_cursor: `2026-07-07T00:00:00.000Z|${OPPORTUNITY_ID}`
     });
+    expect(queryMock).toHaveBeenCalledWith(expect.any(String), [ORGANIZATION_ID, PROJECT_ID, 2]);
   });
 
   it("gets one project analytics opportunity or null", async (): Promise<void> => {

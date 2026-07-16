@@ -3,9 +3,12 @@ import { gunzipSync, gzipSync } from "node:zlib";
 
 import type {
   AnalyticsEventEnvelope,
+  AnalyticsJourneySampleArtifact,
+  AnalyticsJourneySampleEvent,
   AnalyticsSettings
 } from "../../../packages/shared-types/src/index.js";
 import {
+  AnalyticsJourneySampleArtifactSchema,
   getTierCapabilities,
   isSelfHostMode
 } from "../../../packages/shared-types/src/index.js";
@@ -21,7 +24,6 @@ import {
   type ObjectStoreReader
 } from "../../../packages/storage/src/index.js";
 
-const JOURNEY_SAMPLE_SCHEMA_VERSION = "analytics_journey_sample.v1";
 const MAX_JOURNEY_EVENTS = 100;
 const EDGE_EVENT_COUNT = 50;
 
@@ -29,43 +31,22 @@ export interface AnalyticsJourneySampleCaptureDependencies {
   analyticsSettingsStore: Pick<AnalyticsSettingsStore, "getAnalyticsSettingsByProjectId">;
   analyticsJourneySampleStore: Pick<
     AnalyticsJourneySampleStore,
-    "reserveAnalyticsJourneySample" | "recordAnalyticsJourneySample" | "deleteAnalyticsJourneySampleForProject"
+    | "reserveAnalyticsJourneySample"
+    | "recordAnalyticsJourneySample"
+    | "deleteAnalyticsJourneySampleForProject"
   >;
-  analyticsUsageStore?: Pick<
-    AnalyticsUsageStore,
-    "claimAnalyticsUsageForOrganization" | "releaseAnalyticsUsageForOrganization"
-  > | undefined;
+  analyticsUsageStore?:
+    | Pick<
+        AnalyticsUsageStore,
+        "claimAnalyticsUsageForOrganization" | "releaseAnalyticsUsageForOrganization"
+      >
+    | undefined;
   billingStore?: Pick<BillingStore, "getBillingSummaryForOrganization"> | undefined;
   resolveOrganizationIdForProject?: ((projectId: string) => Promise<string | null>) | undefined;
-  objectStore: Pick<ObjectStoreReader, "getObject"> & Pick<ObjectStoreClient, "putObject" | "deleteObject">;
-}
-
-export interface AnalyticsJourneySampleArtifact {
-  schema_version: typeof JOURNEY_SAMPLE_SCHEMA_VERSION;
-  sample_id: string;
-  project_id: string;
-  service: string;
-  environment: string;
-  session_id_hash: string;
-  visitor_id_hash: string | null;
-  first_seen_at: string;
-  last_seen_at: string;
-  analysis_tags: string[];
-  dimensions_summary: Record<string, unknown>;
-  events: AnalyticsJourneySampleEvent[];
-}
-
-interface AnalyticsJourneySampleEvent {
-  event_id: string;
-  occurred_at: string;
-  kind: AnalyticsEventEnvelope["payload"]["kind"];
-  route: AnalyticsEventEnvelope["payload"]["route"] | null;
-  previous_route: AnalyticsEventEnvelope["payload"]["previous_route"] | null;
-  signal: NonNullable<AnalyticsEventEnvelope["payload"]["signal"]> | null;
-  trace_id: string | null;
-  deploy_id: string | null;
-  dimensions: AnalyticsEventEnvelope["payload"]["dimensions"];
-  custom_dimensions: NonNullable<AnalyticsEventEnvelope["payload"]["custom_dimensions"]>;
+  acquireLease(key: string, ttlSeconds: number): Promise<boolean>;
+  releaseLease(key: string): Promise<void>;
+  objectStore: Pick<ObjectStoreReader, "getObject"> &
+    Pick<ObjectStoreClient, "putObject" | "deleteObject">;
 }
 
 export async function maybeCaptureAnalyticsJourneySample(input: {
@@ -77,7 +58,9 @@ export async function maybeCaptureAnalyticsJourneySample(input: {
     return { captured: false, reason: "journey_sample_capture_unavailable" };
   }
 
-  const settings = await input.dependencies.analyticsSettingsStore.getAnalyticsSettingsByProjectId(input.project_id);
+  const settings = await input.dependencies.analyticsSettingsStore.getAnalyticsSettingsByProjectId(
+    input.project_id
+  );
   if (settings === null || !settings.enabled) {
     return { captured: false, reason: "analytics_disabled" };
   }
@@ -90,63 +73,86 @@ export async function maybeCaptureAnalyticsJourneySample(input: {
     return { captured: false, reason: "journey_sample_sampled_out" };
   }
 
-  const objectKey = buildAnalyticsJourneyObjectKey(input.project_id, sampleId);
-  const eventSample = toJourneySampleEvent(input.event);
-  const existing = await readExistingArtifact(input.dependencies.objectStore, objectKey);
-  const artifact = mergeJourneySampleArtifact({
-    existing,
-    project_id: input.project_id,
-    sample_id: sampleId,
-    event: input.event,
-    eventSample
-  });
-  const sampleRecord = toJourneySampleRecord({
-    project_id: input.project_id,
-    event: input.event,
-    artifact,
-    objectKey,
-    settings
-  });
-  const reservation = await input.dependencies.analyticsJourneySampleStore.reserveAnalyticsJourneySample(sampleRecord);
-  const quotaClaim = reservation === "created"
-    ? await claimRetainedJourneySampleQuota({
-        project_id: input.project_id,
-        dependencies: input.dependencies
-      })
-    : { allowed: true as const };
-  if (!quotaClaim.allowed) {
-    await input.dependencies.analyticsJourneySampleStore.deleteAnalyticsJourneySampleForProject({
-      project_id: input.project_id,
-      sample_id: sampleId
-    });
-    return { captured: false, reason: "journey_sample_quota_exceeded" };
+  const leaseKey = `leases:analytics-journey:${input.project_id}:${sampleId}`;
+  const leaseAcquired = await input.dependencies.acquireLease(leaseKey, 30);
+  if (!leaseAcquired) {
+    return { captured: false, reason: "journey_sample_update_in_progress" };
   }
 
   try {
-    await input.dependencies.objectStore.putObject({
-      key: objectKey,
-      body: gzipSync(Buffer.from(JSON.stringify(artifact), "utf8")),
-      contentType: "application/json",
-      contentEncoding: "gzip"
+    const objectKey = buildAnalyticsJourneyObjectKey(input.project_id, sampleId);
+    const eventSample = toJourneySampleEvent(input.event);
+    const existing = await readExistingArtifact(input.dependencies.objectStore, objectKey);
+    const artifact = mergeJourneySampleArtifact({
+      existing,
+      project_id: input.project_id,
+      sample_id: sampleId,
+      event: input.event,
+      eventSample
     });
-
-    await input.dependencies.analyticsJourneySampleStore.recordAnalyticsJourneySample(sampleRecord);
-  } catch (error) {
-    if (reservation === "created") {
-      await releaseRetainedJourneySampleQuotaBestEffort({
-        dependencies: input.dependencies,
-        release: quotaClaim.release
-      });
+    const sampleRecord = toJourneySampleRecord({
+      project_id: input.project_id,
+      event: input.event,
+      artifact,
+      objectKey,
+      settings
+    });
+    const reservation =
+      await input.dependencies.analyticsJourneySampleStore.reserveAnalyticsJourneySample(
+        sampleRecord
+      );
+    const quotaClaim =
+      reservation === "created"
+        ? await claimRetainedJourneySampleQuota({
+            project_id: input.project_id,
+            sample_id: sampleId,
+            dependencies: input.dependencies
+          })
+        : { allowed: true as const };
+    if (!quotaClaim.allowed) {
       await input.dependencies.analyticsJourneySampleStore.deleteAnalyticsJourneySampleForProject({
         project_id: input.project_id,
         sample_id: sampleId
-      }).catch(() => undefined);
-      await input.dependencies.objectStore.deleteObject?.({ key: objectKey }).catch(() => undefined);
+      });
+      return { captured: false, reason: "journey_sample_quota_exceeded" };
     }
-    throw error;
-  }
 
-  return { captured: true };
+    try {
+      await input.dependencies.objectStore.putObject({
+        key: objectKey,
+        body: gzipSync(Buffer.from(JSON.stringify(artifact), "utf8")),
+        contentType: "application/json",
+        contentEncoding: "gzip"
+      });
+
+      await input.dependencies.analyticsJourneySampleStore.recordAnalyticsJourneySample(
+        sampleRecord
+      );
+    } catch (error) {
+      if (reservation === "created") {
+        await releaseRetainedJourneySampleQuotaBestEffort({
+          dependencies: input.dependencies,
+          release: quotaClaim.release
+        });
+        await input.dependencies.analyticsJourneySampleStore
+          .deleteAnalyticsJourneySampleForProject({
+            project_id: input.project_id,
+            sample_id: sampleId
+          })
+          .catch(() => undefined);
+        await input.dependencies.objectStore
+          .deleteObject?.({ key: objectKey })
+          .catch(() => undefined);
+      }
+      throw error;
+    }
+
+    return { captured: true };
+  } finally {
+    if (leaseAcquired) {
+      await input.dependencies.releaseLease(leaseKey).catch(() => undefined);
+    }
+  }
 }
 
 function toJourneySampleRecord(input: {
@@ -185,6 +191,7 @@ type RetainedJourneySampleQuotaRelease = {
   analytics_sessions: number;
   analytics_journey_samples: number;
   analytics_bundle_generations: number;
+  claim_keys?: string[];
 };
 
 type RetainedJourneySampleQuotaClaim =
@@ -193,6 +200,7 @@ type RetainedJourneySampleQuotaClaim =
 
 async function claimRetainedJourneySampleQuota(input: {
   project_id: string;
+  sample_id: string;
   dependencies: AnalyticsJourneySampleCaptureDependencies;
 }): Promise<RetainedJourneySampleQuotaClaim> {
   if (
@@ -229,15 +237,25 @@ async function claimRetainedJourneySampleQuota(input: {
   const caps = getTierCapabilities(billingSummary.plan);
   const claim = await input.dependencies.analyticsUsageStore.claimAnalyticsUsageForOrganization({
     ...release,
+    claims: [{ claim_key: `journey:${input.sample_id}`, metric: "analytics_journey_samples" }],
     limits: {
       monthly_analytics_events: caps.monthly_analytics_events * capacityUnits,
       monthly_analytics_sessions: caps.monthly_analytics_sessions * capacityUnits,
       monthly_analytics_journey_samples: caps.monthly_analytics_journey_samples * capacityUnits,
-      monthly_analytics_bundle_generations: caps.monthly_analytics_bundle_generations * capacityUnits
+      monthly_analytics_bundle_generations:
+        caps.monthly_analytics_bundle_generations * capacityUnits
     }
   });
 
-  return claim.allowed ? { allowed: true, release } : { allowed: false };
+  return claim.allowed
+    ? {
+        allowed: true,
+        release: {
+          ...release,
+          ...(claim.claimed_keys === undefined ? {} : { claim_keys: claim.claimed_keys })
+        }
+      }
+    : { allowed: false };
 }
 
 async function releaseRetainedJourneySampleQuotaBestEffort(input: {
@@ -248,10 +266,15 @@ async function releaseRetainedJourneySampleQuotaBestEffort(input: {
     return;
   }
 
-  await input.dependencies.analyticsUsageStore.releaseAnalyticsUsageForOrganization(input.release).catch(() => undefined);
+  await input.dependencies.analyticsUsageStore
+    .releaseAnalyticsUsageForOrganization(input.release)
+    .catch(() => undefined);
 }
 
-export function buildAnalyticsJourneySampleId(projectId: string, event: AnalyticsEventEnvelope): string {
+export function buildAnalyticsJourneySampleId(
+  projectId: string,
+  event: AnalyticsEventEnvelope
+): string {
   const day = getUtcDay(event.occurred_at);
   const hex = createHash("sha256")
     .update(`${projectId}\0${event.correlation.session_id}\0${day}`, "utf8")
@@ -282,16 +305,20 @@ function mergeJourneySampleArtifact(input: {
   const events = trimJourneyEvents([...eventsById.values()].sort(compareJourneyEvents));
   const firstSeenAt = events[0]?.occurred_at ?? input.event.occurred_at;
   const lastSeenAt = events.at(-1)?.occurred_at ?? input.event.occurred_at;
-  const analysisTags = mergeTags(input.existing?.analysis_tags ?? [], buildAnalysisTags(input.event));
+  const analysisTags = mergeTags(
+    input.existing?.analysis_tags ?? [],
+    buildAnalysisTags(input.event)
+  );
 
   return {
-    schema_version: JOURNEY_SAMPLE_SCHEMA_VERSION,
+    schema_version: "analytics_journey_sample.v1",
     sample_id: input.sample_id,
     project_id: input.project_id,
     service: input.event.service.name,
     environment: input.event.service.environment,
     session_id_hash: hashAnalyticsIdentifier(input.event.correlation.session_id),
-    visitor_id_hash: input.event.correlation.visitor_id_hash ?? input.existing?.visitor_id_hash ?? null,
+    visitor_id_hash:
+      input.event.correlation.visitor_id_hash ?? input.existing?.visitor_id_hash ?? null,
     first_seen_at: firstSeenAt,
     last_seen_at: lastSeenAt,
     analysis_tags: analysisTags,
@@ -310,8 +337,9 @@ async function readExistingArtifact(
   try {
     const compressed = await objectStore.getObject({ key: objectKey });
     const parsed = JSON.parse(gunzipSync(compressed).toString("utf8")) as unknown;
-    if (isJourneySampleArtifact(parsed)) {
-      return parsed;
+    const artifact = AnalyticsJourneySampleArtifactSchema.safeParse(parsed);
+    if (artifact.success) {
+      return artifact.data;
     }
     throw new Error("analytics_journey_sample_artifact_invalid");
   } catch (error) {
@@ -320,17 +348,6 @@ async function readExistingArtifact(
     }
     throw error;
   }
-}
-
-function isJourneySampleArtifact(value: unknown): value is AnalyticsJourneySampleArtifact {
-  if (typeof value !== "object" || value === null) {
-    return false;
-  }
-  const candidate = value as Partial<AnalyticsJourneySampleArtifact>;
-  return candidate.schema_version === JOURNEY_SAMPLE_SCHEMA_VERSION &&
-    typeof candidate.sample_id === "string" &&
-    typeof candidate.project_id === "string" &&
-    Array.isArray(candidate.events);
 }
 
 function toJourneySampleEvent(event: AnalyticsEventEnvelope): AnalyticsJourneySampleEvent {
@@ -351,7 +368,8 @@ function toJourneySampleEvent(event: AnalyticsEventEnvelope): AnalyticsJourneySa
 function buildAnalysisTags(event: AnalyticsEventEnvelope): string[] {
   const tags = [event.payload.kind, `auth:${event.payload.dimensions.auth_state}`];
   const routeKey = event.payload.route?.normalized_path ?? event.payload.route?.path ?? null;
-  const previousRouteKey = event.payload.previous_route?.normalized_path ?? event.payload.previous_route?.path ?? null;
+  const previousRouteKey =
+    event.payload.previous_route?.normalized_path ?? event.payload.previous_route?.path ?? null;
   if (routeKey !== null) {
     tags.push(`route:${routeKey}`);
   }
@@ -375,10 +393,14 @@ function buildAnalysisTags(event: AnalyticsEventEnvelope): string[] {
 }
 
 function mergeTags(existing: string[], next: string[]): string[] {
-  return [...new Set([...existing, ...next])].sort((left, right) => left.localeCompare(right)).slice(0, 50);
+  return [...new Set([...existing, ...next])]
+    .sort((left, right) => left.localeCompare(right))
+    .slice(0, 50);
 }
 
-function buildDimensionsSummary(event: AnalyticsEventEnvelope): Record<string, unknown> {
+function buildDimensionsSummary(
+  event: AnalyticsEventEnvelope
+): AnalyticsJourneySampleArtifact["dimensions_summary"] {
   return {
     auth_state: event.payload.dimensions.auth_state,
     device_type: event.payload.dimensions.device_type,
@@ -402,13 +424,13 @@ function trimJourneyEvents(events: AnalyticsJourneySampleEvent[]): AnalyticsJour
     return events;
   }
 
-  return [
-    ...events.slice(0, EDGE_EVENT_COUNT),
-    ...events.slice(events.length - EDGE_EVENT_COUNT)
-  ];
+  return [...events.slice(0, EDGE_EVENT_COUNT), ...events.slice(events.length - EDGE_EVENT_COUNT)];
 }
 
-function compareJourneyEvents(left: AnalyticsJourneySampleEvent, right: AnalyticsJourneySampleEvent): number {
+function compareJourneyEvents(
+  left: AnalyticsJourneySampleEvent,
+  right: AnalyticsJourneySampleEvent
+): number {
   const timestampCompare = left.occurred_at.localeCompare(right.occurred_at);
   return timestampCompare === 0 ? left.event_id.localeCompare(right.event_id) : timestampCompare;
 }

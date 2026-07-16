@@ -261,7 +261,7 @@ export function ProjectAnalyticsSavedFunnelsSection({
 
       {atLimit && canManage && !isLoading ? (
         <Notice title="Saved funnel limit reached">
-          Archive an active funnel or increase the project limit before creating another.
+          Archive an active funnel before creating another.
         </Notice>
       ) : null}
 

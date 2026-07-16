@@ -88,6 +88,155 @@
       }
     },
     {
+      "id": "valid-analytics-event",
+      "kind": "handler",
+      "relayOptions": {
+        "projectMode": "local-only"
+      },
+      "request": {
+        "method": "POST",
+        "headers": {
+          "content-type": "application/json; charset=utf-8",
+          "host": "app.example.com",
+          "origin": "https://app.example.com"
+        },
+        "ipAddress": "203.0.113.14",
+        "bodyJson": {
+          "batch": [
+            {
+              "schema_version": "2026-07-analytics-01",
+              "event_id": "00000000-0000-4000-8000-000000000405",
+              "event_type": "analytics_event",
+              "project_token": "dbundle_proj_browser_should_not_pass",
+              "sdk_name": "spoofed-browser-sdk",
+              "sdk_version": "1.5.0",
+              "occurred_at": "2026-07-16T09:00:00.000Z",
+              "service": {
+                "name": "checkout-web",
+                "runtime": "browser",
+                "framework": "react",
+                "environment": "production"
+              },
+              "correlation": {
+                "session_id": "session_analytics_001",
+                "visitor_id_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "user_id_hash": null,
+                "trace_id": "trace_analytics_001",
+                "deploy_id": "deploy_2026_07_16"
+              },
+              "payload": {
+                "kind": "page_view",
+                "privacy": {
+                  "mode": "standard",
+                  "consent_granted": true
+                },
+                "signal": {
+                  "action_key": null,
+                  "funnel_key": null,
+                  "step_key": null,
+                  "conversion_key": null,
+                  "marker_key": null
+                },
+                "route": {
+                  "path": "/checkout",
+                  "normalized_path": "/checkout",
+                  "title": "Checkout"
+                },
+                "dimensions": {
+                  "auth_state": "authenticated",
+                  "device_type": "desktop",
+                  "browser_family": "Chrome",
+                  "browser_major": 135,
+                  "os_family": "macOS",
+                  "os_major": 15,
+                  "language": "en",
+                  "locale": "en-US",
+                  "viewport_bucket": "large",
+                  "referrer_domain": "example.com",
+                  "utm_source": null,
+                  "utm_medium": null,
+                  "utm_campaign": null,
+                  "country_code": null,
+                  "region_code": null
+                },
+                "custom_dimensions": {
+                  "account_tier": "team"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "expected": {
+        "status": 202,
+        "accepted": 1,
+        "rejected": 0,
+        "errors": []
+      },
+      "expectedEventFile": [
+        {
+          "schema_version": "2026-07-analytics-01",
+          "event_id": "00000000-0000-4000-8000-000000000405",
+          "event_type": "analytics_event",
+          "sdk_name": "@debugbundle/sdk-browser",
+          "sdk_version": "1.5.0",
+          "occurred_at": "2026-07-16T09:00:00.000Z",
+          "service": {
+            "name": "checkout-web",
+            "runtime": "browser",
+            "framework": "react",
+            "environment": "production"
+          },
+          "correlation": {
+            "session_id": "session_analytics_001",
+            "visitor_id_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "user_id_hash": null,
+            "trace_id": "trace_analytics_001",
+            "deploy_id": "deploy_2026_07_16"
+          },
+          "payload": {
+            "kind": "page_view",
+            "privacy": {
+              "mode": "standard",
+              "consent_granted": true
+            },
+            "signal": {
+              "action_key": null,
+              "funnel_key": null,
+              "step_key": null,
+              "conversion_key": null,
+              "marker_key": null
+            },
+            "route": {
+              "path": "/checkout",
+              "normalized_path": "/checkout",
+              "title": "Checkout"
+            },
+            "dimensions": {
+              "auth_state": "authenticated",
+              "device_type": "desktop",
+              "browser_family": "Chrome",
+              "browser_major": 135,
+              "os_family": "macOS",
+              "os_major": 15,
+              "language": "en",
+              "locale": "en-US",
+              "viewport_bucket": "large",
+              "referrer_domain": "example.com",
+              "utm_source": null,
+              "utm_medium": null,
+              "utm_campaign": null,
+              "country_code": null,
+              "region_code": null
+            },
+            "custom_dimensions": {
+              "account_tier": "team"
+            }
+          }
+        }
+      ]
+    },
+    {
       "id": "mixed-valid-invalid-batch",
       "kind": "handler",
       "request": {

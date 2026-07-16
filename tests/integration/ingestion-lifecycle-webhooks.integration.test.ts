@@ -754,7 +754,7 @@ runIntegration("ingestion integration \u2013 lifecycle webhooks", () => {
       project_id: projectId,
       event_id: eventId,
       event_type: "request_event" as const,
-      event_class: "context_signal" as const,
+      event_class: "incident_signal" as const,
       service_name: "checkout-api",
       environment: "production",
       fingerprint: "fp_non_regression_overlap_replay",

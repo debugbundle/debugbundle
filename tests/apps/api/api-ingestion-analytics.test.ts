@@ -23,6 +23,7 @@ function createSettings(overrides: Partial<AnalyticsSettings> = {}): AnalyticsSe
     journey_sample_rate: 0,
     raw_retention_days: 1,
     sample_retention_days: 7,
+    hourly_retention_days: 30,
     aggregate_retention_months: 12,
     max_saved_funnels: 3,
     max_custom_dimensions: 0,
@@ -36,11 +37,16 @@ function createAnalyticsEvent(input: {
   kind?: AnalyticsEventEnvelope["payload"]["kind"];
   sessionId?: string;
   customDimensions?: Record<string, string>;
+  privacy?: AnalyticsEventEnvelope["payload"]["privacy"];
+  projectToken?: string;
+  visitorIdHash?: string | null;
+  userIdHash?: string | null;
 }): AnalyticsEventEnvelope {
   return {
     schema_version: "2026-07-analytics-01",
     event_id: input.eventId,
     event_type: "analytics_event",
+    ...(input.projectToken === undefined ? {} : { project_token: input.projectToken }),
     occurred_at: "2026-03-10T13:45:27.000Z",
     sdk_name: "@debugbundle/sdk-browser",
     sdk_version: "1.0.0",
@@ -52,13 +58,14 @@ function createAnalyticsEvent(input: {
     },
     correlation: {
       session_id: input.sessionId ?? "sess_123",
-      visitor_id_hash: null,
-      user_id_hash: null,
+      visitor_id_hash: input.visitorIdHash ?? null,
+      user_id_hash: input.userIdHash ?? null,
       trace_id: null,
       deploy_id: null
     },
     payload: {
       kind: input.kind ?? "page_view",
+      privacy: input.privacy ?? { mode: "strict", consent_granted: false },
       route: {
         path: "/pricing",
         normalized_path: "/pricing",
@@ -104,18 +111,24 @@ function createDebugEvent() {
   });
 }
 
-function createDependencies(overrides: {
-  analyticsSettings?: AnalyticsSettings | null;
-  organizationPlan?: "free" | "solo" | "team";
-  persistAndEnqueue?: ApiServerDependencies["ingestionPersistence"]["persistAndEnqueue"];
-  persistAnalyticsAndEnqueue?: NonNullable<ApiServerDependencies["ingestionPersistence"]["persistAnalyticsAndEnqueue"]>;
-  claimEvents?: NonNullable<ApiServerDependencies["ingestionRateLimiter"]>["claimEvents"];
-  billingManagement?: ApiServerDependencies["billingManagement"];
-  analyticsUsage?: ApiServerDependencies["analyticsUsage"];
-} = {}): ReturnType<typeof createApiServer> {
+function createDependencies(
+  overrides: {
+    analyticsSettings?: AnalyticsSettings | null;
+    organizationPlan?: "free" | "solo" | "team";
+    persistAndEnqueue?: ApiServerDependencies["ingestionPersistence"]["persistAndEnqueue"];
+    persistAnalyticsAndEnqueue?: NonNullable<
+      ApiServerDependencies["ingestionPersistence"]["persistAnalyticsAndEnqueue"]
+    >;
+    claimEvents?: NonNullable<ApiServerDependencies["ingestionRateLimiter"]>["claimEvents"];
+    billingManagement?: ApiServerDependencies["billingManagement"];
+    analyticsUsage?: ApiServerDependencies["analyticsUsage"];
+  } = {}
+): ReturnType<typeof createApiServer> {
   return createApiServer({
     ingestionPersistence: {
-      persistAndEnqueue: overrides.persistAndEnqueue ?? vi.fn().mockResolvedValue({ object_key: "raw-events/p/k.json.gz" }),
+      persistAndEnqueue:
+        overrides.persistAndEnqueue ??
+        vi.fn().mockResolvedValue({ object_key: "raw-events/p/k.json.gz" }),
       ...(overrides.persistAnalyticsAndEnqueue === undefined
         ? {}
         : { persistAnalyticsAndEnqueue: overrides.persistAnalyticsAndEnqueue })
@@ -133,16 +146,22 @@ function createDependencies(overrides: {
         : {
             claimEvents: overrides.claimEvents
           },
-    ...(overrides.billingManagement === undefined ? {} : { billingManagement: overrides.billingManagement }),
+    ...(overrides.billingManagement === undefined
+      ? {}
+      : { billingManagement: overrides.billingManagement }),
     ...(overrides.analyticsUsage === undefined ? {} : { analyticsUsage: overrides.analyticsUsage }),
     analyticsSettingsManagement: {
-      getAnalyticsSettingsForProject: vi.fn().mockResolvedValue(
-        overrides.analyticsSettings === undefined ? createSettings() : overrides.analyticsSettings
-      ),
+      getAnalyticsSettingsForProject: vi
+        .fn()
+        .mockResolvedValue(
+          overrides.analyticsSettings === undefined ? createSettings() : overrides.analyticsSettings
+        ),
       updateAnalyticsSettingsForProject: vi.fn()
     },
     memberAuth: {
-      resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
+      resolveMemberByTokenHash: vi
+        .fn()
+        .mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
     },
     tokenManagement: {
       listProjectTokensForOrganization: vi.fn().mockResolvedValue([]),
@@ -171,6 +190,7 @@ describe("api analytics ingestion split", () => {
       object_key: "analytics-events/p/k.json.gz"
     });
     const app = createDependencies({
+      organizationPlan: "free",
       persistAndEnqueue,
       persistAnalyticsAndEnqueue,
       analyticsSettings: createSettings({
@@ -200,6 +220,99 @@ describe("api analytics ingestion split", () => {
     expect(persistAnalyticsAndEnqueue.mock.calls[0]?.[0]).toMatchObject({
       event_type: "analytics_event",
       project_id: PROJECT_ID
+    });
+  });
+
+  it("removes project credentials before persisting debug and analytics events", async () => {
+    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/p/k.json.gz" });
+    const persistAnalyticsAndEnqueue = vi
+      .fn()
+      .mockResolvedValue({ object_key: "analytics-events/p/k.json.gz" });
+    const app = createDependencies({ persistAndEnqueue, persistAnalyticsAndEnqueue });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: { authorization: "Bearer dbundle_proj_test" },
+      payload: {
+        events: [
+          createDebugEvent(),
+          createAnalyticsEvent({
+            eventId: "10000000-0000-4000-8000-000000000010",
+            projectToken: "dbundle_proj_test"
+          })
+        ]
+      }
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(persistAndEnqueue.mock.calls[0]?.[0]).not.toHaveProperty("project_token");
+    expect(persistAnalyticsAndEnqueue.mock.calls[0]?.[0]).not.toHaveProperty("project_token");
+  });
+
+  it("enforces server consent and capture settings before analytics persistence", async () => {
+    const persistAnalyticsAndEnqueue = vi.fn();
+    const app = createDependencies({
+      persistAnalyticsAndEnqueue,
+      analyticsSettings: createSettings({ consent_required: true, capture_page_views: false })
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: { authorization: "Bearer dbundle_proj_test" },
+      payload: {
+        events: [
+          createAnalyticsEvent({ eventId: "10000000-0000-4000-8000-000000000011" }),
+          createAnalyticsEvent({
+            eventId: "10000000-0000-4000-8000-000000000012",
+            privacy: { mode: "strict", consent_granted: true }
+          })
+        ]
+      }
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toEqual({
+      accepted: 0,
+      rejected: 2,
+      errors: [
+        { index: 0, reason: "analytics_consent_required" },
+        { index: 1, reason: "analytics_capture_disabled" }
+      ]
+    });
+    expect(persistAnalyticsAndEnqueue).not.toHaveBeenCalled();
+  });
+
+  it("forces strict server privacy and strips durable analytics identities", async () => {
+    const persistAnalyticsAndEnqueue = vi
+      .fn()
+      .mockResolvedValue({ object_key: "analytics-events/p/k.json.gz" });
+    const app = createDependencies({
+      persistAnalyticsAndEnqueue,
+      analyticsSettings: createSettings({ privacy_mode: "strict" })
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: { authorization: "Bearer dbundle_proj_test" },
+      payload: {
+        events: [
+          createAnalyticsEvent({
+            eventId: "10000000-0000-4000-8000-000000000013",
+            privacy: { mode: "custom", consent_granted: true },
+            visitorIdHash: `sha256:${"a".repeat(64)}`,
+            userIdHash: `sha256:${"b".repeat(64)}`
+          })
+        ]
+      }
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(persistAnalyticsAndEnqueue.mock.calls[0]?.[0]).toMatchObject({
+      correlation: { visitor_id_hash: null, user_id_hash: null },
+      payload: { privacy: { mode: "strict", consent_granted: true } }
     });
   });
 
@@ -303,6 +416,40 @@ describe("api analytics ingestion split", () => {
     expect(persistAnalyticsAndEnqueue).not.toHaveBeenCalled();
   });
 
+  it("enforces the current tier when stored custom-dimension settings are stale", async () => {
+    const persistAnalyticsAndEnqueue = vi.fn();
+    const app = createDependencies({
+      organizationPlan: "free",
+      persistAnalyticsAndEnqueue,
+      analyticsSettings: createSettings({
+        max_custom_dimensions: 8,
+        approved_custom_dimensions: ["account_tier", "release_channel"]
+      })
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: { authorization: "Bearer dbundle_proj_test" },
+      payload: {
+        events: [
+          createAnalyticsEvent({
+            eventId: "10000000-0000-4000-8000-000000000010",
+            customDimensions: { account_tier: "team", release_channel: "stable" }
+          })
+        ]
+      }
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toEqual({
+      accepted: 0,
+      rejected: 1,
+      errors: [{ index: 0, reason: "analytics_invalid_dimension" }]
+    });
+    expect(persistAnalyticsAndEnqueue).not.toHaveBeenCalled();
+  });
+
   it("keeps analytics accepted when debug monthly ingestion allowance is exhausted", async () => {
     const persistAndEnqueue = vi.fn();
     const persistAnalyticsAndEnqueue = vi.fn().mockResolvedValue({
@@ -384,9 +531,7 @@ describe("api analytics ingestion split", () => {
       url: "/v1/events",
       headers: { authorization: "Bearer dbundle_proj_test" },
       payload: {
-        events: [
-          createAnalyticsEvent({ eventId: "10000000-0000-4000-8000-000000000006" })
-        ]
+        events: [createAnalyticsEvent({ eventId: "10000000-0000-4000-8000-000000000006" })]
       }
     });
 
@@ -398,6 +543,117 @@ describe("api analytics ingestion split", () => {
       errors: [{ index: 0, reason: "analytics_quota_exceeded" }]
     });
     expect(persistAnalyticsAndEnqueue).not.toHaveBeenCalled();
+  });
+
+  it("accepts Free analytics within the bounded preview allowances", async () => {
+    const claimAnalyticsUsageForOrganization = vi.fn().mockResolvedValue({
+      allowed: true,
+      usage: {
+        monthly_analytics_events: 1,
+        monthly_analytics_sessions: 1,
+        monthly_analytics_journey_samples: 0,
+        monthly_analytics_bundle_generations: 0
+      }
+    });
+    const persistAnalyticsAndEnqueue = vi.fn().mockResolvedValue({
+      object_key: "analytics-events/p/free.json.gz"
+    });
+    const app = createDependencies({
+      organizationPlan: "free",
+      persistAnalyticsAndEnqueue,
+      billingManagement: createBillingManagementForAnalyticsQuota(99),
+      analyticsUsage: {
+        getAnalyticsUsageForOrganization: vi.fn(),
+        claimAnalyticsUsageForOrganization,
+        releaseAnalyticsUsageForOrganization: vi.fn()
+      }
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: { authorization: "Bearer dbundle_proj_test" },
+      payload: {
+        events: [
+          createAnalyticsEvent({
+            eventId: "10000000-0000-4000-8000-000000000016",
+            kind: "session_start",
+            sessionId: "sess_free"
+          })
+        ]
+      }
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toEqual({ accepted: 1, rejected: 0, errors: [] });
+    expect(claimAnalyticsUsageForOrganization).toHaveBeenCalledWith(
+      expect.objectContaining({
+        analytics_events: 1,
+        analytics_sessions: 1,
+        limits: {
+          monthly_analytics_events: 5_000,
+          monthly_analytics_sessions: 1_000,
+          monthly_analytics_journey_samples: 100,
+          monthly_analytics_bundle_generations: 3
+        }
+      })
+    );
+    expect(persistAnalyticsAndEnqueue).toHaveBeenCalledOnce();
+  });
+
+  it("releases only unpersisted analytics claims after a partial persistence failure", async () => {
+    const firstEventId = "10000000-0000-4000-8000-000000000017";
+    const secondEventId = "10000000-0000-4000-8000-000000000018";
+    const releaseAnalyticsUsageForOrganization = vi.fn().mockResolvedValue(undefined);
+    const persistAnalyticsAndEnqueue = vi
+      .fn()
+      .mockResolvedValueOnce({ object_key: "analytics-events/p/first.json.gz" })
+      .mockRejectedValueOnce(new Error("s3_write_failed"));
+    const app = createDependencies({
+      organizationPlan: "solo",
+      persistAnalyticsAndEnqueue,
+      billingManagement: createBillingManagementForAnalyticsQuota(),
+      analyticsUsage: {
+        getAnalyticsUsageForOrganization: vi.fn(),
+        claimAnalyticsUsageForOrganization: vi.fn().mockResolvedValue({
+          allowed: true,
+          usage: {
+            monthly_analytics_events: 2,
+            monthly_analytics_sessions: 1,
+            monthly_analytics_journey_samples: 0,
+            monthly_analytics_bundle_generations: 0
+          },
+          claimed_keys: [`event:${firstEventId}`, "session:sess_partial", `event:${secondEventId}`]
+        }),
+        releaseAnalyticsUsageForOrganization
+      }
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: { authorization: "Bearer dbundle_proj_test" },
+      payload: {
+        events: [
+          createAnalyticsEvent({
+            eventId: firstEventId,
+            kind: "session_start",
+            sessionId: "sess_partial"
+          }),
+          createAnalyticsEvent({ eventId: secondEventId, sessionId: "sess_partial" })
+        ]
+      }
+    });
+
+    expect(response.statusCode).toBe(500);
+    expect(persistAnalyticsAndEnqueue).toHaveBeenCalledTimes(2);
+    expect(releaseAnalyticsUsageForOrganization).toHaveBeenCalledWith(
+      expect.objectContaining({
+        analytics_events: 2,
+        analytics_sessions: 1,
+        claim_keys: [`event:${secondEventId}`]
+      })
+    );
   });
 
   it("keeps debug events accepted when analytics ingestion quota is exhausted in a mixed batch", async () => {
@@ -497,7 +753,9 @@ describe("api analytics ingestion split", () => {
   });
 });
 
-function createBillingManagementForAnalyticsQuota(): NonNullable<ApiServerDependencies["billingManagement"]> {
+function createBillingManagementForAnalyticsQuota(
+  capacityUnits = 1
+): NonNullable<ApiServerDependencies["billingManagement"]> {
   return {
     getBillingSummaryForOrganization: vi.fn().mockResolvedValue({
       plan: "solo",
@@ -505,9 +763,9 @@ function createBillingManagementForAnalyticsQuota(): NonNullable<ApiServerDepend
       stripe_customer_id: null,
       active_projects: 1,
       capacity_units: {
-        total: 1,
+        total: capacityUnits,
         included: 1,
-        additional_purchased: 0,
+        additional_purchased: capacityUnits - 1,
         pending_reduction: null
       },
       usage_window: {

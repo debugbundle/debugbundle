@@ -25,6 +25,30 @@ describe("cli main analytics routing", () => {
         "web",
         "--environment",
         "production",
+        "--route",
+        "/checkout",
+        "--device-type",
+        "mobile",
+        "--browser",
+        "Chrome",
+        "--os",
+        "iOS",
+        "--language",
+        "en",
+        "--country",
+        "US",
+        "--auth-state",
+        "authenticated",
+        "--referrer",
+        "example.com",
+        "--utm-source",
+        "google",
+        "--utm-medium",
+        "cpc",
+        "--utm-campaign",
+        "summer",
+        "--custom-dimensions-json",
+        '{"account_tier":"team"}',
         "--limit",
         "5",
         "--auth-file",
@@ -41,6 +65,18 @@ describe("cli main analytics routing", () => {
       granularity: "day",
       service: "web",
       environment: "production",
+      route: "/checkout",
+      deviceType: "mobile",
+      browser: "Chrome",
+      os: "iOS",
+      language: "en",
+      country: "US",
+      authState: "authenticated",
+      referrer: "example.com",
+      utmSource: "google",
+      utmMedium: "cpc",
+      utmCampaign: "summer",
+      customDimensions: { account_tier: "team" },
       limit: 5,
       authFilePath: "/tmp/auth.json",
       json: true
@@ -50,52 +86,100 @@ describe("cli main analytics routing", () => {
 
   it("routes detailed analytics metric commands", async () => {
     const getAnalyticsRoutesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "routes" });
-    const getAnalyticsJourneysCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "journeys" });
-    const getAnalyticsDevicesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "devices" });
-    const getAnalyticsReferrersCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "referrers" });
-    const getAnalyticsActionsCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "actions" });
-    const listAnalyticsFunnelsCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "funnels" });
+    const getAnalyticsJourneysCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "journeys" });
+    const getAnalyticsDevicesCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "devices" });
+    const getAnalyticsReferrersCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "referrers" });
+    const getAnalyticsActionsCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "actions" });
+    const listAnalyticsFunnelsCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "funnels" });
     const getAnalyticsFunnelCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "funnel" });
-    const getAnalyticsIncidentImpactCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "impact" });
-    const listAnalyticsOpportunitiesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "opportunities" });
-    const getAnalyticsOpportunityCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "opportunity" });
-    const listAnalyticsBundlesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "bundle-list" });
-    const createAnalyticsBundleCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "bundle-create" });
+    const getAnalyticsIncidentImpactCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "impact" });
+    const listAnalyticsOpportunitiesCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "opportunities" });
+    const getAnalyticsOpportunityCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "opportunity" });
+    const listAnalyticsBundlesCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "bundle-list" });
+    const createAnalyticsBundleCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "bundle-create" });
     const getAnalyticsBundleCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "bundle" });
-    const listAnalyticsJourneySamplesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "sample-list" });
-    const getAnalyticsJourneySampleCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "sample" });
+    const listAnalyticsJourneySamplesCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "sample-list" });
+    const getAnalyticsJourneySampleCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "sample" });
 
-    await expect(runCli(["analytics", "routes", "--project", "proj_123"], { getAnalyticsRoutesCommand })).resolves.toEqual({
+    await expect(
+      runCli(["analytics", "routes", "--project", "proj_123"], { getAnalyticsRoutesCommand })
+    ).resolves.toEqual({
       exitCode: 0,
       output: "routes"
     });
-    await expect(runCli(["analytics", "journeys", "--project", "proj_123"], { getAnalyticsJourneysCommand })).resolves.toEqual({
+    await expect(
+      runCli(["analytics", "journeys", "--project", "proj_123"], { getAnalyticsJourneysCommand })
+    ).resolves.toEqual({
       exitCode: 0,
       output: "journeys"
     });
-    await expect(runCli(["analytics", "devices", "--project", "proj_123"], { getAnalyticsDevicesCommand })).resolves.toEqual({
+    await expect(
+      runCli(["analytics", "devices", "--project", "proj_123"], { getAnalyticsDevicesCommand })
+    ).resolves.toEqual({
       exitCode: 0,
       output: "devices"
     });
-    await expect(runCli(["analytics", "referrers", "--project", "proj_123"], { getAnalyticsReferrersCommand })).resolves.toEqual({
+    await expect(
+      runCli(["analytics", "referrers", "--project", "proj_123"], { getAnalyticsReferrersCommand })
+    ).resolves.toEqual({
       exitCode: 0,
       output: "referrers"
     });
-    await expect(runCli(["analytics", "actions", "--project", "proj_123"], { getAnalyticsActionsCommand })).resolves.toEqual({
+    await expect(
+      runCli(["analytics", "actions", "--project", "proj_123"], { getAnalyticsActionsCommand })
+    ).resolves.toEqual({
       exitCode: 0,
       output: "actions"
     });
-    await expect(runCli(["analytics", "funnels", "--project", "proj_123"], { listAnalyticsFunnelsCommand })).resolves.toEqual({
+    await expect(
+      runCli(["analytics", "funnels", "--project", "proj_123"], { listAnalyticsFunnelsCommand })
+    ).resolves.toEqual({
       exitCode: 0,
       output: "funnels"
     });
-    await expect(runCli(["analytics", "funnel", "checkout", "--project", "proj_123"], { getAnalyticsFunnelCommand })).resolves.toEqual({
+    await expect(
+      runCli(["analytics", "funnel", "checkout", "--project", "proj_123"], {
+        getAnalyticsFunnelCommand
+      })
+    ).resolves.toEqual({
       exitCode: 0,
       output: "funnel"
     });
     await expect(
       runCli(
-        ["analytics", "incident-impact", "incident_123", "--project", "proj_123", "--environment", "production"],
+        [
+          "analytics",
+          "incident-impact",
+          "incident_123",
+          "--project",
+          "proj_123",
+          "--environment",
+          "production"
+        ],
         { getAnalyticsIncidentImpactCommand }
       )
     ).resolves.toEqual({
@@ -104,7 +188,20 @@ describe("cli main analytics routing", () => {
     });
     await expect(
       runCli(
-        ["analytics", "opportunities", "--project", "proj_123", "--status", "all", "--kind", "funnel_dropoff", "--cursor", "cursor-1", "--limit", "5"],
+        [
+          "analytics",
+          "opportunities",
+          "--project",
+          "proj_123",
+          "--status",
+          "all",
+          "--kind",
+          "funnel_dropoff",
+          "--cursor",
+          "cursor-1",
+          "--limit",
+          "5"
+        ],
         { listAnalyticsOpportunitiesCommand }
       )
     ).resolves.toEqual({
@@ -112,10 +209,9 @@ describe("cli main analytics routing", () => {
       output: "opportunities"
     });
     await expect(
-      runCli(
-        ["analytics", "opportunity", "get", "opp_123", "--project", "proj_123"],
-        { getAnalyticsOpportunityCommand }
-      )
+      runCli(["analytics", "opportunity", "get", "opp_123", "--project", "proj_123"], {
+        getAnalyticsOpportunityCommand
+      })
     ).resolves.toEqual({
       exitCode: 0,
       output: "opportunity"
@@ -152,6 +248,8 @@ describe("cli main analytics routing", () => {
           "create",
           "--project",
           "proj_123",
+          "--opportunity-id",
+          "00000000-0000-4000-8000-000000000101",
           "--kind",
           "funnel_dropoff",
           "--funnel",
@@ -169,10 +267,9 @@ describe("cli main analytics routing", () => {
       output: "bundle-create"
     });
     await expect(
-      runCli(
-        ["analytics", "bundle", "get", "gen_123", "--project", "proj_123", "--json"],
-        { getAnalyticsBundleCommand }
-      )
+      runCli(["analytics", "bundle", "get", "gen_123", "--project", "proj_123", "--json"], {
+        getAnalyticsBundleCommand
+      })
     ).resolves.toEqual({
       exitCode: 0,
       output: "bundle"
@@ -219,7 +316,10 @@ describe("cli main analytics routing", () => {
     expect(getAnalyticsReferrersCommand).toHaveBeenCalledWith({ projectId: "proj_123" });
     expect(getAnalyticsActionsCommand).toHaveBeenCalledWith({ projectId: "proj_123" });
     expect(listAnalyticsFunnelsCommand).toHaveBeenCalledWith({ projectId: "proj_123" });
-    expect(getAnalyticsFunnelCommand).toHaveBeenCalledWith({ projectId: "proj_123", funnelKey: "checkout" });
+    expect(getAnalyticsFunnelCommand).toHaveBeenCalledWith({
+      projectId: "proj_123",
+      funnelKey: "checkout"
+    });
     expect(getAnalyticsIncidentImpactCommand).toHaveBeenCalledWith({
       projectId: "proj_123",
       incidentId: "incident_123",
@@ -246,6 +346,7 @@ describe("cli main analytics routing", () => {
     });
     expect(createAnalyticsBundleCommand).toHaveBeenCalledWith({
       projectId: "proj_123",
+      opportunityId: "00000000-0000-4000-8000-000000000101",
       analysisKind: "funnel_dropoff",
       from: undefined,
       to: undefined,
@@ -285,7 +386,16 @@ describe("cli main analytics routing", () => {
     });
 
     const result = await runCli(
-      ["analytics", "settings", "get", "--project", "proj_123", "--auth-file", "/tmp/auth.json", "--json"],
+      [
+        "analytics",
+        "settings",
+        "get",
+        "--project",
+        "proj_123",
+        "--auth-file",
+        "/tmp/auth.json",
+        "--json"
+      ],
       { getAnalyticsSettingsCommand }
     );
 
@@ -316,10 +426,12 @@ describe("cli main analytics routing", () => {
         "standard",
         "--journey-sample-rate",
         "0.25",
+        "--hourly-retention-days",
+        "30",
         "--max-custom-dimensions",
         "2",
         "--approved-custom-dimensions-json",
-        '["auth_state","plan"]',
+        '["account_tier","plan"]',
         "--auth-file",
         "/tmp/auth.json",
         "--json"
@@ -333,8 +445,9 @@ describe("cli main analytics routing", () => {
         enabled: true,
         privacy_mode: "standard",
         journey_sample_rate: 0.25,
+        hourly_retention_days: 30,
         max_custom_dimensions: 2,
-        approved_custom_dimensions: ["auth_state", "plan"]
+        approved_custom_dimensions: ["account_tier", "plan"]
       },
       authFilePath: "/tmp/auth.json",
       json: true
@@ -367,7 +480,9 @@ describe("cli main analytics routing", () => {
     expect(missingProject.exitCode).toBe(4);
     expect(missingProject.output).toContain("Missing required option --project.");
     expect(missingUpdate.exitCode).toBe(4);
-    expect(missingUpdate.output).toContain("At least one analytics settings field must be provided.");
+    expect(missingUpdate.output).toContain(
+      "At least one analytics settings field must be provided."
+    );
     expect(invalidPrivacy.exitCode).toBe(4);
     expect(invalidPrivacy.output).toContain("Invalid value for --privacy-mode.");
     expect(invalidSample.exitCode).toBe(4);
@@ -375,30 +490,68 @@ describe("cli main analytics routing", () => {
   });
 
   it("rejects unknown analytics settings options", async () => {
-    const result = await runCli(["analytics", "settings", "get", "--project", "proj_123", "--unknown", "value"]);
+    const result = await runCli([
+      "analytics",
+      "settings",
+      "get",
+      "--project",
+      "proj_123",
+      "--unknown",
+      "value"
+    ]);
 
     expect(result.exitCode).toBe(4);
     expect(result.output).toContain("Unknown option --unknown.");
   });
 
   it("requires explicit all-projects scope for organization analytics inventories", async () => {
-    const listAnalyticsOpportunitiesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "opportunities" });
-    const listAnalyticsBundlesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "bundles" });
+    const listAnalyticsOpportunitiesCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "opportunities" });
+    const listAnalyticsBundlesCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "bundles" });
 
     await expect(
-      runCli([
-        "analytics", "opportunities", "--all-projects",
-        "--service", "web", "--environment", "production", "--severity", "high",
-        "--bundle-status", "completed", "--from", "2026-03-01T00:00:00.000Z",
-        "--to", "2026-03-08T00:00:00.000Z"
-      ], { listAnalyticsOpportunitiesCommand })
+      runCli(
+        [
+          "analytics",
+          "opportunities",
+          "--all-projects",
+          "--service",
+          "web",
+          "--environment",
+          "production",
+          "--severity",
+          "high",
+          "--bundle-status",
+          "completed",
+          "--from",
+          "2026-03-01T00:00:00.000Z",
+          "--to",
+          "2026-03-08T00:00:00.000Z"
+        ],
+        { listAnalyticsOpportunitiesCommand }
+      )
     ).resolves.toEqual({ exitCode: 0, output: "opportunities" });
     await expect(
-      runCli([
-        "analytics", "bundle", "list", "--all-projects",
-        "--service", "web", "--environment", "production",
-        "--from", "2026-03-01T00:00:00.000Z", "--to", "2026-03-08T00:00:00.000Z"
-      ], { listAnalyticsBundlesCommand })
+      runCli(
+        [
+          "analytics",
+          "bundle",
+          "list",
+          "--all-projects",
+          "--service",
+          "web",
+          "--environment",
+          "production",
+          "--from",
+          "2026-03-01T00:00:00.000Z",
+          "--to",
+          "2026-03-08T00:00:00.000Z"
+        ],
+        { listAnalyticsBundlesCommand }
+      )
     ).resolves.toEqual({ exitCode: 0, output: "bundles" });
     await expect(
       runCli(["analytics", "opportunities"], { listAnalyticsOpportunitiesCommand })
@@ -407,7 +560,9 @@ describe("cli main analytics routing", () => {
       output: expect.stringContaining("Missing required option --project or --all-projects.")
     });
     await expect(
-      runCli(["analytics", "bundle", "list", "--project", "proj_123", "--all-projects"], { listAnalyticsBundlesCommand })
+      runCli(["analytics", "bundle", "list", "--project", "proj_123", "--all-projects"], {
+        listAnalyticsBundlesCommand
+      })
     ).resolves.toMatchObject({
       exitCode: 4,
       output: expect.stringContaining("Use either --project or --all-projects.")

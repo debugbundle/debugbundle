@@ -15,7 +15,7 @@ import {
 } from "../../lib/api.js";
 import { showErrorToast, showSuccessToast } from "../../lib/notify.js";
 import { Button } from "../ui/button.js";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card.js";
+import { CollapsibleCard } from "../ui/collapsible-card.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "../ui/field.js";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../ui/select.js";
 
@@ -200,12 +200,11 @@ export function ProjectCapturePolicyCard({ projectId, organizationPlan, canEdit 
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Capture policy</CardTitle>
-        <CardDescription>Control how much request, log, breadcrumb, and probe context the SDK forwards before worker processing begins.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
+    <CollapsibleCard
+      title="Capture policy"
+      description="Control how much request, log, breadcrumb, and probe context the SDK forwards before worker processing begins."
+      contentClassName="space-y-6"
+    >
         <div className="rounded-lg border border-border/80 bg-background/60 p-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-2 font-medium text-foreground">
             <ShieldCheckIcon className="size-4" />
@@ -356,8 +355,7 @@ export function ProjectCapturePolicyCard({ projectId, organizationPlan, canEdit 
             </div>
           ) : null}
         </form>
-      </CardContent>
-    </Card>
+    </CollapsibleCard>
   );
 }
 

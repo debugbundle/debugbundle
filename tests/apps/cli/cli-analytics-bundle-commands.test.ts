@@ -16,6 +16,7 @@ import { buildAnalyticsBundle } from "../../../packages/analytics-bundle-engine/
 
 const PROJECT_ID = "00000000-0000-0000-0000-000000000001";
 const BUNDLE_GENERATION_ID = "00000000-0000-4000-8000-000000000222";
+const OPPORTUNITY_ID = "00000000-0000-4000-8000-000000000101";
 const FROM = "2026-03-01T00:00:00.000Z";
 const TO = "2026-03-08T00:00:00.000Z";
 
@@ -227,6 +228,7 @@ describe("cli analytics bundle commands", () => {
     expect(createBundle).toHaveBeenCalledWith({
       bearerToken: "dbundle_mem_saved",
       projectId: PROJECT_ID,
+      opportunityId: undefined,
       analysisKind: "route_health",
       from: undefined,
       to: undefined,
@@ -269,6 +271,7 @@ describe("cli analytics bundle commands", () => {
     await api.createBundle({
       bearerToken: "dbundle_mem_x",
       projectId: PROJECT_ID,
+      opportunityId: OPPORTUNITY_ID,
       analysisKind: "funnel_dropoff",
       from: FROM,
       to: TO,
@@ -292,6 +295,7 @@ describe("cli analytics bundle commands", () => {
       bearerToken: "dbundle_mem_x",
       body: {
         project_id: PROJECT_ID,
+        opportunity_id: OPPORTUNITY_ID,
         analysis_kind: "funnel_dropoff",
         from: FROM,
         to: TO,

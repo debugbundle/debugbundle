@@ -39,13 +39,14 @@ describe("analytics saved funnel store", () => {
     expect(query.mock.calls[0]![1]).toEqual([ORGANIZATION_ID, PROJECT_ID]);
   });
 
-  it("locks the project and creates within the active saved-funnel limit", async () => {
+  it("locks the project and derives the active saved-funnel limit from the tier", async () => {
     const query = vi.fn(async (sql: string, params: unknown[]) => {
       if (sql.includes("FOR UPDATE OF p")) {
-        return { rows: [{ max_saved_funnels: 3, organization_plan: "team" }] };
+        expect(sql).toContain("settings.max_saved_funnels");
+        return { rows: [{ max_saved_funnels: null, organization_plan: "team" }] };
       }
       if (sql.includes("SELECT archived_at")) return { rows: [] };
-      if (sql.includes("COUNT(*)")) return { rows: [{ active_count: "2" }] };
+      if (sql.includes("COUNT(*)")) return { rows: [{ active_count: "49" }] };
       if (sql.includes("INSERT INTO analytics_funnel_definitions")) {
         expect(params).toEqual([
           PROJECT_ID,
@@ -54,6 +55,34 @@ describe("analytics saved funnel store", () => {
           JSON.stringify(savedFunnelRow.steps),
           USER_ID
         ]);
+        return { rows: [savedFunnelRow] };
+      }
+      throw new Error(`Unhandled SQL: ${sql}`);
+    });
+    const store = createPostgresAnalyticsSavedFunnelStore(createTransactionalDb(query));
+
+    await expect(
+      store.createSavedFunnelForProject({
+        organization_id: ORGANIZATION_ID,
+        project_id: PROJECT_ID,
+        created_by_user_id: USER_ID,
+        definition: {
+          funnel_key: "checkout",
+          display_name: "Checkout",
+          steps: savedFunnelRow.steps
+        }
+      })
+    ).resolves.toEqual({ status: "created", funnel: savedFunnelRow });
+  });
+
+  it("allows one active saved funnel for a Free project", async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("FOR UPDATE OF p")) {
+        return { rows: [{ max_saved_funnels: null, organization_plan: "free" }] };
+      }
+      if (sql.includes("SELECT archived_at")) return { rows: [] };
+      if (sql.includes("COUNT(*)")) return { rows: [{ active_count: "0" }] };
+      if (sql.includes("INSERT INTO analytics_funnel_definitions")) {
         return { rows: [savedFunnelRow] };
       }
       throw new Error(`Unhandled SQL: ${sql}`);

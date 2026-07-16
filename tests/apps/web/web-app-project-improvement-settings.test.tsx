@@ -29,6 +29,10 @@ async function openSelect(label: RegExp | string): Promise<HTMLButtonElement> {
   return trigger;
 }
 
+async function openImprovementSettings(): Promise<void> {
+  fireEvent.click(await screen.findByRole("button", { name: "Improvement bundles" }));
+}
+
 describe("web app — project improvement settings", () => {
   it("lets owners update improvement settings from the project settings page", async () => {
     const user = userEvent.setup();
@@ -106,9 +110,10 @@ describe("web app — project improvement settings", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
+    await openImprovementSettings();
 
     expect(
-      await screen.findByRole("heading", { name: /automated improvement bundles/i, level: 3 })
+      await screen.findByRole("heading", { name: /^improvement bundles$/i, level: 3 })
     ).toBeInTheDocument();
 
     const enabledSwitch = document.getElementById(
@@ -208,9 +213,10 @@ describe("web app — project improvement settings", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
+    await openImprovementSettings();
 
     expect(
-      await screen.findByRole("heading", { name: /automated improvement bundles/i, level: 3 })
+      await screen.findByRole("heading", { name: /^improvement bundles$/i, level: 3 })
     ).toBeInTheDocument();
     expect(
       screen.getByRole("heading", {
@@ -222,7 +228,7 @@ describe("web app — project improvement settings", () => {
     expect(screen.queryByText(/counts toward the existing bundle allowance/i)).toBeNull();
   });
 
-  it("renders capture policy before automated improvement bundles in project settings", async () => {
+  it("renders capture policy before improvement bundles in project settings", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
@@ -286,7 +292,7 @@ describe("web app — project improvement settings", () => {
       level: 3
     });
     const improvementHeading = await screen.findByRole("heading", {
-      name: /automated improvement bundles/i,
+      name: /^improvement bundles$/i,
       level: 3
     });
 

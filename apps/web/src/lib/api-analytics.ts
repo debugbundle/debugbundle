@@ -310,6 +310,7 @@ export async function createProjectAnalyticsBundle(
     headers: buildBrowserSessionHeaders(true),
     body: JSON.stringify({
       project_id: projectId,
+      ...(input.opportunityId === undefined ? {} : { opportunity_id: input.opportunityId }),
       analysis_kind: input.analysisKind,
       ...(input.last === undefined ? {} : { last: input.last }),
       ...(input.from === undefined ? {} : { from: input.from }),

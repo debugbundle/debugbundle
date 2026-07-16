@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ApiDependencies } from "../../../apps/api/src/api-types.js";
 import { createApiServer } from "../../../apps/api/src/server.js";
@@ -6,11 +6,17 @@ import type { AnalyticsSettings } from "../../../packages/shared-types/src/index
 
 const PROJECT_ID = "00000000-0000-0000-0000-000000000001";
 
-function createProjectAccess(overrides: Partial<{
-  effective_role: "owner" | "admin" | "member";
-  organization_plan: "free" | "solo" | "team";
-  relationship: "owned" | "shared";
-}> = {}) {
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
+function createProjectAccess(
+  overrides: Partial<{
+    effective_role: "owner" | "admin" | "member";
+    organization_plan: "free" | "solo" | "team";
+    relationship: "owned" | "shared";
+  }> = {}
+) {
   return {
     project_id: PROJECT_ID,
     organization_id: "org_123",
@@ -34,19 +40,22 @@ function createSettings(overrides: Partial<AnalyticsSettings> = {}): AnalyticsSe
     journey_sample_rate: 0,
     raw_retention_days: 1,
     sample_retention_days: 7,
+    hourly_retention_days: 30,
     aggregate_retention_months: 12,
-    max_saved_funnels: 3,
-    max_custom_dimensions: 0,
+    max_saved_funnels: 10,
+    max_custom_dimensions: 3,
     approved_custom_dimensions: [],
     ...overrides
   };
 }
 
-function createDependencies(overrides: {
-  auditLogging?: ApiDependencies["auditLogging"];
-  analyticsSettingsManagement?: ApiDependencies["analyticsSettingsManagement"];
-  projectAccess?: ReturnType<typeof createProjectAccess> | null;
-} = {}): ReturnType<typeof createApiServer> {
+function createDependencies(
+  overrides: {
+    auditLogging?: ApiDependencies["auditLogging"];
+    analyticsSettingsManagement?: ApiDependencies["analyticsSettingsManagement"];
+    projectAccess?: ReturnType<typeof createProjectAccess> | null;
+  } = {}
+): ReturnType<typeof createApiServer> {
   return createApiServer({
     ingestionPersistence: { persistAndEnqueue: vi.fn() },
     ingestionMetadata: { resolveProjectByTokenHash: vi.fn() },
@@ -78,7 +87,9 @@ function createDependencies(overrides: {
     },
     ...(overrides.auditLogging === undefined ? {} : { auditLogging: overrides.auditLogging }),
     projectManagement: {
-      resolveProjectAccessForUser: vi.fn().mockResolvedValue(overrides.projectAccess ?? createProjectAccess()),
+      resolveProjectAccessForUser: vi
+        .fn()
+        .mockResolvedValue(overrides.projectAccess ?? createProjectAccess()),
       listProjectsForOrganization: vi.fn().mockResolvedValue([]),
       createProjectForOrganization: vi.fn(),
       updateProjectForOrganization: vi.fn(),
@@ -107,6 +118,30 @@ describe("analytics settings routes", () => {
       });
     });
 
+    it("derives unavailable-storage analytics limits from the current tier", async () => {
+      const teamApp = createDependencies({
+        projectAccess: createProjectAccess({ organization_plan: "team" })
+      });
+      const freeApp = createDependencies({
+        projectAccess: createProjectAccess({ organization_plan: "free" })
+      });
+      const request = {
+        method: "GET" as const,
+        url: `/v1/projects/${PROJECT_ID}/analytics-settings`,
+        headers: { authorization: "Bearer dbundle_mem_test_token" }
+      };
+
+      const teamResponse = await teamApp.inject(request);
+      const freeResponse = await freeApp.inject(request);
+
+      expect(teamResponse.json().settings.max_saved_funnels).toBe(50);
+      expect(teamResponse.json().settings.max_custom_dimensions).toBe(8);
+      expect(teamResponse.json().settings.hourly_retention_days).toBe(90);
+      expect(freeResponse.json().settings.max_saved_funnels).toBe(1);
+      expect(freeResponse.json().settings.max_custom_dimensions).toBe(1);
+      expect(freeResponse.json().settings.hourly_retention_days).toBe(7);
+    });
+
     it("returns stored settings and preview access for members", async () => {
       const app = createDependencies({
         projectAccess: createProjectAccess({
@@ -115,11 +150,13 @@ describe("analytics settings routes", () => {
           organization_plan: "team"
         }),
         analyticsSettingsManagement: {
-          getAnalyticsSettingsForProject: vi.fn().mockResolvedValue(createSettings({
-            enabled: true,
-            privacy_mode: "standard",
-            journey_sample_rate: 0.25
-          })),
+          getAnalyticsSettingsForProject: vi.fn().mockResolvedValue(
+            createSettings({
+              enabled: true,
+              privacy_mode: "standard",
+              journey_sample_rate: 0.25
+            })
+          ),
           updateAnalyticsSettingsForProject: vi.fn()
         }
       });
@@ -142,11 +179,17 @@ describe("analytics settings routes", () => {
       });
     });
 
-    it("reports analytics as unavailable for Free projects", async () => {
+    it("reports analytics as available for Free projects", async () => {
       const app = createDependencies({
         projectAccess: createProjectAccess({ organization_plan: "free" }),
         analyticsSettingsManagement: {
-          getAnalyticsSettingsForProject: vi.fn().mockResolvedValue(createSettings({ enabled: false })),
+          getAnalyticsSettingsForProject: vi.fn().mockResolvedValue(
+            createSettings({
+              enabled: false,
+              max_saved_funnels: 1,
+              max_custom_dimensions: 1
+            })
+          ),
           updateAnalyticsSettingsForProject: vi.fn()
         }
       });
@@ -158,7 +201,7 @@ describe("analytics settings routes", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      expect(response.json().analytics_available).toBe(false);
+      expect(response.json().analytics_available).toBe(true);
     });
 
     it("rejects invalid project ids", async () => {
@@ -183,11 +226,13 @@ describe("analytics settings routes", () => {
         },
         analyticsSettingsManagement: {
           getAnalyticsSettingsForProject: vi.fn(),
-          updateAnalyticsSettingsForProject: vi.fn().mockResolvedValue(createSettings({
-            enabled: true,
-            privacy_mode: "standard",
-            journey_sample_rate: 0.2
-          }))
+          updateAnalyticsSettingsForProject: vi.fn().mockResolvedValue(
+            createSettings({
+              enabled: true,
+              privacy_mode: "standard",
+              journey_sample_rate: 0.2
+            })
+          )
         }
       });
 
@@ -214,7 +259,7 @@ describe("analytics settings routes", () => {
       });
     });
 
-    it("rejects project members, unavailable storage, Free plans, and invalid payloads", async () => {
+    it("rejects project members, unavailable storage, and invalid payloads", async () => {
       const memberApp = createDependencies({
         projectAccess: createProjectAccess({
           relationship: "shared",
@@ -227,13 +272,6 @@ describe("analytics settings routes", () => {
         }
       });
       const unavailableApp = createDependencies();
-      const freeApp = createDependencies({
-        projectAccess: createProjectAccess({ organization_plan: "free" }),
-        analyticsSettingsManagement: {
-          getAnalyticsSettingsForProject: vi.fn(),
-          updateAnalyticsSettingsForProject: vi.fn()
-        }
-      });
       const invalidApp = createDependencies({
         analyticsSettingsManagement: {
           getAnalyticsSettingsForProject: vi.fn(),
@@ -247,14 +285,15 @@ describe("analytics settings routes", () => {
         headers: { authorization: "Bearer dbundle_mem_test_token" }
       };
 
-      await expect(memberApp.inject({ ...request, payload: { enabled: true } })).resolves.toMatchObject({
+      await expect(
+        memberApp.inject({ ...request, payload: { enabled: true } })
+      ).resolves.toMatchObject({
         statusCode: 403
       });
-      await expect(unavailableApp.inject({ ...request, payload: { enabled: true } })).resolves.toMatchObject({
+      await expect(
+        unavailableApp.inject({ ...request, payload: { enabled: true } })
+      ).resolves.toMatchObject({
         statusCode: 404
-      });
-      await expect(freeApp.inject({ ...request, payload: { enabled: true } })).resolves.toMatchObject({
-        statusCode: 403
       });
       await expect(invalidApp.inject({ ...request, payload: {} })).resolves.toMatchObject({
         statusCode: 400
@@ -267,31 +306,87 @@ describe("analytics settings routes", () => {
       ).resolves.toMatchObject({ statusCode: 400 });
     });
 
-    it("requires Team tier for custom dimensions", async () => {
+    it("allows Free owners to enable analytics within the preview limits", async () => {
+      const updateAnalyticsSettingsForProject = vi
+        .fn()
+        .mockResolvedValue(createSettings({ enabled: true, max_saved_funnels: 1 }));
+      const app = createDependencies({
+        projectAccess: createProjectAccess({ organization_plan: "free" }),
+        analyticsSettingsManagement: {
+          getAnalyticsSettingsForProject: vi.fn(),
+          updateAnalyticsSettingsForProject
+        }
+      });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/v1/projects/${PROJECT_ID}/analytics-settings`,
+        headers: { authorization: "Bearer dbundle_mem_test_token" },
+        payload: { enabled: true, max_saved_funnels: 1 }
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        analytics_available: true,
+        settings: { enabled: true, max_saved_funnels: 1 }
+      });
+      expect(updateAnalyticsSettingsForProject).toHaveBeenCalledOnce();
+    });
+
+    it("allows controlled custom dimensions within each hosted tier limit", async () => {
+      const freeApp = createDependencies({
+        projectAccess: createProjectAccess({ organization_plan: "free" }),
+        analyticsSettingsManagement: {
+          getAnalyticsSettingsForProject: vi.fn(),
+          updateAnalyticsSettingsForProject: vi.fn().mockResolvedValue(
+            createSettings({
+              max_saved_funnels: 1,
+              max_custom_dimensions: 1,
+              approved_custom_dimensions: ["account_tier"]
+            })
+          )
+        }
+      });
       const soloApp = createDependencies({
         analyticsSettingsManagement: {
           getAnalyticsSettingsForProject: vi.fn(),
-          updateAnalyticsSettingsForProject: vi.fn()
+          updateAnalyticsSettingsForProject: vi.fn().mockResolvedValue(
+            createSettings({
+              max_custom_dimensions: 2,
+              approved_custom_dimensions: ["account_type", "plan"]
+            })
+          )
         }
       });
       const teamApp = createDependencies({
         projectAccess: createProjectAccess({ organization_plan: "team" }),
         analyticsSettingsManagement: {
           getAnalyticsSettingsForProject: vi.fn(),
-          updateAnalyticsSettingsForProject: vi.fn().mockResolvedValue(createSettings({
-            max_custom_dimensions: 2,
-            approved_custom_dimensions: ["auth_state", "plan"]
-          }))
+          updateAnalyticsSettingsForProject: vi.fn().mockResolvedValue(
+            createSettings({
+              max_custom_dimensions: 2,
+              approved_custom_dimensions: ["account_type", "plan"]
+            })
+          )
         }
       });
 
+      const freeResponse = await freeApp.inject({
+        method: "PATCH",
+        url: `/v1/projects/${PROJECT_ID}/analytics-settings`,
+        headers: { authorization: "Bearer dbundle_mem_test_token" },
+        payload: {
+          max_custom_dimensions: 1,
+          approved_custom_dimensions: ["account_tier"]
+        }
+      });
       const soloResponse = await soloApp.inject({
         method: "PATCH",
         url: `/v1/projects/${PROJECT_ID}/analytics-settings`,
         headers: { authorization: "Bearer dbundle_mem_test_token" },
         payload: {
           max_custom_dimensions: 2,
-          approved_custom_dimensions: ["auth_state", "plan"]
+          approved_custom_dimensions: ["account_type", "plan"]
         }
       });
       const teamResponse = await teamApp.inject({
@@ -300,15 +395,57 @@ describe("analytics settings routes", () => {
         headers: { authorization: "Bearer dbundle_mem_test_token" },
         payload: {
           max_custom_dimensions: 2,
-          approved_custom_dimensions: ["auth_state", "plan"]
+          approved_custom_dimensions: ["account_type", "plan"]
         }
       });
 
-      expect(soloResponse.statusCode).toBe(403);
+      expect(freeResponse.statusCode).toBe(200);
+      expect(soloResponse.statusCode).toBe(200);
       expect(teamResponse.statusCode).toBe(200);
     });
 
-    it("enforces saved-funnel and custom-dimension tier limits", async () => {
+    it("uses self-host capabilities for custom dimensions", async () => {
+      vi.stubEnv("SELFHOST_MODE", "true");
+      const updateAnalyticsSettingsForProject = vi.fn().mockResolvedValue(
+        createSettings({
+          hourly_retention_days: 365,
+          max_saved_funnels: 100,
+          max_custom_dimensions: 20,
+          approved_custom_dimensions: ["deployment_ring"]
+        })
+      );
+      const app = createDependencies({
+        projectAccess: createProjectAccess({ organization_plan: "free" }),
+        analyticsSettingsManagement: {
+          getAnalyticsSettingsForProject: vi.fn(),
+          updateAnalyticsSettingsForProject
+        }
+      });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/v1/projects/${PROJECT_ID}/analytics-settings`,
+        headers: { authorization: "Bearer dbundle_mem_test_token" },
+        payload: {
+          hourly_retention_days: 365,
+          max_custom_dimensions: 20,
+          approved_custom_dimensions: ["deployment_ring"]
+        }
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(updateAnalyticsSettingsForProject).toHaveBeenCalledOnce();
+    });
+
+    it("enforces saved-funnel, custom-dimension, and hourly-retention tier limits", async () => {
+      const freeUpdate = vi.fn();
+      const freeApp = createDependencies({
+        projectAccess: createProjectAccess({ organization_plan: "free" }),
+        analyticsSettingsManagement: {
+          getAnalyticsSettingsForProject: vi.fn(),
+          updateAnalyticsSettingsForProject: freeUpdate
+        }
+      });
       const soloUpdate = vi.fn();
       const soloApp = createDependencies({
         analyticsSettingsManagement: {
@@ -325,12 +462,36 @@ describe("analytics settings routes", () => {
         }
       });
 
+      const freeResponse = await freeApp.inject({
+        method: "PATCH",
+        url: `/v1/projects/${PROJECT_ID}/analytics-settings`,
+        headers: { authorization: "Bearer dbundle_mem_test_token" },
+        payload: {
+          max_saved_funnels: 2
+        }
+      });
       const soloResponse = await soloApp.inject({
         method: "PATCH",
         url: `/v1/projects/${PROJECT_ID}/analytics-settings`,
         headers: { authorization: "Bearer dbundle_mem_test_token" },
         payload: {
           max_saved_funnels: 11
+        }
+      });
+      const freeCustomDimensionResponse = await freeApp.inject({
+        method: "PATCH",
+        url: `/v1/projects/${PROJECT_ID}/analytics-settings`,
+        headers: { authorization: "Bearer dbundle_mem_test_token" },
+        payload: {
+          max_custom_dimensions: 2
+        }
+      });
+      const soloCustomDimensionResponse = await soloApp.inject({
+        method: "PATCH",
+        url: `/v1/projects/${PROJECT_ID}/analytics-settings`,
+        headers: { authorization: "Bearer dbundle_mem_test_token" },
+        payload: {
+          max_custom_dimensions: 4
         }
       });
       const teamCustomDimensionResponse = await teamApp.inject({
@@ -359,13 +520,41 @@ describe("analytics settings routes", () => {
           ]
         }
       });
+      const freeHourlyRetentionResponse = await freeApp.inject({
+        method: "PATCH",
+        url: `/v1/projects/${PROJECT_ID}/analytics-settings`,
+        headers: { authorization: "Bearer dbundle_mem_test_token" },
+        payload: { hourly_retention_days: 8 }
+      });
+      const soloHourlyRetentionResponse = await soloApp.inject({
+        method: "PATCH",
+        url: `/v1/projects/${PROJECT_ID}/analytics-settings`,
+        headers: { authorization: "Bearer dbundle_mem_test_token" },
+        payload: { hourly_retention_days: 31 }
+      });
+      const teamHourlyRetentionResponse = await teamApp.inject({
+        method: "PATCH",
+        url: `/v1/projects/${PROJECT_ID}/analytics-settings`,
+        headers: { authorization: "Bearer dbundle_mem_test_token" },
+        payload: { hourly_retention_days: 91 }
+      });
 
+      expect(freeResponse.statusCode).toBe(403);
+      expect(freeResponse.json()).toEqual({ error: "upgrade_required" });
+      expect(freeCustomDimensionResponse.statusCode).toBe(403);
+      expect(freeCustomDimensionResponse.json()).toEqual({ error: "upgrade_required" });
       expect(soloResponse.statusCode).toBe(403);
       expect(soloResponse.json()).toEqual({ error: "upgrade_required" });
+      expect(soloCustomDimensionResponse.statusCode).toBe(403);
+      expect(soloCustomDimensionResponse.json()).toEqual({ error: "upgrade_required" });
       expect(teamCustomDimensionResponse.statusCode).toBe(403);
       expect(teamCustomDimensionResponse.json()).toEqual({ error: "upgrade_required" });
       expect(teamApprovedDimensionsResponse.statusCode).toBe(403);
       expect(teamApprovedDimensionsResponse.json()).toEqual({ error: "upgrade_required" });
+      expect(freeHourlyRetentionResponse.statusCode).toBe(403);
+      expect(soloHourlyRetentionResponse.statusCode).toBe(403);
+      expect(teamHourlyRetentionResponse.statusCode).toBe(403);
+      expect(freeUpdate).not.toHaveBeenCalled();
       expect(soloUpdate).not.toHaveBeenCalled();
       expect(teamUpdate).not.toHaveBeenCalled();
     });
@@ -375,10 +564,12 @@ describe("analytics settings routes", () => {
       const app = createDependencies({
         projectAccess: createProjectAccess({ organization_plan: "team" }),
         analyticsSettingsManagement: {
-          getAnalyticsSettingsForProject: vi.fn().mockResolvedValue(createSettings({
-            max_custom_dimensions: 2,
-            approved_custom_dimensions: ["account_tier", "workspace_size"]
-          })),
+          getAnalyticsSettingsForProject: vi.fn().mockResolvedValue(
+            createSettings({
+              max_custom_dimensions: 2,
+              approved_custom_dimensions: ["account_tier", "workspace_size"]
+            })
+          ),
           updateAnalyticsSettingsForProject
         }
       });
@@ -394,6 +585,36 @@ describe("analytics settings routes", () => {
 
       expect(response.statusCode).toBe(400);
       expect(response.json()).toEqual({ error: "invalid_payload" });
+      expect(updateAnalyticsSettingsForProject).not.toHaveBeenCalled();
+    });
+
+    it("rejects partial custom-dimension updates when stored settings exceed the current tier", async () => {
+      const updateAnalyticsSettingsForProject = vi.fn();
+      const app = createDependencies({
+        projectAccess: createProjectAccess({ organization_plan: "free" }),
+        analyticsSettingsManagement: {
+          getAnalyticsSettingsForProject: vi.fn().mockResolvedValue(
+            createSettings({
+              max_saved_funnels: 1,
+              max_custom_dimensions: 8,
+              approved_custom_dimensions: ["account_tier"]
+            })
+          ),
+          updateAnalyticsSettingsForProject
+        }
+      });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/v1/projects/${PROJECT_ID}/analytics-settings`,
+        headers: { authorization: "Bearer dbundle_mem_test_token" },
+        payload: {
+          approved_custom_dimensions: ["account_tier"]
+        }
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toEqual({ error: "upgrade_required" });
       expect(updateAnalyticsSettingsForProject).not.toHaveBeenCalled();
     });
 
@@ -418,10 +639,12 @@ describe("analytics settings routes", () => {
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toEqual({ error: "project_not_found" });
-      expect(createAuditLog).toHaveBeenCalledWith(expect.objectContaining({
-        action: "analytics_settings.update",
-        status: "failure"
-      }));
+      expect(createAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "analytics_settings.update",
+          status: "failure"
+        })
+      );
     });
   });
 });

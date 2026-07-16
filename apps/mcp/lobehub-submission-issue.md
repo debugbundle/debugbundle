@@ -2,7 +2,7 @@
 
 Please list DebugBundle in the LobeHub MCP marketplace.
 
-DebugBundle is a public MCP server for production debugging bundles and operational incident workflows for AI agents. It is already published in the official MCP Registry, but it is not yet confirmed in the current LobeHub MCP market results.
+DebugBundle is a public MCP server for production debugging, product analytics, and operational incident workflows for AI agents. It is already published in the official MCP Registry, but it is not yet confirmed in the current LobeHub MCP market results.
 
 ## Proposed Solution
 
@@ -25,6 +25,8 @@ What it does:
 
 - Lists, inspects, resolves, and reopens incidents.
 - Fetches incident context, deterministic debug bundles, and reproduction artifacts.
+- Queries aggregate usage, routes, devices, actions, funnels, journeys, incident impact, and analytics opportunities, and generates bounded analytics bundles for durable analysis.
+- Manages analytics settings and saved funnel definitions through the same member-authenticated surface.
 - Manages hosted health checks, probes, alerts, webhooks, tokens, projects, members, billing, capture policy, capture rules, improvement settings, and GitHub automation.
 - Reuses the same DebugBundle domain services as API and CLI.
 

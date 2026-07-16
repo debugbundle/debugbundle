@@ -100,7 +100,10 @@ describe("analytics bundle generation store", () => {
         return { rows: [] };
       }
 
-      if (sqlText.includes("WHERE project_id = $1::uuid") && sqlText.includes("input_fingerprint = $2")) {
+      if (
+        sqlText.includes("WHERE project_id = $1::uuid") &&
+        sqlText.includes("input_fingerprint = $2")
+      ) {
         expect(params[0]).toBe(PROJECT_ID);
         expect(String(params[1])).toMatch(/^sha256:[a-f0-9]{64}$/);
         return { rows: [generationRow] };
@@ -122,6 +125,99 @@ describe("analytics bundle generation store", () => {
       status: "pending"
     });
     expect(queryMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("resets a failed duplicate generation so the same deterministic request can be retried", async (): Promise<void> => {
+    const failedRow = {
+      ...generationRow,
+      status: "failed",
+      failure_reason: "object_store_unavailable",
+      claimed_at: "2026-07-08T10:01:00.000Z",
+      completed_at: "2026-07-08T10:02:00.000Z"
+    };
+    const retriedRow = {
+      ...generationRow,
+      status: "pending",
+      failure_reason: null,
+      claimed_at: null,
+      completed_at: null,
+      updated_at: "2026-07-08T10:03:00.000Z"
+    };
+    const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      if (sqlText.includes("INSERT INTO analytics_bundle_generations")) return { rows: [] };
+      if (
+        sqlText.includes("WHERE project_id = $1::uuid") &&
+        sqlText.includes("input_fingerprint = $2")
+      ) {
+        return { rows: [failedRow] };
+      }
+      if (sqlText.includes("UPDATE analytics_bundle_generations")) {
+        expect(sqlText).toContain("AND status = 'failed'");
+        expect(sqlText).toContain("failure_reason = NULL");
+        expect(sqlText).toContain("claimed_at = NULL");
+        expect(params).toEqual([
+          GENERATION_ID,
+          USER_ID,
+          OPPORTUNITY_ID,
+          JSON.stringify({ funnel_key: "checkout", step_key: "payment" })
+        ]);
+        return { rows: [retriedRow] };
+      }
+      if (sqlText.includes("UPDATE analytics_opportunities")) {
+        expect(params).toEqual([OPPORTUNITY_ID, "pending", null, null]);
+        return { rows: [] };
+      }
+      throw new Error(`Unhandled failed retry SQL: ${sqlText}`);
+    });
+    const store = createPostgresAnalyticsBundleGenerationStore(createTransactionalDb(queryMock));
+
+    await expect(
+      store.reserveAnalyticsBundleGeneration({
+        project_id: PROJECT_ID,
+        opportunity_id: OPPORTUNITY_ID,
+        requested_by_user_id: USER_ID,
+        analysis_kind: "funnel_dropoff",
+        analysis_spec: { funnel_key: "checkout", step_key: "payment" }
+      })
+    ).resolves.toMatchObject({
+      generation_id: GENERATION_ID,
+      status: "pending",
+      failure_reason: null,
+      claimed_at: null
+    });
+    expect(queryMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("returns the current generation when another request wins a failed retry race", async (): Promise<void> => {
+    const failedRow = { ...generationRow, status: "failed", failure_reason: "transient" };
+    const pendingRow = { ...generationRow, status: "pending", failure_reason: null };
+    let selectCount = 0;
+    const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      if (sqlText.includes("INSERT INTO analytics_bundle_generations")) return { rows: [] };
+      if (sqlText.includes("WHERE project_id = $1::uuid")) {
+        selectCount += 1;
+        return { rows: [failedRow] };
+      }
+      if (sqlText.includes("UPDATE analytics_bundle_generations")) return { rows: [] };
+      if (sqlText.includes("WHERE id = $1::uuid")) {
+        expect(params).toEqual([GENERATION_ID]);
+        return { rows: [pendingRow] };
+      }
+      throw new Error(`Unhandled failed retry race SQL: ${sqlText}`);
+    });
+    const store = createPostgresAnalyticsBundleGenerationStore(createTransactionalDb(queryMock));
+
+    await expect(
+      store.reserveAnalyticsBundleGeneration({
+        project_id: PROJECT_ID,
+        opportunity_id: null,
+        requested_by_user_id: USER_ID,
+        analysis_kind: "usage_summary",
+        analysis_spec: {}
+      })
+    ).resolves.toMatchObject({ generation_id: GENERATION_ID, status: "pending" });
+    expect(selectCount).toBe(1);
+    expect(queryMock).toHaveBeenCalledTimes(4);
   });
 
   it("gets a project-scoped generation by id", async (): Promise<void> => {
@@ -190,11 +286,13 @@ describe("analytics bundle generation store", () => {
         limit: 1
       })
     ).resolves.toMatchObject({
-      bundles: [{
-        generation_id: GENERATION_ID,
-        status: "completed"
-      }],
-      next_cursor: `2026-07-07T09:00:00.000Z|${overflowGenerationId}`
+      bundles: [
+        {
+          generation_id: GENERATION_ID,
+          status: "completed"
+        }
+      ],
+      next_cursor: `2026-07-08T10:00:00.000Z|${GENERATION_ID}`
     });
     expect(queryMock).toHaveBeenCalledOnce();
   });
@@ -220,12 +318,14 @@ describe("analytics bundle generation store", () => {
         2
       ]);
       return {
-        rows: [{
-          ...generationRow,
-          status: "completed",
-          project_name: "Marketing site",
-          project_color_tag: "blue"
-        }]
+        rows: [
+          {
+            ...generationRow,
+            status: "completed",
+            project_name: "Marketing site",
+            project_color_tag: "blue"
+          }
+        ]
       };
     });
     const store = createPostgresAnalyticsBundleGenerationStore(createTransactionalDb(queryMock));
@@ -244,20 +344,24 @@ describe("analytics bundle generation store", () => {
         limit: 1
       })
     ).resolves.toMatchObject({
-      bundles: [{
-        generation_id: GENERATION_ID,
-        project_name: "Marketing site",
-        project_color_tag: "blue"
-      }],
+      bundles: [
+        {
+          generation_id: GENERATION_ID,
+          project_name: "Marketing site",
+          project_color_tag: "blue"
+        }
+      ],
       next_cursor: null
     });
   });
 
   it("builds stable AnalyticsBundle generation cursors", (): void => {
-    expect(buildAnalyticsBundleGenerationCursor({
-      generation_id: GENERATION_ID,
-      created_at: "2026-07-08T10:00:00.000Z"
-    })).toBe(`2026-07-08T10:00:00.000Z|${GENERATION_ID}`);
+    expect(
+      buildAnalyticsBundleGenerationCursor({
+        generation_id: GENERATION_ID,
+        created_at: "2026-07-08T10:00:00.000Z"
+      })
+    ).toBe(`2026-07-08T10:00:00.000Z|${GENERATION_ID}`);
   });
 
   it("claims the oldest pending generation with a skip-locked update", async (): Promise<void> => {
@@ -268,12 +372,14 @@ describe("analytics bundle generation store", () => {
         expect(sqlText).toContain("status = 'running'");
         expect(params).toEqual(["2026-07-08T10:05:00.000Z"]);
         return {
-          rows: [{
-            ...generationRow,
-            status: "running",
-            claimed_at: "2026-07-08T10:05:00.000Z",
-            updated_at: "2026-07-08T10:05:00.000Z"
-          }]
+          rows: [
+            {
+              ...generationRow,
+              status: "running",
+              claimed_at: "2026-07-08T10:05:00.000Z",
+              updated_at: "2026-07-08T10:05:00.000Z"
+            }
+          ]
         };
       }
 
@@ -305,12 +411,14 @@ describe("analytics bundle generation store", () => {
         expect(sqlText).toContain("status IN ('pending', 'running')");
         expect(params).toEqual([PROJECT_ID, GENERATION_ID, "2026-07-08T10:05:00.000Z"]);
         return {
-          rows: [{
-            ...generationRow,
-            status: "running",
-            claimed_at: "2026-07-08T10:05:00.000Z",
-            updated_at: "2026-07-08T10:05:00.000Z"
-          }]
+          rows: [
+            {
+              ...generationRow,
+              status: "running",
+              claimed_at: "2026-07-08T10:05:00.000Z",
+              updated_at: "2026-07-08T10:05:00.000Z"
+            }
+          ]
         };
       }
 
@@ -348,13 +456,15 @@ describe("analytics bundle generation store", () => {
           "2026-07-08T10:10:00.000Z"
         ]);
         return {
-          rows: [{
-            ...generationRow,
-            status: "completed",
-            object_key: `analytics-bundles/${PROJECT_ID}/${GENERATION_ID}/analytics-bundle.json.gz`,
-            completed_at: "2026-07-08T10:10:00.000Z",
-            updated_at: "2026-07-08T10:10:00.000Z"
-          }]
+          rows: [
+            {
+              ...generationRow,
+              status: "completed",
+              object_key: `analytics-bundles/${PROJECT_ID}/${GENERATION_ID}/analytics-bundle.json.gz`,
+              completed_at: "2026-07-08T10:10:00.000Z",
+              updated_at: "2026-07-08T10:10:00.000Z"
+            }
+          ]
         };
       }
 
@@ -397,12 +507,14 @@ describe("analytics bundle generation store", () => {
           "2026-07-08T10:15:00.000Z"
         ]);
         return {
-          rows: [{
-            ...generationRow,
-            status: "failed",
-            failure_reason: "insufficient aggregate inputs",
-            updated_at: "2026-07-08T10:15:00.000Z"
-          }]
+          rows: [
+            {
+              ...generationRow,
+              status: "failed",
+              failure_reason: "insufficient aggregate inputs",
+              updated_at: "2026-07-08T10:15:00.000Z"
+            }
+          ]
         };
       }
 

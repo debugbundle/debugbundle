@@ -115,6 +115,77 @@ function readAnalyticsGranularity(parsedArgv: ParsedArgv): "hour" | "day" | unde
   throw new CliInputError("Invalid value for --granularity.");
 }
 
+function readAnalyticsAuthState(
+  parsedArgv: ParsedArgv
+): "anonymous" | "authenticated" | "unknown" | undefined {
+  const value = readStringOption(parsedArgv, "auth-state");
+  if (
+    value === undefined ||
+    value === "anonymous" ||
+    value === "authenticated" ||
+    value === "unknown"
+  ) {
+    return value;
+  }
+  throw new CliInputError("Invalid value for --auth-state.");
+}
+
+function readAnalyticsCustomDimensionFilters(
+  parsedArgv: ParsedArgv
+): Record<string, string> | undefined {
+  const value = readJsonOption(parsedArgv, "custom-dimensions-json");
+  if (value === undefined) {
+    return undefined;
+  }
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    Array.isArray(value) ||
+    Object.keys(value).length > 8 ||
+    !Object.entries(value).every(
+      ([key, entry]) =>
+        /^[A-Za-z][A-Za-z0-9_.-]{0,63}$/.test(key) &&
+        typeof entry === "string" &&
+        entry.length <= 128
+    )
+  ) {
+    throw new CliInputError("Invalid value for --custom-dimensions-json.");
+  }
+  return value as Record<string, string>;
+}
+
+const ANALYTICS_METRIC_FILTER_OPTIONS = [
+  "route",
+  "device-type",
+  "browser",
+  "os",
+  "language",
+  "country",
+  "auth-state",
+  "referrer",
+  "utm-source",
+  "utm-medium",
+  "utm-campaign",
+  "custom-dimensions-json"
+] as const;
+
+function readAnalyticsMetricFilters(parsedArgv: ParsedArgv): Record<string, unknown> {
+  return {
+    route: readStringOption(parsedArgv, "route"),
+    deviceType: readStringOption(parsedArgv, "device-type"),
+    browser: readStringOption(parsedArgv, "browser"),
+    os: readStringOption(parsedArgv, "os"),
+    language: readStringOption(parsedArgv, "language"),
+    country: readStringOption(parsedArgv, "country"),
+    authState: readAnalyticsAuthState(parsedArgv),
+    referrer: readStringOption(parsedArgv, "referrer"),
+    utmSource: readStringOption(parsedArgv, "utm-source"),
+    utmMedium: readStringOption(parsedArgv, "utm-medium"),
+    utmCampaign: readStringOption(parsedArgv, "utm-campaign"),
+    customDimensions: readAnalyticsCustomDimensionFilters(parsedArgv)
+  };
+}
+
 function readAnalyticsOpportunityStatus(
   parsedArgv: ParsedArgv
 ): "open" | "resolved" | "snoozed" | "all" | undefined {
@@ -226,6 +297,7 @@ function buildAnalyticsSettingsUpdate(parsedArgv: ParsedArgv): AnalyticsSettings
   const integerOptions: Array<[keyof AnalyticsSettingsUpdate, string]> = [
     ["raw_retention_days", "raw-retention-days"],
     ["sample_retention_days", "sample-retention-days"],
+    ["hourly_retention_days", "hourly-retention-days"],
     ["aggregate_retention_months", "aggregate-retention-months"],
     ["max_saved_funnels", "max-saved-funnels"],
     ["max_custom_dimensions", "max-custom-dimensions"]
@@ -268,6 +340,7 @@ export async function handleAnalyticsCommand(
       "granularity",
       "service",
       "environment",
+      ...ANALYTICS_METRIC_FILTER_OPTIONS,
       "limit",
       "auth-file",
       "json"
@@ -286,6 +359,7 @@ export async function handleAnalyticsCommand(
       granularity: readAnalyticsGranularity(parsedArgv),
       service: readStringOption(parsedArgv, "service"),
       environment: readStringOption(parsedArgv, "environment"),
+      ...readAnalyticsMetricFilters(parsedArgv),
       limit: readIntegerOption(parsedArgv, "limit")
     });
     const command =
@@ -317,6 +391,7 @@ export async function handleAnalyticsCommand(
       "granularity",
       "service",
       "environment",
+      ...ANALYTICS_METRIC_FILTER_OPTIONS,
       "limit",
       "auth-file",
       "json"
@@ -338,6 +413,7 @@ export async function handleAnalyticsCommand(
         granularity: readAnalyticsGranularity(parsedArgv),
         service: readStringOption(parsedArgv, "service"),
         environment: readStringOption(parsedArgv, "environment"),
+        ...readAnalyticsMetricFilters(parsedArgv),
         limit: readIntegerOption(parsedArgv, "limit")
       })
     );
@@ -353,6 +429,7 @@ export async function handleAnalyticsCommand(
       "granularity",
       "service",
       "environment",
+      ...ANALYTICS_METRIC_FILTER_OPTIONS,
       "limit",
       "auth-file",
       "json"
@@ -376,6 +453,7 @@ export async function handleAnalyticsCommand(
         granularity: readAnalyticsGranularity(parsedArgv),
         service: readStringOption(parsedArgv, "service"),
         environment: readStringOption(parsedArgv, "environment"),
+        ...readAnalyticsMetricFilters(parsedArgv),
         limit: readIntegerOption(parsedArgv, "limit")
       })
     );
@@ -510,6 +588,7 @@ export async function handleAnalyticsCommand(
       expectNoUnknownOptions(parsedArgv, [
         "project",
         "project-id",
+        "opportunity-id",
         "kind",
         "from",
         "to",
@@ -533,6 +612,7 @@ export async function handleAnalyticsCommand(
       )(
         appendCommonAuthOptions(parsedArgv, {
           projectId,
+          opportunityId: readStringOption(parsedArgv, "opportunity-id"),
           analysisKind: readRequiredAnalyticsBundleKind(parsedArgv),
           from: readStringOption(parsedArgv, "from"),
           to: readStringOption(parsedArgv, "to"),
@@ -726,6 +806,7 @@ export async function handleAnalyticsCommand(
       "journey-sample-rate",
       "raw-retention-days",
       "sample-retention-days",
+      "hourly-retention-days",
       "aggregate-retention-months",
       "max-saved-funnels",
       "max-custom-dimensions",

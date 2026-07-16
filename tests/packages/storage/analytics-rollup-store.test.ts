@@ -32,6 +32,7 @@ function createPageViewEvent(
     },
     payload: {
       kind: "page_view",
+      privacy: { mode: "strict", consent_granted: false },
       route: {
         path: "/pricing",
         normalized_path: "/pricing",
@@ -298,11 +299,7 @@ describe("analytics rollup store", () => {
     expect(
       transitionCalls.every(([, params]) => JSON.stringify(params).includes("/checkout"))
     ).toBe(true);
-    expect(
-      queryMock.mock.calls.some(([sql]) =>
-        String(sql).includes("FROM analytics_transition_rollups")
-      )
-    ).toBe(true);
+    expect(queryMock.mock.calls.some(([sql]) => String(sql).includes("FROM analytics_transition_rollups"))).toBe(false);
   });
 
   it("reconciles incident links when an existing route session gains trace correlation", async (): Promise<void> => {
@@ -367,7 +364,7 @@ describe("analytics rollup store", () => {
     expect(queryMock).toHaveBeenCalledOnce();
   });
 
-  it("evaluates funnel-dropoff opportunities after recording funnel rollups", async (): Promise<void> => {
+  it("records saved-funnel steps without running an opportunity scan in the event transaction", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
       void params;
       if (sqlText.includes("INSERT INTO analytics_ingestion_ledger")) {
@@ -375,6 +372,9 @@ describe("analytics rollup store", () => {
       }
       if (sqlText.includes("INSERT INTO analytics_rollup_uniques")) {
         return { rows: [{ inserted: true, correlation_enriched: false }] };
+      }
+      if (sqlText.includes("FROM analytics_funnel_definitions")) {
+        return { rows: [{ step_order: 1, step_count: 3 }] };
       }
       if (
         sqlText.includes("INSERT INTO analytics_session_rollups") ||
@@ -386,26 +386,6 @@ describe("analytics rollup store", () => {
       if (sqlText.includes("INSERT INTO analytics_incident_session_links")) {
         return { rows: [{ linked_sessions: "0" }] };
       }
-      if (sqlText.includes("FROM analytics_funnel_rollups")) {
-        return {
-          rows: [
-            {
-              service: "web",
-              environment: "production",
-              funnel_key: "checkout",
-              step_key: "payment",
-              step_order: 0,
-              sessions_entered: "100",
-              sessions_completed: "40",
-              dropoffs: "60"
-            }
-          ]
-        };
-      }
-      if (sqlText.includes("INSERT INTO analytics_opportunities")) {
-        return { rows: [{ id: "33333333-3333-4333-8333-333333333333" }] };
-      }
-
       throw new Error(`Unhandled analytics rollup SQL: ${sqlText}`);
     });
 
@@ -425,14 +405,15 @@ describe("analytics rollup store", () => {
         String(sql).includes("INSERT INTO analytics_funnel_rollups")
       )
     ).toHaveLength(2);
+    expect(queryMock.mock.calls.some(([sql]) => String(sql).includes("INSERT INTO analytics_opportunities"))).toBe(false);
     expect(
-      queryMock.mock.calls.some(([sql]) =>
-        String(sql).includes("INSERT INTO analytics_opportunities")
-      )
+      queryMock.mock.calls
+        .filter(([sql]) => String(sql).includes("INSERT INTO analytics_funnel_rollups"))
+        .every(([, params]) => params[7] === 1 && params[16] === 1 && params[17] === 0)
     ).toBe(true);
   });
 
-  it("evaluates journey-friction opportunities after recording route-change transition rollups", async (): Promise<void> => {
+  it("records journey transitions without running an opportunity scan in the event transaction", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
       void params;
       if (sqlText.includes("INSERT INTO analytics_ingestion_ledger")) {
@@ -451,27 +432,6 @@ describe("analytics rollup store", () => {
       if (sqlText.includes("INSERT INTO analytics_incident_session_links")) {
         return { rows: [{ linked_sessions: "0" }] };
       }
-      if (sqlText.includes("FROM analytics_transition_rollups")) {
-        return {
-          rows: [
-            {
-              service: "web",
-              environment: "production",
-              from_route_key: "/checkout",
-              to_route_key: "/pricing",
-              forward_transition_count: "45",
-              reverse_transition_count: "40",
-              total_loop_transitions: "85",
-              unique_sessions: "31"
-            }
-          ]
-        };
-      }
-      if (sqlText.includes("INSERT INTO analytics_opportunities")) {
-        expect(params[4]).toBe("journey_friction");
-        return { rows: [{ id: "44444444-4444-4444-8444-444444444444" }] };
-      }
-
       throw new Error(`Unhandled analytics rollup SQL: ${sqlText}`);
     });
 
@@ -491,19 +451,11 @@ describe("analytics rollup store", () => {
         String(sql).includes("INSERT INTO analytics_transition_rollups")
       )
     ).toHaveLength(2);
-    expect(
-      queryMock.mock.calls.some(([sql]) =>
-        String(sql).includes("FROM analytics_transition_rollups")
-      )
-    ).toBe(true);
-    expect(
-      queryMock.mock.calls.some(([sql]) =>
-        String(sql).includes("INSERT INTO analytics_opportunities")
-      )
-    ).toBe(true);
+    expect(queryMock.mock.calls.some(([sql]) => String(sql).includes("FROM analytics_transition_rollups"))).toBe(false);
+    expect(queryMock.mock.calls.some(([sql]) => String(sql).includes("INSERT INTO analytics_opportunities"))).toBe(false);
   });
 
-  it("evaluates aggregate browser friction markers after recording marker action rollups", async (): Promise<void> => {
+  it("records browser friction markers without running an opportunity scan in the event transaction", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
       void params;
       if (sqlText.includes("INSERT INTO analytics_ingestion_ledger")) {
@@ -521,26 +473,6 @@ describe("analytics rollup store", () => {
       if (sqlText.includes("INSERT INTO analytics_incident_session_links")) {
         return { rows: [{ linked_sessions: "0" }] };
       }
-      if (sqlText.includes("FROM analytics_action_rollups")) {
-        return {
-          rows: [
-            {
-              service: "web",
-              environment: "production",
-              action_key: "marker:friction.dead_click",
-              route_key: "/checkout",
-              event_count: "45",
-              unique_sessions: "22"
-            }
-          ]
-        };
-      }
-      if (sqlText.includes("INSERT INTO analytics_opportunities")) {
-        expect(params[4]).toBe("journey_friction");
-        expect(JSON.stringify(params)).not.toContain("selector");
-        return { rows: [{ id: "55555555-5555-4555-8555-555555555555" }] };
-      }
-
       throw new Error(`Unhandled analytics rollup SQL: ${sqlText}`);
     });
 
@@ -560,13 +492,7 @@ describe("analytics rollup store", () => {
         String(sql).includes("INSERT INTO analytics_action_rollups")
       )
     ).toHaveLength(2);
-    expect(
-      queryMock.mock.calls.some(([sql]) => String(sql).includes("FROM analytics_action_rollups"))
-    ).toBe(true);
-    expect(
-      queryMock.mock.calls.some(([sql]) =>
-        String(sql).includes("INSERT INTO analytics_opportunities")
-      )
-    ).toBe(true);
+    expect(queryMock.mock.calls.some(([sql]) => String(sql).includes("FROM analytics_action_rollups"))).toBe(false);
+    expect(queryMock.mock.calls.some(([sql]) => String(sql).includes("INSERT INTO analytics_opportunities"))).toBe(false);
   });
 });

@@ -1323,6 +1323,7 @@ describe("api default dependencies", () => {
 
     expect(reserveAnalyticsBundleGeneration).toHaveBeenCalledWith({
       project_id: generation.project_id,
+      opportunity_id: null,
       requested_by_user_id: "usr_123",
       analysis_kind: "funnel_dropoff",
       analysis_spec: generation.analysis_spec

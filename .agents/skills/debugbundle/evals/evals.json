@@ -54,6 +54,16 @@
       ]
     },
     {
+      "name": "product_analytics_guidance",
+      "prompt": "The user asks where visitors abandon checkout and whether an analytics bundle should be generated for every visit. Confirm the skill teaches the aggregate-first analytics workflow.",
+      "expected_behavior": [
+        "Start with direct aggregate usage and funnel reads, then inspect bounded journey evidence only when needed.",
+        "Do not generate one analytics bundle per visit; generate a durable artifact only for a bounded analysis question.",
+        "Use member authentication for analytics reads and require explicit intent for settings, saved-funnel, or bundle-generation mutations.",
+        "Preserve consent, redaction, and custom-dimension privacy constraints."
+      ]
+    },
+    {
       "name": "artifact_path_discovery",
       "prompt": "The user reports an unknown local runtime error. Confirm the skill tells the agent which DebugBundle paths and commands to inspect first.",
       "expected_behavior": [

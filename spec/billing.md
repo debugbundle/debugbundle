@@ -364,7 +364,7 @@ Effective capacity:
 included_capacity_units + additional_capacity_units
 ```
 
-The same value expands pooled monthly allowance capacity (each capacity unit carries a full allowance bucket).
+The same value expands pooled monthly allowance capacity (each capacity unit carries a full allowance bucket), including the separately metered monthly analytics event, session, retained-journey-sample, and generated-analytics-bundle allowances on paid tiers. Free receives a fixed, non-expandable preview of 5,000 analytics events, 1,000 sessions, 100 retained journey samples, 3 generated analytics bundles, and 1 saved funnel. Fixed tier capabilities such as saved funnels, custom dimensions, retention windows, and feature availability do not multiply with capacity units. Controlled custom-dimension caps are 1 on Free, 3 on Solo, 8 on Team, and 20 on self-host.
 
 ### 6.3 Recurring Billing Rule
 

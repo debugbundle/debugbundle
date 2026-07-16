@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { afterAll, expect, it } from "vitest";
 
 import {
@@ -16,7 +18,8 @@ import {
   createQueryable,
   createS3AdminClient,
   runIntegration,
-  bootstrapStorageAndCreateBucket
+  bootstrapStorageAndCreateBucket,
+  seedOwnedProject
 } from "../helpers/integration-setup.ts";
 
 runIntegration("storage bootstrap integration", () => {
@@ -165,10 +168,9 @@ runIntegration("storage bootstrap integration", () => {
     await migrateStorageSchema(db);
     await pool.query("DROP INDEX analytics_journey_samples_project_correlation_seen_idx");
     await pool.query("ALTER TABLE analytics_journey_samples DROP COLUMN correlation_session_hash");
-    await pool.query(
-      "DELETE FROM storage_migration_ledger WHERE id = $1",
-      ["202607100002_add_analytics_journey_sample_correlation_hash"]
-    );
+    await pool.query("DELETE FROM storage_migration_ledger WHERE id = $1", [
+      "202607100002_add_analytics_journey_sample_correlation_hash"
+    ]);
 
     await expect(assertStorageSchemaMigrationsApplied(db)).rejects.toThrow(
       "storage_schema_missing_migrations: 202607100002_add_analytics_journey_sample_correlation_hash"
@@ -202,6 +204,183 @@ runIntegration("storage bootstrap integration", () => {
     expect(indexResult.rows).toEqual([
       { index_name: "analytics_journey_samples_project_correlation_seen_idx" }
     ]);
+    await expect(assertStorageSchemaMigrationsApplied(db)).resolves.toBeUndefined();
+  });
+
+  it("expands only the provisional saved-funnel default through the ordered forward migration", async (): Promise<void> => {
+    await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
+    await pool.query("CREATE SCHEMA public");
+
+    const db = createQueryable(pool);
+    await bootstrapStorageSchema(db);
+    await migrateStorageSchema(db);
+
+    const freeProjectId = randomUUID();
+    const soloProjectId = randomUUID();
+    const teamProjectId = randomUUID();
+    await seedOwnedProject({
+      pool,
+      organizationId: randomUUID(),
+      projectId: freeProjectId,
+      organizationName: "Free analytics preview migration",
+      organizationSlug: `free-analytics-${freeProjectId.slice(0, 8)}`,
+      projectName: "Free analytics project",
+      projectSlug: `free-analytics-project-${freeProjectId.slice(0, 8)}`,
+      organizationPlan: "free"
+    });
+    await seedOwnedProject({
+      pool,
+      organizationId: randomUUID(),
+      projectId: soloProjectId,
+      organizationName: "Solo funnel migration",
+      organizationSlug: `solo-funnel-${soloProjectId.slice(0, 8)}`,
+      projectName: "Solo funnel project",
+      projectSlug: `solo-funnel-project-${soloProjectId.slice(0, 8)}`,
+      organizationPlan: "solo"
+    });
+    await seedOwnedProject({
+      pool,
+      organizationId: randomUUID(),
+      projectId: teamProjectId,
+      organizationName: "Team funnel migration",
+      organizationSlug: `team-funnel-${teamProjectId.slice(0, 8)}`,
+      projectName: "Team funnel project",
+      projectSlug: `team-funnel-project-${teamProjectId.slice(0, 8)}`,
+      organizationPlan: "team"
+    });
+    await pool.query(
+      `
+        INSERT INTO project_analytics_settings (project_id, max_saved_funnels)
+        VALUES ($1, 0), ($2, 3), ($3, 3)
+      `,
+      [freeProjectId, soloProjectId, teamProjectId]
+    );
+    await pool.query(
+      "ALTER TABLE project_analytics_settings ALTER COLUMN max_saved_funnels SET DEFAULT 3"
+    );
+    await pool.query("DELETE FROM storage_migration_ledger WHERE id = ANY($1::text[])", [
+      [
+        "202607130001_expand_default_saved_funnel_capacity",
+        "202607140001_enable_free_analytics_preview"
+      ]
+    ]);
+
+    const migrated = await migrateStorageSchema(db);
+
+    expect(migrated.applied).toEqual([
+      "202607130001_expand_default_saved_funnel_capacity",
+      "202607140001_enable_free_analytics_preview"
+    ]);
+    const settings = await pool.query<{
+      project_id: string;
+      max_saved_funnels: number;
+    }>(
+      `
+        SELECT project_id, max_saved_funnels
+        FROM project_analytics_settings
+        WHERE project_id = ANY($1::uuid[])
+        ORDER BY max_saved_funnels ASC
+      `,
+      [[freeProjectId, soloProjectId, teamProjectId]]
+    );
+    expect(settings.rows).toEqual([
+      { project_id: freeProjectId, max_saved_funnels: 1 },
+      { project_id: soloProjectId, max_saved_funnels: 10 },
+      { project_id: teamProjectId, max_saved_funnels: 50 }
+    ]);
+
+    const defaultResult = await pool.query<{ column_default: string }>(
+      `
+        SELECT column_default
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'project_analytics_settings'
+          AND column_name = 'max_saved_funnels'
+      `
+    );
+    expect(defaultResult.rows[0]?.column_default).toContain("10");
+    await expect(assertStorageSchemaMigrationsApplied(db)).resolves.toBeUndefined();
+  });
+
+  it("expands zero custom-dimension capacity by tier without replacing configured limits", async (): Promise<void> => {
+    await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
+    await pool.query("CREATE SCHEMA public");
+
+    const db = createQueryable(pool);
+    await bootstrapStorageSchema(db);
+    await migrateStorageSchema(db);
+
+    const freeProjectId = randomUUID();
+    const soloProjectId = randomUUID();
+    const teamProjectId = randomUUID();
+    const configuredTeamProjectId = randomUUID();
+    const projects = [
+      { id: freeProjectId, plan: "free" as const, name: "Free" },
+      { id: soloProjectId, plan: "solo" as const, name: "Solo" },
+      { id: teamProjectId, plan: "team" as const, name: "Team" },
+      { id: configuredTeamProjectId, plan: "team" as const, name: "Configured Team" }
+    ];
+    for (const project of projects) {
+      await seedOwnedProject({
+        pool,
+        organizationId: randomUUID(),
+        projectId: project.id,
+        organizationName: `${project.name} custom dimension migration`,
+        organizationSlug: `${project.plan}-dimensions-${project.id.slice(0, 8)}`,
+        projectName: `${project.name} custom dimension project`,
+        projectSlug: `${project.plan}-dimensions-project-${project.id.slice(0, 8)}`,
+        organizationPlan: project.plan
+      });
+    }
+    await pool.query(
+      `
+        INSERT INTO project_analytics_settings (project_id, max_custom_dimensions)
+        VALUES ($1, 0), ($2, 0), ($3, 0), ($4, 2)
+      `,
+      [freeProjectId, soloProjectId, teamProjectId, configuredTeamProjectId]
+    );
+    await pool.query(
+      "ALTER TABLE project_analytics_settings ALTER COLUMN max_custom_dimensions SET DEFAULT 0"
+    );
+    await pool.query("DELETE FROM storage_migration_ledger WHERE id = $1", [
+      "202607140002_expand_custom_dimension_capacity"
+    ]);
+
+    const migrated = await migrateStorageSchema(db);
+
+    expect(migrated.applied).toEqual(["202607140002_expand_custom_dimension_capacity"]);
+    const settings = await pool.query<{
+      project_id: string;
+      max_custom_dimensions: number;
+    }>(
+      `
+        SELECT project_id, max_custom_dimensions
+        FROM project_analytics_settings
+        WHERE project_id = ANY($1::uuid[])
+      `,
+      [[freeProjectId, soloProjectId, teamProjectId, configuredTeamProjectId]]
+    );
+    expect(
+      new Map(settings.rows.map((row) => [row.project_id, row.max_custom_dimensions]))
+    ).toEqual(
+      new Map([
+        [freeProjectId, 1],
+        [soloProjectId, 3],
+        [teamProjectId, 8],
+        [configuredTeamProjectId, 2]
+      ])
+    );
+
+    const defaultResult = await pool.query<{ column_default: string }>(
+      `
+        SELECT column_default
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'project_analytics_settings'
+          AND column_name = 'max_custom_dimensions'
+      `
+    );
+    expect(defaultResult.rows[0]?.column_default).toContain("3");
     await expect(assertStorageSchemaMigrationsApplied(db)).resolves.toBeUndefined();
   });
 
@@ -257,10 +436,7 @@ runIntegration("storage bootstrap integration", () => {
         SET checksum = $2
         WHERE id = $1
       `,
-      [
-        "202606050002_add_durable_plan_cleanup_tasks",
-        LEGACY_PLAN_CLEANUP_TASKS_MIGRATION_CHECKSUM
-      ]
+      ["202606050002_add_durable_plan_cleanup_tasks", LEGACY_PLAN_CLEANUP_TASKS_MIGRATION_CHECKSUM]
     );
 
     const repaired = await migrateStorageSchema(createQueryable(pool));

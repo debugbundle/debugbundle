@@ -3,7 +3,10 @@ import { access, readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { EventEnvelopeSchema } from "../../packages/shared-types/src/index.js";
+import {
+  AnalyticsEventEnvelopeSchema,
+  EventEnvelopeSchema
+} from "../../packages/shared-types/src/index.js";
 
 const relayComplianceFixturePath = new URL("../fixtures/relay-compliance.json", import.meta.url);
 const vendoredRelayFixturePaths = [
@@ -53,13 +56,17 @@ const RelayOptionsSchema = z.object({
   environment: z.string().min(1).optional(),
   rateLimitPerMinute: z.number().int().positive().optional()
 });
+const BrowserRelayEventEnvelopeSchema = z.union([
+  EventEnvelopeSchema,
+  AnalyticsEventEnvelopeSchema
+]);
 
 const HandlerCaseSchema = z.object({
   id: z.string().min(1),
   kind: z.literal("handler"),
   request: RelayRequestSchema,
   expected: RelayExpectedSchema,
-  expectedEventFile: z.array(EventEnvelopeSchema).optional()
+  expectedEventFile: z.array(BrowserRelayEventEnvelopeSchema).optional()
 });
 
 const SequenceCaseSchema = z.object({
@@ -81,11 +88,11 @@ const DeliveryCaseSchema = z.object({
   relayOptions: RelayOptionsSchema,
   request: RelayRequestSchema,
   expected: RelayExpectedSchema,
-  expectedEventFile: z.array(EventEnvelopeSchema).optional(),
+  expectedEventFile: z.array(BrowserRelayEventEnvelopeSchema).optional(),
   expectedDeliveredMarker: z.boolean().optional(),
   expectedForwardRequest: z
     .object({
-      events: z.array(EventEnvelopeSchema)
+      events: z.array(BrowserRelayEventEnvelopeSchema)
     })
     .optional()
 });
@@ -103,6 +110,7 @@ describe("relay compliance fixtures", () => {
 
     expect(parsed.cases.map((fixture) => fixture.id)).toEqual([
       "valid-browser-batch",
+      "valid-analytics-event",
       "mixed-valid-invalid-batch",
       "credential-smuggling-payload",
       "wrong-origin-request",

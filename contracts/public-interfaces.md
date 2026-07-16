@@ -60,15 +60,15 @@ Every capability must be available through all applicable interfaces. Operations
 | List analytics journey samples | `GET /v1/analytics/journey-samples` | `analytics journey-samples list` | `list_analytics_journey_samples` | Browser Session or Member Token, retained redacted sample metadata |
 | Get analytics journey sample | `GET /v1/analytics/journey-samples/{id}` | `analytics journey-samples get` | `get_analytics_journey_sample` | Browser Session or Member Token, retained redacted sample artifact |
 | Get analytics settings | `GET /v1/projects/{id}/analytics-settings` | `analytics settings get` | `get_analytics_settings` | Browser Session or Member Token; members receive preview-only payload and all tiers can inspect availability |
-| Update analytics settings | `PATCH /v1/projects/{id}/analytics-settings` | `analytics settings set` | `update_analytics_settings` | Browser Session or Member Token, owner/admin only, Solo+ for analytics enablement, Team for custom dimensions |
-| List saved analytics funnels | `GET /v1/projects/{id}/analytics/saved-funnels` | `analytics saved-funnels list` | `list_saved_analytics_funnels` | Browser Session or Member Token, project member, paid analytics tier |
-| Create saved analytics funnel | `POST /v1/projects/{id}/analytics/saved-funnels` | `analytics saved-funnels create` | `create_saved_analytics_funnel` | Browser Session or Member Token, owner/admin, paid analytics tier and independent saved-funnel cap |
-| Update saved analytics funnel | `PATCH /v1/projects/{id}/analytics/saved-funnels/{key}` | `analytics saved-funnels update` | `update_saved_analytics_funnel` | Browser Session or Member Token, owner/admin, paid analytics tier |
-| Archive saved analytics funnel | `DELETE /v1/projects/{id}/analytics/saved-funnels/{key}` | `analytics saved-funnels archive` | `archive_saved_analytics_funnel` | Browser Session or Member Token, owner/admin, paid analytics tier |
+| Update analytics settings | `PATCH /v1/projects/{id}/analytics-settings` | `analytics settings set` | `update_analytics_settings` | Browser Session or Member Token, owner/admin only, tier-bounded settings |
+| List saved analytics funnels | `GET /v1/projects/{id}/analytics/saved-funnels` | `analytics saved-funnels list` | `list_saved_analytics_funnels` | Browser Session or Member Token, project member, analytics available |
+| Create saved analytics funnel | `POST /v1/projects/{id}/analytics/saved-funnels` | `analytics saved-funnels create` | `create_saved_analytics_funnel` | Browser Session or Member Token, owner/admin, analytics available and independent saved-funnel cap |
+| Update saved analytics funnel | `PATCH /v1/projects/{id}/analytics/saved-funnels/{key}` | `analytics saved-funnels update` | `update_saved_analytics_funnel` | Browser Session or Member Token, owner/admin, analytics available |
+| Archive saved analytics funnel | `DELETE /v1/projects/{id}/analytics/saved-funnels/{key}` | `analytics saved-funnels archive` | `archive_saved_analytics_funnel` | Browser Session or Member Token, owner/admin, analytics available |
 | List analytics opportunities | `GET /v1/analytics/opportunities` | `analytics opportunities` | `list_analytics_opportunities` | Browser Session or Member Token |
 | Get analytics opportunity | `GET /v1/analytics/opportunities/{id}` | `analytics opportunity get` | `get_analytics_opportunity` | Browser Session or Member Token |
 | List AnalyticsBundles | `GET /v1/analytics/bundles` | `analytics bundle list` | `list_analytics_bundles` | Browser Session or Member Token |
-| Generate AnalyticsBundle | `POST /v1/analytics/bundles` | `analytics bundle create` | `generate_analytics_bundle` | Browser Session or Member Token, tier-gated; `incident_impact` requires an accessible `incident_id` from the target project |
+| Generate AnalyticsBundle | `POST /v1/analytics/bundles` | `analytics bundle create` | `generate_analytics_bundle` | Browser Session or Member Token, tier-gated; accepts optional authorized `opportunity_id`; focused kinds require their matching route/funnel/incident/deploy context |
 | Get AnalyticsBundle | `GET /v1/analytics/bundles/{id}` | `analytics bundle get` | `get_analytics_bundle` | Browser Session or Member Token |
 | List project members | `GET /v1/projects/{id}/members` | `project members list` | `list_project_members` | Browser Session or Member Token, any authorized project member |
 | Get project member avatar | `GET /v1/projects/{id}/members/{userId}/avatar` | — | — | Browser session or member token, authorized project viewers only |
@@ -239,7 +239,6 @@ The CLI bootstrap flow is additive and issues the same member-token credential u
 `GET /v1/account/export` returns a JSON attachment with top-level `export_version: 1` plus the retained organization-account record set, including organization and project members, projects, tokens, capture policies, probes, hosted improvement opportunities, reusable Slack destinations, alerts, weekly reports, webhooks, GitHub automation, incidents, audit logs, billing-processing rows, retryable plan-cleanup rows, operational email rows, and retained raw-event, bundle, improvement-bundle, and reproduction artifacts when present in object storage.
 
 `GET /v1/account/avatar` returns the signed-in user's cached avatar bytes with a first-party URL shape of `/v1/account/avatar`. `POST /v1/account/avatar/import-gravatar` performs a server-side fetch against Gravatar only after explicit user action, stores the resulting avatar in object storage, and returns:
-
 - `200 { "avatar": { "source": "gravatar", "avatar_url": "/v1/account/avatar", "updated_at": "ISO8601" } }`
 - `404 { "error": "gravatar_not_found" }` when no Gravatar image exists
 - `502 { "error": "avatar_import_failed" }` when the remote fetch fails or returns an unsupported image
@@ -529,7 +528,7 @@ create, update, and soft-archive controls only to owners/admins. Browser mutatio
 use the same cookie-session CSRF protection and server-owned validation, tier, and
 active-definition limit enforcement as the API.
 
-**Common query params:** `project_id` (required unless the endpoint explicitly supports cross-project summary), `service`, `environment`, `from`, `to`, `granularity`, `route`, `funnel`, `device_type`, `browser`, `os`, `language`, `country`, `auth_state`, `custom_dimension.<key>`, `limit`, `cursor`.
+**Common query params:** `project_id` (required unless the endpoint explicitly supports cross-project summary), `service`, `environment`, `from`, `to`, `granularity`, `route`, `funnel`, `device_type`, `browser`, `os`, `language`, `country`, `auth_state`, `referrer`, `utm_source`, `utm_medium`, `utm_campaign`, `custom_dimension.<key>`, `limit`, `cursor`. Up to eight `custom_dimension.<key>` filters are accepted per request; keys must match `[A-Za-z][A-Za-z0-9_.-]{0,63}` and values are limited to 128 characters. API, CLI (`--custom-dimensions-json`), and MCP (`customDimensions`) apply the same filter limits.
 
 **Analytics summary response shape:**
 ```json
@@ -562,9 +561,9 @@ active-definition limit enforcement as the API.
 }
 ```
 
-The implemented aggregate metrics read surface includes `GET /v1/analytics/summary`, `/routes`, `/journey-patterns`, `/devices`, `/referrers`, `/actions`, `/funnels`, `/funnels/{key}`, and `/incidents/{id}/impact` plus matching `debugbundle analytics summary|routes|journeys|devices|referrers|actions|funnels|funnel|incident-impact` commands and MCP `get_usage_summary`, `get_route_metrics`, `get_journey_patterns`, `get_device_breakdown`, `get_referrer_metrics`, `get_action_metrics`, `list_funnel_metrics`, `get_funnel_analysis`, and `get_incident_impact` tools. Incident impact verifies the requested incident belongs to the accessible project, reads only correlation links and aggregate ledgers, returns affected sessions/routes/funnels, top device/browser segments, linked session journey patterns, and the latest incident-impact AnalyticsBundle state. Its conversion delta is explicitly `unavailable` until a future correlation-safe baseline supports it; the API does not infer a number from unrelated aggregate rows. Journey-pattern rows remain aggregate transition metrics but may include up to three retained redacted `sample_ids` that match the transition tag and requested time window so agents can fetch representative journeys through the journey-sample detail route. Retained redacted journey samples are readable through `GET /v1/analytics/journey-samples` and `/journey-samples/{id}`, matching `debugbundle analytics journey-samples list|get` and MCP `list_analytics_journey_samples` / `get_analytics_journey_sample`; list responses expose metadata only and detail reads fetch the compressed redacted sample artifact from object storage without exposing its object key. Stored analytics opportunities are also readable through `GET /v1/analytics/opportunities` and `/opportunities/{id}`, matching `debugbundle analytics opportunities`, `debugbundle analytics opportunity get`, and MCP `list_analytics_opportunities` / `get_analytics_opportunity`. AnalyticsBundle generation can be requested through `POST /v1/analytics/bundles`, `debugbundle analytics bundle create`, and MCP `generate_analytics_bundle`; successful requests reserve a deterministic generation record and enqueue `build-analytics-bundle`, returning pending state until the worker completes it. AnalyticsBundle generation records can be inventoried through `GET /v1/analytics/bundles`, `debugbundle analytics bundle list`, and MCP `list_analytics_bundles`, returning lightweight metadata including analysis kind, status, timestamps, failure reason, input fingerprint, and whether an artifact exists. Existing AnalyticsBundle generation records are readable through `GET /v1/analytics/bundles/{id}`, `debugbundle analytics bundle get`, and MCP `get_analytics_bundle`; completed generations return the validated `AnalyticsBundleV1` artifact, while pending/running and failed generations return explicit state payloads. Initial stored opportunities are created by a background aggregate-rollup evaluator for `funnel_dropoff` candidates with bounded sample/dropoff thresholds; evidence is aggregate-only and no opportunity implies an AnalyticsBundle artifact exists yet. These endpoints are project-authorized browser-session/member-token read surfaces; project tokens remain write-only for analytics ingestion.
+The implemented aggregate metrics read surface includes `GET /v1/analytics/summary`, `/routes`, `/journey-patterns`, `/devices`, `/referrers`, `/actions`, `/funnels`, `/funnels/{key}`, and `/incidents/{id}/impact` plus matching `debugbundle analytics summary|routes|journeys|devices|referrers|actions|funnels|funnel|incident-impact` commands and MCP `get_usage_summary`, `get_route_metrics`, `get_journey_patterns`, `get_device_breakdown`, `get_referrer_metrics`, `get_action_metrics`, `list_funnel_metrics`, `get_funnel_analysis`, and `get_incident_impact` tools. All metric adapters support the same bounded route/device/browser/OS/language/country/auth/referrer/UTM/custom-dimension filters. Incident impact verifies the requested incident belongs to the accessible project, reads only correlation links and aggregate ledgers, returns affected sessions/routes/funnels, top device/browser segments, linked session journey patterns, and the latest incident-impact AnalyticsBundle state. Its conversion delta is explicitly `unavailable` until a correlation-safe baseline exists; the API does not infer a number from unrelated aggregate rows. Journey-pattern rows remain aggregate transition metrics but may include up to three retained redacted `sample_ids` that match the transition tag and requested time window so agents can fetch representative journeys through the journey-sample detail route. Retained redacted journey samples are readable through `GET /v1/analytics/journey-samples` and `/journey-samples/{id}`, matching `debugbundle analytics journey-samples list|get` and MCP `list_analytics_journey_samples` / `get_analytics_journey_sample`; list responses expose metadata only and detail reads fetch the compressed redacted sample artifact from object storage without exposing its object key. Stored analytics opportunities are also readable through `GET /v1/analytics/opportunities` and `/opportunities/{id}`, matching `debugbundle analytics opportunities`, `debugbundle analytics opportunity get`, and MCP `list_analytics_opportunities` / `get_analytics_opportunity`. Deterministic evaluators cover funnel dropoff, route loops and fixed friction markers, route-exit regression, deploy conversion regression, and correlation-backed incident reach; recurring resolved signals reopen, snoozed signals remain snoozed, and stale open signals resolve after a complete evaluation window. AnalyticsBundle generation can be requested through `POST /v1/analytics/bundles`, `debugbundle analytics bundle create`, and MCP `generate_analytics_bundle`; successful requests reserve a deterministic generation record and enqueue `build-analytics-bundle`, returning pending state until the worker completes it. An optional `opportunity_id` derives the exact authorized opportunity scope/evidence and complete related incident/deploy sets; conflicting caller context is rejected. AnalyticsBundle generation records can be inventoried through `GET /v1/analytics/bundles`, `debugbundle analytics bundle list`, and MCP `list_analytics_bundles`, returning lightweight metadata including analysis kind, status, timestamps, failure reason, input fingerprint, and whether an artifact exists. Existing AnalyticsBundle generation records are readable through `GET /v1/analytics/bundles/{id}`, `debugbundle analytics bundle get`, and MCP `get_analytics_bundle`; completed generations return the validated `AnalyticsBundleV1` artifact, while pending/running and failed generations return explicit state payloads. These endpoints are project-authorized browser-session/member-token read surfaces; project tokens remain write-only for analytics ingestion.
 
-Saved funnel definitions are project-scoped configuration, not one bundle per visit. Each definition contains a stable `funnel_key`, display name, and 2-20 ordered unique `{ step_key, display_name }` entries. Active definitions are limited independently from analytics event/session and AnalyticsBundle-generation allowances; creation enforces the lesser of the project's stored `max_saved_funnels` and its current tier cap under a project transaction lock. Archive is soft so historical aggregates remain interpretable; recreating an archived key reactivates it when capacity permits. Members may list definitions, while owner/admin role is required to create, update, or archive. Matching CLI commands are `debugbundle analytics saved-funnels list|create|update|archive`; matching MCP tools are `list_saved_analytics_funnels`, `create_saved_analytics_funnel`, `update_saved_analytics_funnel`, and `archive_saved_analytics_funnel`.
+Saved funnel definitions are project-scoped configuration, not one bundle per visit. Each definition contains a stable `funnel_key`, display name, and 2-20 ordered unique `{ step_key, display_name }` entries. Active definitions are limited independently from analytics event/session, retained-journey-sample, and AnalyticsBundle-generation allowances. The default active cap is derived from the current tier (1 Free, 10 Solo, 50 Team, 100 self-host), and creation enforces the lesser of any deliberately stored project override and the current tier cap under a project transaction lock. Paid included and purchased capacity units multiply the monthly analytics allowances but do not multiply saved funnels or custom-dimension slots. Archive is soft so historical aggregates remain interpretable; recreating an archived key reactivates it when capacity permits. Members may list definitions, while owner/admin role is required to create, update, or archive. Matching CLI commands are `debugbundle analytics saved-funnels list|create|update|archive`; matching MCP tools are `list_saved_analytics_funnels`, `create_saved_analytics_funnel`, `update_saved_analytics_funnel`, and `archive_saved_analytics_funnel`.
 
 The aggregate opportunity evaluator also creates `journey_friction` records from only the fixed browser friction-marker action rollups (`friction.repeated_click`, `friction.dead_click`, and `friction.backtrack`) once conservative aggregate event/session thresholds are met. Their evidence is limited to the fixed marker key, normalized route, analysis window, and aggregate counts.
 
@@ -726,7 +725,7 @@ For incident impact, journey-pattern `sample_ids` additionally require an exact 
 
 **Analytics opportunity record fields:** `opportunity_id`, `project_id`, `project_name`, `project_color_tag`, `service`, `environment`, `kind`, `status`, `severity`, `confidence`, `title`, `summary`, `evidence`, `related_incident_ids`, `related_deploy_ids`, `first_detected_at`, `last_detected_at`, `resolved_at`, `snoozed_until`, `bundle_generation_id`, `bundle_status`, `bundle_created_at`, `bundle_updated_at`, `bundle_failure_reason`.
 
-Initial stored opportunity kinds are generated from aggregate rollups only: `funnel_dropoff` from funnel rollups and `journey_friction` from bidirectional route-transition loops or the fixed browser friction-marker action rollups (`friction.repeated_click`, `friction.dead_click`, and `friction.backtrack`). Evidence must remain aggregate-only; marker evidence is limited to the fixed marker key, normalized route, analysis window, and aggregate counts. A listed opportunity does not imply an AnalyticsBundle artifact has been generated.
+Stored opportunities are generated from aggregate/correlation ledgers only: `funnel_dropoff` from funnel rollups; `journey_friction` from bidirectional route loops or the fixed browser friction markers (`friction.repeated_click`, `friction.dead_click`, and `friction.backtrack`); `route_health` from current-versus-baseline exit regression; `deploy_comparison` from current-versus-baseline deploy conversion regression; and `incident_impact` from correlation-backed affected-session reach. Evidence must remain aggregate-only; marker evidence is limited to the fixed marker key, normalized route, analysis window, and aggregate counts. A listed opportunity does not imply an AnalyticsBundle artifact has been generated.
 
 **Analytics journey sample list response:** `GET /v1/analytics/journey-samples?project_id=<uuid>&service=<name>&environment=<name>&tag=<tag>&cursor=<cursor>&limit=<n>` returns metadata only:
 
@@ -785,6 +784,7 @@ Journey sample responses must not expose the internal object-storage key. Expire
 ```json
 {
   "project_id": "uuid",
+  "opportunity_id": "uuid | null",
   "analysis_kind": "funnel_dropoff",
   "from": "ISO8601",
   "to": "ISO8601",
@@ -797,7 +797,7 @@ Journey sample responses must not expose the internal object-storage key. Expire
 ```
 
 `last` may be supplied instead of `from` for relative windows such as `"7d"`; `to` may still be supplied with `last` to anchor the window.
-When `incident_id` or `deploy_id` is supplied, the generation stores those values as linked incident/deploy evidence for the AnalyticsBundle artifact while preserving the scalar request fields for compatibility.
+Focused generation requirements are: `funnel_dropoff` requires `funnel`, `route_health` requires `route`, `incident_impact` requires an accessible project `incident_id`, `deploy_comparison` requires `deploy_id`, and `conversion_path` requires `funnel` or `route`. When `opportunity_id` is supplied, it must belong to the target project and match `analysis_kind`; the API derives the opportunity's exact analysis window, service/environment, focus, aggregate evidence, and complete related incident/deploy sets, rejecting conflicting explicit values. When standalone `incident_id` or `deploy_id` is supplied, the generation stores those values as linked evidence while preserving the scalar request fields for compatibility. An identical completed or in-flight request reuses its deterministic generation; an identical failed request resets that generation to pending for retry without a duplicate durable quota claim.
 The web generation surface may submit only the bounded `service` and `environment` keys inside `filters`; it does not expose arbitrary JSON or custom-filter entry. Bundle workers apply these nested scope values while continuing to accept legacy top-level `service` and `environment` analysis specifications. When `route` is supplied, route metrics and journey-pattern evidence are restricted to that normalized route context.
 
 **Analytics inventory list scope:** `GET /v1/analytics/opportunities` and `GET /v1/analytics/bundles` retain their existing project-scoped behavior when `project_id=<uuid>` is supplied. An authorized browser session or member token may omit `project_id` only for these list endpoints to return records across projects in the caller's organization. Cross-project pagination remains ordered by the record timestamp and unique record ID, and bundle rows include `project_name` and `project_color_tag` metadata. Detail, metric, journey-sample, settings, and generation endpoints remain project-scoped.
@@ -834,7 +834,7 @@ CLI callers must opt into this inventory scope with `--all-projects`; the defaul
 }
 ```
 
-**AnalyticsBundle response:** full `AnalyticsBundleV1` JSON when ready; `{ "status": "pending", "bundle_generation_id": "uuid" }` while queued/running; `{ "status": "failed", "reason": "..." }` when generation failed or allowance is exhausted. Every successful generation POST/detail response also includes additive `X-DebugBundle-Generation-Id: <uuid>` metadata, including already-completed and failed deterministic generations whose strict response body has no generation ID. Credentialed app CORS responses expose this header so the web client can navigate to the canonical detail route without changing API/CLI/MCP response bodies. Hydrated representative journeys are capped at five and expose deterministic `selection_rank`, `selection_basis`, and aggregate selection counts. Incident-impact journeys remain eligible only through the exact internal correlation/session, transition, service/environment, bounded-window, completed-artifact constraint; those internal hashes are never exposed.
+**AnalyticsBundle response:** full `AnalyticsBundleV1` JSON when ready; `{ "status": "pending", "bundle_generation_id": "uuid" }` while queued/running; `{ "status": "failed", "reason": "..." }` when generation failed. Every successful generation POST/detail response also includes additive `X-DebugBundle-Generation-Id: <uuid>` metadata, including already-completed and failed deterministic generations whose strict response body has no generation ID. Credentialed app CORS responses expose this header so the web client can navigate to the canonical detail route without changing API/CLI/MCP response bodies. Hydrated representative journeys are capped at five and expose deterministic `selection_rank`, `selection_basis`, and aggregate selection counts. Opportunity-derived baseline fields are retained under `metrics.baseline`, full bounded opportunity evidence under `metrics.current.source_opportunity`, and all related incident/deploy IDs under their linked arrays. Incident-impact journeys remain eligible only through the exact internal correlation/session, transition, service/environment, bounded-window, completed-artifact constraint; those internal hashes are never exposed.
 
 Authorization failure: `401 { "error": "invalid_member_token" }` or `401 { "error": "invalid_session" }`.
 Out-of-scope or missing project/opportunity/bundle: `404`.
@@ -1709,7 +1709,7 @@ Always-on probes (ring buffer + error-flush) require no API endpoints — they a
 | POST | `/v1/projects/{id}/probes/activate` | Browser Session or Member Token (Solo+) | Remotely activate probes matching a label pattern |
 | GET | `/v1/projects/{id}/probes` | Browser Session or Member Token | List active remote probe activations; preserved activations remain readable while paused on Free |
 | POST | `/v1/projects/{id}/probes/deactivate` | Browser Session or Member Token | Deactivate a remote probe activation; cleanup remains available after downgrade |
-| GET | `/v1/sdk/config` | Project Token | SDK config (remote probes and capture policy). Callers may opt into bounded restrictive analytics settings with `X-DebugBundle-Analytics-Config: 1`; Solo+ then includes eligible project settings and Free returns analytics disabled. |
+| GET | `/v1/sdk/config` | Project Token | SDK config (remote probes and capture policy). Callers on any hosted tier may opt into bounded restrictive analytics settings with `X-DebugBundle-Analytics-Config: 1`; the response reflects eligible project settings without ever enabling locally disabled analytics. |
 
 **Activate request:**
 ```json
@@ -1806,12 +1806,12 @@ Send `X-DebugBundle-Analytics-Config: 1` to opt into the optional `analytics` bl
 
 `trigger_token_key` is present only when remote probes are enabled for the project. SDKs use it to validate `dbundle_probe_...` trigger tokens locally without an API call.
 
-Free-tier projects receive an analytics block with `enabled: false`; probes remain enabled for always-on ring buffers but remote activation is not available.
+Free-tier projects may receive their enabled project analytics block when both project settings and the browser SDK opt in. Analytics remains disabled by default; probes remain enabled for always-on ring buffers but remote activation is not available.
 
 **Guardrails:**
 
 | Constraint | Free | Solo | Team |
-|------------|------|---------|------|
+|------------|------|------|------|
 | Always-on probes (ring buffer + error-flush) | Available | Available | Available |
 | Remote activation | Not available (403) | Full access | Full access |
 | Max concurrent remote activations per project | N/A | 5 |
@@ -2174,7 +2174,7 @@ Response `200`: same shape as GET response with updated values.
 
 ### 1.10a Analytics Settings
 
-Per-project AnalyticsBundle settings control opt-in browser product analytics capture, privacy mode, consent behavior, sampling, retention, saved-funnel limits, and Team controlled custom dimensions.
+Per-project AnalyticsBundle settings control opt-in browser product analytics capture, privacy mode, consent behavior, sampling, retention, saved-funnel limits, and tier-bounded controlled custom dimensions.
 
 **Get analytics settings:**
 
@@ -2199,15 +2199,16 @@ Response `200`:
     "journey_sample_rate": 0,
     "raw_retention_days": 1,
     "sample_retention_days": 7,
+    "hourly_retention_days": 30,
     "aggregate_retention_months": 12,
-    "max_saved_funnels": 3,
-    "max_custom_dimensions": 0,
+    "max_saved_funnels": 10,
+    "max_custom_dimensions": 3,
     "approved_custom_dimensions": []
   }
 }
 ```
 
-`analytics_available` is capability-derived from the caller's effective plan (`false` on Free, `true` on Solo/Team/self-host). The stored settings object is project-backed and remains readable to authorized viewers even when analytics is unavailable for the current tier.
+`analytics_available` is capability-derived from the caller's effective plan and is `true` on Free, Solo, Team, and self-host. Free uses bounded preview allowances and one saved funnel. When a project has no stored analytics settings, `max_saved_funnels`, `max_custom_dimensions`, and `hourly_retention_days` default to the current tier capabilities. Hosted hourly-rollup caps/defaults are 7 days on Free, 30 on Solo, and 90 on Team; self-host may configure up to 365 days. Hosted custom-dimension caps are 1 on Free, 3 on Solo, and 8 on Team; self-host supports up to 20. The stored settings object is project-backed and remains readable to authorized viewers even when analytics is disabled.
 
 **Update analytics settings:**
 
@@ -2224,8 +2225,9 @@ Request body (all fields optional, but at least one is required):
   "privacy_mode": "standard",
   "consent_required": true,
   "journey_sample_rate": 0.25,
+  "hourly_retention_days": 30,
   "max_custom_dimensions": 2,
-  "approved_custom_dimensions": ["auth_state", "plan"]
+  "approved_custom_dimensions": ["account_tier", "plan"]
 }
 ```
 
@@ -2236,11 +2238,11 @@ Response `200`: same shape as GET response with updated values.
 - `privacy_mode` must be one of `strict`, `standard`, or `custom`
 - `journey_sample_rate` must be between `0` and `1`
 - retention and limit fields must stay within the shared analytics settings schema bounds
-- saved-funnel and custom-dimension limits must not exceed the caller's effective tier capabilities
-- Team custom dimensions must use approved low-cardinality keys and are rejected on non-Team tiers
+- hourly retention, saved-funnel, and custom-dimension limits must not exceed the caller's effective tier capabilities
+- custom dimensions must use approved low-cardinality keys and stay within the current tier cap
 - `approved_custom_dimensions.length` must be less than or equal to `max_custom_dimensions`, including partial updates after merging with current settings
 - plain members receive `403 { "error": "forbidden" }` on update attempts
-- Free-tier projects receive `403 { "error": "upgrade_required" }` on update attempts because hosted cloud automation is not available
+- values above the current hourly-retention, saved-funnel, or custom-dimension tier cap receive `403 { "error": "upgrade_required" }`
 
 **Error responses:**
 - `401` — missing or invalid auth
@@ -2662,7 +2664,7 @@ debugbundle analytics journey-samples get <sample-id> --project-id <id> [--json]
 debugbundle analytics opportunities (--project-id <id> | --all-projects) [--status <open|resolved|snoozed|all>] [--kind <kind>] [--cursor <cursor>] [--limit <n>] [--json]
 debugbundle analytics opportunity get <opportunity-id> --project-id <id> [--json]
 debugbundle analytics bundle list (--project-id <id> | --all-projects) [--status <all|pending|running|completed|failed>] [--kind <kind>] [--cursor <cursor>] [--limit <n>] [--json]
-debugbundle analytics bundle create --project-id <id> --kind <kind> [--funnel <key>] [--route <path>] [--incident-id <id>] [--deploy-id <id>] [--from <ISO8601>] [--to <ISO8601>] [--last <duration>] [--filters-json <json>] [--json]
+debugbundle analytics bundle create --project-id <id> --kind <kind> [--opportunity-id <id>] [--funnel <key>] [--route <path>] [--incident-id <id>] [--deploy-id <id>] [--from <ISO8601>] [--to <ISO8601>] [--last <duration>] [--filters-json <json>] [--json]
 debugbundle analytics bundle get <bundle-generation-id> --project-id <id> [--json]
 ```
 `debugbundle incidents` defaults to `--status active` so the CLI shows incidents that need attention (`open` or `regressed`). Use `--status all` to omit the status filter and include resolved incidents.
@@ -2925,7 +2927,7 @@ debugbundle_list_webhook_deliveries → same result as `GET /v1/webhooks/{id}/de
 
 Alert MCP tools use camelCase request fields (`projectId`, `serviceId`, `conditionType`, `severityMin`, `cooldownSeconds`, `isEnabled`) over the same HTTP alert API. `cooldownSeconds` is optional on `create_alert` and `update_alert`, uses seconds, defaults to API `0` on create when omitted, accepts `0` to disable suppression, and is capped at `604800`.
 
-Current MCP analytics, alert, Slack-destination, weekly-report, and webhook behavior is a thin adapter over the same shared HTTP clients used by CLI, returning the same machine-readable payloads for lifecycle operations without adding business logic. Analytics MCP tools require member-token or CLI-auth-derived member auth; project tokens are never valid for analytics reads or bundle generation. `generate_analytics_bundle` requests a generation record and `get_analytics_bundle` reads existing generation records or completed artifacts.
+Current MCP analytics, alert, Slack-destination, weekly-report, and webhook behavior is a thin adapter over the same shared HTTP clients used by CLI, returning the same machine-readable payloads for lifecycle operations without adding business logic. Analytics MCP tools require member-token or CLI-auth-derived member auth; project tokens are never valid for analytics reads or bundle generation. `generate_analytics_bundle` accepts the API-equivalent optional `opportunityId`, requests a generation record, and `get_analytics_bundle` reads existing generation records or completed artifacts.
 
 Current MCP local retrieval behavior: when no `bearerToken` is supplied and the project is configured as local-only, `debugbundle_list_incidents`, `debugbundle_get_incident`, `debugbundle_resolve_incident`, `debugbundle_resolve_incidents`, `debugbundle_reopen_incident`, `debugbundle_reopen_incidents`, `debugbundle_get_bundle`, and `debugbundle_get_reproduction` read the same local store used by the CLI (`.debugbundle/local/state.json`, `.debugbundle/bundles/local/`, `.debugbundle/bundles/local/reproductions/`) and return the same machine-readable payloads without cloud auth.
 
@@ -3015,7 +3017,7 @@ get_analytics_settings        → same result as GET /v1/projects/{id}/analytics
 update_analytics_settings     → same result as PATCH /v1/projects/{id}/analytics-settings
 ```
 
-These tools manage hosted improvement opportunities, hosted improvement automation settings, and AnalyticsBundle project settings. `get_improvement_settings` and `get_analytics_settings` return project-backed settings plus capability-derived availability flags. Update tools require owner/admin authorization; analytics custom dimensions additionally require Team tier.
+These tools manage hosted improvement opportunities, hosted improvement automation settings, and AnalyticsBundle project settings. `get_improvement_settings` and `get_analytics_settings` return project-backed settings plus capability-derived availability flags. Update tools require owner/admin authorization; analytics settings and custom dimensions remain bounded by the current tier capabilities.
 
 ### 3.7 Billing Tools
 ```
@@ -3149,7 +3151,7 @@ debugbundle.analytics.convert('subscription_started');
 
 For split frontend/backend deployments, keep relay mode explicit and point `endpoint` at the backend relay URL. Add the backend API origin to `tracePropagationTargets` when cross-origin first-party requests should receive `X-DebugBundle-Trace-Id` and be eligible for policy-driven request-failure promotion. The browser fetch wrapper must preserve native `fetch` input and header semantics, including `Headers`, tuple arrays, record headers, and `Request` object headers. For frontend-only deployments without a backend, use direct mode with a dedicated public write-only `projectToken` and allowed browser origins.
 
-Analytics APIs are disabled unless `analytics.enabled: true` is configured. They emit `analytics_event` envelopes through the analytics lane, never create incidents directly, and must not capture form values, raw click text, screenshots, DOM snapshots, precise location, raw query strings, or secrets.
+Analytics APIs are disabled unless `analytics.enabled: true` is configured. They emit `analytics_event` envelopes through the isolated analytics transport lane, never create incidents directly, and must not capture form values, raw click text, screenshots, DOM snapshots, precise location, raw query strings, or secrets. Direct mode sends `{ "events": [...] }` with the public write-only project token. Relay mode sends credential-free `{ "batch": [...] }`; the strict origin-authorized backend relay accepts analytics envelopes alongside existing browser debug events and attaches its configured project token only to the upstream `/v1/events` request. A failed, throttled, or unauthorized analytics lane must not discard or reject buffered debug-lane events.
 
 ### 4.3 Python SDK (`debugbundle-python`)
 
@@ -3265,7 +3267,7 @@ Payloads are signed with the webhook shared secret (HMAC). Full bundle is NOT em
 The static public site at `debugbundle.com` publishes the following machine-readable artifacts at stable URLs. All are generated from source at build time and served as static files (no server runtime).
 
 | Route | Content-Type | Source | Description |
-|-------|-------------|--------|-------------|
+|-------|--------------|--------|-------------|
 | `/llms.txt` | `text/plain` | Build-time generation | LLM/agent discovery file listing documentation URLs, schema links, example bundles, and agent workflow guides |
 | `/openapi.json` | `application/json` | `apps/api/src/openapi.ts` | OpenAPI 3.1 specification generated from API route Zod schemas |
 | `/schemas/bundle.json` | `application/json` | `packages/shared-types` `BundleV1Schema` | JSON Schema (Draft 2020-12) for the bundle v1 format |

@@ -282,6 +282,9 @@ describe("cli validate command", () => {
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
       "## Notification Delivery"
     );
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "utf8")).toContain(
+      "## Product Analytics"
+    );
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "references", "cli.md"), "utf8")).toContain(
       "debugbundle health checks list --project-id <id>"
     );
@@ -293,6 +296,9 @@ describe("cli validate command", () => {
     );
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "references", "mcp.md"), "utf8")).toContain(
       "## Probe Tools"
+    );
+    expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "references", "mcp.md"), "utf8")).toContain(
+      "## Product Analytics Tools"
     );
     expect(await readFile(join(rootDirectory, ".agents", "skills", "debugbundle", "references", "mcp.md"), "utf8")).toContain(
       "Use the same runtime-evidence-gated workflow through MCP"

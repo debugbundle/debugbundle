@@ -13,6 +13,18 @@ export interface AnalyticsIncidentImpactInput {
   granularity: AnalyticsMetricsGranularity;
   service?: string | undefined;
   environment?: string | undefined;
+  route?: string | undefined;
+  device_type?: string | undefined;
+  browser?: string | undefined;
+  os?: string | undefined;
+  language?: string | undefined;
+  country?: string | undefined;
+  auth_state?: "anonymous" | "authenticated" | "unknown" | undefined;
+  referrer?: string | undefined;
+  utm_source?: string | undefined;
+  utm_medium?: string | undefined;
+  utm_campaign?: string | undefined;
+  custom_dimensions?: Record<string, string> | undefined;
   limit?: number | undefined;
 }
 
@@ -377,6 +389,62 @@ function buildLinkWhere(input: AnalyticsIncidentImpactInput): { sql: string; par
   if (input.environment !== undefined) {
     params.push(input.environment);
     conditions.push(`links.environment = $${params.length}`);
+  }
+
+  if (input.route !== undefined) {
+    params.push(input.route);
+    conditions.push(`links.route_key = $${params.length}`);
+  }
+
+  const rollupFilters: string[] = [];
+  const scalarFilters: Array<[string, unknown]> = [
+    ["device_type", input.device_type],
+    ["browser_family", input.browser],
+    ["os_family", input.os],
+    ["language", input.language],
+    ["country_code", input.country],
+    ["auth_state", input.auth_state]
+  ];
+  for (const [column, value] of scalarFilters) {
+    if (value !== undefined) {
+      params.push(value);
+      rollupFilters.push(`filtered_rollups.${column} = $${params.length}`);
+    }
+  }
+
+  const dimensionFilters: Array<[string, unknown]> = [
+    ["referrer_domain", input.referrer],
+    ["utm_source", input.utm_source],
+    ["utm_medium", input.utm_medium],
+    ["utm_campaign", input.utm_campaign]
+  ];
+  for (const [key, value] of dimensionFilters) {
+    if (value !== undefined) {
+      params.push(value);
+      rollupFilters.push(`filtered_rollups.dimensions->>'${key}' = $${params.length}`);
+    }
+  }
+
+  for (const [key, value] of Object.entries(input.custom_dimensions ?? {}).sort(([left], [right]) => left.localeCompare(right))) {
+    params.push(key, value);
+    rollupFilters.push(
+      `jsonb_extract_path_text(filtered_rollups.dimensions, 'custom_dimensions', $${params.length - 1}::text) = $${params.length}`
+    );
+  }
+
+  if (rollupFilters.length > 0) {
+    conditions.push(`EXISTS (
+          SELECT 1
+          FROM analytics_route_rollups filtered_rollups
+          WHERE filtered_rollups.project_id = links.project_id
+            AND filtered_rollups.service = links.service
+            AND filtered_rollups.environment = links.environment
+            AND filtered_rollups.bucket_start = links.bucket_start
+            AND filtered_rollups.bucket_granularity = links.bucket_granularity
+            AND filtered_rollups.route_key = links.route_key
+            AND filtered_rollups.dimension_hash = links.dimension_hash
+            AND ${rollupFilters.join("\n            AND ")}
+        )`);
   }
   return { sql: `WHERE ${conditions.join("\n        AND ")}`, params };
 }

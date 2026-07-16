@@ -1,6 +1,6 @@
-import { ArrowLeftIcon } from "lucide-react";
-import { useEffect, useState } from "react";
-import { Link, Navigate, useOutletContext, useParams } from "react-router-dom";
+import { ArrowLeftIcon, LoaderCircleIcon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Link, Navigate, useNavigate, useOutletContext, useParams } from "react-router-dom";
 
 import {
   analyticsBundleStateVariant,
@@ -13,7 +13,11 @@ import { Badge } from "../components/ui/badge.js";
 import { Button } from "../components/ui/button.js";
 import { Notice } from "../components/ui/notice.js";
 import { Skeleton } from "../components/ui/skeleton.js";
-import { getProjectAnalyticsOpportunity, type AnalyticsOpportunityRecord } from "../lib/api.js";
+import {
+  createProjectAnalyticsBundle,
+  getProjectAnalyticsOpportunity,
+  type AnalyticsOpportunityRecord
+} from "../lib/api.js";
 
 const INTEGER_FORMAT = new Intl.NumberFormat();
 const PERCENT_FORMAT = new Intl.NumberFormat(undefined, {
@@ -101,6 +105,41 @@ function OpportunityDetailContent({
   projectId: string;
   opportunity: AnalyticsOpportunityRecord;
 }): JSX.Element {
+  const navigate = useNavigate();
+  const generatingRef = useRef(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+
+  async function generateBundle(): Promise<void> {
+    if (generatingRef.current) return;
+    generatingRef.current = true;
+    setIsGenerating(true);
+    setGenerationError(null);
+    try {
+      const result = await createProjectAnalyticsBundle(projectId, {
+        opportunityId: opportunity.opportunity_id,
+        analysisKind: opportunity.kind
+      });
+      const pendingId =
+        "status" in result.bundle && result.bundle.status === "pending"
+          ? result.bundle.bundle_generation_id
+          : null;
+      const generationId = result.generationId ?? pendingId;
+      if (generationId !== null) {
+        void navigate(`/projects/${projectId}/analytics/bundles/${generationId}`);
+        return;
+      }
+      if ("status" in result.bundle && result.bundle.status === "failed") {
+        setGenerationError(result.bundle.reason.replaceAll("_", " "));
+      }
+    } catch (error) {
+      setGenerationError(error instanceof Error ? error.message : "Analytics bundle generation failed.");
+    } finally {
+      generatingRef.current = false;
+      setIsGenerating(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-8">
       <header className="flex flex-col gap-3">
@@ -206,9 +245,32 @@ function OpportunityDetailContent({
             </Button>
           </div>
         )}
+        {opportunity.bundle_generation_id !== null && opportunity.bundle_status !== "failed" ? null : (
+          <div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isGenerating}
+              onClick={() => void generateBundle()}
+            >
+              {isGenerating ? <LoaderCircleIcon className="animate-spin" aria-hidden="true" /> : null}
+              {isGenerating
+                ? "Generating..."
+                : opportunity.bundle_status === "failed"
+                  ? "Generate again"
+                  : "Generate analytics bundle"}
+            </Button>
+          </div>
+        )}
         {opportunity.bundle_failure_reason === null ? null : (
           <Notice title="Analytics bundle generation failed" tone="destructive">
             {opportunity.bundle_failure_reason}
+          </Notice>
+        )}
+        {generationError === null ? null : (
+          <Notice title="Could not generate analytics bundle" tone="destructive">
+            {generationError}
           </Notice>
         )}
       </section>
@@ -255,6 +317,9 @@ function readEvidenceItems(evidence: Record<string, unknown>): EvidenceItem[] {
   const funnelKey = readString(evidence["funnel_key"]);
   const markerKey = readString(evidence["marker_key"]);
   const fromRoute = readString(evidence["from_route_key"]);
+  const routeKey = readString(evidence["route_key"]);
+  const incidentId = readString(evidence["incident_id"]);
+  const conversionKey = readString(evidence["conversion_key"]);
 
   if (funnelKey !== null) {
     return compactEvidenceItems([
@@ -296,6 +361,49 @@ function readEvidenceItems(evidence: Record<string, unknown>): EvidenceItem[] {
         "Minimum reverse transitions",
         readNumber(thresholds?.["min_reverse_transitions"])
       )
+    ]);
+  }
+
+  if (conversionKey !== null) {
+    return compactEvidenceItems([
+      textEvidence("Conversion", conversionKey, true),
+      textEvidence("Current deploy", readString(evidence["deploy_id"]), true),
+      textEvidence("Baseline deploy", readString(evidence["baseline_deploy_id"]), true),
+      integerEvidence("Current sessions", readNumber(evidence["current_sessions"])),
+      integerEvidence("Current conversions", readNumber(evidence["current_conversions"])),
+      percentEvidence("Current conversion rate", readNumber(evidence["current_conversion_rate"])),
+      integerEvidence("Baseline sessions", readNumber(evidence["baseline_sessions"])),
+      integerEvidence("Baseline conversions", readNumber(evidence["baseline_conversions"])),
+      percentEvidence("Baseline conversion rate", readNumber(evidence["baseline_conversion_rate"])),
+      percentEvidence("Conversion rate decrease", readNumber(evidence["conversion_rate_decrease"]))
+    ]);
+  }
+
+  if (incidentId !== null) {
+    return compactEvidenceItems([
+      textEvidence("Incident", incidentId, true),
+      integerEvidence("Affected sessions", readNumber(evidence["affected_sessions"])),
+      integerEvidence("Total sessions", readNumber(evidence["total_sessions"])),
+      integerEvidence("Affected routes", readNumber(evidence["affected_routes"])),
+      percentEvidence("Affected share", readNumber(evidence["affected_share"])),
+      integerEvidence(
+        "Minimum affected sessions",
+        readNumber(thresholds?.["min_affected_sessions"])
+      ),
+      percentEvidence("Minimum affected share", readNumber(thresholds?.["min_affected_share"]))
+    ]);
+  }
+
+  if (routeKey !== null) {
+    return compactEvidenceItems([
+      textEvidence("Route", routeKey, true),
+      integerEvidence("Current sessions", readNumber(evidence["current_sessions"])),
+      integerEvidence("Current exits", readNumber(evidence["current_exits"])),
+      percentEvidence("Current exit rate", readNumber(evidence["current_exit_rate"])),
+      integerEvidence("Baseline sessions", readNumber(evidence["baseline_sessions"])),
+      integerEvidence("Baseline exits", readNumber(evidence["baseline_exits"])),
+      percentEvidence("Baseline exit rate", readNumber(evidence["baseline_exit_rate"])),
+      percentEvidence("Exit rate increase", readNumber(evidence["exit_rate_increase"]))
     ]);
   }
 

@@ -57,6 +57,35 @@ Use probes for targeted evidence gathering when bundle context is insufficient. 
 
 Use alert commands for notification routing and webhook commands for signed event delivery, delivery history, synthetic tests, and manual retries.
 
+## Product Analytics
+
+Use member-authenticated analytics commands for connected projects. Start with direct metrics and generate an analytics bundle only when a bounded analysis question needs a durable artifact.
+
+- `debugbundle analytics summary --project <id> --last 7d [--json]`
+- `debugbundle analytics routes --project <id> --last 30d [--json]`
+- `debugbundle analytics devices --project <id> --last 30d [--json]`
+- `debugbundle analytics referrers --project <id> --last 30d [--json]`
+- `debugbundle analytics actions --project <id> --last 30d [--json]`
+- `debugbundle analytics funnels --project <id> --last 30d [--json]`
+- `debugbundle analytics funnel <key> --project <id> --last 30d [--json]`
+- `debugbundle analytics journeys --project <id> --last 30d [--json]`
+- `debugbundle analytics journey-samples list --project <id> [--service <name>] [--environment <name>] [--tag <tag>] [--json]`
+- `debugbundle analytics journey-samples get <sample-id> --project <id> [--json]`
+- `debugbundle analytics incident-impact <incident-id> --project <id> [--json]`
+- `debugbundle analytics opportunities --project <id> [--json]`
+- `debugbundle analytics opportunity get <opportunity-id> --project <id> [--json]`
+- `debugbundle analytics bundle list --project <id> [--json]`
+- `debugbundle analytics bundle create --project <id> --kind <kind> [--last <duration>] [--funnel <key>] [--route <path>] [--incident-id <id>] [--json]`
+- `debugbundle analytics bundle get <bundle-generation-id> --project <id> [--json]`
+- `debugbundle analytics saved-funnels list --project <id> [--json]`
+- `debugbundle analytics saved-funnels create --project <id> --key <key> --name <name> --steps-json <json> [--json]`
+- `debugbundle analytics saved-funnels update <key> --project <id> [--name <name>] [--steps-json <json>] [--json]`
+- `debugbundle analytics saved-funnels archive <key> --project <id> [--json]`
+- `debugbundle analytics settings get --project <id> [--json]`
+- `debugbundle analytics settings set --project <id> [options] [--json]`
+
+Project tokens are ingestion-only. Read settings before mutation, preserve consent and privacy controls, and never model analytics as one generated bundle per visit.
+
 ## Availability Checks
 
 - `debugbundle health checks list --project-id <id> [--limit <n>] [--auth-file <path>] [--json]`
@@ -81,6 +110,7 @@ Use availability-check commands for hosted endpoint reachability. Prefer `test` 
 - Probes: `https://debugbundle.com/docs/probes` and `https://debugbundle.com/docs/api/probes`
 - Capture policy and rules: `https://debugbundle.com/docs/capture-policy`
 - Managing noise: `https://debugbundle.com/docs/managing-noise`
+- Product analytics: `https://debugbundle.com/docs/analytics` and `https://debugbundle.com/docs/cli/analytics`
 - Availability checks: `https://debugbundle.com/docs/availability-checks`
 - MCP tool catalog: `https://debugbundle.com/docs/mcp/tools`
 

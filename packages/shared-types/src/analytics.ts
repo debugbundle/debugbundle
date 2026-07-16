@@ -13,7 +13,7 @@ export const AnalyticsEventKindValues = [
   "funnel_step",
   "conversion",
   "journey_marker",
-  "session_summary",
+  "session_summary"
 ] as const;
 
 export const AnalyticsEventKindSchema = z.enum(AnalyticsEventKindValues);
@@ -43,7 +43,7 @@ export const AnalyticsBundleAnalysisKindValues = [
   "feature_usage",
   "incident_impact",
   "deploy_comparison",
-  "conversion_path",
+  "conversion_path"
 ] as const;
 
 export const AnalyticsBundleAnalysisKindSchema = z.enum(AnalyticsBundleAnalysisKindValues);
@@ -65,9 +65,10 @@ export const AnalyticsMetricsGranularityValues = ["hour", "day"] as const;
 export const AnalyticsMetricsGranularitySchema = z.enum(AnalyticsMetricsGranularityValues);
 export type AnalyticsMetricsGranularity = z.infer<typeof AnalyticsMetricsGranularitySchema>;
 
-const AnalyticsSafeHashSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/i);
+export const AnalyticsSafeHashSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/i);
 const AnalyticsNullableHashSchema = AnalyticsSafeHashSchema.nullable();
-const AnalyticsNullableTextSchema = (max: number): z.ZodNullable<z.ZodString> => z.string().trim().min(1).max(max).nullable();
+const AnalyticsNullableTextSchema = (max: number): z.ZodNullable<z.ZodString> =>
+  z.string().trim().min(1).max(max).nullable();
 
 const AnalyticsRoutePathSchema = z
   .string()
@@ -75,7 +76,7 @@ const AnalyticsRoutePathSchema = z
   .min(1)
   .max(2048)
   .refine((value) => !value.includes("?") && !value.includes("#"), {
-    message: "Analytics route paths must not include query strings or fragments.",
+    message: "Analytics route paths must not include query strings or fragments."
   })
   .nullable();
 
@@ -85,7 +86,7 @@ const AnalyticsDomainSchema = z
   .min(1)
   .max(255)
   .refine((value) => !/[/?#@]/.test(value), {
-    message: "Analytics referrer domains must be hostnames, not URLs.",
+    message: "Analytics referrer domains must be hostnames, not URLs."
   })
   .nullable();
 
@@ -118,7 +119,7 @@ export const AnalyticsSignalSchema = z
     funnel_key: AnalyticsSignalKeySchema.nullable().optional(),
     step_key: AnalyticsSignalKeySchema.nullable().optional(),
     conversion_key: AnalyticsSignalKeySchema.nullable().optional(),
-    marker_key: AnalyticsSignalKeySchema.nullable().optional(),
+    marker_key: AnalyticsSignalKeySchema.nullable().optional()
   })
   .strict()
   .transform((value) => ({
@@ -126,7 +127,7 @@ export const AnalyticsSignalSchema = z
     funnel_key: value.funnel_key ?? null,
     step_key: value.step_key ?? null,
     conversion_key: value.conversion_key ?? null,
-    marker_key: value.marker_key ?? null,
+    marker_key: value.marker_key ?? null
   }));
 export type AnalyticsSignal = z.infer<typeof AnalyticsSignalSchema>;
 
@@ -134,7 +135,7 @@ export const AnalyticsRouteSchema = z
   .object({
     path: AnalyticsRoutePathSchema,
     normalized_path: AnalyticsRoutePathSchema,
-    title: AnalyticsNullableTextSchema(200),
+    title: AnalyticsNullableTextSchema(200)
   })
   .strict()
   .superRefine((value, context) => {
@@ -142,7 +143,7 @@ export const AnalyticsRouteSchema = z
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["path"],
-        message: "Analytics routes require path or normalized_path.",
+        message: "Analytics routes require path or normalized_path."
       });
     }
   });
@@ -163,8 +164,12 @@ export const AnalyticsDimensionsSchema = z
     utm_source: AnalyticsNullableTextSchema(128),
     utm_medium: AnalyticsNullableTextSchema(128),
     utm_campaign: AnalyticsNullableTextSchema(128),
-    country_code: z.string().trim().regex(/^[A-Z]{2}$/).nullable(),
-    region_code: AnalyticsRegionCodeSchema,
+    country_code: z
+      .string()
+      .trim()
+      .regex(/^[A-Z]{2}$/)
+      .nullable(),
+    region_code: AnalyticsRegionCodeSchema
   })
   .strict();
 export type AnalyticsDimensions = z.infer<typeof AnalyticsDimensionsSchema>;
@@ -176,7 +181,7 @@ export const AnalyticsCustomDimensionKeySchema = z
   .max(64)
   .regex(/^[A-Za-z][A-Za-z0-9_.-]*$/)
   .refine((value) => !isSensitiveCustomDimensionKey(value), {
-    message: "Analytics custom dimension key is reserved for sensitive or high-cardinality data.",
+    message: "Analytics custom dimension key is reserved for sensitive or high-cardinality data."
   });
 export type AnalyticsCustomDimensionKey = z.infer<typeof AnalyticsCustomDimensionKeySchema>;
 
@@ -186,14 +191,14 @@ const AnalyticsCustomDimensionStringValueSchema = z
   .min(1)
   .max(128)
   .refine((value) => !looksSensitiveCustomDimensionValue(value), {
-    message: "Analytics custom dimension value appears sensitive or high-cardinality.",
+    message: "Analytics custom dimension value appears sensitive or high-cardinality."
   });
 
 export const AnalyticsCustomDimensionValueSchema = z.union([
   AnalyticsCustomDimensionStringValueSchema,
   z.number().finite().min(-1_000_000).max(1_000_000),
   z.boolean(),
-  z.null(),
+  z.null()
 ]);
 export type AnalyticsCustomDimensionValue = z.infer<typeof AnalyticsCustomDimensionValueSchema>;
 
@@ -203,7 +208,7 @@ export const AnalyticsCustomDimensionsSchema = z
     if (Object.keys(value).length > MAX_ANALYTICS_CUSTOM_DIMENSIONS_PER_EVENT) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        message: `Analytics events may include at most ${MAX_ANALYTICS_CUSTOM_DIMENSIONS_PER_EVENT} custom dimensions.`,
+        message: `Analytics events may include at most ${MAX_ANALYTICS_CUSTOM_DIMENSIONS_PER_EVENT} custom dimensions.`
       });
     }
   });
@@ -215,7 +220,7 @@ export const AnalyticsServiceSchema = z
     name: z.string().trim().min(1).max(120),
     runtime: z.literal("browser").nullable().optional(),
     framework: z.string().trim().min(1).max(80).nullable().optional(),
-    environment: z.string().trim().min(1).max(120),
+    environment: z.string().trim().min(1).max(120)
   })
   .strict();
 
@@ -227,20 +232,43 @@ export const AnalyticsCorrelationSchema = z
     visitor_id_hash: AnalyticsNullableHashSchema,
     user_id_hash: AnalyticsNullableHashSchema,
     trace_id: z.string().trim().min(1).max(128).nullable(),
-    deploy_id: z.string().trim().min(1).max(128).nullable(),
+    deploy_id: z.string().trim().min(1).max(128).nullable()
   })
   .strict();
 
 export type AnalyticsCorrelation = z.infer<typeof AnalyticsCorrelationSchema>;
 
+export const AnalyticsEventPrivacySchema = z
+  .object({
+    mode: AnalyticsPrivacyModeSchema,
+    consent_granted: z.boolean()
+  })
+  .strict();
+
+export type AnalyticsEventPrivacy = z.infer<typeof AnalyticsEventPrivacySchema>;
+
+export const AnalyticsSessionMetricsSchema = z
+  .object({
+    duration_ms: z.number().int().min(0).max(86_400_000),
+    pageviews: z.number().int().min(0).max(100_000)
+  })
+  .strict();
+
+export type AnalyticsSessionMetrics = z.infer<typeof AnalyticsSessionMetricsSchema>;
+
 export const AnalyticsPayloadSchema = z
   .object({
     kind: AnalyticsEventKindSchema,
+    privacy: AnalyticsEventPrivacySchema.optional().default({
+      mode: "strict",
+      consent_granted: false
+    }),
+    session: AnalyticsSessionMetricsSchema.optional(),
     signal: AnalyticsSignalSchema.optional(),
     route: AnalyticsRouteSchema.nullable().optional(),
     previous_route: AnalyticsRouteSchema.nullable().optional(),
     dimensions: AnalyticsDimensionsSchema,
-    custom_dimensions: AnalyticsCustomDimensionsSchema.optional().default({}),
+    custom_dimensions: AnalyticsCustomDimensionsSchema.optional().default({})
   })
   .strict()
   .superRefine((value, context) => {
@@ -248,7 +276,7 @@ export const AnalyticsPayloadSchema = z
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["route"],
-        message: "Page view and route change analytics events require route context.",
+        message: "Page view and route change analytics events require route context."
       });
     }
 
@@ -256,7 +284,7 @@ export const AnalyticsPayloadSchema = z
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["previous_route"],
-        message: "Analytics previous_route is only valid for route_change events.",
+        message: "Analytics previous_route is only valid for route_change events."
       });
     }
 
@@ -264,7 +292,7 @@ export const AnalyticsPayloadSchema = z
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["signal", "action_key"],
-        message: "Action analytics events require signal.action_key.",
+        message: "Action analytics events require signal.action_key."
       });
     }
 
@@ -273,14 +301,14 @@ export const AnalyticsPayloadSchema = z
         context.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["signal", "funnel_key"],
-          message: "Funnel step analytics events require signal.funnel_key.",
+          message: "Funnel step analytics events require signal.funnel_key."
         });
       }
       if (value.signal?.step_key == null) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["signal", "step_key"],
-          message: "Funnel step analytics events require signal.step_key.",
+          message: "Funnel step analytics events require signal.step_key."
         });
       }
     }
@@ -289,7 +317,7 @@ export const AnalyticsPayloadSchema = z
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["signal", "conversion_key"],
-        message: "Conversion analytics events require signal.conversion_key.",
+        message: "Conversion analytics events require signal.conversion_key."
       });
     }
 
@@ -297,7 +325,15 @@ export const AnalyticsPayloadSchema = z
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["signal", "marker_key"],
-        message: "Journey marker analytics events require signal.marker_key.",
+        message: "Journey marker analytics events require signal.marker_key."
+      });
+    }
+
+    if (value.session !== undefined && value.kind !== "session_summary") {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["session"],
+        message: "Analytics session metrics are only valid for session_summary events."
       });
     }
   });
@@ -316,7 +352,7 @@ export const AnalyticsEventEnvelopeSchema = z
     sdk_version: z.string().trim().min(1).max(80),
     service: AnalyticsServiceSchema,
     correlation: AnalyticsCorrelationSchema,
-    payload: AnalyticsPayloadSchema,
+    payload: AnalyticsPayloadSchema
   })
   .strict();
 
@@ -326,7 +362,7 @@ const AnalyticsMetricsSegmentSchema = z
   .object({
     value: z.string().trim().min(1).max(255),
     sessions: z.number().int().nonnegative(),
-    pageviews: z.number().int().nonnegative(),
+    pageviews: z.number().int().nonnegative()
   })
   .strict();
 
@@ -346,12 +382,12 @@ const AnalyticsUsageSummarySchema = z
     new_visitors: z.number().int().nonnegative(),
     returning_visitors: z.number().int().nonnegative(),
     exits: z.number().int().nonnegative(),
-    conversions: z.number().int().nonnegative(),
+    conversions: z.number().int().nonnegative()
   })
   .strict()
   .refine((value) => Date.parse(value.from) <= Date.parse(value.to), {
     message: "Analytics summary from must be before or equal to to.",
-    path: ["from"],
+    path: ["from"]
   });
 
 export type AnalyticsUsageSummary = z.infer<typeof AnalyticsUsageSummarySchema>;
@@ -363,7 +399,7 @@ const AnalyticsUsageBreakdownsSchema = z
     os: z.array(AnalyticsMetricsSegmentSchema).max(100),
     languages: z.array(AnalyticsMetricsSegmentSchema).max(100),
     referrers: z.array(AnalyticsMetricsSegmentSchema).max(100),
-    auth_states: z.array(AnalyticsMetricsSegmentSchema).max(100),
+    auth_states: z.array(AnalyticsMetricsSegmentSchema).max(100)
   })
   .strict();
 
@@ -372,7 +408,7 @@ export type AnalyticsUsageBreakdowns = z.infer<typeof AnalyticsUsageBreakdownsSc
 export const AnalyticsUsageSummaryResponseSchema = z
   .object({
     summary: AnalyticsUsageSummarySchema,
-    breakdowns: AnalyticsUsageBreakdownsSchema,
+    breakdowns: AnalyticsUsageBreakdownsSchema
   })
   .strict();
 
@@ -385,7 +421,7 @@ const AnalyticsMetricsWindowSchema = z
     to: z.string().datetime(),
     granularity: AnalyticsMetricsGranularitySchema,
     service: z.string().trim().min(1).max(120).nullable(),
-    environment: z.string().trim().min(1).max(120).nullable(),
+    environment: z.string().trim().min(1).max(120).nullable()
   })
   .strict();
 
@@ -399,7 +435,7 @@ const AnalyticsRouteMetricSchema = z
     entrances: z.number().int().nonnegative(),
     exits: z.number().int().nonnegative(),
     bounces: z.number().int().nonnegative(),
-    linked_incident_sessions: z.number().int().nonnegative(),
+    linked_incident_sessions: z.number().int().nonnegative()
   })
   .strict();
 
@@ -408,7 +444,7 @@ export type AnalyticsRouteMetric = z.infer<typeof AnalyticsRouteMetricSchema>;
 export const AnalyticsRouteMetricsResponseSchema = z
   .object({
     window: AnalyticsMetricsWindowSchema,
-    routes: z.array(AnalyticsRouteMetricSchema).max(100),
+    routes: z.array(AnalyticsRouteMetricSchema).max(100)
   })
   .strict();
 
@@ -421,7 +457,7 @@ const AnalyticsJourneyPatternSchema = z
     transition_count: z.number().int().nonnegative(),
     unique_sessions: z.number().int().nonnegative(),
     transition_share: z.number().min(0).max(1),
-    sample_ids: z.array(z.string().uuid()).max(3).default([]),
+    sample_ids: z.array(z.string().uuid()).max(3).default([])
   })
   .strict();
 
@@ -430,30 +466,32 @@ export type AnalyticsJourneyPattern = z.infer<typeof AnalyticsJourneyPatternSche
 export const AnalyticsJourneyPatternsResponseSchema = z
   .object({
     window: AnalyticsMetricsWindowSchema,
-    patterns: z.array(AnalyticsJourneyPatternSchema).max(100),
+    patterns: z.array(AnalyticsJourneyPatternSchema).max(100)
   })
   .strict();
 
-export type AnalyticsJourneyPatternsResponse = z.infer<typeof AnalyticsJourneyPatternsResponseSchema>;
+export type AnalyticsJourneyPatternsResponse = z.infer<
+  typeof AnalyticsJourneyPatternsResponseSchema
+>;
 
 const AnalyticsIncidentImpactSegmentSchema = z
   .object({
     value: z.string().trim().min(1).max(255),
-    affected_sessions: z.number().int().nonnegative(),
+    affected_sessions: z.number().int().nonnegative()
   })
   .strict();
 
 const AnalyticsIncidentImpactRouteSchema = z
   .object({
     route_key: z.string().trim().min(1).max(2048),
-    affected_sessions: z.number().int().nonnegative(),
+    affected_sessions: z.number().int().nonnegative()
   })
   .strict();
 
 const AnalyticsIncidentImpactFunnelSchema = z
   .object({
     funnel_key: z.string().trim().min(1).max(120),
-    affected_sessions: z.number().int().nonnegative(),
+    affected_sessions: z.number().int().nonnegative()
   })
   .strict();
 
@@ -462,7 +500,7 @@ const AnalyticsIncidentImpactJourneyPatternSchema = z
     from_route_key: z.string().trim().min(1).max(2048),
     to_route_key: z.string().trim().min(1).max(2048),
     affected_sessions: z.number().int().nonnegative(),
-    sample_ids: z.array(z.string().uuid()).max(3),
+    sample_ids: z.array(z.string().uuid()).max(3)
   })
   .strict();
 
@@ -470,7 +508,7 @@ const AnalyticsIncidentImpactConversionDeltaSchema = z
   .object({
     availability: z.enum(["available", "unavailable"]),
     value: z.number().finite().nullable(),
-    unit: z.literal("percentage_points"),
+    unit: z.literal("percentage_points")
   })
   .strict()
   .superRefine((value, context) => {
@@ -478,7 +516,7 @@ const AnalyticsIncidentImpactConversionDeltaSchema = z
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["value"],
-        message: "Unavailable conversion deltas must not include a value.",
+        message: "Unavailable conversion deltas must not include a value."
       });
     }
   });
@@ -487,7 +525,7 @@ const AnalyticsIncidentImpactBundleStateSchema = z
   .object({
     status: z.enum(["not_requested", "pending", "running", "completed", "failed"]),
     generation_id: z.string().uuid().nullable(),
-    failure_reason: z.string().trim().min(1).max(240).nullable(),
+    failure_reason: z.string().trim().min(1).max(240).nullable()
   })
   .strict();
 
@@ -502,7 +540,7 @@ export const AnalyticsIncidentImpactResponseSchema = z
     top_browsers: z.array(AnalyticsIncidentImpactSegmentSchema).max(100),
     journey_patterns: z.array(AnalyticsIncidentImpactJourneyPatternSchema).max(100),
     conversion_delta: AnalyticsIncidentImpactConversionDeltaSchema,
-    analytics_bundle: AnalyticsIncidentImpactBundleStateSchema,
+    analytics_bundle: AnalyticsIncidentImpactBundleStateSchema
   })
   .strict();
 
@@ -514,11 +552,13 @@ export const AnalyticsDeviceBreakdownResponseSchema = z
     device_types: z.array(AnalyticsMetricsSegmentSchema).max(100),
     browsers: z.array(AnalyticsMetricsSegmentSchema).max(100),
     os: z.array(AnalyticsMetricsSegmentSchema).max(100),
-    languages: z.array(AnalyticsMetricsSegmentSchema).max(100),
+    languages: z.array(AnalyticsMetricsSegmentSchema).max(100)
   })
   .strict();
 
-export type AnalyticsDeviceBreakdownResponse = z.infer<typeof AnalyticsDeviceBreakdownResponseSchema>;
+export type AnalyticsDeviceBreakdownResponse = z.infer<
+  typeof AnalyticsDeviceBreakdownResponseSchema
+>;
 
 export const AnalyticsReferrerMetricsResponseSchema = z
   .object({
@@ -526,11 +566,13 @@ export const AnalyticsReferrerMetricsResponseSchema = z
     referrers: z.array(AnalyticsMetricsSegmentSchema).max(100),
     utm_sources: z.array(AnalyticsMetricsSegmentSchema).max(100),
     utm_mediums: z.array(AnalyticsMetricsSegmentSchema).max(100),
-    utm_campaigns: z.array(AnalyticsMetricsSegmentSchema).max(100),
+    utm_campaigns: z.array(AnalyticsMetricsSegmentSchema).max(100)
   })
   .strict();
 
-export type AnalyticsReferrerMetricsResponse = z.infer<typeof AnalyticsReferrerMetricsResponseSchema>;
+export type AnalyticsReferrerMetricsResponse = z.infer<
+  typeof AnalyticsReferrerMetricsResponseSchema
+>;
 
 const AnalyticsActionMetricSchema = z
   .object({
@@ -580,7 +622,7 @@ const AnalyticsFunnelStepMetricSchema = z
     sessions_entered: z.number().int().nonnegative(),
     sessions_completed: z.number().int().nonnegative(),
     dropoffs: z.number().int().nonnegative(),
-    conversion_rate: z.number().min(0).max(1),
+    conversion_rate: z.number().min(0).max(1)
   })
   .strict();
 
@@ -598,7 +640,7 @@ const AnalyticsFunnelSummarySchema = z
     sessions_entered: z.number().int().nonnegative(),
     sessions_completed: z.number().int().nonnegative(),
     dropoffs: z.number().int().nonnegative(),
-    conversion_rate: z.number().min(0).max(1),
+    conversion_rate: z.number().min(0).max(1)
   })
   .strict();
 
@@ -607,277 +649,37 @@ export type AnalyticsFunnelSummary = z.infer<typeof AnalyticsFunnelSummarySchema
 export const AnalyticsFunnelAnalysisResponseSchema = z
   .object({
     funnel: AnalyticsFunnelSummarySchema,
-    steps: z.array(AnalyticsFunnelStepMetricSchema).max(100),
+    steps: z.array(AnalyticsFunnelStepMetricSchema).max(100)
   })
   .strict();
 
 export type AnalyticsFunnelAnalysisResponse = z.infer<typeof AnalyticsFunnelAnalysisResponseSchema>;
 
-export const AnalyticsOpportunityStatusValues = ["open", "resolved", "snoozed"] as const;
-export const AnalyticsOpportunityStatusSchema = z.enum(AnalyticsOpportunityStatusValues);
-export type AnalyticsOpportunityStatus = z.infer<typeof AnalyticsOpportunityStatusSchema>;
-
-export const AnalyticsOpportunityBundleStatusValues = ["not_requested", "pending", "running", "completed", "failed"] as const;
-export const AnalyticsOpportunityBundleStatusSchema = z.enum(AnalyticsOpportunityBundleStatusValues);
-export type AnalyticsOpportunityBundleStatus = z.infer<typeof AnalyticsOpportunityBundleStatusSchema>;
-
-export const AnalyticsBundleGenerationStatusValues = ["pending", "running", "completed", "failed"] as const;
-export const AnalyticsBundleGenerationStatusSchema = z.enum(AnalyticsBundleGenerationStatusValues);
-export type AnalyticsBundleGenerationStatus = z.infer<typeof AnalyticsBundleGenerationStatusSchema>;
-
-const AnalyticsOpportunityRecordSchema = z
-  .object({
-    opportunity_id: z.string().uuid(),
-    project_id: z.string().uuid(),
-    project_name: z.string().trim().min(1).max(200),
-    project_color_tag: z.string().trim().min(1).max(32).nullable(),
-    service: z.string().trim().min(1).max(120).nullable(),
-    environment: z.string().trim().min(1).max(120).nullable(),
-    kind: AnalyticsBundleAnalysisKindSchema,
-    status: AnalyticsOpportunityStatusSchema,
-    severity: AnalyticsBundleSeveritySchema,
-    confidence: z.number().min(0).max(1),
-    title: z.string().trim().min(1).max(240),
-    summary: z.string().trim().min(1).max(2000),
-    evidence: z.record(z.string(), z.unknown()),
-    related_incident_ids: z.array(z.string().uuid()).max(100),
-    related_deploy_ids: z.array(z.string().trim().min(1).max(128)).max(100),
-    first_detected_at: z.string().datetime(),
-    last_detected_at: z.string().datetime(),
-    resolved_at: z.string().datetime().nullable(),
-    snoozed_until: z.string().datetime().nullable(),
-    bundle_generation_id: z.string().uuid().nullable(),
-    bundle_status: AnalyticsOpportunityBundleStatusSchema,
-    bundle_created_at: z.string().datetime().nullable(),
-    bundle_updated_at: z.string().datetime().nullable(),
-    bundle_failure_reason: z.string().trim().min(1).max(240).nullable(),
-  })
-  .strict();
-
-export type AnalyticsOpportunityRecord = z.infer<typeof AnalyticsOpportunityRecordSchema>;
-
-export const AnalyticsOpportunitiesListResponseSchema = z
-  .object({
-    opportunities: z.array(AnalyticsOpportunityRecordSchema).max(100),
-    next_cursor: z.string().trim().min(1).nullable(),
-  })
-  .strict();
-
-export type AnalyticsOpportunitiesListResponse = z.infer<typeof AnalyticsOpportunitiesListResponseSchema>;
-
-export const AnalyticsOpportunityResponseSchema = z
-  .object({
-    opportunity: AnalyticsOpportunityRecordSchema,
-  })
-  .strict();
-
-export type AnalyticsOpportunityResponse = z.infer<typeof AnalyticsOpportunityResponseSchema>;
-
-export const AnalyticsBundleGenerationRecordSchema = z
-  .object({
-    generation_id: z.string().uuid(),
-    project_id: z.string().uuid(),
-    project_name: z.string().trim().min(1).max(200).optional(),
-    project_color_tag: z.string().trim().min(1).max(32).nullable().optional(),
-    opportunity_id: z.string().uuid().nullable(),
-    requested_by_user_id: z.string().uuid().nullable(),
-    analysis_kind: AnalyticsBundleAnalysisKindSchema,
-    analysis_spec: z.record(z.string(), z.unknown()),
-    input_fingerprint: AnalyticsSafeHashSchema,
-    status: AnalyticsBundleGenerationStatusSchema,
-    has_artifact: z.boolean(),
-    failure_reason: z.string().trim().min(1).max(240).nullable(),
-    created_at: z.string().datetime(),
-    claimed_at: z.string().datetime().nullable(),
-    completed_at: z.string().datetime().nullable(),
-    updated_at: z.string().datetime(),
-  })
-  .strict();
-
-export type AnalyticsBundleGenerationRecord = z.infer<typeof AnalyticsBundleGenerationRecordSchema>;
-
-export const AnalyticsBundleGenerationsListResponseSchema = z
-  .object({
-    bundles: z.array(AnalyticsBundleGenerationRecordSchema).max(100),
-    next_cursor: z.string().trim().min(1).nullable(),
-  })
-  .strict();
-
-export type AnalyticsBundleGenerationsListResponse = z.infer<typeof AnalyticsBundleGenerationsListResponseSchema>;
-
-const AnalyticsBundleProjectSchema = z
-  .object({
-    project_id: z.string().uuid(),
-    service: z.string().trim().min(1).max(120).nullable(),
-    environment: z.string().trim().min(1).max(120).nullable(),
-  })
-  .strict();
-
-const AnalyticsBundleAnalysisWindowSchema = z
-  .object({
-    from: z.string().datetime(),
-    to: z.string().datetime(),
-    granularity: AnalyticsBundleGranularitySchema,
-  })
-  .strict()
-  .refine((value) => Date.parse(value.from) <= Date.parse(value.to), {
-    message: "AnalyticsBundle analysis_window.from must be before or equal to analysis_window.to.",
-    path: ["from"],
-  });
-
-const AnalyticsBundleSummarySchema = z
-  .object({
-    title: z.string().trim().min(1).max(240),
-    description: z.string().trim().min(1).max(2000),
-    confidence: AnalyticsBundleConfidenceSchema,
-    severity: AnalyticsBundleSeveritySchema,
-  })
-  .strict();
-
-const AnalyticsBundleMetricsSchema = z
-  .object({
-    sessions_analyzed: z.number().int().nonnegative(),
-    affected_sessions: z.number().int().nonnegative().nullable(),
-    baseline: z.record(z.string(), z.unknown()),
-    current: z.record(z.string(), z.unknown()),
-  })
-  .strict();
-
-const AnalyticsBundleRecordSchema = z.record(z.string(), z.unknown());
-
-const AnalyticsBundleRedactionSchema = z
-  .object({
-    rules_applied: z.array(z.string().trim().min(1).max(120)).max(50),
-    omitted_fields: z.array(z.string().trim().min(1).max(200)).max(100),
-  })
-  .strict();
-
-const AnalyticsBundleMetadataSchema = z
-  .object({
-    input_fingerprint: AnalyticsSafeHashSchema,
-  })
-  .strict();
-
-export const AnalyticsBundleV1Schema = z
-  .object({
-    schema_version: z.literal(ANALYTICS_BUNDLE_SCHEMA_VERSION),
-    bundle_type: z.literal("analytics"),
-    analysis_kind: AnalyticsBundleAnalysisKindSchema,
-    project: AnalyticsBundleProjectSchema,
-    analysis_window: AnalyticsBundleAnalysisWindowSchema,
-    summary: AnalyticsBundleSummarySchema,
-    metrics: AnalyticsBundleMetricsSchema,
-    segments: z.array(AnalyticsBundleRecordSchema).max(100),
-    journey_patterns: z.array(AnalyticsBundleRecordSchema).max(100),
-    representative_journeys: z.array(AnalyticsBundleRecordSchema).max(25),
-    linked_incidents: z.array(AnalyticsBundleRecordSchema).max(100),
-    linked_deploys: z.array(AnalyticsBundleRecordSchema).max(50),
-    recommendations: z.array(AnalyticsBundleRecordSchema).max(50),
-    redaction: AnalyticsBundleRedactionSchema,
-    metadata: AnalyticsBundleMetadataSchema,
-  })
-  .strict();
-
-export type AnalyticsBundleV1 = z.infer<typeof AnalyticsBundleV1Schema>;
-
-export const AnalyticsSettingsSchema = z
-  .object({
-    enabled: z.boolean(),
-    privacy_mode: AnalyticsPrivacyModeSchema,
-    consent_required: z.boolean(),
-    capture_page_views: z.boolean(),
-    capture_route_changes: z.boolean(),
-    capture_actions: z.boolean(),
-    capture_friction_signals: z.boolean(),
-    journey_sample_rate: z.number().min(0).max(1),
-    raw_retention_days: z.number().int().min(1).max(30),
-    sample_retention_days: z.number().int().min(1).max(365),
-    aggregate_retention_months: z.number().int().min(1).max(120),
-    max_saved_funnels: z.number().int().min(0).max(100),
-    max_custom_dimensions: z.number().int().min(0).max(20),
-    approved_custom_dimensions: z.array(AnalyticsCustomDimensionKeySchema).max(20),
-  })
-  .strict()
-  .superRefine((value, context) => {
-    if (value.approved_custom_dimensions.length > value.max_custom_dimensions) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["approved_custom_dimensions"],
-        message: "Approved custom dimensions cannot exceed max_custom_dimensions.",
-      });
-    }
-  });
-
-export type AnalyticsSettings = z.infer<typeof AnalyticsSettingsSchema>;
-
-export const AnalyticsSdkConfigSchema = z
-  .object({
-    enabled: z.boolean(),
-    privacy_mode: AnalyticsPrivacyModeSchema,
-    consent_required: z.boolean(),
-    capture_page_views: z.boolean(),
-    capture_route_changes: z.boolean(),
-    capture_actions: z.boolean(),
-    capture_friction_signals: z.boolean(),
-  })
-  .strict();
-
-export type AnalyticsSdkConfig = z.infer<typeof AnalyticsSdkConfigSchema>;
-
-export const AnalyticsSettingsResponseSchema = z
-  .object({
-    access_mode: z.enum(["manage", "preview"]),
-    analytics_available: z.boolean(),
-    settings: AnalyticsSettingsSchema,
-  })
-  .strict();
-
-export type AnalyticsSettingsResponse = z.infer<typeof AnalyticsSettingsResponseSchema>;
-
-export const AnalyticsSettingsUpdateSchema = z
-  .object({
-    enabled: z.boolean().optional(),
-    privacy_mode: AnalyticsPrivacyModeSchema.optional(),
-    consent_required: z.boolean().optional(),
-    capture_page_views: z.boolean().optional(),
-    capture_route_changes: z.boolean().optional(),
-    capture_actions: z.boolean().optional(),
-    capture_friction_signals: z.boolean().optional(),
-    journey_sample_rate: z.number().min(0).max(1).optional(),
-    raw_retention_days: z.number().int().min(1).max(30).optional(),
-    sample_retention_days: z.number().int().min(1).max(365).optional(),
-    aggregate_retention_months: z.number().int().min(1).max(120).optional(),
-    max_saved_funnels: z.number().int().min(0).max(100).optional(),
-    max_custom_dimensions: z.number().int().min(0).max(20).optional(),
-    approved_custom_dimensions: z.array(AnalyticsCustomDimensionKeySchema).max(20).optional(),
-  })
-  .strict()
-  .superRefine((value, context) => {
-    if (
-      value.max_custom_dimensions !== undefined &&
-      value.approved_custom_dimensions !== undefined &&
-      value.approved_custom_dimensions.length > value.max_custom_dimensions
-    ) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["approved_custom_dimensions"],
-        message: "Approved custom dimensions cannot exceed max_custom_dimensions.",
-      });
-    }
-  })
-  .refine((input) => Object.keys(input).length > 0, {
-    message: "At least one analytics settings field must be provided.",
-  });
-
-export type AnalyticsSettingsUpdate = z.infer<typeof AnalyticsSettingsUpdateSchema>;
-
 function normalizeCustomDimensionKey(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
 }
 
 function isSensitiveCustomDimensionKey(value: string): boolean {
   const normalized = normalizeCustomDimensionKey(value);
   const sensitiveKeys = new Set([
+    "auth_state",
+    "device_type",
+    "browser_family",
+    "browser_major",
+    "os_family",
+    "os_major",
+    "language",
+    "locale",
+    "viewport_bucket",
+    "referrer_domain",
+    "utm_source",
+    "utm_medium",
+    "utm_campaign",
+    "country_code",
+    "region_code",
     "email",
     "email_address",
     "phone",
@@ -910,19 +712,23 @@ function isSensitiveCustomDimensionKey(value: string): boolean {
     "body",
     "payload",
     "session_id",
-    "visitor_id",
+    "visitor_id"
   ]);
 
-  return sensitiveKeys.has(normalized)
-    || normalized.endsWith("_id")
-    || normalized.endsWith("_token")
-    || normalized.endsWith("_secret")
-    || normalized.endsWith("_password");
+  return (
+    sensitiveKeys.has(normalized) ||
+    normalized.endsWith("_id") ||
+    normalized.endsWith("_token") ||
+    normalized.endsWith("_secret") ||
+    normalized.endsWith("_password")
+  );
 }
 
 function looksSensitiveCustomDimensionValue(value: string): boolean {
-  return /https?:\/\//i.test(value)
-    || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
-    || /\bBearer\s+[A-Za-z0-9._~+/=-]+/i.test(value)
-    || /\b(?:token|password|secret|api_key)=/i.test(value);
+  return (
+    /https?:\/\//i.test(value) ||
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ||
+    /\bBearer\s+[A-Za-z0-9._~+/=-]+/i.test(value) ||
+    /\b(?:token|password|secret|api_key)=/i.test(value)
+  );
 }

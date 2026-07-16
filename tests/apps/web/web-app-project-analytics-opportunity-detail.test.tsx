@@ -11,6 +11,7 @@ import { createProject, createSession, jsonResponse, requestUrl } from "./web-te
 const PROJECT_ID = "11111111-1111-4111-8111-111111111111";
 const OPPORTUNITY_ID = "55555555-5555-4555-8555-555555555555";
 const INCIDENT_ID = "66666666-6666-4666-8666-666666666666";
+const GENERATION_ID = "77777777-7777-4777-8777-777777777777";
 
 afterEach(() => {
   resetBrowserSessionClientState();
@@ -39,9 +40,11 @@ const funnelEvidence = {
 
 function installOpportunityDetailFetch(
   failOnce = false,
-  evidence: Record<string, unknown> = funnelEvidence
-): { requestedUrls: () => string[] } {
+  evidence: Record<string, unknown> = funnelEvidence,
+  bundleGenerationId: string | null = GENERATION_ID
+): { requestedUrls: () => string[]; createBodies: () => unknown[] } {
   const requestedUrls: string[] = [];
+  const createBodies: unknown[] = [];
   let opportunityRequests = 0;
 
   vi.stubGlobal(
@@ -57,6 +60,13 @@ function installOpportunityDetailFetch(
         return jsonResponse(200, {
           projects: [createProject({ project_id: PROJECT_ID, organization_plan: "team" })]
         });
+      }
+      if (url.endsWith("/v1/analytics/bundles") && init?.method === "POST") {
+        if (typeof init.body !== "string") {
+          throw new Error("Expected analytics bundle request body to be JSON text.");
+        }
+        createBodies.push(JSON.parse(init.body) as unknown);
+        return jsonResponse(200, { status: "pending", bundle_generation_id: GENERATION_ID });
       }
       if (url.includes(`/v1/analytics/opportunities/${OPPORTUNITY_ID}?`)) {
         opportunityRequests += 1;
@@ -84,10 +94,10 @@ function installOpportunityDetailFetch(
             last_detected_at: "2026-07-10T00:00:00.000Z",
             resolved_at: null,
             snoozed_until: null,
-            bundle_generation_id: "77777777-7777-4777-8777-777777777777",
-            bundle_status: "completed",
-            bundle_created_at: "2026-07-10T00:01:00.000Z",
-            bundle_updated_at: "2026-07-10T00:02:00.000Z",
+            bundle_generation_id: bundleGenerationId,
+            bundle_status: bundleGenerationId === null ? "not_requested" : "completed",
+            bundle_created_at: bundleGenerationId === null ? null : "2026-07-10T00:01:00.000Z",
+            bundle_updated_at: bundleGenerationId === null ? null : "2026-07-10T00:02:00.000Z",
             bundle_failure_reason: null
           }
         });
@@ -96,7 +106,7 @@ function installOpportunityDetailFetch(
     })
   );
 
-  return { requestedUrls: () => requestedUrls };
+  return { requestedUrls: () => requestedUrls, createBodies: () => createBodies };
 }
 
 describe("web app - project analytics opportunity detail", () => {
@@ -128,7 +138,7 @@ describe("web app - project analytics opportunity detail", () => {
     expect(screen.getByText("Ready")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "View analytics bundle" })).toHaveAttribute(
       "href",
-      `/projects/${PROJECT_ID}/analytics/bundles/77777777-7777-4777-8777-777777777777`
+      `/projects/${PROJECT_ID}/analytics/bundles/${GENERATION_ID}`
     );
     expect(screen.queryByText("must-not-render")).not.toBeInTheDocument();
     expect(screen.queryByText("secret_payload")).not.toBeInTheDocument();
@@ -141,6 +151,25 @@ describe("web app - project analytics opportunity detail", () => {
             url.includes(`project_id=${PROJECT_ID}`)
         )
     ).toBe(true);
+  });
+
+  it("generates a bundle directly from its stored opportunity context", async () => {
+    const user = userEvent.setup();
+    const state = installOpportunityDetailFetch(false, funnelEvidence, null);
+
+    render(
+      <App initialEntries={[`/projects/${PROJECT_ID}/analytics/opportunities/${OPPORTUNITY_ID}`]} />
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Generate analytics bundle" }));
+    expect(state.createBodies()).toEqual([
+      {
+        project_id: PROJECT_ID,
+        opportunity_id: OPPORTUNITY_ID,
+        analysis_kind: "funnel_dropoff",
+        filters: {}
+      }
+    ]);
   });
 
   it("retries a failed opportunity detail read", async () => {

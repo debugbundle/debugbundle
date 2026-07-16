@@ -167,6 +167,7 @@ export interface ApiAnalyticsDependencies {
     requestAnalyticsBundleGenerationForProject(input: {
       organization_id: string;
       project_id: string;
+      opportunity_id?: string | null | undefined;
       requested_by_user_id: string | null;
       analysis_kind: AnalyticsBundleAnalysisKind;
       analysis_spec: Record<string, unknown>;
@@ -187,6 +188,18 @@ type AnalyticsMetricsQueryInput = {
   granularity: "hour" | "day";
   service?: string | undefined;
   environment?: string | undefined;
+  route?: string | undefined;
+  device_type?: string | undefined;
+  browser?: string | undefined;
+  os?: string | undefined;
+  language?: string | undefined;
+  country?: string | undefined;
+  auth_state?: "anonymous" | "authenticated" | "unknown" | undefined;
+  referrer?: string | undefined;
+  utm_source?: string | undefined;
+  utm_medium?: string | undefined;
+  utm_campaign?: string | undefined;
+  custom_dimensions?: Record<string, string> | undefined;
   limit?: number | undefined;
 };
 

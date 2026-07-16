@@ -24,6 +24,7 @@ const analyticsSettings = {
   journey_sample_rate: 0.1,
   raw_retention_days: 7,
   sample_retention_days: 30,
+  hourly_retention_days: 90,
   aggregate_retention_months: 24,
   max_saved_funnels: 10,
   max_custom_dimensions: 0,

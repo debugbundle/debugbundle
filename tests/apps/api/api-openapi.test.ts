@@ -6,14 +6,24 @@ describe("api openapi spec", () => {
   it("publishes github bootstrap routes and browser-session security directly from source", () => {
     const document = buildPublicOpenApiSpec() as {
       openapi?: string;
-      paths?: Record<string, Record<string, {
-        operationId?: string;
-        security?: unknown;
-        responses?: Record<string, unknown>;
-        parameters?: Array<{ name?: string; in?: string }>;
-      }>>;
+      paths?: Record<
+        string,
+        Record<
+          string,
+          {
+            operationId?: string;
+            security?: unknown;
+            responses?: Record<string, unknown>;
+            parameters?: Array<{ name?: string; in?: string; schema?: { pattern?: string } }>;
+            requestBody?: { content?: { "application/json"?: { schema?: { $ref?: string } } } };
+          }
+        >
+      >;
       components?: {
-        securitySchemes?: Record<string, { type?: string; scheme?: string; in?: string; name?: string }>;
+        securitySchemes?: Record<
+          string,
+          { type?: string; scheme?: string; in?: string; name?: string }
+        >;
       };
     };
 
@@ -23,24 +33,56 @@ describe("api openapi spec", () => {
       memberBearerToken: { type: "http", scheme: "bearer" },
       projectBearerToken: { type: "http", scheme: "bearer" }
     });
-    expect(document.paths?.["/v1/auth/github/device/start"]?.["post"]?.operationId).toBe("startGithubDeviceLogin");
-    expect(document.paths?.["/v1/auth/github/device/poll"]?.["post"]?.operationId).toBe("pollGithubDeviceLogin");
-    expect(document.paths?.["/v1/auth/github/device/claim"]?.["post"]?.operationId).toBe("claimGithubDeviceLogin");
-    expect(document.paths?.["/v1/auth/github/token/exchange"]?.["post"]?.operationId).toBe("exchangeGithubAccessToken");
-    expect(document.paths?.["/v1/auth/logout"]?.["post"]?.security).toEqual([{ browserSession: [] }]);
+    expect(document.paths?.["/v1/auth/github/device/start"]?.["post"]?.operationId).toBe(
+      "startGithubDeviceLogin"
+    );
+    expect(document.paths?.["/v1/auth/github/device/poll"]?.["post"]?.operationId).toBe(
+      "pollGithubDeviceLogin"
+    );
+    expect(document.paths?.["/v1/auth/github/device/claim"]?.["post"]?.operationId).toBe(
+      "claimGithubDeviceLogin"
+    );
+    expect(document.paths?.["/v1/auth/github/token/exchange"]?.["post"]?.operationId).toBe(
+      "exchangeGithubAccessToken"
+    );
+    expect(document.paths?.["/v1/auth/logout"]?.["post"]?.security).toEqual([
+      { browserSession: [] }
+    ]);
     expect(document.paths?.["/v1/auth/github/start"]?.["get"]?.responses).toHaveProperty("302");
     expect(document.paths?.["/v1/projects/{id}/tokens"]?.["get"]?.responses).toHaveProperty("200");
-    expect(document.paths?.["/v1/projects/{id}/availability-checks"]?.["get"]?.operationId).toBe("listAvailabilityChecks");
-    expect(document.paths?.["/v1/projects/{id}/availability-checks/{checkId}"]?.["patch"]?.operationId).toBe("updateAvailabilityCheck");
-    expect(document.paths?.["/v1/projects/{id}/availability-checks/test"]?.["post"]?.responses).toHaveProperty("200");
-    expect(document.paths?.["/v1/analytics/bundles"]?.["get"]?.operationId).toBe("listAnalyticsBundles");
+    expect(document.paths?.["/v1/projects/{id}/availability-checks"]?.["get"]?.operationId).toBe(
+      "listAvailabilityChecks"
+    );
+    expect(
+      document.paths?.["/v1/projects/{id}/availability-checks/{checkId}"]?.["patch"]?.operationId
+    ).toBe("updateAvailabilityCheck");
+    expect(
+      document.paths?.["/v1/projects/{id}/availability-checks/test"]?.["post"]?.responses
+    ).toHaveProperty("200");
+    expect(document.paths?.["/v1/analytics/bundles"]?.["get"]?.operationId).toBe(
+      "listAnalyticsBundles"
+    );
+    expect(document.paths?.["/v1/analytics/bundles"]?.["post"]?.operationId).toBe(
+      "generateAnalyticsBundle"
+    );
+    expect(document.paths?.["/v1/analytics/bundles/{id}"]?.["get"]?.operationId).toBe(
+      "getAnalyticsBundle"
+    );
+    expect(document.paths?.["/v1/analytics/journey-samples"]?.["get"]?.operationId).toBe(
+      "listAnalyticsJourneySamples"
+    );
+    expect(document.paths?.["/v1/analytics/journey-samples/{id}"]?.["get"]?.operationId).toBe(
+      "getAnalyticsJourneySample"
+    );
+    expect(document.paths?.["/v1/analytics/incidents/{id}/impact"]?.["get"]?.operationId).toBe(
+      "getAnalyticsIncidentImpact"
+    );
     expect(
       document.paths?.["/v1/projects/{id}/analytics/saved-funnels"]?.["post"]?.operationId
     ).toBe("createSavedAnalyticsFunnel");
     expect(
-      document.paths?.["/v1/projects/{id}/analytics/saved-funnels/{funnelKey}"]?.[
-        "delete"
-      ]?.operationId
+      document.paths?.["/v1/projects/{id}/analytics/saved-funnels/{funnelKey}"]?.["delete"]
+        ?.operationId
     ).toBe("archiveSavedAnalyticsFunnel");
     expect(
       document.paths?.["/v1/analytics/opportunities"]?.["get"]?.parameters?.map(
@@ -74,11 +116,36 @@ describe("api openapi spec", () => {
       "cursor",
       "limit"
     ]);
-    const availabilityCheckResponseSchema = (document as {
-      components?: {
-        schemas?: Record<string, { properties?: Record<string, { properties?: Record<string, unknown> }> }>;
-      };
-    }).components?.schemas?.["AvailabilityCheckResponse"];
-    expect(availabilityCheckResponseSchema?.properties?.["check"]?.properties).toHaveProperty("linked_incident_status");
+    expect(
+      document.paths?.["/v1/analytics/summary"]?.["get"]?.parameters?.find(
+        (parameter) => parameter.name === "route"
+      )?.schema?.pattern
+    ).toBe("^[^?#]+$");
+    const availabilityCheckResponseSchema = (
+      document as {
+        components?: {
+          schemas?: Record<
+            string,
+            { properties?: Record<string, { properties?: Record<string, unknown> }> }
+          >;
+        };
+      }
+    ).components?.schemas?.["AvailabilityCheckResponse"];
+    expect(availabilityCheckResponseSchema?.properties?.["check"]?.properties).toHaveProperty(
+      "linked_incident_status"
+    );
+    const analyticsBundleCreateSchema = (
+      document as {
+        components?: { schemas?: Record<string, { properties?: Record<string, unknown> }> };
+      }
+    ).components?.schemas?.["AnalyticsBundleCreate"];
+    expect(analyticsBundleCreateSchema?.properties).toHaveProperty("opportunity_id");
+    expect(
+      (
+        analyticsBundleCreateSchema?.properties?.["route"] as
+          | { anyOf?: Array<{ pattern?: string }> }
+          | undefined
+      )?.anyOf?.[0]?.pattern
+    ).toBe("^[^?#]+$");
   });
 });

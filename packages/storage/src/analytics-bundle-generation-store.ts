@@ -47,17 +47,23 @@ export interface AnalyticsBundleGenerationListFilters {
 }
 
 export interface AnalyticsBundleGenerationStore {
-  reserveAnalyticsBundleGeneration(input: ReserveAnalyticsBundleGenerationInput): Promise<AnalyticsBundleGenerationRecord>;
-  listAnalyticsBundleGenerationsForProject(input: AnalyticsBundleGenerationListFilters & {
-    project_id: string;
-    cursor?: { created_at: string; generation_id: string } | undefined;
-    limit: number;
-  }): Promise<{ bundles: AnalyticsBundleGenerationRecord[]; next_cursor: string | null }>;
-  listAnalyticsBundleGenerationsForOrganization?(input: AnalyticsBundleGenerationListFilters & {
-    organization_id: string;
-    cursor?: { created_at: string; generation_id: string } | undefined;
-    limit: number;
-  }): Promise<{ bundles: AnalyticsBundleGenerationInventoryRecord[]; next_cursor: string | null }>;
+  reserveAnalyticsBundleGeneration(
+    input: ReserveAnalyticsBundleGenerationInput
+  ): Promise<AnalyticsBundleGenerationRecord>;
+  listAnalyticsBundleGenerationsForProject(
+    input: AnalyticsBundleGenerationListFilters & {
+      project_id: string;
+      cursor?: { created_at: string; generation_id: string } | undefined;
+      limit: number;
+    }
+  ): Promise<{ bundles: AnalyticsBundleGenerationRecord[]; next_cursor: string | null }>;
+  listAnalyticsBundleGenerationsForOrganization?(
+    input: AnalyticsBundleGenerationListFilters & {
+      organization_id: string;
+      cursor?: { created_at: string; generation_id: string } | undefined;
+      limit: number;
+    }
+  ): Promise<{ bundles: AnalyticsBundleGenerationInventoryRecord[]; next_cursor: string | null }>;
   getAnalyticsBundleGenerationForProject(input: {
     project_id: string;
     generation_id: string;
@@ -105,7 +111,9 @@ type AnalyticsBundleGenerationInventoryRow = AnalyticsBundleGenerationRow & {
   project_color_tag: unknown;
 };
 
-export function createPostgresAnalyticsBundleGenerationStore(db: Queryable): AnalyticsBundleGenerationStore {
+export function createPostgresAnalyticsBundleGenerationStore(
+  db: Queryable
+): AnalyticsBundleGenerationStore {
   return {
     async reserveAnalyticsBundleGeneration(input) {
       return runInTransaction(db, async (tx) => {
@@ -179,6 +187,58 @@ export function createPostgresAnalyticsBundleGenerationStore(db: Queryable): Ana
           throw new Error("analytics_bundle_generation_reservation_race");
         }
 
+        if (existingRow.status === "failed") {
+          const retried = await tx.query<AnalyticsBundleGenerationRow>(
+            `
+              UPDATE analytics_bundle_generations
+              SET
+                requested_by_user_id = $2::uuid,
+                opportunity_id = $3::uuid,
+                analysis_spec = $4::jsonb,
+                status = 'pending',
+                object_key = NULL,
+                failure_reason = NULL,
+                claimed_at = NULL,
+                completed_at = NULL,
+                updated_at = now()
+              WHERE id = $1::uuid
+                AND status = 'failed'
+              RETURNING ${analyticsBundleGenerationSelectColumns()}
+            `,
+            [
+              existingRow.generation_id,
+              input.requested_by_user_id ?? null,
+              input.opportunity_id ?? null,
+              JSON.stringify(analysisSpec)
+            ]
+          );
+          const retriedRow = retried.rows[0];
+          if (retriedRow !== undefined) {
+            await syncOpportunityBundleState(tx, {
+              opportunity_id: input.opportunity_id ?? null,
+              status: "pending",
+              object_key: null,
+              failure_reason: null
+            });
+            return mapAnalyticsBundleGenerationRow(retriedRow);
+          }
+
+          const racedRetry = await tx.query<AnalyticsBundleGenerationRow>(
+            `
+              SELECT ${analyticsBundleGenerationSelectColumns()}
+              FROM analytics_bundle_generations
+              WHERE id = $1::uuid
+              LIMIT 1
+            `,
+            [existingRow.generation_id]
+          );
+          const racedRetryRow = racedRetry.rows[0];
+          if (racedRetryRow === undefined) {
+            throw new Error("analytics_bundle_generation_retry_race");
+          }
+          return mapAnalyticsBundleGenerationRow(racedRetryRow);
+        }
+
         return mapAnalyticsBundleGenerationRow(existingRow);
       });
     },
@@ -204,9 +264,11 @@ export function createPostgresAnalyticsBundleGenerationStore(db: Queryable): Ana
 
       const rows = result.rows.slice(0, limit).map(mapAnalyticsBundleGenerationRow);
       const overflow = result.rows[limit];
-      const next_cursor = overflow === undefined
-        ? null
-        : buildAnalyticsBundleGenerationCursor(mapAnalyticsBundleGenerationRow(overflow));
+      const lastVisible = rows.at(-1);
+      const next_cursor =
+        overflow === undefined || lastVisible === undefined
+          ? null
+          : buildAnalyticsBundleGenerationCursor(lastVisible);
 
       return {
         bundles: rows,
@@ -239,9 +301,11 @@ export function createPostgresAnalyticsBundleGenerationStore(db: Queryable): Ana
 
       const rows = result.rows.slice(0, limit).map(mapAnalyticsBundleGenerationInventoryRow);
       const overflow = result.rows[limit];
-      const next_cursor = overflow === undefined
-        ? null
-        : buildAnalyticsBundleGenerationCursor(mapAnalyticsBundleGenerationRow(overflow));
+      const lastVisible = rows.at(-1);
+      const next_cursor =
+        overflow === undefined || lastVisible === undefined
+          ? null
+          : buildAnalyticsBundleGenerationCursor(lastVisible);
 
       return {
         bundles: rows,
@@ -461,12 +525,14 @@ export function buildAnalyticsBundleInputFingerprint(input: {
   analysis_spec?: Record<string, unknown> | undefined;
 }): string {
   const digest = createHash("sha256")
-    .update(stableSerialize({
-      schema: "analytics_bundle_generation_input.v1",
-      opportunity_id: input.opportunity_id ?? null,
-      analysis_kind: input.analysis_kind,
-      analysis_spec: normalizeAnalysisSpec(input.analysis_spec)
-    }))
+    .update(
+      stableSerialize({
+        schema: "analytics_bundle_generation_input.v1",
+        opportunity_id: input.opportunity_id ?? null,
+        analysis_kind: input.analysis_kind,
+        analysis_spec: normalizeAnalysisSpec(input.analysis_spec)
+      })
+    )
     .digest("hex");
 
   return `sha256:${digest}`;
@@ -526,18 +592,26 @@ async function syncOpportunityBundleState(
   );
 }
 
-function mapAnalyticsBundleGenerationRow(row: AnalyticsBundleGenerationRow): AnalyticsBundleGenerationRecord {
+function mapAnalyticsBundleGenerationRow(
+  row: AnalyticsBundleGenerationRow
+): AnalyticsBundleGenerationRecord {
   return {
     generation_id: toNonEmptyString(row.generation_id, "00000000-0000-0000-0000-000000000000"),
     project_id: toNonEmptyString(row.project_id, "00000000-0000-0000-0000-000000000000"),
     opportunity_id: toNullableString(row.opportunity_id),
     requested_by_user_id: toNullableString(row.requested_by_user_id),
-    analysis_kind: toNonEmptyString(row.analysis_kind, "usage_summary") as AnalyticsBundleAnalysisKind,
+    analysis_kind: toNonEmptyString(
+      row.analysis_kind,
+      "usage_summary"
+    ) as AnalyticsBundleAnalysisKind,
     analysis_spec: normalizeAnalysisSpec(row.analysis_spec),
-    input_fingerprint: toNonEmptyString(row.input_fingerprint, buildAnalyticsBundleInputFingerprint({
-      analysis_kind: "usage_summary",
-      analysis_spec: {}
-    })),
+    input_fingerprint: toNonEmptyString(
+      row.input_fingerprint,
+      buildAnalyticsBundleInputFingerprint({
+        analysis_kind: "usage_summary",
+        analysis_spec: {}
+      })
+    ),
     status: toNonEmptyString(row.status, "pending") as AnalyticsBundleGenerationStatus,
     object_key: toNullableString(row.object_key),
     failure_reason: toNullableString(row.failure_reason),

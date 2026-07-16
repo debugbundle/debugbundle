@@ -1,18 +1,7 @@
 import {
-  AnalyticsActionMetricsResponseSchema,
-  AnalyticsDeviceBreakdownResponseSchema,
-  AnalyticsFunnelAnalysisResponseSchema,
-  AnalyticsFunnelsResponseSchema,
-  AnalyticsIncidentImpactResponseSchema,
-  AnalyticsJourneyPatternsResponseSchema,
-  AnalyticsOpportunitiesListResponseSchema,
   AnalyticsOpportunityBundleStatusSchema,
-  AnalyticsOpportunityResponseSchema,
   AnalyticsBundleSeveritySchema,
   AnalyticsOpportunityStatusSchema,
-  AnalyticsReferrerMetricsResponseSchema,
-  AnalyticsRouteMetricsResponseSchema,
-  AnalyticsUsageSummaryResponseSchema,
   type AnalyticsActionMetricsResponse,
   type AnalyticsBundleAnalysisKind,
   type AnalyticsBundleSeverity,
@@ -30,31 +19,18 @@ import {
   type AnalyticsRouteMetricsResponse,
   type AnalyticsUsageSummaryResponse
 } from "../../../packages/shared-types/src/index.js";
+import {
+  AnalyticsMetricsApiError,
+  createAnalyticsMetricsApi,
+  type AnalyticsMetricsHttpRequest,
+  type AnalyticsMetricsHttpResponse
+} from "./analytics-metrics-api.js";
 import { createCliHttpClient, runAuthenticatedCliCommand } from "./auth-context.js";
 import { readCliAuthState } from "./auth-state.js";
 import type { CliAuthState } from "./auth-state.js";
 import type { CliCommandResult } from "./token-commands.js";
 
-type AnalyticsMetricsHttpRequest = {
-  method: "GET";
-  path: string;
-  bearerToken: string;
-};
-
-type AnalyticsMetricsHttpResponse = {
-  status: number;
-  body: unknown;
-};
-
-export class AnalyticsMetricsApiError extends Error {
-  public readonly status: number;
-
-  public constructor(status: number, message: string) {
-    super(message);
-    this.name = "AnalyticsMetricsApiError";
-    this.status = status;
-  }
-}
+export { AnalyticsMetricsApiError, createAnalyticsMetricsApi } from "./analytics-metrics-api.js";
 
 export interface AnalyticsSummaryCommandInput {
   bearerToken: string;
@@ -65,11 +41,23 @@ export interface AnalyticsSummaryCommandInput {
   granularity?: AnalyticsMetricsGranularity | undefined;
   service?: string | undefined;
   environment?: string | undefined;
+  route?: string | undefined;
+  deviceType?: string | undefined;
+  browser?: string | undefined;
+  os?: string | undefined;
+  language?: string | undefined;
+  country?: string | undefined;
+  authState?: "anonymous" | "authenticated" | "unknown" | undefined;
+  referrer?: string | undefined;
+  utmSource?: string | undefined;
+  utmMedium?: string | undefined;
+  utmCampaign?: string | undefined;
+  customDimensions?: Record<string, string> | undefined;
   limit?: number | undefined;
   json?: boolean | undefined;
 }
 
-type AnalyticsMetricQueryInput = Omit<AnalyticsSummaryCommandInput, "json">;
+export type AnalyticsMetricQueryInput = Omit<AnalyticsSummaryCommandInput, "json">;
 
 export interface AnalyticsFunnelCommandInput extends AnalyticsSummaryCommandInput {
   funnelKey: string;
@@ -102,250 +90,32 @@ export interface AnalyticsOpportunityGetCommandInput {
   json?: boolean | undefined;
 }
 
-function toApiError(status: number, body: unknown, fallback: string): AnalyticsMetricsApiError {
-  if (typeof body === "object" && body !== null && "error" in body && typeof body.error === "string") {
-    return new AnalyticsMetricsApiError(status, body.error);
-  }
-
-  return new AnalyticsMetricsApiError(status, fallback);
-}
-
-export function createAnalyticsMetricsApi(httpClient: {
-  request(request: AnalyticsMetricsHttpRequest): Promise<AnalyticsMetricsHttpResponse>;
-}): {
-  getUsageSummary(input: AnalyticsMetricQueryInput): Promise<AnalyticsUsageSummaryResponse>;
-  getRouteMetrics(input: AnalyticsMetricQueryInput): Promise<AnalyticsRouteMetricsResponse>;
-  getJourneyPatterns(input: AnalyticsMetricQueryInput): Promise<AnalyticsJourneyPatternsResponse>;
-  getDeviceBreakdown(input: AnalyticsMetricQueryInput): Promise<AnalyticsDeviceBreakdownResponse>;
-  getReferrerMetrics(input: AnalyticsMetricQueryInput): Promise<AnalyticsReferrerMetricsResponse>;
-  getActionMetrics(input: AnalyticsMetricQueryInput): Promise<AnalyticsActionMetricsResponse>;
-  listFunnels(input: AnalyticsMetricQueryInput): Promise<AnalyticsFunnelsResponse>;
-  getFunnelAnalysis(input: Omit<AnalyticsFunnelCommandInput, "json">): Promise<AnalyticsFunnelAnalysisResponse>;
-  getIncidentImpact(input: Omit<AnalyticsIncidentImpactCommandInput, "json">): Promise<AnalyticsIncidentImpactResponse>;
-  listOpportunities(input: Omit<AnalyticsOpportunitiesCommandInput, "json">): Promise<AnalyticsOpportunitiesListResponse>;
-  getOpportunity(input: Omit<AnalyticsOpportunityGetCommandInput, "json">): Promise<AnalyticsOpportunityResponse>;
-} {
+function toAnalyticsMetricQueryInput(
+  input: AnalyticsSummaryCommandInput
+): AnalyticsMetricQueryInput {
   return {
-    async getUsageSummary(input): Promise<AnalyticsUsageSummaryResponse> {
-      const response = await httpClient.request({
-        method: "GET",
-        path: `/v1/analytics/summary?${buildMetricsQueryString(input)}`,
-        bearerToken: input.bearerToken
-      });
-
-      if (response.status !== 200) {
-        throw toApiError(response.status, response.body, "Failed to get analytics summary.");
-      }
-
-      const parsed = AnalyticsUsageSummaryResponseSchema.safeParse(response.body);
-      if (!parsed.success) {
-        throw new AnalyticsMetricsApiError(500, "Invalid analytics summary response.");
-      }
-
-      return parsed.data;
-    },
-
-    async getRouteMetrics(input): Promise<AnalyticsRouteMetricsResponse> {
-      const response = await httpClient.request({
-        method: "GET",
-        path: `/v1/analytics/routes?${buildMetricsQueryString(input)}`,
-        bearerToken: input.bearerToken
-      });
-      if (response.status !== 200) {
-        throw toApiError(response.status, response.body, "Failed to get analytics route metrics.");
-      }
-      const parsed = AnalyticsRouteMetricsResponseSchema.safeParse(response.body);
-      if (!parsed.success) {
-        throw new AnalyticsMetricsApiError(500, "Invalid analytics route metrics response.");
-      }
-      return parsed.data;
-    },
-
-    async getJourneyPatterns(input): Promise<AnalyticsJourneyPatternsResponse> {
-      const response = await httpClient.request({
-        method: "GET",
-        path: `/v1/analytics/journey-patterns?${buildMetricsQueryString(input)}`,
-        bearerToken: input.bearerToken
-      });
-      if (response.status !== 200) {
-        throw toApiError(response.status, response.body, "Failed to get analytics journey patterns.");
-      }
-      const parsed = AnalyticsJourneyPatternsResponseSchema.safeParse(response.body);
-      if (!parsed.success) {
-        throw new AnalyticsMetricsApiError(500, "Invalid analytics journey patterns response.");
-      }
-      return parsed.data;
-    },
-
-    async getDeviceBreakdown(input): Promise<AnalyticsDeviceBreakdownResponse> {
-      const response = await httpClient.request({
-        method: "GET",
-        path: `/v1/analytics/devices?${buildMetricsQueryString(input)}`,
-        bearerToken: input.bearerToken
-      });
-      if (response.status !== 200) {
-        throw toApiError(response.status, response.body, "Failed to get analytics device breakdown.");
-      }
-      const parsed = AnalyticsDeviceBreakdownResponseSchema.safeParse(response.body);
-      if (!parsed.success) {
-        throw new AnalyticsMetricsApiError(500, "Invalid analytics device breakdown response.");
-      }
-      return parsed.data;
-    },
-
-    async getReferrerMetrics(input): Promise<AnalyticsReferrerMetricsResponse> {
-      const response = await httpClient.request({
-        method: "GET",
-        path: `/v1/analytics/referrers?${buildMetricsQueryString(input)}`,
-        bearerToken: input.bearerToken
-      });
-      if (response.status !== 200) {
-        throw toApiError(response.status, response.body, "Failed to get analytics referrer metrics.");
-      }
-      const parsed = AnalyticsReferrerMetricsResponseSchema.safeParse(response.body);
-      if (!parsed.success) {
-        throw new AnalyticsMetricsApiError(500, "Invalid analytics referrer metrics response.");
-      }
-      return parsed.data;
-    },
-
-    async getActionMetrics(input): Promise<AnalyticsActionMetricsResponse> {
-      const response = await httpClient.request({
-        method: "GET",
-        path: `/v1/analytics/actions?${buildMetricsQueryString(input)}`,
-        bearerToken: input.bearerToken
-      });
-      if (response.status !== 200) {
-        throw toApiError(response.status, response.body, "Failed to get analytics action metrics.");
-      }
-      const parsed = AnalyticsActionMetricsResponseSchema.safeParse(response.body);
-      if (!parsed.success) {
-        throw new AnalyticsMetricsApiError(500, "Invalid analytics action metrics response.");
-      }
-      return parsed.data;
-    },
-
-    async listFunnels(input): Promise<AnalyticsFunnelsResponse> {
-      const response = await httpClient.request({
-        method: "GET",
-        path: `/v1/analytics/funnels?${buildMetricsQueryString(input)}`,
-        bearerToken: input.bearerToken
-      });
-      if (response.status !== 200) {
-        throw toApiError(response.status, response.body, "Failed to list analytics funnels.");
-      }
-      const parsed = AnalyticsFunnelsResponseSchema.safeParse(response.body);
-      if (!parsed.success) {
-        throw new AnalyticsMetricsApiError(500, "Invalid analytics funnels response.");
-      }
-      return parsed.data;
-    },
-
-    async getFunnelAnalysis(input): Promise<AnalyticsFunnelAnalysisResponse> {
-      const response = await httpClient.request({
-        method: "GET",
-        path: `/v1/analytics/funnels/${encodeURIComponent(input.funnelKey)}?${buildMetricsQueryString(input)}`,
-        bearerToken: input.bearerToken
-      });
-      if (response.status !== 200) {
-        throw toApiError(response.status, response.body, "Failed to get analytics funnel analysis.");
-      }
-      const parsed = AnalyticsFunnelAnalysisResponseSchema.safeParse(response.body);
-      if (!parsed.success) {
-        throw new AnalyticsMetricsApiError(500, "Invalid analytics funnel analysis response.");
-      }
-      return parsed.data;
-    },
-
-    async getIncidentImpact(input): Promise<AnalyticsIncidentImpactResponse> {
-      const response = await httpClient.request({
-        method: "GET",
-        path: `/v1/analytics/incidents/${encodeURIComponent(input.incidentId)}/impact?${buildMetricsQueryString(input)}`,
-        bearerToken: input.bearerToken
-      });
-      if (response.status !== 200) {
-        throw toApiError(response.status, response.body, "Failed to get analytics incident impact.");
-      }
-      const parsed = AnalyticsIncidentImpactResponseSchema.safeParse(response.body);
-      if (!parsed.success) {
-        throw new AnalyticsMetricsApiError(500, "Invalid analytics incident impact response.");
-      }
-      return parsed.data;
-    },
-
-    async listOpportunities(input): Promise<AnalyticsOpportunitiesListResponse> {
-      const response = await httpClient.request({
-        method: "GET",
-        path: `/v1/analytics/opportunities?${buildOpportunitiesQueryString(input)}`,
-        bearerToken: input.bearerToken
-      });
-      if (response.status !== 200) {
-        throw toApiError(response.status, response.body, "Failed to list analytics opportunities.");
-      }
-      const parsed = AnalyticsOpportunitiesListResponseSchema.safeParse(response.body);
-      if (!parsed.success) {
-        throw new AnalyticsMetricsApiError(500, "Invalid analytics opportunities response.");
-      }
-      return parsed.data;
-    },
-
-    async getOpportunity(input): Promise<AnalyticsOpportunityResponse> {
-      const params = new URLSearchParams({ project_id: input.projectId });
-      const response = await httpClient.request({
-        method: "GET",
-        path: `/v1/analytics/opportunities/${encodeURIComponent(input.opportunityId)}?${params.toString()}`,
-        bearerToken: input.bearerToken
-      });
-      if (response.status !== 200) {
-        throw toApiError(response.status, response.body, "Failed to get analytics opportunity.");
-      }
-      const parsed = AnalyticsOpportunityResponseSchema.safeParse(response.body);
-      if (!parsed.success) {
-        throw new AnalyticsMetricsApiError(500, "Invalid analytics opportunity response.");
-      }
-      return parsed.data;
-    }
+    bearerToken: input.bearerToken,
+    projectId: input.projectId,
+    from: input.from,
+    to: input.to,
+    last: input.last,
+    granularity: input.granularity,
+    service: input.service,
+    environment: input.environment,
+    ...(input.route === undefined ? {} : { route: input.route }),
+    ...(input.deviceType === undefined ? {} : { deviceType: input.deviceType }),
+    ...(input.browser === undefined ? {} : { browser: input.browser }),
+    ...(input.os === undefined ? {} : { os: input.os }),
+    ...(input.language === undefined ? {} : { language: input.language }),
+    ...(input.country === undefined ? {} : { country: input.country }),
+    ...(input.authState === undefined ? {} : { authState: input.authState }),
+    ...(input.referrer === undefined ? {} : { referrer: input.referrer }),
+    ...(input.utmSource === undefined ? {} : { utmSource: input.utmSource }),
+    ...(input.utmMedium === undefined ? {} : { utmMedium: input.utmMedium }),
+    ...(input.utmCampaign === undefined ? {} : { utmCampaign: input.utmCampaign }),
+    ...(input.customDimensions === undefined ? {} : { customDimensions: input.customDimensions }),
+    limit: input.limit
   };
-}
-
-function buildMetricsQueryString(input: AnalyticsMetricQueryInput): string {
-  const params = new URLSearchParams({ project_id: input.projectId });
-  appendOptionalParam(params, "from", input.from);
-  appendOptionalParam(params, "to", input.to);
-  appendOptionalParam(params, "last", input.last);
-  appendOptionalParam(params, "granularity", input.granularity);
-  appendOptionalParam(params, "service", input.service);
-  appendOptionalParam(params, "environment", input.environment);
-  if (input.limit !== undefined) {
-    params.set("limit", String(input.limit));
-  }
-
-  return params.toString();
-}
-
-function appendOptionalParam(params: URLSearchParams, key: string, value: string | undefined): void {
-  if (value !== undefined) {
-    params.set(key, value);
-  }
-}
-
-function buildOpportunitiesQueryString(input: Omit<AnalyticsOpportunitiesCommandInput, "json">): string {
-  const params = new URLSearchParams();
-  appendOptionalParam(params, "project_id", input.projectId);
-  appendOptionalParam(params, "status", input.status);
-  appendOptionalParam(params, "kind", input.kind);
-  appendOptionalParam(params, "service", input.service);
-  appendOptionalParam(params, "environment", input.environment);
-  appendOptionalParam(params, "severity", input.severity);
-  appendOptionalParam(params, "bundle_status", input.bundleStatus);
-  appendOptionalParam(params, "from", input.from);
-  appendOptionalParam(params, "to", input.to);
-  appendOptionalParam(params, "cursor", input.cursor);
-  if (input.limit !== undefined) {
-    params.set("limit", String(input.limit));
-  }
-
-  return params.toString();
 }
 
 function mapErrorToExitCode(error: unknown): number {
@@ -366,14 +136,19 @@ function mapErrorToExitCode(error: unknown): number {
   return 1;
 }
 
-function formatTopSegments(label: string, segments: AnalyticsUsageSummaryResponse["breakdowns"]["device_types"]): string {
+function formatTopSegments(
+  label: string,
+  segments: AnalyticsUsageSummaryResponse["breakdowns"]["device_types"]
+): string {
   if (segments.length === 0) {
     return `${label}: none`;
   }
 
   return `${label}: ${segments
     .slice(0, 5)
-    .map((segment) => `${segment.value} (${segment.sessions} sessions, ${segment.pageviews} pageviews)`)
+    .map(
+      (segment) => `${segment.value} (${segment.sessions} sessions, ${segment.pageviews} pageviews)`
+    )
     .join("; ")}`;
 }
 
@@ -405,17 +180,7 @@ export async function getAnalyticsSummaryCommand(
   }
 ): Promise<CliCommandResult> {
   try {
-    const response = await api.getUsageSummary({
-      bearerToken: input.bearerToken,
-      projectId: input.projectId,
-      from: input.from,
-      to: input.to,
-      last: input.last,
-      granularity: input.granularity,
-      service: input.service,
-      environment: input.environment,
-      limit: input.limit
-    });
+    const response = await api.getUsageSummary(toAnalyticsMetricQueryInput(input));
 
     return {
       exitCode: 0,
@@ -435,7 +200,10 @@ function formatRoutes(response: AnalyticsRouteMetricsResponse): string {
   }
 
   return response.routes
-    .map((route) => `${route.route_key}: ${route.pageviews} pageviews, ${route.unique_sessions} sessions, ${route.exits} exits`)
+    .map(
+      (route) =>
+        `${route.route_key}: ${route.pageviews} pageviews, ${route.unique_sessions} sessions, ${route.exits} exits`
+    )
     .join("\n");
 }
 
@@ -484,7 +252,10 @@ function formatActionMetrics(response: AnalyticsActionMetricsResponse): string {
   }
 
   return response.actions
-    .map((action) => `${action.action_key}: ${action.event_count} events, ${action.unique_sessions} sessions, ${action.kind}`)
+    .map(
+      (action) =>
+        `${action.action_key}: ${action.event_count} events, ${action.unique_sessions} sessions, ${action.kind}`
+    )
     .join("\n");
 }
 
@@ -495,8 +266,9 @@ function formatFunnelAnalysis(response: AnalyticsFunnelAnalysisResponse): string
     `sessions_completed: ${response.funnel.sessions_completed}`,
     `dropoffs: ${response.funnel.dropoffs}`,
     `conversion_rate: ${response.funnel.conversion_rate}`,
-    ...response.steps.map((step) =>
-      `${step.step_key}: ${step.sessions_entered} entered, ${step.sessions_completed} completed, ${step.dropoffs} dropoffs`
+    ...response.steps.map(
+      (step) =>
+        `${step.step_key}: ${step.sessions_entered} entered, ${step.sessions_completed} completed, ${step.dropoffs} dropoffs`
     )
   ].join("\n");
 }
@@ -507,8 +279,9 @@ function formatFunnels(response: AnalyticsFunnelsResponse): string {
   }
 
   return response.funnels
-    .map((funnel) =>
-      `${funnel.funnel_key}: ${funnel.sessions_entered} entered, ${funnel.sessions_completed} completed, ${funnel.dropoffs} dropoffs, ${funnel.conversion_rate} conversion`
+    .map(
+      (funnel) =>
+        `${funnel.funnel_key}: ${funnel.sessions_entered} entered, ${funnel.sessions_completed} completed, ${funnel.dropoffs} dropoffs, ${funnel.conversion_rate} conversion`
     )
     .join("\n");
 }
@@ -532,8 +305,9 @@ function formatOpportunities(response: AnalyticsOpportunitiesListResponse): stri
     return "No analytics opportunities found.";
   }
 
-  const rows = response.opportunities.map((opportunity) =>
-    `${opportunity.opportunity_id} | ${opportunity.severity} | ${opportunity.status} | ${opportunity.kind} | ${opportunity.title}`
+  const rows = response.opportunities.map(
+    (opportunity) =>
+      `${opportunity.opportunity_id} | ${opportunity.severity} | ${opportunity.status} | ${opportunity.kind} | ${opportunity.title}`
   );
 
   return `${rows.join("\n")}${response.next_cursor === null ? "" : `\nnext_cursor: ${response.next_cursor}`}`;
@@ -569,17 +343,7 @@ async function runAnalyticsMetricCommand<Response>(
   format: (response: Response) => string
 ): Promise<CliCommandResult> {
   try {
-    const response = await apiCall({
-      bearerToken: input.bearerToken,
-      projectId: input.projectId,
-      from: input.from,
-      to: input.to,
-      last: input.last,
-      granularity: input.granularity,
-      service: input.service,
-      environment: input.environment,
-      limit: input.limit
-    });
+    const response = await apiCall(toAnalyticsMetricQueryInput(input));
 
     return {
       exitCode: 0,
@@ -602,30 +366,54 @@ export async function getAnalyticsRoutesCommand(
 
 export async function getAnalyticsJourneysCommand(
   input: AnalyticsSummaryCommandInput,
-  api: { getJourneyPatterns(input: AnalyticsMetricQueryInput): Promise<AnalyticsJourneyPatternsResponse> }
+  api: {
+    getJourneyPatterns(input: AnalyticsMetricQueryInput): Promise<AnalyticsJourneyPatternsResponse>;
+  }
 ): Promise<CliCommandResult> {
-  return runAnalyticsMetricCommand(input, (request) => api.getJourneyPatterns(request), formatJourneyPatterns);
+  return runAnalyticsMetricCommand(
+    input,
+    (request) => api.getJourneyPatterns(request),
+    formatJourneyPatterns
+  );
 }
 
 export async function getAnalyticsDevicesCommand(
   input: AnalyticsSummaryCommandInput,
-  api: { getDeviceBreakdown(input: AnalyticsMetricQueryInput): Promise<AnalyticsDeviceBreakdownResponse> }
+  api: {
+    getDeviceBreakdown(input: AnalyticsMetricQueryInput): Promise<AnalyticsDeviceBreakdownResponse>;
+  }
 ): Promise<CliCommandResult> {
-  return runAnalyticsMetricCommand(input, (request) => api.getDeviceBreakdown(request), formatDeviceBreakdown);
+  return runAnalyticsMetricCommand(
+    input,
+    (request) => api.getDeviceBreakdown(request),
+    formatDeviceBreakdown
+  );
 }
 
 export async function getAnalyticsReferrersCommand(
   input: AnalyticsSummaryCommandInput,
-  api: { getReferrerMetrics(input: AnalyticsMetricQueryInput): Promise<AnalyticsReferrerMetricsResponse> }
+  api: {
+    getReferrerMetrics(input: AnalyticsMetricQueryInput): Promise<AnalyticsReferrerMetricsResponse>;
+  }
 ): Promise<CliCommandResult> {
-  return runAnalyticsMetricCommand(input, (request) => api.getReferrerMetrics(request), formatReferrerMetrics);
+  return runAnalyticsMetricCommand(
+    input,
+    (request) => api.getReferrerMetrics(request),
+    formatReferrerMetrics
+  );
 }
 
 export async function getAnalyticsActionsCommand(
   input: AnalyticsSummaryCommandInput,
-  api: { getActionMetrics(input: AnalyticsMetricQueryInput): Promise<AnalyticsActionMetricsResponse> }
+  api: {
+    getActionMetrics(input: AnalyticsMetricQueryInput): Promise<AnalyticsActionMetricsResponse>;
+  }
 ): Promise<CliCommandResult> {
-  return runAnalyticsMetricCommand(input, (request) => api.getActionMetrics(request), formatActionMetrics);
+  return runAnalyticsMetricCommand(
+    input,
+    (request) => api.getActionMetrics(request),
+    formatActionMetrics
+  );
 }
 
 export async function listAnalyticsFunnelsCommand(
@@ -637,20 +425,16 @@ export async function listAnalyticsFunnelsCommand(
 
 export async function getAnalyticsFunnelCommand(
   input: AnalyticsFunnelCommandInput,
-  api: { getFunnelAnalysis(input: Omit<AnalyticsFunnelCommandInput, "json">): Promise<AnalyticsFunnelAnalysisResponse> }
+  api: {
+    getFunnelAnalysis(
+      input: Omit<AnalyticsFunnelCommandInput, "json">
+    ): Promise<AnalyticsFunnelAnalysisResponse>;
+  }
 ): Promise<CliCommandResult> {
   try {
     const response = await api.getFunnelAnalysis({
-      bearerToken: input.bearerToken,
-      projectId: input.projectId,
-      funnelKey: input.funnelKey,
-      from: input.from,
-      to: input.to,
-      last: input.last,
-      granularity: input.granularity,
-      service: input.service,
-      environment: input.environment,
-      limit: input.limit
+      ...toAnalyticsMetricQueryInput(input),
+      funnelKey: input.funnelKey
     });
 
     return {
@@ -667,7 +451,11 @@ export async function getAnalyticsFunnelCommand(
 
 export async function getAnalyticsIncidentImpactCommand(
   input: AnalyticsIncidentImpactCommandInput,
-  api: { getIncidentImpact(input: Omit<AnalyticsIncidentImpactCommandInput, "json">): Promise<AnalyticsIncidentImpactResponse> }
+  api: {
+    getIncidentImpact(
+      input: Omit<AnalyticsIncidentImpactCommandInput, "json">
+    ): Promise<AnalyticsIncidentImpactResponse>;
+  }
 ): Promise<CliCommandResult> {
   return runAnalyticsMetricCommand(
     input,
@@ -678,16 +466,30 @@ export async function getAnalyticsIncidentImpactCommand(
 
 export async function listAnalyticsOpportunitiesCommand(
   input: AnalyticsOpportunitiesCommandInput,
-  api: { listOpportunities(input: Omit<AnalyticsOpportunitiesCommandInput, "json">): Promise<AnalyticsOpportunitiesListResponse> }
+  api: {
+    listOpportunities(
+      input: Omit<AnalyticsOpportunitiesCommandInput, "json">
+    ): Promise<AnalyticsOpportunitiesListResponse>;
+  }
 ): Promise<CliCommandResult> {
   try {
-    if (input.status !== undefined && input.status !== "all" && !AnalyticsOpportunityStatusSchema.safeParse(input.status).success) {
+    if (
+      input.status !== undefined &&
+      input.status !== "all" &&
+      !AnalyticsOpportunityStatusSchema.safeParse(input.status).success
+    ) {
       return { exitCode: 4, output: "Invalid value for --status." };
     }
-    if (input.severity !== undefined && !AnalyticsBundleSeveritySchema.safeParse(input.severity).success) {
+    if (
+      input.severity !== undefined &&
+      !AnalyticsBundleSeveritySchema.safeParse(input.severity).success
+    ) {
       return { exitCode: 4, output: "Invalid value for --severity." };
     }
-    if (input.bundleStatus !== undefined && !AnalyticsOpportunityBundleStatusSchema.safeParse(input.bundleStatus).success) {
+    if (
+      input.bundleStatus !== undefined &&
+      !AnalyticsOpportunityBundleStatusSchema.safeParse(input.bundleStatus).success
+    ) {
       return { exitCode: 4, output: "Invalid value for --bundle-status." };
     }
 
@@ -720,7 +522,11 @@ export async function listAnalyticsOpportunitiesCommand(
 
 export async function getAnalyticsOpportunityCommand(
   input: AnalyticsOpportunityGetCommandInput,
-  api: { getOpportunity(input: Omit<AnalyticsOpportunityGetCommandInput, "json">): Promise<AnalyticsOpportunityResponse> }
+  api: {
+    getOpportunity(
+      input: Omit<AnalyticsOpportunityGetCommandInput, "json">
+    ): Promise<AnalyticsOpportunityResponse>;
+  }
 ): Promise<CliCommandResult> {
   try {
     const response = await api.getOpportunity({
@@ -745,9 +551,9 @@ async function createAuthenticatedAnalyticsMetricsApi(
   input: { authFilePath?: string },
   dependencies?: {
     readAuthState?: (input: { authFilePath?: string }) => Promise<CliAuthState>;
-    createHttpClient?: (input: {
-      baseUrl: string;
-    }) => { request(request: AnalyticsMetricsHttpRequest): Promise<AnalyticsMetricsHttpResponse> };
+    createHttpClient?: (input: { baseUrl: string }) => {
+      request(request: AnalyticsMetricsHttpRequest): Promise<AnalyticsMetricsHttpResponse>;
+    };
     createApi?: typeof createAnalyticsMetricsApi;
     fetchImpl?: typeof fetch;
   }
@@ -759,14 +565,16 @@ async function createAuthenticatedAnalyticsMetricsApi(
   }
 
   const authState = await readAuthState(authStateInput);
-  const createHttpClient = dependencies?.createHttpClient ?? ((clientInput: { baseUrl: string }) => {
-    const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
-    if (dependencies?.fetchImpl !== undefined) {
-      httpClientDependencies.fetchImpl = dependencies.fetchImpl;
-    }
+  const createHttpClient =
+    dependencies?.createHttpClient ??
+    ((clientInput: { baseUrl: string }) => {
+      const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
+      if (dependencies?.fetchImpl !== undefined) {
+        httpClientDependencies.fetchImpl = dependencies.fetchImpl;
+      }
 
-    return createCliHttpClient(clientInput, httpClientDependencies);
-  });
+      return createCliHttpClient(clientInput, httpClientDependencies);
+    });
   const httpClient = createHttpClient({ baseUrl: authState.base_url });
   const createApi = dependencies?.createApi ?? createAnalyticsMetricsApi;
 
@@ -794,6 +602,18 @@ export async function getAnalyticsSummaryWithAuthCommand(
           granularity: input.granularity,
           service: input.service,
           environment: input.environment,
+          route: input.route,
+          deviceType: input.deviceType,
+          browser: input.browser,
+          os: input.os,
+          language: input.language,
+          country: input.country,
+          authState: input.authState,
+          referrer: input.referrer,
+          utmSource: input.utmSource,
+          utmMedium: input.utmMedium,
+          utmCampaign: input.utmCampaign,
+          customDimensions: input.customDimensions,
           limit: input.limit,
           json: input.json
         },
@@ -803,16 +623,32 @@ export async function getAnalyticsSummaryWithAuthCommand(
   });
 }
 
-type AnalyticsMetricWithAuthInput = Omit<AnalyticsSummaryCommandInput, "bearerToken"> & { authFilePath?: string };
-type AnalyticsFunnelWithAuthInput = Omit<AnalyticsFunnelCommandInput, "bearerToken"> & { authFilePath?: string };
-type AnalyticsIncidentImpactWithAuthInput = Omit<AnalyticsIncidentImpactCommandInput, "bearerToken"> & { authFilePath?: string };
-type AnalyticsOpportunitiesWithAuthInput = Omit<AnalyticsOpportunitiesCommandInput, "bearerToken"> & { authFilePath?: string };
-type AnalyticsOpportunityGetWithAuthInput = Omit<AnalyticsOpportunityGetCommandInput, "bearerToken"> & { authFilePath?: string };
+type AnalyticsMetricWithAuthInput = Omit<AnalyticsSummaryCommandInput, "bearerToken"> & {
+  authFilePath?: string;
+};
+type AnalyticsFunnelWithAuthInput = Omit<AnalyticsFunnelCommandInput, "bearerToken"> & {
+  authFilePath?: string;
+};
+type AnalyticsIncidentImpactWithAuthInput = Omit<
+  AnalyticsIncidentImpactCommandInput,
+  "bearerToken"
+> & { authFilePath?: string };
+type AnalyticsOpportunitiesWithAuthInput = Omit<
+  AnalyticsOpportunitiesCommandInput,
+  "bearerToken"
+> & { authFilePath?: string };
+type AnalyticsOpportunityGetWithAuthInput = Omit<
+  AnalyticsOpportunityGetCommandInput,
+  "bearerToken"
+> & { authFilePath?: string };
 
 async function runAnalyticsMetricWithAuthCommand(
   input: AnalyticsMetricWithAuthInput,
   dependencies: Parameters<typeof createAuthenticatedAnalyticsMetricsApi>[1] | undefined,
-  run: (authState: CliAuthState, api: ReturnType<typeof createAnalyticsMetricsApi>) => Promise<CliCommandResult>
+  run: (
+    authState: CliAuthState,
+    api: ReturnType<typeof createAnalyticsMetricsApi>
+  ) => Promise<CliCommandResult>
 ): Promise<CliCommandResult> {
   return runAuthenticatedCliCommand(input, {
     createApi: createAuthenticatedAnalyticsMetricsApi,
@@ -834,6 +670,18 @@ function withBearerToken(
     granularity: input.granularity,
     service: input.service,
     environment: input.environment,
+    route: input.route,
+    deviceType: input.deviceType,
+    browser: input.browser,
+    os: input.os,
+    language: input.language,
+    country: input.country,
+    authState: input.authState,
+    referrer: input.referrer,
+    utmSource: input.utmSource,
+    utmMedium: input.utmMedium,
+    utmCampaign: input.utmCampaign,
+    customDimensions: input.customDimensions,
     limit: input.limit,
     json: input.json
   };

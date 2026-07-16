@@ -10,30 +10,42 @@ const PROJECT_ID = "11111111-1111-4111-8111-111111111111";
 describe("analytics metrics store", () => {
   it("reads aggregate usage summary and bounded breakdowns from analytics rollups", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
-      if (sqlText.includes("FROM analytics_session_rollups") && sqlText.includes("SUM(new_visitors)")) {
+      if (
+        sqlText.includes("FROM analytics_session_rollups") &&
+        sqlText.includes("SUM(new_visitors)")
+      ) {
         return {
-          rows: [{
-            sessions: "12",
-            pageviews: "30",
-            new_visitors: "4",
-            returning_visitors: "3",
-            exits: "2"
-          }]
+          rows: [
+            {
+              sessions: "12",
+              pageviews: "30",
+              active_visitors: "7",
+              new_visitors: "4",
+              returning_visitors: "3",
+              exits: "2"
+            }
+          ]
         };
       }
 
-      if (sqlText.includes("FROM analytics_action_rollups") && sqlText.includes("GROUP BY action_key")) {
+      if (
+        sqlText.includes("FROM analytics_action_rollups") &&
+        sqlText.includes("GROUP BY action_key")
+      ) {
         expect(params.at(-1)).toBe(3);
         return {
-          rows: [{
-            action_key: "signup_click",
-            event_count: "14",
-            unique_sessions: "9"
-          }, {
-            action_key: "conversion:trial_started",
-            event_count: "5",
-            unique_sessions: "5"
-          }]
+          rows: [
+            {
+              action_key: "signup_click",
+              event_count: "14",
+              unique_sessions: "9"
+            },
+            {
+              action_key: "conversion:trial_started",
+              event_count: "5",
+              unique_sessions: "5"
+            }
+          ]
         };
       }
 
@@ -125,7 +137,12 @@ describe("analytics metrics store", () => {
       },
       actions: [
         { action_key: "signup_click", kind: "action", event_count: 14, unique_sessions: 9 },
-        { action_key: "conversion:trial_started", kind: "conversion", event_count: 5, unique_sessions: 5 }
+        {
+          action_key: "conversion:trial_started",
+          kind: "conversion",
+          event_count: 5,
+          unique_sessions: 5
+        }
       ]
     });
   });
@@ -134,44 +151,57 @@ describe("analytics metrics store", () => {
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
       if (sqlText.includes("FROM analytics_route_rollups")) {
         return {
-          rows: [{
-            route_key: "/pricing",
-            pageviews: "40",
-            unique_sessions: "22",
-            entrances: "15",
-            exits: "6",
-            bounces: "3",
-            linked_incident_sessions: "2"
-          }]
+          rows: [
+            {
+              route_key: "/pricing",
+              pageviews: "40",
+              unique_sessions: "22",
+              entrances: "15",
+              exits: "6",
+              bounces: "3",
+              linked_incident_sessions: "2"
+            }
+          ]
         };
       }
 
-      if (sqlText.includes("FROM analytics_funnel_rollups") && sqlText.includes("GROUP BY funnel_key")) {
+      if (
+        sqlText.includes("FROM analytics_funnel_rollups") &&
+        sqlText.includes("GROUP BY steps.funnel_key")
+      ) {
         expect(params.at(-1)).toBe(10);
         return {
-          rows: [{
-            funnel_key: "checkout",
-            sessions_entered: "30",
-            sessions_completed: "18",
-            dropoffs: "12"
-          }]
+          rows: [
+            {
+              funnel_key: "checkout",
+              sessions_entered: "30",
+              sessions_completed: "18",
+              dropoffs: "12"
+            }
+          ]
         };
       }
 
       if (sqlText.includes("FROM analytics_funnel_rollups")) {
         expect(params).toContain("checkout");
         return {
-          rows: [{
-            step_key: "payment",
-            step_order: 2,
-            sessions_entered: "20",
-            sessions_completed: "12",
-            dropoffs: "8"
-          }]
+          rows: [
+            {
+              step_key: "payment",
+              step_order: 2,
+              step_count: 3,
+              sessions_entered: "20",
+              sessions_completed: "12",
+              next_sessions_entered: "0"
+            }
+          ]
         };
       }
 
-      if (sqlText.includes("FROM analytics_session_rollups") && sqlText.includes("GROUP BY value")) {
+      if (
+        sqlText.includes("FROM analytics_session_rollups") &&
+        sqlText.includes("GROUP BY value")
+      ) {
         if (sqlText.includes("device_type")) {
           return { rows: [{ value: "mobile", sessions: "8", pageviews: "17" }] };
         }
@@ -197,15 +227,17 @@ describe("analytics metrics store", () => {
 
     await expect(store.getRouteMetrics(input)).resolves.toEqual({
       window: expect.objectContaining({ project_id: PROJECT_ID }),
-      routes: [{
-        route_key: "/pricing",
-        pageviews: 40,
-        unique_sessions: 22,
-        entrances: 15,
-        exits: 6,
-        bounces: 3,
-        linked_incident_sessions: 2
-      }]
+      routes: [
+        {
+          route_key: "/pricing",
+          pageviews: 40,
+          unique_sessions: 22,
+          entrances: 15,
+          exits: 6,
+          bounces: 3,
+          linked_incident_sessions: 2
+        }
+      ]
     });
     await expect(store.getDeviceBreakdown(input)).resolves.toMatchObject({
       device_types: [{ value: "mobile", sessions: 8, pageviews: 17 }]
@@ -216,13 +248,15 @@ describe("analytics metrics store", () => {
     });
     await expect(store.listFunnels(input)).resolves.toEqual({
       window: expect.objectContaining({ project_id: PROJECT_ID }),
-      funnels: [{
-        funnel_key: "checkout",
-        sessions_entered: 30,
-        sessions_completed: 18,
-        dropoffs: 12,
-        conversion_rate: 0.6
-      }]
+      funnels: [
+        {
+          funnel_key: "checkout",
+          sessions_entered: 30,
+          sessions_completed: 18,
+          dropoffs: 12,
+          conversion_rate: 0.6
+        }
+      ]
     });
     await expect(store.getFunnelAnalysis({ ...input, funnel_key: "checkout" })).resolves.toEqual({
       funnel: expect.objectContaining({
@@ -233,14 +267,16 @@ describe("analytics metrics store", () => {
         dropoffs: 8,
         conversion_rate: 0.6
       }),
-      steps: [{
-        step_key: "payment",
-        step_order: 2,
-        sessions_entered: 20,
-        sessions_completed: 12,
-        dropoffs: 8,
-        conversion_rate: 0.6
-      }]
+      steps: [
+        {
+          step_key: "payment",
+          step_order: 2,
+          sessions_entered: 20,
+          sessions_completed: 12,
+          dropoffs: 8,
+          conversion_rate: 0.6
+        }
+      ]
     });
   });
 
@@ -272,10 +308,7 @@ describe("analytics metrics store", () => {
         expect(sqlText).toContain("samples.id::text AS sample_id");
         expect(sqlText).not.toContain("samples.sample_id");
         expect(params[0]).toBe(PROJECT_ID);
-        expect(params[2]).toEqual([
-          "transition:/pricing->/checkout",
-          "transition:/docs->/signup"
-        ]);
+        expect(params[2]).toEqual(["transition:/pricing->/checkout", "transition:/docs->/signup"]);
         expect(params[3]).toBe("2026-03-01T00:00:00.000Z");
         expect(params[4]).toBe("2026-03-08T00:00:00.000Z");
         expect(params.at(-3)).toBe("web");
@@ -362,16 +395,11 @@ describe("analytics metrics store", () => {
     await store.getJourneyPatterns(input);
 
     const routeQuery = observed.find((query) => query.sql.includes("FROM analytics_route_rollups"));
-    const patternQuery = observed.find((query) => query.sql.includes("FROM analytics_transition_rollups"));
+    const patternQuery = observed.find((query) =>
+      query.sql.includes("FROM analytics_transition_rollups")
+    );
     expect(routeQuery?.sql).toContain("route_key = $5");
-    expect(routeQuery?.params).toEqual([
-      PROJECT_ID,
-      input.from,
-      input.to,
-      "day",
-      "/checkout",
-      10
-    ]);
+    expect(routeQuery?.params).toEqual([PROJECT_ID, input.from, input.to, "day", "/checkout", 10]);
     expect(patternQuery?.sql).toContain("(from_route_key = $5 OR to_route_key = $5)");
     expect(patternQuery?.params).toEqual([
       PROJECT_ID,
@@ -380,6 +408,68 @@ describe("analytics metrics store", () => {
       "day",
       "/checkout",
       10
+    ]);
+  });
+
+  it("parameterizes built-in and custom dimension filters", async (): Promise<void> => {
+    const queryMock = vi.fn(async (sql: string, params: unknown[]) => {
+      void sql;
+      void params;
+      return { rows: [] };
+    });
+    const store = createPostgresAnalyticsMetricsStore({ query: queryMock as Queryable["query"] });
+
+    await store.getRouteMetrics({
+      project_id: PROJECT_ID,
+      from: "2026-03-01T00:00:00.000Z",
+      to: "2026-03-08T00:00:00.000Z",
+      granularity: "day",
+      service: "web",
+      environment: "production",
+      route: "/checkout",
+      device_type: "mobile",
+      browser: "Chrome",
+      os: "iOS",
+      language: "en",
+      country: "US",
+      auth_state: "authenticated",
+      referrer: "example.com",
+      utm_source: "google",
+      utm_medium: "cpc",
+      utm_campaign: "summer",
+      custom_dimensions: { account_tier: "team" },
+      limit: 5
+    });
+
+    const [sql, params] = queryMock.mock.calls[0] as unknown as [string, unknown[]];
+    expect(sql).toContain("device_type = $7");
+    expect(sql).toContain("browser_family = $8");
+    expect(sql).toContain("dimensions->>'referrer_domain' = $13");
+    expect(sql).toContain(
+      "jsonb_extract_path_text(dimensions, 'custom_dimensions', $17::text) = $18"
+    );
+    expect(sql).toContain("route_key = $19");
+    expect(params).toEqual([
+      PROJECT_ID,
+      "2026-03-01T00:00:00.000Z",
+      "2026-03-08T00:00:00.000Z",
+      "day",
+      "web",
+      "production",
+      "mobile",
+      "Chrome",
+      "iOS",
+      "en",
+      "US",
+      "authenticated",
+      "example.com",
+      "google",
+      "cpc",
+      "summer",
+      "account_tier",
+      "team",
+      "/checkout",
+      5
     ]);
   });
 
@@ -400,12 +490,14 @@ describe("analytics metrics store", () => {
       }
       if (sqlText.includes("rollup_kind = 'transition_session'")) {
         return {
-          rows: [{
-            from_route_key: "/pricing",
-            to_route_key: "/checkout",
-            affected_sessions: "2",
-            transition_count: "2"
-          }]
+          rows: [
+            {
+              from_route_key: "/pricing",
+              to_route_key: "/checkout",
+              affected_sessions: "2",
+              transition_count: "2"
+            }
+          ]
         };
       }
       if (sqlText.includes("samples.correlation_session_hash = links.subject_hash")) {
@@ -414,38 +506,47 @@ describe("analytics metrics store", () => {
         expect(params[10]).toBe("2026-03-08T00:00:00.000Z");
         expect(params[11]).toBe(3);
         return {
-          rows: [{
-            transition_tag: "transition:/pricing->/checkout",
-            sample_id: "00000000-0000-4000-8000-000000000703"
-          }]
+          rows: [
+            {
+              transition_tag: "transition:/pricing->/checkout",
+              sample_id: "00000000-0000-4000-8000-000000000703"
+            }
+          ]
         };
       }
       if (sqlText.includes("analysis_kind = 'incident_impact'")) {
         return {
-          rows: [{
-            generation_id: "00000000-0000-4000-8000-000000000702",
-            status: "pending",
-            failure_reason: null
-          }]
+          rows: [
+            {
+              generation_id: "00000000-0000-4000-8000-000000000702",
+              status: "pending",
+              failure_reason: null
+            }
+          ]
         };
       }
-      if (sqlText.includes("COUNT(DISTINCT links.subject_hash)") && sqlText.includes("analytics_incident_session_links")) {
+      if (
+        sqlText.includes("COUNT(DISTINCT links.subject_hash)") &&
+        sqlText.includes("analytics_incident_session_links")
+      ) {
         return { rows: [{ affected_sessions: "4" }] };
       }
       throw new Error(`Unhandled incident impact SQL: ${sqlText}`);
     });
     const store = createPostgresAnalyticsMetricsStore({ query: queryMock as Queryable["query"] });
 
-    await expect(store.getIncidentImpact({
-      project_id: PROJECT_ID,
-      incident_id: incidentId,
-      from: "2026-03-01T00:00:00.000Z",
-      to: "2026-03-08T00:00:00.000Z",
-      granularity: "day",
-      service: "web",
-      environment: "production",
-      limit: 10
-    })).resolves.toEqual({
+    await expect(
+      store.getIncidentImpact({
+        project_id: PROJECT_ID,
+        incident_id: incidentId,
+        from: "2026-03-01T00:00:00.000Z",
+        to: "2026-03-08T00:00:00.000Z",
+        granularity: "day",
+        service: "web",
+        environment: "production",
+        limit: 10
+      })
+    ).resolves.toEqual({
       incident_id: incidentId,
       window: {
         project_id: PROJECT_ID,
@@ -460,12 +561,14 @@ describe("analytics metrics store", () => {
       affected_funnels: [{ funnel_key: "checkout", affected_sessions: 3 }],
       top_device_types: [{ value: "mobile", affected_sessions: 3 }],
       top_browsers: [{ value: "Chrome", affected_sessions: 2 }],
-      journey_patterns: [{
-        from_route_key: "/pricing",
-        to_route_key: "/checkout",
-        affected_sessions: 2,
-        sample_ids: ["00000000-0000-4000-8000-000000000703"]
-      }],
+      journey_patterns: [
+        {
+          from_route_key: "/pricing",
+          to_route_key: "/checkout",
+          affected_sessions: 2,
+          sample_ids: ["00000000-0000-4000-8000-000000000703"]
+        }
+      ],
       conversion_delta: {
         availability: "unavailable",
         value: null,
@@ -477,5 +580,47 @@ describe("analytics metrics store", () => {
         failure_reason: null
       }
     });
+  });
+
+  it("applies dimension filters to the linked incident session population", async (): Promise<void> => {
+    const queryMock = vi.fn(async (sql: string, params: unknown[]) => {
+      void sql;
+      void params;
+      return { rows: [] };
+    });
+    const store = createPostgresAnalyticsMetricsStore({ query: queryMock as Queryable["query"] });
+
+    await store.getIncidentImpact({
+      project_id: PROJECT_ID,
+      incident_id: "00000000-0000-4000-8000-000000000704",
+      from: "2026-03-01T00:00:00.000Z",
+      to: "2026-03-08T00:00:00.000Z",
+      granularity: "day",
+      route: "/checkout",
+      device_type: "mobile",
+      referrer: "example.com",
+      custom_dimensions: { account_tier: "team" }
+    });
+
+    const linkQueries = queryMock.mock.calls
+      .map(([sql, params]) => ({ sql: String(sql), params }))
+      .filter(({ sql }) => sql.includes("analytics_incident_session_links"));
+    expect(linkQueries.length).toBeGreaterThan(0);
+    for (const query of linkQueries) {
+      expect(query.sql).toContain("links.route_key = $6");
+      expect(query.sql).toContain("FROM analytics_route_rollups filtered_rollups");
+      expect(query.sql).toContain("filtered_rollups.device_type = $7");
+      expect(query.sql).toContain("filtered_rollups.dimensions->>'referrer_domain' = $8");
+      expect(query.sql).toContain(
+        "jsonb_extract_path_text(filtered_rollups.dimensions, 'custom_dimensions', $9::text) = $10"
+      );
+      expect(query.params.slice(5, 10)).toEqual([
+        "/checkout",
+        "mobile",
+        "example.com",
+        "account_tier",
+        "team"
+      ]);
+    }
   });
 });

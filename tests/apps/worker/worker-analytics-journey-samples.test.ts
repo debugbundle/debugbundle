@@ -12,7 +12,16 @@ import { hashAnalyticsSessionSubject } from "../../../packages/storage/src/index
 const PROJECT_ID = "11111111-1111-4111-8111-111111111111";
 const ORGANIZATION_ID = "99999999-9999-4999-8999-999999999999";
 
-function createAnalyticsEvent(overrides: Partial<AnalyticsEventEnvelope> = {}): AnalyticsEventEnvelope {
+function createJourneyLease() {
+  return {
+    acquireLease: vi.fn().mockResolvedValue(true),
+    releaseLease: vi.fn().mockResolvedValue(undefined)
+  };
+}
+
+function createAnalyticsEvent(
+  overrides: Partial<AnalyticsEventEnvelope> = {}
+): AnalyticsEventEnvelope {
   return {
     schema_version: "2026-07-analytics-01",
     event_id: "550e8400-e29b-41d4-a716-446655440000",
@@ -35,6 +44,7 @@ function createAnalyticsEvent(overrides: Partial<AnalyticsEventEnvelope> = {}): 
     },
     payload: {
       kind: "page_view",
+      privacy: { mode: "standard", consent_granted: true },
       route: {
         path: "/pricing",
         normalized_path: "/pricing",
@@ -78,6 +88,38 @@ describe("analytics journey sample capture", () => {
     ).not.toBe(buildAnalyticsJourneySampleId(PROJECT_ID, event));
   });
 
+  it("does not read or mutate a journey sample while another worker holds its lease", async () => {
+    const getObject = vi.fn();
+    const reserveAnalyticsJourneySample = vi.fn();
+
+    await expect(
+      maybeCaptureAnalyticsJourneySample({
+        project_id: PROJECT_ID,
+        event: createAnalyticsEvent(),
+        dependencies: {
+          analyticsSettingsStore: {
+            getAnalyticsSettingsByProjectId: vi.fn().mockResolvedValue({
+              enabled: true,
+              journey_sample_rate: 1,
+              sample_retention_days: 7
+            })
+          },
+          analyticsJourneySampleStore: {
+            reserveAnalyticsJourneySample,
+            recordAnalyticsJourneySample: vi.fn(),
+            deleteAnalyticsJourneySampleForProject: vi.fn()
+          },
+          acquireLease: vi.fn().mockResolvedValue(false),
+          releaseLease: vi.fn(),
+          objectStore: { getObject, putObject: vi.fn() }
+        }
+      })
+    ).resolves.toEqual({ captured: false, reason: "journey_sample_update_in_progress" });
+
+    expect(getObject).not.toHaveBeenCalled();
+    expect(reserveAnalyticsJourneySample).not.toHaveBeenCalled();
+  });
+
   it("merges existing retained journey artifacts without duplicating events", async (): Promise<void> => {
     const firstEvent = createAnalyticsEvent();
     const secondEvent = createAnalyticsEvent({
@@ -108,18 +150,20 @@ describe("analytics journey sample capture", () => {
       last_seen_at: firstEvent.occurred_at,
       analysis_tags: ["page_view"],
       dimensions_summary: { device_type: "desktop" },
-      events: [{
-        event_id: firstEvent.event_id,
-        occurred_at: firstEvent.occurred_at,
-        kind: "page_view",
-        route: firstEvent.payload.route,
-        previous_route: null,
-        signal: null,
-        trace_id: firstEvent.correlation.trace_id,
-        deploy_id: firstEvent.correlation.deploy_id,
-        dimensions: firstEvent.payload.dimensions,
-        custom_dimensions: firstEvent.payload.custom_dimensions
-      }]
+      events: [
+        {
+          event_id: firstEvent.event_id,
+          occurred_at: firstEvent.occurred_at,
+          kind: "page_view",
+          route: firstEvent.payload.route,
+          previous_route: null,
+          signal: null,
+          trace_id: firstEvent.correlation.trace_id,
+          deploy_id: firstEvent.correlation.deploy_id,
+          dimensions: firstEvent.payload.dimensions,
+          custom_dimensions: firstEvent.payload.custom_dimensions
+        }
+      ]
     };
     const putObject = vi.fn().mockResolvedValue(undefined);
     const reserveAnalyticsJourneySample = vi.fn().mockResolvedValue("exists");
@@ -130,6 +174,7 @@ describe("analytics journey sample capture", () => {
         project_id: PROJECT_ID,
         event: secondEvent,
         dependencies: {
+          ...createJourneyLease(),
           analyticsSettingsStore: {
             getAnalyticsSettingsByProjectId: vi.fn().mockResolvedValue({
               enabled: true,
@@ -143,7 +188,9 @@ describe("analytics journey sample capture", () => {
             deleteAnalyticsJourneySampleForProject: vi.fn()
           },
           objectStore: {
-            getObject: vi.fn().mockResolvedValue(gzipSync(Buffer.from(JSON.stringify(existingArtifact), "utf8"))),
+            getObject: vi
+              .fn()
+              .mockResolvedValue(gzipSync(Buffer.from(JSON.stringify(existingArtifact), "utf8"))),
             putObject
           }
         }
@@ -160,16 +207,25 @@ describe("analytics journey sample capture", () => {
       firstEvent.event_id,
       secondEvent.event_id
     ]);
-    expect(artifact.analysis_tags).toEqual(expect.arrayContaining(["action", "action:pricing.cta"]));
+    expect(artifact.analysis_tags).toEqual(
+      expect.arrayContaining(["action", "action:pricing.cta"])
+    );
     expect(artifact.last_seen_at).toBe(secondEvent.occurred_at);
-    expect(recordAnalyticsJourneySample).toHaveBeenCalledWith(expect.objectContaining({
-      sample_id: sampleId,
-      correlation_session_hash: hashAnalyticsSessionSubject(PROJECT_ID, secondEvent.correlation.session_id),
-      expires_at: "2026-04-09T13:47:00.000Z"
-    }));
-    expect(reserveAnalyticsJourneySample).toHaveBeenCalledWith(expect.objectContaining({
-      sample_id: sampleId
-    }));
+    expect(recordAnalyticsJourneySample).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sample_id: sampleId,
+        correlation_session_hash: hashAnalyticsSessionSubject(
+          PROJECT_ID,
+          secondEvent.correlation.session_id
+        ),
+        expires_at: "2026-04-09T13:47:00.000Z"
+      })
+    );
+    expect(reserveAnalyticsJourneySample).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sample_id: sampleId
+      })
+    );
   });
 
   it("claims retained sample allowance only when a sample reservation is new", async (): Promise<void> => {
@@ -183,6 +239,7 @@ describe("analytics journey sample capture", () => {
         project_id: PROJECT_ID,
         event,
         dependencies: {
+          ...createJourneyLease(),
           analyticsSettingsStore: {
             getAnalyticsSettingsByProjectId: vi.fn().mockResolvedValue({
               enabled: true,
@@ -218,6 +275,7 @@ describe("analytics journey sample capture", () => {
       analytics_sessions: 0,
       analytics_journey_samples: 1,
       analytics_bundle_generations: 0,
+      claims: [{ claim_key: `journey:${sampleId}`, metric: "analytics_journey_samples" }],
       limits: {
         monthly_analytics_events: 150_000,
         monthly_analytics_sessions: 30_000,
@@ -225,9 +283,11 @@ describe("analytics journey sample capture", () => {
         monthly_analytics_bundle_generations: 75
       }
     });
-    expect(recordAnalyticsJourneySample).toHaveBeenCalledWith(expect.objectContaining({
-      sample_id: sampleId
-    }));
+    expect(recordAnalyticsJourneySample).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sample_id: sampleId
+      })
+    );
   });
 
   it("skips new retained samples when the retained sample allowance is exhausted", async (): Promise<void> => {
@@ -239,6 +299,7 @@ describe("analytics journey sample capture", () => {
         project_id: PROJECT_ID,
         event: createAnalyticsEvent(),
         dependencies: {
+          ...createJourneyLease(),
           analyticsSettingsStore: {
             getAnalyticsSettingsByProjectId: vi.fn().mockResolvedValue({
               enabled: true,
@@ -286,12 +347,15 @@ describe("analytics journey sample capture", () => {
     const releaseAnalyticsUsageForOrganization = vi.fn().mockResolvedValue(undefined);
     const deleteAnalyticsJourneySampleForProject = vi.fn().mockResolvedValue(undefined);
     const deleteObject = vi.fn().mockResolvedValue(undefined);
+    const releaseLease = vi.fn().mockResolvedValue(undefined);
 
     await expect(
       maybeCaptureAnalyticsJourneySample({
         project_id: PROJECT_ID,
         event: createAnalyticsEvent(),
         dependencies: {
+          acquireLease: vi.fn().mockResolvedValue(true),
+          releaseLease,
           analyticsSettingsStore: {
             getAnalyticsSettingsByProjectId: vi.fn().mockResolvedValue({
               enabled: true,
@@ -331,6 +395,7 @@ describe("analytics journey sample capture", () => {
     });
     expect(deleteAnalyticsJourneySampleForProject).toHaveBeenCalledOnce();
     expect(deleteObject).toHaveBeenCalledOnce();
+    expect(releaseLease).toHaveBeenCalledOnce();
   });
 
   it("skips capture when project sample settings disable retained samples", async (): Promise<void> => {
@@ -341,6 +406,7 @@ describe("analytics journey sample capture", () => {
         project_id: PROJECT_ID,
         event: createAnalyticsEvent(),
         dependencies: {
+          ...createJourneyLease(),
           analyticsSettingsStore: {
             getAnalyticsSettingsByProjectId: vi.fn().mockResolvedValue({
               enabled: true,

@@ -20,6 +20,18 @@ export const ANALYTICS_METRICS_MCP_TOOL_CATALOG = [
       granularity: z.enum(["hour", "day"]).optional(),
       service: z.string().optional(),
       environment: z.string().optional(),
+      route: z.string().optional(),
+      deviceType: z.string().optional(),
+      browser: z.string().optional(),
+      os: z.string().optional(),
+      language: z.string().optional(),
+      country: z.string().optional(),
+      authState: z.enum(["anonymous", "authenticated", "unknown"]).optional(),
+      referrer: z.string().optional(),
+      utmSource: z.string().optional(),
+      utmMedium: z.string().optional(),
+      utmCampaign: z.string().optional(),
+      customDimensions: z.record(z.string(), z.string()).optional(),
       limit: z.number().optional()
     })
   },
@@ -94,7 +106,8 @@ export const ANALYTICS_METRICS_MCP_TOOL_CATALOG = [
   {
     name: "get_incident_impact",
     group: "analytics_metrics",
-    description: "Get aggregate AnalyticsBundle impact metrics for one incident, including linked routes, funnels, segments, journeys, and bundle state.",
+    description:
+      "Get aggregate AnalyticsBundle impact metrics for one incident, including linked routes, funnels, segments, journeys, and bundle state.",
     inputSchema: analyticsMetricsInputSchema().extend({
       incidentId: z.string()
     })
@@ -102,7 +115,8 @@ export const ANALYTICS_METRICS_MCP_TOOL_CATALOG = [
   {
     name: "list_analytics_opportunities",
     group: "analytics_metrics",
-    description: "List AnalyticsBundle opportunities for a project, or across accessible projects when projectId is omitted.",
+    description:
+      "List AnalyticsBundle opportunities for a project, or across accessible projects when projectId is omitted.",
     inputSchema: z.object({
       bearerToken: z.string(),
       projectId: z.string().optional(),
@@ -131,7 +145,8 @@ export const ANALYTICS_METRICS_MCP_TOOL_CATALOG = [
   {
     name: "list_analytics_bundles",
     group: "analytics_metrics",
-    description: "List AnalyticsBundle generation records for a project, or across accessible projects when projectId is omitted.",
+    description:
+      "List AnalyticsBundle generation records for a project, or across accessible projects when projectId is omitted.",
     inputSchema: z.object({
       bearerToken: z.string(),
       projectId: z.string().optional(),
@@ -152,6 +167,7 @@ export const ANALYTICS_METRICS_MCP_TOOL_CATALOG = [
     inputSchema: z.object({
       bearerToken: z.string(),
       projectId: z.string(),
+      opportunityId: z.string().uuid().optional(),
       analysisKind: AnalyticsBundleAnalysisKindSchema,
       from: z.string().optional(),
       to: z.string().optional(),
@@ -175,17 +191,7 @@ export const ANALYTICS_METRICS_MCP_TOOL_CATALOG = [
   }
 ] as const;
 
-function analyticsMetricsInputSchema(): z.ZodObject<{
-  bearerToken: z.ZodString;
-  projectId: z.ZodString;
-  from: z.ZodOptional<z.ZodString>;
-  to: z.ZodOptional<z.ZodString>;
-  last: z.ZodOptional<z.ZodString>;
-  granularity: z.ZodOptional<z.ZodEnum<["hour", "day"]>>;
-  service: z.ZodOptional<z.ZodString>;
-  environment: z.ZodOptional<z.ZodString>;
-  limit: z.ZodOptional<z.ZodNumber>;
-}> {
+function analyticsMetricsInputSchema(): ReturnType<typeof z.object> {
   return z.object({
     bearerToken: z.string(),
     projectId: z.string(),
@@ -195,6 +201,21 @@ function analyticsMetricsInputSchema(): z.ZodObject<{
     granularity: z.enum(["hour", "day"]).optional(),
     service: z.string().optional(),
     environment: z.string().optional(),
+    route: z.string().optional(),
+    deviceType: z.string().optional(),
+    browser: z.string().optional(),
+    os: z.string().optional(),
+    language: z.string().optional(),
+    country: z.string().optional(),
+    authState: z.enum(["anonymous", "authenticated", "unknown"]).optional(),
+    referrer: z.string().optional(),
+    utmSource: z.string().optional(),
+    utmMedium: z.string().optional(),
+    utmCampaign: z.string().optional(),
+    customDimensions: z
+      .record(z.string().regex(/^[A-Za-z][A-Za-z0-9_.-]{0,63}$/), z.string().max(128))
+      .refine((value) => Object.keys(value).length <= 8)
+      .optional(),
     limit: z.number().optional()
   });
 }

@@ -45,6 +45,11 @@ describe("openclaw plugin parity", () => {
         "debugbundle_revoke_project_token",
         "debugbundle_update_capture_policy",
         "debugbundle_create_capture_rule",
+        "debugbundle_generate_analytics_bundle",
+        "debugbundle_update_analytics_settings",
+        "debugbundle_create_saved_analytics_funnel",
+        "debugbundle_update_saved_analytics_funnel",
+        "debugbundle_archive_saved_analytics_funnel",
         "debugbundle_create_webhook",
         "debugbundle_retry_webhook_delivery",
         "debugbundle_start_trial",
@@ -55,6 +60,8 @@ describe("openclaw plugin parity", () => {
     );
     expect(DEBUGBUNDLE_OPENCLAW_OPTIONAL_TOOL_NAMES).not.toContain("debugbundle_list_incidents");
     expect(DEBUGBUNDLE_OPENCLAW_OPTIONAL_TOOL_NAMES).not.toContain("debugbundle_get_bundle");
+    expect(DEBUGBUNDLE_OPENCLAW_OPTIONAL_TOOL_NAMES).not.toContain("debugbundle_get_usage_summary");
+    expect(DEBUGBUNDLE_OPENCLAW_OPTIONAL_TOOL_NAMES).not.toContain("debugbundle_get_funnel_analysis");
     expect(DEBUGBUNDLE_OPENCLAW_OPTIONAL_TOOL_NAMES).not.toContain("debugbundle_get_billing_summary");
   });
 });

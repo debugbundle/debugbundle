@@ -24,6 +24,7 @@ const analyticsSettings = {
   journey_sample_rate: 0.1,
   raw_retention_days: 7,
   sample_retention_days: 30,
+  hourly_retention_days: 90,
   aggregate_retention_months: 24,
   max_saved_funnels: 10,
   max_custom_dimensions: 0,
@@ -63,6 +64,7 @@ function installOverviewFetch(
     empty?: boolean;
     failMetricsOnce?: boolean;
     failRoutes?: boolean;
+    available?: boolean;
   } = {}
 ): { metricsRequests: () => number; requestedUrls: () => string[] } {
   let metricsRequests = 0;
@@ -86,7 +88,7 @@ function installOverviewFetch(
       if (url.endsWith("/v1/projects/proj_123/analytics-settings")) {
         return jsonResponse(200, {
           access_mode: "manage",
-          analytics_available: plan !== "free",
+          analytics_available: input.available ?? true,
           settings: { ...analyticsSettings, enabled: input.enabled ?? true }
         });
       }
@@ -214,8 +216,13 @@ describe("web app - project analytics overview", () => {
 
     await user.click(analyticsTab);
 
-    expect(await screen.findByRole("heading", { name: "Analytics overview" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Refresh" })).toBeInTheDocument();
+    const overviewHeading = await screen.findByRole("heading", { name: "Analytics overview" });
+    const overviewCard = overviewHeading.closest('[data-slot="card"]');
+    expect(overviewCard).not.toBeNull();
+    expect(overviewHeading).toHaveClass("text-base");
+    expect(
+      within(overviewCard as HTMLElement).getByRole("button", { name: "Refresh" })
+    ).toBeInTheDocument();
     expect(analyticsTab).toHaveAttribute("data-state", "active");
   });
 
@@ -304,7 +311,7 @@ describe("web app - project analytics overview", () => {
     expect(screen.queryByText("More analytics filters")).not.toBeInTheDocument();
   });
 
-  it("shows a setup action when paid analytics capture is disabled", async () => {
+  it("shows a setup action when product analytics capture is disabled", async () => {
     const state = installOverviewFetch({ enabled: false });
 
     render(<App initialEntries={["/projects/proj_123/analytics"]} />);
@@ -320,18 +327,12 @@ describe("web app - project analytics overview", () => {
     expect(state.metricsRequests()).toBe(0);
   });
 
-  it("shows paid-plan guidance when analytics is unavailable", async () => {
-    const state = installOverviewFetch({ plan: "free" });
+  it("shows project guidance when analytics is unavailable", async () => {
+    const state = installOverviewFetch({ plan: "free", available: false });
 
     render(<App initialEntries={["/projects/proj_123/analytics"]} />);
 
-    expect(
-      await screen.findByRole("heading", {
-        name: /upgrade to solo or team to unlock product analytics/i
-      })
-    ).toBeInTheDocument();
-    expect(screen.getByText(/analytics bundles are available on paid plans/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /open billing/i })).toHaveAttribute("href", "/billing");
+    expect(await screen.findByText(/product analytics unavailable/i)).toBeInTheDocument();
     expect(state.metricsRequests()).toBe(0);
   });
 

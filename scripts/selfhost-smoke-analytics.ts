@@ -1,10 +1,15 @@
-import { randomUUID } from "node:crypto";
-
-import {
-  AnalyticsEventEnvelopeSchema,
-  type AnalyticsDimensions,
-  type AnalyticsEventEnvelope
-} from "../packages/shared-types/src/index.js";
+import { BrowserAnalyticsController } from "../sdks/debugbundle-js/packages/sdk-browser/src/analytics.js";
+import { BrowserEventTransport } from "../sdks/debugbundle-js/packages/sdk-browser/src/event-transport.js";
+import { buildBrowserTransportRequestBody } from "../sdks/debugbundle-js/packages/sdk-browser/src/runtime.js";
+import type {
+  ActiveConfig,
+  BrowserAnalyticsEventEnvelope,
+  BrowserDeviceInfo,
+  BrowserTransportMode,
+  DebugBundleBrowserTransport
+} from "../sdks/debugbundle-js/packages/sdk-browser/src/types.js";
+import { createBrowserRelay } from "../sdks/debugbundle-js/packages/sdk-node/src/relay.js";
+import { AnalyticsEventEnvelopeSchema } from "../packages/shared-types/src/index.js";
 
 type AnalyticsSmokeInput = {
   apiBaseUrl: string;
@@ -20,6 +25,8 @@ type AnalyticsSmokeInput = {
 
 export type AnalyticsSmokeResult = {
   acceptedEvents: number;
+  directAcceptedEvents: number;
+  relayAcceptedEvents: number;
   sessions: number;
   pageviews: number;
   conversions: number;
@@ -31,166 +38,254 @@ export type AnalyticsSmokeResult = {
 const SESSION_FIXTURES: Array<{
   sessionId: string;
   converted: boolean;
-  dimensions: AnalyticsDimensions;
+  authState: "anonymous" | "authenticated";
+  transportMode: "direct" | "relay";
+  device: BrowserDeviceInfo;
 }> = [
   {
     sessionId: "selfhost-browser-desktop-chrome",
     converted: true,
-    dimensions: createDimensions({
-      auth_state: "authenticated",
-      device_type: "desktop",
-      browser_family: "Chrome",
-      browser_major: 126,
-      os_family: "macOS",
-      os_major: 15,
-      language: "en-US",
-      locale: "en-US",
-      viewport_bucket: "large",
-      referrer_domain: "search.example",
-      utm_source: "search",
-      utm_medium: "organic"
-    })
+    authState: "authenticated",
+    transportMode: "direct",
+    device: createDevice("desktop", "Chrome", "126", "macOS", "15", "en-US")
   },
   {
     sessionId: "selfhost-browser-mobile-safari",
     converted: false,
-    dimensions: createDimensions({
-      auth_state: "anonymous",
-      device_type: "mobile",
-      browser_family: "Safari",
-      browser_major: 18,
-      os_family: "iOS",
-      os_major: 18,
-      language: "de-DE",
-      locale: "de-DE",
-      viewport_bucket: "small",
-      referrer_domain: "social.example",
-      utm_source: "social",
-      utm_medium: "referral"
-    })
+    authState: "anonymous",
+    transportMode: "relay",
+    device: createDevice("mobile", "Safari", "18", "iOS", "18", "de-DE")
   },
   {
     sessionId: "selfhost-browser-desktop-firefox",
     converted: true,
-    dimensions: createDimensions({
-      auth_state: "authenticated",
-      device_type: "desktop",
-      browser_family: "Firefox",
-      browser_major: 128,
-      os_family: "Windows",
-      os_major: 11,
-      language: "fr-FR",
-      locale: "fr-FR",
-      viewport_bucket: "large",
-      referrer_domain: null,
-      utm_source: null,
-      utm_medium: null
-    })
+    authState: "authenticated",
+    transportMode: "direct",
+    device: createDevice("desktop", "Firefox", "128", "Windows", "11", "fr-FR")
   }
 ];
 
-function createDimensions(overrides: Partial<AnalyticsDimensions>): AnalyticsDimensions {
+function createDevice(
+  deviceType: BrowserDeviceInfo["device_type"],
+  browser: string,
+  browserVersion: string,
+  os: string,
+  osVersion: string,
+  language: string
+): BrowserDeviceInfo {
+  const mobile = deviceType === "mobile";
   return {
-    auth_state: "unknown",
-    device_type: "unknown",
-    browser_family: null,
-    browser_major: null,
-    os_family: null,
-    os_major: null,
-    language: null,
-    locale: null,
-    viewport_bucket: "unknown",
-    referrer_domain: null,
-    utm_source: null,
-    utm_medium: null,
-    utm_campaign: "selfhost-acceptance",
-    country_code: null,
-    region_code: null,
-    ...overrides
+    user_agent: `DebugBundle acceptance ${browser}/${browserVersion}`,
+    os: { name: os, version: osVersion },
+    browser: { name: browser, version: browserVersion },
+    device_type: deviceType,
+    screen: mobile ? { width: 390, height: 844 } : { width: 1440, height: 900 },
+    viewport: mobile ? { width: 390, height: 760 } : { width: 1280, height: 760 },
+    device_pixel_ratio: mobile ? 3 : 2,
+    touch_capable: mobile,
+    language,
+    connection_type: mobile ? "4g" : "ethernet",
+    color_scheme_preference: "light"
   };
 }
 
-function route(path: string, title: string): NonNullable<AnalyticsEventEnvelope["payload"]["route"]> {
-  return { path, normalized_path: path, title };
-}
-
-function signal(overrides: Partial<NonNullable<AnalyticsEventEnvelope["payload"]["signal"]>>): NonNullable<AnalyticsEventEnvelope["payload"]["signal"]> {
-  return {
-    action_key: null,
-    funnel_key: null,
-    step_key: null,
-    conversion_key: null,
-    marker_key: null,
-    ...overrides
+async function emitBrowserSdkTraffic(input: {
+  apiBaseUrl: string;
+  projectToken: string;
+  serviceName: string;
+  fetchImpl: typeof fetch;
+}): Promise<{ total: number; direct: number; relay: number }> {
+  const relay = createBrowserRelay({
+    allowedOrigins: ["http://selfhost-browser.debugbundle.local"],
+    durableWrite: false,
+    endpoint: `${input.apiBaseUrl}/v1/events`,
+    projectToken: input.projectToken,
+    fetchImpl: input.fetchImpl
+  });
+  const eventsByMode: Record<"direct" | "relay", BrowserAnalyticsEventEnvelope[]> = {
+    direct: [],
+    relay: []
   };
-}
+  const acceptedByMode: Record<"direct" | "relay", number> = { direct: 0, relay: 0 };
+  const errorsByMode: Record<"direct" | "relay", unknown[]> = { direct: [], relay: [] };
+  const statusByMode: Record<"direct" | "relay", number | null> = { direct: null, relay: null };
 
-function buildBrowserTraffic(serviceName: string, occurredAt: Date): AnalyticsEventEnvelope[] {
-  return SESSION_FIXTURES.flatMap((fixture, sessionIndex) => {
-    const at = (offset: number): string => new Date(occurredAt.getTime() + (sessionIndex * 20 + offset) * 1_000).toISOString();
-    const base = (kind: AnalyticsEventEnvelope["payload"]["kind"], offset: number): AnalyticsEventEnvelope => ({
-      schema_version: "2026-07-analytics-01",
-      event_id: randomUUID(),
-      event_type: "analytics_event",
-      occurred_at: at(offset),
-      sdk_name: "@debugbundle/sdk-browser",
-      sdk_version: "1.4.0-local-acceptance",
-      service: {
-        name: serviceName,
-        runtime: "browser",
-        framework: "react",
-        environment: "production"
-      },
-      correlation: {
-        session_id: fixture.sessionId,
-        visitor_id_hash: null,
-        user_id_hash: null,
-        trace_id: null,
-        deploy_id: "selfhost-acceptance"
-      },
-      payload: {
-        kind,
-        route: route("/pricing", "Pricing"),
-        dimensions: fixture.dimensions,
-        custom_dimensions: {}
+  for (const fixture of SESSION_FIXTURES) {
+    const events = eventsByMode[fixture.transportMode];
+    const config = createBrowserActiveConfig({
+      endpoint:
+        fixture.transportMode === "direct"
+          ? `${input.apiBaseUrl}/v1/events`
+          : "http://browser-relay.debugbundle.local/events",
+      projectToken: fixture.transportMode === "direct" ? input.projectToken : null,
+      serviceName: input.serviceName,
+      transportMode: fixture.transportMode,
+      transport: async () => ({ status: 202 })
+    });
+    const controller = new BrowserAnalyticsController({
+      getConfig: () => config,
+      getDeviceInfo: () => fixture.device,
+      getCurrentRoute: () => "/pricing?token=must-not-leak",
+      getSessionId: () => fixture.sessionId,
+      enqueue: (event) => events.push(event)
+    });
+    controller.configure({
+      enabled: true,
+      privacyMode: "strict",
+      consentRequired: false,
+      trackPageViews: true,
+      trackRouteChanges: true,
+      trackSessions: true,
+      trackReferrers: true,
+      trackActions: true,
+      trackFrictionSignals: true,
+      sampleRate: 1
+    });
+    controller.api.setContext({ auth_state: fixture.authState, account_tier: "team" });
+    controller.captureSessionStart();
+    controller.api.pageView({ path: "/pricing?token=must-not-leak", title: "Pricing" });
+    controller.api.track("signup_click", { account_tier: "team", email: "owner@example.com" });
+    controller.captureRouteChange("/signup?invite=must-not-leak");
+    controller.api.pageView({ path: "/signup", title: "Sign up" });
+    controller.api.funnel("checkout", "signup_started");
+    controller.captureRouteChange("/checkout?step=payment");
+    if (fixture.converted) {
+      controller.api.funnel("checkout", "subscription_started");
+      controller.api.convert("subscription_started");
+    } else {
+      controller.api.marker("checkout.abandoned");
+    }
+    controller.captureSessionSummary();
+  }
+
+  for (const mode of ["direct", "relay"] as const) {
+    for (const [index, event] of eventsByMode[mode].entries()) {
+      const validation = AnalyticsEventEnvelopeSchema.safeParse(event);
+      if (!validation.success) {
+        throw new Error(
+          `Self-host browser analytics ${mode} event ${index} does not satisfy the public analytics schema: ` +
+            validation.error.issues
+              .map((issue) => `${issue.path.join(".") || "event"}: ${issue.message}`)
+              .join("; ")
+        );
+      }
+    }
+
+    const config = createBrowserActiveConfig({
+      endpoint:
+        mode === "direct"
+          ? `${input.apiBaseUrl}/v1/events`
+          : "http://browser-relay.debugbundle.local/events",
+      projectToken: mode === "direct" ? input.projectToken : null,
+      serviceName: input.serviceName,
+      transportMode: mode,
+      transport: async (request) => {
+        if (mode === "relay") {
+          const response = await relay({
+            method: "POST",
+            headers: {
+              ...request.headers,
+              origin: "http://selfhost-browser.debugbundle.local"
+            },
+            body: buildBrowserTransportRequestBody(request.transportMode, request.events),
+            ipAddress: "127.0.0.1"
+          });
+          acceptedByMode.relay = response.body?.accepted ?? 0;
+          errorsByMode.relay = response.body?.errors ?? [];
+          statusByMode.relay = response.status;
+          return response;
+        }
+        const response = await input.fetchImpl(request.endpoint, {
+          method: "POST",
+          headers: request.headers,
+          body: buildBrowserTransportRequestBody(request.transportMode, request.events)
+        });
+        const body = (await response.json()) as { accepted?: number; errors?: unknown[] };
+        acceptedByMode.direct = body.accepted ?? 0;
+        errorsByMode.direct = body.errors ?? [];
+        statusByMode.direct = response.status;
+        return { status: response.status, body };
       }
     });
+    const transport = new BrowserEventTransport({
+      onDebugResponse: () => undefined,
+      onUnauthorized: () => undefined
+    });
+    transport.configure(config);
+    for (const event of eventsByMode[mode]) transport.enqueueAnalytics(event);
+    await transport.flush();
+    transport.reset();
+  }
 
-    const sessionStart = base("session_start", 0);
-    const pricingView = base("page_view", 1);
-    const signupAction = base("action", 2);
-    signupAction.payload.signal = signal({ action_key: "signup_click" });
-    const signupRoute = base("route_change", 3);
-    signupRoute.payload.route = route("/signup", "Sign up");
-    signupRoute.payload.previous_route = route("/pricing", "Pricing");
-    const signupView = base("page_view", 4);
-    signupView.payload.route = route("/signup", "Sign up");
-    const funnelStart = base("funnel_step", 5);
-    funnelStart.payload.route = route("/signup", "Sign up");
-    funnelStart.payload.signal = signal({ funnel_key: "checkout", step_key: "signup_started" });
-    const checkoutRoute = base("route_change", 6);
-    checkoutRoute.payload.route = route("/checkout", "Checkout");
-    checkoutRoute.payload.previous_route = route("/signup", "Sign up");
-    const outcome = base(fixture.converted ? "conversion" : "journey_marker", 7);
-    outcome.payload.route = route("/checkout", "Checkout");
-    outcome.payload.signal = fixture.converted
-      ? signal({ conversion_key: "subscription_started" })
-      : signal({ marker_key: "checkout.abandoned" });
-    const sessionSummary = base("session_summary", 8);
-    sessionSummary.payload.route = route("/checkout", "Checkout");
+  for (const mode of ["direct", "relay"] as const) {
+    const expected = eventsByMode[mode].length;
+    if (acceptedByMode[mode] !== expected) {
+      throw new Error(
+        `Self-host browser analytics ${mode} ingestion returned HTTP ${statusByMode[mode] ?? "unknown"} and accepted ` +
+          `${acceptedByMode[mode]} of ${expected} events.` +
+          (errorsByMode[mode].length === 0
+            ? ""
+            : ` ${errorsByMode[mode].map(formatIngestionError).join(" ")}`)
+      );
+    }
+  }
 
-    return [
-      sessionStart,
-      pricingView,
-      signupAction,
-      signupRoute,
-      signupView,
-      funnelStart,
-      checkoutRoute,
-      outcome,
-      sessionSummary
-    ].map((event) => AnalyticsEventEnvelopeSchema.parse(event));
-  });
+  return {
+    total: acceptedByMode.direct + acceptedByMode.relay,
+    direct: acceptedByMode.direct,
+    relay: acceptedByMode.relay
+  };
+}
+
+function formatIngestionError(error: unknown): string {
+  if (typeof error === "string") {
+    return error;
+  }
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
+function createBrowserActiveConfig(input: {
+  endpoint: string;
+  projectToken: string | null;
+  serviceName: string;
+  transportMode: BrowserTransportMode;
+  transport: DebugBundleBrowserTransport;
+}): ActiveConfig {
+  return {
+    projectToken: input.projectToken,
+    environment: "production",
+    service: input.serviceName,
+    enabled: true,
+    redactFields: [],
+    tracePropagationTargets: [],
+    sampleRate: 1,
+    batchSize: 100,
+    flushInterval: 60_000,
+    endpoint: input.endpoint,
+    logLevel: "error",
+    maxBreadcrumbs: 0,
+    breadcrumbsOnErrorOnly: true,
+    captureNetwork: false,
+    captureClicks: false,
+    captureRouteChanges: true,
+    captureConsole: false,
+    networkFilter: { urlPatterns: [], urlDenyPatterns: [], statusCodes: [], minResponseTime: null },
+    sessionSampleRate: 1,
+    maxEventsPerSession: 100,
+    maxProbeLabels: 0,
+    maxProbeEntriesPerLabel: 0,
+    probeFlushOnError: false,
+    requestTimeoutMs: 5_000,
+    requestsAnalyticsConfig: true,
+    captureRules: [],
+    fetchImpl: null,
+    transport: input.transport,
+    transportMode: input.transportMode
+  };
 }
 
 function authHeaders(token: string): HeadersInit {
@@ -228,72 +323,103 @@ async function pollUntil<T>(input: {
   throw new Error(input.timeoutMessage);
 }
 
-export async function runSelfhostAnalyticsSmoke(input: AnalyticsSmokeInput): Promise<AnalyticsSmokeResult> {
+export async function runSelfhostAnalyticsSmoke(
+  input: AnalyticsSmokeInput
+): Promise<AnalyticsSmokeResult> {
   const fetchImpl = input.fetchImpl ?? fetch;
-  const wait = input.wait ?? ((milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
+  const wait =
+    input.wait ??
+    ((milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
   const pollIntervalMs = input.pollIntervalMs ?? 1_000;
   const timeoutMs = input.timeoutMs ?? 120_000;
-  const apiBaseUrl = input.apiBaseUrl.endsWith("/") ? input.apiBaseUrl.slice(0, -1) : input.apiBaseUrl;
+  const apiBaseUrl = input.apiBaseUrl.endsWith("/")
+    ? input.apiBaseUrl.slice(0, -1)
+    : input.apiBaseUrl;
 
-  const settingsResponse = await fetchImpl(`${apiBaseUrl}/v1/projects/${input.projectId}/analytics-settings`, {
-    method: "PATCH",
-    headers: {
-      ...authHeaders(input.memberToken),
-      "content-type": "application/json"
-    },
-    body: JSON.stringify({
-      enabled: true,
-      privacy_mode: "strict",
-      consent_required: false,
-      capture_page_views: true,
-      capture_route_changes: true,
-      capture_actions: true,
-      capture_friction_signals: true,
-      journey_sample_rate: 1
-    })
-  });
-  const settings = await parseResponse<{ analytics_available?: boolean; settings?: { enabled?: boolean } }>(
-    settingsResponse,
-    "Self-host analytics settings"
+  const settingsResponse = await fetchImpl(
+    `${apiBaseUrl}/v1/projects/${input.projectId}/analytics-settings`,
+    {
+      method: "PATCH",
+      headers: {
+        ...authHeaders(input.memberToken),
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        enabled: true,
+        privacy_mode: "strict",
+        consent_required: false,
+        capture_page_views: true,
+        capture_route_changes: true,
+        capture_actions: true,
+        capture_friction_signals: true,
+        journey_sample_rate: 1,
+        max_custom_dimensions: 1,
+        approved_custom_dimensions: ["account_tier"]
+      })
+    }
   );
+  const settings = await parseResponse<{
+    analytics_available?: boolean;
+    settings?: { enabled?: boolean };
+  }>(settingsResponse, "Self-host analytics settings");
   if (settings.analytics_available !== true || settings.settings?.enabled !== true) {
     throw new Error("Self-host analytics settings did not enable analytics.");
   }
 
-  const events = buildBrowserTraffic(input.serviceName, new Date(Date.now() - 60_000));
-  const ingestionResponse = await fetchImpl(`${apiBaseUrl}/v1/events`, {
-    method: "POST",
-    headers: {
-      ...authHeaders(input.projectToken),
-      "content-type": "application/json"
-    },
-    body: JSON.stringify({ events })
-  });
-  const ingestion = await parseResponse<{ accepted?: number; rejected?: number }>(
-    ingestionResponse,
-    "Self-host browser analytics ingestion"
+  await parseResponse(
+    await fetchImpl(`${apiBaseUrl}/v1/projects/${input.projectId}/analytics/saved-funnels`, {
+      method: "POST",
+      headers: {
+        ...authHeaders(input.memberToken),
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        funnel_key: "checkout",
+        display_name: "Checkout",
+        steps: [
+          { step_key: "signup_started", display_name: "Signup started" },
+          { step_key: "subscription_started", display_name: "Subscription started" }
+        ]
+      })
+    }),
+    "Self-host analytics saved funnel"
   );
-  if (ingestion.accepted !== events.length || ingestion.rejected !== 0) {
-    throw new Error(`Self-host browser analytics ingestion accepted ${ingestion.accepted ?? 0} of ${events.length} events.`);
-  }
+
+  const accepted = await emitBrowserSdkTraffic({
+    apiBaseUrl,
+    projectToken: input.projectToken,
+    serviceName: input.serviceName,
+    fetchImpl
+  });
 
   const summary = await pollUntil({
     timeoutMs,
     pollIntervalMs,
     wait,
-    timeoutMessage: "Self-host analytics rollups did not include the browser sessions before timeout.",
+    timeoutMessage:
+      "Self-host analytics rollups did not include the browser sessions before timeout.",
     execute: async () => {
       const url = new URL(`${apiBaseUrl}/v1/analytics/summary`);
       url.searchParams.set("project_id", input.projectId);
       url.searchParams.set("last", "1d");
       url.searchParams.set("service", input.serviceName);
       url.searchParams.set("environment", "production");
-      const response = await fetchImpl(url.toString(), { method: "GET", headers: authHeaders(input.memberToken) });
+      const response = await fetchImpl(url.toString(), {
+        method: "GET",
+        headers: authHeaders(input.memberToken)
+      });
       const payload = await parseResponse<{
         summary?: { sessions?: number; pageviews?: number; conversions?: number };
-        breakdowns?: { device_types?: Array<{ value?: string }>; browsers?: Array<{ value?: string }> };
+        breakdowns?: {
+          device_types?: Array<{ value?: string }>;
+          browsers?: Array<{ value?: string }>;
+        };
       }>(response, "Self-host analytics summary");
-      if ((payload.summary?.sessions ?? 0) < 3 || (payload.summary?.pageviews ?? 0) < 6 || (payload.summary?.conversions ?? 0) < 2) {
+      if (
+        (payload.summary?.sessions ?? 0) < 3 ||
+        (payload.summary?.pageviews ?? 0) < 6 ||
+        (payload.summary?.conversions ?? 0) < 2
+      ) {
         return null;
       }
       const deviceTypes = new Set(payload.breakdowns?.device_types?.map((item) => item.value));
@@ -311,7 +437,10 @@ export async function runSelfhostAnalyticsSmoke(input: AnalyticsSmokeInput): Pro
   funnelUrl.searchParams.set("service", input.serviceName);
   funnelUrl.searchParams.set("environment", "production");
   const funnels = await parseResponse<{ funnels?: Array<{ funnel_key?: string }> }>(
-    await fetchImpl(funnelUrl.toString(), { method: "GET", headers: authHeaders(input.memberToken) }),
+    await fetchImpl(funnelUrl.toString(), {
+      method: "GET",
+      headers: authHeaders(input.memberToken)
+    }),
     "Self-host analytics funnels"
   );
   if (!funnels.funnels?.some((funnel) => funnel.funnel_key === "checkout")) {
@@ -322,14 +451,17 @@ export async function runSelfhostAnalyticsSmoke(input: AnalyticsSmokeInput): Pro
     timeoutMs,
     pollIntervalMs,
     wait,
-    timeoutMessage: "Self-host analytics journey sampling did not retain a browser journey before timeout.",
+    timeoutMessage:
+      "Self-host analytics journey sampling did not retain a browser journey before timeout.",
     execute: async () => {
       const url = new URL(`${apiBaseUrl}/v1/analytics/journey-samples`);
       url.searchParams.set("project_id", input.projectId);
       url.searchParams.set("service", input.serviceName);
       url.searchParams.set("environment", "production");
       url.searchParams.set("limit", "20");
-      const payload = await parseResponse<{ samples?: Array<{ sample_id?: string; has_artifact?: boolean }> }>(
+      const payload = await parseResponse<{
+        samples?: Array<{ sample_id?: string; has_artifact?: boolean }>;
+      }>(
         await fetchImpl(url.toString(), { method: "GET", headers: authHeaders(input.memberToken) }),
         "Self-host analytics journey samples"
       );
@@ -355,7 +487,8 @@ export async function runSelfhostAnalyticsSmoke(input: AnalyticsSmokeInput): Pro
     createResponse,
     "Self-host AnalyticsBundle generation"
   );
-  const bundleGenerationId = created.bundle_generation_id ?? createResponse.headers.get("x-debugbundle-generation-id");
+  const bundleGenerationId =
+    created.bundle_generation_id ?? createResponse.headers.get("x-debugbundle-generation-id");
   if (typeof bundleGenerationId !== "string" || bundleGenerationId.length === 0) {
     throw new Error("Self-host AnalyticsBundle generation did not return a generation id.");
   }
@@ -370,19 +503,24 @@ export async function runSelfhostAnalyticsSmoke(input: AnalyticsSmokeInput): Pro
         `${apiBaseUrl}/v1/analytics/bundles/${bundleGenerationId}?project_id=${input.projectId}`,
         { method: "GET", headers: authHeaders(input.memberToken) }
       );
-      const payload = await parseResponse<{ status?: string; reason?: string; schema_version?: string }>(
-        response,
-        "Self-host AnalyticsBundle retrieval"
-      );
+      const payload = await parseResponse<{
+        status?: string;
+        reason?: string;
+        schema_version?: string;
+      }>(response, "Self-host AnalyticsBundle retrieval");
       if (payload.status === "failed") {
-        throw new Error(`Self-host AnalyticsBundle generation failed: ${payload.reason ?? "unknown reason"}.`);
+        throw new Error(
+          `Self-host AnalyticsBundle generation failed: ${payload.reason ?? "unknown reason"}.`
+        );
       }
       return payload.schema_version === "analytics_bundle.v1" ? payload.schema_version : null;
     }
   });
 
   return {
-    acceptedEvents: events.length,
+    acceptedEvents: accepted.total,
+    directAcceptedEvents: accepted.direct,
+    relayAcceptedEvents: accepted.relay,
     sessions: summary.sessions,
     pageviews: summary.pageviews,
     conversions: summary.conversions,

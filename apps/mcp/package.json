@@ -3,7 +3,7 @@
   "mcpName": "com.debugbundle/mcp",
   "version": "1.6.2",
   "private": false,
-  "description": "MCP server for production debugging bundles and incident workflows for AI agents",
+  "description": "MCP server for production debugging, product analytics, and incident workflows for AI agents",
   "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",
@@ -24,6 +24,7 @@
     "ai-agent-debugging",
     "mcp",
     "model-context-protocol",
+    "product-analytics",
     "observability"
   ],
   "engines": {

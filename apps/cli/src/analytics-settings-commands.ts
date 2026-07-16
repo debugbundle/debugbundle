@@ -32,7 +32,12 @@ export class AnalyticsSettingsApiError extends Error {
 }
 
 function toApiError(status: number, body: unknown, fallback: string): AnalyticsSettingsApiError {
-  if (typeof body === "object" && body !== null && "error" in body && typeof body.error === "string") {
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    "error" in body &&
+    typeof body.error === "string"
+  ) {
     return new AnalyticsSettingsApiError(status, body.error);
   }
 
@@ -42,7 +47,10 @@ function toApiError(status: number, body: unknown, fallback: string): AnalyticsS
 export function createAnalyticsSettingsApi(httpClient: {
   request(request: AnalyticsSettingsHttpRequest): Promise<AnalyticsSettingsHttpResponse>;
 }): {
-  getAnalyticsSettings(input: { bearerToken: string; projectId: string }): Promise<AnalyticsSettingsResponse>;
+  getAnalyticsSettings(input: {
+    bearerToken: string;
+    projectId: string;
+  }): Promise<AnalyticsSettingsResponse>;
   updateAnalyticsSettings(input: {
     bearerToken: string;
     projectId: string;
@@ -123,6 +131,7 @@ function formatSettings(response: AnalyticsSettingsResponse): string {
     `journey_sample_rate: ${response.settings.journey_sample_rate}`,
     `raw_retention_days: ${response.settings.raw_retention_days}`,
     `sample_retention_days: ${response.settings.sample_retention_days}`,
+    `hourly_retention_days: ${response.settings.hourly_retention_days}`,
     `aggregate_retention_months: ${response.settings.aggregate_retention_months}`,
     `max_saved_funnels: ${response.settings.max_saved_funnels}`,
     `max_custom_dimensions: ${response.settings.max_custom_dimensions}`,
@@ -137,7 +146,10 @@ export async function getAnalyticsSettingsCommand(
     json?: boolean;
   },
   api: {
-    getAnalyticsSettings(input: { bearerToken: string; projectId: string }): Promise<AnalyticsSettingsResponse>;
+    getAnalyticsSettings(input: {
+      bearerToken: string;
+      projectId: string;
+    }): Promise<AnalyticsSettingsResponse>;
   }
 ): Promise<CliCommandResult> {
   try {
@@ -190,7 +202,9 @@ export async function setAnalyticsSettingsCommand(
 
     return {
       exitCode: 0,
-      output: input.json ? JSON.stringify(response) : `Analytics settings updated.\n${formatSettings(response)}`
+      output: input.json
+        ? JSON.stringify(response)
+        : `Analytics settings updated.\n${formatSettings(response)}`
     };
   } catch (error) {
     return {
@@ -204,9 +218,9 @@ async function createAuthenticatedAnalyticsSettingsApi(
   input: { authFilePath?: string },
   dependencies?: {
     readAuthState?: (input: { authFilePath?: string }) => Promise<CliAuthState>;
-    createHttpClient?: (input: {
-      baseUrl: string;
-    }) => { request(request: AnalyticsSettingsHttpRequest): Promise<AnalyticsSettingsHttpResponse> };
+    createHttpClient?: (input: { baseUrl: string }) => {
+      request(request: AnalyticsSettingsHttpRequest): Promise<AnalyticsSettingsHttpResponse>;
+    };
     createApi?: typeof createAnalyticsSettingsApi;
     fetchImpl?: typeof fetch;
   }
@@ -218,14 +232,16 @@ async function createAuthenticatedAnalyticsSettingsApi(
   }
 
   const authState = await readAuthState(authStateInput);
-  const createHttpClient = dependencies?.createHttpClient ?? ((clientInput: { baseUrl: string }) => {
-    const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
-    if (dependencies?.fetchImpl !== undefined) {
-      httpClientDependencies.fetchImpl = dependencies.fetchImpl;
-    }
+  const createHttpClient =
+    dependencies?.createHttpClient ??
+    ((clientInput: { baseUrl: string }) => {
+      const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
+      if (dependencies?.fetchImpl !== undefined) {
+        httpClientDependencies.fetchImpl = dependencies.fetchImpl;
+      }
 
-    return createCliHttpClient(clientInput, httpClientDependencies);
-  });
+      return createCliHttpClient(clientInput, httpClientDependencies);
+    });
   const httpClient = createHttpClient({ baseUrl: authState.base_url });
   const createApi = dependencies?.createApi ?? createAnalyticsSettingsApi;
 

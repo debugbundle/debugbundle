@@ -1,11 +1,20 @@
 import {
   AnalyticsSettingsSchema,
+  getTierCapabilities,
   type AnalyticsSettings,
   type AnalyticsSettingsUpdate,
+  type TierName
 } from "../../shared-types/src/index.js";
 import type { Queryable } from "./types.js";
 
-type AnalyticsSettingsRow = AnalyticsSettings & Record<string, unknown>;
+type AnalyticsSettingsRow = Omit<
+  AnalyticsSettings,
+  "max_saved_funnels" | "max_custom_dimensions"
+> & {
+  max_saved_funnels: unknown;
+  max_custom_dimensions: unknown;
+  organization_plan: unknown;
+} & Record<string, unknown>;
 
 const ANALYTICS_SETTING_COLUMNS = [
   "enabled",
@@ -18,10 +27,11 @@ const ANALYTICS_SETTING_COLUMNS = [
   "journey_sample_rate",
   "raw_retention_days",
   "sample_retention_days",
+  "hourly_retention_days",
   "aggregate_retention_months",
   "max_saved_funnels",
   "max_custom_dimensions",
-  "approved_custom_dimensions",
+  "approved_custom_dimensions"
 ] as const;
 
 export interface AnalyticsSettingsStore {
@@ -49,11 +59,17 @@ export function createPostgresAnalyticsSettingsStore(db: Queryable): AnalyticsSe
           COALESCE(settings.journey_sample_rate, 0) AS journey_sample_rate,
           COALESCE(settings.raw_retention_days, 1) AS raw_retention_days,
           COALESCE(settings.sample_retention_days, 7) AS sample_retention_days,
+          COALESCE(
+            settings.hourly_retention_days,
+            CASE organizations.plan WHEN 'team' THEN 90 WHEN 'solo' THEN 30 ELSE 7 END
+          ) AS hourly_retention_days,
           COALESCE(settings.aggregate_retention_months, 12) AS aggregate_retention_months,
-          COALESCE(settings.max_saved_funnels, 3) AS max_saved_funnels,
-          COALESCE(settings.max_custom_dimensions, 0) AS max_custom_dimensions,
-          COALESCE(settings.approved_custom_dimensions, '[]'::jsonb) AS approved_custom_dimensions
+          settings.max_saved_funnels,
+          settings.max_custom_dimensions,
+          COALESCE(settings.approved_custom_dimensions, '[]'::jsonb) AS approved_custom_dimensions,
+          organizations.plan AS organization_plan
         FROM projects
+        JOIN organizations ON organizations.id = projects.organization_id
         LEFT JOIN project_analytics_settings settings ON settings.project_id = projects.id
         WHERE projects.id = $1
         LIMIT 1
@@ -84,7 +100,7 @@ export function createPostgresAnalyticsSettingsStore(db: Queryable): AnalyticsSe
 
       const candidate = AnalyticsSettingsSchema.parse({
         ...existing,
-        ...input.update,
+        ...input.update
       });
       const params: unknown[] = [
         input.project_id,
@@ -98,13 +114,15 @@ export function createPostgresAnalyticsSettingsStore(db: Queryable): AnalyticsSe
         candidate.journey_sample_rate,
         candidate.raw_retention_days,
         candidate.sample_retention_days,
+        candidate.hourly_retention_days,
         candidate.aggregate_retention_months,
         candidate.max_saved_funnels,
         candidate.max_custom_dimensions,
-        JSON.stringify(candidate.approved_custom_dimensions),
+        JSON.stringify(candidate.approved_custom_dimensions)
       ];
-      const updateAssignments = ANALYTICS_SETTING_COLUMNS
-        .map((column) => `${column} = EXCLUDED.${column}`)
+      const updateAssignments = ANALYTICS_SETTING_COLUMNS.map(
+        (column) => `${column} = EXCLUDED.${column}`
+      )
         .concat("updated_at = NOW()")
         .join(", ");
 
@@ -122,6 +140,7 @@ export function createPostgresAnalyticsSettingsStore(db: Queryable): AnalyticsSe
             journey_sample_rate,
             raw_retention_days,
             sample_retention_days,
+            hourly_retention_days,
             aggregate_retention_months,
             max_saved_funnels,
             max_custom_dimensions,
@@ -142,7 +161,8 @@ export function createPostgresAnalyticsSettingsStore(db: Queryable): AnalyticsSe
             $12,
             $13,
             $14,
-            $15::jsonb
+            $15,
+            $16::jsonb
           FROM projects
           WHERE projects.id = $1
           ON CONFLICT (project_id) DO UPDATE
@@ -158,6 +178,7 @@ export function createPostgresAnalyticsSettingsStore(db: Queryable): AnalyticsSe
             journey_sample_rate,
             raw_retention_days,
             sample_retention_days,
+            hourly_retention_days,
             aggregate_retention_months,
             max_saved_funnels,
             max_custom_dimensions,
@@ -168,7 +189,7 @@ export function createPostgresAnalyticsSettingsStore(db: Queryable): AnalyticsSe
 
       const row = result.rows[0];
       return row === undefined ? null : parseAnalyticsSettingsRow(row);
-    },
+    }
   };
 }
 
@@ -184,11 +205,22 @@ function parseAnalyticsSettingsRow(row: AnalyticsSettingsRow): AnalyticsSettings
     journey_sample_rate: toNumber(row.journey_sample_rate),
     raw_retention_days: toNumber(row.raw_retention_days),
     sample_retention_days: toNumber(row.sample_retention_days),
+    hourly_retention_days: toNumber(row.hourly_retention_days),
     aggregate_retention_months: toNumber(row.aggregate_retention_months),
-    max_saved_funnels: toNumber(row.max_saved_funnels),
-    max_custom_dimensions: toNumber(row.max_custom_dimensions),
-    approved_custom_dimensions: parseJsonArray(row.approved_custom_dimensions),
+    max_saved_funnels:
+      row.max_saved_funnels == null
+        ? getTierCapabilities(parseTierName(row.organization_plan)).max_analytics_saved_funnels
+        : toNumber(row.max_saved_funnels),
+    max_custom_dimensions:
+      row.max_custom_dimensions == null
+        ? getTierCapabilities(parseTierName(row.organization_plan)).max_analytics_custom_dimensions
+        : toNumber(row.max_custom_dimensions),
+    approved_custom_dimensions: parseJsonArray(row.approved_custom_dimensions)
   });
+}
+
+function parseTierName(value: unknown): TierName {
+  return value === "solo" || value === "team" ? value : "free";
 }
 
 function toNumber(value: unknown): number {

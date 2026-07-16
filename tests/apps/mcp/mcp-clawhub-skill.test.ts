@@ -31,6 +31,12 @@ describe("mcp ClawHub skill", () => {
     expect(skill).toContain("improvement-settings tools");
     expect(skill).toContain("billing, capture-policy, capture-rule");
     expect(skill).toContain("evaluate capture-rule suggestions or path-scoped capture policy");
+    expect(skill).toContain("Product Analytics");
+    expect(skill).toContain("get_usage_summary");
+    expect(skill).toContain("get_funnel_analysis");
+    expect(skill).toContain("generate_analytics_bundle");
+    expect(skill).toContain("does not create one analytics bundle per visit");
+    expect(skill).toContain("update_analytics_settings");
     expect(skill).toContain("Do not use project tokens for retrieval or management operations");
     expect(license).toContain("MIT No Attribution");
   });

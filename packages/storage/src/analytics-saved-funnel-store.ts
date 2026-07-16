@@ -76,7 +76,7 @@ export function createPostgresAnalyticsSavedFunnelStore(db: Queryable): Analytic
         }>(
           `
             SELECT
-              COALESCE(settings.max_saved_funnels, 3) AS max_saved_funnels,
+              settings.max_saved_funnels,
               organizations.plan AS organization_plan
             FROM projects p
             JOIN organizations ON organizations.id = p.organization_id
@@ -113,11 +113,12 @@ export function createPostgresAnalyticsSavedFunnelStore(db: Queryable): Analytic
           `,
           [input.project_id]
         );
-        const effectiveLimit = Math.min(
-          toNumber(projectRow.max_saved_funnels),
-          getTierCapabilities(parseTierName(projectRow.organization_plan))
-            .max_analytics_saved_funnels
-        );
+        const tierLimit = getTierCapabilities(
+          parseTierName(projectRow.organization_plan)
+        ).max_analytics_saved_funnels;
+        const projectLimit =
+          projectRow.max_saved_funnels == null ? tierLimit : toNumber(projectRow.max_saved_funnels);
+        const effectiveLimit = Math.min(projectLimit, tierLimit);
         if (toNumber(count.rows[0]?.active_count) >= effectiveLimit) {
           return { status: "limit_reached" };
         }

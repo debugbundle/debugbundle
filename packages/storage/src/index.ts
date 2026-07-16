@@ -92,6 +92,7 @@ export { createPostgresAnalyticsMetricsStore } from "./analytics-metrics-store.j
 export type {
   AnalyticsAllowanceClaimInput,
   AnalyticsAllowanceClaimResult,
+  AnalyticsAllowanceIdempotencyClaim,
   AnalyticsAllowanceMetric,
   AnalyticsAllowanceReleaseInput,
   AnalyticsAllowanceUsageSummary,
@@ -143,9 +144,13 @@ export {
 } from "./analytics-opportunity-scheduler-store.js";
 export {
   createPostgresAnalyticsOpportunityEvaluator,
+  evaluateAnalyticsDeployConversionOpportunities,
   evaluateAnalyticsFunnelDropoffOpportunities,
+  evaluateAnalyticsIncidentImpactOpportunities,
   evaluateAnalyticsMarkerFrictionOpportunities,
-  evaluateAnalyticsJourneyFrictionOpportunities
+  evaluateAnalyticsJourneyFrictionOpportunities,
+  evaluateAnalyticsRouteExitOpportunities,
+  resolveStaleAnalyticsOpportunities
 } from "./analytics-opportunity-evaluator.js";
 export type {
   AggregateAnalyticsEventsJob,

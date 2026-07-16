@@ -85,10 +85,10 @@ export function createPostgresAnalyticsOpportunityStore(db: Queryable): Analytic
           ORDER BY ao.last_detected_at DESC, ao.id::text DESC
           LIMIT $${where.params.length + 1}
         `,
-        [...where.params, limit]
+        [...where.params, limit + 1]
       );
-      const opportunities = result.rows.map(mapAnalyticsOpportunityRow);
-      const nextRecord = opportunities.length >= limit ? opportunities.at(-1) : undefined;
+      const opportunities = result.rows.slice(0, limit).map(mapAnalyticsOpportunityRow);
+      const nextRecord = result.rows[limit] === undefined ? undefined : opportunities.at(-1);
 
       return AnalyticsOpportunitiesListResponseSchema.parse({
         opportunities,
@@ -106,10 +106,10 @@ export function createPostgresAnalyticsOpportunityStore(db: Queryable): Analytic
           ORDER BY ao.last_detected_at DESC, ao.id::text DESC
           LIMIT $${where.params.length + 1}
         `,
-        [...where.params, limit]
+        [...where.params, limit + 1]
       );
-      const opportunities = result.rows.map(mapAnalyticsOpportunityRow);
-      const nextRecord = opportunities.length >= limit ? opportunities.at(-1) : undefined;
+      const opportunities = result.rows.slice(0, limit).map(mapAnalyticsOpportunityRow);
+      const nextRecord = result.rows[limit] === undefined ? undefined : opportunities.at(-1);
 
       return AnalyticsOpportunitiesListResponseSchema.parse({
         opportunities,

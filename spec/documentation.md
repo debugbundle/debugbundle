@@ -232,7 +232,9 @@ Fumadocs uses `meta.json` files in content directories to control sidebar orderi
     "bundles/...",
     "incidents/...",
     "---AnalyticsBundle---",
-    "analytics/...",
+    "[Overview](/docs/analytics)",
+    "[Privacy & Retention](/docs/analytics/privacy)",
+    "[Self-Hosting](/docs/analytics/self-hosting)",
     "---Configuration---",
     "project-setup/...",
     "capture-policy",
@@ -256,6 +258,10 @@ Fumadocs uses `meta.json` files in content directories to control sidebar orderi
   ]
 }
 ```
+
+AnalyticsBundle uses one flat sidebar section. Its child labels stay concise because the
+section already supplies product context; full product names remain in page titles and
+metadata for standalone pages, search, and sharing.
 
 Sub-directories (`sdks/`, `cli/`, `api/`, etc.) each get their own `meta.json` to control ordering within the section.
 

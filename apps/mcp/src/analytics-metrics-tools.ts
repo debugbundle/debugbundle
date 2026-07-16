@@ -65,7 +65,10 @@ export function createAnalyticsMetricsMcpTools(api: {
   listBundles(input: AnalyticsBundleListToolInput): Promise<unknown>;
   createBundle(input: AnalyticsBundleCreateToolInput): Promise<unknown>;
   getBundle(input: AnalyticsBundleToolInput): Promise<unknown>;
-}): Record<(typeof ANALYTICS_METRICS_MCP_TOOL_NAMES)[number], (input: Record<string, unknown>) => Promise<unknown>> {
+}): Record<
+  (typeof ANALYTICS_METRICS_MCP_TOOL_NAMES)[number],
+  (input: Record<string, unknown>) => Promise<unknown>
+> {
   return {
     async get_usage_summary(input) {
       try {
@@ -216,15 +219,27 @@ export function createAnalyticsMetricsMcpTools(api: {
 }
 
 type AnalyticsMetricsToolInput = {
-    bearerToken: string;
-    projectId: string;
-    from?: string | undefined;
-    to?: string | undefined;
-    last?: string | undefined;
-    granularity?: "hour" | "day" | undefined;
-    service?: string | undefined;
-    environment?: string | undefined;
-    limit?: number | undefined;
+  bearerToken: string;
+  projectId: string;
+  from?: string | undefined;
+  to?: string | undefined;
+  last?: string | undefined;
+  granularity?: "hour" | "day" | undefined;
+  service?: string | undefined;
+  environment?: string | undefined;
+  route?: string | undefined;
+  deviceType?: string | undefined;
+  browser?: string | undefined;
+  os?: string | undefined;
+  language?: string | undefined;
+  country?: string | undefined;
+  authState?: "anonymous" | "authenticated" | "unknown" | undefined;
+  referrer?: string | undefined;
+  utmSource?: string | undefined;
+  utmMedium?: string | undefined;
+  utmCampaign?: string | undefined;
+  customDimensions?: Record<string, string> | undefined;
+  limit?: number | undefined;
 };
 
 type AnalyticsOpportunitiesToolInput = {
@@ -286,6 +301,7 @@ type AnalyticsBundleListToolInput = {
 type AnalyticsBundleCreateToolInput = {
   bearerToken: string;
   projectId: string;
+  opportunityId?: string | undefined;
   analysisKind: AnalyticsBundleAnalysisKind;
   from?: string | undefined;
   to?: string | undefined;
@@ -307,8 +323,53 @@ function readMetricsInput(input: Record<string, unknown>): AnalyticsMetricsToolI
     granularity: readGranularity(input),
     service: readOptionalString(input, "service"),
     environment: readOptionalString(input, "environment"),
+    ...optionalStringField(input, "route"),
+    ...optionalStringField(input, "deviceType"),
+    ...optionalStringField(input, "browser"),
+    ...optionalStringField(input, "os"),
+    ...optionalStringField(input, "language"),
+    ...optionalStringField(input, "country"),
+    ...(readAnalyticsAuthState(input["authState"]) === undefined
+      ? {}
+      : { authState: readAnalyticsAuthState(input["authState"]) }),
+    ...optionalStringField(input, "referrer"),
+    ...optionalStringField(input, "utmSource"),
+    ...optionalStringField(input, "utmMedium"),
+    ...optionalStringField(input, "utmCampaign"),
+    ...(readStringRecord(input["customDimensions"]) === undefined
+      ? {}
+      : { customDimensions: readStringRecord(input["customDimensions"]) }),
     limit: readOptionalNumber(input, "limit")
   };
+}
+
+function optionalStringField(input: Record<string, unknown>, key: string): Record<string, string> {
+  const value = readOptionalString(input, key);
+  return value === undefined ? {} : { [key]: value };
+}
+
+function readAnalyticsAuthState(
+  value: unknown
+): "anonymous" | "authenticated" | "unknown" | undefined {
+  return value === "anonymous" || value === "authenticated" || value === "unknown"
+    ? value
+    : undefined;
+}
+
+function readStringRecord(value: unknown): Record<string, string> | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return undefined;
+  }
+  const entries = Object.entries(value as Record<string, unknown>);
+  return entries.length <= 8 &&
+    entries.every(
+      ([key, entry]) =>
+        /^[A-Za-z][A-Za-z0-9_.-]{0,63}$/.test(key) &&
+        typeof entry === "string" &&
+        entry.length <= 128
+    )
+    ? (Object.fromEntries(entries) as Record<string, string>)
+    : undefined;
 }
 
 function readOpportunitiesInput(input: Record<string, unknown>): AnalyticsOpportunitiesToolInput {
@@ -319,7 +380,10 @@ function readOpportunitiesInput(input: Record<string, unknown>): AnalyticsOpport
   return {
     bearerToken: String(input["bearerToken"]),
     projectId: readOptionalString(input, "projectId"),
-    status: status === "open" || status === "resolved" || status === "snoozed" || status === "all" ? status : undefined,
+    status:
+      status === "open" || status === "resolved" || status === "snoozed" || status === "all"
+        ? status
+        : undefined,
     kind: kind.success ? kind.data : undefined,
     service: readOptionalString(input, "service"),
     environment: readOptionalString(input, "environment"),
@@ -350,7 +414,8 @@ function readBundleListInput(input: Record<string, unknown>): AnalyticsBundleLis
   return {
     bearerToken: String(input["bearerToken"]),
     projectId: readOptionalString(input, "projectId"),
-    status: status === "all" ||
+    status:
+      status === "all" ||
       status === "pending" ||
       status === "running" ||
       status === "completed" ||
@@ -376,6 +441,7 @@ function readBundleCreateInput(input: Record<string, unknown>): AnalyticsBundleC
   return {
     bearerToken: String(input["bearerToken"]),
     projectId: String(input["projectId"]),
+    opportunityId: readOptionalString(input, "opportunityId"),
     analysisKind: analysisKind.data,
     from: readOptionalString(input, "from"),
     to: readOptionalString(input, "to"),
@@ -388,7 +454,10 @@ function readBundleCreateInput(input: Record<string, unknown>): AnalyticsBundleC
   };
 }
 
-function readOptionalRecord(input: Record<string, unknown>, key: string): Record<string, unknown> | undefined {
+function readOptionalRecord(
+  input: Record<string, unknown>,
+  key: string
+): Record<string, unknown> | undefined {
   const value = input[key];
   if (typeof value === "object" && value !== null && !Array.isArray(value)) {
     return value as Record<string, unknown>;

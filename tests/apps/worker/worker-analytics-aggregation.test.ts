@@ -5,7 +5,9 @@ import { describe, expect, it, vi } from "vitest";
 import { processNextAggregateAnalyticsEventsJob } from "../../../apps/worker/src/analytics-aggregation.js";
 import type { AnalyticsEventEnvelope } from "../../../packages/shared-types/src/index.js";
 
-function createAnalyticsEvent(overrides: Partial<AnalyticsEventEnvelope> = {}): AnalyticsEventEnvelope {
+function createAnalyticsEvent(
+  overrides: Partial<AnalyticsEventEnvelope> = {}
+): AnalyticsEventEnvelope {
   return {
     schema_version: "2026-07-analytics-01",
     event_id: "550e8400-e29b-41d4-a716-446655440000",
@@ -28,6 +30,7 @@ function createAnalyticsEvent(overrides: Partial<AnalyticsEventEnvelope> = {}): 
     },
     payload: {
       kind: "page_view",
+      privacy: { mode: "strict", consent_granted: false },
       route: {
         path: "/pricing",
         normalized_path: "/pricing",
@@ -125,6 +128,8 @@ describe("worker processor - aggregate-analytics-events", () => {
           recordAnalyticsEvent: vi.fn().mockResolvedValue({ recorded: true })
         },
         analyticsJourneySamples: {
+          acquireLease: vi.fn().mockResolvedValue(true),
+          releaseLease: vi.fn().mockResolvedValue(undefined),
           analyticsSettingsStore: {
             getAnalyticsSettingsByProjectId: vi.fn().mockResolvedValue({
               enabled: true,
@@ -142,15 +147,20 @@ describe("worker processor - aggregate-analytics-events", () => {
       })
     ).resolves.toEqual({ processed: true });
 
-    expect(putObject).toHaveBeenCalledWith(expect.objectContaining({
-      key: expect.stringMatching(
-        /^analytics-journeys\/11111111-1111-4111-8111-111111111111\/[0-9a-f-]+\.json\.gz$/
-      ),
-      contentType: "application/json",
-      contentEncoding: "gzip"
-    }));
+    expect(putObject).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: expect.stringMatching(
+          /^analytics-journeys\/11111111-1111-4111-8111-111111111111\/[0-9a-f-]+\.json\.gz$/
+        ),
+        contentType: "application/json",
+        contentEncoding: "gzip"
+      })
+    );
     const payload = putObject.mock.calls[0]?.[0] as { body: Buffer };
-    const artifact = JSON.parse(gunzipSync(payload.body).toString("utf8")) as Record<string, unknown>;
+    const artifact = JSON.parse(gunzipSync(payload.body).toString("utf8")) as Record<
+      string,
+      unknown
+    >;
     expect(artifact).toMatchObject({
       schema_version: "analytics_journey_sample.v1",
       project_id: "11111111-1111-4111-8111-111111111111",
@@ -165,17 +175,16 @@ describe("worker processor - aggregate-analytics-events", () => {
         previous_route: event.payload.previous_route
       })
     ]);
-    expect(recordAnalyticsJourneySample).toHaveBeenCalledWith(expect.objectContaining({
-      project_id: "11111111-1111-4111-8111-111111111111",
-      service: "web",
-      environment: "production",
-      analysis_tags: expect.arrayContaining([
-        "route_change",
-        "transition:/->/pricing"
-      ]),
-      object_key: expect.stringMatching(/^analytics-journeys\//),
-      expires_at: "2026-03-17T13:45:27.000Z"
-    }));
+    expect(recordAnalyticsJourneySample).toHaveBeenCalledWith(
+      expect.objectContaining({
+        project_id: "11111111-1111-4111-8111-111111111111",
+        service: "web",
+        environment: "production",
+        analysis_tags: expect.arrayContaining(["route_change", "transition:/->/pricing"]),
+        object_key: expect.stringMatching(/^analytics-journeys\//),
+        expires_at: "2026-03-17T13:45:27.000Z"
+      })
+    );
   });
 
   it("runs journey sample capture on duplicate rollup events so replay can repair sample metadata", async (): Promise<void> => {
@@ -204,6 +213,8 @@ describe("worker processor - aggregate-analytics-events", () => {
           recordAnalyticsEvent: vi.fn().mockResolvedValue({ recorded: false })
         },
         analyticsJourneySamples: {
+          acquireLease: vi.fn().mockResolvedValue(true),
+          releaseLease: vi.fn().mockResolvedValue(undefined),
           analyticsSettingsStore: {
             getAnalyticsSettingsByProjectId: vi.fn().mockResolvedValue({
               enabled: true,
@@ -250,9 +261,11 @@ describe("worker processor - aggregate-analytics-events", () => {
           })
         },
         objectStore: {
-          getObject: vi.fn().mockResolvedValue(
-            gzipSync(Buffer.from(JSON.stringify({ event_type: "analytics_event" }), "utf8"))
-          )
+          getObject: vi
+            .fn()
+            .mockResolvedValue(
+              gzipSync(Buffer.from(JSON.stringify({ event_type: "analytics_event" }), "utf8"))
+            )
         },
         analyticsRollupStore
       })

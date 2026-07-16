@@ -32,6 +32,18 @@ export interface AnalyticsUsageSummaryInput {
   granularity: AnalyticsMetricsGranularity;
   service?: string | undefined;
   environment?: string | undefined;
+  route?: string | undefined;
+  device_type?: string | undefined;
+  browser?: string | undefined;
+  os?: string | undefined;
+  language?: string | undefined;
+  country?: string | undefined;
+  auth_state?: "anonymous" | "authenticated" | "unknown" | undefined;
+  referrer?: string | undefined;
+  utm_source?: string | undefined;
+  utm_medium?: string | undefined;
+  utm_campaign?: string | undefined;
+  custom_dimensions?: Record<string, string> | undefined;
   limit?: number | undefined;
 }
 
@@ -58,6 +70,7 @@ export interface AnalyticsMetricsStore {
 type AnalyticsSummaryTotalsRow = {
   sessions: unknown;
   pageviews: unknown;
+  active_visitors: unknown;
   new_visitors: unknown;
   returning_visitors: unknown;
   exits: unknown;
@@ -116,9 +129,10 @@ type AnalyticsJourneyPatternSampleRow = {
 type AnalyticsFunnelStepMetricRow = {
   step_key: unknown;
   step_order: unknown;
+  step_count: unknown;
   sessions_entered: unknown;
   sessions_completed: unknown;
-  dropoffs: unknown;
+  next_sessions_entered: unknown;
 };
 
 type AnalyticsFunnelListRow = {
@@ -176,7 +190,7 @@ export function createPostgresAnalyticsMetricsStore(db: Queryable): AnalyticsMet
           environment: input.environment ?? null,
           sessions: totals.sessions,
           pageviews: totals.pageviews,
-          active_visitors: totals.new_visitors + totals.returning_visitors,
+          active_visitors: totals.active_visitors,
           new_visitors: totals.new_visitors,
           returning_visitors: totals.returning_visitors,
           exits: totals.exits,
@@ -311,7 +325,7 @@ export function createPostgresAnalyticsMetricsStore(db: Queryable): AnalyticsMet
 
     async getActionMetrics(input) {
       const limit = normalizeLimit(input.limit);
-      const where = buildAnalyticsRollupWhere(input);
+      const where = buildAnalyticsRollupWhere(input, { routeColumns: ["route_key"] });
       const result = await db.query<AnalyticsActionMetricRow>(
         `
           SELECT
@@ -347,17 +361,51 @@ export function createPostgresAnalyticsMetricsStore(db: Queryable): AnalyticsMet
       const where = buildAnalyticsRollupWhere(input);
       const result = await db.query<AnalyticsFunnelListRow>(
         `
+          WITH funnel_steps AS (
+            SELECT
+              definition.funnel_key,
+              step.value->>'step_key' AS step_key,
+              (step.ordinality - 1)::integer AS step_order,
+              jsonb_array_length(definition.steps)::integer AS step_count
+            FROM analytics_funnel_definitions definition
+            CROSS JOIN LATERAL jsonb_array_elements(definition.steps)
+              WITH ORDINALITY AS step(value, ordinality)
+            WHERE definition.project_id = $1::uuid
+              AND definition.archived_at IS NULL
+          ),
+          rollups AS (
+            SELECT
+              funnel_key,
+              step_key,
+              COALESCE(SUM(sessions_entered), 0)::bigint AS sessions_entered,
+              COALESCE(SUM(sessions_completed), 0)::bigint AS sessions_completed
+            FROM analytics_funnel_rollups
+            ${where.sql}
+            GROUP BY funnel_key, step_key
+          )
           SELECT
-            funnel_key,
-            COALESCE(SUM(sessions_entered), 0)::bigint AS sessions_entered,
-            COALESCE(SUM(sessions_completed), 0)::bigint AS sessions_completed,
-            COALESCE(SUM(dropoffs), 0)::bigint AS dropoffs
-          FROM analytics_funnel_rollups
-          ${where.sql}
-          GROUP BY funnel_key
-          HAVING COALESCE(SUM(sessions_entered), 0) > 0
-            OR COALESCE(SUM(sessions_completed), 0) > 0
-            OR COALESCE(SUM(dropoffs), 0) > 0
+            steps.funnel_key,
+            COALESCE(MAX(rollups.sessions_entered) FILTER (WHERE steps.step_order = 0), 0)::bigint
+              AS sessions_entered,
+            COALESCE(MAX(rollups.sessions_completed) FILTER (
+              WHERE steps.step_order = steps.step_count - 1
+            ), 0)::bigint AS sessions_completed,
+            GREATEST(
+              COALESCE(MAX(rollups.sessions_entered) FILTER (WHERE steps.step_order = 0), 0)
+                - COALESCE(MAX(rollups.sessions_completed) FILTER (
+                    WHERE steps.step_order = steps.step_count - 1
+                  ), 0),
+              0
+            )::bigint AS dropoffs
+          FROM funnel_steps steps
+          LEFT JOIN rollups
+            ON rollups.funnel_key = steps.funnel_key
+           AND rollups.step_key = steps.step_key
+          GROUP BY steps.funnel_key
+          HAVING COALESCE(MAX(rollups.sessions_entered) FILTER (WHERE steps.step_order = 0), 0) > 0
+            OR COALESCE(MAX(rollups.sessions_completed) FILTER (
+              WHERE steps.step_order = steps.step_count - 1
+            ), 0) > 0
           ORDER BY sessions_entered DESC, funnel_key ASC
           LIMIT $${where.params.length + 1}
         `,
@@ -388,48 +436,81 @@ export function createPostgresAnalyticsMetricsStore(db: Queryable): AnalyticsMet
       };
       const result = await db.query<AnalyticsFunnelStepMetricRow>(
         `
+          WITH funnel_steps AS (
+            SELECT
+              definition.funnel_key,
+              step.value->>'step_key' AS step_key,
+              (step.ordinality - 1)::integer AS step_order,
+              jsonb_array_length(definition.steps)::integer AS step_count
+            FROM analytics_funnel_definitions definition
+            CROSS JOIN LATERAL jsonb_array_elements(definition.steps)
+              WITH ORDINALITY AS step(value, ordinality)
+            WHERE definition.project_id = $1::uuid
+              AND definition.funnel_key = $${baseWhere.params.length + 1}
+              AND definition.archived_at IS NULL
+          ),
+          rollups AS (
+            SELECT
+              funnel_key,
+              step_key,
+              COALESCE(SUM(sessions_entered), 0)::bigint AS sessions_entered,
+              COALESCE(SUM(sessions_completed), 0)::bigint AS sessions_completed
+            FROM analytics_funnel_rollups
+            ${where.sql}
+            GROUP BY funnel_key, step_key
+          ),
+          joined AS (
+            SELECT
+              steps.step_key,
+              steps.step_order,
+              steps.step_count,
+              COALESCE(rollups.sessions_entered, 0)::bigint AS sessions_entered,
+              COALESCE(rollups.sessions_completed, 0)::bigint AS sessions_completed
+            FROM funnel_steps steps
+            LEFT JOIN rollups
+              ON rollups.funnel_key = steps.funnel_key
+             AND rollups.step_key = steps.step_key
+          )
           SELECT
             step_key,
-            MIN(step_order)::integer AS step_order,
-            COALESCE(SUM(sessions_entered), 0)::bigint AS sessions_entered,
-            COALESCE(SUM(sessions_completed), 0)::bigint AS sessions_completed,
-            COALESCE(SUM(dropoffs), 0)::bigint AS dropoffs
-          FROM analytics_funnel_rollups
-          ${where.sql}
-          GROUP BY step_key
+            step_order,
+            step_count,
+            sessions_entered,
+            sessions_completed,
+            LEAD(sessions_entered, 1, 0) OVER (ORDER BY step_order ASC)::bigint
+              AS next_sessions_entered
+          FROM joined
           ORDER BY step_order ASC, step_key ASC
         `,
         where.params
       );
       const steps = result.rows.map((row) => {
         const sessionsEntered = toNonNegativeInteger(row.sessions_entered);
-        const sessionsCompleted = toNonNegativeInteger(row.sessions_completed);
+        const stepOrder = toNonNegativeInteger(row.step_order);
+        const stepCount = Math.max(1, toNonNegativeInteger(row.step_count));
+        const sessionsCompleted = stepOrder === stepCount - 1
+          ? toNonNegativeInteger(row.sessions_completed)
+          : toNonNegativeInteger(row.next_sessions_entered);
         return {
           step_key: toNonEmptyString(row.step_key, "unknown"),
-          step_order: toNonNegativeInteger(row.step_order),
+          step_order: stepOrder,
           sessions_entered: sessionsEntered,
           sessions_completed: sessionsCompleted,
-          dropoffs: toNonNegativeInteger(row.dropoffs),
+          dropoffs: Math.max(0, sessionsEntered - sessionsCompleted),
           conversion_rate: toConversionRate(sessionsCompleted, sessionsEntered)
         };
       });
-      const totals = steps.reduce(
-        (sum, step) => ({
-          sessions_entered: sum.sessions_entered + step.sessions_entered,
-          sessions_completed: sum.sessions_completed + step.sessions_completed,
-          dropoffs: sum.dropoffs + step.dropoffs
-        }),
-        { sessions_entered: 0, sessions_completed: 0, dropoffs: 0 }
-      );
+      const sessionsEntered = steps[0]?.sessions_entered ?? 0;
+      const sessionsCompleted = steps.at(-1)?.sessions_completed ?? 0;
 
       return AnalyticsFunnelAnalysisResponseSchema.parse({
         funnel: {
           ...buildWindow(input),
           funnel_key: input.funnel_key,
-          sessions_entered: totals.sessions_entered,
-          sessions_completed: totals.sessions_completed,
-          dropoffs: totals.dropoffs,
-          conversion_rate: toConversionRate(totals.sessions_completed, totals.sessions_entered)
+          sessions_entered: sessionsEntered,
+          sessions_completed: sessionsCompleted,
+          dropoffs: Math.max(0, sessionsEntered - sessionsCompleted),
+          conversion_rate: toConversionRate(sessionsCompleted, sessionsEntered)
         },
         steps
       });
@@ -447,6 +528,7 @@ async function readSummaryTotals(
 ): Promise<{
   sessions: number;
   pageviews: number;
+  active_visitors: number;
   new_visitors: number;
   returning_visitors: number;
   exits: number;
@@ -457,6 +539,7 @@ async function readSummaryTotals(
       SELECT
         COALESCE(SUM(sessions), 0)::bigint AS sessions,
         COALESCE(SUM(total_pageviews), 0)::bigint AS pageviews,
+        COALESCE(SUM(active_visitors), 0)::bigint AS active_visitors,
         COALESCE(SUM(new_visitors), 0)::bigint AS new_visitors,
         COALESCE(SUM(returning_visitors), 0)::bigint AS returning_visitors,
         COALESCE(SUM(exits), 0)::bigint AS exits
@@ -470,6 +553,7 @@ async function readSummaryTotals(
   return {
     sessions: toNonNegativeInteger(row?.sessions),
     pageviews: toNonNegativeInteger(row?.pageviews),
+    active_visitors: toNonNegativeInteger(row?.active_visitors),
     new_visitors: toNonNegativeInteger(row?.new_visitors),
     returning_visitors: toNonNegativeInteger(row?.returning_visitors),
     exits: toNonNegativeInteger(row?.exits)
@@ -552,6 +636,35 @@ async function readJourneyPatternSampleIds(
     filters.push(`samples.environment = $${params.length}`);
   }
 
+  const sampleDimensionFilters: Array<[string, unknown]> = [
+    ["device_type", input.device_type],
+    ["browser_family", input.browser],
+    ["os_family", input.os],
+    ["language", input.language],
+    ["country_code", input.country],
+    ["auth_state", input.auth_state],
+    ["referrer_domain", input.referrer],
+    ["utm_source", input.utm_source],
+    ["utm_medium", input.utm_medium],
+    ["utm_campaign", input.utm_campaign]
+  ];
+  for (const [key, value] of sampleDimensionFilters) {
+    if (value !== undefined) {
+      params.push(value);
+      filters.push(`samples.dimensions_summary->>'${key}' = $${params.length}`);
+    }
+  }
+
+  if (input.route !== undefined) {
+    params.push(`route:${input.route}`);
+    filters.push(`samples.analysis_tags @> ARRAY[$${params.length}]::text[]`);
+  }
+
+  for (const [key, value] of Object.entries(input.custom_dimensions ?? {}).sort(([left], [right]) => left.localeCompare(right))) {
+    params.push(key, value);
+    filters.push(`jsonb_extract_path_text(samples.dimensions_summary, 'custom_dimensions', $${params.length - 1}::text) = $${params.length}`);
+  }
+
   params.push(MAX_JOURNEY_PATTERN_SAMPLE_IDS);
   const result = await db.query<AnalyticsJourneyPatternSampleRow>(
     `
@@ -612,6 +725,39 @@ function buildAnalyticsRollupWhere(
   if (input.environment !== undefined) {
     params.push(input.environment);
     conditions.push(`environment = $${params.length}`);
+  }
+
+  const scalarFilters: Array<[string, unknown]> = [
+    ["device_type", input.device_type],
+    ["browser_family", input.browser],
+    ["os_family", input.os],
+    ["language", input.language],
+    ["country_code", input.country],
+    ["auth_state", input.auth_state]
+  ];
+  for (const [column, value] of scalarFilters) {
+    if (value !== undefined) {
+      params.push(value);
+      conditions.push(`${column} = $${params.length}`);
+    }
+  }
+
+  const dimensionFilters: Array<[string, unknown]> = [
+    ["referrer_domain", input.referrer],
+    ["utm_source", input.utm_source],
+    ["utm_medium", input.utm_medium],
+    ["utm_campaign", input.utm_campaign]
+  ];
+  for (const [key, value] of dimensionFilters) {
+    if (value !== undefined) {
+      params.push(value);
+      conditions.push(`dimensions->>'${key}' = $${params.length}`);
+    }
+  }
+
+  for (const [key, value] of Object.entries(input.custom_dimensions ?? {}).sort(([left], [right]) => left.localeCompare(right))) {
+    params.push(key, value);
+    conditions.push(`jsonb_extract_path_text(dimensions, 'custom_dimensions', $${params.length - 1}::text) = $${params.length}`);
   }
 
   const route = "route" in input && typeof input.route === "string" ? input.route : undefined;

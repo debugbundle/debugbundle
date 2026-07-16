@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -85,6 +85,7 @@ function installFetch(
             journey_sample_rate: 0.1,
             raw_retention_days: 7,
             sample_retention_days: 30,
+            hourly_retention_days: 90,
             aggregate_retention_months: 24,
             max_saved_funnels: input.maxSavedFunnels ?? 10,
             max_custom_dimensions: 0,
@@ -147,14 +148,19 @@ function readHeaders(init: RequestInit | undefined): Record<string, string> {
   return Object.fromEntries(new Headers(init?.headers).entries());
 }
 
+async function openAnalyticsSettings(): Promise<void> {
+  fireEvent.click(await screen.findByRole("button", { name: "Product analytics" }));
+}
+
 describe("web app - project analytics saved funnels", () => {
   it("lets owners create, update, and archive ordered definitions", async () => {
     const state = installFetch({ initialFunnels: [] });
     const user = userEvent.setup();
     render(<App initialEntries={[`/projects/${PROJECT_ID}/settings`]} />);
+    await openAnalyticsSettings();
 
     expect(await screen.findByRole("heading", { name: "Saved funnels" })).toBeInTheDocument();
-    const emptyTitle = screen.getByText("No saved funnels");
+    const emptyTitle = await screen.findByText("No saved funnels");
     const emptyState = emptyTitle.closest('[data-slot="empty"]');
     expect(emptyState).not.toBeNull();
     expect(emptyState).toHaveClass(
@@ -224,6 +230,7 @@ describe("web app - project analytics saved funnels", () => {
   it("shows members definitions without mutation controls", async () => {
     installFetch({ role: "member" });
     render(<App initialEntries={[`/projects/${PROJECT_ID}/settings`]} />);
+    await openAnalyticsSettings();
 
     expect(await screen.findByText("Signup")).toBeInTheDocument();
     expect(screen.getByText("landing to complete")).toBeInTheDocument();
@@ -236,9 +243,11 @@ describe("web app - project analytics saved funnels", () => {
     const state = installFetch({ maxSavedFunnels: 1 });
     const user = userEvent.setup();
     render(<App initialEntries={[`/projects/${PROJECT_ID}/settings`]} />);
+    await openAnalyticsSettings();
 
     expect(await screen.findByText("1 of 1 active funnels")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add funnel" })).toBeDisabled();
+    expect(screen.getByText(/archive an active funnel before creating another/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Edit Signup" }));
     const dialog = screen.getByRole("dialog", { name: "Edit saved funnel" });
@@ -254,6 +263,7 @@ describe("web app - project analytics saved funnels", () => {
     const state = installFetch({ failFirstList: true });
     const user = userEvent.setup();
     render(<App initialEntries={[`/projects/${PROJECT_ID}/settings`]} />);
+    await openAnalyticsSettings();
 
     expect(await screen.findByText(/could not load saved funnels/i)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Retry saved funnels" }));
@@ -274,6 +284,7 @@ describe("web app - project analytics saved funnels", () => {
     });
     const user = userEvent.setup();
     render(<App initialEntries={[`/projects/${PROJECT_ID}/settings`]} />);
+    await openAnalyticsSettings();
 
     await screen.findByRole("heading", { name: "Saved funnels" });
     await user.click(screen.getByRole("button", { name: "Add funnel" }));

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   AnalyticsSettingsResponseSchema,
   AnalyticsSettingsSchema,
-  AnalyticsSettingsUpdateSchema,
+  AnalyticsSettingsUpdateSchema
 } from "../../../packages/shared-types/src/index.js";
 
 describe("analytics settings shared types", () => {
@@ -20,10 +20,11 @@ describe("analytics settings shared types", () => {
         journey_sample_rate: 0,
         raw_retention_days: 1,
         sample_retention_days: 7,
+        hourly_retention_days: 30,
         aggregate_retention_months: 12,
         max_saved_funnels: 3,
         max_custom_dimensions: 0,
-        approved_custom_dimensions: [],
+        approved_custom_dimensions: []
       })
     ).toEqual({
       enabled: false,
@@ -36,10 +37,11 @@ describe("analytics settings shared types", () => {
       journey_sample_rate: 0,
       raw_retention_days: 1,
       sample_retention_days: 7,
+      hourly_retention_days: 30,
       aggregate_retention_months: 12,
       max_saved_funnels: 3,
       max_custom_dimensions: 0,
-      approved_custom_dimensions: [],
+      approved_custom_dimensions: []
     });
   });
 
@@ -48,23 +50,23 @@ describe("analytics settings shared types", () => {
     expect(
       AnalyticsSettingsUpdateSchema.parse({
         enabled: true,
-        privacy_mode: "standard",
+        privacy_mode: "standard"
       })
     ).toEqual({
       enabled: true,
-      privacy_mode: "standard",
+      privacy_mode: "standard"
     });
   });
 
   it("rejects sensitive or excessive custom dimension settings", () => {
     expect(
       AnalyticsSettingsUpdateSchema.safeParse({
-        approved_custom_dimensions: ["account_tier", "workspace_size", "user_id"],
+        approved_custom_dimensions: ["account_tier", "workspace_size", "user_id"]
       }).success
     ).toBe(false);
     expect(
       AnalyticsSettingsUpdateSchema.safeParse({
-        approved_custom_dimensions: Array.from({ length: 21 }, (_, index) => `dimension_${index}`),
+        approved_custom_dimensions: Array.from({ length: 21 }, (_, index) => `dimension_${index}`)
       }).success
     ).toBe(false);
   });
@@ -81,17 +83,18 @@ describe("analytics settings shared types", () => {
       journey_sample_rate: 0.1,
       raw_retention_days: 3,
       sample_retention_days: 30,
+      hourly_retention_days: 30,
       aggregate_retention_months: 24,
       max_saved_funnels: 10,
       max_custom_dimensions: 1,
-      approved_custom_dimensions: ["account_tier", "workspace_size"],
+      approved_custom_dimensions: ["account_tier", "workspace_size"]
     };
 
     expect(AnalyticsSettingsSchema.safeParse(invalidSettings).success).toBe(false);
     expect(
       AnalyticsSettingsUpdateSchema.safeParse({
         max_custom_dimensions: 1,
-        approved_custom_dimensions: ["account_tier", "workspace_size"],
+        approved_custom_dimensions: ["account_tier", "workspace_size"]
       }).success
     ).toBe(false);
   });
@@ -112,11 +115,12 @@ describe("analytics settings shared types", () => {
           journey_sample_rate: 0.1,
           raw_retention_days: 3,
           sample_retention_days: 30,
+          hourly_retention_days: 90,
           aggregate_retention_months: 24,
           max_saved_funnels: 10,
           max_custom_dimensions: 8,
-          approved_custom_dimensions: ["account_tier"],
-        },
+          approved_custom_dimensions: ["account_tier"]
+        }
       })
     ).toEqual({
       access_mode: "manage",
@@ -132,11 +136,12 @@ describe("analytics settings shared types", () => {
         journey_sample_rate: 0.1,
         raw_retention_days: 3,
         sample_retention_days: 30,
+        hourly_retention_days: 90,
         aggregate_retention_months: 24,
         max_saved_funnels: 10,
         max_custom_dimensions: 8,
-        approved_custom_dimensions: ["account_tier"],
-      },
+        approved_custom_dimensions: ["account_tier"]
+      }
     });
   });
 });

@@ -605,5 +605,213 @@ export const ANALYTICS_STORAGE_SCHEMA_MIGRATIONS = [
         WHERE correlation_session_hash IS NOT NULL AND has_artifact = true
       `
     ]
+  }),
+  defineAnalyticsStorageSchemaMigration({
+    id: "202607130001_expand_default_saved_funnel_capacity",
+    description:
+      "Replace the provisional three-funnel default with the current Solo and Team tier capacities.",
+    statements: [
+      `
+        ALTER TABLE project_analytics_settings
+        ALTER COLUMN max_saved_funnels SET DEFAULT 10
+      `,
+      `
+        UPDATE project_analytics_settings settings
+        SET
+          max_saved_funnels = CASE organizations.plan
+            WHEN 'team' THEN 50
+            WHEN 'solo' THEN 10
+            ELSE 0
+          END,
+          updated_at = now()
+        FROM projects
+        JOIN organizations ON organizations.id = projects.organization_id
+        WHERE settings.project_id = projects.id
+          AND settings.max_saved_funnels = 3
+      `
+    ]
+  }),
+  defineAnalyticsStorageSchemaMigration({
+    id: "202607140001_enable_free_analytics_preview",
+    description:
+      "Expand existing Free project analytics settings to the included preview funnel capacity.",
+    statements: [
+      `
+        UPDATE project_analytics_settings settings
+        SET
+          max_saved_funnels = 1,
+          updated_at = now()
+        FROM projects
+        JOIN organizations ON organizations.id = projects.organization_id
+        WHERE settings.project_id = projects.id
+          AND organizations.plan = 'free'
+          AND settings.max_saved_funnels = 0
+      `
+    ]
+  }),
+  defineAnalyticsStorageSchemaMigration({
+    id: "202607140002_expand_custom_dimension_capacity",
+    description:
+      "Expand existing zero custom-dimension settings to the current hosted tier capacities.",
+    statements: [
+      `
+        ALTER TABLE project_analytics_settings
+        ALTER COLUMN max_custom_dimensions SET DEFAULT 3
+      `,
+      `
+        UPDATE project_analytics_settings settings
+        SET
+          max_custom_dimensions = CASE organizations.plan
+            WHEN 'team' THEN 8
+            WHEN 'solo' THEN 3
+            ELSE 1
+          END,
+          updated_at = now()
+        FROM projects
+        JOIN organizations ON organizations.id = projects.organization_id
+        WHERE settings.project_id = projects.id
+          AND settings.max_custom_dimensions = 0
+      `
+    ]
+  }),
+  defineAnalyticsStorageSchemaMigration({
+    id: "202607160001_complete_analytics_session_metrics",
+    description:
+      "Track exact active and returning visitors, populate session outcomes, and prevent cross-dimension unique overcounting.",
+    statements: [
+      `
+        ALTER TABLE analytics_ingestion_ledger
+        ADD COLUMN IF NOT EXISTS raw_deleted_at timestamptz
+      `,
+      `
+        CREATE TABLE IF NOT EXISTS analytics_usage_claims (
+          organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+          period_starts_at timestamptz NOT NULL,
+          claim_key text NOT NULL,
+          metric text NOT NULL CHECK (
+            metric IN (
+              'analytics_events',
+              'analytics_sessions',
+              'analytics_journey_samples',
+              'analytics_bundle_generations'
+            )
+          ),
+          created_at timestamptz NOT NULL DEFAULT now(),
+          PRIMARY KEY (organization_id, period_starts_at, claim_key)
+        )
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS analytics_usage_claims_period_idx
+        ON analytics_usage_claims (period_starts_at, organization_id)
+      `,
+      `
+        ALTER TABLE analytics_session_rollups
+        ADD COLUMN IF NOT EXISTS active_visitors bigint NOT NULL DEFAULT 0
+          CHECK (active_visitors >= 0)
+      `,
+      `
+        CREATE TABLE IF NOT EXISTS analytics_visitor_first_seen (
+          project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+          visitor_hash text NOT NULL,
+          first_seen_at timestamptz NOT NULL,
+          last_seen_at timestamptz NOT NULL,
+          PRIMARY KEY (project_id, visitor_hash)
+        )
+      `,
+      `
+        CREATE INDEX IF NOT EXISTS analytics_visitor_first_seen_project_last_seen_idx
+        ON analytics_visitor_first_seen (project_id, last_seen_at DESC)
+      `,
+      `
+        ALTER TABLE analytics_rollup_uniques
+        DROP CONSTRAINT IF EXISTS analytics_rollup_uniques_rollup_kind_check
+      `,
+      `
+        ALTER TABLE analytics_rollup_uniques
+        ADD CONSTRAINT analytics_rollup_uniques_rollup_kind_check
+        CHECK (
+          rollup_kind IN (
+            'session',
+            'visitor',
+            'new_visitor',
+            'returning_visitor',
+            'route_session',
+            'incident_route_session',
+            'transition_session',
+            'action_session',
+            'funnel_step_session',
+            'funnel_completion_session'
+          )
+        ) NOT VALID
+      `,
+      `
+        ALTER TABLE analytics_rollup_uniques
+        VALIDATE CONSTRAINT analytics_rollup_uniques_rollup_kind_check
+      `,
+      `
+        WITH ranked AS (
+          SELECT
+            ctid,
+            row_number() OVER (
+              PARTITION BY
+                project_id,
+                rollup_kind,
+                service,
+                environment,
+                bucket_start,
+                bucket_granularity,
+                rollup_key,
+                subject_hash
+              ORDER BY created_at ASC, dimension_hash ASC
+            ) AS duplicate_rank
+          FROM analytics_rollup_uniques
+        )
+        DELETE FROM analytics_rollup_uniques uniques
+        USING ranked
+        WHERE uniques.ctid = ranked.ctid
+          AND ranked.duplicate_rank > 1
+      `,
+      `
+        ALTER TABLE analytics_rollup_uniques
+        DROP CONSTRAINT IF EXISTS analytics_rollup_uniques_pkey
+      `,
+      `
+        ALTER TABLE analytics_rollup_uniques
+        ADD CONSTRAINT analytics_rollup_uniques_pkey PRIMARY KEY (
+          project_id,
+          rollup_kind,
+          service,
+          environment,
+          bucket_start,
+          bucket_granularity,
+          rollup_key,
+          subject_hash
+        )
+      `
+    ]
+  }),
+  defineAnalyticsStorageSchemaMigration({
+    id: "202607160002_add_analytics_hourly_retention",
+    description: "Add explicit bounded hourly-rollup retention with hosted tier defaults.",
+    statements: [
+      `
+        ALTER TABLE project_analytics_settings
+        ADD COLUMN IF NOT EXISTS hourly_retention_days integer NOT NULL DEFAULT 30
+          CHECK (hourly_retention_days BETWEEN 1 AND 365)
+      `,
+      `
+        UPDATE project_analytics_settings settings
+        SET
+          hourly_retention_days = CASE organizations.plan
+            WHEN 'team' THEN 90
+            WHEN 'solo' THEN 30
+            ELSE 7
+          END,
+          updated_at = now()
+        FROM projects
+        JOIN organizations ON organizations.id = projects.organization_id
+        WHERE settings.project_id = projects.id
+      `
+    ]
   })
 ] as const;

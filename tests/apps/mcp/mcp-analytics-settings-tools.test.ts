@@ -29,10 +29,11 @@ describe("mcp analytics settings tools", () => {
         journey_sample_rate: 0.25,
         raw_retention_days: 1,
         sample_retention_days: 7,
+        hourly_retention_days: 30,
         aggregate_retention_months: 12,
         max_saved_funnels: 3,
         max_custom_dimensions: 2,
-        approved_custom_dimensions: ["auth_state", "plan"]
+        approved_custom_dimensions: ["account_tier", "plan"]
       }
     };
 

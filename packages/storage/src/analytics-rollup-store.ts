@@ -6,11 +6,6 @@ import type {
   AnalyticsEventEnvelope
 } from "../../shared-types/src/index.js";
 import {
-  evaluateAnalyticsFunnelDropoffOpportunities,
-  evaluateAnalyticsMarkerFrictionOpportunities,
-  evaluateAnalyticsJourneyFrictionOpportunities
-} from "./analytics-opportunity-evaluator.js";
-import {
   createPostgresAnalyticsCorrelationStore,
   hashAnalyticsCorrelationValue,
   hashAnalyticsSessionSubject
@@ -41,7 +36,12 @@ interface AnalyticsRollupScope {
 
 interface AnalyticsSessionDeltas {
   sessions: number;
+  activeVisitors: number;
+  newVisitors: number;
+  returningVisitors: number;
+  bounces: number;
   exits: number;
+  totalDurationMs: number;
   totalPageviews: number;
 }
 
@@ -50,6 +50,8 @@ interface AnalyticsRouteDeltas {
   uniqueSessions: number;
   entrances: number;
   exits: number;
+  bounces: number;
+  durationBucketCounts: Record<string, number>;
 }
 
 interface AnalyticsActionDeltas {
@@ -115,7 +117,17 @@ export function createPostgresAnalyticsRollupStore(db: Queryable): AnalyticsRoll
         const routeKey = getRouteKey(input.event);
         const transitionKey = getTransitionKey(input.event);
         const actionKey = getActionKey(input.event);
-        const funnelSignal = getFunnelSignal(input.event);
+        const funnelSignal = await resolveFunnelSignal(tx, input.project_id, input.event);
+        const persistentVisitorHash =
+          input.event.correlation.visitor_id_hash ?? input.event.correlation.user_id_hash;
+        const visitorSubjectHash = persistentVisitorHash ?? sessionSubjectHash;
+        const visitorClassification =
+          input.event.payload.kind === "session_start" && persistentVisitorHash !== null
+            ? await classifyAnalyticsVisitor(tx, input.project_id, persistentVisitorHash, input.event.occurred_at)
+            : null;
+        const sessionMetrics = input.event.payload.session;
+        const isSessionSummary = input.event.payload.kind === "session_summary";
+        const isBounce = isSessionSummary && (sessionMetrics?.pageviews ?? 0) <= 1;
 
         for (const bucketGranularity of ["hour", "day"] as const) {
           const scope: AnalyticsRollupScope = {
@@ -142,9 +154,36 @@ export function createPostgresAnalyticsRollupStore(db: Queryable): AnalyticsRoll
             rollupKey: "active",
             subjectHash: sessionSubjectHash
           });
+          const visitorSubject = await recordAnalyticsUniqueRollupSubject(tx, {
+            ...scope,
+            rollupKind: "visitor",
+            rollupKey: "active",
+            subjectHash: visitorSubjectHash
+          });
+          const newVisitorSubject = visitorClassification === "new"
+            ? await recordAnalyticsUniqueRollupSubject(tx, {
+                ...scope,
+                rollupKind: "new_visitor",
+                rollupKey: "active",
+                subjectHash: visitorSubjectHash
+              })
+            : null;
+          const returningVisitorSubject = visitorClassification === "returning"
+            ? await recordAnalyticsUniqueRollupSubject(tx, {
+                ...scope,
+                rollupKind: "returning_visitor",
+                rollupKey: "active",
+                subjectHash: visitorSubjectHash
+              })
+            : null;
           await upsertSessionRollup(tx, scope, {
             sessions: sessionSubject.inserted ? 1 : 0,
-            exits: input.event.payload.kind === "session_summary" ? 1 : 0,
+            activeVisitors: visitorSubject.inserted ? 1 : 0,
+            newVisitors: newVisitorSubject?.inserted === true ? 1 : 0,
+            returningVisitors: returningVisitorSubject?.inserted === true ? 1 : 0,
+            bounces: isBounce ? 1 : 0,
+            exits: isSessionSummary ? 1 : 0,
+            totalDurationMs: isSessionSummary ? (sessionMetrics?.duration_ms ?? 0) : 0,
             totalPageviews: isPageViewLike(input.event) ? 1 : 0
           });
 
@@ -159,7 +198,9 @@ export function createPostgresAnalyticsRollupStore(db: Queryable): AnalyticsRoll
               pageviews: 1,
               uniqueSessions: routeSessionSubject.inserted ? 1 : 0,
               entrances: input.event.payload.kind === "page_view" ? 1 : 0,
-              exits: 0
+              exits: 0,
+              bounces: 0,
+              durationBucketCounts: {}
             });
             if (routeSessionSubject.inserted || routeSessionSubject.correlation_enriched) {
               await createPostgresAnalyticsCorrelationStore(tx).linkAnalyticsRouteSession({
@@ -174,6 +215,17 @@ export function createPostgresAnalyticsRollupStore(db: Queryable): AnalyticsRoll
                 trace_id_hash: scope.traceIdHash
               });
             }
+          }
+
+          if (routeKey !== null && isSessionSummary) {
+            await upsertRouteRollup(tx, scope, routeKey, {
+              pageviews: 0,
+              uniqueSessions: 0,
+              entrances: 0,
+              exits: 1,
+              bounces: isBounce ? 1 : 0,
+              durationBucketCounts: toDurationBucketCounts(sessionMetrics?.duration_ms ?? 0)
+            });
           }
 
           if (transitionKey !== null) {
@@ -206,46 +258,25 @@ export function createPostgresAnalyticsRollupStore(db: Queryable): AnalyticsRoll
 
           if (funnelSignal !== null) {
             const funnelRollupKey = `${funnelSignal.funnelKey}|${funnelSignal.stepKey}`;
-            const funnelSessionSubject = await recordAnalyticsUniqueRollupSubject(tx, {
+            const funnelStepSubject = await recordAnalyticsUniqueRollupSubject(tx, {
               ...scope,
-              rollupKind: funnelSignal.isCompletion
-                ? "funnel_completion_session"
-                : "funnel_step_session",
+              rollupKind: "funnel_step_session",
               rollupKey: funnelRollupKey,
               subjectHash: sessionSubjectHash
             });
+            const funnelCompletionSubject = funnelSignal.isCompletion
+              ? await recordAnalyticsUniqueRollupSubject(tx, {
+                  ...scope,
+                  rollupKind: "funnel_completion_session",
+                  rollupKey: funnelRollupKey,
+                  subjectHash: sessionSubjectHash
+                })
+              : null;
             await upsertFunnelRollup(tx, scope, funnelSignal, {
-              sessionsEntered: funnelSignal.isCompletion ? 0 : funnelSessionSubject.inserted ? 1 : 0,
-              sessionsCompleted: funnelSignal.isCompletion ? (funnelSessionSubject.inserted ? 1 : 0) : 0
+              sessionsEntered: funnelStepSubject.inserted ? 1 : 0,
+              sessionsCompleted: funnelCompletionSubject?.inserted === true ? 1 : 0
             });
           }
-        }
-
-        if (funnelSignal !== null) {
-          await evaluateAnalyticsFunnelDropoffOpportunities(tx, {
-            project_id: input.project_id,
-            occurred_at: input.event.occurred_at,
-            service: input.event.service.name,
-            environment: input.event.service.environment
-          });
-        }
-
-        if (transitionKey !== null) {
-          await evaluateAnalyticsJourneyFrictionOpportunities(tx, {
-            project_id: input.project_id,
-            occurred_at: input.event.occurred_at,
-            service: input.event.service.name,
-            environment: input.event.service.environment
-          });
-        }
-
-        if (isBrowserFrictionMarker(input.event)) {
-          await evaluateAnalyticsMarkerFrictionOpportunities(tx, {
-            project_id: input.project_id,
-            occurred_at: input.event.occurred_at,
-            service: input.event.service.name,
-            environment: input.event.service.environment
-          });
         }
 
         return { recorded: true };
@@ -326,6 +357,55 @@ function getBucketStart(occurredAt: string, granularity: AnalyticsBucketGranular
   ).toISOString();
 }
 
+async function classifyAnalyticsVisitor(
+  db: Queryable,
+  projectId: string,
+  visitorHash: string,
+  occurredAt: string
+): Promise<"new" | "returning"> {
+  const result = await db.query<{ is_new: boolean }>(
+    `
+      WITH inserted AS (
+        INSERT INTO analytics_visitor_first_seen (
+          project_id,
+          visitor_hash,
+          first_seen_at,
+          last_seen_at
+        )
+        VALUES ($1::uuid, $2, $3::timestamptz, $3::timestamptz)
+        ON CONFLICT DO NOTHING
+        RETURNING 1
+      ),
+      updated AS (
+        UPDATE analytics_visitor_first_seen
+        SET
+          first_seen_at = LEAST(first_seen_at, $3::timestamptz),
+          last_seen_at = GREATEST(last_seen_at, $3::timestamptz)
+        WHERE project_id = $1::uuid
+          AND visitor_hash = $2
+          AND NOT EXISTS (SELECT 1 FROM inserted)
+        RETURNING 1
+      )
+      SELECT EXISTS(SELECT 1 FROM inserted) AS is_new
+    `,
+    [projectId, visitorHash, occurredAt]
+  );
+  return result.rows[0]?.is_new === true ? "new" : "returning";
+}
+
+function toDurationBucketCounts(durationMs: number): Record<string, number> {
+  const bucket = durationMs < 10_000
+    ? "under_10s"
+    : durationMs < 30_000
+      ? "10s_to_30s"
+      : durationMs < 60_000
+        ? "30s_to_60s"
+        : durationMs < 180_000
+          ? "1m_to_3m"
+          : "over_3m";
+  return { [bucket]: 1 };
+}
+
 function getRouteKey(event: AnalyticsEventEnvelope): string | null {
   const route = event.payload.route;
   const key = route?.normalized_path ?? route?.path ?? null;
@@ -359,19 +439,6 @@ function isPageViewLike(event: AnalyticsEventEnvelope): boolean {
   return event.payload.kind === "page_view" || event.payload.kind === "route_change";
 }
 
-function isBrowserFrictionMarker(event: AnalyticsEventEnvelope): boolean {
-  if (event.payload.kind !== "journey_marker") {
-    return false;
-  }
-
-  const markerKey = event.payload.signal?.marker_key;
-  return (
-    markerKey === "friction.repeated_click" ||
-    markerKey === "friction.dead_click" ||
-    markerKey === "friction.backtrack"
-  );
-}
-
 function getActionKey(
   event: AnalyticsEventEnvelope
 ): { actionKey: string; routeKey: string } | null {
@@ -395,39 +462,49 @@ function getActionKey(
   return null;
 }
 
-function getFunnelSignal(event: AnalyticsEventEnvelope): {
+async function resolveFunnelSignal(
+  db: Queryable,
+  projectId: string,
+  event: AnalyticsEventEnvelope
+): Promise<{
   funnelKey: string;
   stepKey: string;
   stepOrder: number;
   isCompletion: boolean;
-} | null {
-  if (
-    event.payload.kind === "funnel_step" &&
-    typeof event.payload.signal?.funnel_key === "string" &&
-    typeof event.payload.signal?.step_key === "string"
-  ) {
-    return {
-      funnelKey: event.payload.signal.funnel_key,
-      stepKey: event.payload.signal.step_key,
-      stepOrder: 0,
-      isCompletion: false
-    };
+} | null> {
+  const funnelKey = event.payload.signal?.funnel_key;
+  const stepKey = event.payload.signal?.step_key;
+  if (event.payload.kind !== "funnel_step" || typeof funnelKey !== "string" || typeof stepKey !== "string") {
+    return null;
   }
 
-  if (
-    event.payload.kind === "conversion" &&
-    typeof event.payload.signal?.funnel_key === "string" &&
-    typeof event.payload.signal?.conversion_key === "string"
-  ) {
-    return {
-      funnelKey: event.payload.signal.funnel_key,
-      stepKey: event.payload.signal.conversion_key,
-      stepOrder: 0,
-      isCompletion: true
-    };
+  const result = await db.query<{ step_order: unknown; step_count: unknown }>(
+    `
+      SELECT
+        (step.ordinality - 1)::integer AS step_order,
+        jsonb_array_length(definition.steps)::integer AS step_count
+      FROM analytics_funnel_definitions definition
+      CROSS JOIN LATERAL jsonb_array_elements(definition.steps) WITH ORDINALITY AS step(value, ordinality)
+      WHERE definition.project_id = $1::uuid
+        AND definition.funnel_key = $2
+        AND definition.archived_at IS NULL
+        AND step.value->>'step_key' = $3
+      LIMIT 1
+    `,
+    [projectId, funnelKey, stepKey]
+  );
+  const row = result.rows[0];
+  if (row === undefined) {
+    return null;
   }
+  const stepOrder = toNonNegativeInteger(row.step_order);
+  const stepCount = Math.max(1, toNonNegativeInteger(row.step_count));
+  return { funnelKey, stepKey, stepOrder, isCompletion: stepOrder === stepCount - 1 };
+}
 
-  return null;
+function toNonNegativeInteger(value: unknown): number {
+  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
+  return Number.isFinite(parsed) ? Math.max(0, Math.trunc(parsed)) : 0;
 }
 
 async function upsertSessionRollup(
@@ -452,10 +529,15 @@ async function upsertSessionRollup(
         country_code,
         auth_state,
         sessions,
+        active_visitors,
+        new_visitors,
+        returning_visitors,
+        bounces,
         exits,
+        total_duration_ms,
         total_pageviews
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+      VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
       ON CONFLICT (
         project_id,
         service,
@@ -465,7 +547,12 @@ async function upsertSessionRollup(
         dimension_hash
       ) DO UPDATE SET
         sessions = analytics_session_rollups.sessions + EXCLUDED.sessions,
+        active_visitors = analytics_session_rollups.active_visitors + EXCLUDED.active_visitors,
+        new_visitors = analytics_session_rollups.new_visitors + EXCLUDED.new_visitors,
+        returning_visitors = analytics_session_rollups.returning_visitors + EXCLUDED.returning_visitors,
+        bounces = analytics_session_rollups.bounces + EXCLUDED.bounces,
         exits = analytics_session_rollups.exits + EXCLUDED.exits,
+        total_duration_ms = analytics_session_rollups.total_duration_ms + EXCLUDED.total_duration_ms,
         total_pageviews = analytics_session_rollups.total_pageviews + EXCLUDED.total_pageviews,
         updated_at = now()
     `,
@@ -484,7 +571,12 @@ async function upsertSessionRollup(
       scope.countryCode,
       scope.authState,
       deltas.sessions,
+      deltas.activeVisitors,
+      deltas.newVisitors,
+      deltas.returningVisitors,
+      deltas.bounces,
       deltas.exits,
+      deltas.totalDurationMs,
       deltas.totalPageviews
     ]
   );
@@ -516,9 +608,11 @@ async function upsertRouteRollup(
         pageviews,
         unique_sessions,
         entrances,
-        exits
+        exits,
+        bounces,
+        duration_bucket_counts
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20::jsonb)
       ON CONFLICT (
         project_id,
         service,
@@ -532,6 +626,24 @@ async function upsertRouteRollup(
         unique_sessions = analytics_route_rollups.unique_sessions + EXCLUDED.unique_sessions,
         entrances = analytics_route_rollups.entrances + EXCLUDED.entrances,
         exits = analytics_route_rollups.exits + EXCLUDED.exits,
+        bounces = analytics_route_rollups.bounces + EXCLUDED.bounces,
+        duration_bucket_counts = jsonb_build_object(
+          'under_10s',
+          COALESCE((analytics_route_rollups.duration_bucket_counts->>'under_10s')::bigint, 0)
+            + COALESCE((EXCLUDED.duration_bucket_counts->>'under_10s')::bigint, 0),
+          '10s_to_30s',
+          COALESCE((analytics_route_rollups.duration_bucket_counts->>'10s_to_30s')::bigint, 0)
+            + COALESCE((EXCLUDED.duration_bucket_counts->>'10s_to_30s')::bigint, 0),
+          '30s_to_60s',
+          COALESCE((analytics_route_rollups.duration_bucket_counts->>'30s_to_60s')::bigint, 0)
+            + COALESCE((EXCLUDED.duration_bucket_counts->>'30s_to_60s')::bigint, 0),
+          '1m_to_3m',
+          COALESCE((analytics_route_rollups.duration_bucket_counts->>'1m_to_3m')::bigint, 0)
+            + COALESCE((EXCLUDED.duration_bucket_counts->>'1m_to_3m')::bigint, 0),
+          'over_3m',
+          COALESCE((analytics_route_rollups.duration_bucket_counts->>'over_3m')::bigint, 0)
+            + COALESCE((EXCLUDED.duration_bucket_counts->>'over_3m')::bigint, 0)
+        ),
         updated_at = now()
     `,
     [
@@ -552,7 +664,9 @@ async function upsertRouteRollup(
       deltas.pageviews,
       deltas.uniqueSessions,
       deltas.entrances,
-      deltas.exits
+      deltas.exits,
+      deltas.bounces,
+      JSON.stringify(deltas.durationBucketCounts)
     ]
   );
 }

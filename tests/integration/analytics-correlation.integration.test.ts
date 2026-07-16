@@ -172,6 +172,7 @@ function createAnalyticsPageView(input: {
     },
     payload: {
       kind: "page_view",
+      privacy: { mode: "strict", consent_granted: false },
       route: {
         path: "/checkout",
         normalized_path: "/checkout",

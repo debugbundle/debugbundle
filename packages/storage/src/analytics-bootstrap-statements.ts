@@ -17,10 +17,11 @@ export const ANALYTICS_BOOTSTRAP_STATEMENTS = [
         CHECK (journey_sample_rate >= 0 AND journey_sample_rate <= 1),
       raw_retention_days integer NOT NULL DEFAULT 1 CHECK (raw_retention_days BETWEEN 1 AND 30),
       sample_retention_days integer NOT NULL DEFAULT 7 CHECK (sample_retention_days BETWEEN 1 AND 365),
+      hourly_retention_days integer NOT NULL DEFAULT 30 CHECK (hourly_retention_days BETWEEN 1 AND 365),
       aggregate_retention_months integer NOT NULL DEFAULT 12
         CHECK (aggregate_retention_months BETWEEN 1 AND 120),
-      max_saved_funnels integer NOT NULL DEFAULT 3 CHECK (max_saved_funnels BETWEEN 0 AND 100),
-      max_custom_dimensions integer NOT NULL DEFAULT 0 CHECK (max_custom_dimensions BETWEEN 0 AND 20),
+      max_saved_funnels integer NOT NULL DEFAULT 10 CHECK (max_saved_funnels BETWEEN 0 AND 100),
+      max_custom_dimensions integer NOT NULL DEFAULT 3 CHECK (max_custom_dimensions BETWEEN 0 AND 20),
       approved_custom_dimensions jsonb NOT NULL DEFAULT '[]'::jsonb
         CHECK (
           jsonb_typeof(approved_custom_dimensions) = 'array'
@@ -37,6 +38,7 @@ export const ANALYTICS_BOOTSTRAP_STATEMENTS = [
       occurred_at timestamptz NOT NULL,
       accepted_at timestamptz NOT NULL DEFAULT now(),
       dedupe_key text NOT NULL,
+      raw_deleted_at timestamptz,
       PRIMARY KEY (project_id, event_id),
       UNIQUE (project_id, dedupe_key)
     )
@@ -58,12 +60,36 @@ export const ANALYTICS_BOOTSTRAP_STATEMENTS = [
     )
   `,
   `
+    CREATE TABLE analytics_usage_claims (
+      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      period_starts_at timestamptz NOT NULL,
+      claim_key text NOT NULL,
+      metric text NOT NULL CHECK (
+        metric IN (
+          'analytics_events',
+          'analytics_sessions',
+          'analytics_journey_samples',
+          'analytics_bundle_generations'
+        )
+      ),
+      created_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (organization_id, period_starts_at, claim_key)
+    )
+  `,
+  `
+    CREATE INDEX analytics_usage_claims_period_idx
+    ON analytics_usage_claims (period_starts_at, organization_id)
+  `,
+  `
     CREATE TABLE analytics_rollup_uniques (
       project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       rollup_kind text NOT NULL
         CHECK (
           rollup_kind IN (
             'session',
+            'visitor',
+            'new_visitor',
+            'returning_visitor',
             'route_session',
             'incident_route_session',
             'transition_session',
@@ -90,10 +116,22 @@ export const ANALYTICS_BOOTSTRAP_STATEMENTS = [
         bucket_start,
         bucket_granularity,
         rollup_key,
-        dimension_hash,
         subject_hash
       )
     )
+  `,
+  `
+    CREATE TABLE analytics_visitor_first_seen (
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      visitor_hash text NOT NULL,
+      first_seen_at timestamptz NOT NULL,
+      last_seen_at timestamptz NOT NULL,
+      PRIMARY KEY (project_id, visitor_hash)
+    )
+  `,
+  `
+    CREATE INDEX analytics_visitor_first_seen_project_last_seen_idx
+    ON analytics_visitor_first_seen (project_id, last_seen_at DESC)
   `,
   `
     CREATE INDEX analytics_rollup_uniques_project_bucket_idx
@@ -173,6 +211,7 @@ export const ANALYTICS_BOOTSTRAP_STATEMENTS = [
       country_code text,
       auth_state text NOT NULL DEFAULT 'unknown',
       sessions bigint NOT NULL DEFAULT 0 CHECK (sessions >= 0),
+      active_visitors bigint NOT NULL DEFAULT 0 CHECK (active_visitors >= 0),
       new_visitors bigint NOT NULL DEFAULT 0 CHECK (new_visitors >= 0),
       returning_visitors bigint NOT NULL DEFAULT 0 CHECK (returning_visitors >= 0),
       bounces bigint NOT NULL DEFAULT 0 CHECK (bounces >= 0),

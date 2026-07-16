@@ -1521,7 +1521,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** server-side processing does not store raw IP addresses in analytics rollups or AnalyticsBundle artifacts
 
 ### AC-ANL-07: Controlled Custom Dimensions
-- **Given** a Team project has approved custom dimensions `account_tier`, `workspace_size`, and `onboarding_state`
+- **Given** a project has approved custom dimensions within its fixed tier cap of 1 on Free, 3 on Solo, 8 on Team, or 20 on self-host
 - **When** the browser SDK sends analytics events with those fields plus unapproved or sensitive fields
 - **Then** approved low-cardinality fields are retained for aggregation
 - **And** unapproved, sensitive, overlong, or high-cardinality fields are rejected, dropped, or redacted before aggregation
@@ -1552,6 +1552,9 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **When** AnalyticsBundle generation runs
 - **Then** bundles are generated for analysis units such as funnel dropoff, route health, incident impact, deploy comparison, feature usage, or journey friction
 - **And** no AnalyticsBundle is generated per visit/session by default
+- **And** focused analysis kinds reject missing or conflicting route, funnel, incident, deploy, or conversion-path context
+- **And** an authorized `opportunity_id` request preserves the opportunity analysis window, aggregate evidence, and complete related incident/deploy sets in the deterministic artifact
+- **And** retrying an identical failed generation resets that generation to pending without creating a duplicate record or quota charge
 
 ### AC-ANL-12: AnalyticsBundle Determinism
 - **Given** the same analysis specification, rollups, representative journey samples, linked incidents, and deploy inputs
@@ -1573,6 +1576,8 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Then** an analytics opportunity is created or updated with kind, status, severity, confidence, title, summary, evidence, related incidents/deploys, and bundle state
 - **And** friction-marker evidence contains only the fixed marker key, normalized route, analysis window, and aggregate event/session counts, never target-derived data
 - **And** tiny-sample opportunities are suppressed or marked low confidence
+- **And** route/deploy regressions compare bounded current and baseline windows, while incident-impact opportunities use correlation-backed affected sessions
+- **And** recurring resolved signals reopen, snoozed signals remain snoozed, and open signals absent for a complete evaluation window resolve automatically
 
 ### AC-ANL-15: Web Main Analytics Surface
 - **Given** a signed-in member with access to projects that have analytics opportunities or generated AnalyticsBundles
@@ -1598,13 +1603,18 @@ If CLI says something is healthy and MCP says something different, that is a pro
 ### AC-ANL-17: Analytics Settings
 - **Given** a project owner or admin opens project analytics settings
 - **When** they configure analytics
-- **Then** they can enable/disable analytics, choose privacy mode, require consent, configure sampling/retention, define saved funnels, and manage Team custom dimensions where the tier allows it
+- **Then** they can enable/disable analytics, choose privacy mode, require consent, configure sampling/retention, define saved funnels, and manage controlled custom dimensions within the current tier cap
+- **And** projects without a deliberately stored saved-funnel override receive the current fixed tier capacity of 1 on Free, 10 on Solo, or 50 on Team without requiring a user-managed numeric limit
+- **And** Free projects can opt into the bounded hosted preview without beginning a paid trial, while analytics capture remains disabled until explicitly enabled for both the project and browser SDK
+- **And** purchased capacity units increase monthly analytics event, session, retained-journey-sample, and generated-bundle allowances without multiplying saved funnels or custom dimensions
+- **And** controlled custom-dimension caps are fixed at 1 on Free, 3 on Solo, 8 on Team, and 20 on self-host
 - **And** plain project members can view permitted analytics state but cannot mutate analytics settings
 
 ### AC-ANL-18: Analytics Retention
 - **Given** analytics raw inputs, journey samples, hourly rollups, daily rollups, and generated AnalyticsBundles exist beyond their configured retention windows
 - **When** retention cleanup runs
 - **Then** expired raw inputs and samples are deleted
+- **And** hourly rollups expire at the project's tier-bounded `hourly_retention_days` while daily rollups remain available for `aggregate_retention_months`
 - **And** configured aggregate metrics and retained bundle metadata remain available for their longer retention windows
 
 ### AC-ANL-19: Separate Allowance Accounting
@@ -1619,6 +1629,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **When** browser analytics events are ingested and processed
 - **Then** analytics capture, aggregation, retrieval, retention, and AnalyticsBundle behavior match hosted core behavior except for hosted-only billing/provider integrations
 - **And** the self-hosted instance never phones home for analytics
+- **And** integrated acceptance emits privacy-safe events through the real browser SDK controller and isolated analytics transport lane in both direct and authenticated relay modes before verifying rollups, funnels, retained journeys, and generated bundle retrieval
 
 ---
 
@@ -1630,6 +1641,13 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Then** the browser SDK sends the event to the same-origin relay endpoint
 - **And** the relay writes a valid event file to `.debugbundle/local/events/`
 - **And** `debugbundle process` produces a bundle containing the browser error
+
+### AC-REL-01a: Analytics Relay End-to-End
+- **Given** opt-in browser analytics is enabled and the browser SDK uses relay mode without a project token
+- **When** the SDK sends a mixed analytics journey batch to an origin-authorized relay
+- **Then** the relay accepts the versioned `analytics_event` envelopes and rejects unsupported or privacy-invalid fields
+- **And** it attaches its configured write-only project token only on the authenticated upstream request
+- **And** the analytics lane reaches the same aggregate, funnel, journey-sample, and allowance processing used by direct browser ingestion without changing debug-lane behavior
 
 ### AC-REL-02: Full-Stack Cross-Context Bundle
 - **Given** a browser `frontend_exception` and a backend `backend_exception` sharing the same `correlation.trace_id`

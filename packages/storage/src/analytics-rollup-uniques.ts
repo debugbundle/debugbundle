@@ -4,6 +4,9 @@ export interface AnalyticsUniqueRollupSubjectInput {
   projectId: string;
   rollupKind:
     | "session"
+    | "visitor"
+    | "new_visitor"
+    | "returning_visitor"
     | "route_session"
     | "transition_session"
     | "action_session"
@@ -57,7 +60,6 @@ export async function recordAnalyticsUniqueRollupSubject(
           AND bucket_start = $5
           AND bucket_granularity = $6
           AND rollup_key = $7
-          AND dimension_hash = $8
           AND subject_hash = $9
           AND (
             trace_id_hash IS DISTINCT FROM COALESCE(trace_id_hash, $10)

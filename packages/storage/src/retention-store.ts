@@ -34,7 +34,9 @@ const ANALYTICS_ROLLUP_TABLES = [
 
 type AnalyticsRetentionTable =
   | (typeof ANALYTICS_ROLLUP_TABLES)[number]
-  | "analytics_incident_correlations";
+  | "analytics_incident_correlations"
+  | "analytics_ingestion_ledger"
+  | "analytics_visitor_first_seen";
 
 function buildUuidValuesPlaceholders(count: number): string {
   return Array.from({ length: count }, (_, index) => `($${index + 1}::uuid)`).join(", ");
@@ -58,10 +60,23 @@ function buildAnalyticsBundleGenerationValuesPlaceholders(count: number): string
 async function pruneExpiredAnalyticsRollupTable(input: {
   db: Queryable;
   tableName: AnalyticsRetentionTable;
-  dateColumn?: "bucket_start" | "occurred_at";
+  dateColumn?: "bucket_start" | "occurred_at" | "last_seen_at";
+  hasBucketGranularity?: boolean;
   now: string;
   limit: number;
 }): Promise<number> {
+  const retentionCutoff = input.hasBucketGranularity
+    ? `CASE
+            WHEN candidate.bucket_granularity = 'hour'
+              THEN $1::timestamptz
+                - make_interval(days => COALESCE(settings.hourly_retention_days, 30)::int)
+            ELSE $1::timestamptz
+              - make_interval(months => COALESCE(settings.aggregate_retention_months, 12)::int)
+          END`
+    : `(
+          $1::timestamptz
+            - make_interval(months => COALESCE(settings.aggregate_retention_months, 12)::int)
+        )`;
   const result = await input.db.query<{ deleted: number }>(
     `
       DELETE FROM ${input.tableName} target
@@ -69,9 +84,7 @@ async function pruneExpiredAnalyticsRollupTable(input: {
         SELECT candidate.ctid
         FROM ${input.tableName} candidate
         LEFT JOIN project_analytics_settings settings ON settings.project_id = candidate.project_id
-        WHERE candidate.${input.dateColumn ?? "bucket_start"} < (
-          $1::timestamptz - make_interval(months => COALESCE(settings.aggregate_retention_months, 12)::int)
-        )
+        WHERE candidate.${input.dateColumn ?? "bucket_start"} < ${retentionCutoff}
         ORDER BY candidate.${input.dateColumn ?? "bucket_start"} ASC, candidate.project_id ASC
         LIMIT $2
       )
@@ -159,6 +172,7 @@ export function createPostgresRetentionStore(db: Queryable): RetentionStore {
           WHERE ail.occurred_at < (
             $1::timestamptz - make_interval(days => COALESCE(settings.raw_retention_days, 1)::int)
           )
+            AND ail.raw_deleted_at IS NULL
           ORDER BY ail.occurred_at ASC, ail.event_id ASC
           LIMIT $2
         `,
@@ -184,8 +198,9 @@ export function createPostgresRetentionStore(db: Queryable): RetentionStore {
           WITH expired(project_id, event_id) AS (
             VALUES ${valuesClause}
           )
-          DELETE FROM analytics_ingestion_ledger ail
-          USING expired
+          UPDATE analytics_ingestion_ledger ail
+          SET raw_deleted_at = now()
+          FROM expired
           WHERE ail.project_id = expired.project_id
             AND ail.event_id = expired.event_id
         `,
@@ -245,6 +260,7 @@ export function createPostgresRetentionStore(db: Queryable): RetentionStore {
         const deletedFromTable = await pruneExpiredAnalyticsRollupTable({
           db,
           tableName,
+          hasBucketGranularity: true,
           now: input.now,
           limit: input.limit
         });
@@ -261,6 +277,43 @@ export function createPostgresRetentionStore(db: Queryable): RetentionStore {
       });
       deletedRows += deletedCorrelations;
       reachedBatchLimit = reachedBatchLimit || deletedCorrelations >= input.limit;
+
+      const deletedLedgerRows = await pruneExpiredAnalyticsRollupTable({
+        db,
+        tableName: "analytics_ingestion_ledger",
+        dateColumn: "occurred_at",
+        now: input.now,
+        limit: input.limit
+      });
+      deletedRows += deletedLedgerRows;
+      reachedBatchLimit = reachedBatchLimit || deletedLedgerRows >= input.limit;
+
+      const deletedVisitorRows = await pruneExpiredAnalyticsRollupTable({
+        db,
+        tableName: "analytics_visitor_first_seen",
+        dateColumn: "last_seen_at",
+        now: input.now,
+        limit: input.limit
+      });
+      deletedRows += deletedVisitorRows;
+      reachedBatchLimit = reachedBatchLimit || deletedVisitorRows >= input.limit;
+
+      const deletedUsageClaims = await db.query<{ deleted: number }>(
+        `
+          DELETE FROM analytics_usage_claims claims
+          WHERE claims.ctid IN (
+            SELECT candidate.ctid
+            FROM analytics_usage_claims candidate
+            WHERE candidate.period_starts_at < $1::timestamptz - interval '13 months'
+            ORDER BY candidate.period_starts_at ASC, candidate.organization_id ASC
+            LIMIT $2
+          )
+          RETURNING 1 AS deleted
+        `,
+        [input.now, input.limit]
+      );
+      deletedRows += deletedUsageClaims.rows.length;
+      reachedBatchLimit = reachedBatchLimit || deletedUsageClaims.rows.length >= input.limit;
 
       return {
         deleted_rows: deletedRows,

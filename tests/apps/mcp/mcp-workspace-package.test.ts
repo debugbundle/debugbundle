@@ -51,7 +51,7 @@ describe("mcp workspace package", () => {
     expect(packageJson.mcpName).toBe("com.debugbundle/mcp");
     expect(packageJson.private).toBe(false);
     expect(packageJson.description).toBe(
-      "MCP server for production debugging bundles and incident workflows for AI agents"
+      "MCP server for production debugging, product analytics, and incident workflows for AI agents"
     );
     expect(packageJson.license).toBe("AGPL-3.0-only");
     expect(packageJson.repository).toEqual({
@@ -71,6 +71,7 @@ describe("mcp workspace package", () => {
       "ai-agent-debugging",
       "mcp",
       "model-context-protocol",
+      "product-analytics",
       "observability"
     ]);
     expect(packageJson.engines).toEqual({ node: ">=22 <27" });
@@ -100,7 +101,7 @@ describe("mcp workspace package", () => {
     expect(serverJson.name).toBe(packageJson.mcpName);
     expect(serverJson.version).toBe(packageJson.version);
     expect(serverJson.description).toBe(
-      "DebugBundle MCP server for incidents, bundles, reproductions, health checks, probes, and ops."
+      "DebugBundle MCP server for incidents, analytics, bundles, health checks, probes, and ops."
     );
     expect(serverJson.description?.length).toBeLessThanOrEqual(100);
     expect(serverJson.packages).toEqual([
@@ -141,12 +142,18 @@ describe("mcp workspace package", () => {
 
   it("ships package-level README and license files", () => {
     const readme = readFileSync(new URL("../../../apps/mcp/README.md", import.meta.url), "utf8");
+    const listing = readFileSync(new URL("../../../apps/mcp/listing.md", import.meta.url), "utf8");
     const license = readFileSync(new URL("../../../apps/mcp/LICENSE", import.meta.url), "utf8");
 
     expect(readme).toContain("# @debugbundle/mcp");
     expect(readme).toContain("npx @debugbundle/mcp");
     expect(readme).toContain("DEBUGBUNDLE_MEMBER_TOKEN");
+    expect(readme).toContain("get_usage_summary");
+    expect(readme).toContain("generate an AnalyticsBundle only when a bounded analysis needs a durable artifact");
     expect(readme).toContain("https://debugbundle.com/docs/mcp");
+    expect(listing).toContain("get_usage_summary");
+    expect(listing).toContain("get_funnel_analysis");
+    expect(listing).toContain("AnalyticsBundle");
     expect(license).toContain("GNU AFFERO GENERAL PUBLIC LICENSE");
     expect(license).toContain("Version 3, 19 November 2007");
   });

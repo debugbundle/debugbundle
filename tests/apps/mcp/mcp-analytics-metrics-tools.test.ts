@@ -56,7 +56,19 @@ describe("mcp analytics metrics tools", () => {
         projectId: "proj_1",
         from: "2026-03-01T00:00:00.000Z",
         to: "2026-03-08T00:00:00.000Z",
-        granularity: "day"
+        granularity: "day",
+        route: "/checkout",
+        deviceType: "mobile",
+        browser: "Chrome",
+        os: "iOS",
+        language: "en",
+        country: "US",
+        authState: "authenticated",
+        referrer: "example.com",
+        utmSource: "google",
+        utmMedium: "cpc",
+        utmCampaign: "summer",
+        customDimensions: { account_tier: "team" }
       })
     ).resolves.toEqual(summaryFixture);
 
@@ -68,6 +80,18 @@ describe("mcp analytics metrics tools", () => {
       granularity: "day",
       service: undefined,
       environment: undefined,
+      route: "/checkout",
+      deviceType: "mobile",
+      browser: "Chrome",
+      os: "iOS",
+      language: "en",
+      country: "US",
+      authState: "authenticated",
+      referrer: "example.com",
+      utmSource: "google",
+      utmMedium: "cpc",
+      utmCampaign: "summer",
+      customDimensions: { account_tier: "team" },
       last: undefined,
       limit: undefined
     });
@@ -173,6 +197,7 @@ describe("mcp analytics metrics tools", () => {
       tools.generate_analytics_bundle({
         bearerToken: "token",
         projectId: "proj_1",
+        opportunityId: "00000000-0000-4000-8000-000000000101",
         analysisKind: "funnel_dropoff",
         last: "7d",
         funnel: "checkout",
@@ -291,6 +316,7 @@ describe("mcp analytics metrics tools", () => {
     expect(api.createBundle).toHaveBeenNthCalledWith(1, {
       bearerToken: "token",
       projectId: "proj_1",
+      opportunityId: "00000000-0000-4000-8000-000000000101",
       analysisKind: "funnel_dropoff",
       from: undefined,
       to: undefined,
@@ -304,6 +330,7 @@ describe("mcp analytics metrics tools", () => {
     expect(api.createBundle).toHaveBeenNthCalledWith(2, {
       bearerToken: "token",
       projectId: "proj_1",
+      opportunityId: undefined,
       analysisKind: "usage_summary",
       from: undefined,
       to: undefined,

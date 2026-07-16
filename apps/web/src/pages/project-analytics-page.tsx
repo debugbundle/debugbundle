@@ -3,11 +3,12 @@ import { useEffect, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 
 import { opportunityDetailPath } from "../components/system/analytics-opportunities-table.js";
-import { AnalyticsSectionHeader } from "../components/system/analytics-section-header.js";
+import { TableRefreshButton } from "../components/system/table-refresh-button.js";
 import { Badge } from "../components/ui/badge.js";
 import { Button } from "../components/ui/button.js";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -104,57 +105,65 @@ export function ProjectAnalyticsPage(): JSX.Element {
     overview.opportunities.length === 0;
 
   return (
-    <div className="flex flex-col gap-6">
-      <AnalyticsSectionHeader
-        title="Analytics overview"
-        description="Aggregate product usage, navigation, and improvement signals for this project."
-        isLoading={isOverviewLoading}
-        onRefresh={() => setOverviewAttempt((attempt) => attempt + 1)}
-      />
+    <Card>
+      <CardHeader>
+        <CardAction>
+          <TableRefreshButton
+            isLoading={isOverviewLoading}
+            onRefresh={() => setOverviewAttempt((attempt) => attempt + 1)}
+            mobileIconOnly
+          />
+        </CardAction>
+        <CardTitle>Analytics overview</CardTitle>
+        <CardDescription>
+          Aggregate product usage, navigation, and improvement signals for this project.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-6">
+        {isOverviewLoading && overview === null ? <AnalyticsOverviewSkeleton /> : null}
 
-      {isOverviewLoading && overview === null ? <AnalyticsOverviewSkeleton /> : null}
+        {overviewError ? (
+          <Notice title="Could not load analytics overview" tone="destructive">
+            <div className="flex flex-col items-start gap-2">
+              <p>
+                The aggregate analytics reads failed. Existing debug and analytics capture are
+                unaffected.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setOverviewAttempt((attempt) => attempt + 1)}
+              >
+                Retry analytics overview
+              </Button>
+            </div>
+          </Notice>
+        ) : null}
 
-      {overviewError ? (
-        <Notice title="Could not load analytics overview" tone="destructive">
-          <div className="flex flex-col items-start gap-2">
-            <p>
-              The aggregate analytics reads failed. Existing debug and analytics capture are
-              unaffected.
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setOverviewAttempt((attempt) => attempt + 1)}
-            >
-              Retry analytics overview
-            </Button>
-          </div>
-        </Notice>
-      ) : null}
+        {isEmpty ? (
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <BarChart3Icon />
+              </EmptyMedia>
+              <EmptyTitle>No analytics activity in this window</EmptyTitle>
+              <EmptyDescription>
+                Analytics starts after opted-in browser capture sends events that match the current
+                project settings.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button asChild type="button" variant="outline" size="sm">
+                <Link to={`/projects/${projectId}/settings`}>Review analytics settings</Link>
+              </Button>
+            </EmptyContent>
+          </Empty>
+        ) : null}
 
-      {isEmpty ? (
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <BarChart3Icon />
-            </EmptyMedia>
-            <EmptyTitle>No analytics activity in this window</EmptyTitle>
-            <EmptyDescription>
-              Analytics starts after opted-in browser capture sends events that match the current
-              project settings.
-            </EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent>
-            <Button asChild type="button" variant="outline" size="sm">
-              <Link to={`/projects/${projectId}/settings`}>Review analytics settings</Link>
-            </Button>
-          </EmptyContent>
-        </Empty>
-      ) : null}
-
-      {overview !== null && !isEmpty ? <AnalyticsOverviewContent overview={overview} /> : null}
-    </div>
+        {overview !== null && !isEmpty ? <AnalyticsOverviewContent overview={overview} /> : null}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -337,14 +346,12 @@ function SegmentTable({
 
 function MetricCard({ label, value }: { label: string; value: number }): JSX.Element {
   return (
-    <Card>
-      <CardHeader>
-        <CardDescription>{label}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <CardTitle className="text-2xl tabular-nums">{INTEGER_FORMAT.format(value)}</CardTitle>
-      </CardContent>
-    </Card>
+    <div className="flex min-w-0 flex-col gap-1 rounded-lg border border-border/80 bg-background/60 px-4 py-3">
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className="text-2xl font-medium tabular-nums text-foreground">
+        {INTEGER_FORMAT.format(value)}
+      </p>
+    </div>
   );
 }
 

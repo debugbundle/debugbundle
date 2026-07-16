@@ -1,4 +1,4 @@
-import { gunzipSync, gzipSync } from "node:zlib";
+import { gzipSync } from "node:zlib";
 
 import {
   buildAnalyticsBundle,
@@ -6,11 +6,11 @@ import {
   type AnalyticsBundleBuildInput
 } from "../../../packages/analytics-bundle-engine/src/index.js";
 import type { RuntimeLogger } from "../../../packages/runtime-logger/src/index.js";
-import type {
-  AnalyticsBundleConfidence,
-  AnalyticsBundleGranularity,
-  AnalyticsBundleSeverity,
-  AnalyticsMetricsGranularity
+import {
+  type AnalyticsBundleConfidence,
+  type AnalyticsBundleGranularity,
+  type AnalyticsBundleSeverity,
+  type AnalyticsMetricsGranularity
 } from "../../../packages/shared-types/src/index.js";
 import {
   buildAnalyticsBundleObjectKey,
@@ -24,16 +24,22 @@ import {
   type ObjectStoreReader
 } from "../../../packages/storage/src/index.js";
 import type { WorkerProcessResult } from "./processor.js";
+import { readRepresentativeJourneySamples } from "./analytics-bundle-journey-evidence.js";
 
 export interface BuildAnalyticsBundleWorkerQueue {
-  claim(jobName: "build-analytics-bundle"): Promise<ClaimedRedisJob<BuildAnalyticsBundleJob> | null>;
+  claim(
+    jobName: "build-analytics-bundle"
+  ): Promise<ClaimedRedisJob<BuildAnalyticsBundleJob> | null>;
 }
 
 export interface BuildAnalyticsBundleWorkerDependencies {
   queue: BuildAnalyticsBundleWorkerQueue;
   analyticsBundleGenerationStore: AnalyticsBundleGenerationStore;
   analyticsMetricsStore: AnalyticsMetricsStore;
-  analyticsJourneySampleStore: Pick<AnalyticsJourneySampleStore, "getAnalyticsJourneySampleForProject">;
+  analyticsJourneySampleStore: Pick<
+    AnalyticsJourneySampleStore,
+    "getAnalyticsJourneySampleForProject"
+  >;
   objectStore: ObjectStoreClient & ObjectStoreReader;
   logger?: RuntimeLogger;
 }
@@ -48,11 +54,12 @@ type NormalizedBundleAnalysisSpec = {
   funnel_key?: string | undefined;
   route?: string | undefined;
   incident_id?: string | undefined;
+  deploy_id?: string | undefined;
+  opportunity_evidence?: Record<string, unknown> | undefined;
 };
 
 const DEFAULT_ANALYSIS_WINDOW_DAYS = 7;
 const DEFAULT_METRIC_LIMIT = 25;
-const MAX_REPRESENTATIVE_JOURNEYS = 5;
 
 export async function processNextBuildAnalyticsBundleJob(
   dependencies: BuildAnalyticsBundleWorkerDependencies
@@ -63,10 +70,11 @@ export async function processNextBuildAnalyticsBundleJob(
   }
 
   const job = claimed.payload;
-  const generation = await dependencies.analyticsBundleGenerationStore.getAnalyticsBundleGenerationForProject({
-    project_id: job.project_id,
-    generation_id: job.generation_id
-  });
+  const generation =
+    await dependencies.analyticsBundleGenerationStore.getAnalyticsBundleGenerationForProject({
+      project_id: job.project_id,
+      generation_id: job.generation_id
+    });
   if (generation === null) {
     dependencies.logger?.warn?.(
       { generation_id: job.generation_id, project_id: job.project_id, trigger: job.trigger },
@@ -81,11 +89,12 @@ export async function processNextBuildAnalyticsBundleJob(
     return { processed: true, reason: `analytics_bundle_generation_${generation.status}` };
   }
 
-  const claimedGeneration = await dependencies.analyticsBundleGenerationStore.claimAnalyticsBundleGenerationForProject({
-    project_id: job.project_id,
-    generation_id: job.generation_id,
-    claimed_at: new Date().toISOString()
-  });
+  const claimedGeneration =
+    await dependencies.analyticsBundleGenerationStore.claimAnalyticsBundleGenerationForProject({
+      project_id: job.project_id,
+      generation_id: job.generation_id,
+      claimed_at: new Date().toISOString()
+    });
   if (claimedGeneration === null) {
     await claimed.ack();
     return { processed: true, reason: "analytics_bundle_generation_claim_conflict" };
@@ -109,11 +118,12 @@ export async function processNextBuildAnalyticsBundleJob(
       contentEncoding: "gzip"
     });
 
-    const completed = await dependencies.analyticsBundleGenerationStore.markAnalyticsBundleGenerationCompleted({
-      project_id: job.project_id,
-      generation_id: job.generation_id,
-      completed_at: new Date().toISOString()
-    });
+    const completed =
+      await dependencies.analyticsBundleGenerationStore.markAnalyticsBundleGenerationCompleted({
+        project_id: job.project_id,
+        generation_id: job.generation_id,
+        completed_at: new Date().toISOString()
+      });
     if (completed === null) {
       throw new Error("analytics_bundle_generation_missing_after_write");
     }
@@ -145,7 +155,10 @@ export async function processNextBuildAnalyticsBundleJob(
 async function buildAnalyticsBundleInput(input: {
   generation: AnalyticsBundleGenerationRecord;
   metricsStore: AnalyticsMetricsStore;
-  analyticsJourneySampleStore: Pick<AnalyticsJourneySampleStore, "getAnalyticsJourneySampleForProject">;
+  analyticsJourneySampleStore: Pick<
+    AnalyticsJourneySampleStore,
+    "getAnalyticsJourneySampleForProject"
+  >;
   objectStore: ObjectStoreReader;
   logger?: RuntimeLogger | undefined;
 }): Promise<AnalyticsBundleBuildInput> {
@@ -187,18 +200,19 @@ async function buildAnalyticsBundleInput(input: {
     funnel,
     routes: routes.routes,
     journeys: journeys.patterns,
-    actions: actions.actions
+    actions: actions.actions,
+    opportunityEvidence: spec.opportunity_evidence
   });
   const representativeJourneys = [
     ...readRecordArray(input.generation.analysis_spec["representative_journeys"]),
-    ...await readRepresentativeJourneySamples({
+    ...(await readRepresentativeJourneySamples({
       project_id: input.generation.project_id,
       analysis_kind: input.generation.analysis_kind,
       journeys: journeys.patterns,
       analyticsJourneySampleStore: input.analyticsJourneySampleStore,
       objectStore: input.objectStore,
       logger: input.logger
-    })
+    }))
   ];
 
   return {
@@ -215,19 +229,30 @@ async function buildAnalyticsBundleInput(input: {
       granularity: spec.granularity as AnalyticsBundleGranularity
     },
     summary: {
-      title: buildBundleTitle(input.generation.analysis_kind, spec.funnel_key, spec.route),
-      description: buildBundleDescription(input.generation.analysis_kind, usage.summary.sessions, affectedSessions),
+      title: buildBundleTitle(
+        input.generation.analysis_kind,
+        spec.funnel_key,
+        spec.route,
+        spec.deploy_id
+      ),
+      description: buildBundleDescription(
+        input.generation.analysis_kind,
+        usage.summary.sessions,
+        affectedSessions
+      ),
       confidence: inferConfidence(usage.summary.sessions),
       severity: inferSeverity(usage.summary.sessions, affectedSessions)
     },
     metrics: {
       sessions_analyzed: usage.summary.sessions,
       affected_sessions: affectedSessions,
+      baseline: buildOpportunityBaseline(spec.opportunity_evidence),
       current: {
         usage: usage.summary,
         routes: routes.routes,
         actions: actions.actions,
-        funnel: funnel?.funnel ?? null
+        funnel: funnel?.funnel ?? null,
+        source_opportunity: spec.opportunity_evidence ?? null
       }
     },
     segments: [
@@ -259,7 +284,10 @@ async function buildAnalyticsBundleInput(input: {
 async function buildIncidentImpactAnalyticsBundleInput(input: {
   generation: AnalyticsBundleGenerationRecord;
   metricsStore: AnalyticsMetricsStore;
-  analyticsJourneySampleStore: Pick<AnalyticsJourneySampleStore, "getAnalyticsJourneySampleForProject">;
+  analyticsJourneySampleStore: Pick<
+    AnalyticsJourneySampleStore,
+    "getAnalyticsJourneySampleForProject"
+  >;
   objectStore: ObjectStoreReader;
   logger?: RuntimeLogger | undefined;
   spec: NormalizedBundleAnalysisSpec & { incident_id: string };
@@ -296,14 +324,19 @@ async function buildIncidentImpactAnalyticsBundleInput(input: {
       granularity: input.spec.granularity as AnalyticsBundleGranularity
     },
     summary: {
-      title: buildBundleTitle(input.generation.analysis_kind, undefined, undefined),
-      description: buildBundleDescription(input.generation.analysis_kind, usage.summary.sessions, affectedSessions),
+      title: buildBundleTitle(input.generation.analysis_kind, undefined, undefined, undefined),
+      description: buildBundleDescription(
+        input.generation.analysis_kind,
+        usage.summary.sessions,
+        affectedSessions
+      ),
       confidence: inferConfidence(affectedSessions),
       severity: inferSeverity(usage.summary.sessions, affectedSessions)
     },
     metrics: {
       sessions_analyzed: usage.summary.sessions,
       affected_sessions: affectedSessions,
+      baseline: buildOpportunityBaseline(input.spec.opportunity_evidence),
       current: {
         usage: usage.summary,
         incident_impact: {
@@ -311,7 +344,8 @@ async function buildIncidentImpactAnalyticsBundleInput(input: {
           affected_routes: impact.affected_routes,
           affected_funnels: impact.affected_funnels,
           conversion_delta: impact.conversion_delta
-        }
+        },
+        source_opportunity: input.spec.opportunity_evidence ?? null
       }
     },
     segments: [
@@ -341,259 +375,34 @@ async function buildIncidentImpactAnalyticsBundleInput(input: {
   };
 }
 
-async function readRepresentativeJourneySamples(input: {
-  project_id: string;
-  analysis_kind: AnalyticsBundleGenerationRecord["analysis_kind"];
-  journeys: JourneyPatternEvidence[];
-  analyticsJourneySampleStore: Pick<AnalyticsJourneySampleStore, "getAnalyticsJourneySampleForProject">;
-  objectStore: ObjectStoreReader;
-  logger?: RuntimeLogger | undefined;
-}): Promise<Array<Record<string, unknown>>> {
-  if (input.analysis_kind === "usage_summary") {
-    return [];
-  }
-
-  const candidates = rankRepresentativeJourneyCandidates(input.analysis_kind, input.journeys)
-    .slice(0, MAX_REPRESENTATIVE_JOURNEYS);
-  const records: Array<Record<string, unknown>> = [];
-  const now = new Date().toISOString();
-
-  for (const candidate of candidates) {
-    try {
-      const sample = await input.analyticsJourneySampleStore.getAnalyticsJourneySampleForProject({
-        project_id: input.project_id,
-        sample_id: candidate.sample_id,
-        now
-      });
-      if (sample === null) {
-        continue;
-      }
-
-      const artifact = parseJourneySampleArtifact(await input.objectStore.getObject({ key: sample.object_key }));
-      if (artifact === null || artifact.project_id !== input.project_id || artifact.sample_id !== sample.sample_id) {
-        input.logger?.warn?.(
-          { project_id: input.project_id, sample_id: candidate.sample_id },
-          "worker_analytics_bundle_journey_sample_invalid"
-        );
-        continue;
-      }
-
-      records.push(toRepresentativeJourneyRecord(artifact, candidate));
-    } catch (error) {
-      input.logger?.warn?.(
-        {
-          error_message: getAnalyticsBundleWorkerErrorMessage(error),
-          project_id: input.project_id,
-          sample_id: candidate.sample_id
-        },
-        "worker_analytics_bundle_journey_sample_unavailable"
-      );
-    }
-  }
-
-  return records;
-}
-
-type JourneyPatternEvidence = {
-  sample_ids?: string[] | undefined;
-  from_route_key?: string | undefined;
-  to_route_key?: string | undefined;
-  affected_sessions?: number | undefined;
-  unique_sessions?: number | undefined;
-  transition_count?: number | undefined;
-  transition_share?: number | undefined;
-};
-
-type RepresentativeJourneyCandidate = {
-  sample_id: string;
-  selection_rank: number;
-  selection_basis: "affected_sessions" | "unique_sessions";
-  primary_count: number;
-  secondary_count: number;
-  transition_share: number;
-  transition_key: string;
-};
-
-type RepresentativeJourneyScore = Omit<RepresentativeJourneyCandidate, "sample_id" | "selection_rank">;
-
-function rankRepresentativeJourneyCandidates(
-  analysisKind: AnalyticsBundleGenerationRecord["analysis_kind"],
-  journeys: JourneyPatternEvidence[]
-): RepresentativeJourneyCandidate[] {
-  const candidates = new Map<string, RepresentativeJourneyScore>();
-
-  for (const journey of journeys) {
-    const candidate = toRepresentativeJourneyCandidate(analysisKind, journey);
-    for (const sampleId of journey.sample_ids ?? []) {
-      const normalizedSampleId = readNonEmptyString(sampleId);
-      if (normalizedSampleId === undefined) {
-        continue;
-      }
-
-      const existing = candidates.get(normalizedSampleId);
-      if (existing === undefined || compareRepresentativeJourneyScores(candidate, existing) < 0) {
-        candidates.set(normalizedSampleId, candidate);
-      }
-    }
-  }
-
-  return [...candidates.entries()]
-    .map(([sample_id, candidate]) => ({ ...candidate, sample_id }))
-    .sort(compareRepresentativeJourneyCandidates)
-    .map((candidate, index) => ({ ...candidate, selection_rank: index + 1 }));
-}
-
-function toRepresentativeJourneyCandidate(
-  analysisKind: AnalyticsBundleGenerationRecord["analysis_kind"],
-  journey: JourneyPatternEvidence
-): Omit<RepresentativeJourneyCandidate, "sample_id" | "selection_rank"> {
-  const isIncidentImpact = analysisKind === "incident_impact";
-  const fromRoute = readNonEmptyString(journey.from_route_key) ?? "unknown";
-  const toRoute = readNonEmptyString(journey.to_route_key) ?? "unknown";
-
-  return {
-    selection_basis: isIncidentImpact ? "affected_sessions" : "unique_sessions",
-    primary_count: isIncidentImpact
-      ? readNonNegativeInteger(journey.affected_sessions)
-      : readNonNegativeInteger(journey.unique_sessions),
-    secondary_count: isIncidentImpact ? 0 : readNonNegativeInteger(journey.transition_count),
-    transition_share: isIncidentImpact ? 0 : readNonNegativeNumber(journey.transition_share),
-    transition_key: `${fromRoute}\u0000${toRoute}`
-  };
-}
-
-function compareRepresentativeJourneyCandidates(
-  left: Omit<RepresentativeJourneyCandidate, "selection_rank">,
-  right: Omit<RepresentativeJourneyCandidate, "selection_rank">
-): number {
-  return compareRepresentativeJourneyScores(left, right) || left.sample_id.localeCompare(right.sample_id);
-}
-
-function compareRepresentativeJourneyScores(
-  left: RepresentativeJourneyScore,
-  right: RepresentativeJourneyScore
-): number {
-  return right.primary_count - left.primary_count ||
-    right.secondary_count - left.secondary_count ||
-    right.transition_share - left.transition_share ||
-    left.transition_key.localeCompare(right.transition_key);
-}
-
-function parseJourneySampleArtifact(body: Buffer): RepresentativeJourneySampleArtifact | null {
-  try {
-    const parsed = JSON.parse(gunzipSync(body).toString("utf8")) as unknown;
-    return isRepresentativeJourneySampleArtifact(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-type RepresentativeJourneySampleArtifact = {
-  schema_version: "analytics_journey_sample.v1";
-  sample_id: string;
-  project_id: string;
-  service: string;
-  environment: string;
-  first_seen_at: string;
-  last_seen_at: string;
-  analysis_tags: string[];
-  dimensions_summary: Record<string, unknown>;
-  events: RepresentativeJourneySampleEvent[];
-};
-
-type RepresentativeJourneySampleEvent = {
-  event_id?: unknown;
-  occurred_at?: unknown;
-  kind?: unknown;
-  route?: { normalized_path?: unknown; path?: unknown } | null;
-  previous_route?: { normalized_path?: unknown; path?: unknown } | null;
-  signal?: {
-    action_key?: unknown;
-    funnel_key?: unknown;
-    step_key?: unknown;
-    conversion_key?: unknown;
-    marker_key?: unknown;
-  } | null;
-  trace_id?: unknown;
-  deploy_id?: unknown;
-  dimensions?: unknown;
-  custom_dimensions?: unknown;
-};
-
-function isRepresentativeJourneySampleArtifact(value: unknown): value is RepresentativeJourneySampleArtifact {
-  if (typeof value !== "object" || value === null) {
-    return false;
-  }
-  const candidate = value as Partial<RepresentativeJourneySampleArtifact>;
-  return candidate.schema_version === "analytics_journey_sample.v1" &&
-    typeof candidate.sample_id === "string" &&
-    typeof candidate.project_id === "string" &&
-    typeof candidate.service === "string" &&
-    typeof candidate.environment === "string" &&
-    typeof candidate.first_seen_at === "string" &&
-    typeof candidate.last_seen_at === "string" &&
-    Array.isArray(candidate.analysis_tags) &&
-    isRecord(candidate.dimensions_summary) &&
-    Array.isArray(candidate.events);
-}
-
-function toRepresentativeJourneyRecord(
-  artifact: RepresentativeJourneySampleArtifact,
-  candidate: RepresentativeJourneyCandidate
+function buildOpportunityBaseline(
+  evidence: Record<string, unknown> | undefined
 ): Record<string, unknown> {
-  return {
-    sample_id: artifact.sample_id,
-    selection_rank: candidate.selection_rank,
-    selection_basis: candidate.selection_basis,
-    selection_primary_count: candidate.primary_count,
-    selection_secondary_count: candidate.secondary_count,
-    selection_transition_share: candidate.transition_share,
-    service: artifact.service,
-    environment: artifact.environment,
-    first_seen_at: artifact.first_seen_at,
-    last_seen_at: artifact.last_seen_at,
-    analysis_tags: artifact.analysis_tags,
-    dimensions_summary: artifact.dimensions_summary,
-    event_count: artifact.events.length,
-    timeline: Object.fromEntries(
-      artifact.events.map((event, index) => [String(index + 1).padStart(3, "0"), toRepresentativeJourneyEvent(event)])
-    )
-  };
-}
-
-function toRepresentativeJourneyEvent(event: RepresentativeJourneySampleEvent): Record<string, unknown> {
-  return {
-    event_id: readNullableString(event.event_id),
-    occurred_at: readNullableString(event.occurred_at),
-    kind: readNullableString(event.kind) ?? "unknown",
-    route: toRouteKey(event.route),
-    previous_route: toRouteKey(event.previous_route),
-    action_key: readNullableString(event.signal?.action_key),
-    funnel_key: readNullableString(event.signal?.funnel_key),
-    step_key: readNullableString(event.signal?.step_key),
-    conversion_key: readNullableString(event.signal?.conversion_key),
-    marker_key: readNullableString(event.signal?.marker_key),
-    trace_id: readNullableString(event.trace_id),
-    deploy_id: readNullableString(event.deploy_id),
-    dimensions: isRecord(event.dimensions) ? event.dimensions : {},
-    custom_dimensions: isRecord(event.custom_dimensions) ? event.custom_dimensions : {}
-  };
-}
-
-function toRouteKey(route: RepresentativeJourneySampleEvent["route"]): string | null {
-  if (route === null || route === undefined) {
-    return null;
+  if (evidence === undefined) {
+    return {};
   }
 
-  return readNullableString(route.normalized_path);
+  const baseline: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(evidence)) {
+    if (key === "baseline_window") {
+      baseline["window"] = value;
+    } else if (key.startsWith("baseline_") && key.length > "baseline_".length) {
+      baseline[key.slice("baseline_".length)] = value;
+    }
+  }
+  return baseline;
 }
 
-function normalizeBundleAnalysisSpec(generation: AnalyticsBundleGenerationRecord): NormalizedBundleAnalysisSpec {
+function normalizeBundleAnalysisSpec(
+  generation: AnalyticsBundleGenerationRecord
+): NormalizedBundleAnalysisSpec {
   const spec = generation.analysis_spec;
   const filters = isRecord(spec["filters"]) ? spec["filters"] : {};
   const fallbackTo = readIsoString(spec["to"]) ?? generation.created_at;
   const to = readIsoString(spec["to"]) ?? fallbackTo;
-  const fallbackFrom = new Date(Date.parse(to) - DEFAULT_ANALYSIS_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const fallbackFrom = new Date(
+    Date.parse(to) - DEFAULT_ANALYSIS_WINDOW_DAYS * 24 * 60 * 60 * 1000
+  ).toISOString();
   const requestedFrom = readIsoString(spec["from"]) ?? fallbackFrom;
   const from = Date.parse(requestedFrom) <= Date.parse(to) ? requestedFrom : fallbackFrom;
 
@@ -602,11 +411,16 @@ function normalizeBundleAnalysisSpec(generation: AnalyticsBundleGenerationRecord
     to,
     granularity: spec["granularity"] === "hour" ? "hour" : "day",
     service: readNonEmptyString(spec["service"]) ?? readNonEmptyString(filters["service"]),
-    environment: readNonEmptyString(spec["environment"]) ?? readNonEmptyString(filters["environment"]),
+    environment:
+      readNonEmptyString(spec["environment"]) ?? readNonEmptyString(filters["environment"]),
     limit: readPositiveInteger(spec["limit"]) ?? DEFAULT_METRIC_LIMIT,
     funnel_key: readNonEmptyString(spec["funnel_key"]) ?? readNonEmptyString(spec["funnel"]),
     route: readNonEmptyString(spec["route"]),
-    incident_id: readUuid(spec["incident_id"])
+    incident_id: readUuid(spec["incident_id"]),
+    deploy_id: readNonEmptyString(spec["deploy_id"]),
+    opportunity_evidence: isRecord(spec["opportunity_evidence"])
+      ? spec["opportunity_evidence"]
+      : undefined
   };
 }
 
@@ -617,13 +431,17 @@ function inferAffectedSessions(input: {
   routes: Awaited<ReturnType<AnalyticsMetricsStore["getRouteMetrics"]>>["routes"];
   journeys: Awaited<ReturnType<AnalyticsMetricsStore["getJourneyPatterns"]>>["patterns"];
   actions: Awaited<ReturnType<AnalyticsMetricsStore["getActionMetrics"]>>["actions"];
+  opportunityEvidence?: Record<string, unknown> | undefined;
 }): number | null {
   if (input.analysisKind === "funnel_dropoff" && input.funnel !== null) {
     return input.funnel.funnel.dropoffs;
   }
 
-  if (input.analysisKind === "route_health" || input.analysisKind === "incident_impact") {
-    const affected = input.routes.reduce((sum, route) => sum + route.linked_incident_sessions, 0);
+  if (input.analysisKind === "route_health") {
+    const opportunityExits = readOptionalNonNegativeInteger(
+      input.opportunityEvidence?.["current_exits"]
+    );
+    const affected = opportunityExits ?? input.routes.reduce((sum, route) => sum + route.exits, 0);
     return Math.min(input.sessionsAnalyzed, affected);
   }
 
@@ -635,6 +453,18 @@ function inferAffectedSessions(input: {
   if (input.analysisKind === "feature_usage") {
     const affected = input.actions.reduce((sum, action) => sum + action.unique_sessions, 0);
     return Math.min(input.sessionsAnalyzed, affected);
+  }
+
+  if (input.analysisKind === "deploy_comparison") {
+    const baseline = readOptionalNonNegativeInteger(
+      input.opportunityEvidence?.["baseline_conversions"]
+    );
+    const current = readOptionalNonNegativeInteger(
+      input.opportunityEvidence?.["current_conversions"]
+    );
+    if (baseline !== undefined && current !== undefined) {
+      return Math.min(input.sessionsAnalyzed, Math.max(0, baseline - current));
+    }
   }
 
   return null;
@@ -663,7 +493,8 @@ function inferSeverity(
 function buildBundleTitle(
   analysisKind: AnalyticsBundleGenerationRecord["analysis_kind"],
   funnelKey: string | undefined,
-  route: string | undefined
+  route: string | undefined,
+  deployId: string | undefined
 ): string {
   if (analysisKind === "funnel_dropoff" && funnelKey !== undefined) {
     return `Funnel dropoff analysis for ${funnelKey}`;
@@ -671,6 +502,10 @@ function buildBundleTitle(
 
   if (analysisKind === "route_health" && route !== undefined) {
     return `Route health analysis for ${route}`;
+  }
+
+  if (analysisKind === "deploy_comparison" && deployId !== undefined) {
+    return `Deploy comparison for ${deployId}`;
   }
 
   return `${analysisKind.replaceAll("_", " ")} analysis`;
@@ -681,8 +516,9 @@ function buildBundleDescription(
   sessionsAnalyzed: number,
   affectedSessions: number | null
 ): string {
-  const affected = affectedSessions === null ? "aggregate usage" : `${affectedSessions} affected sessions`;
-  return `AnalyticsBundle ${analysisKind.replaceAll("_", " ")} evidence across ${sessionsAnalyzed} sessions with ${affected}.`;
+  const affected =
+    affectedSessions === null ? "aggregate usage" : `${affectedSessions} affected sessions`;
+  return `${analysisKind.replaceAll("_", " ")} evidence across ${sessionsAnalyzed} sessions with ${affected}.`;
 }
 
 function buildRecommendations(
@@ -693,12 +529,58 @@ function buildRecommendations(
       {
         priority: 1,
         action: "review_top_segments_and_routes",
-        rationale: "Compare high-volume routes, devices, referrers, and journey transitions before choosing optimizations."
+        rationale:
+          "Compare high-volume routes, devices, referrers, and journey transitions before choosing optimizations."
       }
     ];
   }
 
-  return undefined;
+  const recommendations: Record<
+    AnalyticsBundleGenerationRecord["analysis_kind"],
+    { action: string; rationale: string }
+  > = {
+    usage_summary: {
+      action: "review_top_segments_and_routes",
+      rationale:
+        "Compare high-volume routes, devices, referrers, and journey transitions before choosing optimizations."
+    },
+    route_health: {
+      action: "inspect_route_exit_and_bounce_segments",
+      rationale:
+        "Compare the affected route across device, referrer, and navigation segments before changing its flow."
+    },
+    funnel_dropoff: {
+      action: "reduce_the_highest_funnel_dropoff",
+      rationale:
+        "Inspect the first material step loss and its representative journeys before changing later steps."
+    },
+    journey_friction: {
+      action: "simplify_repeated_navigation_paths",
+      rationale:
+        "Review the highest-reach loops and friction markers, then remove ambiguous or ineffective actions."
+    },
+    feature_usage: {
+      action: "compare_feature_adoption_segments",
+      rationale:
+        "Separate discoverability, activation, and repeat-use signals before changing feature placement."
+    },
+    incident_impact: {
+      action: "prioritize_the_largest_incident_affected_journeys",
+      rationale:
+        "Use correlated routes, segments, and representative journeys to verify the customer impact of the incident fix."
+    },
+    deploy_comparison: {
+      action: "inspect_the_post_deploy_conversion_regression",
+      rationale:
+        "Compare changed routes and actions against the baseline deploy and consider rollback when the regression is confirmed."
+    },
+    conversion_path: {
+      action: "optimize_the_highest_loss_conversion_path",
+      rationale:
+        "Start with the earliest high-reach path loss and validate the change against the same conversion definition."
+    }
+  };
+  return [{ priority: 1, ...recommendations[analysisKind] }];
 }
 
 function toSegments(
@@ -737,8 +619,9 @@ function readLinkedRecords(
   const arrayItems: unknown[] = Array.isArray(arrayValue) ? arrayValue : [];
   const values = [...arrayItems, scalarValue];
 
-  return [...new Set(values.map(readNullableString).filter((item): item is string => item !== null))]
-    .map((item) => ({ [keys.outputKey]: item }));
+  return [
+    ...new Set(values.map(readNullableString).filter((item): item is string => item !== null))
+  ].map((item) => ({ [keys.outputKey]: item }));
 }
 
 function readRecordArray(value: unknown): Array<Record<string, unknown>> {
@@ -764,7 +647,8 @@ function readNonEmptyString(value: unknown): string | undefined {
 
 function readUuid(value: unknown): string | undefined {
   const parsed = readNonEmptyString(value);
-  return parsed !== undefined && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(parsed)
+  return parsed !== undefined &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(parsed)
     ? parsed
     : undefined;
 }
@@ -774,15 +658,13 @@ function readNullableString(value: unknown): string | null {
 }
 
 function readPositiveInteger(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isInteger(value) && value > 0 ? Math.min(value, 100) : undefined;
+  return typeof value === "number" && Number.isInteger(value) && value > 0
+    ? Math.min(value, 100)
+    : undefined;
 }
 
-function readNonNegativeInteger(value: unknown): number {
-  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : 0;
-}
-
-function readNonNegativeNumber(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : 0;
+function readOptionalNonNegativeInteger(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
 }
 
 function getAnalyticsBundleWorkerErrorMessage(error: unknown): string {

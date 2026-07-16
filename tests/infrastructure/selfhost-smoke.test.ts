@@ -26,6 +26,8 @@ describe("self-host smoke runner", () => {
   it("proves the self-host member auth, ingest, and bundle flow end to end", async () => {
     const analytics = {
       acceptedEvents: 27,
+      directAcceptedEvents: 18,
+      relayAcceptedEvents: 9,
       sessions: 3,
       pageviews: 6,
       conversions: 2,
@@ -85,7 +87,9 @@ describe("self-host smoke runner", () => {
         })
       )
       .mockResolvedValueOnce(jsonResponse(200, { status: "pending" }))
-      .mockResolvedValueOnce(jsonResponse(200, { bundle_version: 1, summary: { title: "Self-host smoke" } }));
+      .mockResolvedValueOnce(
+        jsonResponse(200, { bundle_version: 1, summary: { title: "Self-host smoke" } })
+      );
 
     const result = await runSelfhostSmoke({
       apiBaseUrl: "http://api.debugbundle.test",
@@ -117,12 +121,14 @@ describe("self-host smoke runner", () => {
       ]
     });
 
-    expect(runAnalyticsSmoke).toHaveBeenCalledWith(expect.objectContaining({
-      apiBaseUrl: "http://api.debugbundle.test",
-      memberToken: "dbundle_mem_smoke",
-      projectToken: "dbundle_proj_smoke",
-      projectId: "11111111-1111-4111-8111-111111111111"
-    }));
+    expect(runAnalyticsSmoke).toHaveBeenCalledWith(
+      expect.objectContaining({
+        apiBaseUrl: "http://api.debugbundle.test",
+        memberToken: "dbundle_mem_smoke",
+        projectToken: "dbundle_proj_smoke",
+        projectId: "11111111-1111-4111-8111-111111111111"
+      })
+    );
 
     expect(fetchImpl).toHaveBeenNthCalledWith(
       4,

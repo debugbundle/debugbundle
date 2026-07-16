@@ -52,6 +52,7 @@ export interface AnalyticsBundleListCommandInput {
 export interface AnalyticsBundleCreateCommandInput {
   bearerToken: string;
   projectId: string;
+  opportunityId?: string | undefined;
   analysisKind: AnalyticsBundleAnalysisKind;
   from?: string | undefined;
   to?: string | undefined;
@@ -175,6 +176,7 @@ export function createAnalyticsBundleApi(httpClient: {
 function buildCreateBundleBody(input: Omit<AnalyticsBundleCreateCommandInput, "json">): Record<string, unknown> {
   return {
     project_id: input.projectId,
+    ...(input.opportunityId === undefined ? {} : { opportunity_id: input.opportunityId }),
     analysis_kind: input.analysisKind,
     ...(input.from === undefined ? {} : { from: input.from }),
     ...(input.to === undefined ? {} : { to: input.to }),
@@ -301,6 +303,7 @@ export async function createAnalyticsBundleCommand(
     const response = await api.createBundle({
       bearerToken: input.bearerToken,
       projectId: input.projectId,
+      opportunityId: input.opportunityId,
       analysisKind: input.analysisKind,
       from: input.from,
       to: input.to,
@@ -425,6 +428,7 @@ export async function createAnalyticsBundleWithAuthCommand(
         {
           bearerToken: authState.bearer_token,
           projectId: input.projectId,
+          opportunityId: input.opportunityId,
           analysisKind: input.analysisKind,
           from: input.from,
           to: input.to,

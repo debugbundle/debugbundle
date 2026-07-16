@@ -31,10 +31,16 @@ export function redactEvent(event: EventEnvelope): EventEnvelope {
   });
 
   if (!reparsed.success) {
-    return event;
+    return omitProjectToken(event);
   }
 
-  return reparsed.data;
+  return omitProjectToken(reparsed.data);
+}
+
+function omitProjectToken(event: EventEnvelope): EventEnvelope {
+  const sanitized = { ...event };
+  delete sanitized.project_token;
+  return sanitized;
 }
 
 export function isObjectNotFoundError(error: unknown): boolean {

@@ -1420,7 +1420,7 @@ Delivery statuses: `pending` → `delivered` or `retrying` → `delivered` or `f
 
 Analytics storage is aggregate-first. Raw analytics events are short-lived object-storage inputs, not long-term Postgres event rows. Rollups are precomputed counters and summaries keyed by project, time bucket, granularity, route/action/funnel keys, and bounded dimensions; they are the query model for normal analytics reads and must not preserve per-visit raw payloads.
 
-Retention cleanup removes raw analytics objects according to `raw_retention_days`, retained journey samples according to `sample_retention_days`/`expires_at`, generated AnalyticsBundle artifacts/metadata older than `aggregate_retention_months`, and aggregate rollup rows older than `aggregate_retention_months`. In-window rollups remain the normal query model for analytics metrics.
+Retention cleanup removes raw analytics objects according to `raw_retention_days`, retained journey samples according to `sample_retention_days`/`expires_at`, hourly aggregate rows according to `hourly_retention_days`, and daily aggregate rows plus generated AnalyticsBundle artifacts/metadata according to `aggregate_retention_months`. Hourly defaults/caps are 7 days on Free, 30 on Solo, 90 on Team, and up to 365 on self-host. In-window rollups remain the normal query model for analytics metrics.
 
 Required table concepts for the AnalyticsBundle implementation:
 
@@ -1442,7 +1442,7 @@ Required table concepts for the AnalyticsBundle implementation:
 | `analytics_opportunities` | Deterministic usage/friction/incident-impact/deploy-comparison opportunities with status, severity, confidence, evidence summary, related incident/deploy ids, and bundle state |
 | `analytics_bundle_generations` | On-demand or scheduled AnalyticsBundle generation metadata, input fingerprint, status, object key, and failure reason |
 
-Dimension storage must remain bounded. Built-in dimensions include route, device type, browser family/major, OS family/major, language/locale, viewport bucket, referrer domain, UTM fields, auth state, country/region when enabled, deploy, and approved Team custom dimensions. Arbitrary raw JSON payloads must not be used as the long-term analytics query model.
+Dimension storage must remain bounded. Built-in dimensions include route, device type, browser family/major, OS family/major, language/locale, viewport bucket, referrer domain, UTM fields, auth state, country/region when enabled, deploy, and approved tier-bounded custom dimensions. Arbitrary raw JSON payloads must not be used as the long-term analytics query model.
 
 `project_analytics_settings.approved_custom_dimensions` must remain a JSON array whose length is less than or equal to `max_custom_dimensions`; API, storage, and database constraints all preserve that invariant for full and partial settings updates.
 

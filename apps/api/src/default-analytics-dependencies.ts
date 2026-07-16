@@ -152,6 +152,7 @@ export function createDefaultAnalyticsDependencies(input: {
         void request.organization_id;
         const generation = await bundleGenerationStore.reserveAnalyticsBundleGeneration({
           project_id: request.project_id,
+          opportunity_id: request.opportunity_id ?? null,
           requested_by_user_id: request.requested_by_user_id,
           analysis_kind: request.analysis_kind,
           analysis_spec: request.analysis_spec

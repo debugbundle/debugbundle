@@ -41,6 +41,10 @@ async function openSelect(label: RegExp | string): Promise<HTMLElement> {
   return trigger;
 }
 
+async function openProjectSettingsSection(name: string): Promise<void> {
+  fireEvent.click(await screen.findByRole("button", { name }));
+}
+
 async function chooseSelectOption(
   user: ReturnType<typeof userEvent.setup>,
   label: RegExp | string,
@@ -2546,6 +2550,7 @@ describe("web app — management routes", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
+    await openProjectSettingsSection("Weekly reports");
 
     expect(
       await screen.findByRole("button", { name: /save email weekly report/i })
@@ -2667,6 +2672,7 @@ describe("web app — management routes", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
+    await openProjectSettingsSection("Weekly reports");
 
     const emptyWeeklyReportsTitle = await screen.findByText("No Slack weekly reports yet");
     expect(emptyWeeklyReportsTitle.closest('[data-slot="empty"]')).toHaveClass(
@@ -2780,6 +2786,7 @@ describe("web app — management routes", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
+    await openProjectSettingsSection("Weekly reports");
 
     expect(
       await screen.findByText(/slack weekly reports are paused on the current plan/i)

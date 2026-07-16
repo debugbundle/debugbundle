@@ -140,16 +140,42 @@ describe("analytics saved funnel routes", () => {
     expect(created.statusCode).toBe(201);
     expect(updated.statusCode).toBe(200);
     expect(archived.statusCode).toBe(200);
-    expect(
-      createAuditLog.mock.calls.map((call) => (call[0] as { action: string }).action)
-    ).toEqual([
-      "analytics_saved_funnel.create",
-      "analytics_saved_funnel.update",
-      "analytics_saved_funnel.archive"
-    ]);
+    expect(createAuditLog.mock.calls.map((call) => (call[0] as { action: string }).action)).toEqual(
+      [
+        "analytics_saved_funnel.create",
+        "analytics_saved_funnel.update",
+        "analytics_saved_funnel.archive"
+      ]
+    );
   });
 
-  it("rejects malformed input, members, Free plans, unavailable storage, duplicates, and limits", async () => {
+  it("allows a Free owner to create the included saved funnel", async () => {
+    const createSavedFunnelForProject = vi.fn().mockResolvedValue({
+      status: "created",
+      funnel: savedFunnel
+    });
+    const app = createApp({
+      plan: "free",
+      management: createManagement({ createSavedFunnelForProject })
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/projects/${PROJECT_ID}/analytics/saved-funnels`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" },
+      payload: {
+        funnel_key: "checkout",
+        display_name: "Checkout",
+        steps: savedFunnel.steps
+      }
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toEqual({ funnel: savedFunnel });
+    expect(createSavedFunnelForProject).toHaveBeenCalledOnce();
+  });
+
+  it("rejects malformed input, members, unavailable storage, duplicates, and limits", async () => {
     const headers = { authorization: "Bearer dbundle_mem_test_token" };
     const url = `/v1/projects/${PROJECT_ID}/analytics/saved-funnels`;
     const payload = {
@@ -158,7 +184,6 @@ describe("analytics saved funnel routes", () => {
       steps: savedFunnel.steps
     };
     const member = createApp({ role: "member", plan: "team", management: createManagement() });
-    const free = createApp({ plan: "free", management: createManagement() });
     const unavailable = createApp();
     const duplicate = createApp({
       management: createManagement({
@@ -172,9 +197,6 @@ describe("analytics saved funnel routes", () => {
     });
 
     await expect(member.inject({ method: "POST", url, headers, payload })).resolves.toMatchObject({
-      statusCode: 403
-    });
-    await expect(free.inject({ method: "POST", url, headers, payload })).resolves.toMatchObject({
       statusCode: 403
     });
     await expect(
@@ -213,9 +235,7 @@ describe("analytics saved funnel routes", () => {
 
     expect(updated.statusCode).toBe(404);
     expect(archived.statusCode).toBe(404);
-    expect(
-      createAuditLog.mock.calls.map(([record]) => record as Record<string, unknown>)
-    ).toEqual([
+    expect(createAuditLog.mock.calls.map(([record]) => record as Record<string, unknown>)).toEqual([
       expect.objectContaining({
         action: "analytics_saved_funnel.update",
         status: "failure",

@@ -1,8 +1,6 @@
-import {
-  getTierCapabilities,
-  isSelfHostMode
-} from "../../../packages/shared-types/src/index.js";
+import { getTierCapabilities, isSelfHostMode } from "../../../packages/shared-types/src/index.js";
 import type {
+  AnalyticsAllowanceIdempotencyClaim,
   AnalyticsAllowanceReleaseInput,
   BillingSummaryRecord
 } from "../../../packages/storage/src/index.js";
@@ -30,6 +28,7 @@ export type AnalyticsQuotaClaim =
 
 type AnalyticsQuotaEvent = {
   event: {
+    event_id: string;
     payload: {
       kind: string;
     };
@@ -71,7 +70,10 @@ function buildAnalyticsLimits(input: {
   monthly_analytics_bundle_generations: number;
 } {
   const caps = getTierCapabilities(input.organization_plan);
-  const capacityUnits = getCapacityUnits(input.billingSummary);
+  const capacityUnits =
+    input.organization_plan === "solo" || input.organization_plan === "team"
+      ? getCapacityUnits(input.billingSummary)
+      : 1;
 
   return {
     monthly_analytics_events: caps.monthly_analytics_events * capacityUnits,
@@ -109,6 +111,7 @@ async function claimAnalyticsUsage(input: {
   analytics_sessions: number;
   analytics_journey_samples: number;
   analytics_bundle_generations: number;
+  claims?: AnalyticsAllowanceIdempotencyClaim[];
 }): Promise<AnalyticsQuotaClaim> {
   const billingSummary = await readBillingSummary({
     dependencies: input.dependencies,
@@ -130,13 +133,29 @@ async function claimAnalyticsUsage(input: {
   };
   const claim = await analyticsUsage.claimAnalyticsUsageForOrganization({
     ...release,
+    ...(input.claims === undefined ? {} : { claims: input.claims }),
     limits: buildAnalyticsLimits({
       organization_plan: input.organization_plan,
       billingSummary
     })
   });
   if (claim.allowed) {
-    return { allowed: true, release };
+    if (claim.claimed_keys === undefined) {
+      return { allowed: true, release };
+    }
+    const claimedKeys = new Set(claim.claimed_keys);
+    const claimed = (input.claims ?? []).filter((entry) => claimedKeys.has(entry.claim_key));
+    return {
+      allowed: true,
+      release: {
+        ...release,
+        analytics_events: claimed.filter((entry) => entry.metric === "analytics_events").length,
+        analytics_sessions: claimed.filter((entry) => entry.metric === "analytics_sessions").length,
+        analytics_journey_samples: claimed.filter((entry) => entry.metric === "analytics_journey_samples").length,
+        analytics_bundle_generations: claimed.filter((entry) => entry.metric === "analytics_bundle_generations").length,
+        claim_keys: claim.claimed_keys
+      }
+    };
   }
 
   return {
@@ -168,7 +187,8 @@ export async function claimAnalyticsIngestionQuota(input: {
     analytics_events: input.events.length,
     analytics_sessions: countIncomingSessionStarts(input.events),
     analytics_journey_samples: 0,
-    analytics_bundle_generations: 0
+    analytics_bundle_generations: 0,
+    claims: buildIngestionQuotaClaims(input.events)
   });
 }
 
@@ -177,6 +197,7 @@ export async function claimAnalyticsBundleGenerationQuota(input: {
   organization_id: string;
   organization_plan: string | undefined;
   now: Date;
+  claim_key: string;
 }): Promise<AnalyticsQuotaClaim> {
   return claimAnalyticsUsage({
     dependencies: input.dependencies,
@@ -186,17 +207,48 @@ export async function claimAnalyticsBundleGenerationQuota(input: {
     analytics_events: 0,
     analytics_sessions: 0,
     analytics_journey_samples: 0,
-    analytics_bundle_generations: 1
+    analytics_bundle_generations: 1,
+    claims: [
+      {
+        claim_key: `bundle:${input.claim_key}`,
+        metric: "analytics_bundle_generations"
+      }
+    ]
   });
 }
 
 export async function releaseAnalyticsQuotaClaimBestEffort(input: {
   dependencies: ApiDependencies;
   release: AnalyticsAllowanceReleaseInput | undefined;
+  exclude_claim_keys?: ReadonlySet<string> | undefined;
 }): Promise<void> {
   if (input.release === undefined || input.dependencies.analyticsUsage === undefined) {
     return;
   }
+  const excludeClaimKeys = input.exclude_claim_keys;
+  const release = input.release.claim_keys === undefined || excludeClaimKeys === undefined
+    ? input.release
+    : {
+        ...input.release,
+        claim_keys: input.release.claim_keys.filter((key) => !excludeClaimKeys.has(key))
+      };
+  await input.dependencies.analyticsUsage
+    .releaseAnalyticsUsageForOrganization(release)
+    .catch(() => undefined);
+}
 
-  await input.dependencies.analyticsUsage.releaseAnalyticsUsageForOrganization(input.release).catch(() => undefined);
+export function getAnalyticsQuotaClaimKeysForEvent(event: AnalyticsQuotaEvent["event"]): string[] {
+  return [
+    `event:${event.event_id}`,
+    ...(event.payload.kind === "session_start" ? [`session:${event.correlation.session_id}`] : [])
+  ];
+}
+
+function buildIngestionQuotaClaims(events: AnalyticsQuotaEvent[]): AnalyticsAllowanceIdempotencyClaim[] {
+  return events.flatMap(({ event }) => [
+    { claim_key: `event:${event.event_id}`, metric: "analytics_events" as const },
+    ...(event.payload.kind === "session_start"
+      ? [{ claim_key: `session:${event.correlation.session_id}`, metric: "analytics_sessions" as const }]
+      : [])
+  ]);
 }

@@ -520,6 +520,8 @@ export async function runWorkerFromEnv(
                 analyticsUsageStore,
                 billingStore,
                 resolveOrganizationIdForProject,
+                acquireLease: (key, ttlSeconds) => queue.acquireLease(key, ttlSeconds),
+                releaseLease: (key) => queue.releaseLease(key),
                 objectStore
               }
             })

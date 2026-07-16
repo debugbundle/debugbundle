@@ -104,6 +104,7 @@ describe("storage wiring", () => {
       },
       payload: {
         kind: "page_view",
+        privacy: { mode: "strict", consent_granted: false },
         route: {
           path: "/pricing",
           normalized_path: "/pricing",

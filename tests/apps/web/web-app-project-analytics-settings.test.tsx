@@ -24,6 +24,7 @@ const defaultSettings = {
   journey_sample_rate: 0.1,
   raw_retention_days: 7,
   sample_retention_days: 30,
+  hourly_retention_days: 90,
   aggregate_retention_months: 24,
   max_saved_funnels: 10,
   max_custom_dimensions: 0,
@@ -64,7 +65,12 @@ function installFetchMock(input: {
         return jsonResponse(200, {
           access_mode: input.accessMode,
           analytics_available: input.analyticsAvailable,
-          settings: defaultSettings
+          settings: {
+            ...defaultSettings,
+            hourly_retention_days: input.plan === "free" ? 7 : input.plan === "solo" ? 30 : 90,
+            max_saved_funnels: input.plan === "free" ? 1 : defaultSettings.max_saved_funnels,
+            max_custom_dimensions: input.plan === "free" ? 1 : input.plan === "solo" ? 3 : 8
+          }
         });
       }
 
@@ -85,6 +91,10 @@ function installFetchMock(input: {
       return jsonResponse(404, { error: "not_found" });
     })
   );
+}
+
+async function openAnalyticsSettings(): Promise<void> {
+  fireEvent.click(await screen.findByRole("button", { name: "Product analytics" }));
 }
 
 describe("web app - project analytics settings", () => {
@@ -111,10 +121,12 @@ describe("web app - project analytics settings", () => {
     });
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
+    await openAnalyticsSettings();
 
     expect(
       await screen.findByRole("heading", { name: "Product analytics", level: 3 })
     ).toBeInTheDocument();
+    expect(screen.queryByLabelText(/saved funnel limit/i)).toBeNull();
 
     await user.click(await screen.findByRole("switch", { name: /capture semantic actions/i }));
     fireEvent.change(screen.getByLabelText(/custom dimension limit/i), {
@@ -138,6 +150,7 @@ describe("web app - project analytics settings", () => {
     });
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
+    await openAnalyticsSettings();
 
     expect(
       await screen.findByRole("heading", { name: "Product analytics", level: 3 })
@@ -148,7 +161,28 @@ describe("web app - project analytics settings", () => {
     expect(screen.queryByRole("switch", { name: /capture semantic actions/i })).toBeNull();
   });
 
-  it("shows upgrade guidance instead of editable controls when analytics is unavailable", async () => {
+  it("lets Free owners configure the included analytics preview", async () => {
+    installFetchMock({
+      plan: "free",
+      accessMode: "manage",
+      analyticsAvailable: true
+    });
+
+    render(<App initialEntries={["/projects/proj_123/settings"]} />);
+    await openAnalyticsSettings();
+
+    expect(
+      await screen.findByRole("heading", { name: "Product analytics", level: 3 })
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: /save analytics settings/i })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: /capture semantic actions/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/custom dimension limit/i)).toHaveAttribute("max", "1");
+    expect(screen.getByLabelText(/hourly retention/i)).toHaveAttribute("max", "7");
+  });
+
+  it("shows neutral guidance instead of editable controls when analytics availability is unresolved", async () => {
     installFetchMock({
       plan: "free",
       accessMode: "manage",
@@ -156,15 +190,15 @@ describe("web app - project analytics settings", () => {
     });
 
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
+    await openAnalyticsSettings();
 
     expect(
       await screen.findByRole("heading", { name: "Product analytics", level: 3 })
     ).toBeInTheDocument();
     expect(
-      await screen.findByRole("heading", { name: /upgrade to solo or team to unlock product analytics/i })
+      await screen.findByText(/product analytics availability could not be resolved/i)
     ).toBeInTheDocument();
-    expect(screen.getByText(/analytics bundles are available on paid plans/i)).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: /open billing/i })[0]).toHaveAttribute("href", "/billing");
+    expect(screen.queryByText(/analytics bundles are available on paid plans/i)).toBeNull();
     expect(screen.queryByRole("button", { name: /save analytics settings/i })).toBeNull();
   });
 
@@ -196,13 +230,18 @@ describe("web app - project analytics settings", () => {
 
     const user = userEvent.setup();
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
+    await openAnalyticsSettings();
 
-    expect(await screen.findByText(/could not load product analytics settings/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/could not load product analytics settings/i)
+    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /save analytics settings/i })).toBeNull();
 
     await user.click(screen.getByRole("button", { name: "Retry" }));
 
-    expect(await screen.findByRole("button", { name: /save analytics settings/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: /save analytics settings/i })
+    ).toBeInTheDocument();
     expect(analyticsRequests).toBe(2);
   });
 });
