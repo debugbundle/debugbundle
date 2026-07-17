@@ -8,6 +8,7 @@ import { resetBrowserSessionClientState } from "../../../apps/web/src/lib/api.ts
 import { createProject, createSession, jsonResponse, requestUrl } from "./web-test-helpers.js";
 
 afterEach(() => {
+  vi.useRealTimers();
   resetBrowserSessionClientState();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -15,6 +16,9 @@ afterEach(() => {
 
 describe("web app — health status", () => {
   it("shows project color tags in the health status list", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-06-17T12:00:00.000Z"));
+
     const project = createProject({
       color_tag: "emerald",
       organization_plan: "team"
@@ -124,7 +128,7 @@ describe("web app — health status", () => {
       await screen.findByRole("heading", { name: /health status/i, level: 1 })
     ).toBeInTheDocument();
     expect(await screen.findByText(/main app/i)).toBeInTheDocument();
-    expect(screen.getAllByText("100%").length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("100%")).length).toBeGreaterThan(0);
     expect(document.querySelector('[data-project-color-tag="emerald"]')).not.toBeNull();
   });
 
