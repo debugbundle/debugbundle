@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "debugbundle",
   "displayName": "DebugBundle",
-  "version": "1.6.3",
+  "version": "1.7.0",
   "description": "Production debugging bundles for AI agents. Connect Claude Code to DebugBundle incidents, deterministic bundles, reproductions, health checks, probes, alerts, webhooks, projects, and verification workflows.",
   "author": {
     "name": "DebugBundle",
