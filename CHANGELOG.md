@@ -6,13 +6,19 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
-## [1.6.3] - 2026-07-16
+## [1.7.0] - 2026-07-17
 
 ### Added
 
 - Added the production-ready AnalyticsBundle product lane across browser capture, direct and relay ingestion, aggregate usage/routes/devices/referrers/actions/funnels, retained structured journeys, deterministic opportunities, generated analytics bundles, project/workspace web surfaces, and matching API, CLI, and MCP interfaces.
 - Added a bounded Free analytics preview plus fixed tier capabilities for saved funnels, controlled custom dimensions, and hourly retention; paid monthly event, session, retained-journey, and generated-bundle allowances scale with purchased capacity units.
 - Documented the AnalyticsBundle release surface across the repository README, CLI and MCP package READMEs, public interface contract, self-host operating guide, and documentation source tree. The release guidance covers aggregate metrics, bounded structured journey evidence, privacy/retention controls, exact incident-impact correlation, migration order, and the leased bounded scheduled evaluator.
+
+### Changed
+
+- Corrected the public semantic-release classification for AnalyticsBundle. Version `1.6.3` remains published for compatibility, but this `1.7.0` release is the canonical backward-compatible minor release for the new product lane and its API, CLI, MCP, OpenClaw, and SDK capabilities.
+
+## [1.6.3] - 2026-07-16
 
 ### Changed
 

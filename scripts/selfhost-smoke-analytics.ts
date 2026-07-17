@@ -183,7 +183,7 @@ function createBrowserAnalyticsFixtureEvents(input: {
     event_type: "analytics_event",
     occurred_at: "2026-07-16T00:00:00.000Z",
     sdk_name: "@debugbundle/sdk-browser",
-    sdk_version: "1.4.1",
+    sdk_version: "1.5.0",
     service: { name: input.serviceName, runtime: "browser", framework: null, environment: "production" },
     correlation: {
       session_id: input.fixture.sessionId,
