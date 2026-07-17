@@ -592,6 +592,8 @@ async function publishTarget(context, targetKey, target, dryRun) {
       sourceRef,
       "--source-path",
       target.skillPath,
+      "--version",
+      context.version,
       "--changelog",
       `DebugBundle MCP ecosystem release ${context.version}`
     ];

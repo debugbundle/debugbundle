@@ -79,6 +79,7 @@ describe("mcp ecosystem release pipeline", () => {
     expect(releaseSources).toContain("metadata?.isLatest === true");
     expect(releaseSources).toContain("server?.version === version");
     expect(script).toContain('"mcp", "publish", context.bundlePath, "-n", qualifiedName');
+    expect(script).toContain('"--version",\n      context.version');
     expect(releaseSources).toContain('https://api.smithery.ai/servers?namespace=');
     expect(releaseSources).toContain('https://api.smithery.ai/skills/');
     expect(releaseSources).toContain('https://api.smithery.ai/skills?namespace=');
