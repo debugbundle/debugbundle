@@ -86,7 +86,9 @@ Before a local MCP ecosystem release, renew the publisher session if `mcp-publis
 
 ```sh
 export MCP_REGISTRY_KEY_PATH="/secure/operator/path/to/debugbundle.com/key.pem"
-export MCP_REGISTRY_PRIVATE_KEY="$(openssl pkey -in "$MCP_REGISTRY_KEY_PATH" -noout -text | grep -A3 'priv:' | tail -n +2 | tr -d ' :\\n')"
+# Extract the 32-byte Ed25519 secret from the PEM container. This works with
+# macOS's bundled LibreSSL, which cannot parse Ed25519 through `openssl pkey`.
+export MCP_REGISTRY_PRIVATE_KEY="$(awk 'NR > 1 && !/-----/ { printf \"%s\", $0 }' "$MCP_REGISTRY_KEY_PATH" | base64 -D | tail -c 32 | xxd -p -c 256)"
 
 mcp-publisher logout
 mcp-publisher login dns --domain debugbundle.com --private-key "$MCP_REGISTRY_PRIVATE_KEY"
