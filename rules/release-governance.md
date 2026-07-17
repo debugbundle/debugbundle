@@ -78,6 +78,24 @@ After the GitHub-managed npm publish for `@debugbundle/mcp` succeeds, maintainer
 
 Because these registry-authenticated workflows depend on local browser login state, host-installed publisher tools, and marketplace-specific credentials, they intentionally run through the host-side `make release-mcp-ecosystem-*` targets instead of the Docker-backed CI lanes. The source-of-truth config for this follow-through lives in `apps/mcp/ecosystem-release-manifest.json`.
 
+#### Official MCP Registry maintainer renewal
+
+`com.debugbundle/mcp` uses DNS ownership verification for `debugbundle.com`. The published DNS TXT record and the corresponding Ed25519 private key are operator-managed secrets; never commit either one or paste the private key into a chat, shell history, or CI log.
+
+Before a local MCP ecosystem release, renew the publisher session if `mcp-publisher` reports an expired Registry JWT:
+
+```sh
+export MCP_REGISTRY_KEY_PATH="/secure/operator/path/to/debugbundle.com/key.pem"
+export MCP_REGISTRY_PRIVATE_KEY="$(openssl pkey -in "$MCP_REGISTRY_KEY_PATH" -noout -text | grep -A3 'priv:' | tail -n +2 | tr -d ' :\\n')"
+
+mcp-publisher logout
+mcp-publisher login dns --domain debugbundle.com --private-key "$MCP_REGISTRY_PRIVATE_KEY"
+
+unset MCP_REGISTRY_PRIVATE_KEY
+```
+
+The Registry JWT is intentionally short-lived and must not be made permanent. The durable key is the DNS-verification signing key. After login succeeds, resume `pnpm mcp:ecosystem:run --version <published-version>` from the repository root.
+
 ### Package Release Checklist
 
 Any SDK or package published to an external registry must satisfy these minimum artifact checks before release is considered complete:
