@@ -112,13 +112,29 @@ describe("web app — billing usage", () => {
     render(<App initialEntries={["/billing"]} />);
 
     expect(await screen.findByRole("heading", { name: /billing/i, level: 1 })).toBeInTheDocument();
-    await user.click(
-      await screen.findByRole("button", { name: /view raw ingested events breakdown/i })
+    const detailsButton = await screen.findByRole("button", {
+      name: /view raw ingested events breakdown/i
+    });
+    expect(detailsButton).toHaveAttribute("data-variant", "outline");
+    expect(detailsButton.parentElement).toHaveClass("flex", "h-full", "flex-col", "items-end", "gap-3");
+    expect(screen.getByText("Accepted event volume counting against the shared allowance.").parentElement).toHaveClass(
+      "flex",
+      "min-w-0",
+      "flex-col"
     );
+
+    await user.click(detailsButton);
 
     const dialog = await screen.findByRole("dialog", {
       name: /raw ingested events breakdown/i
     });
+    expect(dialog).toHaveClass(
+      "grid-cols-[minmax(0,1fr)]",
+      "max-h-[calc(100dvh-2rem)]",
+      "overflow-y-auto",
+      "overscroll-contain"
+    );
+    expect(within(dialog).getByRole("table").parentElement).toHaveClass("overflow-x-auto");
     expect(within(dialog).getByText(/current billing window/i)).toBeInTheDocument();
     expect(
       within(dialog).getByText(/top 2 projects account for 136,445 of 136,445 counted events/i)

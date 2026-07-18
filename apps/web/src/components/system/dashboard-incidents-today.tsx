@@ -11,6 +11,7 @@ import {
   shouldIgnoreTableRowActivation
 } from "./selectable-table-actions.js";
 import { CursorPaginationControls } from "./cursor-pagination-controls.js";
+import { IncidentTableTitle } from "./incident-table-title.js";
 import { TableRefreshButton } from "./table-refresh-button.js";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
@@ -141,9 +142,11 @@ function DashboardIncidentRow(input: {
   return (
     <TableRow className="cursor-pointer" onClick={(event) => input.onOpen(event, incident)}>
       <TableCell className="align-top whitespace-normal">
-        <Link to={`/incidents/${incident.incident_id}`} className="font-medium text-foreground hover:underline" data-row-interactive="true">
-          {incident.title}
-        </Link>
+        <IncidentTableTitle
+          title={incident.title}
+          to={`/incidents/${incident.incident_id}`}
+          rowInteractive
+        />
         <p className="mt-1 text-xs text-muted-foreground whitespace-normal break-words">
           {formatIncidentMatchedFields(incident.matched_fields)}
         </p>

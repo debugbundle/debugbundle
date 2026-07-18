@@ -46,27 +46,21 @@ export function UsageMeter({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4">
-        <div className="min-w-0">
-          <div className="flex min-h-6 flex-wrap items-start gap-2">
-            <p className="text-sm font-medium leading-6">{label}</p>
-            {actionLabel === undefined || onAction === undefined ? null : (
-              <Button
-                type="button"
-                variant="ghost"
-                size="xs"
-                aria-label={actionAriaLabel}
-                onClick={onAction}
-              >
-                {actionLabel}
-              </Button>
-            )}
-          </div>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-x-4">
+        <div className="flex min-w-0 flex-col">
+          <p className="min-h-6 text-sm font-medium leading-6">{label}</p>
           <p className="text-xs text-muted-foreground">{description}</p>
         </div>
-        <p className="whitespace-nowrap pt-0.5 text-right text-sm font-medium">
-          {used} of {limit}
-        </p>
+        <div className="flex h-full flex-col items-end gap-3">
+          <p className="whitespace-nowrap pt-0.5 text-right text-sm font-medium">
+            {used} of {limit}
+          </p>
+          {actionLabel === undefined || onAction === undefined ? null : (
+            <Button type="button" variant="outline" aria-label={actionAriaLabel} onClick={onAction}>
+              {actionLabel}
+            </Button>
+          )}
+        </div>
       </div>
       <div className="h-2 rounded-full bg-muted">
         <div

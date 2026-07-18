@@ -118,7 +118,10 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
           Manage capacity
         </Button>
       </DialogTrigger>
-      <DialogContent size="lg">
+      <DialogContent
+        size="lg"
+        className="max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain"
+      >
         <DialogHeader>
           <DialogTitle>Manage allowance capacity</DialogTitle>
           <DialogDescription>

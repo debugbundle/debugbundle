@@ -227,6 +227,40 @@ describe("email package", () => {
     expect(rendered.html).toContain('src="https://app.debugbundle.com/email/debugbundle-mark.png"');
   });
 
+  it("contains long alert content within alert email cards", () => {
+    const longSummary =
+      "rename(/var/www/vendor/laravel/framework/src/Illuminate/Console/resources/views/components/two-column-detail.php,/var/www/vendor/laravel/framework/src/Illuminate/Console/resources/views/components/two-column-detail.php.bak):Permissiondenied";
+    const longIncidentId = "inc_3305d860-67a2-4e11-a1e7-8f3c9a26".repeat(3);
+
+    const alert = renderAlertEmail({
+      conditionType: "new_incident",
+      incidentId: longIncidentId,
+      occurredAt: "2026-05-17T10:00:00.000Z",
+      serviceName: "checkout-api",
+      environment: "production",
+      severity: "high"
+    });
+    const digest = renderAlertDigestEmail({
+      alerts: [
+        {
+          conditionType: "new_incident",
+          incidentId: longIncidentId,
+          occurredAt: "2026-05-17T10:00:00.000Z",
+          serviceName: "checkout-api",
+          environment: "production",
+          severity: "high",
+          summary: longSummary
+        }
+      ]
+    });
+
+    expect(alert.html).toContain('class="db-email-kv-list db-email-kv-list-fixed"');
+    expect(alert.html).toContain("table-layout:fixed;");
+    expect(digest.html).toContain('class="db-email-alert-summary"');
+    expect(digest.html).toContain("word-wrap:break-word;word-break:break-word;overflow-wrap:anywhere;");
+    expect(digest.html).toContain(longSummary);
+  });
+
   it("renders webhook auto-disabled emails with escaped content and management links", () => {
     const rendered = renderWebhookAutoDisabledEmail({
       organizationName: 'Acme <Prod>',
@@ -299,6 +333,7 @@ describe("email package", () => {
     expect(rendered.html).toContain('style="display:table-cell;width:66%;padding:0;vertical-align:top;color:#1c1917;font-size:15px;line-height:22px;text-align:right;"');
     expect(rendered.html).toContain("word-break:break-word;overflow-wrap:anywhere;");
     expect(rendered.html).toContain("text-align:right;");
+    expect(rendered.html).not.toContain('class="db-email-kv-list db-email-kv-list-fixed"');
   });
 
   it("renders system email review previews lazily from the current templates", () => {

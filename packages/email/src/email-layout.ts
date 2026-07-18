@@ -109,15 +109,16 @@ export function renderEmailOrderedList(items: string[]): string {
 
 export function renderEmailKeyValueList(
   items: Array<{ label: string; valueHtml: string }>,
-  options: { framed?: boolean } = {}
+  options: { framed?: boolean; fixedLayout?: boolean } = {}
 ): string {
+  const fixedLayout = options.fixedLayout === true;
   const contentHtml = [
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">',
+    `<table class="db-email-kv-list${fixedLayout ? " db-email-kv-list-fixed" : ""}" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;${fixedLayout ? "table-layout:fixed;" : ""}border-collapse:collapse;">`,
     ...items.map((item, index) =>
       [
         `<tr class="db-email-kv-row"${index > 0 ? ` style="border-top:1px solid ${EMAIL_BORDER};"` : ""}>`,
         `<td class="db-email-kv-label db-email-kv-label-${index === 0 ? "first" : "rest"}" style="display:table-cell;width:34%;padding:${index === 0 ? "0 12px 0 0" : "12px 12px 0 0"};vertical-align:top;color:${EMAIL_TEXT_QUIET};font-size:13px;line-height:18px;font-weight:600;letter-spacing:0.02em;text-transform:uppercase;text-align:left;">${escapeHtml(item.label)}</td>`,
-        `<td class="db-email-kv-value db-email-kv-value-${index === 0 ? "first" : "rest"}${index === items.length - 1 ? " db-email-kv-value-last" : ""}" style="display:table-cell;width:66%;padding:${index === 0 ? "0" : "12px 0 0 0"};vertical-align:top;color:${EMAIL_TEXT};font-size:15px;line-height:22px;text-align:right;"><div class="db-email-kv-value-wrap" style="word-break:break-word;overflow-wrap:anywhere;">${item.valueHtml}</div></td>`,
+        `<td class="db-email-kv-value db-email-kv-value-${index === 0 ? "first" : "rest"}${index === items.length - 1 ? " db-email-kv-value-last" : ""}" style="display:table-cell;width:66%;padding:${index === 0 ? "0" : "12px 0 0 0"};vertical-align:top;color:${EMAIL_TEXT};font-size:15px;line-height:22px;text-align:right;"><div class="db-email-kv-value-wrap" style="${fixedLayout ? "word-wrap:break-word;" : ""}word-break:break-word;overflow-wrap:anywhere;">${item.valueHtml}</div></td>`,
         "</tr>"
       ].join("")
     ),

@@ -264,6 +264,11 @@ describe("web page helper coverage", () => {
     );
 
     await user.click(screen.getByRole("button", { name: /create project/i }));
+    const createProjectDialog = screen.getByRole("dialog", { name: /create project/i });
+    expect(createProjectDialog).toHaveClass("max-h-[calc(100dvh-2rem)]");
+    const createProjectScrollPanel = createProjectDialog.querySelector("form > div");
+    expect(createProjectScrollPanel).not.toBeNull();
+    expect(createProjectScrollPanel).toHaveClass("overflow-y-auto", "overscroll-contain");
     await user.type(screen.getByLabelText(/project name/i), "First Project");
     await user.click(screen.getByRole("button", { name: /^create project$/i }));
 
@@ -500,6 +505,12 @@ describe("web page helper coverage", () => {
         onOpenChange={() => {}}
         onBillingChange={onBillingChange}
       />
+    );
+
+    expect(screen.getByRole("dialog", { name: /manage allowance capacity/i })).toHaveClass(
+      "max-h-[calc(100dvh-2rem)]",
+      "overflow-y-auto",
+      "overscroll-contain"
     );
 
     await user.click(screen.getByRole("button", { name: /increase capacity now/i }));

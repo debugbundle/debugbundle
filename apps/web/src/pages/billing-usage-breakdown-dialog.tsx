@@ -105,7 +105,10 @@ export function RawIngestedEventsBreakdownDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="xl" className="max-h-[calc(100vh-2rem)] overflow-y-auto">
+      <DialogContent
+        size="xl"
+        className="grid-cols-[minmax(0,1fr)] max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain"
+      >
         <DialogHeader>
           <DialogTitle>Raw ingested events breakdown</DialogTitle>
           <DialogDescription>

@@ -606,17 +606,20 @@ export function renderAlertEmail(input: AlertEmailInput): { subject: string; tex
       severity: input.severity
     }),
     bodyHtml: [
-      renderEmailKeyValueList([
-        { label: "Alert", valueHtml: escapeHtml(conditionLabel) },
-        ...(input.projectName === undefined || input.projectName === null
-          ? []
-          : [{ label: "Project", valueHtml: escapeHtml(input.projectName) }]),
-        { label: "Service", valueHtml: escapeHtml(input.serviceName) },
-        { label: "Environment", valueHtml: escapeHtml(input.environment) },
-        { label: "Severity", valueHtml: escapeHtml(severityLabel) },
-        { label: "Incident ID", valueHtml: escapeHtml(input.incidentId) },
-        { label: "Detected at", valueHtml: escapeHtml(detectedAt) }
-      ]),
+      renderEmailKeyValueList(
+        [
+          { label: "Alert", valueHtml: escapeHtml(conditionLabel) },
+          ...(input.projectName === undefined || input.projectName === null
+            ? []
+            : [{ label: "Project", valueHtml: escapeHtml(input.projectName) }]),
+          { label: "Service", valueHtml: escapeHtml(input.serviceName) },
+          { label: "Environment", valueHtml: escapeHtml(input.environment) },
+          { label: "Severity", valueHtml: escapeHtml(severityLabel) },
+          { label: "Incident ID", valueHtml: escapeHtml(input.incidentId) },
+          { label: "Detected at", valueHtml: escapeHtml(detectedAt) }
+        ],
+        { fixedLayout: true }
+      ),
       ...(input.incidentUrl === undefined || input.incidentUrl === null
         ? []
         : [
@@ -704,18 +707,21 @@ export function renderAlertDigestEmail(input: {
       .map((alert, index) =>
         renderEmailPanel(
           [
-            `<p style="margin:0 0 14px;color:#1c1917;font-size:16px;line-height:24px;font-weight:600;">${index + 1}. ${escapeHtml(alert.summary ?? "Alert triggered")}</p>`,
-            renderEmailKeyValueList([
-              { label: "Incident ID", valueHtml: escapeHtml(alert.incidentId) },
-              ...(alert.projectName === undefined || alert.projectName === null
-                ? []
-                : [{ label: "Project", valueHtml: escapeHtml(alert.projectName) }]),
-              { label: "Alerts", valueHtml: escapeHtml(alert.conditionLabels.join(", ")) },
-              { label: "Service", valueHtml: escapeHtml(alert.serviceName) },
-              { label: "Environment", valueHtml: escapeHtml(alert.environment) },
-              { label: "Severity", valueHtml: escapeHtml(titleCase(alert.severity)) },
-              { label: "Detected at", valueHtml: escapeHtml(formatEmailDate(alert.occurredAt)) }
-            ]),
+            `<p class="db-email-alert-summary" style="margin:0 0 14px;color:#1c1917;font-size:16px;line-height:24px;font-weight:600;word-wrap:break-word;word-break:break-word;overflow-wrap:anywhere;">${index + 1}. ${escapeHtml(alert.summary ?? "Alert triggered")}</p>`,
+            renderEmailKeyValueList(
+              [
+                { label: "Incident ID", valueHtml: escapeHtml(alert.incidentId) },
+                ...(alert.projectName === undefined || alert.projectName === null
+                  ? []
+                  : [{ label: "Project", valueHtml: escapeHtml(alert.projectName) }]),
+                { label: "Alerts", valueHtml: escapeHtml(alert.conditionLabels.join(", ")) },
+                { label: "Service", valueHtml: escapeHtml(alert.serviceName) },
+                { label: "Environment", valueHtml: escapeHtml(alert.environment) },
+                { label: "Severity", valueHtml: escapeHtml(titleCase(alert.severity)) },
+                { label: "Detected at", valueHtml: escapeHtml(formatEmailDate(alert.occurredAt)) }
+              ],
+              { fixedLayout: true }
+            ),
             ...(alert.incidentUrl === undefined || alert.incidentUrl === null
               ? []
               : [

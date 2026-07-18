@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { Link, useNavigate, useOutletContext } from "react-router-dom";
 
 import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
+import { IncidentTableTitle } from "../components/system/incident-table-title.js";
 import { ProjectSetupSummaryGrid } from "../components/system/project-setup-summary-grid.js";
 import { ResourceListState } from "../components/system/resource-list-state.js";
 import {
@@ -478,9 +479,10 @@ export function ProjectBundlesPage(): JSX.Element {
                     {sortedIncidents.map((incident) => (
                     <TableRow key={incident.incident_id}>
                       <TableCell>
-                        <Link to={`/projects/${incident.project_id}/bundles/${incident.incident_id}`} className="font-medium text-foreground hover:underline">
-                          {incident.title}
-                        </Link>
+                        <IncidentTableTitle
+                          title={incident.title}
+                          to={`/projects/${incident.project_id}/bundles/${incident.incident_id}`}
+                        />
                       </TableCell>
                       <TableCell>
                         <Badge variant={severityVariantMap[incident.severity]}>{incident.severity}</Badge>
@@ -576,13 +578,11 @@ export function IncidentTable({
               />
             </TableCell>
             <TableCell className="align-top whitespace-normal">
-              <Link
+              <IncidentTableTitle
+                title={incident.title}
                 to={`/projects/${incident.project_id}/incidents/${incident.incident_id}`}
-                className="font-medium text-foreground hover:underline"
-                data-row-interactive="true"
-              >
-                {incident.title}
-              </Link>
+                rowInteractive
+              />
               <p className="mt-1 text-xs text-muted-foreground whitespace-normal break-words">
                 {formatIncidentMatchedFields(incident.matched_fields)}
               </p>

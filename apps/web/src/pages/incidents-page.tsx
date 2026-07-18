@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
+import { IncidentTableTitle } from "../components/system/incident-table-title.js";
 import { ProjectColorTagDot } from "../components/system/project-color-tag-dot.js";
 import { PageHeader } from "../components/system/page-header.js";
 import { ResourceListState } from "../components/system/resource-list-state.js";
@@ -223,9 +224,11 @@ export function IncidentsPage(): JSX.Element {
                           />
                         </TableCell>
                         <TableCell className="align-top whitespace-normal">
-                          <Link to={`/incidents/${incident.incident_id}`} className="font-medium text-foreground hover:underline" data-row-interactive="true">
-                            {incident.title}
-                          </Link>
+                          <IncidentTableTitle
+                            title={incident.title}
+                            to={`/incidents/${incident.incident_id}`}
+                            rowInteractive
+                          />
                           <p className="mt-1 text-xs text-muted-foreground whitespace-normal break-words">
                             {formatIncidentMatchedFields(incident.matched_fields)}
                           </p>
