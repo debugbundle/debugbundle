@@ -3,6 +3,7 @@ import { useMemo, useState, type MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
+import { BoundedTableTitle } from "../components/system/bounded-table-title.js";
 import { ProjectColorTagDot } from "../components/system/project-color-tag-dot.js";
 import { HostedImprovementsUpgradeCallout } from "../components/system/hosted-improvements-upgrade-callout.js";
 import { PageHeader } from "../components/system/page-header.js";
@@ -455,17 +456,11 @@ export function ImprovementsTable(input: {
               />
             </TableCell>
             <TableCell className="align-top whitespace-normal">
-              <Link
-                to={
-                  projectScoped
-                    ? `/projects/${improvement.project_id}/improvements/${improvement.improvement_id}`
-                    : `/projects/${improvement.project_id}/improvements/${improvement.improvement_id}`
-                }
-                className="font-medium text-foreground hover:underline"
-                data-row-interactive="true"
-              >
-                {improvement.title}
-              </Link>
+              <BoundedTableTitle
+                title={improvement.title}
+                to={`/projects/${improvement.project_id}/improvements/${improvement.improvement_id}`}
+                rowInteractive
+              />
               <p className="mt-1 text-xs text-muted-foreground whitespace-normal break-words">
                 {improvement.summary}
               </p>

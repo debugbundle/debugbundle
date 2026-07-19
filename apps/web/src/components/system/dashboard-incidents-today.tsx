@@ -11,7 +11,7 @@ import {
   shouldIgnoreTableRowActivation
 } from "./selectable-table-actions.js";
 import { CursorPaginationControls } from "./cursor-pagination-controls.js";
-import { IncidentTableTitle } from "./incident-table-title.js";
+import { BoundedTableTitle } from "./bounded-table-title.js";
 import { TableRefreshButton } from "./table-refresh-button.js";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
@@ -142,7 +142,7 @@ function DashboardIncidentRow(input: {
   return (
     <TableRow className="cursor-pointer" onClick={(event) => input.onOpen(event, incident)}>
       <TableCell className="align-top whitespace-normal">
-        <IncidentTableTitle
+        <BoundedTableTitle
           title={incident.title}
           to={`/incidents/${incident.incident_id}`}
           rowInteractive

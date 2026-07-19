@@ -2,6 +2,7 @@ import { PencilIcon, PlusIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { CalloutCard } from "../components/system/callout-card.js";
+import { BoundedTableTitle } from "../components/system/bounded-table-title.js";
 import { DialogFormContent } from "../components/system/dialog-form-content.js";
 import { GitHubMark } from "../components/system/github-mark.js";
 import { PlanUpgradeCallout } from "../components/system/plan-upgrade-callout.js";
@@ -618,7 +619,9 @@ export function ProjectGitHubPage(): JSX.Element {
                         {githubSettings.deliveries.map((delivery) => (
                           <TableRow key={delivery.delivery_id}>
                             <TableCell className="font-medium">{delivery.rule_name}</TableCell>
-                            <TableCell>{delivery.target_title}</TableCell>
+                            <TableCell className="max-w-80 whitespace-normal">
+                              <BoundedTableTitle title={delivery.target_title} />
+                            </TableCell>
                             <TableCell>
                               <Badge variant={getGitHubDeliveryBadgeVariant(delivery.status)}>{delivery.status}</Badge>
                             </TableCell>

@@ -86,9 +86,13 @@ export function ImprovementDetailPage(): JSX.Element {
       ) : (
         <>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1">
-              <h2 className="text-xl font-semibold">{improvement.title}</h2>
-              <p className="text-sm text-muted-foreground">{improvement.summary}</p>
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <h2 className="text-xl font-semibold [overflow-wrap:anywhere]">
+                {improvement.title}
+              </h2>
+              <p className="text-sm text-muted-foreground [overflow-wrap:anywhere]">
+                {improvement.summary}
+              </p>
             </div>
             <div className="flex items-center gap-2">
               {improvement.status === "resolved" ? (

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { Link, useNavigate, useOutletContext } from "react-router-dom";
 
 import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
-import { IncidentTableTitle } from "../components/system/incident-table-title.js";
+import { BoundedTableTitle } from "../components/system/bounded-table-title.js";
 import { ProjectSetupSummaryGrid } from "../components/system/project-setup-summary-grid.js";
 import { ResourceListState } from "../components/system/resource-list-state.js";
 import {
@@ -479,7 +479,7 @@ export function ProjectBundlesPage(): JSX.Element {
                     {sortedIncidents.map((incident) => (
                     <TableRow key={incident.incident_id}>
                       <TableCell>
-                        <IncidentTableTitle
+                        <BoundedTableTitle
                           title={incident.title}
                           to={`/projects/${incident.project_id}/bundles/${incident.incident_id}`}
                         />
@@ -578,7 +578,7 @@ export function IncidentTable({
               />
             </TableCell>
             <TableCell className="align-top whitespace-normal">
-              <IncidentTableTitle
+              <BoundedTableTitle
                 title={incident.title}
                 to={`/projects/${incident.project_id}/incidents/${incident.incident_id}`}
                 rowInteractive
