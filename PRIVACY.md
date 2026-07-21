@@ -1,6 +1,6 @@
 # DebugBundle Privacy
 
-Last updated: 2026-07-07
+Last updated: 2026-07-21
 
 DebugBundle is designed around customer-controlled debugging data. SDKs capture application evidence only after a customer installs and configures them for a project. Self-hosted instances must not phone home.
 
@@ -19,7 +19,7 @@ Privacy rules:
 
 ## AnalyticsBundle Product Analytics
 
-AnalyticsBundle is planned opt-in product analytics for the customer's own project. It is separate from DebugBundle's own product telemetry.
+AnalyticsBundle is opt-in product analytics for a customer's own project. It uses the same product for DebugBundle's first-party site and app telemetry, while keeping each project's analytics data separate.
 
 AnalyticsBundle rules:
 
@@ -50,3 +50,13 @@ Returning-visitor and active-user analytics require privacy-safe identifiers:
 - `user_id_hash` must be supplied by customer code as a privacy-safe hash. SDKs must not derive raw identity.
 
 Team custom dimensions are controlled dimensions, not arbitrary retained JSON payloads. Values must be bounded, low-cardinality, redacted, and approved by project/tier configuration.
+
+## DebugBundle First-Party Product Telemetry
+
+DebugBundle uses AnalyticsBundle on `debugbundle.com` and `app.debugbundle.com` to understand aggregate page usage, route journeys, coarse device and referrer categories, session behavior, and fixed friction signals. This capture is operated by DebugBundle and is not sent to an advertising or third-party analytics provider.
+
+- Capture uses `standard` mode and a project-scoped opaque browser value whose separate SHA-256-derived hash supports returning-visitor counts.
+- The app sends stable route templates such as `/projects/:projectId/incidents/:incidentId`, not project, incident, bundle, or journey identifiers.
+- Analytics records a coarse authentication state (`anonymous`, `authenticated`, or `unknown`), not an email address, account ID, or name.
+- Raw query strings, form values, raw click text, DOM snapshots, screenshots, precise location, raw IP addresses, secrets, and payment data are excluded.
+- DebugBundle does not require a consent banner for this first-party telemetry configuration. If consent is required for a different deployment or jurisdiction, the SDK and project settings support consent-gated capture.

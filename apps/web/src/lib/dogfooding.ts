@@ -1,4 +1,8 @@
-import { createDebugBundleBrowserSdk, type DebugBundleBrowserInitConfig, type DebugBundleBrowserSdk } from "@debugbundle/sdk-browser";
+import {
+  createDebugBundleBrowserSdk,
+  type DebugBundleBrowserInitConfig,
+  type DebugBundleBrowserSdk
+} from "@debugbundle/sdk-browser";
 
 export interface WebDogfoodingEnv {
   DEV?: boolean;
@@ -33,8 +37,11 @@ export interface DogfoodingWindowTarget {
 
 type WebDogfoodingSdk = Pick<DebugBundleBrowserSdk, "init"> &
   Partial<Pick<DebugBundleBrowserSdk, "captureException" | "flush">>;
+type WebDogfoodingAnalyticsSdk = Pick<DebugBundleBrowserSdk, "analytics">;
 
 const browserDogfoodingSdk = createDebugBundleBrowserSdk();
+const UUID_ROUTE_SEGMENT =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function parseBooleanFlag(value: string | undefined, variableName: string): boolean | null {
   if (value === undefined) {
@@ -73,7 +80,9 @@ function isRelayEndpoint(value: string): boolean {
 function resolveDogfoodingEndpoint(env: WebDogfoodingEnv): string {
   const explicitEndpoint = normalizeText(env.VITE_DEBUGBUNDLE_DOGFOOD_ENDPOINT);
   if (explicitEndpoint !== null) {
-    return isAbsoluteHttpUrl(explicitEndpoint) ? new URL(explicitEndpoint).toString() : explicitEndpoint;
+    return isAbsoluteHttpUrl(explicitEndpoint)
+      ? new URL(explicitEndpoint).toString()
+      : explicitEndpoint;
   }
 
   if (env.DEV) {
@@ -97,8 +106,84 @@ function resolveTracePropagationTargets(env: WebDogfoodingEnv): string[] | undef
   return [new URL(apiBaseUrl).toString()];
 }
 
+function analyticsRouteParameterName(segments: string[], index: number): string | null {
+  const previous = segments[index - 1];
+  if (index === 1 && segments[0] === "projects") {
+    return "projectId";
+  }
+  if (previous === "incidents") {
+    return "incidentId";
+  }
+  if (previous === "improvements") {
+    return "improvementId";
+  }
+  if (previous === "journeys") {
+    return "sampleId";
+  }
+  if (previous === "opportunities") {
+    return "opportunityId";
+  }
+  if (previous === "bundles") {
+    return segments.includes("analytics") ? "generationId" : "incidentId";
+  }
+
+  return null;
+}
+
+/**
+ * Converts app-owned UUID routes into stable templates before AnalyticsBundle sees them.
+ * Unknown identifier-shaped routes fail closed so newly added detail pages cannot silently
+ * create high-cardinality analytics keys or retain internal resource identifiers.
+ */
+export function normalizeWebDogfoodingAnalyticsPath(path: string): string | null {
+  let pathname: string;
+  try {
+    pathname = new URL(path, "https://app.debugbundle.com").pathname;
+  } catch {
+    return null;
+  }
+
+  const segments = pathname.split("/").filter((segment) => segment.length > 0);
+  for (const [index, segment] of segments.entries()) {
+    if (!UUID_ROUTE_SEGMENT.test(segment)) {
+      continue;
+    }
+
+    const parameterName = analyticsRouteParameterName(segments, index);
+    if (parameterName === null) {
+      return null;
+    }
+    segments[index] = `:${parameterName}`;
+  }
+
+  return segments.length === 0 ? "/" : `/${segments.join("/")}`;
+}
+
+export function trackWebDogfoodingPageView(
+  path: string,
+  sdk: WebDogfoodingAnalyticsSdk = browserDogfoodingSdk
+): boolean {
+  const normalizedPath = normalizeWebDogfoodingAnalyticsPath(path);
+  if (normalizedPath === null) {
+    return false;
+  }
+
+  sdk.analytics.pageView({ path: normalizedPath });
+  return true;
+}
+
+export function setWebDogfoodingAnalyticsAuthState(
+  authState: "anonymous" | "authenticated" | "unknown",
+  sdk: WebDogfoodingAnalyticsSdk = browserDogfoodingSdk
+): void {
+  sdk.analytics.setContext({ auth_state: authState });
+}
+
 export function resolveWebDogfoodingConfig(env: WebDogfoodingEnv): WebDogfoodingConfig | null {
-  const enabledFlag = parseBooleanFlag(env.VITE_DEBUGBUNDLE_DOGFOOD_ENABLED, "VITE_DEBUGBUNDLE_DOGFOOD_ENABLED");
+  const enabledFlag = parseBooleanFlag(
+    env.VITE_DEBUGBUNDLE_DOGFOOD_ENABLED,
+    "VITE_DEBUGBUNDLE_DOGFOOD_ENABLED"
+  );
   if (enabledFlag === false) {
     return null;
   }
@@ -117,12 +202,21 @@ export function resolveWebDogfoodingConfig(env: WebDogfoodingEnv): WebDogfooding
     enabled: true,
     projectToken,
     endpoint,
-    environment: normalizeText(env.VITE_DEBUGBUNDLE_DOGFOOD_ENVIRONMENT) ?? normalizeText(env.MODE) ?? "development",
+    environment:
+      normalizeText(env.VITE_DEBUGBUNDLE_DOGFOOD_ENVIRONMENT) ??
+      normalizeText(env.MODE) ??
+      "development",
     service: normalizeText(env.VITE_DEBUGBUNDLE_DOGFOOD_SERVICE) ?? "debugbundle-web",
     exposeTriggers:
-      parseBooleanFlag(env.VITE_DEBUGBUNDLE_DOGFOOD_EXPOSE_TRIGGERS, "VITE_DEBUGBUNDLE_DOGFOOD_EXPOSE_TRIGGERS") ?? false,
+      parseBooleanFlag(
+        env.VITE_DEBUGBUNDLE_DOGFOOD_EXPOSE_TRIGGERS,
+        "VITE_DEBUGBUNDLE_DOGFOOD_EXPOSE_TRIGGERS"
+      ) ?? false,
     captureConsole:
-      parseBooleanFlag(env.VITE_DEBUGBUNDLE_DOGFOOD_CAPTURE_CONSOLE, "VITE_DEBUGBUNDLE_DOGFOOD_CAPTURE_CONSOLE") ?? false
+      parseBooleanFlag(
+        env.VITE_DEBUGBUNDLE_DOGFOOD_CAPTURE_CONSOLE,
+        "VITE_DEBUGBUNDLE_DOGFOOD_CAPTURE_CONSOLE"
+      ) ?? false
   };
 }
 
@@ -146,13 +240,32 @@ export function initializeWebDogfooding(
       ) ?? false;
 
     sdk.init({
-      ...(config.projectToken === null || isRelayEndpoint(config.endpoint) ? {} : { projectToken: config.projectToken }),
+      ...(config.projectToken === null || isRelayEndpoint(config.endpoint)
+        ? {}
+        : { projectToken: config.projectToken }),
       endpoint: config.endpoint,
       environment: config.environment,
       service: config.service,
       captureConsole: config.captureConsole,
       breadcrumbsOnErrorOnly: false,
-      ...(analyticsEnabled ? { analytics: { enabled: true } } : {}),
+      ...(analyticsEnabled
+        ? {
+            analytics: {
+              enabled: true,
+              privacyMode: "standard",
+              consentRequired: false,
+              // App routes contain project and incident IDs, so the router bridge below
+              // emits explicit safe templates instead of SDK-derived raw pathnames.
+              trackPageViews: false,
+              trackRouteChanges: false,
+              trackSessions: true,
+              trackReferrers: true,
+              trackActions: false,
+              trackFrictionSignals: true,
+              sampleRate: 1
+            }
+          }
+        : {}),
       ...(tracePropagationTargets === undefined ? {} : { tracePropagationTargets })
     } satisfies DebugBundleBrowserInitConfig);
 

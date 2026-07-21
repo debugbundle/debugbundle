@@ -39,6 +39,10 @@ import {
   verifyEmailCode
 } from "./lib/api.js";
 import { showErrorToast, showInfoToast, showSuccessToast } from "./lib/notify.js";
+import {
+  setWebDogfoodingAnalyticsAuthState,
+  trackWebDogfoodingPageView
+} from "./lib/dogfooding.js";
 import { SessionProvider, useSession } from "./lib/session.js";
 import { BillingPage } from "./pages/billing-page.js";
 import { AdminAnalyticsPage } from "./pages/admin-analytics-page.js";
@@ -239,10 +243,20 @@ function AppToaster(): JSX.Element {
 }
 
 function RootGate(): JSX.Element {
-  const { isLoading, sessionInvalidationCount } = useSession();
+  const { isLoading, session, sessionInvalidationCount } = useSession();
   const location = useLocation();
   const navigate = useNavigate();
   const lastHandledInvalidationCount = useRef(0);
+
+  useEffect(() => {
+    setWebDogfoodingAnalyticsAuthState(
+      isLoading ? "unknown" : session === null ? "anonymous" : "authenticated"
+    );
+  }, [isLoading, session]);
+
+  useEffect(() => {
+    trackWebDogfoodingPageView(location.pathname);
+  }, [location.pathname]);
 
   useEffect(() => {
     if (

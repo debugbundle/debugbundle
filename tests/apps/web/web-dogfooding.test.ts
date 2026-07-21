@@ -4,7 +4,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   initializeWebDogfooding,
+  normalizeWebDogfoodingAnalyticsPath,
   resolveWebDogfoodingConfig,
+  trackWebDogfoodingPageView,
   type DogfoodingWindowTarget
 } from "../../../apps/web/src/lib/dogfooding.ts";
 
@@ -131,7 +133,9 @@ describe("web dogfooding", () => {
     target.__DEBUGBUNDLE_DOGFOOD__?.triggerFrontendException("manual browser dogfood");
 
     expect(sdk.captureException).toHaveBeenCalledOnce();
-    expect(sdk.captureException).toHaveBeenCalledWith(expect.objectContaining({ message: "manual browser dogfood" }));
+    expect(sdk.captureException).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "manual browser dogfood" })
+    );
     expect(sdk.flush).toHaveBeenCalledOnce();
     expect(scheduledCallback).toBeNull();
   });
@@ -155,7 +159,9 @@ describe("web dogfooding", () => {
       sdk
     );
 
-    expect(sdk.init).toHaveBeenCalledWith(expect.not.objectContaining({ projectToken: expect.any(String) }));
+    expect(sdk.init).toHaveBeenCalledWith(
+      expect.not.objectContaining({ projectToken: expect.any(String) })
+    );
   });
 
   it("does not expose the manual bridge when trigger access is disabled", () => {
@@ -227,9 +233,62 @@ describe("web dogfooding", () => {
       sdk
     );
 
-    expect(sdk.init).toHaveBeenCalledWith(expect.objectContaining({
-      analytics: { enabled: true }
-    }));
+    expect(sdk.init).toHaveBeenCalledWith(
+      expect.objectContaining({
+        analytics: {
+          enabled: true,
+          privacyMode: "standard",
+          consentRequired: false,
+          trackPageViews: false,
+          trackRouteChanges: false,
+          trackSessions: true,
+          trackReferrers: true,
+          trackActions: false,
+          trackFrictionSignals: true,
+          sampleRate: 1
+        }
+      })
+    );
+  });
+
+  it.each([
+    ["/projects/34a4642f-3b2c-4b09-a5f9-845f39bc4eaf", "/projects/:projectId"],
+    [
+      "/projects/34a4642f-3b2c-4b09-a5f9-845f39bc4eaf/incidents/657165bb-22fb-4b82-bc18-21905dcc63fc",
+      "/projects/:projectId/incidents/:incidentId"
+    ],
+    [
+      "/projects/34a4642f-3b2c-4b09-a5f9-845f39bc4eaf/analytics/journeys/657165bb-22fb-4b82-bc18-21905dcc63fc",
+      "/projects/:projectId/analytics/journeys/:sampleId"
+    ],
+    ["/incidents/657165bb-22fb-4b82-bc18-21905dcc63fc", "/incidents/:incidentId"],
+    ["/signup?trial=team", "/signup"]
+  ])("templates dogfooding route %s as %s", (path, expected) => {
+    expect(normalizeWebDogfoodingAnalyticsPath(path)).toBe(expected);
+  });
+
+  it("drops unrecognized identifier-shaped route segments instead of retaining them", () => {
+    expect(
+      normalizeWebDogfoodingAnalyticsPath("/unknown/657165bb-22fb-4b82-bc18-21905dcc63fc")
+    ).toBeNull();
+  });
+
+  it("tracks app page views only with a safe route template", () => {
+    const pageView = vi.fn();
+
+    expect(
+      trackWebDogfoodingPageView("/projects/34a4642f-3b2c-4b09-a5f9-845f39bc4eaf/settings", {
+        analytics: { pageView }
+      })
+    ).toBe(true);
+    expect(pageView).toHaveBeenCalledWith({ path: "/projects/:projectId/settings" });
+
+    expect(
+      trackWebDogfoodingPageView("/unknown/657165bb-22fb-4b82-bc18-21905dcc63fc", {
+        analytics: { pageView }
+      })
+    ).toBe(false);
+    expect(pageView).toHaveBeenCalledOnce();
   });
 
   it("allowlists the configured api base url for split-origin request promotion", () => {
