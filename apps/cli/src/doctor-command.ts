@@ -144,6 +144,10 @@ function buildDoctorJsonOutput(checks: DoctorCheck[], privacyPreview?: DoctorPri
   });
 }
 
+function buildPrivacyPreviewSensitiveValue(field: string): string {
+  return ["privacy", "preview", field].join("-");
+}
+
 function buildPrivacyPreview(): DoctorPrivacyPreview {
   const sampleEvent = createEventEnvelope({
     schema_version: "2026-03-01",
@@ -171,14 +175,14 @@ function buildPrivacyPreview(): DoctorPrivacyPreview {
         step: "payment"
       },
       headers: {
-        authorization: "Bearer dbundle_project_secret_preview",
-        cookie: "session=preview_cookie",
+        authorization: buildPrivacyPreviewSensitiveValue("authorization"),
+        cookie: buildPrivacyPreviewSensitiveValue("cookie"),
         "content-type": "application/json"
       },
       body: {
-        password: "preview-password",
-        card_number: "4242424242424242",
-        otp: "123456",
+        password: buildPrivacyPreviewSensitiveValue("password"),
+        card_number: buildPrivacyPreviewSensitiveValue("card-number"),
+        otp: buildPrivacyPreviewSensitiveValue("otp"),
         email: "alice@example.com"
       },
       response_status: 503,

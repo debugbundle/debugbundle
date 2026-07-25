@@ -33,7 +33,7 @@ describe("openclaw plugin package", () => {
     };
 
     expect(packageJson.name).toBe("@debugbundle/openclaw-plugin");
-    expect(packageJson.version).toBe("1.7.0");
+    expect(packageJson.version).toBe("1.7.1");
     expect(packageJson.private).toBe(false);
     expect(packageJson.description).toBe(
       "OpenClaw tools for runtime error reporting, incident response, live app monitoring, health checks, debug bundles, and product analytics."
@@ -125,5 +125,16 @@ describe("openclaw plugin package", () => {
     expect(manifest.toolMetadata?.["debugbundle_update_analytics_settings"]).toEqual({ optional: true });
     expect(manifest.toolMetadata?.["debugbundle_create_saved_analytics_funnel"]).toEqual({ optional: true });
     expect(manifest.toolMetadata?.["debugbundle_get_usage_summary"]).toBeUndefined();
+  });
+
+  it("does not bundle synthetic bearer credentials that trigger marketplace secret scans", () => {
+    const doctorSource = readFileSync(join(repoRoot, "apps", "cli", "src", "doctor-command.ts"), "utf8");
+    const previewStart = doctorSource.indexOf("function buildPrivacyPreview()");
+    const previewEnd = doctorSource.indexOf("async function buildFileCheck", previewStart);
+    const privacyPreviewSource = doctorSource.slice(previewStart, previewEnd);
+
+    expect(previewStart).toBeGreaterThan(-1);
+    expect(previewEnd).toBeGreaterThan(previewStart);
+    expect(privacyPreviewSource).not.toMatch(/\b(?:authorization|cookie|password|card_number|otp):\s*["'`]/iu);
   });
 });

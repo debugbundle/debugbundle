@@ -6,6 +6,12 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-07-25
+
+### Fixed
+
+- Reworked the deterministic CLI privacy-preview sample so the bundled OpenClaw plugin no longer contains a synthetic bearer-token literal that ClawHub's static scanner mistakes for a hardcoded credential.
+
 ## [1.7.0] - 2026-07-17
 
 ### Added

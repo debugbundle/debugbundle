@@ -1,6 +1,6 @@
 {
   "name": "@debugbundle/openclaw-plugin",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "private": false,
   "description": "OpenClaw tools for runtime error reporting, incident response, live app monitoring, health checks, debug bundles, and product analytics.",
   "license": "AGPL-3.0-only",
