@@ -37,7 +37,9 @@ export interface DogfoodingWindowTarget {
 
 type WebDogfoodingSdk = Pick<DebugBundleBrowserSdk, "init"> &
   Partial<Pick<DebugBundleBrowserSdk, "captureException" | "flush">>;
-type WebDogfoodingAnalyticsSdk = Pick<DebugBundleBrowserSdk, "analytics">;
+type WebDogfoodingAnalyticsSdk<Method extends keyof DebugBundleBrowserSdk["analytics"]> = {
+  analytics: Pick<DebugBundleBrowserSdk["analytics"], Method>;
+};
 
 const browserDogfoodingSdk = createDebugBundleBrowserSdk();
 const UUID_ROUTE_SEGMENT =
@@ -161,7 +163,7 @@ export function normalizeWebDogfoodingAnalyticsPath(path: string): string | null
 
 export function trackWebDogfoodingPageView(
   path: string,
-  sdk: WebDogfoodingAnalyticsSdk = browserDogfoodingSdk
+  sdk: WebDogfoodingAnalyticsSdk<"pageView"> = browserDogfoodingSdk
 ): boolean {
   const normalizedPath = normalizeWebDogfoodingAnalyticsPath(path);
   if (normalizedPath === null) {
@@ -174,7 +176,7 @@ export function trackWebDogfoodingPageView(
 
 export function setWebDogfoodingAnalyticsAuthState(
   authState: "anonymous" | "authenticated" | "unknown",
-  sdk: WebDogfoodingAnalyticsSdk = browserDogfoodingSdk
+  sdk: WebDogfoodingAnalyticsSdk<"setContext"> = browserDogfoodingSdk
 ): void {
   sdk.analytics.setContext({ auth_state: authState });
 }
