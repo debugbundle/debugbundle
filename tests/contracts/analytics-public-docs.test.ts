@@ -259,18 +259,20 @@ describe("public site AnalyticsBundle documentation", () => {
     expect(llms?.content).toContain(
       "runtime error reporting, crash reporting, incident response, endpoint health checks, and product analytics"
     );
-    expect(llms?.content).toContain("- AnalyticsBundle: https://debugbundle.com/docs/analytics/");
     expect(llms?.content).toContain(
-      "- AnalyticsBundle privacy: https://debugbundle.com/docs/analytics/privacy/"
+      "- [AnalyticsBundle](https://debugbundle.com/docs/analytics/)"
     );
     expect(llms?.content).toContain(
-      "- Self-hosted AnalyticsBundle: https://debugbundle.com/docs/analytics/self-hosting/"
+      "- [AnalyticsBundle privacy](https://debugbundle.com/docs/analytics/privacy/)"
     );
     expect(llms?.content).toContain(
-      "- AnalyticsBundle CLI: https://debugbundle.com/docs/cli/analytics/"
+      "- [Self-hosted AnalyticsBundle](https://debugbundle.com/docs/analytics/self-hosting/)"
     );
     expect(llms?.content).toContain(
-      "- AnalyticsBundle API: https://debugbundle.com/docs/api/analytics/"
+      "- [AnalyticsBundle CLI](https://debugbundle.com/docs/cli/analytics/)"
+    );
+    expect(llms?.content).toContain(
+      "- [AnalyticsBundle API](https://debugbundle.com/docs/api/analytics/)"
     );
   });
 
