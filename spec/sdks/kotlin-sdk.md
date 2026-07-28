@@ -1,7 +1,7 @@
 # Kotlin Android SDK Implementation Plan
 
 Version: v1
-Last updated: 2026-05-29
+Last updated: 2026-07-27
 
 ---
 
@@ -638,28 +638,28 @@ Quality gates:
 
 ## Release Readiness Checklist
 
-- [ ] Universal Kotlin API implemented.
-- [ ] Instance client and facade implemented.
-- [ ] Android lifecycle breadcrumbs implemented.
-- [ ] Navigation and Compose breadcrumbs covered by tests.
-- [ ] OkHttp trace injection and request-event capture implemented.
-- [ ] Offline queue survives app restart, respects bounds, and preserves original timestamps.
-- [ ] WorkManager deferred delivery works on connectivity restoration.
-- [ ] Fatal exception next-launch delivery implemented without changing crash behavior.
-- [ ] API 30+ ANR/process-exit evidence captured where available.
-- [ ] Timber and manual log capture are in-process and non-recursive.
-- [ ] Duplicate suppression and loop protection match the universal contract.
-- [ ] Capture policy is fetched, cached, and enforced locally with ingestion as backstop.
-- [ ] Always-on probes, heavy probes, remote directives, and trigger tokens implemented.
-- [ ] SDK failures never throw into host app code.
-- [ ] Main-thread work is bounded and tested.
-- [ ] Request/response bodies, view text, screenshots, location, clipboard, and advertising IDs are off by default.
-- [ ] Trace headers are only added by explicit instrumentation and target allowlists.
-- [ ] Maven artifacts include README, license, sources, docs, signatures, and correct metadata.
-- [ ] Release docs cover config precedence, support labels, install modes, service naming, safe startup/status semantics, and first-event verification.
-- [ ] Public docs include Android setup, OkHttp, Ktor client if shipped, Navigation, Compose, Timber, offline queue, crash/ANR caveats, probes, and privacy examples.
+- [x] Universal Kotlin API implemented.
+- [x] Instance client and facade implemented.
+- [x] Android lifecycle breadcrumbs implemented.
+- [x] Navigation and Compose breadcrumbs covered by tests.
+- [x] OkHttp trace injection and request-event capture implemented.
+- [x] Offline queue survives app restart, respects bounds, and preserves original timestamps.
+- [x] WorkManager deferred delivery works on connectivity restoration.
+- [x] Fatal exception next-launch delivery implemented without changing crash behavior.
+- [x] API 30+ ANR/process-exit evidence captured where available.
+- [x] Timber and manual log capture are in-process and non-recursive.
+- [x] Duplicate suppression and loop protection match the universal contract.
+- [x] Capture policy is fetched, cached, and enforced locally with ingestion as backstop.
+- [x] Always-on probes, heavy probes, remote directives, and trigger tokens implemented.
+- [x] SDK failures never throw into host app code.
+- [x] Main-thread work is bounded and tested.
+- [x] Request/response bodies, view text, screenshots, location, clipboard, and advertising IDs are off by default.
+- [x] Trace headers are only added by explicit instrumentation and target allowlists.
+- [x] Maven artifacts include README, license, sources, docs, signatures, and correct metadata.
+- [x] Release docs cover config precedence, support labels, install modes, service naming, safe startup/status semantics, and first-event verification.
+- [x] Public docs include Android setup, OkHttp, Ktor client if shipped, Navigation, Compose, Timber, offline queue, crash/ANR caveats, probes, and privacy examples.
 - [ ] CI passes all supported Android, Kotlin, AGP, integration, and hardening lanes.
-- [ ] Clean-install smoke passes from staged Maven artifacts.
+- [x] Clean-install smoke passes from staged Maven artifacts.
 - [ ] Published-package smoke passes from Maven Central.
 
 ---

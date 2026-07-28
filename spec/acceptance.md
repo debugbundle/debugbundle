@@ -101,9 +101,13 @@ Last updated: 2026-07-04
 - **Given** an SDK initialized with a `beforeSend` hook
 - **When** the SDK captures an event
 - **Then** the hook receives the fully built event before buffering and transport
+- **And** default redaction has already run
+- **And** local capture-policy evaluation, capture rules, sampling, duplicate suppression, and persistence have not yet run
 - **And** returning a valid event ships that event
 - **And** returning `null` drops the event locally
 - **And** hook exceptions or invalid returned events keep the original event and never throw into host code
+- **And** mutating the hook input cannot mutate the SDK-owned original unless that valid returned event is selected
+- **And** a runtime may skip application hook execution only on an unsafe fatal/crash/shutdown path, and documents that restriction
 
 ### AC-SDK-14: Browser Device Context Capture
 - **Given** a browser app with `@debugbundle/sdk-browser` initialized
@@ -1306,6 +1310,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **When** the capture policy is queried via `GET /v1/projects/{id}/capture-policy`
 - **Then** Free-tier projects default to preset `balanced`
 - **And** paid-tier projects default to preset `balanced`
+- **And** existing projects retain any explicitly persisted preset when the software is upgraded
 - **And** `policy.immediate_client_error_statuses` resolves to `[]` for `balanced`
 - **And** `policy.immediate_client_error_statuses` resolves to `[401,403,409,422]` for `investigative`
 - **And** `policy.immediate_client_error_path_rules` resolves to `[]` for every preset

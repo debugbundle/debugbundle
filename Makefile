@@ -149,7 +149,7 @@ install:
 
 .PHONY: lint
 lint:
-	$(NODE_RUN) "corepack enable && corepack pnpm lint"
+	$(NODE_RUN) "corepack enable && NODE_OPTIONS=--max-old-space-size=6144 corepack pnpm lint"
 
 .PHONY: typecheck
 typecheck:

@@ -1,7 +1,15 @@
 import type { FastifyInstance } from "fastify";
 
-import { hashToken, readBearerToken, requireProjectToken } from "../../../../packages/auth/src/index.js";
-import { classifyEvent, validateEvent } from "../../../../packages/event-normalizer/src/index.js";
+import {
+  hashToken,
+  readBearerToken,
+  requireProjectToken
+} from "../../../../packages/auth/src/index.js";
+import {
+  classifyEvent,
+  classifyInstalledMobileEventCompatibility,
+  validateEvent
+} from "../../../../packages/event-normalizer/src/index.js";
 import {
   countsTowardMonthlyIngestAllowance,
   queueAllowanceLimitReachedNotification,
@@ -32,8 +40,8 @@ import {
 } from "../analytics-quota.js";
 import { redactEvent } from "../api-helpers.js";
 import { SMALL_REQUEST_BODY_LIMIT_BYTES } from "../http-limits.js";
+import { parseCompatibleIngestionRequest } from "../ingestion-request-compatibility.js";
 import { isProjectTokenOriginAllowed } from "../project-token-origins.js";
-import { IngestionRequestSchema } from "../schemas.js";
 import {
   isAnalyticsEventCandidate,
   parseAnalyticsEventCandidate,
@@ -58,7 +66,8 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
   app.post("/v1/events", { bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES }, async (request, reply) => {
     const projectAuth = await requireProjectToken({
       authorizationHeader: request.headers.authorization,
-      resolveByTokenHash: (tokenHash) => dependencies.ingestionMetadata.resolveProjectByTokenHash(tokenHash)
+      resolveByTokenHash: (tokenHash) =>
+        dependencies.ingestionMetadata.resolveProjectByTokenHash(tokenHash)
     });
     if (!projectAuth.ok) {
       return reply.status(401).send({
@@ -89,7 +98,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
 
     const now = new Date();
 
-    const parsedBody = IngestionRequestSchema.safeParse(request.body);
+    const { parsedBody, compatibility } = parseCompatibleIngestionRequest(request.body);
     if (!parsedBody.success) {
       return reply.status(400).send({
         accepted: 0,
@@ -101,6 +110,30 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
           }
         ]
       });
+    }
+    const compatibilityEventCounts = {
+      legacy_android_event: 0,
+      legacy_swift_event: 0
+    };
+    for (const candidate of parsedBody.data.events) {
+      const eventCompatibility = classifyInstalledMobileEventCompatibility(candidate);
+      if (eventCompatibility !== null) {
+        compatibilityEventCounts[eventCompatibility]++;
+      }
+    }
+    const compatibilityEventCount =
+      compatibilityEventCounts.legacy_android_event +
+      compatibilityEventCounts.legacy_swift_event;
+    if (compatibility !== null || compatibilityEventCount > 0) {
+      request.log.info(
+        {
+          compatibility_wrapper: compatibility,
+          compatibility_event_counts: compatibilityEventCounts,
+          compatibility_event_count: compatibilityEventCount,
+          request_event_count: parsedBody.data.events.length
+        },
+        "ingestion_installed_sdk_compatibility_used"
+      );
     }
 
     const errors: Array<{ index: number; reason: string }> = [];
@@ -156,7 +189,11 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
 
     const sharedRateLimitedEventCount = validEvents.length + validAnalyticsEvents.length;
 
-    if (sharedRateLimitedEventCount > 0 && dependencies.ingestionRateLimiter !== undefined && !isSelfHostMode()) {
+    if (
+      sharedRateLimitedEventCount > 0 &&
+      dependencies.ingestionRateLimiter !== undefined &&
+      !isSelfHostMode()
+    ) {
       const bearerToken = readBearerToken(request.headers.authorization);
       if (bearerToken !== null) {
         const rateLimit = await dependencies.ingestionRateLimiter.claimEvents({
@@ -214,12 +251,15 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
             });
           }
 
-          return reply.header("Retry-After", toIngestionRetryAfterSeconds(rateLimit.retry_after_ms)).status(429).send({
-            accepted: 0,
-            rejected: errors.length,
-            errors,
-            retry_after_ms: rateLimit.retry_after_ms
-          });
+          return reply
+            .header("Retry-After", toIngestionRetryAfterSeconds(rateLimit.retry_after_ms))
+            .status(429)
+            .send({
+              accepted: 0,
+              rejected: errors.length,
+              errors,
+              retry_after_ms: rateLimit.retry_after_ms
+            });
         }
       }
     }
@@ -237,7 +277,10 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
     let acceptedAnalyticsEvents = analyticsSelection.acceptedEvents;
 
     const defaultPreset = getDefaultPreset(project.organization_plan);
-    let capturePolicy: ResolvedCapturePolicy = { preset: defaultPreset, ...PRESET_DEFAULTS[defaultPreset] };
+    let capturePolicy: ResolvedCapturePolicy = {
+      preset: defaultPreset,
+      ...PRESET_DEFAULTS[defaultPreset]
+    };
     if (dependencies.capturePolicyManagement !== undefined) {
       const policyRecord = await dependencies.capturePolicyManagement.getCapturePolicyForProject({
         organization_id: "",
@@ -288,11 +331,19 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
         continue;
       }
 
-      if (shouldCaptureEvent(capturePolicy, entry.event.event_type, entry.event.payload as Record<string, unknown>)) {
+      if (
+        shouldCaptureEvent(
+          capturePolicy,
+          entry.event.event_type,
+          entry.event.payload as Record<string, unknown>
+        )
+      ) {
         const baseEventClass = classifyEvent(
           entry.event.event_type,
           entry.event.event_type === "log_event" ? entry.event.payload.level : undefined,
-          entry.event.event_type === "probe_event" && "activation_id" in entry.event.payload ? entry.event.payload.activation_id : undefined,
+          entry.event.event_type === "probe_event" && "activation_id" in entry.event.payload
+            ? entry.event.payload.activation_id
+            : undefined,
           entry.event.payload as Record<string, unknown>,
           capturePolicy.preset,
           capturePolicy.immediate_client_error_statuses,
@@ -311,7 +362,9 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
                     service: {
                       name: entry.event.service.name,
                       environment: entry.event.service.environment,
-                      ...(entry.event.service.runtime === undefined ? {} : { runtime: entry.event.service.runtime })
+                      ...(entry.event.service.runtime === undefined
+                        ? {}
+                        : { runtime: entry.event.service.runtime })
                     },
                     payload: entry.event.payload as Record<string, unknown>
                   }
@@ -401,13 +454,18 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
       );
 
       if (countedEvents.length > 0) {
-        const billingSummary = await dependencies.billingManagement.getBillingSummaryForOrganization({
-          organization_id: project.organization_id,
-          now: now.toISOString()
-        });
+        const billingSummary =
+          await dependencies.billingManagement.getBillingSummaryForOrganization({
+            organization_id: project.organization_id,
+            now: now.toISOString()
+          });
 
         const allowance = billingSummary?.allowances.monthly_raw_ingested_events;
-        if (billingSummary !== null && allowance !== undefined && allowance.used + countedEvents.length > allowance.limit) {
+        if (
+          billingSummary !== null &&
+          allowance !== undefined &&
+          allowance.used + countedEvents.length > allowance.limit
+        ) {
           const quotaExceededErrors = acceptedEvents.map(({ index }) => ({
             index,
             reason: "monthly_quota_exceeded"
@@ -461,12 +519,15 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
               });
             }
 
-            return reply.header("Retry-After", toIngestionRetryAfterSeconds(retryAfterMs)).status(429).send({
-              accepted: 0,
-              rejected: errors.length,
-              errors,
-              retry_after_ms: retryAfterMs
-            });
+            return reply
+              .header("Retry-After", toIngestionRetryAfterSeconds(retryAfterMs))
+              .status(429)
+              .send({
+                accepted: 0,
+                rejected: errors.length,
+                errors,
+                retry_after_ms: retryAfterMs
+              });
           }
 
           debugEventsToPersist = [];
@@ -550,7 +611,8 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
       captureRuleManagement.recordCaptureRuleMatch !== undefined &&
       matchedRuleHits.length > 0
     ) {
-      const recordCaptureRuleMatch = captureRuleManagement.recordCaptureRuleMatch.bind(captureRuleManagement);
+      const recordCaptureRuleMatch =
+        captureRuleManagement.recordCaptureRuleMatch.bind(captureRuleManagement);
       await Promise.allSettled(
         matchedRuleHits.map((match) =>
           recordCaptureRuleMatch({

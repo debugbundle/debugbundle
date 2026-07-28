@@ -531,6 +531,8 @@ Common wrapper for the canonical debug SDK event family:
 
 **Required envelope fields:** `schema_version`, `event_id`, `event_type`, `occurred_at`, `sdk_name`, `sdk_version`, `service.name`, `service.environment`, `payload`
 
+**Closed mobile representation:** Android, Swift, and React Native use this same envelope. Mobile device/app facts belong in the event-type payload's closed optional `device` field; application-owned diagnostic values belong in envelope `context`. Mobile SDKs must not add root `device`, root `environment`, string-valued `service`, or SDK-specific payload extras.
+
 **`event_class` assignment:** This field is NOT set by SDKs. It is assigned by the event-normalizer during worker processing based on the following classification rules:
 
 | event_type | Assigned event_class | Notes |
@@ -856,6 +858,8 @@ Note: `data` fields shown above are for `network_request` breadcrumbs. Other bre
 ```
 
 `probe_event` is emitted in two scenarios: (1) **always-on flush** — when an error occurs, all probe ring buffers flush alongside the error event; in this case `activation_id` is `null`; (2) **remote-activated shipping** (paid tiers only) — when a remote activation matches the label, data ships independently with the `activation_id` set. Probe events are NOT fingerprinted or grouped into incidents. They are diagnostic context: if a probe event shares a `trace_id` or falls within the same time window + service as an incident, it is attached to the bundle as `context.probe_data[]`.
+
+Probe input remains language-idiomatic and may be any serializable value, but the wire representation is always an object. Object/map input remains an object; scalar, `null`, and list/array input is wrapped as `{ "value": <redacted value> }`. The same rule applies to every inline `probe_data.items[].data` value so a buffered probe can never invalidate its parent exception.
 
 ---
 

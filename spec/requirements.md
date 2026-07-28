@@ -524,7 +524,7 @@ All eight canonical event types (FR-SDK-05) are assigned to one of three event c
 | `balanced` | Default hosted behavior | On | Warning+ | Immediate failures: 5xx plus 408/423/424/425/429 | Local ring buffer + exception flush only | Paid-tier only |
 | `investigative` | Short-term deep debugging | On | Info+ | Immediate failures: balanced set plus 409, with optional broader request capture via overrides | Optional standalone | Paid-tier only |
 
-**FR-EVT-05:** Free tier projects must default to `minimal` preset. Solo projects default to `balanced`. Team projects default to `balanced`. Presets are changeable by the project owner via API, CLI, MCP, and web app (interface parity per INV-5).
+**FR-EVT-05:** New Free, Solo, and Team projects must default to the `balanced` preset. Presets are changeable by the project owner via API, CLI, MCP, and web app (interface parity per INV-5). Existing projects retain their persisted preset across upgrades; changing this default must never rewrite an installed project's policy implicitly.
 
 **FR-EVT-06:** Each project may override individual capture dimensions beyond the preset via advanced controls:
 - `capture_logs`: `off | warning | error | info`

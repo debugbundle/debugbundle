@@ -1,7 +1,7 @@
 # Go SDK Implementation Plan
 
 Version: v1
-Last updated: 2026-05-23
+Last updated: 2026-07-27
 
 ---
 
@@ -524,23 +524,23 @@ Quality gates:
 
 ## Release Readiness Checklist
 
-- [ ] Universal Go API implemented.
-- [ ] Instance client and singleton facade implemented.
-- [ ] `net/http`, Gin, and Echo integrations capture requests, panics, and trace/request IDs.
-- [ ] `log/slog`, zap, and zerolog integrations capture structured logs without recursion.
-- [ ] Local-only and connected transports are implemented.
-- [ ] Secure local file writes enforce owner-only permissions, path validation, symlink protection, and unpredictable temp names.
-- [ ] Duplicate suppression and loop protection match the universal contract.
-- [ ] Capture policy is fetched, cached, polled, and enforced locally with ingestion as a backstop.
-- [ ] Always-on probes, remote probes, heavy probes, and trigger tokens are implemented.
-- [ ] Browser relay covers the shared relay contract: origin validation, CORS preflight, POST CORS headers, content type, body size, schema, credential stripping, local-only writes, durable spool, connected forwarding, and rate limiting.
-- [ ] SDK failures never panic into host application code.
-- [ ] Request and response bodies are off by default.
-- [ ] Header capture is allowlist-based by default.
-- [ ] Existing `X-Request-Id` is preserved.
-- [ ] `X-DebugBundle-Trace-Id` links browser and backend events.
-- [ ] Public docs include install, `net/http`, Gin, Echo, browser relay, local-only, connected, logging, probes, and privacy examples.
-- [ ] CI passes all supported Go version lanes and race tests.
+- [x] Universal Go API implemented.
+- [x] Instance client and singleton facade implemented.
+- [x] `net/http`, Gin, and Echo integrations capture requests, panics, and trace/request IDs.
+- [x] `log/slog`, zap, and zerolog integrations capture structured logs without recursion.
+- [x] Local-only and connected transports are implemented.
+- [x] Secure local file writes enforce owner-only permissions, path validation, symlink protection, and unpredictable temp names.
+- [x] Duplicate suppression and loop protection match the universal contract.
+- [x] Capture policy is fetched, cached, polled, and enforced locally with ingestion as a backstop.
+- [x] Always-on probes, remote probes, heavy probes, and trigger tokens are implemented.
+- [x] Browser relay covers the shared relay contract: origin validation, CORS preflight, POST CORS headers, content type, body size, schema, credential stripping, local-only writes, durable spool, connected forwarding, and rate limiting.
+- [x] SDK failures never panic into host application code.
+- [x] Request and response bodies are off by default.
+- [x] Header capture is allowlist-based by default.
+- [x] Existing `X-Request-Id` is preserved.
+- [x] `X-DebugBundle-Trace-Id` links browser and backend events.
+- [x] Public docs include install, `net/http`, Gin, Echo, browser relay, local-only, connected, logging, probes, and privacy examples.
+- [x] CI passes all supported Go version lanes and race tests.
 
 ---
 

@@ -1,7 +1,7 @@
 # Swift iOS SDK Implementation Plan
 
 Version: v1
-Last updated: 2026-05-29
+Last updated: 2026-07-27
 
 ---
 
@@ -670,28 +670,28 @@ Quality gates:
 
 ## Release Readiness Checklist
 
-- [ ] Universal Swift API implemented.
-- [ ] Instance client and facade implemented.
-- [ ] SwiftUI setup and screen breadcrumbs implemented.
-- [ ] UIKit lifecycle and navigation breadcrumbs implemented.
-- [ ] URLSession trace injection and request-event capture implemented.
-- [ ] Offline queue survives app restart, respects bounds, file protection, and preserves original timestamps.
-- [ ] Connectivity-aware deferred delivery works within iOS execution limits.
-- [ ] Handled errors and async wrappers are covered by tests.
-- [ ] Fatal crash evidence is either safely implemented with next-launch delivery or explicitly out of V1 release claims.
-- [ ] SwiftLog and manual log capture are in-process and non-recursive.
-- [ ] Duplicate suppression and loop protection match the universal contract.
-- [ ] Capture policy is fetched, cached, and enforced locally with ingestion as backstop.
-- [ ] Always-on probes, heavy probes, remote directives, and trigger tokens implemented.
-- [ ] SDK failures never throw into host app code.
-- [ ] Main-actor work is bounded and tested.
-- [ ] Request/response bodies, view text, screenshots, location, clipboard, IDFV, advertising IDs, and keychain values are off by default.
-- [ ] Trace headers are only added by explicit instrumentation and target allowlists.
-- [ ] Swift package products include README, license, docs, and correct metadata.
-- [ ] Release docs cover config precedence, support labels, install modes, service naming, safe startup/status semantics, and first-event verification.
-- [ ] Public docs include SwiftUI, UIKit, URLSession, Alamofire if shipped, SwiftLog, offline queue, crash caveats, probes, and privacy examples.
+- [x] Universal Swift API implemented.
+- [x] Instance client and facade implemented.
+- [x] SwiftUI setup and screen breadcrumbs implemented.
+- [x] UIKit lifecycle and navigation breadcrumbs implemented.
+- [x] URLSession trace injection and request-event capture implemented.
+- [x] Offline queue survives app restart, respects bounds, file protection, and preserves original timestamps.
+- [x] Connectivity-aware deferred delivery works within iOS execution limits.
+- [x] Handled errors and async wrappers are covered by tests.
+- [x] Fatal crash evidence is either safely implemented with next-launch delivery or explicitly out of V1 release claims.
+- [x] SwiftLog and manual log capture are in-process and non-recursive.
+- [x] Duplicate suppression and loop protection match the universal contract.
+- [x] Capture policy is fetched, cached, and enforced locally with ingestion as backstop.
+- [x] Always-on probes, heavy probes, remote directives, and trigger tokens implemented.
+- [x] SDK failures never throw into host app code.
+- [x] Main-actor work is bounded and tested.
+- [x] Request/response bodies, view text, screenshots, location, clipboard, IDFV, advertising IDs, and keychain values are off by default.
+- [x] Trace headers are only added by explicit instrumentation and target allowlists.
+- [x] Swift package products include README, license, docs, and correct metadata.
+- [x] Release docs cover config precedence, support labels, install modes, service naming, safe startup/status semantics, and first-event verification.
+- [x] Public docs include SwiftUI, UIKit, URLSession, Alamofire if shipped, SwiftLog, offline queue, crash caveats, probes, and privacy examples.
 - [ ] CI passes all supported Swift, Xcode, iOS, integration, and hardening lanes.
-- [ ] Clean-install smoke passes from staged package tag.
+- [x] Clean-install smoke passes from staged package tag.
 - [ ] Published-package smoke passes from public GitHub tag.
 
 ---

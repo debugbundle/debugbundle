@@ -186,11 +186,12 @@ Every published package must have a README.md containing:
 - Full type hints (PEP 484) on all public APIs.
 - Ship `py.typed` marker file (PEP 561).
 - Validated with `mypy --strict` or `pyright`.
+- The supported runtime floor is Python 3.10. Python 3.9 and older are outside the current 1.x support line; widening support requires its own compatibility release and matrix evidence.
 
 ### PHP
 - PHPDoc blocks on all public methods.
 - Compatible with PHPStan level 8 or Psalm level 1.
-- Use PHP 8.1+ typed properties and return types.
+- Use PHP 8.2+ typed properties and return types. PHP 8.1 and older are outside the current PHP SDK and WordPress 1.x support lines; lowering the floor requires a separately verified compatibility decision.
 
 ---
 

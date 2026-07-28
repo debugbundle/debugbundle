@@ -1,6 +1,14 @@
 import { BundleV1Schema, type BundleV1, type EventEnvelope } from "../../shared-types/src/index.js";
 import { redact, type JsonValue } from "../../redaction/src/index.js";
 import type { BundleBuildContext, BuildBundleJob } from "../../storage/src/index.js";
+import {
+  buildFrontendContext,
+  deriveFirstApplicationFrame,
+  getPrimaryBrowserExceptionEvent,
+  isFrontendExceptionEnvelope,
+  isOpaqueBrowserError,
+  type BrowserExceptionEventContext
+} from "./frontend-context.js";
 
 export interface BundleProbeDataItem {
   label: string;
@@ -36,18 +44,16 @@ export interface BuildBundleInput {
 }
 
 type BackendExceptionEnvelope = Extract<EventEnvelope, { event_type: "backend_exception" }>;
-type FrontendExceptionEnvelope = Extract<EventEnvelope, { event_type: "frontend_exception" }>;
 type RequestEventEnvelope = Extract<EventEnvelope, { event_type: "request_event" }>;
 type LogEventEnvelope = Extract<EventEnvelope, { event_type: "log_event" }>;
-type FrontendBreadcrumbEnvelope = Extract<EventEnvelope, { event_type: "frontend_breadcrumb" }>;
-type FrontendExceptionBreadcrumb = NonNullable<FrontendExceptionEnvelope["payload"]["breadcrumbs"]>[number];
 type DeployMetadataEnvelope = Extract<EventEnvelope, { event_type: "deploy_metadata" }>;
 type BundleErrorContext = Exclude<BundleV1["context"]["error"], null | undefined>;
 type BundleRequestContext = Exclude<BundleV1["context"]["request"], null | undefined>;
 type BundleResponseContext = Exclude<BundleV1["context"]["response"], null | undefined>;
 type BundleDependenciesContext = Exclude<BundleV1["context"]["dependencies"], null | undefined>;
-type BundleRuntimeMemory = NonNullable<Exclude<BundleV1["context"]["runtime"], null | undefined>["memory"]>;
-type BrowserExceptionEventContext = NonNullable<FrontendExceptionEnvelope["payload"]["browser_event"]>;
+type BundleRuntimeMemory = NonNullable<
+  Exclude<BundleV1["context"]["runtime"], null | undefined>["memory"]
+>;
 type BackendRuntimePayload = BackendExceptionEnvelope["payload"]["runtime"] & {
   platform?: string | null;
   arch?: string | null;
@@ -99,10 +105,6 @@ function isBackendExceptionEnvelope(envelope: EventEnvelope): envelope is Backen
   return envelope.event_type === "backend_exception";
 }
 
-function isFrontendExceptionEnvelope(envelope: EventEnvelope): envelope is FrontendExceptionEnvelope {
-  return envelope.event_type === "frontend_exception";
-}
-
 function isRequestEventEnvelope(envelope: EventEnvelope): envelope is RequestEventEnvelope {
   return envelope.event_type === "request_event";
 }
@@ -111,15 +113,14 @@ function isLogEventEnvelope(envelope: EventEnvelope): envelope is LogEventEnvelo
   return envelope.event_type === "log_event";
 }
 
-function isFrontendBreadcrumbEnvelope(envelope: EventEnvelope): envelope is FrontendBreadcrumbEnvelope {
-  return envelope.event_type === "frontend_breadcrumb";
-}
-
 function isDeployMetadataEnvelope(envelope: EventEnvelope): envelope is DeployMetadataEnvelope {
   return envelope.event_type === "deploy_metadata";
 }
 
-function selectPrimarySignalEnvelope(envelopes: EventEnvelope[], sourceEventId: string): EventEnvelope | null {
+function selectPrimarySignalEnvelope(
+  envelopes: EventEnvelope[],
+  sourceEventId: string
+): EventEnvelope | null {
   const sourceEnvelope = envelopes.find((envelope) => envelope.event_id === sourceEventId);
   if (sourceEnvelope !== undefined) {
     return sourceEnvelope;
@@ -145,7 +146,10 @@ function deriveBundleSdk(envelopes: EventEnvelope[], sourceEventId: string): Bun
     };
   }
 
-  const latestCapturedEnvelope = selectLatestEnvelope(envelopes, (envelope) => envelope.event_type !== "probe_event");
+  const latestCapturedEnvelope = selectLatestEnvelope(
+    envelopes,
+    (envelope) => envelope.event_type !== "probe_event"
+  );
   if (latestCapturedEnvelope !== null) {
     return {
       name: latestCapturedEnvelope.sdk_name,
@@ -159,7 +163,9 @@ function deriveBundleSdk(envelopes: EventEnvelope[], sourceEventId: string): Bun
   };
 }
 
-function mapSignalType(eventType: EventEnvelope["event_type"] | null): BundleV1["signal"]["signal_type"] {
+function mapSignalType(
+  eventType: EventEnvelope["event_type"] | null
+): BundleV1["signal"]["signal_type"] {
   if (eventType === "request_event") {
     return "request_failure";
   }
@@ -171,7 +177,9 @@ function mapSignalType(eventType: EventEnvelope["event_type"] | null): BundleV1[
   return "exception";
 }
 
-function inferSignalTypeFromSourceEventTypes(sourceEventTypes: string[]): BundleV1["signal"]["signal_type"] {
+function inferSignalTypeFromSourceEventTypes(
+  sourceEventTypes: string[]
+): BundleV1["signal"]["signal_type"] {
   if (sourceEventTypes.includes("frontend_exception")) {
     return "frontend_exception";
   }
@@ -220,7 +228,10 @@ function isDynamicRouteSegment(segment: string): boolean {
   }
 
   const strippedMalformedPercent = decodedSegment.replace(/%+/g, "");
-  return strippedMalformedPercent !== decodedSegment && DYNAMIC_SEGMENT_PATTERN.test(strippedMalformedPercent);
+  return (
+    strippedMalformedPercent !== decodedSegment &&
+    DYNAMIC_SEGMENT_PATTERN.test(strippedMalformedPercent)
+  );
 }
 
 function normalizeRouteTemplate(path: string | null): string | null {
@@ -239,99 +250,6 @@ function normalizeRouteTemplate(path: string | null): string | null {
     .map((segment) => (isDynamicRouteSegment(segment) ? "{param}" : segment));
 
   return normalizedSegments.length === 0 ? "/" : `/${normalizedSegments.join("/")}`;
-}
-
-function isBrowserSdkFallbackFrame(frame: string): boolean {
-  const normalizedFrame = frame.toLowerCase();
-  return (
-    normalizedFrame.includes("onerror") &&
-    (
-      normalizedFrame.includes("debugbundle-browser-sdk") ||
-      normalizedFrame.includes("debugbundle-browser.js") ||
-      normalizedFrame.includes("wp-content/plugins/debugbundle/")
-    )
-  );
-}
-
-function deriveFirstApplicationFrame(errorContext: BundleErrorContext | null): BundleV1["summary"]["first_application_frame"] {
-  const firstFrame = errorContext?.top_frames[0];
-  if (firstFrame === undefined) {
-    return null;
-  }
-
-  if (isBrowserSdkFallbackFrame(firstFrame)) {
-    return null;
-  }
-
-  const match = /at\s+(.*?)\s+\((.*?):(\d+):(\d+)\)$/.exec(firstFrame) ?? /at\s+(.*?):(\d+):(\d+)$/.exec(firstFrame);
-  if (match === null) {
-    return {
-      file: null,
-      line: null,
-      function: null
-    };
-  }
-
-  if (match.length === 5) {
-    return {
-      function: match[1] ?? null,
-      file: match[2] ?? null,
-      line: Number(match[3])
-    };
-  }
-
-  return {
-    function: null,
-    file: match[1] ?? null,
-    line: Number(match[2])
-  };
-}
-
-function getPrimaryBrowserExceptionEvent(
-  envelopes: EventEnvelope[],
-  primarySignalEnvelope: EventEnvelope | null
-): BrowserExceptionEventContext | null {
-  if (primarySignalEnvelope !== null && isFrontendExceptionEnvelope(primarySignalEnvelope)) {
-    return primarySignalEnvelope.payload.browser_event ?? null;
-  }
-
-  const envelope = selectLatestEnvelopeByType(envelopes, isFrontendExceptionEnvelope);
-  return envelope?.payload.browser_event ?? null;
-}
-
-function isOpaqueBrowserError(
-  errorContext: BundleErrorContext | null,
-  browserEvent: BrowserExceptionEventContext | null
-): boolean {
-  if (browserEvent?.opaque === true) {
-    return true;
-  }
-
-  const firstFrame = errorContext?.top_frames[0];
-  return errorContext?.message === "Window error" && firstFrame !== undefined && isBrowserSdkFallbackFrame(firstFrame);
-}
-
-function stableJson(value: unknown): string {
-  if (value === null || typeof value !== "object") {
-    return JSON.stringify(value);
-  }
-
-  if (Array.isArray(value)) {
-    return `[${value.map((entry) => stableJson(entry)).join(",")}]`;
-  }
-
-  const record = value as Record<string, unknown>;
-  const keys = Object.keys(record).sort();
-  return `{${keys.map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`).join(",")}}`;
-}
-
-function buildFrontendBreadcrumbKey(input: {
-  breadcrumb_type: FrontendExceptionBreadcrumb["breadcrumb_type"];
-  route: string | null | undefined;
-  data: Record<string, unknown>;
-  ts: string;
-}): string {
-  return `${input.breadcrumb_type}:${input.ts}:${input.route ?? ""}:${stableJson(input.data)}`;
 }
 
 function buildErrorContext(
@@ -442,11 +360,18 @@ function titleCaseWord(value: string): string {
 }
 
 function formatDependencyName(name: string): string {
-  return name.split("_").filter((part) => part.length > 0).map(titleCaseWord).join(" ");
+  return name
+    .split("_")
+    .filter((part) => part.length > 0)
+    .map(titleCaseWord)
+    .join(" ");
 }
 
 function inferDependencyName(text: string): string | null {
-  const match = /\b([a-z][a-z0-9]*_api)_(?:invalid_response|error|failure|failed|unavailable|timeout)\b/.exec(text);
+  const match =
+    /\b([a-z][a-z0-9]*_api)_(?:invalid_response|error|failure|failed|unavailable|timeout)\b/.exec(
+      text
+    );
   return match?.[1] ?? null;
 }
 
@@ -467,7 +392,10 @@ function buildDependenciesContext(
 
   const displayName = formatDependencyName(dependencyName);
   const route = requestContext?.route_template ?? requestContext?.path ?? null;
-  const requestDescription = requestContext !== null ? `${requestContext.method} ${route ?? requestContext.path}` : "the failing request";
+  const requestDescription =
+    requestContext !== null
+      ? `${requestContext.method} ${route ?? requestContext.path}`
+      : "the failing request";
   const invalidResponse = text.includes("invalid_response");
 
   return {
@@ -504,7 +432,8 @@ function buildSummaryGuidance(input: {
   if (input.opaqueBrowserError) {
     if (input.browserEvent?.kind === "resource_error") {
       return {
-        likely_cause: "The browser reported a resource load error without a usable application stack.",
+        likely_cause:
+          "The browser reported a resource load error without a usable application stack.",
         confidence: 0.35,
         recommended_action:
           "Inspect the captured resource target, browser network failures, CSP rules, and cross-origin asset configuration."
@@ -512,7 +441,8 @@ function buildSummaryGuidance(input: {
     }
 
     return {
-      likely_cause: "The browser reported an opaque window error without a usable application stack.",
+      likely_cause:
+        "The browser reported an opaque window error without a usable application stack.",
       confidence: 0.35,
       recommended_action:
         "Inspect browser console output, resource loading, cross-origin script settings, and framework-level error boundaries for the affected route."
@@ -520,20 +450,34 @@ function buildSummaryGuidance(input: {
   }
 
   const route = input.requestContext?.route_template ?? input.requestContext?.path ?? null;
-  const requestDescription = input.requestContext !== null ? `${input.requestContext.method} ${route ?? input.requestContext.path}` : null;
+  const requestDescription =
+    input.requestContext !== null
+      ? `${input.requestContext.method} ${route ?? input.requestContext.path}`
+      : null;
   const firstDependency = input.dependenciesContext?.items[0] ?? null;
-  const dependencyDisplayName = firstDependency !== null ? formatDependencyName(firstDependency.name) : null;
+  const dependencyDisplayName =
+    firstDependency !== null ? formatDependencyName(firstDependency.name) : null;
   const firstFrame = input.firstApplicationFrame;
-  const frameDescription = firstFrame?.file !== null && firstFrame?.file !== undefined ? ` in ${firstFrame.file}` : "";
+  const frameDescription =
+    firstFrame?.file !== null && firstFrame?.file !== undefined ? ` in ${firstFrame.file}` : "";
   const invalidResponse = input.errorContext.message.toLowerCase().includes("invalid_response");
 
   let likelyCause: string | null = null;
   let recommendedAction: string | null = null;
 
-  if (firstDependency !== null && dependencyDisplayName !== null && requestDescription !== null && invalidResponse) {
+  if (
+    firstDependency !== null &&
+    dependencyDisplayName !== null &&
+    requestDescription !== null &&
+    invalidResponse
+  ) {
     likelyCause = `${dependencyDisplayName} returned a response that did not match the expected schema while handling ${requestDescription}.`;
     recommendedAction = `Inspect the ${dependencyDisplayName} response handling${frameDescription}, including schema validation and sanitized upstream response shape.`;
-  } else if (firstDependency !== null && dependencyDisplayName !== null && requestDescription !== null) {
+  } else if (
+    firstDependency !== null &&
+    dependencyDisplayName !== null &&
+    requestDescription !== null
+  ) {
     likelyCause = `${dependencyDisplayName} failed while handling ${requestDescription}.`;
     recommendedAction = `Inspect the ${dependencyDisplayName} call path${frameDescription} and compare the captured dependency notes with upstream status.`;
   } else if (requestDescription !== null) {
@@ -653,14 +597,12 @@ function buildResponseContext(envelopes: EventEnvelope[]): BundleResponseContext
 }
 
 function buildLogsContext(envelopes: EventEnvelope[]): BundleV1["context"]["logs"] {
-  const items = envelopes
-    .filter(isLogEventEnvelope)
-    .map((envelope) => ({
-      level: envelope.payload.level,
-      message: envelope.payload.message,
-      timestamp: toIsoTimestamp(envelope.occurred_at),
-      attributes: envelope.payload.attributes
-    }));
+  const items = envelopes.filter(isLogEventEnvelope).map((envelope) => ({
+    level: envelope.payload.level,
+    message: envelope.payload.message,
+    timestamp: toIsoTimestamp(envelope.occurred_at),
+    attributes: envelope.payload.attributes
+  }));
 
   if (items.length === 0) {
     return null;
@@ -669,174 +611,6 @@ function buildLogsContext(envelopes: EventEnvelope[]): BundleV1["context"]["logs
   return {
     version: 1,
     items
-  };
-}
-
-function buildFrontendContext(envelopes: EventEnvelope[]): BundleV1["context"]["frontend"] {
-  const breadcrumbs = new Map<
-    string,
-    {
-      breadcrumb_type: FrontendExceptionBreadcrumb["breadcrumb_type"];
-      route: string | null | undefined;
-      data: Record<string, unknown>;
-      ts: string;
-    }
-  >();
-  const routeChanges: Array<{ from: string; to: string; ts: string }> = [];
-  const clicks: Array<{ selector: string; label: string; ts: string }> = [];
-  const formSubmissions: Array<{ form: string; fields: Record<string, unknown>; ts: string }> = [];
-  const consoleLogs: unknown[] = [];
-  const networkRequests: Array<{
-    method: string;
-    url: string;
-    status: number;
-    ts: string;
-    duration_ms?: number;
-    caller_trace?: string[];
-    response_body?: unknown;
-    request_body?: unknown;
-    response_headers?: Record<string, string>;
-    response_content_length?: number;
-  }> = [];
-  const exceptions: unknown[] = [];
-
-  for (const envelope of envelopes) {
-    if (isFrontendBreadcrumbEnvelope(envelope)) {
-      const entry = {
-        breadcrumb_type: envelope.payload.breadcrumb_type,
-        route: envelope.payload.route,
-        data: envelope.payload.data,
-        ts: toIsoTimestamp(envelope.occurred_at)
-      } satisfies {
-        breadcrumb_type: FrontendExceptionBreadcrumb["breadcrumb_type"];
-        route: string | null | undefined;
-        data: Record<string, unknown>;
-        ts: string;
-      };
-      breadcrumbs.set(buildFrontendBreadcrumbKey(entry), entry);
-    }
-
-    if (isFrontendExceptionEnvelope(envelope)) {
-      for (const breadcrumb of envelope.payload.breadcrumbs ?? []) {
-        const entry = {
-          breadcrumb_type: breadcrumb.breadcrumb_type,
-          route: breadcrumb.route,
-          data: breadcrumb.data,
-          ts: toIsoTimestamp(breadcrumb.ts)
-        } satisfies {
-          breadcrumb_type: FrontendExceptionBreadcrumb["breadcrumb_type"];
-          route: string | null | undefined;
-          data: Record<string, unknown>;
-          ts: string;
-        };
-        breadcrumbs.set(buildFrontendBreadcrumbKey(entry), entry);
-      }
-
-      exceptions.push({
-        name: envelope.payload.name,
-        message: envelope.payload.message,
-        route: envelope.payload.route ?? null,
-        browser: envelope.payload.browser,
-        ts: toIsoTimestamp(envelope.occurred_at),
-        ...(envelope.payload.browser_event !== undefined ? { browser_event: envelope.payload.browser_event } : {})
-      });
-    }
-  }
-
-  const sortedBreadcrumbs = [...breadcrumbs.values()].sort((left, right) => {
-    const timestampComparison = left.ts.localeCompare(right.ts);
-    if (timestampComparison !== 0) {
-      return timestampComparison;
-    }
-
-    return buildFrontendBreadcrumbKey(left).localeCompare(buildFrontendBreadcrumbKey(right));
-  });
-
-  for (const breadcrumb of sortedBreadcrumbs) {
-    if (breadcrumb.breadcrumb_type === "route_change") {
-      const from = typeof breadcrumb.data["from"] === "string" ? breadcrumb.data["from"] : "unknown";
-      const to = typeof breadcrumb.data["to"] === "string" ? breadcrumb.data["to"] : breadcrumb.route ?? "unknown";
-      routeChanges.push({ from, to, ts: breadcrumb.ts });
-    }
-
-    if (breadcrumb.breadcrumb_type === "click") {
-      clicks.push({
-        selector: typeof breadcrumb.data["selector"] === "string" ? breadcrumb.data["selector"] : "unknown",
-        label: typeof breadcrumb.data["label"] === "string" ? breadcrumb.data["label"] : "unknown",
-        ts: breadcrumb.ts
-      });
-    }
-
-    if (breadcrumb.breadcrumb_type === "form_submit") {
-      formSubmissions.push({
-        form: typeof breadcrumb.data["form"] === "string" ? breadcrumb.data["form"] : "unknown",
-        fields:
-          breadcrumb.data["fields"] !== null && typeof breadcrumb.data["fields"] === "object"
-            ? (breadcrumb.data["fields"] as Record<string, unknown>)
-            : {},
-        ts: breadcrumb.ts
-      });
-    }
-
-    if (breadcrumb.breadcrumb_type === "console_log") {
-      consoleLogs.push({
-        ts: breadcrumb.ts,
-        ...breadcrumb.data
-      });
-    }
-
-    if (breadcrumb.breadcrumb_type === "network_request") {
-      const entry: (typeof networkRequests)[number] = {
-        method: typeof breadcrumb.data["method"] === "string" ? breadcrumb.data["method"] : "GET",
-        url: typeof breadcrumb.data["url"] === "string" ? breadcrumb.data["url"] : "unknown",
-        status:
-          typeof breadcrumb.data["status_code"] === "number" && Number.isInteger(breadcrumb.data["status_code"])
-            ? breadcrumb.data["status_code"]
-            : typeof breadcrumb.data["status"] === "number" && Number.isInteger(breadcrumb.data["status"])
-              ? breadcrumb.data["status"]
-              : 0,
-        ts: breadcrumb.ts
-      };
-
-      if (typeof breadcrumb.data["duration_ms"] === "number") entry.duration_ms = breadcrumb.data["duration_ms"];
-      if (Array.isArray(breadcrumb.data["caller_trace"])) entry.caller_trace = breadcrumb.data["caller_trace"] as string[];
-      if (breadcrumb.data["response_body"] !== undefined) entry.response_body = breadcrumb.data["response_body"];
-      if (breadcrumb.data["request_body"] !== undefined) entry.request_body = breadcrumb.data["request_body"];
-      if (typeof breadcrumb.data["response_headers"] === "object" && breadcrumb.data["response_headers"] !== null) {
-        entry.response_headers = breadcrumb.data["response_headers"] as Record<string, string>;
-      }
-      if (typeof breadcrumb.data["response_content_length"] === "number") {
-        entry.response_content_length = breadcrumb.data["response_content_length"];
-      }
-
-      networkRequests.push(entry);
-    }
-  }
-
-  const latestFrontendException = selectLatestEnvelopeByType(envelopes, isFrontendExceptionEnvelope);
-  const domContext = latestFrontendException?.payload.dom_context ?? null;
-
-  if (
-    routeChanges.length === 0 &&
-    clicks.length === 0 &&
-    formSubmissions.length === 0 &&
-    consoleLogs.length === 0 &&
-    networkRequests.length === 0 &&
-    exceptions.length === 0 &&
-    domContext === null
-  ) {
-    return null;
-  }
-
-  return {
-    version: 1,
-    route_changes: routeChanges,
-    clicks,
-    form_submissions: formSubmissions,
-    console_logs: consoleLogs,
-    network_requests: networkRequests,
-    exceptions,
-    dom_context: domContext
   };
 }
 
@@ -875,9 +649,7 @@ function buildDeployContext(
   };
 }
 
-function buildRuntimeContext(
-  envelopes: EventEnvelope[]
-): BundleV1["context"]["runtime"] {
+function buildRuntimeContext(envelopes: EventEnvelope[]): BundleV1["context"]["runtime"] {
   const backendException = selectLatestEnvelopeByType(envelopes, isBackendExceptionEnvelope);
   if (backendException === null) {
     return null;
@@ -940,7 +712,11 @@ function buildGitContext(
 
 function buildDeviceContext(envelopes: EventEnvelope[]): BundleV1["context"]["device"] {
   const envelope = selectLatestEnvelopeByType(envelopes, isFrontendExceptionEnvelope);
-  if (envelope === null || envelope.payload.device === undefined || envelope.payload.device === null) {
+  if (
+    envelope === null ||
+    envelope.payload.device === undefined ||
+    envelope.payload.device === null
+  ) {
     return null;
   }
 
@@ -948,8 +724,8 @@ function buildDeviceContext(envelopes: EventEnvelope[]): BundleV1["context"]["de
     version: 1,
     user_agent: envelope.payload.device.user_agent,
     browser: {
-      name: envelope.payload.browser.name,
-      version: envelope.payload.browser.version
+      name: envelope.payload.browser?.name ?? null,
+      version: envelope.payload.browser?.version ?? null
     },
     os: envelope.payload.device.os,
     device_type: envelope.payload.device.device_type,
@@ -972,17 +748,28 @@ export function buildBundle(input: BuildBundleInput): BundleV1 {
     return left.event_id.localeCompare(right.event_id);
   });
   const sourceEventTypes = [...input.incident.source_event_types].sort();
-  const primarySignalEnvelope = selectPrimarySignalEnvelope(sourceEnvelopes, input.bundleMetadata.source_event_id);
+  const primarySignalEnvelope = selectPrimarySignalEnvelope(
+    sourceEnvelopes,
+    input.bundleMetadata.source_event_id
+  );
   const errorContext = buildErrorContext(sourceEnvelopes, input.incident, primarySignalEnvelope);
   const requestContext = buildRequestContext(sourceEnvelopes);
   const responseContext = buildResponseContext(sourceEnvelopes);
   const logsContext = buildLogsContext(sourceEnvelopes);
   const frontendContext = buildFrontendContext(sourceEnvelopes);
-  const deployContext = buildDeployContext(sourceEnvelopes, input.job.trigger, input.configuredDeploy);
+  const deployContext = buildDeployContext(
+    sourceEnvelopes,
+    input.job.trigger,
+    input.configuredDeploy
+  );
   const runtimeContext = buildRuntimeContext(sourceEnvelopes);
   const gitContext = buildGitContext(sourceEnvelopes, input.configuredDeploy);
   const deviceContext = buildDeviceContext(sourceEnvelopes);
-  const dependenciesContext = buildDependenciesContext(input.incident, errorContext, requestContext);
+  const dependenciesContext = buildDependenciesContext(
+    input.incident,
+    errorContext,
+    requestContext
+  );
   const browserEvent = getPrimaryBrowserExceptionEvent(sourceEnvelopes, primarySignalEnvelope);
   const opaqueBrowserError = isOpaqueBrowserError(errorContext, browserEvent);
   const primarySignalType =
@@ -999,14 +786,18 @@ export function buildBundle(input: BuildBundleInput): BundleV1 {
   const bundleSdk = deriveBundleSdk(sourceEnvelopes, input.bundleMetadata.source_event_id);
   const serviceRuntime =
     input.incident.service_runtime ??
-    selectLatestEnvelope(sourceEnvelopes, (envelope) => envelope.event_type !== "probe_event")?.service.runtime ??
+    selectLatestEnvelope(sourceEnvelopes, (envelope) => envelope.event_type !== "probe_event")
+      ?.service.runtime ??
     null;
   const serviceFramework =
     input.incident.service_framework ??
-    selectLatestEnvelope(sourceEnvelopes, (envelope) => envelope.event_type !== "probe_event")?.service.framework ??
+    selectLatestEnvelope(sourceEnvelopes, (envelope) => envelope.event_type !== "probe_event")
+      ?.service.framework ??
     null;
   const customerVisible = frontendContext !== null;
-  const firstApplicationFrame = opaqueBrowserError ? null : deriveFirstApplicationFrame(errorContext);
+  const firstApplicationFrame = opaqueBrowserError
+    ? null
+    : deriveFirstApplicationFrame(errorContext);
   const summaryGuidance = buildSummaryGuidance({
     errorContext,
     requestContext,

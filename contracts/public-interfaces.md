@@ -309,6 +309,8 @@ Anonymized aggregate account-usage metrics are preserved after deletion for life
 
 The endpoint accepts the existing debug event family plus opt-in `analytics_event` envelopes when project analytics is enabled. Mixed debug/analytics batches are split after validation: debug events follow existing capture-policy/event-class/incident paths, while analytics events follow analytics enablement, controlled custom-dimension validation, analytics-specific event/session allowance checks, short-lived persistence, and analytics rollup queue paths without creating incidents directly. Analytics allowance checks use durable internal analytics counters for event/session ingestion, retained journey samples, and on-demand AnalyticsBundle generation, and do not add analytics keys to the public billing summary `allowances` object.
 
+The canonical direct-ingestion wrapper is `{ "events": [...] }`. After successful project-token authentication only, ingestion also recognizes the exact `{ "batch": [...] }` wrapper and legacy mobile event shapes emitted by installed Android/Swift 1.x clients. That bounded compatibility branch is SDK-identity-gated, deterministically fills missing legacy IDs, normalizes only known shipped mobile fields, and then applies the same closed canonical schema. It must not make arbitrary malformed clients permissive. Structured compatibility diagnostics and counters must remain bounded and distinguish wrapper normalization, event normalization, and final rejection.
+
 **Request:**
 ```json
 {
@@ -403,6 +405,8 @@ When the shared `monthly_raw_ingested_events` allowance is exhausted, new hosted
 Analytics events use separate analytics allowances. Currently implemented analytics-specific rejection reasons include `analytics_disabled`, `analytics_invalid_event`, `analytics_invalid_dimension`, and `analytics_quota_exceeded`; planned consent-specific reasons include `analytics_consent_required`. Analytics-only quota exhaustion returns `429` with `Retry-After`; mixed batches can return `202` with only analytics events rejected. These rejections must not reject otherwise-valid debug events in the same batch unless a shared request-level limit is exceeded.
 
 Rate-limited responses also include `Retry-After: <seconds>` so SDKs can back off without guessing.
+
+Connected SDKs must reconcile the indexed acknowledgement as defined in `contracts/sdk-interface.md`: accepted events are removed exactly once; only events rejected for `rate_limited`, `monthly_quota_exceeded`, or `analytics_quota_exceeded` are retained for retry; other indexed rejections are terminal; and an all-rejected response does not advance delivery-success state. A malformed or inconsistent acknowledgement from the production HTTP endpoint is a retryable protocol failure for the whole submitted batch.
 
 `probe_directives` is only included for paid-tier projects where `remote_probes` capability is enabled and active remote probe activations exist. Omitted for free-tier projects and when no remote probes are active. This enables browser SDKs to receive remote probe state without additional polling requests. Always-on probes are purely SDK-local and require no server-side directives.
 

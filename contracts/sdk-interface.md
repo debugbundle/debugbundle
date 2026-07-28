@@ -1,9 +1,9 @@
 # SDK Interface Contract — DebugBundle
 
 Version: v1
-Last updated: 2026-05-30
+Last updated: 2026-07-27
 
-This contract defines the standard interface that ALL DebugBundle SDKs must implement, regardless of language. It ensures behavioral consistency across Node.js, browser, Python, PHP, Go, Ruby, and all future language SDKs.
+This contract defines the standard interface that ALL DebugBundle SDKs must implement, regardless of language. It ensures behavioral consistency across Node.js, browser, Python, PHP/WordPress, Java, Go, Ruby, .NET, Android, Swift, React Native, and future language SDKs.
 
 ---
 
@@ -43,13 +43,17 @@ Every SDK must expose an init function that accepts a configuration object and r
 
 ### 1.1 Local beforeSend hook
 
-SDKs may expose a synchronous `beforeSend` hook as an optional init config field for app-owned local policy such as final redaction, tenant-specific suppression, or dropping events that must never leave the runtime. The hook receives a fully built DebugBundle event after SDK redaction and before buffering, local capture-rule evaluation, sampling, duplicate suppression, and transport.
+SDKs must expose a language-idiomatic synchronous `beforeSend` hook as an optional init config field for app-owned local policy such as final redaction, tenant-specific suppression, or dropping events that must never leave the runtime. The hook receives an isolated copy of a fully built canonical DebugBundle event after SDK redaction and before local capture-policy/rule evaluation, sampling, duplicate suppression, persistence, buffering, and transport.
 
 Rules:
 - Return the event to keep shipping it.
 - Return `null` to drop the event locally.
-- If the hook throws or returns an invalid event, the SDK must keep the original event and must not throw into host code.
+- A valid replacement may change any event field allowed by the canonical event schema; implementations must not invent additional identity immutability restrictions.
+- The SDK must validate the complete returned envelope against the canonical closed event schema.
+- If the hook throws, panics, or returns an invalid event, the SDK must keep the SDK-owned original event, emit only a bounded internal diagnostic where supported, and must not throw into host code.
+- Mutating the hook input without returning a valid replacement must not mutate the SDK-owned original.
 - Hook execution must not block request/response handling beyond normal synchronous JavaScript/runtime execution.
+- Fatal signal handlers, hard-crash handlers, and shutdown paths may skip application hook execution when invoking user code is unsafe. Each affected SDK must document the restriction; replayed crash events use the normal hook pipeline when safe.
 - Project capture rules remain the preferred operational noise-control surface because they are centralized, auditable, and enforced again by ingestion and worker backstops.
 
 ### 1.2 Node.js local-first transport selection
@@ -88,6 +92,30 @@ These behaviors are mandatory across all SDKs. A new language SDK is non-complia
 - When ingestion returns `429 Too Many Requests`, SDKs must preserve the buffered events and back off before retrying.
 - SDKs must respect `Retry-After` when present; otherwise they must apply a safe default backoff.
 - Backoff and retry behavior must not block the host request/response path or crash the host application/page.
+
+### Per-event ingestion acknowledgement
+
+Connected transports must reconcile the canonical ingestion acknowledgement body rather than treating every `2xx` response as whole-batch success:
+
+```json
+{
+  "accepted": 1,
+  "rejected": 1,
+  "errors": [{ "index": 1, "reason": "rate_limited" }]
+}
+```
+
+Rules:
+
+- `accepted` and `rejected` are non-negative integers whose sum equals the submitted batch length.
+- `errors` contains exactly one unique, in-range index for every rejected event and a non-empty reason.
+- Accepted events are removed exactly once and never requeued.
+- `rate_limited`, `monthly_quota_exceeded`, and `analytics_quota_exceeded` are retryable indexed reasons. Only those indexed events are retained and retried.
+- Other indexed rejection reasons are terminal. Those events are removed with a bounded internal diagnostic.
+- An all-rejected acknowledgement must not advance `lastEventAt` or report a successful delivery.
+- Missing acknowledgement fields are allowed only for an explicitly compatible custom/legacy transport that cannot expose a response body. The SDK may use its documented HTTP-success fallback for that transport.
+- A production HTTP transport that requires acknowledgement must treat a missing, malformed, duplicate-index, out-of-range, or internally inconsistent acknowledgement as a protocol failure and retain the full submitted batch with safe backoff.
+- The response may also contain `probe_directives`; processing those directives does not bypass acknowledgement validation.
 
 **Browser-specific config fields (sdk-browser only):**
 | Field | Type | Default | Description |
@@ -907,7 +935,7 @@ When active probes exist for a paid-tier project, the `POST /v1/events` response
 ### Probe Method Behavior
 
 1. SDK maintains per-label ring buffers for probe data (bounded by `maxProbeLabels` × `maxProbeEntriesPerLabel`).
-2. On `probe(label, data)` call: serialize data, apply redaction, store in ring buffer for that label. If using `{ heavy: true }` option and no remote activation matches, return immediately (zero cost).
+2. On `probe(label, data)` call: serialize data, apply redaction, and store an object in the ring buffer for that label. Object/map values remain objects; every scalar, `null`, or list/array value is represented as `{ "value": <redacted value> }`. If using `{ heavy: true }` option and no remote activation matches, return immediately (zero cost).
 3. If `probeFlushOnError` is `true` (default): when an error event occurs (`backend_exception`, `frontend_exception`), all ring buffers are flushed alongside the error batch. Flushed probe entries are embedded on the exception payload as `payload.probe_data = { version: 1, items: [...] }`, where each item contains `label`, `data`, `timestamp`, and `activation_id: null`.
 4. If a remote activation matches the label (paid tiers only): data is **also** emitted as `probe_event` through standard batching pipeline immediately (independent shipping). `activation_id` is set to the activation ID.
 5. `probe_event` uses the same event envelope as all other events. It bypasses duplicate suppression (probes are inherently unique diagnostic captures).
@@ -1102,9 +1130,9 @@ The browser SDK uses the relay wire shape (`{"batch": [...]}`) in relay mode and
 
 | Status | Body | Meaning |
 |--------|------|---------|
-| 202 | `{ "accepted": N, "rejected": 0, "errors": [] }` | Events processed |
+| 202 | `{ "accepted": N, "rejected": M, "errors": [{ "index": 0, "reason": "..." }] }` | Batch accounted; valid events may be accepted while other events are rejected |
 | 204 | — | Allowed CORS preflight for split frontend/backend relay |
-| 400 | `{ "accepted": N, "rejected": M, "errors": ["..."] }` | Validation failure; valid events in the same batch may already be accepted |
+| 400 | `{ "accepted": 0, "rejected": 0, "errors": [{ "index": -1, "reason": "malformed_payload" }] }` | Request wrapper is malformed; no events were processed |
 | 413 | — | Request body exceeds 256 KB limit |
 | 403 | — | Origin validation failed |
 | 429 | — | Rate limited |

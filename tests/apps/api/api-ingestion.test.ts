@@ -1,154 +1,19 @@
-import { describe, expect, it, vi, afterEach } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createApiServer } from "../../../apps/api/src/server.ts";
 import { hashToken } from "../../../packages/auth/src/index.js";
 import { createEventEnvelope } from "../../../packages/shared-types/src/index.js";
-import { mockedObject, type MockedMethods } from "../../helpers/vitest.ts";
-
-type ApiServerDependencies = Parameters<typeof createApiServer>[0];
-type WebhookDeliveryDependency = MockedMethods<ApiServerDependencies["webhookDelivery"]>;
-type MemberAuthDependency = MockedMethods<ApiServerDependencies["memberAuth"]>;
-type IncidentRetrievalDependency = MockedMethods<ApiServerDependencies["incidentRetrieval"]>;
-type ObjectStoreReaderDependency = MockedMethods<ApiServerDependencies["objectStoreReader"]>;
-type TokenManagementDependency = MockedMethods<ApiServerDependencies["tokenManagement"]>;
-type ProbeManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["probeManagement"]>>;
-type IngestionRateLimiterDependency = MockedMethods<NonNullable<ApiServerDependencies["ingestionRateLimiter"]>>;
-type BillingManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["billingManagement"]>>;
-type ProjectManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["projectManagement"]>>;
-type AccountAnalyticsDependency = MockedMethods<NonNullable<ApiServerDependencies["accountAnalytics"]>>;
-type IngestionRejectionDiagnosticsDependency = MockedMethods<
-  NonNullable<ApiServerDependencies["ingestionRejectionDiagnostics"]>
->;
-
-function createWebhookDeliveryDependency(): WebhookDeliveryDependency {
-  return mockedObject<ApiServerDependencies["webhookDelivery"]>({
-    listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue({ deliveries: [] })
-  });
-}
-
-function createMemberAuthDependency(): MemberAuthDependency {
-  return mockedObject<ApiServerDependencies["memberAuth"]>({
-    resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" })
-  });
-}
-
-function createIncidentRetrievalDependency(): IncidentRetrievalDependency {
-  return mockedObject<ApiServerDependencies["incidentRetrieval"]>({
-    listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
-    getIncidentForOrganization: vi.fn().mockResolvedValue(null),
-    listServicesForOrganization: vi.fn().mockResolvedValue([]),
-    listIncidentLogsForOrganization: vi.fn().mockResolvedValue([])
-  });
-}
-
-function createObjectStoreReaderDependency(): ObjectStoreReaderDependency {
-  return mockedObject<ApiServerDependencies["objectStoreReader"]>({
-    getObject: vi.fn().mockRejectedValue(new Error("s3_object_not_found"))
-  });
-}
-
-function createTokenManagementDependency(): TokenManagementDependency {
-  return mockedObject<ApiServerDependencies["tokenManagement"]>({
-    listProjectTokensForOrganization: vi.fn().mockResolvedValue([]),
-    createProjectTokenForOrganization: vi.fn().mockResolvedValue(null),
-    revokeProjectTokenForOrganization: vi.fn().mockResolvedValue(null),
-    listMemberTokensForOrganization: vi.fn().mockResolvedValue([]),
-    createMemberTokenForOrganization: vi.fn().mockResolvedValue(null),
-    revokeMemberTokenForOrganization: vi.fn().mockResolvedValue(null)
-  });
-}
-
-function createProjectManagementDependency(): ProjectManagementDependency {
-  return mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>({
-    resolveProjectAccessForUser: vi.fn().mockResolvedValue({
-      project_id: "00000000-0000-4000-8000-000000000001",
-      organization_id: "org_123",
-      owner_user_id: "usr_owner",
-      owner_email: "owner@example.com",
-      relationship: "owned",
-      effective_role: "owner",
-      organization_plan: "team"
-    }),
-    listProjectsForUser: vi.fn().mockResolvedValue([]),
-    createProjectForUser: vi.fn().mockResolvedValue(null),
-    updateProjectForUser: vi.fn().mockResolvedValue(null),
-    deleteProjectForUser: vi.fn().mockResolvedValue(null)
-  });
-}
-
-function createProbeManagementDependency(overrides: {
-  listActiveProbesForProject?: ProbeManagementDependency["listActiveProbesForProject"];
-} = {}): ProbeManagementDependency {
-  return mockedObject<NonNullable<ApiServerDependencies["probeManagement"]>>({
-    listActiveProbesForProject: overrides.listActiveProbesForProject ?? vi.fn().mockResolvedValue([]),
-    listActiveProbesForProjectInOrganization: vi.fn().mockResolvedValue({ organization_plan: "solo", activations: [] }),
-    createProbeActivationForProjectInOrganization: vi.fn().mockResolvedValue(null),
-    deactivateProbeActivationForProjectInOrganization: vi.fn().mockResolvedValue(null)
-  });
-}
-
-function createIngestionRateLimiterDependency(overrides: {
-  claimEvents?: IngestionRateLimiterDependency["claimEvents"];
-} = {}): IngestionRateLimiterDependency {
-  return mockedObject<NonNullable<ApiServerDependencies["ingestionRateLimiter"]>>({
-    claimEvents:
-      overrides.claimEvents ??
-      vi.fn().mockResolvedValue({
-        allowed: true,
-        limit: 1_000,
-        remaining: 999,
-        retry_after_ms: 0
-      })
-  });
-}
-
-function createBillingManagementDependency(overrides: {
-  getBillingSummaryForOrganization?: BillingManagementDependency["getBillingSummaryForOrganization"];
-  incrementOrgUsageCounter?: BillingManagementDependency["incrementOrgUsageCounter"];
-  incrementProjectUsageCounter?: BillingManagementDependency["incrementProjectUsageCounter"];
-} = {}): BillingManagementDependency {
-  return mockedObject<NonNullable<ApiServerDependencies["billingManagement"]>>({
-    getBillingSummaryForOrganization:
-      overrides.getBillingSummaryForOrganization ??
-      vi.fn().mockResolvedValue({
-        usage_window: {
-          starts_at: "2026-03-01T00:00:00.000Z",
-          ends_at: "2026-04-01T00:00:00.000Z"
-        },
-        allowances: {
-          monthly_bundle_requests: { used: 0, limit: 25 },
-          monthly_raw_ingested_events: {
-            used: 0,
-            limit: 750
-          },
-          retained_bundle_cap: { used: 0, limit: 5 },
-          monthly_remote_activations: { used: 0, limit: 0 },
-          monthly_alert_deliveries: { used: 0, limit: 25 },
-          monthly_webhook_deliveries: { used: 0, limit: 100 }
-        }
-      }),
-    incrementOrgUsageCounter: overrides.incrementOrgUsageCounter ?? vi.fn().mockResolvedValue(undefined),
-    incrementProjectUsageCounter: overrides.incrementProjectUsageCounter ?? vi.fn().mockResolvedValue(undefined),
-    createCheckoutLink: vi.fn().mockResolvedValue(null),
-    createPortalLink: vi.fn().mockResolvedValue(null)
-  });
-}
-
-function createAccountAnalyticsDependency(overrides: {
-  recordMetricDeltas?: AccountAnalyticsDependency["recordMetricDeltas"];
-} = {}): AccountAnalyticsDependency {
-  return mockedObject<NonNullable<ApiServerDependencies["accountAnalytics"]>>({
-    recordMetricDeltas: overrides.recordMetricDeltas ?? vi.fn().mockResolvedValue("recorded")
-  });
-}
-
-function createIngestionRejectionDiagnosticsDependency(overrides: {
-  recordRejectedDiagnostics?: IngestionRejectionDiagnosticsDependency["recordRejectedDiagnostics"];
-} = {}): IngestionRejectionDiagnosticsDependency {
-  return mockedObject<NonNullable<ApiServerDependencies["ingestionRejectionDiagnostics"]>>({
-    recordRejectedDiagnostics: overrides.recordRejectedDiagnostics ?? vi.fn().mockResolvedValue(undefined)
-  });
-}
+import {
+  createAccountAnalyticsDependency,
+  createBillingManagementDependency,
+  createIncidentRetrievalDependency,
+  createIngestionRateLimiterDependency,
+  createMemberAuthDependency,
+  createObjectStoreReaderDependency,
+  createProbeManagementDependency,
+  createTokenManagementDependency,
+  createWebhookDeliveryDependency
+} from "../../helpers/api-ingestion-dependencies.ts";
 
 describe("api ingestion route", () => {
   it("should reject oversized ingestion payloads with 413", async (): Promise<void> => {
@@ -230,9 +95,19 @@ describe("api ingestion route", () => {
   });
 
   it("should reject captured incident-signal events when the monthly ingestion allowance is exhausted", async (): Promise<void> => {
-    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
-    const resolveProjectByTokenHash = vi.fn().mockResolvedValue({ project_id: "proj_123", organization_id: "org_123", organization_plan: "free" });
-    const queueProjectOperationalEmailDelivery = vi.fn().mockResolvedValue({ delivery_id: "op_123", created: true });
+    const persistAndEnqueue = vi
+      .fn()
+      .mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
+    const resolveProjectByTokenHash = vi
+      .fn()
+      .mockResolvedValue({
+        project_id: "proj_123",
+        organization_id: "org_123",
+        organization_plan: "free"
+      });
+    const queueProjectOperationalEmailDelivery = vi
+      .fn()
+      .mockResolvedValue({ delivery_id: "op_123", created: true });
     const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
     const getBillingSummaryForOrganization = vi.fn().mockResolvedValue({
       usage_window: {
@@ -344,8 +219,12 @@ describe("api ingestion route", () => {
   });
 
   it("queues an 80 percent raw-ingestion allowance warning after accepting counted events", async (): Promise<void> => {
-    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
-    const queueProjectOperationalEmailDelivery = vi.fn().mockResolvedValue({ delivery_id: "op_123", created: true });
+    const persistAndEnqueue = vi
+      .fn()
+      .mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
+    const queueProjectOperationalEmailDelivery = vi
+      .fn()
+      .mockResolvedValue({ delivery_id: "op_123", created: true });
 
     const app = createApiServer({
       ingestionPersistence: { persistAndEnqueue },
@@ -434,8 +313,16 @@ describe("api ingestion route", () => {
   });
 
   it("should reject valid events with 429 when the ingestion rate limit is exceeded", async (): Promise<void> => {
-    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
-    const resolveProjectByTokenHash = vi.fn().mockResolvedValue({ project_id: "proj_123", organization_id: "org_123", organization_plan: "free" });
+    const persistAndEnqueue = vi
+      .fn()
+      .mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
+    const resolveProjectByTokenHash = vi
+      .fn()
+      .mockResolvedValue({
+        project_id: "proj_123",
+        organization_id: "org_123",
+        organization_plan: "free"
+      });
     const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
     const claimEvents = vi.fn().mockResolvedValue({
       allowed: false,
@@ -534,8 +421,12 @@ describe("api ingestion route", () => {
   });
 
   it("should accept valid events, persist raw payloads, and enqueue processing", async (): Promise<void> => {
-    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
-    const resolveProjectByTokenHash = vi.fn().mockResolvedValue({ project_id: "proj_123", organization_id: "org_123" });
+    const persistAndEnqueue = vi
+      .fn()
+      .mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
+    const resolveProjectByTokenHash = vi
+      .fn()
+      .mockResolvedValue({ project_id: "proj_123", organization_id: "org_123" });
 
     const app = createApiServer({
       ingestionPersistence: { persistAndEnqueue },
@@ -622,8 +513,16 @@ describe("api ingestion route", () => {
   });
 
   it("should include probe_directives for paid tiers with active remote probes", async (): Promise<void> => {
-    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
-    const resolveProjectByTokenHash = vi.fn().mockResolvedValue({ project_id: "proj_123", organization_id: "org_123", organization_plan: "solo" });
+    const persistAndEnqueue = vi
+      .fn()
+      .mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
+    const resolveProjectByTokenHash = vi
+      .fn()
+      .mockResolvedValue({
+        project_id: "proj_123",
+        organization_id: "org_123",
+        organization_plan: "solo"
+      });
     const listActiveProbesForProject = vi.fn().mockResolvedValue([
       {
         activation_id: "11111111-1111-4111-8111-111111111111",
@@ -697,8 +596,16 @@ describe("api ingestion route", () => {
   });
 
   it("should omit probe_directives when no active remote probes exist", async (): Promise<void> => {
-    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
-    const resolveProjectByTokenHash = vi.fn().mockResolvedValue({ project_id: "proj_123", organization_id: "org_123", organization_plan: "solo" });
+    const persistAndEnqueue = vi
+      .fn()
+      .mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
+    const resolveProjectByTokenHash = vi
+      .fn()
+      .mockResolvedValue({
+        project_id: "proj_123",
+        organization_id: "org_123",
+        organization_plan: "solo"
+      });
     const listActiveProbesForProject = vi.fn().mockResolvedValue([]);
 
     const app = createApiServer({
@@ -751,8 +658,16 @@ describe("api ingestion route", () => {
   });
 
   it("should omit probe_directives for free tier projects", async (): Promise<void> => {
-    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
-    const resolveProjectByTokenHash = vi.fn().mockResolvedValue({ project_id: "proj_123", organization_id: "org_123", organization_plan: "free" });
+    const persistAndEnqueue = vi
+      .fn()
+      .mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
+    const resolveProjectByTokenHash = vi
+      .fn()
+      .mockResolvedValue({
+        project_id: "proj_123",
+        organization_id: "org_123",
+        organization_plan: "free"
+      });
     const listActiveProbesForProject = vi.fn().mockResolvedValue([
       {
         activation_id: "11111111-1111-4111-8111-111111111111",
@@ -814,10 +729,16 @@ describe("api ingestion route", () => {
   });
 
   it("should reject standalone remote probe_event ingestion after downgrade to free", async (): Promise<void> => {
-    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
+    const persistAndEnqueue = vi
+      .fn()
+      .mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
     const resolveProjectByTokenHash = vi
       .fn()
-      .mockResolvedValue({ project_id: "proj_123", organization_id: "org_123", organization_plan: "free" });
+      .mockResolvedValue({
+        project_id: "proj_123",
+        organization_id: "org_123",
+        organization_plan: "free"
+      });
 
     const app = createApiServer({
       ingestionPersistence: { persistAndEnqueue },
@@ -934,7 +855,9 @@ describe("api ingestion route", () => {
 
   it("should ignore member tokens and browser sessions on the ingestion route", async (): Promise<void> => {
     const resolveProjectByTokenHash = vi.fn().mockResolvedValue({ project_id: "proj_123" });
-    const resolveMemberByTokenHash = vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" });
+    const resolveMemberByTokenHash = vi
+      .fn()
+      .mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" });
     const resolveSessionByToken = vi.fn().mockResolvedValue({
       session_id: "ses_123",
       user_id: "usr_123",
@@ -1032,964 +955,4 @@ describe("api ingestion route", () => {
     expect(resolveProjectByTokenHash).toHaveBeenCalledOnce();
   });
 
-  it("should enforce project token allowed origins when configured", async (): Promise<void> => {
-    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
-    const resolveProjectByTokenHash = vi.fn().mockResolvedValue({
-      project_id: "proj_123",
-      organization_id: "org_123",
-      organization_plan: "free",
-      allowed_origins: ["https://static.example.com"]
-    });
-
-    const app = createApiServer({
-      ingestionPersistence: { persistAndEnqueue },
-      ingestionMetadata: { resolveProjectByTokenHash },
-      memberAuth: createMemberAuthDependency(),
-      tokenManagement: createTokenManagementDependency(),
-      incidentRetrieval: createIncidentRetrievalDependency(),
-      objectStoreReader: createObjectStoreReaderDependency(),
-      webhookDelivery: createWebhookDeliveryDependency()
-    });
-
-    const event = createEventEnvelope({
-      event_type: "log_event",
-      project_token: "dbundle_proj_test",
-      service: {
-        name: "static-site",
-        environment: "production",
-        runtime: "browser",
-        framework: null
-      },
-      payload: {
-        level: "error",
-        message: "boom",
-        attributes: {}
-      }
-    });
-
-    const rejected = await app.inject({
-      method: "POST",
-      url: "/v1/events",
-      headers: {
-        authorization: "Bearer dbundle_proj_test",
-        origin: "https://evil.example.com"
-      },
-      payload: { events: [event] }
-    });
-    const missingOrigin = await app.inject({
-      method: "POST",
-      url: "/v1/events",
-      headers: {
-        authorization: "Bearer dbundle_proj_test"
-      },
-      payload: { events: [event] }
-    });
-    const accepted = await app.inject({
-      method: "POST",
-      url: "/v1/events",
-      headers: {
-        authorization: "Bearer dbundle_proj_test",
-        origin: "https://static.example.com"
-      },
-      payload: { events: [event] }
-    });
-
-    expect(rejected.statusCode).toBe(403);
-    expect(rejected.json()).toEqual({
-      accepted: 0,
-      rejected: 0,
-      errors: [{ index: -1, reason: "origin_not_allowed" }]
-    });
-    expect(missingOrigin.statusCode).toBe(403);
-    expect(missingOrigin.json()).toEqual({
-      accepted: 0,
-      rejected: 0,
-      errors: [{ index: -1, reason: "origin_not_allowed" }]
-    });
-    expect(accepted.statusCode).toBe(202);
-    expect(persistAndEnqueue).toHaveBeenCalledOnce();
-  });
-
-  it("should partially reject malformed events with explicit errors", async (): Promise<void> => {
-    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
-    const resolveProjectByTokenHash = vi.fn().mockResolvedValue({ project_id: "proj_123" });
-
-    const app = createApiServer({
-      ingestionPersistence: {
-        persistAndEnqueue
-      },
-      ingestionMetadata: {
-        resolveProjectByTokenHash
-      },
-      memberAuth: createMemberAuthDependency(),
-      tokenManagement: createTokenManagementDependency(),
-      incidentRetrieval: createIncidentRetrievalDependency(),
-      objectStoreReader: createObjectStoreReaderDependency(),
-      webhookDelivery: createWebhookDeliveryDependency()
-    });
-
-    const validEvent = createEventEnvelope({
-      event_type: "log_event",
-      project_token: "dbundle_proj_test",
-      service: {
-        name: "checkout-api",
-        environment: "production",
-        runtime: "node",
-        framework: "fastify"
-      },
-      payload: {
-        level: "error",
-        message: "boom",
-        attributes: {}
-      }
-    });
-
-    const invalidEvent = {
-      event_type: "unknown"
-    };
-
-    const response = await app.inject({
-      method: "POST",
-      url: "/v1/events",
-      headers: {
-        authorization: "Bearer dbundle_proj_test"
-      },
-      payload: {
-        events: [validEvent, invalidEvent]
-      }
-    });
-
-    expect(response.statusCode).toBe(202);
-
-    const body = response.json<{
-      accepted: number;
-      rejected: number;
-      errors: Array<{ index: number; reason: string }>;
-    }>();
-
-    expect(body.accepted).toBe(1);
-    expect(body.rejected).toBe(1);
-    expect(body.errors[0]?.index).toBe(1);
-    expect(typeof body.errors[0]?.reason).toBe("string");
-    expect(persistAndEnqueue).toHaveBeenCalledOnce();
-  });
-
-  it("accepts installed SDK legacy event context shapes after compatibility normalization", async (): Promise<void> => {
-    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
-    const resolveProjectByTokenHash = vi.fn().mockResolvedValue({ project_id: "proj_123" });
-
-    const app = createApiServer({
-      ingestionPersistence: {
-        persistAndEnqueue
-      },
-      ingestionMetadata: {
-        resolveProjectByTokenHash
-      },
-      memberAuth: createMemberAuthDependency(),
-      tokenManagement: createTokenManagementDependency(),
-      incidentRetrieval: createIncidentRetrievalDependency(),
-      objectStoreReader: createObjectStoreReaderDependency(),
-      webhookDelivery: createWebhookDeliveryDependency()
-    });
-
-    const response = await app.inject({
-      method: "POST",
-      url: "/v1/events",
-      headers: {
-        authorization: "Bearer dbundle_proj_test"
-      },
-      payload: {
-        events: [
-          {
-            schema_version: "2026-03-01",
-            event_id: "550e8400-e29b-41d4-a716-446655440000",
-            event_type: "request_event",
-            occurred_at: "2026-03-10T00:00:00.000Z",
-            sdk_name: "@debugbundle/sdk-java",
-            sdk_version: "1.1.0",
-            service: {
-              name: "patients-api",
-              environment: "production",
-              runtime: "java",
-              framework: null
-            },
-            correlation: {},
-            context: {
-              tenant: "healthbrain"
-            },
-            payload: {
-              method: "GET",
-              path: "/patients",
-              query: null,
-              headers: null,
-              response_status: "503",
-              duration_ms: "42",
-              attributes: {
-                route_template: "/patients/{id}",
-                controller: "PatientsController"
-              }
-            }
-          }
-        ]
-      }
-    });
-
-    expect(response.statusCode).toBe(202);
-    expect(response.json()).toMatchObject({
-      accepted: 1,
-      rejected: 0,
-      errors: []
-    });
-    expect(persistAndEnqueue).toHaveBeenCalledOnce();
-    expect(persistAndEnqueue.mock.calls[0]?.[0]).toMatchObject({
-      context: {
-        tenant: "healthbrain",
-        route_template: "/patients/{id}",
-        controller: "PatientsController"
-      },
-      payload: {
-        query: {},
-        headers: {},
-        response_status: 503,
-        duration_ms: 42,
-        route_template: "/patients/{id}"
-      }
-    });
-  });
-
-  it("should reject malformed request body before event processing", async (): Promise<void> => {
-    const app = createApiServer({
-      ingestionPersistence: {
-        persistAndEnqueue: vi.fn()
-      },
-      ingestionMetadata: {
-        resolveProjectByTokenHash: vi.fn().mockResolvedValue({ project_id: "proj_123" })
-      },
-      memberAuth: createMemberAuthDependency(),
-      tokenManagement: createTokenManagementDependency(),
-      incidentRetrieval: createIncidentRetrievalDependency(),
-      objectStoreReader: createObjectStoreReaderDependency(),
-      webhookDelivery: createWebhookDeliveryDependency()
-    });
-
-    const response = await app.inject({
-      method: "POST",
-      url: "/v1/events",
-      headers: {
-        authorization: "Bearer dbundle_proj_test"
-      },
-      payload: {
-        events: [],
-        extra: true
-      }
-    });
-
-    expect(response.statusCode).toBe(400);
-    expect(response.json<{ errors: Array<{ reason: string }> }>().errors[0]?.reason).toBe("malformed_payload");
-  });
-
-  it("records sanitized diagnostics for invalid events without persisting them", async (): Promise<void> => {
-    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
-    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
-    const recordRejectedDiagnostics = vi.fn().mockResolvedValue(undefined);
-
-    const app = createApiServer({
-      ingestionPersistence: { persistAndEnqueue },
-      ingestionMetadata: {
-        resolveProjectByTokenHash: vi.fn().mockResolvedValue({
-          project_id: "proj_123",
-          organization_id: "org_123",
-          organization_plan: "free"
-        })
-      },
-      accountAnalytics: createAccountAnalyticsDependency({ recordMetricDeltas }),
-      ingestionRejectionDiagnostics: createIngestionRejectionDiagnosticsDependency({
-        recordRejectedDiagnostics
-      }),
-      memberAuth: createMemberAuthDependency(),
-      tokenManagement: createTokenManagementDependency(),
-      incidentRetrieval: createIncidentRetrievalDependency(),
-      objectStoreReader: createObjectStoreReaderDependency(),
-      webhookDelivery: createWebhookDeliveryDependency()
-    });
-
-    const response = await app.inject({
-      method: "POST",
-      url: "/v1/events",
-      headers: {
-        authorization: "Bearer dbundle_proj_test"
-      },
-      payload: {
-        events: [
-          {
-            schema_version: "2026-03-01",
-            event_id: "33333333-3333-4333-8333-333333333333",
-            event_type: "frontend_exception",
-            sdk_name: "@debugbundle/sdk-browser",
-            sdk_version: "0.1.0",
-            service: {
-              name: "tasktime-web",
-              environment: "production",
-              runtime: "browser"
-            },
-            occurred_at: "2026-06-16T08:24:04.562Z",
-            payload: {
-              name: "TypeError",
-              message: "boom"
-            }
-          }
-        ]
-      }
-    });
-
-    expect(response.statusCode).toBe(202);
-    expect(response.json()).toMatchObject({
-      accepted: 0,
-      rejected: 1,
-      errors: [{ index: 0, reason: expect.any(String) }]
-    });
-    expect(recordMetricDeltas).toHaveBeenCalledWith(
-      expect.objectContaining({
-        deltas: expect.objectContaining({
-          raw_events_rejected: 1,
-          events_rejected_malformed: 1
-        })
-      })
-    );
-    expect(recordRejectedDiagnostics).toHaveBeenCalledWith({
-      organization_id: "org_123",
-      occurred_at: expect.any(String),
-      events: [
-        expect.objectContaining({
-          rejection_reason: "invalid_event",
-          project_id: "proj_123",
-          sdk_name: "@debugbundle/sdk-browser",
-          sdk_version: "0.1.0",
-          event_type: "frontend_exception",
-          service_name: "tasktime-web",
-          service_environment: "production",
-          service_runtime: "browser",
-          validation_path: "payload.stack"
-        })
-      ]
-    });
-    expect(persistAndEnqueue).not.toHaveBeenCalled();
-  });
-
-  it("does not record rejection diagnostics for duplicate analytics batches", async (): Promise<void> => {
-    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
-    const recordMetricDeltas = vi.fn().mockResolvedValue("duplicate");
-    const recordRejectedDiagnostics = vi.fn().mockResolvedValue(undefined);
-
-    const app = createApiServer({
-      ingestionPersistence: { persistAndEnqueue },
-      ingestionMetadata: {
-        resolveProjectByTokenHash: vi.fn().mockResolvedValue({
-          project_id: "proj_123",
-          organization_id: "org_123",
-          organization_plan: "free"
-        })
-      },
-      accountAnalytics: createAccountAnalyticsDependency({ recordMetricDeltas }),
-      ingestionRejectionDiagnostics: createIngestionRejectionDiagnosticsDependency({
-        recordRejectedDiagnostics
-      }),
-      memberAuth: createMemberAuthDependency(),
-      tokenManagement: createTokenManagementDependency(),
-      incidentRetrieval: createIncidentRetrievalDependency(),
-      objectStoreReader: createObjectStoreReaderDependency(),
-      webhookDelivery: createWebhookDeliveryDependency()
-    });
-
-    const response = await app.inject({
-      method: "POST",
-      url: "/v1/events",
-      headers: {
-        authorization: "Bearer dbundle_proj_test"
-      },
-      payload: {
-        events: [
-          {
-            schema_version: "2026-03-01",
-            event_id: "33333333-3333-4333-8333-333333333333",
-            event_type: "frontend_exception",
-            sdk_name: "@debugbundle/sdk-browser",
-            sdk_version: "0.1.0",
-            service: {
-              name: "tasktime-web",
-              environment: "production",
-              runtime: "browser"
-            },
-            occurred_at: "2026-06-16T08:24:04.562Z",
-            payload: {
-              name: "TypeError",
-              message: "boom"
-            }
-          }
-        ]
-      }
-    });
-
-    expect(response.statusCode).toBe(202);
-    expect(recordMetricDeltas).toHaveBeenCalled();
-    expect(recordRejectedDiagnostics).not.toHaveBeenCalled();
-    expect(persistAndEnqueue).not.toHaveBeenCalled();
-  });
-
-  it("should reject malformed bearer authorization header", async (): Promise<void> => {
-    const app = createApiServer({
-      ingestionPersistence: {
-        persistAndEnqueue: vi.fn()
-      },
-      ingestionMetadata: {
-        resolveProjectByTokenHash: vi.fn()
-      },
-      memberAuth: createMemberAuthDependency(),
-      tokenManagement: createTokenManagementDependency(),
-      incidentRetrieval: createIncidentRetrievalDependency(),
-      objectStoreReader: createObjectStoreReaderDependency(),
-      webhookDelivery: createWebhookDeliveryDependency()
-    });
-
-    const malformedResponse = await app.inject({
-      method: "POST",
-      url: "/v1/events",
-      headers: {
-        authorization: "Bearer"
-      },
-      payload: {
-        events: []
-      }
-    });
-
-    expect(malformedResponse.statusCode).toBe(401);
-
-    const missingHeaderResponse = await app.inject({
-      method: "POST",
-      url: "/v1/events",
-      payload: {
-        events: []
-      }
-    });
-
-    expect(missingHeaderResponse.statusCode).toBe(401);
-  });
-
-  it("should return webhook delivery history for member token", async (): Promise<void> => {
-    const listDeliveriesForWebhookInOrganization = vi.fn().mockResolvedValue({ deliveries: [
-      {
-        delivery_id: "del_123",
-        event_type: "bundle.reopened",
-        status: "delivered",
-        attempt_count: 1,
-        next_attempt_at: null,
-        last_response_code: 200,
-        last_attempted_at: "2026-03-11T00:00:01.000Z",
-        last_error: null
-      }
-    ] });
-    const resolveMemberByTokenHash = vi.fn().mockResolvedValue({ member_id: "mem_123", organization_id: "org_123" });
-
-    const app = createApiServer({
-      ingestionPersistence: {
-        persistAndEnqueue: vi.fn()
-      },
-      ingestionMetadata: {
-        resolveProjectByTokenHash: vi.fn()
-      },
-      memberAuth: {
-        resolveMemberByTokenHash
-      },
-      projectManagement: createProjectManagementDependency(),
-      tokenManagement: createTokenManagementDependency(),
-      incidentRetrieval: createIncidentRetrievalDependency(),
-      objectStoreReader: createObjectStoreReaderDependency(),
-      webhookDelivery: {
-        listDeliveriesForWebhookInOrganization
-      }
-    });
-
-    const response = await app.inject({
-      method: "GET",
-      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111/deliveries?project_id=00000000-0000-4000-8000-000000000001&limit=10",
-      headers: {
-        authorization: "Bearer dbundle_mem_test"
-      }
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(resolveMemberByTokenHash).toHaveBeenCalledWith(hashToken("dbundle_mem_test"));
-    expect(listDeliveriesForWebhookInOrganization).toHaveBeenCalledWith({
-      webhookId: "11111111-1111-4111-8111-111111111111",
-      organizationId: "org_123",
-      limit: 10
-    });
-    expect(response.json()).toEqual({
-      deliveries: [
-        {
-          delivery_id: "del_123",
-          event_type: "bundle.reopened",
-          status: "delivered",
-          attempt_count: 1,
-          next_attempt_at: null,
-          last_response_code: 200,
-          last_attempted_at: "2026-03-11T00:00:01.000Z",
-          last_error: null
-        }
-      ]
-    });
-  });
-
-  it("should reject webhook delivery history for invalid member token", async (): Promise<void> => {
-    const resolveMemberByTokenHash = vi.fn().mockResolvedValue(null);
-    const app = createApiServer({
-      ingestionPersistence: {
-        persistAndEnqueue: vi.fn()
-      },
-      ingestionMetadata: {
-        resolveProjectByTokenHash: vi.fn()
-      },
-      memberAuth: {
-        resolveMemberByTokenHash
-      },
-      tokenManagement: createTokenManagementDependency(),
-      incidentRetrieval: createIncidentRetrievalDependency(),
-      objectStoreReader: createObjectStoreReaderDependency(),
-      webhookDelivery: createWebhookDeliveryDependency()
-    });
-
-    const response = await app.inject({
-      method: "GET",
-      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111/deliveries?project_id=00000000-0000-4000-8000-000000000001",
-      headers: {
-        authorization: "Bearer dbundle_mem_test"
-      }
-    });
-
-    expect(response.statusCode).toBe(401);
-    expect(resolveMemberByTokenHash).toHaveBeenCalledWith(hashToken("dbundle_mem_test"));
-  });
-
-  it("should reject invalid deliveries query parameters", async (): Promise<void> => {
-    const listDeliveriesForWebhookInOrganization = vi.fn().mockResolvedValue(null);
-    const app = createApiServer({
-      ingestionPersistence: {
-        persistAndEnqueue: vi.fn()
-      },
-      ingestionMetadata: {
-        resolveProjectByTokenHash: vi.fn()
-      },
-      memberAuth: createMemberAuthDependency(),
-      tokenManagement: createTokenManagementDependency(),
-      incidentRetrieval: createIncidentRetrievalDependency(),
-      objectStoreReader: createObjectStoreReaderDependency(),
-      webhookDelivery: {
-        listDeliveriesForWebhookInOrganization
-      }
-    });
-
-    const response = await app.inject({
-      method: "GET",
-      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111/deliveries?project_id=00000000-0000-4000-8000-000000000001&limit=999",
-      headers: {
-        authorization: "Bearer dbundle_mem_test"
-      }
-    });
-
-    expect(response.statusCode).toBe(400);
-    expect(listDeliveriesForWebhookInOrganization).not.toHaveBeenCalled();
-  });
-
-  it("should return not found when webhook is outside member organization scope", async (): Promise<void> => {
-    const app = createApiServer({
-      ingestionPersistence: {
-        persistAndEnqueue: vi.fn()
-      },
-      ingestionMetadata: {
-        resolveProjectByTokenHash: vi.fn()
-      },
-      memberAuth: createMemberAuthDependency(),
-      tokenManagement: createTokenManagementDependency(),
-      incidentRetrieval: createIncidentRetrievalDependency(),
-      objectStoreReader: createObjectStoreReaderDependency(),
-      webhookDelivery: {
-        listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue(null)
-      }
-    });
-
-    const response = await app.inject({
-      method: "GET",
-      url: "/v1/webhooks/11111111-1111-4111-8111-111111111111/deliveries?project_id=00000000-0000-4000-8000-000000000001",
-      headers: {
-        authorization: "Bearer dbundle_mem_test"
-      }
-    });
-
-    expect(response.statusCode).toBe(404);
-  });
-});
-
-describe("self-host mode ingestion bypass", () => {
-  afterEach(() => {
-    delete process.env["SELFHOST_MODE"];
-  });
-
-  it("should bypass rate limiting and quota checks when SELFHOST_MODE=true", async (): Promise<void> => {
-    process.env["SELFHOST_MODE"] = "true";
-
-    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
-    const resolveProjectByTokenHash = vi.fn().mockResolvedValue({ project_id: "proj_123", organization_id: "org_123", organization_plan: "free" });
-    const claimEvents = vi.fn();
-    const getBillingSummaryForOrganization = vi.fn();
-
-    const app = createApiServer({
-      ingestionPersistence: { persistAndEnqueue },
-      ingestionMetadata: { resolveProjectByTokenHash },
-      ingestionRateLimiter: createIngestionRateLimiterDependency({ claimEvents }),
-      billingManagement: createBillingManagementDependency({ getBillingSummaryForOrganization }),
-      memberAuth: createMemberAuthDependency(),
-      tokenManagement: createTokenManagementDependency(),
-      incidentRetrieval: createIncidentRetrievalDependency(),
-      objectStoreReader: createObjectStoreReaderDependency(),
-      webhookDelivery: createWebhookDeliveryDependency()
-    });
-
-    const event = createEventEnvelope({
-      event_type: "backend_exception",
-      project_token: "dbundle_proj_test",
-      service: {
-        name: "checkout-api",
-        environment: "production",
-        runtime: "node",
-        framework: "fastify"
-      },
-      payload: {
-        name: "TypeError",
-        message: "boom",
-        stack: "TypeError: boom",
-        handled: false,
-        request: { method: "GET", path: "/users/123", query: {}, headers: {}, body: null },
-        response: { status_code: 500 },
-        runtime: { version: "22.0.0" }
-      }
-    });
-
-    const response = await app.inject({
-      method: "POST",
-      url: "/v1/events",
-      headers: { authorization: "Bearer dbundle_proj_test" },
-      payload: { events: [event] }
-    });
-
-    expect(response.statusCode).toBe(202);
-    expect(response.json().accepted).toBe(1);
-    expect(claimEvents).not.toHaveBeenCalled();
-    expect(getBillingSummaryForOrganization).not.toHaveBeenCalled();
-    expect(persistAndEnqueue).toHaveBeenCalledOnce();
-  });
-
-  it("should increment usage counters after successful ingestion of billable events", async (): Promise<void> => {
-    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
-    const resolveProjectByTokenHash = vi.fn().mockResolvedValue({ project_id: "proj_123", organization_id: "org_123", organization_plan: "free" });
-    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
-    const incrementOrgUsageCounter = vi.fn().mockResolvedValue(undefined);
-    const incrementProjectUsageCounter = vi.fn().mockResolvedValue(undefined);
-
-    const app = createApiServer({
-      ingestionPersistence: { persistAndEnqueue },
-      ingestionMetadata: { resolveProjectByTokenHash },
-      accountAnalytics: createAccountAnalyticsDependency({ recordMetricDeltas }),
-      billingManagement: createBillingManagementDependency({
-        incrementOrgUsageCounter,
-        incrementProjectUsageCounter
-      }),
-      memberAuth: createMemberAuthDependency(),
-      tokenManagement: createTokenManagementDependency(),
-      incidentRetrieval: createIncidentRetrievalDependency(),
-      objectStoreReader: createObjectStoreReaderDependency(),
-      webhookDelivery: createWebhookDeliveryDependency()
-    });
-
-    const event = createEventEnvelope({
-      event_type: "backend_exception",
-      project_token: "dbundle_proj_test",
-      service: {
-        name: "checkout-api",
-        environment: "production",
-        runtime: "node",
-        framework: "fastify"
-      },
-      payload: {
-        name: "TypeError",
-        message: "boom",
-        stack: "TypeError: boom",
-        handled: false,
-        request: { method: "GET", path: "/users/123", query: {}, headers: {}, body: null },
-        response: { status_code: 500 },
-        runtime: { version: "22.0.0" }
-      }
-    });
-
-    const response = await app.inject({
-      method: "POST",
-      url: "/v1/events",
-      headers: { authorization: "Bearer dbundle_proj_test" },
-      payload: { events: [event] }
-    });
-
-    expect(response.statusCode).toBe(202);
-    expect(response.json().accepted).toBe(1);
-    expect(persistAndEnqueue).toHaveBeenCalledOnce();
-    expect(incrementOrgUsageCounter).toHaveBeenCalledWith({
-      organization_id: "org_123",
-      period_starts_at: expect.any(String),
-      count: 1
-    });
-    expect(incrementProjectUsageCounter).toHaveBeenCalledWith({
-      project_id: "proj_123",
-      period_starts_at: expect.any(String),
-      count: 1
-    });
-    expect(recordMetricDeltas).toHaveBeenCalledWith(
-      expect.objectContaining({
-        organization_id: "org_123",
-        source: "ingestion_batch",
-        deltas: expect.objectContaining({
-          raw_events_accepted: 1,
-          billable_events_counted: 1,
-          incident_signal_events_counted: 1
-        })
-      })
-    );
-  });
-
-  it("should not reject accepted ingestion when account analytics recording fails after persistence", async (): Promise<void> => {
-    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
-    const resolveProjectByTokenHash = vi.fn().mockResolvedValue({ project_id: "proj_123", organization_id: "org_123", organization_plan: "free" });
-    const recordMetricDeltas = vi.fn().mockRejectedValue(new Error("analytics_unavailable"));
-
-    const app = createApiServer({
-      ingestionPersistence: { persistAndEnqueue },
-      ingestionMetadata: { resolveProjectByTokenHash },
-      accountAnalytics: createAccountAnalyticsDependency({ recordMetricDeltas }),
-      billingManagement: createBillingManagementDependency(),
-      memberAuth: createMemberAuthDependency(),
-      tokenManagement: createTokenManagementDependency(),
-      incidentRetrieval: createIncidentRetrievalDependency(),
-      objectStoreReader: createObjectStoreReaderDependency(),
-      webhookDelivery: createWebhookDeliveryDependency()
-    });
-
-    const event = createEventEnvelope({
-      event_type: "backend_exception",
-      project_token: "dbundle_proj_test",
-      service: {
-        name: "checkout-api",
-        environment: "production",
-        runtime: "node",
-        framework: "fastify"
-      },
-      payload: {
-        name: "TypeError",
-        message: "boom",
-        stack: "TypeError: boom",
-        handled: false,
-        request: { method: "GET", path: "/users/123", query: {}, headers: {}, body: null },
-        response: { status_code: 500 },
-        runtime: { version: "22.0.0" }
-      }
-    });
-
-    const response = await app.inject({
-      method: "POST",
-      url: "/v1/events",
-      headers: { authorization: "Bearer dbundle_proj_test" },
-      payload: { events: [event] }
-    });
-
-    expect(response.statusCode).toBe(202);
-    expect(response.json()).toMatchObject({
-      accepted: 1,
-      rejected: 0,
-      errors: []
-    });
-    expect(persistAndEnqueue).toHaveBeenCalledOnce();
-    expect(recordMetricDeltas).toHaveBeenCalledOnce();
-  });
-
-  it("counts accepted probe events in account analytics", async (): Promise<void> => {
-    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/probe.json.gz" });
-    const resolveProjectByTokenHash = vi
-      .fn()
-      .mockResolvedValue({ project_id: "proj_123", organization_id: "org_123", organization_plan: "solo" });
-    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
-
-    const app = createApiServer({
-      ingestionPersistence: { persistAndEnqueue },
-      ingestionMetadata: { resolveProjectByTokenHash },
-      accountAnalytics: createAccountAnalyticsDependency({ recordMetricDeltas }),
-      billingManagement: createBillingManagementDependency(),
-      capturePolicyManagement: {
-        getCapturePolicyForProject: vi.fn().mockResolvedValue({
-          project_id: "proj_123",
-          preset: "investigative",
-          capture_logs: null,
-          capture_request_events: null,
-          capture_breadcrumbs: null,
-          capture_probe_events: "standalone_when_activated",
-          immediate_client_error_statuses: null,
-          immediate_client_error_path_rules: null
-        }),
-        upsertCapturePolicyForProject: vi.fn()
-      },
-      memberAuth: createMemberAuthDependency(),
-      tokenManagement: createTokenManagementDependency(),
-      incidentRetrieval: createIncidentRetrievalDependency(),
-      objectStoreReader: createObjectStoreReaderDependency(),
-      webhookDelivery: createWebhookDeliveryDependency()
-    });
-
-    const event = createEventEnvelope({
-      event_type: "probe_event",
-      project_token: "dbundle_proj_test",
-      service: {
-        name: "checkout-api",
-        environment: "production",
-        runtime: "node",
-        framework: "fastify"
-      },
-      payload: {
-        label: "checkout.tax",
-        data: { rate: 0.2 },
-        activation_id: "00000000-0000-4000-8000-000000000123",
-        probe_label_pattern: "checkout.*"
-      }
-    });
-
-    const response = await app.inject({
-      method: "POST",
-      url: "/v1/events",
-      headers: { authorization: "Bearer dbundle_proj_test" },
-      payload: { events: [event] }
-    });
-
-    expect(response.statusCode).toBe(202);
-    expect(recordMetricDeltas).toHaveBeenCalledWith(
-      expect.objectContaining({
-        organization_id: "org_123",
-        source: "ingestion_batch",
-        deltas: expect.objectContaining({
-          raw_events_accepted: 1,
-          operational_signal_events_counted: 1,
-          probe_events_accepted: 1
-        })
-      })
-    );
-  });
-
-  it("should not reject ingestion when the project dashboard usage counter fails after persistence", async (): Promise<void> => {
-    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
-    const resolveProjectByTokenHash = vi.fn().mockResolvedValue({ project_id: "proj_123", organization_id: "org_123", organization_plan: "free" });
-    const incrementOrgUsageCounter = vi.fn().mockResolvedValue(undefined);
-    const incrementProjectUsageCounter = vi.fn().mockRejectedValue(new Error("project_counter_failed"));
-
-    const app = createApiServer({
-      ingestionPersistence: { persistAndEnqueue },
-      ingestionMetadata: { resolveProjectByTokenHash },
-      billingManagement: createBillingManagementDependency({
-        incrementOrgUsageCounter,
-        incrementProjectUsageCounter
-      }),
-      memberAuth: createMemberAuthDependency(),
-      tokenManagement: createTokenManagementDependency(),
-      incidentRetrieval: createIncidentRetrievalDependency(),
-      objectStoreReader: createObjectStoreReaderDependency(),
-      webhookDelivery: createWebhookDeliveryDependency()
-    });
-
-    const event = createEventEnvelope({
-      event_type: "backend_exception",
-      project_token: "dbundle_proj_test",
-      service: {
-        name: "checkout-api",
-        environment: "production",
-        runtime: "node",
-        framework: "fastify"
-      },
-      payload: {
-        name: "TypeError",
-        message: "boom",
-        stack: "TypeError: boom",
-        handled: false,
-        request: { method: "GET", path: "/users/123", query: {}, headers: {}, body: null },
-        response: { status_code: 500 },
-        runtime: { version: "22.0.0" }
-      }
-    });
-
-    const response = await app.inject({
-      method: "POST",
-      url: "/v1/events",
-      headers: { authorization: "Bearer dbundle_proj_test" },
-      payload: { events: [event] }
-    });
-
-    expect(response.statusCode).toBe(202);
-    expect(response.json().accepted).toBe(1);
-    expect(persistAndEnqueue).toHaveBeenCalledOnce();
-    expect(incrementOrgUsageCounter).toHaveBeenCalledOnce();
-    expect(incrementProjectUsageCounter).toHaveBeenCalledOnce();
-  });
-
-  it("should not increment usage counters for non-billable operational events", async (): Promise<void> => {
-    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/proj_123/path.json.gz" });
-    const resolveProjectByTokenHash = vi.fn().mockResolvedValue({ project_id: "proj_123", organization_id: "org_123", organization_plan: "free" });
-    const incrementOrgUsageCounter = vi.fn().mockResolvedValue(undefined);
-    const incrementProjectUsageCounter = vi.fn().mockResolvedValue(undefined);
-
-    const app = createApiServer({
-      ingestionPersistence: { persistAndEnqueue },
-      ingestionMetadata: { resolveProjectByTokenHash },
-      billingManagement: createBillingManagementDependency({
-        incrementOrgUsageCounter,
-        incrementProjectUsageCounter
-      }),
-      memberAuth: createMemberAuthDependency(),
-      tokenManagement: createTokenManagementDependency(),
-      incidentRetrieval: createIncidentRetrievalDependency(),
-      objectStoreReader: createObjectStoreReaderDependency(),
-      webhookDelivery: createWebhookDeliveryDependency()
-    });
-
-    // error_suppressed is classified as operational_signal — non-billable on all plans
-    const event = createEventEnvelope({
-      event_type: "error_suppressed",
-      project_token: "dbundle_proj_test",
-      service: {
-        name: "checkout-api",
-        environment: "production",
-        runtime: "node",
-        framework: "fastify"
-      },
-      payload: {
-        fingerprint: "abc123",
-        suppressed_count: 5,
-        window_seconds: 60,
-        first_seen: "2026-03-15T12:00:00.000Z",
-        last_seen: "2026-03-15T12:01:00.000Z"
-      }
-    });
-
-    const response = await app.inject({
-      method: "POST",
-      url: "/v1/events",
-      headers: { authorization: "Bearer dbundle_proj_test" },
-      payload: { events: [event] }
-    });
-
-    expect(response.statusCode).toBe(202);
-    // Counter should NOT be called since operational signals don't count toward billing
-    expect(incrementOrgUsageCounter).not.toHaveBeenCalled();
-    expect(incrementProjectUsageCounter).not.toHaveBeenCalled();
-  });
 });

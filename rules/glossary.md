@@ -4,6 +4,29 @@ This glossary defines durable product terms used across requirements, contracts,
 and implementation documentation. Source-of-truth requirements and contracts remain
 authoritative when a term's behavior is specified in more detail.
 
+## SDK Reliability Terms
+
+### Ingestion Acknowledgement
+
+The indexed `accepted`, `rejected`, and `errors` result returned for a connected
+event batch. SDKs use it to remove accepted or terminally rejected events,
+retain only retryable rejections, and avoid reporting delivery health when no
+event was accepted.
+
+### SDK Compatibility Adapter
+
+A narrow, authenticated ingestion normalization path for an exact previously
+published SDK event shape. It protects installed projects during a documented
+upgrade window without relaxing the canonical schema for new SDK versions.
+
+### `beforeSend`
+
+An optional synchronous, application-local SDK hook that receives a fully
+built and redacted event immediately before local capture-policy evaluation.
+Returning the event keeps it, returning the language-equivalent null drops it,
+and hook failure or invalid output preserves the original event without
+throwing into host code.
+
 ## Analytics Terms
 
 ### AnalyticsBundle

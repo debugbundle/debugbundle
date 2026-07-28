@@ -6,10 +6,23 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
-## [1.7.1] - 2026-07-25
+## [1.7.1] - 2026-07-28
+
+### Added
+
+- Added an authenticated compatibility path for installed Android/Swift mobile event shapes, canonical mobile event normalization, and indexed ingestion acknowledgement handling across connected SDK transports.
+- Added the universal safe `beforeSend` hook and object-wrapped arbitrary probe data across the maintained SDK family.
+
+### Changed
+
+- Expanded standalone SDK release assurance with mandatory per-file coverage across JavaScript, Python, PHP, WordPress, Java, Go, Ruby, .NET, Android, Swift, and React Native TypeScript, Android Java, Swift, and Objective-C++ wrapper sources.
+- Prepared coordinated Android, Swift, and React Native `1.2.0` source lines and made React Native npm publication fail closed until clean apps compile against the published native `1.2` artifacts.
+- Prepared `@debugbundle/shared-types` and `@debugbundle/redaction` `1.6.0`
+  as the dependency root for the coordinated JavaScript SDK release.
 
 ### Fixed
 
+- Prevented malformed legacy mobile events and partial ingestion acknowledgements from being silently dequeued, and preserved React Native identity, JavaScript error fidelity, capture policy, probes, and native configuration across the platform bridge.
 - Reworked the deterministic CLI privacy-preview sample so the bundled OpenClaw plugin no longer contains a synthetic bearer-token literal that ClawHub's static scanner mistakes for a hardcoded credential.
 
 ## [1.7.0] - 2026-07-17

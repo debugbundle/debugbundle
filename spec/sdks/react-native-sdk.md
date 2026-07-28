@@ -1,7 +1,7 @@
 # React Native SDK Implementation Plan
 
 Version: v1
-Last updated: 2026-05-30
+Last updated: 2026-07-27
 
 ---
 
@@ -13,7 +13,7 @@ React Native is a client/mobile SDK, not a server SDK and not a browser relay ha
 
 The React Native SDK must satisfy `contracts/sdk-interface.md`, especially sections 1 through 12 and the mobile correlation contract in section 10.1, plus `spec/sdk-language-targets.md`, `rules/sdk-testing-strategy.md`, `rules/security-hardening.md`, and the relevant requirements and acceptance criteria in `spec/requirements.md` and `spec/acceptance.md`.
 
-Current status: `@debugbundle/sdk-react-native@0.1.1` is published on npm from `github.com/debugbundle/debugbundle-react-native`, and the native Swift `DebugBundle` pod dependency is published on CocoaPods at `0.1.1`. The SDK is implemented with repo verify, packed clean-install smoke, Android bridge compatibility lanes for React Native `0.76.9`, `0.82.1`, and `0.85.3`, Android Docker clean RN app smoke, iOS CocoaPods/Xcode clean RN app smoke, tag-triggered npm release, registry visibility verification, and post-publish registry smoke.
+Current status: `@debugbundle/sdk-react-native@1.1.0` and the Android/Swift native `1.1.0` foundations are published. A coordinated `1.2.0` source line contains the production-safety remediation: canonical RN event preservation, truthful native capture-policy/probe/config composition, per-event acknowledgements, universal `beforeSend`, frozen installs, per-file TypeScript and native-wrapper coverage, Android bridge lanes for React Native `0.76.9`, `0.82.1`, and `0.85.3`, bare Android/iOS clean apps, Expo SDK 57 / React Native 0.86 development builds, and iOS JS-to-native-to-ingestion runtime delivery. Publication remains blocked until Android and Swift `1.2.0` are registry-visible and the RN release workflow's clean published-native Android/iOS jobs pass. Hosted green evidence for the full runtime/Expo matrix is still pending.
 
 ---
 
@@ -310,11 +310,11 @@ All public APIs must be no-throw by default. Helpers that wrap application opera
 ## Runtime Compatibility
 
 - Minimum React Native compatibility: React Native 0.76+ for installed-base compatibility.
-- Recommended production React Native version: current stable React Native 0.85.x at the `0.1.1` release.
+- Recommended production React Native version: current stable React Native 0.86.x.
 - React versions: `>=18.2 <20`, matching the claimed React Native `0.76+` through current-stable lanes.
 - JavaScript engines: Hermes is the primary tested JS engine; JSC compatibility is best-effort where the claimed React Native lane supports it.
-- Android: inherit native SDK minimum API 23 and current `com.debugbundle:debugbundle-android-bom:0.1.2` dependency.
-- iOS: inherit native SDK minimum iOS 15 and CocoaPods `DebugBundle ~> 0.1.1` dependency.
+- Android: inherit native SDK minimum API 23 and require the coordinated `com.debugbundle:debugbundle-android-bom:1.2.0` dependency for the remediated source line.
+- iOS: inherit native SDK minimum iOS 15 and require CocoaPods `DebugBundle ~> 1.2` for the remediated source line.
 - New Architecture: TurboModule is required and must be tested.
 - Legacy Architecture: bridge adapter is required for V1 compatibility, but docs should state that new applications should use the New Architecture when supported by their RN version.
 - Expo: development builds and prebuild are supported; Expo Go is not full parity.
@@ -867,13 +867,14 @@ Quality gates:
 - [x] JS-thread work is bounded and tested.
 - [x] Request/response bodies, view text, screenshots, location, clipboard, advertising IDs, IDFV, Android ID, keychain/keystore values, props, and state are off by default.
 - [x] Trace headers are only added to relative URLs and configured first-party targets.
-- [x] Expo development-build support works; Expo Go degraded behavior is documented.
+- [x] Repository-local TypeScript, Android Java, Swift, and Objective-C++ coverage gates enforce the SDK-standard per-file floor.
+- [ ] Expo development-build support works on both Android and iOS; Expo Go degraded behavior is documented. Android and iOS build lanes are configured and await hosted green evidence.
 - [x] npm package includes README, license metadata, TypeScript declarations, native files, config plugin, and correct package exports.
 - [x] Release docs cover config precedence, support labels, install modes, service naming, safe startup/status semantics, and first-event verification.
 - [x] Public docs include bare RN, Expo development build, React Navigation, network capture, offline queue, native crash caveats, probes, and privacy examples.
-- [x] CI passes supported RN, TypeScript, Android, iOS, React Navigation, Expo, package-manager, and hardening lanes.
+- [ ] CI passes supported RN, TypeScript, Android, iOS, React Navigation, Expo, package-manager, and hardening lanes. The expanded native/runtime matrix is configured but has not yet produced hosted green evidence.
 - [x] Clean-install smoke passes from staged npm tarball.
-- [x] Published-package smoke passes from npm registry.
+- [ ] Published-package smoke passes from npm registry for the remediated native dependency set.
 
 ---
 

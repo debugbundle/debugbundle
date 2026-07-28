@@ -9,6 +9,17 @@ import {
   type EventClass,
   type ImmediateClientErrorPathRule
 } from "../../shared-types/src/index.js";
+import {
+  normalizeInstalledMobileEvent,
+  objectWrapCompatibleProbeData
+} from "./mobile-event-compatibility.js";
+
+export {
+  classifyInstalledMobileEventCompatibility,
+  normalizeInstalledMobileEvent,
+  objectWrapCompatibleProbeData
+} from "./mobile-event-compatibility.js";
+export type { InstalledMobileCompatibility } from "./mobile-event-compatibility.js";
 
 export interface NormalizedEvent {
   event_type: EventEnvelope["event_type"];
@@ -30,7 +41,16 @@ export const FINGERPRINT_VERSION = "v1";
 type CorrelationKey = "request_id" | "trace_id" | "session_id" | "user_id_hash";
 
 const PAYLOAD_ALLOWED_KEYS: Record<string, Set<string>> = {
-  backend_exception: new Set(["name", "message", "stack", "handled", "request", "response", "runtime", "probe_data"]),
+  backend_exception: new Set([
+    "name",
+    "message",
+    "stack",
+    "handled",
+    "request",
+    "response",
+    "runtime",
+    "probe_data"
+  ]),
   request_event: new Set([
     "method",
     "path",
@@ -41,10 +61,11 @@ const PAYLOAD_ALLOWED_KEYS: Record<string, Set<string>> = {
     "duration_ms",
     "route_template",
     "response_headers",
-    "response_body"
+    "response_body",
+    "device"
   ]),
-  log_event: new Set(["level", "message", "attributes"]),
-  frontend_breadcrumb: new Set(["breadcrumb_type", "route", "data"]),
+  log_event: new Set(["level", "message", "attributes", "device"]),
+  frontend_breadcrumb: new Set(["breadcrumb_type", "route", "data", "device"]),
   frontend_exception: new Set([
     "name",
     "message",
@@ -59,8 +80,15 @@ const PAYLOAD_ALLOWED_KEYS: Record<string, Set<string>> = {
     "probe_data"
   ]),
   deploy_metadata: new Set(["commit_sha", "version", "branch", "environment", "deployed_at"]),
-  error_suppressed: new Set(["fingerprint", "suppressed_count", "window_seconds", "first_seen", "last_seen"]),
-  probe_event: new Set(["label", "data", "activation_id", "probe_label_pattern"])
+  error_suppressed: new Set([
+    "fingerprint",
+    "suppressed_count",
+    "window_seconds",
+    "first_seen",
+    "last_seen",
+    "device"
+  ]),
+  probe_event: new Set(["label", "data", "activation_id", "probe_label_pattern", "device"])
 };
 
 function isRecord(candidate: unknown): candidate is Record<string, unknown> {
@@ -111,7 +139,9 @@ function mergeContext(
   };
 }
 
-function normalizeCorrelation(candidate: unknown): Record<CorrelationKey, string | null> | undefined {
+function normalizeCorrelation(
+  candidate: unknown
+): Record<CorrelationKey, string | null> | undefined {
   if (!isRecord(candidate)) {
     return undefined;
   }
@@ -171,11 +201,12 @@ function normalizePayloadExtras(input: {
 }
 
 export function normalizeCompatibleEventCandidate(candidate: unknown): unknown {
-  if (!isRecord(candidate)) {
-    return candidate;
+  const mobileCompatibleCandidate = normalizeInstalledMobileEvent(candidate);
+  if (!isRecord(mobileCompatibleCandidate)) {
+    return mobileCompatibleCandidate;
   }
 
-  const event = cloneRecord(candidate);
+  const event = cloneRecord(mobileCompatibleCandidate);
   const eventType = typeof event["event_type"] === "string" ? event["event_type"] : "";
   let context = normalizeMap(event["context"]);
 
@@ -191,6 +222,7 @@ export function normalizeCompatibleEventCandidate(candidate: unknown): unknown {
 
   if (isRecord(event["payload"])) {
     const payload = cloneRecord(event["payload"]);
+    objectWrapCompatibleProbeData(eventType, payload);
     context = mergeContext(context, payload["context"]);
     delete payload["context"];
 
@@ -199,7 +231,10 @@ export function normalizeCompatibleEventCandidate(candidate: unknown): unknown {
     }
     if (eventType === "request_event") {
       const attributes = isRecord(payload["attributes"]) ? payload["attributes"] : null;
-      if (typeof payload["route_template"] !== "string" && typeof attributes?.["route_template"] === "string") {
+      if (
+        typeof payload["route_template"] !== "string" &&
+        typeof attributes?.["route_template"] === "string"
+      ) {
         payload["route_template"] = attributes["route_template"];
       }
       context = mergeContext(context, attributes);
@@ -258,13 +293,15 @@ export function inferMatchedFields(event: NormalizedEvent): string[] {
   return matchedFields;
 }
 
-const UUID_PATTERN = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi;
+const UUID_PATTERN =
+  /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi;
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 const ISO_TIMESTAMP_PATTERN = /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z\b/g;
 const IPV4_PATTERN = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g;
 const HEX_PATTERN = /\b0x[0-9a-f]+\b/gi;
 const BARE_HEX_PATTERN = /\b(?=[0-9a-f]{8,}\b)(?=[0-9a-f]*[a-f])[0-9a-f]+\b/gi;
-const LONG_ALPHANUMERIC_TOKEN_PATTERN = /\b(?=[A-Za-z0-9_-]{16,}\b)(?=[A-Za-z0-9_-]*[A-Za-z])(?=[A-Za-z0-9_-]*\d)[A-Za-z0-9_-]+\b/g;
+const LONG_ALPHANUMERIC_TOKEN_PATTERN =
+  /\b(?=[A-Za-z0-9_-]{16,}\b)(?=[A-Za-z0-9_-]*[A-Za-z])(?=[A-Za-z0-9_-]*\d)[A-Za-z0-9_-]+\b/g;
 const LARGE_NUMBER_PATTERN = /\b\d{2,}\b/g;
 
 const DYNAMIC_SEGMENT_PATTERN = /^(?:\d+|[0-9a-f]{8}-[0-9a-f-]{27}|[A-Za-z0-9_-]{24,})$/;
@@ -285,25 +322,30 @@ const KNOWN_DATABASE_MESSAGE_FAMILIES: KnownDatabaseMessageFamily[] = [
     summary: "PostgreSQL authentication failed",
     when: (message) =>
       looksLikePostgresMessage(message) &&
-      (message.includes("password authentication failed") || message.includes("authentication failed for user"))
+      (message.includes("password authentication failed") ||
+        message.includes("authentication failed for user"))
   },
   {
     summary: "PostgreSQL host resolution failed",
     when: (message) =>
       looksLikePostgresMessage(message) &&
-      (message.includes("could not translate host name") || message.includes("getaddrinfo enotfound"))
+      (message.includes("could not translate host name") ||
+        message.includes("getaddrinfo enotfound"))
   },
   {
     summary: "PostgreSQL connection timed out",
     when: (message) =>
       looksLikePostgresMessage(message) &&
-      (message.includes("connection timed out") || message.includes("timeout expired") || message.includes("etimedout"))
+      (message.includes("connection timed out") ||
+        message.includes("timeout expired") ||
+        message.includes("etimedout"))
   },
   {
     summary: "PostgreSQL connection limit reached",
     when: (message) =>
       looksLikePostgresMessage(message) &&
-      (message.includes("too many connections") || message.includes("remaining connection slots are reserved"))
+      (message.includes("too many connections") ||
+        message.includes("remaining connection slots are reserved"))
   },
   {
     summary: "PostgreSQL database does not exist",
@@ -344,13 +386,16 @@ const KNOWN_DATABASE_MESSAGE_FAMILIES: KnownDatabaseMessageFamily[] = [
   {
     summary: "MongoDB host resolution failed",
     when: (message) =>
-      looksLikeMongoMessage(message) && (message.includes("getaddrinfo enotfound") || message.includes("ename not found"))
+      looksLikeMongoMessage(message) &&
+      (message.includes("getaddrinfo enotfound") || message.includes("ename not found"))
   },
   {
     summary: "MongoDB connection timed out",
     when: (message) =>
       looksLikeMongoMessage(message) &&
-      (message.includes("connection timed out") || message.includes("etimedout") || message.includes("server selection timed out"))
+      (message.includes("connection timed out") ||
+        message.includes("etimedout") ||
+        message.includes("server selection timed out"))
   },
   {
     summary: "MongoDB connection refused",
@@ -367,13 +412,16 @@ const KNOWN_DATABASE_MESSAGE_FAMILIES: KnownDatabaseMessageFamily[] = [
   {
     summary: "Redis host resolution failed",
     when: (message) =>
-      looksLikeRedisMessage(message) && (message.includes("getaddrinfo enotfound") || message.includes("ename not found"))
+      looksLikeRedisMessage(message) &&
+      (message.includes("getaddrinfo enotfound") || message.includes("ename not found"))
   },
   {
     summary: "Redis connection timed out",
     when: (message) =>
       looksLikeRedisMessage(message) &&
-      (message.includes("connection timed out") || message.includes("etimedout") || message.includes("timeout"))
+      (message.includes("connection timed out") ||
+        message.includes("etimedout") ||
+        message.includes("timeout"))
   },
   {
     summary: "Redis connection refused",
@@ -395,7 +443,9 @@ function looksLikeMySqlMessage(message: string): boolean {
 }
 
 function looksLikeMongoMessage(message: string): boolean {
-  return message.includes("mongodb") || message.includes("mongoserver") || message.includes("mongo");
+  return (
+    message.includes("mongodb") || message.includes("mongoserver") || message.includes("mongo")
+  );
 }
 
 function looksLikeRedisMessage(message: string): boolean {
@@ -483,7 +533,10 @@ function isDynamicRouteSegment(segment: string): boolean {
   }
 
   const strippedMalformedPercent = decodedSegment.replace(/%+/g, "");
-  return strippedMalformedPercent !== decodedSegment && DYNAMIC_SEGMENT_PATTERN.test(strippedMalformedPercent);
+  return (
+    strippedMalformedPercent !== decodedSegment &&
+    DYNAMIC_SEGMENT_PATTERN.test(strippedMalformedPercent)
+  );
 }
 
 function selectTopFrames(stack: string, limit = 5): string[] {
@@ -499,7 +552,10 @@ function selectTopFrames(stack: string, limit = 5): string[] {
   return frames;
 }
 
-function normalizeResourceIdentity(value: string | null): { host: string | null; path: string | null } {
+function normalizeResourceIdentity(value: string | null): {
+  host: string | null;
+  path: string | null;
+} {
   if (value === null) {
     return { host: null, path: null };
   }
@@ -554,7 +610,9 @@ function stableJson(value: unknown): string {
   return `{${pairs.join(",")}}`;
 }
 
-export function validateEvent(candidate: unknown): ReturnType<typeof EventEnvelopeSchema.safeParse> {
+export function validateEvent(
+  candidate: unknown
+): ReturnType<typeof EventEnvelopeSchema.safeParse> {
   return EventEnvelopeSchema.safeParse(normalizeCompatibleEventCandidate(candidate));
 }
 
@@ -689,7 +747,7 @@ export function classifyEvent(
   payload?: Record<string, unknown>,
   capturePreset: CapturePreset = "minimal",
   immediateClientErrorStatuses: readonly number[] = [],
-  immediateClientErrorPathRules: readonly ImmediateClientErrorPathRule[] = [],
+  immediateClientErrorPathRules: readonly ImmediateClientErrorPathRule[] = []
 ): EventClass {
   switch (eventType) {
     case "backend_exception":
