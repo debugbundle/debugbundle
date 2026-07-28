@@ -705,19 +705,19 @@ Framework integrations must auto-register log capture alongside error/request ca
 
 | Language | Package | Registry | Phase | Status |
 |----------|---------|----------|-------|--------|
-| Node.js | `@debugbundle/sdk-node` | npm | Phase 8 | Shipped (in `debugbundle-js` repo) |
-| Browser | `@debugbundle/sdk-browser` | npm | Phase 9 | Shipped (in `debugbundle-js` repo) |
-| Python | `debugbundle-python` | PyPI | Phase 18 | Shipped |
-| PHP | `debugbundle/sdk-php` | Packagist | Phase 18a | Shipped |
-| Java | `com.debugbundle:debugbundle-java-core`, servlet/JAX-RS adapters, `com.debugbundle:debugbundle-spring-boot-starter`, and `com.debugbundle:debugbundle-java-agent` | Maven Central | Java SDK | Pre-release |
-| Go | `github.com/debugbundle/debugbundle-go` | Go modules | Phase 18b | Pre-release |
-| Ruby | `debugbundle` | RubyGems | Phase 18c | Pre-release |
+| Node.js | `@debugbundle/sdk-node` | npm | Phase 8 | Released v1.6.0 (in `debugbundle-js` repo) |
+| Browser | `@debugbundle/sdk-browser` | npm | Phase 9 | Released v1.6.0 (in `debugbundle-js` repo) |
+| Python | `debugbundle-python` | PyPI | Phase 18 | Released v1.3.0 |
+| PHP | `debugbundle/sdk-php` | Packagist | Phase 18a | Released v1.3.0 |
+| Java | `com.debugbundle:debugbundle-java-core`, servlet/JAX-RS adapters, `com.debugbundle:debugbundle-spring-boot-starter`, and `com.debugbundle:debugbundle-java-agent` | Maven Central | Java SDK | Released v1.3.0 |
+| Go | `github.com/debugbundle/debugbundle-go` | Go modules | Phase 18b | Released v1.3.0 |
+| Ruby | `debugbundle` | RubyGems | Phase 18c | Released v1.3.0 |
 
 ### V1 SDK Targets (Wave 2 — Enterprise & Platform Depth)
 
 | Language | Package | Registry | Status |
 |----------|---------|----------|--------|
-| C# | `DebugBundle.Sdk` plus `DebugBundle.*` integrations | NuGet | Released v0.1.1 |
+| C# | `DebugBundle.Sdk` plus `DebugBundle.*` integrations | NuGet | Released v1.3.0 |
 | Kotlin (server) | `com.debugbundle:debugbundle-kotlin` | Maven Central | Planned |
 | Rust | `debugbundle` | crates.io | Planned |
 
@@ -725,9 +725,9 @@ Framework integrations must auto-register log capture alongside error/request ca
 
 | Language | Package | Registry | Status |
 |----------|---------|----------|--------|
-| Kotlin (Android) | `com.debugbundle:debugbundle-android` | Maven Central | Released v0.1.2 |
-| Swift (iOS) | `DebugBundle` | Swift Package Manager and CocoaPods | Released v0.1.1; CocoaPods `DebugBundle@0.1.1` published |
-| React Native | `@debugbundle/sdk-react-native` | npm | Released v0.1.1 |
+| Kotlin (Android) | `com.debugbundle:debugbundle-android` | Maven Central | Released v1.2.0 |
+| Swift (iOS) | `DebugBundle` | Swift Package Manager and CocoaPods | Released v1.2.0 through both registries |
+| React Native | `@debugbundle/sdk-react-native` | npm | Released v1.2.0 |
 | Dart / Flutter | `debugbundle` | pub.dev | Planned |
 
 ### V1 Framework Support Matrix

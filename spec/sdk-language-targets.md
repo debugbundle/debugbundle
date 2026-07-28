@@ -103,10 +103,10 @@ TypeScript and JavaScript are delivered as one shared npm SDK surface, exactly a
 **Published SDK expansion and prepared plans:**
 - `github.com/debugbundle/debugbundle-go` — Go SDK published through Go modules. Detailed implementation plan: `spec/sdks/go-sdk.md`.
 - `debugbundle` (RubyGems) — Ruby SDK published through RubyGems. Detailed implementation plan: `spec/sdks/ruby-sdk.md`.
-- `github.com/debugbundle/debugbundle-android` — Kotlin Android SDK 1.1.0 is published; the coordinated 1.2.0 source line implements canonical mobile envelopes, indexed ingestion acknowledgement, durable queueing, crash/ANR replay, native trace propagation, capture policy, probes, `beforeSend`, OkHttp/Ktor, Navigation/Compose, Timber, testkit, BOM, per-file coverage, and a Kotlin 2.1 consumer-metadata gate. The detailed plan lives in `spec/sdks/kotlin-sdk.md`.
-- `github.com/debugbundle/debugbundle-swift` — Swift iOS SDK 1.1.0 is published; the coordinated 1.2.0 source line implements canonical `{events}` delivery, indexed acknowledgement, durable queueing, URLSession/Alamofire, UIKit/SwiftUI, SwiftLog, crash replay, capture policy, probes, `beforeSend`, and per-file coverage through SwiftPM and CocoaPods. The detailed plan lives in `spec/sdks/swift-sdk.md`.
-- `github.com/debugbundle/debugbundle-react-native` — `@debugbundle/sdk-react-native` 1.1.0 is published; the coordinated 1.2.0 source line preserves its canonical RN envelope and JavaScript error identity through native Android/Swift queueing, composes native capture policy/probes/config, exposes actual asynchronous trigger-token validation, implements `beforeSend`, tracks a frozen npm lockfile, and fails release closed until published Android/Swift 1.2 clean-app smokes pass.
-- `github.com/debugbundle/debugbundle-dotnet` — C#/.NET SDK 1.2.0 implements the NuGet package family, remote config/capture policy/probes, canonical transport acknowledgement, `beforeSend`, secure local transports, and browser relay parity. The detailed plan lives in `spec/sdks/csharp-sdk.md`.
+- `github.com/debugbundle/debugbundle-android` — Kotlin Android SDK 1.2.0 is published with canonical mobile envelopes, indexed ingestion acknowledgement, durable queueing, crash/ANR replay, native trace propagation, capture policy, probes, `beforeSend`, OkHttp/Ktor, Navigation/Compose, Timber, testkit, BOM, per-file coverage, and a Kotlin 2.1 consumer-metadata gate. The detailed plan lives in `spec/sdks/kotlin-sdk.md`.
+- `github.com/debugbundle/debugbundle-swift` — Swift iOS SDK 1.2.0 is published through Swift Package Manager and CocoaPods with canonical `{events}` delivery, indexed acknowledgement, durable queueing, URLSession/Alamofire, UIKit/SwiftUI, SwiftLog, crash replay, capture policy, probes, `beforeSend`, and per-file coverage. The detailed plan lives in `spec/sdks/swift-sdk.md`.
+- `github.com/debugbundle/debugbundle-react-native` — `@debugbundle/sdk-react-native` 1.2.0 is published after clean consumers verified the Android and Swift 1.2 dependencies. It preserves its canonical RN envelope and JavaScript error identity through native queueing, composes native capture policy/probes/config, exposes actual asynchronous trigger-token validation, implements `beforeSend`, and tracks a frozen npm lockfile.
+- `github.com/debugbundle/debugbundle-dotnet` — C#/.NET SDK 1.3.0 implements the NuGet package family, remote config/capture policy/probes, canonical transport acknowledgement, `beforeSend`, secure local transports, and browser relay parity. The detailed plan lives in `spec/sdks/csharp-sdk.md`.
 
 ---
 
@@ -821,8 +821,8 @@ For the next phase of SDK implementation, DebugBundle should prioritize these tw
 
 - **Immediate implementation focus (Wave 1):** TS/JS, Python, PHP, WordPress plugin, Java core + Spring Boot + servlet/JAX-RS app-server support, Ruby, Go
 - **Pre-release expansion:** Ruby and Go publication handoff
-- **Next depth layer (Wave 2):** C#/.NET is on 1.2.0; Kotlin server and Rust remain future work.
-- **Strategic product expansion (Wave 3):** Kotlin Android, Swift iOS, and React Native have 1.1.0 published and coordinated 1.2.0 remediation in source; Dart/Flutter remains future work.
+- **Next depth layer (Wave 2):** C#/.NET is on 1.3.0; Kotlin server and Rust remain future work.
+- **Strategic product expansion (Wave 3):** Kotlin Android, Swift iOS, and React Native are published on the coordinated 1.2.0 remediation line; Dart/Flutter remains future work.
 
 ### V1 framework scope per SDK
 

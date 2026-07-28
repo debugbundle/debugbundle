@@ -31,9 +31,8 @@ DebugBundle supports two runtime modes: **local-only** (no cloud account require
 │    debugbundle-wordpress, com.debugbundle Java SDK,             │
 │    debugbundle Ruby SDK, github.com/debugbundle/debugbundle-go  │
 │  Published native/runtime surface:                              │
-│    .NET 1.2.0; Android/Swift/RN 1.1.0 are published, with       │
-│    coordinated 1.2.0 source lines awaiting release. Android/    │
-│    Swift emit canonical mobile envelopes, parse indexed         │
+│    .NET 1.3.0 and coordinated Android/Swift/RN 1.2.0 releases.  │
+│    Android/Swift emit canonical mobile envelopes, parse indexed │
 │    acknowledgements, own durable delivery, and expose additive  │
 │    RN external-event/probe/policy bridge APIs.                   │
 │  Future expansion: Kotlin server, Rust, and Dart/Flutter        │
@@ -245,7 +244,7 @@ packages/
   — debugbundle-ruby   → github.com/debugbundle/debugbundle-ruby (Ruby SDK: Rails + Rack + Sidekiq; release-ready local standalone repo)
   — debugbundle-go     → github.com/debugbundle/debugbundle-go (published Go SDK with core, secure transports, relay, net/http, Gin, Echo, slog, zap, zerolog, remote config, probes, examples, CI, and release workflow)
   — site               → github.com/debugbundle/site (public docs/blog/marketing site)
-  — Wave 2/3 SDKs → separate repos per `spec/sdk-language-targets.md`; .NET is on 1.2.0, while Android, Swift, and React Native have 1.1.0 published and a coordinated remediated 1.2.0 source line. Their local repositories implement canonical connected delivery, per-event acknowledgements, universal `beforeSend`, object-wrapped probes, and the native RN event/policy/probe/config boundary. Kotlin server, Rust, and Dart/Flutter remain future work.
+  — Wave 2/3 SDKs → separate repos per `spec/sdk-language-targets.md`; .NET 1.3.0 and the coordinated Android, Swift, and React Native 1.2.0 line are published. These releases implement canonical connected delivery, per-event acknowledgements, universal `beforeSend`, object-wrapped probes, and the native RN event/policy/probe/config boundary. Kotlin server, Rust, and Dart/Flutter remain future work.
 
 sdks/                    — Local standalone SDK clone roots managed by `sdks.json` and `scripts/bootstrap-sdks.sh`
   debugbundle-js/        — github.com/debugbundle/debugbundle-js (public standalone repo; cloned on demand for single-workspace development)
