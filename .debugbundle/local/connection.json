@@ -1,7 +1,7 @@
 {
   "mode": "connected",
-  "cloud_project_id": "1a1ce9ae-2333-4b0a-9686-50155404f93b",
-  "cloud_base_url": "http://localhost:3003",
+  "cloud_project_id": "bd9e7adf-31a4-4bb7-a0af-2f079cab2e3b",
+  "cloud_base_url": "https://api.debugbundle.com",
   "environments": {
     "local": {
       "delivery": "local-only"

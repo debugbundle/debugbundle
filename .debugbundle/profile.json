@@ -184,7 +184,7 @@
   },
   "debugbundle": {
     "profile_owner": "debugbundle-maintainers",
-    "last_reviewed_at": "2026-05-21T00:00:00.000Z",
+    "last_reviewed_at": "2026-07-28T23:30:00.000Z",
     "validation_status": "agent-validated",
     "skill_path": ".agents/skills/debugbundle",
     "notes": "Agent-validated profile for the DebugBundle core repo. Keep services, critical paths, and workflows aligned when architecture or public interfaces change."
