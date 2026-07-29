@@ -1381,6 +1381,10 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **When** the SDK sends a matching event
 - **Then** the event is rejected with reason `capture_rule_sampled_out`
 - **And** the raw event is not persisted
+- **Given** an active exact-fingerprint rule created from an incident-derived suggestion
+- **When** another event with that canonical fingerprint reaches ingestion
+- **Then** ingestion evaluates the rule against a server-derived fingerprint using the same fingerprint version and normalization as worker grouping
+- **And** the rule action is applied without accepting or trusting a client-supplied fingerprint
 
 ### AC-EVT-08f: Capture Rule Demotion Cannot Drive Incidents
 - **Given** a project with an active `demote` capture rule matching an incident-eligible event

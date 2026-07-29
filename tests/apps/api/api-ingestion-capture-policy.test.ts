@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createApiServer } from "../../../apps/api/src/server.ts";
+import {
+  FINGERPRINT_VERSION,
+  fingerprint,
+  normalizeEvent
+} from "../../../packages/event-normalizer/src/index.js";
 import { createEventEnvelope, type EventEnvelope } from "../../../packages/shared-types/src/index.js";
 import { mockedObject, type MockedMethods } from "../../helpers/vitest.ts";
 
@@ -786,6 +791,74 @@ describe("ingestion capture policy enforcement", () => {
           sample_rate: null,
           sample_event_class: null
         }
+      })
+    );
+  });
+
+  it("should evaluate exact-fingerprint demotion rules during ingestion", async (): Promise<void> => {
+    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/p/k.json.gz" });
+    const event = createEventEnvelope({
+      event_type: "backend_exception",
+      project_token: "dbundle_proj_test",
+      service: { name: "api", environment: "production", runtime: "node", framework: "fastify" },
+      payload: {
+        name: "FastifyError",
+        message: "Body cannot be empty when content-type is set to 'application/json'",
+        stack: "FastifyError: Body cannot be empty\n    at Parser.defaultJsonParser (content-type-parser.js:313:12)",
+        handled: false,
+        request: { method: "POST", path: "/v1/internal/dogfooding/backend-error", query: {}, headers: {}, body: null },
+        response: { status_code: 400, duration_ms: null },
+        runtime: { version: "24.18.0" }
+      }
+    });
+    const ruleId = "00000000-0000-4000-8000-000000000106";
+    const captureRuleManagement: CaptureRuleManagementDependency = {
+      listCaptureRulesForProject: vi.fn(),
+      listActiveCaptureRulesForProject: vi.fn().mockResolvedValue([{
+        id: ruleId,
+        project_id: "proj_123",
+        name: "Demote exact fingerprint",
+        description: null,
+        enabled: true,
+        action: "demote",
+        matcher: {
+          event_types: ["backend_exception"],
+          fingerprint: {
+            version: FINGERPRINT_VERSION,
+            value: fingerprint(normalizeEvent(event))
+          }
+        },
+        sample_rate: null,
+        sample_event_class: null,
+        created_by_user_id: null,
+        created_from_incident_id: null,
+        created_from_event_id: null,
+        expires_at: null,
+        hit_count: 0,
+        last_matched_at: null,
+        created_at: "2026-05-26T10:00:00.000Z",
+        updated_at: "2026-05-26T10:00:00.000Z"
+      }]),
+      createCaptureRuleForProject: vi.fn(),
+      updateCaptureRuleForProject: vi.fn(),
+      deleteCaptureRuleForProject: vi.fn(),
+      recordCaptureRuleMatch: vi.fn().mockResolvedValue(undefined)
+    };
+    const app = createApiServer(createBaseDependencies({ persistAndEnqueue, captureRuleManagement }));
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: { authorization: "Bearer dbundle_proj_test" },
+      payload: { events: [event] }
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(persistAndEnqueue).toHaveBeenCalledWith(
+      expect.any(Object),
+      "proj_123",
+      expect.objectContaining({
+        captureRule: expect.objectContaining({ rule_id: ruleId, outcome: "demote" })
       })
     );
   });

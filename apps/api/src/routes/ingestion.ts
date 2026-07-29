@@ -6,8 +6,11 @@ import {
   requireProjectToken
 } from "../../../../packages/auth/src/index.js";
 import {
+  FINGERPRINT_VERSION,
   classifyEvent,
   classifyInstalledMobileEventCompatibility,
+  fingerprint,
+  normalizeEvent,
   validateEvent
 } from "../../../../packages/event-normalizer/src/index.js";
 import {
@@ -299,6 +302,9 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
             project_id: project.project_id,
             now: now.toISOString()
           });
+    const captureRulesNeedFingerprint = activeCaptureRules.some(
+      (rule) => rule.matcher.fingerprint !== undefined
+    );
     const matchedRuleHits: Array<{ rule_id: string; matched_at: string }> = [];
     const acceptedEvents: Array<{
       index: number;
@@ -367,7 +373,15 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
                         : { runtime: entry.event.service.runtime })
                     },
                     payload: entry.event.payload as Record<string, unknown>
-                  }
+                  },
+                  ...(captureRulesNeedFingerprint
+                    ? {
+                        fingerprint: {
+                          version: FINGERPRINT_VERSION,
+                          value: fingerprint(normalizeEvent(entry.event))
+                        }
+                      }
+                    : {})
                 }),
                 now.toISOString()
               );

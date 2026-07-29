@@ -6,6 +6,12 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.7.2] - 2026-07-29
+
+### Fixed
+
+- Enforced incident-derived exact-fingerprint capture rules during ingestion by deriving the canonical server fingerprint before rule evaluation, while keeping the normal ingestion path unchanged for projects without fingerprint rules.
+
 ## [1.7.1] - 2026-07-29
 
 ### Added

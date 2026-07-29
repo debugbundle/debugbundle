@@ -2066,7 +2066,7 @@ Authorization: Bearer dbundle_member_...  (or browser session, owner/admin only)
 Content-Type: application/json
 ```
 
-Request body matches the shared capture-rule schema and supports `action: "demote" | "sample" | "drop"` plus matcher fields such as `event_types`, `services`, `environments`, `runtime`, `browser_event_kind`, `browser_event_opaque`, `client_kind`, `bot_family`, `message_equals`, `message_contains`, `error_name`, `resource_url`, `request_url`, `status_codes`, `first_party`, and optional `fingerprint`.
+Request body matches the shared capture-rule schema and supports `action: "demote" | "sample" | "drop"` plus matcher fields such as `event_types`, `services`, `environments`, `runtime`, `browser_event_kind`, `browser_event_opaque`, `client_kind`, `bot_family`, `message_equals`, `message_contains`, `error_name`, `resource_url`, `request_url`, `status_codes`, `first_party`, and optional `fingerprint`. Exact-fingerprint matchers are evaluated at ingestion against the server-derived, versioned canonical fingerprint used by worker grouping; clients do not provide or control the evaluated fingerprint.
 
 **Suggest capture rules from an incident:**
 
