@@ -234,6 +234,8 @@ The billing page must expose explicit allowance-capacity controls for paid plans
 - Cancelling a scheduled reduction releases the Stripe subscription schedule and keeps the current quantity in place.
 - Active projects remain active when capacity is reduced; the resulting change is to the shared allowance pool, not project existence.
 - For internally managed admin-override accounts (`stripe_customer_id = null` on a paid plan), the same billing page controls remain available, but both increases and reductions apply immediately by writing the absolute purchased-capacity quantity directly instead of using Stripe subscription updates or schedules.
+- The billing page must show the exact usage-window end in the browser's local timezone together with its UTC equivalent. Calendar-month Free and internal-plan windows remain UTC-authoritative; Stripe-managed paid accounts use the persisted Stripe billing-period boundary.
+- An open billing page must refresh just after the usage-window boundary and when the page becomes visible or focused again. Background refresh failures keep the last trustworthy summary visible, late background reads must not overwrite newer checkout, trial, or capacity results, and billing summary reads must bypass browser/intermediary caches.
 
 ---
 

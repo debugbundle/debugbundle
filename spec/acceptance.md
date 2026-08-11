@@ -734,6 +734,14 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** existing debugging workflows are not interrupted
 - **And** billing-related operations return explicit errors without affecting core debugging access
 
+### AC-BILL-02: Billing Window Reset Visibility
+- **Given** an owner keeps the Billing page open across the current usage-window boundary
+- **When** the boundary passes or the page becomes visible or focused again
+- **Then** the page bypasses cached billing responses and refreshes the usage window and monthly meters
+- **And** the Billing window card shows the exact reset time in the browser's local timezone together with UTC
+- **And** a failed background refresh keeps the last trustworthy summary visible
+- **And** a late background response cannot overwrite a newer checkout, trial, or capacity result
+
 ---
 
 ## 13. Alert Acceptance

@@ -248,15 +248,13 @@ describe("web api client", () => {
       notifications.push(notifications.length + 1);
     });
 
-    vi.stubGlobal(
-      "fetch",
-      vi
-        .fn()
-        .mockResolvedValueOnce(new Response(JSON.stringify({ error: "invalid_session" }), { status: 401 }))
-        .mockResolvedValueOnce(new Response(JSON.stringify({ error: "invalid_session" }), { status: 401 }))
-        .mockResolvedValueOnce(new Response(JSON.stringify({ session: createSession() }), { status: 200 }))
-        .mockResolvedValueOnce(new Response(JSON.stringify({ error: "invalid_session" }), { status: 401 }))
-    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: "invalid_session" }), { status: 401 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: "invalid_session" }), { status: 401 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ session: createSession() }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: "invalid_session" }), { status: 401 }));
+    vi.stubGlobal("fetch", fetchMock);
 
     await expect(getBillingSummary()).rejects.toBeInstanceOf(InvalidSessionError);
     await expect(getBillingSummary()).rejects.toBeInstanceOf(InvalidSessionError);
@@ -266,6 +264,10 @@ describe("web api client", () => {
     unsubscribe();
 
     expect(notifications).toEqual([1, 2]);
+    expect(fetchMock).toHaveBeenNthCalledWith(1, buildApiUrl("/v1/billing"), {
+      credentials: "include",
+      cache: "no-store"
+    });
   });
 
   it("ignores logout 401 responses and clears the csrf header state", async () => {

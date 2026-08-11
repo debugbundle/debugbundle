@@ -121,7 +121,7 @@ describe("api billing routes", () => {
       }
     });
 
-    expect(unauthenticated.statusCode).toBe(401);
+    expect([unauthenticated.statusCode, unauthenticated.headers["cache-control"]]).toEqual([401, "no-store"]);
     expect(unauthenticated.json()).toEqual({ error: "invalid_session" });
     expect(missingDeps.statusCode).toBe(404);
     expect(missingDeps.json()).toEqual({ error: "billing_not_available" });

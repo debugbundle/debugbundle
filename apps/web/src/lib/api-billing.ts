@@ -16,7 +16,8 @@ type BillingSummaryResponse = {
 export async function getBillingSummary(): Promise<BillingSummaryRecord> {
   const body = await readJson<BillingSummaryResponse>(
     await fetch(`${API_BASE}/v1/billing`, {
-      credentials: "include"
+      credentials: "include",
+      cache: "no-store"
     })
   );
 

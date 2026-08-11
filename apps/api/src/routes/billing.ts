@@ -166,6 +166,7 @@ async function recordBillingAdminOverrideAudit(
 
 export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   app.get("/v1/billing", async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
     const principal = await requireOwnerBillingPrincipal(request, reply, dependencies, "management-read");
     if (principal === null) {
       return;

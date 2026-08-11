@@ -6,6 +6,19 @@ export interface PendingBillingCheckout {
 }
 
 const BILLING_CHECKOUT_STORAGE_KEY = "debugbundle.billing.checkout";
+const BILLING_WINDOW_REFRESH_BUFFER_MS = 1_000;
+const BILLING_WINDOW_REFRESH_MAX_DELAY_MS = 86_400_000;
+const BILLING_WINDOW_REFRESH_RETRY_DELAY_MS = 30_000;
+
+interface BillingWindowFormatOptions {
+  locale?: Intl.LocalesArgument;
+  timeZone?: string;
+}
+
+interface BillingUsageWindow {
+  starts_at: string;
+  ends_at: string;
+}
 
 export function readPendingBillingCheckout(): PendingBillingCheckout | null {
   if (typeof window === "undefined") {
@@ -108,6 +121,70 @@ export function formatDate(value: string): string {
     day: "numeric",
     year: "numeric"
   }).format(new Date(value));
+}
+
+function formatDateInTimeZone(value: string, options: BillingWindowFormatOptions): string {
+  return new Intl.DateTimeFormat(options.locale, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: options.timeZone
+  }).format(new Date(value));
+}
+
+function formatTimeInTimeZone(
+  value: string,
+  options: BillingWindowFormatOptions & { timeZone: string }
+): string {
+  return new Intl.DateTimeFormat(options.locale, {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: options.timeZone,
+    timeZoneName: "short"
+  }).format(new Date(value));
+}
+
+function isUtcTimeZone(timeZone: string): boolean {
+  return timeZone === "UTC" || timeZone === "Etc/UTC" || timeZone === "Etc/GMT" || timeZone === "GMT";
+}
+
+export function formatBillingWindowDescription(
+  usageWindow: BillingUsageWindow,
+  options: BillingWindowFormatOptions = {}
+): string {
+  const timeZone = options.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
+  const startsAt = formatDateInTimeZone(usageWindow.starts_at, { ...options, timeZone });
+  const endsAt = formatDateInTimeZone(usageWindow.ends_at, { ...options, timeZone });
+  const localResetAt = `${endsAt} at ${formatTimeInTimeZone(usageWindow.ends_at, {
+    ...options,
+    timeZone
+  })}`;
+  const utcResetDate = formatDateInTimeZone(usageWindow.ends_at, {
+    ...options,
+    timeZone: "UTC"
+  });
+  const utcResetTime = formatTimeInTimeZone(usageWindow.ends_at, {
+    ...options,
+    timeZone: "UTC"
+  });
+  const utcResetAt = endsAt === utcResetDate ? utcResetTime : `${utcResetDate} at ${utcResetTime}`;
+  const resetAt = isUtcTimeZone(timeZone) ? localResetAt : `${localResetAt} (${utcResetAt})`;
+
+  return `Current window: ${startsAt} to ${endsAt}. Resets ${resetAt}.`;
+}
+
+export function getBillingWindowRefreshDelay(endsAt: string, now = Date.now()): number | null {
+  const parsedEndsAt = Date.parse(endsAt);
+  if (!Number.isFinite(parsedEndsAt)) {
+    return null;
+  }
+
+  const remaining = parsedEndsAt + BILLING_WINDOW_REFRESH_BUFFER_MS - now;
+  if (remaining <= 0) {
+    return BILLING_WINDOW_REFRESH_RETRY_DELAY_MS;
+  }
+
+  return Math.min(remaining, BILLING_WINDOW_REFRESH_MAX_DELAY_MS);
 }
 
 export function formatActiveProjectCount(value: number): string {

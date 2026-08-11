@@ -13,8 +13,10 @@ import {
   clearPendingBillingCheckout,
   formatActiveProjectCount,
   formatAllowanceUnitCount,
+  formatBillingWindowDescription,
   formatDate,
   formatPlanName,
+  getBillingWindowRefreshDelay,
   readPendingBillingCheckout,
   writePendingBillingCheckout
 } from "../../../apps/web/src/pages/billing-page.tsx";
@@ -170,6 +172,46 @@ describe("web page helper coverage", () => {
     expect(formatAllowanceUnitCount(1)).toBe("1 allowance unit");
     expect(formatAllowanceUnitCount(4)).toBe("4 allowance units");
     expect(formatDate("2026-04-23T11:56:12.000Z")).toMatch(/2026/);
+    expect(
+      formatBillingWindowDescription(
+        {
+          starts_at: "2026-07-01T00:00:00.000Z",
+          ends_at: "2026-08-01T00:00:00.000Z"
+        },
+        { locale: "en-GB", timeZone: "Europe/Ljubljana" }
+      )
+    ).toBe(
+      "Current window: 1 Jul 2026 to 1 Aug 2026. Resets 1 Aug 2026 at 02:00 CEST (00:00 UTC)."
+    );
+    expect(
+      formatBillingWindowDescription(
+        {
+          starts_at: "2026-07-01T00:00:00.000Z",
+          ends_at: "2026-08-01T00:00:00.000Z"
+        },
+        { locale: "en-GB", timeZone: "UTC" }
+      )
+    ).toBe("Current window: 1 Jul 2026 to 1 Aug 2026. Resets 1 Aug 2026 at 00:00 UTC.");
+    expect(
+      formatBillingWindowDescription(
+        {
+          starts_at: "2026-07-01T00:00:00.000Z",
+          ends_at: "2026-08-01T00:00:00.000Z"
+        },
+        { locale: "en-GB", timeZone: "America/Los_Angeles" }
+      )
+    ).toMatch(
+      /^Current window: 30 Jun 2026 to 31 Jul 2026\. Resets 31 Jul 2026 at 17:00 (?:PDT|GMT-7) \(1 Aug 2026 at 00:00 UTC\)\.$/
+    );
+  });
+
+  it("bounds billing refresh timers and retries safely after a passed boundary", () => {
+    const now = Date.parse("2026-07-01T00:00:00.000Z");
+
+    expect(getBillingWindowRefreshDelay("2026-07-01T00:01:00.000Z", now)).toBe(61_000);
+    expect(getBillingWindowRefreshDelay("2026-08-01T00:00:00.000Z", now)).toBe(86_400_000);
+    expect(getBillingWindowRefreshDelay("2026-06-30T23:59:00.000Z", now)).toBe(30_000);
+    expect(getBillingWindowRefreshDelay("not-a-date", now)).toBeNull();
   });
 
   it("renders checkout return dialog states", () => {

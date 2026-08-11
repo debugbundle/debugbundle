@@ -157,7 +157,7 @@ typecheck:
 
 .PHONY: web-check
 web-check:
-	$(NODE_RUN) "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm vitest run tests/apps/web/web-app-auth.test.tsx tests/apps/web/web-app-management.test.tsx tests/apps/web/web-app-incidents.test.tsx tests/apps/web/web-dogfooding.test.ts && corepack pnpm typecheck"
+	$(NODE_RUN) "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm vitest run tests/apps/web/web-app-auth.test.tsx tests/apps/web/web-app-billing-refresh.test.tsx tests/apps/web/web-app-management.test.tsx tests/apps/web/web-app-incidents.test.tsx tests/apps/web/web-dogfooding.test.ts && corepack pnpm typecheck"
 
 .PHONY: compose-check
 compose-check:

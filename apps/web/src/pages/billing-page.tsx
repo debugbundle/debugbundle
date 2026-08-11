@@ -1,5 +1,5 @@
 import { CreditCardIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { CalloutCard } from "../components/system/callout-card.js";
 import { PageHeader } from "../components/system/page-header.js";
@@ -27,9 +27,11 @@ import {
   clearPendingBillingCheckout,
   formatActiveProjectCount,
   formatAllowanceUnitCount,
+  formatBillingWindowDescription,
   formatDate,
   formatPlanName,
   formatTrialDaysRemaining,
+  getBillingWindowRefreshDelay,
   readPendingBillingCheckout,
   resolveRequestedTrialPlan,
   writePendingBillingCheckout
@@ -37,6 +39,7 @@ import {
 
 const BILLING_CHECKOUT_POLL_INTERVAL_MS = 250;
 const BILLING_CHECKOUT_MAX_POLL_ATTEMPTS = 6;
+const BILLING_BACKGROUND_REFRESH_MIN_INTERVAL_MS = 1_000;
 
 export function BillingPage(): JSX.Element {
   const { refreshSession } = useSession();
@@ -49,6 +52,12 @@ export function BillingPage(): JSX.Element {
   const [isCapacityDialogOpen, setIsCapacityDialogOpen] = useState(false);
   const [isRawIngestBreakdownOpen, setIsRawIngestBreakdownOpen] = useState(false);
   const [checkoutReturnDialog, setCheckoutReturnDialog] = useState<CheckoutReturnDialogState | null>(null);
+  // Older billing reads must not overwrite a later checkout, trial, or capacity response.
+  const billingStateRevisionRef = useRef(0);
+  const commitBilling = useCallback((nextBilling: BillingSummaryRecord): void => {
+    billingStateRevisionRef.current += 1;
+    setBilling(nextBilling);
+  }, []);
   const showBillingLoading = useDelayedVisibility(billing === null && !isForbidden);
   const checkoutStatus = searchParams.get("checkout");
   const checkoutSessionId = searchParams.get("session_id");
@@ -69,13 +78,16 @@ export function BillingPage(): JSX.Element {
     };
 
     const loadBillingSummary = async (): Promise<BillingSummaryRecord | null> => {
+      const revisionAtStart = billingStateRevisionRef.current;
       try {
         const nextBilling = await getBillingSummary();
         if (cancelled) {
           return null;
         }
 
-        setBilling(nextBilling);
+        if (revisionAtStart === billingStateRevisionRef.current) {
+          commitBilling(nextBilling);
+        }
         setIsForbidden(false);
         return nextBilling;
       } catch (error) {
@@ -99,7 +111,7 @@ export function BillingPage(): JSX.Element {
     const pendingCheckout = checkoutStatus === "success" ? readPendingBillingCheckout() : null;
 
     const completeCheckoutReturn = (nextBilling: BillingSummaryRecord): void => {
-      setBilling(nextBilling);
+      commitBilling(nextBilling);
       if (cancelled) {
         return;
       }
@@ -181,7 +193,99 @@ export function BillingPage(): JSX.Element {
         clearTimeout(pollTimer);
       }
     };
-  }, [checkoutSessionId, checkoutStatus, refreshSession, setSearchParams]);
+  }, [checkoutSessionId, checkoutStatus, commitBilling, refreshSession, setSearchParams]);
+
+  useEffect(() => {
+    const usageWindowEndsAt = billing?.usage_window.ends_at;
+    if (usageWindowEndsAt === undefined) {
+      return;
+    }
+
+    let disposed = false;
+    let timeoutId: number | null = null;
+    let refreshInFlight: Promise<void> | null = null;
+    let lastRefreshStartedAt = Number.NEGATIVE_INFINITY;
+
+    const clearScheduledRefresh = (): void => {
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+    };
+
+    const scheduleBoundaryRefresh = (): void => {
+      clearScheduledRefresh();
+      if (disposed || document.visibilityState !== "visible") {
+        return;
+      }
+
+      const delay = getBillingWindowRefreshDelay(usageWindowEndsAt);
+      if (delay === null) {
+        return;
+      }
+
+      timeoutId = window.setTimeout(() => {
+        void refreshBillingSummary();
+      }, delay);
+    };
+
+    const refreshBillingSummary = (): Promise<void> => {
+      clearScheduledRefresh();
+      const now = Date.now();
+      if (
+        disposed ||
+        refreshInFlight !== null ||
+        now - lastRefreshStartedAt < BILLING_BACKGROUND_REFRESH_MIN_INTERVAL_MS
+      ) {
+        scheduleBoundaryRefresh();
+        return refreshInFlight ?? Promise.resolve();
+      }
+
+      lastRefreshStartedAt = now;
+      const revisionAtStart = billingStateRevisionRef.current;
+      const request = getBillingSummary()
+        .then((nextBilling) => {
+          if (!disposed && revisionAtStart === billingStateRevisionRef.current) {
+            commitBilling(nextBilling);
+            setIsForbidden(false);
+          }
+        })
+        .catch(() => {
+          // Background refresh failures keep the last trustworthy summary visible.
+        })
+        .finally(() => {
+          if (refreshInFlight === request) {
+            refreshInFlight = null;
+          }
+          scheduleBoundaryRefresh();
+        });
+      refreshInFlight = request;
+      return request;
+    };
+
+    const handleVisibilityChange = (): void => {
+      if (document.visibilityState === "visible") {
+        void refreshBillingSummary();
+        return;
+      }
+
+      clearScheduledRefresh();
+    };
+    const handleFocus = (): void => {
+      void refreshBillingSummary();
+    };
+
+    scheduleBoundaryRefresh();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      disposed = true;
+      clearScheduledRefresh();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [billing?.usage_window.ends_at, commitBilling]);
 
   async function handleCheckout(targetPlan: "solo" | "team"): Promise<void> {
     setActiveCheckoutPlan(targetPlan);
@@ -222,7 +326,7 @@ export function BillingPage(): JSX.Element {
 
     try {
       const nextBilling = await startBillingTrial(targetPlan);
-      setBilling(nextBilling);
+      commitBilling(nextBilling);
       showSuccessToast(`${formatPlanName(targetPlan)} trial started successfully.`);
       setSearchParams((currentParams) => {
         const nextParams = new URLSearchParams(currentParams);
@@ -418,8 +522,9 @@ export function BillingPage(): JSX.Element {
                   <CalloutCard
                     eyebrow="Usage window"
                     title="Billing window"
-                    description={`Current window: ${formatDate(billing.usage_window.starts_at)} to ${formatDate(billing.usage_window.ends_at)}.`}
+                    description={formatBillingWindowDescription(billing.usage_window)}
                     tone="neutral"
+                    aria-live="polite"
                   />
                 </div>
 
@@ -466,7 +571,7 @@ export function BillingPage(): JSX.Element {
                     managementMode={isBillingManagedInternally ? "internal" : "stripe"}
                     open={isCapacityDialogOpen}
                     onOpenChange={setIsCapacityDialogOpen}
-                    onBillingChange={setBilling}
+                    onBillingChange={commitBilling}
                   />
                 )}
               </CardHeader>
@@ -565,8 +670,10 @@ export {
   clearPendingBillingCheckout,
   formatActiveProjectCount,
   formatAllowanceUnitCount,
+  formatBillingWindowDescription,
   formatDate,
   formatPlanName,
+  getBillingWindowRefreshDelay,
   readPendingBillingCheckout,
   writePendingBillingCheckout
 };

@@ -1072,6 +1072,8 @@ Project `metrics.attention_incidents_today` counts incidents first opened today 
 
 Billing summary, no-card trial start, and allowance-capacity management routes accept both browser session and owner-scoped member tokens. Checkout, checkout confirmation, and portal routes are browser-session-only interactive surfaces. Stripe checkout sessions are created dynamically with `client_reference_id` = `organization_id`; the success URL includes Stripe's `{CHECKOUT_SESSION_ID}` placeholder so the web app can ask the API to verify the returned Checkout Session and sync the account immediately.
 
+`GET /v1/billing` returns `Cache-Control: no-store`. The web Billing page displays the exact `usage_window.ends_at` boundary in the browser's local timezone together with UTC, refreshes just after that boundary, and refreshes again when the page becomes visible or focused. A late background billing response must not replace a newer checkout, trial, or capacity result.
+
 For paid internally managed accounts (`stripe_customer_id = null`), the same capacity routes remain available. In that mode, increases and reductions both apply immediately to the stored purchased-capacity quantity and `pending_reduction` remains `null`.
 
 **Billing summary response shape:**
