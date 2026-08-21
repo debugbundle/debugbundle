@@ -231,6 +231,7 @@ Browser-session bootstrap endpoints exist for the SPA flow only. The separate Gi
 ```
 
 GitHub sign-in preserves the same first-party browser-session model as email-code auth. The start endpoint redirects to GitHub and sets a transient `SameSite=Lax` OAuth state cookie; the callback validates that state, links or creates the user account through `oauth_identities`, issues the normal session cookie, clears the transient OAuth cookie, and redirects back to the app callback URL.
+The callback accepts GitHub's RFC 9207 `iss` query parameter only when it exactly matches `https://github.com/login/oauth`; callbacks without `iss` remain supported for backwards compatibility.
 
 When GitHub sign-in returns a profile image URL, the API may fetch and cache that avatar server-side in first-party object storage as a best-effort post-login step. Avatar import failures must not block authentication.
 
