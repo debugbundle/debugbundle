@@ -1,3 +1,4 @@
+import { GITHUB_OAUTH_ISSUER } from "../../../packages/auth/src/index.js";
 import {
   MAX_BILLING_ADDITIONAL_CAPACITY_UNITS,
   ProjectColorTagSchema
@@ -65,7 +66,8 @@ export const AcceptInviteBodySchema = z
 export const GithubAuthCallbackQuerySchema = z
   .object({
     code: z.string().min(1),
-    state: z.string().min(1)
+    state: z.string().min(1),
+    iss: z.literal(GITHUB_OAUTH_ISSUER).optional()
   })
   .strict();
 

@@ -420,6 +420,7 @@ The API should expose first-party browser-auth endpoints for:
 - GitHub auth start/callback endpoints when OAuth is enabled
 
 These endpoints are for the SPA and should operate through session cookies rather than member tokens.
+The GitHub callback accepts the provider's RFC 9207 `iss` parameter only when it exactly matches `https://github.com/login/oauth`; callbacks without `iss` remain valid for backwards compatibility with older GitHub authorization responses.
 
 ### 10.2 Member-Authorized Endpoints
 

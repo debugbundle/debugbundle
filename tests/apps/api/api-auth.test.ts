@@ -687,7 +687,7 @@ describe("api auth routes", () => {
 
     const callback = await app.inject({
       method: "GET",
-      url: "/v1/auth/github/callback?code=oauth-code&state=oauth-state",
+      url: "/v1/auth/github/callback?code=oauth-code&state=oauth-state&iss=https%3A%2F%2Fgithub.com%2Flogin%2Foauth",
       headers: {
         cookie: "dbundle_github_oauth_state=oauth-state"
       }
@@ -786,7 +786,7 @@ describe("api auth routes", () => {
     const callbackInvalidQueryApp = createServer();
     const invalidQuery = await callbackInvalidQueryApp.inject({
       method: "GET",
-      url: "/v1/auth/github/callback?code=oauth-code"
+      url: "/v1/auth/github/callback?code=oauth-code&state=oauth-state&iss=https%3A%2F%2Fattacker.example%2Flogin%2Foauth"
     });
 
     const callbackCreatedUserApp = createServer({

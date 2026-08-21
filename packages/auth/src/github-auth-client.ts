@@ -5,6 +5,7 @@ const DEFAULT_GITHUB_ACCESS_TOKEN_URL = "https://github.com/login/oauth/access_t
 const DEFAULT_GITHUB_DEVICE_CODE_URL = "https://github.com/login/device/code";
 const DEFAULT_GITHUB_USER_URL = "https://api.github.com/user";
 const DEFAULT_GITHUB_EMAILS_URL = "https://api.github.com/user/emails";
+const GITHUB_OAUTH_ISSUER = "https://github.com/login/oauth";
 
 export interface GitHubOAuthIdentity {
   github_user_id: string;
@@ -315,4 +316,4 @@ export function createGitHubOAuthClient(config: GitHubOAuthClientConfig): GitHub
   };
 }
 
-export { DEFAULT_GITHUB_AUTHORIZE_URL };
+export { DEFAULT_GITHUB_AUTHORIZE_URL, GITHUB_OAUTH_ISSUER };
