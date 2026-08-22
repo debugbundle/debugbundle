@@ -36,7 +36,7 @@ import {
 } from "../../../../packages/shared-types/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import {
-  claimAnalyticsIngestionQuota,
+  claimAnalyticsIngestionQuotaAtBoundary,
   getAnalyticsQuotaClaimKeysForEvent,
   releaseAnalyticsQuotaClaimBestEffort,
   toRetryAfterSeconds as toAnalyticsRetryAfterSeconds
@@ -125,8 +125,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
       }
     }
     const compatibilityEventCount =
-      compatibilityEventCounts.legacy_android_event +
-      compatibilityEventCounts.legacy_swift_event;
+      compatibilityEventCounts.legacy_android_event + compatibilityEventCounts.legacy_swift_event;
     if (compatibility !== null || compatibilityEventCount > 0) {
       request.log.info(
         {
@@ -305,7 +304,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
     const captureRulesNeedFingerprint = activeCaptureRules.some(
       (rule) => rule.matcher.fingerprint !== undefined
     );
-    const matchedRuleHits: Array<{ rule_id: string; matched_at: string }> = [];
+    let matchedRuleHits: Array<{ event_index: number; rule_id: string; matched_at: string }> = [];
     const acceptedEvents: Array<{
       index: number;
       event: ReturnType<typeof redactEvent>;
@@ -388,7 +387,11 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
 
         if (captureRule?.outcome === "drop") {
           errors.push({ index: entry.index, reason: "capture_rule_dropped" });
-          matchedRuleHits.push({ rule_id: captureRule.rule_id, matched_at: now.toISOString() });
+          matchedRuleHits.push({
+            event_index: entry.index,
+            rule_id: captureRule.rule_id,
+            matched_at: now.toISOString()
+          });
           rejectedMetricEvents.push({
             event_id: entry.event.event_id,
             reason: "capture_rule_dropped"
@@ -405,7 +408,11 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
 
         if (captureRule?.outcome === "sampled_out") {
           errors.push({ index: entry.index, reason: "capture_rule_sampled_out" });
-          matchedRuleHits.push({ rule_id: captureRule.rule_id, matched_at: now.toISOString() });
+          matchedRuleHits.push({
+            event_index: entry.index,
+            rule_id: captureRule.rule_id,
+            matched_at: now.toISOString()
+          });
           rejectedMetricEvents.push({
             event_id: entry.event.event_id,
             reason: "capture_rule_sampled_out"
@@ -421,7 +428,11 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
         }
 
         if (captureRule !== null) {
-          matchedRuleHits.push({ rule_id: captureRule.rule_id, matched_at: now.toISOString() });
+          matchedRuleHits.push({
+            event_index: entry.index,
+            rule_id: captureRule.rule_id,
+            matched_at: now.toISOString()
+          });
         }
 
         acceptedEvents.push({
@@ -475,86 +486,98 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
           });
 
         const allowance = billingSummary?.allowances.monthly_raw_ingested_events;
-        if (
-          billingSummary !== null &&
-          allowance !== undefined &&
-          allowance.used + countedEvents.length > allowance.limit
-        ) {
-          const quotaExceededErrors = acceptedEvents.map(({ index }) => ({
-            index,
-            reason: "monthly_quota_exceeded"
-          }));
-          const quotaRejectedMetricEvents = acceptedEvents.map(({ event }) => ({
-            event_id: event.event_id,
-            reason: "monthly_quota_exceeded" as const
-          }));
-          const quotaRejectedDiagnosticEvents = acceptedEvents.map(({ event }) =>
-            buildRejectedDiagnosticFromEvent({
-              project_id: project.project_id,
-              rejection_reason: "monthly_quota_exceeded",
-              event
-            })
+        if (billingSummary !== null) {
+          usageWindowStartsAt = billingSummary.usage_window.starts_at;
+          usageWindowEndsAt = billingSummary.usage_window.ends_at;
+          previousRawIngestAllowanceUsed = allowance?.used ?? null;
+          rawIngestAllowanceLimit = allowance?.limit ?? null;
+        }
+
+        if (billingSummary === null || allowance === undefined) {
+          billingCountedEventsCount = countedEvents.length;
+        } else {
+          const remaining = Math.max(0, allowance.limit - allowance.used);
+          const admittedCountedEvents = countedEvents.slice(0, remaining);
+          const quotaRejectedEvents = countedEvents.slice(remaining);
+          const countedIndexes = new Set(countedEvents.map(({ index }) => index));
+          const admittedCountedIndexes = new Set(admittedCountedEvents.map(({ index }) => index));
+          const quotaRejectedIndexes = new Set(quotaRejectedEvents.map(({ index }) => index));
+
+          billingCountedEventsCount = admittedCountedEvents.length;
+          debugEventsToPersist = acceptedEvents.filter(
+            ({ index }) => !countedIndexes.has(index) || admittedCountedIndexes.has(index)
+          );
+          matchedRuleHits = matchedRuleHits.filter(
+            ({ event_index }) => !quotaRejectedIndexes.has(event_index)
           );
 
-          if (dependencies.operationalEmailDelivery !== undefined) {
-            await queueAllowanceLimitReachedNotification({
-              store: dependencies.operationalEmailDelivery,
-              project_id: project.project_id,
-              meter: "monthly_raw_ingested_events",
-              used: allowance.used,
-              limit: allowance.limit,
-              usage_window_starts_at: billingSummary.usage_window.starts_at,
-              usage_window_ends_at: billingSummary.usage_window.ends_at
-            });
-          }
-          const retryAfterMs = getQuotaRetryAfterMs(billingSummary.usage_window.ends_at, now);
-          errors.push(...quotaExceededErrors);
-          rejectedMetricEvents.push(...quotaRejectedMetricEvents);
-          rejectedDiagnosticEvents.push(...quotaRejectedDiagnosticEvents);
+          if (quotaRejectedEvents.length > 0) {
+            errors.push(
+              ...quotaRejectedEvents.map(({ index }) => ({
+                index,
+                reason: "monthly_quota_exceeded"
+              }))
+            );
+            rejectedMetricEvents.push(
+              ...quotaRejectedEvents.map(({ event }) => ({
+                event_id: event.event_id,
+                reason: "monthly_quota_exceeded" as const
+              }))
+            );
+            rejectedDiagnosticEvents.push(
+              ...quotaRejectedEvents.map(({ event }) =>
+                buildRejectedDiagnosticFromEvent({
+                  project_id: project.project_id,
+                  rejection_reason: "monthly_quota_exceeded",
+                  event
+                })
+              )
+            );
 
-          if (acceptedAnalyticsEvents.length === 0) {
-            const metricRecordResult = await recordIngestionMetricBatchBestEffort({
-              dependencies,
-              log: request.log,
-              organization_id: project.organization_id,
-              project_id: project.project_id,
-              organization_plan: project.organization_plan,
-              occurred_at: now.toISOString(),
-              accepted_events: [],
-              rejected_events: rejectedMetricEvents
-            });
-            if (metricRecordResult === "recorded") {
-              await recordRejectedDiagnosticsBestEffort({
-                dependencies,
-                log: request.log,
-                organization_id: project.organization_id,
-                occurred_at: now.toISOString(),
-                rejected_events: rejectedDiagnosticEvents
+            if (dependencies.operationalEmailDelivery !== undefined) {
+              await queueAllowanceLimitReachedNotification({
+                store: dependencies.operationalEmailDelivery,
+                project_id: project.project_id,
+                meter: "monthly_raw_ingested_events",
+                used: allowance.used,
+                limit: allowance.limit,
+                usage_window_starts_at: billingSummary.usage_window.starts_at,
+                usage_window_ends_at: billingSummary.usage_window.ends_at
               });
             }
 
-            return reply
-              .header("Retry-After", toIngestionRetryAfterSeconds(retryAfterMs))
-              .status(429)
-              .send({
-                accepted: 0,
-                rejected: errors.length,
-                errors,
-                retry_after_ms: retryAfterMs
+            if (debugEventsToPersist.length === 0 && acceptedAnalyticsEvents.length === 0) {
+              const metricRecordResult = await recordIngestionMetricBatchBestEffort({
+                dependencies,
+                log: request.log,
+                organization_id: project.organization_id,
+                project_id: project.project_id,
+                organization_plan: project.organization_plan,
+                occurred_at: now.toISOString(),
+                accepted_events: [],
+                rejected_events: rejectedMetricEvents
               });
-          }
+              if (metricRecordResult === "recorded") {
+                await recordRejectedDiagnosticsBestEffort({
+                  dependencies,
+                  log: request.log,
+                  organization_id: project.organization_id,
+                  occurred_at: now.toISOString(),
+                  rejected_events: rejectedDiagnosticEvents
+                });
+              }
 
-          debugEventsToPersist = [];
-          matchedRuleHits.length = 0;
-        }
-
-        if (debugEventsToPersist.length > 0) {
-          billingCountedEventsCount = countedEvents.length;
-          if (billingSummary !== null) {
-            usageWindowStartsAt = billingSummary.usage_window.starts_at;
-            usageWindowEndsAt = billingSummary.usage_window.ends_at;
-            previousRawIngestAllowanceUsed = allowance?.used ?? null;
-            rawIngestAllowanceLimit = allowance?.limit ?? null;
+              const retryAfterMs = getQuotaRetryAfterMs(billingSummary.usage_window.ends_at, now);
+              return reply
+                .header("Retry-After", toIngestionRetryAfterSeconds(retryAfterMs))
+                .status(429)
+                .send({
+                  accepted: 0,
+                  rejected: errors.length,
+                  errors,
+                  retry_after_ms: retryAfterMs
+                });
+            }
           }
         }
       }
@@ -572,30 +595,31 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
     }
     const persistAnalyticsAndEnqueue = dependencies.ingestionPersistence.persistAnalyticsAndEnqueue;
     if (persistAnalyticsAndEnqueue !== undefined) {
-      const analyticsQuota = await claimAnalyticsIngestionQuota({
+      const analyticsQuota = await claimAnalyticsIngestionQuotaAtBoundary({
         dependencies,
         organization_id: project.organization_id,
         organization_plan: project.organization_plan,
         events: acceptedAnalyticsEvents,
         now
       });
-      if (!analyticsQuota.allowed) {
+      if (analyticsQuota.rejected_events.length > 0) {
         errors.push(
-          ...acceptedAnalyticsEvents.map(({ index }) => ({
+          ...analyticsQuota.rejected_events.map(({ index }) => ({
             index,
             reason: "analytics_quota_exceeded"
           }))
         );
-        acceptedAnalyticsEvents = [];
-        if (accepted === 0) {
+        acceptedAnalyticsEvents = analyticsQuota.accepted_events;
+        if (accepted === 0 && acceptedAnalyticsEvents.length === 0) {
+          const retryAfterMs = analyticsQuota.retry_after_ms ?? 1_000;
           return reply
-            .header("Retry-After", toAnalyticsRetryAfterSeconds(analyticsQuota.retry_after_ms))
+            .header("Retry-After", toAnalyticsRetryAfterSeconds(retryAfterMs))
             .status(429)
             .send({
               accepted: 0,
               rejected: errors.length,
               errors,
-              retry_after_ms: analyticsQuota.retry_after_ms
+              retry_after_ms: retryAfterMs
             });
         }
       }
@@ -610,11 +634,13 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
           accepted += 1;
         }
       } catch (error) {
-        await releaseAnalyticsQuotaClaimBestEffort({
-          dependencies,
-          release: analyticsQuota.allowed ? analyticsQuota.release : undefined,
-          exclude_claim_keys: persistedAnalyticsClaimKeys
-        });
+        for (const release of analyticsQuota.releases) {
+          await releaseAnalyticsQuotaClaimBestEffort({
+            dependencies,
+            release,
+            exclude_claim_keys: persistedAnalyticsClaimKeys
+          });
+        }
         throw error;
       }
     }

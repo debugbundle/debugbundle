@@ -420,7 +420,8 @@ The API should expose first-party browser-auth endpoints for:
 - GitHub auth start/callback endpoints when OAuth is enabled
 
 These endpoints are for the SPA and should operate through session cookies rather than member tokens.
-The GitHub callback accepts the provider's RFC 9207 `iss` parameter only when it exactly matches `https://github.com/login/oauth`; callbacks without `iss` remain valid for backwards compatibility with older GitHub authorization responses.
+Provider-controlled browser redirect callbacks validate every consumed or security-relevant query field and strip unknown query parameters before route logic runs. This applies consistently to GitHub sign-in, GitHub App setup, and Slack OAuth redirects; it does not relax signed webhook verification.
+The GitHub callback accepts the provider's RFC 9207 `iss` parameter only when it exactly matches `https://github.com/login/oauth`; callbacks without `iss` remain valid for backwards compatibility with older GitHub authorization responses, and unrelated provider extensions are ignored.
 
 ### 10.2 Member-Authorized Endpoints
 

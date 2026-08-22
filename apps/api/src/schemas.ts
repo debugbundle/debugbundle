@@ -5,6 +5,13 @@ import {
 } from "../../../packages/shared-types/src/index.js";
 import { z } from "zod";
 
+// Providers may extend redirect query strings. Validate fields we consume and strip everything else.
+function thirdPartyCallbackQuerySchema<Shape extends z.ZodRawShape>(
+  shape: Shape
+): z.ZodObject<Shape> {
+  return z.object(shape).strip();
+}
+
 export const RequestedTrialPlanSchema = z.enum(["solo", "team"]);
 
 export const IngestionRequestSchema = z
@@ -63,13 +70,11 @@ export const AcceptInviteBodySchema = z
   })
   .strict();
 
-export const GithubAuthCallbackQuerySchema = z
-  .object({
-    code: z.string().min(1),
-    state: z.string().min(1),
-    iss: z.literal(GITHUB_OAUTH_ISSUER).optional()
-  })
-  .strict();
+export const GithubAuthCallbackQuerySchema = thirdPartyCallbackQuerySchema({
+  code: z.string().min(1),
+  state: z.string().min(1),
+  iss: z.literal(GITHUB_OAUTH_ISSUER).optional()
+});
 
 export const GithubMockAuthorizeQuerySchema = z
   .object({
@@ -113,13 +118,11 @@ export const GithubTokenExchangeBodySchema = z
   })
   .strict();
 
-export const GitHubAppCallbackQuerySchema = z
-  .object({
-    installation_id: z.coerce.number().int().positive(),
-    setup_action: z.enum(["install", "update", "request"]).optional(),
-    state: z.string().min(1).optional()
-  })
-  .passthrough();
+export const GitHubAppCallbackQuerySchema = thirdPartyCallbackQuerySchema({
+  installation_id: z.coerce.number().int().positive(),
+  setup_action: z.enum(["install", "update", "request"]).optional(),
+  state: z.string().min(1).optional()
+});
 
 export const GitHubAppInstallUrlQuerySchema = z
   .object({
@@ -127,13 +130,11 @@ export const GitHubAppInstallUrlQuerySchema = z
   })
   .strict();
 
-export const SlackAppCallbackQuerySchema = z
-  .object({
-    code: z.string().min(1).optional(),
-    state: z.string().min(1).optional(),
-    error: z.string().min(1).optional()
-  })
-  .passthrough();
+export const SlackAppCallbackQuerySchema = thirdPartyCallbackQuerySchema({
+  code: z.string().min(1).optional(),
+  state: z.string().min(1).optional(),
+  error: z.string().min(1).optional()
+});
 
 export const SlackAppInstallUrlQuerySchema = z
   .object({

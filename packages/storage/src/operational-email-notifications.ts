@@ -31,7 +31,12 @@ function isMonthlyAllowanceMeter(meter: AllowanceMeter): boolean {
   return MONTHLY_ALLOWANCE_METERS.has(meter);
 }
 
-function crossesThreshold(previousUsed: number, nextUsed: number, limit: number, ratio: number): boolean {
+function crossesThreshold(
+  previousUsed: number,
+  nextUsed: number,
+  limit: number,
+  ratio: number
+): boolean {
   if (limit <= 0) {
     return false;
   }
@@ -53,7 +58,9 @@ function buildAllowanceDedupeKey(input: {
   return `${input.kind}:${input.meter}:window:${input.usage_window_starts_at ?? "unknown"}`;
 }
 
-function withUsageWindowStart(input: string | null | undefined): { usage_window_starts_at?: string | null } {
+function withUsageWindowStart(input: string | null | undefined): {
+  usage_window_starts_at?: string | null;
+} {
   if (input === undefined) {
     return {};
   }
@@ -116,7 +123,9 @@ export async function queueAllowanceThresholdNotifications(
         meter: input.meter,
         used: input.next_used,
         limit: input.limit,
-        usage_window_ends_at: isMonthlyAllowanceMeter(input.meter) ? input.usage_window_ends_at ?? null : null
+        usage_window_ends_at: isMonthlyAllowanceMeter(input.meter)
+          ? (input.usage_window_ends_at ?? null)
+          : null
       }
     });
   }
@@ -129,7 +138,9 @@ export async function queueAllowanceThresholdNotifications(
       used: input.next_used,
       limit: input.limit,
       usage_window_starts_at: input.usage_window_starts_at ?? null,
-      usage_window_ends_at: isMonthlyAllowanceMeter(input.meter) ? input.usage_window_ends_at ?? null : null
+      usage_window_ends_at: isMonthlyAllowanceMeter(input.meter)
+        ? (input.usage_window_ends_at ?? null)
+        : null
     });
   }
 }
@@ -143,7 +154,7 @@ export async function queueAllowanceLimitReachedNotification(input: {
   usage_window_starts_at?: string | null;
   usage_window_ends_at?: string | null;
 }): Promise<void> {
-  if (input.limit <= 0) {
+  if (input.limit <= 0 || input.used < input.limit) {
     return;
   }
 
@@ -160,7 +171,9 @@ export async function queueAllowanceLimitReachedNotification(input: {
       meter: input.meter,
       used: input.used,
       limit: input.limit,
-      usage_window_ends_at: isMonthlyAllowanceMeter(input.meter) ? input.usage_window_ends_at ?? null : null
+      usage_window_ends_at: isMonthlyAllowanceMeter(input.meter)
+        ? (input.usage_window_ends_at ?? null)
+        : null
     }
   });
 }

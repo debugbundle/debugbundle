@@ -7,7 +7,10 @@ import {
 } from "../../../packages/storage/src/operational-email-notifications.js";
 import type { OperationalEmailDeliveryStore } from "../../../packages/storage/src/types.js";
 
-function createStoreMock(): Pick<OperationalEmailDeliveryStore, "queueProjectOperationalEmailDelivery"> {
+function createStoreMock(): Pick<
+  OperationalEmailDeliveryStore,
+  "queueProjectOperationalEmailDelivery"
+> {
   return {
     queueProjectOperationalEmailDelivery: vi.fn().mockResolvedValue({
       delivery_id: "opem_123",
@@ -68,6 +71,22 @@ describe("operational email notifications", () => {
         usage_window_ends_at: null
       }
     });
+  });
+
+  it("does not queue a limit-reached email while usage remains below the limit", async (): Promise<void> => {
+    const store = createStoreMock();
+
+    await queueAllowanceLimitReachedNotification({
+      store,
+      project_id: "proj_123",
+      meter: "monthly_raw_ingested_events",
+      used: 169_999,
+      limit: 170_000,
+      usage_window_starts_at: "2026-07-01T00:00:00.000Z",
+      usage_window_ends_at: "2026-08-01T00:00:00.000Z"
+    });
+
+    expect(store.queueProjectOperationalEmailDelivery).not.toHaveBeenCalled();
   });
 
   it("queues one retention rotation notice per dedupe date", async (): Promise<void> => {

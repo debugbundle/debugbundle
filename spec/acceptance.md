@@ -197,6 +197,14 @@ Last updated: 2026-07-04
 - **When** `POST /v1/events` is called
 - **Then** the API returns a 401 unauthorized response
 
+### AC-ING-04: Exact Monthly Allowance Boundary
+- **Given** a hosted project has one whole metered ingestion unit remaining
+- **When** a valid batch contains multiple otherwise-eligible metered events
+- **Then** the API accepts the first metered event, reaches the exact defined limit, and returns indexed quota errors only for the surplus
+- **And** accepted and rejected counts reconcile to the submitted batch
+- **And** events excluded from the applicable meter remain eligible even when metered usage is exhausted
+- **And** a resulting limit-reached notification reports actual usage at or above the limit, never `limit - 1`
+
 ---
 
 ## 2a. Availability Check Acceptance
@@ -664,6 +672,15 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Then** the browser receives a secure session cookie
 - **And** the SPA does not require a browser-stored member token for routine interactive use
 
+### AC-AUTH-07a: Third-Party Callback Query Compatibility
+- **Given** a GitHub sign-in, GitHub App setup, or Slack OAuth redirect with valid consumed fields plus an unknown provider query parameter
+- **When** DebugBundle parses the callback
+- **Then** the callback continues through its normal flow
+- **And** the unknown parameter is stripped before route or domain logic can consume it
+- **And** malformed or duplicated consumed fields are rejected
+- **And** GitHub's optional OAuth issuer is rejected unless it exactly matches the expected issuer
+- **And** signed webhook verification behavior remains unchanged
+
 ### AC-AUTH-08: GitHub Device Bootstrap
 - **Given** a user runs `debugbundle login --github`
 - **When** the CLI shows a GitHub device URL and code, the user approves the OAuth app in a browser, and the CLI continues polling
@@ -741,6 +758,15 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** the Billing window card shows the exact reset time in the browser's local timezone together with UTC
 - **And** a failed background refresh keeps the last trustworthy summary visible
 - **And** a late background response cannot overwrite a newer checkout, trial, or capacity result
+
+### AC-BILL-03: Exact Allowance Utilization
+- **Given** any hosted monthly allowance for bundle requests, raw ingestion, remote activations, alert deliveries, webhook deliveries, or analytics usage has whole units remaining
+- **When** new eligible work reaches or crosses the boundary
+- **Then** work that brings usage exactly to the tier-and-capacity limit is permitted
+- **And** only units beyond the limit are rejected or suppressed
+- **And** batched or fan-out work consumes the exact remaining units in deterministic order
+- **And** non-reservation counters use no conservative under-admission margin, so concurrent contention may produce a small visible overage but must not strand advertised capacity
+- **And** limit-reached notifications are not queued with usage below the defined limit
 
 ---
 
@@ -1649,6 +1675,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **When** new analytics events or bundle-generation requests arrive
 - **Then** analytics-specific quota errors are returned with `Retry-After` when the API rejects the request synchronously
 - **And** otherwise-valid debug events in the same ingestion batch are still accepted unless the shared request-level ingestion rate limit is exceeded
+- **And** an analytics batch that crosses an event or session boundary atomically accepts every event that still fits all applicable meters and returns indexed quota errors only for the surplus
 - **And** existing debug incident ingestion and failure bundle retrieval remain governed by their own allowances
 
 ### AC-ANL-20: Self-Host Parity

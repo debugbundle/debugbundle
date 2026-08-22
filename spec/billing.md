@@ -368,6 +368,8 @@ included_capacity_units + additional_capacity_units
 
 The same value expands pooled monthly allowance capacity (each capacity unit carries a full allowance bucket), including the separately metered monthly analytics event, session, retained-journey-sample, and generated-analytics-bundle allowances on paid tiers. Free receives a fixed, non-expandable preview of 5,000 analytics events, 1,000 sessions, 100 retained journey samples, 3 generated analytics bundles, and 1 saved funnel. Fixed tier capabilities such as saved funnels, custom dimensions, retention windows, and feature availability do not multiply with capacity units. Controlled custom-dimension caps are 1 on Free, 3 on Solo, 8 on Team, and 20 on self-host.
 
+Allowance boundaries are inclusive of the defined limit: work that changes usage from `limit - 1` to `limit` is permitted, while only subsequent units are rejected or suppressed. Batched and fan-out paths must consume at most the exact remaining whole units in deterministic order rather than rejecting the entire batch and stranding available capacity. Meters backed by a durable reservation claim must enforce that boundary atomically. For counters derived from durable accepted records, simultaneous requests must not be handled with a conservative under-admission margin; a small concurrency overage is preferable to rejecting while the authoritative usage snapshot remains below the advertised limit, and that overage must remain visible in actual usage. Operational limit-reached notifications must use actual post-admission usage and must not be queued while `used < limit`.
+
 ### 6.3 Recurring Billing Rule
 
 Recurring payments must be able to both preserve and revoke paid entitlements.

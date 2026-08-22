@@ -26,7 +26,7 @@ export type AnalyticsQuotaClaim =
       };
     };
 
-type AnalyticsQuotaEvent = {
+export type AnalyticsQuotaEvent = {
   event: {
     event_id: string;
     payload: {
@@ -151,8 +151,12 @@ async function claimAnalyticsUsage(input: {
         ...release,
         analytics_events: claimed.filter((entry) => entry.metric === "analytics_events").length,
         analytics_sessions: claimed.filter((entry) => entry.metric === "analytics_sessions").length,
-        analytics_journey_samples: claimed.filter((entry) => entry.metric === "analytics_journey_samples").length,
-        analytics_bundle_generations: claimed.filter((entry) => entry.metric === "analytics_bundle_generations").length,
+        analytics_journey_samples: claimed.filter(
+          (entry) => entry.metric === "analytics_journey_samples"
+        ).length,
+        analytics_bundle_generations: claimed.filter(
+          (entry) => entry.metric === "analytics_bundle_generations"
+        ).length,
         claim_keys: claim.claimed_keys
       }
     };
@@ -192,6 +196,65 @@ export async function claimAnalyticsIngestionQuota(input: {
   });
 }
 
+export async function claimAnalyticsIngestionQuotaAtBoundary<TEvent extends AnalyticsQuotaEvent>(input: {
+  dependencies: ApiDependencies;
+  organization_id: string | undefined;
+  organization_plan: string | undefined;
+  events: TEvent[];
+  now: Date;
+}): Promise<{
+  accepted_events: TEvent[];
+  rejected_events: TEvent[];
+  releases: AnalyticsAllowanceReleaseInput[];
+  retry_after_ms: number | null;
+}> {
+  const batchClaim = await claimAnalyticsIngestionQuota(input);
+  if (batchClaim.allowed) {
+    return {
+      accepted_events: input.events,
+      rejected_events: [],
+      releases: batchClaim.release === undefined ? [] : [batchClaim.release],
+      retry_after_ms: null
+    };
+  }
+
+  if (input.events.length <= 1) {
+    return {
+      accepted_events: [],
+      rejected_events: input.events,
+      releases: [],
+      retry_after_ms: batchClaim.retry_after_ms
+    };
+  }
+
+  const acceptedEvents: TEvent[] = [];
+  const rejectedEvents: TEvent[] = [];
+  const releases: AnalyticsAllowanceReleaseInput[] = [];
+  let retryAfterMs = batchClaim.retry_after_ms;
+
+  // The full-batch claim is the normal fast path. Near a boundary, atomic
+  // per-event claims consume every usable unit without over-claiming a meter.
+  for (const event of input.events) {
+    const eventClaim = await claimAnalyticsIngestionQuota({ ...input, events: [event] });
+    if (eventClaim.allowed) {
+      acceptedEvents.push(event);
+      if (eventClaim.release !== undefined) {
+        releases.push(eventClaim.release);
+      }
+    } else {
+      rejectedEvents.push(event);
+      retryAfterMs = eventClaim.retry_after_ms;
+    }
+  }
+
+  return {
+    accepted_events: acceptedEvents,
+    rejected_events: rejectedEvents,
+    releases,
+    retry_after_ms: retryAfterMs
+  };
+}
+
 export async function claimAnalyticsBundleGenerationQuota(input: {
   dependencies: ApiDependencies;
   organization_id: string;
@@ -226,12 +289,13 @@ export async function releaseAnalyticsQuotaClaimBestEffort(input: {
     return;
   }
   const excludeClaimKeys = input.exclude_claim_keys;
-  const release = input.release.claim_keys === undefined || excludeClaimKeys === undefined
-    ? input.release
-    : {
-        ...input.release,
-        claim_keys: input.release.claim_keys.filter((key) => !excludeClaimKeys.has(key))
-      };
+  const release =
+    input.release.claim_keys === undefined || excludeClaimKeys === undefined
+      ? input.release
+      : {
+          ...input.release,
+          claim_keys: input.release.claim_keys.filter((key) => !excludeClaimKeys.has(key))
+        };
   await input.dependencies.analyticsUsage
     .releaseAnalyticsUsageForOrganization(release)
     .catch(() => undefined);
@@ -244,11 +308,18 @@ export function getAnalyticsQuotaClaimKeysForEvent(event: AnalyticsQuotaEvent["e
   ];
 }
 
-function buildIngestionQuotaClaims(events: AnalyticsQuotaEvent[]): AnalyticsAllowanceIdempotencyClaim[] {
+function buildIngestionQuotaClaims(
+  events: AnalyticsQuotaEvent[]
+): AnalyticsAllowanceIdempotencyClaim[] {
   return events.flatMap(({ event }) => [
     { claim_key: `event:${event.event_id}`, metric: "analytics_events" as const },
     ...(event.payload.kind === "session_start"
-      ? [{ claim_key: `session:${event.correlation.session_id}`, metric: "analytics_sessions" as const }]
+      ? [
+          {
+            claim_key: `session:${event.correlation.session_id}`,
+            metric: "analytics_sessions" as const
+          }
+        ]
       : [])
   ]);
 }

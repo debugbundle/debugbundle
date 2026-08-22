@@ -180,10 +180,11 @@ The billing store must enforce event class separation when computing `monthly_ra
 - **Free plans:** Only Class A events (`event_class = 'incident_signal'`) count against the primary monthly allowance. Class B (context signals) and Class C (operational signals) are excluded.
 - **Paid plans (Solo, Team):** Class A and Class B events count. Class C events (`error_suppressed`, standalone `probe_event`) are excluded on all tiers.
 - No event may change class after normalization. The `event_class` assigned during worker normalization is immutable for billing purposes.
+- Every whole allowance unit is usable: ingestion may accept an event that brings metered usage exactly to the limit, batched ingestion rejects only the metered surplus in stable input order, and unmetered event classes remain eligible after the metered allowance is exhausted.
 
 This invariant ensures that passive telemetry (request events outside the preset-specific immediate request-failure set, deploy metadata, operational aggregates) never silently consumes a Free user's primary error-capture budget, while immediate request failures are deliberately treated as Class A incident signals. 5xx is immediate for every preset; `balanced` and `investigative` also promote 408/423/424/425/429; `investigative` additionally promotes 409. Project policy may explicitly promote additional `4xx` statuses or narrower status+path+method rules, but unpromoted `4xx` telemetry, including repeated generic 404s, remains non-incident context.
 
-**Enforcement:** Billing query tests must verify that Free-tier usage counts exclude Class B and Class C events. Integration tests must confirm that identical ingestion payloads produce different billing counts on Free vs. paid plans.
+**Enforcement:** Billing query tests must verify that Free-tier usage counts exclude Class B and Class C events. Integration tests must confirm that identical ingestion payloads produce different billing counts on Free vs. paid plans. Boundary tests must prove exact final-unit admission, indexed surplus rejection, and continued acceptance of unmetered events.
 
 ---
 

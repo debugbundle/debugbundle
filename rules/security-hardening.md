@@ -46,6 +46,9 @@ Default browser-session lifetime must not exceed 7 days. Changes to session life
 ### SEC-09: Constant-Time Security Comparisons
 All security-sensitive string comparisons (token validation, HMAC verification, OAuth state, CSRF tokens, trigger-token signatures) must use constant-time comparison (`crypto.timingSafeEqual` in Node, `crypto.subtle.verify` in browser). Never use `===` for secrets.
 
+### SEC-09a: Third-Party Redirect Query Evolution
+Provider-controlled browser redirect callbacks must validate every query field the application consumes, including exact provider identifiers when present, and strip unknown query fields before route or domain logic runs. Unknown provider extensions must not break a callback or remain available for accidental downstream use. Missing, malformed, or duplicated consumed fields still fail closed. This rule does not relax signature or payload validation for provider webhooks.
+
 ### SEC-10: Dev-Only Endpoints Fail In Production
 Any dev-only or mock endpoint (e.g., mock OAuth login) must fail at server startup when `NODE_ENV=production`, not at request time. The API must not boot with dev surfaces exposed in production.
 

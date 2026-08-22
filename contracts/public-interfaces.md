@@ -231,7 +231,7 @@ Browser-session bootstrap endpoints exist for the SPA flow only. The separate Gi
 ```
 
 GitHub sign-in preserves the same first-party browser-session model as email-code auth. The start endpoint redirects to GitHub and sets a transient `SameSite=Lax` OAuth state cookie; the callback validates that state, links or creates the user account through `oauth_identities`, issues the normal session cookie, clears the transient OAuth cookie, and redirects back to the app callback URL.
-The callback accepts GitHub's RFC 9207 `iss` query parameter only when it exactly matches `https://github.com/login/oauth`; callbacks without `iss` remain supported for backwards compatibility.
+The callback accepts GitHub's RFC 9207 `iss` query parameter only when it exactly matches `https://github.com/login/oauth`; callbacks without `iss` remain supported for backwards compatibility. Other unrecognized provider query parameters are stripped and do not fail or influence the callback.
 
 When GitHub sign-in returns a profile image URL, the API may fetch and cache that avatar server-side in first-party object storage as a best-effort post-login step. Avatar import failures must not block authentication.
 
@@ -308,7 +308,7 @@ Anonymized aggregate account-usage metrics are preserved after deletion for life
 
 `POST /v1/events` is subject to the shared API request body limit. Requests with a declared `Content-Length` over the limit are rejected before project-token auth, schema validation, persistence, or queueing. The route is also subject to per-project-token ingestion rate limiting using the active tier capability (`ingestion_rate_per_min`). When the limit is exceeded, the API must reject the batch before persistence and return `429 Too Many Requests` with a `Retry-After` header.
 
-The endpoint accepts the existing debug event family plus opt-in `analytics_event` envelopes when project analytics is enabled. Mixed debug/analytics batches are split after validation: debug events follow existing capture-policy/event-class/incident paths, while analytics events follow analytics enablement, controlled custom-dimension validation, analytics-specific event/session allowance checks, short-lived persistence, and analytics rollup queue paths without creating incidents directly. Analytics allowance checks use durable internal analytics counters for event/session ingestion, retained journey samples, and on-demand AnalyticsBundle generation, and do not add analytics keys to the public billing summary `allowances` object.
+The endpoint accepts the existing debug event family plus opt-in `analytics_event` envelopes when project analytics is enabled. Mixed debug/analytics batches are split after validation: debug events follow existing capture-policy/event-class/incident paths, while analytics events follow analytics enablement, controlled custom-dimension validation, analytics-specific event/session allowance checks, short-lived persistence, and analytics rollup queue paths without creating incidents directly. Monthly allowance boundaries are inclusive: an event that brings usage exactly to its limit is accepted. If a debug or analytics batch crosses a monthly boundary, otherwise-eligible events are admitted in stable input order through the exact remaining whole units and only the surplus receives indexed quota errors; events excluded from the applicable meter are unaffected. Analytics allowance checks use durable internal analytics counters for event/session ingestion, retained journey samples, and on-demand AnalyticsBundle generation, and do not add analytics keys to the public billing summary `allowances` object.
 
 The canonical direct-ingestion wrapper is `{ "events": [...] }`. After successful project-token authentication only, ingestion also recognizes the exact `{ "batch": [...] }` wrapper and legacy mobile event shapes emitted by installed Android/Swift 1.x clients. That bounded compatibility branch is SDK-identity-gated, deterministically fills missing legacy IDs, normalizes only known shipped mobile fields, and then applies the same closed canonical schema. It must not make arbitrary malformed clients permissive. Structured compatibility diagnostics and counters must remain bounded and distinguish wrapper normalization, event normalization, and final rejection.
 
@@ -403,7 +403,9 @@ The canonical direct-ingestion wrapper is `{ "events": [...] }`. After successfu
 
 When the shared `monthly_raw_ingested_events` allowance is exhausted, new hosted events are rejected before persistence with `monthly_quota_exceeded`. Already stored data remains retrievable.
 
-Analytics events use separate analytics allowances. Currently implemented analytics-specific rejection reasons include `analytics_disabled`, `analytics_invalid_event`, `analytics_invalid_dimension`, and `analytics_quota_exceeded`; planned consent-specific reasons include `analytics_consent_required`. Analytics-only quota exhaustion returns `429` with `Retry-After`; mixed batches can return `202` with only analytics events rejected. These rejections must not reject otherwise-valid debug events in the same batch unless a shared request-level limit is exceeded.
+When a batch has fewer remaining raw-ingestion units than eligible metered events, the response may be partially accepted. For example, with one unit remaining, a three-event metered batch returns `202` with `accepted: 1`, `rejected: 2`, and `monthly_quota_exceeded` errors for indexes `1` and `2`. Free-tier Class B and Class C events, and Class C events on paid tiers, do not consume this allowance and are not rejected solely because it is exhausted.
+
+Analytics events use separate analytics allowances. Currently implemented analytics-specific rejection reasons include `analytics_disabled`, `analytics_invalid_event`, `analytics_invalid_dimension`, and `analytics_quota_exceeded`; planned consent-specific reasons include `analytics_consent_required`. Analytics-only quota exhaustion returns `429` with `Retry-After`; a batch that has at least one atomically claimed analytics event returns `202` and indexed `analytics_quota_exceeded` errors only for events that do not fit every applicable event/session meter. Mixed batches can return `202` with only analytics events rejected. These rejections must not reject otherwise-valid debug events in the same batch unless a shared request-level limit is exceeded.
 
 Rate-limited responses also include `Retry-After: <seconds>` so SDKs can back off without guessing.
 
@@ -1436,7 +1438,7 @@ These routes back the Team-tier `Connect Slack` flow inside the project alerts m
 }
 ```
 
-`GET /v1/slack/app/callback` validates the signed install state, exchanges the Slack OAuth code, upserts the reusable destination, clears the transient cookie, and redirects back to the requested app path with `slack_connect=success|cancelled|error`.
+`GET /v1/slack/app/callback` validates the signed install state, exchanges the Slack OAuth code, upserts the reusable destination, clears the transient cookie, and redirects back to the requested app path with `slack_connect=success|cancelled|error`. Unrecognized Slack query parameters are stripped before callback logic runs.
 
 Current implementation behavior:
 - `GET /v1/slack/app/install-url` requires owner/admin access, a Team-tier organization, and a scoped project.
@@ -2299,7 +2301,7 @@ Direct browser SDKs may use the opted-in analytics block only to narrow a local 
 | GET | `/v1/github/app/callback` | None | GitHub App setup URL / post-install redirect handler |
 | POST | `/v1/github/app/webhook` | GitHub App webhook secret (HMAC-SHA256) | Installation lifecycle events |
 
-The setup callback endpoint completes the App installation flow for trusted in-app installs: it requires the signed install `state` to match the transient install cookie, validates the `installation_id` through the GitHub App client before recording it in `github_installations`, accepts GitHub's optional `setup_action`, and redirects the user back into the originating DebugBundle project GitHub tab. If GitHub reaches the setup URL without DebugBundle's install state, such as a direct Marketplace install, the endpoint clears any stale install cookie and redirects to the web app without trusting or persisting the unauthenticated `installation_id`.
+The setup callback endpoint completes the App installation flow for trusted in-app installs: it requires the signed install `state` to match the transient install cookie, validates the `installation_id` through the GitHub App client before recording it in `github_installations`, accepts GitHub's optional `setup_action`, strips unrecognized provider query parameters, and redirects the user back into the originating DebugBundle project GitHub tab. If GitHub reaches the setup URL without DebugBundle's install state, such as a direct Marketplace install, the endpoint clears any stale install cookie and redirects to the web app without trusting or persisting the unauthenticated `installation_id`.
 
 The webhook endpoint handles `installation.created`, `installation.deleted`, `installation.suspend`, and `installation.unsuspend` events. All payloads are verified with HMAC-SHA256 using `GITHUB_APP_WEBHOOK_SECRET`.
 
