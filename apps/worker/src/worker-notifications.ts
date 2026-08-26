@@ -435,7 +435,7 @@ export function createGitHubDispatchTransport(input: {
           method: "POST",
           headers: {
             accept: "application/vnd.github+json",
-            authorization: `token ${token}`,
+            authorization: `Bearer ${token}`,
             "content-type": "application/json",
             "x-github-api-version": "2022-11-28",
             "user-agent": "DebugBundle/0.1"

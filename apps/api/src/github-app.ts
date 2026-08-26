@@ -181,7 +181,7 @@ export function createGitHubAppClient(
         "/installation/repositories",
         {
           method: "GET",
-          headers: buildGitHubHeaders(`token ${token}`)
+          headers: buildGitHubHeaders(`Bearer ${token}`)
         },
         GitHubInstallationRepositoriesResponseSchema
       );

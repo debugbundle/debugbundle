@@ -2077,7 +2077,7 @@ describe("worker runtime", () => {
       "https://api.github.com/repos/debugbundle/app/dispatches",
       expect.objectContaining({
         method: "POST",
-        headers: expect.objectContaining({ authorization: "token ghs_cached" }),
+        headers: expect.objectContaining({ authorization: "Bearer ghs_cached" }),
         body: expect.stringContaining('"dispatch_id":"gdd_2"')
       })
     );
