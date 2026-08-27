@@ -8,6 +8,7 @@ import {
 import {
   FINGERPRINT_VERSION,
   classifyEvent,
+  classifyInstalledJavaEventCompatibility,
   classifyInstalledMobileEventCompatibility,
   fingerprint,
   normalizeEvent,
@@ -115,6 +116,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
       });
     }
     const compatibilityEventCounts = {
+      legacy_java_runtime_event: 0,
       legacy_android_event: 0,
       legacy_swift_event: 0
     };
@@ -123,9 +125,14 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
       if (eventCompatibility !== null) {
         compatibilityEventCounts[eventCompatibility]++;
       }
+      if (classifyInstalledJavaEventCompatibility(candidate) !== null) {
+        compatibilityEventCounts.legacy_java_runtime_event++;
+      }
     }
     const compatibilityEventCount =
-      compatibilityEventCounts.legacy_android_event + compatibilityEventCounts.legacy_swift_event;
+      compatibilityEventCounts.legacy_java_runtime_event +
+      compatibilityEventCounts.legacy_android_event +
+      compatibilityEventCounts.legacy_swift_event;
     if (compatibility !== null || compatibilityEventCount > 0) {
       request.log.info(
         {

@@ -58,7 +58,12 @@ The MCP package release manifest must include package-level MCP Registry metadat
 5. Publish `@debugbundle/shared-types` and `@debugbundle/redaction` to npm
 6. Smoke-test clean installs from the registry
 
-The public core repository currently uses package-scoped release workflows rather than a single root `release.yml`. If a future release model introduces a monolithic tag workflow, this document must be updated in the same change.
+**release.yml** — Runs on `v*` tags or manual dispatch:
+1. Validate that the requested stable version matches the root package version
+2. Run the focused core release quality gates and public-site artifact contract checks
+3. Create the canonical core GitHub tag and Release while reporting the independently versioned package surfaces
+
+The root release is the canonical product release for the core monorepo. It does not republish the independently versioned CLI, MCP, shared JS, or standalone SDK packages.
 
 Public CI must NEVER contain deployment config, cloud credentials, or infrastructure code.
 

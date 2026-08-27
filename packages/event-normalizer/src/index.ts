@@ -13,7 +13,13 @@ import {
   normalizeInstalledMobileEvent,
   objectWrapCompatibleProbeData
 } from "./mobile-event-compatibility.js";
+import { normalizeInstalledJavaEvent } from "./java-event-compatibility.js";
 
+export {
+  classifyInstalledJavaEventCompatibility,
+  normalizeInstalledJavaEvent
+} from "./java-event-compatibility.js";
+export type { InstalledJavaCompatibility } from "./java-event-compatibility.js";
 export {
   classifyInstalledMobileEventCompatibility,
   normalizeInstalledMobileEvent,
@@ -201,7 +207,9 @@ function normalizePayloadExtras(input: {
 }
 
 export function normalizeCompatibleEventCandidate(candidate: unknown): unknown {
-  const mobileCompatibleCandidate = normalizeInstalledMobileEvent(candidate);
+  const mobileCompatibleCandidate = normalizeInstalledMobileEvent(
+    normalizeInstalledJavaEvent(candidate)
+  );
   if (!isRecord(mobileCompatibleCandidate)) {
     return mobileCompatibleCandidate;
   }

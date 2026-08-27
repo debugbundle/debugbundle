@@ -5,6 +5,7 @@ import { statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const repoRoot = process.cwd();
+const localComposePath = join(repoRoot, "docker-compose.yml");
 const selfhostComposePath = join(repoRoot, "deploy", "selfhost", "docker-compose.yml");
 const selfhostEnvExamplePath = join(repoRoot, "deploy", "selfhost", ".env.example");
 const selfhostReadmePath = join(repoRoot, "deploy", "selfhost", "README.md");
@@ -12,6 +13,18 @@ const makefilePath = join(repoRoot, "Makefile");
 const localstackInitHookPath = join(repoRoot, "deploy", "selfhost", "localstack-init", "01-create-bucket.sh");
 
 describe("self-host deployment baseline", () => {
+  it("pins LocalStack to the last Community image instead of the licensed latest image", () => {
+    const localCompose = readFileSync(localComposePath, "utf8");
+    const selfhostCompose = readFileSync(selfhostComposePath, "utf8");
+    const makefile = readFileSync(makefilePath, "utf8");
+
+    expect(localCompose).toContain("image: localstack/localstack:4.14.0");
+    expect(selfhostCompose).toContain("image: localstack/localstack:4.14.0");
+    expect(localCompose).not.toContain("image: localstack/localstack:latest");
+    expect(selfhostCompose).not.toContain("image: localstack/localstack:latest");
+    expect(makefile).toContain("$(INTEGRATION_COMPOSE) up -d --wait postgres redis localstack;");
+  });
+
   it("defines the full self-host service topology and bootstrap behavior", () => {
     const compose = readFileSync(selfhostComposePath, "utf8");
 

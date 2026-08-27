@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  classifyInstalledJavaEventCompatibility,
   classifyInstalledMobileEventCompatibility,
   objectWrapCompatibleProbeData,
   validateEvent
 } from "../../../packages/event-normalizer/src/index.js";
+import { createLegacyJavaBackendException } from "../../helpers/java-sdk-event-fixtures.ts";
 import {
   createLegacyAndroidFrontendException,
   createLegacySwiftFrontendException
@@ -22,6 +24,90 @@ function createLegacyAndroidEvent(
 }
 
 describe("installed SDK event compatibility", () => {
+  it("classifies and normalizes only the shipped Java runtime-memory shape", (): void => {
+    const legacy = createLegacyJavaBackendException();
+
+    expect(classifyInstalledJavaEventCompatibility(legacy)).toBe("legacy_java_runtime_event");
+    const result = validateEvent(legacy);
+
+    expect(result.success).toBe(true);
+    if (!result.success || result.data.event_type !== "backend_exception") return;
+    expect(result.data.payload.runtime).toMatchObject({
+      version: "17.0.15",
+      memory: {
+        rss: null,
+        heap_total: 536_870_912,
+        heap_used: 402_653_184,
+        external: null,
+        peak: null
+      },
+      framework_extras: {
+        jvm_name: "OpenJDK 64-Bit Server VM",
+        jvm_max_bytes: 1_073_741_824
+      }
+    });
+    expect("jvm_name" in result.data.payload.runtime).toBe(false);
+  });
+
+  it("does not apply Java runtime compatibility to unrelated SDK identities", (): void => {
+    const candidate = createLegacyJavaBackendException({ sdk_name: "@debugbundle/sdk-node" });
+
+    expect(classifyInstalledJavaEventCompatibility(candidate)).toBeNull();
+    expect(validateEvent(candidate).success).toBe(false);
+  });
+
+  it("does not make extended or invalid Java legacy memory shapes permissive", (): void => {
+    const withExtraMemoryField = createLegacyJavaBackendException();
+    const extraRuntime = (withExtraMemoryField["payload"] as Record<string, unknown>)[
+      "runtime"
+    ] as Record<string, unknown>;
+    extraRuntime["memory"] = {
+      ...(extraRuntime["memory"] as Record<string, unknown>),
+      unexpected_bytes: 1
+    };
+
+    const withImpossibleFreeMemory = createLegacyJavaBackendException();
+    const invalidRuntime = (withImpossibleFreeMemory["payload"] as Record<string, unknown>)[
+      "runtime"
+    ] as Record<string, unknown>;
+    invalidRuntime["memory"] = {
+      max_bytes: 1_073_741_824,
+      total_bytes: 536_870_912,
+      free_bytes: 536_870_913
+    };
+
+    expect(classifyInstalledJavaEventCompatibility(withExtraMemoryField)).toBeNull();
+    expect(validateEvent(withExtraMemoryField).success).toBe(false);
+    expect(classifyInstalledJavaEventCompatibility(withImpossibleFreeMemory)).toBeNull();
+    expect(validateEvent(withImpossibleFreeMemory).success).toBe(false);
+  });
+
+  it("leaves canonical Java runtime memory unchanged", (): void => {
+    const candidate = createLegacyJavaBackendException({ sdk_version: "1.3.1" });
+    const runtime = (candidate["payload"] as Record<string, unknown>)["runtime"] as Record<
+      string,
+      unknown
+    >;
+    runtime["memory"] = {
+      rss: null,
+      heap_total: 536_870_912,
+      heap_used: 402_653_184,
+      external: null,
+      peak: null
+    };
+    runtime["framework_extras"] = {
+      jvm_name: runtime["jvm_name"],
+      jvm_max_bytes: 1_073_741_824
+    };
+    delete runtime["jvm_name"];
+
+    expect(classifyInstalledJavaEventCompatibility(candidate)).toBeNull();
+    const result = validateEvent(candidate);
+    expect(result.success).toBe(true);
+    if (!result.success || result.data.event_type !== "backend_exception") return;
+    expect(result.data.payload.runtime).toEqual(runtime);
+  });
+
   it("classifies only the bounded shipped mobile shapes for compatibility metrics", (): void => {
     expect(classifyInstalledMobileEventCompatibility(createLegacyAndroidFrontendException())).toBe(
       "legacy_android_event"

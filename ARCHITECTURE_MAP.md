@@ -76,7 +76,7 @@
 - **Owns:** Raw event validation, normalization to canonical form, fingerprinting, **event class classification**
 - **Exports:** `validateEvent()`, `normalizeEvent()`, `fingerprint()`, `classifyEvent()`
 - **Depends on:** `shared-types`, `redaction`
-- **Internal structure:** `index.ts` owns canonical normalization/classification and remains the public barrel; `mobile-event-compatibility.ts` owns the bounded, deterministic conversion of wire shapes emitted by installed Android/Swift `1.1.x` clients plus scalar/list probe object-wrapping. No other SDK identities enter this compatibility path.
+- **Internal structure:** `index.ts` owns canonical normalization/classification and remains the public barrel; `mobile-event-compatibility.ts` owns the bounded, deterministic conversion of wire shapes emitted by installed Android/Swift `1.1.x` clients plus scalar/list probe object-wrapping; `java-event-compatibility.ts` owns the exact identity-and-shape-gated conversion of the legacy runtime-memory object emitted by installed Java releases through `1.3.0`. Unrelated SDK identities and extended malformed shapes remain on the strict validation path.
 - **Invariant:** Fingerprint is deterministic. Same failure → same fingerprint. `event_class` assignment is deterministic and immutable after normalization (INV-15), including preset-aware request-event classification when worker jobs carry the resolved capture preset from ingestion.
 
 ### `packages/bundle-engine`
@@ -250,7 +250,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
   - `routes/health.ts` — health/ready/live probes
   - `routes/auth.ts` — signup/login/logout/session plus invite-acceptance, GitHub start/callback browser-auth flows, GitHub device bootstrap, GitHub access-token exchange, session auth-method disclosure, and best-effort GitHub avatar caching after browser OAuth completion
   - `routes/ingestion.ts` — event ingestion; splits accepted `analytics_event` inputs into a separate analytics lane after project-token auth, validates analytics enablement/custom dimensions, persists short-lived raw analytics objects, and avoids incident grouping for analytics events
-  - `ingestion-request-compatibility.ts` — authenticated-ingestion-only compatibility adapter for installed Android/Swift event envelopes; it records bounded compatibility telemetry while canonical and all unrelated SDK shapes remain strict
+  - `ingestion-request-compatibility.ts` — authenticated-ingestion-only adapter for the exact installed Swift `{ batch }` wrapper; event-shape compatibility stays in `event-normalizer`, and ingestion records bounded compatibility telemetry while canonical and unrelated SDK shapes remain strict
   - `routes/incidents.ts` — incident retrieval, bundle, reproduction, logs
   - `routes/analytics-settings.ts` — project AnalyticsBundle settings read/update surface over shared analytics settings schemas, member preview, owner/admin mutation, all-tier analytics availability including the bounded Free preview, and fixed tier-bounded controlled custom dimensions
   - `routes/analytics-saved-funnels.ts` — all-tier project saved-funnel list/create/update/archive surface with member reads, owner/admin mutations, fixed tier-bounded active-definition limits, shared schemas, and configuration audit records

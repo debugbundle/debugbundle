@@ -6,6 +6,14 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.7.3] - 2026-08-27
+
+### Fixed
+
+- Added an SDK-identity- and exact-shape-gated ingestion adapter for the legacy runtime-memory object emitted by installed Java SDK releases, preserving strict rejection for unrelated or extended malformed clients while mapping Java heap and JVM facts into the canonical event contract.
+- Prepared Java SDK `1.3.1` to emit canonical runtime memory fields and validate `beforeSend` runtime mutations before queueing.
+- Restored token-free local and self-host integration startup by pinning the final LocalStack Community image and waiting for infrastructure health before tests begin.
+
 ## [1.7.2] - 2026-07-29
 
 ### Fixed

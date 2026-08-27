@@ -175,6 +175,14 @@ Last updated: 2026-07-04
 - **And** the SDK reuses the native Android and Swift SDK foundations for queueing, transport, capture policy, probes, and native crash evidence where practical
 - **And** Expo Go reports degraded status rather than claiming full native parity
 
+### AC-SDK-22: Java Runtime Facts Contract
+- **Given** the Java SDK captures a backend exception on a supported JVM
+- **When** it serializes `payload.runtime`
+- **Then** `memory` contains exactly `rss`, `heap_total`, `heap_used`, `external`, and `peak`, with unavailable values set to `null`
+- **And** JVM-specific name and heap-ceiling facts are namespaced under `framework_extras`
+- **And** the emitted event passes the shared strict event envelope contract
+- **And** a `beforeSend` hook result containing the retired Java runtime-memory shape is rejected in favor of the original canonical event
+
 ---
 
 ## 2. Ingestion Acceptance

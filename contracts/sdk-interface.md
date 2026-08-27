@@ -543,7 +543,7 @@ The browser SDK injects a `X-DebugBundle-Trace-Id` header (UUID v4) into same-or
 
 Backend SDKs should include safe runtime facts in `backend_exception.payload.runtime` when the host language exposes them without reading environment variables or secrets. The common optional fields are `platform`, `arch`, `pid`, `cwd`, `uptime_sec`, `hostname`, `thread_id`, `framework_version`, `memory`, and `framework_extras`; unavailable values may be omitted or set to `null`.
 
-Current package scope: `@debugbundle/sdk-node`, `debugbundle-python`, and `debugbundle/sdk-php` capture safe backend process facts while excluding environment variables.
+Current package scope: `@debugbundle/sdk-node`, `debugbundle-python`, `debugbundle/sdk-php`, and Java SDK `1.3.1+` capture safe backend process facts while excluding environment variables. Java maps `Runtime.totalMemory()` to `heap_total`, derives `heap_used` from `totalMemory() - freeMemory()`, sets unavailable `rss`, `external`, and `peak` values to `null`, and records `jvm_name` plus the `Runtime.maxMemory()` heap ceiling under `framework_extras` rather than mislabeling the ceiling as observed peak usage.
 Incidents use `trace_id` to link frontend breadcrumbs to backend exceptions. This enables the bundle to include the full user journey (frontend actions → backend failure) in a single debug context.
 
 | Behavior | Rule |

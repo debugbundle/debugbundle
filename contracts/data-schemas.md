@@ -382,6 +382,8 @@ Describes the executing runtime and process state at capture time. Distinct from
 
 **Omission rule:** If a field cannot be determined, omit it or set to `null`.
 
+**Java mapping:** Java SDK `1.3.1+` maps `Runtime.totalMemory()` to `heap_total`, calculates `heap_used` as `totalMemory() - freeMemory()`, and uses `null` for unavailable `rss`, `external`, and `peak`. JVM-specific `jvm_name` and `jvm_max_bytes` values belong under `framework_extras`; `Runtime.maxMemory()` is a heap ceiling and must not be reported as observed `peak` usage. Authenticated ingestion retains a narrowly gated compatibility conversion for the exact legacy Java runtime-memory shape emitted through `1.3.0`.
+
 **`framework_extras`:** Optional, best-effort, namespaced inside `framework_extras`. Documented shape per runtime/framework is available in the bundle schema addendum but not required for bundle validity. Typical fields: `route`, `handler`, `middleware[]`, `render_mode`, `task_name`, `queue`.
 
 #### `context.git` — Source/Revision Metadata

@@ -35,7 +35,7 @@ services:
       start_period: 5s
 
   localstack:
-    image: localstack/localstack:latest
+    image: localstack/localstack:4.14.0
     container_name: ${CONTAINER_PREFIX:-debugbundle-selfhost}-localstack
     restart: unless-stopped
     environment:

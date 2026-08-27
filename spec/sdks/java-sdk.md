@@ -640,6 +640,8 @@ Java request and exception events must include:
 - deployment identity when available
 - framework/container metadata when safe
 
+Java runtime memory must use the exact canonical `{ rss, heap_total, heap_used, external, peak }` object. Map `Runtime.totalMemory()` to `heap_total`, derive `heap_used` from `totalMemory() - freeMemory()`, and set unavailable portable values to `null`. Store the JVM name and `Runtime.maxMemory()` heap ceiling under `framework_extras` as `jvm_name` and `jvm_max_bytes`; the heap ceiling is not observed peak usage.
+
 The SDK must not assign `event_class`; classification remains worker-owned.
 
 ---
@@ -744,7 +746,7 @@ The Java SDK repository must own its test suite.
 Required test groups:
 
 - Core API unit tests for all universal methods.
-- Event envelope serialization tests against canonical schemas.
+- Event envelope serialization tests against canonical schemas, including exact Java runtime-memory keys and `framework_extras` namespacing.
 - Redaction tests for default and custom sensitive fields.
 - Suppression and loop protection tests.
 - Retry/backoff tests using a mock HTTP server.
