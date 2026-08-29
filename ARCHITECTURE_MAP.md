@@ -619,7 +619,7 @@ Integration tests run serially (`--no-file-parallelism --maxWorkers=1`) to avoid
 
 `/post-v1` is reserved for deferred planning artifacts and future feature candidates. It is intentionally non-authoritative and must not override the active V1 spec layer in `/spec`, `/contracts`, or `/rules`.
 
-Environment-specific deployment configuration, operations runbooks, and other private infrastructure concerns are intentionally outside this public architecture map. The public hosting contract still requires private hosted deploys to run database migrations before new API/worker runtime, use image-based two-slot API rollouts with healthcheck assertions, keep production env rendering owner-only and redacted, enforce an edge ingestion body limit, and attach bounded automated recovery to sustained external API health-check failure.
+Environment-specific deployment configuration, operations runbooks, and other private infrastructure concerns are intentionally outside this public architecture map. The public hosting contract still requires private hosted deploys to run database migrations before new API/worker runtime, use image-based two-slot API rollouts with healthcheck assertions, keep production env rendering owner-only and redacted, enforce an edge ingestion body limit, retain exactly the active plus one verified previous stable release/image set with fail-closed target validation and pre-pull disk headroom, and attach bounded automated recovery to sustained external API health-check failure.
 
 ---
 

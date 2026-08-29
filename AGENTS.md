@@ -198,6 +198,12 @@ Project tokens → SDK write-only (ingestion). Member tokens → CLI/API/MCP rea
 - Do not amend commits unless explicitly requested.
 - If unexpected unrelated file changes appear during work, pause and ask user how to proceed.
 
+### Hosted Runtime Disk Retention
+
+- Hosted release/image cleanup belongs in `.local-repos/debugbundle-cloud` and must preserve exactly the active release plus one verified previous stable release, including both releases' immutable API and worker image tags.
+- Use the repo-owned `scripts/hosted-runtime-retention.sh` dry-run/apply flow. Never use `docker system prune`, `docker image prune -a`, or an unvalidated recursive delete on the hosted VM.
+- Cleanup must fail before deletion when the active symlink, previous release, retained images, or candidate target names cannot be validated. After cleanup, verify retained artifacts, container health, public `/ready`, and free disk.
+
 ---
 
 ## 10) Delivery Expectations
