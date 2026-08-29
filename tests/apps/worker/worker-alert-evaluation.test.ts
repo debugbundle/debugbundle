@@ -185,7 +185,7 @@ describe("worker alert evaluation", () => {
       expect.objectContaining({
         incident_id: "inc_456",
         condition_type: "severity_threshold",
-        dedupe_key: "severity_threshold:critical:incident_regressed",
+        dedupe_key: "severity_threshold:critical:incident_regressed:evt_456",
         lifecycle_event: "incident_regressed",
         notification_key: "fp_456"
       })
@@ -195,14 +195,14 @@ describe("worker alert evaluation", () => {
       expect.objectContaining({
         incident_id: "inc_456",
         condition_type: "incident_regressed",
-        dedupe_key: "incident_regressed",
+        dedupe_key: "incident_regressed:evt_456",
         notification_key: "fp_456"
       })
     );
     expect(alertEnqueue).toHaveBeenCalledWith("evaluate-alerts", expect.objectContaining({
       incident_id: "inc_456",
       condition_type: "regression_after_deploy",
-      dedupe_key: "regression_after_deploy",
+      dedupe_key: "regression_after_deploy:evt_456",
       notification_key: "fp_456"
     }));
     expect(alertEnqueue).toHaveBeenCalledWith("evaluate-alerts", expect.objectContaining({
@@ -304,7 +304,7 @@ describe("worker alert evaluation", () => {
     });
   });
 
-  it("queues email alerts into digest rows instead of sending immediately", async (): Promise<void> => {
+  it("queues regressed severity emails with transition dedupe and incident cooldown keys", async (): Promise<void> => {
     const createAlertDeliveryIntent = vi.fn();
     const queueAlertEmailDigestItem = vi
       .fn()
@@ -317,8 +317,10 @@ describe("worker alert evaluation", () => {
         dequeue: vi.fn().mockResolvedValue({
           project_id: "proj_123",
           incident_id: "inc_123",
-          condition_type: "error_spike",
-          dedupe_key: "error_spike",
+          condition_type: "severity_threshold",
+          dedupe_key: "severity_threshold:critical:incident_regressed:evt_456",
+          notification_key: "fp_123",
+          lifecycle_event: "incident_regressed",
           occurred_at: "2026-03-15T12:30:00.000Z",
           service_name: "checkout-api",
           environment: "production",
@@ -332,10 +334,10 @@ describe("worker alert evaluation", () => {
             project_id: "proj_123",
             service_id: null,
             channel: "email",
-            condition_type: "error_spike",
+            condition_type: "severity_threshold",
             severity_min: "high",
-            severity_lifecycle_scope: null,
-            cooldown_seconds: 0,
+            severity_lifecycle_scope: "both",
+            cooldown_seconds: 86_400,
             config: { to: "alerts@example.com" },
             is_enabled: true,
             created_at: "2026-03-15T00:00:00.000Z",
@@ -359,10 +361,10 @@ describe("worker alert evaluation", () => {
       alert_id: "alt_1",
       project_id: "proj_123",
       incident_id: "inc_123",
-      condition_type: "error_spike",
-      dedupe_key: "error_spike",
-      notification_key: "error_spike",
-      cooldown_seconds: 0,
+      condition_type: "severity_threshold",
+      dedupe_key: "severity_threshold:critical:incident_regressed:evt_456",
+      notification_key: "fp_123",
+      cooldown_seconds: 86_400,
       recipient: "alerts@example.com",
       payload: expect.objectContaining({
         incident_id: "inc_123",

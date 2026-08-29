@@ -39,11 +39,24 @@ export function matchesSeverityLifecycleScope(input: {
 export function buildSeverityThresholdDedupeKey(input: {
   severity: "low" | "medium" | "high" | "critical";
   lifecycleEvent: AlertSeverityLifecycleEvent;
+  transitionId?: string;
 }): string {
   // Preserve the pre-scope key for new incidents so replayed pre-upgrade group jobs stay idempotent.
   if (input.lifecycleEvent === "new_incident") {
     return `severity_threshold:${input.severity}`;
   }
 
-  return `severity_threshold:${input.severity}:${input.lifecycleEvent}`;
+  if (input.transitionId === undefined || input.transitionId.length === 0) {
+    throw new Error("alert_regression_transition_id_required");
+  }
+
+  // The source event is stable on retry but changes for each later regression of the same incident.
+  return `severity_threshold:${input.severity}:${input.lifecycleEvent}:${input.transitionId}`;
+}
+
+export function buildRegressionAlertDedupeKey(input: {
+  conditionType: "incident_regressed" | "regression_after_deploy";
+  transitionId: string;
+}): string {
+  return `${input.conditionType}:${input.transitionId}`;
 }

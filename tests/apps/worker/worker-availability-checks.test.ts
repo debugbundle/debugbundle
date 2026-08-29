@@ -422,6 +422,81 @@ describe("worker availability checks", () => {
     );
   });
 
+  it("uses the availability result id to distinguish a later incident regression from its retries", async () => {
+    const claimedCheck = createClaimedCheck({
+      linked_incident_id: "66666666-6666-4666-8666-666666666666",
+      prior_status: "passing",
+      consecutive_failures: 2
+    });
+    const recordedExecution = createRecordedExecution(claimedCheck, {
+      result: {
+        status: "timeout",
+        http_status: null,
+        error_kind: "timeout",
+        error_message: "The availability check timed out."
+      },
+      next_status: "failing",
+      emit_failure_event: true
+    });
+    const queueEnqueue = vi.fn().mockResolvedValue(undefined);
+
+    executeAvailabilityCheckMock.mockResolvedValue(recordedExecution.result);
+
+    await processNextAvailabilityCheck({
+      availabilityCheckStore: {
+        claimNextDueCheck: vi.fn().mockResolvedValue(claimedCheck),
+        recordCheckExecution: vi.fn().mockResolvedValue(recordedExecution),
+        linkIncidentToCheck: vi.fn(),
+        appendIncidentToDailyRollup: vi.fn(),
+        purgeExpiredResults: vi.fn(),
+        purgeExpiredDailyRollups: vi.fn()
+      } as never,
+      incidentStore: {
+        upsertIncident: vi.fn().mockResolvedValue({
+          incident_id: "66666666-6666-4666-8666-666666666666",
+          duplicate_event: false,
+          occurrence_count: 4,
+          regressed_now: true,
+          regression_deploy: null
+        }),
+        insertIncidentEvent: vi.fn(),
+        recordIncidentEventRetention: vi.fn().mockResolvedValue({
+          demoted_event_references: []
+        })
+      } as never,
+      incidentLifecycle: {
+        resolveIncidentForOrganization: vi.fn()
+      },
+      queue: {
+        enqueue: queueEnqueue
+      },
+      objectStore: {
+        putObject: vi.fn()
+      },
+      lifecycleWebhookPublisher: {
+        publish: vi.fn()
+      },
+      now: new Date("2026-06-15T10:00:00.000Z")
+    });
+
+    expect(queueEnqueue).toHaveBeenCalledWith(
+      "evaluate-alerts",
+      expect.objectContaining({
+        condition_type: "severity_threshold",
+        dedupe_key:
+          "severity_threshold:high:incident_regressed:55555555-5555-4555-8555-555555555555",
+        lifecycle_event: "incident_regressed"
+      })
+    );
+    expect(queueEnqueue).toHaveBeenCalledWith(
+      "evaluate-alerts",
+      expect.objectContaining({
+        condition_type: "incident_regressed",
+        dedupe_key: "incident_regressed:55555555-5555-4555-8555-555555555555"
+      })
+    );
+  });
+
   it("auto-resolves the linked incident after sustained recovery", async () => {
     const claimedCheck = createClaimedCheck({
       linked_incident_id: "66666666-6666-4666-8666-666666666666",

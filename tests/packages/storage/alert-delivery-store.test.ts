@@ -1,16 +1,39 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { buildSeverityThresholdDedupeKey } from "../../../packages/storage/src/alert-lifecycle.js";
+import {
+  buildRegressionAlertDedupeKey,
+  buildSeverityThresholdDedupeKey
+} from "../../../packages/storage/src/alert-lifecycle.js";
 import { createPostgresAlertDeliveryStore } from "../../../packages/storage/src/alert-delivery-store.js";
 
 describe("alert delivery store", () => {
-  it("keeps new-incident severity-threshold dedupe keys compatible while separating regressions", () => {
+  it("keeps new-incident keys compatible and gives each regression a replay-stable key", () => {
     expect(buildSeverityThresholdDedupeKey({ severity: "high", lifecycleEvent: "new_incident" })).toBe(
       "severity_threshold:high"
     );
-    expect(buildSeverityThresholdDedupeKey({ severity: "high", lifecycleEvent: "incident_regressed" })).toBe(
-      "severity_threshold:high:incident_regressed"
-    );
+    expect(
+      buildSeverityThresholdDedupeKey({
+        severity: "high",
+        lifecycleEvent: "incident_regressed",
+        transitionId: "evt_1"
+      })
+    ).toBe("severity_threshold:high:incident_regressed:evt_1");
+    expect(
+      buildSeverityThresholdDedupeKey({
+        severity: "high",
+        lifecycleEvent: "incident_regressed",
+        transitionId: "evt_2"
+      })
+    ).toBe("severity_threshold:high:incident_regressed:evt_2");
+    expect(
+      buildRegressionAlertDedupeKey({ conditionType: "incident_regressed", transitionId: "evt_1" })
+    ).toBe("incident_regressed:evt_1");
+    expect(
+      buildRegressionAlertDedupeKey({ conditionType: "regression_after_deploy", transitionId: "evt_1" })
+    ).toBe("regression_after_deploy:evt_1");
+    expect(() =>
+      buildSeverityThresholdDedupeKey({ severity: "high", lifecycleEvent: "incident_regressed" })
+    ).toThrow("alert_regression_transition_id_required");
   });
 
   it("lists matching enabled alerts for a project condition with service and severity filtering", async (): Promise<void> => {

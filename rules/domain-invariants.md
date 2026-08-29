@@ -50,6 +50,7 @@ Jobs:
 - `group-incident` — re-grouping produces same incident assignment
 - `build-bundle` — re-building produces identical bundle (INV-1)
 - `build-reproduction` — re-building produces same reproduction artifact
+- `evaluate-alerts` — replaying one lifecycle transition does not duplicate delivery, while a later regression retains its own dedupe identity and remains subject to the configured notification-key cooldown
 - `deliver-webhook` — re-delivery is logged but does not duplicate business effects
 - `cleanup-retention` — re-running against already-cleaned data is a no-op
 

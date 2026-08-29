@@ -4,6 +4,7 @@ import type { RuntimeLogger } from "../../../packages/runtime-logger/src/index.j
 import { createEventEnvelope, type EventEnvelope } from "../../../packages/shared-types/src/index.js";
 import {
   buildRawEventObjectKey,
+  buildRegressionAlertDedupeKey,
   buildSeverityThresholdDedupeKey,
   executeAvailabilityCheck,
   type AvailabilityCheckStore,
@@ -466,7 +467,8 @@ async function recordAvailabilityIncident(input: {
       condition_type: "severity_threshold",
       dedupe_key: buildSeverityThresholdDedupeKey({
         severity,
-        lifecycleEvent: severityLifecycleEvent
+        lifecycleEvent: severityLifecycleEvent,
+        transitionId: input.event_id
       }),
       notification_key: fingerprint,
       lifecycle_event: severityLifecycleEvent,
@@ -510,7 +512,7 @@ async function recordAvailabilityIncident(input: {
       project_id: input.check.project_id,
       incident_id: incident.incident_id,
       condition_type: "incident_regressed",
-      dedupe_key: "incident_regressed",
+      dedupe_key: buildRegressionAlertDedupeKey({ conditionType: "incident_regressed", transitionId: input.event_id }),
       notification_key: fingerprint,
       occurred_at: input.occurred_at,
       summary: title,

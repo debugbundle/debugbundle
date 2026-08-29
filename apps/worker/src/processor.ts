@@ -48,6 +48,7 @@ import type {
   NormalizeEventsJob
 } from "../../../packages/storage/src/index.js";
 import {
+  buildRegressionAlertDedupeKey,
   buildSeverityThresholdDedupeKey,
   buildBundleRegenerationLeaseKey,
   buildBundleObjectKey,
@@ -925,16 +926,15 @@ export async function processNextGroupIncidentJob(
         severity: job.severity
       });
     }
-
     const severityLifecycleEvent = incident.regressed_now ? "incident_regressed" : "new_incident";
-
     await enqueueAlertEvaluation(dependencies.alertEvaluationQueue, {
       project_id: job.project_id,
       incident_id: incident.incident_id,
       condition_type: "severity_threshold",
       dedupe_key: buildSeverityThresholdDedupeKey({
         severity: job.severity,
-        lifecycleEvent: severityLifecycleEvent
+        lifecycleEvent: severityLifecycleEvent,
+        transitionId: job.event_id
       }),
       notification_key: job.alert_notification_key ?? job.fingerprint,
       lifecycle_event: severityLifecycleEvent,
@@ -950,7 +950,7 @@ export async function processNextGroupIncidentJob(
         project_id: job.project_id,
         incident_id: incident.incident_id,
         condition_type: "incident_regressed",
-        dedupe_key: "incident_regressed",
+        dedupe_key: buildRegressionAlertDedupeKey({ conditionType: "incident_regressed", transitionId: job.event_id }),
         notification_key: job.alert_notification_key ?? job.fingerprint,
         occurred_at: job.occurred_at,
         summary: incidentTitle,
@@ -965,7 +965,7 @@ export async function processNextGroupIncidentJob(
           project_id: job.project_id,
           incident_id: incident.incident_id,
           condition_type: "regression_after_deploy",
-          dedupe_key: "regression_after_deploy",
+          dedupe_key: buildRegressionAlertDedupeKey({ conditionType: "regression_after_deploy", transitionId: job.event_id }),
           notification_key: job.alert_notification_key ?? job.fingerprint,
           occurred_at: job.occurred_at,
           summary: incidentTitle,

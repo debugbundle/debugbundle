@@ -813,6 +813,8 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Then** the rule defaults to notifying for both new incidents and incident regressions
 - **And** API, CLI, and MCP callers can set the scope to `new_incident`, `incident_regressed`, or `both`
 - **And** the worker dedupes severity-threshold alert deliveries separately for the matching lifecycle event
+- **And** replaying one regression transition does not create a duplicate delivery
+- **And** a later regression of the same incident remains eligible for delivery after any configured cooldown
 
 ---
 

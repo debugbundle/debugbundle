@@ -271,7 +271,7 @@ Project list/detail metrics must include `attention_incidents_today`, counting i
 
 **FR-ALT-03:** Configurable via API, CLI, and MCP.
 
-**FR-ALT-04:** Severity-threshold alert rules must be able to notify for new incidents, incident regressions, or both. New severity-threshold alert rules default to both lifecycle events.
+**FR-ALT-04:** Severity-threshold alert rules must be able to notify for new incidents, incident regressions, or both. New severity-threshold alert rules default to both lifecycle events. Delivery dedupe must suppress reprocessing of the same lifecycle transition without permanently suppressing a later regression of the same incident; configured cooldown remains the independent cross-transition suppression control.
 
 ### 1.9 CLI
 
