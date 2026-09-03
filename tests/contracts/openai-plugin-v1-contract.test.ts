@@ -378,16 +378,16 @@ describe("OpenAI plugin v1 contract", () => {
     expect(legacyNames.length).toBeGreaterThan(EXPECTED_TOOL_NAMES.length);
     expect(EXPECTED_TOOL_NAMES.every((name) => legacyNames.includes(name))).toBe(true);
     expect(gaps).toMatchObject({
-      evidence_state: "production_dark_launch_deployed",
+      evidence_state: "developer_mode_reconnect_pending",
       openai_catalog: "implemented_and_contract_tested",
       dedicated_hosted_readers: "implemented_and_unit_tested",
-      oauth_oidc_runtime: "deployed_disabled",
-      streamable_http_transport: "deployed_disabled",
-      plugin_package: "candidate_built_connection_registration_pending",
-      hosted_infrastructure: "production_migrated_dark_launch_deployed_features_disabled",
-      consent_ui: "owner_approved_deployed_feature_disabled_accessibility_pending",
-      developer_mode_connection: "not_registered",
-      production_validation: "dark_launch_passed_run_33754379179",
+      oauth_oidc_runtime: "deployed_enabled_metadata_verified",
+      streamable_http_transport: "deployed_enabled_discovery_probe_verified",
+      plugin_package: "candidate_deployed_digest_frozen_app_json_pending",
+      hosted_infrastructure: "production_migrated_managed_caddy_dns_tls_active",
+      consent_ui: "owner_visual_approved_deployed_accessibility_pending",
+      developer_mode_connection: "owner_registered_reconnect_pending_app_json_not_captured",
+      production_validation: "active_run_33793953970_protocol_probe_passed",
       portal_submission: "not_submitted",
       publication: "not_published",
       directory_discovery: "not_verified"

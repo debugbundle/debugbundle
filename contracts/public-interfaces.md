@@ -3398,7 +3398,7 @@ Bearer resource_metadata="https://mcp.debugbundle.com/.well-known/oauth-protecte
 
 An authenticated tool call missing a required product scope uses the same metadata URL with `error="insufficient_scope"`, the bounded description `The connection does not grant the required DebugBundle scope.`, and one `scope` value taken only from the frozen tool catalog. Arbitrary exception messages and customer data must never be projected into a challenge.
 
-The fixtures are the normative contract for the implemented local source candidate. `tests/fixtures/openai-plugin-v1/implementation-gaps.json` separates implemented/tested consent and runtime source from still-unavailable production deployment, live-client, submission, publication, and directory evidence.
+The fixtures are the normative contract for the implemented source and deployed Developer Mode candidate. `tests/fixtures/openai-plugin-v1/implementation-gaps.json` separates verified production readiness/discovery evidence from still-unavailable owner reconnect, captured connection metadata, live-client corpus, accessibility, reviewer, submission, publication, and directory evidence.
 
 ---
 
