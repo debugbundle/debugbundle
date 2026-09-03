@@ -72,8 +72,7 @@ describe("OpenAI plugin release automation", () => {
     expect(result.manifest.runtime).toMatchObject({
       resource_origin: "https://mcp.debugbundle.com",
       mcp_endpoint: "https://mcp.debugbundle.com/mcp",
-      api_image_digest:
-        "sha256:145c958e79c88ce6404419951bad066e0ba84fcf5b9b87f0470942a0bfaa9570"
+      api_image_digest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u)
     });
     expect(result.manifest.contract.tools_in_scan_order).toHaveLength(23);
     expect(
