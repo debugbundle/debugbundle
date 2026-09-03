@@ -136,6 +136,27 @@ function buildOpenAiInteractionPolicy(): ReturnType<typeof interactionPolicy.bas
 
   // The product UI authenticates and grants consent in one explicit submission.
   for (const check of consentPrompt.checks) {
+    if (
+      check.reason === "op_scopes_missing" ||
+      check.reason === "op_claims_missing" ||
+      check.reason === "rs_scopes_missing"
+    ) {
+      loginPrompt.checks.add(
+        new interactionPolicy.Check(
+          check.reason,
+          check.description,
+          check.error,
+          async (context) => {
+            if (context.oidc.grant === undefined) {
+              return interactionPolicy.Check.REQUEST_PROMPT;
+            }
+            return check.check(context);
+          },
+          (context) => check.details(context)
+        )
+      );
+      continue;
+    }
     loginPrompt.checks.add(check);
   }
   policy.remove("consent");

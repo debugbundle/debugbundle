@@ -5,8 +5,10 @@ import {
   OPENAI_ACCESS_TOKEN_TTL_SECONDS,
   OPENAI_AUTHORIZATION_CODE_TTL_SECONDS,
   OPENAI_CIMD_CLIENT_ID,
+  OPENAI_HOSTED_MCP_SCOPES,
   OPENAI_MCP_ISSUER,
   OPENAI_MCP_RESOURCE,
+  OPENAI_OIDC_SCOPES,
   OPENAI_PRODUCTION_REDIRECT_URI,
   OPENAI_REFRESH_TOKEN_TTL_SECONDS,
   buildOpenAiAuthorizationServerMetadata,
@@ -79,15 +81,37 @@ describe("OpenAI OAuth/OIDC provider profile", () => {
     expect(configuration.scopes).toContain("openid");
     expect(configuration.scopes).toContain("email");
     expect(configuration.routes.authorization).toBe("/oauth/authorize");
-    const interactionPolicy = (
-      configuration.interactions as typeof configuration.interactions & {
-        policy?: Array<{ name: string; checks: Array<{ reason: string }> }>;
-      }
-    ).policy;
-    expect(interactionPolicy?.map((prompt) => prompt.name)).toEqual(["login"]);
-    expect(interactionPolicy?.[0]?.checks.map((check) => check.reason)).toEqual(
+    const policy = configuration.interactions.policy;
+    expect(policy.map((prompt) => prompt.name)).toEqual(["login"]);
+    expect(policy[0]?.checks.map((check) => check.reason)).toEqual(
       expect.arrayContaining(["no_session", "op_scopes_missing", "rs_scopes_missing"])
     );
+    for (const reason of ["op_scopes_missing", "op_claims_missing", "rs_scopes_missing"]) {
+      const check = policy[0]?.checks.find((candidate) => candidate.reason === reason);
+      expect(check).toBeDefined();
+      await expect(
+        Promise.resolve().then(() => check?.check({ oidc: {} }))
+      ).resolves.toBe(true);
+      await expect(
+        Promise.resolve().then(() =>
+          check?.check({
+            oidc: {
+              grant: {
+                getOIDCScopeEncountered: () => OPENAI_OIDC_SCOPES.join(" "),
+                getOIDCClaimsEncountered: () => [],
+                getResourceScopeEncountered: () => OPENAI_HOSTED_MCP_SCOPES.join(" ")
+              },
+              requestParamOIDCScopes: OPENAI_OIDC_SCOPES,
+              requestParamClaims: [],
+              resourceServers: {
+                [OPENAI_MCP_RESOURCE]: { scopes: new Set(OPENAI_HOSTED_MCP_SCOPES) }
+              },
+              requestParamScopes: OPENAI_HOSTED_MCP_SCOPES
+            }
+          })
+        )
+      ).resolves.toBe(false);
+    }
     await expect(
       configuration.features.clientIdMetadataDocument.allowClient(
         {},

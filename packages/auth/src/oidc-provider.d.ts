@@ -44,6 +44,18 @@ declare module "oidc-provider" {
 
   export interface InteractionPolicyCheck {
     reason: string;
+    description: string;
+    error?: string;
+    check(context: InteractionPolicyContext): boolean | Promise<boolean>;
+    details(context: InteractionPolicyContext): unknown;
+  }
+
+  export interface InteractionPolicyContext {
+    oidc: {
+      grant?: unknown;
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
   }
 
   export interface InteractionPolicyPrompt {
@@ -59,6 +71,17 @@ declare module "oidc-provider" {
   };
 
   export const interactionPolicy: {
+    Check: {
+      new (
+        reason: string,
+        description: string,
+        error: string | undefined,
+        check: (context: InteractionPolicyContext) => boolean | Promise<boolean>,
+        details: (context: InteractionPolicyContext) => unknown
+      ): InteractionPolicyCheck;
+      readonly REQUEST_PROMPT: true;
+      readonly NO_NEED_TO_PROMPT: false;
+    };
     base(): InteractionPolicy;
   };
 }
