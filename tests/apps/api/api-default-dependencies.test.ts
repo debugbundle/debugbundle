@@ -1714,7 +1714,7 @@ describe("api default dependencies", () => {
       port: 5432,
       user: "debugbundle",
       password: "debugbundle",
-      database: "debugbundle"
+      database: "debugbundle", max: 10
     });
     expect(createRedisQueueClientMock).toHaveBeenCalledWith({ redisUrl: "redis://localhost:6379" });
     const frequencyArgs = createRedisIncidentFrequencyCounterMock.mock.calls[0]?.[0] as {
@@ -1760,7 +1760,7 @@ describe("api default dependencies", () => {
       port: 5440,
       user: "svc",
       password: "secret",
-      database: "debugbundle_ci"
+      database: "debugbundle_ci", max: 10
     });
     expect(createRedisQueueClientMock).toHaveBeenCalledWith({ redisUrl: "redis://cache:6380" });
     const frequencyArgs = createRedisIncidentFrequencyCounterMock.mock.calls[0]?.[0] as {

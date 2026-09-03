@@ -1,0 +1,9 @@
+{
+  "version": "1.0.0",
+  "prompts": [
+    "Investigate my latest production incident.",
+    "Explain this incident from its bundle and reproduction.",
+    "Summarize product usage and checkout funnel performance for the last 7 days.",
+    "Why is this endpoint health check failing?"
+  ]
+}

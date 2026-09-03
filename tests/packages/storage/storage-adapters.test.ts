@@ -99,9 +99,13 @@ describe("storage adapters", () => {
   beforeEach(() => {
     sendMock = vi.fn();
     redisRpushMock = vi.fn().mockResolvedValue(1);
-    redisLrangeMock = vi.fn().mockResolvedValue(["{\"event_id\":\"e1\"}"]);
+    redisLrangeMock = vi.fn().mockResolvedValue(['{"event_id":"e1"}']);
     redisDelMock = vi.fn().mockResolvedValue(1);
-    redisLpopMock = vi.fn().mockResolvedValue('{"project_id":"proj_123","event_id":"evt_123","object_key":"raw-events/proj_123/e.json.gz"}');
+    redisLpopMock = vi
+      .fn()
+      .mockResolvedValue(
+        '{"project_id":"proj_123","event_id":"evt_123","object_key":"raw-events/proj_123/e.json.gz"}'
+      );
     redisSetMock = vi.fn().mockResolvedValue("OK");
     redisQuitMock = vi.fn().mockResolvedValue("OK");
     redisMultiMock = vi.fn();
@@ -111,16 +115,14 @@ describe("storage adapters", () => {
   });
 
   it("should put and get objects with S3 adapter", async (): Promise<void> => {
-    sendMock
-      .mockResolvedValueOnce(undefined)
-      .mockResolvedValueOnce({
-        Body: {
-          transformToByteArray: async (): Promise<Uint8Array> => {
-            await Promise.resolve();
-            return new Uint8Array(Buffer.from("hello", "utf8"));
-          }
+    sendMock.mockResolvedValueOnce(undefined).mockResolvedValueOnce({
+      Body: {
+        transformToByteArray: async (): Promise<Uint8Array> => {
+          await Promise.resolve();
+          return new Uint8Array(Buffer.from("hello", "utf8"));
         }
-      });
+      }
+    });
 
     const client = createS3ObjectStoreClient({
       endpoint: "http://localstack:4566",
@@ -164,7 +166,10 @@ describe("storage adapters", () => {
   it("should delete all objects under a prefix with deleteObjectsByPrefix", async (): Promise<void> => {
     sendMock
       .mockResolvedValueOnce({
-        Contents: [{ Key: "raw-events/proj_1/2026/03/21/00/a.json.gz" }, { Key: "raw-events/proj_1/2026/03/21/00/b.json.gz" }],
+        Contents: [
+          { Key: "raw-events/proj_1/2026/03/21/00/a.json.gz" },
+          { Key: "raw-events/proj_1/2026/03/21/00/b.json.gz" }
+        ],
         IsTruncated: false
       })
       .mockResolvedValueOnce(undefined);
@@ -181,7 +186,9 @@ describe("storage adapters", () => {
     await client.deleteObjectsByPrefix("raw-events/proj_1/");
 
     expect(sendMock).toHaveBeenCalledTimes(2);
-    const deleteCall = sendMock.mock.calls[1]![0] as { input: { Delete: { Objects: Array<{ Key: string }>; Quiet: boolean } } };
+    const deleteCall = sendMock.mock.calls[1]![0] as {
+      input: { Delete: { Objects: Array<{ Key: string }>; Quiet: boolean } };
+    };
     expect(deleteCall.input.Delete.Objects).toEqual([
       { Key: "raw-events/proj_1/2026/03/21/00/a.json.gz" },
       { Key: "raw-events/proj_1/2026/03/21/00/b.json.gz" }
@@ -321,7 +328,9 @@ describe("storage adapters", () => {
       forcePathStyle: true
     });
 
-    await expect(client.getObject({ key: "raw-events/proj/e.json.gz" })).rejects.toThrow("s3_throttled");
+    await expect(client.getObject({ key: "raw-events/proj/e.json.gz" })).rejects.toThrow(
+      "s3_throttled"
+    );
   });
 
   it("should throw unsupported_s3_body when body stream does not expose transformToByteArray", async (): Promise<void> => {
@@ -340,7 +349,9 @@ describe("storage adapters", () => {
       forcePathStyle: true
     });
 
-    await expect(client.getObject({ key: "raw-events/proj/e.json.gz" })).rejects.toThrow("unsupported_s3_body");
+    await expect(client.getObject({ key: "raw-events/proj/e.json.gz" })).rejects.toThrow(
+      "unsupported_s3_body"
+    );
   });
 
   it("should enqueue and read/clear Redis queue", async (): Promise<void> => {
@@ -362,7 +373,10 @@ describe("storage adapters", () => {
     expect(redisRpushMock).toHaveBeenCalledOnce();
     expect(redisLrangeMock).toHaveBeenCalledOnce();
     expect(redisLpopMock).toHaveBeenCalledOnce();
-    expect(redisDelMock).toHaveBeenCalledWith("jobs:normalize-events", "jobs:normalize-events:processing");
+    expect(redisDelMock).toHaveBeenCalledWith(
+      "jobs:normalize-events",
+      "jobs:normalize-events:processing"
+    );
     expect(redisQuitMock).toHaveBeenCalledOnce();
   });
 
@@ -385,17 +399,22 @@ describe("storage adapters", () => {
   });
 
   it("should enqueue and dequeue aggregate analytics jobs", async (): Promise<void> => {
-    redisLpopMock = vi.fn().mockResolvedValue(
-      '{"project_id":"proj_123","event_id":"550e8400-e29b-41d4-a716-446655440000","object_key":"analytics-events/proj_123/e.json.gz"}'
-    );
+    redisLpopMock = vi
+      .fn()
+      .mockResolvedValue(
+        '{"project_id":"proj_123","event_id":"550e8400-e29b-41d4-a716-446655440000","object_key":"analytics-events/proj_123/e.json.gz"}'
+      );
 
     const queue = createRedisQueueClient({ redisUrl: "redis://redis:6379" });
     const analyticsQueue = queue as typeof queue & {
-      enqueue(jobName: "aggregate-analytics-events", payload: {
-        project_id: string;
-        event_id: string;
-        object_key: string;
-      }): Promise<void>;
+      enqueue(
+        jobName: "aggregate-analytics-events",
+        payload: {
+          project_id: string;
+          event_id: string;
+          object_key: string;
+        }
+      ): Promise<void>;
       dequeue(jobName: "aggregate-analytics-events"): Promise<{
         project_id: string;
         event_id: string;
@@ -426,7 +445,10 @@ describe("storage adapters", () => {
       trigger: "opportunity" as const
     };
     const serializedPayload = JSON.stringify(payload);
-    const envelope = JSON.stringify({ claim_id: "claim_analytics_bundle", payload: serializedPayload });
+    const envelope = JSON.stringify({
+      claim_id: "claim_analytics_bundle",
+      payload: serializedPayload
+    });
     redisLrangeMock = vi.fn().mockResolvedValue([serializedPayload]);
     redisLpopMock = vi.fn().mockResolvedValue(serializedPayload);
     redisEvalMock = vi.fn().mockResolvedValue([serializedPayload, envelope]);
@@ -455,13 +477,18 @@ describe("storage adapters", () => {
       expect.any(String)
     );
     expect(redisZremMock).toHaveBeenCalledWith("jobs:build-analytics-bundle:processing", envelope);
-    expect(redisDelMock).toHaveBeenCalledWith("jobs:build-analytics-bundle", "jobs:build-analytics-bundle:processing");
+    expect(redisDelMock).toHaveBeenCalledWith(
+      "jobs:build-analytics-bundle",
+      "jobs:build-analytics-bundle:processing"
+    );
   });
 
   it("should enqueue and dequeue evaluate-alerts jobs", async (): Promise<void> => {
-    redisLpopMock = vi.fn().mockResolvedValue(
-      '{"project_id":"proj_123","incident_id":"inc_123","condition_type":"new_incident","dedupe_key":"new_incident","occurred_at":"2026-03-15T12:00:00.000Z","service_name":"checkout-api","environment":"production","severity":"high"}'
-    );
+    redisLpopMock = vi
+      .fn()
+      .mockResolvedValue(
+        '{"project_id":"proj_123","incident_id":"inc_123","condition_type":"new_incident","dedupe_key":"new_incident","occurred_at":"2026-03-15T12:00:00.000Z","service_name":"checkout-api","environment":"production","severity":"high"}'
+      );
 
     const queue = createRedisQueueClient({ redisUrl: "redis://redis:6379" });
 
@@ -491,9 +518,11 @@ describe("storage adapters", () => {
   });
 
   it("should enqueue and dequeue generate-weekly-report jobs", async (): Promise<void> => {
-    redisLpopMock = vi.fn().mockResolvedValue(
-      '{"delivery_id":"wrd_123","weekly_report_channel_id":"wr_123","project_id":"proj_123","window_start":"2026-03-09T00:00:00.000Z","window_end":"2026-03-16T00:00:00.000Z"}'
-    );
+    redisLpopMock = vi
+      .fn()
+      .mockResolvedValue(
+        '{"delivery_id":"wrd_123","weekly_report_channel_id":"wr_123","project_id":"proj_123","window_start":"2026-03-09T00:00:00.000Z","window_end":"2026-03-16T00:00:00.000Z"}'
+      );
 
     const queue = createRedisQueueClient({ redisUrl: "redis://redis:6379" });
 
@@ -534,13 +563,23 @@ describe("storage adapters", () => {
     expect(jobs).toHaveLength(1);
     expect(next).toEqual({ scheduled_at: "2026-04-04T12:00:00.000Z" });
     expect(acquired).toBe(true);
-    expect(redisSetMock).toHaveBeenCalledWith("leases:cleanup-retention:schedule", "1", "EX", 3600, "NX");
+    expect(redisSetMock).toHaveBeenCalledWith(
+      "leases:cleanup-retention:schedule",
+      "1",
+      "EX",
+      3600,
+      "NX"
+    );
     expect(redisDelMock).toHaveBeenCalledWith("leases:cleanup-retention:schedule");
-    expect(redisDelMock).toHaveBeenCalledWith("jobs:cleanup-retention", "jobs:cleanup-retention:processing");
+    expect(redisDelMock).toHaveBeenCalledWith(
+      "jobs:cleanup-retention",
+      "jobs:cleanup-retention:processing"
+    );
   });
 
   it("should claim and ack Redis jobs through the processing set", async (): Promise<void> => {
-    const payload = '{"project_id":"proj_123","event_id":"evt_123","object_key":"raw-events/proj_123/e.json.gz"}';
+    const payload =
+      '{"project_id":"proj_123","event_id":"evt_123","object_key":"raw-events/proj_123/e.json.gz"}';
     const envelope = JSON.stringify({ claim_id: "claim_123", payload });
     redisEvalMock = vi.fn().mockResolvedValue([payload, envelope]);
 
@@ -555,7 +594,11 @@ describe("storage adapters", () => {
 
     await claimed?.ack();
 
-    expect(redisZrangebyscoreMock).toHaveBeenCalledWith("jobs:normalize-events:processing", "-inf", expect.any(String));
+    expect(redisZrangebyscoreMock).toHaveBeenCalledWith(
+      "jobs:normalize-events:processing",
+      "-inf",
+      expect.any(String)
+    );
     expect(redisEvalMock).toHaveBeenCalledWith(
       expect.stringContaining("LPOP"),
       2,
@@ -568,7 +611,8 @@ describe("storage adapters", () => {
   });
 
   it("should reclaim stale processing jobs", async (): Promise<void> => {
-    const payload = '{"project_id":"proj_123","event_id":"evt_123","object_key":"raw-events/proj_123/e.json.gz"}';
+    const payload =
+      '{"project_id":"proj_123","event_id":"evt_123","object_key":"raw-events/proj_123/e.json.gz"}';
     const envelope = JSON.stringify({ claim_id: "claim_123", payload });
     redisZrangebyscoreMock = vi.fn().mockResolvedValue([envelope]);
 
@@ -576,23 +620,25 @@ describe("storage adapters", () => {
     const reclaimed = await queue.reclaimStaleProcessingJobs("normalize-events", 123456);
 
     expect(reclaimed).toBe(1);
-    expect(redisZrangebyscoreMock).toHaveBeenCalledWith("jobs:normalize-events:processing", "-inf", "123456");
+    expect(redisZrangebyscoreMock).toHaveBeenCalledWith(
+      "jobs:normalize-events:processing",
+      "-inf",
+      "123456"
+    );
     expect(redisZremMock).toHaveBeenCalledWith("jobs:normalize-events:processing", envelope);
     expect(redisRpushMock).toHaveBeenCalledWith("jobs:normalize-events", payload);
   });
 
   it("should track rolling incident frequencies and compute spike ratio scaffolding", async (): Promise<void> => {
-    const multiExecMock = vi
-      .fn()
-      .mockResolvedValueOnce([
-        [null, 1],
-        [null, 0],
-        [null, 1],
-        [null, 4],
-        [null, 36],
-        [null, 60],
-        [null, 240]
-      ]);
+    const multiExecMock = vi.fn().mockResolvedValueOnce([
+      [null, 1],
+      [null, 0],
+      [null, 1],
+      [null, 4],
+      [null, 36],
+      [null, 60],
+      [null, 240]
+    ]);
 
     const multiMock = vi.fn().mockReturnValue({
       zadd: vi.fn().mockReturnThis(),
@@ -624,17 +670,15 @@ describe("storage adapters", () => {
   });
 
   it("should avoid spike detection for brand-new incidents with insufficient 1h baseline", async (): Promise<void> => {
-    const multiExecMock = vi
-      .fn()
-      .mockResolvedValueOnce([
-        [null, 1],
-        [null, 0],
-        [null, 1],
-        [null, 1],
-        [null, 3],
-        [null, 3],
-        [null, 3]
-      ]);
+    const multiExecMock = vi.fn().mockResolvedValueOnce([
+      [null, 1],
+      [null, 0],
+      [null, 1],
+      [null, 1],
+      [null, 3],
+      [null, 3],
+      [null, 3]
+    ]);
 
     const multiMock = vi.fn().mockReturnValue({
       zadd: vi.fn().mockReturnThis(),
@@ -663,17 +707,15 @@ describe("storage adapters", () => {
   });
 
   it("should not mark a single-event window as spiking", async (): Promise<void> => {
-    const multiExecMock = vi
-      .fn()
-      .mockResolvedValueOnce([
-        [null, 1],
-        [null, 0],
-        [null, 1],
-        [null, 1],
-        [null, 1],
-        [null, 1],
-        [null, 1]
-      ]);
+    const multiExecMock = vi.fn().mockResolvedValueOnce([
+      [null, 1],
+      [null, 0],
+      [null, 1],
+      [null, 1],
+      [null, 1],
+      [null, 1],
+      [null, 1]
+    ]);
 
     const multiMock = vi.fn().mockReturnValue({
       zadd: vi.fn().mockReturnThis(),
@@ -806,7 +848,9 @@ describe("storage adapters", () => {
 
     expect(snapshotQuery).toHaveBeenCalledTimes(2);
     const firstSnapshotSql = snapshotQuery.mock.calls[0]?.[0] as string | undefined;
-    expect(firstSnapshotSql).toContain("frequency_snapshot_at IS NULL OR frequency_snapshot_at <= $10::timestamptz");
+    expect(firstSnapshotSql).toContain(
+      "frequency_snapshot_at IS NULL OR frequency_snapshot_at <= $10::timestamptz"
+    );
 
     await counter.close();
   });

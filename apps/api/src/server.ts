@@ -10,6 +10,9 @@ import type { RuntimeLogger } from "../../../packages/runtime-logger/src/index.j
 import { ANALYTICS_BUNDLE_GENERATION_ID_HEADER } from "../../../packages/shared-types/src/index.js";
 
 import type { ApiDependencies } from "./api-types.js";
+import { resolveBrowserSession } from "./api-helpers.js";
+import { registerOpenAiMcpHttpRoutes, type OpenAiMcpHttpOptions } from "./openai-mcp-http.js";
+import { registerOpenAiOAuthHttpRoutes, type OpenAiOAuthHttpOptions } from "./openai-oauth-http.js";
 import {
   registerApiDogfooding,
   resolveApiDogfoodingConfig,
@@ -51,6 +54,7 @@ import { registerWebhookRoutes } from "./routes/webhooks.js";
 import { registerWeeklyReportChannelRoutes } from "./routes/weekly-report-channels.js";
 import { registerIncidentRoutes } from "./routes/incidents.js";
 import { registerIngestionRoutes } from "./routes/ingestion.js";
+import { registerOpenAiConnectionRoutes } from "./routes/openai-connections.js";
 
 export type { ApiDependencies } from "./api-types.js";
 
@@ -63,6 +67,8 @@ export interface ApiServerOptions {
   stripeWebhook?: StripeWebhookDependencies;
   githubMarketplaceWebhook?: GitHubMarketplaceWebhookDependencies;
   readinessCheck?: () => Promise<void>;
+  openAiMcp?: OpenAiMcpHttpOptions;
+  openAiOAuth?: OpenAiOAuthHttpOptions;
 }
 
 const ALLOWED_CORS_HEADERS = [
@@ -85,7 +91,8 @@ const CSRF_EXEMPT_ROUTE_KEYS = new Set([
   "POST /v1/auth/github/device/poll",
   "POST /v1/auth/github/device/claim",
   "POST /v1/auth/github/token/exchange",
-  "POST /debugbundle/browser"
+  "POST /debugbundle/browser",
+  "POST /oauth/*"
 ]);
 
 function normalizeOrigin(value: string | undefined, fallback: string | null = null): string | null {
@@ -413,6 +420,27 @@ export function createApiServer(
   registerIncidentRoutes(app, dependencies);
   registerImprovementRoutes(app, dependencies);
   registerIngestionRoutes(app, dependencies);
+
+  if (options.openAiMcp !== undefined) {
+    registerOpenAiMcpHttpRoutes(app, options.openAiMcp);
+  }
+  if (options.openAiOAuth !== undefined) {
+    if (options.openAiOAuth.connectionStore !== undefined) {
+      registerOpenAiConnectionRoutes(app, dependencies, options.openAiOAuth.connectionStore);
+    }
+    registerOpenAiOAuthHttpRoutes(app, options.openAiOAuth, {
+      async resolveBrowserSession(cookieHeader) {
+        const session = await resolveBrowserSession(cookieHeader, dependencies);
+        return session === null
+          ? undefined
+          : {
+              userId: session.user_id,
+              organizationId: session.organization_id,
+              emailVerified: session.email_verified_at !== null
+            };
+      }
+    });
+  }
 
   if (options.stripeWebhook !== undefined) {
     registerStripeWebhookRoute(app, options.stripeWebhook);

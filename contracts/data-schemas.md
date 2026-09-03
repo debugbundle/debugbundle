@@ -38,6 +38,7 @@ Top-level envelope fields are strict. SDKs may include optional application meta
 ```
 
 Rules:
+
 1. `payload` is closed per `event_type`; SDKs must not put arbitrary app context into event payloads.
 2. Cross-cutting app or framework context belongs in optional envelope `context`.
 3. Correlation identifiers belong in optional envelope `correlation`. SDKs may emit sparse correlation objects and may omit unknown fields.
@@ -54,6 +55,7 @@ The canonical debugging artifact. A bundle is a **captured image in time** of a 
 **Context block versioning:** Each context block contains `version: 1` (integer) inside the block itself. This allows individual blocks to evolve independently without forcing a whole-bundle version change.
 
 **Compatibility rules:**
+
 1. Unknown context blocks must be ignored safely by consumers.
 2. Missing context blocks are allowed.
 3. Additive fields should be preferred over breaking changes.
@@ -177,18 +179,20 @@ The canonical debugging artifact. A bundle is a **captured image in time** of a 
       "clicks": [{ "selector": "string", "label": "string", "ts": "ISO8601" }],
       "form_submissions": [{ "form": "string", "fields": {}, "ts": "ISO8601" }],
       "console_logs": [],
-      "network_requests": [{
-        "method": "string",
-        "url": "string",
-        "status": 0,
-        "ts": "ISO8601",
-        "duration_ms": 0,
-        "caller_trace": ["getSession (api.ts:21)"],
-        "response_body": { "error": "string" },
-        "request_body": {},
-        "response_headers": { "content-type": "application/json" },
-        "response_content_length": 0
-      }],
+      "network_requests": [
+        {
+          "method": "string",
+          "url": "string",
+          "status": 0,
+          "ts": "ISO8601",
+          "duration_ms": 0,
+          "caller_trace": ["getSession (api.ts:21)"],
+          "response_body": { "error": "string" },
+          "request_body": {},
+          "response_headers": { "content-type": "application/json" },
+          "response_content_length": 0
+        }
+      ],
       "exceptions": [],
       "dom_context": { "mode": "lightweight", "html_excerpt": "string" }
     },
@@ -312,7 +316,10 @@ The canonical debugging artifact. A bundle is a **captured image in time** of a 
 
   "redaction": {
     "redacted": true,
-    "fields": ["context.request.headers.authorization", "context.frontend.form_submissions[0].fields.email"],
+    "fields": [
+      "context.request.headers.authorization",
+      "context.frontend.form_submissions[0].fields.email"
+    ],
     "notes": "string"
   },
 
@@ -327,26 +334,26 @@ The canonical debugging artifact. A bundle is a **captured image in time** of a 
 
 ### Top-Level Additions (vs prior draft)
 
-| Field | Purpose |
-|-------|---------|
+| Field         | Purpose                                                                                                                                                              |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `captured_at` | ISO8601 timestamp of the **primary signal event** (`occurred_at` of the triggering error/exception). Not the bundle generation time (that is `metadata.created_at`). |
-| `sdk.name` | SDK package that captured the events (e.g., `debugbundle-node`, `debugbundle-python`, `@debugbundle/sdk-browser`). |
-| `sdk.version` | SDK version that captured the events. Helps correlate SDK upgrades with bundle quality changes. |
+| `sdk.name`    | SDK package that captured the events (e.g., `debugbundle-node`, `debugbundle-python`, `@debugbundle/sdk-browser`).                                                   |
+| `sdk.version` | SDK version that captured the events. Helps correlate SDK upgrades with bundle quality changes.                                                                      |
 
 ### Summary Derivation Logic
 
 All `summary` fields are **derived at bundle generation time** from existing context. They are not stored separately.
 
-| Field | Derived from |
-|-------|-------------|
-| `severity` | `signal.severity` |
-| `error_type` | `context.error.name` |
-| `error_message` | `context.error.message` |
-| `first_application_frame` | Stack parsing — top application frame from `context.error.stack` |
-| `primary_signal` | `signal.signal_type` |
-| `signals.new_deploy` | Deploy correlation / `context.deploy.regression_window` |
-| `signals.regression_suspected` | `impact.regression_suspected` |
-| `signals.customer_visible` | `impact.customer_visible` |
+| Field                          | Derived from                                                     |
+| ------------------------------ | ---------------------------------------------------------------- |
+| `severity`                     | `signal.severity`                                                |
+| `error_type`                   | `context.error.name`                                             |
+| `error_message`                | `context.error.message`                                          |
+| `first_application_frame`      | Stack parsing — top application frame from `context.error.stack` |
+| `primary_signal`               | `signal.signal_type`                                             |
+| `signals.new_deploy`           | Deploy correlation / `context.deploy.regression_window`          |
+| `signals.regression_suspected` | `impact.regression_suspected`                                    |
+| `signals.customer_visible`     | `impact.customer_visible`                                        |
 
 ### Context Block Reference
 
@@ -354,31 +361,31 @@ All `summary` fields are **derived at bundle generation time** from existing con
 
 Describes the host/infrastructure where the service runs. Correlation identifiers (`trace_id`, `session_id`, `user_id_hash`) belong on the event envelope's `correlation` block, not here.
 
-| Field | Type |
-|-------|------|
-| `os` | string or null |
-| `host` | string or null |
+| Field          | Type           |
+| -------------- | -------------- |
+| `os`           | string or null |
+| `host`         | string or null |
 | `container_id` | string or null |
 
 #### `context.runtime` — Runtime/Process State
 
 Describes the executing runtime and process state at capture time. Distinct from `environment` (host-level).
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `name` | string | Normalized: `node`, `php`, `python`, `browser-js`, `unknown` |
-| `runtime_version` | string or null | Exact runtime version (e.g., `22.2.0`) |
-| `platform` | string or null | OS/platform |
-| `arch` | string or null | CPU architecture |
-| `pid` | number or null | Process ID |
-| `cwd` | string or null | Working directory |
-| `uptime_sec` | number or null | Process uptime |
-| `hostname` | string or null | Host/container hostname |
-| `thread_id` | string, number, or null | Thread/worker identifier |
-| `framework` | string or null | Detected framework (e.g., `nextjs`, `express`, `django`) |
-| `framework_version` | string or null | Framework version |
-| `memory` | object or null | `{ rss, heap_total, heap_used, external, peak }` — best-effort runtime memory stats |
-| `framework_extras` | object or null | Optional framework-specific context (see below) |
+| Field               | Type                    | Notes                                                                               |
+| ------------------- | ----------------------- | ----------------------------------------------------------------------------------- |
+| `name`              | string                  | Normalized: `node`, `php`, `python`, `browser-js`, `unknown`                        |
+| `runtime_version`   | string or null          | Exact runtime version (e.g., `22.2.0`)                                              |
+| `platform`          | string or null          | OS/platform                                                                         |
+| `arch`              | string or null          | CPU architecture                                                                    |
+| `pid`               | number or null          | Process ID                                                                          |
+| `cwd`               | string or null          | Working directory                                                                   |
+| `uptime_sec`        | number or null          | Process uptime                                                                      |
+| `hostname`          | string or null          | Host/container hostname                                                             |
+| `thread_id`         | string, number, or null | Thread/worker identifier                                                            |
+| `framework`         | string or null          | Detected framework (e.g., `nextjs`, `express`, `django`)                            |
+| `framework_version` | string or null          | Framework version                                                                   |
+| `memory`            | object or null          | `{ rss, heap_total, heap_used, external, peak }` — best-effort runtime memory stats |
+| `framework_extras`  | object or null          | Optional framework-specific context (see below)                                     |
 
 **Omission rule:** If a field cannot be determined, omit it or set to `null`.
 
@@ -390,14 +397,14 @@ Describes the executing runtime and process state at capture time. Distinct from
 
 Describes the git/source state associated with the running build.
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `commit` | string or null | Full commit SHA |
-| `commit_short` | string or null | Short commit SHA |
-| `branch` | string or null | Branch or ref name |
-| `repo` | string or null | Repository identifier |
-| `dirty` | boolean | Meaningful primarily in development/local |
-| `source` | string | How git metadata was determined: `config`, `env`, `local`, `unknown` |
+| Field          | Type           | Notes                                                                |
+| -------------- | -------------- | -------------------------------------------------------------------- |
+| `commit`       | string or null | Full commit SHA                                                      |
+| `commit_short` | string or null | Short commit SHA                                                     |
+| `branch`       | string or null | Branch or ref name                                                   |
+| `repo`         | string or null | Repository identifier                                                |
+| `dirty`        | boolean        | Meaningful primarily in development/local                            |
+| `source`       | string         | How git metadata was determined: `config`, `env`, `local`, `unknown` |
 
 **Collection priority:** SDKs should populate in order: (1) explicit application config, (2) CI/CD environment variables, (3) local `.git` inspection, (4) omit / mark `unknown`.
 
@@ -407,19 +414,19 @@ Describes the git/source state associated with the running build.
 
 Describes the end-user's device and browser environment. Populated by browser SDKs only. Backend SDKs omit this block.
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `user_agent` | string or null | Raw `navigator.userAgent` string |
-| `browser` | object | `{ name, version }` — parsed from UA or `navigator.userAgentData` |
-| `os` | object | `{ name, version }` — client operating system |
-| `device_type` | string | `desktop`, `mobile`, `tablet`, or `unknown` — derived from UA |
-| `screen` | object | `{ width, height }` — `screen.width` × `screen.height` (physical pixels) |
-| `viewport` | object | `{ width, height }` — `window.innerWidth` × `window.innerHeight` (CSS pixels) |
-| `device_pixel_ratio` | number or null | `window.devicePixelRatio` |
-| `touch_capable` | boolean or null | `navigator.maxTouchPoints > 0` |
-| `language` | string or null | `navigator.language` (BCP 47 tag, e.g. `en-US`) |
-| `connection_type` | string or null | `navigator.connection.effectiveType` if available (e.g. `4g`, `3g`) |
-| `color_scheme_preference` | string or null | `light`, `dark`, `no-preference`, or `null` — from `prefers-color-scheme` media query |
+| Field                     | Type            | Notes                                                                                 |
+| ------------------------- | --------------- | ------------------------------------------------------------------------------------- |
+| `user_agent`              | string or null  | Raw `navigator.userAgent` string                                                      |
+| `browser`                 | object          | `{ name, version }` — parsed from UA or `navigator.userAgentData`                     |
+| `os`                      | object          | `{ name, version }` — client operating system                                         |
+| `device_type`             | string          | `desktop`, `mobile`, `tablet`, or `unknown` — derived from UA                         |
+| `screen`                  | object          | `{ width, height }` — `screen.width` × `screen.height` (physical pixels)              |
+| `viewport`                | object          | `{ width, height }` — `window.innerWidth` × `window.innerHeight` (CSS pixels)         |
+| `device_pixel_ratio`      | number or null  | `window.devicePixelRatio`                                                             |
+| `touch_capable`           | boolean or null | `navigator.maxTouchPoints > 0`                                                        |
+| `language`                | string or null  | `navigator.language` (BCP 47 tag, e.g. `en-US`)                                       |
+| `connection_type`         | string or null  | `navigator.connection.effectiveType` if available (e.g. `4g`, `3g`)                   |
+| `color_scheme_preference` | string or null  | `light`, `dark`, `no-preference`, or `null` — from `prefers-color-scheme` media query |
 
 **Privacy note:** The raw `user_agent` string is included for debugging but subject to normal redaction rules. SDKs must not collect fine-grained hardware identifiers (GPU model, serial numbers, etc.).
 
@@ -441,6 +448,7 @@ Describes the end-user's device and browser environment. Populated by browser SD
 ```
 
 ### Rules
+
 - All top-level fields present unless explicitly optional
 - Missing values represented as `null`, not omitted
 - `context.error` may be `null` for improvement bundles
@@ -468,12 +476,12 @@ The bundle schema optimizes for:
 
 ### Business Criticality Assignment
 
-| Value | When to assign |
-|-------|---------------|
+| Value      | When to assign                                         |
+| ---------- | ------------------------------------------------------ |
 | `critical` | Customer data loss, revenue impact, or security breach |
-| `high` | Core feature broken for many users |
-| `medium` | Degraded UX, non-critical path failures |
-| `low` | Edge cases, cosmetic issues, rare paths |
+| `high`     | Core feature broken for many users                     |
+| `medium`   | Degraded UX, non-critical path failures                |
+| `low`      | Edge cases, cosmetic issues, rare paths                |
 
 ### Improvement Bundle Differences
 
@@ -537,16 +545,16 @@ Common wrapper for the canonical debug SDK event family:
 
 **`event_class` assignment:** This field is NOT set by SDKs. It is assigned by the event-normalizer during worker processing based on the following classification rules:
 
-| event_type | Assigned event_class | Notes |
-|------------|---------------------|-------|
-| `backend_exception` | `incident_signal` | Always |
-| `frontend_exception` | `incident_signal` | Always |
-| `log_event` | `incident_signal` or `context_signal` | `incident_signal` when `level` is `error`, `fatal`, or `critical`; `context_signal` otherwise |
-| `request_event` | `incident_signal` or `context_signal` | `incident_signal` when `response_status` matches the active capture preset's immediate request-failure statuses (`minimal`: `5xx`; `balanced`: `5xx`, `408`, `423`, `424`, `425`, `429`; `investigative`: balanced plus `409`), the project's resolved `immediate_client_error_statuses`, or a matching `immediate_client_error_path_rules` rule; `context_signal` otherwise |
-| `frontend_breadcrumb` | `context_signal` | Journey context for exceptions |
-| `deploy_metadata` | `context_signal` | Release correlation |
-| `error_suppressed` | `operational_signal` | Platform operations only |
-| `probe_event` | `context_signal` or `operational_signal` | `context_signal` when flushed with an error (always-on); `operational_signal` when standalone remote-activated |
+| event_type            | Assigned event_class                     | Notes                                                                                                                                                                                                                                                                                                                                                                        |
+| --------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `backend_exception`   | `incident_signal`                        | Always                                                                                                                                                                                                                                                                                                                                                                       |
+| `frontend_exception`  | `incident_signal`                        | Always                                                                                                                                                                                                                                                                                                                                                                       |
+| `log_event`           | `incident_signal` or `context_signal`    | `incident_signal` when `level` is `error`, `fatal`, or `critical`; `context_signal` otherwise                                                                                                                                                                                                                                                                                |
+| `request_event`       | `incident_signal` or `context_signal`    | `incident_signal` when `response_status` matches the active capture preset's immediate request-failure statuses (`minimal`: `5xx`; `balanced`: `5xx`, `408`, `423`, `424`, `425`, `429`; `investigative`: balanced plus `409`), the project's resolved `immediate_client_error_statuses`, or a matching `immediate_client_error_path_rules` rule; `context_signal` otherwise |
+| `frontend_breadcrumb` | `context_signal`                         | Journey context for exceptions                                                                                                                                                                                                                                                                                                                                               |
+| `deploy_metadata`     | `context_signal`                         | Release correlation                                                                                                                                                                                                                                                                                                                                                          |
+| `error_suppressed`    | `operational_signal`                     | Platform operations only                                                                                                                                                                                                                                                                                                                                                     |
+| `probe_event`         | `context_signal` or `operational_signal` | `context_signal` when flushed with an error (always-on); `operational_signal` when standalone remote-activated                                                                                                                                                                                                                                                               |
 
 `event_class` is immutable after normalization (INV-15). It drives billing (Free meters only `incident_signal`), incident eligibility (only `incident_signal` creates incidents), and surfacing rules.
 
@@ -705,6 +713,7 @@ AnalyticsBundle artifacts summarize an analysis unit such as a funnel dropoff, r
 ## 3. Event Payload Schemas
 
 ### 3.1 `backend_exception`
+
 ```json
 {
   "name": "string",
@@ -732,6 +741,7 @@ AnalyticsBundle artifacts summarize an analysis unit such as a funnel dropoff, r
 Backend SDKs should fill the optional runtime fields from safe process facts when available. SDKs must not include environment variables in this block.
 
 ### 3.2 `request_event`
+
 ```json
 {
   "method": "string",
@@ -748,6 +758,7 @@ Backend SDKs should fill the optional runtime fields from safe process facts whe
 ```
 
 ### 3.3 `log_event`
+
 ```json
 {
   "level": "string",
@@ -757,6 +768,7 @@ Backend SDKs should fill the optional runtime fields from safe process facts whe
 ```
 
 ### 3.4 `frontend_breadcrumb`
+
 ```json
 {
   "breadcrumb_type": "route_change | click | form_submit | console_log | network_request",
@@ -774,9 +786,11 @@ Backend SDKs should fill the optional runtime fields from safe process facts whe
   }
 }
 ```
+
 Note: `data` fields shown above are for `network_request` breadcrumbs. Other breadcrumb types have their own data shapes.
 
 ### 3.5 `frontend_exception`
+
 ```json
 {
   "name": "string",
@@ -839,6 +853,7 @@ Note: `data` fields shown above are for `network_request` breadcrumbs. Other bre
 `rejection_reason` is present when the Browser SDK captured a global `unhandledrejection` event. It preserves a bounded, sanitized description of the original rejection reason so generic messages such as `Unhandled promise rejection` can be triaged without relying only on the fallback exception message.
 
 ### 3.6 `deploy_metadata`
+
 ```json
 {
   "commit_sha": "string",
@@ -850,6 +865,7 @@ Note: `data` fields shown above are for `network_request` breadcrumbs. Other bre
 ```
 
 ### 3.7 `probe_event`
+
 ```json
 {
   "label": "string",
@@ -885,410 +901,568 @@ Emitted by SDKs when duplicate suppression is active:
 ## 5. Database Schema (PostgreSQL)
 
 ### 5.1 users
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | uuid | PK |
-| email | text | UNIQUE NOT NULL |
-| name | text | |
+
+| Column     | Type        | Constraints            |
+| ---------- | ----------- | ---------------------- |
+| id         | uuid        | PK                     |
+| email      | text        | UNIQUE NOT NULL        |
+| name       | text        |                        |
 | created_at | timestamptz | NOT NULL DEFAULT now() |
 | updated_at | timestamptz | NOT NULL DEFAULT now() |
 
 ### 5.2 organizations
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | uuid | PK |
-| name | text | NOT NULL |
-| plan | text | NOT NULL DEFAULT 'free' |
-| stripe_customer_id | text | |
-| created_at | timestamptz | NOT NULL DEFAULT now() |
-| updated_at | timestamptz | NOT NULL DEFAULT now() |
+
+| Column             | Type        | Constraints             |
+| ------------------ | ----------- | ----------------------- |
+| id                 | uuid        | PK                      |
+| name               | text        | NOT NULL                |
+| plan               | text        | NOT NULL DEFAULT 'free' |
+| stripe_customer_id | text        |                         |
+| created_at         | timestamptz | NOT NULL DEFAULT now()  |
+| updated_at         | timestamptz | NOT NULL DEFAULT now()  |
 
 ### 5.3 organization_members
-| Column | Type | Constraints |
-|--------|------|-------------|
-| organization_id | uuid | FK → organizations, CASCADE |
-| user_id | uuid | FK → users, CASCADE |
-| role | text | NOT NULL DEFAULT 'owner' |
-| created_at | timestamptz | NOT NULL DEFAULT now() |
-| PK | (organization_id, user_id) | |
+
+| Column          | Type                       | Constraints                 |
+| --------------- | -------------------------- | --------------------------- |
+| organization_id | uuid                       | FK → organizations, CASCADE |
+| user_id         | uuid                       | FK → users, CASCADE         |
+| role            | text                       | NOT NULL DEFAULT 'owner'    |
+| created_at      | timestamptz                | NOT NULL DEFAULT now()      |
+| PK              | (organization_id, user_id) |                             |
 
 ### 5.4 projects
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | uuid | PK |
-| organization_id | uuid | FK → organizations, CASCADE |
-| name | text | NOT NULL |
-| slug | text | NOT NULL |
-| environment_default | text | NOT NULL DEFAULT 'production' |
-| created_at | timestamptz | NOT NULL DEFAULT now() |
-| updated_at | timestamptz | NOT NULL DEFAULT now() |
-| UNIQUE | (organization_id, slug) | |
+
+| Column              | Type                    | Constraints                   |
+| ------------------- | ----------------------- | ----------------------------- |
+| id                  | uuid                    | PK                            |
+| organization_id     | uuid                    | FK → organizations, CASCADE   |
+| name                | text                    | NOT NULL                      |
+| slug                | text                    | NOT NULL                      |
+| environment_default | text                    | NOT NULL DEFAULT 'production' |
+| created_at          | timestamptz             | NOT NULL DEFAULT now()        |
+| updated_at          | timestamptz             | NOT NULL DEFAULT now()        |
+| UNIQUE              | (organization_id, slug) |                               |
 
 ### 5.5 project_tokens
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | uuid | PK |
-| project_id | uuid | FK → projects, CASCADE |
-| token_hash | text | UNIQUE NOT NULL |
-| label | text | NOT NULL |
+
+| Column       | Type        | Constraints                                                                                                 |
+| ------------ | ----------- | ----------------------------------------------------------------------------------------------------------- |
+| id           | uuid        | PK                                                                                                          |
+| project_id   | uuid        | FK → projects, CASCADE                                                                                      |
+| token_hash   | text        | UNIQUE NOT NULL                                                                                             |
+| label        | text        | NOT NULL                                                                                                    |
 | last_used_at | timestamptz | Advances after successful active-token authentication; writes may be coalesced for high-frequency ingestion |
-| created_at | timestamptz | NOT NULL DEFAULT now() |
-| revoked_at | timestamptz | |
+| created_at   | timestamptz | NOT NULL DEFAULT now()                                                                                      |
+| revoked_at   | timestamptz |                                                                                                             |
 
 ### 5.5a member_tokens
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | uuid | PK |
-| user_id | uuid | FK → users, CASCADE |
-| organization_id | uuid | FK → organizations, CASCADE |
-| token_hash | text | UNIQUE NOT NULL |
-| label | text | NOT NULL |
-| last_used_at | timestamptz | Advances after successful active-token authentication; writes may be coalesced for high-frequency API use |
-| created_at | timestamptz | NOT NULL DEFAULT now() |
-| revoked_at | timestamptz | |
+
+| Column          | Type        | Constraints                                                                                               |
+| --------------- | ----------- | --------------------------------------------------------------------------------------------------------- |
+| id              | uuid        | PK                                                                                                        |
+| user_id         | uuid        | FK → users, CASCADE                                                                                       |
+| organization_id | uuid        | FK → organizations, CASCADE                                                                               |
+| token_hash      | text        | UNIQUE NOT NULL                                                                                           |
+| label           | text        | NOT NULL                                                                                                  |
+| last_used_at    | timestamptz | Advances after successful active-token authentication; writes may be coalesced for high-frequency API use |
+| created_at      | timestamptz | NOT NULL DEFAULT now()                                                                                    |
+| revoked_at      | timestamptz |                                                                                                           |
 
 ### 5.5b project_invites
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | uuid | PK |
-| project_id | uuid | FK → projects, CASCADE |
-| email | text | NOT NULL |
-| role | text | NOT NULL |
-| invited_by_user_id | uuid | FK → users |
-| invite_token_hash | text | UNIQUE NOT NULL |
-| accepted_at | timestamptz | |
-| canceled_at | timestamptz | |
-| expires_at | timestamptz | NOT NULL |
-| created_at | timestamptz | NOT NULL DEFAULT now() |
-| UNIQUE | (project_id, lower(email)) | WHERE accepted_at IS NULL AND canceled_at IS NULL |
+
+| Column             | Type                       | Constraints                                       |
+| ------------------ | -------------------------- | ------------------------------------------------- |
+| id                 | uuid                       | PK                                                |
+| project_id         | uuid                       | FK → projects, CASCADE                            |
+| email              | text                       | NOT NULL                                          |
+| role               | text                       | NOT NULL                                          |
+| invited_by_user_id | uuid                       | FK → users                                        |
+| invite_token_hash  | text                       | UNIQUE NOT NULL                                   |
+| accepted_at        | timestamptz                |                                                   |
+| canceled_at        | timestamptz                |                                                   |
+| expires_at         | timestamptz                | NOT NULL                                          |
+| created_at         | timestamptz                | NOT NULL DEFAULT now()                            |
+| UNIQUE             | (project_id, lower(email)) | WHERE accepted_at IS NULL AND canceled_at IS NULL |
 
 ### 5.5c oauth_identities
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | uuid | PK |
-| provider | text | NOT NULL |
-| provider_user_id | text | NOT NULL |
-| user_id | uuid | FK → users, CASCADE |
-| created_at | timestamptz | |
-| updated_at | timestamptz | |
-| UNIQUE | (provider, provider_user_id) | |
-| INDEX | (user_id, provider) | |
+
+| Column           | Type                         | Constraints         |
+| ---------------- | ---------------------------- | ------------------- |
+| id               | uuid                         | PK                  |
+| provider         | text                         | NOT NULL            |
+| provider_user_id | text                         | NOT NULL            |
+| user_id          | uuid                         | FK → users, CASCADE |
+| created_at       | timestamptz                  |                     |
+| updated_at       | timestamptz                  |                     |
+| UNIQUE           | (provider, provider_user_id) |                     |
+| INDEX            | (user_id, provider)          |                     |
+
+### 5.5d oauth_authorization_grants (OpenAI Hosted MCP)
+
+This additive table is implemented by the ordered `202608300001_add_openai_oauth_records` forward migration and the empty-schema bootstrap. Production still must apply and verify that migration before enabling OAuth/MCP code that depends on it.
+
+| Column                 | Type                                            | Constraints                                                                            |
+| ---------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------- |
+| id                     | uuid                                            | PK                                                                                     |
+| user_id                | uuid                                            | FK → users, CASCADE; NOT NULL                                                          |
+| organization_id        | uuid                                            | FK → organizations, CASCADE; NOT NULL                                                  |
+| client_id              | text                                            | NOT NULL; exact validated CIMD URL, initially `https://chatgpt.com/oauth/client.json`  |
+| resource               | text                                            | NOT NULL CHECK (`resource = 'https://mcp.debugbundle.com'`)                            |
+| scopes                 | text[]                                          | NOT NULL; non-empty subset of the eight frozen scopes, normalized/sorted/no duplicates |
+| provider_grant_id_hash | text                                            | UNIQUE NOT NULL; HMAC lookup binding to the encrypted provider record                  |
+| consented_at           | timestamptz                                     | NOT NULL                                                                               |
+| expires_at             | timestamptz                                     | NOT NULL; initial active grant horizon 30 days                                         |
+| revoked_at             | timestamptz                                     |                                                                                        |
+| revocation_reason      | text                                            | bounded enum-like application value; no user text                                      |
+| created_at             | timestamptz                                     | NOT NULL DEFAULT now()                                                                 |
+| updated_at             | timestamptz                                     | NOT NULL DEFAULT now()                                                                 |
+| INDEX                  | (user_id, organization_id, client_id, resource) | Active-grant lookup                                                                    |
+| INDEX                  | (expires_at, id)                                | Bounded active-expiry processing                                                       |
+| INDEX                  | (revoked_at, id)                                | Bounded physical-retention cleanup                                                     |
+
+Rules:
+
+- A grant binds exactly one user, organization, validated OpenAI client, resource, and scope set. It never stores email, member-token plaintext/hash, project-token plaintext/hash, customer payloads, or consent-page prose.
+- The eight frozen values are `openid`, `email`, `debugbundle:projects:read`, `debugbundle:incidents:read`, `debugbundle:artifacts:read`, `debugbundle:improvements:read`, `debugbundle:analytics:read`, and `debugbundle:health:read`; adding a scope requires the independent reviewed plugin-version process but no schema migration because scopes remain normalized text values.
+- Account suspension/deletion, membership removal, explicit revocation, refresh-family reuse, or signing-key security response must make the grant unusable immediately.
+- Expired or revoked rows are physically deleted after 90 days, subject to the approved audit-evidence boundary. Required security evidence remains in normal bounded auth audit records, not in live credential tables.
+
+### 5.5e oauth_authorization_codes (OpenAI Hosted MCP)
+
+| Column                | Type              | Constraints                                                             |
+| --------------------- | ----------------- | ----------------------------------------------------------------------- |
+| id                    | uuid              | PK                                                                      |
+| grant_id              | uuid              | FK → oauth_authorization_grants, CASCADE; NOT NULL                      |
+| user_id               | uuid              | FK → users, CASCADE; NOT NULL; immutable binding snapshot               |
+| organization_id       | uuid              | FK → organizations, CASCADE; NOT NULL; immutable binding snapshot       |
+| code_hash             | text              | UNIQUE NOT NULL; plaintext returned once and never persisted            |
+| client_id             | text              | NOT NULL; exact validated CIMD URL                                      |
+| redirect_uri          | text              | NOT NULL; exact `https://chatgpt.com/connector_platform_oauth_redirect` |
+| resource              | text              | NOT NULL CHECK (`resource = 'https://mcp.debugbundle.com'`)             |
+| scopes                | text[]            | NOT NULL; normalized/sorted/no duplicates                               |
+| code_challenge        | text              | NOT NULL                                                                |
+| code_challenge_method | text              | NOT NULL CHECK (`code_challenge_method = 'S256'`)                       |
+| issued_at             | timestamptz       | NOT NULL DEFAULT now()                                                  |
+| expires_at            | timestamptz       | NOT NULL; exactly five minutes after issue                              |
+| consumed_at           | timestamptz       | Single-use marker                                                       |
+| INDEX                 | (expires_at, id)  | Expiry and physical-retention cleanup                                   |
+| INDEX                 | (consumed_at, id) | Consumed-code physical-retention cleanup                                |
+
+Rules:
+
+- Code exchange is atomic: hash match, unused state, expiry, client, redirect, resource, scope, and PKCE verifier checks succeed in the same transaction that sets `consumed_at`.
+- Consumed or expired rows are physically deleted after 24 hours. Failed exchange attempts never restore usability.
+
+### 5.5f oauth_refresh_tokens (OpenAI Hosted MCP)
+
+| Column               | Type                                  | Constraints                                                             |
+| -------------------- | ------------------------------------- | ----------------------------------------------------------------------- |
+| id                   | uuid                                  | PK                                                                      |
+| grant_id             | uuid                                  | FK → oauth_authorization_grants, CASCADE; NOT NULL                      |
+| family_id            | uuid                                  | NOT NULL                                                                |
+| parent_token_id      | uuid                                  | FK → oauth_refresh_tokens, SET NULL                                     |
+| replacement_token_id | uuid                                  | FK → oauth_refresh_tokens, SET NULL                                     |
+| token_hash           | text                                  | UNIQUE NOT NULL; plaintext returned once and never persisted            |
+| client_id            | text                                  | NOT NULL; exact validated CIMD URL                                      |
+| resource             | text                                  | NOT NULL CHECK (`resource = 'https://mcp.debugbundle.com'`)             |
+| scopes               | text[]                                | NOT NULL; normalized/sorted/no duplicates; cannot exceed grant          |
+| issued_at            | timestamptz                           | NOT NULL DEFAULT now()                                                  |
+| expires_at           | timestamptz                           | NOT NULL; exactly 30 days after issue                                   |
+| used_at              | timestamptz                           | Set atomically on rotation                                              |
+| revoked_at           | timestamptz                           |                                                                         |
+| revocation_reason    | text                                  | bounded enum-like application value; no user text                       |
+| reuse_detected_at    | timestamptz                           | Set when a used/replaced token is presented again                       |
+| INDEX                | (grant_id, family_id, issued_at DESC) | Family/current-token lookup                                             |
+| INDEX                | (expires_at, id)                      | Expiry and physical-retention cleanup                                   |
+| INDEX                | (revoked_at, id)                      | Revoked-history cleanup                                                 |
+| UNIQUE               | (family_id)                           | Partial: at most one row where `used_at IS NULL AND revoked_at IS NULL` |
+
+Rules:
+
+- Rotation atomically marks the presented token used and creates its replacement. Reuse revokes the complete family and backing grant before any new access token can be issued.
+- Expired/revoked/non-current refresh history is physically deleted after 30 days. The current active family is never deleted by retention cleanup.
+- JWT access tokens are not stored. Their backing grant is checked on every MCP request so revocation does not wait for the exact 12-minute token expiry.
+
+### 5.5g oauth_provider_artifacts (OpenAI Hosted MCP)
+
+`oidc-provider` requires durable records for protocol models that do not map one-to-one to the product grant/code/refresh tables. The accepted library decision therefore adds this encrypted adapter table in the same ordered migration.
+
+| Column           | Type                                  | Constraints                                                     |
+| ---------------- | ------------------------------------- | --------------------------------------------------------------- |
+| model            | text                                  | PK part; allowlisted `oidc-provider` model name                 |
+| provider_id_hash | text                                  | PK part; HMAC-SHA-256 lookup value, never plaintext provider ID |
+| payload          | jsonb                                 | NOT NULL; versioned integration-secret ciphertext envelope      |
+| grant_id_hash    | text                                  | Optional HMAC lookup for grant revocation                       |
+| session_uid_hash | text                                  | Optional unique HMAC lookup for interaction/session UID         |
+| user_code_hash   | text                                  | Optional unique HMAC lookup for user-code models                |
+| expires_at       | timestamptz                           | NOT NULL; provider-supplied model expiry                        |
+| consumed_at      | timestamptz                           | Atomic provider consumption marker                              |
+| created_at       | timestamptz                           | NOT NULL DEFAULT now()                                          |
+| updated_at       | timestamptz                           | NOT NULL DEFAULT now()                                          |
+| INDEX            | (grant_id_hash, expires_at)           | Grant revoke/expiry lookup                                      |
+| INDEX            | (expires_at, model, provider_id_hash) | Bounded expiry cleanup                                          |
+
+Rules:
+
+- Provider IDs, grant IDs, session UIDs, and user codes are never stored in plaintext; category-separated HMAC values support exact lookup.
+- `payload` is encrypted before persistence and must fail closed when its version/key/ciphertext is invalid.
+- Adapter writes mirror authorization code and refresh-family state into the normalized tables in the same transaction where supported. A mirror/binding failure aborts the provider write.
+- Provider artifacts expire with their protocol model and are deleted by bounded indexed cleanup. They are implementation records, not an alternate customer-data or authorization surface.
+
+### OpenAI OAuth Cleanup And Audit Contract
+
+- Cleanup runs through the existing worker/maintenance mechanism; it adds no always-on process.
+- Every transaction handles at most 500 rows, selects through the expiry/revocation indexes, is idempotent and retry-safe, and records only table/category counts and duration.
+- Cleanup tests must prove that active grants, unconsumed non-expired codes, and the current refresh-family token survive.
+- OAuth/reviewer security audit actions use the existing auth audit surface with bounded action/reason codes and actor/client/grant identifiers. They never contain codes, tokens, assertions, email, tool arguments/results, or customer payloads.
+- Signing keys and reviewer credentials live in hosted secret/config ownership, not these tables, source control, build artifacts, logs, or the plugin package.
+
+### OpenAI Connection Management Projection
+
+The signed-in Settings projection is derived from `oauth_authorization_grants` joined to the exact current organization. It is not a separate table and does not persist display state.
+
+- List queries require both `user_id` and `organization_id`, are capped at 100 newest-first rows, and return only grant UUID, fixed public client name, organization name, allowlisted product scopes, consent/expiry/revocation timestamps, and derived active/expired/revoked status.
+- Identity scopes are not presented as product-data permissions. Unknown or future stored scopes are excluded until a reviewed public contract adds them.
+- User revocation requires the exact grant UUID, user, and organization in one database statement. It sets the grant's bounded `user_revoked` reason, revokes every remaining normalized refresh token, and deletes the provider protocol artifacts bound by the same HMAC grant lookup without deleting DebugBundle customer data.
+- Provider replacement/revocation resolves only through the HMAC provider-grant binding and revokes the same normalized grant/refresh family. Missing or already-inaccessible grants do not disclose cross-tenant existence.
+- Revocation audit records use the existing bounded audit store. Credential material, provider IDs, scope-toggle analytics, customer content, and raw interaction data are never written to the audit payload.
 
 ### 5.6 services
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | uuid | PK |
-| project_id | uuid | FK → projects, CASCADE |
-| name | text | NOT NULL |
-| runtime | text | |
-| framework | text | |
-| environment | text | NOT NULL DEFAULT 'production' |
-| created_at | timestamptz | NOT NULL DEFAULT now() |
-| updated_at | timestamptz | NOT NULL DEFAULT now() |
-| UNIQUE | (project_id, name, environment) | |
+
+| Column      | Type                            | Constraints                   |
+| ----------- | ------------------------------- | ----------------------------- |
+| id          | uuid                            | PK                            |
+| project_id  | uuid                            | FK → projects, CASCADE        |
+| name        | text                            | NOT NULL                      |
+| runtime     | text                            |                               |
+| framework   | text                            |                               |
+| environment | text                            | NOT NULL DEFAULT 'production' |
+| created_at  | timestamptz                     | NOT NULL DEFAULT now()        |
+| updated_at  | timestamptz                     | NOT NULL DEFAULT now()        |
+| UNIQUE      | (project_id, name, environment) |                               |
 
 ### 5.7 deployments
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | uuid | PK |
-| project_id | uuid | FK → projects, CASCADE |
-| service_id | uuid | FK → services, SET NULL |
-| environment | text | NOT NULL |
-| commit_sha | text | |
-| version | text | |
-| branch | text | |
-| deployed_at | timestamptz | NOT NULL |
-| metadata | jsonb | NOT NULL DEFAULT '{}' |
+
+| Column      | Type        | Constraints             |
+| ----------- | ----------- | ----------------------- |
+| id          | uuid        | PK                      |
+| project_id  | uuid        | FK → projects, CASCADE  |
+| service_id  | uuid        | FK → services, SET NULL |
+| environment | text        | NOT NULL                |
+| commit_sha  | text        |                         |
+| version     | text        |                         |
+| branch      | text        |                         |
+| deployed_at | timestamptz | NOT NULL                |
+| metadata    | jsonb       | NOT NULL DEFAULT '{}'   |
 
 ### 5.8 incidents
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | uuid | PK |
-| project_id | uuid | FK → projects, CASCADE |
-| service_id | uuid | FK → services, SET NULL |
-| environment | text | NOT NULL |
-| fingerprint | text | NOT NULL |
-| fingerprint_version | text | NOT NULL DEFAULT 'v1' |
-| title | text | NOT NULL |
-| severity | text | NOT NULL DEFAULT 'medium' |
-| status | text | NOT NULL DEFAULT 'open' |
-| first_seen_at | timestamptz | NOT NULL |
-| last_seen_at | timestamptz | NOT NULL |
-| occurrence_count | integer | NOT NULL DEFAULT 1 |
-| affected_users_estimate | integer | |
-| latest_deployment_id | uuid | FK → deployments, SET NULL |
-| spike_detected_at | timestamptz | |
-| resolved_at | timestamptz | |
-| resolved_by_member_id | uuid | FK → users, SET NULL |
-| regressed_at | timestamptz | |
-| matched_fields | text[] | |
-| bundle_object_key | text | |
-| reproduction_object_key | text | |
-| created_at | timestamptz | NOT NULL DEFAULT now() |
-| updated_at | timestamptz | NOT NULL DEFAULT now() |
+
+| Column                  | Type        | Constraints                |
+| ----------------------- | ----------- | -------------------------- |
+| id                      | uuid        | PK                         |
+| project_id              | uuid        | FK → projects, CASCADE     |
+| service_id              | uuid        | FK → services, SET NULL    |
+| environment             | text        | NOT NULL                   |
+| fingerprint             | text        | NOT NULL                   |
+| fingerprint_version     | text        | NOT NULL DEFAULT 'v1'      |
+| title                   | text        | NOT NULL                   |
+| severity                | text        | NOT NULL DEFAULT 'medium'  |
+| status                  | text        | NOT NULL DEFAULT 'open'    |
+| first_seen_at           | timestamptz | NOT NULL                   |
+| last_seen_at            | timestamptz | NOT NULL                   |
+| occurrence_count        | integer     | NOT NULL DEFAULT 1         |
+| affected_users_estimate | integer     |                            |
+| latest_deployment_id    | uuid        | FK → deployments, SET NULL |
+| spike_detected_at       | timestamptz |                            |
+| resolved_at             | timestamptz |                            |
+| resolved_by_member_id   | uuid        | FK → users, SET NULL       |
+| regressed_at            | timestamptz |                            |
+| matched_fields          | text[]      |                            |
+| bundle_object_key       | text        |                            |
+| reproduction_object_key | text        |                            |
+| created_at              | timestamptz | NOT NULL DEFAULT now()     |
+| updated_at              | timestamptz | NOT NULL DEFAULT now()     |
 
 **Status values:** `open`, `resolved`, `regressed`
 
 **Rolling frequency counters:** Occurrence rates (1m, 5m, 1h, 24h sliding windows) are tracked in Redis sorted sets for real-time spike detection. The `occurrence_count` column is the authoritative durable total. Frequency snapshots are periodically persisted to Postgres (default every 60s) for counter recovery after Redis restart.
 
-| Column | Type | Constraints |
-|--------|------|-------------|
-| frequency_occurrences_1m | integer | |
-| frequency_occurrences_5m | integer | |
-| frequency_occurrences_1h | integer | |
-| frequency_occurrences_24h | integer | |
-| frequency_baseline_1h_per_5m | double precision | |
-| frequency_spike_ratio_5m_to_1h | double precision | |
-| frequency_has_sufficient_baseline | boolean | |
-| frequency_is_spiking | boolean | |
-| frequency_snapshot_at | timestamptz | |
+| Column                            | Type             | Constraints |
+| --------------------------------- | ---------------- | ----------- |
+| frequency_occurrences_1m          | integer          |             |
+| frequency_occurrences_5m          | integer          |             |
+| frequency_occurrences_1h          | integer          |             |
+| frequency_occurrences_24h         | integer          |             |
+| frequency_baseline_1h_per_5m      | double precision |             |
+| frequency_spike_ratio_5m_to_1h    | double precision |             |
+| frequency_has_sufficient_baseline | boolean          |             |
+| frequency_is_spiking              | boolean          |             |
+| frequency_snapshot_at             | timestamptz      |             |
 
 **Occurrence sampling (FR-GRP-07):** Raw events are stored in S3-compatible object storage at ingestion. The `incident_events` junction table references all occurrences. Retention is evaluated at write time by `recordIncidentEventRetention`: each event is assigned boolean retention reasons (`retain_first`, `retain_latest`, `retain_after_deploy`, `retain_highest_severity`, `retain_deploy_metadata`). An event is sampled (`is_sampled = true`) when it holds at least one retention reason. When a new event displaces a previously retained event (e.g. a new "latest" replaces the old "latest"), the displaced event's raw S3 blob is deleted and its `is_sampled` flag is cleared. Bundle assembly queries only `is_sampled = true` events via `listIncidentEventReferences`.
 
 **Indexes:**
+
 - `incidents_project_last_seen_idx` on (project_id, last_seen_at DESC)
 - `incidents_project_env_service_fingerprint_idx` UNIQUE on (project_id, environment, service_id, fingerprint)
 - `incidents_status_idx` on (project_id, status)
 
 ### 5.8a availability_checks
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | uuid | PK |
-| project_id | uuid | FK → projects, CASCADE |
-| created_by_user_id | uuid | FK → users, SET NULL |
-| name | text | NOT NULL |
-| url | text | NOT NULL |
-| method | text | NOT NULL, CHECK IN (`GET`, `HEAD`) |
-| expected_status_min | integer | NOT NULL DEFAULT `200`, CHECK `100..599` |
-| expected_status_max | integer | NOT NULL DEFAULT `399`, CHECK `100..599` |
-| timeout_ms | integer | NOT NULL DEFAULT `2500`, CHECK `500..5000` |
-| interval_seconds | integer | NOT NULL, CHECK `>= 30` |
-| failure_threshold | integer | NOT NULL DEFAULT `3`, CHECK `1..10` |
-| recovery_threshold | integer | NOT NULL DEFAULT `2`, CHECK `1..10` |
-| environment | text | NOT NULL DEFAULT `production` |
-| service_name | text | |
-| enabled | boolean | NOT NULL DEFAULT `true` |
-| status | text | NOT NULL DEFAULT `unknown`, CHECK IN (`unknown`, `passing`, `failing`) |
-| consecutive_failures | integer | NOT NULL DEFAULT `0` |
-| consecutive_successes | integer | NOT NULL DEFAULT `0` |
-| linked_incident_id | uuid | FK → incidents, SET NULL |
-| last_checked_at | timestamptz | |
-| next_check_at | timestamptz | |
-| claimed_at | timestamptz | |
-| last_result_status | text | nullable result-status enum |
-| last_result_http_status | integer | |
-| last_result_error_kind | text | |
-| last_result_error_message | text | |
-| last_result_duration_ms | integer | |
-| deleted_at | timestamptz | Soft-delete marker for future status-history surfaces |
-| created_at | timestamptz | NOT NULL DEFAULT now() |
-| updated_at | timestamptz | NOT NULL DEFAULT now() |
+
+| Column                    | Type        | Constraints                                                            |
+| ------------------------- | ----------- | ---------------------------------------------------------------------- |
+| id                        | uuid        | PK                                                                     |
+| project_id                | uuid        | FK → projects, CASCADE                                                 |
+| created_by_user_id        | uuid        | FK → users, SET NULL                                                   |
+| name                      | text        | NOT NULL                                                               |
+| url                       | text        | NOT NULL                                                               |
+| method                    | text        | NOT NULL, CHECK IN (`GET`, `HEAD`)                                     |
+| expected_status_min       | integer     | NOT NULL DEFAULT `200`, CHECK `100..599`                               |
+| expected_status_max       | integer     | NOT NULL DEFAULT `399`, CHECK `100..599`                               |
+| timeout_ms                | integer     | NOT NULL DEFAULT `2500`, CHECK `500..5000`                             |
+| interval_seconds          | integer     | NOT NULL, CHECK `>= 30`                                                |
+| failure_threshold         | integer     | NOT NULL DEFAULT `3`, CHECK `1..10`                                    |
+| recovery_threshold        | integer     | NOT NULL DEFAULT `2`, CHECK `1..10`                                    |
+| environment               | text        | NOT NULL DEFAULT `production`                                          |
+| service_name              | text        |                                                                        |
+| enabled                   | boolean     | NOT NULL DEFAULT `true`                                                |
+| status                    | text        | NOT NULL DEFAULT `unknown`, CHECK IN (`unknown`, `passing`, `failing`) |
+| consecutive_failures      | integer     | NOT NULL DEFAULT `0`                                                   |
+| consecutive_successes     | integer     | NOT NULL DEFAULT `0`                                                   |
+| linked_incident_id        | uuid        | FK → incidents, SET NULL                                               |
+| last_checked_at           | timestamptz |                                                                        |
+| next_check_at             | timestamptz |                                                                        |
+| claimed_at                | timestamptz |                                                                        |
+| last_result_status        | text        | nullable result-status enum                                            |
+| last_result_http_status   | integer     |                                                                        |
+| last_result_error_kind    | text        |                                                                        |
+| last_result_error_message | text        |                                                                        |
+| last_result_duration_ms   | integer     |                                                                        |
+| deleted_at                | timestamptz | Soft-delete marker for future status-history surfaces                  |
+| created_at                | timestamptz | NOT NULL DEFAULT now()                                                 |
+| updated_at                | timestamptz | NOT NULL DEFAULT now()                                                 |
 
 **Indexes:**
+
 - `availability_checks_project_created_idx` on `(project_id, created_at DESC)`
 - `availability_checks_due_idx` on `(next_check_at, project_id)`
 - `availability_checks_claimed_idx` on `(claimed_at)`
 
 ### 5.8b availability_check_results
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | uuid | PK |
-| check_id | uuid | FK → availability_checks, CASCADE |
-| project_id | uuid | FK → projects, CASCADE |
-| started_at | timestamptz | NOT NULL |
-| completed_at | timestamptz | NOT NULL |
-| duration_ms | integer | NOT NULL |
-| status | text | NOT NULL, CHECK IN (`success`, `http_status_mismatch`, `timeout`, `dns_error`, `tls_error`, `connection_error`, `redirect_blocked`, `security_blocked`, `internal_error`) |
-| http_status | integer | |
-| error_kind | text | |
-| error_message | text | |
-| redirect_count | integer | NOT NULL DEFAULT `0` |
-| checked_url_host | text | NOT NULL |
-| checked_url_path | text | NOT NULL |
-| final_url | text | NOT NULL |
-| created_at | timestamptz | NOT NULL DEFAULT now() |
+
+| Column           | Type        | Constraints                                                                                                                                                               |
+| ---------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| id               | uuid        | PK                                                                                                                                                                        |
+| check_id         | uuid        | FK → availability_checks, CASCADE                                                                                                                                         |
+| project_id       | uuid        | FK → projects, CASCADE                                                                                                                                                    |
+| started_at       | timestamptz | NOT NULL                                                                                                                                                                  |
+| completed_at     | timestamptz | NOT NULL                                                                                                                                                                  |
+| duration_ms      | integer     | NOT NULL                                                                                                                                                                  |
+| status           | text        | NOT NULL, CHECK IN (`success`, `http_status_mismatch`, `timeout`, `dns_error`, `tls_error`, `connection_error`, `redirect_blocked`, `security_blocked`, `internal_error`) |
+| http_status      | integer     |                                                                                                                                                                           |
+| error_kind       | text        |                                                                                                                                                                           |
+| error_message    | text        |                                                                                                                                                                           |
+| redirect_count   | integer     | NOT NULL DEFAULT `0`                                                                                                                                                      |
+| checked_url_host | text        | NOT NULL                                                                                                                                                                  |
+| checked_url_path | text        | NOT NULL                                                                                                                                                                  |
+| final_url        | text        | NOT NULL                                                                                                                                                                  |
+| created_at       | timestamptz | NOT NULL DEFAULT now()                                                                                                                                                    |
 
 Detailed execution history is retained for 30 days and then purged by retention cleanup. Response bodies and raw resolved IP addresses are intentionally not stored.
 
 **Indexes:**
+
 - `availability_check_results_check_started_idx` on `(check_id, started_at DESC)`
 - `availability_check_results_project_started_idx` on `(project_id, started_at DESC)`
 
 ### 5.8c availability_check_daily_rollups
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | uuid | PK |
-| check_id | uuid | FK → availability_checks, CASCADE |
-| project_id | uuid | FK → projects, CASCADE |
-| day | date | NOT NULL |
-| state | text | NOT NULL, CHECK IN (`unknown`, `operational`, `degraded`, `down`, `paused`) |
-| total_checks | integer | NOT NULL DEFAULT `0` |
-| successful_checks | integer | NOT NULL DEFAULT `0` |
-| failed_checks | integer | NOT NULL DEFAULT `0` |
-| degraded_checks | integer | NOT NULL DEFAULT `0` |
-| avg_duration_ms | integer | |
-| first_checked_at | timestamptz | |
-| last_checked_at | timestamptz | |
-| downtime_seconds | integer | NOT NULL DEFAULT `0` |
-| incident_ids | uuid[] | NOT NULL DEFAULT empty array |
-| created_at | timestamptz | NOT NULL DEFAULT now() |
-| updated_at | timestamptz | NOT NULL DEFAULT now() |
-| UNIQUE | `(check_id, day)` |
+
+| Column            | Type              | Constraints                                                                 |
+| ----------------- | ----------------- | --------------------------------------------------------------------------- |
+| id                | uuid              | PK                                                                          |
+| check_id          | uuid              | FK → availability_checks, CASCADE                                           |
+| project_id        | uuid              | FK → projects, CASCADE                                                      |
+| day               | date              | NOT NULL                                                                    |
+| state             | text              | NOT NULL, CHECK IN (`unknown`, `operational`, `degraded`, `down`, `paused`) |
+| total_checks      | integer           | NOT NULL DEFAULT `0`                                                        |
+| successful_checks | integer           | NOT NULL DEFAULT `0`                                                        |
+| failed_checks     | integer           | NOT NULL DEFAULT `0`                                                        |
+| degraded_checks   | integer           | NOT NULL DEFAULT `0`                                                        |
+| avg_duration_ms   | integer           |                                                                             |
+| first_checked_at  | timestamptz       |                                                                             |
+| last_checked_at   | timestamptz       |                                                                             |
+| downtime_seconds  | integer           | NOT NULL DEFAULT `0`                                                        |
+| incident_ids      | uuid[]            | NOT NULL DEFAULT empty array                                                |
+| created_at        | timestamptz       | NOT NULL DEFAULT now()                                                      |
+| updated_at        | timestamptz       | NOT NULL DEFAULT now()                                                      |
+| UNIQUE            | `(check_id, day)` |
 
 Daily rollups are retained for at least 30 days so project status-history surfaces can be layered on later without reshaping the data model.
 
 **Index:** `availability_check_daily_rollups_project_day_idx` on `(project_id, day DESC)`
 
 ### 5.9 incident_events
-| Column | Type | Constraints |
-|--------|------|-------------|
-| incident_id | uuid | FK → incidents, CASCADE |
-| event_id | uuid | NOT NULL |
-| event_type | text | NOT NULL |
-| event_class | text | NOT NULL |
-| occurred_at | timestamptz | NOT NULL |
-| is_sampled | boolean | NOT NULL DEFAULT false |
-| retain_first | boolean | NOT NULL DEFAULT false |
-| retain_latest | boolean | NOT NULL DEFAULT false |
-| retain_after_deploy | boolean | NOT NULL DEFAULT false |
-| retain_highest_severity | boolean | NOT NULL DEFAULT false |
-| retain_deploy_metadata | boolean | NOT NULL DEFAULT false |
-| severity_rank | integer | NOT NULL DEFAULT 0 |
-| PK | (incident_id, event_id) | |
+
+| Column                  | Type                    | Constraints             |
+| ----------------------- | ----------------------- | ----------------------- |
+| incident_id             | uuid                    | FK → incidents, CASCADE |
+| event_id                | uuid                    | NOT NULL                |
+| event_type              | text                    | NOT NULL                |
+| event_class             | text                    | NOT NULL                |
+| occurred_at             | timestamptz             | NOT NULL                |
+| is_sampled              | boolean                 | NOT NULL DEFAULT false  |
+| retain_first            | boolean                 | NOT NULL DEFAULT false  |
+| retain_latest           | boolean                 | NOT NULL DEFAULT false  |
+| retain_after_deploy     | boolean                 | NOT NULL DEFAULT false  |
+| retain_highest_severity | boolean                 | NOT NULL DEFAULT false  |
+| retain_deploy_metadata  | boolean                 | NOT NULL DEFAULT false  |
+| severity_rank           | integer                 | NOT NULL DEFAULT 0      |
+| PK                      | (incident_id, event_id) |                         |
 
 `event_class` values: `incident_signal`, `context_signal`, `operational_signal`. Assigned by event-normalizer, immutable after write (INV-15). Used by billing-store to filter Free-tier event counts (`WHERE event_class = 'incident_signal'`).
 
 **Index:** `incident_events_incident_sampled_idx` on (incident_id, is_sampled, occurred_at ASC, event_id ASC)
 
 ### 5.10 alert_rules
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | uuid | PK |
-| project_id | uuid | FK → projects, CASCADE |
-| created_by_user_id | uuid | NOT NULL, FK → users |
-| service_id | uuid | FK → services, CASCADE |
-| channel | text | NOT NULL |
-| condition_type | text | NOT NULL |
-| severity_min | text | |
-| cooldown_seconds | integer | NOT NULL DEFAULT 0 |
-| config | jsonb | NOT NULL DEFAULT '{}' |
-| is_enabled | boolean | NOT NULL DEFAULT true |
-| created_at | timestamptz | NOT NULL DEFAULT now() |
-| updated_at | timestamptz | NOT NULL DEFAULT now() |
+
+| Column             | Type        | Constraints            |
+| ------------------ | ----------- | ---------------------- |
+| id                 | uuid        | PK                     |
+| project_id         | uuid        | FK → projects, CASCADE |
+| created_by_user_id | uuid        | NOT NULL, FK → users   |
+| service_id         | uuid        | FK → services, CASCADE |
+| channel            | text        | NOT NULL               |
+| condition_type     | text        | NOT NULL               |
+| severity_min       | text        |                        |
+| cooldown_seconds   | integer     | NOT NULL DEFAULT 0     |
+| config             | jsonb       | NOT NULL DEFAULT '{}'  |
+| is_enabled         | boolean     | NOT NULL DEFAULT true  |
+| created_at         | timestamptz | NOT NULL DEFAULT now() |
+| updated_at         | timestamptz | NOT NULL DEFAULT now() |
 
 ### 5.10a alert_deliveries
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | uuid | PK |
-| alert_id | uuid | NOT NULL, FK → alert_rules, CASCADE |
-| project_id | uuid | NOT NULL, FK → projects, CASCADE |
-| incident_id | uuid | NOT NULL, FK → incidents, CASCADE |
-| condition_type | text | NOT NULL |
-| dedupe_key | text | NOT NULL |
-| notification_key | text | NOT NULL DEFAULT '' |
-| channel | text | NOT NULL |
-| status | text | NOT NULL |
-| payload | jsonb | NOT NULL |
-| last_error | text | |
-| delivered_at | timestamptz | |
-| created_at | timestamptz | NOT NULL DEFAULT now() |
-| updated_at | timestamptz | NOT NULL DEFAULT now() |
-| UNIQUE | (alert_id, incident_id, dedupe_key) | |
+
+| Column           | Type                                | Constraints                         |
+| ---------------- | ----------------------------------- | ----------------------------------- |
+| id               | uuid                                | PK                                  |
+| alert_id         | uuid                                | NOT NULL, FK → alert_rules, CASCADE |
+| project_id       | uuid                                | NOT NULL, FK → projects, CASCADE    |
+| incident_id      | uuid                                | NOT NULL, FK → incidents, CASCADE   |
+| condition_type   | text                                | NOT NULL                            |
+| dedupe_key       | text                                | NOT NULL                            |
+| notification_key | text                                | NOT NULL DEFAULT ''                 |
+| channel          | text                                | NOT NULL                            |
+| status           | text                                | NOT NULL                            |
+| payload          | jsonb                               | NOT NULL                            |
+| last_error       | text                                |                                     |
+| delivered_at     | timestamptz                         |                                     |
+| created_at       | timestamptz                         | NOT NULL DEFAULT now()              |
+| updated_at       | timestamptz                         | NOT NULL DEFAULT now()              |
+| UNIQUE           | (alert_id, incident_id, dedupe_key) |                                     |
 
 These rows represent immediate non-email alert sends. Email alerts use the digest queue below so bursty incidents can be aggregated before transport delivery.
 Exact replay idempotency still keys on `(alert_id, incident_id, dedupe_key)`. Optional cooldown suppression uses `(alert_id, notification_key)` plus recent delivery history and does not merge incidents.
 
 ### 5.10b alert_email_digests
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | uuid | PK |
-| project_id | uuid | NOT NULL, FK → projects, CASCADE |
-| recipient | text | NOT NULL |
-| status | text | NOT NULL |
-| next_attempt_at | timestamptz | |
-| claimed_at | timestamptz | |
-| last_error | text | |
-| delivered_at | timestamptz | |
-| created_at | timestamptz | NOT NULL DEFAULT now() |
-| updated_at | timestamptz | NOT NULL DEFAULT now() |
+
+| Column          | Type        | Constraints                      |
+| --------------- | ----------- | -------------------------------- |
+| id              | uuid        | PK                               |
+| project_id      | uuid        | NOT NULL, FK → projects, CASCADE |
+| recipient       | text        | NOT NULL                         |
+| status          | text        | NOT NULL                         |
+| next_attempt_at | timestamptz |                                  |
+| claimed_at      | timestamptz |                                  |
+| last_error      | text        |                                  |
+| delivered_at    | timestamptz |                                  |
+| created_at      | timestamptz | NOT NULL DEFAULT now()           |
+| updated_at      | timestamptz | NOT NULL DEFAULT now()           |
 
 Pending email digests aggregate for a fixed 10-second window per `(project_id, recipient)` before the worker claims them for send.
 
 ### 5.10c alert_email_digest_items
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | uuid | PK |
-| digest_id | uuid | NOT NULL, FK → alert_email_digests, CASCADE |
-| alert_id | uuid | NOT NULL, FK → alert_rules, CASCADE |
-| project_id | uuid | NOT NULL, FK → projects, CASCADE |
-| incident_id | uuid | NOT NULL, FK → incidents, CASCADE |
-| condition_type | text | NOT NULL |
-| dedupe_key | text | NOT NULL |
-| notification_key | text | NOT NULL DEFAULT '' |
-| payload | jsonb | NOT NULL |
-| created_at | timestamptz | NOT NULL DEFAULT now() |
-| UNIQUE | (alert_id, incident_id, dedupe_key) | |
+
+| Column           | Type                                | Constraints                                 |
+| ---------------- | ----------------------------------- | ------------------------------------------- |
+| id               | uuid                                | PK                                          |
+| digest_id        | uuid                                | NOT NULL, FK → alert_email_digests, CASCADE |
+| alert_id         | uuid                                | NOT NULL, FK → alert_rules, CASCADE         |
+| project_id       | uuid                                | NOT NULL, FK → projects, CASCADE            |
+| incident_id      | uuid                                | NOT NULL, FK → incidents, CASCADE           |
+| condition_type   | text                                | NOT NULL                                    |
+| dedupe_key       | text                                | NOT NULL                                    |
+| notification_key | text                                | NOT NULL DEFAULT ''                         |
+| payload          | jsonb                               | NOT NULL                                    |
+| created_at       | timestamptz                         | NOT NULL DEFAULT now()                      |
+| UNIQUE           | (alert_id, incident_id, dedupe_key) |                                             |
 
 Digest-item notification keys follow the same cooldown semantics as immediate deliveries so repeated email notifications can be suppressed without changing per-incident digest dedupe.
 
 ### 5.11 agent_webhooks
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | uuid | PK |
-| project_id | uuid | FK → projects, CASCADE |
-| url | text | NOT NULL |
-| secret_hash | text | NOT NULL |
-| events | text[] | |
-| filters | jsonb | NOT NULL DEFAULT '{}' |
-| is_enabled | boolean | NOT NULL DEFAULT true |
-| created_at | timestamptz | NOT NULL DEFAULT now() |
-| updated_at | timestamptz | NOT NULL DEFAULT now() |
+
+| Column      | Type        | Constraints            |
+| ----------- | ----------- | ---------------------- |
+| id          | uuid        | PK                     |
+| project_id  | uuid        | FK → projects, CASCADE |
+| url         | text        | NOT NULL               |
+| secret_hash | text        | NOT NULL               |
+| events      | text[]      |                        |
+| filters     | jsonb       | NOT NULL DEFAULT '{}'  |
+| is_enabled  | boolean     | NOT NULL DEFAULT true  |
+| created_at  | timestamptz | NOT NULL DEFAULT now() |
+| updated_at  | timestamptz | NOT NULL DEFAULT now() |
 
 ### 5.12 webhook_deliveries
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | uuid | PK |
-| webhook_id | uuid | FK → agent_webhooks, CASCADE |
-| event_name | text | NOT NULL |
-| target_url | text | NOT NULL |
-| attempt_count | integer | NOT NULL DEFAULT 0 |
-| last_response_code | integer | |
-| status | text | NOT NULL DEFAULT 'pending' |
-| created_at | timestamptz | NOT NULL DEFAULT now() |
-| last_attempted_at | timestamptz | |
+
+| Column             | Type        | Constraints                  |
+| ------------------ | ----------- | ---------------------------- |
+| id                 | uuid        | PK                           |
+| webhook_id         | uuid        | FK → agent_webhooks, CASCADE |
+| event_name         | text        | NOT NULL                     |
+| target_url         | text        | NOT NULL                     |
+| attempt_count      | integer     | NOT NULL DEFAULT 0           |
+| last_response_code | integer     |                              |
+| status             | text        | NOT NULL DEFAULT 'pending'   |
+| created_at         | timestamptz | NOT NULL DEFAULT now()       |
+| last_attempted_at  | timestamptz |                              |
 
 ### 5.13 usage_counters
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | uuid | PK |
-| organization_id | uuid | FK → organizations, CASCADE |
-| metric | text | NOT NULL |
-| period_start | date | NOT NULL |
-| period_end | date | NOT NULL |
-| value | bigint | NOT NULL DEFAULT 0 |
-| UNIQUE | (organization_id, metric, period_start, period_end) | |
+
+| Column          | Type                                                | Constraints                 |
+| --------------- | --------------------------------------------------- | --------------------------- |
+| id              | uuid                                                | PK                          |
+| organization_id | uuid                                                | FK → organizations, CASCADE |
+| metric          | text                                                | NOT NULL                    |
+| period_start    | date                                                | NOT NULL                    |
+| period_end      | date                                                | NOT NULL                    |
+| value           | bigint                                              | NOT NULL DEFAULT 0          |
+| UNIQUE          | (organization_id, metric, period_start, period_end) |                             |
 
 ### 5.14 probe_activations (Remote Activations — Solo+ Only)
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | uuid | PK |
-| project_id | uuid | FK → projects, CASCADE |
-| label_pattern | text | NOT NULL |
-| service | text | NOT NULL DEFAULT '*' |
-| environment | text | NOT NULL DEFAULT '*' |
-| activated_by | uuid | FK → users |
-| trigger_token_hash | text | NOT NULL |
-| expires_at | timestamptz | NOT NULL |
-| trigger_expires_at | timestamptz | NOT NULL |
-| deactivated_at | timestamptz | |
-| created_at | timestamptz | NOT NULL DEFAULT now() |
+
+| Column             | Type        | Constraints            |
+| ------------------ | ----------- | ---------------------- |
+| id                 | uuid        | PK                     |
+| project_id         | uuid        | FK → projects, CASCADE |
+| label_pattern      | text        | NOT NULL               |
+| service            | text        | NOT NULL DEFAULT '\*'  |
+| environment        | text        | NOT NULL DEFAULT '\*'  |
+| activated_by       | uuid        | FK → users             |
+| trigger_token_hash | text        | NOT NULL               |
+| expires_at         | timestamptz | NOT NULL               |
+| trigger_expires_at | timestamptz | NOT NULL               |
+| deactivated_at     | timestamptz |                        |
+| created_at         | timestamptz | NOT NULL DEFAULT now() |
 
 This table only tracks **remote activations** (Solo+). Always-on probe mode has no server-side state — ring buffers are purely local to the SDK.
 
 **Indexes:**
+
 - `probe_activations_project_active_idx` on (project_id) WHERE deactivated_at IS NULL AND expires_at > now()
 
 **Constraints:**
+
 - `expires_at` must be ≤ `created_at + interval '1 hour'` (passive activation TTL, max 3600s)
 - `trigger_expires_at` must be ≤ `created_at + interval '24 hours'` (trigger token TTL, max 86400s)
 - `trigger_expires_at` defaults to `expires_at` when `trigger_ttl_seconds` is not provided at creation
@@ -1296,125 +1470,127 @@ This table only tracks **remote activations** (Solo+). Always-on probe mode has 
 - `trigger_token_hash` stores SHA-256 hash of the plaintext trigger token (shown once at activation, never stored in plaintext)
 
 ### 5.15 capture_policies
-| Column | Type | Constraints |
-|--------|------|-------------|
-| project_id | uuid | PK, FK → projects, CASCADE |
-| preset | text | NOT NULL DEFAULT 'minimal' |
-| capture_logs | text | |
-| capture_request_events | text | |
-| capture_breadcrumbs | text | |
-| capture_probe_events | text | |
-| updated_at | timestamptz | NOT NULL DEFAULT now() |
+
+| Column                 | Type        | Constraints                |
+| ---------------------- | ----------- | -------------------------- |
+| project_id             | uuid        | PK, FK → projects, CASCADE |
+| preset                 | text        | NOT NULL DEFAULT 'minimal' |
+| capture_logs           | text        |                            |
+| capture_request_events | text        |                            |
+| capture_breadcrumbs    | text        |                            |
+| capture_probe_events   | text        |                            |
+| updated_at             | timestamptz | NOT NULL DEFAULT now()     |
 
 One row per project. Created on project creation with tier-appropriate defaults (Free: `minimal`, Solo/Team: `balanced`). Nullable override columns (`capture_logs`, etc.) mean "inherit from preset"; non-null means explicit override.
 
 **Preset defaults:**
 
-| Preset | capture_logs | capture_request_events | capture_breadcrumbs | capture_probe_events |
-|--------|-------------|----------------------|--------------------|--------------------|
-| `minimal` | `error` | `failures_only` | `local_only` | `buffer_only` |
-| `balanced` | `warning` | `failures_only` | `exception_only` | `buffer_only` |
-| `investigative` | `info` | `all` | `standalone` | `standalone_when_activated` |
+| Preset          | capture_logs | capture_request_events | capture_breadcrumbs | capture_probe_events        |
+| --------------- | ------------ | ---------------------- | ------------------- | --------------------------- |
+| `minimal`       | `error`      | `failures_only`        | `local_only`        | `buffer_only`               |
+| `balanced`      | `warning`    | `failures_only`        | `exception_only`    | `buffer_only`               |
+| `investigative` | `info`       | `all`                  | `standalone`        | `standalone_when_activated` |
 
 **Resolved policy:** For each control, use the explicit override if non-null, otherwise the preset default. This resolved policy is served via `GET /v1/sdk/config` and `GET /v1/projects/{id}/capture-policy`.
 
 ### 5.16 capture_rules
 
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | uuid | PK |
-| project_id | text | NOT NULL, FK -> projects, CASCADE |
-| name | text | NOT NULL |
-| description | text | |
-| enabled | boolean | NOT NULL DEFAULT true |
-| action | text | NOT NULL, CHECK IN (`demote`, `sample`, `drop`) |
-| matcher | jsonb | NOT NULL |
-| sample_rate | double precision | Required only when `action = 'sample'` |
-| sample_event_class | text | Required only when `action = 'sample'`, CHECK IN (`preserve`, `context`) |
-| created_by_user_id | text | |
-| created_from_incident_id | text | |
-| created_from_event_id | uuid | |
-| expires_at | timestamptz | |
-| hit_count | integer | NOT NULL DEFAULT 0 |
-| last_matched_at | timestamptz | |
-| created_at | timestamptz | NOT NULL DEFAULT now() |
-| updated_at | timestamptz | NOT NULL DEFAULT now() |
+| Column                   | Type             | Constraints                                                              |
+| ------------------------ | ---------------- | ------------------------------------------------------------------------ |
+| id                       | uuid             | PK                                                                       |
+| project_id               | text             | NOT NULL, FK -> projects, CASCADE                                        |
+| name                     | text             | NOT NULL                                                                 |
+| description              | text             |                                                                          |
+| enabled                  | boolean          | NOT NULL DEFAULT true                                                    |
+| action                   | text             | NOT NULL, CHECK IN (`demote`, `sample`, `drop`)                          |
+| matcher                  | jsonb            | NOT NULL                                                                 |
+| sample_rate              | double precision | Required only when `action = 'sample'`                                   |
+| sample_event_class       | text             | Required only when `action = 'sample'`, CHECK IN (`preserve`, `context`) |
+| created_by_user_id       | text             |                                                                          |
+| created_from_incident_id | text             |                                                                          |
+| created_from_event_id    | uuid             |                                                                          |
+| expires_at               | timestamptz      |                                                                          |
+| hit_count                | integer          | NOT NULL DEFAULT 0                                                       |
+| last_matched_at          | timestamptz      |                                                                          |
+| created_at               | timestamptz      | NOT NULL DEFAULT now()                                                   |
+| updated_at               | timestamptz      | NOT NULL DEFAULT now()                                                   |
 
 Capture rules are project-level manual decisions for known noisy event patterns. `demote` keeps matching events as context, `sample` deterministically retains a fraction of matching events, and `drop` rejects matching events before raw persistence where possible. Active rules are served in `GET /v1/sdk/config` as `capture_rules`.
 
 **Indexes:**
+
 - `capture_rules_project_enabled_idx` on (project_id, enabled)
 - `capture_rules_project_updated_idx` on (project_id, updated_at DESC)
 
 ### 5.17 github_installations
 
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | uuid | PK, DEFAULT gen_random_uuid() |
-| organization_id | uuid | NOT NULL, FK → organizations, CASCADE |
-| installation_id | bigint | NOT NULL, UNIQUE |
-| account_login | text | NOT NULL |
-| account_type | text | NOT NULL, CHECK IN ('Organization', 'User') |
-| status | text | NOT NULL, DEFAULT 'active', CHECK IN ('active', 'suspended', 'removed') |
-| created_at | timestamptz | NOT NULL DEFAULT now() |
-| updated_at | timestamptz | NOT NULL DEFAULT now() |
+| Column          | Type        | Constraints                                                             |
+| --------------- | ----------- | ----------------------------------------------------------------------- |
+| id              | uuid        | PK, DEFAULT gen_random_uuid()                                           |
+| organization_id | uuid        | NOT NULL, FK → organizations, CASCADE                                   |
+| installation_id | bigint      | NOT NULL, UNIQUE                                                        |
+| account_login   | text        | NOT NULL                                                                |
+| account_type    | text        | NOT NULL, CHECK IN ('Organization', 'User')                             |
+| status          | text        | NOT NULL, DEFAULT 'active', CHECK IN ('active', 'suspended', 'removed') |
+| created_at      | timestamptz | NOT NULL DEFAULT now()                                                  |
+| updated_at      | timestamptz | NOT NULL DEFAULT now()                                                  |
 
 One row per GitHub App installation. Scoped to one DebugBundle organization. `installation_id` is the GitHub-assigned numeric ID. `status` tracks installation lifecycle from GitHub App webhook events.
 
 ### 5.18 project_github_repos
 
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | uuid | PK, DEFAULT gen_random_uuid() |
-| project_id | uuid | NOT NULL, UNIQUE, FK → projects, CASCADE |
-| installation_id | uuid | NOT NULL, FK → github_installations |
-| repo_owner | text | NOT NULL |
-| repo_name | text | NOT NULL |
-| default_branch | text | NOT NULL, DEFAULT 'main' |
-| created_at | timestamptz | NOT NULL DEFAULT now() |
-| updated_at | timestamptz | NOT NULL DEFAULT now() |
+| Column          | Type        | Constraints                              |
+| --------------- | ----------- | ---------------------------------------- |
+| id              | uuid        | PK, DEFAULT gen_random_uuid()            |
+| project_id      | uuid        | NOT NULL, UNIQUE, FK → projects, CASCADE |
+| installation_id | uuid        | NOT NULL, FK → github_installations      |
+| repo_owner      | text        | NOT NULL                                 |
+| repo_name       | text        | NOT NULL                                 |
+| default_branch  | text        | NOT NULL, DEFAULT 'main'                 |
+| created_at      | timestamptz | NOT NULL DEFAULT now()                   |
+| updated_at      | timestamptz | NOT NULL DEFAULT now()                   |
 
 One primary repo per project, enforced by `UNIQUE` on `project_id`. `installation_id` references the GitHub App installation (not the GitHub numeric ID).
 
 ### 5.19 github_dispatch_rules
 
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | uuid | PK, DEFAULT gen_random_uuid() |
-| project_id | uuid | NOT NULL, FK → projects, CASCADE |
-| name | text | NOT NULL |
-| enabled | boolean | NOT NULL, DEFAULT true |
-| event_types | text[] | NOT NULL |
-| environments | text[] | |
-| services | text[] | |
-| severity_min | text | CHECK IN ('low', 'medium', 'high', 'critical') |
-| bundle_type | text | CHECK IN ('failure', 'improvement') |
-| incident_status | text | NOT NULL, DEFAULT 'new_or_reopened', CHECK IN ('new_only', 'reopened_only', 'new_or_reopened') |
-| cooldown_seconds | integer | NOT NULL, DEFAULT 300 |
-| created_at | timestamptz | NOT NULL DEFAULT now() |
-| updated_at | timestamptz | NOT NULL DEFAULT now() |
+| Column           | Type        | Constraints                                                                                    |
+| ---------------- | ----------- | ---------------------------------------------------------------------------------------------- |
+| id               | uuid        | PK, DEFAULT gen_random_uuid()                                                                  |
+| project_id       | uuid        | NOT NULL, FK → projects, CASCADE                                                               |
+| name             | text        | NOT NULL                                                                                       |
+| enabled          | boolean     | NOT NULL, DEFAULT true                                                                         |
+| event_types      | text[]      | NOT NULL                                                                                       |
+| environments     | text[]      |                                                                                                |
+| services         | text[]      |                                                                                                |
+| severity_min     | text        | CHECK IN ('low', 'medium', 'high', 'critical')                                                 |
+| bundle_type      | text        | CHECK IN ('failure', 'improvement')                                                            |
+| incident_status  | text        | NOT NULL, DEFAULT 'new_or_reopened', CHECK IN ('new_only', 'reopened_only', 'new_or_reopened') |
+| cooldown_seconds | integer     | NOT NULL, DEFAULT 300                                                                          |
+| created_at       | timestamptz | NOT NULL DEFAULT now()                                                                         |
+| updated_at       | timestamptz | NOT NULL DEFAULT now()                                                                         |
 
 Dispatch rules reuse the same filter field semantics as webhook filters (`event_types`, `environments`, `services`, `severity_min`, `bundle_type`). `incident_status` and `cooldown_seconds` are dispatch-specific. `cooldown_seconds` minimum configurable value is 60.
 
 ### 5.20 github_dispatch_deliveries
 
-| Column | Type | Constraints |
-|--------|------|-------------|
-| id | uuid | PK, DEFAULT gen_random_uuid() |
-| rule_id | uuid | NOT NULL, FK → github_dispatch_rules |
-| project_id | uuid | NOT NULL, FK → projects |
-| incident_id | uuid | NULL, FK → incidents |
-| improvement_opportunity_id | uuid | NULL, FK → improvement_opportunities |
-| target_fingerprint | text | NOT NULL |
-| status | text | NOT NULL, DEFAULT 'pending', CHECK IN ('pending', 'delivered', 'failed', 'retrying', 'skipped') |
-| attempt_count | integer | NOT NULL, DEFAULT 0 |
-| last_attempt_at | timestamptz | |
-| last_error | text | |
-| github_status_code | integer | |
-| dispatch_payload | jsonb | NOT NULL |
-| created_at | timestamptz | NOT NULL DEFAULT now() |
-| updated_at | timestamptz | NOT NULL DEFAULT now() |
-| dedupe_key | text | NOT NULL |
+| Column                     | Type        | Constraints                                                                                     |
+| -------------------------- | ----------- | ----------------------------------------------------------------------------------------------- |
+| id                         | uuid        | PK, DEFAULT gen_random_uuid()                                                                   |
+| rule_id                    | uuid        | NOT NULL, FK → github_dispatch_rules                                                            |
+| project_id                 | uuid        | NOT NULL, FK → projects                                                                         |
+| incident_id                | uuid        | NULL, FK → incidents                                                                            |
+| improvement_opportunity_id | uuid        | NULL, FK → improvement_opportunities                                                            |
+| target_fingerprint         | text        | NOT NULL                                                                                        |
+| status                     | text        | NOT NULL, DEFAULT 'pending', CHECK IN ('pending', 'delivered', 'failed', 'retrying', 'skipped') |
+| attempt_count              | integer     | NOT NULL, DEFAULT 0                                                                             |
+| last_attempt_at            | timestamptz |                                                                                                 |
+| last_error                 | text        |                                                                                                 |
+| github_status_code         | integer     |                                                                                                 |
+| dispatch_payload           | jsonb       | NOT NULL                                                                                        |
+| created_at                 | timestamptz | NOT NULL DEFAULT now()                                                                          |
+| updated_at                 | timestamptz | NOT NULL DEFAULT now()                                                                          |
+| dedupe_key                 | text        | NOT NULL                                                                                        |
 
 Exactly one of `incident_id` or `improvement_opportunity_id` must be present. Incident dispatches target a failure incident; hosted improvement dispatches target an improvement opportunity.
 
@@ -1430,23 +1606,23 @@ Retention cleanup removes raw analytics objects according to `raw_retention_days
 
 Required table concepts for the AnalyticsBundle implementation:
 
-| Table | Purpose |
-|---|---|
-| `project_analytics_settings` | Project-scoped analytics enablement, privacy mode, consent requirement, sampling, retention, saved-funnel/custom-dimension limits, and capture toggles |
-| `analytics_usage_counters` | Durable internal monthly analytics allowance counters for events, sessions, retained journey samples, and AnalyticsBundle generations |
-| `analytics_ingestion_ledger` | Idempotency ledger keyed by project/event id so reprocessing does not double-count rollups |
-| `analytics_rollup_uniques` | Idempotency ledger for unique session counts per rollup bucket, dimension hash, route/action/funnel key, and hashed session subject |
-| `analytics_session_rollups` | Hourly/daily session, active-user, new/returning visitor, bounce, exit, duration, and pageview aggregates by bounded dimensions |
-| `analytics_route_rollups` | Hourly/daily route/page aggregates including pageviews, unique sessions, entrances, exits, bounces, duration buckets, and linked incident sessions |
-| `analytics_action_rollups` | Semantic action and feature-usage aggregates by route and bounded dimensions |
-| `analytics_funnel_definitions` | Optional saved funnel definitions for named project funnels |
-| `analytics_funnel_rollups` | Funnel-step conversion/dropoff/time aggregates by bounded dimensions |
-| `analytics_transition_rollups` | Route-to-route transition aggregates for journey/path analysis |
-| `analytics_incident_correlations` | Short-lived hashed debug incident session/trace correlation records used only to reconcile aggregate analytics evidence |
-| `analytics_incident_session_links` | Idempotent incident-to-route-session links that support incident impact metrics without raw event scans |
-| `analytics_journey_samples` | Short-lived retained representative journey sample index pointing to redacted object-storage artifacts; public reads expose only rows with completed artifacts, while an internal project-scoped correlation session hash supports exact incident-impact replay selection |
-| `analytics_opportunities` | Deterministic usage/friction/incident-impact/deploy-comparison opportunities with status, severity, confidence, evidence summary, related incident/deploy ids, and bundle state |
-| `analytics_bundle_generations` | On-demand or scheduled AnalyticsBundle generation metadata, input fingerprint, status, object key, and failure reason |
+| Table                              | Purpose                                                                                                                                                                                                                                                                   |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `project_analytics_settings`       | Project-scoped analytics enablement, privacy mode, consent requirement, sampling, retention, saved-funnel/custom-dimension limits, and capture toggles                                                                                                                    |
+| `analytics_usage_counters`         | Durable internal monthly analytics allowance counters for events, sessions, retained journey samples, and AnalyticsBundle generations                                                                                                                                     |
+| `analytics_ingestion_ledger`       | Idempotency ledger keyed by project/event id so reprocessing does not double-count rollups                                                                                                                                                                                |
+| `analytics_rollup_uniques`         | Idempotency ledger for unique session counts per rollup bucket, dimension hash, route/action/funnel key, and hashed session subject                                                                                                                                       |
+| `analytics_session_rollups`        | Hourly/daily session, active-user, new/returning visitor, bounce, exit, duration, and pageview aggregates by bounded dimensions                                                                                                                                           |
+| `analytics_route_rollups`          | Hourly/daily route/page aggregates including pageviews, unique sessions, entrances, exits, bounces, duration buckets, and linked incident sessions                                                                                                                        |
+| `analytics_action_rollups`         | Semantic action and feature-usage aggregates by route and bounded dimensions                                                                                                                                                                                              |
+| `analytics_funnel_definitions`     | Optional saved funnel definitions for named project funnels                                                                                                                                                                                                               |
+| `analytics_funnel_rollups`         | Funnel-step conversion/dropoff/time aggregates by bounded dimensions                                                                                                                                                                                                      |
+| `analytics_transition_rollups`     | Route-to-route transition aggregates for journey/path analysis                                                                                                                                                                                                            |
+| `analytics_incident_correlations`  | Short-lived hashed debug incident session/trace correlation records used only to reconcile aggregate analytics evidence                                                                                                                                                   |
+| `analytics_incident_session_links` | Idempotent incident-to-route-session links that support incident impact metrics without raw event scans                                                                                                                                                                   |
+| `analytics_journey_samples`        | Short-lived retained representative journey sample index pointing to redacted object-storage artifacts; public reads expose only rows with completed artifacts, while an internal project-scoped correlation session hash supports exact incident-impact replay selection |
+| `analytics_opportunities`          | Deterministic usage/friction/incident-impact/deploy-comparison opportunities with status, severity, confidence, evidence summary, related incident/deploy ids, and bundle state                                                                                           |
+| `analytics_bundle_generations`     | On-demand or scheduled AnalyticsBundle generation metadata, input fingerprint, status, object key, and failure reason                                                                                                                                                     |
 
 Dimension storage must remain bounded. Built-in dimensions include route, device type, browser family/major, OS family/major, language/locale, viewport bucket, referrer domain, UTM fields, auth state, country/region when enabled, deploy, and approved tier-bounded custom dimensions. Arbitrary raw JSON payloads must not be used as the long-term analytics query model.
 
@@ -1481,13 +1657,13 @@ Incident-impact journey-pattern rows use the same bounded `sample_ids` shape, bu
 
 ## 6. Object Storage Path Conventions
 
-| Artifact | Path Pattern |
-|----------|------------|
-| Raw events | `raw-events/{project_id}/{yyyy}/{mm}/{dd}/{hour}/{event_id}.json.gz` |
-| Bundles | `bundles/{project_id}/{incident_id}/bundle.json.gz` |
-| Reproductions | `reproductions/{project_id}/{incident_id}/reproduction.json.gz` |
-| Raw analytics events | `analytics-events/{project_id}/{yyyy}/{mm}/{dd}/{hour}/{event_id}.json.gz` |
-| Analytics journey samples | `analytics-journeys/{project_id}/{sample_id}.json.gz` |
+| Artifact                  | Path Pattern                                                                     |
+| ------------------------- | -------------------------------------------------------------------------------- |
+| Raw events                | `raw-events/{project_id}/{yyyy}/{mm}/{dd}/{hour}/{event_id}.json.gz`             |
+| Bundles                   | `bundles/{project_id}/{incident_id}/bundle.json.gz`                              |
+| Reproductions             | `reproductions/{project_id}/{incident_id}/reproduction.json.gz`                  |
+| Raw analytics events      | `analytics-events/{project_id}/{yyyy}/{mm}/{dd}/{hour}/{event_id}.json.gz`       |
+| Analytics journey samples | `analytics-journeys/{project_id}/{sample_id}.json.gz`                            |
 | AnalyticsBundle artifacts | `analytics-bundles/{project_id}/{bundle_generation_id}/analytics-bundle.json.gz` |
 
 ---
@@ -1496,19 +1672,21 @@ Incident-impact journey-pattern rows use the same bounded `sample_ids` shape, bu
 
 Browser relay events are written to the user's project root under `.debugbundle/`. These paths are local to the user's server, not cloud object storage.
 
-| Artifact | Path | When Used |
-|----------|------|-----------|
-| Local-only relay events | `.debugbundle/local/events/<timestamp>-<sequence>-<service>.events.json` | Relay in local-only mode (same dir as Node SDK file transport) |
-| Connected relay spool | `.debugbundle/local/browser-relay-spool/<timestamp>-<sequence>-<service>.events.json` | Relay in connected durable mode (pre-cloud-forward spool) |
+| Artifact                | Path                                                                                  | When Used                                                      |
+| ----------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Local-only relay events | `.debugbundle/local/events/<timestamp>-<sequence>-<service>.events.json`              | Relay in local-only mode (same dir as Node SDK file transport) |
+| Connected relay spool   | `.debugbundle/local/browser-relay-spool/<timestamp>-<sequence>-<service>.events.json` | Relay in connected durable mode (pre-cloud-forward spool)      |
 
 **Connected durable delivery marker:** when a spooled browser relay batch is successfully forwarded to cloud, the relay writes a sidecar marker file next to the spool entry: `<timestamp>-<sequence>-<service>.events.json.delivered`. The spool payload remains the source event batch; the marker file exists only to track delivered-vs-undelivered retention.
 
 **Wire format:** Both paths use the same file format as the Node SDK file transport:
+
 - Filename: `<timestamp>-<sequence>-<service>.events.json` (e.g., `1711036800000-0001-checkout-web.events.json`)
 - Contents: JSON array of event envelopes (identical to Node SDK file transport output)
 - Write mechanism: atomic temp-file + rename (no partial reads by `debugbundle process`)
 
 **Spool retention (connected durable mode):**
+
 - Delivered spool files: spool entries with a `.delivered` sidecar are pruned after 24 hours (default, measured from the marker mtime)
 - Undelivered spool files: spool entries without a `.delivered` sidecar are retained for 7 days (default, configurable TTL, measured from the spool file mtime)
 
@@ -1645,9 +1823,7 @@ Hosted availability checks are project-scoped external HTTP checks executed by D
     "object_storage": ["string"],
     "external_services": ["string"]
   },
-  "critical_paths": [
-    { "name": "string", "owner_service": "string", "notes": "string" }
-  ],
+  "critical_paths": [{ "name": "string", "owner_service": "string", "notes": "string" }],
   "repo": {
     "root_paths": ["string"],
     "generated_paths": ["string"],

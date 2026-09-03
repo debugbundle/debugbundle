@@ -1,0 +1,18 @@
+{
+  "contract_version": "1.0.0",
+  "evidence_state": "local_source_ready_for_testing",
+  "openai_catalog": "implemented_and_contract_tested",
+  "dedicated_hosted_readers": "implemented_and_unit_tested",
+  "oauth_oidc_runtime": "implemented_and_unit_tested_not_deployed",
+  "streamable_http_transport": "implemented_and_unit_tested_not_deployed",
+  "plugin_package": "candidate_built_connection_registration_pending",
+  "hosted_infrastructure": "source_ready_not_deployed",
+  "consent_ui": "owner_approved_implemented_and_tested_not_deployed",
+  "synthetic_ui_preview": "implemented_and_contract_tested_manual_visual_validation_pending",
+  "developer_mode_connection": "not_registered",
+  "production_validation": "not_run",
+  "portal_submission": "not_submitted",
+  "publication": "not_published",
+  "directory_discovery": "not_verified",
+  "next_gate": "manual_local_accessibility_then_production_and_live_client_validation"
+}

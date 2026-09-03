@@ -14,6 +14,10 @@ export const REQUIRED_API_TABLES = [
   "account_deletion_challenges",
   "github_device_authorizations",
   "oauth_identities",
+  "oauth_authorization_grants",
+  "oauth_authorization_codes",
+  "oauth_refresh_tokens",
+  "oauth_provider_artifacts",
   "organizations",
   "organization_members",
   "projects",
@@ -77,6 +81,10 @@ export const REQUIRED_API_TABLES = [
 export const REQUIRED_WORKER_TABLES = [
   "processed_events",
   "organizations",
+  "oauth_authorization_grants",
+  "oauth_authorization_codes",
+  "oauth_refresh_tokens",
+  "oauth_provider_artifacts",
   "projects",
   "capture_rules",
   "services",
@@ -122,7 +130,7 @@ export const REQUIRED_WORKER_TABLES = [
   "analytics_opportunities",
   "analytics_bundle_generations",
   "analytics_incident_correlations",
-  "analytics_incident_session_links",
+  "analytics_incident_session_links"
 ] as const;
 
 const LEGACY_SCHEMA_TABLE = "schema_migrations";

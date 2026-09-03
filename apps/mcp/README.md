@@ -36,18 +36,18 @@ Use `npx -y @debugbundle/mcp` in clients that require noninteractive package exe
 
 ## Install Matrix
 
-| Environment | Recommended path | Notes |
-| --- | --- | --- |
-| Generic local MCP client | `npx @debugbundle/mcp` | stdio transport |
-| Claude Desktop local MCP | local MCP server config | uses local machine auth/config |
-| Claude Code plugin | `/plugin marketplace add debugbundle/debugbundle` | installs bundled MCP config and DebugBundle skill |
-| Cursor | MCP config with `npx @debugbundle/mcp` | stdio transport |
-| VS Code / GitHub MCP Registry | `com.debugbundle/mcp` | official registry metadata |
-| OpenClaw / ClawHub | DebugBundle skill plus MCP config | use the published skill for workflow guidance |
-| CI/headless agents | `DEBUGBUNDLE_MEMBER_TOKEN` | never use a project token |
-| Self-hosted DebugBundle | `DEBUGBUNDLE_API_URL` plus member auth | points the server at your API base URL |
+| Environment                   | Recommended path                                  | Notes                                             |
+| ----------------------------- | ------------------------------------------------- | ------------------------------------------------- |
+| Generic local MCP client      | `npx @debugbundle/mcp`                            | stdio transport                                   |
+| Claude Desktop local MCP      | local MCP server config                           | uses local machine auth/config                    |
+| Claude Code plugin            | `/plugin marketplace add debugbundle/debugbundle` | installs bundled MCP config and DebugBundle skill |
+| Cursor                        | MCP config with `npx @debugbundle/mcp`            | stdio transport                                   |
+| VS Code / GitHub MCP Registry | `com.debugbundle/mcp`                             | official registry metadata                        |
+| OpenClaw / ClawHub            | DebugBundle skill plus MCP config                 | use the published skill for workflow guidance     |
+| CI/headless agents            | `DEBUGBUNDLE_MEMBER_TOKEN`                        | never use a project token                         |
+| Self-hosted DebugBundle       | `DEBUGBUNDLE_API_URL` plus member auth            | points the server at your API base URL            |
 
-DebugBundle does not expose a hosted remote MCP endpoint today; this package is the local stdio path.
+This package is the supported public local stdio path. A separate OpenAI Plugin `1.0.0` source candidate targets an OAuth-protected read-only remote endpoint at `https://mcp.debugbundle.com/mcp`; it is not deployed, submitted, published, or publicly installable yet and does not alter this package's catalog or authentication.
 
 ## Claude Desktop
 
@@ -79,12 +79,12 @@ The plugin package lives at `apps/mcp/claude-code/debugbundle`, bundles a Claude
 
 ## Authentication
 
-| Mode | Use | Notes |
-| --- | --- | --- |
-| CLI auth state | Local developer machines | Reuses `~/.debugbundle/auth.json` when available. |
+| Mode                       | Use                                     | Notes                                                             |
+| -------------------------- | --------------------------------------- | ----------------------------------------------------------------- |
+| CLI auth state             | Local developer machines                | Reuses `~/.debugbundle/auth.json` when available.                 |
 | `DEBUGBUNDLE_MEMBER_TOKEN` | Headless or marketplace-managed clients | Member tokens are for CLI/API/MCP read and management operations. |
-| Per-tool `bearerToken` | Explicit advanced automation | Overrides default auth for that call only. |
-| Project token | SDK ingestion only | Do not use project tokens for MCP retrieval or management. |
+| Per-tool `bearerToken`     | Explicit advanced automation            | Overrides default auth for that call only.                        |
+| Project token              | SDK ingestion only                      | Do not use project tokens for MCP retrieval or management.        |
 
 ## What Agents Can Do
 
@@ -102,12 +102,12 @@ For analytics questions, use direct aggregate tools first and generate an Analyt
 
 ## Troubleshooting
 
-| Symptom | Check |
-| --- | --- |
-| Node.js launch failure | Use Node.js 22.x through 26.x. Configure the client to use a supported `node` or `npx` runtime. |
-| Missing local auth | Run `debugbundle login`, or set `DEBUGBUNDLE_MEMBER_TOKEN` for headless and managed clients. |
-| Invalid token | Use a `dbundle_mem_` member token. Project tokens are SDK ingestion-only credentials. |
-| Wrong API host | Leave `DEBUGBUNDLE_API_URL` unset for DebugBundle Cloud; set it only for self-hosted or non-default API hosts. |
+| Symptom                    | Check                                                                                                               |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Node.js launch failure     | Use Node.js 22.x through 26.x. Configure the client to use a supported `node` or `npx` runtime.                     |
+| Missing local auth         | Run `debugbundle login`, or set `DEBUGBUNDLE_MEMBER_TOKEN` for headless and managed clients.                        |
+| Invalid token              | Use a `dbundle_mem_` member token. Project tokens are SDK ingestion-only credentials.                               |
+| Wrong API host             | Leave `DEBUGBUNDLE_API_URL` unset for DebugBundle Cloud; set it only for self-hosted or non-default API hosts.      |
 | Local repo not initialized | Run `debugbundle setup` before local-only diagnostics, local bundle analysis, or generated project-skill workflows. |
 
 ## Links
@@ -116,6 +116,7 @@ For analytics questions, use direct aggregate tools first and generate an Analyt
 - Agent workflows: https://debugbundle.com/docs/agent-workflows
 - LLM index: https://debugbundle.com/llms.txt
 - MCP tool schema: https://debugbundle.com/schemas/mcp-tools.json
+- OpenAI Plugin candidate: https://debugbundle.com/docs/mcp/openai-plugin
 - Official MCP Registry metadata: https://github.com/debugbundle/debugbundle/blob/main/apps/mcp/server.json
 
 ## Security And Trust

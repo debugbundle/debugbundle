@@ -57,7 +57,18 @@ const WorkerEnvSchema = z.object({
   LIFECYCLE_WEBHOOK_SECRET: z.string().min(1).optional(),
   WORKER_HEALTH_PORT: z.coerce.number().int().min(0).max(65535).default(0),
   WORKER_RUN_ONCE: z.enum(["0", "1"]).default("0"),
-  ANALYTICS_HASH_SECRET: z.string().min(1)
+  ANALYTICS_HASH_SECRET: z.string().min(1),
+  OPENAI_OAUTH_ENABLED: z.enum(["0", "1", "false", "true"]).default("false"),
+  OPENAI_OAUTH_ADAPTER_ENCRYPTION_KEY: z.string().min(1).optional(),
+  OPENAI_OAUTH_CLEANUP_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .min(60_000)
+    .max(24 * 60 * 60 * 1000)
+    .default(6 * 60 * 60 * 1000),
+  OPENAI_OAUTH_CLEANUP_BATCH_SIZE: z.coerce.number().int().min(1).max(500).default(500),
+  OPENAI_REVIEWER_ACCESS_ENABLED: z.enum(["0", "1", "false", "true"]).default("false"),
+  OPENAI_REVIEWER_CREDENTIAL_EXPIRES_AT: z.string().datetime().optional()
 });
 
 export type WorkerEnv = Omit<z.infer<typeof WorkerEnvSchema>, "DB_SSL_MODE"> & {
@@ -287,7 +298,17 @@ export function parseWorkerEnv(env: Record<string, string | undefined>): WorkerE
     LIFECYCLE_WEBHOOK_SECRET: readOptionalEnv(env["LIFECYCLE_WEBHOOK_SECRET"]),
     WORKER_HEALTH_PORT: env["WORKER_HEALTH_PORT"],
     WORKER_RUN_ONCE: env["WORKER_RUN_ONCE"],
-    ANALYTICS_HASH_SECRET: env["ANALYTICS_HASH_SECRET"]
+    ANALYTICS_HASH_SECRET: env["ANALYTICS_HASH_SECRET"],
+    OPENAI_OAUTH_ENABLED: env["OPENAI_OAUTH_ENABLED"],
+    OPENAI_OAUTH_ADAPTER_ENCRYPTION_KEY: readOptionalEnv(
+      env["OPENAI_OAUTH_ADAPTER_ENCRYPTION_KEY"]
+    ),
+    OPENAI_OAUTH_CLEANUP_INTERVAL_MS: env["OPENAI_OAUTH_CLEANUP_INTERVAL_MS"],
+    OPENAI_OAUTH_CLEANUP_BATCH_SIZE: env["OPENAI_OAUTH_CLEANUP_BATCH_SIZE"],
+    OPENAI_REVIEWER_ACCESS_ENABLED: env["OPENAI_REVIEWER_ACCESS_ENABLED"],
+    OPENAI_REVIEWER_CREDENTIAL_EXPIRES_AT: readOptionalEnv(
+      env["OPENAI_REVIEWER_CREDENTIAL_EXPIRES_AT"]
+    )
   });
 
   if (!parsed.success) {
@@ -312,6 +333,33 @@ export function parseWorkerEnv(env: Record<string, string | undefined>): WorkerE
         "worker_env_invalid: INTEGRATION_SECRET_ENCRYPTION_KEY: expected 32-byte base64url secret"
       );
     }
+  }
+  const oauthEnabled =
+    parsed.data.OPENAI_OAUTH_ENABLED === "true" || parsed.data.OPENAI_OAUTH_ENABLED === "1";
+  const reviewerAccessEnabled =
+    parsed.data.OPENAI_REVIEWER_ACCESS_ENABLED === "true" ||
+    parsed.data.OPENAI_REVIEWER_ACCESS_ENABLED === "1";
+  if (oauthEnabled) {
+    if (parsed.data.OPENAI_OAUTH_ADAPTER_ENCRYPTION_KEY === undefined) {
+      throw new Error(
+        "worker_env_invalid: OPENAI_OAUTH_ADAPTER_ENCRYPTION_KEY: required when OAuth is enabled"
+      );
+    }
+    try {
+      assertIntegrationSecretEncryptionKey(parsed.data.OPENAI_OAUTH_ADAPTER_ENCRYPTION_KEY);
+    } catch {
+      throw new Error(
+        "worker_env_invalid: OPENAI_OAUTH_ADAPTER_ENCRYPTION_KEY: expected 32-byte base64url secret"
+      );
+    }
+  }
+  if (
+    reviewerAccessEnabled &&
+    (!oauthEnabled || parsed.data.OPENAI_REVIEWER_CREDENTIAL_EXPIRES_AT === undefined)
+  ) {
+    throw new Error(
+      "worker_env_invalid: OPENAI_REVIEWER_ACCESS_ENABLED: requires OAuth and reviewer expiry"
+    );
   }
 
   return {

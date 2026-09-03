@@ -1,0 +1,986 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://debugbundle.com/contracts/openai-plugin-v1/schemas.json",
+  "$defs": {
+    "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "cursor": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "dateTime": { "type": "string", "format": "date-time", "maxLength": 64 },
+    "publicUrl": { "type": "string", "format": "uri", "maxLength": 2048 },
+    "shortString": { "type": "string", "maxLength": 256 },
+    "summaryString": { "type": "string", "maxLength": 4096 },
+    "listProjectsInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cursor": { "$ref": "#/$defs/cursor" },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 50, "default": 25 }
+      }
+    },
+    "listServicesInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projectId"],
+      "properties": {
+        "projectId": { "$ref": "#/$defs/id" },
+        "cursor": { "$ref": "#/$defs/cursor" },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 50, "default": 25 }
+      }
+    },
+    "listIncidentsInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projectId"],
+      "properties": {
+        "projectId": { "$ref": "#/$defs/id" },
+        "environment": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "service": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "status": {
+          "enum": ["active", "open", "resolved", "regressed", "all"],
+          "default": "active"
+        },
+        "severity": { "enum": ["low", "medium", "high", "critical"] },
+        "firstSeenAfter": { "$ref": "#/$defs/dateTime" },
+        "attentionAfter": { "$ref": "#/$defs/dateTime" },
+        "cursor": { "$ref": "#/$defs/cursor" },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 50, "default": 25 }
+      }
+    },
+    "incidentLookupInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projectId", "incidentId"],
+      "properties": {
+        "projectId": { "$ref": "#/$defs/id" },
+        "incidentId": { "$ref": "#/$defs/id" }
+      }
+    },
+    "listImprovementsInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projectId"],
+      "properties": {
+        "projectId": { "$ref": "#/$defs/id" },
+        "environment": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "service": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "status": { "enum": ["open", "resolved", "snoozed", "all"], "default": "open" },
+        "severity": { "enum": ["low", "medium", "high", "critical"] },
+        "kind": {
+          "enum": [
+            "warning_hotspot",
+            "slow_request",
+            "request_failure_pattern",
+            "recurring_incident",
+            "post_deploy_regression"
+          ]
+        },
+        "cursor": { "$ref": "#/$defs/cursor" },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 50, "default": 25 }
+      }
+    },
+    "improvementLookupInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projectId", "improvementId"],
+      "properties": {
+        "projectId": { "$ref": "#/$defs/id" },
+        "improvementId": { "$ref": "#/$defs/id" }
+      }
+    },
+    "analyticsMetricsInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projectId"],
+      "properties": {
+        "projectId": { "$ref": "#/$defs/id" },
+        "last": { "enum": ["24h", "7d", "30d", "90d"], "default": "7d" },
+        "granularity": { "enum": ["hour", "day"], "default": "day" },
+        "service": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "environment": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "route": { "type": "string", "minLength": 1, "maxLength": 2048, "pattern": "^/[^?#]*$" },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 25, "default": 10 }
+      }
+    },
+    "analyticsFunnelInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projectId", "funnelKey"],
+      "properties": {
+        "projectId": { "$ref": "#/$defs/id" },
+        "funnelKey": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "last": { "enum": ["24h", "7d", "30d", "90d"], "default": "7d" },
+        "granularity": { "enum": ["hour", "day"], "default": "day" },
+        "service": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "environment": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "route": { "type": "string", "minLength": 1, "maxLength": 2048, "pattern": "^/[^?#]*$" },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 25, "default": 10 }
+      }
+    },
+    "analyticsIncidentImpactInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projectId", "incidentId"],
+      "properties": {
+        "projectId": { "$ref": "#/$defs/id" },
+        "incidentId": { "$ref": "#/$defs/id" },
+        "last": { "enum": ["24h", "7d", "30d", "90d"], "default": "7d" },
+        "granularity": { "enum": ["hour", "day"], "default": "day" },
+        "service": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "environment": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "route": { "type": "string", "minLength": 1, "maxLength": 2048, "pattern": "^/[^?#]*$" },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 25, "default": 10 }
+      }
+    },
+    "listHealthChecksInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projectId"],
+      "properties": {
+        "projectId": { "$ref": "#/$defs/id" },
+        "cursor": { "$ref": "#/$defs/cursor" },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 50, "default": 25 }
+      }
+    },
+    "healthCheckLookupInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projectId", "checkId"],
+      "properties": {
+        "projectId": { "$ref": "#/$defs/id" },
+        "checkId": { "$ref": "#/$defs/id" }
+      }
+    },
+    "listHealthCheckResultsInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projectId", "checkId"],
+      "properties": {
+        "projectId": { "$ref": "#/$defs/id" },
+        "checkId": { "$ref": "#/$defs/id" },
+        "lookbackHours": { "type": "integer", "minimum": 1, "maximum": 168, "default": 24 },
+        "cursor": { "$ref": "#/$defs/cursor" },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 50, "default": 25 }
+      }
+    },
+    "listHealthCheckDailyRollupsInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projectId", "checkId"],
+      "properties": {
+        "projectId": { "$ref": "#/$defs/id" },
+        "checkId": { "$ref": "#/$defs/id" },
+        "days": { "type": "integer", "minimum": 1, "maximum": 90, "default": 30 },
+        "cursor": { "$ref": "#/$defs/cursor" },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 90, "default": 30 }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project_id", "name", "color", "dashboard_url"],
+      "properties": {
+        "project_id": { "$ref": "#/$defs/id" },
+        "name": { "$ref": "#/$defs/shortString" },
+        "color": {
+          "type": ["string", "null"],
+          "enum": [
+            "red",
+            "orange",
+            "amber",
+            "yellow",
+            "lime",
+            "green",
+            "emerald",
+            "teal",
+            "cyan",
+            "sky",
+            "blue",
+            "indigo",
+            "violet",
+            "purple",
+            "fuchsia",
+            "pink",
+            "rose",
+            "slate",
+            null
+          ]
+        },
+        "dashboard_url": { "$ref": "#/$defs/publicUrl" }
+      }
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["service_id", "project_id", "name", "runtime", "framework", "environment"],
+      "properties": {
+        "service_id": { "$ref": "#/$defs/id" },
+        "project_id": { "$ref": "#/$defs/id" },
+        "name": { "$ref": "#/$defs/shortString" },
+        "runtime": { "type": ["string", "null"], "maxLength": 128 },
+        "framework": { "type": ["string", "null"], "maxLength": 128 },
+        "environment": { "type": "string", "maxLength": 128 }
+      }
+    },
+    "incident": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "incident_id",
+        "project_id",
+        "service_name",
+        "environment",
+        "title",
+        "severity",
+        "status",
+        "first_seen_at",
+        "last_seen_at",
+        "occurrence_count",
+        "regressed_at",
+        "dashboard_url"
+      ],
+      "properties": {
+        "incident_id": { "$ref": "#/$defs/id" },
+        "project_id": { "$ref": "#/$defs/id" },
+        "service_name": { "type": ["string", "null"], "maxLength": 128 },
+        "environment": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 512 },
+        "severity": { "enum": ["low", "medium", "high", "critical"] },
+        "status": { "enum": ["open", "resolved", "regressed"] },
+        "first_seen_at": { "$ref": "#/$defs/dateTime" },
+        "last_seen_at": { "$ref": "#/$defs/dateTime" },
+        "occurrence_count": { "type": "integer", "minimum": 0 },
+        "regressed_at": { "anyOf": [{ "$ref": "#/$defs/dateTime" }, { "type": "null" }] },
+        "dashboard_url": { "$ref": "#/$defs/publicUrl" }
+      }
+    },
+    "artifactStatus": { "enum": ["ready", "missing", "stale", "pending", "failed", "oversized"] },
+    "artifactManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_type", "redacted", "truncated", "size_bytes", "omitted_fields"],
+      "properties": {
+        "artifact_type": { "enum": ["bundle", "reproduction", "improvement_bundle"] },
+        "redacted": { "type": "boolean" },
+        "truncated": { "type": "boolean" },
+        "size_bytes": { "type": "integer", "minimum": 0, "maximum": 524288 },
+        "omitted_fields": {
+          "type": "array",
+          "maxItems": 50,
+          "items": { "type": "string", "maxLength": 256 }
+        }
+      }
+    },
+    "stackFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "line", "function"],
+      "properties": {
+        "file": { "type": ["string", "null"], "maxLength": 1024 },
+        "line": { "type": ["integer", "null"], "minimum": 1 },
+        "function": { "type": ["string", "null"], "maxLength": 512 }
+      }
+    },
+    "primarySignal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "description",
+        "error_type",
+        "error_message",
+        "request_method",
+        "request_path",
+        "route_template",
+        "response_status",
+        "first_application_frame"
+      ],
+      "properties": {
+        "description": { "$ref": "#/$defs/summaryString" },
+        "error_type": { "type": ["string", "null"], "maxLength": 256 },
+        "error_message": { "type": ["string", "null"], "maxLength": 4096 },
+        "request_method": { "type": ["string", "null"], "maxLength": 16 },
+        "request_path": { "type": ["string", "null"], "maxLength": 2048 },
+        "route_template": { "type": ["string", "null"], "maxLength": 1024 },
+        "response_status": { "type": ["integer", "null"], "minimum": 100, "maximum": 599 },
+        "first_application_frame": {
+          "anyOf": [{ "$ref": "#/$defs/stackFrame" }, { "type": "null" }]
+        }
+      }
+    },
+    "deployContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit_sha", "deploy_version", "branch", "deployed_at", "regression_window"],
+      "properties": {
+        "commit_sha": { "type": ["string", "null"], "maxLength": 128 },
+        "deploy_version": { "type": ["string", "null"], "maxLength": 128 },
+        "branch": { "type": ["string", "null"], "maxLength": 256 },
+        "deployed_at": { "anyOf": [{ "$ref": "#/$defs/dateTime" }, { "type": "null" }] },
+        "regression_window": { "type": ["boolean", "null"] }
+      }
+    },
+    "redactionSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["redacted", "fields", "notes"],
+      "properties": {
+        "redacted": { "type": "boolean" },
+        "fields": {
+          "type": "array",
+          "maxItems": 100,
+          "items": { "type": "string", "maxLength": 256 }
+        },
+        "notes": { "type": ["string", "null"], "maxLength": 2048 }
+      }
+    },
+    "bundleArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bundle_version",
+        "primary_signal",
+        "deploy",
+        "redaction",
+        "suggested_next_checks"
+      ],
+      "properties": {
+        "bundle_version": { "type": "integer", "minimum": 1 },
+        "primary_signal": { "$ref": "#/$defs/primarySignal" },
+        "deploy": { "$ref": "#/$defs/deployContext" },
+        "redaction": { "anyOf": [{ "$ref": "#/$defs/redactionSummary" }, { "type": "null" }] },
+        "suggested_next_checks": {
+          "type": "array",
+          "maxItems": 20,
+          "items": { "type": "string", "maxLength": 1024 }
+        }
+      }
+    },
+    "reproductionArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["possible", "confidence", "reason", "curl", "httpie", "steps"],
+      "properties": {
+        "possible": { "type": "boolean" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "reason": { "$ref": "#/$defs/summaryString" },
+        "curl": { "type": ["string", "null"], "maxLength": 16384 },
+        "httpie": { "type": ["string", "null"], "maxLength": 16384 },
+        "steps": {
+          "type": "array",
+          "maxItems": 20,
+          "items": { "type": "string", "maxLength": 2048 }
+        }
+      }
+    },
+    "improvement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "improvement_id",
+        "project_id",
+        "service_name",
+        "environment",
+        "kind",
+        "status",
+        "severity",
+        "confidence",
+        "title",
+        "summary",
+        "occurrence_count",
+        "related_incident_ids",
+        "first_detected_at",
+        "last_detected_at",
+        "dashboard_url"
+      ],
+      "properties": {
+        "improvement_id": { "$ref": "#/$defs/id" },
+        "project_id": { "$ref": "#/$defs/id" },
+        "service_name": { "type": "string", "maxLength": 128 },
+        "environment": { "type": "string", "maxLength": 128 },
+        "kind": {
+          "enum": [
+            "warning_hotspot",
+            "slow_request",
+            "request_failure_pattern",
+            "recurring_incident",
+            "post_deploy_regression"
+          ]
+        },
+        "status": { "enum": ["open", "resolved", "snoozed"] },
+        "severity": { "enum": ["low", "medium", "high", "critical"] },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "title": { "type": "string", "maxLength": 512 },
+        "summary": { "$ref": "#/$defs/summaryString" },
+        "occurrence_count": { "type": "integer", "minimum": 0 },
+        "related_incident_ids": {
+          "type": "array",
+          "maxItems": 20,
+          "items": { "$ref": "#/$defs/id" }
+        },
+        "first_detected_at": { "$ref": "#/$defs/dateTime" },
+        "last_detected_at": { "$ref": "#/$defs/dateTime" },
+        "dashboard_url": { "$ref": "#/$defs/publicUrl" }
+      }
+    },
+    "improvementBundleSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "description",
+        "likely_cause",
+        "confidence",
+        "recommended_action",
+        "severity",
+        "error_type",
+        "error_message",
+        "first_application_frame"
+      ],
+      "properties": {
+        "title": { "type": "string", "maxLength": 512 },
+        "description": { "$ref": "#/$defs/summaryString" },
+        "likely_cause": { "type": ["string", "null"], "maxLength": 4096 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "recommended_action": { "type": ["string", "null"], "maxLength": 4096 },
+        "severity": { "enum": ["low", "medium", "high", "critical"] },
+        "error_type": { "type": ["string", "null"], "maxLength": 256 },
+        "error_message": { "type": ["string", "null"], "maxLength": 4096 },
+        "first_application_frame": {
+          "anyOf": [{ "$ref": "#/$defs/stackFrame" }, { "type": "null" }]
+        }
+      }
+    },
+    "improvementBundleArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bundle_version", "summary", "redaction"],
+      "properties": {
+        "bundle_version": { "type": "integer", "minimum": 1 },
+        "summary": { "$ref": "#/$defs/improvementBundleSummary" },
+        "redaction": { "anyOf": [{ "$ref": "#/$defs/redactionSummary" }, { "type": "null" }] }
+      }
+    },
+    "healthCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "check_id",
+        "project_id",
+        "name",
+        "display_url",
+        "method",
+        "expected_status_min",
+        "expected_status_max",
+        "timeout_ms",
+        "interval_seconds",
+        "environment",
+        "service_name",
+        "enabled",
+        "status",
+        "last_checked_at",
+        "last_result_status",
+        "last_result_http_status",
+        "last_result_duration_ms",
+        "dashboard_url"
+      ],
+      "properties": {
+        "check_id": { "$ref": "#/$defs/id" },
+        "project_id": { "$ref": "#/$defs/id" },
+        "name": { "$ref": "#/$defs/shortString" },
+        "display_url": { "$ref": "#/$defs/publicUrl" },
+        "method": { "enum": ["GET", "HEAD"] },
+        "expected_status_min": { "type": "integer", "minimum": 100, "maximum": 599 },
+        "expected_status_max": { "type": "integer", "minimum": 100, "maximum": 599 },
+        "timeout_ms": { "type": "integer", "minimum": 1, "maximum": 30000 },
+        "interval_seconds": { "type": "integer", "minimum": 1 },
+        "environment": { "type": "string", "maxLength": 128 },
+        "service_name": { "type": ["string", "null"], "maxLength": 128 },
+        "enabled": { "type": "boolean" },
+        "status": { "enum": ["unknown", "passing", "failing", "paused"] },
+        "last_checked_at": { "anyOf": [{ "$ref": "#/$defs/dateTime" }, { "type": "null" }] },
+        "last_result_status": {
+          "type": ["string", "null"],
+          "enum": [
+            "success",
+            "http_status_mismatch",
+            "timeout",
+            "dns_error",
+            "tls_error",
+            "connection_error",
+            "redirect_blocked",
+            "security_blocked",
+            "internal_error",
+            null
+          ]
+        },
+        "last_result_http_status": { "type": ["integer", "null"], "minimum": 100, "maximum": 599 },
+        "last_result_duration_ms": { "type": ["integer", "null"], "minimum": 0 },
+        "dashboard_url": { "$ref": "#/$defs/publicUrl" }
+      }
+    },
+    "healthCheckResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "result_id",
+        "check_id",
+        "started_at",
+        "completed_at",
+        "duration_ms",
+        "status",
+        "http_status",
+        "error_kind",
+        "redirect_count",
+        "checked_host",
+        "final_display_url"
+      ],
+      "properties": {
+        "result_id": { "$ref": "#/$defs/id" },
+        "check_id": { "$ref": "#/$defs/id" },
+        "started_at": { "$ref": "#/$defs/dateTime" },
+        "completed_at": { "$ref": "#/$defs/dateTime" },
+        "duration_ms": { "type": "integer", "minimum": 0 },
+        "status": {
+          "enum": [
+            "success",
+            "http_status_mismatch",
+            "timeout",
+            "dns_error",
+            "tls_error",
+            "connection_error",
+            "redirect_blocked",
+            "security_blocked",
+            "internal_error"
+          ]
+        },
+        "http_status": { "type": ["integer", "null"], "minimum": 100, "maximum": 599 },
+        "error_kind": { "type": ["string", "null"], "maxLength": 128 },
+        "redirect_count": { "type": "integer", "minimum": 0, "maximum": 3 },
+        "checked_host": { "type": "string", "maxLength": 253 },
+        "final_display_url": { "$ref": "#/$defs/publicUrl" }
+      }
+    },
+    "healthCheckDailyRollup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "check_id",
+        "day",
+        "state",
+        "total_checks",
+        "successful_checks",
+        "failed_checks",
+        "degraded_checks",
+        "avg_duration_ms",
+        "first_checked_at",
+        "last_checked_at",
+        "downtime_seconds",
+        "incident_ids"
+      ],
+      "properties": {
+        "check_id": { "$ref": "#/$defs/id" },
+        "day": { "type": "string", "format": "date", "maxLength": 10 },
+        "state": { "enum": ["unknown", "operational", "degraded", "down", "paused"] },
+        "total_checks": { "type": "integer", "minimum": 0 },
+        "successful_checks": { "type": "integer", "minimum": 0 },
+        "failed_checks": { "type": "integer", "minimum": 0 },
+        "degraded_checks": { "type": "integer", "minimum": 0 },
+        "avg_duration_ms": { "type": ["number", "null"], "minimum": 0 },
+        "first_checked_at": { "anyOf": [{ "$ref": "#/$defs/dateTime" }, { "type": "null" }] },
+        "last_checked_at": { "anyOf": [{ "$ref": "#/$defs/dateTime" }, { "type": "null" }] },
+        "downtime_seconds": { "type": "integer", "minimum": 0 },
+        "incident_ids": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/id" } }
+      }
+    },
+    "analyticsWindow": {
+      "type": "object", "additionalProperties": false,
+      "required": ["project_id", "from", "to", "granularity", "service", "environment"],
+      "properties": {
+        "project_id": { "$ref": "#/$defs/id" }, "from": { "$ref": "#/$defs/dateTime" },
+        "to": { "$ref": "#/$defs/dateTime" }, "granularity": { "enum": ["hour", "day"] },
+        "service": { "type": ["string", "null"], "maxLength": 120 },
+        "environment": { "type": ["string", "null"], "maxLength": 120 }
+      }
+    },
+    "analyticsSegment": {
+      "type": "object", "additionalProperties": false,
+      "required": ["value", "sessions", "pageviews"],
+      "properties": {
+        "value": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "sessions": { "type": "integer", "minimum": 0 },
+        "pageviews": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "analyticsSummary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["project_id", "from", "to", "granularity", "service", "environment", "sessions", "pageviews", "active_visitors", "new_visitors", "returning_visitors", "exits", "conversions"],
+      "properties": {
+        "project_id": { "$ref": "#/$defs/id" }, "from": { "$ref": "#/$defs/dateTime" },
+        "to": { "$ref": "#/$defs/dateTime" }, "granularity": { "enum": ["hour", "day"] },
+        "service": { "type": ["string", "null"], "maxLength": 120 },
+        "environment": { "type": ["string", "null"], "maxLength": 120 },
+        "sessions": { "type": "integer", "minimum": 0 }, "pageviews": { "type": "integer", "minimum": 0 },
+        "active_visitors": { "type": "integer", "minimum": 0 }, "new_visitors": { "type": "integer", "minimum": 0 },
+        "returning_visitors": { "type": "integer", "minimum": 0 }, "exits": { "type": "integer", "minimum": 0 },
+        "conversions": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "analyticsBreakdowns": {
+      "type": "object", "additionalProperties": false,
+      "required": ["device_types", "browsers", "os", "languages", "referrers", "auth_states"],
+      "properties": {
+        "device_types": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } },
+        "browsers": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } },
+        "os": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } },
+        "languages": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } },
+        "referrers": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } },
+        "auth_states": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } }
+      }
+    },
+    "analyticsRouteMetric": {
+      "type": "object", "additionalProperties": false,
+      "required": ["route_key", "pageviews", "unique_sessions", "entrances", "exits", "bounces", "linked_incident_sessions"],
+      "properties": {
+        "route_key": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "pageviews": { "type": "integer", "minimum": 0 }, "unique_sessions": { "type": "integer", "minimum": 0 },
+        "entrances": { "type": "integer", "minimum": 0 }, "exits": { "type": "integer", "minimum": 0 },
+        "bounces": { "type": "integer", "minimum": 0 }, "linked_incident_sessions": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "analyticsJourneyPattern": {
+      "type": "object", "additionalProperties": false,
+      "required": ["from_route_key", "to_route_key", "transition_count", "unique_sessions", "transition_share"],
+      "properties": {
+        "from_route_key": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "to_route_key": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "transition_count": { "type": "integer", "minimum": 0 }, "unique_sessions": { "type": "integer", "minimum": 0 },
+        "transition_share": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "analyticsActionMetric": {
+      "type": "object", "additionalProperties": false,
+      "required": ["action_key", "kind", "event_count", "unique_sessions"],
+      "properties": {
+        "action_key": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "kind": { "enum": ["action", "conversion", "marker"] },
+        "event_count": { "type": "integer", "minimum": 0 }, "unique_sessions": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "analyticsFunnelMetric": {
+      "type": "object", "additionalProperties": false,
+      "required": ["funnel_key", "sessions_entered", "sessions_completed", "dropoffs", "conversion_rate"],
+      "properties": {
+        "funnel_key": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "sessions_entered": { "type": "integer", "minimum": 0 }, "sessions_completed": { "type": "integer", "minimum": 0 },
+        "dropoffs": { "type": "integer", "minimum": 0 }, "conversion_rate": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "analyticsFunnelStep": {
+      "type": "object", "additionalProperties": false,
+      "required": ["step_key", "step_order", "sessions_entered", "sessions_completed", "dropoffs", "conversion_rate"],
+      "properties": {
+        "step_key": { "type": "string", "minLength": 1, "maxLength": 120 }, "step_order": { "type": "integer", "minimum": 0 },
+        "sessions_entered": { "type": "integer", "minimum": 0 }, "sessions_completed": { "type": "integer", "minimum": 0 },
+        "dropoffs": { "type": "integer", "minimum": 0 }, "conversion_rate": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "analyticsFunnelSummary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["project_id", "funnel_key", "from", "to", "granularity", "service", "environment", "sessions_entered", "sessions_completed", "dropoffs", "conversion_rate"],
+      "properties": {
+        "project_id": { "$ref": "#/$defs/id" }, "funnel_key": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "from": { "$ref": "#/$defs/dateTime" }, "to": { "$ref": "#/$defs/dateTime" }, "granularity": { "enum": ["hour", "day"] },
+        "service": { "type": ["string", "null"], "maxLength": 120 }, "environment": { "type": ["string", "null"], "maxLength": 120 },
+        "sessions_entered": { "type": "integer", "minimum": 0 }, "sessions_completed": { "type": "integer", "minimum": 0 },
+        "dropoffs": { "type": "integer", "minimum": 0 }, "conversion_rate": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "analyticsImpactSegment": {
+      "type": "object", "additionalProperties": false, "required": ["value", "affected_sessions"],
+      "properties": { "value": { "type": "string", "minLength": 1, "maxLength": 255 }, "affected_sessions": { "type": "integer", "minimum": 0 } }
+    },
+    "analyticsImpactRoute": {
+      "type": "object", "additionalProperties": false, "required": ["route_key", "affected_sessions"],
+      "properties": { "route_key": { "type": "string", "minLength": 1, "maxLength": 2048 }, "affected_sessions": { "type": "integer", "minimum": 0 } }
+    },
+    "analyticsImpactFunnel": {
+      "type": "object", "additionalProperties": false, "required": ["funnel_key", "affected_sessions"],
+      "properties": { "funnel_key": { "type": "string", "minLength": 1, "maxLength": 120 }, "affected_sessions": { "type": "integer", "minimum": 0 } }
+    },
+    "analyticsImpactJourney": {
+      "type": "object", "additionalProperties": false,
+      "required": ["from_route_key", "to_route_key", "affected_sessions"],
+      "properties": {
+        "from_route_key": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "to_route_key": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "affected_sessions": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "analyticsConversionDelta": {
+      "type": "object", "additionalProperties": false, "required": ["availability", "value", "unit"],
+      "properties": {
+        "availability": { "enum": ["available", "unavailable"] }, "value": { "type": ["number", "null"] },
+        "unit": { "enum": ["percentage_points"] }
+      }
+    },
+    "listProjectsOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projects", "next_cursor", "empty_state"],
+      "properties": {
+        "projects": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/project" } },
+        "next_cursor": { "anyOf": [{ "$ref": "#/$defs/cursor" }, { "type": "null" }] },
+        "empty_state": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["message", "setup_url"],
+              "properties": {
+                "message": { "$ref": "#/$defs/summaryString" },
+                "setup_url": { "$ref": "#/$defs/publicUrl" }
+              }
+            },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "listServicesOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project_id", "services", "next_cursor"],
+      "properties": {
+        "project_id": { "$ref": "#/$defs/id" },
+        "services": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/service" } },
+        "next_cursor": { "anyOf": [{ "$ref": "#/$defs/cursor" }, { "type": "null" }] }
+      }
+    },
+    "listIncidentsOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project_id", "incidents", "next_cursor"],
+      "properties": {
+        "project_id": { "$ref": "#/$defs/id" },
+        "incidents": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/incident" } },
+        "next_cursor": { "anyOf": [{ "$ref": "#/$defs/cursor" }, { "type": "null" }] }
+      }
+    },
+    "getIncidentOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["incident"],
+      "properties": { "incident": { "$ref": "#/$defs/incident" } }
+    },
+    "getIncidentContextOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "incident",
+        "primary_signal",
+        "bundle_status",
+        "reproduction_status",
+        "deploy",
+        "redaction",
+        "suggested_next_checks",
+        "continuation_url"
+      ],
+      "properties": {
+        "incident": { "$ref": "#/$defs/incident" },
+        "primary_signal": { "$ref": "#/$defs/primarySignal" },
+        "bundle_status": { "$ref": "#/$defs/artifactStatus" },
+        "reproduction_status": { "$ref": "#/$defs/artifactStatus" },
+        "deploy": { "$ref": "#/$defs/deployContext" },
+        "redaction": { "anyOf": [{ "$ref": "#/$defs/redactionSummary" }, { "type": "null" }] },
+        "suggested_next_checks": {
+          "type": "array",
+          "maxItems": 20,
+          "items": { "type": "string", "maxLength": 1024 }
+        },
+        "continuation_url": { "$ref": "#/$defs/publicUrl" }
+      }
+    },
+    "getBundleOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["incident_id", "status", "artifact", "manifest", "message", "continuation_url"],
+      "properties": {
+        "incident_id": { "$ref": "#/$defs/id" },
+        "status": { "$ref": "#/$defs/artifactStatus" },
+        "artifact": { "anyOf": [{ "$ref": "#/$defs/bundleArtifact" }, { "type": "null" }] },
+        "manifest": { "$ref": "#/$defs/artifactManifest" },
+        "message": { "$ref": "#/$defs/summaryString" },
+        "continuation_url": { "$ref": "#/$defs/publicUrl" }
+      }
+    },
+    "getReproductionOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["incident_id", "status", "artifact", "manifest", "message", "continuation_url"],
+      "properties": {
+        "incident_id": { "$ref": "#/$defs/id" },
+        "status": { "$ref": "#/$defs/artifactStatus" },
+        "artifact": { "anyOf": [{ "$ref": "#/$defs/reproductionArtifact" }, { "type": "null" }] },
+        "manifest": { "$ref": "#/$defs/artifactManifest" },
+        "message": { "$ref": "#/$defs/summaryString" },
+        "continuation_url": { "$ref": "#/$defs/publicUrl" }
+      }
+    },
+    "listImprovementsOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project_id", "improvements", "next_cursor"],
+      "properties": {
+        "project_id": { "$ref": "#/$defs/id" },
+        "improvements": {
+          "type": "array",
+          "maxItems": 50,
+          "items": { "$ref": "#/$defs/improvement" }
+        },
+        "next_cursor": { "anyOf": [{ "$ref": "#/$defs/cursor" }, { "type": "null" }] }
+      }
+    },
+    "getImprovementOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["improvement", "evidence_summary", "artifact_status"],
+      "properties": {
+        "improvement": { "$ref": "#/$defs/improvement" },
+        "evidence_summary": {
+          "type": "array",
+          "maxItems": 20,
+          "items": { "type": "string", "maxLength": 2048 }
+        },
+        "artifact_status": { "$ref": "#/$defs/artifactStatus" }
+      }
+    },
+    "getImprovementBundleOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "improvement_id",
+        "status",
+        "artifact",
+        "manifest",
+        "message",
+        "continuation_url"
+      ],
+      "properties": {
+        "improvement_id": { "$ref": "#/$defs/id" },
+        "status": { "$ref": "#/$defs/artifactStatus" },
+        "artifact": {
+          "anyOf": [{ "$ref": "#/$defs/improvementBundleArtifact" }, { "type": "null" }]
+        },
+        "manifest": { "$ref": "#/$defs/artifactManifest" },
+        "message": { "$ref": "#/$defs/summaryString" },
+        "continuation_url": { "$ref": "#/$defs/publicUrl" }
+      }
+    },
+    "getUsageSummaryOutput": {
+      "type": "object", "additionalProperties": false, "required": ["summary", "breakdowns"],
+      "properties": { "summary": { "$ref": "#/$defs/analyticsSummary" }, "breakdowns": { "$ref": "#/$defs/analyticsBreakdowns" } }
+    },
+    "getRouteMetricsOutput": {
+      "type": "object", "additionalProperties": false, "required": ["window", "routes"],
+      "properties": { "window": { "$ref": "#/$defs/analyticsWindow" }, "routes": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsRouteMetric" } } }
+    },
+    "getJourneyPatternsOutput": {
+      "type": "object", "additionalProperties": false, "required": ["window", "patterns"],
+      "properties": { "window": { "$ref": "#/$defs/analyticsWindow" }, "patterns": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsJourneyPattern" } } }
+    },
+    "getDeviceBreakdownOutput": {
+      "type": "object", "additionalProperties": false,
+      "required": ["window", "device_types", "browsers", "os", "languages"],
+      "properties": {
+        "window": { "$ref": "#/$defs/analyticsWindow" },
+        "device_types": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } },
+        "browsers": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } },
+        "os": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } },
+        "languages": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } }
+      }
+    },
+    "getReferrerMetricsOutput": {
+      "type": "object", "additionalProperties": false,
+      "required": ["window", "referrers", "utm_sources", "utm_mediums", "utm_campaigns"],
+      "properties": {
+        "window": { "$ref": "#/$defs/analyticsWindow" },
+        "referrers": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } },
+        "utm_sources": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } },
+        "utm_mediums": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } },
+        "utm_campaigns": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } }
+      }
+    },
+    "getActionMetricsOutput": {
+      "type": "object", "additionalProperties": false, "required": ["window", "actions"],
+      "properties": { "window": { "$ref": "#/$defs/analyticsWindow" }, "actions": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsActionMetric" } } }
+    },
+    "listFunnelMetricsOutput": {
+      "type": "object", "additionalProperties": false, "required": ["window", "funnels"],
+      "properties": { "window": { "$ref": "#/$defs/analyticsWindow" }, "funnels": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsFunnelMetric" } } }
+    },
+    "getFunnelAnalysisOutput": {
+      "type": "object", "additionalProperties": false, "required": ["funnel", "steps"],
+      "properties": { "funnel": { "$ref": "#/$defs/analyticsFunnelSummary" }, "steps": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsFunnelStep" } } }
+    },
+    "getIncidentImpactOutput": {
+      "type": "object", "additionalProperties": false,
+      "required": ["incident_id", "window", "affected_sessions", "affected_routes", "affected_funnels", "top_device_types", "top_browsers", "journey_patterns", "conversion_delta"],
+      "properties": {
+        "incident_id": { "$ref": "#/$defs/id" }, "window": { "$ref": "#/$defs/analyticsWindow" },
+        "affected_sessions": { "type": "integer", "minimum": 0 },
+        "affected_routes": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsImpactRoute" } },
+        "affected_funnels": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsImpactFunnel" } },
+        "top_device_types": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsImpactSegment" } },
+        "top_browsers": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsImpactSegment" } },
+        "journey_patterns": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsImpactJourney" } },
+        "conversion_delta": { "$ref": "#/$defs/analyticsConversionDelta" }
+      }
+    },
+    "listHealthChecksOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project_id", "checks", "next_cursor"],
+      "properties": {
+        "project_id": { "$ref": "#/$defs/id" },
+        "checks": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/healthCheck" } },
+        "next_cursor": { "anyOf": [{ "$ref": "#/$defs/cursor" }, { "type": "null" }] }
+      }
+    },
+    "getHealthCheckOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check"],
+      "properties": { "check": { "$ref": "#/$defs/healthCheck" } }
+    },
+    "listHealthCheckResultsOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project_id", "check_id", "lookback_hours", "results", "next_cursor"],
+      "properties": {
+        "project_id": { "$ref": "#/$defs/id" },
+        "check_id": { "$ref": "#/$defs/id" },
+        "lookback_hours": { "type": "integer", "minimum": 1, "maximum": 168 },
+        "results": {
+          "type": "array",
+          "maxItems": 50,
+          "items": { "$ref": "#/$defs/healthCheckResult" }
+        },
+        "next_cursor": { "anyOf": [{ "$ref": "#/$defs/cursor" }, { "type": "null" }] }
+      }
+    },
+    "listHealthCheckDailyRollupsOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project_id", "check_id", "days", "rollups", "next_cursor"],
+      "properties": {
+        "project_id": { "$ref": "#/$defs/id" },
+        "check_id": { "$ref": "#/$defs/id" },
+        "days": { "type": "integer", "minimum": 1, "maximum": 90 },
+        "rollups": {
+          "type": "array",
+          "maxItems": 90,
+          "items": { "$ref": "#/$defs/healthCheckDailyRollup" }
+        },
+        "next_cursor": { "anyOf": [{ "$ref": "#/$defs/cursor" }, { "type": "null" }] }
+      }
+    }
+  }
+}

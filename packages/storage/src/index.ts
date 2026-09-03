@@ -25,6 +25,8 @@ export type {
 } from "./ingestion-rejection-diagnostic-store.js";
 export { createPostgresIngestionRejectionDiagnosticStore } from "./ingestion-rejection-diagnostic-store.js";
 export * from "./integration-secret-crypto.js";
+export * from "./openai-oidc-provider-adapter.js";
+export * from "./openai-oauth-store.js";
 export * from "./incident-context.js";
 export * from "./incident-reason.js";
 export type {
@@ -139,9 +141,7 @@ export type {
 } from "./analytics-opportunity-evaluator.js";
 export type { EvaluateAnalyticsOpportunitiesJob } from "./analytics-opportunity-jobs.js";
 export type { AnalyticsOpportunitySchedulerStore } from "./analytics-opportunity-scheduler-store.js";
-export {
-  createPostgresAnalyticsOpportunitySchedulerStore
-} from "./analytics-opportunity-scheduler-store.js";
+export { createPostgresAnalyticsOpportunitySchedulerStore } from "./analytics-opportunity-scheduler-store.js";
 export {
   createPostgresAnalyticsOpportunityEvaluator,
   evaluateAnalyticsDeployConversionOpportunities,

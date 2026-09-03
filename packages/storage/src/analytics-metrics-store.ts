@@ -55,16 +55,30 @@ export interface AnalyticsFunnelAnalysisInput extends AnalyticsUsageSummaryInput
   funnel_key: string;
 }
 
+export interface AnalyticsJourneyPatternReadOptions {
+  includeSampleIds?: boolean;
+}
+
+export interface AnalyticsIncidentImpactReadOptions extends AnalyticsJourneyPatternReadOptions {
+  includeBundleState?: boolean;
+}
+
 export interface AnalyticsMetricsStore {
   getUsageSummary(input: AnalyticsUsageSummaryInput): Promise<AnalyticsUsageSummaryResponse>;
   getRouteMetrics(input: AnalyticsRouteContextInput): Promise<AnalyticsRouteMetricsResponse>;
-  getJourneyPatterns(input: AnalyticsRouteContextInput): Promise<AnalyticsJourneyPatternsResponse>;
+  getJourneyPatterns(
+    input: AnalyticsRouteContextInput,
+    options?: AnalyticsJourneyPatternReadOptions
+  ): Promise<AnalyticsJourneyPatternsResponse>;
   getDeviceBreakdown(input: AnalyticsUsageSummaryInput): Promise<AnalyticsDeviceBreakdownResponse>;
   getReferrerMetrics(input: AnalyticsUsageSummaryInput): Promise<AnalyticsReferrerMetricsResponse>;
   getActionMetrics(input: AnalyticsUsageSummaryInput): Promise<AnalyticsActionMetricsResponse>;
   listFunnels(input: AnalyticsUsageSummaryInput): Promise<AnalyticsFunnelsResponse>;
   getFunnelAnalysis(input: AnalyticsFunnelAnalysisInput): Promise<AnalyticsFunnelAnalysisResponse>;
-  getIncidentImpact(input: AnalyticsIncidentImpactInput): Promise<AnalyticsIncidentImpactResponse>;
+  getIncidentImpact(
+    input: AnalyticsIncidentImpactInput,
+    options?: AnalyticsIncidentImpactReadOptions
+  ): Promise<AnalyticsIncidentImpactResponse>;
 }
 
 type AnalyticsSummaryTotalsRow = {
@@ -243,7 +257,7 @@ export function createPostgresAnalyticsMetricsStore(db: Queryable): AnalyticsMet
       });
     },
 
-    async getJourneyPatterns(input) {
+    async getJourneyPatterns(input, options) {
       const limit = normalizeLimit(input.limit);
       const where = buildAnalyticsRollupWhere(input, {
         routeColumns: ["from_route_key", "to_route_key"]
@@ -276,7 +290,9 @@ export function createPostgresAnalyticsMetricsStore(db: Queryable): AnalyticsMet
           transition_share: totalTransitions > 0 ? Math.min(1, transitionCount / totalTransitions) : 0
         };
       });
-      const sampleIdsByTransition = await readJourneyPatternSampleIds(db, input, patterns);
+      const sampleIdsByTransition = options?.includeSampleIds === false
+        ? new Map<string, string[]>()
+        : await readJourneyPatternSampleIds(db, input, patterns);
 
       return AnalyticsJourneyPatternsResponseSchema.parse({
         window: buildWindow(input),
@@ -516,8 +532,8 @@ export function createPostgresAnalyticsMetricsStore(db: Queryable): AnalyticsMet
       });
     },
 
-    async getIncidentImpact(input) {
-      return await readAnalyticsIncidentImpact(db, input);
+    async getIncidentImpact(input, options) {
+      return await readAnalyticsIncidentImpact(db, input, options);
     }
   };
 }

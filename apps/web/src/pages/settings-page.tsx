@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { CalloutCard } from "../components/system/callout-card.js";
 import { PageHeader } from "../components/system/page-header.js";
+import { OpenAiConnectionsSection } from "../components/system/openai-connections-section.js";
 import { UserAvatar } from "../components/system/user-avatar.js";
 import {
   AlertDialog,
@@ -16,7 +17,13 @@ import {
   AlertDialogTrigger
 } from "../components/ui/alert-dialog.js";
 import { Button } from "../components/ui/button.js";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card.js";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "../components/ui/card.js";
 import { Field, FieldDescription, FieldLabel } from "../components/ui/field.js";
 import { Input } from "../components/ui/input.js";
 import {
@@ -59,7 +66,8 @@ export function SettingsPage(): JSX.Element {
   const canManageOrganizationAccount = session.role === "owner";
   const hasEmailCredential = session.auth_methods.email;
   const hasGithubCredential = session.auth_methods.github;
-  const deletionConfirmationMatched = deleteConfirmationText.trim() === DELETE_ACCOUNT_CONFIRMATION_TEXT;
+  const deletionConfirmationMatched =
+    deleteConfirmationText.trim() === DELETE_ACCOUNT_CONFIRMATION_TEXT;
   const deletionOtpValid = /^\d{6}$/.test(deleteOtp.trim());
 
   async function handleExportAccountData(): Promise<void> {
@@ -144,11 +152,17 @@ export function SettingsPage(): JSX.Element {
       void navigate("/login", { replace: true });
     } catch (error) {
       if (error instanceof Error && error.message === "other_owned_organizations_exist") {
-        setDeleteErrorMessage("Transfer or delete the other workspaces you own before deleting this account.");
+        setDeleteErrorMessage(
+          "Transfer or delete the other workspaces you own before deleting this account."
+        );
       } else if (error instanceof Error && error.message === "other_owned_projects_exist") {
-        setDeleteErrorMessage("Delete any projects you still own in other workspaces before deleting this account.");
+        setDeleteErrorMessage(
+          "Delete any projects you still own in other workspaces before deleting this account."
+        );
       } else if (error instanceof Error && error.message === "invalid_otp") {
-        setDeleteErrorMessage("That verification code is invalid or expired. Request a new code and try again.");
+        setDeleteErrorMessage(
+          "That verification code is invalid or expired. Request a new code and try again."
+        );
       } else if (error instanceof Error && error.message === "rate_limited") {
         setDeleteErrorMessage("Too many attempts. Wait a moment and try again.");
       } else {
@@ -188,6 +202,7 @@ export function SettingsPage(): JSX.Element {
   return (
     <div className="space-y-8">
       <PageHeader description="Review your active sign-in methods, account verification state, and account lifecycle controls." />
+      <OpenAiConnectionsSection />
       <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-4">
           <Card>
@@ -206,17 +221,31 @@ export function SettingsPage(): JSX.Element {
           <Card>
             <CardHeader>
               <CardTitle>Avatar</CardTitle>
-              <CardDescription>GitHub avatars sync automatically when available. Gravatar import is always explicit.</CardDescription>
+              <CardDescription>
+                GitHub avatars sync automatically when available. Gravatar import is always
+                explicit.
+              </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-4">
                 <UserAvatar email={session.email} avatarUrl={session.avatar_url} size="lg" />
                 <div className="space-y-1 text-sm">
-                  <p className="font-medium text-foreground">{session.avatar_url === null ? "Initials fallback active" : "Cached profile avatar active"}</p>
-                  <p className="text-muted-foreground">Imports are fetched server-side and cached in DebugBundle storage.</p>
+                  <p className="font-medium text-foreground">
+                    {session.avatar_url === null
+                      ? "Initials fallback active"
+                      : "Cached profile avatar active"}
+                  </p>
+                  <p className="text-muted-foreground">
+                    Imports are fetched server-side and cached in DebugBundle storage.
+                  </p>
                 </div>
               </div>
-              <Button type="button" variant="outline" onClick={() => void handleImportGravatarAvatar()} disabled={isImportingAvatar}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void handleImportGravatarAvatar()}
+                disabled={isImportingAvatar}
+              >
                 {isImportingAvatar ? "Importing..." : "Import from Gravatar"}
               </Button>
             </CardContent>
@@ -250,15 +279,29 @@ export function SettingsPage(): JSX.Element {
             <Card>
               <CardHeader>
                 <CardTitle>Sign-in methods</CardTitle>
-                <CardDescription>Browser sign-in options currently attached to this member identity.</CardDescription>
+                <CardDescription>
+                  Browser sign-in options currently attached to this member identity.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 text-sm">
-                <DetailBlock label="Email code" value={hasEmailCredential ? "Enabled" : "Unavailable"} />
-                <DetailBlock label="GitHub OAuth" value={hasGithubCredential ? "Enabled" : "Not connected"} />
+                <DetailBlock
+                  label="Email code"
+                  value={hasEmailCredential ? "Enabled" : "Unavailable"}
+                />
+                <DetailBlock
+                  label="GitHub OAuth"
+                  value={hasGithubCredential ? "Enabled" : "Not connected"}
+                />
                 {hasEmailCredential ? (
-                  <p className="text-muted-foreground">Email sign-in uses a one-time code and completes account verification as part of the same flow.</p>
+                  <p className="text-muted-foreground">
+                    Email sign-in uses a one-time code and completes account verification as part of
+                    the same flow.
+                  </p>
                 ) : (
-                  <p className="text-muted-foreground">This account currently relies on GitHub only. Request an email code from the login screen if email access should be enabled.</p>
+                  <p className="text-muted-foreground">
+                    This account currently relies on GitHub only. Request an email code from the
+                    login screen if email access should be enabled.
+                  </p>
                 )}
               </CardContent>
             </Card>
@@ -277,12 +320,22 @@ export function SettingsPage(): JSX.Element {
                   <DownloadIcon className="size-4" />
                   Export retained data
                 </div>
-                <p className="mt-2 leading-6">Exports retained account data, including members, projects, tokens, incidents, and debugging artifacts, as a JSON attachment.</p>
+                <p className="mt-2 leading-6">
+                  Exports retained account data, including members, projects, tokens, incidents, and
+                  debugging artifacts, as a JSON attachment.
+                </p>
               </div>
               {!canManageOrganizationAccount ? (
-                <p className="text-sm text-muted-foreground">Only owners can export or delete this account.</p>
+                <p className="text-sm text-muted-foreground">
+                  Only owners can export or delete this account.
+                </p>
               ) : null}
-              <Button type="button" variant="outline" onClick={() => void handleExportAccountData()} disabled={!canManageOrganizationAccount || isExporting}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void handleExportAccountData()}
+                disabled={!canManageOrganizationAccount || isExporting}
+              >
                 <DownloadIcon data-icon="inline-start" />
                 {isExporting ? "Preparing export..." : "Download export"}
               </Button>
@@ -292,7 +345,9 @@ export function SettingsPage(): JSX.Element {
           <Card className="border-destructive/25 bg-destructive/5">
             <CardHeader>
               <CardTitle>Delete account</CardTitle>
-              <CardDescription>Irreversible removal of this account and its retained debugging data.</CardDescription>
+              <CardDescription>
+                Irreversible removal of this account and its retained debugging data.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-lg border border-destructive/25 bg-background/70 p-4 text-sm text-muted-foreground">
@@ -300,14 +355,23 @@ export function SettingsPage(): JSX.Element {
                   <ShieldAlertIcon className="size-4" />
                   Destructive operation
                 </div>
-                <p className="mt-2 leading-6">Deleting this account removes its members, projects, incidents, tokens, and retained debugging artifacts. This cannot be undone.</p>
+                <p className="mt-2 leading-6">
+                  Deleting this account removes its members, projects, incidents, tokens, and
+                  retained debugging artifacts. This cannot be undone.
+                </p>
               </div>
               {!canManageOrganizationAccount ? (
-                <p className="text-sm text-muted-foreground">Only owners can delete this account.</p>
+                <p className="text-sm text-muted-foreground">
+                  Only owners can delete this account.
+                </p>
               ) : null}
               <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
                 <AlertDialogTrigger asChild>
-                  <Button type="button" variant="destructive" disabled={!canManageOrganizationAccount || isDeleting}>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={!canManageOrganizationAccount || isDeleting}
+                  >
                     <Trash2Icon data-icon="inline-start" />
                     Delete account
                   </Button>
@@ -316,12 +380,18 @@ export function SettingsPage(): JSX.Element {
                   <AlertDialogHeader>
                     <AlertDialogTitle>Delete account</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Type <span className="font-medium text-foreground">{DELETE_ACCOUNT_CONFIRMATION_TEXT}</span>, then confirm the one-time email code before permanent deletion.
+                      Type{" "}
+                      <span className="font-medium text-foreground">
+                        {DELETE_ACCOUNT_CONFIRMATION_TEXT}
+                      </span>
+                      , then confirm the one-time email code before permanent deletion.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <div className="space-y-3">
                     <Field>
-                      <FieldLabel htmlFor="delete-account-confirmation-text">Type the confirmation phrase</FieldLabel>
+                      <FieldLabel htmlFor="delete-account-confirmation-text">
+                        Type the confirmation phrase
+                      </FieldLabel>
                       <Input
                         id="delete-account-confirmation-text"
                         value={deleteConfirmationText}
@@ -334,18 +404,23 @@ export function SettingsPage(): JSX.Element {
                         disabled={isRequestingDeleteOtp || isDeleting}
                       />
                       <FieldDescription>
-                        This extra phrase gate reduces accidental deletions before we email the verification code.
+                        This extra phrase gate reduces accidental deletions before we email the
+                        verification code.
                       </FieldDescription>
                     </Field>
                     {!hasRequestedDeleteOtp ? null : (
                       <Field>
-                        <FieldLabel htmlFor="delete-account-otp">Email verification code</FieldLabel>
+                        <FieldLabel htmlFor="delete-account-otp">
+                          Email verification code
+                        </FieldLabel>
                         <Input
                           id="delete-account-otp"
                           inputMode="numeric"
                           autoComplete="one-time-code"
                           value={deleteOtp}
-                          onChange={(event) => setDeleteOtp(event.currentTarget.value.replace(/\D+/g, "").slice(0, 6))}
+                          onChange={(event) =>
+                            setDeleteOtp(event.currentTarget.value.replace(/\D+/g, "").slice(0, 6))
+                          }
                           placeholder="123456"
                           disabled={isRequestingDeleteOtp || isDeleting}
                         />
@@ -354,24 +429,35 @@ export function SettingsPage(): JSX.Element {
                         </FieldDescription>
                       </Field>
                     )}
-                    {deleteErrorMessage === null ? null : <p className="text-sm text-destructive">{deleteErrorMessage}</p>}
+                    {deleteErrorMessage === null ? null : (
+                      <p className="text-sm text-destructive">{deleteErrorMessage}</p>
+                    )}
                   </div>
                   <AlertDialogFooter>
-                    <AlertDialogCancel disabled={isRequestingDeleteOtp || isDeleting}>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel disabled={isRequestingDeleteOtp || isDeleting}>
+                      Cancel
+                    </AlertDialogCancel>
                     {hasRequestedDeleteOtp ? (
                       <>
                         <Button
                           type="button"
                           variant="outline"
                           onClick={() => void handleRequestDeleteOtp()}
-                          disabled={isRequestingDeleteOtp || isDeleting || !deletionConfirmationMatched}
+                          disabled={
+                            isRequestingDeleteOtp || isDeleting || !deletionConfirmationMatched
+                          }
                         >
                           {isRequestingDeleteOtp ? "Resending..." : "Resend code"}
                         </Button>
                         <AlertDialogAction
                           variant="destructive"
                           onClick={() => void handleDeleteAccount()}
-                          disabled={isRequestingDeleteOtp || isDeleting || !deletionConfirmationMatched || !deletionOtpValid}
+                          disabled={
+                            isRequestingDeleteOtp ||
+                            isDeleting ||
+                            !deletionConfirmationMatched ||
+                            !deletionOtpValid
+                          }
                         >
                           {isDeleting ? "Deleting..." : "Delete account"}
                         </AlertDialogAction>
@@ -381,7 +467,9 @@ export function SettingsPage(): JSX.Element {
                         type="button"
                         variant="outline"
                         onClick={() => void handleRequestDeleteOtp()}
-                        disabled={isRequestingDeleteOtp || isDeleting || !deletionConfirmationMatched}
+                        disabled={
+                          isRequestingDeleteOtp || isDeleting || !deletionConfirmationMatched
+                        }
                       >
                         {isRequestingDeleteOtp ? "Sending..." : "Send email code"}
                       </Button>
@@ -393,7 +481,6 @@ export function SettingsPage(): JSX.Element {
           </Card>
         </div>
       </div>
-
     </div>
   );
 }

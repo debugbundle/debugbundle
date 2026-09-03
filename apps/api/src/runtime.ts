@@ -4,11 +4,22 @@ import { Redis } from "ioredis";
 import { z } from "zod";
 
 import { createRuntimeLoggerFromEnv } from "../../../packages/runtime-logger/src/index.js";
-import { buildPostgresSslConfig, parsePostgresSslMode, type PostgresSslMode } from "../../../packages/storage/src/postgres-ssl.js";
+import {
+  buildPostgresSslConfig,
+  parsePostgresSslMode,
+  type PostgresSslMode
+} from "../../../packages/storage/src/postgres-ssl.js";
 import { REQUIRED_API_TABLES } from "../../../packages/storage/src/migrations.js";
 import { assertStorageSchemaMigrationsApplied } from "../../../packages/storage/src/schema-migrations.js";
-import { createPostgresBillingSyncStore, createPostgresGitHubMarketplaceStore } from "../../../packages/storage/src/index.js";
+import {
+  createPostgresBillingSyncStore,
+  createPostgresGitHubMarketplaceStore
+} from "../../../packages/storage/src/index.js";
 import { createApiDependenciesFromEnv } from "./default-dependencies-env.js";
+import {
+  createOpenAiPluginServerOptions,
+  parseOpenAiPluginRuntimeConfig
+} from "./openai-plugin-runtime.js";
 import { createApiServer, type ApiServerOptions } from "./server.js";
 import { createStripeConfig } from "./stripe-config.js";
 
@@ -22,6 +33,7 @@ const ApiRuntimeEnvSchema = z.object({
   DB_USER: z.string().min(1).default("debugbundle"),
   DB_PASSWORD: z.string().min(1).default("debugbundle"),
   DB_NAME: z.string().min(1).default("debugbundle"),
+  DB_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
   DB_SSL_MODE: z.string().optional(),
   REDIS_URL: z.string().min(1).default("redis://localhost:6379"),
   S3_ENDPOINT: z.string().min(1).default("http://localhost:4566"),
@@ -36,7 +48,10 @@ export type ApiRuntimeEnv = Omit<z.infer<typeof ApiRuntimeEnvSchema>, "DB_SSL_MO
 };
 
 export interface Queryable {
-  query<Row extends Record<string, unknown>>(sql: string, params: unknown[]): Promise<{ rows: Row[] }>;
+  query<Row extends Record<string, unknown>>(
+    sql: string,
+    params: unknown[]
+  ): Promise<{ rows: Row[] }>;
   transaction?<Result>(callback: (db: Queryable) => Promise<Result>): Promise<Result>;
 }
 
@@ -46,7 +61,9 @@ export interface DrainingReadinessState {
   readinessCheck(): Promise<void>;
 }
 
-export function createDrainingReadinessState(baseReadinessCheck: () => Promise<void>): DrainingReadinessState {
+export function createDrainingReadinessState(
+  baseReadinessCheck: () => Promise<void>
+): DrainingReadinessState {
   let draining = false;
 
   return {
@@ -77,6 +94,7 @@ export function parseApiRuntimeEnv(env: Record<string, string | undefined>): Api
     DB_USER: env["DB_USER"],
     DB_PASSWORD: env["DB_PASSWORD"],
     DB_NAME: env["DB_NAME"],
+    DB_POOL_MAX: env["DB_POOL_MAX"],
     DB_SSL_MODE: env["DB_SSL_MODE"],
     REDIS_URL: env["REDIS_URL"],
     S3_ENDPOINT: env["S3_ENDPOINT"],
@@ -87,7 +105,9 @@ export function parseApiRuntimeEnv(env: Record<string, string | undefined>): Api
   });
 
   if (!result.success) {
-    const details = result.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ");
+    const details = result.error.issues
+      .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+      .join("; ");
     throw new Error(`api_runtime_env_invalid: ${details}`);
   }
 
@@ -160,6 +180,7 @@ function createApiPool(env: ApiRuntimeEnv): Pool {
     user: env.DB_USER,
     password: env.DB_PASSWORD,
     database: env.DB_NAME,
+    max: env.DB_POOL_MAX,
     ...(ssl === undefined ? {} : { ssl })
   });
 }
@@ -180,14 +201,22 @@ export function buildApiReadinessCheck(env: ApiRuntimeEnv): () => Promise<void> 
 
     try {
       await assertDatabaseSchema({
-        query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) => pool.query<Row>(sql, params)
+        query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) =>
+          pool.query<Row>(sql, params)
       });
     } catch (error) {
-      if (error instanceof Error && (error.message.startsWith("db_schema_missing_tables:") || error.message.startsWith("storage_schema_missing_migrations:") || error.message.startsWith("storage_migration_checksum_mismatch:"))) {
+      if (
+        error instanceof Error &&
+        (error.message.startsWith("db_schema_missing_tables:") ||
+          error.message.startsWith("storage_schema_missing_migrations:") ||
+          error.message.startsWith("storage_migration_checksum_mismatch:"))
+      ) {
         throw error;
       }
 
-      throw new Error(`api_database_unreachable: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `api_database_unreachable: ${error instanceof Error ? error.message : String(error)}`
+      );
     } finally {
       await pool.end();
     }
@@ -199,13 +228,17 @@ export function buildApiReadinessCheck(env: ApiRuntimeEnv): () => Promise<void> 
         throw error;
       }
 
-      throw new Error(`api_redis_unreachable: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `api_redis_unreachable: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
 
     try {
       await assertS3BucketReady(env);
     } catch (error) {
-      throw new Error(`api_s3_bucket_unreachable: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `api_s3_bucket_unreachable: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   };
 }
@@ -236,13 +269,21 @@ function createPoolQueryable(pool: Pool): Queryable {
   };
 }
 
-export async function startApiServerFromEnv(envInput: Record<string, string | undefined>): Promise<void> {
+export async function startApiServerFromEnv(
+  envInput: Record<string, string | undefined>
+): Promise<void> {
   const env = parseApiRuntimeEnv(envInput);
+  const openAiConfig = parseOpenAiPluginRuntimeConfig({
+    ...envInput,
+    DB_POOL_MAX: String(env.DB_POOL_MAX)
+  });
   const logger = createRuntimeLoggerFromEnv({
     app: "api",
     defaultService: "debugbundle-api",
     env: envInput,
-    ...(process.env["npm_package_version"] === undefined ? {} : { version: process.env["npm_package_version"] })
+    ...(process.env["npm_package_version"] === undefined
+      ? {}
+      : { version: process.env["npm_package_version"] })
   });
   const readinessState = createDrainingReadinessState(buildApiReadinessCheck(env));
 
@@ -258,6 +299,7 @@ export async function startApiServerFromEnv(envInput: Record<string, string | un
     DB_USER: env.DB_USER,
     DB_PASSWORD: env.DB_PASSWORD,
     DB_NAME: env.DB_NAME,
+    DB_POOL_MAX: String(env.DB_POOL_MAX),
     DB_SSL_MODE: env.DB_SSL_MODE,
     REDIS_URL: env.REDIS_URL,
     S3_ENDPOINT: env.S3_ENDPOINT,
@@ -289,7 +331,10 @@ export async function startApiServerFromEnv(envInput: Record<string, string | un
     };
   }
 
-  const githubMarketplaceWebhookSecret = readNonEmptyEnv(envInput, "GITHUB_MARKETPLACE_WEBHOOK_SECRET");
+  const githubMarketplaceWebhookSecret = readNonEmptyEnv(
+    envInput,
+    "GITHUB_MARKETPLACE_WEBHOOK_SECRET"
+  );
   if (githubMarketplaceWebhookSecret !== undefined) {
     const marketplacePool = createApiPool(env);
     webhookPools.push(marketplacePool);
@@ -303,6 +348,39 @@ export async function startApiServerFromEnv(envInput: Record<string, string | un
         ? {}
         : { auditLogging: dependencies.auditLogging })
     };
+  }
+
+  if (openAiConfig.oauthEnabled) {
+    const rateLimiter = dependencies.authRateLimiter;
+    if (
+      rateLimiter === undefined ||
+      rateLimiter.checkAvailability === undefined ||
+      rateLimiter.acquireConcurrency === undefined ||
+      rateLimiter.releaseConcurrency === undefined ||
+      rateLimiter.getOpenAiCimdResponse === undefined ||
+      rateLimiter.setOpenAiCimdResponse === undefined ||
+      rateLimiter.claimOpenAiClientAssertionJti === undefined
+    ) {
+      throw new Error("openai_plugin_runtime_rate_limiter_missing");
+    }
+    const openAiRateLimiter = {
+      claimRequest: rateLimiter.claimRequest.bind(rateLimiter),
+      checkAvailability: rateLimiter.checkAvailability.bind(rateLimiter),
+      acquireConcurrency: rateLimiter.acquireConcurrency.bind(rateLimiter),
+      releaseConcurrency: rateLimiter.releaseConcurrency.bind(rateLimiter),
+      getOpenAiCimdResponse: rateLimiter.getOpenAiCimdResponse.bind(rateLimiter),
+      setOpenAiCimdResponse: rateLimiter.setOpenAiCimdResponse.bind(rateLimiter),
+      claimOpenAiClientAssertionJti: rateLimiter.claimOpenAiClientAssertionJti.bind(rateLimiter)
+    };
+    Object.assign(
+      serverOptions,
+      createOpenAiPluginServerOptions({
+        env: { ...envInput, DB_POOL_MAX: String(env.DB_POOL_MAX) },
+        db: dependencies.openAiRuntime.db,
+        hostedReadDependencies: dependencies.openAiRuntime.hostedReadDependencies,
+        rateLimiter: openAiRateLimiter
+      })
+    );
   }
 
   const app = createApiServer(dependencies, {

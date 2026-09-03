@@ -2,7 +2,7 @@
 
 Canonical source-of-truth for MCP marketplace and directory submissions.
 
-Last verified: 2026-06-26
+Last verified: 2026-08-30
 
 ## Primary Listing
 
@@ -25,8 +25,8 @@ Last verified: 2026-06-26
 
 Current release status for MCP ecosystem distribution.
 
-- npm: published as `@debugbundle/mcp` version `1.6.2`.
-- Official MCP Registry: published and verified as `com.debugbundle/mcp` version `1.6.2`; exact latest-version API verification passed on 2026-06-26.
+- npm: published as `@debugbundle/mcp` version `1.7.0`; `npm view` verification passed on 2026-08-30.
+- Official MCP Registry: published and verified as `com.debugbundle/mcp` version `1.7.0`; exact registry API verification passed on 2026-08-30.
 - Smithery MCP: release accepted for `debugbundle/debugbundle` version `1.6.2`, but public registry indexing is still incomplete; support follow-up is pending, and release verification must treat this as partial until marketplace search/indexing shows it.
 - Smithery Skill: published and publicly indexed for `debugbundle/debugbundle`.
 - ClawHub Skill: published as `debugbundle/debugbundle`.
@@ -37,6 +37,7 @@ Current release status for MCP ecosystem distribution.
 - Glama: listed as of 2026-06-26 at `https://glama.ai/mcp/servers/sz3bl40umr`.
 - PulseMCP: auto-listed as official as of 2026-06-26 at `https://www.pulsemcp.com/servers/debugbundle`; command-line verification still requires `manual_check_required` because the site returns HTTP 403 to the release verifier.
 - LobeHub MCP: submitted as a request; no confirmed public listing as of 2026-06-26.
+- OpenAI Plugin: repository-local `1.0.0` source candidate only; not deployed, registered, submitted, approved, published, or directory-discoverable.
 
 Do not describe a downstream directory as live, official, verified, or indexed until the public listing is searchable or the marketplace has explicitly confirmed it.
 
@@ -114,7 +115,7 @@ debugbundle-mcp
 
 - Project tokens are SDK write-only ingestion credentials and must not be used for management, retrieval, billing, or MCP workflows.
 - Member tokens are for CLI, API, and MCP read/manage operations.
-- The MCP package uses stdio transport and does not expose a hosted remote MCP endpoint today.
+- The public MCP package uses stdio transport. The separate OpenAI candidate uses a twenty-three-tool OAuth-protected read-only remote projection, including nine aggregate-only analytics readers, only after its production and review gates pass.
 - Hosted and local management tools use the same underlying DebugBundle services as API and CLI.
 - The Claude Code plugin bundles local stdio MCP config and a workflow skill; it does not grant hosted account access by itself.
 - Report suspicious listings, leaked examples, or security concerns through `https://github.com/debugbundle/debugbundle/security/policy`.

@@ -86,20 +86,20 @@ Local events are written under `.debugbundle/local/events/`; generated bundles a
 
 All SDKs follow the same universal interface: `init`, `captureException`, `captureError`, `captureLog`, `captureRequest`, `captureMessage`, `setContext`, `probe`, and `flush`.
 
-| Runtime | Package | Install | Main docs |
-| --- | --- | --- | --- |
-| Node.js | `@debugbundle/sdk-node` | `npm install @debugbundle/sdk-node` | [Node.js SDK](https://debugbundle.com/docs/sdks/node) |
-| Browser | `@debugbundle/sdk-browser` | `npm install @debugbundle/sdk-browser` | [Browser SDK](https://debugbundle.com/docs/sdks/browser) |
-| Python | `debugbundle-python` | `pip install debugbundle-python` | [Python SDK](https://debugbundle.com/docs/sdks/python) |
-| PHP | `debugbundle/sdk-php` | `composer require debugbundle/sdk-php` | [PHP SDK](https://debugbundle.com/docs/sdks/php) |
-| Java | `com.debugbundle:debugbundle-spring-boot-starter` | Maven or Gradle dependency | [Java SDK](https://debugbundle.com/docs/sdks/java) |
-| .NET | `DebugBundle.AspNetCore` / `DebugBundle.Sdk` | `dotnet add package DebugBundle.AspNetCore` | [.NET SDK](https://debugbundle.com/docs/sdks/dotnet) |
-| Go | `github.com/debugbundle/debugbundle-go` | `go get github.com/debugbundle/debugbundle-go` | [Go SDK](https://debugbundle.com/docs/sdks/go) |
-| Ruby | `debugbundle` | `gem install debugbundle` | [Ruby SDK](https://debugbundle.com/docs/sdks/ruby) |
-| Android | `com.debugbundle:debugbundle-android` | Maven or Gradle dependency | [Android SDK](https://debugbundle.com/docs/sdks/android) |
-| iOS | `DebugBundle` | Swift Package Manager or CocoaPods | [iOS SDK](https://debugbundle.com/docs/sdks/swift) |
-| React Native | `@debugbundle/sdk-react-native` | `npm install @debugbundle/sdk-react-native` | [React Native SDK](https://debugbundle.com/docs/sdks/react-native) |
-| WordPress | `debugbundle-wordpress` | WordPress.org plugin directory | [WordPress plugin](https://debugbundle.com/docs/integrations/wordpress) |
+| Runtime      | Package                                           | Install                                        | Main docs                                                               |
+| ------------ | ------------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------- |
+| Node.js      | `@debugbundle/sdk-node`                           | `npm install @debugbundle/sdk-node`            | [Node.js SDK](https://debugbundle.com/docs/sdks/node)                   |
+| Browser      | `@debugbundle/sdk-browser`                        | `npm install @debugbundle/sdk-browser`         | [Browser SDK](https://debugbundle.com/docs/sdks/browser)                |
+| Python       | `debugbundle-python`                              | `pip install debugbundle-python`               | [Python SDK](https://debugbundle.com/docs/sdks/python)                  |
+| PHP          | `debugbundle/sdk-php`                             | `composer require debugbundle/sdk-php`         | [PHP SDK](https://debugbundle.com/docs/sdks/php)                        |
+| Java         | `com.debugbundle:debugbundle-spring-boot-starter` | Maven or Gradle dependency                     | [Java SDK](https://debugbundle.com/docs/sdks/java)                      |
+| .NET         | `DebugBundle.AspNetCore` / `DebugBundle.Sdk`      | `dotnet add package DebugBundle.AspNetCore`    | [.NET SDK](https://debugbundle.com/docs/sdks/dotnet)                    |
+| Go           | `github.com/debugbundle/debugbundle-go`           | `go get github.com/debugbundle/debugbundle-go` | [Go SDK](https://debugbundle.com/docs/sdks/go)                          |
+| Ruby         | `debugbundle`                                     | `gem install debugbundle`                      | [Ruby SDK](https://debugbundle.com/docs/sdks/ruby)                      |
+| Android      | `com.debugbundle:debugbundle-android`             | Maven or Gradle dependency                     | [Android SDK](https://debugbundle.com/docs/sdks/android)                |
+| iOS          | `DebugBundle`                                     | Swift Package Manager or CocoaPods             | [iOS SDK](https://debugbundle.com/docs/sdks/swift)                      |
+| React Native | `@debugbundle/sdk-react-native`                   | `npm install @debugbundle/sdk-react-native`    | [React Native SDK](https://debugbundle.com/docs/sdks/react-native)      |
+| WordPress    | `debugbundle-wordpress`                           | WordPress.org plugin directory                 | [WordPress plugin](https://debugbundle.com/docs/integrations/wordpress) |
 
 ### Node.js
 
@@ -108,12 +108,12 @@ npm install @debugbundle/sdk-node
 ```
 
 ```typescript
-import { debugbundle } from '@debugbundle/sdk-node';
+import { debugbundle } from "@debugbundle/sdk-node";
 
 debugbundle.init({
   projectToken: process.env.DEBUGBUNDLE_PROJECT_TOKEN,
-  environment: 'production',
-  service: 'api',
+  environment: "production",
+  service: "api"
 });
 
 debugbundle.captureExceptions();
@@ -129,15 +129,15 @@ npm install @debugbundle/sdk-browser
 ```
 
 ```typescript
-import { createDebugBundleBrowserSdk } from '@debugbundle/sdk-browser';
+import { createDebugBundleBrowserSdk } from "@debugbundle/sdk-browser";
 
 const debugbundle = createDebugBundleBrowserSdk();
 
 debugbundle.init({
-  transportMode: 'relay',
-  endpoint: '/debugbundle/browser',
-  environment: 'production',
-  service: 'web',
+  transportMode: "relay",
+  endpoint: "/debugbundle/browser",
+  environment: "production",
+  service: "web"
 });
 ```
 
@@ -270,9 +270,14 @@ Automation can use the HTTP API directly or the MCP server for agent workflows:
 - CLI reference: <https://debugbundle.com/docs/cli>
 - MCP docs: <https://debugbundle.com/docs/mcp>
 - MCP distribution channels: <https://debugbundle.com/docs/mcp/distribution>
+- OpenAI Plugin candidate: <https://debugbundle.com/docs/mcp/openai-plugin>
 - Bundle schema: <https://debugbundle.com/docs/bundles/schema>
 
 Marketplace-managed MCP clients can run `npx @debugbundle/mcp` and provide `DEBUGBUNDLE_MEMBER_TOKEN` in the MCP server environment. The official MCP Registry name is `com.debugbundle/mcp`; project tokens are SDK write-only ingestion credentials and must not be used for MCP retrieval or management.
+
+The separate OpenAI Plugin `1.0.0` source candidate combines a tailored skill with an OAuth-protected twenty-three-tool read-only remote projection plus the owner-approved existing-app consent, synthetic-reviewer, and Settings revocation surfaces. Its nine analytics tools expose bounded aggregate usage, route, device, acquisition, action, funnel, journey-pattern, and incident-impact metrics while excluding individual journeys, custom dimensions, analytics bundles/opportunities, and mutations. It preserves the stdio/OpenClaw surface and is not claimed as deployed, submitted, published, or publicly installable.
+
+For local visual review without a real provider interaction, run `make dev-openai-plugin-preview` and open <http://localhost:5291/__dev/openai-plugin>. The opt-in development route uses the production UI components with deterministic synthetic data and provides every consent/reviewer/Settings state, all 64 scope subsets, and 390 px, 768 px, and 1280 px iframe viewports. Its actions stay in browser memory and never call OAuth, reviewer, grant, or revocation APIs. The route is absent from production builds, and preview evidence does not replace manual accessibility, MCP Inspector, outside-network reviewer, ChatGPT Developer Mode, deployed, submission, or publication validation.
 
 ## Repository Layout
 
@@ -319,13 +324,13 @@ make dev
 
 Local services:
 
-| Service | Default |
-| --- | --- |
-| Web app | `http://localhost:5291` |
-| API | `http://localhost:3003` |
-| Postgres | `localhost:5434` |
-| Redis | `localhost:6380` |
-| LocalStack S3 | `localhost:4567` |
+| Service       | Default                 |
+| ------------- | ----------------------- |
+| Web app       | `http://localhost:5291` |
+| API           | `http://localhost:3003` |
+| Postgres      | `localhost:5434`        |
+| Redis         | `localhost:6380`        |
+| LocalStack S3 | `localhost:4567`        |
 
 Useful checks:
 

@@ -1,7 +1,7 @@
 # Auth Architecture — SPA, API, CLI, MCP
 
-Version: v1
-Last updated: 2026-03-16
+Version: v1.1
+Last updated: 2026-08-30
 
 ---
 
@@ -10,6 +10,7 @@ Last updated: 2026-03-16
 This file is the source-of-truth architecture record for DebugBundle authentication and authorization.
 
 It defines how first-party auth works across:
+
 - `apps/web` (React + Vite SPA)
 - `apps/api` (Fastify HTTP API)
 - `apps/cli`
@@ -27,8 +28,9 @@ DebugBundle uses a **first-party auth system** owned by the API and shared domai
 The system uses **three distinct auth artifacts**:
 
 1. **User sessions** for the web app
-2. **Member tokens** for CLI, MCP, API automation, and agents
+2. **Member tokens** for CLI, local stdio MCP, API automation, and agents
 3. **Project tokens** for SDK ingestion only
+4. **OAuth grants and access tokens** for the official OpenAI-hosted MCP resource only
 
 These artifacts belong to one shared auth domain, but they are intentionally not interchangeable.
 
@@ -49,6 +51,7 @@ These artifacts belong to one shared auth domain, but they are intentionally not
 All auth and authorization logic must live behind shared API/domain services.
 
 No interface may implement its own:
+
 - permission rules
 - token validation rules
 - verification gating rules
@@ -75,6 +78,7 @@ The web app must **not** persist member tokens, refresh tokens, or equivalent lo
 The SPA lives on `app.debugbundle.com` and the API lives on `api.debugbundle.com`. These are same-site (same eTLD+1) but cross-origin.
 
 Required when the SPA starts making API requests:
+
 - The API must configure CORS to allow `https://app.debugbundle.com` as an origin (env-driven, not hardcoded).
 - The SPA must send `credentials: "include"` on fetch requests to the API.
 - Session cookies set by the API (`SameSite=Strict; Secure; HttpOnly`) will be sent by the browser because both subdomains are same-site.
@@ -99,6 +103,7 @@ After a verified member token exists, the bearer may continue through API, CLI, 
 ### 4.1 Web App
 
 The web app is responsible for:
+
 - requesting email sign-in codes
 - verifying email sign-in codes
 - logout
@@ -108,6 +113,7 @@ The web app is responsible for:
 The web app authenticates with a first-party session cookie.
 
 The session is used for interactive browser actions such as:
+
 - viewing account state
 - creating the first member token
 - creating project tokens for projects where the signed-in user has owner/admin project access
@@ -122,9 +128,11 @@ The CLI authenticates with a **member token** created in the web app or via the 
 
 ### 4.3 MCP
 
-The local MCP server does not have a separate auth model.
+The local stdio MCP server does not have a separate auth model.
 
 It reuses the same local auth state already established by the CLI so agents do not need an additional login flow.
+
+The official OpenAI-hosted MCP resource is separate: it accepts only OAuth access tokens issued for `https://mcp.debugbundle.com`. It never accepts a member token, project token, CLI auth file, or token inside a tool argument. This additive principal does not alter local stdio MCP or custom member-token clients.
 
 ### 4.4 SDK Ingestion
 
@@ -139,9 +147,11 @@ Project tokens must never authorize retrieval, management, or account actions.
 ### 5.1 User Session
 
 Purpose:
+
 - interactive browser auth for the SPA
 
 Properties:
+
 - opaque server-side session identifier
 - delivered via `HttpOnly`, `Secure` cookie
 - `SameSite` policy chosen to match same-site SPA + API deployment
@@ -149,19 +159,23 @@ Properties:
 - short idle timeout plus bounded absolute lifetime
 
 Storage model:
+
 - session record stored server-side in Postgres or Redis-backed session storage
 - browser stores only the opaque cookie value
 
 Rules:
+
 - browser never receives reusable member-token plaintext as part of standard login
 - browser session is the source of interactive auth, not local storage state
 
 ### 5.2 Member Token
 
 Purpose:
+
 - non-browser auth for CLI, MCP, API automation, and agents
 
 Properties:
+
 - bearer token
 - scoped to a member identity and organization/project access
 - stored hashed at rest
@@ -169,6 +183,7 @@ Properties:
 - revocable individually
 
 Rules:
+
 - valid for retrieval and management operations
 - invalid for ingestion
 - suitable for local files, CI secrets, and agent workflows
@@ -176,9 +191,11 @@ Rules:
 ### 5.3 Project Token
 
 Purpose:
+
 - SDK write-only ingestion auth
 
 Properties:
+
 - bearer-style token carried by SDK clients
 - scoped to a single project
 - stored hashed at rest
@@ -186,6 +203,7 @@ Properties:
 - revocable individually
 
 Rules:
+
 - valid only for ingestion and SDK config access
 - invalid for incident retrieval, token management, billing, alerts, webhooks, or account operations
 
@@ -271,14 +289,17 @@ This is the primary bootstrap flow for V1.
 ### 7.1 Principal Types
 
 The system recognizes these principal types:
+
 - anonymous browser visitor
 - authenticated browser session user
 - authenticated member-token bearer
 - authenticated project-token bearer
+- authenticated OpenAI OAuth grant bearer
 
 ### 7.2 Authorization Axes
 
 Authorization decisions combine:
+
 - principal type
 - account ownership context
 - project access
@@ -290,11 +311,13 @@ Authorization decisions combine:
 ### 7.3 Verification Gate
 
 Unverified users may:
+
 - access limited account/session surfaces needed to complete verification
 - log into the web app if allowed by product rules
 - browse non-privileged UI surfaces
 
 Unverified users may not:
+
 - create member tokens
 - enable billing
 - invite collaborators
@@ -304,11 +327,13 @@ The first member token is the trust transition point from human bootstrap to age
 ### 7.4 Role Model
 
 The auth domain must support member roles at minimum for:
+
 - owner access
 - admin access
 - standard member access
 
 Role semantics:
+
 - **Owner**: billing owner, delete-project authority, full access to all project resources
 - **Admin**: can manage collaborators, capture policy, and shared integrations/configuration, but cannot delete the project or take over billing
 - **Member**: can access project data and create allowed project-scoped automation resources, but cannot manage collaborators, edit capture policy, manage shared integrations, or mutate automation resources created by other collaborators
@@ -324,6 +349,7 @@ Role checks must be enforced identically for session-authenticated and member-to
 Auth business logic belongs in shared packages and API domain services, not in the SPA, CLI, or MCP adapters.
 
 Expected ownership areas:
+
 - credential hashing and generation
 - password verification
 - session issuance and revocation
@@ -337,6 +363,7 @@ Expected ownership areas:
 ### 8.2 API Layers
 
 The API should separate:
+
 - request parsing and validation
 - principal resolution
 - authorization checks
@@ -353,6 +380,7 @@ V1 should use server-side sessions with one of these approaches:
 2. **Redis-backed session records with durable user/session metadata in Postgres**
 
 Preferred V1 bias:
+
 - keep canonical account and token state in Postgres
 - use Redis only if session throughput or operational simplicity clearly benefits from it
 
@@ -361,6 +389,7 @@ Because the hosted stack now separates the database onto its own instance, sessi
 ### 8.4 Email Code Handling
 
 Email auth codes must:
+
 - be stored only as hashed challenge material at rest
 - never be logged
 - never be retrievable after issuance
@@ -369,6 +398,7 @@ Email auth codes must:
 ### 8.5 Token Handling
 
 Member and project tokens must:
+
 - use explicit prefixes
 - be generated with high entropy
 - be hashed before persistence
@@ -381,6 +411,7 @@ Member and project tokens must:
 Because the SPA uses cookie-backed auth, state-changing browser-session endpoints must have CSRF protection.
 
 V1 acceptable patterns:
+
 - same-site deployment plus strict `SameSite` policy where feasible
 - explicit CSRF token mechanism for state-changing session-authenticated endpoints
 
@@ -391,6 +422,7 @@ Bearer-token endpoints used by CLI and MCP do not require browser-style CSRF pro
 ## 9. Data Model Expectations
 
 The auth system should persist at minimum:
+
 - users
 - organizations
 - organization memberships
@@ -401,6 +433,7 @@ The auth system should persist at minimum:
 - auth audit records
 
 Important expectations:
+
 - token rows store only hashes plus metadata
 - email auth challenges store only hashed code material at rest
 - revoked credentials remain auditable
@@ -413,6 +446,7 @@ Important expectations:
 ### 10.1 Session-Oriented Browser Endpoints
 
 The API should expose first-party browser-auth endpoints for:
+
 - request email code
 - verify email code
 - logout
@@ -426,6 +460,7 @@ The GitHub callback accepts the provider's RFC 9207 `iss` parameter only when it
 ### 10.2 Member-Authorized Endpoints
 
 The API should expose member-authorized endpoints for:
+
 - member token CRUD
 - project token CRUD
 - incidents, bundles, reproduction, logs
@@ -436,14 +471,18 @@ The API should expose member-authorized endpoints for:
 - project and organization management as allowed by role
 
 These endpoints must accept:
+
 - browser session auth for interactive web usage
 - member-token auth for CLI, MCP, and automation
 
 After principal resolution, both auth paths must execute the same authorization and domain logic.
 
+The official OpenAI MCP adapter resolves its OAuth principal separately, then calls dedicated read-only domain readers. An OAuth scope is only an outer capability bound: every reader must still verify the backing grant, user, organization, account status, and current project membership. OpenAI access tokens are never accepted by the normal member-token or project-token authenticators.
+
 ### 10.3 Project-Authorized Endpoints
 
 The API should expose project-authorized endpoints for:
+
 - event ingestion
 - SDK config retrieval
 
@@ -468,6 +507,7 @@ Auth architecture must not push security responsibilities into the UI layer. The
 ## 12. Security Baseline
 
 At minimum, the auth system must implement:
+
 - rate limiting for request-code, verify-code, and token creation
 - token hashing at rest
 - secure cookie attributes
@@ -478,6 +518,7 @@ At minimum, the auth system must implement:
 - no secret or token logging
 
 Sensitive auth actions include:
+
 - email change
 - session revocation
 - member-token creation or revocation
@@ -514,20 +555,23 @@ Sensitive auth actions include:
 ## 14. Explicit Non-Goals
 
 V1 does not require:
+
 - device code flow
 - Google sign-in
 - SSO / SAML
-- hosted multi-tenant MCP auth flow
 - browser storage of reusable bearer auth
 - collapsing member tokens and project tokens into a single credential model
 
 These may be added later without changing the V1 security model.
+
+The former hosted multi-tenant MCP non-goal is superseded only for the approved official OpenAI Plugin v1 surface described below. It remains a non-goal for the local stdio server and for arbitrary hosted clients.
 
 ---
 
 ## 15. Acceptance Alignment
 
 This architecture must preserve and satisfy:
+
 - token isolation
 - verification gating before first member-token creation
 - member-token full access after verification
@@ -536,3 +580,80 @@ This architecture must preserve and satisfy:
 - local MCP reuse of CLI-established auth state
 
 If implementation choices conflict with those properties, this document does not override the source-of-truth contracts or acceptance criteria. It explains how to implement them coherently.
+
+---
+
+## 16. Official OpenAI OAuth And OIDC Profile
+
+### 16.1 Reconciled Boundary
+
+The official OpenAI Plugin is a combined skill plus remote MCP distribution. Customer data is private, so the remote resource is OAuth-first and read-only. This resolves the earlier conflict between this document's hosted-MCP non-goal and `spec/hosted-remote-mcp-connector.md`'s token-first future proposal: those earlier decisions continue to govern local stdio and optional custom hosted clients, while the official OpenAI surface uses the profile in this section.
+
+Canonical identifiers are permanent public contracts:
+
+- protected resource and access-token audience: `https://mcp.debugbundle.com`;
+- authorization issuer: `https://api.debugbundle.com`;
+- Streamable HTTP endpoint: `https://mcp.debugbundle.com/mcp`;
+- protected-resource metadata: `https://mcp.debugbundle.com/.well-known/oauth-protected-resource`;
+- OAuth metadata: `https://api.debugbundle.com/.well-known/oauth-authorization-server`;
+- OIDC metadata: `https://api.debugbundle.com/.well-known/openid-configuration`; and
+- production redirect URI: `https://chatgpt.com/connector_platform_oauth_redirect`.
+
+An origin change means a new OpenAI plugin. A path-only MCP change means a reviewed plugin version. If the live OpenAI app-management page presents a different redirect mode or client metadata URL, stop for contract review rather than wildcarding it.
+
+### 16.2 Maintained Protocol Implementation
+
+The authorization server will use `oidc-provider` v9, initially pinned with `~9.11.2`, mounted in the existing API process with a project-owned Postgres adapter. `@modelcontextprotocol/sdk` supplies Streamable HTTP and resource-server verification primitives. The implementation may use the libraries' `jose` dependency but must not implement protocol cryptography independently.
+
+This choice is recorded in `spec/openai-plugin-oauth-decision.md`. It is accepted because the maintained provider supports OIDC discovery/UserInfo, PKCE, resource indicators, RFC 7009 revocation, RFC 9207, JWT access tokens, `private_key_jwt`, and experimental CIMD. Because CIMD is experimental and may change in a minor release, the dependency is tilde-pinned and its metadata behavior is covered by conformance fixtures. A compatibility/security spike that finds a required fork or substantial custom protocol implementation is a hard stop for owner review; no paid identity provider may be selected without explicit approval.
+
+### 16.3 Authorization And Client Authentication
+
+- Authorization code flow uses PKCE S256 only.
+- Authorization codes live for five minutes, are single-use and hashed at rest, and bind client, exact redirect URI, exact resource, scopes, user, organization, and code challenge.
+- OAuth and OIDC metadata set `authorization_response_iss_parameter_supported: true`.
+- Every successful and error authorization response includes `iss=https://api.debugbundle.com`; comparison is exact, without normalization.
+- Authorization and token requests must carry and bind `resource=https://mcp.debugbundle.com`, and the access-token `aud` is that exact value.
+- CIMD is enabled only for the exact client metadata URL `https://chatgpt.com/oauth/client.json`. Fetches require HTTPS, public DNS/IP resolution on every redirect, no credentials, a 128 KiB response cap, a five-second total timeout, at most two redirects, schema validation, and a short Redis cache. The exact redirect URI and JWKS in the validated document are allowlisted; no wildcard or arbitrary origin is accepted.
+- `private_key_jwt` is the only production token-endpoint client-auth method for the approved client. Assertions require exact `iss` and `sub` equal to the validated client ID, exact token-endpoint audience, a maximum five-minute assertion lifetime, a trusted `kid`, a valid signature, and one-time Redis-backed `jti` replay protection.
+- Public-client `none` is disabled for v1. It may be added only if a recorded OpenAI interoperability test proves it necessary, always with PKCE, through a reviewed contract/version change.
+- Unrestricted dynamic client registration is disabled.
+
+### 16.4 Scopes, Identity, And Consent
+
+The complete initial scope set is:
+
+```text
+openid
+email
+debugbundle:projects:read
+debugbundle:incidents:read
+debugbundle:artifacts:read
+debugbundle:improvements:read
+debugbundle:analytics:read
+debugbundle:health:read
+```
+
+The grant binds one user to one organization and the exact OpenAI client/resource. `list_projects` shows only projects currently visible to that user in the granted organization; every later tool rechecks record and project authorization. `get_incident_context` requires both incident and artifact scopes. `get_incident_impact` requires both analytics and incident scopes and rechecks the incident against the authorized project. New project visibility is not silently broadened by the grant.
+
+OIDC UserInfo returns only stable `sub`, normalized `email`, and `email_verified: true`. A false or missing verification claim fails closed. Email exists only to support OpenAI workspace verified-domain restrictions: it is excluded from access tokens, MCP tool results, and operational logs. A minimal ID token may be issued to support safe `id_token_hint` reauthorization; it contains only required OIDC claims and the same verified identity.
+
+Consent identifies DebugBundle, ChatGPT/Codex, the selected organization, the six individually selectable product read scopes, the verified-identity purpose, the customer-data categories that may be sent on request, the read-only/no-write boundary, and revocation. The analytics scope explicitly covers bounded aggregate usage, routes, devices, acquisition, actions, funnels, journey patterns, and incident impact while excluding individual journeys, custom dimensions, analytics bundles/opportunities, and mutations. The owner approved `spec/openai-plugin-consent-design-proposal.md` on 2026-08-30 and approved the aggregate-only analytics scope extension on 2026-09-02. The local source implements it with the existing `AuthLayout`, shared fields/notices/buttons, Radix/shadcn checkbox and alert-dialog patterns, safe login continuation, and no custom MCP UI. The API remains authoritative for client, redirect, resource, requested/selected scopes, interaction freshness, verified browser session, current organization membership, and grant ownership.
+
+The provider interaction begins and resumes on `api.debugbundle.com`; its HttpOnly interaction cookie is never moved to the app origin. Browser navigation to `/oauth/interaction/{uid}` redirects to `app.debugbundle.com/oauth/consent?interaction={uid}`, and the app uses no-store JSON GET/POST requests against the API interaction URL. The synthetic reviewer POST remains under `/oauth/interaction/{uid}/reviewer` so the same cookie path is valid. Only the opaque UID may appear in these app URLs. Credentials, codes, assertions, tokens, email, organization/project identifiers, grant IDs, and customer content are prohibited from URLs/history. Consent decision endpoints enforce the auth-endpoint IP limit plus the 30/minute pseudonymous session/client interaction limit and fail closed if Redis coordination is unavailable.
+
+### 16.5 Token And Revocation Lifecycle
+
+- Access tokens are asymmetric JWTs valid for exactly 12 minutes with rotatable keys and `kid`, minimal `iss`, `aud`, `sub`, grant/organization, scope, `jti`, `iat`, `nbf`, and `exp` claims, and no customer content or email.
+- Refresh tokens are high-entropy opaque values stored only as hashes, rotate on every use, belong to a replay-detecting family, and expire after 30 days.
+- Every MCP call verifies signature, issuer, audience/resource, time, scopes, grant state, account state, organization, and current record/project access.
+- Account suspension/deletion, membership removal, grant revocation, refresh reuse, or signing-key retirement fails closed. Refresh reuse revokes the family and grant.
+- `/oauth/revoke` revokes the named refresh family and backing grant. The signed-in Settings `OpenAI connections` section lists only the current user's grants in the current organization and revokes an owned grant plus every remaining refresh token through a CSRF-protected POST and explicit confirmation. Organization/account-wide operator revocation remains a documented operational action rather than a browser mass-revoke control.
+- Consumed or expired authorization-code rows are physically deleted after 24 hours; expired/revoked refresh history after 30 days; expired/revoked grant rows after 90 days, subject to the approved audit-evidence boundary.
+- Cleanup uses expiry/revocation indexes and idempotent worker/maintenance batches of at most 500 rows per transaction. It logs counts/duration only and never deletes an active grant or current refresh family.
+
+### 16.6 Reviewer Authentication Lifecycle
+
+OpenAI review uses one synthetic user, organization, project, and deterministic fixture set with no path to production customer organizations. The dedicated credential is high entropy, stored only as a hash in hosted secret/config ownership, entered through the approved password-style app form, accepted only in the `/oauth/interaction/{uid}/reviewer` POST body, cleared from browser component state after the response, and unavailable through the existing query-string review access path. The page never accepts organization or project input.
+
+The route is separately feature-flagged, allows at most 10 attempts per minute per IP and 5 per minute per reviewer-credential key plus a global backstop, and records success, failure, grant, revoke, and expiry security events without credential material. Credentials have a bounded rolling expiry, an alert at least 14 days before expiry, an outside-network pre-submit smoke, and a periodic in-review smoke. Rotation/extension updates the portal only through an approved submission action. Revoke the credential and reviewer grants immediately after publication verification, removal, or review cancellation; a future review uses a newly rotated credential.

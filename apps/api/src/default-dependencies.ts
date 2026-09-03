@@ -12,8 +12,6 @@ import {
   type ImprovementSettingsUpdate
 } from "../../../packages/shared-types/src/index.js";
 import {
-  buildBundleRegenerationLeaseKey,
-  buildImprovementBundleRegenerationLeaseKey,
   buildUserAvatarObjectKey,
   createPostgresAvailabilityCheckStore,
   createPostgresAccountAnalyticsStore,
@@ -43,17 +41,17 @@ import {
   executeAvailabilityCheck,
   validateAvailabilityCheckDefinition,
   type ObjectStoreClient,
-  type QueueClient,
-  type RedisQueueClient,
   type WebhookEventType
 } from "../../../packages/storage/src/index.js";
-import {
-  createBillingManagement
-} from "./billing-management.js";
+import { createBillingManagement } from "./billing-management.js";
 import { createDefaultAnalyticsDependencies } from "./default-analytics-dependencies.js";
 import { createEnvBillingLinkProvider } from "./billing-links.js";
 import { createDefaultGitHubManagement } from "./default-github-management.js";
-import type { CreateApiDependenciesInput, DefaultApiDependencies } from "./default-dependency-types.js";
+import { createDefaultRegenerationDependencies } from "./default-regeneration-dependencies.js";
+import type {
+  CreateApiDependenciesInput,
+  DefaultApiDependencies
+} from "./default-dependency-types.js";
 import {
   buildAccountExportArtifacts,
   normalizeEmailForConfig
@@ -74,8 +72,6 @@ export {
   stripTrailingSlash
 } from "./default-dependency-helpers.js";
 export type { BillingEmailContact, BillingEmailService } from "./default-dependency-helpers.js";
-
-const BUNDLE_REGENERATION_LEASE_TTL_SECONDS = 30;
 
 export function createApiDependencies(input: CreateApiDependenciesInput): DefaultApiDependencies {
   const rootDb = input.db;
@@ -136,13 +132,10 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
       accepted_at: string;
     }) => metadataStore.acceptProjectInviteForUser!(request)
   };
-  const webAuth = createWebSessionAuthService(
-    webAuthStore,
-    {
-      ...(input.authEmails === undefined ? {} : { authEmails: input.authEmails }),
-      ...(input.githubOAuth === undefined ? {} : { githubOAuth: input.githubOAuth })
-    }
-  );
+  const webAuth = createWebSessionAuthService(webAuthStore, {
+    ...(input.authEmails === undefined ? {} : { authEmails: input.authEmails }),
+    ...(input.githubOAuth === undefined ? {} : { githubOAuth: input.githubOAuth })
+  });
   const accountDeletionAuth = createAccountDeletionChallengeService(authStore, {
     ...(input.authEmails === undefined ? {} : { authEmails: input.authEmails })
   });
@@ -230,7 +223,9 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
   const normalizedAdminAnalyticsAccessEmails =
     input.adminAnalyticsAccessEmails === undefined
       ? []
-      : input.adminAnalyticsAccessEmails.map(normalizeEmailForConfig).filter((email) => email.length > 0);
+      : input.adminAnalyticsAccessEmails
+          .map(normalizeEmailForConfig)
+          .filter((email) => email.length > 0);
   const adminAnalyticsAccessEmails =
     normalizedAdminAnalyticsAccessEmails.length === 0
       ? null
@@ -238,7 +233,9 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
   const billingAdminEmails =
     input.billingAdminEmails === undefined
       ? null
-      : new Set(input.billingAdminEmails.map(normalizeEmailForConfig).filter((email) => email.length > 0));
+      : new Set(
+          input.billingAdminEmails.map(normalizeEmailForConfig).filter((email) => email.length > 0)
+        );
   const billingManagementServices = createBillingManagement({
     db: input.db,
     ...(input.stripeConfig === undefined ? {} : { stripeConfig: input.stripeConfig }),
@@ -253,8 +250,9 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
     authEmails === undefined
       ? undefined
       : {
-          sendProjectInviteEmail: (request: Parameters<AuthEmailSender["sendProjectInviteEmail"]>[0]) =>
-            authEmails.sendProjectInviteEmail(request)
+          sendProjectInviteEmail: (
+            request: Parameters<AuthEmailSender["sendProjectInviteEmail"]>[0]
+          ) => authEmails.sendProjectInviteEmail(request)
         };
 
   return {
@@ -270,7 +268,8 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
           adminAnalytics: {
             isOperatorAllowed: ({ email }: { email: string }) =>
               adminAnalyticsAccessEmails.has(normalizeEmailForConfig(email)),
-            getSummary: (request: { now: string }) => accountAnalyticsStore.getAdminAnalyticsSummary(request),
+            getSummary: (request: { now: string }) =>
+              accountAnalyticsStore.getAdminAnalyticsSummary(request),
             getMalformedRejectionBreakdown: (request: { now: string; limit: number }) =>
               ingestionRejectionDiagnosticStore?.getMalformedRejectionBreakdown(request) ??
               Promise.resolve({
@@ -282,7 +281,9 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
               })
           }
         }),
-    ...(input.ingestionRateLimiter === undefined ? {} : { ingestionRateLimiter: input.ingestionRateLimiter }),
+    ...(input.ingestionRateLimiter === undefined
+      ? {}
+      : { ingestionRateLimiter: input.ingestionRateLimiter }),
     ...(input.authRateLimiter === undefined ? {} : { authRateLimiter: input.authRateLimiter }),
     auditLogging: auditLogStore,
     memberAuth,
@@ -292,12 +293,18 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
     ...(inviteEmails === undefined ? {} : { inviteEmails }),
     ...(input.billingEmails === undefined ? {} : { billingEmails: input.billingEmails }),
     tokenManagement: {
-      listProjectTokensForOrganization: (input) => metadataStore.listProjectTokensForOrganization(input),
-      createProjectTokenForOrganization: (input) => metadataStore.createProjectTokenForOrganization(input),
-      revokeProjectTokenForOrganization: (input) => metadataStore.revokeProjectTokenForOrganization(input),
-      listMemberTokensForOrganization: (input) => metadataStore.listMemberTokensForOrganization(input),
-      createMemberTokenForOrganization: (input) => metadataStore.createMemberTokenForOrganization(input),
-      revokeMemberTokenForOrganization: (input) => metadataStore.revokeMemberTokenForOrganization(input)
+      listProjectTokensForOrganization: (input) =>
+        metadataStore.listProjectTokensForOrganization(input),
+      createProjectTokenForOrganization: (input) =>
+        metadataStore.createProjectTokenForOrganization(input),
+      revokeProjectTokenForOrganization: (input) =>
+        metadataStore.revokeProjectTokenForOrganization(input),
+      listMemberTokensForOrganization: (input) =>
+        metadataStore.listMemberTokensForOrganization(input),
+      createMemberTokenForOrganization: (input) =>
+        metadataStore.createMemberTokenForOrganization(input),
+      revokeMemberTokenForOrganization: (input) =>
+        metadataStore.revokeMemberTokenForOrganization(input)
     },
     projectManagement: {
       resolveProjectAccessForUser: (input) => metadataStore.resolveProjectAccessForUser!(input),
@@ -307,7 +314,9 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
       deleteProjectForUser: async (deleteInput) => {
         const result = await metadataStore.deleteProjectForUser!(deleteInput);
         if (result !== null) {
-          await deleteProjectObjects(input.objectStore, deleteInput.project_id).catch(() => undefined);
+          await deleteProjectObjects(input.objectStore, deleteInput.project_id).catch(
+            () => undefined
+          );
         }
         return result;
       },
@@ -317,7 +326,9 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
       deleteProjectForOrganization: async (deleteInput) => {
         const result = await metadataStore.deleteProjectForOrganization(deleteInput);
         if (result !== null) {
-          await deleteProjectObjects(input.objectStore, deleteInput.project_id).catch(() => undefined);
+          await deleteProjectObjects(input.objectStore, deleteInput.project_id).catch(
+            () => undefined
+          );
         }
         return result;
       }
@@ -335,7 +346,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
 
         return {
           ...result,
-          artifacts: await buildAccountExportArtifacts(input.objectStore, result),
+          artifacts: await buildAccountExportArtifacts(input.objectStore, result)
         };
       },
       deleteAccountForOrganization: async (deleteInput: {
@@ -350,19 +361,23 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
           result !== "other_owned_projects_exist"
         ) {
           await Promise.all(
-            result.deleted_project_ids.map((projectId) => deleteProjectObjects(input.objectStore, projectId).catch(() => undefined)),
+            result.deleted_project_ids.map((projectId) =>
+              deleteProjectObjects(input.objectStore, projectId).catch(() => undefined)
+            )
           );
           if (result.user_deleted && input.objectStore.deleteObject !== undefined) {
-            await input.objectStore.deleteObject({
-              key: buildUserAvatarObjectKey(deleteInput.user_id)
-            }).catch(() => undefined);
+            await input.objectStore
+              .deleteObject({
+                key: buildUserAvatarObjectKey(deleteInput.user_id)
+              })
+              .catch(() => undefined);
           }
         }
 
         return result;
       },
       getUserAvatar: (request) => accountStore.getUserAvatar(request),
-      saveUserAvatar: (request) => accountStore.saveUserAvatar(request),
+      saveUserAvatar: (request) => accountStore.saveUserAvatar(request)
     },
     billingManagement,
     ...createDefaultAnalyticsDependencies({ db: input.db, queue: input.queue }),
@@ -370,7 +385,8 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
       ? {}
       : {
           billingAdmin: {
-            isOperatorAllowed: ({ email }: { email: string }) => billingAdminEmails.has(normalizeEmailForConfig(email)),
+            isOperatorAllowed: ({ email }: { email: string }) =>
+              billingAdminEmails.has(normalizeEmailForConfig(email)),
             overrideOrganizationBilling: (request) =>
               billingManagementServices.overrideOrganizationBilling(request)
           }
@@ -399,7 +415,8 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
         }),
     probeManagement: {
       listActiveProbesForProject: (input) => metadataStore.listActiveProbesForProject(input),
-      listActiveProbesForProjectInOrganization: (input) => metadataStore.listActiveProbesForProjectInOrganization(input),
+      listActiveProbesForProjectInOrganization: (input) =>
+        metadataStore.listActiveProbesForProjectInOrganization(input),
       createProbeActivationForProjectInOrganization: (input) =>
         metadataStore.createProbeActivationForProjectInOrganization(input),
       deactivateProbeActivationForProjectInOrganization: (input) =>
@@ -415,7 +432,9 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
         project_id: string;
         update: CapturePolicyUpdate;
       }) => {
-        const existingRecord = await capturePolicyStore.getCapturePolicyByProjectId(input.project_id);
+        const existingRecord = await capturePolicyStore.getCapturePolicyByProjectId(
+          input.project_id
+        );
         let preset = existingRecord?.preset;
 
         if (preset === undefined) {
@@ -616,7 +635,11 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
           return deleted;
         });
       },
-      recordCaptureRuleMatch: (input: { project_id: string; rule_id: string; matched_at: string }) =>
+      recordCaptureRuleMatch: (input: {
+        project_id: string;
+        rule_id: string;
+        matched_at: string;
+      }) =>
         captureRuleStore.recordCaptureRuleMatch({
           id: input.rule_id,
           project_id: input.project_id,
@@ -624,7 +647,10 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
         })
     },
     improvementSettingsManagement: {
-      getImprovementSettingsForProject: (input: { organization_id: string; project_id: string }) => {
+      getImprovementSettingsForProject: (input: {
+        organization_id: string;
+        project_id: string;
+      }) => {
         void input.organization_id;
         return improvementSettingsStore.getImprovementSettingsByProjectId(input.project_id);
       },
@@ -643,7 +669,8 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
         };
 
         if (input.update.automated_improvement_bundles_enabled !== undefined) {
-          update.automated_improvement_bundles_enabled = input.update.automated_improvement_bundles_enabled;
+          update.automated_improvement_bundles_enabled =
+            input.update.automated_improvement_bundles_enabled;
         }
         if (input.update.improvement_bundle_sensitivity !== undefined) {
           update.improvement_bundle_sensitivity = input.update.improvement_bundle_sensitivity;
@@ -692,145 +719,48 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
       }
     },
     improvementManagement: {
-      listImprovementsForOrganization: (input) => improvementOpportunityStore.listImprovementsForOrganization(input),
-      getImprovementForOrganization: (input) => improvementOpportunityStore.getImprovementForOrganization(input),
-      resolveImprovementForOrganization: (input) => improvementOpportunityStore.resolveImprovementForOrganization(input),
-      reopenImprovementForOrganization: (input) => improvementOpportunityStore.reopenImprovementForOrganization(input),
-      snoozeImprovementForOrganization: (input) => improvementOpportunityStore.snoozeImprovementForOrganization!(input)
+      listImprovementsForOrganization: (input) =>
+        improvementOpportunityStore.listImprovementsForOrganization(input),
+      getImprovementForOrganization: (input) =>
+        improvementOpportunityStore.getImprovementForOrganization(input),
+      resolveImprovementForOrganization: (input) =>
+        improvementOpportunityStore.resolveImprovementForOrganization(input),
+      reopenImprovementForOrganization: (input) =>
+        improvementOpportunityStore.reopenImprovementForOrganization(input),
+      snoozeImprovementForOrganization: (input) =>
+        improvementOpportunityStore.snoozeImprovementForOrganization!(input)
     },
     incidentRetrieval: {
       listIncidentsForOrganization: (input) => metadataStore.listIncidentsForOrganization(input),
       getIncidentForOrganization: (input) => metadataStore.getIncidentForOrganization(input),
-      resolveIncidentForOrganization: (input) => incidentLifecycle.resolveIncidentForOrganization(input),
-      resolveIncidentsForOrganization: (input) => incidentLifecycle.resolveIncidentsForOrganization(input),
-      reopenIncidentForOrganization: (input) => incidentLifecycle.reopenIncidentForOrganization(input),
-      reopenIncidentsForOrganization: (input) => incidentLifecycle.reopenIncidentsForOrganization(input),
-      getBundleFailureReasonForOrganization: (input) => metadataStore.getBundleFailureReasonForOrganization!(input),
-      getBundleSourceForOrganization: (input) => metadataStore.getBundleSourceForOrganization!(input),
+      resolveIncidentForOrganization: (input) =>
+        incidentLifecycle.resolveIncidentForOrganization(input),
+      resolveIncidentsForOrganization: (input) =>
+        incidentLifecycle.resolveIncidentsForOrganization(input),
+      reopenIncidentForOrganization: (input) =>
+        incidentLifecycle.reopenIncidentForOrganization(input),
+      reopenIncidentsForOrganization: (input) =>
+        incidentLifecycle.reopenIncidentsForOrganization(input),
+      getBundleFailureReasonForOrganization: (input) =>
+        metadataStore.getBundleFailureReasonForOrganization!(input),
+      getBundleSourceForOrganization: (input) =>
+        metadataStore.getBundleSourceForOrganization!(input),
       listServicesForOrganization: (input) => metadataStore.listServicesForOrganization!(input),
-      listIncidentLogsForOrganization: (input) => metadataStore.listIncidentLogsForOrganization(input)
+      listIncidentLogsForOrganization: (input) =>
+        metadataStore.listIncidentLogsForOrganization(input)
     },
     objectStoreReader: {
       getObject: (request) => input.objectStore.getObject(request)
     },
     objectStoreWriter: {
-      putObject: (request: Parameters<ObjectStoreClient["putObject"]>[0]) => input.objectStore.putObject(request)
+      putObject: (request: Parameters<ObjectStoreClient["putObject"]>[0]) =>
+        input.objectStore.putObject(request)
     },
-    bundleRegeneration: {
-      async requestRegeneration(regenerationInput) {
-        const queueWithLease = input.queue as QueueClient & Partial<Pick<RedisQueueClient, "acquireLease" | "releaseLease">>;
-        const leaseKey = buildBundleRegenerationLeaseKey(regenerationInput.incident_id);
-
-        if (queueWithLease.acquireLease !== undefined) {
-          const acquired = await queueWithLease.acquireLease(leaseKey, BUNDLE_REGENERATION_LEASE_TTL_SECONDS);
-          if (!acquired) {
-            return false;
-          }
-        }
-
-        const source = await metadataStore.getBundleSourceForOrganization!({
-          organization_id: regenerationInput.organization_id,
-          incident_id: regenerationInput.incident_id
-        });
-
-        if (source === null) {
-          await queueWithLease.releaseLease?.(leaseKey);
-          return false;
-        }
-
-        try {
-          await metadataStore.markBundleGenerationFailure!({
-            incident_id: regenerationInput.incident_id,
-            reason: null
-          });
-
-          await input.queue.enqueue("build-bundle", {
-            project_id: regenerationInput.project_id,
-            incident_id: regenerationInput.incident_id,
-            event_id: source.event_id,
-            occurred_at: source.occurred_at,
-            occurrence_count: source.occurrence_count,
-            trigger: "regeneration"
-          });
-        } catch (error) {
-          await queueWithLease.releaseLease?.(leaseKey);
-          throw error;
-        }
-
-        return true;
-      }
-    },
-    improvementBundleRegeneration: {
-      async requestRegeneration(regenerationInput) {
-        const queueWithLease = input.queue as QueueClient &
-          Partial<Pick<RedisQueueClient, "acquireLease" | "releaseLease">> & {
-            enqueue(jobName: "build-improvement-bundle", payload: {
-              project_id: string;
-              opportunity_id: string;
-              event_id: string;
-              event_type?: "log_event" | "request_event";
-              occurred_at: string;
-              occurrence_count: number;
-              trigger: "regeneration";
-            }): Promise<void>;
-          };
-        const leaseKey = buildImprovementBundleRegenerationLeaseKey(regenerationInput.opportunity_id);
-
-        if (queueWithLease.acquireLease !== undefined) {
-          const acquired = await queueWithLease.acquireLease(leaseKey, BUNDLE_REGENERATION_LEASE_TTL_SECONDS);
-          if (!acquired) {
-            return true;
-          }
-        }
-
-        const improvement = await improvementOpportunityStore.getImprovementForOrganization({
-          organization_id: regenerationInput.organization_id,
-          improvement_id: regenerationInput.opportunity_id
-        });
-
-        if (
-          improvement === null ||
-          improvement.project_id !== regenerationInput.project_id ||
-          improvement.kind === "recurring_incident" ||
-          improvement.kind === "post_deploy_regression"
-        ) {
-          await queueWithLease.releaseLease?.(leaseKey);
-          return false;
-        }
-
-        const [source] = await improvementOpportunityStore.listImprovementEventReferences({
-          opportunity_id: regenerationInput.opportunity_id,
-          limit: 1
-        });
-
-        if (source === undefined) {
-          await queueWithLease.releaseLease?.(leaseKey);
-          return false;
-        }
-
-        if (source.event_type !== "log_event" && source.event_type !== "request_event") {
-          await queueWithLease.releaseLease?.(leaseKey);
-          return false;
-        }
-
-        try {
-          await queueWithLease.enqueue("build-improvement-bundle", {
-            project_id: regenerationInput.project_id,
-            opportunity_id: regenerationInput.opportunity_id,
-            event_id: source.event_id,
-            event_type: source.event_type,
-            occurred_at: source.occurred_at,
-            occurrence_count: improvement.occurrence_count,
-            trigger: "regeneration"
-          });
-        } catch (error) {
-          await queueWithLease.releaseLease?.(leaseKey);
-          throw error;
-        }
-
-        return true;
-      }
-    },
+    ...createDefaultRegenerationDependencies({
+      queue: input.queue,
+      metadataStore,
+      improvementOpportunityStore
+    }),
     alertManagement: {
       listAlertsForOrganization: (input) => metadataStore.listAlertsForOrganization(input),
       createAlertForOrganization: (input) => metadataStore.createAlertForOrganization(input),
@@ -849,9 +779,11 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
       updateWebhookForOrganization: (input) => webhookDelivery.updateWebhookForOrganization(input),
       deleteWebhookForOrganization: (input) => webhookDelivery.deleteWebhookForOrganization(input)
     },
-    ...(input.stripeConfig !== undefined ? {
-      stripeConfig: input.stripeConfig,
-      billingSyncStore
-    } : {})
+    ...(input.stripeConfig !== undefined
+      ? {
+          stripeConfig: input.stripeConfig,
+          billingSyncStore
+        }
+      : {})
   };
 }

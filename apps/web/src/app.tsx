@@ -17,16 +17,18 @@ import { Toaster } from "sonner";
 import { AppSidebar } from "./components/system/app-sidebar.js";
 import { createProjectRoutes } from "./app-project-routes.js";
 import { AppUpdateNotifier } from "./components/system/app-update-notifier.js";
-import { BrandLockup } from "./components/system/brand-lockup.js";
+import { AuthLayout } from "./components/system/auth-layout.js";
 import { CalloutCard } from "./components/system/callout-card.js";
 import { DashboardIncidentsToday } from "./components/system/dashboard-incidents-today.js";
 import { RecentProjectsTable } from "./components/system/recent-projects-table.js";
 import { GitHubMark } from "./components/system/github-mark.js";
-import { ProjectRouteProvider, type ActiveProjectRoute } from "./components/system/project-route-context.js";
+import {
+  ProjectRouteProvider,
+  type ActiveProjectRoute
+} from "./components/system/project-route-context.js";
 import { SectionCards } from "./components/system/section-cards.js";
 import { SiteHeader } from "./components/system/site-header.js";
 import { Button } from "./components/ui/button.js";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "./components/ui/field.js";
 import { Input } from "./components/ui/input.js";
 import { Notice } from "./components/ui/notice.js";
@@ -54,17 +56,22 @@ import { IncidentDetailPage } from "./pages/incident-detail-page.js";
 import { HealthStatusPage } from "./pages/health-status-page.js";
 import { ProjectInvitePage } from "./pages/project-invite-page.js";
 import { SettingsPage } from "./pages/settings-page.js";
+import { OpenAiConsentPage } from "./pages/openai-consent-page.js";
+import { OpenAiReviewerPage } from "./pages/openai-reviewer-page.js";
 import { WorkspaceAnalyticsPage } from "./pages/workspace-analytics-page.js";
 import { SidebarInset, SidebarProvider } from "./components/ui/sidebar.js";
 import { isSystemEmailReviewEnabled } from "./lib/system-email-previews.js";
+import {
+  OPENAI_PLUGIN_PREVIEW_ROUTE,
+  isOpenAiPluginPreviewEnabled
+} from "./lib/openai-plugin-preview-gate.js";
+import { createOpenAiPluginPreviewRoute } from "./openai-plugin-preview-route.js";
 import { ThemeProvider, useTheme } from "./lib/theme.js";
 import { TooltipProvider } from "./components/ui/tooltip.js";
 import { SystemEmailReviewPage } from "./pages/system-email-review-page.js";
 
 const GITHUB_START_HREF = buildApiUrl("/v1/auth/github/start");
 const SIGNUP_TRIAL_STORAGE_KEY = "debugbundle.auth.signup_trial";
-const TERMS_OF_SERVICE_URL = "https://debugbundle.com/terms";
-const PRIVACY_POLICY_URL = "https://debugbundle.com/privacy";
 
 interface AppProps {
   initialEntries?: string[];
@@ -166,6 +173,9 @@ export function App({ initialEntries }: AppProps): JSX.Element {
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/invite" element={<ProjectInvitePage />} />
             <Route path="/auth/github/callback" element={<GithubAuthCallbackPage />} />
+            <Route path="/oauth/consent" element={<OpenAiConsentPage />} />
+            <Route path="/oauth/reviewer" element={<OpenAiReviewerPage />} />
+            {createOpenAiPluginPreviewRoute(<LoadingScreen />)}
             <Route path="/analytics" element={<AdminAnalyticsRoute />} />
             <Route element={<ProtectedLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
@@ -198,6 +208,9 @@ export function App({ initialEntries }: AppProps): JSX.Element {
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/invite" element={<ProjectInvitePage />} />
             <Route path="/auth/github/callback" element={<GithubAuthCallbackPage />} />
+            <Route path="/oauth/consent" element={<OpenAiConsentPage />} />
+            <Route path="/oauth/reviewer" element={<OpenAiReviewerPage />} />
+            {createOpenAiPluginPreviewRoute(<LoadingScreen />)}
             <Route path="/analytics" element={<AdminAnalyticsRoute />} />
             <Route element={<ProtectedLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
@@ -284,7 +297,10 @@ function isPublicAuthPath(pathname: string): boolean {
     pathname === "/login" ||
     pathname === "/signup" ||
     pathname === "/invite" ||
-    pathname.startsWith("/auth/github/callback")
+    pathname.startsWith("/auth/github/callback") ||
+    pathname === "/oauth/consent" ||
+    pathname === "/oauth/reviewer" ||
+    (isOpenAiPluginPreviewEnabled() && pathname === OPENAI_PLUGIN_PREVIEW_ROUTE)
   );
 }
 
@@ -357,70 +373,18 @@ function ProtectedShell({
         <AppSidebar variant="inset" session={session} onSignOut={handleSignOut} />
         <SidebarInset>
           <SiteHeader />
-          <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-hidden p-6">
-            {children}
-          </div>
+          <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-hidden p-6">{children}</div>
         </SidebarInset>
       </SidebarProvider>
     </ProjectRouteProvider>
   );
 }
 
-function AuthLayout({
-  title,
-  heading = title,
-  description,
-  children
-}: {
-  title: string;
-  heading?: string;
-  description: string;
-  children: React.ReactNode;
-}): JSX.Element {
-  return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-muted p-6 text-foreground md:p-10">
-      <div className="flex w-full max-w-md flex-col gap-6">
-        <div className="flex justify-center">
-          <BrandLockup href="/login" />
-        </div>
-
-        <Card>
-          <CardHeader className="text-center">
-            <CardTitle className="sr-only">{title}</CardTitle>
-            <p className="text-xl font-semibold">{heading}</p>
-            <CardDescription>{description}</CardDescription>
-          </CardHeader>
-          <CardContent>{children}</CardContent>
-        </Card>
-
-        <FieldDescription className="px-6 text-center text-balance">
-          By continuing, you agree to our{" "}
-          <a
-            href={TERMS_OF_SERVICE_URL}
-            className="underline underline-offset-4 hover:text-foreground"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Terms of Service
-          </a>{" "}
-          and{" "}
-          <a
-            href={PRIVACY_POLICY_URL}
-            className="underline underline-offset-4 hover:text-foreground"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Privacy Policy
-          </a>
-          .
-        </FieldDescription>
-      </div>
-    </div>
-  );
-}
-
 function GithubLink({ trialPlan }: { trialPlan?: RequestedTrialPlan | null } = {}): JSX.Element {
-  const href = trialPlan === undefined || trialPlan === null ? GITHUB_START_HREF : `${GITHUB_START_HREF}?trial=${trialPlan}`;
+  const href =
+    trialPlan === undefined || trialPlan === null
+      ? GITHUB_START_HREF
+      : `${GITHUB_START_HREF}?trial=${trialPlan}`;
 
   return (
     <Button asChild variant="outline" className="w-full justify-center">

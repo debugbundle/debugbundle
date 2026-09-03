@@ -376,6 +376,64 @@ describe("analytics metrics store", () => {
     });
   });
 
+  it("can suppress retained journey samples and bundle-generation state for aggregate-only consumers", async (): Promise<void> => {
+    const queryMock = vi.fn(async (sqlText: string) => {
+      if (sqlText.includes("FROM analytics_transition_rollups")) {
+        return {
+          rows: [
+            {
+              from_route_key: "/pricing",
+              to_route_key: "/checkout",
+              transition_count: "3",
+              unique_sessions: "2",
+              total_transitions: "3"
+            }
+          ]
+        };
+      }
+      if (sqlText.includes("rollup_kind = 'transition_session'")) {
+        return {
+          rows: [
+            {
+              from_route_key: "/pricing",
+              to_route_key: "/checkout",
+              affected_sessions: "2"
+            }
+          ]
+        };
+      }
+      return { rows: [] };
+    });
+    const store = createPostgresAnalyticsMetricsStore({ query: queryMock as Queryable["query"] });
+    const input = {
+      project_id: PROJECT_ID,
+      from: "2026-03-01T00:00:00.000Z",
+      to: "2026-03-08T00:00:00.000Z",
+      granularity: "day" as const,
+      limit: 10
+    };
+
+    const patterns = await store.getJourneyPatterns(input, { includeSampleIds: false });
+    const impact = await store.getIncidentImpact(
+      {
+        ...input,
+        incident_id: "00000000-0000-4000-8000-000000000704"
+      },
+      { includeSampleIds: false, includeBundleState: false }
+    );
+
+    expect(patterns.patterns[0]?.sample_ids).toEqual([]);
+    expect(impact.journey_patterns[0]?.sample_ids).toEqual([]);
+    expect(impact.analytics_bundle).toEqual({
+      status: "not_requested",
+      generation_id: null,
+      failure_reason: null
+    });
+    const sql = queryMock.mock.calls.map(([statement]) => String(statement)).join("\n");
+    expect(sql).not.toContain("analytics_journey_samples");
+    expect(sql).not.toContain("analytics_bundle_generations");
+  });
+
   it("narrows route and journey-pattern queries to an explicit route context", async (): Promise<void> => {
     const observed: Array<{ sql: string; params: unknown[] }> = [];
     const queryMock = vi.fn(async (sql: string, params: unknown[]) => {

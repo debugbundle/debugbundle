@@ -28,6 +28,7 @@ import {
   createPostgresGitHubStore,
   createPostgresImprovementOpportunityStore,
   createPostgresOperationalEmailDeliveryStore,
+  createPostgresOpenAiOAuthStore,
   createPostgresSlackDestinationStore,
   createPostgresWebhookDeliveryStore,
   createPostgresMetadataStore,
@@ -75,6 +76,7 @@ import {
 } from "./analytics-bundle-processor.js";
 import { scheduleTrialLifecycleEmails } from "./trial-lifecycle-scheduler.js";
 import { registerWorkerDogfooding } from "./dogfooding.js";
+import { createOpenAiOAuthMaintenance } from "./openai-oauth-maintenance.js";
 import {
   buildWorkerReadinessCheck,
   createPoolQueryable,
@@ -224,6 +226,25 @@ export async function runWorkerFromEnv(
   });
 
   const queryable = createPoolQueryable(pool);
+  let openAiOAuthMaintenance: ReturnType<typeof createOpenAiOAuthMaintenance> | null = null;
+  if (env.OPENAI_OAUTH_ENABLED === "true" || env.OPENAI_OAUTH_ENABLED === "1") {
+    const encryptionKey = env.OPENAI_OAUTH_ADAPTER_ENCRYPTION_KEY;
+    if (encryptionKey === undefined) {
+      throw new Error("openai_oauth_worker_encryption_key_missing");
+    }
+    const oauthStore = createPostgresOpenAiOAuthStore(queryable, encryptionKey);
+    openAiOAuthMaintenance = createOpenAiOAuthMaintenance({
+      cleanupExpiredCredentials: (request) => oauthStore.cleanupExpiredCredentials(request),
+      logger,
+      intervalMs: env.OPENAI_OAUTH_CLEANUP_INTERVAL_MS,
+      batchSize: env.OPENAI_OAUTH_CLEANUP_BATCH_SIZE,
+      ...(env.OPENAI_REVIEWER_CREDENTIAL_EXPIRES_AT === undefined
+        ? {}
+        : {
+            reviewerCredentialExpiresAt: env.OPENAI_REVIEWER_CREDENTIAL_EXPIRES_AT
+          })
+    });
+  }
   const shutdownState = createWorkerShutdownState();
   const readinessCheck = buildWorkerReadinessCheck({ env, queryable });
   const drainingReadinessCheck = async (): Promise<void> => {
@@ -477,6 +498,12 @@ export async function runWorkerFromEnv(
     do {
       if (shutdownState.isShuttingDown()) {
         break;
+      }
+
+      if (openAiOAuthMaintenance !== null) {
+        await runWorkerStep(logger, "openai-oauth-maintenance", async () => {
+          await openAiOAuthMaintenance.runIfDue();
+        });
       }
 
       const normalizeResult = await runClaimedProcessStep("normalize-events", async () =>

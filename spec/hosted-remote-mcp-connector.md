@@ -1,14 +1,17 @@
 # Hosted Remote MCP Connector Proposal
 
-Status: scoped future slice; deferred from the current distribution pass
+Status: split decision; official OpenAI profile approved, arbitrary hosted-client profile deferred
 Owner: developer experience / platform
 Created: 2026-06-25
+Last reconciled: 2026-09-02
 
 ## Summary
 
 DebugBundle currently ships a local stdio MCP server through `@debugbundle/mcp` and the official MCP Registry entry `com.debugbundle/mcp`. A hosted Remote MCP connector would let remote-agent environments connect to DebugBundle without running local `npx`, but it is a separate product and infrastructure slice rather than a marketplace metadata update.
 
-Current decision: do not implement or list hosted Remote MCP as part of the current MCP discovery/distribution pass. If this becomes a near-term product slice, use the low-overhead launch shape in this proposal: dedicated `mcp.debugbundle.com` endpoint, member-token auth first, hosted-safe tools only, and no database changes unless the implementation demonstrably needs persistent connector grants, OAuth state, or dedicated rate-limit ledgers.
+Current decision: the official OpenAI Plugin v1 may implement one OAuth-first, read-only hosted profile at the permanent `https://mcp.debugbundle.com` origin. Arbitrary custom hosted clients and general marketplace distribution remain deferred and may later use a separately reviewed member-token profile. The official profile is not a transport wrapper around the broad stdio catalog.
+
+The authoritative OpenAI requirements are `FR-MCP-04` through `FR-MCP-11`, `NFR-MCP-01` through `NFR-MCP-04`, `AC-MCP-03` through `AC-MCP-13`, `contracts/public-interfaces.md`, and the fixtures under `tests/fixtures/openai-plugin-v1/`. Where this older proposal conflicts, those source-of-truth contracts win.
 
 ## Goals
 
@@ -32,37 +35,38 @@ Prefer:
 https://mcp.debugbundle.com
 ```
 
-Fallback if simpler operationally:
-
-```text
-https://api.debugbundle.com/mcp
-```
-
-The dedicated hostname is easier to document, monitor, and submit to connector marketplaces.
-
-Decision for first hosted slice: use `https://mcp.debugbundle.com` unless deployment constraints make the fallback materially simpler.
+For the official OpenAI plugin, this origin is permanent. `https://api.debugbundle.com/mcp` is not a fallback: MCP resource routes must be unreachable through the API host. A scheme/host/port change requires a new OpenAI plugin; a path-only change requires a reviewed plugin version.
 
 ## Auth Model
 
-Initial acceptable path:
+Custom hosted-client path (deferred, not the official OpenAI plugin):
 
 - `Authorization: Bearer dbundle_mem_*` member tokens for custom Remote MCP clients.
 - Existing member/project authorization checks for every tool call.
 - No project-token acceptance for retrieval, management, billing, project, incident, bundle, webhook, alert, probe, health-check, or token-management tools.
 
-Decision for first hosted slice: start token-first with member tokens. Defer OAuth until a marketplace-managed multi-user connector requires it.
+The token-first decision applies only to a future custom hosted-client profile.
 
-Preferred later path:
+Official OpenAI path (approved contract; local runtime and consent source implemented, not deployed):
 
-- OAuth for marketplace-managed multi-user clients.
-- Per-connector scopes if the Remote MCP ecosystem standardizes a stable scope model.
+- OAuth 2.1/OIDC with the exact issuer, resource, scopes, PKCE, RFC 9207, CIMD, client-authentication, UserInfo, lifecycle, and retention profile in `spec/auth-architecture.md`.
+- Exactly twenty-three tools from `tests/fixtures/openai-plugin-v1/tool-contracts.json`.
+- No member or project token in transport or tool arguments.
+- No custom MCP UI in v1; only the owner-approved existing-app consent, reviewer, and Settings revocation surfaces are present.
 
 ## Tool Scope
 
-Expose hosted-safe tools only:
+The official OpenAI profile exposes only:
 
-- Incident listing, context, bundle, reproduction, resolve, and reopen.
-- Hosted health checks, probes, alerts, webhooks, weekly reports, projects, members, billing, capture policy, capture rules, improvements, services, GitHub automation, and setup diagnostics.
+- `list_projects`, `list_services`;
+- `list_incidents`, `get_incident`, `get_incident_context`, `get_bundle`, `get_reproduction`;
+- `list_improvements`, `get_improvement`, `get_improvement_bundle`; and
+- `get_usage_summary`, `get_route_metrics`, `get_journey_patterns`, `get_device_breakdown`, `get_referrer_metrics`, `get_action_metrics`, `list_funnel_metrics`, `get_funnel_analysis`, `get_incident_impact`; and
+- `list_health_checks`, `get_health_check`, `list_health_check_results`, `list_health_check_daily_rollups`.
+
+All are dedicated zero-mutation hosted reads. The nine analytics readers use a separate `debugbundle:analytics:read` scope; `get_incident_impact` also requires incident scope. They read aggregate ledgers only and exclude individual journey samples/sample IDs, custom dimensions, analytics opportunities, AnalyticsBundle records/generation, settings, and every mutation. `get_incident_context` requires incident and artifact scopes and excludes raw logs. Health-check outputs use sanitized display URLs. Missing or stale artifacts never enqueue regeneration.
+
+A future custom hosted-client profile may propose a broader hosted-safe catalog, but it cannot silently inherit the OpenAI grant or plugin version.
 
 Exclude local-only tools:
 
@@ -70,23 +74,25 @@ Exclude local-only tools:
 - Local bundle filesystem reads.
 - Repository filesystem access.
 - Any tool that assumes the MCP server process is running inside the user's code checkout.
+- Raw logs, individual analytics journey samples, analytics opportunities/bundles, custom dimensions, and every mutation in the official OpenAI profile.
 
-Decision for first hosted slice: the hosted-safe tool set above is the launch scope. Local-only diagnostics stay stdio-only.
+Local-only diagnostics stay stdio-only. Existing stdio and OpenClaw retain the full current catalog and order.
 
 ## Runtime Requirements
 
-- Use the existing MCP tool catalog as the source of truth.
-- Add a transport adapter only; do not fork business logic.
+- Keep shared domain readers in packages/API-owned services. The OpenAI catalog is an isolated projection; `apps/api` must never import `apps/mcp`.
+- Preserve the existing MCP catalog as the source of truth for stdio and OpenClaw only.
 - Validate every inbound request at the MCP transport boundary.
 - Authorize every tool call against the authenticated member and project membership.
 - Add hosted MCP rate limits separate from ingestion limits.
-- Treat mutation tools like API/CLI management actions for audit logging.
+- OpenAI tool domain execution must not synchronously write audit/product state. Metadata-only request telemetry is outside the domain transaction.
 - Log only operational metadata; never log bearer tokens, tool arguments containing secrets, raw bundle contents, webhook secrets, or customer payloads.
-- Expose readiness and liveness checks if this is a separately deployed service.
+- Run in the existing API image/process on the current Lightsail host; do not add a service/container without a separately approved capacity decision.
+- Use the database-aware MCP bulkhead, Redis fail-closed coordination, atomic two-host slot promotion, independently operated no-deploy MCP Caddy gate, monitoring, and capacity gates in `FR-MCP-09`, `NFR-MCP-01`, `NFR-MCP-03`, and `AC-MCP-10`.
 
 ## Schema And Deploy Safety
 
-Avoid database changes for the first slice if possible by reusing existing auth, audit, and rate-limit infrastructure.
+The official OpenAI OAuth profile uses the additive grant, authorization-code, refresh-family, and encrypted provider-artifact records frozen in `contracts/data-schemas.md`. The ordered forward migration, empty-schema bootstrap, migration catalog, and fail-closed runtime readiness dependency are implemented in local source. Production still must apply and verify the migration before either feature flag is enabled.
 
 If persistent hosted-MCP sessions, connector grants, OAuth clients, or dedicated rate-limit ledgers require schema changes:
 
@@ -104,6 +110,7 @@ Before public launch:
 - Update `apps/mcp/server.json` only if the active MCP Registry schema supports remote metadata for the chosen transport.
 - Update marketplace listings to distinguish local stdio from hosted Remote MCP.
 - Add security notes explaining that hosted MCP cannot access local repository files or local-only bundles.
+- Complete the independent OpenAI package, scan, review corpus, submission, publication, and discovery gates in `rules/release-governance.md`.
 
 ## Acceptance
 
@@ -113,3 +120,4 @@ Before public launch:
 - Auth is member-scoped and tenant-isolated.
 - Rate limits, audit logs, readiness checks, and operational logs are present.
 - Public docs and listings do not claim hosted Remote MCP availability before launch.
+- The official OpenAI evidence state remains reported as a local source candidate until production migration/deployment, live-client validation, portal review, publication, and directory discovery are independently proven.

@@ -76,14 +76,19 @@ vi.mock("../../../apps/api/src/stripe-config.js", () => ({
 }));
 
 vi.mock("../../../packages/storage/src/index.js", async () => {
-  const actual = await vi.importActual<Record<string, unknown>>("../../../packages/storage/src/index.js");
+  const actual = await vi.importActual<Record<string, unknown>>(
+    "../../../packages/storage/src/index.js"
+  );
   return {
     ...actual,
     createPostgresGitHubMarketplaceStore: createPostgresGitHubMarketplaceStoreMock
   };
 });
 
-import { createDrainingReadinessState, startApiServerFromEnv } from "../../../apps/api/src/runtime.js";
+import {
+  createDrainingReadinessState,
+  startApiServerFromEnv
+} from "../../../apps/api/src/runtime.js";
 
 function buildMigratedRuntimeSchemaRows(sql: string): { rows: Record<string, unknown>[] } {
   if (sql.includes("information_schema.tables")) {
@@ -155,7 +160,11 @@ function buildMigratedRuntimeSchemaRows(sql: string): { rows: Record<string, unk
         { table_name: "github_marketplace_accounts" },
         { table_name: "project_github_repos" },
         { table_name: "github_dispatch_rules" },
-        { table_name: "github_dispatch_deliveries" }
+        { table_name: "github_dispatch_deliveries" },
+        { table_name: "oauth_authorization_grants" },
+        { table_name: "oauth_authorization_codes" },
+        { table_name: "oauth_refresh_tokens" },
+        { table_name: "oauth_provider_artifacts" }
       ]
     };
   }

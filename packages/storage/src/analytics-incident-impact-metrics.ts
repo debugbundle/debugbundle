@@ -28,6 +28,11 @@ export interface AnalyticsIncidentImpactInput {
   limit?: number | undefined;
 }
 
+export interface AnalyticsIncidentImpactReadOptions {
+  includeSampleIds?: boolean;
+  includeBundleState?: boolean;
+}
+
 type CountRow = { affected_sessions: unknown };
 type RouteRow = { route_key: unknown; affected_sessions: unknown };
 type FunnelRow = { funnel_key: unknown; affected_sessions: unknown };
@@ -45,7 +50,8 @@ const MAX_INCIDENT_IMPACT_JOURNEY_SAMPLE_IDS = 3;
 
 export async function readAnalyticsIncidentImpact(
   db: Queryable,
-  input: AnalyticsIncidentImpactInput
+  input: AnalyticsIncidentImpactInput,
+  options?: AnalyticsIncidentImpactReadOptions
 ): Promise<AnalyticsIncidentImpactResponse> {
   const limit = normalizeLimit(input.limit);
   const [affectedSessionResult, routes, funnels, deviceTypes, browsers, journeys, bundle] = await Promise.all([
@@ -55,9 +61,13 @@ export async function readAnalyticsIncidentImpact(
     readAffectedSegments(db, input, limit, "device_type"),
     readAffectedSegments(db, input, limit, "browser_family"),
     readAffectedJourneyPatterns(db, input, limit),
-    readIncidentImpactBundleState(db, input)
+    options?.includeBundleState === false
+      ? Promise.resolve(null)
+      : readIncidentImpactBundleState(db, input)
   ]);
-  const sampleIdsByTransition = await readAffectedJourneySampleIds(db, input, journeys.rows);
+  const sampleIdsByTransition = options?.includeSampleIds === false
+    ? new Map<string, string[]>()
+    : await readAffectedJourneySampleIds(db, input, journeys.rows);
 
   return AnalyticsIncidentImpactResponseSchema.parse({
     incident_id: input.incident_id,

@@ -55,7 +55,9 @@ function getChangedFiles() {
       run(`git rev-parse --verify ${baseSha}`);
       diffRange = `${baseSha}...${headSha}`;
     } catch {
-      console.warn(`coverage:changed: unable to verify BASE_SHA=${baseSha}; falling back to ${diffRange}`);
+      console.warn(
+        `coverage:changed: unable to verify BASE_SHA=${baseSha}; falling back to ${diffRange}`
+      );
     }
 
     const output = run(`git diff --name-only --diff-filter=ACMR ${diffRange}`);
@@ -72,10 +74,13 @@ function getChangedFiles() {
   const trackedOutput = run("git diff --name-only --diff-filter=ACMR HEAD");
   const untrackedOutput = run("git ls-files --others --exclude-standard");
 
-  return [...new Set([
-    ...trackedOutput.split("\n"),
-    ...untrackedOutput.split("\n")
-  ].map((value) => value.trim()).filter(Boolean))];
+  return [
+    ...new Set(
+      [...trackedOutput.split("\n"), ...untrackedOutput.split("\n")]
+        .map((value) => value.trim())
+        .filter(Boolean)
+    )
+  ];
 }
 
 function quotePath(filePath) {
@@ -214,6 +219,10 @@ function getChangedAddedLines(filePath) {
 }
 
 function isSourceCandidate(filePath) {
+  if (/\.d\.(ts|mts|cts)$/.test(filePath)) {
+    return false;
+  }
+
   if (!/\.(ts|tsx|js|jsx|mjs|cjs)$/.test(filePath)) {
     return false;
   }
@@ -249,7 +258,9 @@ function isSourceCandidate(filePath) {
 function loadCoverageSummary() {
   const summaryPath = path.join(process.cwd(), "coverage", "coverage-summary.json");
   if (!existsSync(summaryPath)) {
-    throw new Error("coverage summary missing at coverage/coverage-summary.json; run tests with coverage before coverage:changed");
+    throw new Error(
+      "coverage summary missing at coverage/coverage-summary.json; run tests with coverage before coverage:changed"
+    );
   }
 
   const raw = readFileSync(summaryPath, "utf8");
@@ -270,7 +281,9 @@ function loadCoverageSummary() {
 function loadCoverageDetails() {
   const coveragePath = path.join(process.cwd(), "coverage", "coverage-final.json");
   if (!existsSync(coveragePath)) {
-    throw new Error("coverage details missing at coverage/coverage-final.json; run tests with coverage before coverage:changed");
+    throw new Error(
+      "coverage details missing at coverage/coverage-final.json; run tests with coverage before coverage:changed"
+    );
   }
 
   const raw = readFileSync(coveragePath, "utf8");
@@ -285,9 +298,7 @@ function loadCoverageDetails() {
 }
 
 function stripComments(source) {
-  return source
-    .replaceAll(/\/\*[\s\S]*?\*\//g, "")
-    .replaceAll(/(^|\s)\/\/.*$/gm, "");
+  return source.replaceAll(/\/\*[\s\S]*?\*\//g, "").replaceAll(/(^|\s)\/\/.*$/gm, "");
 }
 
 function isTypeOnlyModule(filePath) {
@@ -304,8 +315,11 @@ function isTypeOnlyModule(filePath) {
   }
 
   const hasRuntimeImport = /\bimport\s+(?!type\b)/.test(normalized);
-  const hasRuntimeExport = /\bexport\s+(async\s+)?(function|class|const|let|var|enum)\b/.test(normalized);
-  const hasRuntimeDeclaration = /\b(async\s+)?function\b|\bclass\b|\bconst\b|\blet\b|\bvar\b|\benum\b/.test(normalized);
+  const hasRuntimeExport = /\bexport\s+(async\s+)?(function|class|const|let|var|enum)\b/.test(
+    normalized
+  );
+  const hasRuntimeDeclaration =
+    /\b(async\s+)?function\b|\bclass\b|\bconst\b|\blet\b|\bvar\b|\benum\b/.test(normalized);
 
   return !hasRuntimeImport && !hasRuntimeExport && !hasRuntimeDeclaration;
 }
@@ -324,8 +338,9 @@ function collectExecutableAddedLineFailures(fileCoverage, addedLines) {
   const statementCounts = fileCoverage.s ?? {};
 
   for (const line of addedLines) {
-    const statements = Object.entries(statementMap)
-      .filter(([, location]) => locationContainsLine(location, line));
+    const statements = Object.entries(statementMap).filter(([, location]) =>
+      locationContainsLine(location, line)
+    );
     if (statements.length > 0 && statements.every(([id]) => (statementCounts[id] ?? 0) === 0)) {
       failures.push(`line ${line} is not covered`);
       continue;
@@ -360,11 +375,10 @@ function main() {
       continue;
     }
 
-    const metricFailures = METRICS
-      .map((metric) => {
-        const pct = coverage?.[metric]?.pct;
-        return { metric, pct };
-      })
+    const metricFailures = METRICS.map((metric) => {
+      const pct = coverage?.[metric]?.pct;
+      return { metric, pct };
+    })
       .filter(({ pct }) => typeof pct !== "number" || pct < REQUIRED_THRESHOLD)
       .map(({ metric, pct }) => `${metric}=${formatMetric(pct)}%`);
 
@@ -398,10 +412,13 @@ function main() {
     process.exit(1);
   }
 
-  const diffCoveredSuffix = diffCoveredFiles.length > 0
-    ? `; ${diffCoveredFiles.length} below-threshold file(s) passed by changed-line coverage`
-    : "";
-  console.log(`coverage:changed: passed for ${candidates.length} changed source file(s)${diffCoveredSuffix}`);
+  const diffCoveredSuffix =
+    diffCoveredFiles.length > 0
+      ? `; ${diffCoveredFiles.length} below-threshold file(s) passed by changed-line coverage`
+      : "";
+  console.log(
+    `coverage:changed: passed for ${candidates.length} changed source file(s)${diffCoveredSuffix}`
+  );
 }
 
 main();

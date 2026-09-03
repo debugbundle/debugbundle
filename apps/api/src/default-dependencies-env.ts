@@ -16,6 +16,8 @@ import {
 
 import { createApiDependencies } from "./default-dependencies.js";
 import type { DefaultApiDependencies } from "./default-dependency-types.js";
+import { createOpenAiHostedReadDependencies } from "./openai-mcp-dependencies.js";
+import type { OpenAiHostedReadDependencies } from "./openai-mcp-operations.js";
 import {
   createAuthEmailSender,
   createBillingEmailService,
@@ -54,9 +56,23 @@ function createPoolQueryable(pool: Pool): Queryable {
   };
 }
 
+export function resolveApiDatabasePoolMax(env: Record<string, string | undefined>): number {
+  const value = Number(env["DB_POOL_MAX"] ?? "10");
+  if (!Number.isInteger(value) || value < 1 || value > 100) {
+    throw new Error("api_database_pool_max_invalid");
+  }
+  return value;
+}
+
 export function createApiDependenciesFromEnv(
   env: Record<string, string | undefined>
-): DefaultApiDependencies & { close(): Promise<void> } {
+): DefaultApiDependencies & {
+  openAiRuntime: {
+    db: Queryable;
+    hostedReadDependencies: OpenAiHostedReadDependencies;
+  };
+  close(): Promise<void>;
+} {
   const githubOAuth = createGithubOAuthConfigFromEnv(env);
   const dbSsl = buildPostgresSslConfig(env["DB_SSL_MODE"]);
   const dbPool = new Pool({
@@ -65,6 +81,7 @@ export function createApiDependenciesFromEnv(
     user: env["DB_USER"] ?? "debugbundle",
     password: env["DB_PASSWORD"] ?? "debugbundle",
     database: env["DB_NAME"] ?? "debugbundle",
+    max: resolveApiDatabasePoolMax(env),
     ...(dbSsl === undefined ? {} : { ssl: dbSsl })
   });
   const db = createPoolQueryable(dbPool);
@@ -100,7 +117,9 @@ export function createApiDependenciesFromEnv(
                 accessKeyId: env["AWS_ACCESS_KEY_ID"],
                 secretAccessKey: env["AWS_SECRET_ACCESS_KEY"]
               }),
-          timeoutMs: Number(env["AUTH_EMAIL_TIMEOUT_MS"] ?? env["WEEKLY_REPORT_EMAIL_TIMEOUT_MS"] ?? "10000")
+          timeoutMs: Number(
+            env["AUTH_EMAIL_TIMEOUT_MS"] ?? env["WEEKLY_REPORT_EMAIL_TIMEOUT_MS"] ?? "10000"
+          )
         })
       : undefined;
 
@@ -159,14 +178,25 @@ export function createApiDependenciesFromEnv(
       ? {}
       : { billingAdminEmails: billingAdminEmails ?? [] }),
     ...(stripeConfig === undefined ? {} : { stripeConfig }),
-    ...(lifecycleWebhookFallbackTargetUrl === undefined ? {} : { lifecycleWebhookFallbackTargetUrl }),
-    ...(lifecycleWebhookFallbackSigningSecret === undefined ? {} : { lifecycleWebhookFallbackSigningSecret }),
+    ...(lifecycleWebhookFallbackTargetUrl === undefined
+      ? {}
+      : { lifecycleWebhookFallbackTargetUrl }),
+    ...(lifecycleWebhookFallbackSigningSecret === undefined
+      ? {}
+      : { lifecycleWebhookFallbackSigningSecret }),
     authRateLimiter,
     ingestionRateLimiter
   });
 
   return {
     ...dependencies,
+    openAiRuntime: {
+      db,
+      hostedReadDependencies: createOpenAiHostedReadDependencies({
+        db,
+        objectStoreReader: { getObject: (request) => objectStore.getObject(request) }
+      })
+    },
     async close(): Promise<void> {
       await authRateLimiter.close();
       await ingestionRateLimiter.close();

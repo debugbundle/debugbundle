@@ -30,6 +30,7 @@ All SDK internal failures must be caught and silently swallowed (with optional i
 Sensitive data must be redacted BEFORE leaving the SDK (client-side) and BEFORE any event payload is persisted (server-side). The pipeline must never persist unredacted sensitive fields.
 
 Targets for automatic redaction:
+
 - Passwords / password fields
 - Authorization headers (Bearer tokens, API keys)
 - Cookie values
@@ -46,6 +47,7 @@ Targets for automatic redaction:
 All worker jobs must be idempotent. Re-running any job with the same input must produce the same result without duplicating data or corrupting state.
 
 Jobs:
+
 - `normalize-events` — re-normalizing already-normalized events produces same output
 - `group-incident` — re-grouping produces same incident assignment
 - `build-bundle` — re-building produces identical bundle (INV-1)
@@ -73,9 +75,11 @@ Capture-rule management is a core operation: list, create, update, delete, sugge
 ## INV-6: Token Security
 
 ### INV-6a: Tokens Hashed at Rest
+
 All tokens (project tokens, member tokens) must be stored as cryptographic hashes (SHA-256 minimum) in the database. The plaintext token is returned exactly once at creation time and never retrievable again.
 
 ### INV-6b: Token Scope Enforcement
+
 Project tokens authenticate SDK event ingestion only. They cannot be used to read incidents, bundles, manage alerts, or perform any account operations.
 
 Member tokens authenticate CLI/API/MCP operations. They cannot be used for SDK ingestion.
@@ -103,6 +107,7 @@ Reproduction artifacts must always include an explicit `confidence` field with v
 ## INV-9: Retention Enforcement
 
 Data must be deleted when it reaches its retention limit. Retention values are defined in `TIER_CAPABILITIES` (`packages/shared-types/src/tier-capabilities.ts`):
+
 - Free plan: `bundle_retention_days: 7`, `raw_event_retention_days: 7`
 - Solo plan: `bundle_retention_days: 30`, `raw_event_retention_days: 14`
 - Team plan: `bundle_retention_days: 90`, `raw_event_retention_days: 30`
@@ -126,6 +131,7 @@ Each context block within the bundle may carry its own `version` field (integer)
 ## INV-11: Event Envelope Completeness
 
 Every event persisted through ingestion must contain the complete envelope:
+
 - `schema_version` (date string, e.g., `"2026-03-01"`)
 - `event_id` (UUID v4)
 - `event_type` (one of: `backend_exception`, `request_event`, `log_event`, `frontend_breadcrumb`, `frontend_exception`, `deploy_metadata`, `error_suppressed`, `probe_event`)
@@ -250,5 +256,25 @@ Each dispatch rule operates an independent cooldown window per incident fingerpr
 ## INV-23: GitHub App Webhook Verification
 
 All incoming GitHub App webhook events (`POST /v1/github/app/webhook`) must be verified using HMAC-SHA256 with the `GITHUB_APP_WEBHOOK_SECRET` before processing. Unverified payloads must be rejected with `401`. This is consistent with INV-7 (webhook signing) applied to incoming GitHub events.
+
+---
+
+## INV-24: OpenAI Principal Separation
+
+The official OpenAI MCP resource accepts only OAuth access tokens issued for exact audience `https://mcp.debugbundle.com`. It never accepts member tokens, project tokens, browser sessions, CLI auth files, or credentials supplied in tool arguments. OpenAI credentials are never accepted by member-token, project-token, CLI, stdio MCP, SDK ingestion, or OpenClaw auth paths.
+
+This extends rather than replaces INV-6: project tokens remain SDK write-only, member tokens retain their current CLI/API/stdio/OpenClaw role, and OAuth scopes never replace current record/project authorization.
+
+## INV-25: OpenAI Read-Only Means Zero Customer-State Mutation
+
+A tool advertised with `readOnlyHint: true` may read existing records and stored artifacts only. It cannot regenerate artifacts, enqueue work, write last-access state, synchronously write audit/product state, send external actions, or otherwise change customer-visible state. Missing, stale, pending, failed, or oversized evidence returns a bounded status without starting work. Metadata-only operational telemetry outside the domain transaction is allowed only when it cannot affect the result.
+
+## INV-26: OpenAI Public Surface Is An Isolated Projection
+
+The official `1.0.0` projection is exactly the twenty-three ordered tools and schemas in `tests/fixtures/openai-plugin-v1/`. Its nine analytics tools are aggregate-only: journey-pattern and incident-impact reads disable retained-sample access, incident impact also disables AnalyticsBundle-state access, and no OpenAI analytics input accepts custom dimensions. `apps/api` may import shared packages but must never import `apps/mcp`. The existing stdio catalog and OpenClaw full projection remain unchanged. Adding, removing, renaming, reordering, rescoping, or incompatibly changing an OpenAI tool requires the independent reviewed plugin-version process; changing the resource origin requires a new plugin.
+
+## INV-27: OpenAI Evidence Boundaries Are Honest
+
+Contract, local/automated, live backend, deployed, portal/review, published, directory-discoverable, communicated, and owner-approved states are separate evidence categories. No passing fixture, documentation check, CI run, deployment, approval, or exact listing URL may be represented as proving a later state. Submission, publication, communication, and spending require their own explicit gates.
 
 **Enforcement:** Tests must verify that webhook payloads without valid signatures are rejected, and that valid signatures from the configured secret are accepted.

@@ -719,3 +719,33 @@ export interface GitHubDispatchDeliveryRecord {
   github_status_code: number | null;
   created_at: string;
 }
+
+export type OpenAiProductScope =
+  | "debugbundle:projects:read"
+  | "debugbundle:incidents:read"
+  | "debugbundle:artifacts:read"
+  | "debugbundle:improvements:read"
+  | "debugbundle:analytics:read"
+  | "debugbundle:health:read";
+
+export interface OpenAiConsentInteractionRecord {
+  interaction_id: string;
+  client_name: "ChatGPT and Codex";
+  publisher: "OpenAI";
+  organization_name: string | null;
+  identity_scopes: ["openid", "email"];
+  product_scopes: OpenAiProductScope[];
+  reviewer_access_available: boolean;
+  authentication_required?: true;
+}
+
+export interface OpenAiConnectionRecord {
+  grant_id: string;
+  client_name: "ChatGPT and Codex";
+  organization_name: string;
+  product_scopes: OpenAiProductScope[];
+  consented_at: string;
+  expires_at: string;
+  revoked_at: string | null;
+  status: "active" | "expired" | "revoked";
+}

@@ -1,0 +1,44 @@
+{
+  "name": "debugbundle",
+  "version": "1.0.0",
+  "description": "Investigate production incidents and aggregate product analytics with read-only DebugBundle evidence.",
+  "author": {
+    "name": "DebugBundle",
+    "email": "support@debugbundle.com",
+    "url": "https://debugbundle.com"
+  },
+  "homepage": "https://debugbundle.com/docs/mcp/openai-plugin",
+  "repository": "https://github.com/debugbundle/debugbundle",
+  "license": "MIT-0",
+  "keywords": [
+    "debugbundle",
+    "production-debugging",
+    "incident-response",
+    "runtime-errors",
+    "debug-bundles",
+    "endpoint-health",
+    "product-analytics",
+    "mcp"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "DebugBundle",
+    "shortDescription": "Investigate incidents and aggregate product analytics.",
+    "longDescription": "Connect DebugBundle to inspect authorized production incidents, deterministic redacted bundles, reproductions, runtime improvements, aggregate product analytics, and endpoint-health evidence. Version 1 is read-only and cannot modify projects, incident state, analytics settings, or customer data.",
+    "developerName": "DebugBundle",
+    "category": "Developer Tools",
+    "capabilities": ["Read"],
+    "websiteURL": "https://debugbundle.com/docs/mcp/openai-plugin",
+    "privacyPolicyURL": "https://debugbundle.com/privacy",
+    "termsOfServiceURL": "https://debugbundle.com/terms",
+    "defaultPrompt": [
+      "Investigate my latest production incident.",
+      "Explain this incident from its bundle and reproduction.",
+      "Summarize product usage and checkout funnel performance for the last 7 days.",
+      "Why is this endpoint health check failing?"
+    ],
+    "brandColor": "#7C3AED",
+    "composerIcon": "./assets/icon-512.png",
+    "logo": "./assets/icon-512.png"
+  }
+}

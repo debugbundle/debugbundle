@@ -242,6 +242,7 @@ function buildLlmsTxt(): string {
       `- ${toMarkdownLink('CLI cloud workflow', toAbsoluteUrl('/docs/cli/cloud-workflow/'))}`,
       `- ${toMarkdownLink('API overview', toAbsoluteUrl('/docs/api/'))}`,
       `- ${toMarkdownLink('MCP overview', toAbsoluteUrl('/docs/mcp/'))}`,
+      `- ${toMarkdownLink('OpenAI Plugin candidate', toAbsoluteUrl('/docs/mcp/openai-plugin/'))}`,
       `- ${toMarkdownLink('MCP tools', toAbsoluteUrl('/docs/mcp/tools/'))}`,
       `- ${toMarkdownLink('AnalyticsBundle', toAbsoluteUrl('/docs/analytics/'))}`,
       `- ${toMarkdownLink('AnalyticsBundle privacy', toAbsoluteUrl('/docs/analytics/privacy/'))}`,

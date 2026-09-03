@@ -1,0 +1,255 @@
+{
+  "contract_version": "1.0.0",
+  "product_shape": "skill_plus_remote_mcp",
+  "custom_ui": false,
+  "resource": "https://mcp.debugbundle.com",
+  "endpoint": "https://mcp.debugbundle.com/mcp",
+  "issuer": "https://api.debugbundle.com",
+  "scopes": [
+    "openid",
+    "email",
+    "debugbundle:projects:read",
+    "debugbundle:incidents:read",
+    "debugbundle:artifacts:read",
+    "debugbundle:improvements:read",
+    "debugbundle:analytics:read",
+    "debugbundle:health:read"
+  ],
+  "annotations": {
+    "readOnlyHint": true,
+    "openWorldHint": false,
+    "destructiveHint": false
+  },
+  "data_categories": [
+    "account_project_metadata",
+    "production_incident_metadata",
+    "redacted_debug_artifacts",
+    "runtime_improvement_evidence",
+    "aggregate_product_analytics",
+    "endpoint_health_configuration_and_results",
+    "verified_identity_for_workspace_domain_restrictions"
+  ],
+  "exclusions": [
+    "raw_logs",
+    "individual_analytics_journey_samples",
+    "analytics_custom_dimensions",
+    "analytics_opportunities_and_bundles",
+    "mutations",
+    "local_filesystem_and_setup_tools",
+    "tokens_and_auth_headers",
+    "object_storage_keys_and_signed_urls",
+    "database_only_ids_and_internal_hashes",
+    "custom_mcp_ui"
+  ],
+  "tools": [
+    {
+      "name": "list_projects",
+      "title": "List DebugBundle projects",
+      "description": "List the DebugBundle projects available through the current OAuth grant.",
+      "securitySchemes": [{ "type": "oauth2", "scopes": ["debugbundle:projects:read"] }],
+      "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
+      "input_schema_ref": "schemas.json#/$defs/listProjectsInput",
+      "output_schema_ref": "schemas.json#/$defs/listProjectsOutput"
+    },
+    {
+      "name": "list_services",
+      "title": "List project services",
+      "description": "List known services and environments for one authorized DebugBundle project.",
+      "securitySchemes": [{ "type": "oauth2", "scopes": ["debugbundle:projects:read"] }],
+      "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
+      "input_schema_ref": "schemas.json#/$defs/listServicesInput",
+      "output_schema_ref": "schemas.json#/$defs/listServicesOutput"
+    },
+    {
+      "name": "list_incidents",
+      "title": "List project incidents",
+      "description": "List bounded recent or active incidents for one authorized DebugBundle project.",
+      "securitySchemes": [{ "type": "oauth2", "scopes": ["debugbundle:incidents:read"] }],
+      "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
+      "input_schema_ref": "schemas.json#/$defs/listIncidentsInput",
+      "output_schema_ref": "schemas.json#/$defs/listIncidentsOutput"
+    },
+    {
+      "name": "get_incident",
+      "title": "Get an incident",
+      "description": "Read the summary and lifecycle state of one authorized DebugBundle incident.",
+      "securitySchemes": [{ "type": "oauth2", "scopes": ["debugbundle:incidents:read"] }],
+      "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
+      "input_schema_ref": "schemas.json#/$defs/incidentLookupInput",
+      "output_schema_ref": "schemas.json#/$defs/getIncidentOutput"
+    },
+    {
+      "name": "get_incident_context",
+      "title": "Get incident context",
+      "description": "Read bounded deterministic incident and existing artifact-derived context without raw logs or regeneration.",
+      "securitySchemes": [
+        { "type": "oauth2", "scopes": ["debugbundle:incidents:read", "debugbundle:artifacts:read"] }
+      ],
+      "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
+      "input_schema_ref": "schemas.json#/$defs/incidentLookupInput",
+      "output_schema_ref": "schemas.json#/$defs/getIncidentContextOutput"
+    },
+    {
+      "name": "get_bundle",
+      "title": "Get a debug bundle",
+      "description": "Read an existing bounded redacted debug bundle without regenerating or queueing work.",
+      "securitySchemes": [{ "type": "oauth2", "scopes": ["debugbundle:artifacts:read"] }],
+      "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
+      "input_schema_ref": "schemas.json#/$defs/incidentLookupInput",
+      "output_schema_ref": "schemas.json#/$defs/getBundleOutput"
+    },
+    {
+      "name": "get_reproduction",
+      "title": "Get reproduction evidence",
+      "description": "Read existing bounded redacted reproduction evidence without regenerating or queueing work.",
+      "securitySchemes": [{ "type": "oauth2", "scopes": ["debugbundle:artifacts:read"] }],
+      "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
+      "input_schema_ref": "schemas.json#/$defs/incidentLookupInput",
+      "output_schema_ref": "schemas.json#/$defs/getReproductionOutput"
+    },
+    {
+      "name": "list_improvements",
+      "title": "List improvement opportunities",
+      "description": "List bounded runtime improvement opportunities for one authorized DebugBundle project.",
+      "securitySchemes": [{ "type": "oauth2", "scopes": ["debugbundle:improvements:read"] }],
+      "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
+      "input_schema_ref": "schemas.json#/$defs/listImprovementsInput",
+      "output_schema_ref": "schemas.json#/$defs/listImprovementsOutput"
+    },
+    {
+      "name": "get_improvement",
+      "title": "Get an improvement opportunity",
+      "description": "Read one authorized runtime improvement opportunity and its bounded evidence summary.",
+      "securitySchemes": [{ "type": "oauth2", "scopes": ["debugbundle:improvements:read"] }],
+      "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
+      "input_schema_ref": "schemas.json#/$defs/improvementLookupInput",
+      "output_schema_ref": "schemas.json#/$defs/getImprovementOutput"
+    },
+    {
+      "name": "get_improvement_bundle",
+      "title": "Get an improvement bundle",
+      "description": "Read an existing bounded redacted improvement artifact without regenerating or queueing work.",
+      "securitySchemes": [{ "type": "oauth2", "scopes": ["debugbundle:improvements:read"] }],
+      "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
+      "input_schema_ref": "schemas.json#/$defs/improvementLookupInput",
+      "output_schema_ref": "schemas.json#/$defs/getImprovementBundleOutput"
+    },
+    {
+      "name": "get_usage_summary",
+      "title": "Get aggregate usage summary",
+      "description": "Read bounded aggregate visits, visitors, conversions, and standard breakdowns for one authorized project.",
+      "securitySchemes": [{ "type": "oauth2", "scopes": ["debugbundle:analytics:read"] }],
+      "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
+      "input_schema_ref": "schemas.json#/$defs/analyticsMetricsInput",
+      "output_schema_ref": "schemas.json#/$defs/getUsageSummaryOutput"
+    },
+    {
+      "name": "get_route_metrics",
+      "title": "Get aggregate route metrics",
+      "description": "Read bounded aggregate traffic, entry, exit, bounce, and linked-incident counts by route.",
+      "securitySchemes": [{ "type": "oauth2", "scopes": ["debugbundle:analytics:read"] }],
+      "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
+      "input_schema_ref": "schemas.json#/$defs/analyticsMetricsInput",
+      "output_schema_ref": "schemas.json#/$defs/getRouteMetricsOutput"
+    },
+    {
+      "name": "get_journey_patterns",
+      "title": "Get aggregate journey patterns",
+      "description": "Read bounded aggregate route transitions without individual journey samples or sample identifiers.",
+      "securitySchemes": [{ "type": "oauth2", "scopes": ["debugbundle:analytics:read"] }],
+      "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
+      "input_schema_ref": "schemas.json#/$defs/analyticsMetricsInput",
+      "output_schema_ref": "schemas.json#/$defs/getJourneyPatternsOutput"
+    },
+    {
+      "name": "get_device_breakdown",
+      "title": "Get aggregate device breakdown",
+      "description": "Read bounded aggregate device, browser, operating-system, and language metrics.",
+      "securitySchemes": [{ "type": "oauth2", "scopes": ["debugbundle:analytics:read"] }],
+      "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
+      "input_schema_ref": "schemas.json#/$defs/analyticsMetricsInput",
+      "output_schema_ref": "schemas.json#/$defs/getDeviceBreakdownOutput"
+    },
+    {
+      "name": "get_referrer_metrics",
+      "title": "Get aggregate acquisition metrics",
+      "description": "Read bounded aggregate referrer and standard UTM-source, medium, and campaign metrics.",
+      "securitySchemes": [{ "type": "oauth2", "scopes": ["debugbundle:analytics:read"] }],
+      "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
+      "input_schema_ref": "schemas.json#/$defs/analyticsMetricsInput",
+      "output_schema_ref": "schemas.json#/$defs/getReferrerMetricsOutput"
+    },
+    {
+      "name": "get_action_metrics",
+      "title": "Get aggregate action metrics",
+      "description": "Read bounded aggregate action, conversion, and marker counts for one authorized project.",
+      "securitySchemes": [{ "type": "oauth2", "scopes": ["debugbundle:analytics:read"] }],
+      "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
+      "input_schema_ref": "schemas.json#/$defs/analyticsMetricsInput",
+      "output_schema_ref": "schemas.json#/$defs/getActionMetricsOutput"
+    },
+    {
+      "name": "list_funnel_metrics",
+      "title": "List aggregate funnel metrics",
+      "description": "List bounded aggregate funnel entry, completion, dropoff, and conversion metrics.",
+      "securitySchemes": [{ "type": "oauth2", "scopes": ["debugbundle:analytics:read"] }],
+      "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
+      "input_schema_ref": "schemas.json#/$defs/analyticsMetricsInput",
+      "output_schema_ref": "schemas.json#/$defs/listFunnelMetricsOutput"
+    },
+    {
+      "name": "get_funnel_analysis",
+      "title": "Get aggregate funnel analysis",
+      "description": "Read bounded aggregate step and conversion metrics for one named funnel.",
+      "securitySchemes": [{ "type": "oauth2", "scopes": ["debugbundle:analytics:read"] }],
+      "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
+      "input_schema_ref": "schemas.json#/$defs/analyticsFunnelInput",
+      "output_schema_ref": "schemas.json#/$defs/getFunnelAnalysisOutput"
+    },
+    {
+      "name": "get_incident_impact",
+      "title": "Get aggregate incident impact",
+      "description": "Read bounded aggregate audience, route, funnel, and transition impact for one incident without samples or bundle generation.",
+      "securitySchemes": [{ "type": "oauth2", "scopes": ["debugbundle:analytics:read", "debugbundle:incidents:read"] }],
+      "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
+      "input_schema_ref": "schemas.json#/$defs/analyticsIncidentImpactInput",
+      "output_schema_ref": "schemas.json#/$defs/getIncidentImpactOutput"
+    },
+    {
+      "name": "list_health_checks",
+      "title": "List endpoint health checks",
+      "description": "List saved endpoint-health checks with sanitized display URLs for one authorized project.",
+      "securitySchemes": [{ "type": "oauth2", "scopes": ["debugbundle:health:read"] }],
+      "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
+      "input_schema_ref": "schemas.json#/$defs/listHealthChecksInput",
+      "output_schema_ref": "schemas.json#/$defs/listHealthChecksOutput"
+    },
+    {
+      "name": "get_health_check",
+      "title": "Get an endpoint health check",
+      "description": "Read one endpoint-health definition with a sanitized HTTP(S) display URL and no internal scheduling state.",
+      "securitySchemes": [{ "type": "oauth2", "scopes": ["debugbundle:health:read"] }],
+      "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
+      "input_schema_ref": "schemas.json#/$defs/healthCheckLookupInput",
+      "output_schema_ref": "schemas.json#/$defs/getHealthCheckOutput"
+    },
+    {
+      "name": "list_health_check_results",
+      "title": "List endpoint health results",
+      "description": "List bounded recent outcomes for one authorized endpoint-health check.",
+      "securitySchemes": [{ "type": "oauth2", "scopes": ["debugbundle:health:read"] }],
+      "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
+      "input_schema_ref": "schemas.json#/$defs/listHealthCheckResultsInput",
+      "output_schema_ref": "schemas.json#/$defs/listHealthCheckResultsOutput"
+    },
+    {
+      "name": "list_health_check_daily_rollups",
+      "title": "List daily endpoint health summaries",
+      "description": "List bounded daily uptime and failure summaries for one authorized endpoint-health check.",
+      "securitySchemes": [{ "type": "oauth2", "scopes": ["debugbundle:health:read"] }],
+      "annotations": { "readOnlyHint": true, "openWorldHint": false, "destructiveHint": false },
+      "input_schema_ref": "schemas.json#/$defs/listHealthCheckDailyRollupsInput",
+      "output_schema_ref": "schemas.json#/$defs/listHealthCheckDailyRollupsOutput"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "contract_version": "1.0.0",
+  "route": "/__dev/openai-plugin",
+  "development_opt_in": "VITE_OPENAI_PLUGIN_PREVIEW=true",
+  "production_available": false,
+  "surfaces": {
+    "consent": [
+      "default",
+      "loading",
+      "expired",
+      "unavailable",
+      "retryable",
+      "allow-processing",
+      "deny-processing"
+    ],
+    "reviewer": ["default", "error", "rate-limit"],
+    "settings": ["empty", "active", "expired", "revoked", "confirmation"]
+  },
+  "scope_sets": 64,
+  "viewports": [
+    { "id": "mobile", "label": "Mobile", "width": 390, "height": 844 },
+    { "id": "tablet", "label": "Tablet", "width": 768, "height": 1024 },
+    { "id": "desktop", "label": "Desktop", "width": 1280, "height": 900 }
+  ],
+  "network_effects": {
+    "oauth_requests": 0,
+    "reviewer_submissions": 0,
+    "grant_creations": 0,
+    "connection_revocations": 0
+  }
+}

@@ -48,6 +48,7 @@ Last updated: 2026-07-04
 **FR-SDK-16:** All backend SDKs must implement the universal SDK interface: `init`, `captureException`, `captureError` (alias), `captureLog`, `captureRequest`, `captureMessage`, `setContext`, `flush`. Method names must follow language-idiomatic conventions (camelCase for Node/PHP, snake_case for Python).
 
 **FR-SDK-17:** All backend SDKs must support vanilla language hooks — hooking into the language’s native error, exception, and logging mechanisms with zero framework dependency:
+
 - **Node.js:** `captureExceptions()` (process uncaughtException), `captureRejections()` (process unhandledRejection), `captureConsole()` (console.error/warn wrapping, opt-in).
 - **PHP:** `captureErrors()` (set_error_handler), `captureExceptions()` (set_exception_handler), `captureShutdown()` (register_shutdown_function for fatal errors).
 - **Python:** `capture_exceptions()` (sys.excepthook), `capture_logging()` (logging module handler, opt-in), `capture_async()` (asyncio loop exception handler).
@@ -58,6 +59,7 @@ Last updated: 2026-07-04
 **FR-SDK-19:** SDKs must support configurable log level filtering via `logLevel` init config (default: `"warning"`). Events below the configured level are silently discarded.
 
 **FR-SDK-20:** SDKs must auto-detect installed logging libraries on `init()` and offer to register DebugBundle handlers automatically:
+
 - **Node.js:** Detect pino, winston, bunyan via `require.resolve`.
 - **PHP:** Detect Monolog via Composer autoload.
 - **Python:** Detect structlog, loguru via import check.
@@ -177,6 +179,7 @@ Last updated: 2026-07-04
 **FR-GRP-04:** Regression detection: when a new event matches the fingerprint of a `resolved` incident, transition the incident to `regressed` status, set `regressed_at`, regenerate the bundle, and fire `bundle.reopened` webhook. If the regression occurs within 24 hours of a deploy, correlate with the deploy metadata.
 
 **FR-GRP-05:** Incident state transitions — V1 uses three states:
+
 - `open` — created on first event, receiving events
 - `resolved` — explicitly resolved by user action
 - `regressed` — new event arrived for a resolved incident
@@ -315,6 +318,26 @@ Project list/detail metrics must include `attention_incidents_today`, counting i
 
 **FR-MCP-03:** MCP responses must be deterministic, compact, machine-readable, redaction-aware, and consistent with CLI/API results. `verify_cloud` must accept `trigger5xx` and `trigger4xxStatus` so agents can run the same active hosted 5xx proof path as `debugbundle verify cloud --trigger-5xx` and the same configured-client-error proof path as `debugbundle verify cloud --trigger-4xx <status>`.
 
+**FR-MCP-04:** The official OpenAI Plugin v1 product is an independently versioned `1.0.0` distribution that combines one tailored DebugBundle skill with an OAuth-protected remote MCP server. It has no custom MCP UI and exposes only the twenty-three read-only tools frozen in `contracts/public-interfaces.md` and `tests/fixtures/openai-plugin-v1/tool-contracts.json`.
+
+**FR-MCP-05:** Every OpenAI Plugin v1 tool must advertise an exact title, description, strict input schema, explicit output schema, per-tool OAuth `securitySchemes`, and `readOnlyHint: true`, `openWorldHint: false`, and `destructiveHint: false`. Inputs never accept member tokens, project tokens, source selection, local paths, or unknown fields. Results return schema-valid `structuredContent` plus a compact text summary and include only fields allowlisted by `contracts/openai-plugin-v1-data-map.md`. Missing or invalid credentials and missing product scopes must return bounded server-authored OAuth challenges through `_meta["mcp/www_authenticate"]`, including `error` and `error_description`; insufficient-scope challenges also include exactly one required scope from the frozen tool catalog.
+
+**FR-MCP-06:** OpenAI Plugin reads must use dedicated hosted readers that only read existing records and stored artifacts. They must not regenerate artifacts, enqueue work, update last-access state, synchronously write product/audit events, or otherwise mutate customer-visible state. Missing, stale, pending, failed, or oversized artifacts return a bounded status and authenticated continuation URL without starting work. `get_incident_context` requires both `debugbundle:incidents:read` and `debugbundle:artifacts:read` and excludes raw logs. Health-check display URLs must allow only HTTP(S), remove userinfo, query, and fragment, and redact secret-like path segments.
+
+**FR-MCP-07:** The permanent public OpenAI MCP resource origin is `https://mcp.debugbundle.com`, with Streamable HTTP at `https://mcp.debugbundle.com/mcp`. Changing its scheme, hostname, or port requires a new plugin; changing only its endpoint path requires a reviewed plugin version. MCP resource routes are unavailable on `api.debugbundle.com`, and OAuth/OIDC issuer routes are unavailable on `mcp.debugbundle.com`.
+
+**FR-MCP-08:** OpenAI customer access uses first-party OAuth 2.1/OIDC in the existing API process with issuer `https://api.debugbundle.com`, resource/audience `https://mcp.debugbundle.com`, authorization-code flow with PKCE S256, RFC 9207 issuer identification on every success and error response, CIMD as the preferred client-registration mechanism, `private_key_jwt` as the preferred client authentication method, no unrestricted dynamic client registration, verified UserInfo for `openid email`, short-lived JWT access tokens, rotating opaque refresh-token families, revocation, and current record/project authorization on every tool call.
+
+**FR-MCP-09:** OpenAI Plugin v1 runs in the current hosted API image/process and same Lightsail runtime, behind independently gated `mcp.debugbundle.com` Caddy routing. API and MCP host blocks promote atomically across the existing two slots, while an MCP-only validated Caddy gate can return a bounded `503` without an image deploy or API restart. Hosted ownership, environment rendering, monitoring, and rollout automation remain in `.local-repos/debugbundle-cloud`.
+
+**FR-MCP-10:** The OpenAI projection is additive and isolated. It must not change the existing stdio MCP tool names, order, descriptions, schemas, response envelopes, protocol initialization, local/connected behavior, CLI-established member authentication, CLI commands, OpenClaw full-catalog projection, installed project tokens, SDK ingestion, or existing HTTP APIs.
+
+**FR-MCP-11:** OpenAI Plugin versions and release automation are independent from core, CLI, npm MCP, OpenClaw, and shared-package versions. Publishing `@debugbundle/mcp` must never silently change, submit, publish, or announce the OpenAI plugin. The tracked deterministic release manifest must identify the implementation source commit without self-reference: a following manifest-only evidence commit is valid only when verification proves the recorded commit is an ancestor and no other committed or working-tree path differs. Submission, Cancel Review, publication, directory edits, announcements, and recurring spend require the explicit approvals and evidence gates in `rules/release-governance.md`.
+
+**FR-MCP-12:** OpenAI authorization uses the owner-approved existing-app consent design: `app.debugbundle.com/oauth/consent` presents the server-authoritative OpenAI client/publisher, current verified member organization, required `openid email` identity purpose, six individually selectable product scopes, exact read-only/data-transfer disclosures, allow/deny actions, and revocation link. Anonymous members continue through the existing safe login return path. `app.debugbundle.com/oauth/reviewer` accepts only the bounded synthetic-review credential in a password-style POST-backed field and never offers organization/project selection. Signed-in Settings lists only the current user's grants in the current organization and revokes an owned grant plus its refresh family through a confirmed CSRF-protected POST. Interaction URLs contain only an opaque provider UID; credentials, codes, assertions, tokens, email, customer identifiers, grant IDs, and customer data never appear in authorization, reviewer, or revocation URLs/history.
+
+**FR-MCP-13:** OpenAI Plugin v1 product analytics is limited to nine aggregate-only readers under `debugbundle:analytics:read`: `get_usage_summary`, `get_route_metrics`, `get_journey_patterns`, `get_device_breakdown`, `get_referrer_metrics`, `get_action_metrics`, `list_funnel_metrics`, `get_funnel_analysis`, and `get_incident_impact`. `get_incident_impact` additionally requires `debugbundle:incidents:read` and rechecks the incident against the authorized project. Analytics inputs use only fixed lookbacks through 90 days, hour/day granularity, bounded standard filters, and at most 25 rows. The hosted readers must not query or expose individual journey samples or sample IDs, custom dimensions, analytics opportunities, AnalyticsBundle inventory/detail/generation or generation state, saved-funnel/settings writes, raw analytics events, or any mutation. This owner-approved 2026-09-02 source-of-truth decision supersedes the proposal's earlier blanket exclusion of product analytics while preserving its read-only and data-minimization architecture.
+
 ### 1.11 Web App
 
 **FR-WEB-01:** Signup/login/logout plus session-aware account bootstrap using first-party auth, with passwordless email-code auth and GitHub sign-in in V1.
@@ -371,7 +394,7 @@ DebugBundle must preserve anonymized account-level aggregate usage metrics and r
 
 **FR-AUTH-07:** Agents modeled as project members (no separate permissions model).
 
-**FR-AUTH-08:** Anti-abuse: email-code verification (see FR-AUTH-04), rate limiting (see NFR-RATE-*), signup throttling, and CAPTCHA on browser email-code requests.
+**FR-AUTH-08:** Anti-abuse: email-code verification (see FR-AUTH-04), rate limiting (see NFR-RATE-\*), signup throttling, and CAPTCHA on browser email-code requests.
 
 **FR-AUTH-09:** Project-sharing invite model: project owners and project admins can invite collaborators to a specific project by email. Invited identity accepts via link into their own DebugBundle account. Collaborator roles are `admin` and `member`. Agent members may still be added through direct member-token generation without email invite.
 
@@ -504,11 +527,11 @@ When a collaborator is removed from a project or leaves a shared project, DebugB
 
 All eight canonical event types (FR-SDK-05) are assigned to one of three event classes:
 
-| Event Class | Event Types | Purpose |
-|---|---|---|
-| **A — Incident Signals** | `backend_exception`, `frontend_exception`, qualifying `log_event` (`error`/`fatal`/`critical`), first-party `request_event` matching the preset-specific immediate request-failure set (`minimal`: 5xx only; `balanced`: 5xx plus 408/423/424/425/429; `investigative`: balanced plus 409) | Events that create or materially update incidents. The primary product value. |
-| **B — Context Signals** | `request_event` values outside the preset-specific immediate request-failure set (as request snapshot), `frontend_breadcrumb`, non-incident-eligible `log_event`, `deploy_metadata`, probe data flushed alongside errors | Events that enrich an incident but do not independently create one. Context travels with the incident. |
-| **C — Operational Signals** | `error_suppressed`, standalone `probe_event` | Events that exist to operate the platform, not to represent user-facing failures. |
+| Event Class                 | Event Types                                                                                                                                                                                                                                                                                | Purpose                                                                                                |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| **A — Incident Signals**    | `backend_exception`, `frontend_exception`, qualifying `log_event` (`error`/`fatal`/`critical`), first-party `request_event` matching the preset-specific immediate request-failure set (`minimal`: 5xx only; `balanced`: 5xx plus 408/423/424/425/429; `investigative`: balanced plus 409) | Events that create or materially update incidents. The primary product value.                          |
+| **B — Context Signals**     | `request_event` values outside the preset-specific immediate request-failure set (as request snapshot), `frontend_breadcrumb`, non-incident-eligible `log_event`, `deploy_metadata`, probe data flushed alongside errors                                                                   | Events that enrich an incident but do not independently create one. Context travels with the incident. |
+| **C — Operational Signals** | `error_suppressed`, standalone `probe_event`                                                                                                                                                                                                                                               | Events that exist to operate the platform, not to represent user-facing failures.                      |
 
 **FR-EVT-01:** Every event persisted through ingestion must carry an `event_class` classification (`incident_signal`, `context_signal`, or `operational_signal`). Classification is determined at the worker normalization stage based on event type and project capture policy.
 
@@ -522,15 +545,16 @@ All eight canonical event types (FR-SDK-05) are assigned to one of three event c
 
 **FR-EVT-04:** Each project must have a `capture_preset` field with one of three values: `minimal`, `balanced`, or `investigative`. The preset determines default capture behavior per event type.
 
-| Preset | Goal | Exceptions | Logs | Request Events | Breadcrumbs | Probe Events |
-|---|---|---|---|---|---|---|
-| `minimal` | Protect quota, capture only real failures | On | Error+ only | Immediate failures: 5xx only | Local ring buffer + exception flush only | Buffer-only |
-| `balanced` | Default hosted behavior | On | Warning+ | Immediate failures: 5xx plus 408/423/424/425/429 | Local ring buffer + exception flush only | Paid-tier only |
-| `investigative` | Short-term deep debugging | On | Info+ | Immediate failures: balanced set plus 409, with optional broader request capture via overrides | Optional standalone | Paid-tier only |
+| Preset          | Goal                                      | Exceptions | Logs        | Request Events                                                                                 | Breadcrumbs                              | Probe Events   |
+| --------------- | ----------------------------------------- | ---------- | ----------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------- | -------------- |
+| `minimal`       | Protect quota, capture only real failures | On         | Error+ only | Immediate failures: 5xx only                                                                   | Local ring buffer + exception flush only | Buffer-only    |
+| `balanced`      | Default hosted behavior                   | On         | Warning+    | Immediate failures: 5xx plus 408/423/424/425/429                                               | Local ring buffer + exception flush only | Paid-tier only |
+| `investigative` | Short-term deep debugging                 | On         | Info+       | Immediate failures: balanced set plus 409, with optional broader request capture via overrides | Optional standalone                      | Paid-tier only |
 
 **FR-EVT-05:** New Free, Solo, and Team projects must default to the `balanced` preset. Presets are changeable by the project owner via API, CLI, MCP, and web app (interface parity per INV-5). Existing projects retain their persisted preset across upgrades; changing this default must never rewrite an installed project's policy implicitly.
 
 **FR-EVT-06:** Each project may override individual capture dimensions beyond the preset via advanced controls:
+
 - `capture_logs`: `off | warning | error | info`
 - `capture_request_events`: `off | failures_only | filtered | all`
 - `capture_breadcrumbs`: `local_only | exception_only | standalone`
@@ -559,6 +583,7 @@ Advanced controls are optional. When unset, the preset's defaults apply. The ini
 #### Surfacing Rules
 
 **FR-EVT-09:** Default user-facing surfacing must follow event class:
+
 - **Class A** (incident signals): Always visible in incident list, bundles, and alerts.
 - **Class B** (context signals): Visible only as incident context (bundle context blocks, request snapshots, breadcrumb trails). Never shown as standalone primary inventory items by default.
 - **Class C** (operational signals): Hidden from normal user inventory. Available in advanced/internal views only.
@@ -566,6 +591,7 @@ Advanced controls are optional. When unset, the preset's defaults apply. The ini
 #### Free Tier Default Policy (Canonical)
 
 **FR-EVT-10:** The canonical Free tier capture policy is:
+
 - Incident creation: `backend_exception`, `frontend_exception`, qualifying `error`/`fatal`/`critical` `log_event`, and first-party 5xx `request_event`.
 - Standalone `request_event` ingestion: 5xx failures only by default; non-5xx request snapshots are rejected unless policy is widened.
 - Request context capture: Keep request snapshot attached to exception incidents as context.
@@ -607,6 +633,7 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 #### Privacy And Capture Controls
 
 **FR-ANL-08:** Analytics SDK configuration must support privacy modes:
+
 - `strict`: session-only analytics, no persistent visitor identifier.
 - `standard`: first-party anonymous visitor identifier scoped to the project and represented server-side as a hash for returning-visitor and active-user metrics.
 - `custom`: customer-owned consent/identity integration, still bounded by DebugBundle schemas, redaction, and server enforcement.
@@ -809,12 +836,12 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **NFR-SCALE-02:** Rate limiting (Redis sliding window, `429` + `Retry-After`):
 
-| Scope | Free | Solo | Team | Key |
-|-------|------|---------|------|-----|
-| Ingestion | 1,000 events/min | 5,000 events/min | 10,000 events/min | Per project token |
-| Retrieval API | 100 req/min | 300 req/min | 500 req/min | Per member token |
-| Auth endpoints | 10 req/min | 10 req/min | 10 req/min | Per IP |
-| Unauthenticated | 20 req/min | 20 req/min | 20 req/min | Per IP |
+| Scope           | Free             | Solo             | Team              | Key               |
+| --------------- | ---------------- | ---------------- | ----------------- | ----------------- |
+| Ingestion       | 1,000 events/min | 5,000 events/min | 10,000 events/min | Per project token |
+| Retrieval API   | 100 req/min      | 300 req/min      | 500 req/min       | Per member token  |
+| Auth endpoints  | 10 req/min       | 10 req/min       | 10 req/min        | Per IP            |
+| Unauthenticated | 20 req/min       | 20 req/min       | 20 req/min        | Per IP            |
 
 Self-hosted deployments have no enforced rate limits (configurable via environment variables). SDKs must handle `429` responses gracefully with exponential backoff (already covered by SDK safety guarantees).
 
@@ -853,3 +880,17 @@ Self-hosted deployments have no enforced rate limits (configurable via environme
 **NFR-SCHEMA-03:** Field meanings must not change silently.
 
 **NFR-SCHEMA-04:** Removed fields require schema version bump.
+
+### 2.9 Hosted MCP Reliability And Privacy
+
+**NFR-MCP-01:** OpenAI OAuth and MCP admission must use Redis-backed, identity-aware rate limits: authorization requests at most 30/minute per user session and validated client; token exchanges at most 30/minute per validated client plus 5/minute per authorization-code or refresh-family key; unauthenticated MCP challenges initially 120/minute/IP with burst 30 plus a measured global backstop; authenticated MCP requests at most 60/minute/user and 60/minute/grant with the stricter remaining budget winning; artifact tools at most 20/minute/user and 20/minute/grant; reviewer entry at most 10/minute/IP and 5/minute/credential key plus a global backstop; and concurrent calls at most two per grant. IP/global limits are defense-in-depth for shared OpenAI egress, not the primary authenticated identity limit. A database-aware bulkhead reserves at least six connections for ordinary API traffic. With the current default database pool of ten, global MCP concurrency starts at two and may rise to at most four only after measurement proves the reserve. Full coordination fails closed with bounded `429` or `503` behavior; it never waits unboundedly for a database connection.
+
+**NFR-MCP-02:** OpenAI MCP requests are bounded to 256 KiB, normal tool execution completes below 25 seconds, list pages contain at most 50 records unless a smaller tool contract applies, and artifact `structuredContent` is at most 512 KiB. Operational logs contain metadata only and exclude tool arguments/results, OAuth material, email, incident text, endpoint bodies, and customer identifiers.
+
+**NFR-MCP-03:** Public enablement requires the stricter of 30% or 512 MiB free memory, sustained CPU below 65% with short bursts below 85%, event-loop lag p95 below 100 ms, more than 12 GiB normal free disk while preserving the existing 6 GiB deploy floor, no primary API/worker/queue regression, metadata-read p95 below two seconds, artifact-read p95 below five seconds, at least 99% expected tool-call success, and at least 95% invited-user OAuth completion. Capacity thresholds may be tightened from measurements but not weakened to make a failing launch pass.
+
+**NFR-MCP-04:** OAuth credential records have bounded physical retention: consumed or expired authorization codes are deleted after 24 hours; expired or revoked refresh-token history after 30 days; and expired or revoked grants after 90 days, subject to the approved audit-evidence boundary. Cleanup is indexed, idempotent, retry-safe, and limited to at most 500 rows per transaction; it never removes an active grant or current refresh family.
+
+**NFR-MCP-05:** Consent, reviewer, and connection-management surfaces reuse the existing accessible app design system and remain keyboard/screen-reader usable at mobile and desktop widths. The API, not UI state, validates exact client, redirect, resource, requested/selected scopes, interaction freshness, browser session, verified email, membership, organization, reviewer identity, and grant ownership. Consent decisions are limited to 10/minute/IP and 30/minute per pseudonymous session-plus-client interaction with a global backstop, fail closed when Redis coordination is unavailable, preserve user scope selections across retryable failures, and never send identifiers, credentials, or scope toggles to product analytics.
+
+The repository must also provide an explicitly opted-in development/test-only synthetic preview at `/__dev/openai-plugin` that composes the production consent, reviewer, and connection components with deterministic non-customer fixtures. It must cover every state in `tests/fixtures/openai-plugin-v1/ui-preview-matrix.json`, all 64 product-scope subsets, and real 390 px, 768 px, and 1280 px iframe viewports. Preview actions stay in browser memory and issue no OAuth, reviewer, grant, or revocation request. The route must not mount in a production build even if its development opt-in variable is supplied. Preview evidence assists manual review but never satisfies deployed, live-client, reviewer, portal, or publication gates.

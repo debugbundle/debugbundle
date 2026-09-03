@@ -6,6 +6,16 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Added
+
+- Added the local-source OpenAI Plugin `1.0.0` candidate: an independently versioned production-debugging and aggregate-analytics skill plus an OAuth-protected, exact twenty-three-tool read-only remote MCP projection, with dedicated no-side-effect readers, sample-free aggregate analytics, bounded privacy projections, owner-approved existing-app consent/reviewer/revocation surfaces, reviewer isolation, deterministic package/eval evidence, and same-Lightsail deployment/monitoring source.
+
+### Security
+
+- Added OAuth/OIDC PKCE, RFC 9207 response issuer, CIMD `private_key_jwt`, resource/audience/scope binding, verified UserInfo, rotation/revocation/retention controls, canonical-host isolation, sanitized health-check URLs, MCP bulkheads, and secret-free structured telemetry for the candidate remote surface.
+
+The candidate is not deployed, submitted, approved by OpenAI, published, or directory-discoverable. Manual accessibility/live-client validation and all production, reviewer, Developer Mode, portal, publication, communication, and spending gates remain separate.
+
 ## [1.7.3] - 2026-08-27
 
 ### Fixed

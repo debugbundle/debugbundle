@@ -68,10 +68,16 @@ help:
 	@echo "  make release-mcp-ecosystem-publish VERSION=x.y.z TARGETS=officialRegistry,smithery,clawhub"
 	@echo "  make release-mcp-ecosystem-verify VERSION=x.y.z TARGETS=officialRegistry,smithery,clawhub,glama,lobehub"
 	@echo "  make release-mcp-ecosystem VERSION=x.y.z"
+	@echo "  make openai-plugin-validate  Validate the source-ready OpenAI plugin package"
+	@echo "  make openai-plugin-check     Run package, skill, and release contract tests"
+	@echo "  make openai-plugin-plan      Print the non-mutating OpenAI release plan"
+	@echo "  make openai-plugin-prepare   Build deterministic local candidate archives"
+	@echo "  make openai-plugin-verify    Verify source manifest and candidate hashes"
 	@echo "  make test-integration Run Compose-backed ingestion integration tests"
 	@echo "  make api-check       Run API runtime bootstrap tests"
 	@echo "  make backend-restart Recreate API + worker so they reload current env"
 	@echo "  make dev             Start everything (infra + API + worker + web) and open http://localhost:5291"
+	@echo "  make dev-openai-plugin-preview Start dev with the local synthetic OpenAI UI review route"
 	@echo "  make dev-public      Start the public-site dev server at http://localhost:5292"
 	@echo "  make dev-down        Stop the full local dev stack"
 	@echo "  make dev-reset       Drop local DB/cache/object-store state and rebuild from scratch"
@@ -157,7 +163,7 @@ typecheck:
 
 .PHONY: web-check
 web-check:
-	$(NODE_RUN) "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm vitest run tests/apps/web/web-app-auth.test.tsx tests/apps/web/web-app-billing-refresh.test.tsx tests/apps/web/web-app-management.test.tsx tests/apps/web/web-app-incidents.test.tsx tests/apps/web/web-dogfooding.test.ts && corepack pnpm typecheck"
+	$(NODE_RUN) "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm vitest run tests/apps/web/web-app-auth.test.tsx tests/apps/web/web-app-billing-refresh.test.tsx tests/apps/web/web-app-management.test.tsx tests/apps/web/web-app-incidents.test.tsx tests/apps/web/web-app-openai-oauth.test.tsx tests/apps/web/web-openai-plugin-preview.test.tsx tests/apps/web/web-dogfooding.test.ts && corepack pnpm typecheck"
 
 .PHONY: compose-check
 compose-check:
@@ -185,7 +191,7 @@ test-all:
 
 .PHONY: test-all-quick
 test-all-quick:
-	$(NODE_RUN) "corepack enable && corepack pnpm vitest run"
+	$(NODE_RUN) "apk add --no-cache git >/dev/null && corepack enable && corepack pnpm vitest run"
 	$(MAKE) test-integration
 
 .PHONY: build
@@ -212,6 +218,26 @@ release-mcp-ecosystem-verify:
 release-mcp-ecosystem:
 	node scripts/release-mcp-ecosystem.mjs run $(if $(VERSION),--version $(VERSION),) $(if $(TARGETS),--targets $(TARGETS),)
 
+.PHONY: openai-plugin-validate
+openai-plugin-validate:
+	$(NODE_RUN) "node scripts/validate-openai-plugin.mjs && node scripts/release-openai-plugin.mjs validate"
+
+.PHONY: openai-plugin-check
+openai-plugin-check:
+	$(NODE_RUN) "apk add --no-cache git >/dev/null && corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm vitest run tests/apps/mcp/mcp-openai-plugin.test.ts tests/contracts/openai-plugin-skill-parity.test.ts tests/infrastructure/openai-plugin-release.test.ts"
+
+.PHONY: openai-plugin-plan
+openai-plugin-plan:
+	$(NODE_RUN) "node scripts/release-openai-plugin.mjs plan"
+
+.PHONY: openai-plugin-prepare
+openai-plugin-prepare:
+	$(NODE_RUN) "apk add --no-cache git >/dev/null && node scripts/release-openai-plugin.mjs prepare $(if $(OPENAI_REQUIRE_CONNECTION),--require-connection,) $(if $(OPENAI_API_IMAGE_DIGEST),--api-image-digest $(OPENAI_API_IMAGE_DIGEST),)"
+
+.PHONY: openai-plugin-verify
+openai-plugin-verify:
+	$(NODE_RUN) "apk add --no-cache git >/dev/null && node scripts/release-openai-plugin.mjs verify $(if $(OPENAI_REQUIRE_CONNECTION),--require-connection,) $(if $(OPENAI_API_IMAGE_DIGEST),--api-image-digest $(OPENAI_API_IMAGE_DIGEST),)"
+
 .PHONY: ci
 ci: lint typecheck test build
 
@@ -234,7 +260,7 @@ test-integration:
 		-e S3_ENDPOINT=http://localstack:4566 \
 		-e S3_REGION=us-east-1 \
 		-e S3_BUCKET=debugbundle-raw-events \
-			$(NODE_IMAGE) sh -lc "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm db:bootstrap && corepack pnpm db:migrate && corepack pnpm vitest run --no-file-parallelism --maxWorkers=1 tests/integration/alert-delivery-dedupe.integration.test.ts tests/integration/analytics-correlation.integration.test.ts tests/integration/analytics-saved-funnels.integration.test.ts tests/integration/availability-checks.integration.test.ts tests/integration/ingestion-core.integration.test.ts tests/integration/ingestion-bundle-triggers.integration.test.ts tests/integration/ingestion-replay-idempotency.integration.test.ts tests/integration/ingestion-lifecycle-webhooks.integration.test.ts tests/integration/billing-sync.integration.test.ts tests/integration/project-deletion.integration.test.ts tests/integration/retention-cleanup.integration.test.ts tests/integration/retention-sampling.integration.test.ts tests/integration/storage-migrations.integration.test.ts"
+		$(NODE_IMAGE) sh -lc "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm db:bootstrap && corepack pnpm db:migrate && corepack pnpm vitest run --no-file-parallelism --maxWorkers=1 tests/integration/alert-delivery-dedupe.integration.test.ts tests/integration/analytics-correlation.integration.test.ts tests/integration/analytics-incident-impact.integration.test.ts tests/integration/analytics-saved-funnels.integration.test.ts tests/integration/availability-checks.integration.test.ts tests/integration/ingestion-core.integration.test.ts tests/integration/ingestion-bundle-triggers.integration.test.ts tests/integration/ingestion-replay-idempotency.integration.test.ts tests/integration/ingestion-lifecycle-webhooks.integration.test.ts tests/integration/billing-sync.integration.test.ts tests/integration/openai-coordination.integration.test.ts tests/integration/openai-reviewer-fixtures.integration.test.ts tests/integration/project-deletion.integration.test.ts tests/integration/retention-cleanup.integration.test.ts tests/integration/retention-sampling.integration.test.ts tests/integration/storage-migrations.integration.test.ts"
 
 .PHONY: test-integration-down
 test-integration-down:
@@ -272,6 +298,10 @@ dev-public:
 		-w "$(WORKDIR)" \
 		-p $(PUBLIC_SITE_PORT):$(PUBLIC_SITE_PORT) \
 		$(NODE_IMAGE) sh -lc "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm public-site:artifacts && corepack pnpm --dir ./site install --force --frozen-lockfile=false && corepack pnpm --dir ./site dev --hostname 0.0.0.0 --port $(PUBLIC_SITE_PORT)"
+
+.PHONY: dev-openai-plugin-preview
+dev-openai-plugin-preview:
+	$(MAKE) VITE_OPENAI_PLUGIN_PREVIEW=true dev
 
 .PHONY: backend-restart
 backend-restart: ensure-probe-trigger-secret install

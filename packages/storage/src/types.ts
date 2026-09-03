@@ -106,72 +106,29 @@ export type {
   RedisQueueJobName
 } from "./queue-types.js";
 
-export interface ObjectStorePutInput {
-  key: string;
-  body: Buffer;
-  contentType: string;
-  contentEncoding?: string;
-}
-
-export interface ObjectStoreDeleteInput {
-  key: string;
-}
-
-export interface ObjectStoreClient {
-  putObject(input: ObjectStorePutInput): Promise<void>;
-  deleteObject?(input: ObjectStoreDeleteInput): Promise<void>;
-}
-
-export interface ObjectStorePrefixDeleter {
-  deleteObjectsByPrefix(prefix: string): Promise<void>;
-}
-
-export interface ObjectStoreReadInput {
-  key: string;
-}
-
-export interface ObjectStoreReader {
-  getObject(input: ObjectStoreReadInput): Promise<Buffer>;
-}
-
-export interface RetentionRawEventReference {
-  project_id: string;
-  event_id: string;
-  occurred_at: string;
-}
-
-export interface RetentionAnalyticsRawEventReference {
-  project_id: string;
-  event_id: string;
-  occurred_at: string;
-}
-
-export interface RetentionAnalyticsJourneySampleReference {
-  project_id: string;
-  sample_id: string;
-  s3_object_key: string;
-  expires_at: string;
-}
-
-export interface RetentionAnalyticsBundleGenerationReference {
-  project_id: string;
-  generation_id: string;
-  opportunity_id: string | null;
-  status: "completed" | "failed";
-  object_key: string | null;
-  completed_at: string | null;
-  updated_at: string;
-}
-
-export interface RetentionAnalyticsRollupPruneResult {
-  deleted_rows: number;
-  reached_batch_limit: boolean;
-}
-
-export interface RetentionExpiredIncidentReference {
-  project_id: string;
-  incident_id: string;
-}
+export type {
+  ObjectStoreClient,
+  ObjectStoreDeleteInput,
+  ObjectStorePrefixDeleter,
+  ObjectStorePutInput,
+  ObjectStoreReader,
+  ObjectStoreReadInput
+} from "./object-store-types.js";
+export type {
+  AuthRateLimiter,
+  IngestionRateLimiter,
+  IngestionRateLimitResult,
+  OpenAiCoordinationService
+} from "./rate-limiter-types.js";
+export type {
+  RetentionAnalyticsBundleGenerationReference,
+  RetentionAnalyticsJourneySampleReference,
+  RetentionAnalyticsRawEventReference,
+  RetentionAnalyticsRollupPruneResult,
+  RetentionExpiredIncidentReference,
+  RetentionRawEventReference,
+  RetentionStore
+} from "./retention-types.js";
 
 export interface IngestionPersistenceService {
   persistAndEnqueue(
@@ -186,32 +143,6 @@ export interface IngestionPersistenceService {
   ): Promise<{ object_key: string }>;
 }
 
-export interface IngestionRateLimitResult {
-  allowed: boolean;
-  limit: number;
-  remaining: number;
-  retry_after_ms: number;
-}
-
-export interface IngestionRateLimiter {
-  claimEvents(input: {
-    token_hash: string;
-    project_id: string;
-    event_count: number;
-    limit: number;
-    now?: string;
-  }): Promise<IngestionRateLimitResult>;
-}
-
-export interface AuthRateLimiter {
-  claimRequest(input: {
-    ip: string;
-    subject?: string;
-    bucket?: string;
-    limit: number;
-    now?: string;
-  }): Promise<IngestionRateLimitResult>;
-}
 export interface ResolveProjectResult {
   project_id: string;
   organization_id?: string;
@@ -416,7 +347,10 @@ export type UpdateProjectMemberRoleResult =
     };
 
 export interface ProbeManagementStore {
-  listActiveProbesForProject(input: { project_id: string; now: string }): Promise<ProbeActivationRecord[]>;
+  listActiveProbesForProject(input: {
+    project_id: string;
+    now: string;
+  }): Promise<ProbeActivationRecord[]>;
   listActiveProbesForProjectInOrganization(input: {
     organization_id: string;
     project_id: string;
@@ -431,16 +365,25 @@ export interface ProbeManagementStore {
     environment: string;
     expires_at: string;
     trigger_expires_at: string;
-  }): Promise<{ organization_plan: TierName; activation: ProbeActivationRecord; trigger_token: string; concurrent_limit_exceeded?: boolean } | null>;
+  }): Promise<{
+    organization_plan: TierName;
+    activation: ProbeActivationRecord;
+    trigger_token: string;
+    concurrent_limit_exceeded?: boolean;
+  } | null>;
   deactivateProbeActivationForProjectInOrganization(input: {
     organization_id: string;
     project_id: string;
     activation_id: string;
     deactivated_at: string;
-  }): Promise<{ organization_plan: TierName; deactivated: { activation_id: string; deactivated_at: string } } | null>;
+  }): Promise<{
+    organization_plan: TierName;
+    deactivated: { activation_id: string; deactivated_at: string };
+  } | null>;
 }
 export interface PostgresMetadataStore
-  extends MetadataStore,
+  extends
+    MetadataStore,
     TokenManagementStore,
     ProjectManagementStore,
     ProjectCollaborationStore,
@@ -617,7 +560,12 @@ export interface ImprovementRetrievalRecord extends Record<string, unknown> {
   service_runtime: string | null;
   service_framework: string | null;
   environment: string;
-  kind: "warning_hotspot" | "slow_request" | "request_failure_pattern" | "recurring_incident" | "post_deploy_regression";
+  kind:
+    | "warning_hotspot"
+    | "slow_request"
+    | "request_failure_pattern"
+    | "recurring_incident"
+    | "post_deploy_regression";
   status: "open" | "resolved" | "snoozed";
   severity: "low" | "medium" | "high" | "critical";
   confidence: number;
@@ -758,10 +706,18 @@ export interface MetadataStore {
     incident_id: string;
     user_id?: string;
   }): Promise<IncidentRetrievalRecord | null>;
-  resolveIncidentForOrganization(input: ResolveIncidentForOrganizationInput): Promise<IncidentRetrievalRecord | null>;
-  resolveIncidentsForOrganization(input: ResolveIncidentsForOrganizationInput): Promise<IncidentRetrievalRecord[]>;
-  reopenIncidentForOrganization(input: ReopenIncidentForOrganizationInput): Promise<IncidentRetrievalRecord | null>;
-  reopenIncidentsForOrganization(input: ReopenIncidentsForOrganizationInput): Promise<IncidentRetrievalRecord[]>;
+  resolveIncidentForOrganization(
+    input: ResolveIncidentForOrganizationInput
+  ): Promise<IncidentRetrievalRecord | null>;
+  resolveIncidentsForOrganization(
+    input: ResolveIncidentsForOrganizationInput
+  ): Promise<IncidentRetrievalRecord[]>;
+  reopenIncidentForOrganization(
+    input: ReopenIncidentForOrganizationInput
+  ): Promise<IncidentRetrievalRecord | null>;
+  reopenIncidentsForOrganization(
+    input: ReopenIncidentsForOrganizationInput
+  ): Promise<IncidentRetrievalRecord[]>;
   listServicesForOrganization?(input: {
     organization_id: string;
     user_id?: string;
@@ -776,8 +732,14 @@ export interface MetadataStore {
     level?: string;
     cursor?: IncidentLogsCursor;
   }): Promise<IncidentLogRecord[]>;
-  getBundleFailureReasonForOrganization?(input: { organization_id: string; incident_id: string }): Promise<string | null>;
-  getBundleSourceForOrganization?(input: { organization_id: string; incident_id: string }): Promise<{
+  getBundleFailureReasonForOrganization?(input: {
+    organization_id: string;
+    incident_id: string;
+  }): Promise<string | null>;
+  getBundleSourceForOrganization?(input: {
+    organization_id: string;
+    incident_id: string;
+  }): Promise<{
     event_id: string;
     occurred_at: string;
     occurrence_count: number;
@@ -785,7 +747,9 @@ export interface MetadataStore {
   } | null>;
   upsertIncident(input: UpsertIncidentInput): Promise<UpsertIncidentResult>;
   insertIncidentEvent(input: InsertIncidentEventInput): Promise<void>;
-  recordIncidentEventRetention(input: RecordIncidentEventRetentionInput): Promise<RecordIncidentEventRetentionResult>;
+  recordIncidentEventRetention(
+    input: RecordIncidentEventRetentionInput
+  ): Promise<RecordIncidentEventRetentionResult>;
   markIncidentSpiking(input: MarkIncidentSpikingInput): Promise<boolean>;
 }
 
@@ -798,7 +762,12 @@ export interface ImprovementRetrievalStore {
     service?: string;
     status?: "open" | "resolved" | "snoozed";
     severity?: "low" | "medium" | "high" | "critical";
-    kind?: "warning_hotspot" | "slow_request" | "request_failure_pattern" | "recurring_incident" | "post_deploy_regression";
+    kind?:
+      | "warning_hotspot"
+      | "slow_request"
+      | "request_failure_pattern"
+      | "recurring_incident"
+      | "post_deploy_regression";
     cursor?: ImprovementsCursor;
     limit: number;
   }): Promise<ImprovementRetrievalRecord[]>;
@@ -807,9 +776,15 @@ export interface ImprovementRetrievalStore {
     improvement_id: string;
     user_id?: string;
   }): Promise<ImprovementRetrievalRecord | null>;
-  resolveImprovementForOrganization(input: ResolveImprovementForOrganizationInput): Promise<ImprovementRetrievalRecord | null>;
-  reopenImprovementForOrganization(input: ReopenImprovementForOrganizationInput): Promise<ImprovementRetrievalRecord | null>;
-  snoozeImprovementForOrganization?(input: SnoozeImprovementForOrganizationInput): Promise<ImprovementRetrievalRecord | null>;
+  resolveImprovementForOrganization(
+    input: ResolveImprovementForOrganizationInput
+  ): Promise<ImprovementRetrievalRecord | null>;
+  reopenImprovementForOrganization(
+    input: ReopenImprovementForOrganizationInput
+  ): Promise<ImprovementRetrievalRecord | null>;
+  snoozeImprovementForOrganization?(
+    input: SnoozeImprovementForOrganizationInput
+  ): Promise<ImprovementRetrievalRecord | null>;
 }
 
 export type RetainedBundleOwnerReference =
@@ -825,20 +800,6 @@ export type RetainedBundleOwnerReference =
       incident_id: null;
       improvement_opportunity_id: string;
     };
-
-export interface RetentionStore {
-  listExpiredSampledRawEvents(input: { now: string; limit: number }): Promise<RetentionRawEventReference[]>;
-  markRawEventsExpired(input: { references: RetentionRawEventReference[] }): Promise<void>;
-  listExpiredAnalyticsRawEvents(input: { now: string; limit: number }): Promise<RetentionAnalyticsRawEventReference[]>;
-  deleteExpiredAnalyticsRawEvents(input: { references: RetentionAnalyticsRawEventReference[] }): Promise<void>;
-  listExpiredAnalyticsJourneySamples(input: { now: string; limit: number }): Promise<RetentionAnalyticsJourneySampleReference[]>;
-  deleteExpiredAnalyticsJourneySamples(input: { references: RetentionAnalyticsJourneySampleReference[] }): Promise<void>;
-  pruneExpiredAnalyticsRollups(input: { now: string; limit: number }): Promise<RetentionAnalyticsRollupPruneResult>;
-  listExpiredAnalyticsBundleGenerations(input: { now: string; limit: number }): Promise<RetentionAnalyticsBundleGenerationReference[]>;
-  deleteExpiredAnalyticsBundleGenerations(input: { references: RetentionAnalyticsBundleGenerationReference[] }): Promise<void>;
-  listExpiredIncidents(input: { now: string; limit: number }): Promise<RetentionExpiredIncidentReference[]>;
-  deleteExpiredIncidents(input: { references: RetentionExpiredIncidentReference[] }): Promise<void>;
-}
 
 export interface BundleBuildContext {
   incident_id: string;
@@ -874,9 +835,18 @@ export interface LogEventCandidateReference {
 }
 
 export interface BundleBuildContextStore {
-  getBundleBuildContext(input: { project_id: string; incident_id: string }): Promise<BundleBuildContext | null>;
-  hasBundleGenerationForSourceEvent?(input: { incident_id: string; event_id: string }): Promise<boolean>;
-  markBundleGenerationFailure?(input: { incident_id: string; reason: string | null }): Promise<void>;
+  getBundleBuildContext(input: {
+    project_id: string;
+    incident_id: string;
+  }): Promise<BundleBuildContext | null>;
+  hasBundleGenerationForSourceEvent?(input: {
+    incident_id: string;
+    event_id: string;
+  }): Promise<boolean>;
+  markBundleGenerationFailure?(input: {
+    incident_id: string;
+    reason: string | null;
+  }): Promise<void>;
   pruneRetainedBundleOwnersForProject?(input: {
     project_id: string;
     retained_bundle_limit: number;
@@ -922,11 +892,19 @@ export interface IncidentFrequencySnapshot {
 }
 
 export interface IncidentFrequencyCounter {
-  recordOccurrence(input: { incident_id: string; event_id: string; occurred_at: string }): Promise<IncidentFrequencySnapshot>;
+  recordOccurrence(input: {
+    incident_id: string;
+    event_id: string;
+    occurred_at: string;
+  }): Promise<IncidentFrequencySnapshot>;
 }
 
 export interface RequestAnomalyCounter {
-  recordObservation(input: { anomaly_key: string; event_id: string; occurred_at: string }): Promise<IncidentFrequencySnapshot>;
+  recordObservation(input: {
+    anomaly_key: string;
+    event_id: string;
+    occurred_at: string;
+  }): Promise<IncidentFrequencySnapshot>;
 }
 
 export interface FrequencySnapshotStore {
@@ -950,7 +928,10 @@ export interface QueryResult<Row> {
 }
 
 export interface Queryable {
-  query<Row extends Record<string, unknown>>(sql: string, params: unknown[]): Promise<QueryResult<Row>>;
+  query<Row extends Record<string, unknown>>(
+    sql: string,
+    params: unknown[]
+  ): Promise<QueryResult<Row>>;
   transaction?<Result>(callback: (db: Queryable) => Promise<Result>): Promise<Result>;
 }
 
@@ -973,10 +954,18 @@ export interface MemberAuthService {
 }
 
 export interface IncidentLifecycleService {
-  resolveIncidentForOrganization(input: ResolveIncidentForOrganizationInput): Promise<IncidentRetrievalRecord | null>;
-  resolveIncidentsForOrganization(input: ResolveIncidentsForOrganizationInput): Promise<IncidentRetrievalRecord[]>;
-  reopenIncidentForOrganization(input: ReopenIncidentForOrganizationInput): Promise<IncidentRetrievalRecord | null>;
-  reopenIncidentsForOrganization(input: ReopenIncidentsForOrganizationInput): Promise<IncidentRetrievalRecord[]>;
+  resolveIncidentForOrganization(
+    input: ResolveIncidentForOrganizationInput
+  ): Promise<IncidentRetrievalRecord | null>;
+  resolveIncidentsForOrganization(
+    input: ResolveIncidentsForOrganizationInput
+  ): Promise<IncidentRetrievalRecord[]>;
+  reopenIncidentForOrganization(
+    input: ReopenIncidentForOrganizationInput
+  ): Promise<IncidentRetrievalRecord | null>;
+  reopenIncidentsForOrganization(
+    input: ReopenIncidentsForOrganizationInput
+  ): Promise<IncidentRetrievalRecord[]>;
 }
 
 export interface BuildRawEventObjectKeyInput {

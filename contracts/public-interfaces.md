@@ -9,157 +9,157 @@ Last updated: 2026-07-04
 
 Every capability must be available through all applicable interfaces. Operations marked CLI-only are local-environment operations that have no server-side equivalent.
 
-| Operation | API | CLI | MCP | Notes |
-|-----------|-----|-----|-----|-------|
-| Request email code | `POST /v1/auth/request-code` | — | — | Web-auth bootstrap only |
-| Verify email code | `POST /v1/auth/verify-code` | — | — | Web-auth bootstrap only |
-| Logout (web session) | `POST /v1/auth/logout` | — | — | Web-auth bootstrap only |
-| Current session | `GET /v1/auth/session` | — | — | Web-auth bootstrap only |
-| Get current account avatar | `GET /v1/account/avatar` | — | — | Browser session only, cached first-party avatar bytes |
-| Import Gravatar avatar | `POST /v1/account/avatar/import-gravatar` | — | — | Browser session only, explicit user action from account settings |
-| Export account data | `GET /v1/account/export` | — | — | Browser session only, owner only |
-| Request account deletion OTP | `POST /v1/account/delete/request-otp` | — | — | Browser session only, owner only |
-| Delete account | `DELETE /v1/account` | — | — | Browser session only, owner only, requires confirmation phrase + OTP |
-| Accept project invite | `POST /v1/auth/project-invite/accept` | — | — | Browser session only |
-| GitHub sign-in start | `GET /v1/auth/github/start` | — | — | Browser redirect entry point only |
-| GitHub sign-in callback | `GET /v1/auth/github/callback` | — | — | Browser redirect callback only |
-| Slack app install URL | `GET /v1/slack/app/install-url` | `slack connect-url` | `get_slack_connect_url` | Returns a browser handoff URL for Team-tier project alert setup |
-| Slack app callback | `GET /v1/slack/app/callback` | — | — | Browser OAuth callback only |
-| GitHub device auth start | `POST /v1/auth/github/device/start` | — | — | CLI/browserless bootstrap helper |
-| GitHub device auth poll | `POST /v1/auth/github/device/poll` | — | — | CLI/browserless bootstrap helper |
-| GitHub device auth claim | `POST /v1/auth/github/device/claim` | — | — | Issues the member token after approval |
-| GitHub token exchange | `POST /v1/auth/github/token/exchange` | — | — | Exchanges an existing GitHub access token, including `gh auth token`, for a member token |
-| Ingest events | `POST /v1/events` | — | — | SDK-only (project token) |
-| List incidents | `GET /v1/incidents` | `incidents` | `list_incidents` | |
-| Get incident | `GET /v1/incidents/{id}` | `inspect` | `get_incident` | |
-| Get incident context | `GET /v1/incidents/{id}/context` | `explain` | `get_incident_context` | Deterministic one-call incident explanation context aggregation |
-| Resolve incident | `POST /v1/incidents/{id}/resolve` | `resolve <incident-id>` | `resolve_incident` | Explicit user action |
-| Resolve incidents (bulk) | `POST /v1/incidents/resolve` | `resolve <incident-id> [incident-id ...]` | `resolve_incidents` | One bulk mutation request for cloud incidents; local mode still resolves per incident against `.debugbundle/local/state.json` |
-| Reopen incident | `POST /v1/incidents/{id}/reopen` | `reopen <incident-id>` | `reopen_incident` | Explicit user action |
-| Reopen incidents (bulk) | `POST /v1/incidents/reopen` | `reopen <incident-id> [incident-id ...]` | `reopen_incidents` | One bulk mutation request for cloud incidents; local mode still reopens per incident against `.debugbundle/local/state.json` |
-| Get bundle | `GET /v1/incidents/{id}/bundle` | `bundle` | `get_bundle` | |
-| Get reproduction | `GET /v1/incidents/{id}/reproduction` | `reproduce` | `get_reproduction` | |
-| Suggest capture rules from incident | `POST /v1/incidents/{id}/capture-rule-suggestion` | `capture-rule suggest` | `suggest_capture_rules_from_incident` | Browser Session or Member Token; deterministic bundle-derived suggestions |
-| Create capture rule from incident suggestion | `POST /v1/incidents/{id}/capture-rules` | `capture-rule create-from-suggestion` | `create_capture_rule_from_incident_suggestion` | Browser Session or Member Token, owner/admin only |
-| Get logs | `GET /v1/logs` | `logs` | `get_logs` | Query by incident_id |
-| List improvements | `GET /v1/improvements` | `improvements list` | `list_improvements` | Hosted deterministic improvement opportunities across the organization or a filtered project |
-| Get improvement | `GET /v1/improvements/{id}` | `improvements get` | `get_improvement` | |
-| Resolve improvement | `POST /v1/improvements/{id}/resolve` | `improvements resolve` | `resolve_improvement` | Explicit user action |
-| Reopen improvement | `POST /v1/improvements/{id}/reopen` | `improvements reopen` | `reopen_improvement` | Explicit user action |
-| Snooze improvement | `POST /v1/improvements/{id}/snooze` | `improvements snooze` | `snooze_improvement` | Explicit user action |
-| Get improvement bundle | `GET /v1/projects/{id}/improvements/{improvementId}/bundle` | `improvements bundle` | `get_improvement_bundle` | Hosted improvement artifact for a project-scoped opportunity |
-| Get analytics summary | `GET /v1/analytics/summary` | `analytics summary` | `get_usage_summary` | Browser Session or Member Token, aggregate metrics only |
-| Get analytics routes | `GET /v1/analytics/routes` | `analytics routes` | `get_route_metrics` | Browser Session or Member Token |
-| Get analytics devices | `GET /v1/analytics/devices` | `analytics devices` | `get_device_breakdown` | Browser Session or Member Token |
-| Get analytics referrers | `GET /v1/analytics/referrers` | `analytics referrers` | `get_referrer_metrics` | Browser Session or Member Token |
-| Get analytics actions | `GET /v1/analytics/actions` | `analytics actions` | `get_action_metrics` | Browser Session or Member Token |
-| List analytics funnels | `GET /v1/analytics/funnels` | `analytics funnels` | `list_funnel_metrics` | Browser Session or Member Token |
-| Get analytics funnel | `GET /v1/analytics/funnels/{key}` | `analytics funnel` | `get_funnel_analysis` | Browser Session or Member Token |
-| Get incident analytics impact | `GET /v1/analytics/incidents/{id}/impact` | `analytics incident-impact <incident-id>` | `get_incident_impact` | Browser Session or Member Token; project-scoped incident ownership required |
-| Get journey patterns | `GET /v1/analytics/journey-patterns` | `analytics journeys` | `get_journey_patterns` | Browser Session or Member Token, aggregate/sample-safe data |
-| List analytics journey samples | `GET /v1/analytics/journey-samples` | `analytics journey-samples list` | `list_analytics_journey_samples` | Browser Session or Member Token, retained redacted sample metadata |
-| Get analytics journey sample | `GET /v1/analytics/journey-samples/{id}` | `analytics journey-samples get` | `get_analytics_journey_sample` | Browser Session or Member Token, retained redacted sample artifact |
-| Get analytics settings | `GET /v1/projects/{id}/analytics-settings` | `analytics settings get` | `get_analytics_settings` | Browser Session or Member Token; members receive preview-only payload and all tiers can inspect availability |
-| Update analytics settings | `PATCH /v1/projects/{id}/analytics-settings` | `analytics settings set` | `update_analytics_settings` | Browser Session or Member Token, owner/admin only, tier-bounded settings |
-| List saved analytics funnels | `GET /v1/projects/{id}/analytics/saved-funnels` | `analytics saved-funnels list` | `list_saved_analytics_funnels` | Browser Session or Member Token, project member, analytics available |
-| Create saved analytics funnel | `POST /v1/projects/{id}/analytics/saved-funnels` | `analytics saved-funnels create` | `create_saved_analytics_funnel` | Browser Session or Member Token, owner/admin, analytics available and independent saved-funnel cap |
-| Update saved analytics funnel | `PATCH /v1/projects/{id}/analytics/saved-funnels/{key}` | `analytics saved-funnels update` | `update_saved_analytics_funnel` | Browser Session or Member Token, owner/admin, analytics available |
-| Archive saved analytics funnel | `DELETE /v1/projects/{id}/analytics/saved-funnels/{key}` | `analytics saved-funnels archive` | `archive_saved_analytics_funnel` | Browser Session or Member Token, owner/admin, analytics available |
-| List analytics opportunities | `GET /v1/analytics/opportunities` | `analytics opportunities` | `list_analytics_opportunities` | Browser Session or Member Token |
-| Get analytics opportunity | `GET /v1/analytics/opportunities/{id}` | `analytics opportunity get` | `get_analytics_opportunity` | Browser Session or Member Token |
-| List AnalyticsBundles | `GET /v1/analytics/bundles` | `analytics bundle list` | `list_analytics_bundles` | Browser Session or Member Token |
-| Generate AnalyticsBundle | `POST /v1/analytics/bundles` | `analytics bundle create` | `generate_analytics_bundle` | Browser Session or Member Token, tier-gated; accepts optional authorized `opportunity_id`; focused kinds require their matching route/funnel/incident/deploy context |
-| Get AnalyticsBundle | `GET /v1/analytics/bundles/{id}` | `analytics bundle get` | `get_analytics_bundle` | Browser Session or Member Token |
-| List project members | `GET /v1/projects/{id}/members` | `project members list` | `list_project_members` | Browser Session or Member Token, any authorized project member |
-| Get project member avatar | `GET /v1/projects/{id}/members/{userId}/avatar` | — | — | Browser session or member token, authorized project viewers only |
-| List pending project invites | `GET /v1/projects/{id}/invites` | `project members invites` | `list_project_member_invites` | Browser Session or Member Token, owner/admin only |
-| Invite project member | `POST /v1/projects/{id}/invite` | `project members invite` | `invite_project_member` | Browser Session or Member Token, owner/admin only, Team tier |
-| Cancel project invite | `DELETE /v1/projects/{id}/invites/{inviteId}` | `project members cancel-invite` | `cancel_project_member_invite` | Browser Session or Member Token, owner/admin only |
-| Update project member role | `PATCH /v1/projects/{id}/members/{userId}` | `project members update-role` | `update_project_member_role` | Browser Session or Member Token, owner/admin only |
-| Remove project member | `DELETE /v1/projects/{id}/members/{userId}` | `project members remove` | `remove_project_member` | Browser Session or Member Token, owner/admin only |
-| Leave project membership | `DELETE /v1/projects/{id}/membership` | `project members leave` | `leave_project` | Browser Session or Member Token, any collaborator on that project |
-| List projects | `GET /v1/projects` | `project list` | `list_projects` | Browser Session or Member Token, scoped to owned and shared projects |
-| Create project | `POST /v1/projects` | `project create` | `create_project` | Browser Session or Member Token, owner only |
-| Update project | `PATCH /v1/projects/{id}` | `project update` | `update_project` | Browser Session or Member Token, owner only |
-| Delete project | `DELETE /v1/projects/{id}` | `project delete` | `delete_project` | Browser Session or Member Token, owner only |
-| Get billing summary | `GET /v1/billing` | `billing get` | `get_billing_summary` | Browser Session or Member Token, owner only |
-| Start no-card trial | `POST /v1/billing/trial/start` | `billing trial start` | `start_trial` | Browser Session or Member Token, owner only |
-| Start billing checkout | `POST /v1/billing/checkout` | — | — | Browser Session only, owner only |
-| Open billing portal | `POST /v1/billing/portal` | — | — | Browser Session only, owner only |
-| Increase capacity now | `POST /v1/billing/capacity/increase` | `billing capacity increase` | `increase_capacity` | Browser Session or Member Token, owner only |
-| Schedule capacity reduction | `POST /v1/billing/capacity/scheduled-reduction` | `billing capacity schedule-reduction` | `schedule_capacity_reduction` | Browser Session or Member Token, owner only |
-| Cancel scheduled capacity reduction | `DELETE /v1/billing/capacity/scheduled-reduction` | `billing capacity cancel-reduction` | `cancel_capacity_reduction` | Browser Session or Member Token, owner only |
-| List project tokens | `GET /v1/projects/{id}/tokens` | `token project list` | `list_project_tokens` | Browser session or member token with project access |
-| Create project token | `POST /v1/projects/{id}/tokens` | `token project create` | `create_project_token` | Owner/admin project access; plaintext returned once; optional static-browser origin allowlist |
-| Revoke project token | `POST /v1/projects/{id}/tokens/{tokenId}/revoke` | `token project revoke` | `revoke_project_token` | Owner/admin project access |
-| List member tokens | `GET /v1/member/tokens` | `token member list` | `list_member_tokens` | Browser session or member token scoped to caller |
-| Create member token | `POST /v1/member/tokens` | `token member create` | `create_member_token` | Browser session or member token; plaintext returned once |
-| Revoke member token | `POST /v1/member/tokens/{tokenId}/revoke` | `token member revoke` | `revoke_member_token` | Browser session or caller-owned member token |
-| List services | `GET /v1/services` | `services` | `list_services` | |
-| Alert CRUD | `POST/GET/PATCH/DELETE /v1/alerts` | `alert list/create/update/delete` | `list_alerts/create_alert/update_alert/delete_alert` | Browser Session or Member Token, scoped to project; member may mutate only self-created rules |
-| Project Slack destinations | `GET /v1/projects/{id}/slack/destinations` | `slack list` | `list_slack_destinations` | Browser Session or Member Token, reusable Slack channel list for alert setup; preserved destinations remain readable while paused on Free |
-| Test Slack destination | `POST /v1/projects/{id}/slack/destinations/{destinationId}/test` | `slack test` | `test_slack_destination` | Browser Session or Member Token, owner/admin only, Team tier |
-| Delete Slack destination | `DELETE /v1/projects/{id}/slack/destinations/{destinationId}` | `slack delete` | `delete_slack_destination` | Browser Session or Member Token, owner/admin cleanup action; allowed after downgrade |
-| Weekly report channel CRUD | `POST/GET/PATCH/DELETE /v1/weekly-report-channels` | `weekly-report list/create/update/delete` | `list_weekly_report_channels/create_weekly_report_channel/update_weekly_report_channel/delete_weekly_report_channel` | Browser Session or Member Token, scoped to organization/project; preserved Slack channels remain readable while paused |
-| List webhooks | `GET /v1/webhooks` | `webhook list` | `list_webhooks` | Browser Session or Member Token, scoped to project |
-| Create webhook | `POST /v1/webhooks` | `webhook create` | `create_webhook` | Signing secret returned once |
-| Update webhook | `PATCH /v1/webhooks/{id}` | `webhook update` | `update_webhook` | Owner/admin may update any webhook; member may update only self-created webhooks |
-| Delete webhook | `DELETE /v1/webhooks/{id}` | `webhook delete` | `delete_webhook` | Owner/admin may delete any webhook; member may delete only self-created webhooks |
-| Test webhook | `POST /v1/webhooks/{id}/test` | `webhook test` | `test_webhook` | Queues a signed synthetic delivery; member may test only self-created webhooks |
-| Webhook deliveries | `GET /v1/webhooks/{id}/deliveries` | `webhook deliveries` | `list_webhook_deliveries` | Statuses: pending, retrying, delivered, failed, disabled |
-| Retry webhook delivery | `POST /v1/webhooks/{id}/deliveries/{deliveryId}/retry` | `webhook retry` | `retry_webhook_delivery` | Resets failed/disabled delivery to retrying; member may retry only self-created webhooks |
-| Doctor | — | `doctor` | `doctor` | CLI/MCP-only (local env) |
-| Validate | — | `validate [--fix]` | `validate` | CLI/MCP-only (local env) |
-| Verify local | — | `verify local` | `verify_local` | CLI/MCP-only (local env) |
-| Verify cloud | — | `verify cloud` | `verify_cloud` | Uses API internally; `--trigger-5xx`/`trigger5xx` proves hosted synthetic incident creation, `--trigger-4xx <status>`/`trigger4xxStatus` proves configured hosted 4xx promotion, and `--expect-app-event` proves real SDK-driven app capture |
-| Smoke test | — | `smoke` | `smoke` | CLI/MCP-only |
-| Login | — | `login` | — | CLI-only (stores member-token auth state locally; supports member-token, GitHub device, and `gh` bootstrap modes) |
-| Setup project | — | `setup` | — | CLI-only (local scaffold generation, mixed-runtime discovery, relay scaffolding, and runtime-specific relay guidance) |
-| Ingest local logs | — | `ingest` | — | CLI-only (local log parser pipeline) |
-| Watch local logs | — | `watch` | — | CLI-only (local log tail pipeline) |
-| Process local events | — | `process` | — | CLI-only (local file transport pipeline) |
-| Connect | — | `connect` | — | CLI-only (interactive) |
-| Profile validate | — | `profile validate` | — | CLI-only (local files) |
-| Profile show | — | `profile show` | — | CLI-only (local files) |
-| Profile sync | — | `profile sync` | — | CLI-only (local files) |
-| Analyze (local) | — | `analyze` | `analyze` | CLI/MCP-only (local agent-driven) |
-| Activate probes (remote) | `POST /v1/projects/{id}/probes/activate` | `probe activate` | `activate_probe` | Browser Session or Member Token, Solo+ only |
-| List active probes (remote) | `GET /v1/projects/{id}/probes` | `probe list` | `list_active_probes` | Browser Session or Member Token, preserved activations remain readable while paused on Free |
-| Deactivate probes (remote) | `POST /v1/projects/{id}/probes/deactivate` | `probe deactivate` | `deactivate_probe` | Browser Session or Member Token cleanup action; allowed after downgrade |
-| List health checks | `GET /v1/projects/{id}/availability-checks` | `health checks list` | `list_health_checks` | Browser Session or Member Token; readable to any authorized project member |
-| Get health check | `GET /v1/projects/{id}/availability-checks/{checkId}` | `health checks get` | `get_health_check` | Browser Session or Member Token; readable to any authorized project member |
-| Create health check | `POST /v1/projects/{id}/availability-checks` | `health checks create` | `create_health_check` | Browser Session or Member Token, owner/admin only |
-| Update health check | `PATCH /v1/projects/{id}/availability-checks/{checkId}` | `health checks update` | `update_health_check` | Browser Session or Member Token, owner/admin only |
-| Delete health check | `DELETE /v1/projects/{id}/availability-checks/{checkId}` | `health checks delete` | `delete_health_check` | Browser Session or Member Token, owner/admin only |
-| Test health check target | `POST /v1/projects/{id}/availability-checks/test` | `health checks test` | `test_health_check` | Browser Session or Member Token, owner/admin only, side-effect-free |
-| List health check results | `GET /v1/projects/{id}/availability-checks/{checkId}/results` | `health checks results` | `list_health_check_results` | Browser Session or Member Token; readable to any authorized project member |
-| List health check daily rollups | `GET /v1/projects/{id}/availability-checks/{checkId}/daily-rollups` | `health checks daily-rollups` | `list_health_check_daily_rollups` | Browser Session or Member Token; readable to any authorized project member |
-| Get capture policy | `GET /v1/projects/{id}/capture-policy` | `capture-policy get` | `get_capture_policy` | Browser Session or Member Token; member receives preview-only payload |
-| Update capture policy | `PATCH /v1/projects/{id}/capture-policy` | `capture-policy set` | `update_capture_policy` | Browser Session or Member Token, owner/admin only |
-| List capture rules | `GET /v1/projects/{id}/capture-rules` | `capture-rule list` | `list_capture_rules` | Browser Session or Member Token; members receive preview-only payload |
-| Create capture rule | `POST /v1/projects/{id}/capture-rules` | `capture-rule create` | `create_capture_rule` | Browser Session or Member Token, owner/admin only |
-| Update capture rule | `PATCH /v1/projects/{id}/capture-rules/{ruleId}` | `capture-rule update` | `update_capture_rule` | Browser Session or Member Token, owner/admin only |
-| Delete capture rule | `DELETE /v1/projects/{id}/capture-rules/{ruleId}` | `capture-rule delete` | `delete_capture_rule` | Browser Session or Member Token, owner/admin only |
-| Get improvement settings | `GET /v1/projects/{id}/improvement-settings` | `improvements settings get` | `get_improvement_settings` | Browser Session or Member Token; members receive preview-only payload and all tiers can inspect availability |
-| Update improvement settings | `PATCH /v1/projects/{id}/improvement-settings` | `improvements settings set` | `update_improvement_settings` | Browser Session or Member Token, owner/admin only, paid Solo+ or self-host |
-| SDK config | `GET /v1/sdk/config` | — | — | SDK-only (project token, includes resolved capture policy; callers may opt into bounded restrictive analytics capture settings with `X-DebugBundle-Analytics-Config: 1`) |
-| Get GitHub App install URL | `GET /v1/github/app/install-url` | — | — | Browser Session or Member Token, owner/admin only on eligible Solo+ project; web convenience route for the install/reconnect CTA, optionally signed with a return path |
-| Get GitHub installation | `GET /v1/github/installation` | `github status` | `get_github_status` | Browser Session or Member Token; read remains available when preserved GitHub setup is paused on Free |
-| Disconnect GitHub installation | `DELETE /v1/github/installation` | — | — | Web/API cleanup action; owner/admin only and allowed after downgrade |
-| List GitHub repositories | `GET /v1/github/repositories` | `github repos` | `list_github_repositories` | Browser Session or Member Token, owner/admin only on eligible Solo+ project |
-| Get project GitHub repo | `GET /v1/projects/{id}/github/repo` | `github status` | `get_github_status` | Included in status response; read remains available when preserved GitHub setup is paused on Free |
-| Set project GitHub repo | `PUT /v1/projects/{id}/github/repo` | `github repo set` | `set_project_github_repo` | Browser Session or Member Token, owner/admin only, Solo+ only |
-| Remove project GitHub repo | `DELETE /v1/projects/{id}/github/repo` | `github repo remove` | `remove_project_github_repo` | Browser Session or Member Token, owner/admin cleanup action; allowed after downgrade |
-| Create dispatch rule | `POST /v1/projects/{id}/github/rules` | `github rules create` | `create_github_dispatch_rule` | Browser Session or Member Token, any authorized project member on eligible Solo+ project |
-| List dispatch rules | `GET /v1/projects/{id}/github/rules` | `github rules` | `list_github_dispatch_rules` | Browser Session or Member Token; read remains available when preserved GitHub setup is paused on Free |
-| Get dispatch rule | `GET /v1/projects/{id}/github/rules/{ruleId}` | — | — | API convenience; CLI/MCP use list |
-| Update dispatch rule | `PATCH /v1/projects/{id}/github/rules/{ruleId}` | `github rules update` | `update_github_dispatch_rule` | Browser Session or Member Token, owner/admin may update any rule; member may update only self-created rules |
-| Delete dispatch rule | `DELETE /v1/projects/{id}/github/rules/{ruleId}` | `github rules delete` | `delete_github_dispatch_rule` | Browser Session or Member Token cleanup action; owner/admin may delete any rule and member may delete only self-created rules, allowed after downgrade |
-| List dispatch deliveries | `GET /v1/projects/{id}/github/deliveries` | `github deliveries` | `list_github_deliveries` | Browser Session or Member Token; read remains available when preserved GitHub setup is paused on Free |
-| Retry dispatch delivery | `POST /v1/projects/{id}/github/deliveries/{id}/retry` | `github deliveries retry` | `retry_github_delivery` | Browser Session or Member Token, owner/admin or creator-owned-rule member on eligible Solo+ project |
-| GitHub App callback | `GET /v1/github/app/callback` | — | — | GitHub App setup URL / post-install redirect handler |
-| GitHub App webhook | `POST /v1/github/app/webhook` | — | — | Installation lifecycle events (HMAC-verified) |
-| GitHub Marketplace webhook | `POST /v1/github/marketplace/webhook` | — | — | GitHub Marketplace listing webhook for purchase/subscription lifecycle tracking (HMAC-verified) |
+| Operation                                    | API                                                                 | CLI                                       | MCP                                                                                                                  | Notes                                                                                                                                                                                                                                        |
+| -------------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Request email code                           | `POST /v1/auth/request-code`                                        | —                                         | —                                                                                                                    | Web-auth bootstrap only                                                                                                                                                                                                                      |
+| Verify email code                            | `POST /v1/auth/verify-code`                                         | —                                         | —                                                                                                                    | Web-auth bootstrap only                                                                                                                                                                                                                      |
+| Logout (web session)                         | `POST /v1/auth/logout`                                              | —                                         | —                                                                                                                    | Web-auth bootstrap only                                                                                                                                                                                                                      |
+| Current session                              | `GET /v1/auth/session`                                              | —                                         | —                                                                                                                    | Web-auth bootstrap only                                                                                                                                                                                                                      |
+| Get current account avatar                   | `GET /v1/account/avatar`                                            | —                                         | —                                                                                                                    | Browser session only, cached first-party avatar bytes                                                                                                                                                                                        |
+| Import Gravatar avatar                       | `POST /v1/account/avatar/import-gravatar`                           | —                                         | —                                                                                                                    | Browser session only, explicit user action from account settings                                                                                                                                                                             |
+| Export account data                          | `GET /v1/account/export`                                            | —                                         | —                                                                                                                    | Browser session only, owner only                                                                                                                                                                                                             |
+| Request account deletion OTP                 | `POST /v1/account/delete/request-otp`                               | —                                         | —                                                                                                                    | Browser session only, owner only                                                                                                                                                                                                             |
+| Delete account                               | `DELETE /v1/account`                                                | —                                         | —                                                                                                                    | Browser session only, owner only, requires confirmation phrase + OTP                                                                                                                                                                         |
+| Accept project invite                        | `POST /v1/auth/project-invite/accept`                               | —                                         | —                                                                                                                    | Browser session only                                                                                                                                                                                                                         |
+| GitHub sign-in start                         | `GET /v1/auth/github/start`                                         | —                                         | —                                                                                                                    | Browser redirect entry point only                                                                                                                                                                                                            |
+| GitHub sign-in callback                      | `GET /v1/auth/github/callback`                                      | —                                         | —                                                                                                                    | Browser redirect callback only                                                                                                                                                                                                               |
+| Slack app install URL                        | `GET /v1/slack/app/install-url`                                     | `slack connect-url`                       | `get_slack_connect_url`                                                                                              | Returns a browser handoff URL for Team-tier project alert setup                                                                                                                                                                              |
+| Slack app callback                           | `GET /v1/slack/app/callback`                                        | —                                         | —                                                                                                                    | Browser OAuth callback only                                                                                                                                                                                                                  |
+| GitHub device auth start                     | `POST /v1/auth/github/device/start`                                 | —                                         | —                                                                                                                    | CLI/browserless bootstrap helper                                                                                                                                                                                                             |
+| GitHub device auth poll                      | `POST /v1/auth/github/device/poll`                                  | —                                         | —                                                                                                                    | CLI/browserless bootstrap helper                                                                                                                                                                                                             |
+| GitHub device auth claim                     | `POST /v1/auth/github/device/claim`                                 | —                                         | —                                                                                                                    | Issues the member token after approval                                                                                                                                                                                                       |
+| GitHub token exchange                        | `POST /v1/auth/github/token/exchange`                               | —                                         | —                                                                                                                    | Exchanges an existing GitHub access token, including `gh auth token`, for a member token                                                                                                                                                     |
+| Ingest events                                | `POST /v1/events`                                                   | —                                         | —                                                                                                                    | SDK-only (project token)                                                                                                                                                                                                                     |
+| List incidents                               | `GET /v1/incidents`                                                 | `incidents`                               | `list_incidents`                                                                                                     |                                                                                                                                                                                                                                              |
+| Get incident                                 | `GET /v1/incidents/{id}`                                            | `inspect`                                 | `get_incident`                                                                                                       |                                                                                                                                                                                                                                              |
+| Get incident context                         | `GET /v1/incidents/{id}/context`                                    | `explain`                                 | `get_incident_context`                                                                                               | Deterministic one-call incident explanation context aggregation                                                                                                                                                                              |
+| Resolve incident                             | `POST /v1/incidents/{id}/resolve`                                   | `resolve <incident-id>`                   | `resolve_incident`                                                                                                   | Explicit user action                                                                                                                                                                                                                         |
+| Resolve incidents (bulk)                     | `POST /v1/incidents/resolve`                                        | `resolve <incident-id> [incident-id ...]` | `resolve_incidents`                                                                                                  | One bulk mutation request for cloud incidents; local mode still resolves per incident against `.debugbundle/local/state.json`                                                                                                                |
+| Reopen incident                              | `POST /v1/incidents/{id}/reopen`                                    | `reopen <incident-id>`                    | `reopen_incident`                                                                                                    | Explicit user action                                                                                                                                                                                                                         |
+| Reopen incidents (bulk)                      | `POST /v1/incidents/reopen`                                         | `reopen <incident-id> [incident-id ...]`  | `reopen_incidents`                                                                                                   | One bulk mutation request for cloud incidents; local mode still reopens per incident against `.debugbundle/local/state.json`                                                                                                                 |
+| Get bundle                                   | `GET /v1/incidents/{id}/bundle`                                     | `bundle`                                  | `get_bundle`                                                                                                         |                                                                                                                                                                                                                                              |
+| Get reproduction                             | `GET /v1/incidents/{id}/reproduction`                               | `reproduce`                               | `get_reproduction`                                                                                                   |                                                                                                                                                                                                                                              |
+| Suggest capture rules from incident          | `POST /v1/incidents/{id}/capture-rule-suggestion`                   | `capture-rule suggest`                    | `suggest_capture_rules_from_incident`                                                                                | Browser Session or Member Token; deterministic bundle-derived suggestions                                                                                                                                                                    |
+| Create capture rule from incident suggestion | `POST /v1/incidents/{id}/capture-rules`                             | `capture-rule create-from-suggestion`     | `create_capture_rule_from_incident_suggestion`                                                                       | Browser Session or Member Token, owner/admin only                                                                                                                                                                                            |
+| Get logs                                     | `GET /v1/logs`                                                      | `logs`                                    | `get_logs`                                                                                                           | Query by incident_id                                                                                                                                                                                                                         |
+| List improvements                            | `GET /v1/improvements`                                              | `improvements list`                       | `list_improvements`                                                                                                  | Hosted deterministic improvement opportunities across the organization or a filtered project                                                                                                                                                 |
+| Get improvement                              | `GET /v1/improvements/{id}`                                         | `improvements get`                        | `get_improvement`                                                                                                    |                                                                                                                                                                                                                                              |
+| Resolve improvement                          | `POST /v1/improvements/{id}/resolve`                                | `improvements resolve`                    | `resolve_improvement`                                                                                                | Explicit user action                                                                                                                                                                                                                         |
+| Reopen improvement                           | `POST /v1/improvements/{id}/reopen`                                 | `improvements reopen`                     | `reopen_improvement`                                                                                                 | Explicit user action                                                                                                                                                                                                                         |
+| Snooze improvement                           | `POST /v1/improvements/{id}/snooze`                                 | `improvements snooze`                     | `snooze_improvement`                                                                                                 | Explicit user action                                                                                                                                                                                                                         |
+| Get improvement bundle                       | `GET /v1/projects/{id}/improvements/{improvementId}/bundle`         | `improvements bundle`                     | `get_improvement_bundle`                                                                                             | Hosted improvement artifact for a project-scoped opportunity                                                                                                                                                                                 |
+| Get analytics summary                        | `GET /v1/analytics/summary`                                         | `analytics summary`                       | `get_usage_summary`                                                                                                  | Browser Session or Member Token, aggregate metrics only                                                                                                                                                                                      |
+| Get analytics routes                         | `GET /v1/analytics/routes`                                          | `analytics routes`                        | `get_route_metrics`                                                                                                  | Browser Session or Member Token                                                                                                                                                                                                              |
+| Get analytics devices                        | `GET /v1/analytics/devices`                                         | `analytics devices`                       | `get_device_breakdown`                                                                                               | Browser Session or Member Token                                                                                                                                                                                                              |
+| Get analytics referrers                      | `GET /v1/analytics/referrers`                                       | `analytics referrers`                     | `get_referrer_metrics`                                                                                               | Browser Session or Member Token                                                                                                                                                                                                              |
+| Get analytics actions                        | `GET /v1/analytics/actions`                                         | `analytics actions`                       | `get_action_metrics`                                                                                                 | Browser Session or Member Token                                                                                                                                                                                                              |
+| List analytics funnels                       | `GET /v1/analytics/funnels`                                         | `analytics funnels`                       | `list_funnel_metrics`                                                                                                | Browser Session or Member Token                                                                                                                                                                                                              |
+| Get analytics funnel                         | `GET /v1/analytics/funnels/{key}`                                   | `analytics funnel`                        | `get_funnel_analysis`                                                                                                | Browser Session or Member Token                                                                                                                                                                                                              |
+| Get incident analytics impact                | `GET /v1/analytics/incidents/{id}/impact`                           | `analytics incident-impact <incident-id>` | `get_incident_impact`                                                                                                | Browser Session or Member Token; project-scoped incident ownership required                                                                                                                                                                  |
+| Get journey patterns                         | `GET /v1/analytics/journey-patterns`                                | `analytics journeys`                      | `get_journey_patterns`                                                                                               | Browser Session or Member Token, aggregate/sample-safe data                                                                                                                                                                                  |
+| List analytics journey samples               | `GET /v1/analytics/journey-samples`                                 | `analytics journey-samples list`          | `list_analytics_journey_samples`                                                                                     | Browser Session or Member Token, retained redacted sample metadata                                                                                                                                                                           |
+| Get analytics journey sample                 | `GET /v1/analytics/journey-samples/{id}`                            | `analytics journey-samples get`           | `get_analytics_journey_sample`                                                                                       | Browser Session or Member Token, retained redacted sample artifact                                                                                                                                                                           |
+| Get analytics settings                       | `GET /v1/projects/{id}/analytics-settings`                          | `analytics settings get`                  | `get_analytics_settings`                                                                                             | Browser Session or Member Token; members receive preview-only payload and all tiers can inspect availability                                                                                                                                 |
+| Update analytics settings                    | `PATCH /v1/projects/{id}/analytics-settings`                        | `analytics settings set`                  | `update_analytics_settings`                                                                                          | Browser Session or Member Token, owner/admin only, tier-bounded settings                                                                                                                                                                     |
+| List saved analytics funnels                 | `GET /v1/projects/{id}/analytics/saved-funnels`                     | `analytics saved-funnels list`            | `list_saved_analytics_funnels`                                                                                       | Browser Session or Member Token, project member, analytics available                                                                                                                                                                         |
+| Create saved analytics funnel                | `POST /v1/projects/{id}/analytics/saved-funnels`                    | `analytics saved-funnels create`          | `create_saved_analytics_funnel`                                                                                      | Browser Session or Member Token, owner/admin, analytics available and independent saved-funnel cap                                                                                                                                           |
+| Update saved analytics funnel                | `PATCH /v1/projects/{id}/analytics/saved-funnels/{key}`             | `analytics saved-funnels update`          | `update_saved_analytics_funnel`                                                                                      | Browser Session or Member Token, owner/admin, analytics available                                                                                                                                                                            |
+| Archive saved analytics funnel               | `DELETE /v1/projects/{id}/analytics/saved-funnels/{key}`            | `analytics saved-funnels archive`         | `archive_saved_analytics_funnel`                                                                                     | Browser Session or Member Token, owner/admin, analytics available                                                                                                                                                                            |
+| List analytics opportunities                 | `GET /v1/analytics/opportunities`                                   | `analytics opportunities`                 | `list_analytics_opportunities`                                                                                       | Browser Session or Member Token                                                                                                                                                                                                              |
+| Get analytics opportunity                    | `GET /v1/analytics/opportunities/{id}`                              | `analytics opportunity get`               | `get_analytics_opportunity`                                                                                          | Browser Session or Member Token                                                                                                                                                                                                              |
+| List AnalyticsBundles                        | `GET /v1/analytics/bundles`                                         | `analytics bundle list`                   | `list_analytics_bundles`                                                                                             | Browser Session or Member Token                                                                                                                                                                                                              |
+| Generate AnalyticsBundle                     | `POST /v1/analytics/bundles`                                        | `analytics bundle create`                 | `generate_analytics_bundle`                                                                                          | Browser Session or Member Token, tier-gated; accepts optional authorized `opportunity_id`; focused kinds require their matching route/funnel/incident/deploy context                                                                         |
+| Get AnalyticsBundle                          | `GET /v1/analytics/bundles/{id}`                                    | `analytics bundle get`                    | `get_analytics_bundle`                                                                                               | Browser Session or Member Token                                                                                                                                                                                                              |
+| List project members                         | `GET /v1/projects/{id}/members`                                     | `project members list`                    | `list_project_members`                                                                                               | Browser Session or Member Token, any authorized project member                                                                                                                                                                               |
+| Get project member avatar                    | `GET /v1/projects/{id}/members/{userId}/avatar`                     | —                                         | —                                                                                                                    | Browser session or member token, authorized project viewers only                                                                                                                                                                             |
+| List pending project invites                 | `GET /v1/projects/{id}/invites`                                     | `project members invites`                 | `list_project_member_invites`                                                                                        | Browser Session or Member Token, owner/admin only                                                                                                                                                                                            |
+| Invite project member                        | `POST /v1/projects/{id}/invite`                                     | `project members invite`                  | `invite_project_member`                                                                                              | Browser Session or Member Token, owner/admin only, Team tier                                                                                                                                                                                 |
+| Cancel project invite                        | `DELETE /v1/projects/{id}/invites/{inviteId}`                       | `project members cancel-invite`           | `cancel_project_member_invite`                                                                                       | Browser Session or Member Token, owner/admin only                                                                                                                                                                                            |
+| Update project member role                   | `PATCH /v1/projects/{id}/members/{userId}`                          | `project members update-role`             | `update_project_member_role`                                                                                         | Browser Session or Member Token, owner/admin only                                                                                                                                                                                            |
+| Remove project member                        | `DELETE /v1/projects/{id}/members/{userId}`                         | `project members remove`                  | `remove_project_member`                                                                                              | Browser Session or Member Token, owner/admin only                                                                                                                                                                                            |
+| Leave project membership                     | `DELETE /v1/projects/{id}/membership`                               | `project members leave`                   | `leave_project`                                                                                                      | Browser Session or Member Token, any collaborator on that project                                                                                                                                                                            |
+| List projects                                | `GET /v1/projects`                                                  | `project list`                            | `list_projects`                                                                                                      | Browser Session or Member Token, scoped to owned and shared projects                                                                                                                                                                         |
+| Create project                               | `POST /v1/projects`                                                 | `project create`                          | `create_project`                                                                                                     | Browser Session or Member Token, owner only                                                                                                                                                                                                  |
+| Update project                               | `PATCH /v1/projects/{id}`                                           | `project update`                          | `update_project`                                                                                                     | Browser Session or Member Token, owner only                                                                                                                                                                                                  |
+| Delete project                               | `DELETE /v1/projects/{id}`                                          | `project delete`                          | `delete_project`                                                                                                     | Browser Session or Member Token, owner only                                                                                                                                                                                                  |
+| Get billing summary                          | `GET /v1/billing`                                                   | `billing get`                             | `get_billing_summary`                                                                                                | Browser Session or Member Token, owner only                                                                                                                                                                                                  |
+| Start no-card trial                          | `POST /v1/billing/trial/start`                                      | `billing trial start`                     | `start_trial`                                                                                                        | Browser Session or Member Token, owner only                                                                                                                                                                                                  |
+| Start billing checkout                       | `POST /v1/billing/checkout`                                         | —                                         | —                                                                                                                    | Browser Session only, owner only                                                                                                                                                                                                             |
+| Open billing portal                          | `POST /v1/billing/portal`                                           | —                                         | —                                                                                                                    | Browser Session only, owner only                                                                                                                                                                                                             |
+| Increase capacity now                        | `POST /v1/billing/capacity/increase`                                | `billing capacity increase`               | `increase_capacity`                                                                                                  | Browser Session or Member Token, owner only                                                                                                                                                                                                  |
+| Schedule capacity reduction                  | `POST /v1/billing/capacity/scheduled-reduction`                     | `billing capacity schedule-reduction`     | `schedule_capacity_reduction`                                                                                        | Browser Session or Member Token, owner only                                                                                                                                                                                                  |
+| Cancel scheduled capacity reduction          | `DELETE /v1/billing/capacity/scheduled-reduction`                   | `billing capacity cancel-reduction`       | `cancel_capacity_reduction`                                                                                          | Browser Session or Member Token, owner only                                                                                                                                                                                                  |
+| List project tokens                          | `GET /v1/projects/{id}/tokens`                                      | `token project list`                      | `list_project_tokens`                                                                                                | Browser session or member token with project access                                                                                                                                                                                          |
+| Create project token                         | `POST /v1/projects/{id}/tokens`                                     | `token project create`                    | `create_project_token`                                                                                               | Owner/admin project access; plaintext returned once; optional static-browser origin allowlist                                                                                                                                                |
+| Revoke project token                         | `POST /v1/projects/{id}/tokens/{tokenId}/revoke`                    | `token project revoke`                    | `revoke_project_token`                                                                                               | Owner/admin project access                                                                                                                                                                                                                   |
+| List member tokens                           | `GET /v1/member/tokens`                                             | `token member list`                       | `list_member_tokens`                                                                                                 | Browser session or member token scoped to caller                                                                                                                                                                                             |
+| Create member token                          | `POST /v1/member/tokens`                                            | `token member create`                     | `create_member_token`                                                                                                | Browser session or member token; plaintext returned once                                                                                                                                                                                     |
+| Revoke member token                          | `POST /v1/member/tokens/{tokenId}/revoke`                           | `token member revoke`                     | `revoke_member_token`                                                                                                | Browser session or caller-owned member token                                                                                                                                                                                                 |
+| List services                                | `GET /v1/services`                                                  | `services`                                | `list_services`                                                                                                      |                                                                                                                                                                                                                                              |
+| Alert CRUD                                   | `POST/GET/PATCH/DELETE /v1/alerts`                                  | `alert list/create/update/delete`         | `list_alerts/create_alert/update_alert/delete_alert`                                                                 | Browser Session or Member Token, scoped to project; member may mutate only self-created rules                                                                                                                                                |
+| Project Slack destinations                   | `GET /v1/projects/{id}/slack/destinations`                          | `slack list`                              | `list_slack_destinations`                                                                                            | Browser Session or Member Token, reusable Slack channel list for alert setup; preserved destinations remain readable while paused on Free                                                                                                    |
+| Test Slack destination                       | `POST /v1/projects/{id}/slack/destinations/{destinationId}/test`    | `slack test`                              | `test_slack_destination`                                                                                             | Browser Session or Member Token, owner/admin only, Team tier                                                                                                                                                                                 |
+| Delete Slack destination                     | `DELETE /v1/projects/{id}/slack/destinations/{destinationId}`       | `slack delete`                            | `delete_slack_destination`                                                                                           | Browser Session or Member Token, owner/admin cleanup action; allowed after downgrade                                                                                                                                                         |
+| Weekly report channel CRUD                   | `POST/GET/PATCH/DELETE /v1/weekly-report-channels`                  | `weekly-report list/create/update/delete` | `list_weekly_report_channels/create_weekly_report_channel/update_weekly_report_channel/delete_weekly_report_channel` | Browser Session or Member Token, scoped to organization/project; preserved Slack channels remain readable while paused                                                                                                                       |
+| List webhooks                                | `GET /v1/webhooks`                                                  | `webhook list`                            | `list_webhooks`                                                                                                      | Browser Session or Member Token, scoped to project                                                                                                                                                                                           |
+| Create webhook                               | `POST /v1/webhooks`                                                 | `webhook create`                          | `create_webhook`                                                                                                     | Signing secret returned once                                                                                                                                                                                                                 |
+| Update webhook                               | `PATCH /v1/webhooks/{id}`                                           | `webhook update`                          | `update_webhook`                                                                                                     | Owner/admin may update any webhook; member may update only self-created webhooks                                                                                                                                                             |
+| Delete webhook                               | `DELETE /v1/webhooks/{id}`                                          | `webhook delete`                          | `delete_webhook`                                                                                                     | Owner/admin may delete any webhook; member may delete only self-created webhooks                                                                                                                                                             |
+| Test webhook                                 | `POST /v1/webhooks/{id}/test`                                       | `webhook test`                            | `test_webhook`                                                                                                       | Queues a signed synthetic delivery; member may test only self-created webhooks                                                                                                                                                               |
+| Webhook deliveries                           | `GET /v1/webhooks/{id}/deliveries`                                  | `webhook deliveries`                      | `list_webhook_deliveries`                                                                                            | Statuses: pending, retrying, delivered, failed, disabled                                                                                                                                                                                     |
+| Retry webhook delivery                       | `POST /v1/webhooks/{id}/deliveries/{deliveryId}/retry`              | `webhook retry`                           | `retry_webhook_delivery`                                                                                             | Resets failed/disabled delivery to retrying; member may retry only self-created webhooks                                                                                                                                                     |
+| Doctor                                       | —                                                                   | `doctor`                                  | `doctor`                                                                                                             | CLI/MCP-only (local env)                                                                                                                                                                                                                     |
+| Validate                                     | —                                                                   | `validate [--fix]`                        | `validate`                                                                                                           | CLI/MCP-only (local env)                                                                                                                                                                                                                     |
+| Verify local                                 | —                                                                   | `verify local`                            | `verify_local`                                                                                                       | CLI/MCP-only (local env)                                                                                                                                                                                                                     |
+| Verify cloud                                 | —                                                                   | `verify cloud`                            | `verify_cloud`                                                                                                       | Uses API internally; `--trigger-5xx`/`trigger5xx` proves hosted synthetic incident creation, `--trigger-4xx <status>`/`trigger4xxStatus` proves configured hosted 4xx promotion, and `--expect-app-event` proves real SDK-driven app capture |
+| Smoke test                                   | —                                                                   | `smoke`                                   | `smoke`                                                                                                              | CLI/MCP-only                                                                                                                                                                                                                                 |
+| Login                                        | —                                                                   | `login`                                   | —                                                                                                                    | CLI-only (stores member-token auth state locally; supports member-token, GitHub device, and `gh` bootstrap modes)                                                                                                                            |
+| Setup project                                | —                                                                   | `setup`                                   | —                                                                                                                    | CLI-only (local scaffold generation, mixed-runtime discovery, relay scaffolding, and runtime-specific relay guidance)                                                                                                                        |
+| Ingest local logs                            | —                                                                   | `ingest`                                  | —                                                                                                                    | CLI-only (local log parser pipeline)                                                                                                                                                                                                         |
+| Watch local logs                             | —                                                                   | `watch`                                   | —                                                                                                                    | CLI-only (local log tail pipeline)                                                                                                                                                                                                           |
+| Process local events                         | —                                                                   | `process`                                 | —                                                                                                                    | CLI-only (local file transport pipeline)                                                                                                                                                                                                     |
+| Connect                                      | —                                                                   | `connect`                                 | —                                                                                                                    | CLI-only (interactive)                                                                                                                                                                                                                       |
+| Profile validate                             | —                                                                   | `profile validate`                        | —                                                                                                                    | CLI-only (local files)                                                                                                                                                                                                                       |
+| Profile show                                 | —                                                                   | `profile show`                            | —                                                                                                                    | CLI-only (local files)                                                                                                                                                                                                                       |
+| Profile sync                                 | —                                                                   | `profile sync`                            | —                                                                                                                    | CLI-only (local files)                                                                                                                                                                                                                       |
+| Analyze (local)                              | —                                                                   | `analyze`                                 | `analyze`                                                                                                            | CLI/MCP-only (local agent-driven)                                                                                                                                                                                                            |
+| Activate probes (remote)                     | `POST /v1/projects/{id}/probes/activate`                            | `probe activate`                          | `activate_probe`                                                                                                     | Browser Session or Member Token, Solo+ only                                                                                                                                                                                                  |
+| List active probes (remote)                  | `GET /v1/projects/{id}/probes`                                      | `probe list`                              | `list_active_probes`                                                                                                 | Browser Session or Member Token, preserved activations remain readable while paused on Free                                                                                                                                                  |
+| Deactivate probes (remote)                   | `POST /v1/projects/{id}/probes/deactivate`                          | `probe deactivate`                        | `deactivate_probe`                                                                                                   | Browser Session or Member Token cleanup action; allowed after downgrade                                                                                                                                                                      |
+| List health checks                           | `GET /v1/projects/{id}/availability-checks`                         | `health checks list`                      | `list_health_checks`                                                                                                 | Browser Session or Member Token; readable to any authorized project member                                                                                                                                                                   |
+| Get health check                             | `GET /v1/projects/{id}/availability-checks/{checkId}`               | `health checks get`                       | `get_health_check`                                                                                                   | Browser Session or Member Token; readable to any authorized project member                                                                                                                                                                   |
+| Create health check                          | `POST /v1/projects/{id}/availability-checks`                        | `health checks create`                    | `create_health_check`                                                                                                | Browser Session or Member Token, owner/admin only                                                                                                                                                                                            |
+| Update health check                          | `PATCH /v1/projects/{id}/availability-checks/{checkId}`             | `health checks update`                    | `update_health_check`                                                                                                | Browser Session or Member Token, owner/admin only                                                                                                                                                                                            |
+| Delete health check                          | `DELETE /v1/projects/{id}/availability-checks/{checkId}`            | `health checks delete`                    | `delete_health_check`                                                                                                | Browser Session or Member Token, owner/admin only                                                                                                                                                                                            |
+| Test health check target                     | `POST /v1/projects/{id}/availability-checks/test`                   | `health checks test`                      | `test_health_check`                                                                                                  | Browser Session or Member Token, owner/admin only, side-effect-free                                                                                                                                                                          |
+| List health check results                    | `GET /v1/projects/{id}/availability-checks/{checkId}/results`       | `health checks results`                   | `list_health_check_results`                                                                                          | Browser Session or Member Token; readable to any authorized project member                                                                                                                                                                   |
+| List health check daily rollups              | `GET /v1/projects/{id}/availability-checks/{checkId}/daily-rollups` | `health checks daily-rollups`             | `list_health_check_daily_rollups`                                                                                    | Browser Session or Member Token; readable to any authorized project member                                                                                                                                                                   |
+| Get capture policy                           | `GET /v1/projects/{id}/capture-policy`                              | `capture-policy get`                      | `get_capture_policy`                                                                                                 | Browser Session or Member Token; member receives preview-only payload                                                                                                                                                                        |
+| Update capture policy                        | `PATCH /v1/projects/{id}/capture-policy`                            | `capture-policy set`                      | `update_capture_policy`                                                                                              | Browser Session or Member Token, owner/admin only                                                                                                                                                                                            |
+| List capture rules                           | `GET /v1/projects/{id}/capture-rules`                               | `capture-rule list`                       | `list_capture_rules`                                                                                                 | Browser Session or Member Token; members receive preview-only payload                                                                                                                                                                        |
+| Create capture rule                          | `POST /v1/projects/{id}/capture-rules`                              | `capture-rule create`                     | `create_capture_rule`                                                                                                | Browser Session or Member Token, owner/admin only                                                                                                                                                                                            |
+| Update capture rule                          | `PATCH /v1/projects/{id}/capture-rules/{ruleId}`                    | `capture-rule update`                     | `update_capture_rule`                                                                                                | Browser Session or Member Token, owner/admin only                                                                                                                                                                                            |
+| Delete capture rule                          | `DELETE /v1/projects/{id}/capture-rules/{ruleId}`                   | `capture-rule delete`                     | `delete_capture_rule`                                                                                                | Browser Session or Member Token, owner/admin only                                                                                                                                                                                            |
+| Get improvement settings                     | `GET /v1/projects/{id}/improvement-settings`                        | `improvements settings get`               | `get_improvement_settings`                                                                                           | Browser Session or Member Token; members receive preview-only payload and all tiers can inspect availability                                                                                                                                 |
+| Update improvement settings                  | `PATCH /v1/projects/{id}/improvement-settings`                      | `improvements settings set`               | `update_improvement_settings`                                                                                        | Browser Session or Member Token, owner/admin only, paid Solo+ or self-host                                                                                                                                                                   |
+| SDK config                                   | `GET /v1/sdk/config`                                                | —                                         | —                                                                                                                    | SDK-only (project token, includes resolved capture policy; callers may opt into bounded restrictive analytics capture settings with `X-DebugBundle-Analytics-Config: 1`)                                                                     |
+| Get GitHub App install URL                   | `GET /v1/github/app/install-url`                                    | —                                         | —                                                                                                                    | Browser Session or Member Token, owner/admin only on eligible Solo+ project; web convenience route for the install/reconnect CTA, optionally signed with a return path                                                                       |
+| Get GitHub installation                      | `GET /v1/github/installation`                                       | `github status`                           | `get_github_status`                                                                                                  | Browser Session or Member Token; read remains available when preserved GitHub setup is paused on Free                                                                                                                                        |
+| Disconnect GitHub installation               | `DELETE /v1/github/installation`                                    | —                                         | —                                                                                                                    | Web/API cleanup action; owner/admin only and allowed after downgrade                                                                                                                                                                         |
+| List GitHub repositories                     | `GET /v1/github/repositories`                                       | `github repos`                            | `list_github_repositories`                                                                                           | Browser Session or Member Token, owner/admin only on eligible Solo+ project                                                                                                                                                                  |
+| Get project GitHub repo                      | `GET /v1/projects/{id}/github/repo`                                 | `github status`                           | `get_github_status`                                                                                                  | Included in status response; read remains available when preserved GitHub setup is paused on Free                                                                                                                                            |
+| Set project GitHub repo                      | `PUT /v1/projects/{id}/github/repo`                                 | `github repo set`                         | `set_project_github_repo`                                                                                            | Browser Session or Member Token, owner/admin only, Solo+ only                                                                                                                                                                                |
+| Remove project GitHub repo                   | `DELETE /v1/projects/{id}/github/repo`                              | `github repo remove`                      | `remove_project_github_repo`                                                                                         | Browser Session or Member Token, owner/admin cleanup action; allowed after downgrade                                                                                                                                                         |
+| Create dispatch rule                         | `POST /v1/projects/{id}/github/rules`                               | `github rules create`                     | `create_github_dispatch_rule`                                                                                        | Browser Session or Member Token, any authorized project member on eligible Solo+ project                                                                                                                                                     |
+| List dispatch rules                          | `GET /v1/projects/{id}/github/rules`                                | `github rules`                            | `list_github_dispatch_rules`                                                                                         | Browser Session or Member Token; read remains available when preserved GitHub setup is paused on Free                                                                                                                                        |
+| Get dispatch rule                            | `GET /v1/projects/{id}/github/rules/{ruleId}`                       | —                                         | —                                                                                                                    | API convenience; CLI/MCP use list                                                                                                                                                                                                            |
+| Update dispatch rule                         | `PATCH /v1/projects/{id}/github/rules/{ruleId}`                     | `github rules update`                     | `update_github_dispatch_rule`                                                                                        | Browser Session or Member Token, owner/admin may update any rule; member may update only self-created rules                                                                                                                                  |
+| Delete dispatch rule                         | `DELETE /v1/projects/{id}/github/rules/{ruleId}`                    | `github rules delete`                     | `delete_github_dispatch_rule`                                                                                        | Browser Session or Member Token cleanup action; owner/admin may delete any rule and member may delete only self-created rules, allowed after downgrade                                                                                       |
+| List dispatch deliveries                     | `GET /v1/projects/{id}/github/deliveries`                           | `github deliveries`                       | `list_github_deliveries`                                                                                             | Browser Session or Member Token; read remains available when preserved GitHub setup is paused on Free                                                                                                                                        |
+| Retry dispatch delivery                      | `POST /v1/projects/{id}/github/deliveries/{id}/retry`               | `github deliveries retry`                 | `retry_github_delivery`                                                                                              | Browser Session or Member Token, owner/admin or creator-owned-rule member on eligible Solo+ project                                                                                                                                          |
+| GitHub App callback                          | `GET /v1/github/app/callback`                                       | —                                         | —                                                                                                                    | GitHub App setup URL / post-install redirect handler                                                                                                                                                                                         |
+| GitHub App webhook                           | `POST /v1/github/app/webhook`                                       | —                                         | —                                                                                                                    | Installation lifecycle events (HMAC-verified)                                                                                                                                                                                                |
+| GitHub Marketplace webhook                   | `POST /v1/github/marketplace/webhook`                               | —                                         | —                                                                                                                    | GitHub Marketplace listing webhook for purchase/subscription lifecycle tracking (HMAC-verified)                                                                                                                                              |
 
 ---
 
@@ -168,6 +168,7 @@ Every capability must be available through all applicable interfaces. Operations
 Base URL: `https://api.debugbundle.com/v1` (cloud). Self-hosted: configurable.
 
 Auth model:
+
 - Browser session cookie for interactive web-auth and member-authorized web usage
 - Bearer member token for CLI, MCP, and automation
 - Project token header for ingestion and SDK config
@@ -180,25 +181,25 @@ Stripe checkout and customer-portal billing routes remain browser-session-only i
 
 ### 1.0a Browser Auth
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| POST | `/v1/auth/request-code` | None | Request a one-time email code for browser sign-in or first-time signup |
-| POST | `/v1/auth/verify-code` | None | Verify a one-time email code and create a browser session |
-| POST | `/v1/auth/logout` | Browser Session | Revoke current browser session |
-| GET | `/v1/auth/session` | Browser Session | Return current session state or `session: null` when signed out |
-| GET | `/review/access` | None | Secret-gated reviewer bootstrap that sets a short-lived review grant cookie and redirects to the app |
-| GET | `/v1/account/avatar` | Browser Session | Return the signed-in user's cached avatar bytes when one has been imported |
-| POST | `/v1/account/avatar/import-gravatar` | Browser Session | Import and cache a Gravatar avatar server-side after explicit user action |
-| GET | `/v1/account/export` | Browser Session | Export retained organization-account data as a JSON attachment (owner only) |
-| POST | `/v1/account/delete/request-otp` | Browser Session | Request an email OTP for account deletion after the exact confirmation phrase is provided (owner only) |
-| DELETE | `/v1/account` | Browser Session | Permanently delete the current organization account after phrase confirmation and OTP verification (owner only) |
-| POST | `/v1/auth/project-invite/accept` | Browser Session | Accept a pending project invite for the current signed-in user |
-| GET | `/v1/auth/github/start` | None | Start GitHub OAuth and set transient state cookie |
-| GET | `/v1/auth/github/callback` | None | Complete GitHub OAuth, issue browser session, and redirect back to the app |
-| POST | `/v1/auth/github/device/start` | None | Start GitHub device flow and return the verification URL/code |
-| POST | `/v1/auth/github/device/poll` | None | Poll GitHub device-flow progress through DebugBundle |
-| POST | `/v1/auth/github/device/claim` | None | Claim the issued member token after device approval completes |
-| POST | `/v1/auth/github/token/exchange` | None | Exchange an existing GitHub access token for a DebugBundle member token |
+| Method | Path                                 | Auth            | Description                                                                                                     |
+| ------ | ------------------------------------ | --------------- | --------------------------------------------------------------------------------------------------------------- |
+| POST   | `/v1/auth/request-code`              | None            | Request a one-time email code for browser sign-in or first-time signup                                          |
+| POST   | `/v1/auth/verify-code`               | None            | Verify a one-time email code and create a browser session                                                       |
+| POST   | `/v1/auth/logout`                    | Browser Session | Revoke current browser session                                                                                  |
+| GET    | `/v1/auth/session`                   | Browser Session | Return current session state or `session: null` when signed out                                                 |
+| GET    | `/review/access`                     | None            | Secret-gated reviewer bootstrap that sets a short-lived review grant cookie and redirects to the app            |
+| GET    | `/v1/account/avatar`                 | Browser Session | Return the signed-in user's cached avatar bytes when one has been imported                                      |
+| POST   | `/v1/account/avatar/import-gravatar` | Browser Session | Import and cache a Gravatar avatar server-side after explicit user action                                       |
+| GET    | `/v1/account/export`                 | Browser Session | Export retained organization-account data as a JSON attachment (owner only)                                     |
+| POST   | `/v1/account/delete/request-otp`     | Browser Session | Request an email OTP for account deletion after the exact confirmation phrase is provided (owner only)          |
+| DELETE | `/v1/account`                        | Browser Session | Permanently delete the current organization account after phrase confirmation and OTP verification (owner only) |
+| POST   | `/v1/auth/project-invite/accept`     | Browser Session | Accept a pending project invite for the current signed-in user                                                  |
+| GET    | `/v1/auth/github/start`              | None            | Start GitHub OAuth and set transient state cookie                                                               |
+| GET    | `/v1/auth/github/callback`           | None            | Complete GitHub OAuth, issue browser session, and redirect back to the app                                      |
+| POST   | `/v1/auth/github/device/start`       | None            | Start GitHub device flow and return the verification URL/code                                                   |
+| POST   | `/v1/auth/github/device/poll`        | None            | Poll GitHub device-flow progress through DebugBundle                                                            |
+| POST   | `/v1/auth/github/device/claim`       | None            | Claim the issued member token after device approval completes                                                   |
+| POST   | `/v1/auth/github/token/exchange`     | None            | Exchange an existing GitHub access token for a DebugBundle member token                                         |
 
 Browser-session bootstrap endpoints exist for the SPA flow only. The separate GitHub CLI bootstrap endpoints are API-backed helpers used by `debugbundle login --github*`, while MCP still reuses the member-token auth state established by the CLI.
 
@@ -213,6 +214,7 @@ Browser-session bootstrap endpoints exist for the SPA flow only. The separate Gi
 `POST /v1/auth/request-code` always returns a generic success payload when the request is valid. Existing accounts can use the code immediately. New accounts are created only after a valid code is verified, and the request endpoint preserves the same response shape so the browser flow does not reveal account existence.
 
 **Request email code:**
+
 ```json
 {
   "email": "user@example.com",
@@ -223,6 +225,7 @@ Browser-session bootstrap endpoints exist for the SPA flow only. The separate Gi
 `accepted_terms` is required and must be `true`. The server records the corresponding `accepted_terms_at` timestamp on account creation.
 
 **Verify email code:**
+
 ```json
 {
   "email": "user@example.com",
@@ -240,6 +243,7 @@ The CLI bootstrap flow is additive and issues the same member-token credential u
 `GET /v1/account/export` returns a JSON attachment with top-level `export_version: 1` plus the retained organization-account record set, including organization and project members, projects, tokens, capture policies, probes, hosted improvement opportunities, reusable Slack destinations, alerts, weekly reports, webhooks, GitHub automation, incidents, audit logs, billing-processing rows, retryable plan-cleanup rows, operational email rows, and retained raw-event, bundle, improvement-bundle, and reproduction artifacts when present in object storage.
 
 `GET /v1/account/avatar` returns the signed-in user's cached avatar bytes with a first-party URL shape of `/v1/account/avatar`. `POST /v1/account/avatar/import-gravatar` performs a server-side fetch against Gravatar only after explicit user action, stores the resulting avatar in object storage, and returns:
+
 - `200 { "avatar": { "source": "gravatar", "avatar_url": "/v1/account/avatar", "updated_at": "ISO8601" } }`
 - `404 { "error": "gravatar_not_found" }` when no Gravatar image exists
 - `502 { "error": "avatar_import_failed" }` when the remote fetch fails or returns an unsupported image
@@ -277,6 +281,7 @@ On success, the delete removes the signed-in user from every remaining organizat
 Anonymized aggregate account-usage metrics are preserved after deletion for lifecycle analytics, but they are not user-accessible after the account is gone and they do not retain project names, payloads, tokens, emails, or other customer content. Required payment/provider-retention records are also preserved outside the normal account export surface for accounting, tax, audit, fraud, chargeback, and webhook-idempotency needs.
 
 **Accept project invite request:**
+
 ```json
 {
   "token": "dbundle_invite_..."
@@ -284,6 +289,7 @@ Anonymized aggregate account-usage metrics are preserved after deletion for life
 ```
 
 **Accept project invite response:**
+
 ```json
 {
   "membership": {
@@ -302,9 +308,9 @@ Anonymized aggregate account-usage metrics are preserved after deletion for life
 
 ### 1.1 Ingestion
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| POST | `/v1/events` | Project Token | Ingest batched events |
+| Method | Path         | Auth          | Description           |
+| ------ | ------------ | ------------- | --------------------- |
+| POST   | `/v1/events` | Project Token | Ingest batched events |
 
 `POST /v1/events` is subject to the shared API request body limit. Requests with a declared `Content-Length` over the limit are rejected before project-token auth, schema validation, persistence, or queueing. The route is also subject to per-project-token ingestion rate limiting using the active tier capability (`ingestion_rate_per_min`). When the limit is exceeded, the API must reject the batch before persistence and return `429 Too Many Requests` with a `Retry-After` header.
 
@@ -313,6 +319,7 @@ The endpoint accepts the existing debug event family plus opt-in `analytics_even
 The canonical direct-ingestion wrapper is `{ "events": [...] }`. After successful project-token authentication only, ingestion also recognizes the exact `{ "batch": [...] }` wrapper, legacy mobile event shapes emitted by installed Android/Swift 1.x clients, and the exact legacy `backend_exception.payload.runtime` memory shape emitted by installed `@debugbundle/sdk-java` releases through `1.3.0`. The Java branch requires the exact `{ max_bytes, total_bytes, free_bytes }` memory keys plus the shipped top-level runtime `jvm_name`, maps `total_bytes` to `heap_total`, derives `heap_used` as `total_bytes - free_bytes`, sets unavailable canonical process metrics to `null`, and moves the JVM name and heap ceiling into `framework_extras`. These bounded compatibility branches are SDK-identity- and shape-gated and then apply the same closed canonical schema. They must not make arbitrary, unrelated, extended, or numerically invalid clients permissive. Structured compatibility diagnostics and counters must remain bounded and distinguish wrapper normalization, event normalization, and final rejection.
 
 **Request:**
+
 ```json
 {
   "events": [
@@ -321,8 +328,18 @@ The canonical direct-ingestion wrapper is `{ "events": [...] }`. After successfu
       "event_id": "uuid",
       "event_type": "backend_exception",
       "occurred_at": "ISO8601",
-      "service": { "name": "string", "runtime": "string", "framework": "string", "environment": "string" },
-      "correlation": { "request_id": "string?", "trace_id": "string?", "session_id": "string?", "user_id_hash": "string?" },
+      "service": {
+        "name": "string",
+        "runtime": "string",
+        "framework": "string",
+        "environment": "string"
+      },
+      "correlation": {
+        "request_id": "string?",
+        "trace_id": "string?",
+        "session_id": "string?",
+        "user_id_hash": "string?"
+      },
       "payload": {}
     }
   ]
@@ -330,6 +347,7 @@ The canonical direct-ingestion wrapper is `{ "events": [...] }`. After successfu
 ```
 
 **Response:**
+
 ```json
 {
   "accepted": 1,
@@ -350,6 +368,7 @@ The canonical direct-ingestion wrapper is `{ "events": [...] }`. After successfu
 ```
 
 **Rate-limited response:**
+
 ```json
 {
   "accepted": 0,
@@ -369,6 +388,7 @@ The canonical direct-ingestion wrapper is `{ "events": [...] }`. After successfu
 ```
 
 **Oversized body response:**
+
 ```json
 {
   "accepted": 0,
@@ -383,6 +403,7 @@ The canonical direct-ingestion wrapper is `{ "events": [...] }`. After successfu
 ```
 
 **Monthly quota exhausted response:**
+
 ```json
 {
   "accepted": 0,
@@ -415,18 +436,18 @@ Connected SDKs must reconcile the indexed acknowledgement as defined in `contrac
 
 ### 1.2 Incidents
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/v1/incidents` | Browser Session or Member Token | List incidents (filterable) |
-| GET | `/v1/incidents/{id}` | Browser Session or Member Token | Get incident metadata |
-| GET | `/v1/incidents/{id}/context` | Browser Session or Member Token | Get deterministic one-call incident explanation context |
-| POST | `/v1/incidents/{id}/resolve` | Browser Session or Member Token | Explicitly resolve an incident |
-| POST | `/v1/incidents/resolve` | Browser Session or Member Token | Explicitly resolve incidents in bulk |
-| POST | `/v1/incidents/{id}/reopen` | Browser Session or Member Token | Explicitly reopen an incident |
-| POST | `/v1/incidents/reopen` | Browser Session or Member Token | Explicitly reopen incidents in bulk |
-| GET | `/v1/incidents/{id}/bundle` | Browser Session or Member Token | Get debug bundle |
-| GET | `/v1/incidents/{id}/reproduction` | Browser Session or Member Token | Get reproduction artifact |
-| GET | `/v1/logs` | Browser Session or Member Token | Query logs by incident |
+| Method | Path                              | Auth                            | Description                                             |
+| ------ | --------------------------------- | ------------------------------- | ------------------------------------------------------- |
+| GET    | `/v1/incidents`                   | Browser Session or Member Token | List incidents (filterable)                             |
+| GET    | `/v1/incidents/{id}`              | Browser Session or Member Token | Get incident metadata                                   |
+| GET    | `/v1/incidents/{id}/context`      | Browser Session or Member Token | Get deterministic one-call incident explanation context |
+| POST   | `/v1/incidents/{id}/resolve`      | Browser Session or Member Token | Explicitly resolve an incident                          |
+| POST   | `/v1/incidents/resolve`           | Browser Session or Member Token | Explicitly resolve incidents in bulk                    |
+| POST   | `/v1/incidents/{id}/reopen`       | Browser Session or Member Token | Explicitly reopen an incident                           |
+| POST   | `/v1/incidents/reopen`            | Browser Session or Member Token | Explicitly reopen incidents in bulk                     |
+| GET    | `/v1/incidents/{id}/bundle`       | Browser Session or Member Token | Get debug bundle                                        |
+| GET    | `/v1/incidents/{id}/reproduction` | Browser Session or Member Token | Get reproduction artifact                               |
+| GET    | `/v1/logs`                        | Browser Session or Member Token | Query logs by incident                                  |
 
 **Query params (list incidents):** `project_id`, `environment`, `service`, `status` (`active`/open/resolved/regressed; `active` means open or regressed), `severity`, `first_seen_after`, `attention_after`, `limit`, `cursor`
 
@@ -439,6 +460,7 @@ Low-value external-probe `GET`/`404` routes such as common WordPress, OWA, RDWeb
 **Incident response fields include:** `id`, `project_id`, `project_name`, `service_id`, `service_name`, `environment`, `fingerprint`, `fingerprint_version`, `title`, `severity`, `status`, `first_seen_at`, `last_seen_at`, `occurrence_count`, `affected_users_estimate`, `spike_detected_at`, `resolved_at`, `regressed_at`, `matched_fields`, `incident_reason`
 
 Current API implementation scope (Phase 1 continuation):
+
 - `GET /v1/incidents` response body: `{ incidents: IncidentRetrievalRecord[], next_cursor: string | null }`
 - `GET /v1/incidents/{id}` response body: `{ incident: IncidentRetrievalRecord }`
 - `GET /v1/incidents/{id}/context` response body: `IncidentContextRecord`
@@ -466,6 +488,7 @@ Current API implementation scope (Phase 1 continuation):
   }
 }
 ```
+
 - `GET /v1/incidents/{id}/bundle` response body: artifact JSON when present; `{ "status": "pending" }` when artifact is missing; `{ "status": "failed", "reason": "..." }` when artifact is unreadable/invalid
 - `GET /v1/incidents/{id}/reproduction` response body: artifact JSON when present; `{ "status": "pending" }` while the reproduction artifact is not yet available; `404 { "error": "reproduction_not_found" }` on non-not-found artifact read failures
 - `GET /v1/logs` requires `incident_id` and supports `level`, `cursor`, `limit` (1-100, default 20); response body: `{ logs: [{ event_id, event_type, occurred_at, is_sampled, level }], next_cursor }`
@@ -479,20 +502,21 @@ When hosted bundle generation is blocked by the shared `monthly_bundle_requests`
 
 ### 1.2a Improvements
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/v1/improvements` | Browser Session or Member Token | List hosted improvement opportunities (filterable) |
-| GET | `/v1/improvements/{id}` | Browser Session or Member Token | Get hosted improvement metadata |
-| POST | `/v1/improvements/{id}/resolve` | Browser Session or Member Token | Explicitly resolve a hosted improvement |
-| POST | `/v1/improvements/{id}/reopen` | Browser Session or Member Token | Reopen a hosted improvement |
-| POST | `/v1/improvements/{id}/snooze` | Browser Session or Member Token | Snooze a hosted improvement until a future ISO8601 timestamp |
-| GET | `/v1/projects/{id}/improvements/{improvementId}/bundle` | Browser Session or Member Token | Get the hosted improvement bundle artifact |
+| Method | Path                                                    | Auth                            | Description                                                  |
+| ------ | ------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------ |
+| GET    | `/v1/improvements`                                      | Browser Session or Member Token | List hosted improvement opportunities (filterable)           |
+| GET    | `/v1/improvements/{id}`                                 | Browser Session or Member Token | Get hosted improvement metadata                              |
+| POST   | `/v1/improvements/{id}/resolve`                         | Browser Session or Member Token | Explicitly resolve a hosted improvement                      |
+| POST   | `/v1/improvements/{id}/reopen`                          | Browser Session or Member Token | Reopen a hosted improvement                                  |
+| POST   | `/v1/improvements/{id}/snooze`                          | Browser Session or Member Token | Snooze a hosted improvement until a future ISO8601 timestamp |
+| GET    | `/v1/projects/{id}/improvements/{improvementId}/bundle` | Browser Session or Member Token | Get the hosted improvement bundle artifact                   |
 
 **Query params (list improvements):** `project_id`, `environment`, `service`, `status` (open/resolved/snoozed), `severity`, `kind`, `limit`, `cursor`
 
 Open request/log candidates below the configured generation threshold are internal counting state and are excluded from list responses. Common external-probe `GET`/`404` request paths are excluded from hosted improvement lists. Recurring-incident opportunities are listed after their recurrence threshold is met; post-deploy regression opportunities may be listed immediately.
 
 Current API implementation scope:
+
 - `GET /v1/improvements` response body: `{ improvements: ImprovementRetrievalRecord[], next_cursor: string | null }`
 - `GET /v1/improvements/{id}` response body: `{ improvement: ImprovementRetrievalRecord }`
 - `POST /v1/improvements/{id}/resolve` response body: `{ improvement: ImprovementRetrievalRecord }`
@@ -507,27 +531,27 @@ Analytics read/manage APIs require Browser Session or Member Token auth. Project
 
 Analytics shares browser SDK capture primitives with debug capture where that reduces duplication and improves correlation: normalized route keys, session ids, sanitized action/click descriptors, device/browser context, referrer/UTM parsing, and structured journey entries. The public interfaces remain separate. Debug events and debug bundles do not require analytics to be enabled, and analytics settings, consent, quotas, sampling, retention, or failures must not suppress existing incident/debug capture. When both lanes capture the same browser signal, API/CLI/MCP consumers see separate debug and analytics records linked by common correlation fields rather than a merged raw telemetry store.
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/v1/analytics/summary` | Browser Session or Member Token | Project usage summary for a time range |
-| GET | `/v1/analytics/routes` | Browser Session or Member Token | Route/page metrics |
-| GET | `/v1/analytics/devices` | Browser Session or Member Token | Device/browser/OS/language breakdown |
-| GET | `/v1/analytics/referrers` | Browser Session or Member Token | Referrer and UTM metrics |
-| GET | `/v1/analytics/actions` | Browser Session or Member Token | Action, marker, and conversion metrics |
-| GET | `/v1/analytics/funnels` | Browser Session or Member Token | Funnel definitions and aggregate conversion summaries |
-| GET | `/v1/analytics/funnels/{key}` | Browser Session or Member Token | Detailed funnel conversion/dropoff breakdown |
-| GET | `/v1/analytics/journey-patterns` | Browser Session or Member Token | Aggregate path and friction patterns plus retained representative sample references |
-| GET | `/v1/analytics/journey-samples` | Browser Session or Member Token | Retained redacted journey sample metadata |
-| GET | `/v1/analytics/journey-samples/{id}` | Browser Session or Member Token | Retained redacted journey sample artifact |
-| GET | `/v1/analytics/opportunities` | Browser Session or Member Token | Analytics opportunities |
-| GET | `/v1/analytics/opportunities/{id}` | Browser Session or Member Token | Analytics opportunity detail |
-| GET | `/v1/analytics/bundles` | Browser Session or Member Token | List AnalyticsBundle generation records and pending/failed/completed states |
-| POST | `/v1/analytics/bundles` | Browser Session or Member Token | Request AnalyticsBundle generation |
-| GET | `/v1/analytics/bundles/{id}` | Browser Session or Member Token | Fetch generated AnalyticsBundle or status |
-| GET | `/v1/projects/{id}/analytics/saved-funnels` | Browser Session or Member Token | List active saved funnel definitions |
-| POST | `/v1/projects/{id}/analytics/saved-funnels` | Browser Session or Member Token, owner/admin | Create or reactivate a saved funnel definition |
-| PATCH | `/v1/projects/{id}/analytics/saved-funnels/{key}` | Browser Session or Member Token, owner/admin | Update a saved funnel definition |
-| DELETE | `/v1/projects/{id}/analytics/saved-funnels/{key}` | Browser Session or Member Token, owner/admin | Soft-archive a saved funnel definition |
+| Method | Path                                              | Auth                                         | Description                                                                         |
+| ------ | ------------------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------- |
+| GET    | `/v1/analytics/summary`                           | Browser Session or Member Token              | Project usage summary for a time range                                              |
+| GET    | `/v1/analytics/routes`                            | Browser Session or Member Token              | Route/page metrics                                                                  |
+| GET    | `/v1/analytics/devices`                           | Browser Session or Member Token              | Device/browser/OS/language breakdown                                                |
+| GET    | `/v1/analytics/referrers`                         | Browser Session or Member Token              | Referrer and UTM metrics                                                            |
+| GET    | `/v1/analytics/actions`                           | Browser Session or Member Token              | Action, marker, and conversion metrics                                              |
+| GET    | `/v1/analytics/funnels`                           | Browser Session or Member Token              | Funnel definitions and aggregate conversion summaries                               |
+| GET    | `/v1/analytics/funnels/{key}`                     | Browser Session or Member Token              | Detailed funnel conversion/dropoff breakdown                                        |
+| GET    | `/v1/analytics/journey-patterns`                  | Browser Session or Member Token              | Aggregate path and friction patterns plus retained representative sample references |
+| GET    | `/v1/analytics/journey-samples`                   | Browser Session or Member Token              | Retained redacted journey sample metadata                                           |
+| GET    | `/v1/analytics/journey-samples/{id}`              | Browser Session or Member Token              | Retained redacted journey sample artifact                                           |
+| GET    | `/v1/analytics/opportunities`                     | Browser Session or Member Token              | Analytics opportunities                                                             |
+| GET    | `/v1/analytics/opportunities/{id}`                | Browser Session or Member Token              | Analytics opportunity detail                                                        |
+| GET    | `/v1/analytics/bundles`                           | Browser Session or Member Token              | List AnalyticsBundle generation records and pending/failed/completed states         |
+| POST   | `/v1/analytics/bundles`                           | Browser Session or Member Token              | Request AnalyticsBundle generation                                                  |
+| GET    | `/v1/analytics/bundles/{id}`                      | Browser Session or Member Token              | Fetch generated AnalyticsBundle or status                                           |
+| GET    | `/v1/projects/{id}/analytics/saved-funnels`       | Browser Session or Member Token              | List active saved funnel definitions                                                |
+| POST   | `/v1/projects/{id}/analytics/saved-funnels`       | Browser Session or Member Token, owner/admin | Create or reactivate a saved funnel definition                                      |
+| PATCH  | `/v1/projects/{id}/analytics/saved-funnels/{key}` | Browser Session or Member Token, owner/admin | Update a saved funnel definition                                                    |
+| DELETE | `/v1/projects/{id}/analytics/saved-funnels/{key}` | Browser Session or Member Token, owner/admin | Soft-archive a saved funnel definition                                              |
 
 The web client exposes these saved-funnel operations inside Project Settings under
 Product analytics. It lists active definitions for authorized members and exposes
@@ -538,6 +562,7 @@ active-definition limit enforcement as the API.
 **Common query params:** `project_id` (required unless the endpoint explicitly supports cross-project summary), `service`, `environment`, `from`, `to`, `granularity`, `route`, `funnel`, `device_type`, `browser`, `os`, `language`, `country`, `auth_state`, `referrer`, `utm_source`, `utm_medium`, `utm_campaign`, `custom_dimension.<key>`, `limit`, `cursor`. Up to eight `custom_dimension.<key>` filters are accepted per request; keys must match `[A-Za-z][A-Za-z0-9_.-]{0,63}` and values are limited to 128 characters. API, CLI (`--custom-dimensions-json`), and MCP (`customDimensions`) apply the same filter limits.
 
 **Analytics summary response shape:**
+
 ```json
 {
   "summary": {
@@ -556,9 +581,7 @@ active-definition limit enforcement as the API.
     "conversions": 42
   },
   "breakdowns": {
-    "device_types": [
-      { "value": "desktop", "sessions": 700, "pageviews": 1600 }
-    ],
+    "device_types": [{ "value": "desktop", "sessions": 700, "pageviews": 1600 }],
     "browsers": [],
     "os": [],
     "languages": [],
@@ -577,6 +600,7 @@ The aggregate opportunity evaluator also creates `journey_friction` records from
 For incident impact, journey-pattern `sample_ids` additionally require an exact internal project-scoped affected-session hash, matching service/environment, a completed unexpired artifact, and the affected transition. Route or time overlap alone cannot return or hydrate a sample. The internal correlation hash is not exposed by API, CLI, or MCP, and legacy samples without it are omitted from incident-impact replay.
 
 **Analytics incident-impact response shape:**
+
 ```json
 {
   "incident_id": "uuid",
@@ -593,13 +617,25 @@ For incident impact, journey-pattern `sample_ids` additionally require an exact 
   "affected_funnels": [{ "funnel_key": "checkout", "affected_sessions": 3 }],
   "top_device_types": [{ "value": "mobile", "affected_sessions": 3 }],
   "top_browsers": [{ "value": "Chrome", "affected_sessions": 2 }],
-  "journey_patterns": [{ "from_route_key": "/pricing", "to_route_key": "/checkout", "affected_sessions": 2, "sample_ids": ["uuid"] }],
+  "journey_patterns": [
+    {
+      "from_route_key": "/pricing",
+      "to_route_key": "/checkout",
+      "affected_sessions": 2,
+      "sample_ids": ["uuid"]
+    }
+  ],
   "conversion_delta": { "availability": "unavailable", "value": null, "unit": "percentage_points" },
-  "analytics_bundle": { "status": "not_requested | pending | running | completed | failed", "generation_id": "uuid | null", "failure_reason": "string | null" }
+  "analytics_bundle": {
+    "status": "not_requested | pending | running | completed | failed",
+    "generation_id": "uuid | null",
+    "failure_reason": "string | null"
+  }
 }
 ```
 
 **Analytics route metrics response shape:**
+
 ```json
 {
   "window": {
@@ -625,6 +661,7 @@ For incident impact, journey-pattern `sample_ids` additionally require an exact 
 ```
 
 **Analytics journey-pattern response shape:**
+
 ```json
 {
   "window": {
@@ -653,6 +690,7 @@ For incident impact, journey-pattern `sample_ids` additionally require an exact 
 **Analytics device/referrer metrics response shapes:** `/devices` returns the same `window` plus `device_types`, `browsers`, `os`, and `languages` segment arrays. `/referrers` returns the same `window` plus `referrers`, `utm_sources`, `utm_mediums`, and `utm_campaigns` segment arrays. Segment rows use `{ "value": "string", "sessions": 0, "pageviews": 0 }`.
 
 **Analytics action metrics response shape:**
+
 ```json
 {
   "window": {
@@ -675,6 +713,7 @@ For incident impact, journey-pattern `sample_ids` additionally require an exact 
 ```
 
 **Analytics funnel summaries response shape:**
+
 ```json
 {
   "window": {
@@ -698,6 +737,7 @@ For incident impact, journey-pattern `sample_ids` additionally require an exact 
 ```
 
 **Analytics funnel analysis response shape:**
+
 ```json
 {
   "funnel": {
@@ -788,6 +828,7 @@ Stored opportunities are generated from aggregate/correlation ledgers only: `fun
 Journey sample responses must not expose the internal object-storage key. Expired samples return `404`.
 
 **AnalyticsBundle generation request:**
+
 ```json
 {
   "project_id": "uuid",
@@ -850,13 +891,14 @@ Quota exhausted: `429 { "error": "analytics_quota_exceeded", "retry_after_ms": <
 
 ### 1.3 Services
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/v1/services` | Browser Session or Member Token | List services for a project |
+| Method | Path           | Auth                            | Description                 |
+| ------ | -------------- | ------------------------------- | --------------------------- |
+| GET    | `/v1/services` | Browser Session or Member Token | List services for a project |
 
 **Query params (services):** `project_id` (required), `limit` (optional, 1-100, default 100)
 
 Current API implementation scope (Phase 7 kickoff slice):
+
 - `GET /v1/services` requires `project_id` and returns `200 { services: ServiceRetrievalRecord[] }`
 - `ServiceRetrievalRecord` fields: `service_id`, `project_id`, `name`, `runtime`, `framework`, `environment`
 - Authorization failure: `401 { "error": "invalid_member_token" }`
@@ -866,18 +908,19 @@ Current API implementation scope (Phase 7 kickoff slice):
 
 ### 1.3a Project Members
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/v1/projects/{id}/members` | Browser Session or Member Token (any authorized project member) | List project members including the owner and collaborators |
-| GET | `/v1/projects/{id}/members/{userId}/avatar` | Browser Session or Member Token | Return a cached project member avatar for authorized project viewers |
-| GET | `/v1/projects/{id}/invites` | Browser Session or Member Token (owner/admin only) | List pending, non-expired project invites |
-| POST | `/v1/projects/{id}/invite` | Browser Session or Member Token (owner/admin only) | Create a pending project collaborator invite |
-| DELETE | `/v1/projects/{id}/invites/{inviteId}` | Browser Session or Member Token (owner/admin only) | Cancel a pending project invite |
-| PATCH | `/v1/projects/{id}/members/{userId}` | Browser Session or Member Token (owner/admin only) | Update a collaborator role between `admin` and `member` |
-| DELETE | `/v1/projects/{id}/members/{userId}` | Browser Session or Member Token (owner/admin only) | Remove a collaborator from the project |
-| DELETE | `/v1/projects/{id}/membership` | Browser Session or Member Token (collaborator only) | Leave a shared project as the authenticated collaborator |
+| Method | Path                                        | Auth                                                            | Description                                                          |
+| ------ | ------------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------------------- |
+| GET    | `/v1/projects/{id}/members`                 | Browser Session or Member Token (any authorized project member) | List project members including the owner and collaborators           |
+| GET    | `/v1/projects/{id}/members/{userId}/avatar` | Browser Session or Member Token                                 | Return a cached project member avatar for authorized project viewers |
+| GET    | `/v1/projects/{id}/invites`                 | Browser Session or Member Token (owner/admin only)              | List pending, non-expired project invites                            |
+| POST   | `/v1/projects/{id}/invite`                  | Browser Session or Member Token (owner/admin only)              | Create a pending project collaborator invite                         |
+| DELETE | `/v1/projects/{id}/invites/{inviteId}`      | Browser Session or Member Token (owner/admin only)              | Cancel a pending project invite                                      |
+| PATCH  | `/v1/projects/{id}/members/{userId}`        | Browser Session or Member Token (owner/admin only)              | Update a collaborator role between `admin` and `member`              |
+| DELETE | `/v1/projects/{id}/members/{userId}`        | Browser Session or Member Token (owner/admin only)              | Remove a collaborator from the project                               |
+| DELETE | `/v1/projects/{id}/membership`              | Browser Session or Member Token (collaborator only)             | Leave a shared project as the authenticated collaborator             |
 
 **Member list response shape:**
+
 ```json
 {
   "members": [
@@ -894,6 +937,7 @@ Current API implementation scope (Phase 7 kickoff slice):
 ```
 
 **Create invite request:**
+
 ```json
 {
   "email": "new@example.com",
@@ -902,6 +946,7 @@ Current API implementation scope (Phase 7 kickoff slice):
 ```
 
 **Invite response shape:**
+
 ```json
 {
   "invite": {
@@ -920,6 +965,7 @@ Current API implementation scope (Phase 7 kickoff slice):
 Invite creation also sends a transactional invite email containing a one-time acceptance link when invite email delivery is configured.
 
 **Pending invite list response shape:**
+
 ```json
 {
   "invites": [
@@ -938,6 +984,7 @@ Invite creation also sends a transactional invite email containing a one-time ac
 ```
 
 **Member removal response shape:**
+
 ```json
 {
   "member": {
@@ -952,6 +999,7 @@ Invite creation also sends a transactional invite email containing a one-time ac
 ```
 
 **Update member role request:**
+
 ```json
 {
   "role": "admin"
@@ -959,6 +1007,7 @@ Invite creation also sends a transactional invite email containing a one-time ac
 ```
 
 **Update member role response shape:**
+
 ```json
 {
   "member": {
@@ -991,19 +1040,21 @@ Invite creation also sends a transactional invite email containing a one-time ac
 
 ### 1.3b Project Management
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/v1/projects` | Browser Session or Member Token | List projects visible to the caller, including owned and shared projects |
-| POST | `/v1/projects` | Browser Session or Member Token (owner only) | Create new project in caller organization |
-| PATCH | `/v1/projects/{id}` | Browser Session or Member Token (owner only) | Update project name, slug, default environment, or optional color tag |
-| DELETE | `/v1/projects/{id}` | Browser Session or Member Token (owner only) | Delete project and its project-scoped resources |
+| Method | Path                | Auth                                         | Description                                                              |
+| ------ | ------------------- | -------------------------------------------- | ------------------------------------------------------------------------ |
+| GET    | `/v1/projects`      | Browser Session or Member Token              | List projects visible to the caller, including owned and shared projects |
+| POST   | `/v1/projects`      | Browser Session or Member Token (owner only) | Create new project in caller organization                                |
+| PATCH  | `/v1/projects/{id}` | Browser Session or Member Token (owner only) | Update project name, slug, default environment, or optional color tag    |
+| DELETE | `/v1/projects/{id}` | Browser Session or Member Token (owner only) | Delete project and its project-scoped resources                          |
 
 **List projects query:**
+
 - `limit` default `20`, min `1`, max `100`
 
 When a collaborator keeps saved access to a shared project but the owner's current tier no longer allows sharing, `GET /v1/projects` still returns that project with `shared_access_suspended: true` so the UI can show a paused state instead of dropping the project from view. Project-scoped mutations for that collaborator return `403 { "error": "shared_access_suspended" }` until the owner upgrades again.
 
 **Create project request:**
+
 ```json
 {
   "name": "Main App",
@@ -1016,6 +1067,7 @@ When a collaborator keeps saved access to a shared project but the owner's curre
 `color_tag` is optional. Accepted values are `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `emerald`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `purple`, `fuchsia`, `pink`, `rose`, and `slate`.
 
 **Project response shape:**
+
 ```json
 {
   "project": {
@@ -1037,6 +1089,7 @@ When a collaborator keeps saved access to a shared project but the owner's curre
 ```
 
 **Update project request:**
+
 ```json
 {
   "name": "Main App",
@@ -1062,16 +1115,16 @@ Project `metrics.attention_incidents_today` counts incidents first opened today 
 
 ### 1.3c Billing
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/v1/billing` | Browser Session or Member Token (owner only) | Return billing summary, plan state, and allowance usage for the current organization |
-| POST | `/v1/billing/trial/start` | Browser Session or Member Token (owner only) | Start an eligible 30-day no-card Solo or Team trial for the current organization |
-| POST | `/v1/billing/checkout` | Browser Session (owner only) | Create a Stripe-hosted checkout session URL for an allowed upgrade target |
-| POST | `/v1/billing/checkout/confirm` | Browser Session (owner only) | Verify a returned Stripe Checkout Session and sync the organization billing snapshot from Stripe |
-| POST | `/v1/billing/portal` | Browser Session (owner only) | Create a Stripe-hosted customer-portal session URL for an active paid plan |
-| POST | `/v1/billing/capacity/increase` | Browser Session or Member Token (owner only) | Immediately increase additional allowance-capacity units via Stripe subscription update with proration |
-| POST | `/v1/billing/capacity/scheduled-reduction` | Browser Session or Member Token (owner only) | Schedule an allowance-capacity reduction to take effect at the next billing-period boundary via Stripe subscription schedule |
-| DELETE | `/v1/billing/capacity/scheduled-reduction` | Browser Session or Member Token (owner only) | Cancel a pending scheduled allowance-capacity reduction, releasing the Stripe subscription schedule |
+| Method | Path                                       | Auth                                         | Description                                                                                                                  |
+| ------ | ------------------------------------------ | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/v1/billing`                              | Browser Session or Member Token (owner only) | Return billing summary, plan state, and allowance usage for the current organization                                         |
+| POST   | `/v1/billing/trial/start`                  | Browser Session or Member Token (owner only) | Start an eligible 30-day no-card Solo or Team trial for the current organization                                             |
+| POST   | `/v1/billing/checkout`                     | Browser Session (owner only)                 | Create a Stripe-hosted checkout session URL for an allowed upgrade target                                                    |
+| POST   | `/v1/billing/checkout/confirm`             | Browser Session (owner only)                 | Verify a returned Stripe Checkout Session and sync the organization billing snapshot from Stripe                             |
+| POST   | `/v1/billing/portal`                       | Browser Session (owner only)                 | Create a Stripe-hosted customer-portal session URL for an active paid plan                                                   |
+| POST   | `/v1/billing/capacity/increase`            | Browser Session or Member Token (owner only) | Immediately increase additional allowance-capacity units via Stripe subscription update with proration                       |
+| POST   | `/v1/billing/capacity/scheduled-reduction` | Browser Session or Member Token (owner only) | Schedule an allowance-capacity reduction to take effect at the next billing-period boundary via Stripe subscription schedule |
+| DELETE | `/v1/billing/capacity/scheduled-reduction` | Browser Session or Member Token (owner only) | Cancel a pending scheduled allowance-capacity reduction, releasing the Stripe subscription schedule                          |
 
 Billing summary, no-card trial start, and allowance-capacity management routes accept both browser session and owner-scoped member tokens. Checkout, checkout confirmation, and portal routes are browser-session-only interactive surfaces. Stripe checkout sessions are created dynamically with `client_reference_id` = `organization_id`; the success URL includes Stripe's `{CHECKOUT_SESSION_ID}` placeholder so the web app can ask the API to verify the returned Checkout Session and sync the account immediately.
 
@@ -1080,6 +1133,7 @@ Billing summary, no-card trial start, and allowance-capacity management routes a
 For paid internally managed accounts (`stripe_customer_id = null`), the same capacity routes remain available. In that mode, increases and reductions both apply immediately to the stored purchased-capacity quantity and `pending_reduction` remains `null`.
 
 **Billing summary response shape:**
+
 ```json
 {
   "billing": {
@@ -1145,12 +1199,13 @@ For paid internally managed accounts (`stripe_customer_id = null`), the same cap
 `capacity_units.additional_purchased` is the persisted count of purchased extra capacity units for the organization. Billing allowance capacity is computed from `included + additional_purchased`, not inferred from the current number of projects.
 
 `capacity_units.pending_reduction` is `null` when no scheduled reduction exists. When a reduction is scheduled:
+
 ```json
 {
   "pending_reduction": {
     "additional_purchased": 1,
     "total": 4,
-    "effective_at": "2026-04-01T00:00:00.000Z",
+    "effective_at": "2026-04-01T00:00:00.000Z"
   }
 }
 ```
@@ -1158,6 +1213,7 @@ For paid internally managed accounts (`stripe_customer_id = null`), the same cap
 `trial` is always present. It records whether the organization is currently eligible for a no-card trial, whether a trial is active, the selected trial plan when one was used, lifecycle timestamps (`started_at`, `used_at`, `converted_at`, `expired_at`), and `days_remaining` during an active trial.
 
 **Trial start request:**
+
 ```json
 {
   "target_plan": "team"
@@ -1167,6 +1223,7 @@ For paid internally managed accounts (`stripe_customer_id = null`), the same cap
 `target_plan` must be `solo` or `team`. The route starts a 30-day no-card trial only when the organization is still eligible. Response is the updated billing summary.
 
 **Checkout request:**
+
 ```json
 {
   "target_plan": "team"
@@ -1174,6 +1231,7 @@ For paid internally managed accounts (`stripe_customer_id = null`), the same cap
 ```
 
 **Checkout / portal response shape:**
+
 ```json
 {
   "url": "https://checkout.stripe.com/..."
@@ -1181,6 +1239,7 @@ For paid internally managed accounts (`stripe_customer_id = null`), the same cap
 ```
 
 **Checkout confirmation request:**
+
 ```json
 {
   "session_id": "cs_test_123"
@@ -1190,6 +1249,7 @@ For paid internally managed accounts (`stripe_customer_id = null`), the same cap
 Checkout confirmation returns the standard billing summary response after the API retrieves and verifies the Stripe Checkout Session and subscription. The route must only apply the session when its `client_reference_id` or `metadata.organization_id` matches the authenticated browser session organization.
 
 **Capacity increase request:**
+
 ```json
 {
   "target_additional_capacity_units": 3
@@ -1199,6 +1259,7 @@ Checkout confirmation returns the standard billing summary response after the AP
 `target_additional_capacity_units` must be greater than the current `additional_purchased` count and no greater than 99. The Stripe subscription item quantity is updated immediately with proration. A pending scheduled reduction must be cancelled before increasing capacity. Response is the updated billing summary.
 
 **Capacity reduction schedule request:**
+
 ```json
 {
   "target_additional_capacity_units": 1
@@ -1223,16 +1284,17 @@ Checkout confirmation returns the standard billing summary response after the AP
 
 ### 1.3d Token Management
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/v1/projects/{id}/tokens` | Browser Session or Member Token | List project tokens visible through project access |
-| POST | `/v1/projects/{id}/tokens` | Browser Session or Member Token, owner/admin project access | Create new project token (plaintext shown once) |
-| POST | `/v1/projects/{id}/tokens/{tokenId}/revoke` | Browser Session or Member Token, owner/admin project access | Revoke project token |
-| GET | `/v1/member/tokens` | Browser Session or Member Token | List member tokens for caller identity |
-| POST | `/v1/member/tokens` | Browser Session or Member Token | Create new member token (plaintext shown once) |
-| POST | `/v1/member/tokens/{tokenId}/revoke` | Browser Session or Member Token | Revoke member token |
+| Method | Path                                        | Auth                                                        | Description                                        |
+| ------ | ------------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------- |
+| GET    | `/v1/projects/{id}/tokens`                  | Browser Session or Member Token                             | List project tokens visible through project access |
+| POST   | `/v1/projects/{id}/tokens`                  | Browser Session or Member Token, owner/admin project access | Create new project token (plaintext shown once)    |
+| POST   | `/v1/projects/{id}/tokens/{tokenId}/revoke` | Browser Session or Member Token, owner/admin project access | Revoke project token                               |
+| GET    | `/v1/member/tokens`                         | Browser Session or Member Token                             | List member tokens for caller identity             |
+| POST   | `/v1/member/tokens`                         | Browser Session or Member Token                             | Create new member token (plaintext shown once)     |
+| POST   | `/v1/member/tokens/{tokenId}/revoke`        | Browser Session or Member Token                             | Revoke member token                                |
 
 **Create token request:**
+
 ```json
 {
   "label": "ci",
@@ -1243,6 +1305,7 @@ Checkout confirmation returns the standard billing summary response after the AP
 `allowed_origins` is optional and applies only to project tokens. It can be set through the dashboard's **Allowed browser origins** field or through CLI/API/MCP automation. The dashboard accepts one origin per line or comma-separated. When present, `POST /v1/events` and `GET /v1/sdk/config` require an `Origin` header matching one of the normalized origins; requests without `Origin` are rejected. This is intended for direct/static browser ingestion abuse reduction and should not be used for server SDK or relay-forwarding tokens. It is not a replacement for the same-origin browser relay because non-browser clients can still spoof `Origin`.
 
 **Create token response:**
+
 ```json
 {
   "token": {
@@ -1259,6 +1322,7 @@ Checkout confirmation returns the standard billing summary response after the AP
 ```
 
 **List tokens response:**
+
 ```json
 {
   "tokens": [
@@ -1276,16 +1340,17 @@ Checkout confirmation returns the standard billing summary response after the AP
 
 ### 1.4 Alerts
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| POST | `/v1/alerts` | Browser Session or Member Token | Create alert rule |
-| GET | `/v1/alerts` | Browser Session or Member Token | List alert rules |
-| PATCH | `/v1/alerts/{id}` | Browser Session or Member Token | Update alert rule |
+| Method | Path              | Auth                            | Description       |
+| ------ | ----------------- | ------------------------------- | ----------------- |
+| POST   | `/v1/alerts`      | Browser Session or Member Token | Create alert rule |
+| GET    | `/v1/alerts`      | Browser Session or Member Token | List alert rules  |
+| PATCH  | `/v1/alerts/{id}` | Browser Session or Member Token | Update alert rule |
 | DELETE | `/v1/alerts/{id}` | Browser Session or Member Token | Delete alert rule |
 
 **Query params (list alerts):** `project_id` (required UUID), `limit` (optional, integer 1-100, default 20)
 
 **Create alert request:**
+
 ```json
 {
   "project_id": "uuid",
@@ -1309,6 +1374,7 @@ For `channel: "email"`, `config.to` is required and must be a single recipient e
 For `channel: "slack"`, prefer `config.slack_destination_id` when the workspace/channel was connected through the Slack OAuth flow. Direct `config.webhook_url` remains valid for callers that intentionally want a raw webhook configuration.
 
 **Update alert request:**
+
 ```json
 {
   "channel": "webhook",
@@ -1328,6 +1394,7 @@ Update requests must include at least one field. `service_id`, `severity_min`, `
 When updating channel-specific `config`, include the `channel` in the same request so validation can apply the correct config schema.
 
 **Alert response:**
+
 ```json
 {
   "alert": {
@@ -1351,6 +1418,7 @@ When updating channel-specific `config`, include the `channel` in the same reque
 ```
 
 **List alerts response:**
+
 ```json
 {
   "alerts": [
@@ -1376,6 +1444,7 @@ When updating channel-specific `config`, include the `channel` in the same reque
 ```
 
 Current API implementation scope (Phase 10 alert CRUD slice):
+
 - `GET /v1/alerts` returns `200 { alerts: AlertRule[] }` for callers authorized on the target project.
 - `POST /v1/alerts` returns `201 { alert: AlertRule }`.
 - `PATCH /v1/alerts/{id}` returns `200 { alert: AlertRule }` for owner/admin or the rule creator.
@@ -1401,17 +1470,18 @@ Current API implementation scope (Phase 10 alert CRUD slice):
 
 These routes back the Team-tier `Connect Slack` flow inside the project alerts modal and the agent-facing Slack destination management commands. The OAuth callback remains browser-only, while API, CLI, and MCP all support listing, testing, and deleting reusable Slack destinations plus creating browser handoff install URLs.
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/v1/slack/app/install-url` | Browser Session or Member Token (owner/admin only) | Return a Slack OAuth authorize URL for a project-scoped connect flow |
-| GET | `/v1/slack/app/callback` | None | Complete Slack OAuth and redirect back to the app |
-| GET | `/v1/projects/{id}/slack/destinations` | Browser Session or Member Token | List reusable connected Slack channels for the project organization |
-| POST | `/v1/projects/{id}/slack/destinations/{destinationId}/test` | Browser Session or Member Token (owner/admin only) | Send a test message to a reusable connected Slack channel |
-| DELETE | `/v1/projects/{id}/slack/destinations/{destinationId}` | Browser Session or Member Token (owner/admin only) | Disconnect a reusable Slack destination |
+| Method | Path                                                        | Auth                                               | Description                                                          |
+| ------ | ----------------------------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------- |
+| GET    | `/v1/slack/app/install-url`                                 | Browser Session or Member Token (owner/admin only) | Return a Slack OAuth authorize URL for a project-scoped connect flow |
+| GET    | `/v1/slack/app/callback`                                    | None                                               | Complete Slack OAuth and redirect back to the app                    |
+| GET    | `/v1/projects/{id}/slack/destinations`                      | Browser Session or Member Token                    | List reusable connected Slack channels for the project organization  |
+| POST   | `/v1/projects/{id}/slack/destinations/{destinationId}/test` | Browser Session or Member Token (owner/admin only) | Send a test message to a reusable connected Slack channel            |
+| DELETE | `/v1/projects/{id}/slack/destinations/{destinationId}`      | Browser Session or Member Token (owner/admin only) | Disconnect a reusable Slack destination                              |
 
 **Install-url query params:** `project_id` (required UUID), `return_to` (optional app-relative path such as `/projects/<projectId>/alerts`)
 
 **Install-url response:**
+
 ```json
 {
   "install_url": "https://slack.com/oauth/v2/authorize?client_id=...&scope=incoming-webhook&redirect_uri=...&state=..."
@@ -1419,6 +1489,7 @@ These routes back the Team-tier `Connect Slack` flow inside the project alerts m
 ```
 
 **List connected Slack destinations response:**
+
 ```json
 {
   "destinations": [
@@ -1441,6 +1512,7 @@ These routes back the Team-tier `Connect Slack` flow inside the project alerts m
 `GET /v1/slack/app/callback` validates the signed install state, exchanges the Slack OAuth code, upserts the reusable destination, clears the transient cookie, and redirects back to the requested app path with `slack_connect=success|cancelled|error`. Unrecognized Slack query parameters are stripped before callback logic runs.
 
 Current implementation behavior:
+
 - `GET /v1/slack/app/install-url` requires owner/admin access, a Team-tier organization, and a scoped project.
 - `GET /v1/projects/{id}/slack/destinations` requires member auth and keeps preserved destinations readable after downgrade so saved Slack setup remains visible while paused on Free.
 - `POST /v1/projects/{id}/slack/destinations/{destinationId}/test` requires owner/admin access, decrypts the stored webhook URL, sends a Slack test message, and returns `502` with a stable Slack-specific error code when delivery fails.
@@ -1449,19 +1521,20 @@ Current implementation behavior:
 
 ### 1.5 Webhooks
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| POST | `/v1/webhooks` | Browser Session or Member Token | Create webhook |
-| GET | `/v1/webhooks` | Browser Session or Member Token | List webhooks |
-| GET | `/v1/webhooks/{id}` | Browser Session or Member Token | Get webhook details |
-| PATCH | `/v1/webhooks/{id}` | Browser Session or Member Token | Update webhook |
-| DELETE | `/v1/webhooks/{id}` | Browser Session or Member Token | Delete webhook |
-| POST | `/v1/webhooks/{id}/test` | Browser Session or Member Token | Queue a signed synthetic test delivery |
-| GET | `/v1/webhooks/{id}/deliveries` | Browser Session or Member Token | List delivery history |
+| Method | Path                           | Auth                            | Description                            |
+| ------ | ------------------------------ | ------------------------------- | -------------------------------------- |
+| POST   | `/v1/webhooks`                 | Browser Session or Member Token | Create webhook                         |
+| GET    | `/v1/webhooks`                 | Browser Session or Member Token | List webhooks                          |
+| GET    | `/v1/webhooks/{id}`            | Browser Session or Member Token | Get webhook details                    |
+| PATCH  | `/v1/webhooks/{id}`            | Browser Session or Member Token | Update webhook                         |
+| DELETE | `/v1/webhooks/{id}`            | Browser Session or Member Token | Delete webhook                         |
+| POST   | `/v1/webhooks/{id}/test`       | Browser Session or Member Token | Queue a signed synthetic test delivery |
+| GET    | `/v1/webhooks/{id}/deliveries` | Browser Session or Member Token | List delivery history                  |
 
 **Deliveries query params:** `limit` (optional, integer 1-100, default 20)
 
 **Test delivery request:**
+
 ```json
 {
   "event_type": "verification.passed"
@@ -1471,6 +1544,7 @@ Current implementation behavior:
 `event_type` is optional and defaults to `verification.passed`.
 
 **Test delivery response:**
+
 ```json
 {
   "delivery": {
@@ -1481,6 +1555,7 @@ Current implementation behavior:
 ```
 
 **Deliveries response:**
+
 ```json
 {
   "deliveries": [
@@ -1501,6 +1576,7 @@ Current implementation behavior:
 Lifecycle webhook delivery creation is paused when the shared `monthly_webhook_deliveries` allowance is exhausted. Existing incidents, bundles, webhook configuration, delivery history, and manual retry of already-created failed deliveries remain available. Synthetic test deliveries also consume this meter and return `429 { "error": "monthly_quota_exceeded" }` with `Retry-After` when the allowance is exhausted.
 
 **Create webhook request:**
+
 ```json
 {
   "project_id": "uuid",
@@ -1516,6 +1592,7 @@ Lifecycle webhook delivery creation is paused when the shared `monthly_webhook_d
 ```
 
 **Create webhook response:**
+
 ```json
 {
   "webhook": {
@@ -1543,6 +1620,7 @@ Lifecycle webhook delivery creation is paused when the shared `monthly_webhook_d
 **List webhooks query params:** `project_id` (required), `limit` (optional, integer 1-100, default 20)
 
 **List/get/update response shape:**
+
 ```json
 {
   "webhook": {
@@ -1560,6 +1638,7 @@ Lifecycle webhook delivery creation is paused when the shared `monthly_webhook_d
 ```
 
 **Lifecycle event payload** (`bundle.reopened`, `incident.spike_detected`):
+
 ```json
 {
   "event_type": "bundle.reopened",
@@ -1581,6 +1660,7 @@ Lifecycle webhook delivery creation is paused when the shared `monthly_webhook_d
 Deploy correlation fields are populated when `regression_after_deploy` is `true` (regression within 24h of a deploy). When `false`, all deploy fields are `null`.
 
 **Synthetic test payload** (`POST /v1/webhooks/{id}/test`):
+
 ```json
 {
   "delivery_id": "uuid",
@@ -1603,11 +1683,11 @@ Owner and admin may manage any webhook in the project. Plain members may create 
 
 ### 1.6 Weekly Report Channels
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| POST | `/v1/weekly-report-channels` | Browser Session or Member Token | Create weekly report channel |
-| GET | `/v1/weekly-report-channels` | Browser Session or Member Token | List weekly report channels |
-| PATCH | `/v1/weekly-report-channels/{id}` | Browser Session or Member Token | Update weekly report channel |
+| Method | Path                              | Auth                            | Description                  |
+| ------ | --------------------------------- | ------------------------------- | ---------------------------- |
+| POST   | `/v1/weekly-report-channels`      | Browser Session or Member Token | Create weekly report channel |
+| GET    | `/v1/weekly-report-channels`      | Browser Session or Member Token | List weekly report channels  |
+| PATCH  | `/v1/weekly-report-channels/{id}` | Browser Session or Member Token | Update weekly report channel |
 | DELETE | `/v1/weekly-report-channels/{id}` | Browser Session or Member Token | Delete weekly report channel |
 
 Project members with access may list weekly report channels. Only project owners and admins may create, update, or delete weekly report channels.
@@ -1615,6 +1695,7 @@ Project members with access may list weekly report channels. Only project owners
 **Query params (list weekly report channels):** `project_id` (required UUID), `limit` (optional, integer 1-100, default 20)
 
 **Create weekly report channel request:**
+
 ```json
 {
   "project_id": "uuid",
@@ -1634,6 +1715,7 @@ Project members with access may list weekly report channels. Only project owners
 Slack channels accept either `config.webhook_url` or `config.slack_destination_id`. Team-tier callers should prefer `slack_destination_id` so weekly reports reuse the same encrypted connected Slack channel as alert rules.
 
 **Update weekly report channel request:**
+
 ```json
 {
   "schedule": {
@@ -1646,6 +1728,7 @@ Slack channels accept either `config.webhook_url` or `config.slack_destination_i
 ```
 
 **Weekly report channel response:**
+
 ```json
 {
   "channel": {
@@ -1668,6 +1751,7 @@ Slack channels accept either `config.webhook_url` or `config.slack_destination_i
 ```
 
 **List weekly report channels response:**
+
 ```json
 {
   "channels": [
@@ -1703,24 +1787,25 @@ Slack channels accept either `config.webhook_url` or `config.slack_destination_i
 
 ### 1.7 Health
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/health` | None | System health |
-| GET | `/ready` | None | Readiness probe; returns `200 { "status": "ready" }` when required runtime dependencies are available, otherwise `503 { "status": "not_ready", "reason": "..." }` |
-| GET | `/live` | None | Liveness probe |
+| Method | Path      | Auth | Description                                                                                                                                                       |
+| ------ | --------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/health` | None | System health                                                                                                                                                     |
+| GET    | `/ready`  | None | Readiness probe; returns `200 { "status": "ready" }` when required runtime dependencies are available, otherwise `503 { "status": "not_ready", "reason": "..." }` |
+| GET    | `/live`   | None | Liveness probe                                                                                                                                                    |
 
 ### 1.8 Probes (Remote Activation — Solo+ Only)
 
 Always-on probes (ring buffer + error-flush) require no API endpoints — they are purely SDK-local. The endpoints below manage **remote activation** (Solo+ only). When a project downgrades to Free, saved remote probe activations remain readable through the management list route so owners can see what will resume after an upgrade. Activation still fails with `upgrade_required` while the lower tier is active, while deactivation remains available as a cleanup action.
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| POST | `/v1/projects/{id}/probes/activate` | Browser Session or Member Token (Solo+) | Remotely activate probes matching a label pattern |
-| GET | `/v1/projects/{id}/probes` | Browser Session or Member Token | List active remote probe activations; preserved activations remain readable while paused on Free |
-| POST | `/v1/projects/{id}/probes/deactivate` | Browser Session or Member Token | Deactivate a remote probe activation; cleanup remains available after downgrade |
-| GET | `/v1/sdk/config` | Project Token | SDK config (remote probes and capture policy). Callers on any hosted tier may opt into bounded restrictive analytics settings with `X-DebugBundle-Analytics-Config: 1`; the response reflects eligible project settings without ever enabling locally disabled analytics. |
+| Method | Path                                  | Auth                                    | Description                                                                                                                                                                                                                                                               |
+| ------ | ------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/v1/projects/{id}/probes/activate`   | Browser Session or Member Token (Solo+) | Remotely activate probes matching a label pattern                                                                                                                                                                                                                         |
+| GET    | `/v1/projects/{id}/probes`            | Browser Session or Member Token         | List active remote probe activations; preserved activations remain readable while paused on Free                                                                                                                                                                          |
+| POST   | `/v1/projects/{id}/probes/deactivate` | Browser Session or Member Token         | Deactivate a remote probe activation; cleanup remains available after downgrade                                                                                                                                                                                           |
+| GET    | `/v1/sdk/config`                      | Project Token                           | SDK config (remote probes and capture policy). Callers on any hosted tier may opt into bounded restrictive analytics settings with `X-DebugBundle-Analytics-Config: 1`; the response reflects eligible project settings without ever enabling locally disabled analytics. |
 
 **Activate request:**
+
 ```json
 {
   "label_pattern": "checkout.*",
@@ -1731,16 +1816,17 @@ Always-on probes (ring buffer + error-flush) require no API endpoints — they a
 }
 ```
 
-| Field | Required | Default | Constraint |
-|-------|----------|---------|------------|
-| `label_pattern` | Yes | — | Dot-notation label or wildcard (`checkout.*`, `*`) |
-| `service` | No | `*` (all) | Scope to specific service |
-| `environment` | No | `*` (all) | Scope to specific environment |
-| `ttl_seconds` | Yes | — | Passive activation TTL (max 3600s / 1 hour) |
-| `trigger_ttl_seconds` | No | `ttl_seconds` | Trigger token TTL (max 86400s / 24 hours) |
-| `sample_rate` | No | `1.0` | 0.0–1.0 |
+| Field                 | Required | Default       | Constraint                                         |
+| --------------------- | -------- | ------------- | -------------------------------------------------- |
+| `label_pattern`       | Yes      | —             | Dot-notation label or wildcard (`checkout.*`, `*`) |
+| `service`             | No       | `*` (all)     | Scope to specific service                          |
+| `environment`         | No       | `*` (all)     | Scope to specific environment                      |
+| `ttl_seconds`         | Yes      | —             | Passive activation TTL (max 3600s / 1 hour)        |
+| `trigger_ttl_seconds` | No       | `ttl_seconds` | Trigger token TTL (max 86400s / 24 hours)          |
+| `sample_rate`         | No       | `1.0`         | 0.0–1.0                                            |
 
 **Activate response:**
+
 ```json
 {
   "activation_id": "uuid",
@@ -1759,6 +1845,7 @@ Always-on probes (ring buffer + error-flush) require no API endpoints — they a
 If the shared `monthly_remote_activations` allowance is exhausted, activation requests are rejected before creation with `429 { "error": "monthly_quota_exceeded", "retry_after_ms": <ms> }` and a `Retry-After` header.
 
 **List response:**
+
 ```json
 {
   "activations": [
@@ -1776,6 +1863,7 @@ If the shared `monthly_remote_activations` allowance is exhausted, activation re
 ```
 
 **Deactivate request:**
+
 ```json
 { "activation_id": "uuid" }
 ```
@@ -1819,34 +1907,35 @@ Free-tier projects may receive their enabled project analytics block when both p
 
 **Guardrails:**
 
-| Constraint | Free | Solo | Team |
-|------------|------|------|------|
-| Always-on probes (ring buffer + error-flush) | Available | Available | Available |
-| Remote activation | Not available (403) | Full access | Full access |
-| Max concurrent remote activations per project | N/A | 5 |
-| Max remote activation TTL | N/A | 3600s (1 hr) |
-| Max trigger token TTL | N/A | 86400s (24 hr) |
-| `ttl_seconds` required | N/A | Yes |
-| Auth (remote activation) | N/A (403) | Member token |
-| Browser config delivery (remote) | N/A | Session-start check + ingestion piggybacking |
-| Backend config delivery (remote) | N/A | 60s polling (CDN-cached) |
+| Constraint                                    | Free                | Solo                                         | Team        |
+| --------------------------------------------- | ------------------- | -------------------------------------------- | ----------- |
+| Always-on probes (ring buffer + error-flush)  | Available           | Available                                    | Available   |
+| Remote activation                             | Not available (403) | Full access                                  | Full access |
+| Max concurrent remote activations per project | N/A                 | 5                                            |
+| Max remote activation TTL                     | N/A                 | 3600s (1 hr)                                 |
+| Max trigger token TTL                         | N/A                 | 86400s (24 hr)                               |
+| `ttl_seconds` required                        | N/A                 | Yes                                          |
+| Auth (remote activation)                      | N/A (403)           | Member token                                 |
+| Browser config delivery (remote)              | N/A                 | Session-start check + ingestion piggybacking |
+| Backend config delivery (remote)              | N/A                 | 60s polling (CDN-cached)                     |
 
 ### 1.8a Availability Checks
 
 Availability checks are hosted external HTTP checks executed by DebugBundle infrastructure, not by customer SDKs. V1 supports `GET` and `HEAD` targets only. Failures reuse the same incident, bundle, alert, webhook, CLI, MCP, and project-navigation model as the rest of DebugBundle rather than creating a separate uptime product. Saved checks remain visible after downgrade; checks that exceed the current plan's count or interval limits are marked paused and stop executing until the project becomes eligible again.
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/v1/projects/{id}/availability-checks` | Browser Session or Member Token | List health checks plus plan-derived limits for the project |
-| GET | `/v1/projects/{id}/availability-checks/{checkId}` | Browser Session or Member Token | Fetch one health check plus current plan-derived limits |
-| POST | `/v1/projects/{id}/availability-checks` | Browser Session or Member Token (owner/admin) | Create a hosted health check |
-| PATCH | `/v1/projects/{id}/availability-checks/{checkId}` | Browser Session or Member Token (owner/admin) | Update a hosted health check |
-| DELETE | `/v1/projects/{id}/availability-checks/{checkId}` | Browser Session or Member Token (owner/admin) | Delete a hosted health check |
-| POST | `/v1/projects/{id}/availability-checks/test` | Browser Session or Member Token (owner/admin) | Run a side-effect-free target test using the same validation and execution rules as saved checks |
-| GET | `/v1/projects/{id}/availability-checks/{checkId}/results` | Browser Session or Member Token | List recent raw execution results for a health check |
-| GET | `/v1/projects/{id}/availability-checks/{checkId}/daily-rollups` | Browser Session or Member Token | List retained per-day state rollups for a health check |
+| Method | Path                                                            | Auth                                          | Description                                                                                      |
+| ------ | --------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| GET    | `/v1/projects/{id}/availability-checks`                         | Browser Session or Member Token               | List health checks plus plan-derived limits for the project                                      |
+| GET    | `/v1/projects/{id}/availability-checks/{checkId}`               | Browser Session or Member Token               | Fetch one health check plus current plan-derived limits                                          |
+| POST   | `/v1/projects/{id}/availability-checks`                         | Browser Session or Member Token (owner/admin) | Create a hosted health check                                                                     |
+| PATCH  | `/v1/projects/{id}/availability-checks/{checkId}`               | Browser Session or Member Token (owner/admin) | Update a hosted health check                                                                     |
+| DELETE | `/v1/projects/{id}/availability-checks/{checkId}`               | Browser Session or Member Token (owner/admin) | Delete a hosted health check                                                                     |
+| POST   | `/v1/projects/{id}/availability-checks/test`                    | Browser Session or Member Token (owner/admin) | Run a side-effect-free target test using the same validation and execution rules as saved checks |
+| GET    | `/v1/projects/{id}/availability-checks/{checkId}/results`       | Browser Session or Member Token               | List recent raw execution results for a health check                                             |
+| GET    | `/v1/projects/{id}/availability-checks/{checkId}/daily-rollups` | Browser Session or Member Token               | List retained per-day state rollups for a health check                                           |
 
 **Create request:**
+
 ```json
 {
   "name": "Primary app",
@@ -1864,22 +1953,23 @@ Availability checks are hosted external HTTP checks executed by DebugBundle infr
 }
 ```
 
-| Field | Required | Default | Constraint |
-|-------|----------|---------|------------|
-| `name` | Yes | — | 1-120 chars |
-| `url` | Yes | — | `http` or `https` only; credentials forbidden; local/private targets blocked |
-| `method` | No | `GET` | `GET` or `HEAD` |
-| `expected_status_min` | No | `200` | integer `100-599`, must be `<= expected_status_max` |
-| `expected_status_max` | No | `399` | integer `100-599`, must be `>= expected_status_min` |
-| `timeout_ms` | No | `2500` | integer `500-5000` |
-| `interval_seconds` | Yes | — | integer `30-86400`, but plan minimums may be higher |
-| `failure_threshold` | No | `3` | integer `1-10` |
-| `recovery_threshold` | No | `2` | integer `1-10` |
-| `environment` | No | project-default behavior | optional project-scoped environment label |
-| `service_name` | No | `null` | optional service label used for filtering and incident grouping |
-| `enabled` | No | `true` | disabled checks remain visible and retained but do not execute |
+| Field                 | Required | Default                  | Constraint                                                                   |
+| --------------------- | -------- | ------------------------ | ---------------------------------------------------------------------------- |
+| `name`                | Yes      | —                        | 1-120 chars                                                                  |
+| `url`                 | Yes      | —                        | `http` or `https` only; credentials forbidden; local/private targets blocked |
+| `method`              | No       | `GET`                    | `GET` or `HEAD`                                                              |
+| `expected_status_min` | No       | `200`                    | integer `100-599`, must be `<= expected_status_max`                          |
+| `expected_status_max` | No       | `399`                    | integer `100-599`, must be `>= expected_status_min`                          |
+| `timeout_ms`          | No       | `2500`                   | integer `500-5000`                                                           |
+| `interval_seconds`    | Yes      | —                        | integer `30-86400`, but plan minimums may be higher                          |
+| `failure_threshold`   | No       | `3`                      | integer `1-10`                                                               |
+| `recovery_threshold`  | No       | `2`                      | integer `1-10`                                                               |
+| `environment`         | No       | project-default behavior | optional project-scoped environment label                                    |
+| `service_name`        | No       | `null`                   | optional service label used for filtering and incident grouping              |
+| `enabled`             | No       | `true`                   | disabled checks remain visible and retained but do not execute               |
 
 **List response:**
+
 ```json
 {
   "checks": [
@@ -1910,6 +2000,7 @@ Availability checks are hosted external HTTP checks executed by DebugBundle infr
 `status` is one of `unknown`, `passing`, `failing`, or `paused`. `paused` is used for disabled checks and for preserved checks that exceed current plan limits after downgrade. The worker retains raw results and daily rollups for 30 days so the project can later expose a status-history page without schema changes.
 
 **Results response:**
+
 ```json
 {
   "results": [
@@ -1931,6 +2022,7 @@ Availability checks are hosted external HTTP checks executed by DebugBundle infr
 ```
 
 **Daily rollups response:**
+
 ```json
 {
   "rollups": [
@@ -1953,13 +2045,13 @@ Daily rollup `state` is intentionally less sensitive than raw execution status. 
 
 Guardrails:
 
-| Constraint | Free | Solo | Team |
-|------------|------|------|------|
-| Max checks per project | 1 | 3 | 8 |
-| Minimum interval | 300s (5m) | 60s | 30s |
-| History retention | 30 days | 30 days | 30 days |
-| Read access | Authorized project member | Authorized project member | Authorized project member |
-| Create/update/delete/test | Owner/admin | Owner/admin | Owner/admin |
+| Constraint                | Free                      | Solo                      | Team                      |
+| ------------------------- | ------------------------- | ------------------------- | ------------------------- |
+| Max checks per project    | 1                         | 3                         | 8                         |
+| Minimum interval          | 300s (5m)                 | 60s                       | 30s                       |
+| History retention         | 30 days                   | 30 days                   | 30 days                   |
+| Read access               | Authorized project member | Authorized project member | Authorized project member |
+| Create/update/delete/test | Owner/admin               | Owner/admin               | Owner/admin               |
 
 When consecutive failures reach `failure_threshold`, DebugBundle opens or regresses the linked availability incident for that check using the normal incident lifecycle. When consecutive successes reach `recovery_threshold`, DebugBundle auto-resolves the linked availability incident.
 
@@ -1975,6 +2067,7 @@ Authorization: Bearer dbundle_member_...  (or browser session)
 ```
 
 Response `200`:
+
 ```json
 {
   "policy": {
@@ -2011,6 +2104,7 @@ Content-Type: application/json
 ```
 
 Request body (all fields optional):
+
 ```json
 {
   "preset": "minimal | balanced | investigative",
@@ -2028,6 +2122,7 @@ Request body (all fields optional):
 Response `200`: same shape as GET response with updated values.
 
 **Validation rules:**
+
 - `preset` must be one of `minimal`, `balanced`, `investigative`
 - override keys must be valid control names
 - override values must be valid for that control
@@ -2040,6 +2135,7 @@ Response `200`: same shape as GET response with updated values.
 - Plain members receive `403 { "error": "forbidden" }` on update attempts
 
 **Error responses:**
+
 - `401` — missing or invalid auth
 - `403` — insufficient role (non-owner) or tier restriction
 - `404` — project not found or not in caller's organization
@@ -2056,6 +2152,7 @@ Authorization: Bearer dbundle_member_...  (or browser session)
 ```
 
 Response `200`:
+
 ```json
 {
   "access_mode": "manage | preview",
@@ -2081,6 +2178,7 @@ Authorization: Bearer dbundle_member_...  (or browser session)
 ```
 
 Response `200`:
+
 ```json
 {
   "bundle_status": "ready | pending | failed",
@@ -2112,6 +2210,7 @@ Content-Type: application/json
 ```
 
 Request body:
+
 ```json
 {
   "suggestion_id": "primary_resource_host_demote",
@@ -2127,6 +2226,7 @@ Response `201`: same `{"rule": ...}` shape as direct capture-rule creation.
 Response `200`: same `{"rule": ...}` shape when a matching rule already exists for the selected incident suggestion. This makes the suggestion workflow idempotent and prevents duplicate rules for the same suggested condition.
 
 **Error responses:**
+
 - `401` — missing or invalid auth
 - `403` — insufficient role for create/update/delete
 - `404` — incident, project, or suggestion not found
@@ -2144,6 +2244,7 @@ Authorization: Bearer dbundle_member_...  (or browser session)
 ```
 
 Response `200`:
+
 ```json
 {
   "access_mode": "manage | preview",
@@ -2166,6 +2267,7 @@ Content-Type: application/json
 ```
 
 Request body (all fields optional, but at least one is required):
+
 ```json
 {
   "automated_improvement_bundles_enabled": false,
@@ -2176,6 +2278,7 @@ Request body (all fields optional, but at least one is required):
 Response `200`: same shape as GET response with updated values.
 
 **Validation rules:**
+
 - `automated_improvement_bundles_enabled` must be boolean when provided
 - `improvement_bundle_sensitivity` must be one of `high_confidence`, `balanced`, or `verbose`
 - request body must include at least one mutable field
@@ -2193,6 +2296,7 @@ Authorization: Bearer dbundle_member_...  (or browser session)
 ```
 
 Response `200`:
+
 ```json
 {
   "access_mode": "manage | preview",
@@ -2228,6 +2332,7 @@ Content-Type: application/json
 ```
 
 Request body (all fields optional, but at least one is required):
+
 ```json
 {
   "enabled": true,
@@ -2243,6 +2348,7 @@ Request body (all fields optional, but at least one is required):
 Response `200`: same shape as GET response with updated values.
 
 **Validation rules:**
+
 - analytics capture remains disabled by default
 - `privacy_mode` must be one of `strict`, `standard`, or `custom`
 - `journey_sample_rate` must be between `0` and `1`
@@ -2254,6 +2360,7 @@ Response `200`: same shape as GET response with updated values.
 - values above the current hourly-retention, saved-funnel, or custom-dimension tier cap receive `403 { "error": "upgrade_required" }`
 
 **Error responses:**
+
 - `401` — missing or invalid auth
 - `403` — insufficient role or tier restriction
 - `404` — project not found or improvement settings unavailable
@@ -2261,6 +2368,7 @@ Response `200`: same shape as GET response with updated values.
 **SDK config integration:**
 
 `GET /v1/sdk/config` response includes the resolved capture policy. When the caller sends `X-DebugBundle-Analytics-Config: 1`, it also includes bounded analytics capture settings:
+
 ```json
 {
   "probes_enabled": true,
@@ -2296,10 +2404,10 @@ Direct browser SDKs may use the opted-in analytics block only to narrow a local 
 
 **GitHub App lifecycle (not user-facing management routes):**
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/v1/github/app/callback` | None | GitHub App setup URL / post-install redirect handler |
-| POST | `/v1/github/app/webhook` | GitHub App webhook secret (HMAC-SHA256) | Installation lifecycle events |
+| Method | Path                      | Auth                                    | Description                                          |
+| ------ | ------------------------- | --------------------------------------- | ---------------------------------------------------- |
+| GET    | `/v1/github/app/callback` | None                                    | GitHub App setup URL / post-install redirect handler |
+| POST   | `/v1/github/app/webhook`  | GitHub App webhook secret (HMAC-SHA256) | Installation lifecycle events                        |
 
 The setup callback endpoint completes the App installation flow for trusted in-app installs: it requires the signed install `state` to match the transient install cookie, validates the `installation_id` through the GitHub App client before recording it in `github_installations`, accepts GitHub's optional `setup_action`, strips unrecognized provider query parameters, and redirects the user back into the originating DebugBundle project GitHub tab. If GitHub reaches the setup URL without DebugBundle's install state, such as a direct Marketplace install, the endpoint clears any stale install cookie and redirects to the web app without trusting or persisting the unauthenticated `installation_id`.
 
@@ -2307,17 +2415,18 @@ The webhook endpoint handles `installation.created`, `installation.deleted`, `in
 
 **Installation and repository management:**
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/v1/github/app/install-url` | Browser Session or Member Token (owner/admin only) | Get the GitHub App installation URL used by the web install/reconnect CTA |
-| GET | `/v1/github/installation` | Browser Session or Member Token | Get current org's GitHub App installation status; preserved setup remains readable while paused on Free |
-| DELETE | `/v1/github/installation` | Browser Session or Member Token (owner/admin only) | Disconnect GitHub installation |
-| GET | `/v1/github/repositories` | Browser Session or Member Token (owner/admin only) | List repositories available to the installation |
-| GET | `/v1/projects/{id}/github/repo` | Browser Session or Member Token | Get project's assigned primary repo |
-| PUT | `/v1/projects/{id}/github/repo` | Browser Session or Member Token (owner/admin only) | Set or change project's primary repo |
-| DELETE | `/v1/projects/{id}/github/repo` | Browser Session or Member Token (owner/admin only) | Remove project's repo assignment |
+| Method | Path                            | Auth                                               | Description                                                                                             |
+| ------ | ------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| GET    | `/v1/github/app/install-url`    | Browser Session or Member Token (owner/admin only) | Get the GitHub App installation URL used by the web install/reconnect CTA                               |
+| GET    | `/v1/github/installation`       | Browser Session or Member Token                    | Get current org's GitHub App installation status; preserved setup remains readable while paused on Free |
+| DELETE | `/v1/github/installation`       | Browser Session or Member Token (owner/admin only) | Disconnect GitHub installation                                                                          |
+| GET    | `/v1/github/repositories`       | Browser Session or Member Token (owner/admin only) | List repositories available to the installation                                                         |
+| GET    | `/v1/projects/{id}/github/repo` | Browser Session or Member Token                    | Get project's assigned primary repo                                                                     |
+| PUT    | `/v1/projects/{id}/github/repo` | Browser Session or Member Token (owner/admin only) | Set or change project's primary repo                                                                    |
+| DELETE | `/v1/projects/{id}/github/repo` | Browser Session or Member Token (owner/admin only) | Remove project's repo assignment                                                                        |
 
 **Get installation response:**
+
 ```json
 {
   "installation": {
@@ -2333,6 +2442,7 @@ The webhook endpoint handles `installation.created`, `installation.deleted`, `in
 ```
 
 When no GitHub App installation is connected yet, the route returns:
+
 ```json
 {
   "installation": null
@@ -2340,6 +2450,7 @@ When no GitHub App installation is connected yet, the route returns:
 ```
 
 **List repositories response:**
+
 ```json
 {
   "repositories": [
@@ -2356,6 +2467,7 @@ When no GitHub App installation is connected yet, the route returns:
 ```
 
 **Set repo request:**
+
 ```json
 {
   "owner": "my-org",
@@ -2364,6 +2476,7 @@ When no GitHub App installation is connected yet, the route returns:
 ```
 
 **Get/set repo response:**
+
 ```json
 {
   "repo": {
@@ -2380,6 +2493,7 @@ When no GitHub App installation is connected yet, the route returns:
 ```
 
 When no repository is assigned to the project yet, the route returns:
+
 ```json
 {
   "repo": null
@@ -2392,15 +2506,16 @@ GitHub automation eligibility is determined from the target project's owner plan
 
 **Dispatch rule management:**
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| POST | `/v1/projects/{id}/github/rules` | Browser Session or Member Token | Create dispatch rule |
-| GET | `/v1/projects/{id}/github/rules` | Browser Session or Member Token | List dispatch rules |
-| GET | `/v1/projects/{id}/github/rules/{ruleId}` | Browser Session or Member Token | Get single rule |
-| PATCH | `/v1/projects/{id}/github/rules/{ruleId}` | Browser Session or Member Token | Update rule |
-| DELETE | `/v1/projects/{id}/github/rules/{ruleId}` | Browser Session or Member Token | Delete rule |
+| Method | Path                                      | Auth                            | Description          |
+| ------ | ----------------------------------------- | ------------------------------- | -------------------- |
+| POST   | `/v1/projects/{id}/github/rules`          | Browser Session or Member Token | Create dispatch rule |
+| GET    | `/v1/projects/{id}/github/rules`          | Browser Session or Member Token | List dispatch rules  |
+| GET    | `/v1/projects/{id}/github/rules/{ruleId}` | Browser Session or Member Token | Get single rule      |
+| PATCH  | `/v1/projects/{id}/github/rules/{ruleId}` | Browser Session or Member Token | Update rule          |
+| DELETE | `/v1/projects/{id}/github/rules/{ruleId}` | Browser Session or Member Token | Delete rule          |
 
 **Create rule request:**
+
 ```json
 {
   "name": "High severity incidents",
@@ -2415,6 +2530,7 @@ GitHub automation eligibility is determined from the target project's owner plan
 ```
 
 Rules may also subscribe to hosted improvement bundle creation:
+
 ```json
 {
   "name": "Hosted improvements",
@@ -2431,6 +2547,7 @@ Rules may also subscribe to hosted improvement bundle creation:
 `incident_status` only affects incident lifecycle events. Hosted improvement rules send `incident_status: "new_or_reopened"` for schema consistency and match on `bundle_type: "improvement"` plus the selected `improvement_bundle.created` event.
 
 **Rule response:**
+
 ```json
 {
   "rule": {
@@ -2453,6 +2570,7 @@ Rules may also subscribe to hosted improvement bundle creation:
 ```
 
 **List rules response:**
+
 ```json
 {
   "rules": [
@@ -2463,14 +2581,15 @@ Rules may also subscribe to hosted improvement bundle creation:
 
 **Dispatch delivery history:**
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/v1/projects/{id}/github/deliveries` | Browser Session or Member Token | List delivery history |
-| POST | `/v1/projects/{id}/github/deliveries/{id}/retry` | Browser Session or Member Token | Retry a failed delivery |
+| Method | Path                                             | Auth                            | Description             |
+| ------ | ------------------------------------------------ | ------------------------------- | ----------------------- |
+| GET    | `/v1/projects/{id}/github/deliveries`            | Browser Session or Member Token | List delivery history   |
+| POST   | `/v1/projects/{id}/github/deliveries/{id}/retry` | Browser Session or Member Token | Retry a failed delivery |
 
 **Deliveries query params:** `status` (optional: `pending`, `delivered`, `failed`, `retrying`, `skipped`), `limit` (optional, 1-100, default 20)
 
 **List deliveries response:**
+
 ```json
 {
   "deliveries": [
@@ -2503,6 +2622,7 @@ Owner and admin may manage any dispatch rule. Plain members may create dispatch 
 When a project downgrades to Free, preserved GitHub installation state, repository assignment, dispatch rules, and delivery history remain readable so the owner can see what will resume after an upgrade. GitHub install flows, repository set/update operations, rule create/update operations, and delivery retries still fail with `upgrade_required` while the lower tier is active. Delete-only cleanup actions for the installation, repo assignment, and dispatch rules remain available.
 
 **Error responses:**
+
 - `401 { "error": "invalid_member_token" }` — missing or invalid auth
 - `403 { "error": "forbidden" }` — caller lacks the required project role or resource ownership for the attempted mutation
 - `403 { "error": "upgrade_required" }` — Free-tier project
@@ -2514,6 +2634,7 @@ When a project downgrades to Free, preserved GitHub installation state, reposito
 - `400 { "error": "invalid_payload" }` — invalid request body
 
 **Dispatch payload contract** (sent as `client_payload` in `repository_dispatch`):
+
 ```json
 {
   "debugbundle_event": "bundle.created",
@@ -2547,6 +2668,7 @@ A GitHub delivery with `status: "delivered"` and `github_status_code: 204` means
 Reference action distribution: external repositories consume `debugbundle/action@v1` for incident dispatches. The action lives in the dedicated public `debugbundle/action` repository and fetches the bundle and reproduction artifact into `.debugbundle/bundles/cloud/` using `incident-id`, `debugbundle-token`, optional `api-base-url`, and optional `workspace-root` inputs. Hosted improvement dispatches expose `links.bundle` directly in the payload for repository-owned workflows to fetch with a member token.
 
 ### API Response Rules
+
 - JSON only
 - Versioned endpoints
 - Explicit nulls (never omit fields)
@@ -2562,6 +2684,7 @@ Reference action distribution: external repositories consume `debugbundle/action
 Binary: `debugbundle`
 
 ### 2.1 Auth Commands
+
 ```
 debugbundle login
 debugbundle whoami
@@ -2572,6 +2695,7 @@ V1 CLI auth uses a member token created in the web app or API, or bootstrapped t
 Current local CLI behavior: `debugbundle login` accepts an explicit member token or GitHub flags, and when run with no explicit auth mode in an interactive terminal it prompts for GitHub auto mode, GitHub device flow, or manual member-token entry. Read-path commands and token-management commands reuse that stored auth state when constructing authenticated API requests, so local users and agents do not need to inject bearer tokens manually once `debugbundle login` has been completed.
 
 ### 2.2 Setup Commands
+
 ```
 debugbundle setup [--non-interactive] [--json]
 debugbundle connect [--auth-file <path>] [--json]
@@ -2604,6 +2728,7 @@ Current local CLI clean behavior is `debugbundle clean [--events] [--bundles] [-
 Current local CLI process behavior is `debugbundle process [--json]`. It reads batch files from `.debugbundle/local/events/`, validates and classifies envelopes through `event-normalizer`, groups local incidents by `fingerprint + environment + service`, writes deterministic bundle artifacts to `.debugbundle/bundles/local/`, writes deterministic reproduction artifacts to `.debugbundle/bundles/local/reproductions/`, and persists the authoritative local incident index plus processing watermark in `.debugbundle/local/state.json`. JSON mode returns processed file/event/incident counts with per-service incident totals. When no event files are newer than the watermark, the command exits `0` and reports `No new events to process.`
 
 ### 2.3 Verification Commands
+
 ```
 debugbundle verify local [--json]
 debugbundle verify cloud --project-id <id> [--trigger-5xx | --trigger-4xx <400-499> | --expect-app-event] [--service <name>] [--environment <name>] [--trace-id <id>] [--request-id <id>] [--max-age-minutes <n>] [--auth-file <path>] [--json]
@@ -2636,7 +2761,9 @@ Active `verify cloud --trigger-5xx --json`, `verify cloud --trigger-4xx <status>
 Current smoke CLI behavior is `debugbundle smoke --project-id <id> [--service <name>] [--environment <name>] [--max-age-minutes <n>] [--auth-file <path>] [--json]`. It is a lightweight orchestration layer over the current local and cloud verification commands: it runs both deterministically, summarizes them as `local-verification` and `cloud-verification` checks, aggregates child warnings/errors, and returns the shared setup/verification JSON schema. Exit-code precedence is preserved for validation (`4`) and auth/config (`2`) failures surfaced by either child verification path.
 
 ### 2.3a Setup/Verification JSON Output Schema
+
 All setup and verification commands with `--json` must return:
+
 ```json
 {
   "status": "healthy | warning | error",
@@ -2651,6 +2778,7 @@ All setup and verification commands with `--json` must return:
 ```
 
 ### 2.4 Data Commands
+
 ```
 debugbundle incidents [--source <local|cloud>] [--project-id <id>] [--environment <env>] [--service <name>] [--status <active|open|resolved|regressed|all>] [--severity <level>] [--first-seen-after <ISO8601>] [--attention-after <ISO8601>] [--cursor <cursor>] [--limit <n>] [--json]
 debugbundle inspect <incident-id> [--source <local|cloud>] [--json]
@@ -2676,6 +2804,7 @@ debugbundle analytics bundle list (--project-id <id> | --all-projects) [--status
 debugbundle analytics bundle create --project-id <id> --kind <kind> [--opportunity-id <id>] [--funnel <key>] [--route <path>] [--incident-id <id>] [--deploy-id <id>] [--from <ISO8601>] [--to <ISO8601>] [--last <duration>] [--filters-json <json>] [--json]
 debugbundle analytics bundle get <bundle-generation-id> --project-id <id> [--json]
 ```
+
 `debugbundle incidents` defaults to `--status active` so the CLI shows incidents that need attention (`open` or `regressed`). Use `--status all` to omit the status filter and include resolved incidents.
 
 Current local CLI retrieval behavior: when `.debugbundle/local/connection.json` is configured with `"mode": "local-only"`, `debugbundle incidents`, `debugbundle inspect`, `debugbundle resolve`, `debugbundle reopen`, `debugbundle bundle`, and `debugbundle reproduce` read `.debugbundle/local/state.json`, `.debugbundle/bundles/local/`, and `.debugbundle/bundles/local/reproductions/` directly without requiring `debugbundle login`. Local incident listing preserves the machine-readable `{ incidents, next_cursor }` shape and applies `project_id`, `environment`, `service`, `status`, `severity`, `first_seen_after` / `--first-seen-after`, `attention_after` / `--attention-after`, `cursor`, and `limit` filters against the local incident index.
@@ -2689,6 +2818,7 @@ Current local CLI retrieval limitation: `debugbundle logs` still requires the au
 Analytics CLI commands are hosted/self-host API-backed commands. They require member-token auth, return the same JSON shapes as the analytics API, and must not read local raw analytics files directly in V1. Raw analytics objects, retained journey samples, and expired aggregate rollup rows are removed by the shared retention cleanup path according to project analytics retention settings; in-window aggregate rollups remain the normal query source. Human output should prioritize compact tables and summaries; `--json` returns the raw machine-readable API payload for agents.
 
 ### 2.5 Alert Commands
+
 ```
 debugbundle alert list --project-id <id> [--limit <n>] [--auth-file <path>] [--json]
 debugbundle alert create --project-id <id> --channel <channel> --condition <condition> [--service-id <id>] [--severity-min <level>] [--cooldown <seconds>] --config-json <json> [--is-enabled <true|false>] [--auth-file <path>] [--json]
@@ -2699,6 +2829,7 @@ debugbundle alert delete <id> --project-id <id> [--auth-file <path>] [--json]
 Current alert CLI behavior is a thin adapter over the alert HTTP client in `packages/alert-client`, reusing stored member auth after `debugbundle login` and forwarding JSON output without duplicating transport logic. `alert create` requires `--config-json` with a channel-specific object, and `alert update` accepts `null` clears for `service_id`, `severity_min`, or `config`. `--cooldown` maps to API `cooldown_seconds`, uses seconds, accepts `0` to disable notification suppression, and accepts positive values up to `604800` (7 days). Slack alert configs can use either `{"webhook_url":"..."}` or `{"slack_destination_id":"uuid"}`.
 
 ### 2.6 Webhook Commands
+
 ```
 debugbundle webhook list --project-id <id> [--limit <n>] [--auth-file <path>] [--json]
 debugbundle webhook create --project-id <id> --url <url> --event <event[,event]> [--environment <env[,env]>] [--service <svc[,svc]>] [--severity-min <level>] [--bundle-type <type[,type]>] [--verification <true|false>] [--is-enabled <true|false>] [--auth-file <path>] [--json]
@@ -2712,6 +2843,7 @@ debugbundle webhook retry <id> <delivery-id> --project-id <id> [--auth-file <pat
 Current webhook CLI behavior is a thin adapter over the webhook HTTP client in `packages/webhook-client`, reusing stored member auth after `debugbundle login` and forwarding JSON output without duplicating transport logic. Multi-value flags (`--event`, `--environment`, `--service`, `--bundle-type`) accept comma-separated values.
 
 ### 2.7 Slack Commands
+
 ```
 debugbundle slack list --project-id <id> [--auth-file <path>] [--json]
 debugbundle slack connect-url --project-id <id> [--return-to </projects/...>] [--auth-file <path>] [--json]
@@ -2722,6 +2854,7 @@ debugbundle slack delete <destination-id> --project-id <id> [--auth-file <path>]
 Current Slack CLI behavior is a thin adapter over `packages/slack-client`. `slack connect-url` returns the browser OAuth handoff URL, `slack list` exposes reusable connected destinations for a project organization, `slack test` sends a test message to the selected destination, and `slack delete` remains available after downgrade to remove a destination once no alert rules or weekly reports still reference it.
 
 ### 2.8 Weekly Report Commands
+
 ```
 debugbundle weekly-report list --project-id <id> [--limit <n>] [--auth-file <path>] [--json]
 debugbundle weekly-report create --project-id <id> --channel <email|slack> --day-of-week <day> --hour-of-day <0-23> --timezone <iana> --config-json <json> [--is-enabled <true|false>] [--auth-file <path>] [--json]
@@ -2732,6 +2865,7 @@ debugbundle weekly-report delete <channel-id> [--auth-file <path>] [--json]
 Current weekly report CLI behavior is a thin adapter over the weekly report HTTP client in `packages/weekly-report-client`, reusing stored member auth after `debugbundle login` and forwarding JSON output without duplicating transport logic. Slack weekly-report configs accept either `{"webhook_url":"..."}` or `{"slack_destination_id":"uuid"}` in `--config-json`; preserved Slack weekly-report channels remain listed while paused after downgrade.
 
 ### 2.9 Profile Commands
+
 ```
 debugbundle profile validate [--json]
 debugbundle profile show [--json]
@@ -2741,6 +2875,7 @@ debugbundle profile sync
 Current local `debugbundle profile validate` behavior validates `.debugbundle/profile.json` and reports field-path errors for missing or invalid required schema fields.
 
 ### 2.10 Analysis Commands
+
 ```
 debugbundle analyze [--type failure|improvement|performance] [--local] [--json]
 ```
@@ -2748,6 +2883,7 @@ debugbundle analyze [--type failure|improvement|performance] [--local] [--json]
 Current local `debugbundle analyze` behavior reads `.debugbundle/bundles/local/`, `.debugbundle/profile.json`, and repository source files discovered from the profile's service paths, then emits a deterministic bundle analysis artifact. The current implementation supports `--type improvement` for local analysis, uses the recipe contract at `.agents/skills/debugbundle/assets/schemas/improvement-analysis.json`, returns exit code `3` when no local bundles are available, and returns exit code `4` for unsupported local analysis types or invalid local profile state.
 
 ### 2.11 Probe Commands (Remote Activation — Solo+ Only)
+
 ```
 debugbundle probe activate <project-id> --label-pattern <pattern> [--service <name>] [--environment <name>] [--ttl-seconds <n>] [--trigger-ttl-seconds <n>] [--auth-file <path>] [--json]
 debugbundle probe list <project-id> [--auth-file <path>] [--json]
@@ -2757,6 +2893,7 @@ debugbundle probe deactivate <project-id> <activation-id> [--auth-file <path>] [
 These commands manage remote probe activations. `probe activate` remains a Solo+ mutation, `probe list` stays readable on Free after downgrade, and `probe deactivate` remains available as cleanup for preserved activations. Always-on probes require no CLI commands — they operate automatically in the SDK.
 
 ### 2.11a Health Check Commands
+
 ```
 debugbundle health checks list --project-id <id> [--limit <n>] [--auth-file <path>] [--json]
 debugbundle health checks get <check-id> --project-id <id> [--auth-file <path>] [--json]
@@ -2771,6 +2908,7 @@ debugbundle health checks daily-rollups <check-id> --project-id <id> [--limit <n
 These commands manage hosted health checks without requiring SDK changes. Read commands are available to any authorized project member. Create, update, delete, and test require owner/admin authorization. `health checks test` is side-effect-free and does not create incidents or retained history. Passing `--service null` during create or update clears the optional service label.
 
 ### 2.12 Capture Policy Commands
+
 ```
 debugbundle capture-policy get [--project <id>] [--json]
 debugbundle capture-policy set [--project <id>] --preset <minimal|balanced|investigative> [--json]
@@ -2781,6 +2919,7 @@ debugbundle capture-policy set [--project <id>] --client-error-incidents <preset
 `capture-policy get` displays the project's current resolved policy plus raw override semantics for client error incidents. `capture-policy set` updates the preset and/or individual override fields via `--override key=value` (use `null` to clear an override), and also supports the dedicated client-error incident mode flags shown above. `--client-error-path-rule` promotes a specific `4xx` status and path pattern without promoting that status globally. Owner-only.
 
 ### 2.12a Capture Rule Commands
+
 ```
 debugbundle capture-rule list --project-id <id> [--auth-file <path>] [--json]
 debugbundle capture-rule suggest <incident-id> [--auth-file <path>] [--json]
@@ -2793,6 +2932,7 @@ debugbundle capture-rule delete <rule-id> --project-id <id> [--auth-file <path>]
 `capture-rule suggest` exposes the deterministic incident suggestion surface without mutating project state. `capture-rule create-from-suggestion` applies one of those suggestions with optional local overrides like `name`, `description`, or `expires-at`. Direct `create/update/delete` remain the explicit project-management surface and require owner/admin authorization.
 
 ### 2.13 Improvement Settings Commands
+
 ```
 debugbundle improvements list [--project-id <id>] [--environment <name>] [--service <name>] [--status <status>] [--severity <level>] [--kind <kind>] [--cursor <cursor>] [--limit <n>] [--json]
 debugbundle improvements get <improvement-id> [--json]
@@ -2807,6 +2947,7 @@ debugbundle improvements settings set --project <id> [--enabled <true|false>] [-
 `improvements list/get/bundle/resolve/reopen/snooze` are the hosted improvement-management surface and map directly to the corresponding improvement retrieval routes. `improvements settings get` displays project-backed hosted improvement automation settings plus a capability-derived `cloud_automation_available` flag. `improvements settings set` updates the enabled flag and/or sensitivity mode. Owner/admin only; Free-tier projects receive `upgrade_required`.
 
 ### 2.14 Billing Commands
+
 ```
 debugbundle billing get [--json]
 debugbundle billing trial start --plan <solo|team> [--json]
@@ -2830,6 +2971,7 @@ All billing commands require a stored member token with owner role. The `--json`
 `analyze` reads local bundles from `.debugbundle/bundles/local/`, the project profile, and relevant source code. It generates an analysis bundle following the bundle schema. The `--local` flag is implied when running without cloud credentials. The skill layer (`.agents/skills/debugbundle/assets/schemas/`) provides structured analysis recipes that the user's AI agent follows to produce the analysis.
 
 ### 2.14 Project Commands
+
 ```
 debugbundle project list [--limit <n>] [--auth-file <path>] [--json]
 debugbundle project create --name <name> --slug <slug> [--environment-default <env>] [--auth-file <path>] [--json]
@@ -2840,6 +2982,7 @@ debugbundle project delete <project-id> [--auth-file <path>] [--json]
 `project list` lists both owned and shared projects visible to the authenticated member and includes relationship metadata such as `effective_role`, `owner_email`, and owner-visible `sharing_state`. `project create` creates a new owned project with the given name and slug. `project update` modifies existing project attributes for an accessible project. `project delete` permanently removes a project (owner-only). All require member token authentication.
 
 ### 2.15 Project Member Commands
+
 ```
 debugbundle project members list --project-id <id> [--auth-file <path>] [--json]
 debugbundle project members invites --project-id <id> [--auth-file <path>] [--json]
@@ -2853,6 +2996,7 @@ debugbundle project members leave --project-id <id> [--auth-file <path>] [--json
 `project members list` lists the owner and collaborators for one project. `project members invites` lists pending invitations for that project. `project members invite` sends a collaborator invitation to the specified email (Team tier). `project members cancel-invite` cancels a pending invitation. `project members update-role` changes a collaborator's role. `project members remove` removes another collaborator from the project. `project members leave` removes the authenticated collaborator's own membership from that project. Member removal and self-leave remove only that collaborator's project-scoped automation resources for that project, such as alert rules, webhooks, and GitHub dispatch rules; other project resources remain. Listing is available to any authorized project member, while invite visibility and management remain owner/admin-only.
 
 ### 2.16 GitHub Commands
+
 ```
 debugbundle github status [--project-id <id>] [--auth-file <path>] [--json]
 debugbundle github repos [--project-id <id>] [--auth-file <path>] [--json]
@@ -2869,13 +3013,14 @@ debugbundle github deliveries retry <delivery-id> [--project-id <id>] [--auth-fi
 `github status` shows the organization's GitHub App installation status and any assigned repo for the current project. `github repos` lists repositories available to the installation for owner/admin callers. `github repo set` assigns a primary repo to the project for owner/admin callers. `github rules create` is available to any authorized collaborator on an eligible shared project, while rule update/delete and delivery retry obey creator ownership for plain members. `github deliveries` lists recent delivery history for a project, and `github deliveries retry` retries a failed delivery within that project scope when the caller owns the underlying rule or has admin rights. Multi-value flags (`--event`, `--environment`, `--service`) accept comma-separated values. Eligibility is determined from the target project's owner plan, not the acting collaborator's personal plan.
 
 ### Exit Codes
-| Code | Meaning |
-|------|---------|
-| 0 | Success |
-| 1 | General failure |
-| 2 | Auth/config error |
-| 3 | Resource not found |
-| 4 | Validation error |
+
+| Code | Meaning            |
+| ---- | ------------------ |
+| 0    | Success            |
+| 1    | General failure    |
+| 2    | Auth/config error  |
+| 3    | Resource not found |
+| 4    | Validation error   |
 
 ---
 
@@ -2888,6 +3033,7 @@ Install surface: `@debugbundle/mcp` publishes a standalone stdio MCP server with
 Discovery surface: `apps/mcp/clawhub/debugbundle/SKILL.md` is the portable Agent Skill source published to ClawHub and Smithery Skills. Its frontmatter description, the MCP package/registry descriptions used by Claude and other MCP clients, and the OpenClaw package/manifest descriptions must stay aligned around truthful capability-first language. The release verifier checks configured ClawHub capability queries and maximum ranks after publication; exact-slug availability is not sufficient evidence of discoverability.
 
 ### 3.1 Core Tools
+
 ```
 debugbundle_list_incidents    → same result as GET /v1/incidents (including `next_cursor`)
 debugbundle_get_incident      → same result as GET /v1/incidents/{id}
@@ -2947,6 +3093,7 @@ Current connected-mode MCP retrieval behavior: when the project is configured as
 Current MCP retrieval limitation: `debugbundle_get_logs` remains cloud-backed in the current implementation and still requires a bearer token.
 
 ### 3.2 Setup/Verification Tools
+
 ```
 debugbundle_doctor            → same result as `debugbundle doctor --json`
 debugbundle_validate          → same result as `debugbundle validate --json`
@@ -2958,6 +3105,7 @@ debugbundle_smoke             → same result as `debugbundle smoke --json`
 Current MCP setup/verification behavior is a thin adapter over the existing CLI command modules in `apps/cli/src/`. The MCP wrappers force JSON mode, parse the CLI JSON output, and return the same machine-readable payloads to agents without adding extra business logic. `doctor` accepts `privacy: true` to mirror `debugbundle doctor --privacy --json`, including the same deterministic privacy preview payload.
 
 Current MCP setup/verification input shape:
+
 - `doctor`: optional `authFilePath`, `privacy`
 - `validate`: optional `fix`
 - `verify_local`: no required inputs
@@ -2965,6 +3113,7 @@ Current MCP setup/verification input shape:
 - `smoke`: required `projectId`, optional `service`, `environment`, `maxAgeMinutes`, `authFilePath`
 
 ### 3.3 Analysis Tools
+
 ```
 debugbundle_analyze           → same result as `debugbundle analyze --json`
 ```
@@ -2972,6 +3121,7 @@ debugbundle_analyze           → same result as `debugbundle analyze --json`
 Current MCP analysis behavior is a thin adapter over the CLI analyze command in `apps/cli/src/analyze-command.ts`. The MCP wrapper forces JSON mode, forwards the optional `type` and `local` inputs, and returns the same machine-readable payload that `debugbundle analyze --json` produces.
 
 ### 3.4 Probe Tools (Remote Activation — Solo+ Only)
+
 ```
 debugbundle_activate_probe    → same result as POST /v1/projects/{id}/probes/activate
 debugbundle_list_active_probes → same result as GET /v1/projects/{id}/probes
@@ -2981,6 +3131,7 @@ debugbundle_deactivate_probe  → same result as POST /v1/projects/{id}/probes/d
 These tools manage remote probe activations. `activate_probe` remains a Solo+ mutation, while `list_active_probes` stays readable on Free after downgrade and `deactivate_probe` remains available as cleanup for preserved activations. Always-on probes require no MCP tools — they operate automatically in the SDK.
 
 ### 3.4a Health Check Tools
+
 ```
 list_health_checks         → same result as GET /v1/projects/{id}/availability-checks
 get_health_check           → same result as GET /v1/projects/{id}/availability-checks/{checkId}
@@ -2995,6 +3146,7 @@ list_health_check_daily_rollups → same result as GET /v1/projects/{id}/availab
 These tools expose the hosted health-check management surface for agents and automations. Read operations are available to any authorized project member. Create, update, delete, and test require owner/admin authorization. `test_health_check` is side-effect-free and does not open incidents or write retained history.
 
 ### 3.5 Capture Policy Tools
+
 ```
 get_capture_policy            → same result as GET /v1/projects/{id}/capture-policy
 update_capture_policy         → same result as PATCH /v1/projects/{id}/capture-policy
@@ -3003,6 +3155,7 @@ update_capture_policy         → same result as PATCH /v1/projects/{id}/capture
 These tools manage per-project capture policy (preset selection and advanced overrides, including status-wide and path-scoped client-error incident promotion). `get_capture_policy` returns a preview-only payload to plain members and an editable payload to owner/admin callers. `update_capture_policy` requires owner/admin authorization.
 
 ### 3.5a Capture Rule Tools
+
 ```
 list_capture_rules                         → same result as GET /v1/projects/{id}/capture-rules
 create_capture_rule                        → same result as POST /v1/projects/{id}/capture-rules
@@ -3015,6 +3168,7 @@ create_capture_rule_from_incident_suggestion → same result as POST /v1/inciden
 These tools expose the same manual capture-rule workflow as the API and CLI. Suggestions are deterministic and read-only. Rule creation, update, deletion, and create-from-suggestion require owner/admin authorization.
 
 ### 3.6 Improvement Settings Tools
+
 ```
 list_improvements            → same result as GET /v1/improvements
 get_improvement              → same result as GET /v1/improvements/{id}
@@ -3031,6 +3185,7 @@ update_analytics_settings     → same result as PATCH /v1/projects/{id}/analyti
 These tools manage hosted improvement opportunities, hosted improvement automation settings, and AnalyticsBundle project settings. `get_improvement_settings` and `get_analytics_settings` return project-backed settings plus capability-derived availability flags. Update tools require owner/admin authorization; analytics settings and custom dimensions remain bounded by the current tier capabilities.
 
 ### 3.7 Billing Tools
+
 ```
 debugbundle_get_billing_summary          → same result as GET /v1/billing
 start_trial                              → same result as POST /v1/billing/trial/start
@@ -3042,6 +3197,7 @@ cancel_capacity_reduction                → same result as DELETE /v1/billing/c
 These tools manage organization billing summary, no-card trial start, and capacity lifecycle. All require owner-scoped member token authentication. `get_billing_summary` includes the `billing_state` field plus the normalized `trial` object. `start_trial` accepts `targetPlan: "solo" | "team"`. Capacity tools return `trial_conversion_required` while an active no-card trial still requires paid conversion.
 
 ### 3.7 Project Tools
+
 ```
 debugbundle_list_projects     → same result as GET /v1/projects
 debugbundle_create_project    → same result as POST /v1/projects
@@ -3053,6 +3209,7 @@ These tools manage project lifecycle. `create_project`, `update_project`, and `d
 `create_project` accepts optional `colorTag`; `update_project` accepts optional `colorTag` and clears the tag when `null` is provided. The value set matches the shared palette documented for `color_tag` on `POST /v1/projects`.
 
 ### 3.8 Member Tools
+
 ```
 list_project_members         → same result as GET /v1/projects/{id}/members
 list_project_member_invites  → same result as GET /v1/projects/{id}/invites
@@ -3066,6 +3223,7 @@ leave_project                → same result as DELETE /v1/projects/{id}/members
 These tools manage project collaboration lifecycle. Listing is available to any authorized project member. Invite, cancel, role update, and removal require owner/admin authorization. `leave_project` is for collaborators leaving their own membership. `invite_project_member` requires Team tier.
 
 ### 3.9 GitHub Tools
+
 ```
 debugbundle_get_github_status           → same result as GET /v1/github/installation
 debugbundle_list_github_repositories    → same result as GET /v1/github/repositories
@@ -3082,6 +3240,7 @@ debugbundle_retry_github_delivery       → same result as POST /v1/projects/{id
 These tools manage GitHub repository automation. Project-scoped read operations use the target project's owner plan for eligibility; repository connection management requires owner/admin access; dispatch-rule create is available to authorized project collaborators, while update/delete and delivery retry obey creator ownership for plain members.
 
 ### MCP Response Rules
+
 - Deterministic
 - Compact
 - Machine-readable
@@ -3092,7 +3251,156 @@ These tools manage GitHub repository automation. Project-scoped read operations 
 
 ---
 
-## 3a. OpenClaw Plugin Interface
+## 3a. Official OpenAI Plugin V1 Interface
+
+This is an additive public projection and does not replace or modify the stdio MCP contract above. The official distribution version starts at independent semver `1.0.0`, combines one tailored DebugBundle skill with remote MCP, and has no custom MCP UI.
+
+### Canonical Hosts And Endpoints
+
+| Surface                     | Exact URL                                                            | Contract                                                                |
+| --------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| MCP resource                | `https://mcp.debugbundle.com`                                        | Permanent origin and access-token audience                              |
+| Streamable HTTP             | `https://mcp.debugbundle.com/mcp`                                    | Public production MCP endpoint                                          |
+| Protected-resource metadata | `https://mcp.debugbundle.com/.well-known/oauth-protected-resource`   | RFC 9728 metadata and scope/resource discovery                          |
+| OpenAI domain challenge     | `https://mcp.debugbundle.com/.well-known/openai-apps-challenge`      | Exact portal-provided token; never a secret or wildcard                 |
+| OAuth metadata              | `https://api.debugbundle.com/.well-known/oauth-authorization-server` | Issuer and authorization-server discovery                               |
+| OIDC metadata               | `https://api.debugbundle.com/.well-known/openid-configuration`       | Verified-domain/UserInfo discovery                                      |
+| Authorization               | `https://api.debugbundle.com/oauth/authorize`                        | Browser session, consent, code, PKCE S256, RFC 9207 `iss`               |
+| Interaction API             | `https://api.debugbundle.com/oauth/interaction/{uid}`                | Browser redirect plus no-store JSON describe/allow/deny bound to UID    |
+| Reviewer interaction        | `https://api.debugbundle.com/oauth/interaction/{uid}/reviewer`       | POST-only synthetic-review credential; no query credential              |
+| Consent UI                  | `https://app.debugbundle.com/oauth/consent?interaction={uid}`        | Existing public-auth layout; opaque UID is the only interaction value   |
+| Reviewer UI                 | `https://app.debugbundle.com/oauth/reviewer?interaction={uid}`       | Existing public-auth layout; fixed synthetic tenant only                |
+| Token                       | `https://api.debugbundle.com/oauth/token`                            | Code/refresh exchange with exact resource binding and `private_key_jwt` |
+| Revocation                  | `https://api.debugbundle.com/oauth/revoke`                           | Refresh-family and backing-grant revocation                             |
+| UserInfo                    | `https://api.debugbundle.com/oauth/userinfo`                         | `sub`, normalized `email`, `email_verified: true` only                  |
+| JWKS                        | `https://api.debugbundle.com/oauth/jwks.json`                        | Rotatable public signing keys with `kid`                                |
+| Connection inventory        | `https://api.debugbundle.com/v1/openai/connections`                  | Browser-session no-store list for exact current user and organization   |
+| Connection revocation       | `https://api.debugbundle.com/v1/openai/connections/revoke`           | CSRF-protected POST body; owned grant and refresh-family revocation     |
+
+MCP resource routes are unavailable through `api.debugbundle.com`; OAuth/OIDC issuer routes are unavailable through `mcp.debugbundle.com`. Trusted Caddy/Fastify surface isolation rejects alternate `Host`, `Forwarded`, `X-Forwarded-Host`, direct-port, and spoofed surface-marker requests. Changing resource scheme, hostname, or port requires a new OpenAI plugin. A path-only endpoint change requires a reviewed version.
+
+The provider creates an opaque interaction UID on the API origin. Browser navigation to `GET /oauth/interaction/{uid}` returns a no-store `303` to the approved app consent route while leaving the HttpOnly provider interaction cookie scoped to the API origin. The app explicitly requests JSON from the same API interaction URL, then submits `{ "decision": "allow|deny", "product_scopes": [...] }` with the existing browser session and CSRF header. A successful decision returns only a server-validated API-origin `continue_url`; the browser resumes the provider and the provider performs the final redirect. The reviewer endpoint remains below the same `/oauth/interaction/{uid}` cookie path. The deprecated `/oauth/reviewer/access` path returns `404` and never accepts a credential.
+
+`/__dev/openai-plugin` is a non-public, frontend-only visual review harness, not an OAuth, MCP, or Settings interface. It is mounted only in an explicitly opted-in development build (and tests), consumes deterministic synthetic fixtures, and reuses the production UI components without calling the endpoints above. It is absent from production routing even if `VITE_OPENAI_PLUGIN_PREVIEW=true`. Its state matrix is frozen in `tests/fixtures/openai-plugin-v1/ui-preview-matrix.json`; preview evidence cannot be promoted to live or deployed evidence.
+
+Only the opaque interaction UID is permitted in consent/reviewer URLs. OAuth codes, credentials, assertions, tokens, email, organization/project/customer identifiers, grant IDs, and customer content are prohibited from URLs and browser history. Consent rendering never includes customer-captured content. The API revalidates exact client, redirect, resource, interaction freshness, requested and selected scopes, verified browser session, current organization membership, and reviewer boundary; UI controls are not authorization controls.
+
+`GET /v1/openai/connections` returns `{ "connections": [...] }`, where each row contains only `grant_id`, fixed `client_name`, current `organization_name`, allowlisted `product_scopes`, `consented_at`, `expires_at`, nullable `revoked_at`, and derived `status` (`active|expired|revoked`). It never lists another user or organization. `POST /v1/openai/connections/revoke` accepts strict `{ "grant_id": "uuid" }`, returns `{ "revoked": true }`, and atomically revokes the owned normalized grant and remaining refresh family. Missing/unowned grants return the same bounded `404 openai_connection_not_found`; grant IDs are POST body data, not route parameters.
+
+### Principal And Scopes
+
+The remote principal is one active OAuth grant bound to an exact client, user, organization, resource, and scope set. The resource accepts only OAuth bearer access tokens with `aud=https://mcp.debugbundle.com`; it rejects member tokens, project tokens, browser sessions, CLI auth files, and credentials inside tool inputs. Each invocation rechecks grant/account/organization status and current record/project authorization.
+
+Supported scopes are exactly:
+
+```text
+openid
+email
+debugbundle:projects:read
+debugbundle:incidents:read
+debugbundle:artifacts:read
+debugbundle:improvements:read
+debugbundle:analytics:read
+debugbundle:health:read
+```
+
+Every tool declares exactly one `securitySchemes` entry of `{ "type": "oauth2", "scopes": [...] }`. `openid` and `email` support linking and verified workspace-domain restrictions; product tools declare only the product scope(s) they consume. `get_incident_context` requires incident and artifact scopes. `get_incident_impact` requires analytics and incident scopes.
+
+### Exact V1 Tool Allowlist
+
+| Order | Tool                              | Required product scope(s)                                  | Input/output schema                                                      |
+| ----: | --------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------ |
+|     1 | `list_projects`                   | `debugbundle:projects:read`                                | `listProjectsInput` / `listProjectsOutput`                               |
+|     2 | `list_services`                   | `debugbundle:projects:read`                                | `listServicesInput` / `listServicesOutput`                               |
+|     3 | `list_incidents`                  | `debugbundle:incidents:read`                               | `listIncidentsInput` / `listIncidentsOutput`                             |
+|     4 | `get_incident`                    | `debugbundle:incidents:read`                               | `incidentLookupInput` / `getIncidentOutput`                              |
+|     5 | `get_incident_context`            | `debugbundle:incidents:read`, `debugbundle:artifacts:read` | `incidentLookupInput` / `getIncidentContextOutput`                       |
+|     6 | `get_bundle`                      | `debugbundle:artifacts:read`                               | `incidentLookupInput` / `getBundleOutput`                                |
+|     7 | `get_reproduction`                | `debugbundle:artifacts:read`                               | `incidentLookupInput` / `getReproductionOutput`                          |
+|     8 | `list_improvements`               | `debugbundle:improvements:read`                            | `listImprovementsInput` / `listImprovementsOutput`                       |
+|     9 | `get_improvement`                 | `debugbundle:improvements:read`                            | `improvementLookupInput` / `getImprovementOutput`                        |
+|    10 | `get_improvement_bundle`          | `debugbundle:improvements:read`                            | `improvementLookupInput` / `getImprovementBundleOutput`                  |
+|    11 | `get_usage_summary`               | `debugbundle:analytics:read`                               | `analyticsMetricsInput` / `getUsageSummaryOutput`                        |
+|    12 | `get_route_metrics`               | `debugbundle:analytics:read`                               | `analyticsMetricsInput` / `getRouteMetricsOutput`                        |
+|    13 | `get_journey_patterns`            | `debugbundle:analytics:read`                               | `analyticsMetricsInput` / `getJourneyPatternsOutput`                     |
+|    14 | `get_device_breakdown`            | `debugbundle:analytics:read`                               | `analyticsMetricsInput` / `getDeviceBreakdownOutput`                     |
+|    15 | `get_referrer_metrics`            | `debugbundle:analytics:read`                               | `analyticsMetricsInput` / `getReferrerMetricsOutput`                     |
+|    16 | `get_action_metrics`              | `debugbundle:analytics:read`                               | `analyticsMetricsInput` / `getActionMetricsOutput`                       |
+|    17 | `list_funnel_metrics`             | `debugbundle:analytics:read`                               | `analyticsMetricsInput` / `listFunnelMetricsOutput`                      |
+|    18 | `get_funnel_analysis`             | `debugbundle:analytics:read`                               | `analyticsFunnelInput` / `getFunnelAnalysisOutput`                       |
+|    19 | `get_incident_impact`             | `debugbundle:analytics:read`, `debugbundle:incidents:read` | `analyticsIncidentImpactInput` / `getIncidentImpactOutput`               |
+|    20 | `list_health_checks`              | `debugbundle:health:read`                                  | `listHealthChecksInput` / `listHealthChecksOutput`                       |
+|    21 | `get_health_check`                | `debugbundle:health:read`                                  | `healthCheckLookupInput` / `getHealthCheckOutput`                        |
+|    22 | `list_health_check_results`       | `debugbundle:health:read`                                  | `listHealthCheckResultsInput` / `listHealthCheckResultsOutput`           |
+|    23 | `list_health_check_daily_rollups` | `debugbundle:health:read`                                  | `listHealthCheckDailyRollupsInput` / `listHealthCheckDailyRollupsOutput` |
+
+The exact titles, descriptions, order, per-tool security schemes, annotations, and JSON Schema definitions are frozen in `tests/fixtures/openai-plugin-v1/tool-contracts.json` and `tests/fixtures/openai-plugin-v1/schemas.json`. Those fixtures are normative for `tools/list` and successful `structuredContent`. Every tool advertises:
+
+```json
+{
+  "readOnlyHint": true,
+  "openWorldHint": false,
+  "destructiveHint": false
+}
+```
+
+Inputs are strict and reject unknown fields. They never contain `bearerToken`, `source`, local paths, headers, secrets, custom dimensions, or individual/sample identifiers. All project-scoped lists and lookups require `projectId`; list limits are capped at 50 except daily rollups, whose schema caps both `days` and `limit` at 90. Health results cap `lookbackHours` at 168. Analytics readers accept only fixed `last` lookbacks of 24 hours, 7 days, 30 days, or 90 days, hour/day granularity, optional service/environment/normalized-route filters, and a limit capped at 25.
+
+### Read And Result Invariants
+
+OpenAI handlers call dedicated hosted readers. A successful read may query existing records and stored artifacts only. It never regenerates an artifact, enqueues a job, writes last-access state, synchronously writes an audit/product event, sends an external request on the user's behalf, or mutates customer-visible state. Metadata-only request telemetry may be emitted outside the domain transaction and cannot affect the result.
+
+Missing, stale, pending, failed, or oversized artifact reads return their exact status, a safe explanation, manifest, and authenticated `continuation_url`; `artifact` is `null` and no work starts. Artifact structured results are capped at 512 KiB. `get_incident_context` returns only the allowlisted incident, primary-signal, artifact-status, deploy, redaction, and next-check fields; it has no `logs` field and must not query raw log inventory.
+
+The nine analytics readers query existing aggregate ledgers only. `get_journey_patterns` disables the retained journey-sample lookup before projection. `get_incident_impact` rechecks the requested incident, disables both the retained-sample and analytics-bundle-state lookups, and returns only aggregate reach. Individual journey samples/sample IDs, raw analytics events, custom dimensions, analytics opportunities, AnalyticsBundle inventory/detail/generation and generation state, saved-funnel/settings changes, and all analytics mutations are outside OpenAI v1. These restrictions do not change the richer existing API, CLI, stdio MCP, OpenClaw, or web analytics contracts.
+
+Health-check `display_url` and result `final_display_url` are derived, never copied verbatim: parse a valid HTTP(S) URL, reject other schemes, drop userinfo/query/fragment, normalize the host, and replace secret-like path segments with `[REDACTED]`. The output omits internal scheduling/claim state, failure counters, stored error messages, credentials, and query parameters.
+
+All results run existing DebugBundle redaction before the OpenAI allowlist. They omit auth material, email, request bodies, form values, cookies, signed URLs, object keys, database-only identifiers, internal fingerprints/hashes, hidden debug fields, raw logs, individual analytics/journey data, and unbounded captured content. Customer strings are untrusted data, never instructions. Exact sources, transforms, categories, bounds, and adjacent omissions live in `contracts/openai-plugin-v1-data-map.md`.
+
+### Result And Error Envelope
+
+Success returns both:
+
+- `structuredContent` exactly matching the advertised output schema; and
+- one compact text content item summarizing the status/count without adding fields or secrets.
+
+Expected domain states are represented in schema-valid structured content where the tool contract defines a status. Protocol/auth/input failures use bounded MCP errors:
+
+| Error                     | MCP/HTTP behavior                                                 | Notes                                                  |
+| ------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------ |
+| `authentication_required` | `401` plus `WWW-Authenticate` and `_meta["mcp/www_authenticate"]` | Includes exact protected-resource metadata URL         |
+| `invalid_token`           | `401` challenge                                                   | Invalid issuer/audience/time/grant/account/client      |
+| `insufficient_scope`      | `403` or OAuth challenge with required scope                      | No domain reader call when scope is missing            |
+| `forbidden`               | `403`                                                             | Current record/project membership denied               |
+| `not_found`               | bounded tool error                                                | Does not reveal cross-tenant existence                 |
+| `invalid_input`           | bounded tool error or `400`                                       | Strict schema/unknown fields/bounds                    |
+| `rate_limited`            | `429` plus bounded `Retry-After`                                  | Identity-aware Redis limit                             |
+| `busy`                    | `429` or `503`                                                    | Database-aware bulkhead admission rejected immediately |
+| `temporarily_unavailable` | `503`                                                             | Redis coordination or MCP surface gate failed closed   |
+| `result_too_large`        | schema-valid `oversized` artifact state                           | No partial secret-bearing result and no regeneration   |
+| `timeout`                 | bounded tool error                                                | Below the API 30-second ceiling                        |
+| `internal_error`          | bounded tool error                                                | No stack trace, exception, or correlation secret       |
+
+The unauthenticated HTTP boundary returns this discovery header:
+
+```text
+WWW-Authenticate: Bearer resource_metadata="https://mcp.debugbundle.com/.well-known/oauth-protected-resource"
+```
+
+Its response body and an unauthenticated tool-call result carry this exact server-authored challenge as the sole `_meta["mcp/www_authenticate"]` item:
+
+```text
+Bearer resource_metadata="https://mcp.debugbundle.com/.well-known/oauth-protected-resource", error="invalid_token", error_description="A valid DebugBundle connection is required."
+```
+
+An authenticated tool call missing a required product scope uses the same metadata URL with `error="insufficient_scope"`, the bounded description `The connection does not grant the required DebugBundle scope.`, and one `scope` value taken only from the frozen tool catalog. Arbitrary exception messages and customer data must never be projected into a challenge.
+
+The fixtures are the normative contract for the implemented local source candidate. `tests/fixtures/openai-plugin-v1/implementation-gaps.json` separates implemented/tested consent and runtime source from still-unavailable production deployment, live-client, submission, publication, and directory evidence.
+
+---
+
+## 3b. OpenClaw Plugin Interface
 
 Package: `@debugbundle/openclaw-plugin`
 
@@ -3117,19 +3425,19 @@ See `/contracts/sdk-interface.md` for the full universal interface contract. Bel
 ### 4.1 Node SDK (`@debugbundle/sdk-node`)
 
 ```js
-const debugbundle = require('@debugbundle/sdk-node');
+const debugbundle = require("@debugbundle/sdk-node");
 
 // Minimal init (framework auto-detected)
 debugbundle.init({ projectToken: process.env.DEBUGBUNDLE_TOKEN });
 
 // Vanilla hooks (no framework required)
-debugbundle.captureExceptions();    // process.on('uncaughtException')
-debugbundle.captureRejections();    // process.on('unhandledRejection')
-debugbundle.captureConsole();       // console.error/warn wrapping (opt-in)
+debugbundle.captureExceptions(); // process.on('uncaughtException')
+debugbundle.captureRejections(); // process.on('unhandledRejection')
+debugbundle.captureConsole(); // console.error/warn wrapping (opt-in)
 
 // Manual capture
-debugbundle.captureException(new Error('checkout failed'), { userId: '123' });
-debugbundle.captureLog('Slow query detected', 'warning', { query: 'SELECT...' });
+debugbundle.captureException(new Error("checkout failed"), { userId: "123" });
+debugbundle.captureLog("Slow query detected", "warning", { query: "SELECT..." });
 debugbundle.captureRequest(req, res);
 ```
 
@@ -3138,11 +3446,11 @@ Current implementation scope (Phase 8 complete): the Node SDK now covers the ful
 ### 4.2 Browser SDK (`@debugbundle/sdk-browser`)
 
 ```js
-import { debugbundle } from '@debugbundle/sdk-browser';
+import { debugbundle } from "@debugbundle/sdk-browser";
 
 debugbundle.init({
-  transportMode: 'relay',
-  endpoint: '/debugbundle/browser',
+  transportMode: "relay",
+  endpoint: "/debugbundle/browser"
   // captureConsole: false (opt-in),
   // captureNetwork: true (default),
   // maskFormValues: true (default),
@@ -3151,13 +3459,13 @@ debugbundle.init({
 // Auto-captures: window errors, promise rejections, route changes, clicks, network
 // Manual capture:
 debugbundle.captureException(err);
-debugbundle.captureMessage('User clicked broken link', 'warning');
+debugbundle.captureMessage("User clicked broken link", "warning");
 
 // Optional product analytics for AnalyticsBundle:
 debugbundle.analytics.setConsent(true);
-debugbundle.analytics.track('checkout.step_viewed', { step: 'payment' });
-debugbundle.analytics.funnel('checkout', 'payment_submitted');
-debugbundle.analytics.convert('subscription_started');
+debugbundle.analytics.track("checkout.step_viewed", { step: "payment" });
+debugbundle.analytics.funnel("checkout", "payment_submitted");
+debugbundle.analytics.convert("subscription_started");
 ```
 
 For split frontend/backend deployments, keep relay mode explicit and point `endpoint` at the backend relay URL. Add the backend API origin to `tracePropagationTargets` when cross-origin first-party requests should receive `X-DebugBundle-Trace-Id` and be eligible for policy-driven request-failure promotion. The browser fetch wrapper must preserve native `fetch` input and header semantics, including `Headers`, tuple arrays, record headers, and `Request` object headers. For frontend-only deployments without a backend, use direct mode with a dedicated public write-only `projectToken` and allowed browser origins.
@@ -3209,13 +3517,13 @@ DebugBundle::captureLog('Cache miss rate high', 'warning', ['rate' => 0.45]);
 
 ```js
 // Node.js — always-on: buffers in per-label ring buffer, flushes alongside errors
-debugbundle.probe('checkout.pricing.tax', { cart, taxRate, computedTax });
+debugbundle.probe("checkout.pricing.tax", { cart, taxRate, computedTax });
 
 // Lazy variant (backend SDKs only) — callback invoked for ring buffer storage
-debugbundle.probe('checkout.pricing.tax', () => ({ cart, taxRate, computedTax }));
+debugbundle.probe("checkout.pricing.tax", () => ({ cart, taxRate, computedTax }));
 
 // Heavy probe (backend SDKs only) — dormant in always-on mode, only fires when remotely activated (paid tiers)
-debugbundle.probe('db.query-plan', () => ({ plan: db.explain(query) }), { heavy: true });
+debugbundle.probe("db.query-plan", () => ({ plan: db.explain(query) }), { heavy: true });
 ```
 
 ```python
@@ -3232,7 +3540,7 @@ DebugBundle::probe('checkout.pricing.tax', fn() => ['cart' => $cart, 'taxRate' =
 
 ```js
 // Browser — data only, no lazy variant. Buffers in ring buffer, flushes alongside frontend_exception
-debugbundle.probe('checkout.ui.cart-render', { itemCount, renderTime });
+debugbundle.probe("checkout.ui.cart-render", { itemCount, renderTime });
 ```
 
 ---
@@ -3240,6 +3548,7 @@ debugbundle.probe('checkout.ui.cart-render', { itemCount, renderTime });
 ## 5. Webhook Payload Contract
 
 ### Event Types
+
 - `bundle.created`
 - `bundle.updated`
 - `bundle.reopened`
@@ -3250,6 +3559,7 @@ debugbundle.probe('checkout.ui.cart-render', { itemCount, renderTime });
 - `incident.spike_detected`
 
 ### Payload Shape
+
 ```json
 {
   "event": "bundle.created",
@@ -3277,16 +3587,16 @@ Payloads are signed with the webhook shared secret (HMAC). Full bundle is NOT em
 
 The static public site at `debugbundle.com` publishes the following machine-readable artifacts at stable URLs. All are generated from source at build time and served as static files (no server runtime).
 
-| Route | Content-Type | Source | Description |
-|-------|--------------|--------|-------------|
-| `/llms.txt` | `text/plain` | Build-time generation | LLM/agent discovery file listing documentation URLs, schema links, example bundles, and agent workflow guides |
-| `/openapi.json` | `application/json` | `apps/api/src/openapi.ts` | OpenAPI 3.1 specification generated from API route Zod schemas |
-| `/schemas/bundle.json` | `application/json` | `packages/shared-types` `BundleV1Schema` | JSON Schema (Draft 2020-12) for the bundle v1 format |
-| `/schemas/profile.json` | `application/json` | `apps/cli/src/profile-validation.ts` `ProfileSchema` | JSON Schema for `profile.json` validation |
-| `/schemas/webhook-events.json` | `application/json` | `packages/webhook-client` `WebhookEventPayloadSchema` | JSON Schema for webhook event payloads |
-| `/schemas/mcp-tools.json` | `application/json` | `apps/mcp/src/tool-catalog.ts` `MCP_TOOL_CATALOG` | MCP tool invocation schemas (oneOf per tool) |
-| `/examples/bundle.failure.json` | `application/json` | `examples/bundle.failure.json` | Example failure bundle validated against `BundleV1Schema` |
-| `/examples/bundle.improvement.json` | `application/json` | `examples/bundle.improvement.json` | Example improvement bundle validated against `BundleV1Schema` |
+| Route                               | Content-Type       | Source                                                | Description                                                                                                   |
+| ----------------------------------- | ------------------ | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `/llms.txt`                         | `text/plain`       | Build-time generation                                 | LLM/agent discovery file listing documentation URLs, schema links, example bundles, and agent workflow guides |
+| `/openapi.json`                     | `application/json` | `apps/api/src/openapi.ts`                             | OpenAPI 3.1 specification generated from API route Zod schemas                                                |
+| `/schemas/bundle.json`              | `application/json` | `packages/shared-types` `BundleV1Schema`              | JSON Schema (Draft 2020-12) for the bundle v1 format                                                          |
+| `/schemas/profile.json`             | `application/json` | `apps/cli/src/profile-validation.ts` `ProfileSchema`  | JSON Schema for `profile.json` validation                                                                     |
+| `/schemas/webhook-events.json`      | `application/json` | `packages/webhook-client` `WebhookEventPayloadSchema` | JSON Schema for webhook event payloads                                                                        |
+| `/schemas/mcp-tools.json`           | `application/json` | `apps/mcp/src/tool-catalog.ts` `MCP_TOOL_CATALOG`     | MCP tool invocation schemas (oneOf per tool)                                                                  |
+| `/examples/bundle.failure.json`     | `application/json` | `examples/bundle.failure.json`                        | Example failure bundle validated against `BundleV1Schema`                                                     |
+| `/examples/bundle.improvement.json` | `application/json` | `examples/bundle.improvement.json`                    | Example improvement bundle validated against `BundleV1Schema`                                                 |
 
 ### Generation Pipeline
 

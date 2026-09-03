@@ -9,17 +9,17 @@ Last updated: 2026-05-31
 
 The public repository must contain these root-level files:
 
-| File | Purpose | Status |
-|------|---------|--------|
-| `README.md` | Project overview, quick start, badges, links | Required |
-| `LICENSE` | AGPL-3.0-only full text | Required |
-| `CONTRIBUTING.md` | How to contribute (fork, branch, test, PR) | Required |
-| `CODE_OF_CONDUCT.md` | Community conduct standards (Contributor Covenant v2.1) | Required |
-| `SECURITY.md` | Vulnerability disclosure process | Required |
-| `CHANGELOG.md` | Release history (Keep a Changelog format) | Required |
-| `.github/ISSUE_TEMPLATE/bug_report.yml` | Structured bug report template | Required |
-| `.github/ISSUE_TEMPLATE/feature_request.yml` | Feature request template | Required |
-| `.github/PULL_REQUEST_TEMPLATE.md` | PR checklist (tests, docs, breaking changes) | Required |
+| File                                         | Purpose                                                 | Status   |
+| -------------------------------------------- | ------------------------------------------------------- | -------- |
+| `README.md`                                  | Project overview, quick start, badges, links            | Required |
+| `LICENSE`                                    | AGPL-3.0-only full text                                 | Required |
+| `CONTRIBUTING.md`                            | How to contribute (fork, branch, test, PR)              | Required |
+| `CODE_OF_CONDUCT.md`                         | Community conduct standards (Contributor Covenant v2.1) | Required |
+| `SECURITY.md`                                | Vulnerability disclosure process                        | Required |
+| `CHANGELOG.md`                               | Release history (Keep a Changelog format)               | Required |
+| `.github/ISSUE_TEMPLATE/bug_report.yml`      | Structured bug report template                          | Required |
+| `.github/ISSUE_TEMPLATE/feature_request.yml` | Feature request template                                | Required |
+| `.github/PULL_REQUEST_TEMPLATE.md`           | PR checklist (tests, docs, breaking changes)            | Required |
 
 ---
 
@@ -28,6 +28,7 @@ The public repository must contain these root-level files:
 ### Public Repository (`.github/workflows/`)
 
 **ci.yml** — Runs on every push and PR:
+
 1. `pnpm install` (frozen lockfile)
 2. `turbo lint` (ESLint)
 3. `turbo typecheck` (tsc --noEmit)
@@ -35,6 +36,7 @@ The public repository must contain these root-level files:
 5. `turbo build`
 
 **release-cli-package.yml** — Runs on `cli-v*` tags or manual dispatch:
+
 1. Validate the CLI release manifest and version
 2. Run focused CLI package tests
 3. Pack and smoke-test the staged artifact
@@ -42,6 +44,7 @@ The public repository must contain these root-level files:
 5. Smoke-test a clean install from the registry
 
 **release-mcp-package.yml** — Runs on `mcp-v*` tags or manual dispatch:
+
 1. Validate the MCP release manifest and version
 2. Run focused MCP package tests
 3. Pack and smoke-test the staged artifact
@@ -51,6 +54,7 @@ The public repository must contain these root-level files:
 The MCP package release manifest must include package-level MCP Registry metadata (`server.json`) alongside `package.json`, `README.md`, `LICENSE`, and the executable bin wrapper so public registry and marketplace submissions can be validated from the same release artifact.
 
 **release-shared-js-packages.yml** — Runs on `shared-js-v*` tags or manual dispatch:
+
 1. Validate the shared package versions
 2. Run focused shared-package tests
 3. Build the shared packages and prepare publish manifests
@@ -59,6 +63,7 @@ The MCP package release manifest must include package-level MCP Registry metadat
 6. Smoke-test clean installs from the registry
 
 **release.yml** — Runs on `v*` tags or manual dispatch:
+
 1. Validate that the requested stable version matches the root package version
 2. Run the focused core release quality gates and public-site artifact contract checks
 3. Create the canonical core GitHub tag and Release while reporting the independently versioned package surfaces
@@ -143,6 +148,70 @@ Our own source-deployed surfaces intentionally dogfood the published JS packages
 
 Do not bump those dogfooding manifests ahead of a registry publish. The hosted source deploy workflow installs from those manifests and should always resolve packages that already exist in the target registry.
 
+### Official OpenAI Plugin Release Discipline
+
+The official OpenAI plugin is an independent public surface. It starts at strict semver `1.0.0` and does not inherit the root, CLI, npm MCP, OpenClaw, or shared-package version. Local reinstall cachebusters may use semver build metadata, but public packages and portal versions must not.
+
+The release driver must be repository-owned and independent from `release-mcp-package.yml` and the MCP ecosystem follow-through. Publishing `@debugbundle/mcp` must never bump, package, scan, submit, publish, announce, or otherwise mutate the OpenAI plugin. Likewise, an OpenAI release must not silently publish npm/MCP Registry/Smithery/ClawHub/OpenClaw artifacts.
+
+Every candidate must deterministically record and verify:
+
+- plugin version and source commit;
+- deployed immutable API image digest;
+- permanent resource origin and MCP endpoint;
+- registered OpenAI app/connection ID after Developer Mode registration exists;
+- skill, listing, starter-prompt, test-case, release-note, data-map, and asset hashes; and
+- the exact scanned tool names/order, titles, descriptions, input/output schemas, annotations, and security schemes.
+
+The manifest's source commit identifies the commit containing the implementation inputs, not a
+self-reference to the commit that records the manifest. One immediately following evidence-only
+commit may contain the manifest itself; verification must prove that the recorded commit is an
+ancestor and that no path except `apps/mcp/openai/release-manifest.json` changed between it and the
+current commit. Any other committed or working-tree change invalidates the candidate until it is
+prepared again.
+
+Validation fails before any external action for placeholders, missing assets, path escapes, unknown manifest fields, stale connection metadata, hash/version/origin drift, or any mismatch with `tests/fixtures/openai-plugin-v1/`. No reviewer credential, domain-challenge token, OAuth key, client assertion, or other secret may enter the package, release manifest, source control, CI artifact, or log.
+
+#### Candidate And Production Gates
+
+An OpenAI candidate is not submission-ready until all of the following are independently evidenced:
+
+1. contract/data-map/privacy/threat-model review is complete;
+2. all twenty-three dedicated readers prove zero customer-state mutation and schema-valid bounded results, including no retained-sample or AnalyticsBundle-state query from the aggregate-only OpenAI analytics readers;
+3. OAuth/OIDC conformance, CIMD/client-auth, revocation, retention, reviewer isolation, host isolation, and negative security suites pass;
+4. stdio, CLI/member auth, OpenClaw, installed project, SDK ingestion, and existing API compatibility suites pass;
+5. the universal production MCP endpoint is deployed at the exact permanent origin with immutable digest evidence;
+6. same-host load, database reserve, Redis fail-closed, Caddy gate/rollback, monitoring, and every capacity threshold pass;
+7. reviewer credentials and synthetic fixtures pass an outside-network smoke without MFA, email, SMS, private networking, or customer data;
+8. public website, support, privacy, terms, and OpenAI plugin documentation are live and match the verified publisher identity; and
+9. the submission corpus contains at least five positive and three negative reproducible test cases, accurate starter prompts, release notes, country/region decision, and current tool scan.
+
+Developer Mode connection/scan is testing evidence only. It does not authorize submission and the portal must submit the production MCP URL from scratch, not reference an existing integration/app ID.
+
+#### Approval And Portal Gates
+
+- Creating or editing non-live local packet files is reversible preparation. Opening/altering a portal draft, submitting for review, selecting Cancel Review, appealing, publishing, unpublishing, deleting a plugin, or changing a live directory record is an external action.
+- Submission requires explicit owner approval after review of the exact candidate digest, scan, listing, permissions, five-positive/three-negative corpus, reviewer lifecycle, production evidence, and policy attestations.
+- Cancel Review and resubmission require fresh explicit owner approval because only one version may be in review at a time and cancellation changes external review state.
+- OpenAI approval does not authorize publication. Publication requires a separate explicit owner approval after confirming that the approved snapshot still matches the immutable production contract.
+- Tool name/title/description, input/output schema, annotation, security scheme, initialization instructions, or MCP path changes require deploy, new draft/version, scan, review, and approved publication. Breaking tool-contract changes are forbidden; evolve additively and keep old contracts available. An origin change requires a new plugin.
+
+#### Publication, Discovery, Communication, And Spend
+
+After an explicitly approved publication, verify independently that:
+
+- the approved version is the published version;
+- the live endpoint and scanned contract still match the release manifest;
+- OAuth linking and all representative/negative cases work outside the operator network;
+- the plugin appears through capability-oriented discovery in the universal Plugins Directory shared by ChatGPT and Codex, not merely through an exact URL/name; and
+- support/revocation/monitoring paths and the MCP-only emergency gate are ready.
+
+Publication is not directory discovery, and discovery is not announcement approval. Directory metadata edits, launch posts, email, social/press outreach, partner communication, and other announcements each require the owner's explicit communication approval. A free external monitor may be proposed only after current terms are verified; any new recurring spend, paid identity provider, larger host, or separate MCP instance requires explicit owner approval before purchase or mutation.
+
+Release reporting must keep these evidence states separate: contract/documentation, local/automated, live backend, deployed immutable artifact, Developer Mode/scan, submitted/in review, approved, published, directory-discoverable, communicated, and owner-approved. A green earlier state never implies a later one.
+
+This release discipline was rechecked on 2026-08-30 against the current official OpenAI [plugin submission](https://developers.openai.com/plugins/deploy/submission) and [MCP server review](https://developers.openai.com/plugins/deploy/app-review) requirements. Those documents remain the external source for portal permissions, verified publisher identity, universal production URLs, scan contents, reviewer access, review lifecycle, and the distinction between approval and publication; this repository's stricter owner-approval gates still apply.
+
 ### Private Repository (`debugbundle-cloud`)
 
 Handles production deployment, container publishing to private registries, and infrastructure provisioning. See `/rules/architectural-constraints.md` section 6a.
@@ -152,6 +221,7 @@ Handles production deployment, container publishing to private registries, and i
 ## 3. Breaking Change Policy
 
 ### Production
+
 - Breaking changes require a major version bump.
 - Migration guide must be published: what changed, why, how to update.
 - Deprecated features retained for at least one major version before removal.
@@ -187,13 +257,14 @@ The root `README.md` must contain:
 
 The repository should include example applications under `examples/`:
 
-| Example | Framework | Description |
-|---------|-----------|-------------|
-| `examples/express-basic/` | Express | Minimal Express app with DebugBundle SDK |
-| `examples/fastify-basic/` | Fastify | Minimal Fastify app with DebugBundle SDK |
-| `examples/nextjs-basic/` | Next.js | Next.js app with server + browser SDK |
+| Example                   | Framework | Description                              |
+| ------------------------- | --------- | ---------------------------------------- |
+| `examples/express-basic/` | Express   | Minimal Express app with DebugBundle SDK |
+| `examples/fastify-basic/` | Fastify   | Minimal Fastify app with DebugBundle SDK |
+| `examples/nextjs-basic/`  | Next.js   | Next.js app with server + browser SDK    |
 
 Each example must include:
+
 - `README.md` with setup instructions
 - Working `package.json`
 - `.env.example` with required variables

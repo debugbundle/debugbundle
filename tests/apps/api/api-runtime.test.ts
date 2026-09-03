@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { assertDatabaseSchema, parseApiRuntimeEnv, type Queryable } from "../../../apps/api/src/runtime.js";
+import {
+  assertDatabaseSchema,
+  parseApiRuntimeEnv,
+  type Queryable
+} from "../../../apps/api/src/runtime.js";
 import { REQUIRED_API_TABLES } from "../../../packages/storage/src/migrations.js";
 import { STORAGE_SCHEMA_MIGRATIONS } from "../../../packages/storage/src/schema-migrations.js";
 
@@ -43,6 +47,7 @@ describe("api runtime", () => {
     expect(env.API_PORT).toBe(3000);
     expect(env.DB_SSL_MODE).toBe("disable");
     expect(env.DB_HOST).toBe("localhost");
+    expect(env.DB_POOL_MAX).toBe(10);
     expect(env.S3_BUCKET).toBe("debugbundle-raw-events");
   });
 
