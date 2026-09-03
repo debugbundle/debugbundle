@@ -210,7 +210,10 @@ export function buildOpenAiOidcConfiguration(
     cookies: { keys: dependencies.cookieKeys },
     clients: [],
     clientAuthMethods: ["private_key_jwt"],
-    scopes: [...OPENAI_OIDC_SCOPES, ...OPENAI_HOSTED_MCP_SCOPES],
+    // Product scopes belong exclusively to the RFC 8707 resource server below.
+    // Advertising them here also makes oidc-provider treat them as OP scopes and
+    // re-prompt after a correctly scoped resource grant has already been saved.
+    scopes: [...OPENAI_OIDC_SCOPES],
     responseTypes: ["code"],
     grantTypes: ["authorization_code", "refresh_token"],
     claims: {

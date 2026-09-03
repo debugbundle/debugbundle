@@ -78,8 +78,13 @@ describe("OpenAI OAuth/OIDC provider profile", () => {
     expect(configuration.features.registration).toEqual({ enabled: false });
     expect(configuration.features.devInteractions).toEqual({ enabled: false });
     expect(configuration.formats).toEqual({ AccessToken: "jwt" });
-    expect(configuration.scopes).toContain("openid");
-    expect(configuration.scopes).toContain("email");
+    expect(configuration.scopes).toEqual(OPENAI_OIDC_SCOPES);
+    expect(
+      configuration.features.resourceIndicators.getResourceServerInfo(
+        {},
+        OPENAI_MCP_RESOURCE
+      )
+    ).toMatchObject({ scope: OPENAI_HOSTED_MCP_SCOPES.join(" ") });
     expect(configuration.routes.authorization).toBe("/oauth/authorize");
     const policy = configuration.interactions.policy;
     expect(policy.map((prompt) => prompt.name)).toEqual(["login"]);
