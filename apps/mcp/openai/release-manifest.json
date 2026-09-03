@@ -3,7 +3,7 @@
   "plugin_version": "1.0.0",
   "evidence_state": "local_source_ready",
   "source": {
-    "commit": "793c99f5426fa5179219834bb723695afe6810ae",
+    "commit": "3a0931b9f0b8b18b96edcbc82cfab4e6c6decea6",
     "tree_clean": true,
     "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
@@ -11,7 +11,7 @@
     "resource_origin": "https://mcp.debugbundle.com",
     "mcp_endpoint": "https://mcp.debugbundle.com/mcp",
     "oauth_issuer": "https://api.debugbundle.com",
-    "api_image_digest": "sha256:4c92a9ba995dc65426b279b8d5ea1b4281b8e829cc4ee26324793ac6397b5f04"
+    "api_image_digest": "sha256:176fc263ff9015b3d353889fcd5438132968ffcc36899d5f5f47773fc4b93288"
   },
   "registered_connection_id": null,
   "package": {
