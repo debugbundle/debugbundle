@@ -1,0 +1,97 @@
+{
+  "schema_version": "1.0.0",
+  "plugin_version": "1.0.0",
+  "evidence_state": "local_source_ready",
+  "source": {
+    "commit": "112766c1b40b699385236d73dc7c86967ae7a940",
+    "tree_clean": true,
+    "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "runtime": {
+    "resource_origin": "https://mcp.debugbundle.com",
+    "mcp_endpoint": "https://mcp.debugbundle.com/mcp",
+    "oauth_issuer": "https://api.debugbundle.com",
+    "api_image_digest": null
+  },
+  "registered_connection_id": null,
+  "package": {
+    "archive_file": "debugbundle-openai-plugin-1.0.0.zip",
+    "archive_sha256": "4bcd4154f6817e80c6f11a7da5319bb8c580b4ace364c000a58ff8b26dd2fb0c",
+    "archive_bytes": 38068,
+    "files": {
+      ".codex-plugin/plugin.json": "9d61d8719ff99941025b6573f1d95e5377516f16f932681078ebf41d349577bb",
+      "LICENSE": "173fbd73cffbb3afaf6f4036f314df050dff382bf6965b0d35d06544c8b08d3d",
+      "README.md": "7846108cb7afda44431c843557db3417e8208a8cddf80b0279e9fa205eb2c6dc",
+      "assets/icon-512.png": "a05a29674a75a945b1a378c73c27322c9b1f14456329bec1fc1d986453696e30",
+      "skills/debugbundle/SKILL.md": "795a0915bd7a27720c8f4e710fc29c79784985a149b18875896fef9b4ffcc607",
+      "skills/debugbundle/references/privacy-and-safety.md": "5266d4110ff8f586694da427d0cf9fb6dca08f0368af3afca87b3908dba8ac97",
+      "skills/debugbundle/references/tools.md": "d294c7b6827baa6f8df4680434ea672f25c8a82c45e8f57ecc204fe2341fd240"
+    }
+  },
+  "submission": {
+    "files": {
+      "data-map.md": "90751261d20abbe9fcb80da3423e03927be5561f8a990bdb1734fab3c909162f",
+      "listing.md": "1a7d8fba8cb9ecdb6f2bd65a066577f5149e4769aa1ce49b8b293e4b7812a29b",
+      "post-launch-article-draft.md": "6ce0f34a4ce8261eb4a0f10e0f3c5fcc89de9677ffdcd988075ed296d97db7cd",
+      "release-notes.md": "f96f0ae58b66fe326f00b6feb380a61025d5782a4568d2b012ae3ed42b5fa0b1",
+      "review-checklist.md": "4d96b7c2df960ada8b5483b79afffa81e7b4f13a3a20b3903365692af0b5a5fa",
+      "starter-prompts.json": "bc7193b501f4a6de03723b415dcb57878f5ef32a4ce798639306e4694be9fa19",
+      "test-cases.json": "80b45bc0d5969129ca55e0037d12c76244dd7afcc14c7d45b94a88a7a059c6f0"
+    }
+  },
+  "contract": {
+    "tools_in_scan_order": [
+      "list_projects",
+      "list_services",
+      "list_incidents",
+      "get_incident",
+      "get_incident_context",
+      "get_bundle",
+      "get_reproduction",
+      "list_improvements",
+      "get_improvement",
+      "get_improvement_bundle",
+      "get_usage_summary",
+      "get_route_metrics",
+      "get_journey_patterns",
+      "get_device_breakdown",
+      "get_referrer_metrics",
+      "get_action_metrics",
+      "list_funnel_metrics",
+      "get_funnel_analysis",
+      "get_incident_impact",
+      "list_health_checks",
+      "get_health_check",
+      "list_health_check_results",
+      "list_health_check_daily_rollups"
+    ],
+    "tool_contract_sha256": "fcd3433e7d8ed5f3a8a743c91b0b45cd5ea330a2b13d02691144bdcbaca5aed7",
+    "schemas_sha256": "6b65362bf2cc60091c522acdd4f1200cf2ef2e53704c612089981b52f3e45b7b",
+    "data_map_sha256": "4396a77191652c00da0a820da3587a2b4f0554afbc552ef524de1dac3479b46a",
+    "reviewer_fixture_sha256": "7eeff32a1dd14b4cb0fe5126e04470e448cf3f73a54bfb4f7e9e8f64327c6758"
+  },
+  "manual_gates": [
+    "immutable_api_image_deployment_digest",
+    "developer_mode_connection_registration_scan_and_app_json",
+    "manual_consent_reviewer_visual_and_accessibility_validation",
+    "production_migration_and_database_ledger_evidence",
+    "dns_tls_caddy_monitoring_capacity_and_rollback_evidence",
+    "reviewer_credential_provisioning_and_outside_network_smoke",
+    "mcp_inspector_chatgpt_and_codex_manual_corpus",
+    "privacy_legal_and_owner_candidate_review",
+    "owner_submission_approval",
+    "openai_review_and_approval",
+    "separate_owner_publication_approval",
+    "directory_discovery_verification",
+    "separate_communication_approval"
+  ],
+  "automation_boundary": {
+    "portal_login": false,
+    "submit_or_cancel_review": false,
+    "publish_or_unpublish": false,
+    "directory_edit": false,
+    "announcement_or_communication": false,
+    "recurring_spend": false,
+    "deployment_or_infrastructure_mutation": false
+  }
+}
