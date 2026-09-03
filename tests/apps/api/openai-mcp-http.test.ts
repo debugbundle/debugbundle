@@ -201,6 +201,53 @@ describe("OpenAI hosted MCP HTTP boundary", () => {
     });
   });
 
+  it("returns the OAuth challenge for ChatGPT's empty binary discovery probe", async () => {
+    const app = createApp();
+    app.post("/binary-parser-control", async () => ({ accepted: true }));
+    const response = await app.inject({
+      method: "POST",
+      url: "/mcp",
+      headers: {
+        ...CANONICAL_HEADERS,
+        accept: "*/*",
+        "content-type": "application/octet-stream"
+      },
+      payload: Buffer.alloc(0)
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.headers["www-authenticate"]).toBe(
+      'Bearer resource_metadata="https://mcp.debugbundle.com/.well-known/oauth-protected-resource"'
+    );
+    expect(response.json()).toEqual({
+      error: "invalid_access_token",
+      _meta: {
+        "mcp/www_authenticate": [
+          'Bearer resource_metadata="https://mcp.debugbundle.com/.well-known/oauth-protected-resource", error="invalid_token", error_description="A valid DebugBundle connection is required."'
+        ]
+      }
+    });
+
+    const nonEmptyProbe = await app.inject({
+      method: "POST",
+      url: "/mcp",
+      headers: {
+        ...CANONICAL_HEADERS,
+        "content-type": "application/octet-stream"
+      },
+      payload: Buffer.from([1])
+    });
+    expect(nonEmptyProbe.statusCode).toBe(415);
+
+    const unrelatedRoute = await app.inject({
+      method: "POST",
+      url: "/binary-parser-control",
+      headers: { "content-type": "application/octet-stream" },
+      payload: Buffer.alloc(0)
+    });
+    expect(unrelatedRoute.statusCode).toBe(415);
+  });
+
   it("serves the SDK Streamable HTTP initialize response with a verified token", async () => {
     const app = createApp();
     const response = await app.inject({

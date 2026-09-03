@@ -709,6 +709,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** UserInfo returns only stable `sub`, normalized `email`, and `email_verified: true`; email is absent from access tokens, tools, and operational logs
 - **And** OAuth plugin credentials are rejected by member-token and project-token paths, while those existing credential types remain unchanged
 - **And** unauthenticated HTTP discovery returns the exact protected-resource `WWW-Authenticate` header plus an `_meta["mcp/www_authenticate"]` `invalid_token` challenge with bounded `error_description`
+- **And** ChatGPT's zero-length `application/octet-stream` discovery POST to `/mcp` reaches that same challenge instead of failing content-type parsing, while a non-empty binary body or binary POST to another API route remains `415 Unsupported Media Type`
 - **And** an authenticated tool call missing a required product scope returns an `_meta["mcp/www_authenticate"]` `insufficient_scope` challenge naming only that frozen required scope, without invoking its domain reader
 
 ### AC-MCP-08: Token Lifecycle, Revocation, Retention, And Reviewer Isolation

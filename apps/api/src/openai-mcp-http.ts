@@ -247,6 +247,27 @@ export function registerOpenAiMcpHttpRoutes(
     return reply.header("Allow", "POST, OPTIONS").status(204).send();
   });
 
+  // ChatGPT uses an empty binary POST to discover the OAuth challenge. Keep
+  // this compatibility behavior limited to /mcp and reject every other binary
+  // body before it can reach authentication or an application route.
+  app.addContentTypeParser(
+    "application/octet-stream",
+    { parseAs: "buffer", bodyLimit: 1 },
+    (request, body, done) => {
+      if (request.method !== "POST" || request.url !== "/mcp" || body.length !== 0) {
+        const error = new Error("Unsupported Media Type") as Error & {
+          code: string;
+          statusCode: number;
+        };
+        error.code = "FST_ERR_CTP_INVALID_MEDIA_TYPE";
+        error.statusCode = 415;
+        done(error);
+        return;
+      }
+      done(null, undefined);
+    }
+  );
+
   app.post("/mcp", async (request, reply) => {
     const startedAt = performance.now();
     const method = readMcpMethod(request.body);

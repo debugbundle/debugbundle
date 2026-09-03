@@ -92,6 +92,7 @@ The approved official OpenAI Plugin adds one isolated read-only retrieval path w
 ChatGPT / Codex
   → Streamable HTTP + OAuth access token
   → https://mcp.debugbundle.com/mcp
+  → route-scoped empty-binary discovery compatibility + OAuth challenge
   → trusted-host/surface validation in the existing Fastify API process
   → exact twenty-three-tool OpenAI projection
   → dedicated zero-mutation hosted readers, including nine aggregate-only analytics readers
