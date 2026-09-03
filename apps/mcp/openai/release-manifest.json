@@ -3,7 +3,7 @@
   "plugin_version": "1.0.0",
   "evidence_state": "local_source_ready",
   "source": {
-    "commit": "112766c1b40b699385236d73dc7c86967ae7a940",
+    "commit": "c57c3b1c43efeaa65fa82f44dc33e6dd65e3620b",
     "tree_clean": true,
     "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
@@ -11,7 +11,7 @@
     "resource_origin": "https://mcp.debugbundle.com",
     "mcp_endpoint": "https://mcp.debugbundle.com/mcp",
     "oauth_issuer": "https://api.debugbundle.com",
-    "api_image_digest": null
+    "api_image_digest": "sha256:145c958e79c88ce6404419951bad066e0ba84fcf5b9b87f0470942a0bfaa9570"
   },
   "registered_connection_id": null,
   "package": {
@@ -34,7 +34,7 @@
       "listing.md": "1a7d8fba8cb9ecdb6f2bd65a066577f5149e4769aa1ce49b8b293e4b7812a29b",
       "post-launch-article-draft.md": "6ce0f34a4ce8261eb4a0f10e0f3c5fcc89de9677ffdcd988075ed296d97db7cd",
       "release-notes.md": "f96f0ae58b66fe326f00b6feb380a61025d5782a4568d2b012ae3ed42b5fa0b1",
-      "review-checklist.md": "4d96b7c2df960ada8b5483b79afffa81e7b4f13a3a20b3903365692af0b5a5fa",
+      "review-checklist.md": "8624eed9d64c5aa9a1e3a499131659e864ad850a0925fa4677197c1296f8ffad",
       "starter-prompts.json": "bc7193b501f4a6de03723b415dcb57878f5ef32a4ce798639306e4694be9fa19",
       "test-cases.json": "80b45bc0d5969129ca55e0037d12c76244dd7afcc14c7d45b94a88a7a059c6f0"
     }
@@ -71,7 +71,6 @@
     "reviewer_fixture_sha256": "7eeff32a1dd14b4cb0fe5126e04470e448cf3f73a54bfb4f7e9e8f64327c6758"
   },
   "manual_gates": [
-    "immutable_api_image_deployment_digest",
     "developer_mode_connection_registration_scan_and_app_json",
     "manual_consent_reviewer_visual_and_accessibility_validation",
     "production_migration_and_database_ledger_evidence",
