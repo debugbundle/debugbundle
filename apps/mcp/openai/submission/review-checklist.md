@@ -12,8 +12,8 @@ Status markers in this file are deliberately manual. A repository-local green re
 ## Runtime and infrastructure
 
 - [x] Local source implements Streamable HTTP, canonical-host isolation, OAuth/OIDC, resource/audience/scope checks, bounded readers, Redis rate limits, and database-aware MCP bulkheads.
-- [ ] Additive production migration is applied and its ledger/checksum is recorded.
-- [ ] Immutable API image is deployed on the existing host and its digest is recorded.
+- [x] Additive production migration is applied (`applied=1`, `already_applied=47`) by hosted stack run `33754379179`.
+- [x] Immutable API image is deployed on the existing host at digest `sha256:145c958e79c88ce6404419951bad066e0ba84fcf5b9b87f0470942a0bfaa9570`.
 - [ ] DNS/TLS/Caddy dual-host promotion, MCP-only gate, monitoring, retention, load, rollback, and outside-network checks pass.
 
 ## Reviewer and client

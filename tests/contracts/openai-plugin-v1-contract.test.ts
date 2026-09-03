@@ -378,16 +378,16 @@ describe("OpenAI plugin v1 contract", () => {
     expect(legacyNames.length).toBeGreaterThan(EXPECTED_TOOL_NAMES.length);
     expect(EXPECTED_TOOL_NAMES.every((name) => legacyNames.includes(name))).toBe(true);
     expect(gaps).toMatchObject({
-      evidence_state: "local_source_ready_for_testing",
+      evidence_state: "production_dark_launch_deployed",
       openai_catalog: "implemented_and_contract_tested",
       dedicated_hosted_readers: "implemented_and_unit_tested",
-      oauth_oidc_runtime: "implemented_and_unit_tested_not_deployed",
-      streamable_http_transport: "implemented_and_unit_tested_not_deployed",
+      oauth_oidc_runtime: "deployed_disabled",
+      streamable_http_transport: "deployed_disabled",
       plugin_package: "candidate_built_connection_registration_pending",
-      hosted_infrastructure: "source_ready_not_deployed",
-      consent_ui: "owner_approved_implemented_and_tested_not_deployed",
+      hosted_infrastructure: "production_migrated_dark_launch_deployed_features_disabled",
+      consent_ui: "owner_approved_deployed_feature_disabled_accessibility_pending",
       developer_mode_connection: "not_registered",
-      production_validation: "not_run",
+      production_validation: "dark_launch_passed_run_33754379179",
       portal_submission: "not_submitted",
       publication: "not_published",
       directory_discovery: "not_verified"
