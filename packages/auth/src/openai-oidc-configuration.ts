@@ -113,6 +113,16 @@ function readString(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
+function readOptionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function readStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string")
+    : [];
+}
+
 export function createOpenAiOidcFetch(
   fetchImpl: typeof fetch | undefined,
   cache: OpenAiCimdResponseCache
@@ -185,20 +195,19 @@ export function buildOpenAiOidcConfiguration(
         ack: "draft-02",
         allowFetch: (_ctx: unknown, clientId: string) =>
           Promise.resolve(clientId === OPENAI_CIMD_CLIENT_ID),
-        allowClient: (_ctx: unknown, client: Record<string, unknown>) =>
-          Promise.resolve(
+        allowClient: (_ctx: unknown, client: Record<string, unknown>) => {
+          const jwksUri = readOptionalString(client["jwksUri"]);
+          const signingAlgorithm = readOptionalString(client["tokenEndpointAuthSigningAlg"]);
+          return Promise.resolve(
             isAllowedOpenAiCimdClient({
-              clientId: readString(client["client_id"]),
-              redirectUris: Array.isArray(client["redirect_uris"])
-                ? client["redirect_uris"].filter(
-                    (value): value is string => typeof value === "string"
-                  )
-                : [],
-              clientAuthMethod: readString(client["token_endpoint_auth_method"]),
-              jwksUri: readString(client["jwks_uri"]),
-              signingAlgorithm: readString(client["token_endpoint_auth_signing_alg"])
+              clientId: readString(client["clientId"]),
+              redirectUris: readStringArray(client["redirectUris"]),
+              clientAuthMethod: readString(client["tokenEndpointAuthMethod"]),
+              ...(jwksUri === undefined ? {} : { jwksUri }),
+              ...(signingAlgorithm === undefined ? {} : { signingAlgorithm })
             })
-          ),
+          );
+        },
         cacheDuration: { min: 300, max: 300 }
       },
       devInteractions: { enabled: false },

@@ -89,6 +89,18 @@ describe("OpenAI OAuth/OIDC provider profile", () => {
         }
       )
     ).resolves.toBe(false);
+    await expect(
+      configuration.features.clientIdMetadataDocument.allowClient(
+        {},
+        {
+          clientId: OPENAI_CIMD_CLIENT_ID,
+          redirectUris: [OPENAI_PRODUCTION_REDIRECT_URI],
+          tokenEndpointAuthMethod: "private_key_jwt",
+          jwksUri: "https://chatgpt.com/oauth/jwks.json",
+          tokenEndpointAuthSigningAlg: "RS256"
+        }
+      )
+    ).resolves.toBe(true);
 
     const now = Math.floor(Date.now() / 1_000);
     await expect(
