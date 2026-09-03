@@ -79,6 +79,15 @@ describe("OpenAI OAuth/OIDC provider profile", () => {
     expect(configuration.scopes).toContain("openid");
     expect(configuration.scopes).toContain("email");
     expect(configuration.routes.authorization).toBe("/oauth/authorize");
+    const interactionPolicy = (
+      configuration.interactions as typeof configuration.interactions & {
+        policy?: Array<{ name: string; checks: Array<{ reason: string }> }>;
+      }
+    ).policy;
+    expect(interactionPolicy?.map((prompt) => prompt.name)).toEqual(["login"]);
+    expect(interactionPolicy?.[0]?.checks.map((check) => check.reason)).toEqual(
+      expect.arrayContaining(["no_session", "op_scopes_missing", "rs_scopes_missing"])
+    );
     await expect(
       configuration.features.clientIdMetadataDocument.allowClient(
         {},

@@ -1,4 +1,4 @@
-import { errors } from "oidc-provider";
+import { errors, interactionPolicy } from "oidc-provider";
 
 import {
   OPENAI_ACCESS_TOKEN_TTL_SECONDS,
@@ -84,7 +84,10 @@ export interface OpenAiOidcConfiguration {
     userinfo: string;
     jwks: string;
   };
-  interactions: { url: (_ctx: unknown, interaction: { uid: string }) => string };
+  interactions: {
+    policy: ReturnType<typeof interactionPolicy.base>;
+    url: (_ctx: unknown, interaction: { uid: string }) => string;
+  };
   fetch: typeof fetch;
   fetchResponseBodyLimits: {
     "client_id metadata document": number;
@@ -121,6 +124,22 @@ function readStringArray(value: unknown): string[] {
   return Array.isArray(value)
     ? value.filter((entry): entry is string => typeof entry === "string")
     : [];
+}
+
+function buildOpenAiInteractionPolicy(): ReturnType<typeof interactionPolicy.base> {
+  const policy = interactionPolicy.base();
+  const loginPrompt = policy.get("login");
+  const consentPrompt = policy.get("consent");
+  if (loginPrompt === undefined || consentPrompt === undefined) {
+    throw new Error("openai_oauth_interaction_policy_invalid");
+  }
+
+  // The product UI authenticates and grants consent in one explicit submission.
+  for (const check of consentPrompt.checks) {
+    loginPrompt.checks.add(check);
+  }
+  policy.remove("consent");
+  return policy;
 }
 
 export function createOpenAiOidcFetch(
@@ -239,6 +258,7 @@ export function buildOpenAiOidcConfiguration(
       jwks: "/oauth/jwks.json"
     },
     interactions: {
+      policy: buildOpenAiInteractionPolicy(),
       url: (_ctx: unknown, interaction: { uid: string }) =>
         `/oauth/interaction/${encodeURIComponent(interaction.uid)}`
     },

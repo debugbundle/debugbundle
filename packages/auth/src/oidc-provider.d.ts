@@ -41,4 +41,24 @@ declare module "oidc-provider" {
   export const errors: {
     InvalidClientAuth: new (options?: unknown) => Error;
   };
+
+  export interface InteractionPolicyCheck {
+    reason: string;
+  }
+
+  export interface InteractionPolicyPrompt {
+    name: string;
+    checks: InteractionPolicyCheck[] & {
+      add(check: InteractionPolicyCheck, index?: number): void;
+    };
+  }
+
+  export type InteractionPolicy = InteractionPolicyPrompt[] & {
+    get(name: string): InteractionPolicyPrompt | undefined;
+    remove(name: string): void;
+  };
+
+  export const interactionPolicy: {
+    base(): InteractionPolicy;
+  };
 }
