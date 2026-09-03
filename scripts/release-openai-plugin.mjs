@@ -197,10 +197,23 @@ function verify(args) {
 
   const currentArchive = buildDeterministicZip(pluginArchiveEntries());
   const actualManifest = readJson(releaseManifestPath);
+  const recordedApiImageDigest = actualManifest?.runtime?.api_image_digest;
+  if (
+    recordedApiImageDigest !== null &&
+    recordedApiImageDigest !== undefined &&
+    !/^sha256:[0-9a-f]{64}$/u.test(recordedApiImageDigest)
+  ) {
+    return {
+      ok: false,
+      failures: ["release_manifest_invalid_api_image_digest"],
+      validation
+    };
+  }
+  const apiImageDigest = args.apiImageDigest ?? recordedApiImageDigest ?? undefined;
   const expectedManifest = buildManifest(
     validation,
     currentArchive,
-    args.apiImageDigest,
+    apiImageDigest,
     actualManifest?.source?.commit
   );
   const failures = [];
