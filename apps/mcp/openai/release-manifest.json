@@ -3,7 +3,7 @@
   "plugin_version": "1.0.0",
   "evidence_state": "local_connection_ready",
   "source": {
-    "commit": "2fb59c07a3a07e38427d2093ee747eef0fcb5e9a",
+    "commit": "3e68fd5b578ad47058ba82e23bfb4509907f8722",
     "tree_clean": true,
     "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
@@ -35,7 +35,7 @@
       "listing.md": "1a7d8fba8cb9ecdb6f2bd65a066577f5149e4769aa1ce49b8b293e4b7812a29b",
       "post-launch-article-draft.md": "6ce0f34a4ce8261eb4a0f10e0f3c5fcc89de9677ffdcd988075ed296d97db7cd",
       "release-notes.md": "f96f0ae58b66fe326f00b6feb380a61025d5782a4568d2b012ae3ed42b5fa0b1",
-      "review-checklist.md": "a3c95cf2a327628df8e8cb6a3299d0a36e6d441e98f973275b6e0a9d6c1ea7e3",
+      "review-checklist.md": "5ca84fe79f022e6cf88ac938633012ba9753057d324fbcaeeaebbfc505c18ac5",
       "starter-prompts.json": "bc7193b501f4a6de03723b415dcb57878f5ef32a4ce798639306e4694be9fa19",
       "test-cases.json": "80b45bc0d5969129ca55e0037d12c76244dd7afcc14c7d45b94a88a7a059c6f0"
     }
@@ -72,9 +72,8 @@
     "reviewer_fixture_sha256": "7eeff32a1dd14b4cb0fe5126e04470e448cf3f73a54bfb4f7e9e8f64327c6758"
   },
   "manual_gates": [
-    "manual_consent_reviewer_visual_and_accessibility_validation",
-    "production_migration_and_database_ledger_evidence",
-    "dns_tls_caddy_monitoring_capacity_and_rollback_evidence",
+    "manual_keyboard_and_screen_reader_accessibility_validation",
+    "representative_capacity_load_and_rollback_evidence",
     "reviewer_credential_provisioning_and_outside_network_smoke",
     "mcp_inspector_chatgpt_and_codex_manual_corpus",
     "privacy_legal_and_owner_candidate_review",
