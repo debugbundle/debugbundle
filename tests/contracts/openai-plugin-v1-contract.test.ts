@@ -378,19 +378,22 @@ describe("OpenAI plugin v1 contract", () => {
     expect(legacyNames.length).toBeGreaterThan(EXPECTED_TOOL_NAMES.length);
     expect(EXPECTED_TOOL_NAMES.every((name) => legacyNames.includes(name))).toBe(true);
     expect(gaps).toMatchObject({
-      evidence_state: "developer_mode_reconnect_pending",
+      evidence_state: "developer_mode_connection_and_partial_chatgpt_corpus_verified",
       openai_catalog: "implemented_and_contract_tested",
       dedicated_hosted_readers: "implemented_and_unit_tested",
       oauth_oidc_runtime: "deployed_enabled_metadata_verified",
       streamable_http_transport: "deployed_enabled_discovery_probe_verified",
-      plugin_package: "candidate_deployed_digest_frozen_app_json_pending",
+      plugin_package: "candidate_deployed_digest_frozen_app_json_captured",
       hosted_infrastructure: "production_migrated_managed_caddy_dns_tls_active",
       consent_ui: "owner_visual_approved_deployed_accessibility_pending",
-      developer_mode_connection: "owner_registered_reconnect_pending_app_json_not_captured",
-      production_validation: "active_run_33793953970_protocol_probe_passed",
+      developer_mode_connection: "owner_registered_reconnected_and_app_json_captured",
+      production_validation:
+        "active_run_33853418331_connection_discovery_and_two_chatgpt_cases_passed",
       portal_submission: "not_submitted",
       publication: "not_published",
-      directory_discovery: "not_verified"
+      directory_discovery: "not_verified",
+      next_gate:
+        "inspector_remaining_chatgpt_codex_reviewer_accessibility_and_capacity_validation"
     });
   });
 });
