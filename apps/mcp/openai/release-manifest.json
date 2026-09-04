@@ -11,7 +11,7 @@
     "resource_origin": "https://mcp.debugbundle.com",
     "mcp_endpoint": "https://mcp.debugbundle.com/mcp",
     "oauth_issuer": "https://api.debugbundle.com",
-    "api_image_digest": "sha256:f09ab594f74f550a706419d14de0fe3ee9b763173761b888c7f3f0924509825d"
+    "api_image_digest": "sha256:31ea395f9774b7087e82ef83ced7f8fbb90c8b5eef2b3a89d148a5a7163bdeef"
   },
   "registered_connection_id": "plugin_asdk_app_6a99ba6c1e7881919091a592738692c6",
   "package": {
