@@ -1,5 +1,6 @@
-import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -74,6 +75,34 @@ describe("OpenAI plugin release automation", () => {
     expect(source).toContain("release_artifact_set_incomplete");
     expect(source).toContain("submission_packet_drift");
     expect(source).toContain("release_checksums_drift");
+  });
+
+  it("fails closed when generated release artifacts drift", () => {
+    const outputRoot = mkdtempSync(join(tmpdir(), "debugbundle-openai-artifacts-"));
+    try {
+      writeFileSync(join(outputRoot, "debugbundle-openai-plugin-1.0.0.zip"), "stale-plugin");
+      writeFileSync(join(outputRoot, "debugbundle-openai-submission-1.0.0.zip"), "stale-packet");
+      writeFileSync(join(outputRoot, "SHA256SUMS"), "stale-checksums\n");
+
+      const completed = spawnSync(
+        process.execPath,
+        ["scripts/release-openai-plugin.mjs", "verify", "--output", outputRoot, "--json"],
+        { cwd: repoRoot, encoding: "utf8" }
+      );
+      expect(completed.stdout, completed.stderr).not.toBe("");
+      const result = JSON.parse(completed.stdout) as { failures: string[] };
+
+      expect(completed.status).toBe(1);
+      expect(result.failures).toEqual(
+        expect.arrayContaining([
+          "plugin_archive_drift",
+          "submission_packet_drift",
+          "release_checksums_drift"
+        ])
+      );
+    } finally {
+      rmSync(outputRoot, { recursive: true, force: true });
+    }
   });
 
   it("verifies the committed source manifest and exact package hashes without live access", () => {
