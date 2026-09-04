@@ -17,6 +17,7 @@ describe("OpenAI plugin package", () => {
     const result = JSON.parse(output) as {
       ok: boolean;
       evidenceState: string;
+      connectionId: string;
       version: string;
       manualGates: string[];
       failures: string[];
