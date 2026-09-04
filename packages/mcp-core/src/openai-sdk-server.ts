@@ -71,9 +71,7 @@ function toolContractToSdkTool(tool: (typeof OPENAI_TOOL_CATALOG)[number]): Tool
 function toolError(authChallenge?: string): CallToolResult {
   return {
     isError: true,
-    ...(authChallenge === undefined
-      ? {}
-      : { _meta: { "mcp/www_authenticate": [authChallenge] } }),
+    ...(authChallenge === undefined ? {} : { _meta: { "mcp/www_authenticate": [authChallenge] } }),
     content: [
       {
         type: "text",
@@ -86,6 +84,7 @@ function toolError(authChallenge?: string): CallToolResult {
 export function createOpenAiSdkServer(input: {
   operations: OpenAiHostedOperations;
   operationTimeoutMs?: number;
+  onToolError?: () => void;
 }): Server {
   const server = new Server(
     { name: "debugbundle-openai-plugin", version: "1.0.0" },
@@ -132,6 +131,7 @@ export function createOpenAiSdkServer(input: {
         const name = request.params.name as OpenAiToolName;
         const handler = handlers[name];
         if (handler === undefined) {
+          input.onToolError?.();
           return toolError();
         }
         const result = await handler({
@@ -143,6 +143,7 @@ export function createOpenAiSdkServer(input: {
           structuredContent: result.structuredContent
         };
       } catch (error) {
+        input.onToolError?.();
         return toolError(openAiMcpAuthChallengeForError(error));
       }
     }

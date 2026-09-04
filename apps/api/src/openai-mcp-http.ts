@@ -545,11 +545,15 @@ export function registerOpenAiMcpHttpRoutes(
     rawRequest.auth = auth;
     const socketBytesBefore = reply.raw.socket?.bytesWritten ?? 0;
     let transportFailed = false;
+    let toolFailed = false;
 
     try {
       server = createOpenAiSdkServer({
         operations: options.operations,
-        operationTimeoutMs
+        operationTimeoutMs,
+        onToolError: () => {
+          toolFailed = true;
+        }
       });
       transport = new StreamableHTTPServerTransport({
         enableJsonResponse: true
@@ -575,7 +579,8 @@ export function registerOpenAiMcpHttpRoutes(
         ...(toolName === undefined ? {} : { tool: toolName }),
         grantKey: pseudonymousOpenAiSubject("grant", grantId),
         clientKey: pseudonymousOpenAiSubject("client", auth.clientId),
-        outcome: transportFailed || reply.raw.statusCode >= 500 ? "failure" : "success",
+        outcome:
+          transportFailed || toolFailed || reply.raw.statusCode >= 500 ? "failure" : "success",
         status: reply.raw.statusCode,
         durationMs,
         admission: "allowed",

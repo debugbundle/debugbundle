@@ -46,6 +46,7 @@ function createApp(
     domainVerificationToken?: string;
     readinessCheck?: () => Promise<void>;
     logger?: FastifyBaseLogger;
+    listProjects?: () => Promise<unknown>;
     acquireConcurrency?: (input: {
       bucket: string;
       subject: string;
@@ -67,7 +68,7 @@ function createApp(
       verifyAccessToken: input.verifyAccessToken ?? vi.fn(async () => AUTH)
     },
     operations: {
-      list_projects: vi.fn(async () => ({ projects: [], next_cursor: null }))
+      list_projects: input.listProjects ?? vi.fn(async () => ({ projects: [], next_cursor: null }))
     },
     rateLimiter: {
       acquireConcurrency:
@@ -492,5 +493,39 @@ describe("OpenAI hosted MCP HTTP boundary", () => {
     expect(logs).not.toContain("forbidden_customer_value");
     expect(logs).not.toContain("user_1");
     expect(logs).not.toContain("grant_1");
+  });
+
+  it("records tool-level JSON-RPC errors as failures without logging error details", async () => {
+    const capture = captureLogger();
+    const app = createApp({
+      logger: capture.logger,
+      listProjects: vi.fn(async () => {
+        throw new Error("private projection detail must not be logged");
+      })
+    });
+    const response = await app.inject({
+      method: "POST",
+      url: "/mcp",
+      headers: {
+        ...CANONICAL_HEADERS,
+        authorization: "Bearer access-token",
+        accept: "application/json, text/event-stream",
+        "content-type": "application/json"
+      },
+      payload: {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: { name: "list_projects", arguments: {} }
+      }
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ result: { isError: true } });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    const logs = capture.read();
+    expect(logs).toContain('"event":"openai_mcp_request"');
+    expect(logs).toContain('"outcome":"failure"');
+    expect(logs).not.toContain("private projection detail");
   });
 });
