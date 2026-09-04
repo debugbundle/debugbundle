@@ -3,7 +3,7 @@
   "plugin_version": "1.0.0",
   "evidence_state": "local_connection_ready",
   "source": {
-    "commit": "eed3ab83288ca2645fefde6b327b301abcf4b904",
+    "commit": "f2f5b4442f86622c67f6f53c456319824bc8d506",
     "tree_clean": true,
     "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
@@ -16,13 +16,13 @@
   "registered_connection_id": "plugin_asdk_app_6a99ba6c1e7881919091a592738692c6",
   "package": {
     "archive_file": "debugbundle-openai-plugin-1.0.0.zip",
-    "archive_sha256": "b59e9ee899642bae401a1a3ad95f16714e61ca5b1405d4a513684ddba377a77e",
-    "archive_bytes": 38299,
+    "archive_sha256": "aafc052a474756e1dfcb0af40b0ef18bd48c2b9caf533b3861ee3e7227b13dc1",
+    "archive_bytes": 38533,
     "files": {
       ".app.json": "137807180af48e9e6f6df967ebcb23925ed87fc051d219d153a1bc604c174f31",
       ".codex-plugin/plugin.json": "8d2b0d9586ac27e13c2ac3b41062dd9da2c55a144c738d4f4beaec027d7fd6c1",
       "LICENSE": "173fbd73cffbb3afaf6f4036f314df050dff382bf6965b0d35d06544c8b08d3d",
-      "README.md": "5de30ec7da3a0eb5d334c326130639ba2d3b508e98a27e8e007fd6ba99660af9",
+      "README.md": "9afd7496047d40cc73084ec93603218c6a0f88671325743f43c34a70f0b1f8c8",
       "assets/icon-512.png": "a05a29674a75a945b1a378c73c27322c9b1f14456329bec1fc1d986453696e30",
       "skills/debugbundle/SKILL.md": "795a0915bd7a27720c8f4e710fc29c79784985a149b18875896fef9b4ffcc607",
       "skills/debugbundle/references/privacy-and-safety.md": "5266d4110ff8f586694da427d0cf9fb6dca08f0368af3afca87b3908dba8ac97",
@@ -35,7 +35,7 @@
       "listing.md": "1a7d8fba8cb9ecdb6f2bd65a066577f5149e4769aa1ce49b8b293e4b7812a29b",
       "post-launch-article-draft.md": "6ce0f34a4ce8261eb4a0f10e0f3c5fcc89de9677ffdcd988075ed296d97db7cd",
       "release-notes.md": "f96f0ae58b66fe326f00b6feb380a61025d5782a4568d2b012ae3ed42b5fa0b1",
-      "review-checklist.md": "c71e192f8d0f6a1f4e372c92d9464f5dcdce610f59eba4c7a2a5e83e187b7c80",
+      "review-checklist.md": "985c2d3f649ff0647141729765410dd6fce35f6f18c0b9f80dbf21a1acec234d",
       "starter-prompts.json": "bc7193b501f4a6de03723b415dcb57878f5ef32a4ce798639306e4694be9fa19",
       "test-cases.json": "80b45bc0d5969129ca55e0037d12c76244dd7afcc14c7d45b94a88a7a059c6f0"
     }
