@@ -31,6 +31,7 @@ Status markers in this file are deliberately manual. A repository-local green re
 - [x] Fresh-thread Codex discovery and the aggregate product-analytics corpus case pass.
 - [x] The owner-client endpoint-health case passes its primary read-only sequence with a sanitized URL, recent results, daily rollups, bounded linked-incident context, and no endpoint mutation or raw-log access.
 - [x] Older health-result pagination passes with the exact opaque `next_cursor` against hosted run `33868241338`. After the 10:55 UTC failure exposed the order-sensitive comparison, the structural-equality correction was deployed at API/worker digest `sha256:990f8fe5bb1ddac48d9edf30174586f4d21d07d67ba9643b9c81c4e557e64c48`. At 12:05 UTC on 2026-09-04, the owner repeated the same project/check/lookback/limit request: page one returned two HTTP `200` results and cursor `eyJvZmZzZXQiOjJ9`; page two returned the next two HTTP `200` results and cursor `eyJvZmZzZXQiOjR9`. Metadata-only production telemetry independently recorded both tool calls as admitted successes without timeout or cancellation.
+- [x] The owner-client improvement inventory preserves an explicit empty result. At 12:28 UTC on 2026-09-04, a DebugBundle API request returned `improvements: []` with `next_cursor: null`; ChatGPT did not broaden to another project, inspect any artifact, or claim a mutation. Metadata-only production telemetry recorded one admitted successful `list_improvements` call in 28 ms within `le_4_kib`, without timeout or cancellation.
 
 ## Submission and publication
 
