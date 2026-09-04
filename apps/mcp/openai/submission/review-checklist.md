@@ -29,6 +29,8 @@ Status markers in this file are deliberately manual. A repository-local green re
 - [ ] MCP Inspector and the remaining ChatGPT/Codex retained corpus pass against production.
 - [x] The validated personal Codex package is installed and enabled through the supported cachebuster/reinstall workflow.
 - [x] Fresh-thread Codex discovery and the aggregate product-analytics corpus case pass.
+- [x] The owner-client endpoint-health case passes its primary read-only sequence with a sanitized URL, recent results, daily rollups, bounded linked-incident context, and no endpoint mutation or raw-log access.
+- [ ] Re-run older health-result pagination with the exact opaque `next_cursor`. The server cursor regression passes, but three live client retries returned bounded tool failures and SEC-35 metadata-only telemetry intentionally retained neither arguments nor error payloads.
 
 ## Submission and publication
 

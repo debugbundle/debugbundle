@@ -519,6 +519,67 @@ describe("dedicated OpenAI hosted readers", () => {
     }
   });
 
+  it("continues health-check results with the opaque cursor returned by the prior page", async () => {
+    const fixture = createDependencies();
+    const healthResults = Array.from({ length: 60 }, (_, index) => {
+      const checkedAt = new Date(Date.now() - index * 60_000).toISOString();
+      return {
+        result_id: `result_${index}`,
+        check_id: "check_1",
+        project_id: "project_1",
+        started_at: checkedAt,
+        completed_at: checkedAt,
+        duration_ms: 42,
+        status: "success",
+        http_status: 200,
+        error_kind: null,
+        error_message: "must not escape",
+        redirect_count: 0,
+        checked_url_host: "example.test",
+        final_url: "https://example.test/ready"
+      };
+    });
+    fixture.dependencies.availabilityCheckManagement.listResultsForCheckInOrganization.mockResolvedValue(
+      healthResults
+    );
+    const operations = createOpenAiHostedOperations({
+      dependencies: fixture.dependencies as never,
+      dashboardBaseUrl: "https://app.debugbundle.com"
+    });
+
+    const firstPage = (await operations.list_health_check_results?.({
+      principal: PRINCIPAL,
+      input: { projectId: "project_1", checkId: "check_1", lookbackHours: 24, limit: 25 }
+    })) as { results: Array<{ result_id: string }>; next_cursor: string | null };
+    const secondPage = (await operations.list_health_check_results?.({
+      principal: PRINCIPAL,
+      input: {
+        projectId: "project_1",
+        checkId: "check_1",
+        lookbackHours: 24,
+        limit: 25,
+        cursor: firstPage.next_cursor
+      }
+    })) as { results: Array<{ result_id: string }>; next_cursor: string | null };
+
+    expect(firstPage).toMatchObject({
+      results: expect.arrayContaining([expect.objectContaining({ result_id: "result_0" })])
+    });
+    expect(firstPage.results).toHaveLength(25);
+    expect(firstPage.next_cursor).toEqual(expect.any(String));
+    expect(secondPage).toMatchObject({
+      results: expect.arrayContaining([expect.objectContaining({ result_id: "result_25" })])
+    });
+    expect(secondPage.results).toHaveLength(25);
+    expect(secondPage.next_cursor).toEqual(expect.any(String));
+    expect(
+      fixture.dependencies.availabilityCheckManagement.listResultsForCheckInOrganization
+    ).toHaveBeenNthCalledWith(1, expect.objectContaining({ limit: 26 }));
+    expect(
+      fixture.dependencies.availabilityCheckManagement.listResultsForCheckInOrganization
+    ).toHaveBeenNthCalledWith(2, expect.objectContaining({ limit: 51 }));
+  });
+
   it("denies project reads when current access no longer matches the grant organization", async () => {
     const fixture = createDependencies("org_other");
     const operations = createOpenAiHostedOperations({

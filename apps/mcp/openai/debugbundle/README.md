@@ -21,7 +21,7 @@ make openai-plugin-prepare
 
 `prepare` creates a deterministic candidate archive and non-secret submission packet. It never signs in to OpenAI, changes Developer Mode, submits, publishes, changes directory metadata, communicates publicly, or creates spend.
 
-Copy this plugin to a personal plugin source and use the plugin-creator cachebuster/reinstall workflow. Do not commit personal marketplace state. The supported personal install and fresh-thread Codex discovery are verified, including one aggregate-analytics case; the remaining Codex and ChatGPT Developer Mode corpus must still pass before submission can be considered.
+Copy this plugin to a personal plugin source and use the plugin-creator cachebuster/reinstall workflow. Do not commit personal marketplace state. The supported personal install and fresh-thread Codex discovery are verified, including aggregate-analytics and endpoint-health cases. The endpoint-health case preserved URL sanitization and read-only behavior, but an older-result pagination retry remains open because the live client call inputs are intentionally absent from metadata-only telemetry. The remaining Codex and ChatGPT Developer Mode corpus must still pass before submission can be considered.
 
 ## Links
 
