@@ -5,12 +5,15 @@ import { createOpenAiAccessTokenVerifier } from "../../../packages/auth/src/inde
 
 let privateKey: Awaited<ReturnType<typeof generateKeyPair>>["privateKey"];
 let jwks: { keys: Array<Record<string, unknown>> };
+let privateJwks: { keys: Array<Record<string, unknown>> };
 
 beforeAll(async () => {
   const pair = await generateKeyPair("RS256", { extractable: true });
   privateKey = pair.privateKey;
   const publicJwk = await exportJWK(pair.publicKey);
+  const privateJwk = await exportJWK(pair.privateKey);
   jwks = { keys: [{ ...publicJwk, kid: "key-1", alg: "RS256", use: "sig" }] };
+  privateJwks = { keys: [{ ...privateJwk, kid: "key-1", alg: "RS256", use: "sig" }] };
 });
 
 async function signToken(
@@ -61,6 +64,17 @@ describe("OpenAI access-token verifier", () => {
       clientId: "https://chatgpt.com/oauth/client.json",
       resource: "https://mcp.debugbundle.com",
       scopes: ["debugbundle:projects:read", "debugbundle:incidents:read"]
+    });
+  });
+
+  it("verifies provider-issued tokens when configured from the private signing JWKS", async () => {
+    const verifier = createOpenAiAccessTokenVerifier({
+      jwks: privateJwks,
+      isGrantActive: vi.fn(async () => true)
+    });
+
+    await expect(verifier.verifyAccessToken(await signToken())).resolves.toMatchObject({
+      clientId: "https://chatgpt.com/oauth/client.json"
     });
   });
 

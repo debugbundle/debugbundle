@@ -23,6 +23,21 @@ export interface OpenAiAccessTokenVerifierDependencies {
   isGrantActive: (input: OpenAiGrantStatusInput) => Promise<boolean>;
 }
 
+function toPublicVerificationJwks(
+  jwks: OpenAiAccessTokenVerifierDependencies["jwks"]
+): JSONWebKeySet {
+  return {
+    keys: jwks.keys.map((key) => ({
+      kty: key["kty"],
+      kid: key["kid"],
+      alg: key["alg"],
+      use: key["use"],
+      n: key["n"],
+      e: key["e"]
+    }))
+  } as JSONWebKeySet;
+}
+
 function readRequiredClaim(payload: JWTPayload, name: string): string {
   const value = payload[name];
   if (typeof value !== "string" || value.length === 0) {
@@ -70,7 +85,9 @@ function assertAccessTokenProfile(
 export function createOpenAiAccessTokenVerifier(
   dependencies: OpenAiAccessTokenVerifierDependencies
 ): { verifyAccessToken(token: string): Promise<AuthInfo> } {
-  const keySet = createLocalJWKSet(dependencies.jwks as JSONWebKeySet);
+  // The OAuth provider and resource server share one configured signing key set.
+  // Verification must expose only the public RSA parameters to jose.
+  const keySet = createLocalJWKSet(toPublicVerificationJwks(dependencies.jwks));
 
   return {
     async verifyAccessToken(token): Promise<AuthInfo> {
