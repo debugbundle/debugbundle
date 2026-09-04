@@ -1,8 +1,8 @@
 # OpenAI Plugin Consent And Reviewer Access Design Proposal
 
-Status: Owner-approved 2026-08-30; aggregate-analytics extension approved 2026-09-02; implemented in local source for testing, not deployed
+Status: Owner-approved 2026-08-30; aggregate-analytics extension approved 2026-09-02; implemented and deployed for owner-approved Developer Mode validation; keyboard and screen-reader review pending
 Version: 1.0
-Last updated: 2026-09-03
+Last updated: 2026-09-04
 
 ## Purpose and approval boundary
 

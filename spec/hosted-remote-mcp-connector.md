@@ -3,7 +3,7 @@
 Status: split decision; official OpenAI profile approved, arbitrary hosted-client profile deferred
 Owner: developer experience / platform
 Created: 2026-06-25
-Last reconciled: 2026-09-02
+Last reconciled: 2026-09-04
 
 ## Summary
 
@@ -47,7 +47,7 @@ Custom hosted-client path (deferred, not the official OpenAI plugin):
 
 The token-first decision applies only to a future custom hosted-client profile.
 
-Official OpenAI path (approved contract; local runtime and consent source implemented, not deployed):
+Official OpenAI path (approved contract; deployed for owner-approved Developer Mode validation):
 
 - OAuth 2.1/OIDC with the exact issuer, resource, scopes, PKCE, RFC 9207, CIMD, client-authentication, UserInfo, lifecycle, and retention profile in `spec/auth-architecture.md`.
 - Exactly twenty-three tools from `tests/fixtures/openai-plugin-v1/tool-contracts.json`.

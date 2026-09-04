@@ -13,7 +13,7 @@ Status markers in this file are deliberately manual. A repository-local green re
 
 - [x] Local source implements Streamable HTTP, canonical-host isolation, OAuth/OIDC, resource/audience/scope checks, bounded readers, Redis rate limits, and database-aware MCP bulkheads.
 - [x] Additive production migration is applied (`applied=1`, `already_applied=47`) by hosted stack run `33754379179`.
-- [x] The current API/worker image is deployed on the existing host at digest `sha256:990f8fe5bb1ddac48d9edf30174586f4d21d07d67ba9643b9c81c4e557e64c48`; the self-contained schema correction remains a local candidate and requires a new immutable digest before submission.
+- [x] The self-contained schema correction is deployed on the existing shared Lightsail runtime by hosted run `33907119277` at API/worker digest `sha256:349c98954955643f3f14cb1070623bbf7c25d3e6b1402d35214bca9479d3fdb7`; all 48 migrations were already applied, the existing OAuth/MCP/reviewer/Caddy configuration was preserved, and independent public API/MCP/OAuth boundary checks pass.
 - [x] DNS/TLS, managed Caddy dual-host promotion, the MCP-only gate, retention, and outside-network readiness checks pass.
 - [x] A read-only rollback inventory confirms the active and previous release metadata plus both retained API/worker image tags and immutable digests are present locally on the shared host.
 - [ ] Representative capacity/load and shared-runtime rollback evidence passes against the immutable candidate.
@@ -30,7 +30,7 @@ Status markers in this file are deliberately manual. A repository-local green re
 - [ ] Reviewer outside-network smoke passes without MFA/email/SMS/private networking and proves synthetic-tenant isolation.
 - [x] ChatGPT Developer Mode registered the production endpoint, the owner reconnected successfully, and the real non-secret `.app.json` mapping is captured for local testing only.
 - [x] MCP Inspector 2.5.0 reaches the production Streamable HTTP endpoint headlessly and receives the exact bounded RFC 9728 `auth_required` challenge. Metadata-only production telemetry independently records the unauthenticated `initialize` rejection. Authenticated Inspector use is intentionally unavailable because production accepts only OpenAI's exact CIMD client with `private_key_jwt`; no bearer token was extracted and no public-client exception was added. The equivalent authenticated `initialize` and `tools/list` path already passes through ChatGPT.
-- [x] The data-free local Inspector harness scans the exact 23-tool candidate catalog in strict mode with no schema errors or portability warnings. Every advertised local reference is self-contained, nullable type unions use portable `anyOf` serialization, and the catalog remains below the 512 KiB response bound. This candidate correction is not production evidence until separately deployed.
+- [x] The data-free local Inspector harness scans the exact 23-tool candidate catalog in strict mode with no schema errors or portability warnings. Every advertised local reference is self-contained, nullable type unions use portable `anyOf` serialization, and the catalog remains below the 512 KiB response bound. Hosted run `33907119277` deployed the correction; post-deploy authenticated catalog refresh remains a separate live-client check.
 - [ ] The remaining ChatGPT/Codex retained corpus passes against production.
 - [x] The validated personal Codex package is installed and enabled through the supported cachebuster/reinstall workflow.
 - [x] Fresh-thread Codex discovery and the aggregate product-analytics corpus case pass.
