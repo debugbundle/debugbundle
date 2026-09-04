@@ -30,7 +30,7 @@ Status markers in this file are deliberately manual. A repository-local green re
 - [x] The validated personal Codex package is installed and enabled through the supported cachebuster/reinstall workflow.
 - [x] Fresh-thread Codex discovery and the aggregate product-analytics corpus case pass.
 - [x] The owner-client endpoint-health case passes its primary read-only sequence with a sanitized URL, recent results, daily rollups, bounded linked-incident context, and no endpoint mutation or raw-log access.
-- [ ] Deploy and re-run older health-result pagination with the exact opaque `next_cursor`. At 10:55 UTC on 2026-09-04, the owner confirmed the exact cursor and unchanged project/check/lookback/limit still failed on page two. A red public-handler regression reproduced an order-sensitive strict-input comparison when `cursor` followed `limit`; the structural-equality correction passes locally but is not yet deployed.
+- [ ] Re-run older health-result pagination with the exact opaque `next_cursor` against hosted run `33868241338`. At 10:55 UTC on 2026-09-04, the owner confirmed the exact cursor and unchanged project/check/lookback/limit still failed on page two. A red public-handler regression reproduced the order-sensitive strict-input comparison when `cursor` followed `limit`; the structural-equality correction is deployed at API/worker digest `sha256:990f8fe5bb1ddac48d9edf30174586f4d21d07d67ba9643b9c81c4e557e64c48`, and only the authenticated continuation recheck remains.
 
 ## Submission and publication
 
