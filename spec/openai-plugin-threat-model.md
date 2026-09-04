@@ -102,7 +102,7 @@ Implemented in local source and covered by focused automated evidence:
 - owner-approved existing-app consent/reviewer UI, exact disclosure/scope controls, API-origin interaction handoff, owned Settings inventory/revocation, and focused accessibility/HTTP tests; and
 - repository-owned Caddy/deployment/monitoring/capacity source in `.local-repos/debugbundle-cloud`.
 
-Production evidence now includes the additive migration, same-Lightsail immutable image deployment, managed Caddy and DNS/TLS activation, OAuth/reviewer/MCP configuration, OAuth and MCP metadata, the bounded live ChatGPT discovery challenge, successful owner reconnect, the captured non-secret Developer Mode connection mapping, and passing project/service plus incident/context/existing-artifact ChatGPT cases. The deployed API digest is frozen in `apps/mcp/openai/release-manifest.json`.
+Production evidence now includes the additive migration, same-Lightsail immutable image deployment, managed Caddy and DNS/TLS activation, OAuth/reviewer/MCP configuration, OAuth and MCP metadata, the bounded live ChatGPT discovery challenge, successful owner reconnect, the captured non-secret Developer Mode connection mapping, passing project/service plus incident/context/existing-artifact ChatGPT cases, and a passing fresh-thread Codex aggregate-analytics case. The deployed API digest is frozen in `apps/mcp/openai/release-manifest.json`.
 
 Not claimed or performed:
 

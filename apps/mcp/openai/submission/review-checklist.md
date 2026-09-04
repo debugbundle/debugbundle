@@ -26,9 +26,9 @@ Status markers in this file are deliberately manual. A repository-local green re
 - [ ] Consent, reviewer, and connection-management surfaces pass keyboard and screen-reader validation.
 - [ ] Time-bounded reviewer credential is provisioned outside source control and outside-network smoke passes without MFA/email/SMS/private networking.
 - [x] ChatGPT Developer Mode registered the production endpoint, the owner reconnected successfully, and the real non-secret `.app.json` mapping is captured for local testing only.
-- [ ] MCP Inspector and full retained corpus pass against production.
+- [ ] MCP Inspector and the remaining ChatGPT/Codex retained corpus pass against production.
 - [x] The validated personal Codex package is installed and enabled through the supported cachebuster/reinstall workflow.
-- [ ] Fresh-thread Codex discovery and the retained Codex corpus pass.
+- [x] Fresh-thread Codex discovery and the aggregate product-analytics corpus case pass.
 
 ## Submission and publication
 
