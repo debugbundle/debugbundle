@@ -3,7 +3,7 @@
   "plugin_version": "1.0.0",
   "evidence_state": "local_connection_ready",
   "source": {
-    "commit": "c997da5c2f1f633c18b53d5b9819dc468145e6e3",
+    "commit": "eada2035e884652f7426913a59a570eb380779d6",
     "tree_clean": true,
     "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
@@ -11,18 +11,18 @@
     "resource_origin": "https://mcp.debugbundle.com",
     "mcp_endpoint": "https://mcp.debugbundle.com/mcp",
     "oauth_issuer": "https://api.debugbundle.com",
-    "api_image_digest": "sha256:ba3194f4e22902f90034fdb14d88eb624b62dd594371759af0eff314847be2e5"
+    "api_image_digest": "sha256:990f8fe5bb1ddac48d9edf30174586f4d21d07d67ba9643b9c81c4e557e64c48"
   },
   "registered_connection_id": "plugin_asdk_app_6a99ba6c1e7881919091a592738692c6",
   "package": {
     "archive_file": "debugbundle-openai-plugin-1.0.0.zip",
-    "archive_sha256": "8a2e0b6207b4786ab94acd2e4c5e88d0bac1ac499afff23267f8891fbc2ad08c",
-    "archive_bytes": 38658,
+    "archive_sha256": "57787fe9b206643b54870385f8d237426c87c57bae2290691f3c0eb31bd0116c",
+    "archive_bytes": 38692,
     "files": {
       ".app.json": "137807180af48e9e6f6df967ebcb23925ed87fc051d219d153a1bc604c174f31",
       ".codex-plugin/plugin.json": "8d2b0d9586ac27e13c2ac3b41062dd9da2c55a144c738d4f4beaec027d7fd6c1",
       "LICENSE": "173fbd73cffbb3afaf6f4036f314df050dff382bf6965b0d35d06544c8b08d3d",
-      "README.md": "bf0707fb565d47849d9ab741bc7f71b6f6c4046f670d3271209e9e77b5caa111",
+      "README.md": "3b1a288b31da7406b13a5f8d6e5bf6e3e3627d6c3bf97198ef21b76162c1b712",
       "assets/icon-512.png": "a05a29674a75a945b1a378c73c27322c9b1f14456329bec1fc1d986453696e30",
       "skills/debugbundle/SKILL.md": "795a0915bd7a27720c8f4e710fc29c79784985a149b18875896fef9b4ffcc607",
       "skills/debugbundle/references/privacy-and-safety.md": "5266d4110ff8f586694da427d0cf9fb6dca08f0368af3afca87b3908dba8ac97",
@@ -35,7 +35,7 @@
       "listing.md": "1a7d8fba8cb9ecdb6f2bd65a066577f5149e4769aa1ce49b8b293e4b7812a29b",
       "post-launch-article-draft.md": "6ce0f34a4ce8261eb4a0f10e0f3c5fcc89de9677ffdcd988075ed296d97db7cd",
       "release-notes.md": "f96f0ae58b66fe326f00b6feb380a61025d5782a4568d2b012ae3ed42b5fa0b1",
-      "review-checklist.md": "83f4b9bb20bf748295f3d7869ef6ebc57c007d7ca489c07ac7ea696a0fbaf0d8",
+      "review-checklist.md": "12186be57eb1b92ea52a08f07011acff7e63543f1ee3196f2bad4f4615c871e7",
       "starter-prompts.json": "bc7193b501f4a6de03723b415dcb57878f5ef32a4ce798639306e4694be9fa19",
       "test-cases.json": "80b45bc0d5969129ca55e0037d12c76244dd7afcc14c7d45b94a88a7a059c6f0"
     }
