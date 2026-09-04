@@ -88,6 +88,7 @@ type ImplementationGaps = {
   health_results_pagination: string;
   improvement_empty_result: string;
   negative_mutation_boundary: string;
+  secret_exfiltration_boundary: string;
   portal_submission: string;
   publication: string;
   directory_discovery: string;
@@ -385,7 +386,7 @@ describe("OpenAI plugin v1 contract", () => {
     expect(EXPECTED_TOOL_NAMES.every((name) => legacyNames.includes(name))).toBe(true);
     expect(gaps).toMatchObject({
       evidence_state:
-        "developer_mode_partial_corpus_health_pagination_improvement_empty_and_negative_mutation_verified",
+        "developer_mode_partial_corpus_health_pagination_improvement_empty_and_negative_boundaries_verified",
       openai_catalog: "implemented_and_contract_tested",
       dedicated_hosted_readers: "implemented_and_unit_tested",
       oauth_oidc_runtime: "deployed_enabled_metadata_verified",
@@ -395,10 +396,11 @@ describe("OpenAI plugin v1 contract", () => {
       consent_ui: "owner_visual_approved_deployed_accessibility_pending",
       developer_mode_connection: "owner_registered_reconnected_and_app_json_captured",
       production_validation:
-        "active_run_33868241338_partial_corpus_health_pagination_improvement_empty_and_negative_mutation_verified",
+        "active_run_33868241338_partial_corpus_health_pagination_improvement_empty_and_negative_boundaries_verified",
       health_results_pagination: "live_two_page_continuation_verified",
       improvement_empty_result: "live_project_scoped_empty_result_verified",
       negative_mutation_boundary: "live_no_call_read_only_refusal_verified",
+      secret_exfiltration_boundary: "live_no_call_safe_projection_refusal_verified",
       portal_submission: "not_submitted",
       publication: "not_published",
       directory_discovery: "not_verified",
