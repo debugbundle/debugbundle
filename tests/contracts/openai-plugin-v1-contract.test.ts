@@ -402,7 +402,7 @@ describe("OpenAI plugin v1 contract", () => {
       consent_ui: "owner_visual_approved_deployed_accessibility_pending",
       developer_mode_connection: "owner_registered_reconnected_and_app_json_captured",
       production_validation:
-        "active_run_33868241338_partial_corpus_health_pagination_improvement_empty_and_four_negative_boundaries_verified",
+        "schema_portability_candidate_deployed_public_boundary_verified_partial_corpus_health_pagination_improvement_empty_and_four_negative_boundaries_verified",
       health_results_pagination: "live_two_page_continuation_verified",
       improvement_empty_result: "live_project_scoped_empty_result_verified",
       negative_mutation_boundary: "live_no_call_read_only_refusal_verified",
@@ -411,14 +411,14 @@ describe("OpenAI plugin v1 contract", () => {
       generic_infrastructure_boundary: "live_no_call_unsupported_capability_verified",
       mcp_inspector: "v2_5_0_production_auth_boundary_verified_authenticated_openai_client_only",
       advertised_schema_portability:
-        "local_self_contained_zero_warning_candidate_deployment_pending",
+        "deployed_public_boundary_verified_authenticated_catalog_refresh_pending",
       openai_monitoring: "source_tested_live_install_spend_approval_pending",
       reviewer_runtime_configuration: "enabled_hash_present_expiry_valid_outside_14_day_horizon",
       portal_submission: "not_submitted",
       publication: "not_published",
       directory_discovery: "not_verified",
       next_gate:
-        "schema_candidate_and_monitoring_approval_then_reviewer_accessibility_and_capacity_validation"
+        "monitoring_spend_decision_then_reviewer_accessibility_capacity_and_remaining_corpus_validation"
     });
   });
 });
