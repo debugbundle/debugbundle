@@ -17,6 +17,27 @@ function runJson(args: string[]): unknown {
 }
 
 describe("OpenAI plugin release automation", () => {
+  it("keeps completed rollback evidence out of the remaining manual gates", () => {
+    const sources = [
+      "SYSTEM_OVERVIEW.md",
+      "ARCHITECTURE_MAP.md",
+      "spec/openai-plugin-threat-model.md",
+      "apps/mcp/openai/submission/review-checklist.md"
+    ].map((path) => readFileSync(join(repoRoot, path), "utf8"));
+    const checklist = sources.at(-1);
+
+    expect(checklist).toContain(
+      "- [x] The controlled shared-runtime rollback rehearsal passes against immutable images."
+    );
+    expect(checklist).toContain(
+      "- [ ] Representative capacity/load evidence passes against the immutable candidate."
+    );
+    for (const source of sources) {
+      expect(source).not.toContain("load/rollback evidence");
+      expect(source).not.toContain("capacity/load and shared-runtime rollback evidence");
+    }
+  });
+
   it("provides a data-free local MCP Inspector catalog harness", () => {
     const makefile = readFileSync(join(repoRoot, "Makefile"), "utf8");
     const harness = readFileSync(

@@ -16,7 +16,8 @@ Status markers in this file are deliberately manual. A repository-local green re
 - [x] The self-contained schema correction is deployed on the existing shared Lightsail runtime by hosted run `33907119277` at API/worker digest `sha256:349c98954955643f3f14cb1070623bbf7c25d3e6b1402d35214bca9479d3fdb7`; all 48 migrations were already applied, the existing OAuth/MCP/reviewer/Caddy configuration was preserved, and independent public API/MCP/OAuth boundary checks pass.
 - [x] DNS/TLS, managed Caddy dual-host promotion, the MCP-only gate, retention, and outside-network readiness checks pass.
 - [x] A read-only rollback inventory confirms the active and previous release metadata plus both retained API/worker image tags and immutable digests are present locally on the shared host.
-- [ ] Representative capacity/load and shared-runtime rollback evidence passes against the immutable candidate.
+- [x] The controlled shared-runtime rollback rehearsal passes against immutable images.
+- [ ] Representative capacity/load evidence passes against the immutable candidate.
 - [ ] Install the five source-defined OpenAI MCP/OAuth/reviewer CloudWatch metric filters and alarms after explicit recurring-spend approval. A 2026-09-04 read-only inventory found only the seven pre-existing hosted alarms/metric streams in Frankfurt and the primary API health alarm in Virginia; none of the OpenAI-specific filters or alarms is live. Existing alarm checks therefore prove only that the installed baseline alarms are not active.
 
 ## Reviewer and client
