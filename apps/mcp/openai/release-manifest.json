@@ -3,7 +3,7 @@
   "plugin_version": "1.0.0",
   "evidence_state": "local_connection_ready",
   "source": {
-    "commit": "8ce381b195175307b02d2488f8e95af67b5e42ee",
+    "commit": "e8c8c5af36c5c3d90c2b55fd18f9e182b0162bbd",
     "tree_clean": true,
     "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
@@ -73,7 +73,7 @@
   },
   "manual_gates": [
     "manual_keyboard_and_screen_reader_accessibility_validation",
-    "representative_capacity_load_and_rollback_evidence",
+    "representative_capacity_load_evidence",
     "reviewer_outside_network_smoke_and_fixture_isolation",
     "remaining_chatgpt_and_codex_reviewer_corpus",
     "openai_monitoring_install_and_recurring_spend_approval",
