@@ -105,6 +105,19 @@ describe("OpenAI plugin release automation", () => {
     expect(result.manifest.manual_gates).toContain(
       "representative_capacity_load_and_rollback_evidence"
     );
+    expect(result.manifest.manual_gates).toContain(
+      "reviewer_outside_network_smoke_and_fixture_isolation"
+    );
+    expect(result.manifest.manual_gates).toContain("remaining_chatgpt_and_codex_reviewer_corpus");
+    expect(result.manifest.manual_gates).toContain(
+      "openai_monitoring_install_and_recurring_spend_approval"
+    );
+    expect(result.manifest.manual_gates).not.toContain(
+      "reviewer_credential_provisioning_and_outside_network_smoke"
+    );
+    expect(result.manifest.manual_gates).not.toContain(
+      "mcp_inspector_chatgpt_and_codex_manual_corpus"
+    );
     expect(result.manifest.manual_gates).not.toContain(
       "manual_consent_reviewer_visual_and_accessibility_validation"
     );

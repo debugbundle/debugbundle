@@ -90,8 +90,9 @@ function manualGates(validation, apiImageDigest) {
   const gates = [
     "manual_keyboard_and_screen_reader_accessibility_validation",
     "representative_capacity_load_and_rollback_evidence",
-    "reviewer_credential_provisioning_and_outside_network_smoke",
-    "mcp_inspector_chatgpt_and_codex_manual_corpus",
+    "reviewer_outside_network_smoke_and_fixture_isolation",
+    "remaining_chatgpt_and_codex_reviewer_corpus",
+    "openai_monitoring_install_and_recurring_spend_approval",
     "privacy_legal_and_owner_candidate_review",
     "owner_submission_approval",
     "openai_review_and_approval",
