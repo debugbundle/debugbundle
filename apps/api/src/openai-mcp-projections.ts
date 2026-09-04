@@ -27,6 +27,12 @@ function numberOrNull(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function httpStatusOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value >= 100 && value <= 599
+    ? value
+    : null;
+}
+
 function booleanOrNull(value: unknown): boolean | null {
   return typeof value === "boolean" ? value : null;
 }
@@ -206,7 +212,7 @@ export function mapPrimarySignal(bundle: Record<string, unknown>): Record<string
     request_method: stringOrNull(request["method"]),
     request_path: stringOrNull(request["path"]),
     route_template: stringOrNull(request["route_template"]),
-    response_status: numberOrNull(response["status_code"]),
+    response_status: httpStatusOrNull(response["status_code"]),
     first_application_frame:
       frame === null
         ? null

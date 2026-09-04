@@ -261,15 +261,17 @@ function createDependencies(organizationId = "org_1") {
             service: input.service ?? null,
             environment: input.environment ?? null
           },
-          routes: [{
-            route_key: "/orders",
-            pageviews: 10,
-            unique_sessions: 6,
-            entrances: 3,
-            exits: 2,
-            bounces: 1,
-            linked_incident_sessions: 2
-          }]
+          routes: [
+            {
+              route_key: "/orders",
+              pageviews: 10,
+              unique_sessions: 6,
+              entrances: 3,
+              exits: 2,
+              bounces: 1,
+              linked_incident_sessions: 2
+            }
+          ]
         })),
         getJourneyPatterns: vi.fn(async (input: AnalyticsInputFixture) => ({
           window: {
@@ -280,14 +282,16 @@ function createDependencies(organizationId = "org_1") {
             service: input.service ?? null,
             environment: input.environment ?? null
           },
-          patterns: [{
-            from_route_key: "/pricing",
-            to_route_key: "/checkout",
-            transition_count: 4,
-            unique_sessions: 3,
-            transition_share: 0.5,
-            sample_ids: ["must-not-escape-sample-id"]
-          }]
+          patterns: [
+            {
+              from_route_key: "/pricing",
+              to_route_key: "/checkout",
+              transition_count: 4,
+              unique_sessions: 3,
+              transition_share: 0.5,
+              sample_ids: ["must-not-escape-sample-id"]
+            }
+          ]
         })),
         getDeviceBreakdown: vi.fn(async (input: AnalyticsInputFixture) => ({
           window: {
@@ -337,13 +341,15 @@ function createDependencies(organizationId = "org_1") {
             service: input.service ?? null,
             environment: input.environment ?? null
           },
-          funnels: [{
-            funnel_key: "checkout",
-            sessions_entered: 8,
-            sessions_completed: 3,
-            dropoffs: 5,
-            conversion_rate: 0.375
-          }]
+          funnels: [
+            {
+              funnel_key: "checkout",
+              sessions_entered: 8,
+              sessions_completed: 3,
+              dropoffs: 5,
+              conversion_rate: 0.375
+            }
+          ]
         })),
         getFunnelAnalysis: vi.fn(async (input: AnalyticsInputFixture) => ({
           funnel: {
@@ -359,14 +365,16 @@ function createDependencies(organizationId = "org_1") {
             dropoffs: 5,
             conversion_rate: 0.375
           },
-          steps: [{
-            step_key: "start",
-            step_order: 0,
-            sessions_entered: 8,
-            sessions_completed: 3,
-            dropoffs: 5,
-            conversion_rate: 0.375
-          }]
+          steps: [
+            {
+              step_key: "start",
+              step_order: 0,
+              sessions_entered: 8,
+              sessions_completed: 3,
+              dropoffs: 5,
+              conversion_rate: 0.375
+            }
+          ]
         })),
         getIncidentImpact: vi.fn(async (input: AnalyticsInputFixture) => ({
           incident_id: input.incident_id,
@@ -383,12 +391,14 @@ function createDependencies(organizationId = "org_1") {
           affected_funnels: [{ funnel_key: "checkout", affected_sessions: 2 }],
           top_device_types: [{ value: "mobile", affected_sessions: 3 }],
           top_browsers: [],
-          journey_patterns: [{
-            from_route_key: "/pricing",
-            to_route_key: "/checkout",
-            affected_sessions: 2,
-            sample_ids: ["must-not-escape-impact-sample-id"]
-          }],
+          journey_patterns: [
+            {
+              from_route_key: "/pricing",
+              to_route_key: "/checkout",
+              affected_sessions: 2,
+              sample_ids: ["must-not-escape-impact-sample-id"]
+            }
+          ],
           conversion_delta: { availability: "unavailable", value: null, unit: "percentage_points" },
           analytics_bundle: {
             status: "failed",
@@ -464,6 +474,49 @@ describe("dedicated OpenAI hosted readers", () => {
     );
     expect(fixture.listIncidentLogsForOrganization).not.toHaveBeenCalled();
     expect(fixture.bundleRegeneration.requestRegeneration).not.toHaveBeenCalled();
+  });
+
+  it("represents non-HTTP artifact response statuses as null", async () => {
+    const fixture = createDependencies();
+    const nonHttpBundle = gzipSync(
+      JSON.stringify({
+        bundle_version: 1,
+        summary: {
+          description: "The worker normalization step failed.",
+          error_type: "Error",
+          error_message: "Invalid integer input.",
+          first_application_frame: null
+        },
+        context: {
+          request: { method: "UNKNOWN", path: "/", route_template: "/" },
+          response: { status_code: 0 },
+          error: { name: "Error", message: "Invalid integer input." },
+          deploy: {}
+        },
+        redaction: { redacted: true, fields: [], notes: null }
+      })
+    );
+    fixture.dependencies.objectStoreReader.getObject.mockImplementation(
+      async ({ key }: { key: string }) =>
+        key.includes("reproductions") ? reproduction : nonHttpBundle
+    );
+    const operations = createOpenAiHostedOperations({
+      dependencies: fixture.dependencies as never,
+      dashboardBaseUrl: "https://app.debugbundle.com"
+    });
+    const handlers = createOpenAiHostedToolHandlers({ operations });
+
+    for (const name of ["get_incident_context", "get_bundle"] as const) {
+      await expect(
+        handlers[name]({ principal: PRINCIPAL, input: toolInputs[name] })
+      ).resolves.toMatchObject({
+        structuredContent: {
+          ...(name === "get_bundle"
+            ? { artifact: { primary_signal: { response_status: null } } }
+            : { primary_signal: { response_status: null } })
+        }
+      });
+    }
   });
 
   it("denies project reads when current access no longer matches the grant organization", async () => {
