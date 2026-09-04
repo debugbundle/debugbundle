@@ -3,7 +3,7 @@
   "plugin_version": "1.0.0",
   "evidence_state": "local_connection_ready",
   "source": {
-    "commit": "ccb26f20b7e0b62a2035a6117adcd73b599a7766",
+    "commit": "ca00e92372a569b41097eccd455f3d51832ef180",
     "tree_clean": true,
     "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
@@ -11,18 +11,18 @@
     "resource_origin": "https://mcp.debugbundle.com",
     "mcp_endpoint": "https://mcp.debugbundle.com/mcp",
     "oauth_issuer": "https://api.debugbundle.com",
-    "api_image_digest": "sha256:990f8fe5bb1ddac48d9edf30174586f4d21d07d67ba9643b9c81c4e557e64c48"
+    "api_image_digest": null
   },
   "registered_connection_id": "plugin_asdk_app_6a99ba6c1e7881919091a592738692c6",
   "package": {
     "archive_file": "debugbundle-openai-plugin-1.0.0.zip",
-    "archive_sha256": "addb2b8a9f65f437a10e9f8e98ad816585ef30bfd73b96f067ef20dc3d034128",
-    "archive_bytes": 39418,
+    "archive_sha256": "251832213c2098a031baf2523cd731f6e39cb5522cee7011780e249d03b8b7b5",
+    "archive_bytes": 39542,
     "files": {
       ".app.json": "137807180af48e9e6f6df967ebcb23925ed87fc051d219d153a1bc604c174f31",
       ".codex-plugin/plugin.json": "8d2b0d9586ac27e13c2ac3b41062dd9da2c55a144c738d4f4beaec027d7fd6c1",
       "LICENSE": "173fbd73cffbb3afaf6f4036f314df050dff382bf6965b0d35d06544c8b08d3d",
-      "README.md": "5b008f5664bca774fb37c44043bd291bf22eb522cc9da216838fcb46aafc6838",
+      "README.md": "05b8efe9c870f5ce85ef76f19a394569aad0b772e6b4577bf0d124d7fbc9bebf",
       "assets/icon-512.png": "a05a29674a75a945b1a378c73c27322c9b1f14456329bec1fc1d986453696e30",
       "skills/debugbundle/SKILL.md": "795a0915bd7a27720c8f4e710fc29c79784985a149b18875896fef9b4ffcc607",
       "skills/debugbundle/references/privacy-and-safety.md": "5266d4110ff8f586694da427d0cf9fb6dca08f0368af3afca87b3908dba8ac97",
@@ -35,7 +35,7 @@
       "listing.md": "1a7d8fba8cb9ecdb6f2bd65a066577f5149e4769aa1ce49b8b293e4b7812a29b",
       "post-launch-article-draft.md": "6ce0f34a4ce8261eb4a0f10e0f3c5fcc89de9677ffdcd988075ed296d97db7cd",
       "release-notes.md": "f96f0ae58b66fe326f00b6feb380a61025d5782a4568d2b012ae3ed42b5fa0b1",
-      "review-checklist.md": "eb17b9536655f72d11bb885fc44eba13a25cdb1455d5af8e3223e2cbec841b0e",
+      "review-checklist.md": "fa72db09557704d313bdc924db528a01e88cbd55592a247ee2b833d2dddf7e41",
       "starter-prompts.json": "bc7193b501f4a6de03723b415dcb57878f5ef32a4ce798639306e4694be9fa19",
       "test-cases.json": "80b45bc0d5969129ca55e0037d12c76244dd7afcc14c7d45b94a88a7a059c6f0"
     }
@@ -72,10 +72,12 @@
     "reviewer_fixture_sha256": "7eeff32a1dd14b4cb0fe5126e04470e448cf3f73a54bfb4f7e9e8f64327c6758"
   },
   "manual_gates": [
+    "immutable_api_image_deployment_digest",
     "manual_keyboard_and_screen_reader_accessibility_validation",
     "representative_capacity_load_and_rollback_evidence",
-    "reviewer_credential_provisioning_and_outside_network_smoke",
-    "mcp_inspector_chatgpt_and_codex_manual_corpus",
+    "reviewer_outside_network_smoke_and_fixture_isolation",
+    "remaining_chatgpt_and_codex_reviewer_corpus",
+    "openai_monitoring_install_and_recurring_spend_approval",
     "privacy_legal_and_owner_candidate_review",
     "owner_submission_approval",
     "openai_review_and_approval",
