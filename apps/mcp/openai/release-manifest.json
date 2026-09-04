@@ -1,9 +1,9 @@
 {
   "schema_version": "1.0.0",
   "plugin_version": "1.0.0",
-  "evidence_state": "local_source_ready",
+  "evidence_state": "local_connection_ready",
   "source": {
-    "commit": "f410fe0b8e7dde7ec4cf14f35edb188911365a6f",
+    "commit": "8580f7718a21d0943bc9df35f902668167507d98",
     "tree_clean": true,
     "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
@@ -13,15 +13,16 @@
     "oauth_issuer": "https://api.debugbundle.com",
     "api_image_digest": "sha256:ba3194f4e22902f90034fdb14d88eb624b62dd594371759af0eff314847be2e5"
   },
-  "registered_connection_id": null,
+  "registered_connection_id": "plugin_asdk_app_6a99ba6c1e7881919091a592738692c6",
   "package": {
     "archive_file": "debugbundle-openai-plugin-1.0.0.zip",
-    "archive_sha256": "4bcd4154f6817e80c6f11a7da5319bb8c580b4ace364c000a58ff8b26dd2fb0c",
-    "archive_bytes": 38068,
+    "archive_sha256": "9e1d06d030ba5ec4ac03e62ce9c8b064d5e01d09a7e6ca91f7d14d525ca99d9b",
+    "archive_bytes": 38208,
     "files": {
-      ".codex-plugin/plugin.json": "9d61d8719ff99941025b6573f1d95e5377516f16f932681078ebf41d349577bb",
+      ".app.json": "137807180af48e9e6f6df967ebcb23925ed87fc051d219d153a1bc604c174f31",
+      ".codex-plugin/plugin.json": "8d2b0d9586ac27e13c2ac3b41062dd9da2c55a144c738d4f4beaec027d7fd6c1",
       "LICENSE": "173fbd73cffbb3afaf6f4036f314df050dff382bf6965b0d35d06544c8b08d3d",
-      "README.md": "7846108cb7afda44431c843557db3417e8208a8cddf80b0279e9fa205eb2c6dc",
+      "README.md": "6af9daaa8ad3a168d3d86e85002906da154c79c6652ba77820d2c8208a50caae",
       "assets/icon-512.png": "a05a29674a75a945b1a378c73c27322c9b1f14456329bec1fc1d986453696e30",
       "skills/debugbundle/SKILL.md": "795a0915bd7a27720c8f4e710fc29c79784985a149b18875896fef9b4ffcc607",
       "skills/debugbundle/references/privacy-and-safety.md": "5266d4110ff8f586694da427d0cf9fb6dca08f0368af3afca87b3908dba8ac97",
@@ -34,7 +35,7 @@
       "listing.md": "1a7d8fba8cb9ecdb6f2bd65a066577f5149e4769aa1ce49b8b293e4b7812a29b",
       "post-launch-article-draft.md": "6ce0f34a4ce8261eb4a0f10e0f3c5fcc89de9677ffdcd988075ed296d97db7cd",
       "release-notes.md": "f96f0ae58b66fe326f00b6feb380a61025d5782a4568d2b012ae3ed42b5fa0b1",
-      "review-checklist.md": "8624eed9d64c5aa9a1e3a499131659e864ad850a0925fa4677197c1296f8ffad",
+      "review-checklist.md": "a3c95cf2a327628df8e8cb6a3299d0a36e6d441e98f973275b6e0a9d6c1ea7e3",
       "starter-prompts.json": "bc7193b501f4a6de03723b415dcb57878f5ef32a4ce798639306e4694be9fa19",
       "test-cases.json": "80b45bc0d5969129ca55e0037d12c76244dd7afcc14c7d45b94a88a7a059c6f0"
     }
@@ -71,7 +72,6 @@
     "reviewer_fixture_sha256": "7eeff32a1dd14b4cb0fe5126e04470e448cf3f73a54bfb4f7e9e8f64327c6758"
   },
   "manual_gates": [
-    "developer_mode_connection_registration_scan_and_app_json",
     "manual_consent_reviewer_visual_and_accessibility_validation",
     "production_migration_and_database_ledger_evidence",
     "dns_tls_caddy_monitoring_capacity_and_rollback_evidence",
