@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from "node:util";
+
 import { redact, type JsonValue } from "../../redaction/src/index.js";
 
 import schemaContract from "./contracts/schemas.json" with { type: "json" };
@@ -239,7 +241,7 @@ function projectSchemaValue(schemaInput: JsonSchema, value: unknown, path: strin
 
 function validateSchemaValue(schemaInput: JsonSchema, value: unknown, path: string): unknown {
   const projected = projectSchemaValue(schemaInput, value, path);
-  if (JSON.stringify(projected) !== JSON.stringify(value)) {
+  if (!isDeepStrictEqual(projected, value)) {
     throw new Error(`openai_mcp_schema_mismatch:${path}`);
   }
   return projected;
@@ -315,7 +317,7 @@ export function parseOpenAiToolInput(name: string, value: unknown): Record<strin
   const tool = requireTool(name);
   try {
     const parsed = projectSchemaValue(readSchemaReference(tool.input_schema_ref), value, "input");
-    if (!isRecord(parsed) || JSON.stringify(parsed) !== JSON.stringify(value)) {
+    if (!isRecord(parsed) || !isDeepStrictEqual(parsed, value)) {
       throw new Error("strict_input_required");
     }
     return parsed;

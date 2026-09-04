@@ -1,6 +1,6 @@
 {
   "contract_version": "1.0.0",
-  "evidence_state": "developer_mode_connection_and_partial_chatgpt_codex_corpus_health_case_verified",
+  "evidence_state": "developer_mode_partial_corpus_health_pagination_correction_pending_deployment",
   "openai_catalog": "implemented_and_contract_tested",
   "dedicated_hosted_readers": "implemented_and_unit_tested",
   "oauth_oidc_runtime": "deployed_enabled_metadata_verified",
@@ -10,10 +10,10 @@
   "consent_ui": "owner_visual_approved_deployed_accessibility_pending",
   "synthetic_ui_preview": "implemented_contract_tested_and_owner_visual_approved_accessibility_pending",
   "developer_mode_connection": "owner_registered_reconnected_and_app_json_captured",
-  "production_validation": "active_run_33853418331_connection_discovery_two_chatgpt_one_codex_and_one_owner_client_health_case_passed",
-  "health_results_pagination": "server_cursor_regression_passed_live_client_retry_arguments_unavailable",
+  "production_validation": "active_run_33853418331_partial_corpus_passed_health_pagination_failure_confirmed",
+  "health_results_pagination": "live_failure_reproduced_order_independent_validation_fix_verified_deployment_pending",
   "portal_submission": "not_submitted",
   "publication": "not_published",
   "directory_discovery": "not_verified",
-  "next_gate": "health_pagination_client_recheck_inspector_remaining_corpus_reviewer_accessibility_and_capacity_validation"
+  "next_gate": "deploy_retest_health_pagination_then_inspector_remaining_corpus_reviewer_accessibility_and_capacity_validation"
 }

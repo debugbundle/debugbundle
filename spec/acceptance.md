@@ -678,6 +678,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Then** title, description, strict input schema, explicit output schema, per-tool OAuth scopes, and annotations exactly match the contract fixture
 - **And** annotations are `readOnlyHint: true`, `openWorldHint: false`, and `destructiveHint: false`
 - **And** successful results contain schema-valid `structuredContent` plus one bounded human-readable text item
+- **And** schema-valid JSON object inputs remain valid regardless of member order, including a continuation cursor appended after the other pagination fields
 - **And** unknown inputs, oversized limits/windows, and schema-invalid results fail closed without internal details
 
 ### AC-MCP-05: Strict No-Side-Effect Hosted Reads

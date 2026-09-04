@@ -44,6 +44,18 @@ describe("OpenAI MCP tool catalog", () => {
     ).toThrow("openai_mcp_unknown_tool:get_logs");
   });
 
+  it("accepts schema-valid inputs regardless of JSON object property order", () => {
+    const input = {
+      projectId: "project_1",
+      checkId: "check_1",
+      lookbackHours: 24,
+      limit: 2,
+      cursor: "eyJvZmZzZXQiOjJ9"
+    };
+
+    expect(parseOpenAiToolInput("list_health_check_results", input)).toEqual(input);
+  });
+
   it("keeps every tool read-only, closed-world, and non-destructive", () => {
     for (const tool of OPENAI_TOOL_CATALOG) {
       expect(tool.annotations).toEqual({

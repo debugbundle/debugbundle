@@ -546,32 +546,40 @@ describe("dedicated OpenAI hosted readers", () => {
       dependencies: fixture.dependencies as never,
       dashboardBaseUrl: "https://app.debugbundle.com"
     });
+    const handlers = createOpenAiHostedToolHandlers({ operations });
 
-    const firstPage = (await operations.list_health_check_results?.({
+    const firstPage = (await handlers.list_health_check_results({
       principal: PRINCIPAL,
       input: { projectId: "project_1", checkId: "check_1", lookbackHours: 24, limit: 25 }
-    })) as { results: Array<{ result_id: string }>; next_cursor: string | null };
-    const secondPage = (await operations.list_health_check_results?.({
+    })) as unknown as {
+      structuredContent: { results: Array<{ result_id: string }>; next_cursor: string | null };
+    };
+    const firstPageContent = firstPage.structuredContent;
+    const secondPage = (await handlers.list_health_check_results({
       principal: PRINCIPAL,
       input: {
         projectId: "project_1",
         checkId: "check_1",
         lookbackHours: 24,
         limit: 25,
-        cursor: firstPage.next_cursor
+        cursor: firstPageContent.next_cursor
       }
-    })) as { results: Array<{ result_id: string }>; next_cursor: string | null };
+    })) as unknown as {
+      structuredContent: { results: Array<{ result_id: string }>; next_cursor: string | null };
+    };
 
-    expect(firstPage).toMatchObject({
+    const secondPageContent = secondPage.structuredContent;
+
+    expect(firstPageContent).toMatchObject({
       results: expect.arrayContaining([expect.objectContaining({ result_id: "result_0" })])
     });
-    expect(firstPage.results).toHaveLength(25);
-    expect(firstPage.next_cursor).toEqual(expect.any(String));
-    expect(secondPage).toMatchObject({
+    expect(firstPageContent.results).toHaveLength(25);
+    expect(firstPageContent.next_cursor).toEqual(expect.any(String));
+    expect(secondPageContent).toMatchObject({
       results: expect.arrayContaining([expect.objectContaining({ result_id: "result_25" })])
     });
-    expect(secondPage.results).toHaveLength(25);
-    expect(secondPage.next_cursor).toEqual(expect.any(String));
+    expect(secondPageContent.results).toHaveLength(25);
+    expect(secondPageContent.next_cursor).toEqual(expect.any(String));
     expect(
       fixture.dependencies.availabilityCheckManagement.listResultsForCheckInOrganization
     ).toHaveBeenNthCalledWith(1, expect.objectContaining({ limit: 26 }));
