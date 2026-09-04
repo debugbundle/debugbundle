@@ -23,7 +23,7 @@ Status markers in this file are deliberately manual. A repository-local green re
 - [x] Opt-in development-only synthetic preview covers the frozen UI state matrix, all 64 scope subsets, and 390/768/1280 px iframe viewports without OAuth or customer-state requests.
 - [ ] Consent, reviewer, and connection-management surfaces pass manual visual, keyboard, and screen-reader validation at mobile and desktop widths.
 - [ ] Time-bounded reviewer credential is provisioned outside source control and outside-network smoke passes without MFA/email/SMS/private networking.
-- [ ] ChatGPT Developer Mode registers the production endpoint and a real `.app.json` is added for local testing only.
+- [x] ChatGPT Developer Mode registered the production endpoint, the owner reconnected successfully, and the real non-secret `.app.json` mapping is captured for local testing only.
 - [ ] MCP Inspector and full retained corpus pass against production.
 - [ ] Fresh Codex local install/reinstall and new-thread discovery pass.
 

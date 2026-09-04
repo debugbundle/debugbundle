@@ -68,7 +68,9 @@ describe("OpenAI plugin release automation", () => {
     expect(result.ok).toBe(true);
     expect(result.failures).toEqual([]);
     expect(result.manifest.plugin_version).toBe("1.0.0");
-    expect(result.manifest.registered_connection_id).toBeNull();
+    expect(result.manifest.registered_connection_id).toBe(
+      "plugin_asdk_app_6a99ba6c1e7881919091a592738692c6"
+    );
     expect(result.manifest.runtime).toMatchObject({
       resource_origin: "https://mcp.debugbundle.com",
       mcp_endpoint: "https://mcp.debugbundle.com/mcp",
@@ -78,7 +80,7 @@ describe("OpenAI plugin release automation", () => {
     expect(
       Object.values(result.manifest.automation_boundary).every((value) => value === false)
     ).toBe(true);
-    expect(result.manifest.manual_gates).toContain(
+    expect(result.manifest.manual_gates).not.toContain(
       "developer_mode_connection_registration_scan_and_app_json"
     );
     expect(result.manifest.manual_gates).toContain(
@@ -137,8 +139,8 @@ describe("OpenAI plugin release automation", () => {
       'git(["add", "source.txt"]);',
       'git(["commit", "-q", "-m", "source changed"]);',
       'const changed = readOpenAiPluginSourceState({ repoRoot: root, releaseManifestRelativePath: "release-manifest.json", recordedCommit: sourceCommit });',
-      'rmSync(root, { recursive: true, force: true });',
-      'process.stdout.write(JSON.stringify({ sourceCommit, manifestOnly, changed }));'
+      "rmSync(root, { recursive: true, force: true });",
+      "process.stdout.write(JSON.stringify({ sourceCommit, manifestOnly, changed }));"
     ].join("");
 
     const result = JSON.parse(

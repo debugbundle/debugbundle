@@ -21,6 +21,7 @@
     "mcp"
   ],
   "skills": "./skills/",
+  "apps": "./.app.json",
   "interface": {
     "displayName": "DebugBundle",
     "shortDescription": "Investigate incidents and aggregate product analytics.",

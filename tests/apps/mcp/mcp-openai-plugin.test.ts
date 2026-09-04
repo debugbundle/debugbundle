@@ -8,7 +8,7 @@ const repoRoot = process.cwd();
 const pluginRoot = join(repoRoot, "apps/mcp/openai/debugbundle");
 
 describe("OpenAI plugin package", () => {
-  it("passes the repository source-ready validator without fabricating connection state", () => {
+  it("passes the repository validator with the captured Developer Mode connection", () => {
     const output = execFileSync(
       process.execPath,
       ["scripts/validate-openai-plugin.mjs", "--json"],
@@ -24,9 +24,10 @@ describe("OpenAI plugin package", () => {
 
     expect(result).toEqual({
       ok: true,
-      evidenceState: "local_source_ready",
+      evidenceState: "local_connection_ready",
+      connectionId: "plugin_asdk_app_6a99ba6c1e7881919091a592738692c6",
       version: "1.0.0",
-      manualGates: ["developer_mode_connection_registration_and_app_json"],
+      manualGates: [],
       failures: []
     });
   });
@@ -62,9 +63,16 @@ describe("OpenAI plugin package", () => {
     expect(readFileSync(join(pluginRoot, "assets/icon-512.png"))).toEqual(
       readFileSync(join(repoRoot, "site/public/icon-512.png"))
     );
-    expect(manifest.apps).toBeUndefined();
+    expect(manifest.apps).toBe("./.app.json");
     expect(manifest.mcpServers).toBeUndefined();
-    expect(existsSync(join(pluginRoot, ".app.json"))).toBe(false);
+    expect(existsSync(join(pluginRoot, ".app.json"))).toBe(true);
+    expect(JSON.parse(readFileSync(join(pluginRoot, ".app.json"), "utf8"))).toEqual({
+      apps: {
+        debugbundle: {
+          id: "plugin_asdk_app_6a99ba6c1e7881919091a592738692c6"
+        }
+      }
+    });
     expect(existsSync(join(pluginRoot, ".mcp.json"))).toBe(false);
   });
 
