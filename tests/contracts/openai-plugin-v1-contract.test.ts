@@ -382,8 +382,7 @@ describe("OpenAI plugin v1 contract", () => {
     expect(legacyNames.length).toBeGreaterThan(EXPECTED_TOOL_NAMES.length);
     expect(EXPECTED_TOOL_NAMES.every((name) => legacyNames.includes(name))).toBe(true);
     expect(gaps).toMatchObject({
-      evidence_state:
-        "developer_mode_partial_corpus_health_pagination_correction_deployed_retest_pending",
+      evidence_state: "developer_mode_partial_corpus_health_pagination_verified",
       openai_catalog: "implemented_and_contract_tested",
       dedicated_hosted_readers: "implemented_and_unit_tested",
       oauth_oidc_runtime: "deployed_enabled_metadata_verified",
@@ -392,15 +391,12 @@ describe("OpenAI plugin v1 contract", () => {
       hosted_infrastructure: "production_migrated_managed_caddy_dns_tls_active",
       consent_ui: "owner_visual_approved_deployed_accessibility_pending",
       developer_mode_connection: "owner_registered_reconnected_and_app_json_captured",
-      production_validation:
-        "active_run_33868241338_partial_corpus_health_pagination_correction_deployed",
-      health_results_pagination:
-        "live_failure_reproduced_order_independent_validation_fix_deployed_retest_pending",
+      production_validation: "active_run_33868241338_partial_corpus_health_pagination_verified",
+      health_results_pagination: "live_two_page_continuation_verified",
       portal_submission: "not_submitted",
       publication: "not_published",
       directory_discovery: "not_verified",
-      next_gate:
-        "retest_health_pagination_then_inspector_remaining_corpus_reviewer_accessibility_and_capacity_validation"
+      next_gate: "inspector_remaining_corpus_reviewer_accessibility_and_capacity_validation"
     });
   });
 });
