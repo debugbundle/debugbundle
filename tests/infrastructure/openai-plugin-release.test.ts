@@ -84,7 +84,19 @@ describe("OpenAI plugin release automation", () => {
       "developer_mode_connection_registration_scan_and_app_json"
     );
     expect(result.manifest.manual_gates).toContain(
+      "manual_keyboard_and_screen_reader_accessibility_validation"
+    );
+    expect(result.manifest.manual_gates).toContain(
+      "representative_capacity_load_and_rollback_evidence"
+    );
+    expect(result.manifest.manual_gates).not.toContain(
       "manual_consent_reviewer_visual_and_accessibility_validation"
+    );
+    expect(result.manifest.manual_gates).not.toContain(
+      "production_migration_and_database_ledger_evidence"
+    );
+    expect(result.manifest.manual_gates).not.toContain(
+      "dns_tls_caddy_monitoring_capacity_and_rollback_evidence"
     );
     expect(result.manifest.manual_gates).not.toContain(
       "owner_approval_and_implementation_of_consent_ui_design"

@@ -88,9 +88,8 @@ function packetArchiveEntries(manifestBytes) {
 
 function manualGates(validation, apiImageDigest) {
   const gates = [
-    "manual_consent_reviewer_visual_and_accessibility_validation",
-    "production_migration_and_database_ledger_evidence",
-    "dns_tls_caddy_monitoring_capacity_and_rollback_evidence",
+    "manual_keyboard_and_screen_reader_accessibility_validation",
+    "representative_capacity_load_and_rollback_evidence",
     "reviewer_credential_provisioning_and_outside_network_smoke",
     "mcp_inspector_chatgpt_and_codex_manual_corpus",
     "privacy_legal_and_owner_candidate_review",

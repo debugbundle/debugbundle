@@ -13,19 +13,22 @@ Status markers in this file are deliberately manual. A repository-local green re
 
 - [x] Local source implements Streamable HTTP, canonical-host isolation, OAuth/OIDC, resource/audience/scope checks, bounded readers, Redis rate limits, and database-aware MCP bulkheads.
 - [x] Additive production migration is applied (`applied=1`, `already_applied=47`) by hosted stack run `33754379179`.
-- [x] Immutable API image is deployed on the existing host at digest `sha256:145c958e79c88ce6404419951bad066e0ba84fcf5b9b87f0470942a0bfaa9570`.
-- [ ] DNS/TLS/Caddy dual-host promotion, MCP-only gate, monitoring, retention, load, rollback, and outside-network checks pass.
+- [x] Immutable API image is deployed on the existing host at digest `sha256:ba3194f4e22902f90034fdb14d88eb624b62dd594371759af0eff314847be2e5`.
+- [x] DNS/TLS, managed Caddy dual-host promotion, the MCP-only gate, monitoring, retention, and outside-network readiness checks pass.
+- [ ] Representative capacity/load and shared-runtime rollback evidence passes against the immutable candidate.
 
 ## Reviewer and client
 
 - [x] Synthetic fixed reviewer identity/tenant fixture and rate-limited credential backend exist locally.
 - [x] Owner-approved consent/reviewer UI is implemented and covered by automated interaction and accessibility-state tests.
 - [x] Opt-in development-only synthetic preview covers the frozen UI state matrix, all 64 scope subsets, and 390/768/1280 px iframe viewports without OAuth or customer-state requests.
-- [ ] Consent, reviewer, and connection-management surfaces pass manual visual, keyboard, and screen-reader validation at mobile and desktop widths.
+- [x] Owner manual visual validation of the consent, reviewer, and connection-management surfaces passes at mobile, tablet, and desktop widths.
+- [ ] Consent, reviewer, and connection-management surfaces pass keyboard and screen-reader validation.
 - [ ] Time-bounded reviewer credential is provisioned outside source control and outside-network smoke passes without MFA/email/SMS/private networking.
 - [x] ChatGPT Developer Mode registered the production endpoint, the owner reconnected successfully, and the real non-secret `.app.json` mapping is captured for local testing only.
 - [ ] MCP Inspector and full retained corpus pass against production.
-- [ ] Fresh Codex local install/reinstall and new-thread discovery pass.
+- [x] The validated personal Codex package is installed and enabled through the supported cachebuster/reinstall workflow.
+- [ ] Fresh-thread Codex discovery and the retained Codex corpus pass.
 
 ## Submission and publication
 
