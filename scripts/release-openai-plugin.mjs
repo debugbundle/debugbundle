@@ -164,13 +164,30 @@ function candidatePaths(outputRoot) {
   };
 }
 
+function readRecordedSourceCommit() {
+  if (!existsSync(releaseManifestPath)) return undefined;
+  return readJson(releaseManifestPath)?.source?.commit;
+}
+
+function releaseChecksums(paths, pluginArchive, packetArchive) {
+  return `${[
+    `${sha256Bytes(pluginArchive)}  ${paths.plugin.split("/").at(-1)}`,
+    `${sha256Bytes(packetArchive)}  ${paths.packet.split("/").at(-1)}`
+  ].join("\n")}\n`;
+}
+
 function prepare(args) {
   const validation = validateOpenAiPluginSource({ requireConnection: args.requireConnection });
   if (!validation.ok)
     throw new Error(`source_validation_failed:\n${validation.failures.join("\n")}`);
 
   const pluginArchive = buildDeterministicZip(pluginArchiveEntries());
-  const manifest = buildManifest(validation, pluginArchive, args.apiImageDigest);
+  const manifest = buildManifest(
+    validation,
+    pluginArchive,
+    args.apiImageDigest,
+    readRecordedSourceCommit()
+  );
   const manifestBytes = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`, "utf8");
   writeFileSync(releaseManifestPath, manifestBytes);
 
@@ -179,11 +196,7 @@ function prepare(args) {
   mkdirSync(args.outputRoot, { recursive: true });
   writeFileSync(paths.plugin, pluginArchive);
   writeFileSync(paths.packet, packetArchive);
-  const checksumText = [
-    `${sha256Bytes(pluginArchive)}  ${paths.plugin.split("/").at(-1)}`,
-    `${sha256Bytes(packetArchive)}  ${paths.packet.split("/").at(-1)}`
-  ].join("\n");
-  writeFileSync(paths.checksums, `${checksumText}\n`, "utf8");
+  writeFileSync(paths.checksums, releaseChecksums(paths, pluginArchive, packetArchive), "utf8");
 
   return { validation, manifest, paths, packet_sha256: sha256Bytes(packetArchive) };
 }
@@ -220,12 +233,35 @@ function verify(args) {
   if (stableJson(actualManifest) !== stableJson(expectedManifest)) {
     failures.push("release_manifest_drift");
   }
+  const expectedManifestBytes = Buffer.from(
+    `${JSON.stringify(expectedManifest, null, 2)}\n`,
+    "utf8"
+  );
+  const expectedPacket = buildDeterministicZip(packetArchiveEntries(expectedManifestBytes));
   const paths = candidatePaths(args.outputRoot);
+  const artifactPaths = [paths.plugin, paths.packet, paths.checksums];
+  const existingArtifactCount = artifactPaths.filter((path) => existsSync(path)).length;
+  if (existingArtifactCount > 0 && existingArtifactCount !== artifactPaths.length) {
+    failures.push("release_artifact_set_incomplete");
+  }
   if (
     existsSync(paths.plugin) &&
     sha256Bytes(readFileSync(paths.plugin)) !== sha256Bytes(currentArchive)
   ) {
     failures.push("plugin_archive_drift");
+  }
+  if (
+    existsSync(paths.packet) &&
+    sha256Bytes(readFileSync(paths.packet)) !== sha256Bytes(expectedPacket)
+  ) {
+    failures.push("submission_packet_drift");
+  }
+  if (
+    existsSync(paths.checksums) &&
+    readFileSync(paths.checksums, "utf8") !==
+      releaseChecksums(paths, currentArchive, expectedPacket)
+  ) {
+    failures.push("release_checksums_drift");
   }
   return { ok: failures.length === 0, failures, validation, manifest: expectedManifest };
 }

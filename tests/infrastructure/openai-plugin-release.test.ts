@@ -67,6 +67,15 @@ describe("OpenAI plugin release automation", () => {
     expect(source).not.toContain("docker ");
   });
 
+  it("keeps prepared submission evidence aligned after manifest-only release commits", () => {
+    const source = readFileSync(join(repoRoot, "scripts/release-openai-plugin.mjs"), "utf8");
+
+    expect(source).toContain("readRecordedSourceCommit");
+    expect(source).toContain("release_artifact_set_incomplete");
+    expect(source).toContain("submission_packet_drift");
+    expect(source).toContain("release_checksums_drift");
+  });
+
   it("verifies the committed source manifest and exact package hashes without live access", () => {
     const result = runJson(["verify"]) as {
       ok: boolean;
