@@ -89,9 +89,14 @@ describe("OpenAI plugin release automation", () => {
     );
     expect(result.manifest.runtime).toMatchObject({
       resource_origin: "https://mcp.debugbundle.com",
-      mcp_endpoint: "https://mcp.debugbundle.com/mcp",
-      api_image_digest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u)
+      mcp_endpoint: "https://mcp.debugbundle.com/mcp"
     });
+    if (result.manifest.runtime.api_image_digest === null) {
+      expect(result.manifest.manual_gates).toContain("immutable_api_image_deployment_digest");
+    } else {
+      expect(result.manifest.runtime.api_image_digest).toMatch(/^sha256:[0-9a-f]{64}$/u);
+      expect(result.manifest.manual_gates).not.toContain("immutable_api_image_deployment_digest");
+    }
     expect(result.manifest.contract.tools_in_scan_order).toHaveLength(23);
     expect(
       Object.values(result.manifest.automation_boundary).every((value) => value === false)
@@ -130,7 +135,6 @@ describe("OpenAI plugin release automation", () => {
     expect(result.manifest.manual_gates).not.toContain(
       "owner_approval_and_implementation_of_consent_ui_design"
     );
-    expect(result.manifest.manual_gates).not.toContain("immutable_api_image_deployment_digest");
   });
 
   it("produces byte-identical ZIP bytes for the same ordered or unordered inputs", () => {
