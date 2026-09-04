@@ -36,6 +36,8 @@ export type OpenAiToolCatalogEntry = (typeof toolContracts.tools)[number];
 
 type JsonSchema = {
   $ref?: string;
+  $defs?: Record<string, JsonSchema>;
+  allOf?: JsonSchema[];
   anyOf?: JsonSchema[];
   type?: string | string[];
   enum?: unknown[];
@@ -56,6 +58,13 @@ type JsonSchema = {
 const schemaDefinitions = schemaContract.$defs as Record<string, JsonSchema>;
 const toolNames = new Set<string>(OPENAI_TOOL_NAMES);
 const MAX_OUTPUT_BYTES = 524_288;
+const advertisedSchemaCache = new Map<
+  string,
+  {
+    inputSchema: Readonly<Record<string, unknown>>;
+    outputSchema: Readonly<Record<string, unknown>>;
+  }
+>();
 
 function deepFreeze<T>(value: T): Readonly<T> {
   if (typeof value === "object" && value !== null && !Object.isFrozen(value)) {
@@ -94,15 +103,105 @@ function readSchemaReference(reference: string): JsonSchema {
   return schema;
 }
 
+function collectLocalDefinitions(schema: JsonSchema, definitions: Set<string>): void {
+  if (schema.$ref !== undefined) {
+    const prefix = "#/$defs/";
+    if (!schema.$ref.startsWith(prefix)) {
+      throw new Error(`openai_mcp_invalid_definition_ref:${schema.$ref}`);
+    }
+    const name = schema.$ref.slice(prefix.length);
+    if (definitions.has(name)) {
+      return;
+    }
+    const definition = schemaDefinitions[name];
+    if (definition === undefined) {
+      throw new Error(`openai_mcp_missing_definition_ref:${schema.$ref}`);
+    }
+    definitions.add(name);
+    collectLocalDefinitions(definition, definitions);
+  }
+
+  for (const candidate of schema.anyOf ?? []) {
+    collectLocalDefinitions(candidate, definitions);
+  }
+  for (const candidate of schema.allOf ?? []) {
+    collectLocalDefinitions(candidate, definitions);
+  }
+  for (const property of Object.values(schema.properties ?? {})) {
+    collectLocalDefinitions(property, definitions);
+  }
+  if (schema.items !== undefined) {
+    collectLocalDefinitions(schema.items, definitions);
+  }
+}
+
+function normalizeAdvertisedSchema(schema: JsonSchema): JsonSchema {
+  const normalized: JsonSchema = { ...schema };
+  if (schema.properties !== undefined) {
+    normalized.properties = Object.fromEntries(
+      Object.entries(schema.properties).map(([name, property]) => [
+        name,
+        normalizeAdvertisedSchema(property)
+      ])
+    );
+  }
+  if (schema.items !== undefined) {
+    normalized.items = normalizeAdvertisedSchema(schema.items);
+  }
+  if (schema.anyOf !== undefined) {
+    normalized.anyOf = schema.anyOf.map(normalizeAdvertisedSchema);
+  }
+  if (schema.allOf !== undefined) {
+    normalized.allOf = schema.allOf.map(normalizeAdvertisedSchema);
+  }
+  if (Array.isArray(schema.type)) {
+    const typeUnion = schema.type.map((type) => ({ type }));
+    delete normalized.type;
+    if (normalized.anyOf === undefined) {
+      normalized.anyOf = typeUnion;
+    } else {
+      normalized.allOf = [
+        ...(normalized.allOf ?? []),
+        { anyOf: normalized.anyOf },
+        { anyOf: typeUnion }
+      ];
+      delete normalized.anyOf;
+    }
+  }
+  return normalized;
+}
+
+function materializeAdvertisedSchema(schema: JsonSchema): Readonly<Record<string, unknown>> {
+  const definitionNames = new Set<string>();
+  collectLocalDefinitions(schema, definitionNames);
+  const normalizedSchema = normalizeAdvertisedSchema(schema);
+  if (definitionNames.size === 0) {
+    return deepFreeze(normalizedSchema) as Readonly<Record<string, unknown>>;
+  }
+
+  const definitions = Object.fromEntries(
+    [...definitionNames].map((name) => [name, normalizeAdvertisedSchema(schemaDefinitions[name]!)])
+  );
+  return deepFreeze({ ...normalizedSchema, $defs: definitions }) as Readonly<
+    Record<string, unknown>
+  >;
+}
+
 export function getOpenAiToolSchemas(name: string): {
   inputSchema: Readonly<Record<string, unknown>>;
   outputSchema: Readonly<Record<string, unknown>>;
 } {
+  const cached = advertisedSchemaCache.get(name);
+  if (cached !== undefined) {
+    return cached;
+  }
   const tool = requireTool(name);
-  return {
-    inputSchema: readSchemaReference(tool.input_schema_ref) as Readonly<Record<string, unknown>>,
-    outputSchema: readSchemaReference(tool.output_schema_ref) as Readonly<Record<string, unknown>>
+  const schemas = {
+    inputSchema: materializeAdvertisedSchema(readSchemaReference(tool.input_schema_ref)),
+    outputSchema: materializeAdvertisedSchema(readSchemaReference(tool.output_schema_ref))
   };
+  advertisedSchemaCache.set(name, schemas);
+  return schemas;
 }
 
 function resolveSchema(schema: JsonSchema): JsonSchema {

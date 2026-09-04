@@ -90,6 +90,11 @@ type ImplementationGaps = {
   negative_mutation_boundary: string;
   secret_exfiltration_boundary: string;
   individual_analytics_boundary: string;
+  generic_infrastructure_boundary: string;
+  mcp_inspector: string;
+  advertised_schema_portability: string;
+  openai_monitoring: string;
+  reviewer_runtime_configuration: string;
   portal_submission: string;
   publication: string;
   directory_discovery: string;
@@ -387,7 +392,7 @@ describe("OpenAI plugin v1 contract", () => {
     expect(EXPECTED_TOOL_NAMES.every((name) => legacyNames.includes(name))).toBe(true);
     expect(gaps).toMatchObject({
       evidence_state:
-        "developer_mode_partial_corpus_health_pagination_improvement_empty_and_three_negative_boundaries_verified",
+        "developer_mode_partial_corpus_health_pagination_improvement_empty_and_four_negative_boundaries_verified",
       openai_catalog: "implemented_and_contract_tested",
       dedicated_hosted_readers: "implemented_and_unit_tested",
       oauth_oidc_runtime: "deployed_enabled_metadata_verified",
@@ -397,16 +402,23 @@ describe("OpenAI plugin v1 contract", () => {
       consent_ui: "owner_visual_approved_deployed_accessibility_pending",
       developer_mode_connection: "owner_registered_reconnected_and_app_json_captured",
       production_validation:
-        "active_run_33868241338_partial_corpus_health_pagination_improvement_empty_and_three_negative_boundaries_verified",
+        "active_run_33868241338_partial_corpus_health_pagination_improvement_empty_and_four_negative_boundaries_verified",
       health_results_pagination: "live_two_page_continuation_verified",
       improvement_empty_result: "live_project_scoped_empty_result_verified",
       negative_mutation_boundary: "live_no_call_read_only_refusal_verified",
       secret_exfiltration_boundary: "live_no_call_safe_projection_refusal_verified",
       individual_analytics_boundary: "live_no_call_aggregate_only_refusal_verified",
+      generic_infrastructure_boundary: "live_no_call_unsupported_capability_verified",
+      mcp_inspector: "v2_5_0_production_auth_boundary_verified_authenticated_openai_client_only",
+      advertised_schema_portability:
+        "local_self_contained_zero_warning_candidate_deployment_pending",
+      openai_monitoring: "source_tested_live_install_spend_approval_pending",
+      reviewer_runtime_configuration: "enabled_hash_present_expiry_valid_outside_14_day_horizon",
       portal_submission: "not_submitted",
       publication: "not_published",
       directory_discovery: "not_verified",
-      next_gate: "inspector_remaining_corpus_reviewer_accessibility_and_capacity_validation"
+      next_gate:
+        "schema_candidate_and_monitoring_approval_then_reviewer_accessibility_and_capacity_validation"
     });
   });
 });

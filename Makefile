@@ -70,6 +70,7 @@ help:
 	@echo "  make release-mcp-ecosystem VERSION=x.y.z"
 	@echo "  make openai-plugin-validate  Validate the source-ready OpenAI plugin package"
 	@echo "  make openai-plugin-check     Run package, skill, and release contract tests"
+	@echo "  make openai-plugin-inspector-check Validate the exact data-free catalog with MCP Inspector"
 	@echo "  make openai-plugin-plan      Print the non-mutating OpenAI release plan"
 	@echo "  make openai-plugin-prepare   Build deterministic local candidate archives"
 	@echo "  make openai-plugin-verify    Verify source manifest and candidate hashes"
@@ -225,6 +226,10 @@ openai-plugin-validate:
 .PHONY: openai-plugin-check
 openai-plugin-check:
 	$(NODE_RUN) "apk add --no-cache git >/dev/null && corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm vitest run tests/apps/mcp/mcp-openai-plugin.test.ts tests/contracts/openai-plugin-skill-parity.test.ts tests/infrastructure/openai-plugin-release.test.ts"
+
+.PHONY: openai-plugin-inspector-check
+openai-plugin-inspector-check:
+	$(NODE_RUN) "corepack enable && $(PNPM_INSTALL_RELAXED) && npx --yes @modelcontextprotocol/inspector@2.5.0 --cli ./node_modules/.bin/tsx scripts/openai-plugin-inspector-harness.ts --method tools/list --strict --format json >/dev/null"
 
 .PHONY: openai-plugin-plan
 openai-plugin-plan:

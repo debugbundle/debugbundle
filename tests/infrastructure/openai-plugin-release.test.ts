@@ -16,6 +16,22 @@ function runJson(args: string[]): unknown {
 }
 
 describe("OpenAI plugin release automation", () => {
+  it("provides a data-free local MCP Inspector catalog harness", () => {
+    const makefile = readFileSync(join(repoRoot, "Makefile"), "utf8");
+    const harness = readFileSync(
+      join(repoRoot, "scripts/openai-plugin-inspector-harness.ts"),
+      "utf8"
+    );
+
+    expect(makefile).toContain("openai-plugin-inspector-check:");
+    expect(makefile).toContain("@modelcontextprotocol/inspector@2.5.0 --cli");
+    expect(makefile).toContain("--method tools/list --strict --format json");
+    expect(harness).toContain("OPENAI_TOOL_CATALOG.map");
+    expect(harness).toContain("getOpenAiToolSchemas");
+    expect(harness).not.toContain("createOpenAiHostedToolHandlers");
+    expect(harness).not.toContain("process.env");
+  });
+
   it("is independently versioned and permanently excludes external release actions", () => {
     const plan = runJson(["plan"]) as {
       version: string;

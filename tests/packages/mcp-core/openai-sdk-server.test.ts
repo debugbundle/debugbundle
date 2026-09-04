@@ -8,8 +8,37 @@ import {
   createOpenAiSdkServer
 } from "../../../packages/mcp-core/src/index.js";
 
-const RESOURCE_METADATA_URL =
-  "https://mcp.debugbundle.com/.well-known/oauth-protected-resource";
+const RESOURCE_METADATA_URL = "https://mcp.debugbundle.com/.well-known/oauth-protected-resource";
+
+function localSchemaReferences(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap(localSchemaReferences);
+  }
+  if (typeof value !== "object" || value === null) {
+    return [];
+  }
+
+  const record = value as Record<string, unknown>;
+  return [
+    ...(typeof record["$ref"] === "string" ? [record["$ref"]] : []),
+    ...Object.values(record).flatMap(localSchemaReferences)
+  ];
+}
+
+function schemaTypeArrays(value: unknown): unknown[][] {
+  if (Array.isArray(value)) {
+    return value.flatMap(schemaTypeArrays);
+  }
+  if (typeof value !== "object" || value === null) {
+    return [];
+  }
+
+  const record = value as Record<string, unknown>;
+  return [
+    ...(Array.isArray(record["type"]) ? [record["type"]] : []),
+    ...Object.values(record).flatMap(schemaTypeArrays)
+  ];
+}
 
 const AUTH: AuthInfo = {
   token: "not-a-real-token",
@@ -84,7 +113,17 @@ describe("OpenAI SDK MCP server", () => {
       expect(tool["_meta"]).toEqual({
         securitySchemes: OPENAI_TOOL_CATALOG[index]?.securitySchemes
       });
+      for (const schema of [tool["inputSchema"], tool["outputSchema"]]) {
+        const definitions = (schema as { $defs?: Record<string, unknown> }).$defs;
+        for (const reference of localSchemaReferences(schema)) {
+          expect(reference).toMatch(/^#\/\$defs\/[A-Za-z0-9_-]+$/u);
+          expect(definitions?.[reference.slice("#/$defs/".length)]).toBeDefined();
+        }
+        expect(schemaTypeArrays(schema)).toEqual([]);
+      }
     }
+
+    expect(Buffer.byteLength(JSON.stringify(tools), "utf8")).toBeLessThan(524_288);
   });
 
   it("requires an authenticated principal and both incident-context scopes", async () => {
