@@ -89,7 +89,7 @@ function packetArchiveEntries(manifestBytes) {
 function manualGates(validation, apiImageDigest) {
   const gates = [
     "manual_keyboard_and_screen_reader_accessibility_validation",
-    "representative_capacity_load_and_rollback_evidence",
+    "representative_capacity_load_evidence",
     "reviewer_outside_network_smoke_and_fixture_isolation",
     "remaining_chatgpt_and_codex_reviewer_corpus",
     "openai_monitoring_install_and_recurring_spend_approval",

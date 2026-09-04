@@ -145,7 +145,8 @@ describe("OpenAI plugin release automation", () => {
     expect(result.manifest.manual_gates).toContain(
       "manual_keyboard_and_screen_reader_accessibility_validation"
     );
-    expect(result.manifest.manual_gates).toContain(
+    expect(result.manifest.manual_gates).toContain("representative_capacity_load_evidence");
+    expect(result.manifest.manual_gates).not.toContain(
       "representative_capacity_load_and_rollback_evidence"
     );
     expect(result.manifest.manual_gates).toContain(
