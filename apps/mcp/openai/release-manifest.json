@@ -3,7 +3,7 @@
   "plugin_version": "1.0.0",
   "evidence_state": "local_connection_ready",
   "source": {
-    "commit": "b2acf4b49fa1fd1fa66195e8ea4173aaeab21d6b",
+    "commit": "46fb2d757ebe36b7a7d677f5cfc0348cfea3100c",
     "tree_clean": true,
     "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
@@ -32,10 +32,11 @@
   "submission": {
     "files": {
       "data-map.md": "90751261d20abbe9fcb80da3423e03927be5561f8a990bdb1734fab3c909162f",
-      "listing.md": "1a7d8fba8cb9ecdb6f2bd65a066577f5149e4769aa1ce49b8b293e4b7812a29b",
+      "listing.md": "6a58a0ce58c6555c02771b4f4e9c25d75efbc595ccb90aa51f45ec7b195255b0",
+      "policy-review.md": "981b7cc81cb297263d44da8d28364f5954f9b0bca57c622b0aba0d62d991e738",
       "post-launch-article-draft.md": "6ce0f34a4ce8261eb4a0f10e0f3c5fcc89de9677ffdcd988075ed296d97db7cd",
       "release-notes.md": "f96f0ae58b66fe326f00b6feb380a61025d5782a4568d2b012ae3ed42b5fa0b1",
-      "review-checklist.md": "c60d22555eec4c40959d75d13b6c02d958ea5a8fab6324402ef761351b1b23f4",
+      "review-checklist.md": "2621c4a37e356c4ce1dd2bb3a16cdd316f93c897076de1f11870f997f22f74d7",
       "starter-prompts.json": "bc7193b501f4a6de03723b415dcb57878f5ef32a4ce798639306e4694be9fa19",
       "test-cases.json": "80b45bc0d5969129ca55e0037d12c76244dd7afcc14c7d45b94a88a7a059c6f0"
     }
@@ -68,7 +69,7 @@
     ],
     "tool_contract_sha256": "fcd3433e7d8ed5f3a8a743c91b0b45cd5ea330a2b13d02691144bdcbaca5aed7",
     "schemas_sha256": "6b65362bf2cc60091c522acdd4f1200cf2ef2e53704c612089981b52f3e45b7b",
-    "data_map_sha256": "4396a77191652c00da0a820da3587a2b4f0554afbc552ef524de1dac3479b46a",
+    "data_map_sha256": "04c5c4e7b8589fbdc6244d201d6e777f4ca60931d4f3333efce5a11cd21feff3",
     "reviewer_fixture_sha256": "7eeff32a1dd14b4cb0fe5126e04470e448cf3f73a54bfb4f7e9e8f64327c6758"
   },
   "manual_gates": [
@@ -77,7 +78,7 @@
     "reviewer_outside_network_smoke_and_fixture_isolation",
     "remaining_chatgpt_and_codex_reviewer_corpus",
     "openai_monitoring_install_and_recurring_spend_approval",
-    "privacy_legal_and_owner_candidate_review",
+    "remaining_owner_legal_attestations",
     "owner_submission_approval",
     "openai_review_and_approval",
     "separate_owner_publication_approval",
