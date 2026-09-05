@@ -1,7 +1,7 @@
 # DebugBundle OpenAI Plugin Listing
 
 Version: 1.0.0
-Evidence state: local source candidate; not submitted, approved, published, or directory-discoverable
+Evidence state: production candidate with Developer Mode connection and bounded live-client evidence; not submitted, approved, published, or directory-discoverable
 
 ## Portal fields
 

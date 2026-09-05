@@ -55,6 +55,7 @@ const requiredPackageFiles = [
 const requiredSubmissionFiles = [
   "data-map.md",
   "listing.md",
+  "policy-review.md",
   "release-notes.md",
   "review-checklist.md",
   "starter-prompts.json",

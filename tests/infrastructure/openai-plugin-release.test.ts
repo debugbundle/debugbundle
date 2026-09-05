@@ -54,6 +54,19 @@ describe("OpenAI plugin release automation", () => {
     expect(harness).not.toContain("process.env");
   });
 
+  it("packages an explicit privacy and legal review record", () => {
+    const policyReview = readFileSync(
+      join(repoRoot, "apps/mcp/openai/submission/policy-review.md"),
+      "utf8"
+    );
+
+    expect(policyReview).toContain("## Engineering Verification");
+    expect(policyReview).toContain("## Owner Legal Attestations");
+    expect(policyReview).toContain("OpenAI is the recipient");
+    expect(policyReview).toContain("aggregate product analytics");
+    expect(policyReview).toContain("No legal conclusion is inferred from a passing test");
+  });
+
   it("is independently versioned and permanently excludes external release actions", () => {
     const plan = runJson(["plan"]) as {
       version: string;
@@ -177,6 +190,10 @@ describe("OpenAI plugin release automation", () => {
     expect(result.manifest.manual_gates).toContain(
       "openai_monitoring_install_and_recurring_spend_approval"
     );
+    expect(result.manifest.manual_gates).toContain(
+      "owner_legal_attestations_and_policy_deployment"
+    );
+    expect(result.manifest.manual_gates).not.toContain("privacy_legal_and_owner_candidate_review");
     expect(result.manifest.manual_gates).not.toContain(
       "reviewer_credential_provisioning_and_outside_network_smoke"
     );

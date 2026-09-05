@@ -24,7 +24,7 @@ const SCOPE_COPY: Record<OpenAiProductScope, { label: string; description: strin
   },
   "debugbundle:incidents:read": {
     label: "Read incident summaries and structured context",
-    description: "Incident metadata, status, fingerprints, and bounded context."
+    description: "Incident severity, status, timing, and bounded context."
   },
   "debugbundle:artifacts:read": {
     label: "Read existing redacted bundles and reproductions",

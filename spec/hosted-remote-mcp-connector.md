@@ -120,4 +120,4 @@ Before public launch:
 - Auth is member-scoped and tenant-isolated.
 - Rate limits, audit logs, readiness checks, and operational logs are present.
 - Public docs and listings do not claim hosted Remote MCP availability before launch.
-- The official OpenAI evidence state remains reported as a local source candidate until production migration/deployment, live-client validation, portal review, publication, and directory discovery are independently proven.
+- The official OpenAI evidence state reports production deployment, live-client validation, portal review, publication, and directory discovery independently. A deployed Developer Mode candidate must never be described as approved, published, or directory-discoverable before those later gates are proven.

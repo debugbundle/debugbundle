@@ -108,8 +108,8 @@ Production evidence now includes the additive migration, same-Lightsail immutabl
 
 Not claimed or performed:
 
-- no completed production ChatGPT/Codex reviewer corpus, external reviewer smoke, accessibility review, representative load evidence, or live OpenAI-specific alarm installation;
-- no privacy/legal/security/owner sign-off; and
+- no completed production ChatGPT/Codex reviewer corpus, external reviewer smoke, human assistive-technology review, representative load evidence, or live OpenAI-specific alarm installation;
+- engineering privacy/security reconciliation is complete, but owner legal attestations and reconciled public-policy deployment remain open; and
 - no portal submission, Cancel Review, approval, publication, directory edit/discovery, announcement, or spend change.
 
 These gaps remain release blockers, not reasons to weaken the controls or mark unavailable evidence green.

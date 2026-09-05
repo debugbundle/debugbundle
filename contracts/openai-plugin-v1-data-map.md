@@ -1,8 +1,8 @@
 # Official OpenAI Plugin V1 Field-Level Data Map
 
 Version: 1.0.0
-Status: Frozen contract implemented in local source; privacy/legal approval and production evidence pending
-Last updated: 2026-09-02
+Status: Frozen contract implemented and deployed; engineering privacy review complete; owner legal attestation and reconciled public-policy deployment pending
+Last updated: 2026-09-05
 
 ## Contract Use
 

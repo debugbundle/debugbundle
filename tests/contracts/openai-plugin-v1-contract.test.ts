@@ -83,6 +83,8 @@ type ImplementationGaps = {
   plugin_package: string;
   hosted_infrastructure: string;
   consent_ui: string;
+  synthetic_ui_preview: string;
+  privacy_review: string;
   developer_mode_connection: string;
   production_validation: string;
   health_results_pagination: string;
@@ -98,6 +100,7 @@ type ImplementationGaps = {
   portal_submission: string;
   publication: string;
   directory_discovery: string;
+  next_gate: string;
 };
 
 type ReviewerFixture = {
@@ -383,7 +386,7 @@ describe("OpenAI plugin v1 contract", () => {
     expect(forbiddenImports).toEqual([]);
   });
 
-  it("separates the implemented local candidate from manual and production evidence gaps", async () => {
+  it("separates the deployed production candidate from later manual evidence gates", async () => {
     const gaps = await readJson<ImplementationGaps>("implementation-gaps.json");
     const legacyNames = MCP_TOOL_CATALOG.map((tool) => tool.name);
 
@@ -399,7 +402,10 @@ describe("OpenAI plugin v1 contract", () => {
       streamable_http_transport: "deployed_enabled_discovery_probe_verified",
       plugin_package: "candidate_deployed_digest_frozen_app_json_and_codex_install_verified",
       hosted_infrastructure: "production_migrated_managed_caddy_dns_tls_active",
-      consent_ui: "owner_visual_approved_deployed_accessibility_pending",
+      consent_ui:
+        "owner_visual_approved_deployed_automated_keyboard_verified_manual_assistive_technology_pending",
+      synthetic_ui_preview: "implemented_contract_tested_and_owner_visual_approved",
+      privacy_review: "engineering_reconciled_owner_legal_and_live_policy_deployment_pending",
       developer_mode_connection: "owner_registered_reconnected_and_app_json_captured",
       production_validation:
         "schema_portability_candidate_deployed_public_boundary_verified_partial_corpus_health_pagination_improvement_empty_and_four_negative_boundaries_verified",
@@ -418,7 +424,7 @@ describe("OpenAI plugin v1 contract", () => {
       publication: "not_published",
       directory_discovery: "not_verified",
       next_gate:
-        "monitoring_spend_decision_then_reviewer_accessibility_capacity_and_remaining_corpus_validation"
+        "owner_legal_and_policy_deployment_then_reviewer_assistive_technology_capacity_monitoring_remaining_corpus_and_portal_scan"
     });
   });
 });

@@ -90,6 +90,10 @@ describe("web app - OpenAI OAuth", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: /see projects available/i })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: /read incident summaries/i })).toBeChecked();
+    expect(
+      screen.getByText(/incident severity, status, timing, and bounded context/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/fingerprints/i)).not.toBeInTheDocument();
     const allowButton = screen.getByRole("button", { name: /allow access/i });
     const denyButton = screen.getByRole("button", { name: /^deny$/i });
     const decisionGroup = screen.getByRole("group", { name: /authorization decision/i });
@@ -105,11 +109,50 @@ describe("web app - OpenAI OAuth", () => {
     expect(denyButton).toHaveClass("w-full", "sm:w-auto");
   });
 
+  it("keeps consent scope choices and decisions in a complete keyboard order", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = requestUrl(input);
+      if (url.endsWith("/v1/auth/session")) {
+        return jsonResponse(200, { session: createSession() });
+      }
+      if (url.endsWith("/oauth/interaction/interaction_123")) {
+        return jsonResponse(200, { interaction: INTERACTION });
+      }
+      return jsonResponse(404, { error: "not_found" });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/oauth/consent?interaction=interaction_123"]} />);
+
+    const brandLink = await screen.findByRole("link", { name: "DebugBundle" });
+    const checkboxes = await screen.findAllByRole("checkbox");
+    brandLink.focus();
+
+    for (const checkbox of checkboxes) {
+      await user.tab();
+      expect(checkbox).toHaveFocus();
+    }
+
+    const allowButton = screen.getByRole("button", { name: /allow access/i });
+    const denyButton = screen.getByRole("button", { name: /^deny$/i });
+    const settingsLink = screen.getByRole("link", { name: "Settings" });
+    const termsLink = screen.getByRole("link", { name: /terms of service/i });
+    const privacyLink = screen.getByRole("link", { name: /privacy policy/i });
+
+    for (const control of [allowButton, denyButton, settingsLink, termsLink, privacyLink]) {
+      await user.tab();
+      expect(control).toHaveFocus();
+    }
+
+    checkboxes[0]?.focus();
+    expect(checkboxes[0]).toBeChecked();
+    await user.keyboard(" ");
+    expect(checkboxes[0]).not.toBeChecked();
+  });
+
   it.each([
-    [
-      403,
-      "This organization is no longer available for this authorization request."
-    ],
+    [403, "This organization is no longer available for this authorization request."],
     [
       400,
       "This authorization request is invalid or has expired. Return to ChatGPT or Codex and try again."
@@ -242,6 +285,34 @@ describe("web app - OpenAI OAuth", () => {
     expect(credential).toHaveValue("");
   });
 
+  it("submits the reviewer credential with Enter and returns focus to a bounded error", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (requestUrl(input).endsWith("/v1/auth/session")) {
+        return jsonResponse(401, { error: "invalid_session" });
+      }
+      if (
+        requestUrl(input).endsWith("/oauth/interaction/interaction_123/reviewer") &&
+        init?.method === "POST"
+      ) {
+        return jsonResponse(401, { error: "openai_reviewer_access_denied" });
+      }
+      return jsonResponse(404, { error: "not_found" });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App initialEntries={["/oauth/reviewer?interaction=interaction_123"]} />);
+
+    const credential = await screen.findByLabelText(/review credential/i);
+    credential.focus();
+    await user.keyboard("reviewer-credential-at-least-thirty-two-characters{Enter}");
+
+    const error = await screen.findByRole("alert");
+    expect(error).toHaveTextContent(/could not verify the review credential/i);
+    expect(error.parentElement).toHaveFocus();
+    expect(credential).toHaveValue("");
+  });
+
   it("lists retained OpenAI connections in settings and revokes through confirmation", async () => {
     const user = userEvent.setup();
     let revoked = false;
@@ -285,9 +356,21 @@ describe("web app - OpenAI OAuth", () => {
 
     expect(await screen.findByRole("heading", { name: /openai connections/i })).toBeInTheDocument();
     expect((await screen.findAllByText("Acme Engineering"))[0]).toBeInTheDocument();
-    await user.click(screen.getAllByRole("button", { name: /revoke access/i })[0]!);
+    const revokeTrigger = screen.getAllByRole("button", { name: /revoke access/i })[0]!;
+    revokeTrigger.focus();
+    await user.keyboard("{Enter}");
     expect(screen.getByRole("alertdialog")).toHaveTextContent(/does not delete debugbundle data/i);
-    await user.click(screen.getByRole("button", { name: /^revoke access$/i }));
+    const cancelButton = screen.getByRole("button", { name: /^cancel$/i });
+    expect(cancelButton).toHaveFocus();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(revokeTrigger).toHaveFocus();
+
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("button", { name: /^cancel$/i })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: /^revoke access$/i })).toHaveFocus();
+    await user.keyboard("{Enter}");
 
     await waitFor(() => {
       expect(screen.getByText(/no openai connections/i)).toBeInTheDocument();

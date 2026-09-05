@@ -7,7 +7,8 @@ Status markers in this file are deliberately manual. A repository-local green re
 - [x] Source contract freezes exactly twenty-three read-only tools and eight OAuth/OIDC scopes.
 - [x] Field-level data map, threat model, OAuth decision record, schemas, and synthetic reviewer fixture exist.
 - [x] Package contains no `.mcp.json`, credential, challenge token, OAuth key, client assertion, or customer data.
-- [ ] Owner/privacy/legal review signs off the exact data map and live policies.
+- [x] Engineering privacy review reconciles the exact data map, implementation exclusions, public disclosure categories, OpenAI as recipient, purpose, retention, and user controls in `policy-review.md`.
+- [ ] Owner legal attestations in `policy-review.md` are complete and the reconciled public policies are deployed at the exact listing URLs.
 
 ## Runtime and infrastructure
 
@@ -26,7 +27,8 @@ Status markers in this file are deliberately manual. A repository-local green re
 - [x] Owner-approved consent/reviewer UI is implemented and covered by automated interaction and accessibility-state tests.
 - [x] Opt-in development-only synthetic preview covers the frozen UI state matrix, all 64 scope subsets, and 390/768/1280 px iframe viewports without OAuth or customer-state requests.
 - [x] Owner manual visual validation of the consent, reviewer, and connection-management surfaces passes at mobile, tablet, and desktop widths.
-- [ ] Consent, reviewer, and connection-management surfaces pass keyboard and screen-reader validation.
+- [x] Automated keyboard regressions cover consent scope toggling and complete focus order, reviewer submission/error focus, and Settings revoke-dialog focus entry, Escape restoration, traversal, and activation.
+- [ ] Human assistive-technology validation covers screen-reader announcements and a final keyboard spot check of the deployed consent, reviewer, and connection-management surfaces.
 - [x] Reviewer access is enabled with a credential hash present outside source control and a valid expiry outside the 14-day warning horizon; the bounded runtime check exposed no hash or timestamp value.
 - [ ] Reviewer outside-network smoke passes without MFA/email/SMS/private networking and proves synthetic-tenant isolation.
 - [x] ChatGPT Developer Mode registered the production endpoint, the owner reconnected successfully, and the real non-secret `.app.json` mapping is captured for local testing only.
@@ -45,7 +47,7 @@ Status markers in this file are deliberately manual. A repository-local green re
 
 ## Submission and publication
 
-- [ ] Official OpenAI requirements are revalidated against primary documentation within seven days of submission.
+- [x] Official OpenAI requirements were revalidated against primary documentation on 2026-09-05. Recheck after 2026-09-12 or if the live portal differs before submission.
 - [ ] Live category and country/region availability decisions are recorded and owner-approved.
 - [ ] Tool scan matches the release manifest exactly and non-secret scan output is archived.
 - [ ] Owner explicitly approves the exact candidate digest and submission packet.
