@@ -191,6 +191,9 @@ describe("OpenAI plugin release automation", () => {
       "openai_monitoring_install_and_recurring_spend_approval"
     );
     expect(result.manifest.manual_gates).toContain(
+      "remaining_owner_legal_attestations"
+    );
+    expect(result.manifest.manual_gates).not.toContain(
       "owner_legal_attestations_and_policy_deployment"
     );
     expect(result.manifest.manual_gates).not.toContain("privacy_legal_and_owner_candidate_review");
