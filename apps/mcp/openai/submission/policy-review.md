@@ -1,6 +1,6 @@
 # OpenAI Plugin 1.0.0 Policy Review
 
-Status: Engineering privacy review complete on 2026-09-05; owner approved the OpenAI disclosure and customer-authorization language on 2026-09-05. Remaining operator/country legal attestations and deployment of the reconciled public policies remain pending.
+Status: Engineering privacy review complete on 2026-09-05; owner approved the OpenAI disclosure, customer-authorization, and restricted-data language on 2026-09-05. The reconciled public policies are deployed and verified. Remaining operator/controller, international-transfer, and country legal attestations remain pending.
 
 This record separates implementation evidence from legal conclusions. No legal conclusion is inferred from a passing test or a source-level privacy control.
 
@@ -39,8 +39,8 @@ These are the only privacy/legal decisions that engineering evidence cannot make
 - [x] The owner approved terms requiring a member who connects OpenAI for an organization to have permission to share the selected project data. The consent UI separately identifies OpenAI, the selected scopes, and the read-only transfer before access is allowed.
 - [ ] DebugBundle&apos;s lawful basis and controller/processor allocation for personal data belonging to users or other people are appropriate for the operator, customer agreements, and target countries.
 - [ ] Processor/subprocessor, international-transfer, DPA, deletion/export, and security-incident commitments are accurate for the hosted vendors and countries offered.
-- [ ] The product and customer terms adequately prevent use of the OpenAI connection with OpenAI Restricted Data (PCI data, protected health information, government identifiers, or access credentials), or a separately approved technical eligibility control is implemented before submission.
-- [ ] The reconciled privacy, terms, support, and OpenAI documentation are deployed at the exact listing URLs and reviewed as rendered.
+- [x] The owner approved terms that prohibit use of the OpenAI connection with payment-card data, protected health information, government identifiers, access credentials, authentication secrets, and other restricted data prohibited by OpenAI.
+- [x] Site commit `325bffd8953e01fcfd4f9fcc183fbd9e39839884` is deployed by site-only run `33954101292`; the exact privacy, terms, support, and OpenAI documentation listing URLs return successfully and their required disclosures were verified in the rendered responses on 2026-09-05.
 - [ ] The final country/region availability selection matches the legal and support coverage the owner is prepared to provide.
 
 If any attestation is uncertain, obtain qualified legal review before submission rather than weakening the technical data boundary or making an unsupported portal attestation.

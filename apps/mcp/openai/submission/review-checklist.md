@@ -8,7 +8,8 @@ Status markers in this file are deliberately manual. A repository-local green re
 - [x] Field-level data map, threat model, OAuth decision record, schemas, and synthetic reviewer fixture exist.
 - [x] Package contains no `.mcp.json`, credential, challenge token, OAuth key, client assertion, or customer data.
 - [x] Engineering privacy review reconciles the exact data map, implementation exclusions, public disclosure categories, OpenAI as recipient, purpose, retention, and user controls in `policy-review.md`.
-- [ ] Owner legal attestations in `policy-review.md` are complete and the reconciled public policies are deployed at the exact listing URLs.
+- [x] Reconciled public privacy, terms, support, and OpenAI documentation are deployed at the exact listing URLs by site-only run `33954101292` and reviewed as rendered.
+- [ ] Remaining owner legal attestations in `policy-review.md` are complete.
 
 ## Runtime and infrastructure
 

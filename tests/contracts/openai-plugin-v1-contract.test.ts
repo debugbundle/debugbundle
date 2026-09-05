@@ -405,7 +405,7 @@ describe("OpenAI plugin v1 contract", () => {
       consent_ui:
         "owner_visual_approved_deployed_automated_keyboard_verified_manual_assistive_technology_pending",
       synthetic_ui_preview: "implemented_contract_tested_and_owner_visual_approved",
-      privacy_review: "engineering_reconciled_owner_legal_and_live_policy_deployment_pending",
+      privacy_review: "engineering_reconciled_live_policy_deployed_owner_legal_attestations_pending",
       developer_mode_connection: "owner_registered_reconnected_and_app_json_captured",
       production_validation:
         "schema_portability_candidate_deployed_public_boundary_verified_partial_corpus_health_pagination_improvement_empty_and_four_negative_boundaries_verified",
