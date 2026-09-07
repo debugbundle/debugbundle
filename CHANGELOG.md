@@ -14,7 +14,11 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 - Added OAuth/OIDC PKCE, RFC 9207 response issuer, CIMD `private_key_jwt`, resource/audience/scope binding, verified UserInfo, rotation/revocation/retention controls, canonical-host isolation, sanitized health-check URLs, MCP bulkheads, and secret-free structured telemetry for the candidate remote surface.
 
-The candidate is not deployed, submitted, approved by OpenAI, published, or directory-discoverable. Manual accessibility/live-client validation and all production, reviewer, Developer Mode, portal, publication, communication, and spending gates remain separate.
+### Fixed
+
+- Prevented a revoked OpenAI connection's retained legacy OIDC Grant artifact from causing a server error during reconnection. New Grant artifacts are now indexed for atomic revocation, while legacy rows fail closed against the normalized grant lifecycle until bounded expiry.
+
+The Developer Mode candidate is deployed and registered, but it is not submitted, approved by OpenAI, published, or directory-discoverable. Manual accessibility, reviewer, remaining live-client, portal, publication, communication, and spending gates remain separate.
 
 ## [1.7.3] - 2026-08-27
 

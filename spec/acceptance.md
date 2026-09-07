@@ -782,6 +782,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Given** a signed-in member's retained OpenAI connections
 - **When** Settings lists or revokes a connection
 - **Then** list and revoke are scoped to that exact user and current organization, revoke uses a CSRF-protected POST body plus explicit confirmation, the backing grant and remaining refresh family become unusable, the action is audit-recorded without credential/customer content, and revocation does not delete DebugBundle data
+- **And** a later authorization ignores any retained legacy provider grant whose normalized grant is revoked or expired, opens a fresh consent interaction instead of issuing a code against stale authorization, and indexes every new provider Grant for atomic revocation
 - **Given** the development-only synthetic preview is explicitly enabled
 - **When** `/__dev/openai-plugin` is inspected
 - **Then** it composes the production components for every consent, reviewer, and Settings state in `tests/fixtures/openai-plugin-v1/ui-preview-matrix.json`, exposes all 64 scope-selection subsets, and renders inside 390 px, 768 px, and 1280 px iframes so responsive breakpoints are exercised

@@ -99,6 +99,18 @@ function readPayloadString(payload: ProviderPayload, key: string): string | unde
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
+function providerGrantIdForArtifact(
+  model: string,
+  id: string,
+  payload: ProviderPayload
+): string | undefined {
+  const referencedGrantId = readPayloadString(payload, "grantId");
+  if (referencedGrantId !== undefined) {
+    return referencedGrantId;
+  }
+  return model === "Grant" ? id : undefined;
+}
+
 function readPayloadResource(payload: ProviderPayload): string | undefined {
   const value = payload["resource"];
   if (typeof value === "string") {
@@ -310,6 +322,8 @@ export function createPostgresOidcProviderAdapterFactory(
         throw new Error("oauth_provider_expiry_invalid");
       }
 
+      const providerGrantId = providerGrantIdForArtifact(this.#model, id, payload);
+
       await withTransaction(db, async (tx) => {
         await tx.query(
           `
@@ -338,9 +352,9 @@ export function createPostgresOidcProviderAdapterFactory(
             this.#model,
             hashOpenAiOidcProviderLookup(encryptionKey, "id", id),
             encryptPayload(payload, encryptionKey),
-            typeof payload["grantId"] === "string"
-              ? hashOpenAiOidcProviderLookup(encryptionKey, "grant", payload["grantId"])
-              : null,
+            providerGrantId === undefined
+              ? null
+              : hashOpenAiOidcProviderLookup(encryptionKey, "grant", providerGrantId),
             typeof payload["uid"] === "string"
               ? hashOpenAiOidcProviderLookup(encryptionKey, "session", payload["uid"])
               : null,
@@ -359,16 +373,34 @@ export function createPostgresOidcProviderAdapterFactory(
     }
 
     async find(id: string): Promise<ProviderPayload | undefined> {
+      const requireActiveGrantBinding = this.#model === "Grant";
       const result = await db.query<ProviderArtifactRow>(
         `
           SELECT payload, consumed_at::text AS consumed_at
-          FROM oauth_provider_artifacts
-          WHERE model = $1
-            AND provider_id_hash = $2
-            AND expires_at > now()
+          FROM oauth_provider_artifacts artifact
+          WHERE artifact.model = $1
+            AND artifact.provider_id_hash = $2
+            AND artifact.expires_at > now()
+            ${
+              requireActiveGrantBinding
+                ? `AND EXISTS (
+                    SELECT 1
+                    FROM oauth_authorization_grants grant_record
+                    WHERE grant_record.provider_grant_id_hash = $3
+                      AND grant_record.revoked_at IS NULL
+                      AND grant_record.expires_at > now()
+                  )`
+                : ""
+            }
           LIMIT 1
         `,
-        [this.#model, hashOpenAiOidcProviderLookup(encryptionKey, "id", id)]
+        [
+          this.#model,
+          hashOpenAiOidcProviderLookup(encryptionKey, "id", id),
+          ...(requireActiveGrantBinding
+            ? [hashOpenAiOidcProviderLookup(encryptionKey, "grant", id)]
+            : [])
+        ]
       );
       return mapArtifact(result.rows[0], encryptionKey);
     }

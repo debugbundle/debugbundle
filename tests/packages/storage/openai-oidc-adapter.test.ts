@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createPostgresOidcProviderAdapterFactory,
+  hashOpenAiOidcProviderLookup,
   type Queryable
 } from "../../../packages/storage/src/index.js";
 
@@ -14,6 +15,70 @@ function sha256(value: string): string {
 }
 
 describe("Postgres oidc-provider adapter", () => {
+  it("indexes provider Grant artifacts under the category-separated grant hash", async () => {
+    const query = vi.fn(async (sql: string, params: unknown[]) => {
+      void sql;
+      void params;
+      return { rows: [] };
+    });
+    const Adapter = createPostgresOidcProviderAdapterFactory(
+      { query } as unknown as Queryable,
+      TEST_KEY
+    );
+
+    await new Adapter("Grant").upsert(
+      "provider-grant-secret",
+      {
+        jti: "provider-grant-secret",
+        kind: "Grant",
+        accountId: "user_1",
+        clientId: "https://chatgpt.com/oauth/client.json"
+      },
+      3_600
+    );
+
+    const params = query.mock.calls[0]?.[1];
+    expect(params?.[3]).toBe(
+      hashOpenAiOidcProviderLookup(TEST_KEY, "grant", "provider-grant-secret")
+    );
+    expect(JSON.stringify(params)).not.toContain("provider-grant-secret");
+  });
+
+  it("ignores a retained provider Grant after its normalized grant is revoked", async () => {
+    let persistedPayload: unknown;
+    const query = vi.fn(async (sql: string, params: unknown[]) => {
+      if (sql.includes("INSERT INTO oauth_provider_artifacts")) {
+        persistedPayload = params[2];
+        return { rows: [] };
+      }
+      if (sql.includes("SELECT payload")) {
+        expect(sql).toContain("oauth_authorization_grants");
+        expect(sql).toContain("revoked_at IS NULL");
+        return { rows: [] };
+      }
+      return { rows: [] };
+    });
+    const Adapter = createPostgresOidcProviderAdapterFactory(
+      { query } as unknown as Queryable,
+      TEST_KEY
+    );
+    const adapter = new Adapter("Grant");
+
+    await adapter.upsert(
+      "retained-provider-grant",
+      {
+        jti: "retained-provider-grant",
+        kind: "Grant",
+        accountId: "user_1",
+        clientId: "https://chatgpt.com/oauth/client.json"
+      },
+      3_600
+    );
+    expect(persistedPayload).toBeDefined();
+
+    await expect(adapter.find("retained-provider-grant")).resolves.toBeUndefined();
+  });
+
   it("persists only hashed lookup keys and an encrypted payload", async () => {
     const query = vi.fn(async (sql: string, params: unknown[]) => {
       void sql;

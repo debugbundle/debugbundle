@@ -1106,6 +1106,7 @@ Rules:
 Rules:
 
 - Provider IDs, grant IDs, session UIDs, and user codes are never stored in plaintext; category-separated HMAC values support exact lookup.
+- Provider `Grant` rows set `grant_id_hash` from their own provider ID so normalized revocation deletes the provider grant atomically with its dependent artifacts. A legacy row without that index remains physically retained only until its bounded expiry, but `Grant.find` requires a current non-revoked normalized binding and therefore treats the legacy row as authorization-inert immediately.
 - `payload` is encrypted before persistence and must fail closed when its version/key/ciphertext is invalid.
 - Adapter writes mirror authorization code and refresh-family state into the normalized tables in the same transaction where supported. A mirror/binding failure aborts the provider write.
 - Provider artifacts expire with their protocol model and are deleted by bounded indexed cleanup. They are implementation records, not an alternate customer-data or authorization surface.
