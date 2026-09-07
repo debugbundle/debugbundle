@@ -9,13 +9,20 @@ import {
   OPENAI_TOOL_NAMES,
   createOpenAiSdkServer,
   openAiMcpInvalidTokenChallenge,
-  type OpenAiHostedOperations
+  type OpenAiHostedOperations,
+  type OpenAiToolName
 } from "../../../packages/mcp-core/src/index.js";
 import {
   claimOpenAiRateLimits,
   pseudonymousOpenAiSubject,
   type OpenAiMcpAdmissionCoordinator
 } from "./openai-rate-limits.js";
+import {
+  reportOpenAiOperationalSignal,
+  type OpenAiMcpAdmission,
+  type OpenAiMcpMethod,
+  type OpenAiOperationalMonitor
+} from "./openai-operational-monitoring.js";
 
 const OPENAI_MCP_RESOURCE = "https://mcp.debugbundle.com";
 const OPENAI_CIMD_CLIENT_ID = "https://chatgpt.com/oauth/client.json";
@@ -46,10 +53,11 @@ export interface OpenAiMcpHttpOptions {
   operationTimeoutMs?: number;
   domainVerificationToken?: string;
   readinessCheck?: () => Promise<void>;
+  operationalMonitor?: OpenAiOperationalMonitor;
 }
 
 const OPENAI_TOOL_NAME_SET = new Set<string>(OPENAI_TOOL_NAMES);
-const OPENAI_MCP_METHODS = new Set([
+const OPENAI_MCP_METHODS = new Set<string>([
   "initialize",
   "notifications/initialized",
   "ping",
@@ -106,7 +114,7 @@ function isValidAuthInfo(auth: AuthInfo): boolean {
   );
 }
 
-function readToolName(body: unknown): string | undefined {
+function readToolName(body: unknown): OpenAiToolName | undefined {
   if (typeof body !== "object" || body === null || Array.isArray(body)) {
     return undefined;
   }
@@ -119,15 +127,19 @@ function readToolName(body: unknown): string | undefined {
     return undefined;
   }
   const name = (params as Record<string, unknown>)["name"];
-  return typeof name === "string" && OPENAI_TOOL_NAME_SET.has(name) ? name : undefined;
+  return typeof name === "string" && OPENAI_TOOL_NAME_SET.has(name)
+    ? (name as OpenAiToolName)
+    : undefined;
 }
 
-function readMcpMethod(body: unknown): string {
+function readMcpMethod(body: unknown): OpenAiMcpMethod {
   if (typeof body !== "object" || body === null || Array.isArray(body)) {
     return "invalid";
   }
   const method = (body as Record<string, unknown>)["method"];
-  return typeof method === "string" && OPENAI_MCP_METHODS.has(method) ? method : "other";
+  return typeof method === "string" && OPENAI_MCP_METHODS.has(method)
+    ? (method as OpenAiMcpMethod)
+    : "other";
 }
 
 export function openAiResponseSizeBucket(bytes: number): string {
@@ -140,18 +152,19 @@ export function openAiResponseSizeBucket(bytes: number): string {
 function logMcpRequest(
   request: FastifyRequest,
   input: {
-    method: string;
-    tool?: string;
+    method: OpenAiMcpMethod;
+    tool?: OpenAiToolName;
     grantKey?: string;
     clientKey?: string;
     outcome: "success" | "failure";
     status: number;
     durationMs: number;
-    admission: string;
+    admission: OpenAiMcpAdmission;
     responseBytes?: number;
     timeout?: boolean;
     canceled?: boolean;
-  }
+  },
+  monitor?: OpenAiOperationalMonitor
 ): void {
   request.log.info(
     {
@@ -171,6 +184,38 @@ function logMcpRequest(
     },
     "openai_mcp_request"
   );
+  if (input.outcome !== "failure") {
+    return;
+  }
+  if (input.admission === "unauthenticated" || input.admission === "auth_rejected") {
+    return;
+  }
+  const shared = {
+    method: input.method,
+    ...(input.tool === undefined ? {} : { tool: input.tool }),
+    status: input.status
+  };
+  if (input.timeout === true) {
+    reportOpenAiOperationalSignal(monitor, {
+      category: "mcp_request_timeout",
+      ...shared,
+      admission: input.admission
+    });
+    return;
+  }
+  if (input.admission === "capacity_rejected" || input.admission === "rate_limited") {
+    reportOpenAiOperationalSignal(monitor, {
+      category: "mcp_admission_rejected",
+      ...shared,
+      admission: input.admission
+    });
+    return;
+  }
+  reportOpenAiOperationalSignal(monitor, {
+    category: "mcp_request_failure",
+    ...shared,
+    admission: input.admission
+  });
 }
 
 export function registerOpenAiMcpHttpRoutes(
@@ -273,14 +318,18 @@ export function registerOpenAiMcpHttpRoutes(
     const method = readMcpMethod(request.body);
     const toolName = readToolName(request.body);
     if (!requireCanonicalHost(request, reply, options.expectedHost)) {
-      logMcpRequest(request, {
-        method,
-        ...(toolName === undefined ? {} : { tool: toolName }),
-        outcome: "failure",
-        status: 421,
-        durationMs: performance.now() - startedAt,
-        admission: "canonical_host_rejected"
-      });
+      logMcpRequest(
+        request,
+        {
+          method,
+          ...(toolName === undefined ? {} : { tool: toolName }),
+          outcome: "failure",
+          status: 421,
+          durationMs: performance.now() - startedAt,
+          admission: "canonical_host_rejected"
+        },
+        options.operationalMonitor
+      );
       return;
     }
 
@@ -300,14 +349,18 @@ export function registerOpenAiMcpHttpRoutes(
           ]
         });
         if (!rate.allowed) {
-          logMcpRequest(request, {
-            method,
-            ...(toolName === undefined ? {} : { tool: toolName }),
-            outcome: "failure",
-            status: 429,
-            durationMs: performance.now() - startedAt,
-            admission: "rate_limited"
-          });
+          logMcpRequest(
+            request,
+            {
+              method,
+              ...(toolName === undefined ? {} : { tool: toolName }),
+              outcome: "failure",
+              status: 429,
+              durationMs: performance.now() - startedAt,
+              admission: "rate_limited"
+            },
+            options.operationalMonitor
+          );
           request.log.info(
             {
               event: "openai_mcp_admission_rejected",
@@ -322,24 +375,32 @@ export function registerOpenAiMcpHttpRoutes(
             .send({ error: "openai_mcp_rate_limited" });
         }
       } catch {
-        logMcpRequest(request, {
+        logMcpRequest(
+          request,
+          {
+            method,
+            ...(toolName === undefined ? {} : { tool: toolName }),
+            outcome: "failure",
+            status: 503,
+            durationMs: performance.now() - startedAt,
+            admission: "coordination_unavailable"
+          },
+          options.operationalMonitor
+        );
+        return reply.status(503).send({ error: "openai_mcp_coordination_unavailable" });
+      }
+      logMcpRequest(
+        request,
+        {
           method,
           ...(toolName === undefined ? {} : { tool: toolName }),
           outcome: "failure",
-          status: 503,
+          status: 401,
           durationMs: performance.now() - startedAt,
-          admission: "coordination_unavailable"
-        });
-        return reply.status(503).send({ error: "openai_mcp_coordination_unavailable" });
-      }
-      logMcpRequest(request, {
-        method,
-        ...(toolName === undefined ? {} : { tool: toolName }),
-        outcome: "failure",
-        status: 401,
-        durationMs: performance.now() - startedAt,
-        admission: "unauthenticated"
-      });
+          admission: "unauthenticated"
+        },
+        options.operationalMonitor
+      );
       return sendBearerChallenge(reply);
     }
 
@@ -347,25 +408,33 @@ export function registerOpenAiMcpHttpRoutes(
     try {
       auth = await options.verifier.verifyAccessToken(token);
     } catch {
-      logMcpRequest(request, {
-        method,
-        ...(toolName === undefined ? {} : { tool: toolName }),
-        outcome: "failure",
-        status: 401,
-        durationMs: performance.now() - startedAt,
-        admission: "auth_rejected"
-      });
+      logMcpRequest(
+        request,
+        {
+          method,
+          ...(toolName === undefined ? {} : { tool: toolName }),
+          outcome: "failure",
+          status: 401,
+          durationMs: performance.now() - startedAt,
+          admission: "auth_rejected"
+        },
+        options.operationalMonitor
+      );
       return sendBearerChallenge(reply);
     }
     if (!isValidAuthInfo(auth)) {
-      logMcpRequest(request, {
-        method,
-        ...(toolName === undefined ? {} : { tool: toolName }),
-        outcome: "failure",
-        status: 401,
-        durationMs: performance.now() - startedAt,
-        admission: "auth_rejected"
-      });
+      logMcpRequest(
+        request,
+        {
+          method,
+          ...(toolName === undefined ? {} : { tool: toolName }),
+          outcome: "failure",
+          status: 401,
+          durationMs: performance.now() - startedAt,
+          admission: "auth_rejected"
+        },
+        options.operationalMonitor
+      );
       return sendBearerChallenge(reply);
     }
 
@@ -410,16 +479,20 @@ export function registerOpenAiMcpHttpRoutes(
         claims
       });
       if (!rate.allowed) {
-        logMcpRequest(request, {
-          method,
-          ...(toolName === undefined ? {} : { tool: toolName }),
-          grantKey: pseudonymousOpenAiSubject("grant", grantId),
-          clientKey: pseudonymousOpenAiSubject("client", auth.clientId),
-          outcome: "failure",
-          status: 429,
-          durationMs: performance.now() - startedAt,
-          admission: "rate_limited"
-        });
+        logMcpRequest(
+          request,
+          {
+            method,
+            ...(toolName === undefined ? {} : { tool: toolName }),
+            grantKey: pseudonymousOpenAiSubject("grant", grantId),
+            clientKey: pseudonymousOpenAiSubject("client", auth.clientId),
+            outcome: "failure",
+            status: 429,
+            durationMs: performance.now() - startedAt,
+            admission: "rate_limited"
+          },
+          options.operationalMonitor
+        );
         request.log.info(
           {
             event: "openai_mcp_admission_rejected",
@@ -435,16 +508,20 @@ export function registerOpenAiMcpHttpRoutes(
           .send({ error: "openai_mcp_rate_limited" });
       }
     } catch {
-      logMcpRequest(request, {
-        method,
-        ...(toolName === undefined ? {} : { tool: toolName }),
-        grantKey: pseudonymousOpenAiSubject("grant", grantId),
-        clientKey: pseudonymousOpenAiSubject("client", auth.clientId),
-        outcome: "failure",
-        status: 503,
-        durationMs: performance.now() - startedAt,
-        admission: "coordination_unavailable"
-      });
+      logMcpRequest(
+        request,
+        {
+          method,
+          ...(toolName === undefined ? {} : { tool: toolName }),
+          grantKey: pseudonymousOpenAiSubject("grant", grantId),
+          clientKey: pseudonymousOpenAiSubject("client", auth.clientId),
+          outcome: "failure",
+          status: 503,
+          durationMs: performance.now() - startedAt,
+          admission: "coordination_unavailable"
+        },
+        options.operationalMonitor
+      );
       return reply.status(503).send({ error: "openai_mcp_coordination_unavailable" });
     }
 
@@ -453,16 +530,20 @@ export function registerOpenAiMcpHttpRoutes(
       activeRequests >= maxConcurrentRequests ||
       grantConcurrency >= maxConcurrentRequestsPerGrant
     ) {
-      logMcpRequest(request, {
-        method,
-        ...(toolName === undefined ? {} : { tool: toolName }),
-        grantKey: pseudonymousOpenAiSubject("grant", grantId),
-        clientKey: pseudonymousOpenAiSubject("client", auth.clientId),
-        outcome: "failure",
-        status: 503,
-        durationMs: performance.now() - startedAt,
-        admission: "capacity_rejected"
-      });
+      logMcpRequest(
+        request,
+        {
+          method,
+          ...(toolName === undefined ? {} : { tool: toolName }),
+          grantKey: pseudonymousOpenAiSubject("grant", grantId),
+          clientKey: pseudonymousOpenAiSubject("client", auth.clientId),
+          outcome: "failure",
+          status: 503,
+          durationMs: performance.now() - startedAt,
+          admission: "capacity_rejected"
+        },
+        options.operationalMonitor
+      );
       request.log.info(
         {
           event: "openai_mcp_admission_rejected",
@@ -498,16 +579,20 @@ export function registerOpenAiMcpHttpRoutes(
         });
         if (!result.acquired) {
           await Promise.all(leases.map((lease) => options.rateLimiter.releaseConcurrency(lease)));
-          logMcpRequest(request, {
-            method,
-            ...(toolName === undefined ? {} : { tool: toolName }),
-            grantKey: grantSubject,
-            clientKey: pseudonymousOpenAiSubject("client", auth.clientId),
-            outcome: "failure",
-            status: 503,
-            durationMs: performance.now() - startedAt,
-            admission: "capacity_rejected"
-          });
+          logMcpRequest(
+            request,
+            {
+              method,
+              ...(toolName === undefined ? {} : { tool: toolName }),
+              grantKey: grantSubject,
+              clientKey: pseudonymousOpenAiSubject("client", auth.clientId),
+              outcome: "failure",
+              status: 503,
+              durationMs: performance.now() - startedAt,
+              admission: "capacity_rejected"
+            },
+            options.operationalMonitor
+          );
           return reply
             .header("Retry-After", String(Math.max(1, Math.ceil(result.retry_after_ms / 1_000))))
             .status(503)
@@ -523,16 +608,20 @@ export function registerOpenAiMcpHttpRoutes(
       await Promise.allSettled(
         leases.map((lease) => options.rateLimiter.releaseConcurrency(lease))
       );
-      logMcpRequest(request, {
-        method,
-        ...(toolName === undefined ? {} : { tool: toolName }),
-        grantKey: grantSubject,
-        clientKey: pseudonymousOpenAiSubject("client", auth.clientId),
-        outcome: "failure",
-        status: 503,
-        durationMs: performance.now() - startedAt,
-        admission: "coordination_unavailable"
-      });
+      logMcpRequest(
+        request,
+        {
+          method,
+          ...(toolName === undefined ? {} : { tool: toolName }),
+          grantKey: grantSubject,
+          clientKey: pseudonymousOpenAiSubject("client", auth.clientId),
+          outcome: "failure",
+          status: 503,
+          durationMs: performance.now() - startedAt,
+          admission: "coordination_unavailable"
+        },
+        options.operationalMonitor
+      );
       return reply.status(503).send({ error: "openai_mcp_coordination_unavailable" });
     }
     const admittedGrantConcurrency = activeRequestsByGrant.get(grantId) ?? 0;
@@ -574,20 +663,24 @@ export function registerOpenAiMcpHttpRoutes(
         (reply.raw.socket?.bytesWritten ?? socketBytesBefore) - socketBytesBefore
       );
       const durationMs = performance.now() - startedAt;
-      logMcpRequest(request, {
-        method,
-        ...(toolName === undefined ? {} : { tool: toolName }),
-        grantKey: pseudonymousOpenAiSubject("grant", grantId),
-        clientKey: pseudonymousOpenAiSubject("client", auth.clientId),
-        outcome:
-          transportFailed || toolFailed || reply.raw.statusCode >= 500 ? "failure" : "success",
-        status: reply.raw.statusCode,
-        durationMs,
-        admission: "allowed",
-        responseBytes,
-        timeout: durationMs >= operationTimeoutMs,
-        canceled: request.raw.aborted || reply.raw.destroyed
-      });
+      logMcpRequest(
+        request,
+        {
+          method,
+          ...(toolName === undefined ? {} : { tool: toolName }),
+          grantKey: pseudonymousOpenAiSubject("grant", grantId),
+          clientKey: pseudonymousOpenAiSubject("client", auth.clientId),
+          outcome:
+            transportFailed || toolFailed || reply.raw.statusCode >= 500 ? "failure" : "success",
+          status: reply.raw.statusCode,
+          durationMs,
+          admission: "allowed",
+          responseBytes,
+          timeout: durationMs >= operationTimeoutMs,
+          canceled: request.raw.aborted || reply.raw.destroyed
+        },
+        options.operationalMonitor
+      );
       activeRequests -= 1;
       const remainingGrantRequests = (activeRequestsByGrant.get(grantId) ?? 1) - 1;
       if (remainingGrantRequests <= 0) {

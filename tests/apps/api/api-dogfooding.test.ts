@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createHostedDogfoodingTransport, resolveApiDogfoodingConfig } from "../../../apps/api/src/dogfooding.ts";
+import {
+  createApiDogfoodingOpenAiMonitor,
+  createHostedDogfoodingTransport,
+  resolveApiDogfoodingConfig,
+  sanitizeApiDogfoodingEvent
+} from "../../../apps/api/src/dogfooding.ts";
 import { createApiServer } from "../../../apps/api/src/server.ts";
 import { SESSION_COOKIE_NAME, generateMemberToken } from "../../../packages/auth/src/index.js";
 import { createEventEnvelope } from "../../../packages/shared-types/src/index.js";
@@ -108,6 +113,7 @@ describe("api dogfooding", () => {
     const sdkPlugin = vi.fn((_fastify, _options, done: () => void) => done());
     const dogfoodingSdk = {
       init: vi.fn(),
+      captureError: vi.fn(),
       fastify: vi.fn(() => sdkPlugin)
     };
 
@@ -127,20 +133,25 @@ describe("api dogfooding", () => {
       url: "/__dogfood/backend-error"
     });
 
-    expect(dogfoodingSdk.init).toHaveBeenCalledWith(expect.objectContaining({
-      projectToken: "dbundle_proj_dogfood",
-      endpoint: "http://127.0.0.1:3001/v1/events",
-      environment: "development",
-      service: "debugbundle-api",
-      framework: "fastify",
-      captureConsole: false,
-      projectMode: "connected",
-      transport: expect.any(Function)
-    }));
+    expect(dogfoodingSdk.init).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectToken: "dbundle_proj_dogfood",
+        endpoint: "http://127.0.0.1:3001/v1/events",
+        environment: "development",
+        service: "debugbundle-api",
+        framework: "fastify",
+        captureConsole: false,
+        projectMode: "connected",
+        beforeSend: sanitizeApiDogfoodingEvent,
+        transport: expect.any(Function)
+      })
+    );
     expect(dogfoodingSdk.fastify).toHaveBeenCalledOnce();
     expect(sdkPlugin).toHaveBeenCalledOnce();
     expect(response.statusCode).toBe(500);
-    expect(response.json<{ message: string }>().message).toContain("debugbundle_dogfood_backend_exception");
+    expect(response.json<{ message: string }>().message).toContain(
+      "debugbundle_dogfood_backend_exception"
+    );
   });
 
   it("requires owner auth for the hosted backend verification trigger", async () => {
@@ -213,7 +224,9 @@ describe("api dogfooding", () => {
     });
 
     expect(response.statusCode).toBe(500);
-    expect(response.json<{ message: string }>().message).toContain("debugbundle_dogfood_backend_exception");
+    expect(response.json<{ message: string }>().message).toContain(
+      "debugbundle_dogfood_backend_exception"
+    );
   });
 
   it("posts backend dogfooding events through the hosted ingestion transport", async () => {
@@ -271,6 +284,168 @@ describe("api dogfooding", () => {
         })
       })
     );
+  });
+
+  it("captures only bounded OpenAI operational metadata through dogfooding", () => {
+    const sdk = {
+      init: vi.fn(),
+      captureError: vi.fn(),
+      fastify: vi.fn()
+    };
+    const monitor = createApiDogfoodingOpenAiMonitor(sdk);
+
+    monitor({
+      category: "mcp_request_failure",
+      method: "tools/call",
+      tool: "list_projects",
+      status: 200,
+      admission: "allowed"
+    });
+    monitor({
+      category: "oauth_request_failure",
+      endpoint: "/oauth/token",
+      status: 400,
+      admission: "allowed"
+    });
+    monitor({
+      category: "reviewer_credential_expiring",
+      remainingDays: 10,
+      expired: false
+    });
+
+    expect(sdk.captureError).toHaveBeenCalledTimes(3);
+    expect(sdk.captureError).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        message:
+          "openai_mcp_request_failure method=tools/call tool=list_projects status=200 admission=allowed",
+        stack:
+          "Error: openai_mcp_request_failure method=tools/call tool=list_projects status=200 admission=allowed"
+      }),
+      { handled: true, request: {} }
+    );
+    expect(sdk.captureError).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        message: "openai_oauth_request_failure endpoint=/oauth/token status=400 admission=allowed",
+        stack:
+          "Error: openai_oauth_request_failure endpoint=/oauth/token status=400 admission=allowed"
+      }),
+      { handled: true, request: {} }
+    );
+    expect(sdk.captureError).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({
+        message: "openai_reviewer_credential_expiring remaining_days=10 expired=false",
+        stack: "Error: openai_reviewer_credential_expiring remaining_days=10 expired=false"
+      }),
+      { handled: true, request: {} }
+    );
+    expect(JSON.stringify(sdk.captureError.mock.calls)).not.toContain("token_hash");
+  });
+
+  it("strips ambient request, correlation, probes, and host details from OpenAI incidents", () => {
+    const event = createEventEnvelope({
+      event_type: "backend_exception",
+      project_token: "dbundle_proj_dogfood",
+      service: {
+        name: "debugbundle-api",
+        environment: "production",
+        runtime: "node",
+        framework: "fastify"
+      },
+      correlation: {
+        request_id: "secret-request-id",
+        trace_id: "secret-trace-id",
+        session_id: "secret-session-id",
+        user_id_hash: "secret-user-hash"
+      },
+      payload: {
+        name: "Error",
+        message:
+          "openai_mcp_request_failure method=tools/call tool=list_projects status=200 admission=allowed",
+        stack: "Error: signal\n at /private/app/source.ts:42:1",
+        handled: true,
+        request: {
+          method: "POST",
+          path: "/mcp",
+          query: { code: "secret-code" },
+          headers: { authorization: "Bearer secret-token" },
+          body: { projectId: "secret-project" }
+        },
+        response: {
+          status_code: 200,
+          body: { result: "secret-result" }
+        },
+        runtime: {
+          version: "v24.0.0",
+          platform: "linux",
+          arch: "arm64",
+          pid: 42,
+          cwd: "/private/app",
+          uptime_sec: 100,
+          hostname: "private-host",
+          memory: null
+        },
+        probe_data: {
+          version: 1,
+          items: [
+            {
+              label: "secret-probe",
+              data: { value: "secret-probe-value" },
+              timestamp: "2026-09-07T00:00:00.000Z",
+              activation_id: null
+            }
+          ]
+        }
+      }
+    });
+
+    const sanitized = sanitizeApiDogfoodingEvent(event);
+
+    expect(sanitized).toMatchObject({
+      correlation: {
+        request_id: null,
+        trace_id: null,
+        session_id: null,
+        user_id_hash: null
+      },
+      payload: {
+        name: "OpenAiOperationalSignal",
+        handled: true,
+        request: {
+          method: "UNKNOWN",
+          path: "/",
+          query: {},
+          headers: {},
+          body: null
+        },
+        response: { status_code: 0 },
+        runtime: { version: "v24.0.0" }
+      }
+    });
+    const serialized = JSON.stringify(sanitized);
+    for (const excluded of [
+      "secret-request-id",
+      "secret-code",
+      "secret-token",
+      "secret-project",
+      "secret-result",
+      "private-host",
+      "secret-probe-value",
+      "/private/app/source.ts"
+    ]) {
+      expect(serialized).not.toContain(excluded);
+    }
+
+    const ordinaryEvent = {
+      ...event,
+      payload: {
+        ...event.payload,
+        message: "ordinary backend failure"
+      }
+    };
+    expect(sanitizeApiDogfoodingEvent(ordinaryEvent)).toBe(ordinaryEvent);
   });
 
   it("mounts the browser relay route even without dogfooding config", async () => {
@@ -383,13 +558,15 @@ describe("api dogfooding", () => {
     expect(response.statusCode).toBe(202);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0]?.[0]).toBe("http://127.0.0.1:3001/v1/events");
-    expect(fetchMock.mock.calls[0]?.[1]).toEqual(expect.objectContaining({
-      method: "POST",
-      headers: expect.objectContaining({
-        Authorization: "Bearer dbundle_proj_dogfood",
-        "Content-Type": "application/json"
+    expect(fetchMock.mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer dbundle_proj_dogfood",
+          "Content-Type": "application/json"
+        })
       })
-    }));
+    );
   });
 
   it("does not expose the backend trigger route when dogfooding is disabled", async () => {

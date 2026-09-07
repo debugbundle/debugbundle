@@ -405,7 +405,8 @@ describe("OpenAI plugin v1 contract", () => {
       consent_ui:
         "owner_visual_approved_deployed_automated_keyboard_verified_manual_assistive_technology_pending",
       synthetic_ui_preview: "implemented_contract_tested_and_owner_visual_approved",
-      privacy_review: "engineering_reconciled_live_policy_deployed_owner_legal_attestations_pending",
+      privacy_review:
+        "engineering_reconciled_live_policy_deployed_owner_legal_attestations_pending",
       developer_mode_connection: "owner_registered_reconnected_and_app_json_captured",
       production_validation:
         "schema_portability_candidate_deployed_public_boundary_verified_partial_corpus_health_pagination_improvement_empty_and_four_negative_boundaries_verified",
@@ -418,13 +419,14 @@ describe("OpenAI plugin v1 contract", () => {
       mcp_inspector: "v2_5_0_production_auth_boundary_verified_authenticated_openai_client_only",
       advertised_schema_portability:
         "deployed_public_boundary_verified_authenticated_catalog_refresh_pending",
-      openai_monitoring: "source_tested_live_install_spend_approval_pending",
+      openai_monitoring:
+        "hybrid_source_tested_external_ready_up_runtime_incident_deployment_pending",
       reviewer_runtime_configuration: "enabled_hash_present_expiry_valid_outside_14_day_horizon",
       portal_submission: "not_submitted",
       publication: "not_published",
       directory_discovery: "not_verified",
       next_gate:
-        "owner_legal_and_policy_deployment_then_reviewer_assistive_technology_capacity_monitoring_remaining_corpus_and_portal_scan"
+        "hybrid_monitoring_deployment_then_reviewer_assistive_technology_capacity_remaining_corpus_and_portal_scan"
     });
   });
 });

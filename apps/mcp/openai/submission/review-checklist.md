@@ -20,7 +20,7 @@ Status markers in this file are deliberately manual. A repository-local green re
 - [x] A read-only rollback inventory confirms the active and previous release metadata plus both retained API/worker image tags and immutable digests are present locally on the shared host.
 - [x] The controlled shared-runtime rollback rehearsal passes against immutable images.
 - [ ] Representative capacity/load evidence passes against the immutable candidate.
-- [ ] Install the five source-defined OpenAI MCP/OAuth/reviewer CloudWatch metric filters and alarms after explicit recurring-spend approval. A 2026-09-04 read-only inventory found only the seven pre-existing hosted alarms/metric streams in Frankfurt and the primary API health alarm in Virginia; none of the OpenAI-specific filters or alarms is live. Existing alarm checks therefore prove only that the installed baseline alarms are not active.
+- [ ] Deploy and verify the owner-approved hybrid monitoring boundary: metadata-only handled DebugBundle incidents for alert-worthy MCP/OAuth/reviewer failures, normal discovery/rejected bearer tokens excluded from incidents, independent free-tier UptimeRobot monitoring of `https://mcp.debugbundle.com/ready`, and the existing AWS baseline unchanged. Source tests prove that the baseline installer cannot create the five superseded OpenAI custom metrics or alarms. UptimeRobot monitor `803934645` independently reports `Up` on the free five-minute interval; deployed incident-capture evidence remains open.
 
 ## Reviewer and client
 

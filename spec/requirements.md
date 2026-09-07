@@ -871,6 +871,8 @@ Self-hosted deployments have no enforced rate limits (configurable via environme
 
 **NFR-OBS-02:** Track: ingestion failures, queue backlog, bundle generation failures, webhook delivery failures, auth anomalies.
 
+**NFR-OBS-03:** The official OpenAI plugin must dogfood DebugBundle for alert-worthy MCP request failures, MCP timeouts, MCP admission rejection, OAuth failures, and reviewer-credential expiry using handled incidents whose request-derived dimensions are limited to finite endpoint/method/tool/status/admission fields. Before delivery, the capture must replace the ambient request and response with empty placeholders, clear correlation, remove probe data and executable stack frames, and reduce runtime context to the Node version; only the normal service/environment, SDK/version, event time/ID, and ingestion-authentication envelope may remain. Normal unauthenticated MCP discovery and rejected bearer tokens must remain logs rather than incidents. Independent public reachability and TLS coverage must monitor `https://mcp.debugbundle.com/ready` outside the DebugBundle/AWS runtime, while the existing AWS alarm baseline remains unchanged. The baseline monitoring installer must not create dedicated OpenAI CloudWatch custom metrics or alarms; a paid monitor or new recurring monitoring spend still requires explicit owner approval.
+
 ### 2.8 Schema Evolution
 
 **NFR-SCHEMA-01:** New required fields require schema version bump.

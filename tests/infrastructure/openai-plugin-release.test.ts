@@ -188,11 +188,9 @@ describe("OpenAI plugin release automation", () => {
     );
     expect(result.manifest.manual_gates).toContain("remaining_chatgpt_and_codex_reviewer_corpus");
     expect(result.manifest.manual_gates).toContain(
-      "openai_monitoring_install_and_recurring_spend_approval"
+      "hybrid_openai_monitoring_deployment_and_external_ready_validation"
     );
-    expect(result.manifest.manual_gates).toContain(
-      "remaining_owner_legal_attestations"
-    );
+    expect(result.manifest.manual_gates).toContain("remaining_owner_legal_attestations");
     expect(result.manifest.manual_gates).not.toContain(
       "owner_legal_attestations_and_policy_deployment"
     );

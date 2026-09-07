@@ -799,6 +799,15 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** missing scope, cross-organization/project/incident access, query-bearing route input, unknown input, lookback over 90 days, and limit over 25 fail closed
 - **And** the existing API, CLI, stdio MCP, OpenClaw, and web analytics readers retain their current richer authorized behavior and contracts
 
+### AC-MCP-16: Hybrid OpenAI Operational Monitoring
+
+- **Given** API dogfooding is connected for the hosted OpenAI runtime
+- **When** an alert-worthy MCP request fails or times out, MCP admission is rejected, OAuth fails, or the reviewer credential enters its warning horizon
+- **Then** DebugBundle receives a handled incident whose request-derived dimensions contain only bounded endpoint/method/tool/status/admission/expiry metadata; its delivery sanitizer empties request/response placeholders, clears correlation, removes probe data and executable stack frames, and retains only Node version from runtime context, while credentials, request arguments, tool results, customer content, customer IDs, and pseudonymous grant/client keys never appear
+- **And** normal unauthenticated MCP discovery and rejected bearer tokens remain metadata logs without creating incidents
+- **And** an independently operated free-tier monitor checks `https://mcp.debugbundle.com/ready` at five-minute intervals and alerts the account's existing email contact without rebooting the shared host or bypassing the MCP-only gate
+- **And** the existing AWS baseline remains intact, while its installer proves that no dedicated OpenAI CloudWatch custom metric or alarm can be added accidentally
+
 ---
 
 ## 9a. OpenClaw Plugin Acceptance

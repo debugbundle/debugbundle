@@ -14,6 +14,7 @@ import { resolveBrowserSession } from "./api-helpers.js";
 import { registerOpenAiMcpHttpRoutes, type OpenAiMcpHttpOptions } from "./openai-mcp-http.js";
 import { registerOpenAiOAuthHttpRoutes, type OpenAiOAuthHttpOptions } from "./openai-oauth-http.js";
 import {
+  createApiDogfoodingOpenAiMonitor,
   registerApiDogfooding,
   resolveApiDogfoodingConfig,
   type ApiDogfoodingSdk
@@ -391,7 +392,17 @@ export function createApiServer(
     () => undefined
   );
 
-  registerApiDogfooding(app, dogfoodingEnv, dependencies, options.dogfoodingSdk, app.log);
+  const registeredDogfooding = registerApiDogfooding(
+    app,
+    dogfoodingEnv,
+    dependencies,
+    options.dogfoodingSdk,
+    app.log
+  );
+  const dogfoodingOpenAiMonitor =
+    registeredDogfooding?.deliveryMode === "connected"
+      ? createApiDogfoodingOpenAiMonitor(options.dogfoodingSdk)
+      : undefined;
 
   registerAccountRoutes(app, dependencies);
   registerAdminAnalyticsRoutes(app, dependencies);
@@ -422,24 +433,36 @@ export function createApiServer(
   registerIngestionRoutes(app, dependencies);
 
   if (options.openAiMcp !== undefined) {
-    registerOpenAiMcpHttpRoutes(app, options.openAiMcp);
+    const operationalMonitor = options.openAiMcp.operationalMonitor ?? dogfoodingOpenAiMonitor;
+    registerOpenAiMcpHttpRoutes(app, {
+      ...options.openAiMcp,
+      ...(operationalMonitor === undefined ? {} : { operationalMonitor })
+    });
   }
   if (options.openAiOAuth !== undefined) {
     if (options.openAiOAuth.connectionStore !== undefined) {
       registerOpenAiConnectionRoutes(app, dependencies, options.openAiOAuth.connectionStore);
     }
-    registerOpenAiOAuthHttpRoutes(app, options.openAiOAuth, {
-      async resolveBrowserSession(cookieHeader) {
-        const session = await resolveBrowserSession(cookieHeader, dependencies);
-        return session === null
-          ? undefined
-          : {
-              userId: session.user_id,
-              organizationId: session.organization_id,
-              emailVerified: session.email_verified_at !== null
-            };
+    const operationalMonitor = options.openAiOAuth.operationalMonitor ?? dogfoodingOpenAiMonitor;
+    registerOpenAiOAuthHttpRoutes(
+      app,
+      {
+        ...options.openAiOAuth,
+        ...(operationalMonitor === undefined ? {} : { operationalMonitor })
+      },
+      {
+        async resolveBrowserSession(cookieHeader) {
+          const session = await resolveBrowserSession(cookieHeader, dependencies);
+          return session === null
+            ? undefined
+            : {
+                userId: session.user_id,
+                organizationId: session.organization_id,
+                emailVerified: session.email_verified_at !== null
+              };
+        }
       }
-    });
+    );
   }
 
   if (options.stripeWebhook !== undefined) {

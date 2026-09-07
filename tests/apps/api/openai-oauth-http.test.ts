@@ -193,11 +193,13 @@ describe("OpenAI OAuth HTTP boundary", () => {
 
   it("warns when the bounded reviewer credential is near expiry", async () => {
     const capture = captureLogger();
+    const operationalMonitor = vi.fn();
     const app = Fastify({ loggerInstance: capture.logger });
     apps.push(app);
     registerOpenAiOAuthHttpRoutes(app, {
       expectedHost: "api.debugbundle.com",
       provider,
+      operationalMonitor,
       reviewerCredentialExpiresAt: new Date(Date.now() + 10 * 24 * 60 * 60 * 1_000).toISOString()
     });
 
@@ -207,6 +209,12 @@ describe("OpenAI OAuth HTTP boundary", () => {
     const logs = capture.read();
     expect(logs).toContain("openai_reviewer_credential_expiring");
     expect(logs).toContain('"expired":false');
+    expect(operationalMonitor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: "reviewer_credential_expiring",
+        expired: false
+      })
+    );
   });
 
   it("keeps reviewer access POST-only and relays only the bounded body credential", async () => {
@@ -319,11 +327,13 @@ describe("OpenAI OAuth HTTP boundary", () => {
 
   it("logs only bounded OAuth metadata and never codes, verifiers, assertions, or reviewer credentials", async () => {
     const capture = captureLogger();
+    const operationalMonitor = vi.fn();
     const app = Fastify({ loggerInstance: capture.logger });
     apps.push(app);
     registerOpenAiOAuthHttpRoutes(app, {
       expectedHost: "api.debugbundle.com",
       provider,
+      operationalMonitor,
       reviewerAccess: {
         complete: vi.fn(async () => {
           throw new Error("reviewer secret rejection detail");
@@ -369,5 +379,15 @@ describe("OpenAI OAuth HTTP boundary", () => {
     expect(logs).not.toContain(assertion);
     expect(logs).not.toContain(reviewerCredential);
     expect(logs).not.toContain("reviewer secret rejection detail");
+    expect(operationalMonitor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: "oauth_request_failure",
+        endpoint: "/oauth/token"
+      })
+    );
+    expect(JSON.stringify(operationalMonitor.mock.calls)).not.toContain(code);
+    expect(JSON.stringify(operationalMonitor.mock.calls)).not.toContain(verifier);
+    expect(JSON.stringify(operationalMonitor.mock.calls)).not.toContain(assertion);
+    expect(JSON.stringify(operationalMonitor.mock.calls)).not.toContain(reviewerCredential);
   });
 });

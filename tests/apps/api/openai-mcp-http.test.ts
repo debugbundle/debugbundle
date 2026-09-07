@@ -43,6 +43,7 @@ function createApp(
   input: {
     verifyAccessToken?: (token: string) => Promise<AuthInfo>;
     maxConcurrentRequests?: number;
+    operationTimeoutMs?: number;
     domainVerificationToken?: string;
     readinessCheck?: () => Promise<void>;
     logger?: FastifyBaseLogger;
@@ -58,6 +59,7 @@ function createApp(
       subject: string;
       leaseId: string;
     }) => Promise<void>;
+    operationalMonitor?: (signal: unknown) => void;
   } = {}
 ) {
   const app = input.logger === undefined ? Fastify() : Fastify({ loggerInstance: input.logger });
@@ -80,10 +82,16 @@ function createApp(
     ...(input.maxConcurrentRequests === undefined
       ? {}
       : { maxConcurrentRequests: input.maxConcurrentRequests }),
+    ...(input.operationTimeoutMs === undefined
+      ? {}
+      : { operationTimeoutMs: input.operationTimeoutMs }),
     ...(input.domainVerificationToken === undefined
       ? {}
       : { domainVerificationToken: input.domainVerificationToken }),
-    readinessCheck: input.readinessCheck ?? vi.fn(async () => undefined)
+    readinessCheck: input.readinessCheck ?? vi.fn(async () => undefined),
+    ...(input.operationalMonitor === undefined
+      ? {}
+      : { operationalMonitor: input.operationalMonitor })
   });
   return app;
 }
@@ -181,7 +189,8 @@ describe("OpenAI hosted MCP HTTP boundary", () => {
   });
 
   it("returns an RFC 9728 challenge before processing unauthenticated MCP input", async () => {
-    const app = createApp();
+    const operationalMonitor = vi.fn();
+    const app = createApp({ operationalMonitor });
     const response = await app.inject({
       method: "POST",
       url: "/mcp",
@@ -200,6 +209,7 @@ describe("OpenAI hosted MCP HTTP boundary", () => {
         ]
       }
     });
+    expect(operationalMonitor).not.toHaveBeenCalled();
   });
 
   it("returns the OAuth challenge for ChatGPT's empty binary discovery probe", async () => {
@@ -284,7 +294,9 @@ describe("OpenAI hosted MCP HTTP boundary", () => {
   });
 
   it("fails closed when token verification fails or the MCP bulkhead is disabled", async () => {
+    const rejectedMonitor = vi.fn();
     const rejected = createApp({
+      operationalMonitor: rejectedMonitor,
       verifyAccessToken: vi.fn(async () => {
         throw new Error("invalid token detail must not escape");
       })
@@ -300,8 +312,13 @@ describe("OpenAI hosted MCP HTTP boundary", () => {
     });
     expect(invalidToken.statusCode).toBe(401);
     expect(invalidToken.body).not.toContain("invalid token detail");
+    expect(rejectedMonitor).not.toHaveBeenCalled();
 
-    const disabled = createApp({ maxConcurrentRequests: 0 });
+    const disabledMonitor = vi.fn();
+    const disabled = createApp({
+      maxConcurrentRequests: 0,
+      operationalMonitor: disabledMonitor
+    });
     const saturated = await disabled.inject({
       method: "POST",
       url: "/mcp",
@@ -313,6 +330,12 @@ describe("OpenAI hosted MCP HTTP boundary", () => {
     });
     expect(saturated.statusCode).toBe(503);
     expect(saturated.json()).toEqual({ error: "openai_mcp_capacity_unavailable" });
+    expect(disabledMonitor).toHaveBeenCalledWith({
+      category: "mcp_admission_rejected",
+      method: "tools/list",
+      status: 503,
+      admission: "capacity_rejected"
+    });
   });
 
   it("claims and releases Redis-coordinated global and grant concurrency leases", async () => {
@@ -497,8 +520,12 @@ describe("OpenAI hosted MCP HTTP boundary", () => {
 
   it("records tool-level JSON-RPC errors as failures without logging error details", async () => {
     const capture = captureLogger();
+    const operationalMonitor = vi.fn(() => {
+      throw new Error("monitoring transport unavailable");
+    });
     const app = createApp({
       logger: capture.logger,
+      operationalMonitor,
       listProjects: vi.fn(async () => {
         throw new Error("private projection detail must not be logged");
       })
@@ -527,5 +554,51 @@ describe("OpenAI hosted MCP HTTP boundary", () => {
     expect(logs).toContain('"event":"openai_mcp_request"');
     expect(logs).toContain('"outcome":"failure"');
     expect(logs).not.toContain("private projection detail");
+    expect(operationalMonitor).toHaveBeenCalledWith({
+      category: "mcp_request_failure",
+      method: "tools/call",
+      tool: "list_projects",
+      status: 200,
+      admission: "allowed"
+    });
+    expect(JSON.stringify(operationalMonitor.mock.calls)).not.toContain(
+      "private projection detail"
+    );
+  });
+
+  it("reports a bounded timeout signal without changing the MCP error result", async () => {
+    const operationalMonitor = vi.fn();
+    const app = createApp({
+      operationalMonitor,
+      operationTimeoutMs: 1,
+      listProjects: () => new Promise(() => undefined)
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/mcp",
+      headers: {
+        ...CANONICAL_HEADERS,
+        authorization: "Bearer access-token",
+        accept: "application/json, text/event-stream",
+        "content-type": "application/json"
+      },
+      payload: {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: { name: "list_projects", arguments: {} }
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ result: { isError: true } });
+    expect(operationalMonitor).toHaveBeenCalledWith({
+      category: "mcp_request_timeout",
+      method: "tools/call",
+      tool: "list_projects",
+      status: 200,
+      admission: "allowed"
+    });
   });
 });

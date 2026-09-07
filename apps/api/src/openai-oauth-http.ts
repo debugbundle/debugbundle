@@ -12,6 +12,12 @@ import {
   pseudonymousOpenAiSubject,
   type OpenAiRequestRateLimiter
 } from "./openai-rate-limits.js";
+import {
+  reportOpenAiOperationalSignal,
+  type OpenAiOAuthAdmission,
+  type OpenAiOAuthEndpoint,
+  type OpenAiOperationalMonitor
+} from "./openai-operational-monitoring.js";
 
 export interface OpenAiOAuthHttpOptions {
   expectedHost: string;
@@ -23,6 +29,7 @@ export interface OpenAiOAuthHttpOptions {
   consentUiBaseUrl?: string;
   connectionStore?: Pick<OpenAiOAuthStore, "listConnectionsForUser" | "revokeConnectionForUser">;
   maxConcurrentRequests?: number;
+  operationalMonitor?: OpenAiOperationalMonitor;
 }
 
 export interface OpenAiOAuthHttpDependencies {
@@ -126,9 +133,9 @@ function parseOAuthForm(request: FastifyRequest): URLSearchParams {
   return new URLSearchParams(Buffer.isBuffer(request.body) ? request.body.toString("utf8") : "");
 }
 
-function oauthEndpoint(request: FastifyRequest): string {
+function oauthEndpoint(request: FastifyRequest): OpenAiOAuthEndpoint {
   const pathname = new URL(request.raw.url ?? "/", "https://api.debugbundle.com").pathname;
-  const known = new Set([
+  const known = new Set<string>([
     "/.well-known/oauth-authorization-server",
     "/.well-known/openid-configuration",
     "/oauth/authorize",
@@ -139,7 +146,7 @@ function oauthEndpoint(request: FastifyRequest): string {
     "/oauth/reviewer/access"
   ]);
   return known.has(pathname)
-    ? pathname
+    ? (pathname as OpenAiOAuthEndpoint)
     : pathname.startsWith("/oauth/interaction/")
       ? pathname.endsWith("/reviewer")
         ? "/oauth/interaction/:uid/reviewer"
@@ -154,21 +161,25 @@ function oauthClientKey(request: FastifyRequest): string | undefined {
   return clientId === null ? undefined : pseudonymousOpenAiSubject("client", clientId);
 }
 
+type OpenAiOAuthTelemetryInput = {
+  outcome: "success" | "failure";
+  status: number;
+  durationMs: number;
+  admission: OpenAiOAuthAdmission;
+  clientKey?: string;
+};
+
 function logOAuthRequest(
   request: FastifyRequest,
-  input: {
-    outcome: "success" | "failure";
-    status: number;
-    durationMs: number;
-    admission: string;
-    clientKey?: string;
-  }
+  input: OpenAiOAuthTelemetryInput,
+  monitor?: OpenAiOperationalMonitor
 ): void {
+  const endpoint = oauthEndpoint(request);
   request.log.info(
     {
       event: "openai_oauth_request",
       request_id: request.id,
-      endpoint: oauthEndpoint(request),
+      endpoint,
       ...(input.clientKey === undefined ? {} : { client_key: input.clientKey }),
       outcome: input.outcome,
       status: input.status,
@@ -177,9 +188,21 @@ function logOAuthRequest(
     },
     "openai_oauth_request"
   );
+  if (input.outcome === "failure") {
+    reportOpenAiOperationalSignal(monitor, {
+      category: "oauth_request_failure",
+      endpoint,
+      status: input.status,
+      admission: input.admission
+    });
+  }
 }
 
-function registerReviewerExpiryMonitor(app: FastifyInstance, expiresAt: string): void {
+function registerReviewerExpiryMonitor(
+  app: FastifyInstance,
+  expiresAt: string,
+  monitor?: OpenAiOperationalMonitor
+): void {
   const emit = (): void => {
     const remainingMs = new Date(expiresAt).getTime() - Date.now();
     const remainingDays = Math.floor(remainingMs / (24 * 60 * 60 * 1_000));
@@ -192,6 +215,11 @@ function registerReviewerExpiryMonitor(app: FastifyInstance, expiresAt: string):
         },
         "openai_reviewer_credential_expiring"
       );
+      reportOpenAiOperationalSignal(monitor, {
+        category: "reviewer_credential_expiring",
+        remainingDays,
+        expired: remainingMs <= 0
+      });
     }
   };
   const timer = setInterval(emit, 6 * 60 * 60 * 1_000);
@@ -250,9 +278,15 @@ export function registerOpenAiOAuthHttpRoutes(
 ): void {
   const maxConcurrentRequests = options.maxConcurrentRequests ?? 16;
   let activeRequests = 0;
+  const recordOAuthRequest = (request: FastifyRequest, input: OpenAiOAuthTelemetryInput): void =>
+    logOAuthRequest(request, input, options.operationalMonitor);
 
   if (options.reviewerCredentialExpiresAt !== undefined) {
-    registerReviewerExpiryMonitor(app, options.reviewerCredentialExpiresAt);
+    registerReviewerExpiryMonitor(
+      app,
+      options.reviewerCredentialExpiresAt,
+      options.operationalMonitor
+    );
   }
 
   async function admitConsentInteraction(
@@ -305,7 +339,7 @@ export function registerOpenAiOAuthHttpRoutes(
     const startedAt = performance.now();
     const clientKey = oauthClientKey(request);
     if (!requireCanonicalApiHost(request, reply, options.expectedHost)) {
-      logOAuthRequest(request, {
+      recordOAuthRequest(request, {
         outcome: "failure",
         status: 421,
         durationMs: performance.now() - startedAt,
@@ -321,7 +355,7 @@ export function registerOpenAiOAuthHttpRoutes(
         claims: oauthRateLimitClaims(request)
       });
       if (!rate.allowed) {
-        logOAuthRequest(request, {
+        recordOAuthRequest(request, {
           outcome: "failure",
           status: 429,
           durationMs: performance.now() - startedAt,
@@ -335,7 +369,7 @@ export function registerOpenAiOAuthHttpRoutes(
         return;
       }
     } catch {
-      logOAuthRequest(request, {
+      recordOAuthRequest(request, {
         outcome: "failure",
         status: 503,
         durationMs: performance.now() - startedAt,
@@ -346,7 +380,7 @@ export function registerOpenAiOAuthHttpRoutes(
       return;
     }
     if (activeRequests >= maxConcurrentRequests) {
-      logOAuthRequest(request, {
+      recordOAuthRequest(request, {
         outcome: "failure",
         status: 503,
         durationMs: performance.now() - startedAt,
@@ -360,7 +394,7 @@ export function registerOpenAiOAuthHttpRoutes(
     try {
       reply.hijack();
       await relayProviderRequest(options.provider, buildProviderRequest(request), reply.raw);
-      logOAuthRequest(request, {
+      recordOAuthRequest(request, {
         outcome: reply.raw.statusCode >= 400 ? "failure" : "success",
         status: reply.raw.statusCode,
         durationMs: performance.now() - startedAt,
@@ -373,7 +407,7 @@ export function registerOpenAiOAuthHttpRoutes(
         reply.raw.setHeader("content-type", "application/json; charset=utf-8");
         reply.raw.end(JSON.stringify({ error: "oauth_provider_error" }));
       }
-      logOAuthRequest(request, {
+      recordOAuthRequest(request, {
         outcome: "failure",
         status: reply.raw.statusCode >= 400 ? reply.raw.statusCode : 500,
         durationMs: performance.now() - startedAt,
@@ -404,7 +438,7 @@ export function registerOpenAiOAuthHttpRoutes(
   app.post("/oauth/interaction/:uid/reviewer", async (request, reply) => {
     const startedAt = performance.now();
     if (!requireCanonicalApiHost(request, reply, options.expectedHost)) {
-      logOAuthRequest(request, {
+      recordOAuthRequest(request, {
         outcome: "failure",
         status: 421,
         durationMs: performance.now() - startedAt,
@@ -421,7 +455,7 @@ export function registerOpenAiOAuthHttpRoutes(
     }
     const parsed = ReviewerAccessBodySchema.safeParse(request.body);
     if (!parsed.success) {
-      logOAuthRequest(request, {
+      recordOAuthRequest(request, {
         outcome: "failure",
         status: 400,
         durationMs: performance.now() - startedAt,
@@ -448,7 +482,7 @@ export function registerOpenAiOAuthHttpRoutes(
         ]
       });
       if (!rate.allowed) {
-        logOAuthRequest(request, {
+        recordOAuthRequest(request, {
           outcome: "failure",
           status: 429,
           durationMs: performance.now() - startedAt,
@@ -461,7 +495,7 @@ export function registerOpenAiOAuthHttpRoutes(
           .send({ error: "openai_reviewer_rate_limited" });
       }
     } catch {
-      logOAuthRequest(request, {
+      recordOAuthRequest(request, {
         outcome: "failure",
         status: 503,
         durationMs: performance.now() - startedAt,
@@ -481,7 +515,7 @@ export function registerOpenAiOAuthHttpRoutes(
       await reply.header("Cache-Control", "no-store").send({
         continue_url: completed.continueUrl
       });
-      logOAuthRequest(request, {
+      recordOAuthRequest(request, {
         outcome: "success",
         status: 200,
         durationMs: performance.now() - startedAt,
@@ -490,7 +524,7 @@ export function registerOpenAiOAuthHttpRoutes(
       });
     } catch {
       await reply.status(401).send({ error: "openai_reviewer_access_denied" });
-      logOAuthRequest(request, {
+      recordOAuthRequest(request, {
         outcome: "failure",
         status: 401,
         durationMs: performance.now() - startedAt,

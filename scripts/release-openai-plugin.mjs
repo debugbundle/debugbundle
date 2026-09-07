@@ -92,7 +92,7 @@ function manualGates(validation, apiImageDigest) {
     "representative_capacity_load_evidence",
     "reviewer_outside_network_smoke_and_fixture_isolation",
     "remaining_chatgpt_and_codex_reviewer_corpus",
-    "openai_monitoring_install_and_recurring_spend_approval",
+    "hybrid_openai_monitoring_deployment_and_external_ready_validation",
     "remaining_owner_legal_attestations",
     "owner_submission_approval",
     "openai_review_and_approval",
