@@ -20,10 +20,10 @@
   "generic_infrastructure_boundary": "live_no_call_unsupported_capability_verified",
   "mcp_inspector": "v2_5_0_production_auth_boundary_verified_authenticated_openai_client_only",
   "advertised_schema_portability": "deployed_public_boundary_verified_authenticated_catalog_refresh_pending",
-  "openai_monitoring": "hybrid_source_tested_external_ready_up_runtime_incident_deployment_pending",
+  "openai_monitoring": "hybrid_deployed_external_ready_up_runtime_incident_sanitized_verified",
   "reviewer_runtime_configuration": "enabled_hash_present_expiry_valid_outside_14_day_horizon",
   "portal_submission": "not_submitted",
   "publication": "not_published",
   "directory_discovery": "not_verified",
-  "next_gate": "hybrid_monitoring_deployment_then_reviewer_assistive_technology_capacity_remaining_corpus_and_portal_scan"
+  "next_gate": "reviewer_assistive_technology_capacity_remaining_corpus_and_portal_scan"
 }

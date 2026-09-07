@@ -187,7 +187,7 @@ describe("OpenAI plugin release automation", () => {
       "reviewer_outside_network_smoke_and_fixture_isolation"
     );
     expect(result.manifest.manual_gates).toContain("remaining_chatgpt_and_codex_reviewer_corpus");
-    expect(result.manifest.manual_gates).toContain(
+    expect(result.manifest.manual_gates).not.toContain(
       "hybrid_openai_monitoring_deployment_and_external_ready_validation"
     );
     expect(result.manifest.manual_gates).toContain("remaining_owner_legal_attestations");
