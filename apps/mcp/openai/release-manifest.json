@@ -3,7 +3,7 @@
   "plugin_version": "1.0.0",
   "evidence_state": "local_connection_ready",
   "source": {
-    "commit": "78580b0a1faa1f88eb037b65f78663fb88e87895",
+    "commit": "3286e757c0fae125da3e67f52a8ae12b1e4173c1",
     "tree_clean": true,
     "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
@@ -11,7 +11,7 @@
     "resource_origin": "https://mcp.debugbundle.com",
     "mcp_endpoint": "https://mcp.debugbundle.com/mcp",
     "oauth_issuer": "https://api.debugbundle.com",
-    "api_image_digest": "sha256:48d4fa5ec6b30426f2c34f934d072051f87fdf7fcac6de84ca4879ad9730669e"
+    "api_image_digest": "sha256:4ad1e0d62d85a98b2ffe5ad08525af7578d8096b53d6509dbb39bb637637f091"
   },
   "registered_connection_id": "plugin_asdk_app_6a99ba6c1e7881919091a592738692c6",
   "package": {
