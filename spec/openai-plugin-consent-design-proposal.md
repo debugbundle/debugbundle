@@ -53,7 +53,7 @@ The credential is paste-friendly, never revealed after entry, submitted only in 
 
 ### Revocation
 
-Add an `OpenAI connections` section to the existing signed-in Settings page. Use the signed-in management template and a compact list/table rather than cards. Each row shows client name, organization, granted scopes summary, consent time, expiry, and status. The explicit `Revoke access` action opens the existing `AlertDialog` pattern and names the connection and consequence. Revocation does not delete DebugBundle data.
+Add a full-width `OpenAI connections` section after the primary cards on the existing signed-in Settings page. Use the signed-in management template and a compact list/table rather than cards. Active rows remain immediately visible. Retained expired/revoked rows stay out of the primary task path under a collapsed, keyboard-accessible `Connection history` disclosure that explains the 90-day automatic cleanup boundary. Each expanded row shows client name, organization, granted scopes summary, consent time, expiry, and status. The explicit `Revoke access` action opens the existing `AlertDialog` pattern and names the connection and consequence. Revocation does not delete DebugBundle data.
 
 ## Existing system reuse
 
@@ -184,6 +184,8 @@ On 2026-09-02 the owner approved adding one sixth checkbox using the same design
 On 2026-09-03 the owner approved refining the consent decision footer to use the standard responsive action hierarchy: `Allow access` before `Deny` in logical and visual order on mobile, stacked with the primary action at the top, then inline and right-aligned with `Deny` on the left and `Allow access` on the right at tablet and desktop widths. The implementation reuses existing button variants, spacing, and breakpoints.
 
 On 2026-09-03 the owner completed visual inspection and approved the implemented consent, reviewer, Settings revocation, aggregate-analytics consent, preview-state, and responsive action treatment. This closes the visual-design approval gate only; keyboard, screen-reader, real-client, deployed, reviewer, and OpenAI portal validation remain separate evidence gates.
+
+On 2026-09-08 the owner requested that OpenAI connections move below the primary Settings cards and that revoked entries no longer compete with active connections. The retained-history disclosure above implements that refinement without shortening the approved OAuth security-retention period.
 
 ## Development preview approval record
 

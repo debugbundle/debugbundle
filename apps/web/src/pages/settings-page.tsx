@@ -202,7 +202,6 @@ export function SettingsPage(): JSX.Element {
   return (
     <div className="space-y-8">
       <PageHeader description="Review your active sign-in methods, account verification state, and account lifecycle controls." />
-      <OpenAiConnectionsSection />
       <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-4">
           <Card>
@@ -481,6 +480,7 @@ export function SettingsPage(): JSX.Element {
           </Card>
         </div>
       </div>
+      <OpenAiConnectionsSection />
     </div>
   );
 }

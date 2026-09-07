@@ -10,6 +10,10 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 - Added the local-source OpenAI Plugin `1.0.0` candidate: an independently versioned production-debugging and aggregate-analytics skill plus an OAuth-protected, exact twenty-three-tool read-only remote MCP projection, with dedicated no-side-effect readers, sample-free aggregate analytics, bounded privacy projections, owner-approved existing-app consent/reviewer/revocation surfaces, reviewer isolation, deterministic package/eval evidence, and same-Lightsail deployment/monitoring source.
 
+### Changed
+
+- Moved OpenAI connection management below the primary Settings cards and collapsed retained expired/revoked grants into an accessible connection-history disclosure while preserving automatic security retention.
+
 ### Security
 
 - Added OAuth/OIDC PKCE, RFC 9207 response issuer, CIMD `private_key_jwt`, resource/audience/scope binding, verified UserInfo, rotation/revocation/retention controls, canonical-host isolation, sanitized health-check URLs, MCP bulkheads, and secret-free structured telemetry for the candidate remote surface.

@@ -1,4 +1,4 @@
-import { LoaderCircleIcon } from "lucide-react";
+import { ChevronRightIcon, LoaderCircleIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { OpenAiConnectionRecord, OpenAiProductScope } from "../../lib/api-types.js";
@@ -19,6 +19,7 @@ import {
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card.js";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../ui/collapsible.js";
 import { Notice } from "../ui/notice.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table.js";
 
@@ -157,6 +158,108 @@ export interface OpenAiConnectionsSectionViewProps {
   onRevoke: (connection: OpenAiConnectionRecord) => Promise<void>;
 }
 
+function OpenAiConnectionRecords({
+  connections,
+  revokingGrantId,
+  confirmationGrantId,
+  onRevoke
+}: {
+  connections: OpenAiConnectionRecord[];
+  revokingGrantId: string | null;
+  confirmationGrantId?: string;
+  onRevoke: (connection: OpenAiConnectionRecord) => Promise<void>;
+}): JSX.Element {
+  return (
+    <>
+      <div className="hidden md:block">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Connection</TableHead>
+              <TableHead>Access</TableHead>
+              <TableHead>Consent and expiry</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>
+                <span className="sr-only">Actions</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {connections.map((connection) => (
+              <TableRow key={connection.grant_id}>
+                <TableCell>
+                  <p className="font-medium">{connection.client_name}</p>
+                  <p className="text-muted-foreground">{connection.organization_name}</p>
+                </TableCell>
+                <TableCell className="max-w-56 whitespace-normal">
+                  {scopeSummary(connection.product_scopes)}
+                </TableCell>
+                <TableCell>
+                  <p>{formatDate(connection.consented_at)}</p>
+                  <p className="text-muted-foreground">
+                    Expires {formatDate(connection.expires_at)}
+                  </p>
+                </TableCell>
+                <TableCell>
+                  <StatusBadge status={connection.status} />
+                </TableCell>
+                <TableCell className="text-right">
+                  {connection.status === "active" ? (
+                    <RevokeOpenAiConnectionDialog
+                      connection={connection}
+                      isRevoking={revokingGrantId === connection.grant_id}
+                      defaultOpen={confirmationGrantId === connection.grant_id}
+                      onRevoke={() => onRevoke(connection)}
+                    />
+                  ) : null}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="flex flex-col gap-3 md:hidden">
+        {connections.map((connection) => (
+          <div
+            key={connection.grant_id}
+            className="flex flex-col gap-3 rounded-lg border bg-background/70 p-4 text-sm"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-medium">{connection.client_name}</p>
+                <p className="text-muted-foreground">{connection.organization_name}</p>
+              </div>
+              <StatusBadge status={connection.status} />
+            </div>
+            <dl className="flex flex-col gap-2">
+              <div>
+                <dt className="text-muted-foreground">Access</dt>
+                <dd>{scopeSummary(connection.product_scopes)}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Consented</dt>
+                <dd>{formatDate(connection.consented_at)}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Expires</dt>
+                <dd>{formatDate(connection.expires_at)}</dd>
+              </div>
+            </dl>
+            {connection.status === "active" ? (
+              <RevokeOpenAiConnectionDialog
+                connection={connection}
+                isRevoking={revokingGrantId === connection.grant_id}
+                onRevoke={() => onRevoke(connection)}
+              />
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 export function OpenAiConnectionsSectionView({
   connections,
   loadError,
@@ -164,6 +267,9 @@ export function OpenAiConnectionsSectionView({
   confirmationGrantId,
   onRevoke
 }: OpenAiConnectionsSectionViewProps): JSX.Element {
+  const activeConnections = connections?.filter((connection) => connection.status === "active");
+  const connectionHistory = connections?.filter((connection) => connection.status !== "active");
+
   return (
     <section id="openai-connections" aria-labelledby="openai-connections-title">
       <Card>
@@ -173,7 +279,7 @@ export function OpenAiConnectionsSectionView({
             Review or revoke ChatGPT and Codex access to this organization.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-4">
           {loadError ? (
             <Notice tone="destructive">
               Could not load OpenAI connections. Refresh the page to try again.
@@ -192,91 +298,42 @@ export function OpenAiConnectionsSectionView({
             </p>
           ) : (
             <>
-              <div className="hidden md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Connection</TableHead>
-                      <TableHead>Access</TableHead>
-                      <TableHead>Consent and expiry</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>
-                        <span className="sr-only">Actions</span>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {connections.map((connection) => (
-                      <TableRow key={connection.grant_id}>
-                        <TableCell>
-                          <p className="font-medium">{connection.client_name}</p>
-                          <p className="text-muted-foreground">{connection.organization_name}</p>
-                        </TableCell>
-                        <TableCell className="max-w-56 whitespace-normal">
-                          {scopeSummary(connection.product_scopes)}
-                        </TableCell>
-                        <TableCell>
-                          <p>{formatDate(connection.consented_at)}</p>
-                          <p className="text-muted-foreground">
-                            Expires {formatDate(connection.expires_at)}
-                          </p>
-                        </TableCell>
-                        <TableCell>
-                          <StatusBadge status={connection.status} />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {connection.status === "active" ? (
-                            <RevokeOpenAiConnectionDialog
-                              connection={connection}
-                              isRevoking={revokingGrantId === connection.grant_id}
-                              defaultOpen={confirmationGrantId === connection.grant_id}
-                              onRevoke={() => onRevoke(connection)}
-                            />
-                          ) : null}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              {activeConnections?.length === 0 ? (
+                <p className="py-4 text-sm text-muted-foreground">No active OpenAI connections.</p>
+              ) : (
+                <OpenAiConnectionRecords
+                  connections={activeConnections ?? []}
+                  revokingGrantId={revokingGrantId}
+                  {...(confirmationGrantId === undefined ? {} : { confirmationGrantId })}
+                  onRevoke={onRevoke}
+                />
+              )}
 
-              <div className="space-y-3 md:hidden">
-                {connections.map((connection) => (
-                  <div
-                    key={connection.grant_id}
-                    className="space-y-3 rounded-lg border bg-background/70 p-4 text-sm"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-medium">{connection.client_name}</p>
-                        <p className="text-muted-foreground">{connection.organization_name}</p>
-                      </div>
-                      <StatusBadge status={connection.status} />
-                    </div>
-                    <dl className="space-y-2">
-                      <div>
-                        <dt className="text-muted-foreground">Access</dt>
-                        <dd>{scopeSummary(connection.product_scopes)}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-muted-foreground">Consented</dt>
-                        <dd>{formatDate(connection.consented_at)}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-muted-foreground">Expires</dt>
-                        <dd>{formatDate(connection.expires_at)}</dd>
-                      </div>
-                    </dl>
-                    {connection.status === "active" ? (
-                      <RevokeOpenAiConnectionDialog
-                        connection={connection}
-                        isRevoking={revokingGrantId === connection.grant_id}
-                        onRevoke={() => onRevoke(connection)}
+              {(connectionHistory?.length ?? 0) > 0 ? (
+                <Collapsible className="flex flex-col gap-3">
+                  <CollapsibleTrigger asChild>
+                    <Button type="button" variant="ghost" className="w-full justify-between">
+                      Connection history ({connectionHistory?.length ?? 0})
+                      <ChevronRightIcon
+                        data-icon="inline-end"
+                        aria-hidden="true"
+                        className="transition-transform duration-200 group-data-[state=open]/button:rotate-90 motion-reduce:transition-none"
                       />
-                    ) : null}
-                  </div>
-                ))}
-              </div>
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="flex flex-col gap-3">
+                    <p className="text-sm text-muted-foreground">
+                      Revoked and expired connections are retained for up to 90 days for security
+                      and removed automatically.
+                    </p>
+                    <OpenAiConnectionRecords
+                      connections={connectionHistory ?? []}
+                      revokingGrantId={revokingGrantId}
+                      onRevoke={onRevoke}
+                    />
+                  </CollapsibleContent>
+                </Collapsible>
+              ) : null}
             </>
           )}
         </CardContent>

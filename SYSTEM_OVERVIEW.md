@@ -116,7 +116,8 @@ Explicit local development review
   → zero OAuth/reviewer/grant/revocation requests; route absent from production
 
 Signed-in Settings
-  → exact-user/current-organization OpenAI connection inventory
+  → exact-user/current-organization OpenAI connection inventory at the end of Settings
+  → active connections first; retained revoked/expired history collapsed by default
   → confirmed POST-body revocation of grant + refresh family
 ```
 

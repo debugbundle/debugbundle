@@ -1124,6 +1124,7 @@ Rules:
 The signed-in Settings projection is derived from `oauth_authorization_grants` joined to the exact current organization. It is not a separate table and does not persist display state.
 
 - List queries require both `user_id` and `organization_id`, are capped at 100 newest-first rows, and return only grant UUID, fixed public client name, organization name, allowlisted product scopes, consent/expiry/revocation timestamps, and derived active/expired/revoked status.
+- The web projection presents active rows immediately and keeps retained expired/revoked rows in a collapsed connection-history disclosure. It does not persist a separate display state or delete credential records early; history disappears through the bounded physical-retention cleanup above.
 - Identity scopes are not presented as product-data permissions. Unknown or future stored scopes are excluded until a reviewed public contract adds them.
 - User revocation requires the exact grant UUID, user, and organization in one database statement. It sets the grant's bounded `user_revoked` reason, revokes every remaining normalized refresh token, and deletes the provider protocol artifacts bound by the same HMAC grant lookup without deleting DebugBundle customer data.
 - Provider replacement/revocation resolves only through the HMAC provider-grant binding and revokes the same normalized grant/refresh family. Missing or already-inaccessible grants do not disclose cross-tenant existence.

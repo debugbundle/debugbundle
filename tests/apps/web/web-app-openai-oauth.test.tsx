@@ -316,6 +316,26 @@ describe("web app - OpenAI OAuth", () => {
   it("lists retained OpenAI connections in settings and revokes through confirmation", async () => {
     const user = userEvent.setup();
     let revoked = false;
+    const activeConnection = {
+      grant_id: "grant_123",
+      client_name: "ChatGPT and Codex",
+      organization_name: "Acme Engineering",
+      product_scopes: ["debugbundle:projects:read"],
+      consented_at: "2026-08-30T10:00:00.000Z",
+      expires_at: "2026-09-29T10:00:00.000Z",
+      revoked_at: null,
+      status: "active"
+    } as const;
+    const retainedRevokedConnection = {
+      grant_id: "grant_older",
+      client_name: "ChatGPT and Codex",
+      organization_name: "Acme Engineering",
+      product_scopes: ["debugbundle:analytics:read"],
+      consented_at: "2026-08-20T10:00:00.000Z",
+      expires_at: "2026-09-19T10:00:00.000Z",
+      revoked_at: "2026-08-21T10:00:00.000Z",
+      status: "revoked"
+    } as const;
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
       if (url.endsWith("/v1/auth/session")) {
@@ -323,20 +343,16 @@ describe("web app - OpenAI OAuth", () => {
       }
       if (url.endsWith("/v1/openai/connections") && init?.method !== "POST") {
         return jsonResponse(200, {
-          connections: revoked
-            ? []
-            : [
-                {
-                  grant_id: "grant_123",
-                  client_name: "ChatGPT and Codex",
-                  organization_name: "Acme Engineering",
-                  product_scopes: ["debugbundle:projects:read"],
-                  consented_at: "2026-08-30T10:00:00.000Z",
-                  expires_at: "2026-09-29T10:00:00.000Z",
-                  revoked_at: null,
-                  status: "active"
+          connections: [
+            revoked
+              ? {
+                  ...activeConnection,
+                  revoked_at: "2026-09-01T10:00:00.000Z",
+                  status: "revoked"
                 }
-              ]
+              : activeConnection,
+            retainedRevokedConnection
+          ]
         });
       }
       if (url.endsWith("/v1/openai/connections/revoke") && init?.method === "POST") {
@@ -354,8 +370,25 @@ describe("web app - OpenAI OAuth", () => {
 
     render(<App initialEntries={["/settings"]} />);
 
-    expect(await screen.findByRole("heading", { name: /openai connections/i })).toBeInTheDocument();
+    const openAiHeading = await screen.findByRole("heading", { name: /openai connections/i });
+    const signInHeading = screen.getByRole("heading", { name: /sign-in methods/i });
+    const deleteAccountHeading = screen.getByRole("heading", { name: /delete account/i });
+    expect(
+      signInHeading.compareDocumentPosition(openAiHeading) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      deleteAccountHeading.compareDocumentPosition(openAiHeading) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
     expect((await screen.findAllByText("Acme Engineering"))[0]).toBeInTheDocument();
+    expect(screen.queryByText("Revoked")).not.toBeInTheDocument();
+
+    const historyTrigger = screen.getByRole("button", { name: /connection history \(1\)/i });
+    historyTrigger.focus();
+    await user.keyboard("{Enter}");
+    expect(historyTrigger).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getAllByText("Revoked").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Analytics").length).toBeGreaterThan(0);
+
     const revokeTrigger = screen.getAllByRole("button", { name: /revoke access/i })[0]!;
     revokeTrigger.focus();
     await user.keyboard("{Enter}");
@@ -373,7 +406,8 @@ describe("web app - OpenAI OAuth", () => {
     await user.keyboard("{Enter}");
 
     await waitFor(() => {
-      expect(screen.getByText(/no openai connections/i)).toBeInTheDocument();
+      expect(screen.getByText(/no active openai connections/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /connection history \(2\)/i })).toBeInTheDocument();
     });
   });
 });

@@ -186,12 +186,18 @@ describe("web app - OpenAI plugin synthetic preview", () => {
     ["expired", /expired/i],
     ["revoked", /revoked/i]
   ])("renders the Settings %s state", async (state, expectedCopy) => {
+    const user = userEvent.setup();
     renderPreview(`surface=settings&state=${state}`);
     const section = (await screen.findByRole("heading", { name: /openai connections/i })).closest(
       "section"
     );
     expect(section).not.toBeNull();
-    expect(within(section as HTMLElement).getAllByText(expectedCopy).length).toBeGreaterThan(0);
+    const sectionQueries = within(section as HTMLElement);
+    if (state === "expired" || state === "revoked") {
+      expect(sectionQueries.queryByText(expectedCopy)).not.toBeInTheDocument();
+      await user.click(sectionQueries.getByRole("button", { name: /connection history \(1\)/i }));
+    }
+    expect(sectionQueries.getAllByText(expectedCopy).length).toBeGreaterThan(0);
   });
 
   it("opens the real revocation confirmation in the Settings confirmation state", async () => {
@@ -236,6 +242,8 @@ describe("web app - OpenAI plugin synthetic preview", () => {
     await user.click((await screen.findAllByRole("button", { name: /revoke access/i }))[0]!);
     await user.click(screen.getByRole("button", { name: /^revoke access$/i }));
 
+    expect(await screen.findByText(/no active openai connections/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /connection history \(1\)/i }));
     expect(await screen.findAllByText("Revoked")).toHaveLength(2);
     expectNoPreviewApiCalls(fetchMock);
   });
