@@ -1,7 +1,7 @@
 # Official OpenAI Plugin V1 Threat Model Foundation
 
-Status: Hybrid monitoring deployed and verified; independent readiness monitor live
-Date: 2026-09-07
+Status: Hybrid monitoring deployed and verified; independent readiness monitor live; owner assistive-technology validation approved
+Date: 2026-09-08
 Scope: Combined OpenAI skill plus remote MCP `1.0.0`
 
 ## Security Objective
@@ -112,8 +112,8 @@ The final monitoring gap in that production inventory is superseded by the owner
 
 Not claimed or performed:
 
-- no completed production ChatGPT/Codex reviewer corpus, external reviewer smoke, human assistive-technology review, or representative load evidence;
-- engineering privacy/security reconciliation and reconciled public-policy deployment are complete, but the remaining owner legal attestations remain open; and
+- owner visual, keyboard, and screen-reader review, the owner-authenticated 23-tool production corpus, rotated reviewer credential, and outside-network fixed-tenant isolation smoke are complete; the synthetic reviewer retained corpus and representative load evidence remain incomplete;
+- engineering privacy/security reconciliation and the prior public-policy deployment are complete; the owner supplied and approved the Malta operator/controller, privacy-role, transfer, and all-supported-country decisions on 2026-09-08, while the corresponding updated-policy deployment and OpenAI publisher-identity verification remain open; and
 - no portal submission, Cancel Review, approval, publication, directory edit/discovery, announcement, or spend change.
 
 These gaps remain release blockers, not reasons to weaken the controls or mark unavailable evidence green.

@@ -493,7 +493,7 @@ When a collaborator is removed from a project or leaves a shared project, DebugB
 
 **FR-DOC-10:** The public marketing, docs, and blog surface must ship as a single statically exported Next.js app. Docs must live under `/docs`, blog must live under `/blog`, Fumadocs must power both content surfaces, and the final build must be deployable to S3 + CloudFront with no Node.js server requirement.
 
-**FR-DOC-11:** The static public site must preserve SEO-friendly behavior via standard Next.js metadata, sitemap, robots, canonical URLs, and clean route structure while allowing distinct layouts for marketing/legal pages, `/docs`, and `/blog`.
+**FR-DOC-11:** The static public site must preserve SEO-friendly behavior via standard Next.js metadata, sitemap, robots, canonical URLs, clean route structure, and one shared 1200×630 Open Graph/Twitter image across marketing, legal, `/docs`, and `/blog` pages. The authenticated app entry point must provide baseline description, canonical, icon, theme, and social-preview metadata while remaining explicitly `noindex, nofollow`.
 
 ### 1.18 Onboarding & Installation
 

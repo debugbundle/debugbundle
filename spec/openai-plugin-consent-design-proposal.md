@@ -1,8 +1,8 @@
 # OpenAI Plugin Consent And Reviewer Access Design Proposal
 
-Status: Owner-approved 2026-08-30; aggregate-analytics extension approved 2026-09-02; implemented and deployed for owner-approved Developer Mode validation; keyboard and screen-reader review pending
+Status: Owner-approved 2026-08-30; aggregate-analytics extension approved 2026-09-02; implemented and deployed for owner-approved Developer Mode validation; owner keyboard and screen-reader review approved 2026-09-08
 Version: 1.0
-Last updated: 2026-09-04
+Last updated: 2026-09-08
 
 ## Purpose and approval boundary
 
@@ -184,6 +184,8 @@ On 2026-09-02 the owner approved adding one sixth checkbox using the same design
 On 2026-09-03 the owner approved refining the consent decision footer to use the standard responsive action hierarchy: `Allow access` before `Deny` in logical and visual order on mobile, stacked with the primary action at the top, then inline and right-aligned with `Deny` on the left and `Allow access` on the right at tablet and desktop widths. The implementation reuses existing button variants, spacing, and breakpoints.
 
 On 2026-09-03 the owner completed visual inspection and approved the implemented consent, reviewer, Settings revocation, aggregate-analytics consent, preview-state, and responsive action treatment. This closes the visual-design approval gate only; keyboard, screen-reader, real-client, deployed, reviewer, and OpenAI portal validation remain separate evidence gates.
+
+On 2026-09-08 the owner confirmed completion and approval of the final keyboard and screen-reader spot check for the deployed consent, reviewer, and connection-management surfaces. This closes the human assistive-technology gate only; reviewer, capacity, remaining corpus, legal, portal-review, publication, and discovery evidence remain separate.
 
 On 2026-09-08 the owner requested that OpenAI connections move below the primary Settings cards and that revoked entries no longer compete with active connections. The retained-history disclosure above implements that refinement without shortening the approved OAuth security-retention period.
 

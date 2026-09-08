@@ -1251,6 +1251,8 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Given** the production public site deployment
 - **Then** sitemap and robots files are published as static assets
 - **And** key marketing, docs, and blog routes expose stable metadata and canonical URLs through standard Next.js metadata generation
+- **And** every public site page inherits the shared 1200×630 Open Graph image and `summary_large_image` Twitter card
+- **And** the authenticated app entry point provides description, canonical, icon, theme, Open Graph, and Twitter metadata while declaring `noindex, nofollow`
 
 ---
 

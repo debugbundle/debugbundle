@@ -39,7 +39,6 @@ const expectedEndpoint = `${expectedResource}/mcp`;
 const expectedIssuer = "https://api.debugbundle.com";
 const expectedPrompts = [
   "Investigate my latest production incident.",
-  "Explain this incident from its bundle and reproduction.",
   "Summarize product usage and checkout funnel performance for the last 7 days.",
   "Why is this endpoint health check failing?"
 ];
@@ -296,6 +295,9 @@ function validateManifest(failures) {
   }
   if (stableJson(manifest.interface?.defaultPrompt) !== stableJson(expectedPrompts)) {
     failures.push("plugin_manifest:starter_prompt_drift");
+  }
+  if ((manifest.interface?.defaultPrompt?.length ?? 0) > 3) {
+    failures.push("plugin_manifest:too_many_default_prompts");
   }
   for (const prompt of manifest.interface?.defaultPrompt ?? []) {
     if (typeof prompt !== "string" || prompt.length === 0 || prompt.length > 128) {

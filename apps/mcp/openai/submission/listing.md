@@ -6,6 +6,7 @@ Evidence state: production candidate with Developer Mode connection and bounded 
 ## Portal fields
 
 - Name: `DebugBundle`
+- Publisher identity: verified individual `Owen Far` (verification pending in the OpenAI organization used for submission)
 - Short description: `Investigate incidents and aggregate product analytics with read-only evidence.`
 - Category: select `Developer Tools` if that exact category exists in the live portal. Otherwise pause, record the closest verified category in the release evidence, and obtain owner review before submission.
 - Website: `https://debugbundle.com/docs/mcp/openai-plugin`
@@ -14,6 +15,7 @@ Evidence state: production candidate with Developer Mode connection and bounded 
 - Terms: `https://debugbundle.com/terms`
 - Security: `https://github.com/debugbundle/debugbundle/security/policy`
 - MCP URL: `https://mcp.debugbundle.com/mcp`
+- Availability: all countries supported by the OpenAI submission portal
 
 ## Long description
 
@@ -21,4 +23,4 @@ DebugBundle helps developers investigate production runtime failures and aggrega
 
 ## Positioning boundaries
 
-The listing must not claim full observability, generic infrastructure monitoring, autonomous repair, automatic production fixes, raw-log access, individual-user analytics, arbitrary event search, or replacement of another monitoring product. Product analytics claims must remain limited to the nine frozen aggregate-only readers. Public availability, countries/regions, enhanced distribution, and proactive suggestions remain live portal decisions and are not asserted by this packet.
+The listing must not claim full observability, generic infrastructure monitoring, autonomous repair, automatic production fixes, raw-log access, individual-user analytics, arbitrary event search, or replacement of another monitoring product. Product analytics claims must remain limited to the nine frozen aggregate-only readers. The owner selected every country offered by the OpenAI portal; the live portal remains authoritative for that exact supported-country list. Enhanced distribution and proactive suggestions remain separate live portal decisions and are not asserted by this packet.

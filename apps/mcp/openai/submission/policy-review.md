@@ -1,19 +1,19 @@
 # OpenAI Plugin 1.0.0 Policy Review
 
-Status: Engineering privacy review complete on 2026-09-05; owner approved the OpenAI disclosure, customer-authorization, and restricted-data language on 2026-09-05. The reconciled public policies are deployed and verified. Remaining operator/controller, international-transfer, and country legal attestations remain pending.
+Status: Engineering privacy review complete. The owner approved the OpenAI disclosure, customer-authorization, and restricted-data language on 2026-09-05, then supplied and approved Owen Far as the Malta-based operator/controller and all OpenAI-supported countries as the intended launch availability on 2026-09-08. The corresponding policy source is reconciled locally; its deployment and the OpenAI verified-publisher identity remain pending.
 
 This record separates implementation evidence from legal conclusions. No legal conclusion is inferred from a passing test or a source-level privacy control.
 
 ## Official Requirements Revalidated
 
-The submission packet was checked on 2026-09-05 against current primary OpenAI sources:
+The submission packet was rechecked on 2026-09-08 against current primary OpenAI sources:
 
 - [Plugin guidelines](https://developers.openai.com/plugins/app-guidelines), including data minimization, restricted data, privacy-policy disclosures, and reviewer credentials;
 - [Security and privacy](https://developers.openai.com/plugins/guides/security-privacy), including least privilege, explicit consent, retention, deletion, OAuth, security review, and monitoring;
 - [Submit plugins](https://developers.openai.com/plugins/deploy/submission), including verified identity, public legal/support URLs, five positive and three negative cases, availability, and policy attestations; and
 - [MCP server review requirements](https://developers.openai.com/plugins/deploy/app-review), including disclosure parity, outside-network reviewer access, and submission-project eligibility.
 
-Recheck these pages if submission occurs after 2026-09-12 or if the portal requirements differ.
+Recheck these pages if submission occurs after 2026-09-15 or if the portal requirements differ.
 
 ## Engineering Verification
 
@@ -34,14 +34,14 @@ Normative technical evidence remains in `contracts/openai-plugin-v1-data-map.md`
 
 These are the only privacy/legal decisions that engineering evidence cannot make for the owner:
 
-- [ ] The verified OpenAI developer or business identity accurately matches the public DebugBundle name, website, support contact, privacy policy, and terms.
-- [ ] The public policies identify the correct legal operator/controller and contact details, and their governing-law, consumer, data-rights, and dispute terms are appropriate for the operator and target countries.
+- [ ] The OpenAI developer identity is verified as the individual `Owen Far` in the same organization and global-data-residency project used for submission, and the portal selection matches the public DebugBundle website, support contact, privacy policy, terms, and named operator.
+- [x] The owner identified Owen Far in Malta as the legal operator/controller and approved concise public operator, contact, governing-law, mandatory-consumer-rights, data-rights, and dispute language. The updated policy source must still be deployed and verified at the listing URLs.
 - [x] The owner approved terms requiring a member who connects OpenAI for an organization to have permission to share the selected project data. The consent UI separately identifies OpenAI, the selected scopes, and the read-only transfer before access is allowed.
-- [ ] DebugBundle&apos;s lawful basis and controller/processor allocation for personal data belonging to users or other people are appropriate for the operator, customer agreements, and target countries.
-- [ ] Processor/subprocessor, international-transfer, DPA, deletion/export, and security-incident commitments are accurate for the hosted vendors and countries offered.
+- [x] The owner approved the policy allocation in which DebugBundle is controller for account, billing, service-administration, security, and first-party telemetry information, and processor for customer-submitted project data, together with contract, legal-obligation, legitimate-interest, and consent-where-required bases.
+- [x] The owner approved the policy&apos;s provider-category, international-transfer, contractual/technical-safeguard, deletion/export, and security boundaries. The public text does not claim a separate DPA offering or a safeguard that engineering has not verified.
 - [x] The owner approved terms that prohibit use of the OpenAI connection with payment-card data, protected health information, government identifiers, access credentials, authentication secrets, and other restricted data prohibited by OpenAI.
 - [x] Site commit `325bffd8953e01fcfd4f9fcc183fbd9e39839884` is deployed by site-only run `33954101292`; the exact privacy, terms, support, and OpenAI documentation listing URLs return successfully and their required disclosures were verified in the rendered responses on 2026-09-05.
-- [ ] The final country/region availability selection matches the legal and support coverage the owner is prepared to provide.
+- [x] The owner selected all OpenAI-supported countries as the intended launch availability on 2026-09-08. The live portal must remain the authority for the exact selectable country list at submission time.
 
 If any attestation is uncertain, obtain qualified legal review before submission rather than weakening the technical data boundary or making an unsupported portal attestation.
 

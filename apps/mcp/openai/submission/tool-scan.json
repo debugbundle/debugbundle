@@ -1,0 +1,45 @@
+{
+  "schema_version": "1.0.0",
+  "plugin_version": "1.0.0",
+  "observed_at": "2026-09-08T00:45:30Z",
+  "client": {
+    "authentication": "OAuth",
+    "environment": "fresh_ephemeral_read_only"
+  },
+  "catalog": {
+    "count": 23,
+    "tools": [
+      "list_projects",
+      "list_services",
+      "list_incidents",
+      "get_incident",
+      "get_incident_context",
+      "get_bundle",
+      "get_reproduction",
+      "list_improvements",
+      "get_improvement",
+      "get_improvement_bundle",
+      "get_usage_summary",
+      "get_route_metrics",
+      "get_journey_patterns",
+      "get_device_breakdown",
+      "get_referrer_metrics",
+      "get_action_metrics",
+      "list_funnel_metrics",
+      "get_funnel_analysis",
+      "get_incident_impact",
+      "list_health_checks",
+      "get_health_check",
+      "list_health_check_results",
+      "list_health_check_daily_rollups"
+    ],
+    "matches_frozen_contract": true
+  },
+  "corpus": {
+    "all_tools_called": true,
+    "successful_tool_calls": 23,
+    "tool_errors": 0,
+    "max_concurrency": 2,
+    "mutation_occurred": false
+  }
+}

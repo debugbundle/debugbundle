@@ -16,6 +16,7 @@ import {
   createPostgresGitHubMarketplaceStore
 } from "../../../packages/storage/src/index.js";
 import { createApiDependenciesFromEnv } from "./default-dependencies-env.js";
+import { startHostedMcpEventLoopEvidence } from "./event-loop-evidence.js";
 import {
   createOpenAiPluginServerOptions,
   parseOpenAiPluginRuntimeConfig
@@ -388,6 +389,7 @@ export async function startApiServerFromEnv(
     logger,
     readinessCheck: () => readinessState.readinessCheck()
   });
+  const eventLoopEvidence = startHostedMcpEventLoopEvidence(openAiConfig.hostedMcpEnabled);
 
   let shutdownStarted = false;
   const closeDependencies =
@@ -416,6 +418,7 @@ export async function startApiServerFromEnv(
         await closeDependencies();
       }
       await Promise.all(webhookPools.map(async (pool) => pool.end()));
+      eventLoopEvidence?.stop();
       clearTimeout(forceExitTimer);
       logger.info({ signal }, "api_server_shutdown_complete");
     } catch (error) {

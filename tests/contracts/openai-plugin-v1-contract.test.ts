@@ -395,7 +395,7 @@ describe("OpenAI plugin v1 contract", () => {
     expect(EXPECTED_TOOL_NAMES.every((name) => legacyNames.includes(name))).toBe(true);
     expect(gaps).toMatchObject({
       evidence_state:
-        "developer_mode_partial_corpus_health_pagination_improvement_empty_and_four_negative_boundaries_verified",
+        "developer_mode_owner_23_tool_corpus_health_pagination_improvement_and_four_negative_boundaries_verified",
       openai_catalog: "implemented_and_contract_tested",
       dedicated_hosted_readers: "implemented_and_unit_tested",
       oauth_oidc_runtime: "deployed_enabled_metadata_verified",
@@ -403,13 +403,13 @@ describe("OpenAI plugin v1 contract", () => {
       plugin_package: "candidate_deployed_digest_frozen_app_json_and_codex_install_verified",
       hosted_infrastructure: "production_migrated_managed_caddy_dns_tls_active",
       consent_ui:
-        "owner_visual_approved_deployed_automated_keyboard_verified_manual_assistive_technology_pending",
+        "owner_visual_keyboard_and_screen_reader_approved_deployed_automated_keyboard_verified",
       synthetic_ui_preview: "implemented_contract_tested_and_owner_visual_approved",
       privacy_review:
-        "engineering_reconciled_live_policy_deployed_owner_legal_attestations_pending",
+        "owner_operator_jurisdiction_roles_transfers_and_countries_approved_updated_policy_deploy_and_publisher_identity_pending",
       developer_mode_connection: "owner_registered_reconnected_and_app_json_captured",
       production_validation:
-        "schema_portability_candidate_deployed_public_boundary_verified_partial_corpus_health_pagination_improvement_empty_and_four_negative_boundaries_verified",
+        "owner_23_tool_corpus_and_public_boundaries_verified_reviewer_synthetic_pending",
       health_results_pagination: "live_two_page_continuation_verified",
       improvement_empty_result: "live_project_scoped_empty_result_verified",
       negative_mutation_boundary: "live_no_call_read_only_refusal_verified",
@@ -418,15 +418,16 @@ describe("OpenAI plugin v1 contract", () => {
       generic_infrastructure_boundary: "live_no_call_unsupported_capability_verified",
       mcp_inspector: "v2_5_0_production_auth_boundary_verified_authenticated_openai_client_only",
       advertised_schema_portability:
-        "deployed_public_boundary_verified_authenticated_catalog_refresh_pending",
+        "deployed_public_boundary_and_authenticated_fresh_codex_catalog_verified",
       openai_monitoring:
         "hybrid_deployed_external_ready_up_runtime_incident_sanitized_verified",
-      reviewer_runtime_configuration: "enabled_hash_present_expiry_valid_outside_14_day_horizon",
+      reviewer_runtime_configuration:
+        "rotated_config_only_deployed_and_outside_network_synthetic_isolation_verified",
       portal_submission: "not_submitted",
       publication: "not_published",
       directory_discovery: "not_verified",
       next_gate:
-        "reviewer_assistive_technology_capacity_remaining_corpus_and_portal_scan"
+        "reviewer_retained_corpus_capacity_policy_deploy_publisher_identity_and_portal_scan"
     });
   });
 });

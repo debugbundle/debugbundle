@@ -33,7 +33,7 @@ describe("OpenAI plugin package", () => {
     });
   });
 
-  it("contains production metadata, four exact prompts, and the verified source icon", () => {
+  it("contains production metadata, three exact prompts, and the verified source icon", () => {
     const manifest = JSON.parse(
       readFileSync(join(pluginRoot, ".codex-plugin/plugin.json"), "utf8")
     ) as {
@@ -55,10 +55,10 @@ describe("OpenAI plugin package", () => {
     expect(manifest.interface.capabilities).toEqual(["Read"]);
     expect(manifest.interface.defaultPrompt).toEqual([
       "Investigate my latest production incident.",
-      "Explain this incident from its bundle and reproduction.",
       "Summarize product usage and checkout funnel performance for the last 7 days.",
       "Why is this endpoint health check failing?"
     ]);
+    expect(manifest.interface.defaultPrompt.length).toBeLessThanOrEqual(3);
     expect(manifest.interface.defaultPrompt.every((prompt) => prompt.length <= 128)).toBe(true);
     expect(manifest.interface.composerIcon).toBe("./assets/icon-512.png");
     expect(readFileSync(join(pluginRoot, "assets/icon-512.png"))).toEqual(

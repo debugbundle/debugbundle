@@ -54,6 +54,44 @@ describe("OpenAI plugin release automation", () => {
     expect(harness).not.toContain("process.env");
   });
 
+  it("archives the non-secret authenticated production tool scan", () => {
+    const scan = JSON.parse(
+      readFileSync(join(repoRoot, "apps/mcp/openai/submission/tool-scan.json"), "utf8")
+    ) as {
+      plugin_version: string;
+      client: { authentication: string; environment: string };
+      catalog: { count: number; tools: string[]; matches_frozen_contract: boolean };
+      corpus: {
+        all_tools_called: boolean;
+        successful_tool_calls: number;
+        tool_errors: number;
+        max_concurrency: number;
+        mutation_occurred: boolean;
+      };
+    };
+    const manifest = JSON.parse(
+      readFileSync(join(repoRoot, "apps/mcp/openai/release-manifest.json"), "utf8")
+    ) as { contract: { tools_in_scan_order: string[] } };
+
+    expect(scan.plugin_version).toBe("1.0.0");
+    expect(scan.client).toEqual({
+      authentication: "OAuth",
+      environment: "fresh_ephemeral_read_only"
+    });
+    expect(scan.catalog).toEqual({
+      count: 23,
+      tools: manifest.contract.tools_in_scan_order,
+      matches_frozen_contract: true
+    });
+    expect(scan.corpus).toEqual({
+      all_tools_called: true,
+      successful_tool_calls: 23,
+      tool_errors: 0,
+      max_concurrency: 2,
+      mutation_occurred: false
+    });
+  });
+
   it("packages an explicit privacy and legal review record", () => {
     const policyReview = readFileSync(
       join(repoRoot, "apps/mcp/openai/submission/policy-review.md"),
@@ -109,6 +147,13 @@ describe("OpenAI plugin release automation", () => {
     expect(source).toContain("release_artifact_set_incomplete");
     expect(source).toContain("submission_packet_drift");
     expect(source).toContain("release_checksums_drift");
+  });
+
+  it("excludes completed reviewer-isolation and owner-legal evidence from manual gates", () => {
+    const source = readFileSync(join(repoRoot, "scripts/release-openai-plugin.mjs"), "utf8");
+
+    expect(source).not.toContain('"reviewer_outside_network_smoke_and_fixture_isolation"');
+    expect(source).not.toContain('"remaining_owner_legal_attestations"');
   });
 
   it("fails closed when generated release artifacts drift", () => {
@@ -176,21 +221,24 @@ describe("OpenAI plugin release automation", () => {
     expect(result.manifest.manual_gates).not.toContain(
       "developer_mode_connection_registration_scan_and_app_json"
     );
-    expect(result.manifest.manual_gates).toContain(
+    expect(result.manifest.manual_gates).not.toContain(
       "manual_keyboard_and_screen_reader_accessibility_validation"
     );
     expect(result.manifest.manual_gates).toContain("representative_capacity_load_evidence");
     expect(result.manifest.manual_gates).not.toContain(
       "representative_capacity_load_and_rollback_evidence"
     );
-    expect(result.manifest.manual_gates).toContain(
+    expect(result.manifest.manual_gates).not.toContain(
       "reviewer_outside_network_smoke_and_fixture_isolation"
     );
-    expect(result.manifest.manual_gates).toContain("remaining_chatgpt_and_codex_reviewer_corpus");
+    expect(result.manifest.manual_gates).toContain("reviewer_synthetic_retained_corpus");
+    expect(result.manifest.manual_gates).not.toContain(
+      "remaining_chatgpt_and_codex_reviewer_corpus"
+    );
     expect(result.manifest.manual_gates).not.toContain(
       "hybrid_openai_monitoring_deployment_and_external_ready_validation"
     );
-    expect(result.manifest.manual_gates).toContain("remaining_owner_legal_attestations");
+    expect(result.manifest.manual_gates).not.toContain("remaining_owner_legal_attestations");
     expect(result.manifest.manual_gates).not.toContain(
       "owner_legal_attestations_and_policy_deployment"
     );
