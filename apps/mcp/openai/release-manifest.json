@@ -3,7 +3,7 @@
   "plugin_version": "1.0.0",
   "evidence_state": "local_connection_ready",
   "source": {
-    "commit": "3286e757c0fae125da3e67f52a8ae12b1e4173c1",
+    "commit": "6531a9a779bc738fe6ba2eb85df431087147297d",
     "tree_clean": true,
     "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
@@ -11,16 +11,16 @@
     "resource_origin": "https://mcp.debugbundle.com",
     "mcp_endpoint": "https://mcp.debugbundle.com/mcp",
     "oauth_issuer": "https://api.debugbundle.com",
-    "api_image_digest": "sha256:4ad1e0d62d85a98b2ffe5ad08525af7578d8096b53d6509dbb39bb637637f091"
+    "api_image_digest": "sha256:77a2a04441919b682568dbb08ebef7b181c52eccace191c040adcea76a5763f9"
   },
   "registered_connection_id": "plugin_asdk_app_6a99ba6c1e7881919091a592738692c6",
   "package": {
     "archive_file": "debugbundle-openai-plugin-1.0.0.zip",
-    "archive_sha256": "251832213c2098a031baf2523cd731f6e39cb5522cee7011780e249d03b8b7b5",
-    "archive_bytes": 39542,
+    "archive_sha256": "a3a0c49291e322c1021ea71a617342efd760778d3d6798465878674bd75ab142",
+    "archive_bytes": 39477,
     "files": {
       ".app.json": "137807180af48e9e6f6df967ebcb23925ed87fc051d219d153a1bc604c174f31",
-      ".codex-plugin/plugin.json": "8d2b0d9586ac27e13c2ac3b41062dd9da2c55a144c738d4f4beaec027d7fd6c1",
+      ".codex-plugin/plugin.json": "051710910809fa38924f91c2c3220bf214e35cca55d455850cd1ea33c96e3751",
       "LICENSE": "173fbd73cffbb3afaf6f4036f314df050dff382bf6965b0d35d06544c8b08d3d",
       "README.md": "05b8efe9c870f5ce85ef76f19a394569aad0b772e6b4577bf0d124d7fbc9bebf",
       "assets/icon-512.png": "a05a29674a75a945b1a378c73c27322c9b1f14456329bec1fc1d986453696e30",
@@ -32,13 +32,14 @@
   "submission": {
     "files": {
       "data-map.md": "90751261d20abbe9fcb80da3423e03927be5561f8a990bdb1734fab3c909162f",
-      "listing.md": "6a58a0ce58c6555c02771b4f4e9c25d75efbc595ccb90aa51f45ec7b195255b0",
-      "policy-review.md": "981b7cc81cb297263d44da8d28364f5954f9b0bca57c622b0aba0d62d991e738",
+      "listing.md": "cc7675c5b562ae4f03186d0689a86ef6419a869ba3d35095d823a15f013d844e",
+      "policy-review.md": "c9e19f156241d0f02528a7f0e5b6c1fbaa09af5c8b688863b3b81bc890abaa62",
       "post-launch-article-draft.md": "6ce0f34a4ce8261eb4a0f10e0f3c5fcc89de9677ffdcd988075ed296d97db7cd",
       "release-notes.md": "f96f0ae58b66fe326f00b6feb380a61025d5782a4568d2b012ae3ed42b5fa0b1",
-      "review-checklist.md": "61779ce92b70afe65049f55fbda5fe5b1312fe20b50e7ae93124f30c4f12b413",
-      "starter-prompts.json": "bc7193b501f4a6de03723b415dcb57878f5ef32a4ce798639306e4694be9fa19",
-      "test-cases.json": "80b45bc0d5969129ca55e0037d12c76244dd7afcc14c7d45b94a88a7a059c6f0"
+      "review-checklist.md": "0192eaa55cd9f8b3127c46ea0a14f826ecdaf3e94b06f8c03a0b2d8b45c33078",
+      "starter-prompts.json": "6d6461d82d0a0e2f429a8c776e8e9185cf8879637653a5fbf2b6235b62c6d7c2",
+      "test-cases.json": "80b45bc0d5969129ca55e0037d12c76244dd7afcc14c7d45b94a88a7a059c6f0",
+      "tool-scan.json": "ff38eb57f13fc704659de6e039c2cdcc1dddc2472a6341132cd0defbe4b8fc48"
     }
   },
   "contract": {
@@ -73,11 +74,8 @@
     "reviewer_fixture_sha256": "7eeff32a1dd14b4cb0fe5126e04470e448cf3f73a54bfb4f7e9e8f64327c6758"
   },
   "manual_gates": [
-    "manual_keyboard_and_screen_reader_accessibility_validation",
     "representative_capacity_load_evidence",
-    "reviewer_outside_network_smoke_and_fixture_isolation",
-    "remaining_chatgpt_and_codex_reviewer_corpus",
-    "remaining_owner_legal_attestations",
+    "reviewer_synthetic_retained_corpus",
     "owner_submission_approval",
     "openai_review_and_approval",
     "separate_owner_publication_approval",
