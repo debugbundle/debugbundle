@@ -6,7 +6,7 @@
  *   if (!caps.remote_probes) return reply.status(403).send({ error: "upgrade_required" });
  *
  * Adding a tier or moving a feature between tiers = one config change here.
- * Source-of-truth for values: /spec/tiers.md (finalized).
+ * Source-of-truth for values: /spec/product.md section 13 (finalized).
  */
 
 export const MAX_BILLING_ADDITIONAL_CAPACITY_UNITS = 99;
@@ -41,7 +41,10 @@ export const TIER_CAPABILITIES = {
     max_analytics_custom_dimensions: 1,
     analytics_hourly_retention_days: 7,
     availability_checks_per_project: 1,
-    availability_check_min_interval_seconds: 300
+    availability_monitored_projects_per_organization: 3,
+    availability_active_checks_per_organization: 3,
+    availability_check_min_interval_seconds: 300,
+    availability_check_recommended_failure_threshold: 3
   },
   solo: {
     remote_probes: true,
@@ -72,7 +75,10 @@ export const TIER_CAPABILITIES = {
     max_analytics_custom_dimensions: 3,
     analytics_hourly_retention_days: 30,
     availability_checks_per_project: 3,
-    availability_check_min_interval_seconds: 60
+    availability_monitored_projects_per_organization: 10,
+    availability_active_checks_per_organization: 30,
+    availability_check_min_interval_seconds: 60,
+    availability_check_recommended_failure_threshold: 3
   },
   team: {
     remote_probes: true,
@@ -102,8 +108,11 @@ export const TIER_CAPABILITIES = {
     max_analytics_saved_funnels: 50,
     max_analytics_custom_dimensions: 8,
     analytics_hourly_retention_days: 90,
-    availability_checks_per_project: 8,
-    availability_check_min_interval_seconds: 30
+    availability_checks_per_project: 10,
+    availability_monitored_projects_per_organization: 10,
+    availability_active_checks_per_organization: 50,
+    availability_check_min_interval_seconds: 60,
+    availability_check_recommended_failure_threshold: 2
   }
 } as const;
 
@@ -138,7 +147,10 @@ export interface TierCapabilities {
   readonly max_analytics_custom_dimensions: number;
   readonly analytics_hourly_retention_days: number;
   readonly availability_checks_per_project: number;
+  readonly availability_monitored_projects_per_organization: number;
+  readonly availability_active_checks_per_organization: number;
   readonly availability_check_min_interval_seconds: number;
+  readonly availability_check_recommended_failure_threshold: number;
 }
 
 /**
@@ -174,7 +186,10 @@ const SELFHOST_CAPABILITIES: TierCapabilities = {
   max_analytics_custom_dimensions: 20,
   analytics_hourly_retention_days: 365,
   availability_checks_per_project: 1_000_000,
-  availability_check_min_interval_seconds: 30
+  availability_monitored_projects_per_organization: 1_000_000,
+  availability_active_checks_per_organization: 1_000_000,
+  availability_check_min_interval_seconds: 30,
+  availability_check_recommended_failure_threshold: 3
 };
 
 /** Whether the instance is running in self-host mode (all tier limits bypassed). */

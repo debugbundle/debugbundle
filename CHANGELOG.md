@@ -12,6 +12,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ### Changed
 
+- Set the pre-launch Solo price to $4.99 per month, clarified that all paid prices exclude applicable VAT/taxes, and bounded hosted availability monitoring by tier: Free supports one check across up to three monitored projects, Solo supports three checks across up to ten monitored projects, and Team supports ten checks across up to ten monitored projects. Team checks now use a one-minute minimum interval, recommend two consecutive failures, and still allow one-failure alerting for critical endpoints.
 - Moved OpenAI connection management below the primary Settings cards and collapsed retained expired/revoked grants into an accessible connection-history disclosure while preserving automatic security retention.
 
 ### Security
@@ -20,6 +21,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ### Fixed
 
+- Prevented preserved health checks paused by a per-project limit after downgrade from consuming organization execution slots and unnecessarily pausing eligible checks in other projects.
 - Prevented a revoked OpenAI connection's retained legacy OIDC Grant artifact from causing a server error during reconnection. New Grant artifacts are now indexed for atomic revocation, while legacy rows fail closed against the normalized grant lifecycle until bounded expiry.
 
 The Developer Mode candidate is deployed and registered, but it is not submitted, approved by OpenAI, published, or directory-discoverable. Manual accessibility, reviewer, remaining live-client, portal, publication, communication, and spending gates remain separate.

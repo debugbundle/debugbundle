@@ -29,7 +29,12 @@ export class HealthCheckApiError extends Error {
 }
 
 function toApiError(status: number, body: unknown): HealthCheckApiError {
-  if (typeof body === "object" && body !== null && "error" in body && typeof body.error === "string") {
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    "error" in body &&
+    typeof body.error === "string"
+  ) {
     return new HealthCheckApiError(status, body.error);
   }
 
@@ -69,11 +74,13 @@ function buildCreateRequestBody(input: CreateHealthCheckInput): Record<string, u
     expected_status_max: input.expectedStatusMax,
     timeout_ms: input.timeoutMs,
     interval_seconds: input.intervalSeconds,
-    failure_threshold: input.failureThreshold,
     recovery_threshold: input.recoveryThreshold,
     enabled: input.enabled
   };
 
+  if (input.failureThreshold !== undefined) {
+    body["failure_threshold"] = input.failureThreshold;
+  }
   if (input.environment !== undefined) {
     body["environment"] = input.environment;
   }
@@ -174,7 +181,10 @@ export function createHealthCheckApi(httpClient: {
         throw toApiError(response.status, response.body);
       }
 
-      return response.body as { checks: AvailabilityCheckRecord[]; limits: AvailabilityCheckLimits };
+      return response.body as {
+        checks: AvailabilityCheckRecord[];
+        limits: AvailabilityCheckLimits;
+      };
     },
 
     async getHealthCheck(input) {
@@ -288,7 +298,10 @@ export function createHealthCheckApi(httpClient: {
   };
 }
 
-function formatServiceAndEnvironment(check: { service_name: string | null; environment: string }): string {
+function formatServiceAndEnvironment(check: {
+  service_name: string | null;
+  environment: string;
+}): string {
   return `${check.service_name ?? "availability"}/${check.environment}`;
 }
 
@@ -369,7 +382,7 @@ export async function listHealthChecksCommand(
     if (result.checks.length === 0) {
       return {
         exitCode: 0,
-        output: `No health checks.\nPlan limits: ${result.limits.max_checks_per_project} checks, minimum interval ${result.limits.min_interval_seconds}s.`
+        output: `No health checks.\nPlan limits: ${result.limits.max_checks_per_project} checks per project, ${result.limits.max_monitored_projects_per_organization} monitored projects, ${result.limits.max_active_checks_per_organization} active checks, minimum interval ${result.limits.min_interval_seconds}s.`
       };
     }
 
@@ -378,7 +391,10 @@ export async function listHealthChecksCommand(
       output: result.checks.map(formatCheckSummary).join("\n\n")
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -410,10 +426,13 @@ export async function getHealthCheckCommand(
 
     return {
       exitCode: 0,
-      output: `${formatCheckSummary(result.check)}\nlimits=${result.limits.max_checks_per_project} min_interval=${result.limits.min_interval_seconds}s`
+      output: `${formatCheckSummary(result.check)}\nlimits=${result.limits.max_checks_per_project} monitored_projects=${result.limits.max_monitored_projects_per_organization} active_checks=${result.limits.max_active_checks_per_organization} min_interval=${result.limits.min_interval_seconds}s recommended_failures=${result.limits.recommended_failure_threshold}`
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -435,7 +454,10 @@ export async function createHealthCheckCommand(
       output: `Health check created: ${result.check.check_id} (${result.check.name})`
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -457,7 +479,10 @@ export async function updateHealthCheckCommand(
       output: `Health check updated: ${result.check.check_id} (${result.check.name})`
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -492,7 +517,10 @@ export async function deleteHealthCheckCommand(
       output: result.deleted ? "Health check deleted." : "Health check was already deleted."
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -514,7 +542,10 @@ export async function testHealthCheckCommand(
       output: formatTestResult(result)
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -556,7 +587,10 @@ export async function listHealthCheckResultsCommand(
       output: result.results.map(formatCheckResultSummary).join("\n")
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -598,7 +632,10 @@ export async function listHealthCheckDailyRollupsCommand(
       output: result.rollups.map(formatCheckDailyRollupSummary).join("\n")
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -620,7 +657,8 @@ async function createAuthenticatedHealthCheckApi(
 
   const authState = await readAuth(authStateInput);
   const createHttpClient =
-    dependencies?.createHttpClient ?? ((clientInput: { baseUrl: string }) => createCliHttpClient(clientInput));
+    dependencies?.createHttpClient ??
+    ((clientInput: { baseUrl: string }) => createCliHttpClient(clientInput));
   const httpClient = createHttpClient({ baseUrl: authState.base_url });
   const createApi = dependencies?.createApi ?? createHealthCheckApi;
 
@@ -688,7 +726,7 @@ export async function createHealthCheckWithAuthCommand(
     expectedStatusMax: number;
     timeoutMs: number;
     intervalSeconds: number;
-    failureThreshold: number;
+    failureThreshold?: number;
     recoveryThreshold: number;
     environment?: string;
     serviceName?: string | null;
@@ -850,7 +888,10 @@ export async function listHealthCheckDailyRollupsWithAuthCommand(
           ...(input.limit === undefined ? {} : { limit: input.limit }),
           ...(input.json === undefined ? {} : { json: input.json })
         },
-        { listHealthCheckDailyRollups: (requestInput) => api.listHealthCheckDailyRollups(requestInput) }
+        {
+          listHealthCheckDailyRollups: (requestInput) =>
+            api.listHealthCheckDailyRollups(requestInput)
+        }
       )
   });
 }

@@ -1,7 +1,7 @@
 # Acceptance Criteria — DebugBundle
 
 Version: v1
-Last updated: 2026-07-04
+Last updated: 2026-09-10
 
 ---
 
@@ -260,14 +260,24 @@ Last updated: 2026-07-04
 - **When** two consecutive executions later succeed
 - **Then** DebugBundle auto-resolves the linked availability incident
 
-### AC-AVC-03: Tier Limits Pause But Do Not Hide Preserved Checks
+### AC-AVC-03: Tier Capacity Preserves Existing Checks Gracefully
 
 - **Given** a project that previously configured health checks on a higher plan
-- **When** the project downgrades below the configured count or interval allowance
+- **When** the organization moves below the configured project or check-count allowance
 - **Then** existing checks remain readable through API, CLI, MCP, and web
 - **And** out-of-policy checks show paused state and stop executing
 - **And** create/update attempts that violate current tier limits return explicit limit errors
-- **And** per-project count caps are 1 on Free, 3 on Solo, and 8 on Team
+- **And** saved-check caps per project are 1 on Free, 3 on Solo, and 10 on Team
+- **And** monitored-project caps per organization are 3 on Free and 10 on Solo and Team
+- **And** active-check caps per organization are 3 on Free, 30 on Solo, and 50 on Team
+- **And** checks paused by the per-project saved-check cap do not consume organization execution slots or pause otherwise eligible checks in other monitored projects
+- **Given** an existing Team check whose persisted interval is `30` seconds
+- **When** the Team minimum becomes `60` seconds
+- **Then** the check remains enabled and executes no more frequently than every `60` seconds
+- **And** reads expose the effective `60` second interval without requiring a schema migration or rewriting the stored row
+- **And** new Team create/update requests below `60` seconds return the existing explicit interval-limit error
+- **And** a new Team check that omits `failure_threshold` uses the recommended value `2`
+- **And** callers can explicitly set `failure_threshold: 1` for especially critical endpoints
 
 ### AC-AVC-04: Health Check Test Is Side-Effect-Free
 
@@ -1026,6 +1036,17 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** batched or fan-out work consumes the exact remaining units in deterministic order
 - **And** non-reservation counters use no conservative under-admission margin, so concurrent contention may produce a small visible overage but must not strand advertised capacity
 - **And** limit-reached notifications are not queued with usage below the defined limit
+
+### AC-BILL-04: Solo Launch Price Is Canonical
+
+- **Given** the pre-public-launch Stripe catalog and DebugBundle pricing surfaces
+- **When** a new customer starts paid Solo checkout
+- **Then** the checkout uses the single active `$4.99/month` Solo plan Price configured by `STRIPE_SOLO_PRICE_ID`
+- **And** no alternate Solo base price is advertised or retained as an active launch Price
+- **And** Solo extra capacity remains `$0.99/unit/month`
+- **And** Team remains `$19/month`
+- **And** all advertised paid prices state that they exclude VAT or other applicable taxes, which are calculated and applied at checkout
+- **And** every paid catalog Price uses `tax_behavior: exclusive`
 
 ---
 

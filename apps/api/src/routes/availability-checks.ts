@@ -20,16 +20,26 @@ function isProjectManager(role: "owner" | "admin" | "member"): boolean {
 
 function buildAvailabilityLimits(plan: string | undefined): {
   max_checks_per_project: number;
+  max_monitored_projects_per_organization: number;
+  max_active_checks_per_organization: number;
   min_interval_seconds: number;
+  recommended_failure_threshold: number;
 } {
   const caps = getTierCapabilities(plan);
   return {
     max_checks_per_project: caps.availability_checks_per_project,
-    min_interval_seconds: caps.availability_check_min_interval_seconds
+    max_monitored_projects_per_organization: caps.availability_monitored_projects_per_organization,
+    max_active_checks_per_organization: caps.availability_active_checks_per_organization,
+    min_interval_seconds: caps.availability_check_min_interval_seconds,
+    recommended_failure_threshold: caps.availability_check_recommended_failure_threshold
   };
 }
 
-export function mapAvailabilityValidationError(error: unknown): { status: number; error: string; message?: string } {
+export function mapAvailabilityValidationError(error: unknown): {
+  status: number;
+  error: string;
+  message?: string;
+} {
   if (error instanceof AvailabilityCheckValidationError) {
     return {
       status: 400,
@@ -107,11 +117,12 @@ export function registerAvailabilityCheckRoutes(
       return reply.status(400).send({ error: "invalid_query" });
     }
 
-    const checks = await dependencies.availabilityCheckManagement.listChecksForProjectInOrganization({
-      organization_id: auth.access.organization_id,
-      project_id: parsedParams.data.id,
-      limit: parsedQuery.data.limit
-    });
+    const checks =
+      await dependencies.availabilityCheckManagement.listChecksForProjectInOrganization({
+        organization_id: auth.access.organization_id,
+        project_id: parsedParams.data.id,
+        limit: parsedQuery.data.limit
+      });
 
     if (checks === null) {
       return reply.status(404).send({ error: "project_not_found" });
@@ -182,28 +193,32 @@ export function registerAvailabilityCheckRoutes(
     }
 
     try {
-      const created = await dependencies.availabilityCheckManagement.createCheckForProjectInOrganization({
-        organization_id: auth.access.organization_id,
-        project_id: parsedParams.data.id,
-        created_by_user_id: auth.member.member_id,
-        name: parsedBody.data.name,
-        url: parsedBody.data.url,
-        method: parsedBody.data.method,
-        expected_status_min: parsedBody.data.expected_status_min,
-        expected_status_max: parsedBody.data.expected_status_max,
-        timeout_ms: parsedBody.data.timeout_ms,
-        interval_seconds: parsedBody.data.interval_seconds,
-        failure_threshold: parsedBody.data.failure_threshold,
-        recovery_threshold: parsedBody.data.recovery_threshold,
-        enabled: parsedBody.data.enabled,
-        ...(parsedBody.data.environment === undefined
-          ? {}
-          : { environment: parsedBody.data.environment }),
-        ...(parsedBody.data.service_name === undefined
-          ? {}
-          : { service_name: parsedBody.data.service_name }),
-        now: new Date().toISOString()
-      });
+      const created =
+        await dependencies.availabilityCheckManagement.createCheckForProjectInOrganization({
+          organization_id: auth.access.organization_id,
+          project_id: parsedParams.data.id,
+          created_by_user_id: auth.member.member_id,
+          name: parsedBody.data.name,
+          url: parsedBody.data.url,
+          method: parsedBody.data.method,
+          expected_status_min: parsedBody.data.expected_status_min,
+          expected_status_max: parsedBody.data.expected_status_max,
+          timeout_ms: parsedBody.data.timeout_ms,
+          interval_seconds: parsedBody.data.interval_seconds,
+          failure_threshold:
+            parsedBody.data.failure_threshold ??
+            getTierCapabilities(auth.access.organization_plan)
+              .availability_check_recommended_failure_threshold,
+          recovery_threshold: parsedBody.data.recovery_threshold,
+          enabled: parsedBody.data.enabled,
+          ...(parsedBody.data.environment === undefined
+            ? {}
+            : { environment: parsedBody.data.environment }),
+          ...(parsedBody.data.service_name === undefined
+            ? {}
+            : { service_name: parsedBody.data.service_name }),
+          now: new Date().toISOString()
+        });
 
       if (created === "project_not_found") {
         await recordAvailabilityAudit(request, dependencies, {
@@ -330,42 +345,41 @@ export function registerAvailabilityCheckRoutes(
     }
 
     try {
-      const updated = await dependencies.availabilityCheckManagement.updateCheckForProjectInOrganization({
-        organization_id: auth.access.organization_id,
-        project_id: parsedParams.data.id,
-        check_id: parsedParams.data.checkId,
-        ...(parsedBody.data.name === undefined ? {} : { name: parsedBody.data.name }),
-        ...(parsedBody.data.url === undefined ? {} : { url: parsedBody.data.url }),
-        ...(parsedBody.data.method === undefined ? {} : { method: parsedBody.data.method }),
-        ...(parsedBody.data.expected_status_min === undefined
-          ? {}
-          : { expected_status_min: parsedBody.data.expected_status_min }),
-        ...(parsedBody.data.expected_status_max === undefined
-          ? {}
-          : { expected_status_max: parsedBody.data.expected_status_max }),
-        ...(parsedBody.data.timeout_ms === undefined
-          ? {}
-          : { timeout_ms: parsedBody.data.timeout_ms }),
-        ...(parsedBody.data.interval_seconds === undefined
-          ? {}
-          : { interval_seconds: parsedBody.data.interval_seconds }),
-        ...(parsedBody.data.failure_threshold === undefined
-          ? {}
-          : { failure_threshold: parsedBody.data.failure_threshold }),
-        ...(parsedBody.data.recovery_threshold === undefined
-          ? {}
-          : { recovery_threshold: parsedBody.data.recovery_threshold }),
-        ...(parsedBody.data.environment === undefined
-          ? {}
-          : { environment: parsedBody.data.environment }),
-        ...(parsedBody.data.service_name === undefined
-          ? {}
-          : { service_name: parsedBody.data.service_name }),
-        ...(parsedBody.data.enabled === undefined
-          ? {}
-          : { enabled: parsedBody.data.enabled }),
-        now: new Date().toISOString()
-      });
+      const updated =
+        await dependencies.availabilityCheckManagement.updateCheckForProjectInOrganization({
+          organization_id: auth.access.organization_id,
+          project_id: parsedParams.data.id,
+          check_id: parsedParams.data.checkId,
+          ...(parsedBody.data.name === undefined ? {} : { name: parsedBody.data.name }),
+          ...(parsedBody.data.url === undefined ? {} : { url: parsedBody.data.url }),
+          ...(parsedBody.data.method === undefined ? {} : { method: parsedBody.data.method }),
+          ...(parsedBody.data.expected_status_min === undefined
+            ? {}
+            : { expected_status_min: parsedBody.data.expected_status_min }),
+          ...(parsedBody.data.expected_status_max === undefined
+            ? {}
+            : { expected_status_max: parsedBody.data.expected_status_max }),
+          ...(parsedBody.data.timeout_ms === undefined
+            ? {}
+            : { timeout_ms: parsedBody.data.timeout_ms }),
+          ...(parsedBody.data.interval_seconds === undefined
+            ? {}
+            : { interval_seconds: parsedBody.data.interval_seconds }),
+          ...(parsedBody.data.failure_threshold === undefined
+            ? {}
+            : { failure_threshold: parsedBody.data.failure_threshold }),
+          ...(parsedBody.data.recovery_threshold === undefined
+            ? {}
+            : { recovery_threshold: parsedBody.data.recovery_threshold }),
+          ...(parsedBody.data.environment === undefined
+            ? {}
+            : { environment: parsedBody.data.environment }),
+          ...(parsedBody.data.service_name === undefined
+            ? {}
+            : { service_name: parsedBody.data.service_name }),
+          ...(parsedBody.data.enabled === undefined ? {} : { enabled: parsedBody.data.enabled }),
+          now: new Date().toISOString()
+        });
 
       if (updated === "check_not_found") {
         await recordAvailabilityAudit(request, dependencies, {
@@ -380,6 +394,24 @@ export function registerAvailabilityCheckRoutes(
           }
         });
         return reply.status(404).send({ error: "check_not_found" });
+      }
+      if (updated === "limit_reached") {
+        await recordAvailabilityAudit(request, dependencies, {
+          organization_id: auth.access.organization_id,
+          actor_user_id: auth.member.member_id,
+          action: "availability_check.update",
+          target_id: parsedParams.data.checkId,
+          status: "failure",
+          metadata: {
+            project_id: parsedParams.data.id,
+            reason: "limit_reached",
+            enabled: parsedBody.data.enabled
+          }
+        });
+        return reply.status(409).send({
+          error: "availability_check_limit_reached",
+          limits: buildAvailabilityLimits(auth.access.organization_plan)
+        });
       }
       if (updated === "interval_too_low") {
         await recordAvailabilityAudit(request, dependencies, {
@@ -458,12 +490,13 @@ export function registerAvailabilityCheckRoutes(
       return reply.status(404).send({ error: "availability_checks_unavailable" });
     }
 
-    const deleted = await dependencies.availabilityCheckManagement.deleteCheckForProjectInOrganization({
-      organization_id: auth.access.organization_id,
-      project_id: parsedParams.data.id,
-      check_id: parsedParams.data.checkId,
-      deleted_at: new Date().toISOString()
-    });
+    const deleted =
+      await dependencies.availabilityCheckManagement.deleteCheckForProjectInOrganization({
+        organization_id: auth.access.organization_id,
+        project_id: parsedParams.data.id,
+        check_id: parsedParams.data.checkId,
+        deleted_at: new Date().toISOString()
+      });
 
     if (!deleted) {
       await recordAvailabilityAudit(request, dependencies, {
@@ -516,12 +549,13 @@ export function registerAvailabilityCheckRoutes(
       return reply.status(400).send({ error: "invalid_query" });
     }
 
-    const results = await dependencies.availabilityCheckManagement.listResultsForCheckInOrganization({
-      organization_id: auth.access.organization_id,
-      project_id: parsedParams.data.id,
-      check_id: parsedParams.data.checkId,
-      limit: parsedQuery.data.limit
-    });
+    const results =
+      await dependencies.availabilityCheckManagement.listResultsForCheckInOrganization({
+        organization_id: auth.access.organization_id,
+        project_id: parsedParams.data.id,
+        check_id: parsedParams.data.checkId,
+        limit: parsedQuery.data.limit
+      });
 
     if (results === null) {
       return reply.status(404).send({ error: "check_not_found" });
@@ -552,12 +586,13 @@ export function registerAvailabilityCheckRoutes(
       return reply.status(400).send({ error: "invalid_query" });
     }
 
-    const rollups = await dependencies.availabilityCheckManagement.listDailyRollupsForCheckInOrganization({
-      organization_id: auth.access.organization_id,
-      project_id: parsedParams.data.id,
-      check_id: parsedParams.data.checkId,
-      limit: parsedQuery.data.limit
-    });
+    const rollups =
+      await dependencies.availabilityCheckManagement.listDailyRollupsForCheckInOrganization({
+        organization_id: auth.access.organization_id,
+        project_id: parsedParams.data.id,
+        check_id: parsedParams.data.checkId,
+        limit: parsedQuery.data.limit
+      });
 
     if (rollups === null) {
       return reply.status(404).send({ error: "check_not_found" });

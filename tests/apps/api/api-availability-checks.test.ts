@@ -8,7 +8,9 @@ type ApiServerDependencies = Parameters<typeof createApiServer>[0];
 type AvailabilityCheckManagementDependency = MockedMethods<
   NonNullable<ApiServerDependencies["availabilityCheckManagement"]>
 >;
-type ProjectManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["projectManagement"]>>;
+type ProjectManagementDependency = MockedMethods<
+  NonNullable<ApiServerDependencies["projectManagement"]>
+>;
 type MemberAuthDependency = MockedMethods<ApiServerDependencies["memberAuth"]>;
 
 const checkFixture = {
@@ -76,23 +78,37 @@ const rollupFixture = {
   incident_ids: []
 };
 
-function createServer(overrides: {
-  availabilityCheckManagement?: AvailabilityCheckManagementDependency;
-  availabilityChecksUnavailable?: boolean;
-  projectManagement?: Partial<ProjectManagementDependency>;
-  memberAuth?: MemberAuthDependency;
-} = {}): ReturnType<typeof createApiServer> {
+const soloLimits = {
+  max_checks_per_project: 3,
+  max_monitored_projects_per_organization: 10,
+  max_active_checks_per_organization: 30,
+  min_interval_seconds: 60,
+  recommended_failure_threshold: 3
+};
+
+function createServer(
+  overrides: {
+    availabilityCheckManagement?: AvailabilityCheckManagementDependency;
+    availabilityChecksUnavailable?: boolean;
+    projectManagement?: Partial<ProjectManagementDependency>;
+    memberAuth?: MemberAuthDependency;
+  } = {}
+): ReturnType<typeof createApiServer> {
   return createApiServer({
     ingestionPersistence: {
       persistAndEnqueue: vi.fn()
     },
     ingestionMetadata: mockedObject<ApiServerDependencies["ingestionMetadata"]>({
-      resolveProjectByTokenHash: vi.fn().mockResolvedValue({ project_id: "proj_123", organization_plan: "free" })
+      resolveProjectByTokenHash: vi
+        .fn()
+        .mockResolvedValue({ project_id: "proj_123", organization_plan: "free" })
     }),
     memberAuth:
       overrides.memberAuth ??
       mockedObject<ApiServerDependencies["memberAuth"]>({
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "usr_123", organization_id: "org_owner" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "usr_123", organization_id: "org_owner" })
       }),
     tokenManagement: mockedObject<ApiServerDependencies["tokenManagement"]>({
       listProjectTokensForOrganization: vi.fn().mockResolvedValue([]),
@@ -209,8 +225,10 @@ describe("api availability check routes", () => {
     });
     expect(listResponse.statusCode).toBe(200);
     expect(listResponse.json()).toMatchObject({
-      checks: [expect.objectContaining({ check_id: checkFixture.check_id, linked_incident_status: null })],
-      limits: { max_checks_per_project: 3, min_interval_seconds: 60 }
+      checks: [
+        expect.objectContaining({ check_id: checkFixture.check_id, linked_incident_status: null })
+      ],
+      limits: soloLimits
     });
 
     const getResponse = await app.inject({
@@ -220,7 +238,10 @@ describe("api availability check routes", () => {
     });
     expect(getResponse.statusCode).toBe(200);
     expect(getResponse.json()).toMatchObject({
-      check: expect.objectContaining({ check_id: checkFixture.check_id, linked_incident_status: null })
+      check: expect.objectContaining({
+        check_id: checkFixture.check_id,
+        linked_incident_status: null
+      })
     });
 
     const createResponse = await app.inject({
@@ -313,6 +334,72 @@ describe("api availability check routes", () => {
     );
   });
 
+  it("uses the Team-recommended two-failure default while allowing explicit thresholds", async () => {
+    const createCheckForProjectInOrganization = vi.fn().mockResolvedValue({
+      ...checkFixture,
+      organization_plan: "team",
+      failure_threshold: 2
+    });
+    const app = createServer({
+      projectManagement: {
+        resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+          project_id: checkFixture.project_id,
+          organization_id: "org_owner",
+          owner_user_id: "usr_owner",
+          owner_email: "owner@example.com",
+          relationship: "owner",
+          sharing_state: "owned",
+          effective_role: "owner",
+          organization_plan: "team"
+        })
+      },
+      availabilityCheckManagement: mockedObject<
+        NonNullable<ApiServerDependencies["availabilityCheckManagement"]>
+      >({
+        listChecksForProjectInOrganization: vi.fn(),
+        getCheckForProjectInOrganization: vi.fn(),
+        createCheckForProjectInOrganization,
+        updateCheckForProjectInOrganization: vi.fn(),
+        deleteCheckForProjectInOrganization: vi.fn(),
+        listResultsForCheckInOrganization: vi.fn(),
+        listDailyRollupsForCheckInOrganization: vi.fn(),
+        testCheck: vi.fn()
+      })
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/projects/${checkFixture.project_id}/availability-checks`,
+      headers: { authorization: "Bearer dbundle_mem_test" },
+      payload: {
+        name: "Primary app",
+        url: "https://app.example.com/health",
+        interval_seconds: 60
+      }
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(createCheckForProjectInOrganization).toHaveBeenCalledWith(
+      expect.objectContaining({ failure_threshold: 2 })
+    );
+
+    const criticalResponse = await app.inject({
+      method: "POST",
+      url: `/v1/projects/${checkFixture.project_id}/availability-checks`,
+      headers: { authorization: "Bearer dbundle_mem_test" },
+      payload: {
+        name: "Critical endpoint",
+        url: "https://app.example.com/critical",
+        interval_seconds: 60,
+        failure_threshold: 1
+      }
+    });
+    expect(criticalResponse.statusCode).toBe(201);
+    expect(createCheckForProjectInOrganization).toHaveBeenLastCalledWith(
+      expect.objectContaining({ failure_threshold: 1 })
+    );
+  });
+
   it("allows members to read checks but forbids mutations and tests", async () => {
     const app = createServer({
       projectManagement: {
@@ -373,9 +460,14 @@ describe("api availability check routes", () => {
       deleteCheckForProjectInOrganization: vi.fn().mockResolvedValue(true),
       listResultsForCheckInOrganization: vi.fn().mockResolvedValue([]),
       listDailyRollupsForCheckInOrganization: vi.fn().mockResolvedValue([]),
-      testCheck: vi.fn().mockRejectedValue(
-        new AvailabilityCheckValidationError("blocked_hostname", "Availability checks cannot target localhost or private hostnames.")
-      )
+      testCheck: vi
+        .fn()
+        .mockRejectedValue(
+          new AvailabilityCheckValidationError(
+            "blocked_hostname",
+            "Availability checks cannot target localhost or private hostnames."
+          )
+        )
     });
     const app = createServer({ availabilityCheckManagement });
 
@@ -401,7 +493,7 @@ describe("api availability check routes", () => {
     expect(createResponse.statusCode).toBe(409);
     expect(createResponse.json()).toEqual({
       error: "availability_check_limit_reached",
-      limits: { max_checks_per_project: 3, min_interval_seconds: 60 }
+      limits: soloLimits
     });
 
     const updateResponse = await app.inject({
@@ -415,8 +507,27 @@ describe("api availability check routes", () => {
     expect(updateResponse.statusCode).toBe(409);
     expect(updateResponse.json()).toEqual({
       error: "availability_check_interval_too_low",
-      limits: { max_checks_per_project: 3, min_interval_seconds: 60 }
+      limits: soloLimits
     });
+
+    const activationLimitApp = createServer({
+      availabilityCheckManagement: {
+        ...availabilityCheckManagement,
+        updateCheckForProjectInOrganization: vi.fn().mockResolvedValue("limit_reached")
+      }
+    });
+    const activationResponse = await activationLimitApp.inject({
+      method: "PATCH",
+      url: `/v1/projects/${checkFixture.project_id}/availability-checks/${checkFixture.check_id}`,
+      headers: authHeader,
+      payload: { enabled: true }
+    });
+    expect(activationResponse.statusCode).toBe(409);
+    expect(activationResponse.json()).toEqual({
+      error: "availability_check_limit_reached",
+      limits: soloLimits
+    });
+    await activationLimitApp.close();
 
     const testResponse = await app.inject({
       method: "POST",
@@ -448,7 +559,9 @@ describe("api availability check routes", () => {
     expect(unavailableResponse.json()).toEqual({ error: "availability_checks_unavailable" });
 
     const missingApp = createServer({
-      availabilityCheckManagement: mockedObject<NonNullable<ApiServerDependencies["availabilityCheckManagement"]>>({
+      availabilityCheckManagement: mockedObject<
+        NonNullable<ApiServerDependencies["availabilityCheckManagement"]>
+      >({
         listChecksForProjectInOrganization: vi.fn().mockResolvedValue(null),
         getCheckForProjectInOrganization: vi.fn().mockResolvedValue(null),
         createCheckForProjectInOrganization: vi.fn().mockResolvedValue("project_not_found"),

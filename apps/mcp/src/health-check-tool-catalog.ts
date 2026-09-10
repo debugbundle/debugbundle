@@ -24,7 +24,8 @@ export const HEALTH_CHECK_MCP_TOOL_CATALOG = [
   {
     name: "create_health_check",
     group: "health_checks",
-    description: "Create a hosted health check for a project.",
+    description:
+      "Create a hosted health check for a project. Omit failureThreshold to use the plan recommendation.",
     inputSchema: z.object({
       bearerToken: z.string(),
       projectId: z.string(),

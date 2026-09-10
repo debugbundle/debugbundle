@@ -45,6 +45,12 @@ export function getDefaultAvailabilityCheckIntervalSeconds(
   return Math.max(limits?.min_interval_seconds ?? 300, DEFAULT_NEW_CHECK_INTERVAL_SECONDS);
 }
 
+export function getDefaultAvailabilityFailureThreshold(
+  limits: AvailabilityCheckLimits | null
+): number {
+  return limits?.recommended_failure_threshold ?? 3;
+}
+
 export function getHealthChecksAutoRefreshIntervalMs(
   checks: AvailabilityCheckRecord[] | null
 ): number | null {
@@ -76,22 +82,20 @@ export function hasPendingInitialHealthCheckResult(
   );
 }
 
-export function buildCheckDraft(formState: AvailabilityCheckFormState):
-  | {
-      name: string;
-      url: string;
-      method: "GET" | "HEAD";
-      expected_status_min: number;
-      expected_status_max: number;
-      timeout_ms: number;
-      interval_seconds: number;
-      failure_threshold: number;
-      recovery_threshold: number;
-      environment?: string;
-      service_name?: string | null;
-      enabled: boolean;
-    }
-  | null {
+export function buildCheckDraft(formState: AvailabilityCheckFormState): {
+  name: string;
+  url: string;
+  method: "GET" | "HEAD";
+  expected_status_min: number;
+  expected_status_max: number;
+  timeout_ms: number;
+  interval_seconds: number;
+  failure_threshold: number;
+  recovery_threshold: number;
+  environment?: string;
+  service_name?: string | null;
+  enabled: boolean;
+} | null {
   if (formState.name.trim() === "" || formState.url.trim() === "") {
     return null;
   }
@@ -104,9 +108,14 @@ export function buildCheckDraft(formState: AvailabilityCheckFormState):
   const recoveryThreshold = Number.parseInt(formState.recovery_threshold, 10);
 
   if (
-    [expectedStatusMin, expectedStatusMax, timeoutMs, intervalSeconds, failureThreshold, recoveryThreshold].some(
-      (value) => !Number.isFinite(value)
-    ) ||
+    [
+      expectedStatusMin,
+      expectedStatusMax,
+      timeoutMs,
+      intervalSeconds,
+      failureThreshold,
+      recoveryThreshold
+    ].some((value) => !Number.isFinite(value)) ||
     expectedStatusMin > expectedStatusMax
   ) {
     return null;
@@ -124,7 +133,9 @@ export function buildCheckDraft(formState: AvailabilityCheckFormState):
     recovery_threshold: recoveryThreshold,
     enabled: formState.enabled,
     ...(formState.environment.trim() === "" ? {} : { environment: formState.environment.trim() }),
-    ...(formState.service_name.trim() === "" ? { service_name: null } : { service_name: formState.service_name.trim() })
+    ...(formState.service_name.trim() === ""
+      ? { service_name: null }
+      : { service_name: formState.service_name.trim() })
   };
 }
 
@@ -197,7 +208,13 @@ export function formatDailyStateLabel(
 }
 
 export function formatAvailabilityStatus(status: AvailabilityCheckRecord["status"]): string {
-  return status === "unknown" ? "Unknown" : status === "passing" ? "Passing" : status === "failing" ? "Failing" : "Paused";
+  return status === "unknown"
+    ? "Unknown"
+    : status === "passing"
+      ? "Passing"
+      : status === "failing"
+        ? "Failing"
+        : "Paused";
 }
 
 export function formatPausedReason(reason: string): string {
@@ -206,6 +223,12 @@ export function formatPausedReason(reason: string): string {
   }
   if (reason === "plan_check_limit_exceeded") {
     return "Over plan check limit";
+  }
+  if (reason === "plan_monitored_project_limit_exceeded") {
+    return "Over monitored project limit";
+  }
+  if (reason === "plan_organization_check_limit_exceeded") {
+    return "Over organization check limit";
   }
   if (reason === "plan_interval_too_low") {
     return "Interval below plan minimum";
@@ -260,7 +283,7 @@ export function getAvailabilityErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     switch (error.message) {
       case "availability_check_limit_reached":
-        return "This project already uses the maximum number of health checks allowed by the current plan.";
+        return "This project or organization already uses the health-check capacity allowed by the current plan.";
       case "availability_check_interval_too_low":
         return "The polling interval is lower than the minimum allowed by the current plan.";
       case "invalid_check_target":

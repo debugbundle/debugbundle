@@ -3309,7 +3309,7 @@
         },
         {
           "name": "create_health_check",
-          "description": "Create a hosted health check for a project.",
+          "description": "Create a hosted health check for a project. Omit failureThreshold to use the plan recommendation.",
           "inputSchema": {
             "type": "object",
             "properties": {
@@ -7410,7 +7410,7 @@
       {
         "mcpToolName": "create_health_check",
         "openClawToolName": "debugbundle_create_health_check",
-        "description": "Create a hosted health check for a project.",
+        "description": "Create a hosted health check for a project. Omit failureThreshold to use the plan recommendation.",
         "optional": true,
         "parameters": {
           "type": "object",

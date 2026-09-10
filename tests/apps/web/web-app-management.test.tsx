@@ -293,7 +293,13 @@ describe("web app — management routes", () => {
               updated_at: "2026-03-17T09:00:00.000Z"
             }
           ],
-          limits: { max_checks_per_project: 8, min_interval_seconds: 30 }
+          limits: {
+            max_checks_per_project: 10,
+            max_monitored_projects_per_organization: 10,
+            max_active_checks_per_organization: 50,
+            min_interval_seconds: 60,
+            recommended_failure_threshold: 2
+          }
         });
       }
 
@@ -412,7 +418,7 @@ describe("web app — management routes", () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/^3 event types subscribed across endpoints\.$/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/^plan minimum interval 30s with 30-day retained history\.$/i)
+      screen.getByText(/^plan minimum interval 60s with 30-day retained history\.$/i)
     ).toBeInTheDocument();
     expect(
       screen.getByText(/^2 dispatch rules configured for debugbundle\/app\.$/i)
@@ -463,7 +469,13 @@ describe("web app — management routes", () => {
       if (url.endsWith("/v1/projects/proj_123/availability-checks?limit=100")) {
         return jsonResponse(200, {
           checks: [],
-          limits: { max_checks_per_project: 1, min_interval_seconds: 300 }
+          limits: {
+            max_checks_per_project: 1,
+            max_monitored_projects_per_organization: 3,
+            max_active_checks_per_organization: 3,
+            min_interval_seconds: 300,
+            recommended_failure_threshold: 3
+          }
         });
       }
 
@@ -4047,7 +4059,13 @@ describe("web app — management routes", () => {
       if (url.endsWith("/v1/projects/proj_123/availability-checks?limit=100")) {
         return jsonResponse(200, {
           checks: [createHealthCheck({ project_id: "proj_123", status: "passing" })],
-          limits: { max_checks_per_project: 3, min_interval_seconds: 60 }
+          limits: {
+            max_checks_per_project: 3,
+            max_monitored_projects_per_organization: 10,
+            max_active_checks_per_organization: 30,
+            min_interval_seconds: 60,
+            recommended_failure_threshold: 3
+          }
         });
       }
 
@@ -4056,7 +4074,13 @@ describe("web app — management routes", () => {
           checks: [
             createHealthCheck({ check_id: "chk_456", project_id: "proj_456", status: "failing" })
           ],
-          limits: { max_checks_per_project: 3, min_interval_seconds: 60 }
+          limits: {
+            max_checks_per_project: 3,
+            max_monitored_projects_per_organization: 10,
+            max_active_checks_per_organization: 30,
+            min_interval_seconds: 60,
+            recommended_failure_threshold: 3
+          }
         });
       }
 
@@ -4222,7 +4246,13 @@ describe("web app — management routes", () => {
       if (url.endsWith("/v1/projects/proj_123/availability-checks?limit=100")) {
         return jsonResponse(200, {
           checks: [],
-          limits: { max_checks_per_project: 1, min_interval_seconds: 300 }
+          limits: {
+            max_checks_per_project: 1,
+            max_monitored_projects_per_organization: 3,
+            max_active_checks_per_organization: 3,
+            min_interval_seconds: 300,
+            recommended_failure_threshold: 3
+          }
         });
       }
 

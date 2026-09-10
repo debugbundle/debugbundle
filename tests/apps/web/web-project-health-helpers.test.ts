@@ -12,6 +12,7 @@ import {
   formatDateTime,
   formatDowntime,
   formatPausedReason,
+  getDefaultAvailabilityFailureThreshold,
   getDefaultAvailabilityCheckIntervalSeconds,
   getHealthChecksAutoRefreshIntervalMs,
   hasPendingInitialHealthCheckResult,
@@ -84,6 +85,12 @@ describe("web project health helpers", () => {
   it("formats paused reasons, downtime, and generic availability errors", () => {
     expect(formatPausedReason("disabled")).toBe("Disabled");
     expect(formatPausedReason("plan_check_limit_exceeded")).toBe("Over plan check limit");
+    expect(formatPausedReason("plan_monitored_project_limit_exceeded")).toBe(
+      "Over monitored project limit"
+    );
+    expect(formatPausedReason("plan_organization_check_limit_exceeded")).toBe(
+      "Over organization check limit"
+    );
     expect(formatPausedReason("plan_interval_too_low")).toBe("Interval below plan minimum");
     expect(formatPausedReason("custom_reason")).toBe("custom_reason");
 
@@ -97,7 +104,7 @@ describe("web project health helpers", () => {
       "Your session expired. Refresh the page and sign in again."
     );
     expect(getAvailabilityErrorMessage(new Error("availability_check_limit_reached"))).toBe(
-      "This project already uses the maximum number of health checks allowed by the current plan."
+      "This project or organization already uses the health-check capacity allowed by the current plan."
     );
     expect(getAvailabilityErrorMessage(new Error("availability_check_interval_too_low"))).toBe(
       "The polling interval is lower than the minimum allowed by the current plan."
@@ -111,7 +118,9 @@ describe("web project health helpers", () => {
     expect(getAvailabilityErrorMessage(new Error("unknown"))).toBe(
       "Could not complete the health-check request."
     );
-    expect(getAvailabilityErrorMessage("unknown")).toBe("Could not complete the health-check request.");
+    expect(getAvailabilityErrorMessage("unknown")).toBe(
+      "Could not complete the health-check request."
+    );
   });
 
   it("formats dates as non-empty user-facing strings", () => {
@@ -121,9 +130,34 @@ describe("web project health helpers", () => {
 
   it("chooses a conservative default interval for new checks", () => {
     expect(getDefaultAvailabilityCheckIntervalSeconds(null)).toBe(300);
-    expect(getDefaultAvailabilityCheckIntervalSeconds({ max_checks_per_project: 1, min_interval_seconds: 300 })).toBe(300);
-    expect(getDefaultAvailabilityCheckIntervalSeconds({ max_checks_per_project: 3, min_interval_seconds: 60 })).toBe(60);
-    expect(getDefaultAvailabilityCheckIntervalSeconds({ max_checks_per_project: 8, min_interval_seconds: 30 })).toBe(60);
+    expect(
+      getDefaultAvailabilityCheckIntervalSeconds({
+        max_checks_per_project: 1,
+        max_monitored_projects_per_organization: 3,
+        max_active_checks_per_organization: 3,
+        min_interval_seconds: 300,
+        recommended_failure_threshold: 3
+      })
+    ).toBe(300);
+    expect(
+      getDefaultAvailabilityCheckIntervalSeconds({
+        max_checks_per_project: 3,
+        max_monitored_projects_per_organization: 10,
+        max_active_checks_per_organization: 30,
+        min_interval_seconds: 60,
+        recommended_failure_threshold: 3
+      })
+    ).toBe(60);
+    const teamLimits = {
+      max_checks_per_project: 10,
+      max_monitored_projects_per_organization: 10,
+      max_active_checks_per_organization: 50,
+      min_interval_seconds: 60,
+      recommended_failure_threshold: 2
+    };
+    expect(getDefaultAvailabilityCheckIntervalSeconds(teamLimits)).toBe(60);
+    expect(getDefaultAvailabilityFailureThreshold(teamLimits)).toBe(2);
+    expect(getDefaultAvailabilityFailureThreshold(null)).toBe(3);
   });
 
   it("derives auto-refresh from the smallest active health-check interval", () => {
@@ -173,11 +207,19 @@ describe("web project health helpers", () => {
     ).toBe(60_000);
     expect(
       hasPendingInitialHealthCheckResult([
-        { ...baseCheck, check_id: "check_pending", status: "unknown", last_checked_at: null, next_check_at: "2026-06-16T10:01:00.000Z" }
+        {
+          ...baseCheck,
+          check_id: "check_pending",
+          status: "unknown",
+          last_checked_at: null,
+          next_check_at: "2026-06-16T10:01:00.000Z"
+        }
       ])
     ).toBe(true);
 
-    expect(getHealthChecksAutoRefreshIntervalMs([{ ...baseCheck, interval_seconds: 10 }])).toBe(15_000);
+    expect(getHealthChecksAutoRefreshIntervalMs([{ ...baseCheck, interval_seconds: 10 }])).toBe(
+      15_000
+    );
     expect(
       getHealthChecksAutoRefreshIntervalMs([
         { ...baseCheck, check_id: "check_only_paused", status: "paused" },
@@ -186,8 +228,19 @@ describe("web project health helpers", () => {
     ).toBeNull();
     expect(
       hasPendingInitialHealthCheckResult([
-        { ...baseCheck, check_id: "check_passing", last_checked_at: "2026-06-16T10:00:00.000Z", next_check_at: "2026-06-16T10:01:00.000Z" },
-        { ...baseCheck, check_id: "check_disabled_pending", enabled: false, status: "unknown", next_check_at: "2026-06-16T10:01:00.000Z" }
+        {
+          ...baseCheck,
+          check_id: "check_passing",
+          last_checked_at: "2026-06-16T10:00:00.000Z",
+          next_check_at: "2026-06-16T10:01:00.000Z"
+        },
+        {
+          ...baseCheck,
+          check_id: "check_disabled_pending",
+          enabled: false,
+          status: "unknown",
+          next_check_at: "2026-06-16T10:01:00.000Z"
+        }
       ])
     ).toBe(false);
   });

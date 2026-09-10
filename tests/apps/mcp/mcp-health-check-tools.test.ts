@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { HealthCheckApiError } from "../../../apps/cli/src/health-check-commands.js";
-import { HEALTH_CHECK_MCP_TOOL_NAMES, createHealthCheckMcpTools } from "../../../apps/mcp/src/health-check-tools.js";
+import {
+  HEALTH_CHECK_MCP_TOOL_NAMES,
+  createHealthCheckMcpTools
+} from "../../../apps/mcp/src/health-check-tools.js";
 
 describe("mcp health check tools", () => {
   it("declares health-check tool parity", () => {
@@ -18,11 +21,21 @@ describe("mcp health check tools", () => {
   });
 
   it("returns payloads for all health-check operations", async () => {
+    const limits = {
+      max_checks_per_project: 3,
+      max_monitored_projects_per_organization: 10,
+      max_active_checks_per_organization: 30,
+      min_interval_seconds: 60,
+      recommended_failure_threshold: 3
+    };
+    const createHealthCheck = vi.fn().mockResolvedValue({ check: { check_id: "chk_1" } });
     const tools = createHealthCheckMcpTools({
-      listHealthChecks: vi.fn().mockResolvedValue({ checks: [], limits: { max_checks_per_project: 3, min_interval_seconds: 60 } }),
+      listHealthChecks: vi.fn().mockResolvedValue({ checks: [], limits }),
       getHealthCheck: vi.fn().mockResolvedValue({ check: { check_id: "chk_1" } }),
-      createHealthCheck: vi.fn().mockResolvedValue({ check: { check_id: "chk_1" } }),
-      updateHealthCheck: vi.fn().mockResolvedValue({ check: { check_id: "chk_1", enabled: false } }),
+      createHealthCheck,
+      updateHealthCheck: vi
+        .fn()
+        .mockResolvedValue({ check: { check_id: "chk_1", enabled: false } }),
       deleteHealthCheck: vi.fn().mockResolvedValue({ deleted: true }),
       testHealthCheck: vi.fn().mockResolvedValue({
         normalized_url: "https://app.example.com/health",
@@ -34,9 +47,13 @@ describe("mcp health check tools", () => {
 
     await expect(
       tools.list_health_checks({ bearerToken: "dbundle_mem_x", projectId: "proj_1", limit: 10 })
-    ).resolves.toEqual({ checks: [], limits: { max_checks_per_project: 3, min_interval_seconds: 60 } });
+    ).resolves.toEqual({ checks: [], limits });
     await expect(
-      tools.get_health_check({ bearerToken: "dbundle_mem_x", projectId: "proj_1", checkId: "chk_1" })
+      tools.get_health_check({
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        checkId: "chk_1"
+      })
     ).resolves.toEqual({ check: { check_id: "chk_1" } });
     await expect(
       tools.create_health_check({
@@ -47,6 +64,9 @@ describe("mcp health check tools", () => {
         intervalSeconds: 60
       })
     ).resolves.toEqual({ check: { check_id: "chk_1" } });
+    expect(createHealthCheck).toHaveBeenCalledWith(
+      expect.not.objectContaining({ failureThreshold: expect.anything() })
+    );
     await expect(
       tools.update_health_check({
         bearerToken: "dbundle_mem_x",
@@ -56,27 +76,48 @@ describe("mcp health check tools", () => {
       })
     ).resolves.toEqual({ check: { check_id: "chk_1", enabled: false } });
     await expect(
-      tools.delete_health_check({ bearerToken: "dbundle_mem_x", projectId: "proj_1", checkId: "chk_1" })
+      tools.delete_health_check({
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        checkId: "chk_1"
+      })
     ).resolves.toEqual({ deleted: true });
     await expect(
-      tools.test_health_check({ bearerToken: "dbundle_mem_x", projectId: "proj_1", url: "https://app.example.com/health" })
+      tools.test_health_check({
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        url: "https://app.example.com/health"
+      })
     ).resolves.toEqual({
       normalized_url: "https://app.example.com/health",
       result: { status: "success", http_status: 200 }
     });
     await expect(
-      tools.list_health_check_results({ bearerToken: "dbundle_mem_x", projectId: "proj_1", checkId: "chk_1" })
+      tools.list_health_check_results({
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        checkId: "chk_1"
+      })
     ).resolves.toEqual({ results: [] });
     await expect(
-      tools.list_health_check_daily_rollups({ bearerToken: "dbundle_mem_x", projectId: "proj_1", checkId: "chk_1", limit: 30 })
+      tools.list_health_check_daily_rollups({
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        checkId: "chk_1",
+        limit: 30
+      })
     ).resolves.toEqual({ rollups: [] });
   });
 
   it("maps health-check api and unknown errors to mcp tool errors", async () => {
     const tools = createHealthCheckMcpTools({
-      listHealthChecks: vi.fn().mockRejectedValue(new HealthCheckApiError(401, "invalid_member_token")),
+      listHealthChecks: vi
+        .fn()
+        .mockRejectedValue(new HealthCheckApiError(401, "invalid_member_token")),
       getHealthCheck: vi.fn().mockRejectedValue(new HealthCheckApiError(404, "check_not_found")),
-      createHealthCheck: vi.fn().mockRejectedValue(new HealthCheckApiError(409, "availability_check_limit_reached")),
+      createHealthCheck: vi
+        .fn()
+        .mockRejectedValue(new HealthCheckApiError(409, "availability_check_limit_reached")),
       updateHealthCheck: vi.fn().mockRejectedValue(new Error("network")),
       deleteHealthCheck: vi.fn().mockResolvedValue({ deleted: true }),
       testHealthCheck: vi.fn().mockResolvedValue({
@@ -91,7 +132,11 @@ describe("mcp health check tools", () => {
       tools.list_health_checks({ bearerToken: "bad", projectId: "proj_1" })
     ).rejects.toThrow("mcp_tool_error:invalid_member_token");
     await expect(
-      tools.get_health_check({ bearerToken: "dbundle_mem_x", projectId: "proj_1", checkId: "missing" })
+      tools.get_health_check({
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        checkId: "missing"
+      })
     ).rejects.toThrow("mcp_tool_error:check_not_found");
     await expect(
       tools.create_health_check({
@@ -103,7 +148,12 @@ describe("mcp health check tools", () => {
       })
     ).rejects.toThrow("mcp_tool_error:availability_check_limit_reached");
     await expect(
-      tools.update_health_check({ bearerToken: "dbundle_mem_x", projectId: "proj_1", checkId: "chk_1", enabled: false })
+      tools.update_health_check({
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        checkId: "chk_1",
+        enabled: false
+      })
     ).rejects.toThrow("mcp_tool_error:unknown_error");
   });
 });

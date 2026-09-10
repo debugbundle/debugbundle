@@ -1,7 +1,7 @@
 # Billing
 
 Version: v1
-Last updated: 2026-06-04
+Last updated: 2026-09-10
 
 ---
 
@@ -20,7 +20,7 @@ It covers:
 
 If this file conflicts with a weaker summary elsewhere, this file wins for billing behavior.
 
-Pricing amounts and tier definitions live in `/spec/tiers.md` (source of truth for pricing numbers). This file focuses on how those tiers are implemented through Stripe and enforced in the product.
+Pricing amounts and tier definitions live in `/spec/product.md` section 13 (source of truth for pricing numbers). This file focuses on how those tiers are implemented through Stripe and enforced in the product.
 
 GitHub Marketplace listing support is related but distinct. In the current model, GitHub Marketplace webhook events are tracked for listing-originated purchase/subscription state and install attribution, while Stripe remains the authoritative source of truth for paid DebugBundle entitlements.
 
@@ -36,19 +36,21 @@ DebugBundle requires the following Stripe products:
 
 | Product | Description | Billing |
 |---------|-------------|---------|
-| Solo Plan | DebugBundle Solo — 3 included capacity units, solo developer tier | $2.99/month recurring |
-| Team Plan | DebugBundle Team — 15 included capacity units, collaboration tier | $19/month recurring |
+| Solo Plan | DebugBundle Solo — 3 included capacity units, solo developer tier | $4.99/month recurring, excl. VAT/taxes |
+| Team Plan | DebugBundle Team — 15 included capacity units, collaboration tier | $19/month recurring, excl. VAT/taxes |
 
 **Extra capacity add-ons (one per paid tier):**
 
 | Product | Description | Billing |
 |---------|-------------|---------|
-| Solo Extra Capacity | Additional capacity unit for Solo plan | $0.99/month recurring, quantity-based |
-| Team Extra Capacity | Additional capacity unit for Team plan | $1.99/month recurring, quantity-based |
+| Solo Extra Capacity | Additional capacity unit for Solo plan | $0.99/month recurring, quantity-based, excl. VAT/taxes |
+| Team Extra Capacity | Additional capacity unit for Team plan | $1.99/month recurring, quantity-based, excl. VAT/taxes |
 
 ### 2.2 Price Configuration
 
 Each product must have a single default monthly-recurring Price in Stripe.
+
+All paid prices are denominated in USD and exclude VAT or other applicable taxes. Taxes are calculated and applied at checkout. Stripe Prices must use `tax_behavior: exclusive` so Checkout can apply the correct tax for the customer.
 
 Extra-capacity prices must have `usage_type: licensed` and allow quantity > 1 so customers can purchase multiple capacity units in one subscription item.
 
@@ -674,9 +676,9 @@ Billing webhook processing triggers the correct lifecycle emails for:
 
 ## 14. Cross-References
 
-- Tier pricing and allowance numbers: `/spec/tiers.md`
+- Tier pricing and allowance numbers: `/spec/product.md` section 13
 - System email inventory: `/spec/system-emails.md`
 - Product overview and pricing philosophy: `/spec/product.md` §13
-- Requirements: `/spec/requirements.md` FR-BIL-01 through FR-BIL-05
+- Requirements: `/spec/requirements.md` FR-BIL-01 through FR-BIL-06
 - Auth and session model: `/spec/auth-architecture.md`
 - Domain invariants for billing enforcement: `/rules/domain-invariants.md`

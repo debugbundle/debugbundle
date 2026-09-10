@@ -93,18 +93,26 @@ const dailyRollupFixture = {
   updated_at: "2026-06-15T23:59:59.000Z"
 };
 
+const soloLimits = {
+  max_checks_per_project: 3,
+  max_monitored_projects_per_organization: 10,
+  max_active_checks_per_organization: 30,
+  min_interval_seconds: 60,
+  recommended_failure_threshold: 3
+};
+
 describe("cli health check commands", () => {
   it("renders list and get outputs in human and json modes", async () => {
     const listApi = {
       listHealthChecks: vi.fn().mockResolvedValue({
         checks: [checkFixture],
-        limits: { max_checks_per_project: 3, min_interval_seconds: 60 }
+        limits: soloLimits
       })
     };
     const getApi = {
       getHealthCheck: vi.fn().mockResolvedValue({
         check: checkFixture,
-        limits: { max_checks_per_project: 3, min_interval_seconds: 60 }
+        limits: soloLimits
       })
     };
 
@@ -121,7 +129,7 @@ describe("cli health check commands", () => {
     );
     expect(JSON.parse(listJson.output)).toEqual({
       checks: [checkFixture],
-      limits: { max_checks_per_project: 3, min_interval_seconds: 60 }
+      limits: soloLimits
     });
 
     const getHuman = await getHealthCheckCommand(
@@ -129,7 +137,9 @@ describe("cli health check commands", () => {
       getApi
     );
     expect(getHuman.exitCode).toBe(0);
-    expect(getHuman.output).toContain("limits=3 min_interval=60s");
+    expect(getHuman.output).toContain(
+      "limits=3 monitored_projects=10 active_checks=30 min_interval=60s recommended_failures=3"
+    );
   });
 
   it("renders create, update, delete, test, and results outputs", async () => {
@@ -159,7 +169,9 @@ describe("cli health check commands", () => {
         checkId: "chk_1",
         enabled: false
       },
-      { updateHealthCheck: vi.fn().mockResolvedValue({ check: { ...checkFixture, enabled: false } }) }
+      {
+        updateHealthCheck: vi.fn().mockResolvedValue({ check: { ...checkFixture, enabled: false } })
+      }
     );
     expect(updateResult.output).toBe("Health check updated: chk_1 (Primary app)");
 
@@ -215,7 +227,11 @@ describe("cli health check commands", () => {
   it("maps health-check api errors to deterministic exit codes", async () => {
     const authResult = await listHealthChecksCommand(
       { bearerToken: "bad", projectId: "proj_1" },
-      { listHealthChecks: vi.fn().mockRejectedValue(new HealthCheckApiError(401, "invalid_member_token")) }
+      {
+        listHealthChecks: vi
+          .fn()
+          .mockRejectedValue(new HealthCheckApiError(401, "invalid_member_token"))
+      }
     );
     expect(authResult.exitCode).toBe(2);
 
@@ -235,7 +251,11 @@ describe("cli health check commands", () => {
         expectedStatusMax: 399,
         timeoutMs: 5000
       },
-      { testHealthCheck: vi.fn().mockRejectedValue(new HealthCheckApiError(400, "invalid_check_target")) }
+      {
+        testHealthCheck: vi
+          .fn()
+          .mockRejectedValue(new HealthCheckApiError(400, "invalid_check_target"))
+      }
     );
     expect(invalidResult.exitCode).toBe(4);
 
@@ -254,26 +274,33 @@ describe("cli health check commands", () => {
         recoveryThreshold: 2,
         enabled: true
       },
-      { createHealthCheck: vi.fn().mockRejectedValue(new HealthCheckApiError(409, "availability_check_limit_reached")) }
+      {
+        createHealthCheck: vi
+          .fn()
+          .mockRejectedValue(new HealthCheckApiError(409, "availability_check_limit_reached"))
+      }
     );
     expect(conflictResult.exitCode).toBe(5);
 
     const rateLimitedResult = await listHealthCheckDailyRollupsCommand(
       { bearerToken: "dbundle_mem_x", projectId: "proj_1", checkId: "chk_1" },
-      { listHealthCheckDailyRollups: vi.fn().mockRejectedValue(new HealthCheckApiError(429, "rate_limited")) }
+      {
+        listHealthCheckDailyRollups: vi
+          .fn()
+          .mockRejectedValue(new HealthCheckApiError(429, "rate_limited"))
+      }
     );
     expect(rateLimitedResult.exitCode).toBe(6);
   });
 
   it("serializes health-check api requests and maps non-standard error bodies", async () => {
     const httpClient = {
-      request: vi.fn(
-        async (request: HealthCheckHttpRequest): Promise<HealthCheckHttpResponse> => {
+      request: vi.fn(async (request: HealthCheckHttpRequest): Promise<HealthCheckHttpResponse> => {
         if (request.method === "GET" && request.path.includes("/availability-checks?")) {
-          return { status: 200, body: { checks: [checkFixture], limits: { max_checks_per_project: 3, min_interval_seconds: 60 } } };
+          return { status: 200, body: { checks: [checkFixture], limits: soloLimits } };
         }
         if (request.method === "GET" && request.path.endsWith("/availability-checks/chk_1")) {
-          return { status: 200, body: { check: checkFixture, limits: { max_checks_per_project: 3, min_interval_seconds: 60 } } };
+          return { status: 200, body: { check: checkFixture, limits: soloLimits } };
         }
         if (request.method === "POST" && request.path.endsWith("/availability-checks")) {
           return { status: 201, body: { check: checkFixture } };
@@ -311,17 +338,16 @@ describe("cli health check commands", () => {
           return { status: 200, body: { rollups: [dailyRollupFixture] } };
         }
         return { status: 418, body: "teapot" };
-        }
-      )
+      })
     };
     const api = createHealthCheckApi(httpClient);
 
     await expect(
       api.listHealthChecks({ bearerToken: "dbundle_mem_x", projectId: "proj 1", limit: 3 })
-    ).resolves.toEqual({ checks: [checkFixture], limits: { max_checks_per_project: 3, min_interval_seconds: 60 } });
+    ).resolves.toEqual({ checks: [checkFixture], limits: soloLimits });
     await expect(
       api.getHealthCheck({ bearerToken: "dbundle_mem_x", projectId: "proj_1", checkId: "chk_1" })
-    ).resolves.toEqual({ check: checkFixture, limits: { max_checks_per_project: 3, min_interval_seconds: 60 } });
+    ).resolves.toEqual({ check: checkFixture, limits: soloLimits });
     await expect(
       api.createHealthCheck({
         bearerToken: "dbundle_mem_x",
@@ -333,7 +359,6 @@ describe("cli health check commands", () => {
         expectedStatusMax: 399,
         timeoutMs: 5000,
         intervalSeconds: 60,
-        failureThreshold: 3,
         recoveryThreshold: 2,
         environment: "production",
         serviceName: "web",
@@ -372,12 +397,24 @@ describe("cli health check commands", () => {
         expectedStatusMax: 399,
         timeoutMs: 5000
       })
-    ).resolves.toEqual(expect.objectContaining({ normalized_url: "https://app.example.com/health" }));
+    ).resolves.toEqual(
+      expect.objectContaining({ normalized_url: "https://app.example.com/health" })
+    );
     await expect(
-      api.listHealthCheckResults({ bearerToken: "dbundle_mem_x", projectId: "proj_1", checkId: "chk_1", limit: 7 })
+      api.listHealthCheckResults({
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        checkId: "chk_1",
+        limit: 7
+      })
     ).resolves.toEqual({ results: [resultFixture] });
     await expect(
-      api.listHealthCheckDailyRollups({ bearerToken: "dbundle_mem_x", projectId: "proj_1", checkId: "chk_1", limit: 9 })
+      api.listHealthCheckDailyRollups({
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        checkId: "chk_1",
+        limit: 9
+      })
     ).resolves.toEqual({ rollups: [dailyRollupFixture] });
 
     expect(httpClient.request).toHaveBeenNthCalledWith(
@@ -388,6 +425,7 @@ describe("cli health check commands", () => {
         bearerToken: "dbundle_mem_x"
       })
     );
+    expect(httpClient.request.mock.calls[2]?.[0]?.body).not.toHaveProperty("failure_threshold");
     expect(httpClient.request).toHaveBeenNthCalledWith(
       3,
       expect.objectContaining({
@@ -485,7 +523,11 @@ describe("cli health check commands", () => {
         recoveryThreshold: 2,
         enabled: true
       },
-      { readAuthState: vi.fn().mockRejectedValue(new CliAuthStateError("auth_state_missing", "Not logged in.")) }
+      {
+        readAuthState: vi
+          .fn()
+          .mockRejectedValue(new CliAuthStateError("auth_state_missing", "Not logged in."))
+      }
     );
     expect(result.exitCode).toBe(2);
     expect(result.output).toBe("Not logged in.");
@@ -501,11 +543,11 @@ describe("cli health check commands", () => {
     const api = {
       listHealthChecks: vi.fn().mockResolvedValue({
         checks: [checkFixture],
-        limits: { max_checks_per_project: 3, min_interval_seconds: 60 }
+        limits: soloLimits
       }),
       getHealthCheck: vi.fn().mockResolvedValue({
         check: checkFixture,
-        limits: { max_checks_per_project: 3, min_interval_seconds: 60 }
+        limits: soloLimits
       }),
       createHealthCheck: vi.fn().mockResolvedValue({ check: checkFixture }),
       updateHealthCheck: vi.fn().mockResolvedValue({ check: checkFixture }),
@@ -535,13 +577,22 @@ describe("cli health check commands", () => {
       listHealthChecksWithAuthCommand({ projectId: "proj_1", limit: 2, json: true }, dependencies)
     ).resolves.toEqual(expect.objectContaining({ exitCode: 0 }));
     await expect(
-      getHealthCheckWithAuthCommand({ projectId: "proj_1", checkId: "chk_1", json: true }, dependencies)
+      getHealthCheckWithAuthCommand(
+        { projectId: "proj_1", checkId: "chk_1", json: true },
+        dependencies
+      )
     ).resolves.toEqual(expect.objectContaining({ exitCode: 0 }));
     await expect(
-      updateHealthCheckWithAuthCommand({ projectId: "proj_1", checkId: "chk_1", enabled: false, json: true }, dependencies)
+      updateHealthCheckWithAuthCommand(
+        { projectId: "proj_1", checkId: "chk_1", enabled: false, json: true },
+        dependencies
+      )
     ).resolves.toEqual(expect.objectContaining({ exitCode: 0 }));
     await expect(
-      deleteHealthCheckWithAuthCommand({ projectId: "proj_1", checkId: "chk_1", json: true }, dependencies)
+      deleteHealthCheckWithAuthCommand(
+        { projectId: "proj_1", checkId: "chk_1", json: true },
+        dependencies
+      )
     ).resolves.toEqual(expect.objectContaining({ exitCode: 0 }));
     await expect(
       testHealthCheckWithAuthCommand(
@@ -558,10 +609,16 @@ describe("cli health check commands", () => {
       )
     ).resolves.toEqual(expect.objectContaining({ exitCode: 0 }));
     await expect(
-      listHealthCheckResultsWithAuthCommand({ projectId: "proj_1", checkId: "chk_1", limit: 2, json: true }, dependencies)
+      listHealthCheckResultsWithAuthCommand(
+        { projectId: "proj_1", checkId: "chk_1", limit: 2, json: true },
+        dependencies
+      )
     ).resolves.toEqual(expect.objectContaining({ exitCode: 0 }));
     await expect(
-      listHealthCheckDailyRollupsWithAuthCommand({ projectId: "proj_1", checkId: "chk_1", limit: 2, json: true }, dependencies)
+      listHealthCheckDailyRollupsWithAuthCommand(
+        { projectId: "proj_1", checkId: "chk_1", limit: 2, json: true },
+        dependencies
+      )
     ).resolves.toEqual(expect.objectContaining({ exitCode: 0 }));
 
     expect(api.listHealthChecks).toHaveBeenCalledWith({

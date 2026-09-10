@@ -1,7 +1,7 @@
 # System Emails
 
 Version: v1
-Last updated: 2026-06-04
+Last updated: 2026-09-10
 
 ---
 
@@ -301,5 +301,5 @@ At minimum, test coverage must verify that the system triggers the correct email
 ## 9. Cross-References
 
 - Billing lifecycle source-of-truth: `/spec/billing.md`
-- Tier allowance notification requirements: `/spec/tiers.md`
+- Tier allowance notification requirements: `/spec/product.md` section 13
 - Existing auth flows: `/spec/auth-architecture.md`

@@ -1921,7 +1921,7 @@ Free-tier projects may receive their enabled project analytics block when both p
 
 ### 1.8a Availability Checks
 
-Availability checks are hosted external HTTP checks executed by DebugBundle infrastructure, not by customer SDKs. V1 supports `GET` and `HEAD` targets only. Failures reuse the same incident, bundle, alert, webhook, CLI, MCP, and project-navigation model as the rest of DebugBundle rather than creating a separate uptime product. Saved checks remain visible after downgrade; checks that exceed the current plan's count or interval limits are marked paused and stop executing until the project becomes eligible again.
+Availability checks are hosted external HTTP checks executed by DebugBundle infrastructure, not by customer SDKs. V1 supports `GET` and `HEAD` targets only. Failures reuse the same incident, bundle, alert, webhook, CLI, MCP, and project-navigation model as the rest of DebugBundle rather than creating a separate uptime product. Saved checks remain visible after entitlement changes; deterministic excess checks beyond project or organization count limits are marked paused, while stored intervals below the current floor execute at that floor without a row rewrite.
 
 | Method | Path                                                            | Auth                                          | Description                                                                                      |
 | ------ | --------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------ |
@@ -1953,20 +1953,20 @@ Availability checks are hosted external HTTP checks executed by DebugBundle infr
 }
 ```
 
-| Field                 | Required | Default                  | Constraint                                                                   |
-| --------------------- | -------- | ------------------------ | ---------------------------------------------------------------------------- |
-| `name`                | Yes      | —                        | 1-120 chars                                                                  |
-| `url`                 | Yes      | —                        | `http` or `https` only; credentials forbidden; local/private targets blocked |
-| `method`              | No       | `GET`                    | `GET` or `HEAD`                                                              |
-| `expected_status_min` | No       | `200`                    | integer `100-599`, must be `<= expected_status_max`                          |
-| `expected_status_max` | No       | `399`                    | integer `100-599`, must be `>= expected_status_min`                          |
-| `timeout_ms`          | No       | `2500`                   | integer `500-5000`                                                           |
-| `interval_seconds`    | Yes      | —                        | integer `30-86400`, but plan minimums may be higher                          |
-| `failure_threshold`   | No       | `3`                      | integer `1-10`                                                               |
-| `recovery_threshold`  | No       | `2`                      | integer `1-10`                                                               |
-| `environment`         | No       | project-default behavior | optional project-scoped environment label                                    |
-| `service_name`        | No       | `null`                   | optional service label used for filtering and incident grouping              |
-| `enabled`             | No       | `true`                   | disabled checks remain visible and retained but do not execute               |
+| Field                 | Required | Default                                          | Constraint                                                                   |
+| --------------------- | -------- | ------------------------------------------------ | ---------------------------------------------------------------------------- |
+| `name`                | Yes      | —                                                | 1-120 chars                                                                  |
+| `url`                 | Yes      | —                                                | `http` or `https` only; credentials forbidden; local/private targets blocked |
+| `method`              | No       | `GET`                                            | `GET` or `HEAD`                                                              |
+| `expected_status_min` | No       | `200`                                            | integer `100-599`, must be `<= expected_status_max`                          |
+| `expected_status_max` | No       | `399`                                            | integer `100-599`, must be `>= expected_status_min`                          |
+| `timeout_ms`          | No       | `2500`                                           | integer `500-5000`                                                           |
+| `interval_seconds`    | Yes      | —                                                | integer `30-86400`, but plan minimums may be higher                          |
+| `failure_threshold`   | No       | Plan recommendation (`2` on Team; `3` otherwise) | integer `1-10`; explicitly set `1` for especially critical endpoints         |
+| `recovery_threshold`  | No       | `2`                                              | integer `1-10`                                                               |
+| `environment`         | No       | project-default behavior                         | optional project-scoped environment label                                    |
+| `service_name`        | No       | `null`                                           | optional service label used for filtering and incident grouping              |
+| `enabled`             | No       | `true`                                           | disabled checks remain visible and retained but do not execute               |
 
 **List response:**
 
@@ -1992,12 +1992,15 @@ Availability checks are hosted external HTTP checks executed by DebugBundle infr
   ],
   "limits": {
     "max_checks_per_project": 3,
-    "min_interval_seconds": 60
+    "max_monitored_projects_per_organization": 10,
+    "max_active_checks_per_organization": 30,
+    "min_interval_seconds": 60,
+    "recommended_failure_threshold": 3
   }
 }
 ```
 
-`status` is one of `unknown`, `passing`, `failing`, or `paused`. `paused` is used for disabled checks and for preserved checks that exceed current plan limits after downgrade. The worker retains raw results and daily rollups for 30 days so the project can later expose a status-history page without schema changes.
+`status` is one of `unknown`, `passing`, `failing`, or `paused`. `paused` is used for disabled checks and for deterministic excess checks preserved after project or organization count limits change. `paused_reason` may be `disabled`, `plan_check_limit_exceeded`, `plan_monitored_project_limit_exceeded`, or `plan_organization_check_limit_exceeded`; the historical `plan_interval_too_low` value remains readable for compatibility. A check stored below its current plan's interval floor is not paused or rewritten: reads and worker scheduling expose and use the effective plan minimum. The worker retains raw results and daily rollups for 30 days so the project can later expose a status-history page without schema changes.
 
 **Results response:**
 
@@ -2045,13 +2048,21 @@ Daily rollup `state` is intentionally less sensitive than raw execution status. 
 
 Guardrails:
 
-| Constraint                | Free                      | Solo                      | Team                      |
-| ------------------------- | ------------------------- | ------------------------- | ------------------------- |
-| Max checks per project    | 1                         | 3                         | 8                         |
-| Minimum interval          | 300s (5m)                 | 60s                       | 30s                       |
-| History retention         | 30 days                   | 30 days                   | 30 days                   |
-| Read access               | Authorized project member | Authorized project member | Authorized project member |
-| Create/update/delete/test | Owner/admin               | Owner/admin               | Owner/admin               |
+| Constraint                              | Free                      | Solo                      | Team                      |
+| --------------------------------------- | ------------------------- | ------------------------- | ------------------------- |
+| Max saved checks per project            | 1                         | 3                         | 10                        |
+| Max monitored projects per organization | 3                         | 10                        | 10                        |
+| Max active checks per organization      | 3                         | 30                        | 50                        |
+| Minimum interval                        | 300s (5m)                 | 60s                       | 60s                       |
+| Recommended failure threshold           | 3                         | 3                         | 2                         |
+| Supported failure threshold             | 1-10                      | 1-10                      | 1-10                      |
+| History retention                       | 30 days                   | 30 days                   | 30 days                   |
+| Read access                             | Authorized project member | Authorized project member | Authorized project member |
+| Create/update/delete/test               | Owner/admin               | Owner/admin               | Owner/admin               |
+
+Total projects remain unlimited, but only projects with an enabled availability check count toward the monitored-project cap. A 30-second hosted interval is reserved for a future premium capacity option. Existing Team checks stored at 30 seconds continue without a migration and execute at the effective 60-second floor; new requests below the current floor return `availability_check_interval_too_low`.
+
+Execution eligibility applies the per-project saved-check cap before ranking enabled checks within eligible monitored projects against the organization active-check cap. Preserved checks paused by the per-project cap do not consume organization execution slots. List/detail reads and worker claims use the same deterministic ranking; saved rows are not deleted or disabled by an entitlement change.
 
 When consecutive failures reach `failure_threshold`, DebugBundle opens or regresses the linked availability incident for that check using the normal incident lifecycle. When consecutive successes reach `recovery_threshold`, DebugBundle auto-resolves the linked availability incident.
 

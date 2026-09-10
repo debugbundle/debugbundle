@@ -38,16 +38,24 @@ describe('Phase 15 — Homepage, Marketing & Blog', () => {
   describe('pricing page', () => {
     it('has real tier pricing data from spec', () => {
       const pricing = readFileSync(join(siteDir, 'pricing/page.tsx'), 'utf8');
+      const pricingDocs = readFileSync(
+        join(process.cwd(), 'site/content/docs/pricing.mdx'),
+        'utf8'
+      );
+      const retiredSoloPrice = ['$2', '99'].join('.');
 
       // Must reference actual prices
-      expect(pricing).toContain('$2.99');
+      expect(pricing).toContain('$4.99');
       expect(pricing).toContain('$19');
+      expect(pricingDocs).toContain('$4.99');
+      expect(pricing).not.toContain(retiredSoloPrice);
+      expect(pricingDocs).not.toContain(retiredSoloPrice);
       // Must reference all three tiers
       expect(pricing).toContain('Free');
       expect(pricing).toContain('Solo');
       expect(pricing).toContain('Team');
       expect(pricing).toContain('3 health checks /project');
-      expect(pricing).toContain('8 health checks /project');
+      expect(pricing).toContain('10 health checks /project');
       // Must NOT still contain placeholder text
       expect(pricing).not.toContain('richer allowance and slot details');
     });

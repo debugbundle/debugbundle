@@ -279,7 +279,10 @@ export type AvailabilityIncidentStatus = "open" | "resolved" | "regressed";
 
 export interface AvailabilityCheckLimits {
   max_checks_per_project: number;
+  max_monitored_projects_per_organization: number;
+  max_active_checks_per_organization: number;
   min_interval_seconds: number;
+  recommended_failure_threshold: number;
 }
 
 export interface AvailabilityCheckRecord {

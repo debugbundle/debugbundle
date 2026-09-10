@@ -30,7 +30,9 @@ async function chooseSelectOption(
   await user.click(await screen.findByRole("option", { name: optionName }));
 }
 
-function createHealthCheck(overrides: Partial<AvailabilityCheckRecord> = {}): AvailabilityCheckRecord {
+function createHealthCheck(
+  overrides: Partial<AvailabilityCheckRecord> = {}
+): AvailabilityCheckRecord {
   return {
     check_id: "chk_1",
     project_id: "proj_123",
@@ -98,6 +100,14 @@ const rollupFixture: AvailabilityCheckDailyRollupRecord = {
   incident_ids: []
 };
 
+const teamLimits = {
+  max_checks_per_project: 10,
+  max_monitored_projects_per_organization: 10,
+  max_active_checks_per_organization: 50,
+  min_interval_seconds: 60,
+  recommended_failure_threshold: 2
+};
+
 afterEach(() => {
   resetBrowserSessionClientState();
   vi.restoreAllMocks();
@@ -133,7 +143,7 @@ describe("web app — project health page", () => {
       if (url.endsWith("/v1/projects/proj_123/availability-checks?limit=50")) {
         return jsonResponse(200, {
           checks,
-          limits: { max_checks_per_project: 8, min_interval_seconds: 30 }
+          limits: teamLimits
         });
       }
       if (url.endsWith("/v1/projects/proj_123/availability-checks/chk_1/results?limit=20")) {
@@ -169,7 +179,10 @@ describe("web app — project health page", () => {
         checks.push(createdCheck);
         return jsonResponse(201, { check: createdCheck });
       }
-      if (url.endsWith("/v1/projects/proj_123/availability-checks/chk_1") && init?.method === "DELETE") {
+      if (
+        url.endsWith("/v1/projects/proj_123/availability-checks/chk_1") &&
+        init?.method === "DELETE"
+      ) {
         checks.splice(0, checks.length, createdCheck);
         return jsonResponse(200, { deleted: true });
       }
@@ -184,7 +197,9 @@ describe("web app — project health page", () => {
     expect(await screen.findByText("Primary app")).toBeInTheDocument();
     expect(screen.getAllByText("Passing").length).toBeGreaterThan(0);
     expect(screen.getByText(/GET https:\/\/app\.example\.com\/health/)).toBeInTheDocument();
-    expect((await screen.findAllByText("https://app.example.com/health")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("https://app.example.com/health")).length).toBeGreaterThan(
+      0
+    );
     expect(screen.getByText(/1440 checks/)).toBeInTheDocument();
     expect(screen.getByText(/30-day daily history/i)).toBeInTheDocument();
 
@@ -197,20 +212,28 @@ describe("web app — project health page", () => {
 
     await user.click(screen.getByRole("button", { name: /create health check/i }));
     expect(screen.getByLabelText(/interval/i)).toHaveValue(60);
+    expect(screen.getByLabelText(/failure threshold/i)).toHaveValue(2);
+    expect(screen.getByText(/use 1 only for especially critical endpoints/i)).toBeInTheDocument();
     await user.type(screen.getByLabelText(/^name$/i), "Checkout app");
     await user.clear(screen.getByLabelText(/check url/i));
     await user.type(screen.getByLabelText(/check url/i), "https://checkout.example.com/health");
-    await user.clear(screen.getByLabelText(/interval/i));
-    await user.type(screen.getByLabelText(/interval/i), "30");
     await chooseSelectOption(user, "Service", "Custom service");
     await user.type(screen.getByRole("textbox", { name: "Custom service" }), "checkout");
 
     await user.click(screen.getByRole("button", { name: /test endpoint/i }));
-    expect(await screen.findByText(/endpoint responded within the expected status range/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/endpoint responded within the expected status range/i)
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /create check/i }));
     await waitFor(() => {
-      expect(fetchMock.mock.calls.some(([requestInput, init]) => requestUrl(requestInput).endsWith("/v1/projects/proj_123/availability-checks") && init?.method === "POST")).toBe(true);
+      expect(
+        fetchMock.mock.calls.some(
+          ([requestInput, init]) =>
+            requestUrl(requestInput).endsWith("/v1/projects/proj_123/availability-checks") &&
+            init?.method === "POST"
+        )
+      ).toBe(true);
     });
     expect(await screen.findByText("Checkout app")).toBeInTheDocument();
 
@@ -256,13 +279,15 @@ describe("web app — project health page", () => {
         if (url.endsWith("/v1/projects/proj_123/availability-checks?limit=50")) {
           return jsonResponse(200, {
             checks,
-            limits: { max_checks_per_project: 8, min_interval_seconds: 30 }
+            limits: teamLimits
           });
         }
         if (url.endsWith("/v1/projects/proj_123/availability-checks/chk_1/results?limit=20")) {
           return jsonResponse(200, { results: [] });
         }
-        if (url.endsWith("/v1/projects/proj_123/availability-checks/chk_1/daily-rollups?limit=30")) {
+        if (
+          url.endsWith("/v1/projects/proj_123/availability-checks/chk_1/daily-rollups?limit=30")
+        ) {
           return jsonResponse(200, { rollups: [] });
         }
 

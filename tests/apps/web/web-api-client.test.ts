@@ -102,22 +102,30 @@ describe("web api client", () => {
       downtime_seconds: 60,
       incident_ids: []
     };
+    const limits = {
+      max_checks_per_project: 3,
+      max_monitored_projects_per_organization: 10,
+      max_active_checks_per_organization: 30,
+      min_interval_seconds: 60,
+      recommended_failure_threshold: 3
+    };
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url =
-        typeof input === "string" ? input :
-        input instanceof URL ? input.toString() :
-        input.url;
+        typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
 
       if (url.endsWith("/v1/projects/proj_1/availability-checks?limit=50")) {
         return Promise.resolve(
-          new Response(JSON.stringify({ checks: [check], limits: { max_checks_per_project: 3, min_interval_seconds: 60 } }), {
+          new Response(JSON.stringify({ checks: [check], limits }), {
             status: 200
           })
         );
       }
-      if (url.endsWith("/v1/projects/proj_1/availability-checks/chk_1") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/projects/proj_1/availability-checks/chk_1") &&
+        init?.method === undefined
+      ) {
         return Promise.resolve(
-          new Response(JSON.stringify({ check, limits: { max_checks_per_project: 3, min_interval_seconds: 60 } }), {
+          new Response(JSON.stringify({ check, limits }), {
             status: 200
           })
         );
@@ -125,10 +133,18 @@ describe("web api client", () => {
       if (url.endsWith("/v1/projects/proj_1/availability-checks") && init?.method === "POST") {
         return Promise.resolve(new Response(JSON.stringify({ check }), { status: 201 }));
       }
-      if (url.endsWith("/v1/projects/proj_1/availability-checks/chk_1") && init?.method === "PATCH") {
-        return Promise.resolve(new Response(JSON.stringify({ check: { ...check, enabled: false } }), { status: 200 }));
+      if (
+        url.endsWith("/v1/projects/proj_1/availability-checks/chk_1") &&
+        init?.method === "PATCH"
+      ) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ check: { ...check, enabled: false } }), { status: 200 })
+        );
       }
-      if (url.endsWith("/v1/projects/proj_1/availability-checks/chk_1") && init?.method === "DELETE") {
+      if (
+        url.endsWith("/v1/projects/proj_1/availability-checks/chk_1") &&
+        init?.method === "DELETE"
+      ) {
         return Promise.resolve(new Response(JSON.stringify({ deleted: true }), { status: 200 }));
       }
       if (url.endsWith("/v1/projects/proj_1/availability-checks/test")) {
@@ -154,10 +170,14 @@ describe("web api client", () => {
         );
       }
       if (url.endsWith("/v1/projects/proj_1/availability-checks/chk_1/results?limit=7")) {
-        return Promise.resolve(new Response(JSON.stringify({ results: [result] }), { status: 200 }));
+        return Promise.resolve(
+          new Response(JSON.stringify({ results: [result] }), { status: 200 })
+        );
       }
       if (url.endsWith("/v1/projects/proj_1/availability-checks/chk_1/daily-rollups?limit=9")) {
-        return Promise.resolve(new Response(JSON.stringify({ rollups: [rollup] }), { status: 200 }));
+        return Promise.resolve(
+          new Response(JSON.stringify({ rollups: [rollup] }), { status: 200 })
+        );
       }
 
       return Promise.resolve(new Response(JSON.stringify({ error: "not_found" }), { status: 404 }));
@@ -166,11 +186,11 @@ describe("web api client", () => {
 
     await expect(listProjectAvailabilityChecks("proj_1", 50)).resolves.toEqual({
       checks: [check],
-      limits: { max_checks_per_project: 3, min_interval_seconds: 60 }
+      limits
     });
     await expect(getProjectAvailabilityCheck("proj_1", "chk_1")).resolves.toEqual({
       check,
-      limits: { max_checks_per_project: 3, min_interval_seconds: 60 }
+      limits
     });
     await expect(
       createProjectAvailabilityCheck("proj_1", {
@@ -188,7 +208,9 @@ describe("web api client", () => {
         enabled: true
       })
     ).resolves.toEqual(check);
-    await expect(updateProjectAvailabilityCheck("proj_1", "chk_1", { enabled: false })).resolves.toEqual({
+    await expect(
+      updateProjectAvailabilityCheck("proj_1", "chk_1", { enabled: false })
+    ).resolves.toEqual({
       ...check,
       enabled: false
     });
@@ -201,9 +223,15 @@ describe("web api client", () => {
         expected_status_max: 399,
         timeout_ms: 5000
       })
-    ).resolves.toEqual(expect.objectContaining({ normalized_url: "https://app.example.com/health" }));
-    await expect(listProjectAvailabilityCheckResults("proj_1", "chk_1", 7)).resolves.toEqual([result]);
-    await expect(listProjectAvailabilityCheckDailyRollups("proj_1", "chk_1", 9)).resolves.toEqual([rollup]);
+    ).resolves.toEqual(
+      expect.objectContaining({ normalized_url: "https://app.example.com/health" })
+    );
+    await expect(listProjectAvailabilityCheckResults("proj_1", "chk_1", 7)).resolves.toEqual([
+      result
+    ]);
+    await expect(listProjectAvailabilityCheckDailyRollups("proj_1", "chk_1", 9)).resolves.toEqual([
+      rollup
+    ]);
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
@@ -250,10 +278,18 @@ describe("web api client", () => {
 
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ error: "invalid_session" }), { status: 401 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ error: "invalid_session" }), { status: 401 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ session: createSession() }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ error: "invalid_session" }), { status: 401 }));
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: "invalid_session" }), { status: 401 })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: "invalid_session" }), { status: 401 })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ session: createSession() }), { status: 200 })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: "invalid_session" }), { status: 401 })
+      );
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(getBillingSummary()).rejects.toBeInstanceOf(InvalidSessionError);
@@ -273,9 +309,15 @@ describe("web api client", () => {
   it("ignores logout 401 responses and clears the csrf header state", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ session: createSession() }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ error: "invalid_session" }), { status: 401 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ alert: { alert_id: "al_1" } }), { status: 200 }));
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ session: createSession() }), { status: 200 })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: "invalid_session" }), { status: 401 })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ alert: { alert_id: "al_1" } }), { status: 200 })
+      );
 
     vi.stubGlobal("fetch", fetchMock);
 
@@ -404,9 +446,19 @@ describe("web api client", () => {
       .mockResolvedValueOnce(
         new Response(JSON.stringify({ incidents: [], next_cursor: "cursor_2" }), { status: 200 })
       )
-      .mockResolvedValueOnce(new Response(JSON.stringify({ install_url: "https://github.com/apps/debugbundle/installations/new" }), { status: 200 }))
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ install_url: "https://github.com/apps/debugbundle/installations/new?state=return" }), { status: 200 })
+        new Response(
+          JSON.stringify({ install_url: "https://github.com/apps/debugbundle/installations/new" }),
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            install_url: "https://github.com/apps/debugbundle/installations/new?state=return"
+          }),
+          { status: 200 }
+        )
       );
 
     vi.stubGlobal("fetch", fetchMock);
@@ -433,11 +485,17 @@ describe("web api client", () => {
       { credentials: "include" }
     );
     expect(installUrl).toBe("https://github.com/apps/debugbundle/installations/new");
-    expect(fetchMock).toHaveBeenNthCalledWith(2, buildApiUrl("/v1/github/app/install-url"), { credentials: "include" });
-    expect(installUrlWithReturnTo).toBe("https://github.com/apps/debugbundle/installations/new?state=return");
+    expect(fetchMock).toHaveBeenNthCalledWith(2, buildApiUrl("/v1/github/app/install-url"), {
+      credentials: "include"
+    });
+    expect(installUrlWithReturnTo).toBe(
+      "https://github.com/apps/debugbundle/installations/new?state=return"
+    );
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
-      buildApiUrl("/v1/github/app/install-url?return_to=%2Fprojects%2Fproj_1%2Fgithub&project_id=proj_1"),
+      buildApiUrl(
+        "/v1/github/app/install-url?return_to=%2Fprojects%2Fproj_1%2Fgithub&project_id=proj_1"
+      ),
       { credentials: "include" }
     );
   });
@@ -445,12 +503,19 @@ describe("web api client", () => {
   it("calls bulk incident lifecycle endpoints with csrf headers", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ session: createSession() }), { status: 200 }))
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ incidents: [{ incident_id: "inc_1", status: "resolved" }] }), { status: 200 })
+        new Response(JSON.stringify({ session: createSession() }), { status: 200 })
       )
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ incidents: [{ incident_id: "inc_1", status: "open" }] }), { status: 200 })
+        new Response(
+          JSON.stringify({ incidents: [{ incident_id: "inc_1", status: "resolved" }] }),
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ incidents: [{ incident_id: "inc_1", status: "open" }] }), {
+          status: 200
+        })
       );
 
     vi.stubGlobal("fetch", fetchMock);
@@ -486,7 +551,14 @@ describe("web api client", () => {
   it("falls back to the default export filename when content disposition is missing", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(new Response(JSON.stringify({ organization_id: "org_123" }), { status: 200, headers: { "Content-Type": "application/json" } }))
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(JSON.stringify({ organization_id: "org_123" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          })
+        )
     );
 
     const result = await exportAccountData();
@@ -577,13 +649,18 @@ describe("web api client", () => {
         )
       )
       .mockResolvedValueOnce(new Response(JSON.stringify({ status: "failed" }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ error: "delete_failed" }), { status: 500 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: "delete_failed" }), { status: 500 })
+      )
       .mockResolvedValueOnce(new Response("not-json", { status: 502 }));
 
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(getIncidentBundle("inc_1")).resolves.toEqual({ status: "pending" });
-    await expect(getIncidentBundle("inc_1")).resolves.toMatchObject({ status: "ready", bundle: { bundle_id: "bun_1" } });
+    await expect(getIncidentBundle("inc_1")).resolves.toMatchObject({
+      status: "ready",
+      bundle: { bundle_id: "bun_1" }
+    });
     await expect(getIncidentReproduction("inc_1")).resolves.toEqual({ status: "failed" });
     await expect(deleteAlert("al_1", "proj_1")).rejects.toThrow("delete_failed");
     await expect(deleteAlert("al_2", "proj_1")).rejects.toThrow("request_failed_502");

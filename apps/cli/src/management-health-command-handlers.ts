@@ -20,7 +20,10 @@ import {
   requirePositional,
   type ParsedArgv
 } from "./argv-helpers.js";
-import type { CliCommandResult, ManagementCommandDependencies } from "./management-command-dependencies.js";
+import type {
+  CliCommandResult,
+  ManagementCommandDependencies
+} from "./management-command-dependencies.js";
 
 function readOptionalServiceName(parsedArgv: ParsedArgv): string | null | undefined {
   const service = readStringOption(parsedArgv, "service");
@@ -127,6 +130,7 @@ export async function handleHealthCommand(
     const enabled = readBooleanStringOption(parsedArgv, "enabled") ?? true;
     const environment = readStringOption(parsedArgv, "environment");
     const serviceName = readOptionalServiceName(parsedArgv);
+    const failureThreshold = readIntegerOption(parsedArgv, "failure-threshold");
 
     return await (dependencies.createHealthCheckCommand ?? defaultCreateHealthCheckCommand)(
       appendCommonAuthOptions(parsedArgv, {
@@ -138,7 +142,7 @@ export async function handleHealthCommand(
         expectedStatusMax: readIntegerOption(parsedArgv, "expected-status-max") ?? 399,
         timeoutMs: readIntegerOption(parsedArgv, "timeout-ms") ?? 2500,
         intervalSeconds,
-        failureThreshold: readIntegerOption(parsedArgv, "failure-threshold") ?? 3,
+        ...(failureThreshold === undefined ? {} : { failureThreshold }),
         recoveryThreshold: readIntegerOption(parsedArgv, "recovery-threshold") ?? 2,
         ...(environment === undefined ? {} : { environment }),
         ...(serviceName === undefined ? {} : { serviceName }),
@@ -287,7 +291,9 @@ export async function handleHealthCommand(
     ensureNoExtraPositionals(parsedArgv, 4);
 
     const limit = readLimitOption(parsedArgv);
-    return await (dependencies.listHealthCheckResultsCommand ?? defaultListHealthCheckResultsCommand)(
+    return await (
+      dependencies.listHealthCheckResultsCommand ?? defaultListHealthCheckResultsCommand
+    )(
       appendCommonAuthOptions(parsedArgv, {
         projectId: readRequiredProjectId(parsedArgv),
         checkId: requirePositional(parsedArgv, 3, "check-id"),
@@ -301,7 +307,9 @@ export async function handleHealthCommand(
     ensureNoExtraPositionals(parsedArgv, 4);
 
     const limit = readLimitOption(parsedArgv);
-    return await (dependencies.listHealthCheckDailyRollupsCommand ?? defaultListHealthCheckDailyRollupsCommand)(
+    return await (
+      dependencies.listHealthCheckDailyRollupsCommand ?? defaultListHealthCheckDailyRollupsCommand
+    )(
       appendCommonAuthOptions(parsedArgv, {
         projectId: readRequiredProjectId(parsedArgv),
         checkId: requirePositional(parsedArgv, 3, "check-id"),

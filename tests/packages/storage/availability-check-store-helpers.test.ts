@@ -5,8 +5,12 @@ import {
   buildPlanEligibilityCaseSql,
   computeAvailabilityCheckNextScheduledAt,
   deriveAvailabilityCheckDailyState,
+  getEffectiveAvailabilityCheckIntervalSeconds,
+  getPlanActiveCheckLimit,
   getPlanCheckLimit,
   getPlanMinIntervalSeconds,
+  getPlanMonitoredProjectLimit,
+  getPlanRecommendedFailureThreshold,
   mapAvailabilityCheckRow,
   normalizeAvailabilityCheckPlan,
   projectExistsForAvailabilityChecks
@@ -29,7 +33,8 @@ const baseRow = {
   enabled: true,
   base_status: "passing",
   within_plan_limit: true,
-  meets_plan_interval: true,
+  within_monitored_project_limit: true,
+  within_organization_active_limit: true,
   organization_plan: "solo",
   consecutive_failures: 0,
   consecutive_successes: 7,
@@ -53,15 +58,28 @@ describe("availability check store helpers", () => {
     expect(normalizeAvailabilityCheckPlan("enterprise")).toBe("free");
     expect(getPlanCheckLimit("free")).toBe(1);
     expect(getPlanCheckLimit("solo")).toBe(3);
-    expect(getPlanCheckLimit("team")).toBe(8);
+    expect(getPlanCheckLimit("team")).toBe(10);
+    expect(getPlanMonitoredProjectLimit("free")).toBe(3);
+    expect(getPlanMonitoredProjectLimit("solo")).toBe(10);
+    expect(getPlanMonitoredProjectLimit("team")).toBe(10);
+    expect(getPlanActiveCheckLimit("free")).toBe(3);
+    expect(getPlanActiveCheckLimit("solo")).toBe(30);
+    expect(getPlanActiveCheckLimit("team")).toBe(50);
     expect(getPlanMinIntervalSeconds("free")).toBe(300);
     expect(getPlanMinIntervalSeconds("solo")).toBe(60);
-    expect(getPlanMinIntervalSeconds("team")).toBe(30);
+    expect(getPlanMinIntervalSeconds("team")).toBe(60);
+    expect(getPlanRecommendedFailureThreshold("free")).toBe(3);
+    expect(getPlanRecommendedFailureThreshold("solo")).toBe(3);
+    expect(getPlanRecommendedFailureThreshold("team")).toBe(2);
+    expect(getEffectiveAvailabilityCheckIntervalSeconds("team", 30)).toBe(60);
+    expect(getEffectiveAvailabilityCheckIntervalSeconds("team", 120)).toBe(120);
   });
 
   it("builds plan eligibility SQL for check counts and intervals", () => {
-    expect(buildPlanEligibilityCaseSql("limit")).toContain("WHEN 'team' THEN 8");
+    expect(buildPlanEligibilityCaseSql("limit")).toContain("WHEN 'team' THEN 10");
     expect(buildPlanEligibilityCaseSql("limit")).toContain("ELSE 1");
+    expect(buildPlanEligibilityCaseSql("monitored_projects")).toContain("WHEN 'team' THEN 10");
+    expect(buildPlanEligibilityCaseSql("active_checks")).toContain("WHEN 'solo' THEN 30");
     expect(buildPlanEligibilityCaseSql("interval")).toContain("WHEN 'solo' THEN 60");
     expect(buildPlanEligibilityCaseSql("interval")).toContain("ELSE 300");
   });
@@ -86,8 +104,24 @@ describe("availability check store helpers", () => {
     expect(mapAvailabilityCheckRow({ ...baseRow, within_plan_limit: false })).toEqual(
       expect.objectContaining({ status: "paused", paused_reason: "plan_check_limit_exceeded" })
     );
-    expect(mapAvailabilityCheckRow({ ...baseRow, meets_plan_interval: false })).toEqual(
-      expect.objectContaining({ status: "paused", paused_reason: "plan_interval_too_low" })
+    expect(mapAvailabilityCheckRow({ ...baseRow, within_monitored_project_limit: false })).toEqual(
+      expect.objectContaining({
+        status: "paused",
+        paused_reason: "plan_monitored_project_limit_exceeded"
+      })
+    );
+    expect(
+      mapAvailabilityCheckRow({ ...baseRow, within_organization_active_limit: false })
+    ).toEqual(
+      expect.objectContaining({
+        status: "paused",
+        paused_reason: "plan_organization_check_limit_exceeded"
+      })
+    );
+    expect(
+      mapAvailabilityCheckRow({ ...baseRow, organization_plan: "team", interval_seconds: 30 })
+    ).toEqual(
+      expect.objectContaining({ interval_seconds: 60, status: "passing", paused_reason: null })
     );
     expect(
       mapAvailabilityCheckRow({
@@ -176,7 +210,9 @@ describe("availability check store helpers", () => {
         .fn()
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ environment_default: null, organization_plan: "team" }] })
-        .mockResolvedValueOnce({ rows: [{ environment_default: "staging", organization_plan: "unknown" }] })
+        .mockResolvedValueOnce({
+          rows: [{ environment_default: "staging", organization_plan: "unknown" }]
+        })
     };
 
     await expect(

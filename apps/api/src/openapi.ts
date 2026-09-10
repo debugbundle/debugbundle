@@ -4,11 +4,9 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 import { SESSION_COOKIE_NAME } from "../../../packages/auth/src/index.js";
 import {
   AlertListResponseSchema,
-  AlertResponseSchema,
+  AlertResponseSchema
 } from "../../../packages/alert-client/src/index.js";
-import {
-  BillingSummaryResponseSchema,
-} from "../../../packages/billing-client/src/index.js";
+import { BillingSummaryResponseSchema } from "../../../packages/billing-client/src/index.js";
 import {
   BundleV1Schema,
   CaptureRuleSuggestionsResponseSchema as SharedCaptureRuleSuggestionsResponseSchema,
@@ -26,13 +24,13 @@ import {
   EventEnvelopeSchema,
   ImprovementSettingsResponseSchema,
   ImprovementSettingsUpdateSchema,
-  ResolvedCapturePolicySchema as SharedResolvedCapturePolicySchema,
+  ResolvedCapturePolicySchema as SharedResolvedCapturePolicySchema
 } from "../../../packages/shared-types/src/index.js";
 import {
   DeletedProjectRecordSchema,
   ProjectCreateResponseSchema,
   ProjectDeleteResponseSchema,
-  ProjectListResponseSchema,
+  ProjectListResponseSchema
 } from "../../../packages/project-management-client/src/index.js";
 import {
   BulkIncidentResponseSchema,
@@ -42,11 +40,11 @@ import {
   ImprovementsResponseSchema,
   LogsResponseSchema,
   ReproductionResponseSchema,
-  ServicesResponseSchema,
+  ServicesResponseSchema
 } from "../../../packages/retrieval-client/src/index.js";
 import {
   TokenCreateResponseSchema,
-  TokenListResponseSchema,
+  TokenListResponseSchema
 } from "../../../packages/token-management/src/index.js";
 import {
   RetryWebhookDeliveryResponseSchema,
@@ -54,11 +52,11 @@ import {
   WebhookDeliveriesResponseSchema,
   WebhookResponseSchema,
   WebhookTestResponseSchema,
-  WebhookListResponseSchema,
+  WebhookListResponseSchema
 } from "../../../packages/webhook-client/src/index.js";
 import {
   WeeklyReportChannelListResponseSchema,
-  WeeklyReportChannelResponseSchema,
+  WeeklyReportChannelResponseSchema
 } from "../../../packages/weekly-report-client/src/index.js";
 import {
   AccountDeleteBodySchema,
@@ -121,7 +119,7 @@ import {
   WebhooksQuerySchema,
   WebhookTestBodySchema,
   WeeklyReportChannelParamsSchema,
-  WeeklyReportChannelsQuerySchema,
+  WeeklyReportChannelsQuerySchema
 } from "./schemas.js";
 import { createAnalyticsMetricOpenApiOperations } from "./openapi-analytics.js";
 
@@ -170,13 +168,15 @@ const projectBearerAuth = [projectBearerTokenSecurity];
 const ApiErrorSchema = z.object({ error: z.string() }).strict();
 const SuccessResponseSchema = z.object({ success: z.boolean() }).strict();
 const BillingLinkResponseSchema = z.object({ url: z.string().url() }).strict();
-const BundleFailureStatusSchema = z.object({ status: z.literal("failed"), reason: z.string() }).strict();
+const BundleFailureStatusSchema = z
+  .object({ status: z.literal("failed"), reason: z.string() })
+  .strict();
 const ProjectInviteMembershipSchema = z
   .object({
     project_id: z.string(),
     user_id: z.string(),
     role: z.enum(["owner", "admin", "member"]),
-    membership_type: z.enum(["owner", "collaborator"]).optional(),
+    membership_type: z.enum(["owner", "collaborator"]).optional()
   })
   .strict();
 const AcceptInviteResponseSchema = z.object({ membership: ProjectInviteMembershipSchema }).strict();
@@ -197,9 +197,9 @@ const WebSessionSchema = z
     auth_methods: z
       .object({
         email: z.boolean(),
-        github: z.boolean(),
+        github: z.boolean()
       })
-      .strict(),
+      .strict()
   })
   .strict();
 const SessionResponseSchema = z.object({ session: WebSessionSchema.nullable() }).strict();
@@ -237,7 +237,7 @@ const GithubDevicePollResponseSchema = z.discriminatedUnion("status", [
 const AccountStoredArtifactSchema = z
   .object({
     key: z.string(),
-    content: z.unknown(),
+    content: z.unknown()
   })
   .strict();
 const AccountExportResponseSchema = z
@@ -286,9 +286,9 @@ const AccountExportResponseSchema = z
       .object({
         raw_events: z.array(AccountStoredArtifactSchema),
         bundles: z.array(AccountStoredArtifactSchema),
-        reproductions: z.array(AccountStoredArtifactSchema),
+        reproductions: z.array(AccountStoredArtifactSchema)
       })
-      .strict(),
+      .strict()
   })
   .strict();
 const AccountDeletionResponseSchema = z
@@ -299,9 +299,9 @@ const AccountDeletionResponseSchema = z
         organization_id: z.string(),
         deleted_project_ids: z.array(z.string()),
         user_deleted: z.boolean(),
-        deleted_member_token_count: z.number().int().nonnegative(),
+        deleted_member_token_count: z.number().int().nonnegative()
       })
-      .strict(),
+      .strict()
   })
   .strict();
 const SlackDestinationSchema = z
@@ -315,22 +315,22 @@ const SlackDestinationSchema = z
     installed_by_member_id: z.string().uuid().nullable(),
     is_active: z.boolean(),
     created_at: z.string().datetime(),
-    updated_at: z.string().datetime(),
+    updated_at: z.string().datetime()
   })
   .strict();
 const SlackInstallUrlResponseSchema = z
   .object({
-    install_url: z.string().url(),
+    install_url: z.string().url()
   })
   .strict();
 const SlackDestinationListResponseSchema = z
   .object({
-    destinations: z.array(SlackDestinationSchema),
+    destinations: z.array(SlackDestinationSchema)
   })
   .strict();
 const SlackDestinationTestResponseSchema = z
   .object({
-    delivered: z.literal(true),
+    delivered: z.literal(true)
   })
   .strict();
 const ProjectMemberSchema = z
@@ -340,7 +340,7 @@ const ProjectMemberSchema = z
     role: z.enum(["owner", "admin", "member"]),
     membership_type: z.enum(["owner", "collaborator"]),
     avatar_url: z.string().min(1).nullable(),
-    created_at: z.string().datetime(),
+    created_at: z.string().datetime()
   })
   .strict();
 const AccountAvatarImportResponseSchema = z
@@ -349,9 +349,9 @@ const AccountAvatarImportResponseSchema = z
       .object({
         source: z.enum(["github", "gravatar"]),
         avatar_url: z.string().min(1),
-        updated_at: z.string().datetime(),
+        updated_at: z.string().datetime()
       })
-      .strict(),
+      .strict()
   })
   .strict();
 const ProjectInviteSchema = z
@@ -364,24 +364,36 @@ const ProjectInviteSchema = z
     accepted_at: z.string().datetime().nullable(),
     canceled_at: z.string().datetime().nullable(),
     expires_at: z.string().datetime(),
-    created_at: z.string().datetime(),
+    created_at: z.string().datetime()
   })
   .strict();
-const ProjectMemberListResponseSchema = z.object({ members: z.array(ProjectMemberSchema) }).strict();
+const ProjectMemberListResponseSchema = z
+  .object({ members: z.array(ProjectMemberSchema) })
+  .strict();
 const ProjectMemberResponseSchema = z.object({ member: ProjectMemberSchema }).strict();
-const ProjectInviteListResponseSchema = z.object({ invites: z.array(ProjectInviteSchema) }).strict();
+const ProjectInviteListResponseSchema = z
+  .object({ invites: z.array(ProjectInviteSchema) })
+  .strict();
 const ProjectInviteResponseSchema = z.object({ invite: ProjectInviteSchema }).strict();
-const ProjectUpdateResponseSchema = z.object({ project: DeletedProjectRecordSchema.extend({ metrics: z.object({
-  open_incidents: z.number().int().nonnegative(),
-  regressed_incidents: z.number().int().nonnegative(),
-  attention_incidents_today: z.number().int().nonnegative(),
-  opened_incidents_today: z.number().int().nonnegative(),
-  opened_incidents_month: z.number().int().nonnegative(),
-  monthly_bundle_requests: z.number().int().nonnegative(),
-  monthly_raw_ingested_events: z.number().int().nonnegative(),
-  retained_bundles: z.number().int().nonnegative(),
-  monthly_alert_deliveries: z.number().int().nonnegative(),
-}).strict() }) }).strict();
+const ProjectUpdateResponseSchema = z
+  .object({
+    project: DeletedProjectRecordSchema.extend({
+      metrics: z
+        .object({
+          open_incidents: z.number().int().nonnegative(),
+          regressed_incidents: z.number().int().nonnegative(),
+          attention_incidents_today: z.number().int().nonnegative(),
+          opened_incidents_today: z.number().int().nonnegative(),
+          opened_incidents_month: z.number().int().nonnegative(),
+          monthly_bundle_requests: z.number().int().nonnegative(),
+          monthly_raw_ingested_events: z.number().int().nonnegative(),
+          retained_bundles: z.number().int().nonnegative(),
+          monthly_alert_deliveries: z.number().int().nonnegative()
+        })
+        .strict()
+    })
+  })
+  .strict();
 const ProbeActivationSchema = z
   .object({
     activation_id: z.string().uuid(),
@@ -389,19 +401,23 @@ const ProbeActivationSchema = z
     service: z.string(),
     environment: z.string(),
     expires_at: z.string().datetime(),
-    trigger_expires_at: z.string().datetime(),
+    trigger_expires_at: z.string().datetime()
   })
   .strict();
 const ProbeActivationResponseSchema = z
   .object({
     activation: ProbeActivationSchema,
-    trigger_token: z.string(),
+    trigger_token: z.string()
   })
   .strict();
-const ProbeActivationListResponseSchema = z.object({ activations: z.array(ProbeActivationSchema) }).strict();
+const ProbeActivationListResponseSchema = z
+  .object({ activations: z.array(ProbeActivationSchema) })
+  .strict();
 const ProbeDeactivationResponseSchema = z
   .object({
-    deactivated: z.object({ activation_id: z.string().uuid(), deactivated_at: z.string().datetime() }).strict(),
+    deactivated: z
+      .object({ activation_id: z.string().uuid(), deactivated_at: z.string().datetime() })
+      .strict()
   })
   .strict();
 const CaptureRuleResponseSchema = SharedCaptureRuleResponseSchema;
@@ -417,7 +433,7 @@ const SdkConfigResponseSchema = z
     analytics: SharedAnalyticsSdkConfigSchema.optional(),
     capture_policy: ResolvedCapturePolicySchema,
     capture_rules: z.array(CaptureRuleResponseSchema.shape.rule),
-    trigger_token_key: z.string().optional(),
+    trigger_token_key: z.string().optional()
   })
   .strict();
 const IngestionErrorSchema = z.object({ index: z.number().int(), reason: z.string() }).strict();
@@ -429,17 +445,23 @@ const IngestionAcceptedResponseSchema = z
     retry_after_ms: z.number().int().positive().optional(),
     probe_directives: z
       .object({
-        active_probes: z.array(ProbeActivationSchema),
+        active_probes: z.array(ProbeActivationSchema)
       })
-      .optional(),
+      .optional()
   })
   .strict();
-const OpenApiIngestionRequestSchema = z.object({
-  events: z.array(z.union([EventEnvelopeSchema, AnalyticsEventEnvelopeSchema]))
-}).strict();
-const HealthResponseSchema = z.object({ status: z.literal("ok"), version: z.string(), uptime: z.number() }).strict();
+const OpenApiIngestionRequestSchema = z
+  .object({
+    events: z.array(z.union([EventEnvelopeSchema, AnalyticsEventEnvelopeSchema]))
+  })
+  .strict();
+const HealthResponseSchema = z
+  .object({ status: z.literal("ok"), version: z.string(), uptime: z.number() })
+  .strict();
 const ReadyResponseSchema = z.object({ status: z.literal("ready") }).strict();
-const NotReadyResponseSchema = z.object({ status: z.literal("not_ready"), reason: z.string() }).strict();
+const NotReadyResponseSchema = z
+  .object({ status: z.literal("not_ready"), reason: z.string() })
+  .strict();
 const LiveResponseSchema = z.object({ status: z.literal("live") }).strict();
 const AvailabilityCheckResultStatusSchema = z.enum([
   "success",
@@ -457,7 +479,10 @@ const AvailabilityIncidentStatusSchema = z.enum(["open", "resolved", "regressed"
 const AvailabilityCheckLimitsSchema = z
   .object({
     max_checks_per_project: z.number().int().nonnegative(),
-    min_interval_seconds: z.number().int().positive()
+    max_monitored_projects_per_organization: z.number().int().nonnegative(),
+    max_active_checks_per_organization: z.number().int().nonnegative(),
+    min_interval_seconds: z.number().int().positive(),
+    recommended_failure_threshold: z.number().int().min(1).max(10)
   })
   .strict();
 const AvailabilityCheckRecordSchema = z
@@ -588,14 +613,17 @@ function toJsonSchema(schema: unknown): JsonSchemaDocument {
   const document = zodToJsonSchema(schema as never, {
     target: "jsonSchema2019-09",
     $refStrategy: "none",
-    definitionPath: "$defs",
+    definitionPath: "$defs"
   }) as JsonSchemaDocument;
 
   delete document["$schema"];
   return document;
 }
 
-function buildParameters(schema: unknown, location: "path" | "query"): Array<Record<string, unknown>> {
+function buildParameters(
+  schema: unknown,
+  location: "path" | "query"
+): Array<Record<string, unknown>> {
   const jsonSchema = toJsonSchema(schema) as {
     properties?: Record<string, JsonSchemaDocument>;
     required?: string[];
@@ -606,7 +634,7 @@ function buildParameters(schema: unknown, location: "path" | "query"): Array<Rec
     name,
     in: location,
     required: location === "path" ? true : required.has(name),
-    schema: propertySchema,
+    schema: propertySchema
   }));
 }
 
@@ -616,7 +644,7 @@ function resolveSchemaSpec(
 ): JsonSchemaDocument {
   if ("oneOf" in schema) {
     return {
-      oneOf: schema.oneOf.map((entry) => resolveSchemaSpec(entry, components)),
+      oneOf: schema.oneOf.map((entry) => resolveSchemaSpec(entry, components))
     };
   }
 
@@ -631,11 +659,20 @@ function buildPublicApiOperations(): OperationSpec[] {
   const apiError = component("ApiError", ApiErrorSchema);
   const successResponse = component("SuccessResponse", SuccessResponseSchema);
   const sessionResponse = component("SessionResponse", SessionResponseSchema);
-  const githubDeviceStartResponse = component("GithubDeviceStartResponse", GithubDeviceStartResponseSchema);
-  const githubDevicePollResponse = component("GithubDevicePollResponse", GithubDevicePollResponseSchema);
+  const githubDeviceStartResponse = component(
+    "GithubDeviceStartResponse",
+    GithubDeviceStartResponseSchema
+  );
+  const githubDevicePollResponse = component(
+    "GithubDevicePollResponse",
+    GithubDevicePollResponseSchema
+  );
   const acceptInviteResponse = component("AcceptInviteResponse", AcceptInviteResponseSchema);
   const accountExportResponse = component("AccountExportResponse", AccountExportResponseSchema);
-  const accountDeletionResponse = component("AccountDeletionResponse", AccountDeletionResponseSchema);
+  const accountDeletionResponse = component(
+    "AccountDeletionResponse",
+    AccountDeletionResponseSchema
+  );
   const avatarImageResponse = component("AvatarImageResponse", z.string());
   const ingestionRequest = component("IngestionRequest", OpenApiIngestionRequestSchema);
   const ingestionResponse = component("IngestionAcceptedResponse", IngestionAcceptedResponseSchema);
@@ -646,63 +683,141 @@ function buildPublicApiOperations(): OperationSpec[] {
   const improvementResponse = component("ImprovementResponse", ImprovementResponseSchema);
   const improvementSnoozeBody = component("ImprovementSnoozeBody", ImprovementSnoozeBodySchema);
   const bundleResponse = component("BundleDocument", BundleV1Schema);
-  const bundlePending = component("PendingStatus", z.object({ status: z.literal("pending") }).strict());
+  const bundlePending = component(
+    "PendingStatus",
+    z.object({ status: z.literal("pending") }).strict()
+  );
   const bundleFailed = component("BundleFailedStatus", BundleFailureStatusSchema);
   const reproductionResponse = component("ReproductionResponse", ReproductionResponseSchema);
   const logsResponse = component("LogsResponse", LogsResponseSchema);
   const servicesResponse = component("ServicesResponse", ServicesResponseSchema);
-  const memberListResponse = component("ProjectMemberListResponse", ProjectMemberListResponseSchema);
-  const inviteListResponse = component("ProjectInviteListResponse", ProjectInviteListResponseSchema);
+  const memberListResponse = component(
+    "ProjectMemberListResponse",
+    ProjectMemberListResponseSchema
+  );
+  const inviteListResponse = component(
+    "ProjectInviteListResponse",
+    ProjectInviteListResponseSchema
+  );
   const inviteResponse = component("ProjectInviteResponse", ProjectInviteResponseSchema);
   const memberResponse = component("ProjectMemberResponse", ProjectMemberResponseSchema);
   const projectListResponse = component("ProjectListResponse", ProjectListResponseSchema);
   const projectCreateResponse = component("ProjectCreateResponse", ProjectCreateResponseSchema);
   const projectUpdateResponse = component("ProjectUpdateResponse", ProjectUpdateResponseSchema);
   const projectDeleteResponse = component("ProjectDeleteResponse", ProjectDeleteResponseSchema);
-  const slackInstallUrlResponse = component("SlackInstallUrlResponse", SlackInstallUrlResponseSchema);
-  const slackDestinationListResponse = component("SlackDestinationListResponse", SlackDestinationListResponseSchema);
-  const slackDestinationTestResponse = component("SlackDestinationTestResponse", SlackDestinationTestResponseSchema);
+  const slackInstallUrlResponse = component(
+    "SlackInstallUrlResponse",
+    SlackInstallUrlResponseSchema
+  );
+  const slackDestinationListResponse = component(
+    "SlackDestinationListResponse",
+    SlackDestinationListResponseSchema
+  );
+  const slackDestinationTestResponse = component(
+    "SlackDestinationTestResponse",
+    SlackDestinationTestResponseSchema
+  );
   const billingSummaryResponse = component("BillingSummaryResponse", BillingSummaryResponseSchema);
   const billingLinkResponse = component("BillingLinkResponse", BillingLinkResponseSchema);
   const tokenListResponse = component("TokenListResponse", TokenListResponseSchema);
   const tokenResponse = component("TokenResponse", TokenCreateResponseSchema);
   const alertsResponse = component("AlertListResponse", AlertListResponseSchema);
   const alertResponse = component("AlertResponse", AlertResponseSchema);
-  const weeklyReportChannelsResponse = component("WeeklyReportChannelListResponse", WeeklyReportChannelListResponseSchema);
-  const weeklyReportChannelResponse = component("WeeklyReportChannelResponse", WeeklyReportChannelResponseSchema);
+  const weeklyReportChannelsResponse = component(
+    "WeeklyReportChannelListResponse",
+    WeeklyReportChannelListResponseSchema
+  );
+  const weeklyReportChannelResponse = component(
+    "WeeklyReportChannelResponse",
+    WeeklyReportChannelResponseSchema
+  );
   const webhookListResponse = component("WebhookListResponse", WebhookListResponseSchema);
   const webhookResponse = component("WebhookResponse", WebhookResponseSchema);
   const webhookCreateResponse = component("WebhookCreateResponse", WebhookCreateResponseSchema);
-  const webhookDeliveriesResponse = component("WebhookDeliveriesResponse", WebhookDeliveriesResponseSchema);
+  const webhookDeliveriesResponse = component(
+    "WebhookDeliveriesResponse",
+    WebhookDeliveriesResponseSchema
+  );
   const webhookTestResponse = component("WebhookTestResponse", WebhookTestResponseSchema);
-  const webhookRetryResponse = component("WebhookRetryResponse", RetryWebhookDeliveryResponseSchema);
-  const probeActivationResponse = component("ProbeActivationResponse", ProbeActivationResponseSchema);
-  const probeActivationListResponse = component("ProbeActivationListResponse", ProbeActivationListResponseSchema);
-  const probeDeactivationResponse = component("ProbeDeactivationResponse", ProbeDeactivationResponseSchema);
+  const webhookRetryResponse = component(
+    "WebhookRetryResponse",
+    RetryWebhookDeliveryResponseSchema
+  );
+  const probeActivationResponse = component(
+    "ProbeActivationResponse",
+    ProbeActivationResponseSchema
+  );
+  const probeActivationListResponse = component(
+    "ProbeActivationListResponse",
+    ProbeActivationListResponseSchema
+  );
+  const probeDeactivationResponse = component(
+    "ProbeDeactivationResponse",
+    ProbeDeactivationResponseSchema
+  );
   const captureRuleCreate = component("CaptureRuleCreate", SharedCaptureRuleCreateSchema);
-  const createCaptureRuleFromSuggestion = component("CreateCaptureRuleFromSuggestion", SharedCreateCaptureRuleFromSuggestionSchema);
+  const createCaptureRuleFromSuggestion = component(
+    "CreateCaptureRuleFromSuggestion",
+    SharedCreateCaptureRuleFromSuggestionSchema
+  );
   const captureRuleUpdate = component("CaptureRuleUpdate", SharedCaptureRuleUpdateSchema);
   const captureRuleResponse = component("CaptureRuleResponse", CaptureRuleResponseSchema);
   const captureRulesResponse = component("CaptureRulesResponse", CaptureRulesResponseSchema);
-  const captureRuleSuggestionsResponse = component("CaptureRuleSuggestionsResponse", SharedCaptureRuleSuggestionsResponseSchema);
+  const captureRuleSuggestionsResponse = component(
+    "CaptureRuleSuggestionsResponse",
+    SharedCaptureRuleSuggestionsResponseSchema
+  );
   const capturePolicyUpdate = component("CapturePolicyUpdate", CapturePolicyUpdateSchema);
   const capturePolicyResponse = component("CapturePolicyResponse", CapturePolicyResponseSchema);
-  const analyticsSettingsUpdate = component("AnalyticsSettingsUpdate", AnalyticsSettingsUpdateSchema);
-  const analyticsSettingsResponse = component("AnalyticsSettingsResponse", AnalyticsSettingsResponseSchema);
-  const improvementSettingsUpdate = component("ImprovementSettingsUpdate", ImprovementSettingsUpdateSchema);
-  const improvementSettingsResponse = component("ImprovementSettingsResponse", ImprovementSettingsResponseSchema);
+  const analyticsSettingsUpdate = component(
+    "AnalyticsSettingsUpdate",
+    AnalyticsSettingsUpdateSchema
+  );
+  const analyticsSettingsResponse = component(
+    "AnalyticsSettingsResponse",
+    AnalyticsSettingsResponseSchema
+  );
+  const improvementSettingsUpdate = component(
+    "ImprovementSettingsUpdate",
+    ImprovementSettingsUpdateSchema
+  );
+  const improvementSettingsResponse = component(
+    "ImprovementSettingsResponse",
+    ImprovementSettingsResponseSchema
+  );
   const sdkConfigResponse = component("SdkConfigResponse", SdkConfigResponseSchema);
   const healthResponse = component("HealthResponse", HealthResponseSchema);
   const readyResponse = component("ReadyResponse", ReadyResponseSchema);
   const notReadyResponse = component("NotReadyResponse", NotReadyResponseSchema);
   const liveResponse = component("LiveResponse", LiveResponseSchema);
-  const availabilityCheckListResponse = component("AvailabilityCheckListResponse", AvailabilityCheckListResponseSchema);
-  const availabilityCheckResponse = component("AvailabilityCheckResponse", AvailabilityCheckResponseSchema);
-  const availabilityCheckMutationResponse = component("AvailabilityCheckMutationResponse", AvailabilityCheckMutationResponseSchema);
-  const availabilityCheckDeleteResponse = component("AvailabilityCheckDeleteResponse", AvailabilityCheckDeleteResponseSchema);
-  const availabilityCheckResultsResponse = component("AvailabilityCheckResultsResponse", AvailabilityCheckResultsResponseSchema);
-  const availabilityCheckDailyRollupsResponse = component("AvailabilityCheckDailyRollupsResponse", AvailabilityCheckDailyRollupsResponseSchema);
-  const availabilityCheckTestResponse = component("AvailabilityCheckTestResponse", AvailabilityCheckTestResponseSchema);
+  const availabilityCheckListResponse = component(
+    "AvailabilityCheckListResponse",
+    AvailabilityCheckListResponseSchema
+  );
+  const availabilityCheckResponse = component(
+    "AvailabilityCheckResponse",
+    AvailabilityCheckResponseSchema
+  );
+  const availabilityCheckMutationResponse = component(
+    "AvailabilityCheckMutationResponse",
+    AvailabilityCheckMutationResponseSchema
+  );
+  const availabilityCheckDeleteResponse = component(
+    "AvailabilityCheckDeleteResponse",
+    AvailabilityCheckDeleteResponseSchema
+  );
+  const availabilityCheckResultsResponse = component(
+    "AvailabilityCheckResultsResponse",
+    AvailabilityCheckResultsResponseSchema
+  );
+  const availabilityCheckDailyRollupsResponse = component(
+    "AvailabilityCheckDailyRollupsResponse",
+    AvailabilityCheckDailyRollupsResponseSchema
+  );
+  const availabilityCheckTestResponse = component(
+    "AvailabilityCheckTestResponse",
+    AvailabilityCheckTestResponseSchema
+  );
 
   return [
     {
@@ -711,7 +826,7 @@ function buildPublicApiOperations(): OperationSpec[] {
       operationId: "getHealth",
       summary: "Get service health",
       tags: ["System"],
-      responses: { "200": { description: "Current health status.", schema: healthResponse } },
+      responses: { "200": { description: "Current health status.", schema: healthResponse } }
     },
     {
       method: "get",
@@ -721,8 +836,11 @@ function buildPublicApiOperations(): OperationSpec[] {
       tags: ["System"],
       responses: {
         "200": { description: "Current readiness status.", schema: readyResponse },
-        "503": { description: "A required runtime dependency is unavailable.", schema: notReadyResponse }
-      },
+        "503": {
+          description: "A required runtime dependency is unavailable.",
+          schema: notReadyResponse
+        }
+      }
     },
     {
       method: "get",
@@ -730,7 +848,7 @@ function buildPublicApiOperations(): OperationSpec[] {
       operationId: "getLiveness",
       summary: "Get liveness status",
       tags: ["System"],
-      responses: { "200": { description: "Current liveness status.", schema: liveResponse } },
+      responses: { "200": { description: "Current liveness status.", schema: liveResponse } }
     },
     {
       method: "post",
@@ -743,8 +861,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Email code request accepted.", schema: successResponse },
         "400": { description: "Invalid request body.", schema: apiError },
         "429": { description: "Too many auth attempts from this IP.", schema: apiError },
-        "503": { description: "Auth is not configured.", schema: apiError },
-      },
+        "503": { description: "Auth is not configured.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -757,8 +875,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Browser session created.", schema: sessionResponse },
         "400": { description: "Invalid code or request body.", schema: apiError },
         "429": { description: "Too many auth attempts from this IP.", schema: apiError },
-        "503": { description: "Auth is not configured.", schema: apiError },
-      },
+        "503": { description: "Auth is not configured.", schema: apiError }
+      }
     },
     {
       method: "get",
@@ -770,11 +888,11 @@ function buildPublicApiOperations(): OperationSpec[] {
         "302": {
           description: "Redirects to GitHub authorization.",
           headers: {
-            Location: { description: "GitHub authorization URL.", schema: z.string().url() },
-          },
+            Location: { description: "GitHub authorization URL.", schema: z.string().url() }
+          }
         },
-        "503": { description: "Auth is not configured.", schema: apiError },
-      },
+        "503": { description: "Auth is not configured.", schema: apiError }
+      }
     },
     {
       method: "get",
@@ -787,12 +905,12 @@ function buildPublicApiOperations(): OperationSpec[] {
         "302": {
           description: "Redirects back to the application callback URL.",
           headers: {
-            Location: { description: "Application redirect URL.", schema: z.string().url() },
-          },
+            Location: { description: "Application redirect URL.", schema: z.string().url() }
+          }
         },
         "400": { description: "Invalid callback query.", schema: apiError },
-        "503": { description: "Auth is not configured.", schema: apiError },
-      },
+        "503": { description: "Auth is not configured.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -802,7 +920,10 @@ function buildPublicApiOperations(): OperationSpec[] {
       tags: ["Auth"],
       requestBody: component("GithubDeviceStartBody", GithubDeviceStartBodySchema),
       responses: {
-        "200": { description: "GitHub device authorization created.", schema: githubDeviceStartResponse },
+        "200": {
+          description: "GitHub device authorization created.",
+          schema: githubDeviceStartResponse
+        },
         "400": { description: "Invalid request body.", schema: apiError },
         "429": { description: "Too many auth attempts from this IP.", schema: apiError },
         "503": { description: "GitHub device auth is unavailable.", schema: apiError }
@@ -816,7 +937,10 @@ function buildPublicApiOperations(): OperationSpec[] {
       tags: ["Auth"],
       requestBody: component("GithubDevicePollBody", GithubDevicePollBodySchema),
       responses: {
-        "200": { description: "Current GitHub device authorization status.", schema: githubDevicePollResponse },
+        "200": {
+          description: "Current GitHub device authorization status.",
+          schema: githubDevicePollResponse
+        },
         "400": { description: "Invalid request body.", schema: apiError },
         "404": { description: "Device authorization request was not found.", schema: apiError },
         "429": { description: "Too many auth attempts from this IP.", schema: apiError },
@@ -863,9 +987,12 @@ function buildPublicApiOperations(): OperationSpec[] {
       tags: ["Auth"],
       security: browserSessionAuth,
       responses: {
-        "200": { description: "Current browser session or null when signed out.", schema: sessionResponse },
-        "503": { description: "Auth is not configured.", schema: apiError },
-      },
+        "200": {
+          description: "Current browser session or null when signed out.",
+          schema: sessionResponse
+        },
+        "503": { description: "Auth is not configured.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -877,8 +1004,8 @@ function buildPublicApiOperations(): OperationSpec[] {
       responses: {
         "200": { description: "Browser session revoked.", schema: successResponse },
         "401": { description: "Browser session is missing or invalid.", schema: apiError },
-        "503": { description: "Auth is not configured.", schema: apiError },
-      },
+        "503": { description: "Auth is not configured.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -892,9 +1019,12 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Invite accepted.", schema: acceptInviteResponse },
         "400": { description: "Invalid invite token or payload.", schema: apiError },
         "401": { description: "Browser session is missing or invalid.", schema: apiError },
-        "403": { description: "Invite email does not match the signed-in account.", schema: apiError },
-        "503": { description: "Auth is not configured.", schema: apiError },
-      },
+        "403": {
+          description: "Invite email does not match the signed-in account.",
+          schema: apiError
+        },
+        "503": { description: "Auth is not configured.", schema: apiError }
+      }
     },
     {
       method: "get",
@@ -908,8 +1038,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "401": { description: "Browser session is missing or invalid.", schema: apiError },
         "403": { description: "Owner access is required.", schema: apiError },
         "404": { description: "Account export was not available.", schema: apiError },
-        "503": { description: "Account management is not configured.", schema: apiError },
-      },
+        "503": { description: "Account management is not configured.", schema: apiError }
+      }
     },
     {
       method: "get",
@@ -922,8 +1052,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Avatar image bytes.", schema: avatarImageResponse },
         "401": { description: "Browser session is missing or invalid.", schema: apiError },
         "404": { description: "Avatar was not found.", schema: apiError },
-        "503": { description: "Account management is not configured.", schema: apiError },
-      },
+        "503": { description: "Account management is not configured.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -933,12 +1063,15 @@ function buildPublicApiOperations(): OperationSpec[] {
       tags: ["Account"],
       security: browserSessionAuth,
       responses: {
-        "200": { description: "Avatar imported and cached.", schema: component("AccountAvatarImportResponse", AccountAvatarImportResponseSchema) },
+        "200": {
+          description: "Avatar imported and cached.",
+          schema: component("AccountAvatarImportResponse", AccountAvatarImportResponseSchema)
+        },
         "401": { description: "Browser session is missing or invalid.", schema: apiError },
         "404": { description: "No Gravatar image was found.", schema: apiError },
         "502": { description: "Avatar import failed.", schema: apiError },
-        "503": { description: "Account management is not configured.", schema: apiError },
-      },
+        "503": { description: "Account management is not configured.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -953,9 +1086,12 @@ function buildPublicApiOperations(): OperationSpec[] {
         "400": { description: "Invalid confirmation payload.", schema: apiError },
         "401": { description: "Browser session is missing or invalid.", schema: apiError },
         "403": { description: "Owner access is required.", schema: apiError },
-        "429": { description: "Deletion verification requests are rate limited.", schema: apiError },
-        "503": { description: "Account deletion verification is unavailable.", schema: apiError },
-      },
+        "429": {
+          description: "Deletion verification requests are rate limited.",
+          schema: apiError
+        },
+        "503": { description: "Account deletion verification is unavailable.", schema: apiError }
+      }
     },
     {
       method: "delete",
@@ -971,10 +1107,13 @@ function buildPublicApiOperations(): OperationSpec[] {
         "401": { description: "Browser session is missing or invalid.", schema: apiError },
         "403": { description: "Owner access is required.", schema: apiError },
         "404": { description: "Account was not found.", schema: apiError },
-        "409": { description: "Other owner-scoped organizations or projects still exist.", schema: apiError },
+        "409": {
+          description: "Other owner-scoped organizations or projects still exist.",
+          schema: apiError
+        },
         "429": { description: "Deletion attempts are rate limited.", schema: apiError },
-        "503": { description: "Account management is not configured.", schema: apiError },
-      },
+        "503": { description: "Account management is not configured.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -992,10 +1131,13 @@ function buildPublicApiOperations(): OperationSpec[] {
           description: "Rate limit or monthly ingestion quota exceeded.",
           schema: ingestionResponse,
           headers: {
-            "Retry-After": { description: "Seconds until the caller should retry.", schema: z.string() },
-          },
-        },
-      },
+            "Retry-After": {
+              description: "Seconds until the caller should retry.",
+              schema: z.string()
+            }
+          }
+        }
+      }
     },
     {
       method: "get",
@@ -1008,8 +1150,8 @@ function buildPublicApiOperations(): OperationSpec[] {
       responses: {
         "200": { description: "Incident list.", schema: incidentListResponse },
         "400": { description: "Invalid query parameters.", schema: apiError },
-        "401": { description: "Member token is invalid.", schema: apiError },
-      },
+        "401": { description: "Member token is invalid.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -1020,12 +1162,15 @@ function buildPublicApiOperations(): OperationSpec[] {
       security: anyMemberAuth,
       requestBody: component("BulkIncidentMutationBody", BulkIncidentMutationBodySchema),
       responses: {
-        "200": { description: "Resolved incident details in request order.", schema: bulkIncidentResponse },
+        "200": {
+          description: "Resolved incident details in request order.",
+          schema: bulkIncidentResponse
+        },
         "400": { description: "Invalid request body.", schema: apiError },
         "401": { description: "Member token is invalid.", schema: apiError },
         "404": { description: "One or more incidents were not found.", schema: apiError },
-        "500": { description: "Incident resolution is unavailable.", schema: apiError },
-      },
+        "500": { description: "Incident resolution is unavailable.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -1036,12 +1181,15 @@ function buildPublicApiOperations(): OperationSpec[] {
       security: anyMemberAuth,
       requestBody: component("BulkIncidentMutationBody", BulkIncidentMutationBodySchema),
       responses: {
-        "200": { description: "Reopened incident details in request order.", schema: bulkIncidentResponse },
+        "200": {
+          description: "Reopened incident details in request order.",
+          schema: bulkIncidentResponse
+        },
         "400": { description: "Invalid request body.", schema: apiError },
         "401": { description: "Member token is invalid.", schema: apiError },
         "404": { description: "One or more incidents were not found.", schema: apiError },
-        "500": { description: "Incident reopen is unavailable.", schema: apiError },
-      },
+        "500": { description: "Incident reopen is unavailable.", schema: apiError }
+      }
     },
     {
       method: "get",
@@ -1055,8 +1203,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Incident details.", schema: incidentResponse },
         "400": { description: "Invalid incident id.", schema: apiError },
         "401": { description: "Member token is invalid.", schema: apiError },
-        "404": { description: "Incident was not found.", schema: apiError },
-      },
+        "404": { description: "Incident was not found.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -1071,8 +1219,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "400": { description: "Invalid incident id.", schema: apiError },
         "401": { description: "Member token is invalid.", schema: apiError },
         "404": { description: "Incident was not found.", schema: apiError },
-        "500": { description: "Incident resolution is unavailable.", schema: apiError },
-      },
+        "500": { description: "Incident resolution is unavailable.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -1087,8 +1235,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "400": { description: "Invalid incident id.", schema: apiError },
         "401": { description: "Member token is invalid.", schema: apiError },
         "404": { description: "Incident was not found.", schema: apiError },
-        "500": { description: "Incident reopen is unavailable.", schema: apiError },
-      },
+        "500": { description: "Incident reopen is unavailable.", schema: apiError }
+      }
     },
     {
       method: "get",
@@ -1101,12 +1249,12 @@ function buildPublicApiOperations(): OperationSpec[] {
       responses: {
         "200": {
           description: "Bundle document or a generation status.",
-          schema: { oneOf: [bundleResponse, bundlePending, bundleFailed] },
+          schema: { oneOf: [bundleResponse, bundlePending, bundleFailed] }
         },
         "400": { description: "Invalid incident id.", schema: apiError },
         "401": { description: "Member token is invalid.", schema: apiError },
-        "404": { description: "Incident was not found.", schema: apiError },
-      },
+        "404": { description: "Incident was not found.", schema: apiError }
+      }
     },
     {
       method: "get",
@@ -1117,11 +1265,14 @@ function buildPublicApiOperations(): OperationSpec[] {
       security: memberBearerAuth,
       params: IncidentParamsSchema,
       responses: {
-        "200": { description: "Reproduction artifact or a pending status.", schema: reproductionResponse },
+        "200": {
+          description: "Reproduction artifact or a pending status.",
+          schema: reproductionResponse
+        },
         "400": { description: "Invalid incident id.", schema: apiError },
         "401": { description: "Member token is invalid.", schema: apiError },
-        "404": { description: "Incident or reproduction artifact was not found.", schema: apiError },
-      },
+        "404": { description: "Incident or reproduction artifact was not found.", schema: apiError }
+      }
     },
     {
       method: "get",
@@ -1135,8 +1286,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Improvement opportunity list.", schema: improvementListResponse },
         "400": { description: "Invalid query parameters.", schema: apiError },
         "401": { description: "Member token is invalid.", schema: apiError },
-        "404": { description: "Improvement management is unavailable.", schema: apiError },
-      },
+        "404": { description: "Improvement management is unavailable.", schema: apiError }
+      }
     },
     {
       method: "get",
@@ -1150,8 +1301,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Improvement opportunity details.", schema: improvementResponse },
         "400": { description: "Invalid improvement id.", schema: apiError },
         "401": { description: "Member token is invalid.", schema: apiError },
-        "404": { description: "Improvement opportunity was not found.", schema: apiError },
-      },
+        "404": { description: "Improvement opportunity was not found.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -1165,8 +1316,11 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Resolved improvement opportunity.", schema: improvementResponse },
         "400": { description: "Invalid improvement id.", schema: apiError },
         "401": { description: "Member token is invalid.", schema: apiError },
-        "404": { description: "Improvement opportunity was not found or resolution is unavailable.", schema: apiError },
-      },
+        "404": {
+          description: "Improvement opportunity was not found or resolution is unavailable.",
+          schema: apiError
+        }
+      }
     },
     {
       method: "post",
@@ -1180,8 +1334,11 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Reopened improvement opportunity.", schema: improvementResponse },
         "400": { description: "Invalid improvement id.", schema: apiError },
         "401": { description: "Member token is invalid.", schema: apiError },
-        "404": { description: "Improvement opportunity was not found or reopen is unavailable.", schema: apiError },
-      },
+        "404": {
+          description: "Improvement opportunity was not found or reopen is unavailable.",
+          schema: apiError
+        }
+      }
     },
     {
       method: "post",
@@ -1196,8 +1353,11 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Snoozed improvement opportunity.", schema: improvementResponse },
         "400": { description: "Invalid improvement id or snooze timestamp.", schema: apiError },
         "401": { description: "Member token is invalid.", schema: apiError },
-        "404": { description: "Improvement opportunity was not found or snooze is unavailable.", schema: apiError },
-      },
+        "404": {
+          description: "Improvement opportunity was not found or snooze is unavailable.",
+          schema: apiError
+        }
+      }
     },
     {
       method: "get",
@@ -1210,12 +1370,15 @@ function buildPublicApiOperations(): OperationSpec[] {
       responses: {
         "200": {
           description: "Improvement bundle document or generation status.",
-          schema: { oneOf: [bundleResponse, bundlePending, bundleFailed] },
+          schema: { oneOf: [bundleResponse, bundlePending, bundleFailed] }
         },
         "400": { description: "Invalid project or improvement id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Project or improvement opportunity was not found.", schema: apiError },
-      },
+        "404": {
+          description: "Project or improvement opportunity was not found.",
+          schema: apiError
+        }
+      }
     },
     {
       method: "get",
@@ -1228,8 +1391,8 @@ function buildPublicApiOperations(): OperationSpec[] {
       responses: {
         "200": { description: "Incident logs.", schema: logsResponse },
         "400": { description: "Invalid query parameters.", schema: apiError },
-        "401": { description: "Member token is invalid.", schema: apiError },
-      },
+        "401": { description: "Member token is invalid.", schema: apiError }
+      }
     },
     {
       method: "get",
@@ -1244,8 +1407,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "400": { description: "Invalid query parameters.", schema: apiError },
         "401": { description: "Member token is invalid.", schema: apiError },
         "404": { description: "Project was not found.", schema: apiError },
-        "500": { description: "Service retrieval is unavailable.", schema: apiError },
-      },
+        "500": { description: "Service retrieval is unavailable.", schema: apiError }
+      }
     },
     {
       method: "get",
@@ -1259,9 +1422,15 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Project members.", schema: memberListResponse },
         "400": { description: "Invalid project id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "403": { description: "Shared collaborator access is paused until the owner upgrades again.", schema: apiError },
-        "404": { description: "Project was not found or collaboration is unavailable.", schema: apiError },
-      },
+        "403": {
+          description: "Shared collaborator access is paused until the owner upgrades again.",
+          schema: apiError
+        },
+        "404": {
+          description: "Project was not found or collaboration is unavailable.",
+          schema: apiError
+        }
+      }
     },
     {
       method: "get",
@@ -1275,8 +1444,11 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Pending project invites.", schema: inviteListResponse },
         "400": { description: "Invalid project id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Project was not found or collaboration is unavailable.", schema: apiError },
-      },
+        "404": {
+          description: "Project was not found or collaboration is unavailable.",
+          schema: apiError
+        }
+      }
     },
     {
       method: "get",
@@ -1291,8 +1463,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "400": { description: "Invalid member id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
         "404": { description: "Project, member, or avatar was not found.", schema: apiError },
-        "503": { description: "Account management is not configured.", schema: apiError },
-      },
+        "503": { description: "Account management is not configured.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -1307,11 +1479,20 @@ function buildPublicApiOperations(): OperationSpec[] {
         "201": { description: "Invite created.", schema: inviteResponse },
         "400": { description: "Invalid project id or request body.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "403": { description: "Admin or owner access and verified email are required.", schema: apiError },
-        "404": { description: "Project was not found or collaboration is unavailable.", schema: apiError },
-        "409": { description: "Member or invite already exists, or collaborator limits were reached.", schema: apiError },
-        "500": { description: "Unexpected invite creation failure.", schema: apiError },
-      },
+        "403": {
+          description: "Admin or owner access and verified email are required.",
+          schema: apiError
+        },
+        "404": {
+          description: "Project was not found or collaboration is unavailable.",
+          schema: apiError
+        },
+        "409": {
+          description: "Member or invite already exists, or collaborator limits were reached.",
+          schema: apiError
+        },
+        "500": { description: "Unexpected invite creation failure.", schema: apiError }
+      }
     },
     {
       method: "delete",
@@ -1325,9 +1506,12 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Invite cancelled.", schema: inviteResponse },
         "400": { description: "Invalid request body.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "403": { description: "Admin or owner access and verified email are required.", schema: apiError },
-        "404": { description: "Invite was not found.", schema: apiError },
-      },
+        "403": {
+          description: "Admin or owner access and verified email are required.",
+          schema: apiError
+        },
+        "404": { description: "Invite was not found.", schema: apiError }
+      }
     },
     {
       method: "patch",
@@ -1344,8 +1528,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "401": { description: "Authentication is invalid.", schema: apiError },
         "403": { description: "Admin or owner access is required.", schema: apiError },
         "404": { description: "Member was not found.", schema: apiError },
-        "409": { description: "Owner role cannot be changed.", schema: apiError },
-      },
+        "409": { description: "Owner role cannot be changed.", schema: apiError }
+      }
     },
     {
       method: "delete",
@@ -1361,8 +1545,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "401": { description: "Authentication is invalid.", schema: apiError },
         "403": { description: "Admin or owner access is required.", schema: apiError },
         "404": { description: "Member was not found.", schema: apiError },
-        "409": { description: "Owner cannot be removed.", schema: apiError },
-      },
+        "409": { description: "Owner cannot be removed.", schema: apiError }
+      }
     },
     {
       method: "delete",
@@ -1377,8 +1561,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "400": { description: "Invalid project id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
         "404": { description: "Project membership was not found.", schema: apiError },
-        "409": { description: "Owners cannot leave their own project.", schema: apiError },
-      },
+        "409": { description: "Owners cannot leave their own project.", schema: apiError }
+      }
     },
     {
       method: "get",
@@ -1389,11 +1573,14 @@ function buildPublicApiOperations(): OperationSpec[] {
       security: anyMemberAuth,
       query: ProjectsQuerySchema,
       responses: {
-        "200": { description: "Projects for the caller organization.", schema: projectListResponse },
+        "200": {
+          description: "Projects for the caller organization.",
+          schema: projectListResponse
+        },
         "400": { description: "Invalid query parameters.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Projects are unavailable.", schema: apiError },
-      },
+        "404": { description: "Projects are unavailable.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -1409,8 +1596,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "401": { description: "Authentication is invalid.", schema: apiError },
         "403": { description: "Owner access is required.", schema: apiError },
         "404": { description: "Projects are unavailable.", schema: apiError },
-        "409": { description: "Project slug already exists.", schema: apiError },
-      },
+        "409": { description: "Project slug already exists.", schema: apiError }
+      }
     },
     {
       method: "patch",
@@ -1425,10 +1612,17 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Updated project.", schema: projectUpdateResponse },
         "400": { description: "Invalid project id or request body.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "403": { description: "Owner access is required, and paused shared collaborator access cannot mutate the project.", schema: apiError },
-        "404": { description: "Project was not found or projects are unavailable.", schema: apiError },
-        "409": { description: "Project slug is already in use.", schema: apiError },
-      },
+        "403": {
+          description:
+            "Owner access is required, and paused shared collaborator access cannot mutate the project.",
+          schema: apiError
+        },
+        "404": {
+          description: "Project was not found or projects are unavailable.",
+          schema: apiError
+        },
+        "409": { description: "Project slug is already in use.", schema: apiError }
+      }
     },
     {
       method: "delete",
@@ -1442,9 +1636,16 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Deleted project.", schema: projectDeleteResponse },
         "400": { description: "Invalid project id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "403": { description: "Owner access is required, and paused shared collaborator access cannot delete the project.", schema: apiError },
-        "404": { description: "Project was not found or projects are unavailable.", schema: apiError },
-      },
+        "403": {
+          description:
+            "Owner access is required, and paused shared collaborator access cannot delete the project.",
+          schema: apiError
+        },
+        "404": {
+          description: "Project was not found or projects are unavailable.",
+          schema: apiError
+        }
+      }
     },
     {
       method: "get",
@@ -1456,10 +1657,16 @@ function buildPublicApiOperations(): OperationSpec[] {
       params: ProjectParamsSchema,
       query: TokenListQuerySchema,
       responses: {
-        "200": { description: "Hosted health checks plus project plan limits.", schema: availabilityCheckListResponse },
+        "200": {
+          description: "Hosted health checks plus project plan limits.",
+          schema: availabilityCheckListResponse
+        },
         "400": { description: "Invalid project id or query parameters.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Project was not found or availability checks are unavailable.", schema: apiError }
+        "404": {
+          description: "Project was not found or availability checks are unavailable.",
+          schema: apiError
+        }
       }
     },
     {
@@ -1472,12 +1679,21 @@ function buildPublicApiOperations(): OperationSpec[] {
       params: ProjectParamsSchema,
       requestBody: component("AvailabilityCheckCreateBody", AvailabilityCheckCreateBodySchema),
       responses: {
-        "201": { description: "Hosted health check created.", schema: availabilityCheckMutationResponse },
+        "201": {
+          description: "Hosted health check created.",
+          schema: availabilityCheckMutationResponse
+        },
         "400": { description: "Invalid project id, payload, or blocked target.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
         "403": { description: "Owner or admin project access is required.", schema: apiError },
-        "404": { description: "Project was not found or availability checks are unavailable.", schema: apiError },
-        "409": { description: "Tier count or minimum-interval limit was reached.", schema: apiError }
+        "404": {
+          description: "Project was not found or availability checks are unavailable.",
+          schema: apiError
+        },
+        "409": {
+          description: "Tier count or minimum-interval limit was reached.",
+          schema: apiError
+        }
       }
     },
     {
@@ -1489,10 +1705,16 @@ function buildPublicApiOperations(): OperationSpec[] {
       security: anyMemberAuth,
       params: ProjectAvailabilityCheckParamsSchema,
       responses: {
-        "200": { description: "Hosted health check detail plus project plan limits.", schema: availabilityCheckResponse },
+        "200": {
+          description: "Hosted health check detail plus project plan limits.",
+          schema: availabilityCheckResponse
+        },
         "400": { description: "Invalid project id or check id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Health check was not found or availability checks are unavailable.", schema: apiError }
+        "404": {
+          description: "Health check was not found or availability checks are unavailable.",
+          schema: apiError
+        }
       }
     },
     {
@@ -1505,11 +1727,20 @@ function buildPublicApiOperations(): OperationSpec[] {
       params: ProjectAvailabilityCheckParamsSchema,
       requestBody: component("AvailabilityCheckUpdateBody", AvailabilityCheckUpdateBodySchema),
       responses: {
-        "200": { description: "Hosted health check updated.", schema: availabilityCheckMutationResponse },
-        "400": { description: "Invalid project id, check id, payload, or blocked target.", schema: apiError },
+        "200": {
+          description: "Hosted health check updated.",
+          schema: availabilityCheckMutationResponse
+        },
+        "400": {
+          description: "Invalid project id, check id, payload, or blocked target.",
+          schema: apiError
+        },
         "401": { description: "Authentication is invalid.", schema: apiError },
         "403": { description: "Owner or admin project access is required.", schema: apiError },
-        "404": { description: "Health check was not found or availability checks are unavailable.", schema: apiError },
+        "404": {
+          description: "Health check was not found or availability checks are unavailable.",
+          schema: apiError
+        },
         "409": { description: "Minimum-interval limit was reached.", schema: apiError }
       }
     },
@@ -1522,11 +1753,17 @@ function buildPublicApiOperations(): OperationSpec[] {
       security: anyMemberAuth,
       params: ProjectAvailabilityCheckParamsSchema,
       responses: {
-        "200": { description: "Hosted health check deleted.", schema: availabilityCheckDeleteResponse },
+        "200": {
+          description: "Hosted health check deleted.",
+          schema: availabilityCheckDeleteResponse
+        },
         "400": { description: "Invalid project id or check id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
         "403": { description: "Owner or admin project access is required.", schema: apiError },
-        "404": { description: "Health check was not found or availability checks are unavailable.", schema: apiError }
+        "404": {
+          description: "Health check was not found or availability checks are unavailable.",
+          schema: apiError
+        }
       }
     },
     {
@@ -1539,10 +1776,19 @@ function buildPublicApiOperations(): OperationSpec[] {
       params: ProjectAvailabilityCheckParamsSchema,
       query: TokenListQuerySchema,
       responses: {
-        "200": { description: "Recent retained execution results.", schema: availabilityCheckResultsResponse },
-        "400": { description: "Invalid project id, check id, or query parameters.", schema: apiError },
+        "200": {
+          description: "Recent retained execution results.",
+          schema: availabilityCheckResultsResponse
+        },
+        "400": {
+          description: "Invalid project id, check id, or query parameters.",
+          schema: apiError
+        },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Health check was not found or availability checks are unavailable.", schema: apiError }
+        "404": {
+          description: "Health check was not found or availability checks are unavailable.",
+          schema: apiError
+        }
       }
     },
     {
@@ -1555,10 +1801,19 @@ function buildPublicApiOperations(): OperationSpec[] {
       params: ProjectAvailabilityCheckParamsSchema,
       query: TokenListQuerySchema,
       responses: {
-        "200": { description: "Retained daily health history.", schema: availabilityCheckDailyRollupsResponse },
-        "400": { description: "Invalid project id, check id, or query parameters.", schema: apiError },
+        "200": {
+          description: "Retained daily health history.",
+          schema: availabilityCheckDailyRollupsResponse
+        },
+        "400": {
+          description: "Invalid project id, check id, or query parameters.",
+          schema: apiError
+        },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Health check was not found or availability checks are unavailable.", schema: apiError }
+        "404": {
+          description: "Health check was not found or availability checks are unavailable.",
+          schema: apiError
+        }
       }
     },
     {
@@ -1571,11 +1826,17 @@ function buildPublicApiOperations(): OperationSpec[] {
       params: ProjectParamsSchema,
       requestBody: component("AvailabilityCheckTestBody", AvailabilityCheckTestBodySchema),
       responses: {
-        "200": { description: "Side-effect-free health-check test result.", schema: availabilityCheckTestResponse },
+        "200": {
+          description: "Side-effect-free health-check test result.",
+          schema: availabilityCheckTestResponse
+        },
         "400": { description: "Invalid project id, payload, or blocked target.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
         "403": { description: "Owner or admin project access is required.", schema: apiError },
-        "404": { description: "Project was not found or availability checks are unavailable.", schema: apiError }
+        "404": {
+          description: "Project was not found or availability checks are unavailable.",
+          schema: apiError
+        }
       }
     },
     {
@@ -1590,10 +1851,14 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Slack OAuth install URL.", schema: slackInstallUrlResponse },
         "400": { description: "Invalid query parameters.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "403": { description: "Owner access is required, or paused shared collaborator access cannot delete preserved Slack setup.", schema: apiError },
+        "403": {
+          description:
+            "Owner access is required, or paused shared collaborator access cannot delete preserved Slack setup.",
+          schema: apiError
+        },
         "404": { description: "Project was not found.", schema: apiError },
-        "503": { description: "Slack integration is not configured.", schema: apiError },
-      },
+        "503": { description: "Slack integration is not configured.", schema: apiError }
+      }
     },
     {
       method: "get",
@@ -1603,8 +1868,11 @@ function buildPublicApiOperations(): OperationSpec[] {
       tags: ["Slack"],
       query: SlackAppCallbackQuerySchema,
       responses: {
-        "302": { description: "Redirects back to the application after Slack OAuth completes or is cancelled." },
-      },
+        "302": {
+          description:
+            "Redirects back to the application after Slack OAuth completes or is cancelled."
+        }
+      }
     },
     {
       method: "get",
@@ -1615,13 +1883,20 @@ function buildPublicApiOperations(): OperationSpec[] {
       security: anyMemberAuth,
       params: ProjectParamsSchema,
       responses: {
-        "200": { description: "Reusable Slack destinations.", schema: slackDestinationListResponse },
+        "200": {
+          description: "Reusable Slack destinations.",
+          schema: slackDestinationListResponse
+        },
         "400": { description: "Invalid project id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "403": { description: "Paused shared collaborator access cannot view preserved Slack destinations.", schema: apiError },
+        "403": {
+          description:
+            "Paused shared collaborator access cannot view preserved Slack destinations.",
+          schema: apiError
+        },
         "404": { description: "Project was not found.", schema: apiError },
-        "503": { description: "Slack integration is not configured.", schema: apiError },
-      },
+        "503": { description: "Slack integration is not configured.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -1632,14 +1907,17 @@ function buildPublicApiOperations(): OperationSpec[] {
       security: anyMemberAuth,
       params: ProjectSlackDestinationDeleteParamsSchema,
       responses: {
-        "200": { description: "Slack destination test delivered.", schema: slackDestinationTestResponse },
+        "200": {
+          description: "Slack destination test delivered.",
+          schema: slackDestinationTestResponse
+        },
         "400": { description: "Invalid project id or Slack destination id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
         "403": { description: "Owner access or Team tier is required.", schema: apiError },
         "404": { description: "Project or Slack destination was not found.", schema: apiError },
         "502": { description: "Slack delivery failed.", schema: apiError },
-        "503": { description: "Slack integration is not configured.", schema: apiError },
-      },
+        "503": { description: "Slack integration is not configured.", schema: apiError }
+      }
     },
     {
       method: "delete",
@@ -1653,11 +1931,18 @@ function buildPublicApiOperations(): OperationSpec[] {
         "204": { description: "Slack destination deleted." },
         "400": { description: "Invalid project id or Slack destination id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "403": { description: "Owner access is required, or paused shared collaborator access cannot delete preserved Slack setup.", schema: apiError },
+        "403": {
+          description:
+            "Owner access is required, or paused shared collaborator access cannot delete preserved Slack setup.",
+          schema: apiError
+        },
         "404": { description: "Slack destination was not found.", schema: apiError },
-        "409": { description: "Slack destination is still referenced by an alert rule or weekly report.", schema: apiError },
-        "503": { description: "Slack integration is not configured.", schema: apiError },
-      },
+        "409": {
+          description: "Slack destination is still referenced by an alert rule or weekly report.",
+          schema: apiError
+        },
+        "503": { description: "Slack integration is not configured.", schema: apiError }
+      }
     },
     {
       method: "get",
@@ -1670,8 +1955,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Billing summary.", schema: billingSummaryResponse },
         "401": { description: "Authentication is invalid.", schema: apiError },
         "403": { description: "Owner access is required.", schema: apiError },
-        "404": { description: "Billing was not found or is unavailable.", schema: apiError },
-      },
+        "404": { description: "Billing was not found or is unavailable.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -1688,8 +1973,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "403": { description: "Owner access or a verified email is required.", schema: apiError },
         "404": { description: "Billing was not found or is unavailable.", schema: apiError },
         "409": { description: "Requested plan change is invalid.", schema: apiError },
-        "503": { description: "Billing is not configured.", schema: apiError },
-      },
+        "503": { description: "Billing is not configured.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -1706,8 +1991,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "403": { description: "Owner access is required.", schema: apiError },
         "404": { description: "Billing or checkout session was not found.", schema: apiError },
         "409": { description: "Checkout session is not complete.", schema: apiError },
-        "503": { description: "Billing confirmation is unavailable.", schema: apiError },
-      },
+        "503": { description: "Billing confirmation is unavailable.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -1722,8 +2007,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "403": { description: "Owner access or a verified email is required.", schema: apiError },
         "404": { description: "Billing was not found or is unavailable.", schema: apiError },
         "409": { description: "No active subscription exists.", schema: apiError },
-        "503": { description: "Billing is not configured.", schema: apiError },
-      },
+        "503": { description: "Billing is not configured.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -1740,8 +2025,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "403": { description: "Owner access or a verified email is required.", schema: apiError },
         "404": { description: "Billing was not found or is unavailable.", schema: apiError },
         "409": { description: "Requested capacity change is invalid.", schema: apiError },
-        "503": { description: "Billing is not configured.", schema: apiError },
-      },
+        "503": { description: "Billing is not configured.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -1758,8 +2043,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "403": { description: "Owner access or a verified email is required.", schema: apiError },
         "404": { description: "Billing was not found or is unavailable.", schema: apiError },
         "409": { description: "Requested capacity reduction is invalid.", schema: apiError },
-        "503": { description: "Billing is not configured.", schema: apiError },
-      },
+        "503": { description: "Billing is not configured.", schema: apiError }
+      }
     },
     {
       method: "delete",
@@ -1774,8 +2059,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "403": { description: "Owner access or a verified email is required.", schema: apiError },
         "404": { description: "Billing was not found or is unavailable.", schema: apiError },
         "409": { description: "No scheduled reduction exists.", schema: apiError },
-        "503": { description: "Billing is not configured.", schema: apiError },
-      },
+        "503": { description: "Billing is not configured.", schema: apiError }
+      }
     },
     {
       method: "get",
@@ -1790,8 +2075,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Project tokens.", schema: tokenListResponse },
         "400": { description: "Invalid project id or query parameters.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Project was not found.", schema: apiError },
-      },
+        "404": { description: "Project was not found.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -1807,8 +2092,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "400": { description: "Invalid project id or request body.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
         "403": { description: "Owner or admin project access is required.", schema: apiError },
-        "404": { description: "Project was not found.", schema: apiError },
-      },
+        "404": { description: "Project was not found.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -1823,8 +2108,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "400": { description: "Invalid token id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
         "403": { description: "Owner or admin project access is required.", schema: apiError },
-        "404": { description: "Token was not found.", schema: apiError },
-      },
+        "404": { description: "Token was not found.", schema: apiError }
+      }
     },
     {
       method: "get",
@@ -1837,8 +2122,8 @@ function buildPublicApiOperations(): OperationSpec[] {
       responses: {
         "200": { description: "Member tokens.", schema: tokenListResponse },
         "400": { description: "Invalid query parameters.", schema: apiError },
-        "401": { description: "Authentication is invalid.", schema: apiError },
-      },
+        "401": { description: "Authentication is invalid.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -1852,8 +2137,11 @@ function buildPublicApiOperations(): OperationSpec[] {
         "201": { description: "Member token created.", schema: tokenResponse },
         "400": { description: "Invalid request body.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "403": { description: "Verified email is required before creating the first member token.", schema: apiError },
-      },
+        "403": {
+          description: "Verified email is required before creating the first member token.",
+          schema: apiError
+        }
+      }
     },
     {
       method: "post",
@@ -1867,8 +2155,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Revoked member token.", schema: tokenResponse },
         "400": { description: "Invalid token id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Token was not found.", schema: apiError },
-      },
+        "404": { description: "Token was not found.", schema: apiError }
+      }
     },
     {
       method: "get",
@@ -1882,8 +2170,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Alert rules.", schema: alertsResponse },
         "400": { description: "Invalid query parameters.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Project was not found.", schema: apiError },
-      },
+        "404": { description: "Project was not found.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -1897,8 +2185,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "201": { description: "Alert rule created.", schema: alertResponse },
         "400": { description: "Invalid request body.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Project was not found.", schema: apiError },
-      },
+        "404": { description: "Project was not found.", schema: apiError }
+      }
     },
     {
       method: "patch",
@@ -1913,8 +2201,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Updated alert rule.", schema: alertResponse },
         "400": { description: "Invalid alert id or request body.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Alert was not found.", schema: apiError },
-      },
+        "404": { description: "Alert was not found.", schema: apiError }
+      }
     },
     {
       method: "delete",
@@ -1928,8 +2216,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "204": { description: "Alert rule deleted." },
         "400": { description: "Invalid alert id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Alert was not found.", schema: apiError },
-      },
+        "404": { description: "Alert was not found.", schema: apiError }
+      }
     },
     {
       method: "get",
@@ -1940,11 +2228,15 @@ function buildPublicApiOperations(): OperationSpec[] {
       security: anyMemberAuth,
       query: WeeklyReportChannelsQuerySchema,
       responses: {
-        "200": { description: "Weekly report channels, including preserved Slack channels paused by downgrade.", schema: weeklyReportChannelsResponse },
+        "200": {
+          description:
+            "Weekly report channels, including preserved Slack channels paused by downgrade.",
+          schema: weeklyReportChannelsResponse
+        },
         "400": { description: "Invalid query parameters.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Project was not found.", schema: apiError },
-      },
+        "404": { description: "Project was not found.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -1955,13 +2247,20 @@ function buildPublicApiOperations(): OperationSpec[] {
       security: anyMemberAuth,
       requestBody: component("CreateWeeklyReportChannelBody", CreateWeeklyReportChannelBodySchema),
       responses: {
-        "201": { description: "Weekly report channel created.", schema: weeklyReportChannelResponse },
+        "201": {
+          description: "Weekly report channel created.",
+          schema: weeklyReportChannelResponse
+        },
         "400": { description: "Invalid request body.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "403": { description: "Team tier is required for connected Slack destinations, and paused shared collaborator access cannot manage weekly reports.", schema: apiError },
+        "403": {
+          description:
+            "Team tier is required for connected Slack destinations, and paused shared collaborator access cannot manage weekly reports.",
+          schema: apiError
+        },
         "404": { description: "Project was not found.", schema: apiError },
-        "503": { description: "Slack integration is not configured.", schema: apiError },
-      },
+        "503": { description: "Slack integration is not configured.", schema: apiError }
+      }
     },
     {
       method: "patch",
@@ -1973,13 +2272,20 @@ function buildPublicApiOperations(): OperationSpec[] {
       params: WeeklyReportChannelParamsSchema,
       requestBody: component("UpdateWeeklyReportChannelBody", UpdateWeeklyReportChannelBodySchema),
       responses: {
-        "200": { description: "Updated weekly report channel.", schema: weeklyReportChannelResponse },
+        "200": {
+          description: "Updated weekly report channel.",
+          schema: weeklyReportChannelResponse
+        },
         "400": { description: "Invalid channel id or request body.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
         "404": { description: "Weekly report channel was not found.", schema: apiError },
-        "403": { description: "Team tier is required for connected Slack destinations, and paused shared collaborator access cannot manage weekly reports.", schema: apiError },
-        "503": { description: "Slack integration is not configured.", schema: apiError },
-      },
+        "403": {
+          description:
+            "Team tier is required for connected Slack destinations, and paused shared collaborator access cannot manage weekly reports.",
+          schema: apiError
+        },
+        "503": { description: "Slack integration is not configured.", schema: apiError }
+      }
     },
     {
       method: "delete",
@@ -1993,8 +2299,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "204": { description: "Weekly report channel deleted." },
         "400": { description: "Invalid channel id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Weekly report channel was not found.", schema: apiError },
-      },
+        "404": { description: "Weekly report channel was not found.", schema: apiError }
+      }
     },
     {
       method: "get",
@@ -2008,8 +2314,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Webhooks for a project.", schema: webhookListResponse },
         "400": { description: "Invalid query parameters.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Project was not found.", schema: apiError },
-      },
+        "404": { description: "Project was not found.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -2023,8 +2329,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "201": { description: "Webhook created.", schema: webhookCreateResponse },
         "400": { description: "Invalid request body.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Project was not found.", schema: apiError },
-      },
+        "404": { description: "Project was not found.", schema: apiError }
+      }
     },
     {
       method: "get",
@@ -2038,8 +2344,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Webhook details.", schema: webhookResponse },
         "400": { description: "Invalid webhook id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Webhook was not found.", schema: apiError },
-      },
+        "404": { description: "Webhook was not found.", schema: apiError }
+      }
     },
     {
       method: "patch",
@@ -2054,8 +2360,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Updated webhook.", schema: webhookResponse },
         "400": { description: "Invalid webhook id or request body.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Webhook was not found.", schema: apiError },
-      },
+        "404": { description: "Webhook was not found.", schema: apiError }
+      }
     },
     {
       method: "delete",
@@ -2069,8 +2375,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "204": { description: "Webhook deleted." },
         "400": { description: "Invalid webhook id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Webhook was not found.", schema: apiError },
-      },
+        "404": { description: "Webhook was not found.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -2085,8 +2391,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Synthetic delivery queued.", schema: webhookTestResponse },
         "400": { description: "Invalid webhook id or request body.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Webhook was not found.", schema: apiError },
-      },
+        "404": { description: "Webhook was not found.", schema: apiError }
+      }
     },
     {
       method: "get",
@@ -2101,8 +2407,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Webhook deliveries.", schema: webhookDeliveriesResponse },
         "400": { description: "Invalid webhook id or query parameters.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Webhook was not found.", schema: apiError },
-      },
+        "404": { description: "Webhook was not found.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -2113,11 +2419,14 @@ function buildPublicApiOperations(): OperationSpec[] {
       security: anyMemberAuth,
       params: WebhookDeliveryRetryParamsSchema,
       responses: {
-        "200": { description: "Webhook delivery reset for retrying.", schema: webhookRetryResponse },
+        "200": {
+          description: "Webhook delivery reset for retrying.",
+          schema: webhookRetryResponse
+        },
         "400": { description: "Invalid webhook or delivery id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Webhook or delivery was not found.", schema: apiError },
-      },
+        "404": { description: "Webhook or delivery was not found.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -2132,17 +2441,23 @@ function buildPublicApiOperations(): OperationSpec[] {
         "201": { description: "Probe activation created.", schema: probeActivationResponse },
         "400": { description: "Invalid project id or request body.", schema: apiError },
         "401": { description: "Member token is invalid.", schema: apiError },
-        "403": { description: "Paused shared collaborator access cannot manage probes.", schema: apiError },
+        "403": {
+          description: "Paused shared collaborator access cannot manage probes.",
+          schema: apiError
+        },
         "404": { description: "Project was not found.", schema: apiError },
         "409": { description: "Concurrent activation limit reached.", schema: apiError },
         "429": {
           description: "Monthly remote activation quota exceeded.",
           schema: apiError,
           headers: {
-            "Retry-After": { description: "Seconds until the caller should retry.", schema: z.string() },
-          },
-        },
-      },
+            "Retry-After": {
+              description: "Seconds until the caller should retry.",
+              schema: z.string()
+            }
+          }
+        }
+      }
     },
     {
       method: "get",
@@ -2156,9 +2471,12 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Active probe activations.", schema: probeActivationListResponse },
         "400": { description: "Invalid project id.", schema: apiError },
         "401": { description: "Member token is invalid.", schema: apiError },
-        "403": { description: "Paused shared collaborator access cannot view preserved probe activations.", schema: apiError },
-        "404": { description: "Project was not found.", schema: apiError },
-      },
+        "403": {
+          description: "Paused shared collaborator access cannot view preserved probe activations.",
+          schema: apiError
+        },
+        "404": { description: "Project was not found.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -2173,9 +2491,13 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Probe activation deactivated.", schema: probeDeactivationResponse },
         "400": { description: "Invalid project id or request body.", schema: apiError },
         "401": { description: "Member token is invalid.", schema: apiError },
-        "403": { description: "Remote probes are not available for the caller tier, and paused shared collaborator access cannot manage probes.", schema: apiError },
-        "404": { description: "Activation was not found.", schema: apiError },
-      },
+        "403": {
+          description:
+            "Remote probes are not available for the caller tier, and paused shared collaborator access cannot manage probes.",
+          schema: apiError
+        },
+        "404": { description: "Activation was not found.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -2189,8 +2511,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Capture rule suggestions.", schema: captureRuleSuggestionsResponse },
         "400": { description: "Invalid incident id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Incident was not found.", schema: apiError },
-      },
+        "404": { description: "Incident was not found.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -2205,10 +2527,17 @@ function buildPublicApiOperations(): OperationSpec[] {
         "201": { description: "Capture rule created.", schema: captureRuleResponse },
         "400": { description: "Invalid incident id or request body.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "403": { description: "Owner/admin access is required, and paused shared collaborator access cannot create capture rules.", schema: apiError },
+        "403": {
+          description:
+            "Owner/admin access is required, and paused shared collaborator access cannot create capture rules.",
+          schema: apiError
+        },
         "404": { description: "Incident, suggestion, or project was not found.", schema: apiError },
-        "409": { description: "Suggestion generation is unavailable until a bundle is ready.", schema: apiError },
-      },
+        "409": {
+          description: "Suggestion generation is unavailable until a bundle is ready.",
+          schema: apiError
+        }
+      }
     },
     {
       method: "get",
@@ -2222,8 +2551,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Project capture rules.", schema: captureRulesResponse },
         "400": { description: "Invalid project id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Project was not found.", schema: apiError },
-      },
+        "404": { description: "Project was not found.", schema: apiError }
+      }
     },
     {
       method: "post",
@@ -2239,8 +2568,11 @@ function buildPublicApiOperations(): OperationSpec[] {
         "400": { description: "Invalid project id or request body.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
         "403": { description: "Owner/admin access is required.", schema: apiError },
-        "404": { description: "Project was not found or capture rules are unavailable.", schema: apiError },
-      },
+        "404": {
+          description: "Project was not found or capture rules are unavailable.",
+          schema: apiError
+        }
+      }
     },
     {
       method: "patch",
@@ -2256,8 +2588,11 @@ function buildPublicApiOperations(): OperationSpec[] {
         "400": { description: "Invalid project id, rule id, or request body.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
         "403": { description: "Owner/admin access is required.", schema: apiError },
-        "404": { description: "Capture rule was not found or capture rules are unavailable.", schema: apiError },
-      },
+        "404": {
+          description: "Capture rule was not found or capture rules are unavailable.",
+          schema: apiError
+        }
+      }
     },
     {
       method: "delete",
@@ -2272,8 +2607,11 @@ function buildPublicApiOperations(): OperationSpec[] {
         "400": { description: "Invalid project id or rule id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
         "403": { description: "Owner/admin access is required.", schema: apiError },
-        "404": { description: "Capture rule was not found or capture rules are unavailable.", schema: apiError },
-      },
+        "404": {
+          description: "Capture rule was not found or capture rules are unavailable.",
+          schema: apiError
+        }
+      }
     },
     {
       method: "get",
@@ -2287,8 +2625,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "Resolved capture policy.", schema: capturePolicyResponse },
         "400": { description: "Invalid project id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Project was not found.", schema: apiError },
-      },
+        "404": { description: "Project was not found.", schema: apiError }
+      }
     },
     {
       method: "patch",
@@ -2304,8 +2642,11 @@ function buildPublicApiOperations(): OperationSpec[] {
         "400": { description: "Invalid project id or request body.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
         "403": { description: "Owner access is required.", schema: apiError },
-        "404": { description: "Project was not found or capture policy is unavailable.", schema: apiError },
-      },
+        "404": {
+          description: "Project was not found or capture policy is unavailable.",
+          schema: apiError
+        }
+      }
     },
     {
       method: "get",
@@ -2316,11 +2657,14 @@ function buildPublicApiOperations(): OperationSpec[] {
       security: anyMemberAuth,
       params: ProjectParamsSchema,
       responses: {
-        "200": { description: "Automated improvement settings.", schema: improvementSettingsResponse },
+        "200": {
+          description: "Automated improvement settings.",
+          schema: improvementSettingsResponse
+        },
         "400": { description: "Invalid project id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Project was not found.", schema: apiError },
-      },
+        "404": { description: "Project was not found.", schema: apiError }
+      }
     },
     {
       method: "patch",
@@ -2332,12 +2676,21 @@ function buildPublicApiOperations(): OperationSpec[] {
       params: ProjectParamsSchema,
       requestBody: improvementSettingsUpdate,
       responses: {
-        "200": { description: "Updated automated improvement settings.", schema: improvementSettingsResponse },
+        "200": {
+          description: "Updated automated improvement settings.",
+          schema: improvementSettingsResponse
+        },
         "400": { description: "Invalid project id or request body.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "403": { description: "Owner/admin access or an eligible paid tier is required.", schema: apiError },
-        "404": { description: "Project was not found or improvement settings are unavailable.", schema: apiError },
-      },
+        "403": {
+          description: "Owner/admin access or an eligible paid tier is required.",
+          schema: apiError
+        },
+        "404": {
+          description: "Project was not found or improvement settings are unavailable.",
+          schema: apiError
+        }
+      }
     },
     ...createAnalyticsMetricOpenApiOperations({ apiError, anyMemberAuth }),
     {
@@ -2352,8 +2705,8 @@ function buildPublicApiOperations(): OperationSpec[] {
         "200": { description: "AnalyticsBundle settings.", schema: analyticsSettingsResponse },
         "400": { description: "Invalid project id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "404": { description: "Project was not found.", schema: apiError },
-      },
+        "404": { description: "Project was not found.", schema: apiError }
+      }
     },
     {
       method: "patch",
@@ -2365,12 +2718,21 @@ function buildPublicApiOperations(): OperationSpec[] {
       params: ProjectParamsSchema,
       requestBody: analyticsSettingsUpdate,
       responses: {
-        "200": { description: "Updated AnalyticsBundle settings.", schema: analyticsSettingsResponse },
+        "200": {
+          description: "Updated AnalyticsBundle settings.",
+          schema: analyticsSettingsResponse
+        },
         "400": { description: "Invalid project id or request body.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
-        "403": { description: "Owner/admin access or an eligible tier is required.", schema: apiError },
-        "404": { description: "Project was not found or analytics settings are unavailable.", schema: apiError },
-      },
+        "403": {
+          description: "Owner/admin access or an eligible tier is required.",
+          schema: apiError
+        },
+        "404": {
+          description: "Project was not found or analytics settings are unavailable.",
+          schema: apiError
+        }
+      }
     },
     {
       method: "get",
@@ -2382,9 +2744,9 @@ function buildPublicApiOperations(): OperationSpec[] {
       responses: {
         "200": { description: "SDK config payload.", schema: sdkConfigResponse },
         "304": { description: "SDK config has not changed since the provided ETag." },
-        "401": { description: "Project token is invalid.", schema: apiError },
-      },
-    },
+        "401": { description: "Project token is invalid.", schema: apiError }
+      }
+    }
   ];
 }
 
@@ -2397,7 +2759,7 @@ export function buildPublicOpenApiSpec(): Record<string, unknown> {
     const pathItem = (paths[operation.path] ??= {});
     const parameters = [
       ...(operation.params === undefined ? [] : buildParameters(operation.params, "path")),
-      ...(operation.query === undefined ? [] : buildParameters(operation.query, "query")),
+      ...(operation.query === undefined ? [] : buildParameters(operation.query, "query"))
     ];
 
     pathItem[operation.method] = {
@@ -2413,10 +2775,10 @@ export function buildPublicOpenApiSpec(): Record<string, unknown> {
               required: true,
               content: {
                 "application/json": {
-                  schema: resolveSchemaSpec(operation.requestBody, components),
-                },
-              },
-            },
+                  schema: resolveSchemaSpec(operation.requestBody, components)
+                }
+              }
+            }
           }),
       responses: Object.fromEntries(
         Object.entries(operation.responses).map(([statusCode, response]) => [
@@ -2431,23 +2793,23 @@ export function buildPublicOpenApiSpec(): Record<string, unknown> {
                       headerName,
                       {
                         description: header.description,
-                        schema: toJsonSchema(header.schema),
-                      },
+                        schema: toJsonSchema(header.schema)
+                      }
                     ])
-                  ),
+                  )
                 }),
             ...(response.schema === undefined
               ? {}
               : {
                   content: {
                     "application/json": {
-                      schema: resolveSchemaSpec(response.schema, components),
-                    },
-                  },
-                }),
-          },
+                      schema: resolveSchemaSpec(response.schema, components)
+                    }
+                  }
+                })
+          }
         ])
-      ),
+      )
     };
   }
 
@@ -2456,12 +2818,12 @@ export function buildPublicOpenApiSpec(): Record<string, unknown> {
     info: {
       title: "DebugBundle HTTP API",
       version: "v1",
-      description: "Source-backed OpenAPI description for the public DebugBundle HTTP API.",
+      description: "Source-backed OpenAPI description for the public DebugBundle HTTP API."
     },
-    servers: [
-      { url: "https://api.debugbundle.com", description: "DebugBundle Cloud API" },
-    ],
-    tags: Array.from(new Set(operations.flatMap((operation) => operation.tags))).map((name) => ({ name })),
+    servers: [{ url: "https://api.debugbundle.com", description: "DebugBundle Cloud API" }],
+    tags: Array.from(new Set(operations.flatMap((operation) => operation.tags))).map((name) => ({
+      name
+    })),
     paths,
     components: {
       securitySchemes: {
@@ -2469,22 +2831,22 @@ export function buildPublicOpenApiSpec(): Record<string, unknown> {
           type: "apiKey",
           in: "cookie",
           name: SESSION_COOKIE_NAME,
-          description: "Browser session cookie for interactive authenticated routes.",
+          description: "Browser session cookie for interactive authenticated routes."
         },
         memberBearerToken: {
           type: "http",
           scheme: "bearer",
           bearerFormat: "Opaque member token",
-          description: "Bearer member token used by the CLI, MCP, and automation.",
+          description: "Bearer member token used by the CLI, MCP, and automation."
         },
         projectBearerToken: {
           type: "http",
           scheme: "bearer",
           bearerFormat: "Opaque project token",
-          description: "Bearer project token used by ingestion and SDK config routes.",
-        },
+          description: "Bearer project token used by ingestion and SDK config routes."
+        }
       },
-      schemas: Object.fromEntries(components.entries()),
-    },
+      schemas: Object.fromEntries(components.entries())
+    }
   };
 }

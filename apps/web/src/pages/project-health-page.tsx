@@ -1,14 +1,18 @@
-import { ActivityIcon, PencilIcon, PlusIcon, RotateCcwIcon, ShieldAlertIcon, Trash2Icon } from "lucide-react";
+import {
+  ActivityIcon,
+  PencilIcon,
+  PlusIcon,
+  RotateCcwIcon,
+  ShieldAlertIcon,
+  Trash2Icon
+} from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 
 import { DialogFormContent } from "../components/system/dialog-form-content.js";
 import { PlanUpgradeCallout } from "../components/system/plan-upgrade-callout.js";
-import {
-  ProjectScopeSelect,
-  useProjectScopeOptions
-} from "../components/system/project-scope-controls.js";
+import { useProjectScopeOptions } from "../components/system/project-scope-controls.js";
 import { ProjectResourceEmptyState } from "../components/system/project-resource-empty-state.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
 import {
@@ -24,15 +28,24 @@ import {
 } from "../components/ui/alert-dialog.js";
 import { Badge } from "../components/ui/badge.js";
 import { Button } from "../components/ui/button.js";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card.js";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "../components/ui/card.js";
 import { Dialog, DialogTrigger } from "../components/ui/dialog.js";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "../components/ui/field.js";
-import { Input } from "../components/ui/input.js";
 import { Notice } from "../components/ui/notice.js";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { Skeleton } from "../components/ui/skeleton.js";
-import { Switch } from "../components/ui/switch.js";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "../components/ui/table.js";
 import {
   createProjectAvailabilityCheck,
   deleteProjectAvailabilityCheck,
@@ -48,6 +61,7 @@ import {
 import { showErrorToast, showSuccessToast } from "../lib/notify.js";
 import { getProjectEffectiveRole } from "../lib/project-access.js";
 import { useDelayedVisibility } from "../lib/use-delayed-visibility.js";
+import { AvailabilityCheckFormFields } from "./availability-check-form-fields.js";
 import {
   availabilityResultVariant,
   availabilityStatusVariant,
@@ -60,6 +74,7 @@ import {
   formatDay,
   formatDowntime,
   formatPausedReason,
+  getDefaultAvailabilityFailureThreshold,
   getDefaultAvailabilityCheckIntervalSeconds,
   getHealthChecksAutoRefreshIntervalMs,
   hasPendingInitialHealthCheckResult,
@@ -70,11 +85,6 @@ import {
   refreshProjectAvailabilityChecks,
   type AvailabilityCheckFormState
 } from "./project-health-page-utils.js";
-
-const METHOD_OPTIONS: Array<{ value: "GET" | "HEAD"; label: string }> = [
-  { value: "GET", label: "GET" },
-  { value: "HEAD", label: "HEAD" }
-];
 
 const DEFAULT_FORM_STATE: AvailabilityCheckFormState = {
   name: "",
@@ -129,6 +139,7 @@ export function ProjectHealthPage(): JSX.Element {
     limits === null ||
     (checks !== null && checks.length >= limits.max_checks_per_project);
   const defaultIntervalSeconds = getDefaultAvailabilityCheckIntervalSeconds(limits);
+  const defaultFailureThreshold = getDefaultAvailabilityFailureThreshold(limits);
   const autoRefreshIntervalMs = getHealthChecksAutoRefreshIntervalMs(checks);
   const refreshIntervalMs = hasPendingInitialHealthCheckResult(checks)
     ? PENDING_HEALTH_CHECK_REFRESH_INTERVAL_MS
@@ -136,12 +147,16 @@ export function ProjectHealthPage(): JSX.Element {
   const scopeOptions = useProjectScopeOptions(projectId, project.environment_default);
   const testResultNotice =
     testMessage === null ? null : (
-      <Notice tone={testResult?.result.status === "success" ? "success" : "warning"} title={testResult === null ? "Test failed" : "Latest test result"}>
+      <Notice
+        tone={testResult?.result.status === "success" ? "success" : "warning"}
+        title={testResult === null ? "Test failed" : "Latest test result"}
+      >
         <div className="space-y-1">
           <p>{testMessage}</p>
           {testResult === null ? null : (
             <p className="font-mono text-xs">
-              {testResult.result.status} • {testResult.result.http_status ?? "no-status"} • {testResult.result.duration_ms}ms
+              {testResult.result.status} • {testResult.result.http_status ?? "no-status"} •{" "}
+              {testResult.result.duration_ms}ms
             </p>
           )}
         </div>
@@ -176,7 +191,12 @@ export function ProjectHealthPage(): JSX.Element {
 
     setResults(null);
     setRollups(null);
-    void loadProjectAvailabilityCheckHistory({ projectId, selectedCheckId, setResults, setRollups });
+    void loadProjectAvailabilityCheckHistory({
+      projectId,
+      selectedCheckId,
+      setResults,
+      setRollups
+    });
   }, [projectId, selectedCheckId]);
 
   useEffect(() => {
@@ -266,6 +286,7 @@ export function ProjectHealthPage(): JSX.Element {
       setFormState({
         ...DEFAULT_FORM_STATE,
         interval_seconds: String(defaultIntervalSeconds),
+        failure_threshold: String(defaultFailureThreshold),
         environment: defaultEnvironment
       });
       return;
@@ -333,7 +354,9 @@ export function ProjectHealthPage(): JSX.Element {
       });
       setIsFormOpen(false);
       showSuccessToast(
-        formMode === "create" ? "Health check created successfully." : "Health check updated successfully."
+        formMode === "create"
+          ? "Health check created successfully."
+          : "Health check updated successfully."
       );
     } catch (error) {
       showErrorToast(getAvailabilityErrorMessage(error));
@@ -345,7 +368,9 @@ export function ProjectHealthPage(): JSX.Element {
   async function handleRunTest(): Promise<void> {
     const draft = buildCheckDraft(formState);
     if (draft === null) {
-      showErrorToast("Complete the URL, status range, and timeout values before testing the endpoint.");
+      showErrorToast(
+        "Complete the URL, status range, and timeout values before testing the endpoint."
+      );
       return;
     }
 
@@ -416,7 +441,12 @@ export function ProjectHealthPage(): JSX.Element {
                 <div className="flex w-full flex-col gap-3">
                   {testResultNotice}
                   <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <Button type="button" variant="outline" onClick={() => void handleRunTest()} disabled={isTesting || isSubmitting}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void handleRunTest()}
+                      disabled={isTesting || isSubmitting}
+                    >
                       <ActivityIcon data-icon="inline-start" />
                       {isTesting ? "Testing..." : "Test endpoint"}
                     </Button>
@@ -434,184 +464,12 @@ export function ProjectHealthPage(): JSX.Element {
               }
               onSubmit={(submitEvent) => void handleSaveCheck(submitEvent)}
             >
-              <FieldGroup>
-                <Field>
-                  <FieldLabel htmlFor="health-check-name">Name</FieldLabel>
-                  <FieldDescription>Use a short label that describes what this endpoint proves, such as API root or checkout health.</FieldDescription>
-                  <Input
-                    id="health-check-name"
-                    value={formState.name}
-                    onChange={(event) => {
-                      const value = event.currentTarget.value;
-                      setFormState((current) => ({ ...current, name: value }));
-                    }}
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="health-check-url">Check URL</FieldLabel>
-                  <FieldDescription>Public HTTP or HTTPS endpoint that should respond from outside your network.</FieldDescription>
-                  <Input
-                    id="health-check-url"
-                    type="url"
-                    placeholder="https://app.example.com/health"
-                    value={formState.url}
-                    onChange={(event) => {
-                      const value = event.currentTarget.value;
-                      setFormState((current) => ({ ...current, url: value }));
-                    }}
-                  />
-                </Field>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Field>
-                    <FieldLabel htmlFor="health-check-method">Method</FieldLabel>
-                    <Select value={formState.method} onValueChange={(value) => setFormState((current) => ({ ...current, method: value as "GET" | "HEAD" }))}>
-                      <SelectTrigger id="health-check-method">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {METHOD_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="health-check-timeout">Timeout (ms)</FieldLabel>
-                    <Input
-                      id="health-check-timeout"
-                      type="number"
-                      min={500}
-                      max={5000}
-                      value={formState.timeout_ms}
-                      onChange={(event) => {
-                        const value = event.currentTarget.value;
-                        setFormState((current) => ({ ...current, timeout_ms: value }));
-                      }}
-                    />
-                  </Field>
-                </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Field>
-                    <FieldLabel htmlFor="health-check-status-min">Expected status minimum</FieldLabel>
-                    <Input
-                      id="health-check-status-min"
-                      type="number"
-                      min={100}
-                      max={599}
-                      value={formState.expected_status_min}
-                      onChange={(event) => {
-                        const value = event.currentTarget.value;
-                        setFormState((current) => ({ ...current, expected_status_min: value }));
-                      }}
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="health-check-status-max">Expected status maximum</FieldLabel>
-                    <Input
-                      id="health-check-status-max"
-                      type="number"
-                      min={100}
-                      max={599}
-                      value={formState.expected_status_max}
-                      onChange={(event) => {
-                        const value = event.currentTarget.value;
-                        setFormState((current) => ({ ...current, expected_status_max: value }));
-                      }}
-                    />
-                  </Field>
-                </div>
-                <div className="grid gap-4 md:grid-cols-3">
-                  <Field>
-                    <FieldLabel htmlFor="health-check-interval">Interval (seconds)</FieldLabel>
-                    <Input
-                      id="health-check-interval"
-                      type="number"
-                      min={limits?.min_interval_seconds ?? 30}
-                      max={86400}
-                      value={formState.interval_seconds}
-                      onChange={(event) => {
-                        const value = event.currentTarget.value;
-                        setFormState((current) => ({ ...current, interval_seconds: value }));
-                      }}
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="health-check-failures">Failure threshold</FieldLabel>
-                    <Input
-                      id="health-check-failures"
-                      type="number"
-                      min={1}
-                      max={10}
-                      value={formState.failure_threshold}
-                      onChange={(event) => {
-                        const value = event.currentTarget.value;
-                        setFormState((current) => ({ ...current, failure_threshold: value }));
-                      }}
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="health-check-recovery">Recovery threshold</FieldLabel>
-                    <Input
-                      id="health-check-recovery"
-                      type="number"
-                      min={1}
-                      max={10}
-                      value={formState.recovery_threshold}
-                      onChange={(event) => {
-                        const value = event.currentTarget.value;
-                        setFormState((current) => ({ ...current, recovery_threshold: value }));
-                      }}
-                    />
-                  </Field>
-                </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Field>
-                    <FieldLabel htmlFor="health-check-environment">Environment label</FieldLabel>
-                    <FieldDescription>Defaults to the project environment so incidents line up with the rest of the project.</FieldDescription>
-                    <ProjectScopeSelect
-                      id="health-check-environment"
-                      label="Environment"
-                      value={formState.environment}
-                      options={scopeOptions.environments}
-                      allLabel="All environments"
-                      includeAll={false}
-                      onValueChange={(environment) =>
-                        setFormState((current) => ({ ...current, environment }))
-                      }
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="health-check-service">Service label</FieldLabel>
-                    <FieldDescription>Optional service name to group uptime incidents with the same service filters.</FieldDescription>
-                    <ProjectScopeSelect
-                      id="health-check-service"
-                      label="Service"
-                      value={formState.service_name}
-                      options={scopeOptions.services}
-                      allLabel="No service label"
-                      onValueChange={(service_name) =>
-                        setFormState((current) => ({ ...current, service_name }))
-                      }
-                    />
-                  </Field>
-                </div>
-                <Field orientation="horizontal" className="items-center justify-between gap-4">
-                  <div className="flex flex-1 flex-col gap-1">
-                    <FieldLabel id="health-check-enabled-label" htmlFor="health-check-enabled">Enabled</FieldLabel>
-                    <FieldDescription>Disabled checks stay saved but do not execute until you re-enable them.</FieldDescription>
-                  </div>
-                  <Switch
-                    id="health-check-enabled"
-                    aria-labelledby="health-check-enabled-label"
-                    checked={formState.enabled}
-                    onCheckedChange={(checked) => setFormState((current) => ({ ...current, enabled: Boolean(checked) }))}
-                  />
-                </Field>
-              </FieldGroup>
+              <AvailabilityCheckFormFields
+                formState={formState}
+                limits={limits}
+                scopeOptions={scopeOptions}
+                setFormState={setFormState}
+              />
             </DialogFormContent>
           </Dialog>
         ) : null}
@@ -633,7 +491,7 @@ export function ProjectHealthPage(): JSX.Element {
               <PlanUpgradeCallout
                 eyebrow="Plan limits"
                 title="Some saved health checks are paused by the current plan"
-                description="Paused checks stay visible for configuration and history, but execution stops when a downgrade pushes them past the plan's check-count or interval limits."
+                description="Paused checks stay visible for configuration and history, but deterministic excess checks stop executing when project or organization count limits are exceeded."
               />
             ) : null}
 
@@ -681,11 +539,15 @@ export function ProjectHealthPage(): JSX.Element {
                           <TableCell className="w-44 max-w-44 whitespace-normal">
                             <div className="min-w-0 space-y-1">
                               <div className="flex flex-wrap items-center gap-2">
-                                <span className="block max-w-full truncate font-medium text-foreground">{check.name}</span>
+                                <span className="block max-w-full truncate font-medium text-foreground">
+                                  {check.name}
+                                </span>
                                 {!check.enabled ? <Badge variant="outline">Disabled</Badge> : null}
                                 {hasVisibleLinkedIncident(check) ? (
                                   <Badge variant="warning">
-                                    <Link to={`/incidents/${check.linked_incident_id}`}>Open incident</Link>
+                                    <Link to={`/incidents/${check.linked_incident_id}`}>
+                                      Open incident
+                                    </Link>
                                   </Badge>
                                 ) : null}
                               </div>
@@ -702,7 +564,9 @@ export function ProjectHealthPage(): JSX.Element {
                           </TableCell>
                           <TableCell className="whitespace-normal">
                             <div className="space-y-1">
-                              <p className="break-all font-mono text-xs text-foreground">{check.method} {check.url}</p>
+                              <p className="break-all font-mono text-xs text-foreground">
+                                {check.method} {check.url}
+                              </p>
                               <p className="text-xs text-muted-foreground">
                                 Healthy when {check.expected_status_min}-{check.expected_status_max}
                               </p>
@@ -712,15 +576,22 @@ export function ProjectHealthPage(): JSX.Element {
                             {check.interval_seconds}s
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                            {check.last_checked_at === null ? "Never" : formatDateTime(check.last_checked_at)}
+                            {check.last_checked_at === null
+                              ? "Never"
+                              : formatDateTime(check.last_checked_at)}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2">
                               {canManageChecks ? (
-                                <Button type="button" variant="ghost" size="icon-sm" onClick={(event) => {
-                                  event.stopPropagation();
-                                  openEditDialog(check);
-                                }}>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    openEditDialog(check);
+                                  }}
+                                >
                                   <PencilIcon />
                                   <span className="sr-only">Edit</span>
                                 </Button>
@@ -743,12 +614,16 @@ export function ProjectHealthPage(): JSX.Element {
                                     <AlertDialogHeader>
                                       <AlertDialogTitle>Delete health check?</AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        Delete {check.name} and stop future polling. Existing incidents and saved 30-day history remain until normal retention cleanup removes them.
+                                        Delete {check.name} and stop future polling. Existing
+                                        incidents and saved 30-day history remain until normal
+                                        retention cleanup removes them.
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
                                       <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction onClick={() => void handleDeleteCheck(check.check_id)}>
+                                      <AlertDialogAction
+                                        onClick={() => void handleDeleteCheck(check.check_id)}
+                                      >
                                         Delete check
                                       </AlertDialogAction>
                                     </AlertDialogFooter>
@@ -770,7 +645,9 @@ export function ProjectHealthPage(): JSX.Element {
         <Card>
           <CardHeader>
             <CardTitle>Selected check</CardTitle>
-            <CardDescription>Current state, thresholds, and the last observed execution for the check in focus.</CardDescription>
+            <CardDescription>
+              Current state, thresholds, and the last observed execution for the check in focus.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {selectedCheck === null ? (
@@ -787,16 +664,48 @@ export function ProjectHealthPage(): JSX.Element {
                   </Badge>
                   <Badge variant="outline">{selectedCheck.method}</Badge>
                   {selectedCheck.paused_reason === null ? null : (
-                    <Badge variant="warning">{formatPausedReason(selectedCheck.paused_reason)}</Badge>
+                    <Badge variant="warning">
+                      {formatPausedReason(selectedCheck.paused_reason)}
+                    </Badge>
                   )}
                 </div>
                 <DetailRow label="URL" value={selectedCheck.url} monospace />
-                <DetailRow label="Healthy status range" value={`${selectedCheck.expected_status_min}-${selectedCheck.expected_status_max}`} />
-                <DetailRow label="Failure threshold" value={`${selectedCheck.failure_threshold} consecutive failures`} />
-                <DetailRow label="Recovery threshold" value={`${selectedCheck.recovery_threshold} consecutive successes`} />
-                <DetailRow label="Last result" value={selectedCheck.last_result_status === null ? "No checks yet" : `${selectedCheck.last_result_status}${selectedCheck.last_result_http_status === null ? "" : ` (${selectedCheck.last_result_http_status})`}`} />
-                <DetailRow label="Last duration" value={selectedCheck.last_result_duration_ms === null ? "No checks yet" : `${selectedCheck.last_result_duration_ms}ms`} />
-                <DetailRow label="Next scheduled check" value={selectedCheck.next_check_at === null ? "Pending save" : formatDateTime(selectedCheck.next_check_at)} />
+                <DetailRow
+                  label="Healthy status range"
+                  value={`${selectedCheck.expected_status_min}-${selectedCheck.expected_status_max}`}
+                />
+                <DetailRow
+                  label="Failure threshold"
+                  value={`${selectedCheck.failure_threshold} consecutive failures`}
+                />
+                <DetailRow
+                  label="Recovery threshold"
+                  value={`${selectedCheck.recovery_threshold} consecutive successes`}
+                />
+                <DetailRow
+                  label="Last result"
+                  value={
+                    selectedCheck.last_result_status === null
+                      ? "No checks yet"
+                      : `${selectedCheck.last_result_status}${selectedCheck.last_result_http_status === null ? "" : ` (${selectedCheck.last_result_http_status})`}`
+                  }
+                />
+                <DetailRow
+                  label="Last duration"
+                  value={
+                    selectedCheck.last_result_duration_ms === null
+                      ? "No checks yet"
+                      : `${selectedCheck.last_result_duration_ms}ms`
+                  }
+                />
+                <DetailRow
+                  label="Next scheduled check"
+                  value={
+                    selectedCheck.next_check_at === null
+                      ? "Pending save"
+                      : formatDateTime(selectedCheck.next_check_at)
+                  }
+                />
               </div>
             )}
           </CardContent>
@@ -807,7 +716,9 @@ export function ProjectHealthPage(): JSX.Element {
         <Card>
           <CardHeader>
             <CardTitle>Recent executions</CardTitle>
-            <CardDescription>The latest raw health-check attempts for the selected endpoint.</CardDescription>
+            <CardDescription>
+              The latest raw health-check attempts for the selected endpoint.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {selectedCheck === null ? (
@@ -894,9 +805,12 @@ export function ProjectHealthPage(): JSX.Element {
                   <div key={rollup.day} className="rounded-lg border border-border/80 px-3 py-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1">
-                        <p className="text-sm font-medium text-foreground">{formatDay(rollup.day)}</p>
+                        <p className="text-sm font-medium text-foreground">
+                          {formatDay(rollup.day)}
+                        </p>
                         <p className="text-xs text-muted-foreground">
-                          {rollup.total_checks} checks • {rollup.successful_checks} healthy • {rollup.failed_checks} failed
+                          {rollup.total_checks} checks • {rollup.successful_checks} healthy •{" "}
+                          {rollup.failed_checks} failed
                         </p>
                       </div>
                       <Badge
@@ -907,7 +821,10 @@ export function ProjectHealthPage(): JSX.Element {
                       </Badge>
                     </div>
                     <div className="mt-3 grid gap-2 text-xs text-muted-foreground">
-                      <p>Average duration: {rollup.avg_duration_ms === null ? "n/a" : `${rollup.avg_duration_ms}ms`}</p>
+                      <p>
+                        Average duration:{" "}
+                        {rollup.avg_duration_ms === null ? "n/a" : `${rollup.avg_duration_ms}ms`}
+                      </p>
                       <p>Downtime estimate: {formatDowntime(rollup.downtime_seconds)}</p>
                     </div>
                   </div>
@@ -936,8 +853,16 @@ function hasVisibleLinkedIncident(check: AvailabilityCheckRecord): boolean {
 function DetailRow(input: { label: string; value: string; monospace?: boolean }): JSX.Element {
   return (
     <div className="space-y-1">
-      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{input.label}</p>
-      <p className={input.monospace ? "break-all font-mono text-sm text-foreground" : "text-sm text-foreground"}>
+      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        {input.label}
+      </p>
+      <p
+        className={
+          input.monospace
+            ? "break-all font-mono text-sm text-foreground"
+            : "text-sm text-foreground"
+        }
+      >
         {input.value}
       </p>
     </div>

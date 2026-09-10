@@ -319,7 +319,11 @@ export const AlertConditionTypeSchema = z.enum([
   "severity_threshold",
   "regression_after_deploy"
 ]);
-export const AlertSeverityLifecycleScopeSchema = z.enum(["new_incident", "incident_regressed", "both"]);
+export const AlertSeverityLifecycleScopeSchema = z.enum([
+  "new_incident",
+  "incident_regressed",
+  "both"
+]);
 
 const AlertEmailConfigSchema = z
   .object({
@@ -742,7 +746,7 @@ const AvailabilityCheckBodyShape = {
   expected_status_max: z.coerce.number().int().min(100).max(599).default(399),
   timeout_ms: z.coerce.number().int().min(500).max(5000).default(2500),
   interval_seconds: z.coerce.number().int().min(30).max(86400),
-  failure_threshold: z.coerce.number().int().min(1).max(10).default(3),
+  failure_threshold: z.coerce.number().int().min(1).max(10).optional(),
   recovery_threshold: z.coerce.number().int().min(1).max(10).default(2),
   environment: z.string().min(1).max(50).optional(),
   service_name: z.string().min(1).max(120).nullable().optional(),

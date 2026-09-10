@@ -3,9 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createPostgresAvailabilityCheckStore } from "../../../packages/storage/src/availability-check-store.js";
 import type { AvailabilityCheckExecutionResult } from "../../../packages/storage/src/availability-check-executor.js";
 
-function buildCheckRow(
-  overrides: Record<string, unknown> = {}
-): Record<string, unknown> {
+function buildCheckRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     check_id: "chk_1",
     project_id: "proj_1",
@@ -36,14 +34,13 @@ function buildCheckRow(
     created_at: "2026-06-15T09:00:00.000Z",
     updated_at: "2026-06-15T10:00:00.000Z",
     within_plan_limit: true,
-    meets_plan_interval: true,
+    within_monitored_project_limit: true,
+    within_organization_active_limit: true,
     ...overrides
   };
 }
 
-function buildClaimedRow(
-  overrides: Record<string, unknown> = {}
-): Record<string, unknown> {
+function buildClaimedRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     check_id: "chk_1",
     project_id: "proj_1",
@@ -85,7 +82,8 @@ function createSequentialDb(results: Array<{ rows: Record<string, unknown>[] }>)
 
   return {
     query,
-    transaction: async <Result>(callback: (tx: { query: typeof query }) => Promise<Result>) => callback({ query })
+    transaction: async <Result>(callback: (tx: { query: typeof query }) => Promise<Result>) =>
+      callback({ query })
   };
 }
 
@@ -256,6 +254,11 @@ describe("availability check store", () => {
       createSequentialDb([
         { rows: [{ environment_default: "production", organization_plan: "team" }] },
         { rows: [{ count: "0" }] },
+        {
+          rows: [
+            { active_check_count: "0", monitored_project_count: "0", project_is_monitored: false }
+          ]
+        },
         { rows: [] },
         { rows: [buildCheckRow()] }
       ]) as never
@@ -283,6 +286,11 @@ describe("availability check store", () => {
       txResults: [
         { rows: [{ environment_default: "production", organization_plan: "team" }] },
         { rows: [{ count: "0" }] },
+        {
+          rows: [
+            { active_check_count: "0", monitored_project_count: "0", project_is_monitored: false }
+          ]
+        },
         { rows: [] },
         { rows: [buildCheckRow()] }
       ]
@@ -317,6 +325,11 @@ describe("availability check store", () => {
       createSequentialDb([
         { rows: [{ environment_default: "production", organization_plan: "team" }] },
         { rows: [{ count: "0" }] },
+        {
+          rows: [
+            { active_check_count: "0", monitored_project_count: "0", project_is_monitored: false }
+          ]
+        },
         { rows: [] },
         { rows: [] }
       ]) as never
@@ -339,6 +352,40 @@ describe("availability check store", () => {
         now: "2026-06-15T10:00:00.000Z"
       })
     ).rejects.toThrow("availability_check_insert_failed");
+
+    const organizationLimitStore = createPostgresAvailabilityCheckStore(
+      createSequentialDb([
+        { rows: [{ environment_default: "production", organization_plan: "team" }] },
+        { rows: [{ count: "0" }] },
+        {
+          rows: [
+            {
+              active_check_count: "50",
+              monitored_project_count: "10",
+              project_is_monitored: false
+            }
+          ]
+        }
+      ]) as never
+    );
+    await expect(
+      organizationLimitStore.createCheckForProjectInOrganization({
+        organization_id: "org_1",
+        project_id: "proj_1",
+        created_by_user_id: "user_1",
+        name: "Primary app",
+        url: "https://app.example.com/health",
+        method: "GET",
+        expected_status_min: 200,
+        expected_status_max: 399,
+        timeout_ms: 5000,
+        interval_seconds: 60,
+        failure_threshold: 2,
+        recovery_threshold: 2,
+        enabled: true,
+        now: "2026-06-15T10:00:00.000Z"
+      })
+    ).resolves.toBe("limit_reached");
 
     const missingUpdateStore = createPostgresAvailabilityCheckStore(
       createSequentialDb([{ rows: [] }]) as never
@@ -365,10 +412,53 @@ describe("availability check store", () => {
       })
     ).resolves.toBe("interval_too_low");
 
+    const projectLimitActivationStore = createPostgresAvailabilityCheckStore(
+      createSequentialDb([
+        {
+          rows: [{ organization_plan: "free", enabled: false, project_check_rank: "2" }]
+        }
+      ]) as never
+    );
+    await expect(
+      projectLimitActivationStore.updateCheckForProjectInOrganization({
+        organization_id: "org_1",
+        project_id: "proj_1",
+        check_id: "chk_2",
+        enabled: true,
+        now: "2026-06-15T10:00:00.000Z"
+      })
+    ).resolves.toBe("limit_reached");
+
+    const activationLimitStore = createPostgresAvailabilityCheckStore(
+      createSequentialDb([
+        {
+          rows: [{ organization_plan: "free", enabled: false, project_check_rank: "1" }]
+        },
+        {
+          rows: [
+            {
+              active_check_count: "3",
+              monitored_project_count: "3",
+              project_is_monitored: false
+            }
+          ]
+        }
+      ]) as never
+    );
+    await expect(
+      activationLimitStore.updateCheckForProjectInOrganization({
+        organization_id: "org_1",
+        project_id: "proj_1",
+        check_id: "chk_1",
+        enabled: true,
+        now: "2026-06-15T10:00:00.000Z"
+      })
+    ).resolves.toBe("limit_reached");
+
     const updateStoreDb = createSequentialDb([
-        { rows: [{ organization_plan: "team" }] },
-        { rows: [] },
-        { rows: [buildCheckRow({ enabled: false })] }
+      { rows: [{ organization_plan: "team" }] },
+      { rows: [] },
+      { rows: [buildCheckRow({ enabled: false })] }
     ]);
     const updateStore = createPostgresAvailabilityCheckStore(updateStoreDb as never);
     await expect(
@@ -548,6 +638,12 @@ describe("availability check store", () => {
     expect(claimSql).toMatch(/ORDER BY ranked\.next_check_at ASC, ranked\.id ASC/s);
     expect(claimSql).toMatch(/LIMIT \$3/s);
     expect(claimSql).toMatch(/JOIN candidate ON candidate\.check_id = ranked\.id/s);
+    expect(claimSql).toContain("monitored_project_rank <=");
+    expect(claimSql).toContain("organization_check_rank <=");
+    expect(claimSql).toMatch(
+      /JOIN monitored_project_ranks monitored_ranks[\s\S]+monitored_ranks\.monitored_project_rank <=/
+    );
+    expect(claimSql).not.toContain("interval_seconds >=");
     expect(claimDb.query.mock.calls[0]?.[1]).toEqual([
       "2026-06-15T10:00:00.000Z",
       "2026-06-15T09:59:00.000Z",
@@ -590,6 +686,16 @@ describe("availability check store", () => {
       "2026-06-15T09:56:00.000Z",
       20
     ]);
+
+    const legacyIntervalStore = createPostgresAvailabilityCheckStore(
+      createSequentialDb([{ rows: [buildClaimedRow({ interval_seconds: 30 })] }]) as never
+    );
+    await expect(
+      legacyIntervalStore.claimNextDueCheck({
+        now: "2026-06-15T10:00:00.000Z",
+        claim_timeout_before: "2026-06-15T09:59:00.000Z"
+      })
+    ).resolves.toEqual(expect.objectContaining({ interval_seconds: 60 }));
 
     const rowUndefinedDb = createSequentialDb([{ rows: [] }]);
     const rowUndefinedStore = createPostgresAvailabilityCheckStore(rowUndefinedDb as never);
@@ -761,12 +867,10 @@ describe("availability check store", () => {
     ).resolves.toBeUndefined();
     expect(String(db.query.mock.calls[1]?.[0] ?? "")).toContain("state = 'down'");
 
-    await expect(
-      store.purgeExpiredResults({ now: "2026-07-15T10:00:00.000Z" })
-    ).resolves.toBe(4);
+    await expect(store.purgeExpiredResults({ now: "2026-07-15T10:00:00.000Z" })).resolves.toBe(4);
 
-    await expect(
-      store.purgeExpiredDailyRollups({ now: "2026-07-15T10:00:00.000Z" })
-    ).resolves.toBe(2);
+    await expect(store.purgeExpiredDailyRollups({ now: "2026-07-15T10:00:00.000Z" })).resolves.toBe(
+      2
+    );
   });
 });

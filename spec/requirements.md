@@ -1,7 +1,7 @@
 # Requirements — DebugBundle
 
 Version: v1
-Last updated: 2026-07-04
+Last updated: 2026-09-10
 
 ---
 
@@ -132,7 +132,9 @@ Last updated: 2026-07-04
 
 **FR-AVC-03:** Availability checks must be manageable through API, CLI, MCP, and web using the same domain services. Authorized project members may read checks and retained results. Owner/admin callers may create, update, delete, enable/disable, and test checks. Test execution must be side-effect-free in V1 and must not create incidents or retained history rows.
 
-**FR-AVC-04:** Hosted availability checks must enforce tier limits per project: Free `1` check with minimum `300` second interval, Solo `3` checks with minimum `60` second interval, Team `8` checks with minimum `30` second interval. Checks that exceed current plan limits after downgrade remain visible but pause execution until the project is eligible again.
+**FR-AVC-04:** Hosted availability checks must enforce tier capacity across three scopes: Free allows `1` saved check per project, `3` monitored projects per organization, `3` active checks per organization, and a minimum `300` second interval; Solo allows `3` saved checks per project, `10` monitored projects per organization, `30` active checks per organization, and a minimum `60` second interval; Team allows `10` saved checks per project, `10` monitored projects per organization, `50` active checks per organization, and a minimum `60` second interval. Total project creation remains unlimited; a monitored project is one with at least one enabled availability check. Existing checks that exceed count limits after an entitlement change remain visible but pause execution until eligible. Existing checks stored below the current interval floor remain enabled and execute at the effective plan minimum without rewriting persisted configuration or requiring a schema migration; new create/update requests below the floor are rejected. Team creation defaults to the recommended `failure_threshold` of `2`, while callers may explicitly select any supported threshold from `1` through `10`, including `1` for especially critical endpoints. A `30` second hosted interval is reserved for a future premium capacity option and is not included in the initial hosted tiers.
+
+Execution eligibility under FR-AVC-04 must exclude checks beyond the per-project saved-check cap before assigning organization active-check ranks. Preserved per-project excess must not consume execution slots or pause eligible checks in other monitored projects. API reads and worker claims must share this deterministic eligibility calculation.
 
 **FR-AVC-05:** DebugBundle must retain availability-check raw execution results and per-day rollups for at least 30 days, then purge older records. The retained daily rollups must be sufficient to back a future project status-history surface without a schema redesign.
 
@@ -361,6 +363,8 @@ Project list/detail metrics must include `attention_incidents_today`, counting i
 **FR-BIL-04:** Successful renewal, payment failure, downgrade warning, downgrade confirmation, and capacity-change confirmation emails are mandatory billing lifecycle notifications.
 
 **FR-BIL-05:** A dedicated Stripe webhook sync path and a separate support/admin override path must exist; the admin path is for controlled exceptions and must not become the primary recurring-billing source of truth.
+
+**FR-BIL-06:** The V1 Solo base subscription price is `$4.99/month`. New Solo Checkout Sessions must use the one active monthly-recurring Stripe Price configured by `STRIPE_SOLO_PRICE_ID`; no alternate Solo base price may remain advertised or active in the launch catalog. Solo extra capacity remains `$0.99/unit/month`, and Team remains `$19/month`. All advertised paid prices are denominated in USD and exclude VAT or other applicable taxes, which Stripe calculates and applies at Checkout using `tax_behavior: exclusive` Prices.
 
 See `/spec/billing.md` and `/spec/system-emails.md` for the detailed source-of-truth design.
 

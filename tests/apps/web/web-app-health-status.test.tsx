@@ -73,7 +73,13 @@ describe("web app — health status", () => {
                 updated_at: "2026-06-17T12:00:00.000Z"
               }
             ],
-            limits: { max_checks_per_project: 8, min_interval_seconds: 30 }
+            limits: {
+              max_checks_per_project: 10,
+              max_monitored_projects_per_organization: 10,
+              max_active_checks_per_organization: 50,
+              min_interval_seconds: 60,
+              recommended_failure_threshold: 2
+            }
           });
         }
 
@@ -186,7 +192,13 @@ describe("web app — health status", () => {
                 updated_at: "2026-06-17T12:00:00.000Z"
               }
             ],
-            limits: { max_checks_per_project: 8, min_interval_seconds: 30 }
+            limits: {
+              max_checks_per_project: 10,
+              max_monitored_projects_per_organization: 10,
+              max_active_checks_per_organization: 50,
+              min_interval_seconds: 60,
+              recommended_failure_threshold: 2
+            }
           });
         }
 

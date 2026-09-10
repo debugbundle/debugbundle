@@ -69,11 +69,20 @@ describe("tier capabilities", () => {
 
   it("should expose health-check limits per tier", (): void => {
     expect(getTierCapabilities("free").availability_checks_per_project).toBe(1);
+    expect(getTierCapabilities("free").availability_monitored_projects_per_organization).toBe(3);
+    expect(getTierCapabilities("free").availability_active_checks_per_organization).toBe(3);
     expect(getTierCapabilities("free").availability_check_min_interval_seconds).toBe(300);
+    expect(getTierCapabilities("free").availability_check_recommended_failure_threshold).toBe(3);
     expect(getTierCapabilities("solo").availability_checks_per_project).toBe(3);
+    expect(getTierCapabilities("solo").availability_monitored_projects_per_organization).toBe(10);
+    expect(getTierCapabilities("solo").availability_active_checks_per_organization).toBe(30);
     expect(getTierCapabilities("solo").availability_check_min_interval_seconds).toBe(60);
-    expect(getTierCapabilities("team").availability_checks_per_project).toBe(8);
-    expect(getTierCapabilities("team").availability_check_min_interval_seconds).toBe(30);
+    expect(getTierCapabilities("solo").availability_check_recommended_failure_threshold).toBe(3);
+    expect(getTierCapabilities("team").availability_checks_per_project).toBe(10);
+    expect(getTierCapabilities("team").availability_monitored_projects_per_organization).toBe(10);
+    expect(getTierCapabilities("team").availability_active_checks_per_organization).toBe(50);
+    expect(getTierCapabilities("team").availability_check_min_interval_seconds).toBe(60);
+    expect(getTierCapabilities("team").availability_check_recommended_failure_threshold).toBe(2);
   });
 
   it("should gate member invites for team tier only", (): void => {
@@ -241,6 +250,9 @@ describe("self-host mode", () => {
       expect(caps.member_invites).toBe(true);
       expect(caps.availability_checks_per_project).toBeGreaterThanOrEqual(1_000_000);
       expect(caps.availability_check_min_interval_seconds).toBe(30);
+      expect(caps.availability_monitored_projects_per_organization).toBe(1_000_000);
+      expect(caps.availability_active_checks_per_organization).toBe(1_000_000);
+      expect(caps.availability_check_recommended_failure_threshold).toBe(3);
       expect(caps.included_capacity_units).toBeGreaterThanOrEqual(1_000_000);
       expect(caps.max_members).toBeGreaterThanOrEqual(1_000);
       expect(caps.ingestion_rate_per_min).toBeGreaterThanOrEqual(1_000_000);

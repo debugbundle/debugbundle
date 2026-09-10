@@ -40,7 +40,7 @@ export function createHealthCheckMcpTools(api: {
     expectedStatusMax: number;
     timeoutMs: number;
     intervalSeconds: number;
-    failureThreshold: number;
+    failureThreshold?: number;
     recoveryThreshold: number;
     environment?: string;
     serviceName?: string | null;
@@ -89,7 +89,10 @@ export function createHealthCheckMcpTools(api: {
     checkId: string;
     limit?: number;
   }): Promise<unknown>;
-}): Record<(typeof HEALTH_CHECK_MCP_TOOL_NAMES)[number], (input: Record<string, unknown>) => Promise<unknown>> {
+}): Record<
+  (typeof HEALTH_CHECK_MCP_TOOL_NAMES)[number],
+  (input: Record<string, unknown>) => Promise<unknown>
+> {
   return {
     async list_health_checks(input) {
       try {
@@ -135,7 +138,7 @@ export function createHealthCheckMcpTools(api: {
           expectedStatusMax: number;
           timeoutMs: number;
           intervalSeconds: number;
-          failureThreshold: number;
+          failureThreshold?: number;
           recoveryThreshold: number;
           environment?: string;
           serviceName?: string | null;
@@ -146,16 +149,21 @@ export function createHealthCheckMcpTools(api: {
           name: String(input["name"]),
           url: String(input["url"]),
           method: input["method"] === "HEAD" ? "HEAD" : "GET",
-          expectedStatusMin: typeof input["expectedStatusMin"] === "number" ? input["expectedStatusMin"] : 200,
-          expectedStatusMax: typeof input["expectedStatusMax"] === "number" ? input["expectedStatusMax"] : 399,
+          expectedStatusMin:
+            typeof input["expectedStatusMin"] === "number" ? input["expectedStatusMin"] : 200,
+          expectedStatusMax:
+            typeof input["expectedStatusMax"] === "number" ? input["expectedStatusMax"] : 399,
           timeoutMs: typeof input["timeoutMs"] === "number" ? input["timeoutMs"] : 2500,
           intervalSeconds: Number(input["intervalSeconds"]),
-          failureThreshold: typeof input["failureThreshold"] === "number" ? input["failureThreshold"] : 3,
-          recoveryThreshold: typeof input["recoveryThreshold"] === "number" ? input["recoveryThreshold"] : 2,
+          recoveryThreshold:
+            typeof input["recoveryThreshold"] === "number" ? input["recoveryThreshold"] : 2,
           enabled: typeof input["enabled"] === "boolean" ? input["enabled"] : true
         };
         if (typeof input["environment"] === "string") {
           requestInput.environment = input["environment"];
+        }
+        if (typeof input["failureThreshold"] === "number") {
+          requestInput.failureThreshold = input["failureThreshold"];
         }
         if (typeof input["serviceName"] === "string" || input["serviceName"] === null) {
           requestInput.serviceName = input["serviceName"];
@@ -252,8 +260,10 @@ export function createHealthCheckMcpTools(api: {
           projectId: String(input["projectId"]),
           url: String(input["url"]),
           method: input["method"] === "HEAD" ? "HEAD" : "GET",
-          expectedStatusMin: typeof input["expectedStatusMin"] === "number" ? input["expectedStatusMin"] : 200,
-          expectedStatusMax: typeof input["expectedStatusMax"] === "number" ? input["expectedStatusMax"] : 399,
+          expectedStatusMin:
+            typeof input["expectedStatusMin"] === "number" ? input["expectedStatusMin"] : 200,
+          expectedStatusMax:
+            typeof input["expectedStatusMax"] === "number" ? input["expectedStatusMax"] : 399,
           timeoutMs: typeof input["timeoutMs"] === "number" ? input["timeoutMs"] : 2500
         });
       } catch (error) {

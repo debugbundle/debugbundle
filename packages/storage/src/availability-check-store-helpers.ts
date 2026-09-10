@@ -20,26 +20,76 @@ export function getPlanCheckLimit(plan: TierName): number {
   return getTierCapabilities(plan).availability_checks_per_project;
 }
 
+export function getPlanMonitoredProjectLimit(plan: TierName): number {
+  return getTierCapabilities(plan).availability_monitored_projects_per_organization;
+}
+
+export function getPlanActiveCheckLimit(plan: TierName): number {
+  return getTierCapabilities(plan).availability_active_checks_per_organization;
+}
+
 export function getPlanMinIntervalSeconds(plan: TierName): number {
   return getTierCapabilities(plan).availability_check_min_interval_seconds;
+}
+
+export function getPlanRecommendedFailureThreshold(plan: TierName): number {
+  return getTierCapabilities(plan).availability_check_recommended_failure_threshold;
+}
+
+export function getEffectiveAvailabilityCheckIntervalSeconds(
+  plan: TierName,
+  configuredIntervalSeconds: number
+): number {
+  return Math.max(configuredIntervalSeconds, getPlanMinIntervalSeconds(plan));
 }
 
 const TIER_CAPABILITIES_SQL = {
   free_limit: getTierCapabilities("free").availability_checks_per_project,
   solo_limit: getTierCapabilities("solo").availability_checks_per_project,
   team_limit: getTierCapabilities("team").availability_checks_per_project,
+  free_monitored_projects:
+    getTierCapabilities("free").availability_monitored_projects_per_organization,
+  solo_monitored_projects:
+    getTierCapabilities("solo").availability_monitored_projects_per_organization,
+  team_monitored_projects:
+    getTierCapabilities("team").availability_monitored_projects_per_organization,
+  free_active_checks: getTierCapabilities("free").availability_active_checks_per_organization,
+  solo_active_checks: getTierCapabilities("solo").availability_active_checks_per_organization,
+  team_active_checks: getTierCapabilities("team").availability_active_checks_per_organization,
   free_interval: getTierCapabilities("free").availability_check_min_interval_seconds,
   solo_interval: getTierCapabilities("solo").availability_check_min_interval_seconds,
   team_interval: getTierCapabilities("team").availability_check_min_interval_seconds
 } as const;
 
-export function buildPlanEligibilityCaseSql(kind: "limit" | "interval"): string {
+export function buildPlanEligibilityCaseSql(
+  kind: "limit" | "monitored_projects" | "active_checks" | "interval"
+): string {
   if (kind === "limit") {
     return `
       CASE COALESCE(o.plan, 'free')
         WHEN 'solo' THEN ${TIER_CAPABILITIES_SQL.solo_limit}
         WHEN 'team' THEN ${TIER_CAPABILITIES_SQL.team_limit}
         ELSE ${TIER_CAPABILITIES_SQL.free_limit}
+      END
+    `;
+  }
+
+  if (kind === "monitored_projects") {
+    return `
+      CASE COALESCE(o.plan, 'free')
+        WHEN 'solo' THEN ${TIER_CAPABILITIES_SQL.solo_monitored_projects}
+        WHEN 'team' THEN ${TIER_CAPABILITIES_SQL.team_monitored_projects}
+        ELSE ${TIER_CAPABILITIES_SQL.free_monitored_projects}
+      END
+    `;
+  }
+
+  if (kind === "active_checks") {
+    return `
+      CASE COALESCE(o.plan, 'free')
+        WHEN 'solo' THEN ${TIER_CAPABILITIES_SQL.solo_active_checks}
+        WHEN 'team' THEN ${TIER_CAPABILITIES_SQL.team_active_checks}
+        ELSE ${TIER_CAPABILITIES_SQL.free_active_checks}
       END
     `;
   }
@@ -57,7 +107,8 @@ function computeDisplayStatus(
   enabled: boolean,
   baseStatus: Exclude<AvailabilityCheckHealthStatus, "paused">,
   withinPlanLimit: boolean,
-  meetsPlanInterval: boolean
+  withinMonitoredProjectLimit: boolean,
+  withinOrganizationActiveLimit: boolean
 ): { status: AvailabilityCheckHealthStatus; paused_reason: string | null } {
   if (!enabled) {
     return { status: "paused", paused_reason: "disabled" };
@@ -65,18 +116,23 @@ function computeDisplayStatus(
   if (!withinPlanLimit) {
     return { status: "paused", paused_reason: "plan_check_limit_exceeded" };
   }
-  if (!meetsPlanInterval) {
-    return { status: "paused", paused_reason: "plan_interval_too_low" };
+  if (!withinMonitoredProjectLimit) {
+    return { status: "paused", paused_reason: "plan_monitored_project_limit_exceeded" };
+  }
+  if (!withinOrganizationActiveLimit) {
+    return { status: "paused", paused_reason: "plan_organization_check_limit_exceeded" };
   }
   return { status: baseStatus, paused_reason: null };
 }
 
 export function mapAvailabilityCheckRow(row: Record<string, unknown>): AvailabilityCheckRecord {
+  const organizationPlan = normalizeAvailabilityCheckPlan(row["organization_plan"]);
   const display = computeDisplayStatus(
     Boolean(row["enabled"]),
     (row["base_status"] as Exclude<AvailabilityCheckHealthStatus, "paused">) ?? "unknown",
     Boolean(row["within_plan_limit"]),
-    Boolean(row["meets_plan_interval"])
+    Boolean(row["within_monitored_project_limit"]),
+    Boolean(row["within_organization_active_limit"])
   );
   const linkedIncidentStatus =
     row["linked_incident_status"] === "open" ||
@@ -94,7 +150,10 @@ export function mapAvailabilityCheckRow(row: Record<string, unknown>): Availabil
     expected_status_min: Number(row["expected_status_min"]),
     expected_status_max: Number(row["expected_status_max"]),
     timeout_ms: Number(row["timeout_ms"]),
-    interval_seconds: Number(row["interval_seconds"]),
+    interval_seconds: getEffectiveAvailabilityCheckIntervalSeconds(
+      organizationPlan,
+      Number(row["interval_seconds"])
+    ),
     failure_threshold: Number(row["failure_threshold"]),
     recovery_threshold: Number(row["recovery_threshold"]),
     environment: String(row["environment"]),
@@ -102,10 +161,11 @@ export function mapAvailabilityCheckRow(row: Record<string, unknown>): Availabil
     enabled: Boolean(row["enabled"]),
     status: display.status,
     paused_reason: display.paused_reason,
-    organization_plan: normalizeAvailabilityCheckPlan(row["organization_plan"]),
+    organization_plan: organizationPlan,
     consecutive_failures: Number(row["consecutive_failures"]),
     consecutive_successes: Number(row["consecutive_successes"]),
-    linked_incident_id: typeof row["linked_incident_id"] === "string" ? row["linked_incident_id"] : null,
+    linked_incident_id:
+      typeof row["linked_incident_id"] === "string" ? row["linked_incident_id"] : null,
     linked_incident_status: linkedIncidentStatus,
     last_checked_at: typeof row["last_checked_at"] === "string" ? row["last_checked_at"] : null,
     next_check_at: typeof row["next_check_at"] === "string" ? row["next_check_at"] : null,
@@ -118,7 +178,9 @@ export function mapAvailabilityCheckRow(row: Record<string, unknown>): Availabil
     last_result_error_kind:
       typeof row["last_result_error_kind"] === "string" ? row["last_result_error_kind"] : null,
     last_result_error_message:
-      typeof row["last_result_error_message"] === "string" ? row["last_result_error_message"] : null,
+      typeof row["last_result_error_message"] === "string"
+        ? row["last_result_error_message"]
+        : null,
     last_result_duration_ms:
       typeof row["last_result_duration_ms"] === "number" ? row["last_result_duration_ms"] : null,
     created_at: String(row["created_at"]),
@@ -174,7 +236,7 @@ export async function projectExistsForAvailabilityChecks(
       WHERE p.id = $1::uuid
         AND p.organization_id = $2::uuid
       LIMIT 1
-      ${input.lock_project === true ? "FOR UPDATE OF p" : ""}
+      ${input.lock_project === true ? "FOR UPDATE OF p, o" : ""}
     `,
     [input.project_id, input.organization_id]
   );
@@ -190,4 +252,39 @@ export async function projectExistsForAvailabilityChecks(
     environment_default: typeof environmentDefault === "string" ? environmentDefault : "production",
     organization_plan: normalizeAvailabilityCheckPlan(row["organization_plan"])
   };
+}
+
+export async function hasAvailabilityActivationCapacity(
+  db: Queryable,
+  input: {
+    organization_id: string;
+    project_id: string;
+    plan: TierName;
+  }
+): Promise<boolean> {
+  const result = await db.query<Record<string, unknown>>(
+    `
+      SELECT
+        COUNT(*) FILTER (WHERE c.enabled = true)::text AS active_check_count,
+        COUNT(DISTINCT c.project_id) FILTER (WHERE c.enabled = true)::text
+          AS monitored_project_count,
+        COALESCE(BOOL_OR(c.enabled = true AND c.project_id = $2::uuid), false)
+          AS project_is_monitored
+      FROM availability_checks c
+      JOIN projects p ON p.id = c.project_id
+      WHERE p.organization_id = $1::uuid
+        AND c.deleted_at IS NULL
+    `,
+    [input.organization_id, input.project_id]
+  );
+
+  const row = result.rows[0] ?? {};
+  const activeCheckCount = Number(row["active_check_count"] ?? "0");
+  const monitoredProjectCount = Number(row["monitored_project_count"] ?? "0");
+  const projectIsMonitored = Boolean(row["project_is_monitored"]);
+
+  return (
+    activeCheckCount < getPlanActiveCheckLimit(input.plan) &&
+    (projectIsMonitored || monitoredProjectCount < getPlanMonitoredProjectLimit(input.plan))
+  );
 }

@@ -147,7 +147,7 @@ export interface AvailabilityCheckStore {
     service_name?: string | null;
     enabled?: boolean;
     now: string;
-  }): Promise<AvailabilityCheckRecord | "check_not_found" | "interval_too_low">;
+  }): Promise<AvailabilityCheckRecord | "check_not_found" | "limit_reached" | "interval_too_low">;
   deleteCheckForProjectInOrganization(input: {
     organization_id: string;
     project_id: string;
