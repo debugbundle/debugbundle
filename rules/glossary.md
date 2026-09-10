@@ -4,6 +4,27 @@ This glossary defines durable product terms used across requirements, contracts,
 and implementation documentation. Source-of-truth requirements and contracts remain
 authoritative when a term's behavior is specified in more detail.
 
+## Hosted Health-Check Terms
+
+### Monitored Project
+
+A project with at least one enabled hosted health check. The organization-wide
+monitored-project allowance is separate from unlimited project creation and from
+the number of saved checks allowed in each project.
+
+### Active Health-Check Allowance
+
+The organization-wide bound on scheduled health-check execution, applied together
+with the per-project saved-check and monitored-project caps. Existing excess
+checks remain saved and visible but pause execution; checks already paused by
+the per-project cap do not consume organization execution slots.
+
+### Effective Health-Check Interval
+
+The greater of a check's saved interval and the current plan's minimum interval.
+Existing checks use this interval for reads and execution without rewriting their
+saved configuration. New create/update requests must meet the current floor.
+
 ## SDK Reliability Terms
 
 ### Ingestion Acknowledgement
