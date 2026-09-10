@@ -51,7 +51,8 @@ vi.mock("ioredis", () => ({
 vi.mock("@aws-sdk/client-s3", () => ({
   S3Client: vi.fn(function MockS3Client() {
     return {
-      send: s3SendMock
+      send: s3SendMock,
+      destroy: vi.fn()
     };
   }),
   HeadBucketCommand: class {

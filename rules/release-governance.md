@@ -1,7 +1,7 @@
 # Release & Open-Source Governance — DebugBundle
 
 Version: v1
-Last updated: 2026-05-31
+Last updated: 2026-09-10
 
 ---
 
@@ -69,6 +69,12 @@ The MCP package release manifest must include package-level MCP Registry metadat
 3. Create the canonical core GitHub tag and Release while reporting the independently versioned package surfaces
 
 The root release is the canonical product release for the core monorepo. It does not republish the independently versioned CLI, MCP, shared JS, or standalone SDK packages.
+
+### Hosted Core Version Checklist
+
+Before deploying changed core/runtime behavior, explicitly choose the next root `package.json` version and add its dated `CHANGELOG.md` section. Backwards-compatible bug fixes, resource-lifecycle corrections, and internal refactors normally use a patch increment; new public capabilities use a minor increment, and breaking changes follow the major-version policy below. Documentation/evidence-only follow-ups and redeployments of unchanged runtime code do not require another bump.
+
+Verify the root version inside the deployed API/worker images and retain the exact deployed commit/digests as separate build identifiers. Do not change independent CLI, MCP, OpenAI plugin, shared JS, or SDK versions merely to match the core release. Confirm whether the owner also authorized the canonical GitHub tag/Release; a hosted deploy alone must not silently publish other distribution surfaces.
 
 Public CI must NEVER contain deployment config, cloud credentials, or infrastructure code.
 

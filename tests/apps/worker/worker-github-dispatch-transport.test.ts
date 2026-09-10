@@ -4,6 +4,45 @@ import { createGitHubDispatchTransport } from "../../../apps/worker/src/worker-n
 import { createGitHubInstallationTokenFixture } from "../../helpers/github-installation-token.js";
 
 describe("GitHub dispatch transport", () => {
+  it.each(["token-error", "dispatch-error", "dispatch-success"] as const)(
+    "cancels unused response bodies after %s",
+    async (scenario) => {
+      const cancel = vi.fn().mockResolvedValue(undefined);
+      const fetchImpl = vi.fn().mockResolvedValue({
+        ok: scenario === "dispatch-success",
+        status: scenario === "dispatch-success" ? 204 : 503,
+        headers: new Headers({ "retry-after": "30" }),
+        body: { cancel }
+      });
+      const transport = createGitHubDispatchTransport({
+        appId: "123",
+        privateKey: "test-only",
+        createAppJwt: () => "test-only",
+        tokenCache: {
+          get: vi.fn().mockResolvedValue(scenario === "token-error" ? null : "test-token"),
+          set: vi.fn()
+        },
+        fetchImpl
+      });
+      const result = transport.deliver({
+        delivery_id: "test-delivery",
+        installation_id: 99,
+        repo_owner: "test-owner",
+        repo_name: "test-repo",
+        dispatch_payload: {}
+      });
+      if (scenario === "dispatch-success") {
+        await expect(result).resolves.toBeUndefined();
+      } else {
+        await expect(result).rejects.toMatchObject({
+          statusCode: 503,
+          retryAfterSeconds: scenario === "token-error" ? null : 30
+        });
+      }
+      expect(cancel).toHaveBeenCalledOnce();
+    }
+  );
+
   it.each(["stateful", "stateless"] as const)(
     "preserves %s installation tokens through caching and dispatch authentication",
     async (tokenFormat) => {
@@ -43,11 +82,7 @@ describe("GitHub dispatch transport", () => {
       expect(installationToken).toHaveLength(expectedTokenLength);
       expect(installationToken.split(".")).toHaveLength(expectedTokenSegments);
       expect(get).toHaveBeenCalledTimes(2);
-      expect(set).toHaveBeenCalledWith(
-        "github-installation-token:99",
-        installationToken,
-        50 * 60
-      );
+      expect(set).toHaveBeenCalledWith("github-installation-token:99", installationToken, 50 * 60);
       expect(set).toHaveBeenCalledTimes(1);
       expect(fetchImpl).toHaveBeenCalledTimes(3);
       expect(fetchImpl).toHaveBeenNthCalledWith(

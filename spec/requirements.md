@@ -808,6 +808,8 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **NFR-REL-07:** Self-host: strong startup validation, clear log messages, health endpoints, doctor/validate commands.
 
+**NFR-REL-08:** Worker lifecycle resources must remain bounded independently of uptime. Completed polls must release shutdown registrations and timers; shutdown must interrupt both polling lanes without changing queue acknowledgement/draining behavior. Incident-frequency snapshot throttling retains at most 10,000 incident IDs, evicting the least recently persisted entry without deleting authoritative counters or allowing older durable snapshots to overwrite newer ones. Temporary readiness clients and unused outbound HTTP response bodies must be released on success and failure. See `spec/worker-resource-lifecycle.md` for verification and rollout criteria.
+
 ### 2.3 Security
 
 **NFR-SEC-01:** TLS in transit (HTTPS only). SDKs must reject non-TLS endpoints in production mode.

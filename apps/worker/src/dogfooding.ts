@@ -1,12 +1,17 @@
 import { debugbundle, type DebugBundleNodeInitConfig } from "@debugbundle/sdk-node";
 
-import { createRuntimeLoggerFromEnv, getErrorMessage } from "../../../packages/runtime-logger/src/index.js";
+import {
+  createRuntimeLoggerFromEnv,
+  getErrorMessage
+} from "../../../packages/runtime-logger/src/index.js";
 
 const dogfoodingLogger = createRuntimeLoggerFromEnv({
   app: "worker",
   defaultService: "debugbundle-worker",
   env: process.env,
-  ...(process.env["npm_package_version"] === undefined ? {} : { version: process.env["npm_package_version"] })
+  ...(process.env["npm_package_version"] === undefined
+    ? {}
+    : { version: process.env["npm_package_version"] })
 });
 
 let workerDogfoodingEnabled = false;
@@ -53,6 +58,7 @@ export function createHostedDogfoodingTransport(
         status: response.status
       };
     } finally {
+      controller.abort();
       clearTimeout(timeout);
     }
   };
@@ -79,7 +85,10 @@ function normalizeText(value: string | undefined): string | null {
   return trimmed === undefined || trimmed.length === 0 ? null : trimmed;
 }
 
-function resolveDogfoodingEndpoint(env: Record<string, string | undefined>, projectToken: string | null): string | null {
+function resolveDogfoodingEndpoint(
+  env: Record<string, string | undefined>,
+  projectToken: string | null
+): string | null {
   if (projectToken === null) {
     return null;
   }
@@ -89,9 +98,10 @@ function resolveDogfoodingEndpoint(env: Record<string, string | undefined>, proj
     return new URL(explicitEndpoint).toString();
   }
 
-  const apiBaseUrl = normalizeText(env["DEBUGBUNDLE_API_URL"])
-    ?? normalizeText(env["API_BASE_URL"])
-    ?? normalizeText(env["VITE_API_URL"]);
+  const apiBaseUrl =
+    normalizeText(env["DEBUGBUNDLE_API_URL"]) ??
+    normalizeText(env["API_BASE_URL"]) ??
+    normalizeText(env["VITE_API_URL"]);
   if (apiBaseUrl === null) {
     throw new Error("worker_dogfooding_missing_api_url");
   }
@@ -99,7 +109,9 @@ function resolveDogfoodingEndpoint(env: Record<string, string | undefined>, proj
   return new URL("/v1/events", apiBaseUrl).toString();
 }
 
-export function resolveWorkerDogfoodingConfig(env: Record<string, string | undefined>): WorkerDogfoodingConfig | null {
+export function resolveWorkerDogfoodingConfig(
+  env: Record<string, string | undefined>
+): WorkerDogfoodingConfig | null {
   const enabledFlag = parseBooleanFlag(
     env["DEBUGBUNDLE_WORKER_DOGFOOD_ENABLED"],
     "DEBUGBUNDLE_WORKER_DOGFOOD_ENABLED"
@@ -115,9 +127,9 @@ export function resolveWorkerDogfoodingConfig(env: Record<string, string | undef
     projectToken,
     endpoint: resolveDogfoodingEndpoint(env, projectToken),
     environment:
-      normalizeText(env["DEBUGBUNDLE_WORKER_DOGFOOD_ENVIRONMENT"])
-      ?? normalizeText(env["NODE_ENV"])
-      ?? "development",
+      normalizeText(env["DEBUGBUNDLE_WORKER_DOGFOOD_ENVIRONMENT"]) ??
+      normalizeText(env["NODE_ENV"]) ??
+      "development",
     service: normalizeText(env["DEBUGBUNDLE_WORKER_DOGFOOD_SERVICE"]) ?? "debugbundle-worker",
     captureConsole:
       parseBooleanFlag(

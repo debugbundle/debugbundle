@@ -169,7 +169,11 @@ export async function assertS3BucketReady(env: ApiRuntimeEnv): Promise<void> {
     }
   });
 
-  await s3.send(new HeadBucketCommand({ Bucket: env.S3_BUCKET }));
+  try {
+    await s3.send(new HeadBucketCommand({ Bucket: env.S3_BUCKET }));
+  } finally {
+    s3.destroy();
+  }
 }
 
 function createApiPool(env: ApiRuntimeEnv): Pool {

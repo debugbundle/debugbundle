@@ -84,6 +84,7 @@ help:
 	@echo "  make dev-reset       Drop local DB/cache/object-store state and rebuild from scratch"
 	@echo "  make api-run         Start API with env-driven dependencies on compose network"
 	@echo "  make worker-check    Run worker bootstrap/processor tests"
+	@echo "  make worker-memory-check Check bounded idle-poll memory in isolation"
 	@echo "  make worker-run      Start worker with env-driven dependencies on compose network"
 	@echo "  make shell           Open a Node container shell in repo root"
 
@@ -349,6 +350,12 @@ api-run: ensure-probe-trigger-secret infra-bootstrap
 .PHONY: worker-check
 worker-check:
 	$(NODE_RUN) "corepack enable && corepack pnpm worker:check"
+
+.PHONY: worker-memory-check
+worker-memory-check:
+	docker run --rm --memory=768m --cpus=1 \
+		-v "$(PWD):$(WORKDIR):ro" -w "$(WORKDIR)" \
+		$(NODE_IMAGE) node --expose-gc --import tsx scripts/check-worker-poll-memory.mjs
 
 .PHONY: worker-run
 worker-run: ensure-probe-trigger-secret infra-bootstrap

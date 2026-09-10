@@ -13,7 +13,6 @@ import {
   assertIntegrationSecretEncryptionKey,
   type Queryable
 } from "../../../packages/storage/src/index.js";
-import { delay } from "./worker-steps.js";
 
 const WorkerEnvSchema = z.object({
   DB_HOST: z.string().min(1).default("localhost"),
@@ -88,11 +87,13 @@ export interface WorkerShutdownState {
   isShuttingDown(): boolean;
   requestShutdown(): void;
   waitForShutdown(): Promise<void>;
+  waitForNextPoll(ms: number): Promise<void>;
   readinessCheck(readinessCheck: () => Promise<void>): Promise<void>;
 }
 
 export function createWorkerShutdownState(): WorkerShutdownState {
   let shuttingDown = false;
+  const pendingPolls = new Set<() => void>();
   let resolveShutdown: (() => void) | null = null;
   const shutdownPromise = new Promise<void>((resolve) => {
     resolveShutdown = resolve;
@@ -109,9 +110,29 @@ export function createWorkerShutdownState(): WorkerShutdownState {
 
       shuttingDown = true;
       resolveShutdown?.();
+      for (const finishPoll of pendingPolls) {
+        finishPoll();
+      }
     },
     async waitForShutdown() {
       await shutdownPromise;
+    },
+    waitForNextPoll(ms) {
+      if (shuttingDown) {
+        return Promise.resolve();
+      }
+
+      // Keep only active waits. Racing every poll against shutdownPromise retains
+      // all losing promise reactions for the entire lifetime of the worker.
+      return new Promise<void>((resolve) => {
+        const finishPoll = (): void => {
+          clearTimeout(timer);
+          pendingPolls.delete(finishPoll);
+          resolve();
+        };
+        const timer = setTimeout(finishPoll, ms);
+        pendingPolls.add(finishPoll);
+      });
     },
     async readinessCheck(readinessCheck: () => Promise<void>) {
       if (shuttingDown) {
@@ -149,15 +170,11 @@ export function createPoolQueryable(pool: Pool): Queryable {
   };
 }
 
-export async function delayUntilNextPollOrShutdown(
+export function delayUntilNextPollOrShutdown(
   ms: number,
   shutdownState: WorkerShutdownState
 ): Promise<void> {
-  if (shutdownState.isShuttingDown()) {
-    return;
-  }
-
-  await Promise.race([delay(ms), shutdownState.waitForShutdown()]);
+  return shutdownState.waitForNextPoll(ms);
 }
 
 export function normalizeWorkerBaseUrl(value: string | undefined): string | null {
@@ -413,7 +430,11 @@ export async function assertWorkerS3BucketReady(env: WorkerEnv): Promise<void> {
   };
   const s3 = new S3Client(s3Config);
 
-  await s3.send(new HeadBucketCommand({ Bucket: env.S3_BUCKET }));
+  try {
+    await s3.send(new HeadBucketCommand({ Bucket: env.S3_BUCKET }));
+  } finally {
+    s3.destroy();
+  }
 }
 
 export function buildWorkerReadinessCheck(input: {

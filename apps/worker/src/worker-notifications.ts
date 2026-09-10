@@ -410,6 +410,7 @@ export function createGitHubDispatchTransport(input: {
       }
     );
     if (!response.ok) {
+      await response.body?.cancel().catch(() => undefined);
       throw new GitHubDispatchDeliveryError(
         `github_dispatch_token_error_${response.status}`,
         response.status,
@@ -457,6 +458,7 @@ export function createGitHubDispatchTransport(input: {
         }
       );
 
+      await response.body?.cancel().catch(() => undefined);
       if (!response.ok) {
         const retryAfterHeader = response.headers.get("retry-after");
         const retryAfterSeconds =
@@ -576,13 +578,18 @@ export function createLifecycleWebhookTransport(
         const message = error instanceof Error ? error.message : String(error);
         throw new LifecycleWebhookDeliveryError(`webhook_transport_error:${message}`, null);
       } finally {
+        // Delivery is decided from status, not an arbitrarily large response body.
+        controller.abort();
         clearTimeout(timeout);
       }
     }
   };
 }
 
-export { createAlertEmailDigestTransport, createAlertTransport } from "./worker-alert-transports.js";
+export {
+  createAlertEmailDigestTransport,
+  createAlertTransport
+} from "./worker-alert-transports.js";
 
 export {
   createWeeklyReportTransport,

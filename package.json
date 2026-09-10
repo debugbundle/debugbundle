@@ -1,6 +1,6 @@
 {
   "name": "debugbundle",
-  "version": "1.7.3",
+  "version": "1.7.4",
   "private": true,
   "type": "module",
   "description": "DebugBundle monorepo",
@@ -39,7 +39,7 @@
     "api:start": "tsx apps/api/src/main.ts",
     "api:check": "vitest run tests/apps/api/api-runtime.test.ts tests/apps/api/api-runtime-start.test.ts tests/apps/api/api-dogfooding.test.ts",
     "worker:start": "tsx apps/worker/src/main.ts",
-    "worker:check": "vitest run tests/apps/worker/worker-runtime.test.ts tests/apps/worker/worker-processor-normalize.test.ts tests/apps/worker/worker-processor-group-incident.test.ts tests/apps/worker/worker-processor-bundle-delivery.test.ts tests/apps/worker/worker-weekly-reporting.test.ts"
+    "worker:check": "vitest run tests/apps/worker && node --expose-gc --import tsx scripts/check-worker-poll-memory.mjs"
   },
   "devDependencies": {
     "@debugbundle/cli": "workspace:*",

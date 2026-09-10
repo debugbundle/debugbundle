@@ -25,6 +25,24 @@ The greater of a check's saved interval and the current plan's minimum interval.
 Existing checks use this interval for reads and execution without rewriting their
 saved configuration. New create/update requests must meet the current floor.
 
+## Worker Resource Terms
+
+### Retained Heap
+
+JavaScript objects still reachable after garbage collection. The idle-poll memory
+gate measures this separately from temporary allocations and whole-process RSS.
+
+### RSS (Resident Set Size)
+
+Memory pages currently resident for a process, including JavaScript heap, native
+allocations, code, and stacks. RSS can fluctuate without a JavaScript object leak.
+
+### Frequency Snapshot-Throttling Cache
+
+A bounded worker-local map that reduces repeated incident-frequency snapshot
+writes. It is not authoritative counter storage; eviction permits an extra
+timestamp-guarded write without deleting Redis or Postgres data.
+
 ## SDK Reliability Terms
 
 ### Ingestion Acknowledgement

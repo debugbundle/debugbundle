@@ -6,6 +6,8 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.7.4] - 2026-09-10
+
 ### Added
 
 - Added the local-source OpenAI Plugin `1.0.0` candidate: an independently versioned production-debugging and aggregate-analytics skill plus an OAuth-protected, exact twenty-three-tool read-only remote MCP projection, with dedicated no-side-effect readers, sample-free aggregate analytics, bounded privacy projections, owner-approved existing-app consent/reviewer/revocation surfaces, reviewer isolation, deterministic package/eval evidence, and same-Lightsail deployment/monitoring source.
@@ -21,6 +23,7 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ### Fixed
 
+- Fixed idle worker memory growth caused by completed polls retaining shutdown promise reactions. Poll waits now release resources on timeout or shutdown; frequency snapshot caching is bounded, temporary S3 readiness clients are destroyed, and unused worker HTTP response bodies are released. Added an isolated retained-memory regression gate; no database migration or health-check cadence change is required.
 - Prevented preserved health checks paused by a per-project limit after downgrade from consuming organization execution slots and unnecessarily pausing eligible checks in other projects.
 - Prevented a revoked OpenAI connection's retained legacy OIDC Grant artifact from causing a server error during reconnection. New Grant artifacts are now indexed for atomic revocation, while legacy rows fail closed against the normalized grant lifecycle until bounded expiry.
 

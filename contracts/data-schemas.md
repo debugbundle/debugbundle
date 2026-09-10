@@ -1190,6 +1190,8 @@ The signed-in Settings projection is derived from `oauth_authorization_grants` j
 
 **Rolling frequency counters:** Occurrence rates (1m, 5m, 1h, 24h sliding windows) are tracked in Redis sorted sets for real-time spike detection. The `occurrence_count` column is the authoritative durable total. Frequency snapshots are periodically persisted to Postgres (default every 60s) for counter recovery after Redis restart.
 
+The worker's in-memory snapshot-throttling cache holds at most 10,000 incident IDs, ordered by successful persistence. Evicting the oldest entry can cause an additional snapshot write, but does not evict Redis counters or durable incident data. The existing timestamp guard prevents an older snapshot from replacing a newer persisted snapshot. This is an internal resource bound, not a schema or public interface change.
+
 | Column                            | Type             | Constraints |
 | --------------------------------- | ---------------- | ----------- |
 | frequency_occurrences_1m          | integer          |             |

@@ -20,6 +20,29 @@ describe("availability check executor validation", () => {
     vi.unstubAllGlobals();
   });
 
+  it("cancels a redirect response before rejecting its unsafe destination", async () => {
+    lookupMock.mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
+    const cancel = vi.fn().mockResolvedValue(undefined);
+    const fetchMock = vi.fn().mockResolvedValue({
+      status: 302,
+      headers: new Headers({ location: "http://localhost/private" }),
+      body: { cancel }
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await executeAvailabilityCheck({
+      url: "https://example.com/health",
+      method: "GET",
+      expected_status_min: 200,
+      expected_status_max: 399,
+      timeout_ms: 5000
+    });
+
+    expect(result.status).toBe("security_blocked");
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
   it("rejects embedded credentials", async () => {
     await expect(
       validateAvailabilityCheckDefinition({
@@ -264,9 +287,16 @@ describe("availability check executor validation", () => {
       .mockResolvedValueOnce([{ address: "10.0.0.5", family: 4 }]);
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(new Response(null, { status: 302, headers: { location: "https://www.example.com/ready" } }))
+      .mockResolvedValueOnce(
+        new Response(null, { status: 302, headers: { location: "https://www.example.com/ready" } })
+      )
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
-      .mockResolvedValueOnce(new Response(null, { status: 302, headers: { location: "https://internal.example.test/health" } }));
+      .mockResolvedValueOnce(
+        new Response(null, {
+          status: 302,
+          headers: { location: "https://internal.example.test/health" }
+        })
+      );
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(

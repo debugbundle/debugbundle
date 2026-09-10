@@ -1006,6 +1006,16 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **When** more than 1 project, more than 1 member, or more than 1 webhook is configured
 - **Then** all features work without restriction (no plan enforcement, no billing integration)
 
+### AC-WORKER-01: Bounded Worker Resource Lifecycle
+
+- **Given** an idle worker with the normal job and availability-check polling lanes
+- **When** 200,000 synthetic polls complete after warm-up and full garbage collection
+- **Then** retained promise growth stays below 2,048 objects and retained heap growth stays below 4 MiB (`make worker-memory-check`); no completed poll timer remains
+- **And** shutdown immediately resolves both outstanding waits, clears their timers, rejects readiness while draining, and preserves existing job acknowledgement/resource-close behavior
+- **And** frequency snapshot throttling retains at most 10,000 incident IDs; eviction permits an extra timestamp-guarded persistence attempt without losing counters, while failed persistence remains retryable
+- **And** temporary API/worker S3 readiness clients are destroyed on success and failure, unused worker HTTP response bodies are released, and unsafe redirect responses are cancelled before target rejection without weakening SSRF checks
+- **And** production stability is assessed separately over 24–48 hours after an approved deployment; the synthetic check is not a production workload soak test
+
 ---
 
 ## 12. Billing Failure Acceptance

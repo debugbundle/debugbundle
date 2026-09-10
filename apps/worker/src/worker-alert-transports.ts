@@ -128,6 +128,8 @@ export function createAlertTransport(input: CreateAlertTransportInput): AlertDel
       const message = error instanceof Error ? error.message : String(error);
       throw new AlertDeliveryError(`alert_transport_error:${message}`);
     } finally {
+      // Only status is consumed; release any unread response body/connection.
+      controller.abort();
       clearTimeout(timeout);
     }
   }

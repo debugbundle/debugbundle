@@ -36,7 +36,10 @@ export interface AvailabilityCheckExecutionResult {
 }
 
 export class AvailabilityCheckValidationError extends Error {
-  public constructor(public readonly code: string, message: string) {
+  public constructor(
+    public readonly code: string,
+    message: string
+  ) {
     super(message);
     this.name = "AvailabilityCheckValidationError";
   }
@@ -240,7 +243,9 @@ function redactUrlForEvidence(url: URL): string {
   return redacted.toString();
 }
 
-function classifyNetworkError(error: unknown): Pick<AvailabilityCheckExecutionResult, "status" | "error_kind" | "error_message"> {
+function classifyNetworkError(
+  error: unknown
+): Pick<AvailabilityCheckExecutionResult, "status" | "error_kind" | "error_message"> {
   if (error instanceof AvailabilityCheckValidationError) {
     return {
       status: "security_blocked",
@@ -321,7 +326,7 @@ export async function executeAvailabilityCheck(
         redirect: "manual",
         headers: {
           "user-agent": "DebugBundle-AvailabilityCheck/1.0",
-          "accept": "*/*"
+          accept: "*/*"
         },
         signal: controller.signal
       });
@@ -333,15 +338,21 @@ export async function executeAvailabilityCheck(
         location !== null &&
         redirectCount < MAX_REDIRECTS
       ) {
+        // Cancel before validation: an unsafe redirect must not leave its body open.
+        response.body?.cancel().catch(() => undefined);
         const nextUrl = new URL(location, currentUrl);
         await assertSafeUrlTarget(nextUrl);
         currentUrl = nextUrl;
         redirectCount += 1;
-        response.body?.cancel().catch(() => undefined);
         continue;
       }
 
-      if (response.status >= 300 && response.status < 400 && location !== null && redirectCount >= MAX_REDIRECTS) {
+      if (
+        response.status >= 300 &&
+        response.status < 400 &&
+        location !== null &&
+        redirectCount >= MAX_REDIRECTS
+      ) {
         response.body?.cancel().catch(() => undefined);
         return {
           status: "redirect_blocked",

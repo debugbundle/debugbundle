@@ -424,6 +424,7 @@ export function createWeeklyReportTransport(input: {
           throw new Error(`weekly_report_slack_http_error_${response.status}`);
         }
       } finally {
+        controller.abort();
         clearTimeout(timeout);
       }
     }

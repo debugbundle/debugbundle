@@ -5,7 +5,7 @@ import type {
   FrequencySnapshotStore,
   IncidentFrequencyCounter,
   IncidentFrequencySnapshot,
-  RequestAnomalyCounter,
+  RequestAnomalyCounter
 } from "./types.js";
 
 const SPIKE_THRESHOLD = 3.0;
@@ -16,6 +16,7 @@ const WINDOW_24H_SECONDS = 24 * 60 * 60;
 const WINDOW_RETENTION_SECONDS = WINDOW_24H_SECONDS + WINDOW_1H_SECONDS;
 const MIN_BASELINE_1H_OCCURRENCES_FOR_SPIKE = 12;
 const DEFAULT_FREQUENCY_SNAPSHOT_INTERVAL_SECONDS = 60;
+const MAX_FREQUENCY_SNAPSHOT_CACHE_ENTRIES = 10_000;
 
 function toUnixSeconds(isoTimestamp: string): number {
   return Math.floor(new Date(isoTimestamp).getTime() / 1000);
@@ -67,9 +68,12 @@ async function recordFrequencyOccurrence(input: {
   };
 }
 
-export function createRedisIncidentFrequencyCounter(input: CreateRedisQueueClientInput): IncidentFrequencyCounter & { close(): Promise<void> } {
+export function createRedisIncidentFrequencyCounter(
+  input: CreateRedisQueueClientInput
+): IncidentFrequencyCounter & { close(): Promise<void> } {
   const redis = new Redis(input.redisUrl);
-  const snapshotIntervalSeconds = input.frequencySnapshotIntervalSeconds ?? DEFAULT_FREQUENCY_SNAPSHOT_INTERVAL_SECONDS;
+  const snapshotIntervalSeconds =
+    input.frequencySnapshotIntervalSeconds ?? DEFAULT_FREQUENCY_SNAPSHOT_INTERVAL_SECONDS;
   const lastSnapshotByIncidentId = new Map<string, number>();
   const snapshotQueryable = input.snapshotStore;
 
@@ -125,7 +129,8 @@ export function createRedisIncidentFrequencyCounter(input: CreateRedisQueueClien
       if (snapshotStore !== null) {
         const lastSnapshotAt = lastSnapshotByIncidentId.get(event.incident_id);
         const shouldPersistSnapshot =
-          lastSnapshotAt === undefined || occurredAt - lastSnapshotAt >= Math.max(snapshotIntervalSeconds, 1);
+          lastSnapshotAt === undefined ||
+          occurredAt - lastSnapshotAt >= Math.max(snapshotIntervalSeconds, 1);
 
         if (shouldPersistSnapshot) {
           await snapshotStore.persistIncidentFrequencySnapshot({
@@ -141,7 +146,17 @@ export function createRedisIncidentFrequencyCounter(input: CreateRedisQueueClien
             is_spiking: snapshot.is_spiking
           });
 
+          // This is only a write-throttling cache, not the counter authority.
+          // Eviction permits an extra timestamp-guarded DB write without losing
+          // frequency data or retaining every incident seen over process uptime.
+          lastSnapshotByIncidentId.delete(event.incident_id);
           lastSnapshotByIncidentId.set(event.incident_id, occurredAt);
+          if (lastSnapshotByIncidentId.size > MAX_FREQUENCY_SNAPSHOT_CACHE_ENTRIES) {
+            const oldestIncidentId = lastSnapshotByIncidentId.keys().next().value;
+            if (oldestIncidentId !== undefined) {
+              lastSnapshotByIncidentId.delete(oldestIncidentId);
+            }
+          }
         }
       }
 
@@ -149,12 +164,15 @@ export function createRedisIncidentFrequencyCounter(input: CreateRedisQueueClien
     },
 
     async close(): Promise<void> {
+      lastSnapshotByIncidentId.clear();
       await redis.quit();
     }
   };
 }
 
-export function createRedisRequestAnomalyCounter(input: CreateRedisQueueClientInput): RequestAnomalyCounter & { close(): Promise<void> } {
+export function createRedisRequestAnomalyCounter(
+  input: CreateRedisQueueClientInput
+): RequestAnomalyCounter & { close(): Promise<void> } {
   const redis = new Redis(input.redisUrl);
 
   return {
