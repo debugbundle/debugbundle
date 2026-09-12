@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -61,8 +62,9 @@ describe("OpenAI plugin package", () => {
     expect(manifest.interface.defaultPrompt.length).toBeLessThanOrEqual(3);
     expect(manifest.interface.defaultPrompt.every((prompt) => prompt.length <= 128)).toBe(true);
     expect(manifest.interface.composerIcon).toBe("./assets/icon-512.png");
-    expect(readFileSync(join(pluginRoot, "assets/icon-512.png"))).toEqual(
-      readFileSync(join(repoRoot, "site/public/icon-512.png"))
+    // Pin the approved icon without requiring private website source in public CI.
+    expect(createHash("sha256").update(readFileSync(join(pluginRoot, "assets/icon-512.png"))).digest("hex")).toBe(
+      "a05a29674a75a945b1a378c73c27322c9b1f14456329bec1fc1d986453696e30"
     );
     expect(manifest.apps).toBe("./.app.json");
     expect(manifest.mcpServers).toBeUndefined();
