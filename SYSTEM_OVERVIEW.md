@@ -7,6 +7,12 @@
 
 ## What Is DebugBundle?
 
+The public core, SDKs, shared libraries, CLI/MCP tools, and agent plugins use
+Apache-2.0. WordPress remains GPL-2.0-or-later. Website implementation and hosted
+operations live in private repositories; published docs, examples, and generated
+reference artifacts remain public and Apache-2.0. Maintainers pair handwritten
+site docs with related code changes; see `spec/licensing.md`.
+
 The core artifact is the **Debug Bundle** — a deterministic, versioned (`bundle_version: 1`), privacy-aware package of debugging context for a single incident. The bundle schema includes per-context block versioning (`version: 1` on each context block) to enable independent evolution. Context blocks include `error`, `request`, `response`, `logs`, `frontend`, `environment`, `deploy`, `runtime`, `git`, `dependencies`, `probe_data`, and `device` (browser-only: UA, browser, OS, device type, screen, viewport, touch, locale, connection, color scheme). The AnalyticsBundle foundation defines a second artifact family for opt-in browser product analytics: aggregate usage metrics, journeys, funnels, friction patterns, incident impact, and improvement recommendations without creating incidents or storing long-term raw analytics streams. Browser debug and analytics capture should share sanitized frontend primitives where practical, but debug bundles must never depend on analytics being enabled or healthy.
 
 ### Canonical Primitives
@@ -447,7 +453,7 @@ Event billing uses the event class model: Free meters only `incident_signal` eve
 
 ## License
 
-AGPLv3 — open-core model. Same code for cloud and self-host. Trademark protected.
+Apache 2.0 — open-core model. Same code for cloud and self-host. Trademark protected.
 
 This working tree is now the public core repo checkout. Local multi-repo convenience comes from a root-level `site/` clone, ignored `.local-repos/` and `.local-notes/` workspace areas, plus bootstrap-managed SDK clones under `sdks/`.
 

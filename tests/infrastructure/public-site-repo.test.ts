@@ -5,11 +5,11 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const repoRoot = process.cwd();
-const siteRoot = join(repoRoot, "site");
-const describePublicSiteRepo = existsSync(siteRoot) ? describe : describe.skip;
+const siteRoot = process.env["DEBUGBUNDLE_SITE_ROOT"] ?? join(repoRoot, "site");
+const describePublicSiteRepo = process.env["DEBUGBUNDLE_SITE_ROOT"] !== undefined || existsSync(join(siteRoot, "package.json")) ? describe : describe.skip;
 
-describePublicSiteRepo("public site repository export", () => {
-  it("is shaped for publishing as the dedicated debugbundle/site repository", () => {
+describePublicSiteRepo("private website repository", () => {
+  it("keeps website implementation private and published documentation reusable", () => {
     const expectedRootFiles = [
       "package.json",
       "pnpm-lock.yaml",
@@ -35,7 +35,7 @@ describePublicSiteRepo("public site repository export", () => {
 
     const manifest = JSON.parse(readFileSync(join(siteRoot, "release-manifest.json"), "utf8")) as {
       package: string;
-      publicRepository: string;
+      privateRepository: string;
       sourceDirectory: string;
       distributionRef: string;
       requiredReleaseFiles: string[];
@@ -43,7 +43,7 @@ describePublicSiteRepo("public site repository export", () => {
 
     expect(manifest).toEqual({
       package: "debugbundle/site",
-      publicRepository: "https://github.com/debugbundle/site",
+      privateRepository: "https://github.com/debugbundle/site",
       sourceDirectory: "site",
       distributionRef: "debugbundle/site",
       requiredReleaseFiles: expectedRootFiles.filter(
@@ -87,7 +87,7 @@ describePublicSiteRepo("public site repository export", () => {
     expect(tsconfig.compilerOptions?.["skipLibCheck"]).toBe(true);
     expect(tsconfig.compilerOptions?.["strict"]).toBe(true);
     expect(nextEnv).not.toContain("./.next/types/routes.d.ts");
-    expect(readme).toContain("https://github.com/debugbundle/site");
+    expect(readme).toContain("private `debugbundle/site` repository");
     expect(readme).toContain("vendored generated artifacts");
     expect(readme).toContain("headers-manifest.json");
     expect(readme).toContain("pnpm build");
@@ -115,7 +115,7 @@ describePublicSiteRepo("public site repository export", () => {
       "Canonical: https://debugbundle.com/.well-known/security.txt"
     );
     expect(readFileSync(securityTxtPath, "utf8")).toContain(
-      "Policy: https://github.com/debugbundle/site/security/policy"
+      "Policy: https://debugbundle.com/security/"
     );
 
     expect(ciWorkflow).toContain("release-manifest.json");
@@ -127,7 +127,7 @@ describePublicSiteRepo("public site repository export", () => {
     expect(releaseWorkflow).not.toContain("secrets.");
   });
 
-  it("rehearses the copy-to-public-repo cutover from the staged site root", () => {
+  it("rehearses an isolated checkout of the private site", () => {
     const rehearsalRoot = mkdtempSync(join(tmpdir(), "debugbundle-site-cutover-"));
 
     try {
@@ -138,6 +138,7 @@ describePublicSiteRepo("public site repository export", () => {
           entry === "out" ||
           entry === ".source" ||
           entry === ".git" ||
+          entry === ".product-contracts" ||
           entry === ".pnpm-store" ||
           entry === "tsconfig.tsbuildinfo" ||
           entry === ".DS_Store"
@@ -152,7 +153,7 @@ describePublicSiteRepo("public site repository export", () => {
         readFileSync(join(rehearsalRoot, "release-manifest.json"), "utf8")
       ) as {
         distributionRef: string;
-        publicRepository: string;
+        privateRepository: string;
         requiredReleaseFiles: string[];
       };
       const readme = readFileSync(join(rehearsalRoot, "README.md"), "utf8");
@@ -165,9 +166,9 @@ describePublicSiteRepo("public site repository export", () => {
         expect(existsSync(join(rehearsalRoot, fileName))).toBe(true);
       }
 
-      expect(manifest.publicRepository).toBe("https://github.com/debugbundle/site");
+      expect(manifest.privateRepository).toBe("https://github.com/debugbundle/site");
       expect(manifest.distributionRef).toBe("debugbundle/site");
-      expect(readme).toContain("copy the directory contents to that repo root");
+      expect(readme).toContain("deployed website and documentation remain public");
       expect(readme).toContain("vendored generated artifacts");
       expect(releaseWorkflow).toContain("gh release create");
       expect(releaseWorkflow).toContain("release-manifest.json");

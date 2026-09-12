@@ -455,12 +455,18 @@ async function buildErrorCodeReference(): Promise<ErrorCodeReference> {
 }
 
 export async function buildMachineReadableArtifacts(): Promise<MachineReadableArtifact[]> {
-  const [failureBundle, improvementBundle] = await Promise.all([
+  const [failureBundle, improvementBundle, license] = await Promise.all([
     readExampleBundle('bundle.failure.json'),
     readExampleBundle('bundle.improvement.json'),
+    readFile(join(workspaceRoot, 'LICENSE'), 'utf8'),
   ]);
 
   return [
+    {
+      routePath: '/licenses/apache-2.0.txt',
+      contentType: 'text/plain',
+      content: license,
+    },
     {
       routePath: '/llms.txt',
       contentType: 'text/plain',

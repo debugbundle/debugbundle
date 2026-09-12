@@ -124,10 +124,10 @@ For analytics questions, use direct aggregate tools first and generate an Analyt
 - Official MCP Registry name: `com.debugbundle/mcp`.
 - Official npm package: `@debugbundle/mcp`.
 - Source repository: https://github.com/debugbundle/debugbundle/tree/main/apps/mcp
-- License: AGPL-3.0-only.
+- License: Apache-2.0.
 - The server uses stdio transport and local process credentials. It does not include hidden hosted management auth.
 - Public examples must use placeholders only; never paste real member tokens, project tokens, webhook secrets, or customer configuration into marketplace listings.
 
 ## License
 
-AGPL-3.0-only.
+Apache-2.0.

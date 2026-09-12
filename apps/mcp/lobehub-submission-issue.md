@@ -19,7 +19,7 @@ Canonical public metadata:
 - npm package: `https://www.npmjs.com/package/@debugbundle/mcp`
 - Public install command: `npx @debugbundle/mcp`
 - Transport: `stdio`
-- License: `AGPL-3.0-only`
+- License: `Apache-2.0`
 
 What it does:
 

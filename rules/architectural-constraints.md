@@ -97,7 +97,7 @@ This repo is the public core product repo for DebugBundle. Cloud deployment and 
 - **Public CI** runs tests, lint, type-check, and build validation only. No deployment pipelines.
 - **Private CI** (in `debugbundle-cloud`) handles production deployment, container publishing, and infrastructure provisioning.
 - **Community contributions** target the public product repo. Changes should benefit both self-host and cloud editions.
-- **Enterprise extensions** may later live under `packages/ee-*` with the same AGPLv3 license or a separate license if needed.
+- **Licensing:** First-party public product code is Apache-2.0. The private `debugbundle/site` repository owns website implementation and branding; published docs, examples, and generated reference artifacts remain Apache-2.0. The product dashboard remains public. See `spec/licensing.md` for the WordPress exception and documentation ownership.
 
 ---
 

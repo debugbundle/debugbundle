@@ -7,14 +7,17 @@ import { MCP_TOOL_NAMES } from "../../apps/mcp/src/tool-catalog.ts";
 import { TIER_CAPABILITIES } from "../../packages/shared-types/src/index.ts";
 import { buildMachineReadableArtifacts } from "../../scripts/public-site-artifacts.ts";
 
-const siteRoot = join(process.cwd(), "site");
+const siteRoot = process.env["DEBUGBUNDLE_SITE_ROOT"] ?? join(process.cwd(), "site");
 const docsRoot = join(siteRoot, "content", "docs");
 
 function readDoc(relativePath: string): string {
   return readFileSync(join(docsRoot, relativePath), "utf8");
 }
 
-describe("public site AnalyticsBundle documentation", () => {
+// Private-site CI runs these integration checks with an explicit site checkout.
+const describeSiteDocs = process.env["DEBUGBUNDLE_SITE_ROOT"] !== undefined || existsSync(docsRoot) ? describe : describe.skip;
+
+describeSiteDocs("public site AnalyticsBundle documentation", () => {
   it("ships every AnalyticsBundle page required by the documentation contract", () => {
     const requiredPages = [
       "analytics/index.mdx",
@@ -165,7 +168,8 @@ describe("public site AnalyticsBundle documentation", () => {
     );
     const quickstart = readDoc("quickstart.mdx");
 
-    expect(homepage).toContain("Understand product usage");
+    expect(homepage).toContain("Use opt-in analytics to understand affected journeys and friction.");
+    expect(homepage).toContain("href: '/docs/analytics/'");
     expect(homepage).toContain("promptId: 'product-analytics-workflow'");
     expect(prompts).toContain("'product-analytics-workflow'");
     expect(prompts).toContain("https://debugbundle.com/docs/analytics");
@@ -252,6 +256,34 @@ describe("public site AnalyticsBundle documentation", () => {
     expect(artifactSource).toContain("'/docs/api/analytics/'");
   });
 
+  it("documents agent-native analytics workflows across MCP and generated skill guidance", () => {
+    const mcpOverview = readDoc("mcp/index.mdx");
+    const mcpWorkflows = readDoc("mcp/workflows.mdx");
+    const agentWorkflows = readDoc("agent-workflows.mdx");
+    const skillFile = readDoc("agent-workflows/skill-file.mdx");
+
+    expect(mcpOverview).toContain(`${MCP_TOOL_NAMES.length} tools`);
+    expect(mcpOverview).toContain("Product analytics");
+    expect(mcpWorkflows).toContain("Product Analytics Review");
+    expect(mcpWorkflows).toContain("get_usage_summary");
+    expect(mcpWorkflows).toContain("get_funnel_analysis");
+    expect(mcpWorkflows).toContain("generate_analytics_bundle");
+    expect(mcpWorkflows).toContain("not one bundle per visit");
+    expect(agentWorkflows).toContain("Product Analytics Review");
+    expect(agentWorkflows).toContain("direct aggregate reads first");
+    expect(skillFile).toContain("Product Analytics");
+    expect(skillFile).toContain("debugbundle analytics summary");
+    expect(skillFile).toContain("get_usage_summary");
+  });
+});
+
+describe("generated analytics discovery contract", () => {
+  it("publishes the complete current Apache license without private site source", async () => {
+    const artifacts = await buildMachineReadableArtifacts();
+    expect(artifacts.find((artifact) => artifact.routePath === "/licenses/apache-2.0.txt")?.content).toBe(
+      readFileSync(join(process.cwd(), "LICENSE"), "utf8")
+    );
+  });
   it("publishes capability-first positioning and AnalyticsBundle links in the generated agent discovery artifact", async () => {
     const artifacts = await buildMachineReadableArtifacts();
     const llms = artifacts.find((artifact) => artifact.routePath === "/llms.txt");
@@ -276,23 +308,4 @@ describe("public site AnalyticsBundle documentation", () => {
     );
   });
 
-  it("documents agent-native analytics workflows across MCP and generated skill guidance", () => {
-    const mcpOverview = readDoc("mcp/index.mdx");
-    const mcpWorkflows = readDoc("mcp/workflows.mdx");
-    const agentWorkflows = readDoc("agent-workflows.mdx");
-    const skillFile = readDoc("agent-workflows/skill-file.mdx");
-
-    expect(mcpOverview).toContain(`${MCP_TOOL_NAMES.length} tools`);
-    expect(mcpOverview).toContain("Product analytics");
-    expect(mcpWorkflows).toContain("Product Analytics Review");
-    expect(mcpWorkflows).toContain("get_usage_summary");
-    expect(mcpWorkflows).toContain("get_funnel_analysis");
-    expect(mcpWorkflows).toContain("generate_analytics_bundle");
-    expect(mcpWorkflows).toContain("not one bundle per visit");
-    expect(agentWorkflows).toContain("Product Analytics Review");
-    expect(agentWorkflows).toContain("direct aggregate reads first");
-    expect(skillFile).toContain("Product Analytics");
-    expect(skillFile).toContain("debugbundle analytics summary");
-    expect(skillFile).toContain("get_usage_summary");
-  });
 });

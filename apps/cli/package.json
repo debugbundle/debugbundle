@@ -1,9 +1,9 @@
 {
   "name": "@debugbundle/cli",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "private": false,
   "description": "Command-line interface for DebugBundle",
-  "license": "AGPL-3.0-only",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/debugbundle/debugbundle",
@@ -13,7 +13,13 @@
   "bugs": {
     "url": "https://github.com/debugbundle/debugbundle/issues"
   },
-  "keywords": ["debugbundle", "debugging", "ai-agent", "cli", "incident-response"],
+  "keywords": [
+    "debugbundle",
+    "debugging",
+    "ai-agent",
+    "cli",
+    "incident-response"
+  ],
   "engines": {
     "node": ">=22 <27"
   },
@@ -26,7 +32,12 @@
   "bin": {
     "debugbundle": "bin/debugbundle.js"
   },
-  "files": ["bin", "dist", "README.md", "LICENSE"],
+  "files": [
+    "bin",
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "dependencies": {
     "@node-rs/argon2": "^2.0.2"
   },

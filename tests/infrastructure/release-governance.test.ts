@@ -88,8 +88,8 @@ describe("release governance baseline", () => {
     expect(security).toContain("Initial triage");
     expect(security).toContain("Supported Versions");
 
-    expect(license).toContain("GNU AFFERO GENERAL PUBLIC LICENSE");
-    expect(license).toContain("Version 3, 19 November 2007");
+    expect(license).toContain("Apache License");
+    expect(license).toContain("Version 2.0, January 2004");
 
     expect(changelog).toContain("## [Unreleased]");
     expect(changelog).toMatch(/## \[0\.1\.0\] - \d{4}-\d{2}-\d{2}/);

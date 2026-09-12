@@ -198,7 +198,7 @@ User reports bug → Agent checks DebugBundle incidents
 ## 12. Open-Source & Self-Hosting
 
 - Open-core + hosted SaaS model
-- AGPLv3 license (prevents SaaS reselling)
+- Apache 2.0 license (prevents SaaS reselling)
 - Single product monorepo today, with public org repo structure to be finalized before public launch
 - Self-hosting supported via Docker Compose
 - Trademark protection (TRADEMARK.md)

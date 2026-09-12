@@ -93,16 +93,18 @@ describe('public core repository export', () => {
     });
 
     expect(packageJson.private).toBe(true);
-    expect(packageJson.license).toBe('AGPL-3.0-only');
+    expect(packageJson.license).toBe('Apache-2.0');
     expect(packageJson.packageManager).toBe('pnpm@11.3.0');
     expect(packageJson.repository?.url).toBe('git+https://github.com/debugbundle/debugbundle.git');
     expect(packageJson.bugs?.url).toBe('https://github.com/debugbundle/debugbundle/issues');
     expect(packageJson.homepage).toBe('https://github.com/debugbundle/debugbundle#readme');
 
     expect(readme).toContain('https://github.com/debugbundle/debugbundle');
-    expect(readme).toContain('AGPL-3.0-only');
+    expect(readme).toContain('Apache-2.0');
     expect(ciWorkflow).not.toContain('secrets.');
     expect(ciWorkflow).not.toContain('aws');
+    expect(ciWorkflow).not.toContain('repository: debugbundle/site');
+    expect(readFileSync(join(repoRoot, '.github/workflows/release.yml'), 'utf8')).not.toContain('repository: debugbundle/site');
 
     expect(packageJson.devDependencies?.['@debugbundle/public-site']).toBeUndefined();
     expect(packageJson.scripts?.['public-site:dev']).toBe('tsx scripts/public-site-artifacts.ts && pnpm --dir ./site dev');

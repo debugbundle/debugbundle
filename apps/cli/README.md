@@ -60,4 +60,4 @@ Full CLI documentation: https://debugbundle.com/docs/cli
 
 ## License
 
-AGPL-3.0-only
+Apache-2.0

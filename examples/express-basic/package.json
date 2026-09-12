@@ -8,5 +8,6 @@
   "dependencies": {
     "@debugbundle/sdk-node": "0.1.8",
     "express": "^5.1.0"
-  }
+  },
+  "license": "Apache-2.0"
 }

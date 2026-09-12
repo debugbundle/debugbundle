@@ -61,6 +61,6 @@ describe("mcp ClawHub skill", () => {
     expect(skill).not.toContain("coo" + "kies");
     expect(skill).not.toContain(".agents/skills/debugbundle/SKILL.md");
     expect(skill).not.toContain("after `debugbundle setup`, read that " + "local " + "skill");
-    expect(license).toContain("MIT No Attribution");
+    expect(license).toContain("Apache License");
   });
 });

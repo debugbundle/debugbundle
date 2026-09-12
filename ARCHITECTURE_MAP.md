@@ -7,6 +7,13 @@
 
 ## Module Dependency Graph
 
+Licensing boundary: public product modules, SDKs, shared libraries, tools, and
+plugins are Apache-2.0, with the WordPress GPL-2.0-or-later exception. Private
+`debugbundle/site` owns website implementation and branding; private
+`debugbundle-cloud` owns hosted operations. The product dashboard remains public.
+Published docs and generated references remain Apache-2.0; public builds require
+no private repository. See `spec/licensing.md` for paired documentation changes.
+
 ```
                     ┌──────────────┐
                     │ shared-types │  (Zod schemas, TS types, constants)

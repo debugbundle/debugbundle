@@ -1287,6 +1287,18 @@ If CLI says something is healthy and MCP says something different, that is a pro
 
 ---
 
+### AC-DOC-16: Private Site and Public Documentation
+
+- **Given** a public core or SDK change with documentation impact
+- **Then** its public README/contracts/examples are updated in the same change
+- **And** maintainers record and apply any paired private-site documentation update
+- **And** generated reference artifacts come from the release's explicit product commit
+- **And** public builds require no private-site access
+- **And** published docs, examples, and reference artifacts remain publicly readable and Apache-2.0
+- **And** public contributors can report corrections through public issues or PRs
+
+---
+
 ## 17. End-to-End Agent Workflow Acceptance
 
 ### AC-E2E-01: Full Agent Loop

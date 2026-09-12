@@ -5,7 +5,7 @@ Production debugging bundles for AI agents, with runtime error reporting and inc
 ![CI](https://img.shields.io/github/actions/workflow/status/debugbundle/debugbundle/ci.yml?branch=main&label=ci)
 ![CLI](https://img.shields.io/npm/v/%40debugbundle%2Fcli?label=cli&color=blue)
 ![MCP](https://img.shields.io/npm/v/%40debugbundle%2Fmcp?label=mcp&color=blue)
-![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue)
+![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 
 DebugBundle provides runtime error reporting, crash reporting, incident response, endpoint health checks, and product analytics for humans and AI agents. It captures runtime failures, groups them into incidents, and publishes deterministic debug bundles. Its monitoring scope is customer-facing runtime behavior and endpoint health, not generic infrastructure metrics.
 
@@ -418,4 +418,4 @@ See [SECURITY.md](SECURITY.md) for scope and response expectations.
 
 ## License
 
-DebugBundle is licensed under AGPL-3.0-only. See [LICENSE](LICENSE).
+DebugBundle is licensed under Apache-2.0. See [LICENSE](LICENSE).

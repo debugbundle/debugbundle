@@ -118,7 +118,7 @@ describe("mcp Claude Code plugin marketplace package", () => {
       description:
         "Production debugging bundles for AI agents. Connect Claude Code to DebugBundle incidents, deterministic bundles, reproductions, health checks, probes, alerts, webhooks, projects, and verification workflows.",
       version: mcpPackage.version,
-      license: "AGPL-3.0-only",
+      license: "Apache-2.0",
       keywords: expectedClaudeKeywords
     });
     expect(pluginManifest.userConfig?.["member_token"]).toMatchObject({

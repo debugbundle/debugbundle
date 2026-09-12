@@ -10,6 +10,7 @@ Describe the change and the user-visible or operator-visible impact.
 ## Docs
 
 - [ ] Updated docs, contracts, or trackers when behavior or interfaces changed
+- [ ] Recorded any paired site documentation commit or PR; public contributors may describe the required changes here
 - [ ] No doc updates were needed
 
 ## Breaking changes

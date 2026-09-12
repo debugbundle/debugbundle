@@ -50,4 +50,4 @@ Full DebugBundle MCP and agent workflow documentation:
 
 ## License
 
-AGPL-3.0-only.
+Apache-2.0.

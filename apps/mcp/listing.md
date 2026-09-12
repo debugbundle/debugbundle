@@ -18,7 +18,7 @@ Last verified: 2026-08-30
 - Registry metadata: `https://github.com/debugbundle/debugbundle/blob/main/apps/mcp/server.json`
 - Claude Code marketplace metadata: `https://github.com/debugbundle/debugbundle/blob/main/.claude-plugin/marketplace.json`
 - Claude Code plugin package: `https://github.com/debugbundle/debugbundle/tree/main/apps/mcp/claude-code/debugbundle`
-- License: `AGPL-3.0-only`
+- License: `Apache-2.0`
 - Security reporting: `https://github.com/debugbundle/debugbundle/security/policy`
 
 ## Publication Status

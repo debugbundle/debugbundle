@@ -33,7 +33,7 @@ describe("openclaw plugin package", () => {
     };
 
     expect(packageJson.name).toBe("@debugbundle/openclaw-plugin");
-    expect(packageJson.version).toBe("1.7.1");
+    expect(packageJson.version).toBe("1.8.0");
     expect(packageJson.private).toBe(false);
     expect(packageJson.description).toBe(
       "OpenClaw tools for runtime error reporting, incident response, live app monitoring, health checks, debug bundles, and product analytics."
@@ -47,7 +47,7 @@ describe("openclaw plugin package", () => {
       "health-checks",
       "product-analytics"
     ]));
-    expect(packageJson.license).toBe("AGPL-3.0-only");
+    expect(packageJson.license).toBe("Apache-2.0");
     expect(packageJson.repository).toEqual({
       type: "git",
       url: "https://github.com/debugbundle/debugbundle",
@@ -101,7 +101,7 @@ describe("openclaw plugin package", () => {
     expect(readme).toContain("debugbundle_get_usage_summary");
     expect(readme).toContain("debugbundle_get_funnel_analysis");
     expect(readme).toContain("debugbundle_generate_analytics_bundle");
-    expect(license).toContain("GNU AFFERO GENERAL PUBLIC LICENSE");
+    expect(license).toContain("Apache License");
     expect(manifest.id).toBe("debugbundle");
     expect(manifest.description).toBe(
       "Use DebugBundle for runtime error reporting, incident response, live app monitoring, health checks, debug bundles, and product analytics."

@@ -9,7 +9,7 @@
   },
   "homepage": "https://debugbundle.com/docs/mcp/openai-plugin",
   "repository": "https://github.com/debugbundle/debugbundle",
-  "license": "MIT-0",
+  "license": "Apache-2.0",
   "keywords": [
     "debugbundle",
     "production-debugging",

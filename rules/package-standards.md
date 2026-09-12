@@ -110,7 +110,7 @@ Every published `package.json` must include:
   "name": "@debugbundle/<package>",
   "version": "0.1.0",
   "description": "<one-line description>",
-  "license": "AGPL-3.0-only",
+  "license": "Apache-2.0",
   "repository": { "type": "git", "url": "https://github.com/debugbundle/debugbundle", "directory": "packages/<name>" },
   "homepage": "https://debugbundle.com/docs/<package>",
   "bugs": "https://github.com/debugbundle/debugbundle/issues",
@@ -128,7 +128,7 @@ Every published `package.json` must include:
 [project]
 name = "debugbundle-python"
 description = "DebugBundle SDK for Python — production debugging bundles for AI agents"
-license = "AGPL-3.0-only"
+license = "Apache-2.0"
 requires-python = ">=3.10"
 keywords = ["debugbundle", "debugging", "ai-agent", "error-tracking"]
 classifiers = [
@@ -150,7 +150,7 @@ Issues = "https://github.com/debugbundle/debugbundle-python/issues"
 {
   "name": "debugbundle/sdk-php",
   "description": "DebugBundle SDK for PHP — production debugging bundles for AI agents",
-  "license": "AGPL-3.0-only",
+  "license": "Apache-2.0",
   "type": "library",
   "require": { "php": ">=8.2" },
   "autoload": { "psr-4": { "DebugBundle\\": "src/" } },
@@ -170,7 +170,7 @@ Every published package must have a README.md containing:
 4. **Quick start** — minimal working example (< 10 lines)
 5. **Configuration** — all options with defaults
 6. **Link to full docs** — `https://debugbundle.com/docs/<package>`
-7. **License** — AGPL-3.0-only
+7. **License** — Apache-2.0
 
 ---
 
@@ -197,9 +197,9 @@ Every published package must have a README.md containing:
 
 ## 7. License
 
-- All packages: `AGPL-3.0-only`.
+- All first-party public packages: `Apache-2.0`, including shared libraries and portable agent skills. The WordPress plugin is the sole exception (`GPL-2.0-or-later`); bundled dependencies retain their compatible license notices.
 - Each package directory contains a `LICENSE` file (copy of root).
-- Enterprise extensions in `packages/ee-*` may use a separate commercial license (documented per-package).
+- Private website and hosted operations source is proprietary. Published docs, examples, and generated reference artifacts remain Apache-2.0. See `spec/licensing.md` for the complete boundary and documentation workflow.
 
 ---
 

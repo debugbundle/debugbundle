@@ -499,6 +499,8 @@ When a collaborator is removed from a project or leaves a shared project, DebugB
 
 **FR-DOC-11:** The static public site must preserve SEO-friendly behavior via standard Next.js metadata, sitemap, robots, canonical URLs, clean route structure, and one shared 1200×630 Open Graph/Twitter image across marketing, legal, `/docs`, and `/blog` pages. The authenticated app entry point must provide baseline description, canonical, icon, theme, and social-preview metadata while remaining explicitly `noindex, nofollow`.
 
+**FR-DOC-12:** The private website implementation must not restrict access to published documentation or require private-repository access for public product builds. Documentation, examples, and generated reference artifacts remain Apache-2.0. Maintainers must pair handwritten site documentation changes with related core/SDK changes; public contributors may supply documentation corrections through public issues and PRs. See `spec/licensing.md`.
+
 ### 1.18 Onboarding & Installation
 
 **FR-ONB-01:** Installation documentation must offer two paths: (a) **Agent-driven** — provide a ready-made prompt/instruction the user gives to their AI agent, which then runs `debugbundle setup` to detect runtimes, install SDKs, generate scaffold, create agent skill, and configure transport; (b) **Manual** — traditional step-by-step CLI commands. See `/spec/local-first-onboarding.md`.

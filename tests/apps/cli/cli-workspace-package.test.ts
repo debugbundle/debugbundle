@@ -34,7 +34,7 @@ describe("cli workspace package", () => {
     expect(packageJson.name).toBe("@debugbundle/cli");
     expect(packageJson.private).toBe(false);
     expect(packageJson.description).toBe("Command-line interface for DebugBundle");
-    expect(packageJson.license).toBe("AGPL-3.0-only");
+    expect(packageJson.license).toBe("Apache-2.0");
     expect(packageJson.repository).toEqual({
       type: "git",
       url: "https://github.com/debugbundle/debugbundle",
@@ -81,8 +81,8 @@ describe("cli workspace package", () => {
     expect(readme).toContain("# @debugbundle/cli");
     expect(readme).toContain("npm install -g @debugbundle/cli");
     expect(readme).toContain("https://debugbundle.com/docs/cli");
-    expect(license).toContain("GNU AFFERO GENERAL PUBLIC LICENSE");
-    expect(license).toContain("Version 3, 19 November 2007");
+    expect(license).toContain("Apache License");
+    expect(license).toContain("Version 2.0, January 2004");
   });
 
   it("ships release metadata and workflow automation for npm publication", () => {

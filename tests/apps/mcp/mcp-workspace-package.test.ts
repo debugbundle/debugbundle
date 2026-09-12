@@ -53,7 +53,7 @@ describe("mcp workspace package", () => {
     expect(packageJson.description).toBe(
       "MCP server for runtime error reporting, incident response, health checks, debug bundles, and product analytics"
     );
-    expect(packageJson.license).toBe("AGPL-3.0-only");
+    expect(packageJson.license).toBe("Apache-2.0");
     expect(packageJson.repository).toEqual({
       type: "git",
       url: "https://github.com/debugbundle/debugbundle",
@@ -162,8 +162,8 @@ describe("mcp workspace package", () => {
     expect(listing).toContain("AnalyticsBundle");
     expect(listing).toContain("Runtime error reporting, incident response, debug bundles, and product analytics for AI agents.");
     expect(listing).not.toContain("Production debugging and product analytics for AI agents.");
-    expect(license).toContain("GNU AFFERO GENERAL PUBLIC LICENSE");
-    expect(license).toContain("Version 3, 19 November 2007");
+    expect(license).toContain("Apache License");
+    expect(license).toContain("Version 2.0, January 2004");
   });
 
   it("ships release metadata and workflow automation for npm publication", () => {

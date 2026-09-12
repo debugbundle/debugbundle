@@ -12,7 +12,7 @@ The public repository must contain these root-level files:
 | File                                         | Purpose                                                 | Status   |
 | -------------------------------------------- | ------------------------------------------------------- | -------- |
 | `README.md`                                  | Project overview, quick start, badges, links            | Required |
-| `LICENSE`                                    | AGPL-3.0-only full text                                 | Required |
+| `LICENSE`                                    | Apache-2.0 full text                                 | Required |
 | `CONTRIBUTING.md`                            | How to contribute (fork, branch, test, PR)              | Required |
 | `CODE_OF_CONDUCT.md`                         | Community conduct standards (Contributor Covenant v2.1) | Required |
 | `SECURITY.md`                                | Vulnerability disclosure process                        | Required |
@@ -255,7 +255,7 @@ The root `README.md` must contain:
 6. **Documentation links** — Docs site, API reference, CLI reference
 7. **Self-hosting** — Link to `deploy/docker-compose.yml` and self-host guide
 8. **Contributing** — Link to CONTRIBUTING.md
-9. **License** — AGPL-3.0-only with brief explanation
+9. **License** — Apache-2.0 with brief explanation
 
 ---
 

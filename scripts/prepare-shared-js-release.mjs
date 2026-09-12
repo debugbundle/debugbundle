@@ -5,6 +5,11 @@ import process from "node:process";
 const repoRoot = process.cwd();
 const outputRoot = path.resolve(process.argv[2] ?? ".tmp/shared-js-publish");
 
+const licenseText = readFileSync(path.join(repoRoot, "LICENSE"), "utf8");
+if (!licenseText.includes("Apache License") || !licenseText.includes("Version 2.0, January 2004") || !licenseText.includes("END OF TERMS AND CONDITIONS")) {
+  throw new Error("missing_complete_apache_license");
+}
+
 const packageDefinitions = [
   {
     sourceDir: "packages/shared-types",
@@ -52,6 +57,9 @@ mkdirSync(outputRoot, { recursive: true });
 
 for (const definition of packageDefinitions) {
   const sourcePackageJson = readJson(path.join(definition.sourceDir, "package.json"));
+  if (sourcePackageJson.license !== "Apache-2.0") {
+    throw new Error(`unexpected_package_license:${sourcePackageJson.name}`);
+  }
   const distAbsoluteDir = path.join(repoRoot, definition.sourceDir, "dist");
 
   if (!existsSync(distAbsoluteDir)) {
@@ -62,7 +70,7 @@ for (const definition of packageDefinitions) {
   mkdirSync(outputDir, { recursive: true });
   cpSync(distAbsoluteDir, path.join(outputDir, "dist"), { recursive: true });
   copyOptionalFile(definition.readmePath, outputDir, "README.md");
-  copyOptionalFile("LICENSE", outputDir, "LICENSE");
+  writeFileSync(path.join(outputDir, "LICENSE"), licenseText);
 
   const publishPackageJson = {
     name: sourcePackageJson.name,

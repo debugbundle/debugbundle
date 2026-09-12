@@ -11,14 +11,14 @@
       "name": "debugbundle",
       "displayName": "DebugBundle",
       "description": "Production debugging bundles for AI agents. Connect Claude Code to DebugBundle incidents, deterministic bundles, reproductions, health checks, probes, alerts, webhooks, projects, and verification workflows.",
-      "version": "1.7.0",
+      "version": "1.8.0",
       "author": {
         "name": "DebugBundle",
         "url": "https://debugbundle.com"
       },
       "homepage": "https://debugbundle.com/docs/mcp",
       "repository": "https://github.com/debugbundle/debugbundle",
-      "license": "AGPL-3.0-only",
+      "license": "Apache-2.0",
       "keywords": [
         "debugbundle",
         "mcp",

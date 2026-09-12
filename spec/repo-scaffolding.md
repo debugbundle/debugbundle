@@ -12,7 +12,7 @@
 ├── AGENTS.md                          # Agent execution contract
 ├── SYSTEM_OVERVIEW.md                 # Context compression — system overview
 ├── ARCHITECTURE_MAP.md                # Context compression — module boundaries
-├── LICENSE                            # AGPLv3
+├── LICENSE                            # Apache 2.0
 ├── TRADEMARK.md                       # Trademark usage guidelines
 ├── README.md                          # Project overview + quickstart
 ├── package.json                       # Root workspace config

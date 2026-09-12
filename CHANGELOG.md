@@ -6,6 +6,14 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-09-12
+
+### Changed
+
+- License the public core, shared libraries, CLI/MCP tools, agent skills, and plugins under Apache-2.0.
+- Keep website implementation private while preserving public Apache-2.0 documentation, examples, and generated references.
+- Document maintainer ownership of paired code and site documentation changes.
+
 ## [1.7.4] - 2026-09-10
 
 ### Added

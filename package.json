@@ -1,6 +1,6 @@
 {
   "name": "debugbundle",
-  "version": "1.7.4",
+  "version": "1.8.0",
   "private": true,
   "type": "module",
   "description": "DebugBundle monorepo",
@@ -98,7 +98,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "AGPL-3.0-only",
+  "license": "Apache-2.0",
   "bugs": {
     "url": "https://github.com/debugbundle/debugbundle/issues"
   },

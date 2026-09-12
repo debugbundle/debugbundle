@@ -284,7 +284,7 @@ function validateManifest(failures) {
   ) {
     failures.push("plugin_manifest:publisher_drift");
   }
-  if (manifest.license !== "MIT-0") failures.push("plugin_manifest:license_drift");
+  if (manifest.license !== "Apache-2.0") failures.push("plugin_manifest:license_drift");
   if (manifest.skills !== "./skills/") failures.push("plugin_manifest:skills_path_drift");
   if (manifest.mcpServers !== undefined) failures.push("plugin_manifest:mcp_server_forbidden");
   if (manifest.hooks !== undefined) failures.push("plugin_manifest:hooks_forbidden");
