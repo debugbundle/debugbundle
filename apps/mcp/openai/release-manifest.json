@@ -3,7 +3,7 @@
   "plugin_version": "1.0.0",
   "evidence_state": "local_connection_ready",
   "source": {
-    "commit": "70d0b738daed8de1308d096324f4702feda72c5a",
+    "commit": "ca96b7877ed99b3da7fbd0b5dc6343eef83d3600",
     "tree_clean": true,
     "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
@@ -16,12 +16,12 @@
   "registered_connection_id": "plugin_asdk_app_6a99ba6c1e7881919091a592738692c6",
   "package": {
     "archive_file": "debugbundle-openai-plugin-1.0.0.zip",
-    "archive_sha256": "a3a0c49291e322c1021ea71a617342efd760778d3d6798465878674bd75ab142",
-    "archive_bytes": 39477,
+    "archive_sha256": "a5b984b02f72887bdc1000b8c6698d231edc2fb76917dc98b9caa69f858fcbdb",
+    "archive_bytes": 49955,
     "files": {
       ".app.json": "137807180af48e9e6f6df967ebcb23925ed87fc051d219d153a1bc604c174f31",
-      ".codex-plugin/plugin.json": "051710910809fa38924f91c2c3220bf214e35cca55d455850cd1ea33c96e3751",
-      "LICENSE": "173fbd73cffbb3afaf6f4036f314df050dff382bf6965b0d35d06544c8b08d3d",
+      ".codex-plugin/plugin.json": "dcecda2c8257e08110a3ee7a3eb89fe9af1d41ddb5c9e5f8efe63d07f425b831",
+      "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
       "README.md": "05b8efe9c870f5ce85ef76f19a394569aad0b772e6b4577bf0d124d7fbc9bebf",
       "assets/icon-512.png": "a05a29674a75a945b1a378c73c27322c9b1f14456329bec1fc1d986453696e30",
       "skills/debugbundle/SKILL.md": "795a0915bd7a27720c8f4e710fc29c79784985a149b18875896fef9b4ffcc607",
