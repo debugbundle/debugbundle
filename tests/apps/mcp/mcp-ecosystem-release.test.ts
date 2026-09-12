@@ -163,9 +163,9 @@ describe("mcp ecosystem release pipeline", () => {
       discoveryTargets?: Array<{ key?: string; type?: string }>;
     };
 
-    expect(plan.version).toBe("1.7.0");
+    expect(plan.version).toBe("1.8.0");
     expect(plan.packageName).toBe("@debugbundle/mcp");
-    expect(plan.mcpb?.bundlePath).toContain(".tmp/mcp-ecosystem/1.7.0/debugbundle-mcp.mcpb");
+    expect(plan.mcpb?.bundlePath).toContain(".tmp/mcp-ecosystem/1.8.0/debugbundle-mcp.mcpb");
     expect(plan.publishTargets).toEqual([
       expect.objectContaining({ key: "officialRegistry", type: "push" }),
       expect.objectContaining({ key: "smithery", type: "push" }),

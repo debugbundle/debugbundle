@@ -205,7 +205,7 @@ license-prepare-shared:
 	$(NODE_RUN) 'CI=1 corepack pnpm --dir packages/shared-types exec tsc -p tsconfig.build.json && corepack pnpm --dir packages/redaction exec tsc -p tsconfig.build.json && node scripts/prepare-shared-js-release.mjs /tmp/apache-shared-js-publish && mkdir -p .tmp/apache-packages && npm pack /tmp/apache-shared-js-publish/shared-types --pack-destination .tmp/apache-packages && npm pack /tmp/apache-shared-js-publish/redaction --pack-destination .tmp/apache-packages'
 
 license-check:
-	$(NODE_RUN) 'corepack pnpm vitest run tests/infrastructure/release-governance.test.ts tests/infrastructure/public-core-repo.test.ts tests/apps/cli/cli-workspace-package.test.ts tests/apps/mcp/mcp-workspace-package.test.ts tests/apps/mcp/mcp-claude-code-plugin.test.ts tests/apps/mcp/mcp-clawhub-skill.test.ts tests/apps/openclaw-plugin/openclaw-plugin-package.test.ts'
+	$(NODE_RUN) 'corepack pnpm vitest run tests/infrastructure/release-governance.test.ts tests/infrastructure/public-core-repo.test.ts tests/apps/cli/cli-workspace-package.test.ts tests/apps/mcp/mcp-workspace-package.test.ts tests/apps/mcp/mcp-claude-code-plugin.test.ts tests/apps/mcp/mcp-clawhub-skill.test.ts tests/apps/mcp/mcp-ecosystem-release.test.ts tests/apps/openclaw-plugin/openclaw-plugin-package.test.ts'
 
 .PHONY: release-mcp-ecosystem-plan
 release-mcp-ecosystem-plan:
@@ -393,3 +393,7 @@ shell:
 .PHONY: license-docs-check
 license-docs-check:
 	$(NODE_RUN) 'corepack pnpm vitest run tests/contracts/analytics-public-docs.test.ts tests/infrastructure/public-site-repo.test.ts'
+
+.PHONY: license-site-check
+license-site-check:
+	$(NODE_RUN) 'corepack enable && corepack pnpm public-site:artifacts && corepack pnpm --dir site test && corepack pnpm --dir site build && corepack pnpm --dir site typecheck'
