@@ -204,6 +204,10 @@ build:
 npm-publishing-check:
 	$(NODE_RUN) 'corepack pnpm vitest run tests/infrastructure/js-sdk-release-workflow.test.ts'
 
+.PHONY: format-lockfile
+format-lockfile:
+	$(NODE_RUN) 'corepack pnpm exec prettier --write pnpm-lock.yaml'
+
 license-prepare-shared:
 	$(NODE_RUN) 'CI=1 corepack pnpm --dir packages/shared-types exec tsc -p tsconfig.build.json && corepack pnpm --dir packages/redaction exec tsc -p tsconfig.build.json && node scripts/prepare-shared-js-release.mjs /tmp/apache-shared-js-publish && mkdir -p .tmp/apache-packages && npm pack /tmp/apache-shared-js-publish/shared-types --pack-destination .tmp/apache-packages && npm pack /tmp/apache-shared-js-publish/redaction --pack-destination .tmp/apache-packages'
 
