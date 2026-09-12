@@ -4,19 +4,19 @@ Owner authorization: 2026-09-12, public first-party releases use Apache-2.0,
 website implementation becomes private, and WordPress retains GPL-2.0-or-later.
 See `spec/licensing.md`. Historical registry artifacts and release tags remain intact.
 
-The approved minor-version release train is in progress. The site repository is
-now private and its deployment checkout is verified. No hosted deployment or
-core 1.8.0 release has occurred yet.
+The approved package release train and hosted rollout have shipped. Core 1.8.0
+and site 1.3.0 are live. The site repository is private. The remaining owner
+decisions and external discovery follow-ups below are not marked complete.
 
 ## Validation
 
 - Licensing assertions initially reproduced 10 failures in 23 tests.
 - Expanded licensing/package/MCP checks: 31 passed; documentation checks: 16 passed.
 - Trusted publishing workflow/metadata checks: 6 passed; staged shared archives independently verify matching repository metadata and full Apache text. Licensing regression checks: 31 passed after OIDC preparation.
-- Root lint and typecheck passed. Full public-core CI passed in run `34710232312`.
+- Root lint and typecheck passed. Full public-core CI passed in run `34724625082`; canonical release gates passed in `34725140794`.
 - Site behavior: 21 tests passed; production build and typecheck passed.
 - OpenAI candidate: 16 local checks passed and hashes regenerated; portal untouched.
-- GitHub recognizes Apache-2.0 on all public core, SDK, Action and organization-profile repositories. WordPress retains its GPL exception. Site source is now private; deployed-site content refresh remains pending.
+- GitHub recognizes Apache-2.0 on all public core, SDK, Action and organization-profile repositories. WordPress retains its GPL exception. Site source is private; deployed Apache documentation and license text are verified.
 - Pre-existing untracked Android `*/bin/` directories are preserved.
 
 ## Publication ledger
@@ -33,21 +33,21 @@ core 1.8.0 release has occurred yet.
 | Java package family | 1.4.0 | Published. Central diagnostic `34717533993` confirms `PUBLISHED`; the original release rerun `34709278570` passed, skipping upload and checking published installs. All eight code artifacts carry the full license and the parent POM declares Apache. Published source is `44fd7a3`; GitHub tag `4334aad` adds only the read-only Central diagnostic workflow. Future tags are pinned to the tested workflow commit. |
 | Android | 1.3.1 correction | Published; all nine Central artifacts independently verified for full licenses. Release 34721136022 rerun passed published registry checks without re-upload. GitHub v1.3.1 points to 6994542. Historical 1.3.0 remains intact. |
 | Swift | 1.3.0 | Published; Apache spec and installed license verified. Published installation and event-delivery checks passed locally and in `34710663393`; GitHub v1.3.0 release published. Verification now refreshes the CocoaPods index and uses the same runner tooling as the staged release. |
-| React Native | 1.3.0 | Native prerequisites published and OIDC configured. Source 68e7710 uses Android 1.3.1 and passes 65 local tests, coverage, typecheck and packed smoke. Release 34723866051 is running the full compatibility and published-native matrix before npm publication. |
+| React Native | 1.3.0 | Published through OIDC from 68e7710; full compatibility, native runtime, published Android/Swift application builds and registry smoke passed in 34723866051. Downloaded npm archive verifies full Apache text and Android 1.3.1. npm page and GitHub v1.3.0 verified. |
 | WordPress | 1.4.2 | Published to GitHub and WordPress.org from 9c43fc5. Releases 34722824838 and 34722944393 passed. WordPress.org API reports 1.4.2; downloaded ZIP independently verifies Browser 1.7.0, PHP 1.4.0 full Apache license, and GPL plugin metadata. |
 | CLI and npm MCP | 1.8.0 | Both published through OIDC; releases34722330720 and34722335426 passed with registry smokes. Both tarballs independently verified for full Apache licenses. |
 | OpenClaw plugin | 1.8.0 | Published and verified as latest 1.8.0 from 6c579f1; complete Apache LICENSE hash verified in the public archive file record. Moderation is clean. Initial provider memory-limit failure resolved on retry. |
 | MCP Registry, Smithery, ClawHub | New package versions | Official Registry 1.8.0 published and verified after renewal using the existing local DNS key. Smithery MCPB release 7811bb75-4e55-42e9-a187-d134786436ab reports SUCCESS; corrected Apache listing metadata is publicly indexed. Smithery skill is indexed. ClawHub portable skill 1.8.0 exists with clean moderation, but discovery ranks remain partial and its mandatory MIT-0 distribution license needs an explicit owner exception or removal decision. |
 | Claude marketplace | 1.8.0 | Catalog/plugin/install pins advanced and pushed in 95265e6 after npm MCP 1.8.0 registry smoke passed. |
-| Core GitHub release | 1.8.0 | Dogfooding updates pushed in 95265e6; full core CI 34722940414 passed. Canonical release waits for remaining release-train gates. |
-| Public site | 1.3.0 | Private source13c4161 pushed; CI34722589798 passed. Public Apache docs, generated license, Browser1.7.0 dependency,21 site tests/build/typecheck verified. Hosted deployment still pending. |
+| Core GitHub release | 1.8.0 | Published v1.8.0 at 81ddbef1244063ae3634c19093bf43bb04e21284 in 34725140794 after full CI 34724625082. Hosted rollout 34725269542 passed. Running API and worker report 1.8.0 and Apache-2.0; full license hashes verified. |
+| Public site | 1.3.0 | Private source 13c4161; CI 34722589798 and v1.3.0 release 34724752761 passed. Hosted rollout 34725269542 passed. Live docs/licensing/quickstart return200 after canonical redirects, no old-license references on checked pages; public Apache text hash matches source and reference data reports core1.8.0. |
 | GitHub Action | 1.1.0 | CI and release `34709497001` passed; floating `v1` points to the same source. |
 | GitHub organization profile | Apache-2.0 | License and explanation pushed. |
 | OpenAI plugin | Independent 1.0.0 candidate | Apache source and local hashes refreshed. No portal draft, submission or publication action. |
 
 ## Required account steps
 
-1. All seven npm trusted publishers are saved and verified in Edge, each scoped to the exact repository/workflow and direct npm publishing. Five OIDC workflows are pushed; six npm packages have successful token-free releases and registry smokes.
+1. All seven npm trusted publishers are saved and verified in Edge, each scoped to the exact repository/workflow and direct npm publishing. Five OIDC workflows are pushed; all seven npm packages have successful token-free releases and registry smokes.
 2. Automatic approval review rejected deleting the obsolete `NPM_TOKEN` secret; explicit approval requested for the three named repositories, each only after its OIDC release passes. No secrets deleted yet.
 3. Official MCP Registry session renewed using the existing local DNS signing key. Its verified location is saved in private operator memory; no key material is committed.
 4. ClawHub requires MIT-0 for its portable skill listing. Owner decision is pending: retain that platform-specific exception or remove the listing. No exception is silently added to the Apache policy.
@@ -72,4 +72,16 @@ CLI/MCP and ecosystem targets, then dogfooding manifests, canonical core release
 and hosted/site deployment with immutable references. Verify registry metadata,
 embedded licenses, clean installs, GitHub metadata and deployed HTML separately.
 
-Six npm releases, all backend/native prerequisites, WordPress.org, the official MCP Registry, and OpenClaw are verified. React Native release checks are running. Site source is committed and verified; hosted rollout waits for release completion. ClawHub licensing/discovery and old-secret deletion remain open as described above.
+All seven npm releases, backend/native SDKs, WordPress.org, the official MCP
+Registry, Smithery MCP/skill, OpenClaw, core1.8.0, and private-site1.3.0 are
+published and verified. Hosted run34725269542 deployed product81ddbef and
+site13c4161 with MCP gate preserved. API/MCP readiness, unauthenticated MCP401
+challenge, OAuth discovery, exact SPA build marker, and public Apache docs pass.
+The active runtime is20260912232654-6c7dd6ec7381; previous stable
+20260910205503-ab844e56ce15 is retained. Both containers are healthy with zero
+restarts; complete Apache license hashes match and the host has46GB free.
+
+ClawHub licensing/discovery and old-secret deletion remain open as described
+above. Glama's public README shows Apache; its unauthenticated API now returns401.
+PulseMCP and MCP.so listings are present; LobeHub remains a manual discovery
+follow-up. These pull-based directory checks are distinct from registry releases.
