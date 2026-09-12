@@ -29,7 +29,9 @@ to the deployed website, documentation, examples, or machine-readable artifacts.
 
 The product dashboard and self-host deployment assets remain in the public core.
 Public builds and tests must not require access to either private repository.
-Hosted workflows use a short-lived GitHub App token scoped to the site with read-only contents access.
+Hosted workflows require a separate credential limited to reading the site
+repository; the owner selected a fine-grained personal access token. Public
+product builds never depend on that credential.
 
 ## Documentation changes
 
