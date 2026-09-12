@@ -15,7 +15,9 @@ import {
   findSmitheryQualifiedEntry,
   findSmitheryQualifiedSkill,
   matchesGlamaServer,
-  verifyClawHubDiscovery
+  verifyClawHubDiscovery,
+  smitheryStdioDirectoryUrl,
+  verifyClawHubPlugin
 } from "./mcp-ecosystem-verification.mjs";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
@@ -703,7 +705,7 @@ async function verify(context) {
           `https://api.smithery.ai/servers/${encodeURIComponent(target.namespace)}/${encodeURIComponent(target.slug)}`
         );
         const namespacePayload = await fetchJson(
-          `https://api.smithery.ai/servers?namespace=${encodeURIComponent(target.namespace)}`
+          smitheryStdioDirectoryUrl(target.namespace)
         );
         const namespaceEntry = findSmitheryQualifiedEntry(namespacePayload, qualifiedName);
         const latestConnection = Array.isArray(exactServer?.connections) ? exactServer.connections.at(0) : undefined;
@@ -785,25 +787,9 @@ async function verify(context) {
       }
 
       if (targetKey === "clawhubPlugin") {
-        const result = runCommand("npx", [
-          "-y",
-          `${target.cliPackage}@${target.cliVersion}`,
-          "package",
-          "inspect",
-          target.packageName,
-          "--files",
-          "--json"
-        ]);
-        const payload = parseJsonFromCommandOutput(result.stdout);
-        const packageRecord = payload.package ?? payload;
-        const latestVersion = payload.latestVersion ?? payload.version;
-        report.verify.clawhubPlugin = {
-          status: packageRecord === undefined ? "missing" : "found",
-          packageName: target.packageName,
-          pluginId: target.pluginId,
-          latestVersion: latestVersion?.version ?? null,
-          files: Array.isArray(payload.version?.files) ? payload.version.files.map((file) => file.path) : null
-        };
+        report.verify.clawhubPlugin = verifyClawHubPlugin(
+          target, context.version, runCommand, parseJsonFromCommandOutput
+        );
         continue;
       }
 

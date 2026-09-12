@@ -171,3 +171,28 @@ export function collectVerificationFailures(context, report) {
 
   return failures;
 }
+
+export function smitheryStdioDirectoryUrl(namespace) {
+  // This release publishes MCPB/stdio; the directory otherwise defaults to remote servers.
+  return `https://api.smithery.ai/servers?namespace=${encodeURIComponent(namespace)}&remote=false`;
+}
+
+export function verifyClawHubPluginRecord(payload, target, expectedVersion) {
+  const packageRecord = payload.package;
+  const latestVersion = payload.latestVersion?.version ?? payload.version?.version ?? packageRecord?.latestVersion ?? null;
+  return {
+    status: packageRecord === undefined ? "missing" : latestVersion === expectedVersion ? "found" : "partial",
+    packageName: target.packageName,
+    pluginId: target.pluginId,
+    latestVersion,
+    files: Array.isArray(payload.version?.files) ? payload.version.files.map((file) => file.path) : null
+  };
+}
+
+export function verifyClawHubPlugin(target, expectedVersion, runCommand, parseJson) {
+  const result = runCommand("npx", [
+    "-y", `${target.cliPackage}@${target.cliVersion}`,
+    "package", "inspect", target.packageName, "--files", "--json"
+  ]);
+  return verifyClawHubPluginRecord(parseJson(result.stdout), target, expectedVersion);
+}

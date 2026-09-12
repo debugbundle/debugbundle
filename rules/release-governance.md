@@ -87,8 +87,8 @@ After the GitHub-managed npm publish for `@debugbundle/mcp` succeeds, maintainer
 3. Publishing the MCPB bundle to Smithery under the configured namespace/slug.
 4. Publishing the GitHub-backed portable shared skill from `apps/mcp/clawhub/debugbundle/` to the Smithery Skills registry.
 5. Publishing the portable shared skill from `apps/mcp/clawhub/debugbundle/` to ClawHub/OpenClaw.
-6. Building, validating, and publishing the OpenClaw plugin package from `apps/openclaw-plugin/` to ClawHub.
-7. Verifying that Smithery publication is publicly indexed, not merely addressable by an exact object URL. Exact-record existence without public registry visibility is a failed release state.
+6. Building, validating, and publishing the OpenClaw plugin package from `apps/openclaw-plugin/` to ClawHub. Verification must match the expected version; an older latest package is a failed release state.
+7. Verifying that Smithery publication is publicly indexed, not merely addressable by an exact object URL. For MCPB releases, query the public directory with `remote=false` so stdio records are included. Exact-record existence without public registry visibility is a failed release state.
 8. Verifying ClawHub discovery against the bounded capability-first query/rank checks in `apps/mcp/ecosystem-release-manifest.json`, with limited retries for index propagation. Exact-slug lookup alone is not sufficient.
 9. Emitting the follow-up discovery checklist for pull-based directories such as Glama and LobeHub, which should be treated as verification surfaces unless they later document a first-party publish API.
 

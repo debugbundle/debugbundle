@@ -404,3 +404,7 @@ license-docs-check:
 .PHONY: license-site-check
 license-site-check:
 	$(NODE_RUN) 'corepack enable && corepack pnpm public-site:artifacts && corepack pnpm --dir site test && corepack pnpm --dir site build && corepack pnpm --dir site typecheck'
+
+.PHONY: mcp-ecosystem-check
+mcp-ecosystem-check:
+	$(NODE_RUN) 'corepack pnpm vitest run tests/apps/mcp/mcp-ecosystem-release.test.ts'

@@ -98,11 +98,30 @@ describe("mcp ecosystem release pipeline", () => {
     expect(releaseSources).toContain("maxRank");
     expect(script).toContain("/skills/");
     expect(script).toContain("parseJsonFromCommandOutput");
-    expect(script).toContain('"package",');
+    expect(releaseSources).toContain('"package",');
     expect(script).toContain('"plugin:validate"');
     expect(script).toContain('`${target.cliPackage}@${target.cliVersion}`');
     expect(script).toContain("manual_check_required");
     expect(script).toContain("verification_failed:");
+  });
+
+  it("checks the stdio directory and rejects stale OpenClaw releases", async () => {
+    const helperUrl = pathToFileURL(join(repoRoot, "scripts", "mcp-ecosystem-verification.mjs")).href;
+    const { smitheryStdioDirectoryUrl, verifyClawHubPluginRecord } = await import(helperUrl) as {
+      smitheryStdioDirectoryUrl: (namespace: string) => string;
+      verifyClawHubPluginRecord: (
+        payload: unknown, target: { packageName: string; pluginId: string }, expectedVersion: string
+      ) => { status: string };
+    };
+    const url = new URL(smitheryStdioDirectoryUrl("debugbundle"));
+    expect(url.searchParams.get("namespace")).toBe("debugbundle");
+    expect(url.searchParams.get("remote")).toBe("false");
+    const target = { packageName: "@debugbundle/openclaw-plugin", pluginId: "debugbundle" };
+    const payload = { package: { name: target.packageName }, version: { version: "1.7.1", files: [] } };
+    expect(verifyClawHubPluginRecord(payload, target, "1.8.0").status).toBe("partial");
+    payload.version.version = "1.8.0";
+    expect(verifyClawHubPluginRecord(payload, target, "1.8.0").status).toBe("found");
+    expect(verifyClawHubPluginRecord({}, target, "1.8.0").status).toBe("missing");
   });
 
   it("ranks ClawHub search results and retries bounded discovery checks", async () => {
