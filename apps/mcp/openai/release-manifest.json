@@ -3,7 +3,7 @@
   "plugin_version": "1.0.0",
   "evidence_state": "local_connection_ready",
   "source": {
-    "commit": "b507f652e09fe1e8d2fe0e1dd98597b6984ce4fe",
+    "commit": "95265e6ecf8a2a3d30c02435e6dbdfe153f4afc8",
     "tree_clean": true,
     "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
