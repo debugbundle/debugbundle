@@ -142,7 +142,8 @@ The V1 release train must publish dependency roots before dependent wrappers. Do
 4. Publish React Native only after the Android Maven package family and Swift/CocoaPods package it delegates to are published and smoke-tested.
 5. Publish WordPress only after the PHP SDK and browser SDK versions it requires are published and smoke-tested; rebuild the bundled browser asset from those exact published versions before assembling the plugin ZIP.
 6. Bump internal dogfooding manifests only after their referenced registry versions exist, then run hosted/source-deploy validation.
-7. Create the canonical core GitHub release after package-specific release workflows and registry smoke checks are green.
+7. Update the Claude Code catalog, plugin manifest, and pinned MCP install command only after that npm MCP version is published and its registry smoke passes. Source package release candidates must not make marketplace installs resolve an unpublished version.
+8. Create the canonical core GitHub release after package-specific release workflows and registry smoke checks are green.
 
 ### Internal Dogfooding Version Touchpoints
 
