@@ -5,15 +5,28 @@ The owner approved this policy on 2026-09-12.
 ## Public product
 
 All first-party public product code, SDKs, shared libraries, CLI/MCP tools,
-portable agent skills, plugins, GitHub Action, examples, schemas, and generated
+plugins, GitHub Action, examples, schemas, and generated
 reference artifacts use the unmodified Apache License, Version 2.0 (`Apache-2.0`).
 Published packages must carry consistent license metadata and the full license
 text wherever the artifact format supports it. Third-party notices are retained.
 
 The WordPress plugin remains `GPL-2.0-or-later`; its bundled dependencies must
-retain their own compatible license notices. This is the only first-party public
-package exception. Apache-2.0 dependencies may be combined under GPLv3, which the
+retain their own compatible license notices. Apache-2.0 dependencies may be combined under GPLv3, which the
 plugin's "or later" grant permits; they do not grant a GPLv2-only distribution path.
+
+## Service-required exceptions
+
+On 2026-09-13, the owner approved complying with distribution services' mandatory
+license requirements. Apache-2.0 remains the default. Scope each required exception
+to the affected artifact and document its SPDX identifier, service requirement,
+and bundled license; it does not change unrelated product packages.
+
+- WordPress plugin: GPL-2.0-or-later, as described above.
+- Portable ClawHub skill in `apps/mcp/clawhub/debugbundle/`: MIT-0, required by
+  [ClawHub](https://github.com/openclaw/clawhub/blob/main/docs/skill-format.md#license).
+  Its instruction document and accompanying license use MIT-0 wherever this
+  same folder is distributed, including Smithery Skills. The executable MCP
+  server and OpenClaw plugin remain Apache-2.0.
 
 Existing release artifacts and recipients' previously granted rights remain
 unchanged. Publish fresh versions instead of replacing immutable registry

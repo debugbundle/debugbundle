@@ -8,7 +8,8 @@
 ## Module Dependency Graph
 
 Licensing boundary: public product modules, SDKs, shared libraries, tools, and
-plugins are Apache-2.0, with the WordPress GPL-2.0-or-later exception. Private
+plugins are Apache-2.0. Service-required artifact exceptions are WordPress
+(GPL-2.0-or-later) and the portable ClawHub/Smithery skill (MIT-0). Private
 `debugbundle/site` owns website implementation and branding; private
 `debugbundle-cloud` owns hosted operations. The product dashboard remains public.
 Published docs and generated references remain Apache-2.0; public builds require

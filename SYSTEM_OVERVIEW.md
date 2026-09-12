@@ -8,7 +8,8 @@
 ## What Is DebugBundle?
 
 The public core, SDKs, shared libraries, CLI/MCP tools, and agent plugins use
-Apache-2.0. WordPress remains GPL-2.0-or-later. Website implementation and hosted
+Apache-2.0. Service-required exceptions are scoped to their artifacts: WordPress
+uses GPL-2.0-or-later and the portable ClawHub/Smithery skill uses MIT-0. Website implementation and hosted
 operations live in private repositories; published docs, examples, and generated
 reference artifacts remain public and Apache-2.0. Maintainers pair handwritten
 site docs with related code changes; see `spec/licensing.md`.

@@ -1,5 +1,6 @@
 ---
 name: debugbundle
+license: MIT-0
 description: >-
   Use DebugBundle for runtime error reporting, crash reporting, incident reporting,
   incident response, live app monitoring, and production monitoring focused on runtime

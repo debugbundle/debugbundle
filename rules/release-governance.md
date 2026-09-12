@@ -314,3 +314,13 @@ Each example must include:
 - Cloud service health should be exposed at `status.debugbundle.com`.
 - Health check endpoints: `GET /healthz` (API), `GET /readyz` (Worker).
 - Downtime notifications via status page and optional webhook.
+
+
+### Distribution-service license requirements
+
+Apache-2.0 is the public product default. Honor mandatory service-specific license
+requirements through narrowly scoped, documented artifact exceptions; see
+`spec/licensing.md`. The portable ClawHub/Smithery skill folder uses MIT-0, and
+the WordPress plugin uses GPL-2.0-or-later. Verify both metadata and the bundled
+license before publication. A license-only correction to an immutable portable
+skill version may use a separate patch version without republishing MCP or SDKs.

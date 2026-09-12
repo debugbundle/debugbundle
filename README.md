@@ -418,4 +418,4 @@ See [SECURITY.md](SECURITY.md) for scope and response expectations.
 
 ## License
 
-DebugBundle is licensed under Apache-2.0. See [LICENSE](LICENSE).
+DebugBundle core, SDKs, and executable developer tools use [Apache-2.0](LICENSE). Service-required exceptions are limited to the WordPress plugin (GPL-2.0-or-later) and portable ClawHub/Smithery instruction skill (MIT-0). See the [licensing policy](spec/licensing.md).
