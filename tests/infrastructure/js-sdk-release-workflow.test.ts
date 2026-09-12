@@ -6,6 +6,26 @@ import { describe, expect, it } from "vitest";
 const repoRoot = process.cwd();
 
 describe("shared js package release workflow", () => {
+  it.each(["shared-types", "redaction"])("identifies the trusted publishing repository for %s", (name) => {
+    const manifest = JSON.parse(readFileSync(join(repoRoot, "packages", name, "package.json"), "utf8"));
+    expect(manifest.repository).toEqual({
+      type: "git",
+      url: "git+https://github.com/debugbundle/debugbundle.git",
+      directory: `packages/${name}`
+    });
+    const prepare = readFileSync(join(repoRoot, "scripts/prepare-shared-js-release.mjs"), "utf8");
+    expect(prepare).toContain("repository: sourcePackageJson.repository");
+  });
+
+  it.each(["shared-js-packages", "cli-package", "mcp-package"])("uses token-free publishing for %s", (name) => {
+    const workflow = readFileSync(join(repoRoot, ".github/workflows", `release-${name}.yml`), "utf8");
+    const publishJob = workflow.split("\n  release:\n")[1];
+    expect(publishJob).toMatch(/permissions:\n      contents: read\n      id-token: write/);
+    expect(publishJob).toContain("npm install --global npm@11.5.2");
+    expect(workflow).not.toContain("secrets.NPM_TOKEN");
+    expect(workflow).not.toContain("NODE_AUTH_TOKEN");
+  });
+
   it("ships the core-owned shared package workflow aligned with the dedicated sdk repo split", () => {
     const workflowPath = join(repoRoot, ".github", "workflows", "release-shared-js-packages.yml");
 

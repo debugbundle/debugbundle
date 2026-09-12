@@ -12,6 +12,7 @@ core 1.8.0 release has occurred yet.
 
 - Licensing assertions initially reproduced 10 failures in 23 tests.
 - Expanded licensing/package/MCP checks: 31 passed; documentation checks: 16 passed.
+- Trusted publishing workflow/metadata checks: 6 passed; staged shared archives independently verify matching repository metadata and full Apache text. Licensing regression checks: 31 passed after OIDC preparation.
 - Root lint and typecheck passed. Full public-core CI passed in run `34710232312`.
 - Site behavior: 21 tests passed; production build and typecheck passed.
 - OpenAI candidate: 16 local checks passed and hashes regenerated; portal untouched.
@@ -30,7 +31,7 @@ core 1.8.0 release has occurred yet.
 | Ruby | 1.4.0 | Published; release smoke `34709591621` passed; RubyGems metadata and full gem license verified. |
 | .NET package family | 1.4.0 | All ten packages published and full licenses verified. Original post-publish check exceeded the indexing window; fresh .NET 8/10 registry smokes passed in `34710479246`, and the subsequent complete release run `34710568729` passed. GitHub release points to exact published source `476709d3b6cf651fa1cd314689321ac594272932`. |
 | Java package family | 1.4.0 | Published. Central diagnostic `34717533993` confirms `PUBLISHED`; the original release rerun `34709278570` passed, skipping upload and checking published installs. All eight code artifacts carry the full license and the parent POM declares Apache. Published source is `44fd7a3`; GitHub tag `4334aad` adds only the read-only Central diagnostic workflow. Future tags are pinned to the tested workflow commit. |
-| Android | 1.3.1 correction | 1.3.0 release and consumer smoke `34709695368` passed, but independent archive inspection found that Android AARs omitted the generic license resource. Packaging correction `6994542` adds module-specific license paths and a staged/published archive gate. All nine staged publications and the Docker consumer smoke pass; CI `34718423566` is running before publication. 1.3.0 artifacts and tags remain intact. |
+| Android | 1.3.1 correction | 1.3.0 release and consumer smoke `34709695368` passed, but independent archive inspection found that Android AARs omitted the generic license resource. Packaging correction `6994542` adds module-specific license paths and a staged/published archive gate. All nine staged publications and the Docker consumer smoke pass; Full CI `34718423566` passed; release `34721136022` is running. 1.3.0 artifacts and tags remain intact. |
 | Swift | 1.3.0 | Published; Apache spec and installed license verified. Published installation and event-delivery checks passed locally and in `34710663393`; GitHub v1.3.0 release published. Verification now refreshes the CocoaPods index and uses the same runner tooling as the staged release. |
 | React Native | 1.3.0 | Full compatibility matrix `34709699202` passed; publication waits for native registry verification and npm credentials. |
 | WordPress | 1.4.2 | PHP lock updated to verified 1.4.0. Browser 1.7.0 dependency, rebuilt asset, ZIP and WordPress.org publication still pending. |
@@ -46,8 +47,9 @@ core 1.8.0 release has occurred yet.
 
 ## Required account steps
 
-1. Renew npm publishing credentials and update `NPM_TOKEN` in `debugbundle/debugbundle`, `debugbundle/debugbundle-js`, and `debugbundle/debugbundle-react-native`. The existing root secret dates from May 30 and was rejected; no npm target version was consumed.
-2. npm browser sign-in is now requested so publishing credentials can be renewed directly without sharing secrets in chat.
+1. Configure GitHub Actions trusted publishers for all seven npm packages. The user authorized direct setup in the signed-in Edge browser; npm security-key authentication is pending for the first package.
+2. Replace token authentication in the five release workflows across core, JS SDK and React Native; shared publish manifests also need matching repository metadata.
+3. Publish dependency-first and verify registry artifacts and clean installs before removing the three obsolete `NPM_TOKEN` repository secrets.
 
 The GitHub access step is complete: a fine-grained token limited to `site` with
 read-only Contents/Metadata permissions is saved as cloud `SITE_CHECKOUT_TOKEN`.
@@ -70,6 +72,6 @@ and hosted/site deployment with immutable references. Verify registry metadata,
 embedded licenses, clean installs, GitHub metadata and deployed HTML separately.
 
 The remaining account prerequisite is npm publishing access. Java publication is
-complete. Android packaging correction passes local archive/consumer checks; CI
-is in progress before publishing 1.3.1. Site and WordPress
+complete. Android packaging correction passes local archive/consumer checks; full CI passed
+and release `34721136022` is in progress for 1.3.1. Site and WordPress
 local changes are intentionally uncommitted pending their browser SDK dependency.

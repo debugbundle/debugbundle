@@ -10,5 +10,10 @@
   },
   "scripts": {
     "build": "pnpm --dir ../.. exec tsc -p packages/redaction/tsconfig.build.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/debugbundle/debugbundle.git",
+    "directory": "packages/redaction"
   }
 }

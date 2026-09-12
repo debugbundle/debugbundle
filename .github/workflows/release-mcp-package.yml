@@ -135,6 +135,9 @@ jobs:
           RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
 
   release:
+    permissions:
+      contents: read
+      id-token: write
     needs: validate
     runs-on: ubuntu-latest
     steps:
@@ -146,6 +149,9 @@ jobs:
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
+
+      - name: Set up npm for trusted publishing
+        run: npm install --global npm@11.5.2
 
       - name: Setup pnpm via Corepack
         run: |
@@ -292,8 +298,6 @@ jobs:
       - name: Publish MCP package
         if: steps.published_state.outputs.state == 'none'
         run: npm publish ./apps/mcp --tag latest --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Smoke test published MCP package
         shell: bash

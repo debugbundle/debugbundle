@@ -79,6 +79,7 @@ for (const definition of packageDefinitions) {
     type: "module",
     license: sourcePackageJson.license,
     description: sourcePackageJson.description,
+    repository: sourcePackageJson.repository,
     files: ["dist", "README.md", "LICENSE"],
     main: "./dist/index.js",
     types: "./dist/index.d.ts",

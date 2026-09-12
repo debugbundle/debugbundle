@@ -116,6 +116,16 @@ The Registry JWT is intentionally short-lived and must not be made permanent. Th
 
 ### Package Release Checklist
 
+All seven npm packages publish through GitHub Actions trusted publishers (OIDC),
+with `id-token: write` confined to the publishing job and npm CLI pinned to 11.5.2.
+Do not pass `NPM_TOKEN` or `NODE_AUTH_TOKEN` to publishing steps. Each npm trusted
+publisher must match the source repository and exact workflow filename, leave
+the environment blank while these workflows use no environment, and allow
+direct `npm publish`. Published manifests must include the matching GitHub
+`repository.url`. Core owns shared types/redaction, CLI and MCP; the JS SDK repo
+owns Node/browser; the React Native repo owns its SDK. Remove old repository
+publishing secrets only after successful OIDC publication and registry smokes.
+
 Any SDK or package published to an external registry must satisfy these minimum artifact checks before release is considered complete:
 
 1. Every publishable package includes a package-level `README.md` that is present in the final published artifact.
