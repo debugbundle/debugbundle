@@ -5,7 +5,7 @@ website implementation becomes private, and WordPress retains GPL-2.0-or-later.
 On 2026-09-13 the owner also approved scoped licenses required by distribution services, including MIT-0 for the portable ClawHub/Smithery instruction skill. See `spec/licensing.md`. Historical registry artifacts and release tags remain intact.
 
 The approved package release train and hosted rollout have shipped. Core 1.8.0
-and site 1.3.0 are live. The site repository is private. The final service-license correction, follow-up CI audit, and external discovery checks are tracked below.
+and site 1.3.0 are live. The site repository is private. The service-license correction and site documentation are published. Final follow-up CI results and external discovery limits are tracked below.
 
 ## Validation
 
@@ -36,12 +36,12 @@ and site 1.3.0 are live. The site repository is private. The final service-licen
 | WordPress | 1.4.2 | Published to GitHub and WordPress.org from 9c43fc5. Releases 34722824838 and 34722944393 passed. WordPress.org API reports 1.4.2; downloaded ZIP independently verifies Browser 1.7.0, PHP 1.4.0 full Apache license, and GPL plugin metadata. |
 | CLI and npm MCP | 1.8.0 | Both published through OIDC; releases34722330720 and34722335426 passed with registry smokes. Both tarballs independently verified for full Apache licenses. |
 | OpenClaw plugin | 1.8.0 | Published and verified as latest 1.8.0 from 6c579f1; complete Apache LICENSE hash verified in the public archive file record. Moderation is clean. Initial provider memory-limit failure resolved on retry. |
-| MCP Registry, Smithery, ClawHub | New package versions | Official Registry 1.8.0 published and verified after renewal using the existing local DNS key. Smithery MCPB release 7811bb75-4e55-42e9-a187-d134786436ab reports SUCCESS; corrected Apache listing metadata is publicly indexed. Smithery skill is indexed. ClawHub portable skill 1.8.0 exists with clean moderation, but discovery ranks remain partial and the owner-approved MIT-0 source correction is prepared for skill-only 1.8.1 publication. |
+| MCP Registry, Smithery, ClawHub | New package versions | Official Registry 1.8.0 published and verified after renewal using the existing local DNS key. Smithery MCPB release 7811bb75-4e55-42e9-a187-d134786436ab reports SUCCESS; corrected Apache listing metadata is publicly indexed. Smithery skill is indexed. ClawHub portable skill 1.8.0 exists with clean moderation, but discovery ranks remain partial and skill-only 1.8.1 is published from 8e3ec7a with MIT-0 metadata, a byte-identical MIT-0 license, and clean moderation. Five of seven capability search checks pass; the long combined query is absent and incident response ranks17, below the required top10. This external discovery gate remains partial. |
 | Claude marketplace | 1.8.0 | Catalog/plugin/install pins advanced and pushed in 95265e6 after npm MCP 1.8.0 registry smoke passed. |
 | Core GitHub release | 1.8.0 | Published v1.8.0 at 81ddbef1244063ae3634c19093bf43bb04e21284 in 34725140794 after full CI 34724625082. Hosted rollout 34725269542 passed. Running API and worker report 1.8.0 and Apache-2.0; full license hashes verified. |
 | Public site | 1.3.0 | Private source 13c4161; CI 34722589798 and v1.3.0 release 34724752761 passed. Hosted rollout 34725269542 passed. Live docs/licensing/quickstart return200 after canonical redirects, no old-license references on checked pages; public Apache text hash matches source and reference data reports core1.8.0. |
 | GitHub Action | 1.1.0 | CI and release `34709497001` passed; floating `v1` points to the same source. |
-| GitHub organization profile | Apache-2.0 | License and explanation pushed. |
+| GitHub organization profile | Apache-2.0 | License and explanation pushed; service-required exceptions clarified in 3099125. |
 | OpenAI plugin | Independent 1.0.0 candidate | Apache source and local hashes refreshed. No portal draft, submission or publication action. |
 
 ## Required account steps
@@ -49,7 +49,7 @@ and site 1.3.0 are live. The site repository is private. The final service-licen
 1. All seven npm trusted publishers are saved and verified in Edge, each scoped to the exact repository/workflow and direct npm publishing. Five OIDC workflows are pushed; all seven npm packages have successful token-free releases and registry smokes.
 2. With explicit owner approval, obsolete `NPM_TOKEN` secrets were deleted and verified absent in `debugbundle/debugbundle`, `debugbundle/debugbundle-js`, and `debugbundle/debugbundle-react-native` after their OIDC releases passed. Unrelated credentials were preserved.
 3. Official MCP Registry session renewed using the existing local DNS signing key. Its verified location is saved in private operator memory; no key material is committed.
-4. The owner approved the service-required MIT-0 license for the portable instruction skill. Source policy, bundled license, frontmatter, and regression checks are corrected; skill-only 1.8.1 publication and deployed documentation verification remain pending.
+4. The owner approved the service-required MIT-0 license for the portable instruction skill. Source policy, bundled license, frontmatter, and regression checks are corrected. Skill-only 1.8.1 is published and independently verified; Smithery Skills refreshed the same folder, and the deployed documentation is verified.
 
 The GitHub access step is complete: a fine-grained token limited to `site` with
 read-only Contents/Metadata permissions is saved as cloud `SITE_CHECKOUT_TOKEN`.
@@ -80,7 +80,7 @@ The active runtime is20260912232654-6c7dd6ec7381; previous stable
 20260910205503-ab844e56ce15 is retained. Both containers are healthy with zero
 restarts; complete Apache license hashes match and the host has46GB free.
 
-Old-secret deletion is complete. ClawHub license correction publication and discovery remain tracked above. Glama's public README shows Apache; its unauthenticated API now returns401.
+Old-secret deletion and the ClawHub license correction are complete. ClawHub search ranking remains partial as recorded above; this is not an unpublished or incorrectly licensed artifact. Glama's public README shows Apache; its unauthenticated API now returns401.
 PulseMCP and MCP.so listings are present; LobeHub remains a manual discovery
 follow-up. These pull-based directory checks are distinct from registry releases.
 
@@ -88,6 +88,12 @@ follow-up. These pull-based directory checks are distinct from registry releases
 
 All 20 recorded release, CI and deployment runs were independently rechecked as successful on 2026-09-13. A broader recent-workflow audit also found:
 
-- React Native tag-triggered run `34725054762` attempted to upload already-published 1.3.0 after successful run `34723866051`. Release recovery now verifies matching npm archive integrity before skipping an existing immutable version; 71 local tests and packed smoke pass. Recovery workflow verification is pending.
-- Swift CI `34710663321` exposed asynchronous real network-monitor callbacks in fixed-batch acknowledgement and CocoaPods test fixtures. Test-only dependency isolation is prepared; published package verification `34710663393` already passed. Fresh source CI is pending.
+- React Native tag-triggered run `34725054762` attempted to upload already-published 1.3.0 after successful run `34723866051`. Release recovery now verifies matching npm archive integrity before skipping an existing immutable version; 71 local tests and packed smoke pass. The identical published archive was independently matched by SHA-512. Recovery release run: `34726630680`; matching source CI: `34726630583` (commit `5d96cd4`).
+- Swift CI `34710663321` exposed asynchronous real network-monitor callbacks in fixed-batch acknowledgement and CocoaPods test fixtures. Test-only dependency isolation is committed as `a9c960e`; 77 host tests, clean CocoaPods delivery, and 77 simulator tests passed locally. Published package verification `34710663393` already passed. Fresh source CI run: `34726659697`.
 - Service-license regression reproduced the bundled-license conflict before correction; all 32 licensing checks then passed.
+
+- Site exception documentation: 21 tests, typecheck and production build passed locally; CI `34726699697` and immutable site-only deployment `34726699485` passed. Product remains `81ddbef1244063ae3634c19093bf43bb04e21284`; site source is `ee552d7`. Live docs verify Apache 2.0, MIT-0 and GPL exceptions without old-license references. Public Apache text retains its canonical SHA-256; API readiness is200 and SPA build marker is unchanged.
+- Fresh GitHub metadata audit confirms public core, all SDK repositories and Action are Apache-2.0; WordPress is GPL; site and cloud are private. Three obsolete npm repository secrets were independently rechecked absent.
+- MCP ecosystem verification finds official Registry1.8.0, indexed Smithery MCP1.8.0 and skill, OpenClaw plugin1.8.0, and portable skill1.8.1/MIT-0/clean moderation. The combined verification exits nonzero solely for the two ClawHub search-rank checks above; it is deliberately not recorded as wholly green.
+
+- Core follow-up CI `34726676338` detected stale OpenAI candidate source metadata after the policy-only commit. The unchanged 1.0.0 candidate requires its standard local source-commit refresh; no plugin content/version or portal publication is part of this correction. Follow-up workflow outcomes remain available on the exact commits and run IDs above.

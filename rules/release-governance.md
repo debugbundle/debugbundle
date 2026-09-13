@@ -324,3 +324,10 @@ requirements through narrowly scoped, documented artifact exceptions; see
 the WordPress plugin uses GPL-2.0-or-later. Verify both metadata and the bundled
 license before publication. A license-only correction to an immutable portable
 skill version may use a separate patch version without republishing MCP or SDKs.
+
+After a skill-only patch, do not re-upload its immutable version during the next
+MCP release. If the portable folder is unchanged, exclude `clawhub` from the
+publish target list and still include it in verification. If it changed, publish
+a fresh portable-skill version with the pinned ClawHub CLI and immutable source
+commit, then verify its actual license, files, moderation, and discovery. The
+MCP package version and portable-skill patch version need not match.
