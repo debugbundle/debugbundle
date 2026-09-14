@@ -3,6 +3,8 @@
 > Module boundary map for agent navigation.
 > If this file conflicts with `/spec/architecture.md` or `/contracts/*`, those win.
 
+`scripts/incident-recovery-check.py` owns disposable Docker orchestration for the real API/worker recovery exercise; `scripts/incident-recovery-check.mjs` owns its synthetic HTTP workload and storage/artifact assertions. Neither is a production service. Reviewer fixture seeding disables synthetic health execution while preserving retained review evidence. Hosted Redis persistence activation and existing-volume preservation are private-cloud operator responsibilities.
+
 ---
 
 ## Module Dependency Graph

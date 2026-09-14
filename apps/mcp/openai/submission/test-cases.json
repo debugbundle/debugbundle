@@ -152,8 +152,8 @@
     {
       "id": "positive-failing-health-check",
       "kind": "positive",
-      "prompt": "Why is the synthetic checkout health check failing, and has it been down all day?",
-      "setup_state": "One failing health result and one daily rollup exist; stored URL contains userinfo/query/fragment secrets.",
+      "prompt": "What does the retained history show for the synthetic checkout health check?",
+      "setup_state": "The synthetic check is disabled for execution and reads as paused. One failing health result and one daily rollup remain; the stored URL contains userinfo/query/fragment privacy-test values.",
       "auth": {
         "user_id": "11111111-1111-4111-8111-111111111111",
         "organization_id": "22222222-2222-4222-8222-222222222222",
@@ -194,6 +194,7 @@
       "answer_properties": [
         "uses only the sanitized display URL",
         "reports recent outcome and daily aggregate separately",
+        "distinguishes the paused check from its historical failed result",
         "does not reconfigure or test the endpoint"
       ],
       "cleanup": "No reset; read-only calls only."
@@ -308,10 +309,22 @@
       "expected_arguments": [
         { "projectId": "44444444-4444-4444-8444-444444444444", "last": "7d" },
         { "projectId": "44444444-4444-4444-8444-444444444444", "last": "7d" },
-        { "projectId": "44444444-4444-4444-8444-444444444444", "funnelKey": "checkout", "last": "7d" }
+        {
+          "projectId": "44444444-4444-4444-8444-444444444444",
+          "funnelKey": "checkout",
+          "last": "7d"
+        }
       ],
-      "expected_result_schemas": ["getUsageSummaryOutput", "listFunnelMetricsOutput", "getFunnelAnalysisOutput"],
-      "forbidden_tools": ["get_analytics_journey_sample", "generate_analytics_bundle", "update_analytics_settings"],
+      "expected_result_schemas": [
+        "getUsageSummaryOutput",
+        "listFunnelMetricsOutput",
+        "getFunnelAnalysisOutput"
+      ],
+      "forbidden_tools": [
+        "get_analytics_journey_sample",
+        "generate_analytics_bundle",
+        "update_analytics_settings"
+      ],
       "forbidden_fields": ["sample_ids", "custom_dimensions", "subject_hash", "generation_id"],
       "answer_properties": [
         "reports only aggregate counts and rates",
@@ -468,7 +481,11 @@
       "expected_sequence": [],
       "expected_arguments": [],
       "expected_result_schemas": [],
-      "forbidden_tools": ["get_analytics_journey_sample", "update_analytics_settings", "create_saved_funnel"],
+      "forbidden_tools": [
+        "get_analytics_journey_sample",
+        "update_analytics_settings",
+        "create_saved_funnel"
+      ],
       "forbidden_fields": ["sample_ids", "email", "subject_hash", "custom_dimensions"],
       "answer_properties": [
         "explains that only aggregate analytics are available",

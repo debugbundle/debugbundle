@@ -55,6 +55,7 @@ help:
 	@echo "  make web-check       Run focused web auth/account tests via Docker"
 	@echo "  make compose-check   Run local Docker Compose configuration checks"
 	@echo "  make load-check      Run noisy-ingestion load checks via Docker"
+	@echo "  make incident-recovery-check  Exercise real HTTP/storage bursts and crashes in isolated Docker"
 	@echo "  make perf-check      Run performance benchmark checks via Docker"
 	@echo "  make test-unit       Run unit tests with coverage gates via Docker"
 	@echo "  make test            Alias of test-unit"
@@ -186,6 +187,10 @@ worker-jobs:
 	$(DOCKER_COMPOSE) exec -T -e WORKER_JOB_PROJECT_ID -e WORKER_JOB_ID -e WORKER_JOB_RETRY worker sh -lc "node --import tsx scripts/worker-jobs.ts"
 
 .PHONY: test-focused
+.PHONY: incident-recovery-check
+incident-recovery-check:
+	python3 scripts/incident-recovery-check.py
+
 .PHONY: browser-evidence-check
 browser-evidence-check:
 	docker run --rm -v "$(CURDIR):/workspace" -w /workspace node:24-bookworm sh -lc 'apt-get update -qq && apt-get install -y -qq --no-install-recommends chromium >/dev/null && node --import tsx scripts/check-browser-evidence.mjs'

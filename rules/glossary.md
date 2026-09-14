@@ -35,6 +35,10 @@ The Postgres-owned record of adopted worker jobs, downstream intents, retries an
 
 Starting a candidate worker with dependency readiness enabled and processing paused until the deployment commits promotion and creates its activation marker. A previous Redis-only worker cannot consume jobs already owned by the journal.
 
+### Redis Append-Only Persistence
+
+A Redis append-only file (AOF) records write commands for restart recovery. The hosted recovery policy uses `appendfsync always`, flushing writes to disk before acknowledgement, and retains the exact existing data volume. It protects waiting ingress before Postgres adoption but does not replace host/disk backup and restore.
+
 ## Worker Resource Terms
 
 ### Retained Heap

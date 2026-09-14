@@ -201,6 +201,7 @@ async function main(): Promise<void> {
         ids.incident_id
       ]
     );
+    // Health evidence is retained for read-only review, never scheduled for outbound execution.
     await client.query(
       `
         INSERT INTO availability_checks (
@@ -208,10 +209,11 @@ async function main(): Promise<void> {
           environment, service_name, enabled, status, last_checked_at, next_check_at,
           last_result_status, last_result_http_status, last_result_duration_ms, created_at, updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, 'GET', 60, 'production', 'checkout-api', true,
+        VALUES ($1, $2, $3, $4, $5, 'GET', 60, 'production', 'checkout-api', false,
                 'failing', $6, $7, 'http_status_mismatch', 503, 420, $8, $8)
         ON CONFLICT (id) DO UPDATE
-        SET url = EXCLUDED.url, status = EXCLUDED.status, last_checked_at = EXCLUDED.last_checked_at,
+        SET url = EXCLUDED.url, enabled = EXCLUDED.enabled, status = EXCLUDED.status,
+            last_checked_at = EXCLUDED.last_checked_at,
             next_check_at = EXCLUDED.next_check_at, updated_at = EXCLUDED.updated_at
       `,
       [

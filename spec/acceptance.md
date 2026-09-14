@@ -732,6 +732,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Given** the synthetic OpenAI reviewer credential
 - **When** it is exercised or expires
 - **Then** POST-body entry, rate limits, monitoring, audit lifecycle, rotation/revocation procedures, and synthetic-tenant-only access are enforced without MFA, email, SMS, private networking, or production customer data
+- **And** the retained synthetic health check is seeded disabled, including on reseed of an enabled legacy fixture; it remains readable with its historical results/rollups but is excluded from worker scheduling while ordinary enabled checks still execute
 
 ### AC-MCP-09: Canonical Host And Permanent Origin Isolation
 

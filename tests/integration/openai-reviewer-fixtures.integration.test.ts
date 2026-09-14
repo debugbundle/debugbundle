@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 
 import { afterAll, beforeAll, expect, it } from "vitest";
 
@@ -7,6 +8,7 @@ import {
   buildImprovementBundleObjectKey,
   buildReproductionObjectKey
 } from "../../packages/storage/src/index.js";
+import { createPostgresAvailabilityCheckStore } from "../../packages/storage/src/availability-check-store.js";
 import reviewerFixture from "../fixtures/openai-plugin-v1/reviewer-tenant.json" with { type: "json" };
 import {
   bootstrapStorageAndCreateBucket,
@@ -54,11 +56,56 @@ runIntegration("OpenAI reviewer fixture integration", () => {
       version: "1.0.0",
       anchor: "2026-09-02T12:00:00.000Z"
     });
+    const checkState = async () => {
+      const result = await pool.query<{ enabled: boolean; status: string }>(
+        "SELECT enabled, status FROM availability_checks WHERE id = $1",
+        [reviewerFixture.identifiers.health_check_id]
+      );
+      return result.rows[0];
+    };
+    expect(await checkState()).toEqual({ enabled: false, status: "failing" });
+    // Re-seeding must also repair a previously enabled synthetic check.
+    await pool.query("UPDATE availability_checks SET enabled = true WHERE id = $1", [
+      reviewerFixture.identifiers.health_check_id
+    ]);
     expect(runSeeder()).toEqual({
       mode: "applied",
       version: "1.0.0",
       anchor: "2026-09-02T12:00:00.000Z"
     });
+    expect(await checkState()).toEqual({ enabled: false, status: "failing" });
+
+    const ordinaryCheckId = randomUUID();
+    await pool.query(
+      `INSERT INTO availability_checks
+         (id, project_id, created_by_user_id, name, url, method, interval_seconds,
+          environment, enabled, next_check_at)
+       VALUES ($1, $2, $3, 'Ordinary enabled check', 'https://example.com/health',
+               'GET', 60, 'production', true, $4)`,
+      [
+        ordinaryCheckId,
+        reviewerFixture.identifiers.project_id,
+        reviewerFixture.identifiers.user_id,
+        "2026-09-02T12:00:00.000Z"
+      ]
+    );
+    const store = createPostgresAvailabilityCheckStore(pool);
+    const claimed = await store.claimDueChecks({
+      now: "2026-09-02T12:10:00.000Z",
+      claim_timeout_before: "2026-09-02T12:05:00.000Z",
+      limit: 100
+    });
+    expect(claimed.map((check) => check.check_id)).toContain(ordinaryCheckId);
+    expect(claimed.map((check) => check.check_id)).not.toContain(
+      reviewerFixture.identifiers.health_check_id
+    );
+    const retained = await pool.query<{ results: number; rollups: number }>(
+      `SELECT
+         (SELECT COUNT(*)::int FROM availability_check_results WHERE check_id = $1) AS results,
+         (SELECT COUNT(*)::int FROM availability_check_daily_rollups WHERE check_id = $1) AS rollups`,
+      [reviewerFixture.identifiers.health_check_id]
+    );
+    expect(retained.rows[0]).toEqual({ results: 1, rollups: 1 });
 
     const projectId = reviewerFixture.identifiers.project_id;
     const aggregateCounts = await pool.query<Record<string, string>>(
@@ -113,10 +160,7 @@ runIntegration("OpenAI reviewer fixture integration", () => {
     ).resolves.toBeInstanceOf(Buffer);
     await expect(
       objectStore.getObject({
-        key: buildImprovementBundleObjectKey(
-          projectId,
-          reviewerFixture.identifiers.improvement_id
-        )
+        key: buildImprovementBundleObjectKey(projectId, reviewerFixture.identifiers.improvement_id)
       })
     ).resolves.toBeInstanceOf(Buffer);
 
