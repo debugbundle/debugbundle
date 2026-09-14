@@ -721,14 +721,16 @@ Environment-specific deployment configuration, operations runbooks, and other pr
 
 Analytics correlation locking is acquired before rollup writes in a separate statement (`lockAnalyticsCorrelation`), so overlapping analytics/incident transactions cannot both miss the other side. Durable job maintenance resumes full bounded batches at one-second intervals while backlog summaries remain once per minute.
 
-## Incident evidence reliability extension (local candidate)
+## Incident evidence reliability extension
 
 The JS SDK companion owns guarded native error hooks/field readers and stack URL sanitization (`native-error-hooks.ts`, `native-fields.ts`, `browser-stack.ts`). Its existing Node relay and the Java relay preserve the bounded browser context. `scripts/check-browser-evidence.mjs` is a disposable native Chromium-to-relay-to-bundle verification path, not a production service.
 
-Core `event-normalizer/java-timer-message.ts` owns scoped v2 WildFly calendar normalization; ingestion supplies legacy v1 capture-rule aliases through the shared evaluator. `mcp-core/browser-evidence.ts` owns the additive bounded OpenAI browser projection. Worker `improvement-bundle-context.ts` canonicalizes storage timestamps before schema validation; storage occurrence recording preserves latest evidence on delayed arrivals. `storage/metadata-bundles.ts` resolves exact project/service/environment deployment history at the source occurrence; `bundle-engine/deployment-context.ts` reconciles it with time-scoped raw deployment evidence. See `spec/incident-reliability.md` for compatibility, verification and remaining promotion gates.
+Core `event-normalizer/java-timer-message.ts` owns scoped v2 WildFly calendar normalization; ingestion supplies legacy v1 capture-rule aliases through the shared evaluator. `mcp-core/browser-evidence.ts` owns the additive bounded OpenAI browser projection. Worker `improvement-bundle-context.ts` canonicalizes storage timestamps before schema validation; storage occurrence recording preserves latest evidence on delayed arrivals. `storage/metadata-bundles.ts` resolves exact project/service/environment deployment history at the source occurrence; `bundle-engine/deployment-context.ts` reconciles it with time-scoped raw deployment evidence. See `spec/incident-reliability.md` for compatibility, hosted release verification and remaining SDK adoption, repair and capacity gates.
 
 `redaction/browser-stack.ts` provides the server ingestion backstop for HTTP(S) browser stack URL privacy, including legacy SDK submissions.
 
 The durable queue adapter treats reproduction `bundle_missing`/`bundle_invalid` outcomes as retryable failures instead of completed receipts. Browser stack sanitizers consume the full URL before separating stack punctuation, so parentheses within credentials/query cannot bypass redaction.
 
 `storage/object-store-errors.ts` owns the shared explicit-absence classifier used by OpenAI artifact readers and incident/improvement context loaders. Non-absence storage failures propagate to bounded build retries instead of silently discarding available context.
+
+Core 1.9.1 forwards `WORKER_START_PAUSED` through `worker-env.ts` into startup activation. Environment and full-startup regressions cover the paused boundary; the private cloud image build also verifies this wiring before publication. Hosted migration/activation and a bounded native-browser/improvement canary passed; broader capacity and customer adoption remain separate.

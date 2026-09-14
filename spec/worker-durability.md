@@ -1,6 +1,6 @@
 # Durable worker processing
 
-Status: local implementation candidate, 2026-09-13. Production rollout and live proof are separate. Maps to FR-PROC-07, NFR-REL-02/03/06/08, INV-4 and the worker durability acceptance checks.
+Status: released in hosted core 1.9.1 on 2026-09-14, with migration, activation and bounded live capture verified. Capacity and historical repair remain separate gates. Maps to FR-PROC-07, NFR-REL-02/03/06/08, INV-4 and the worker durability acceptance checks.
 
 ## Ownership and transactions
 

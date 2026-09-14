@@ -25,6 +25,16 @@ The greater of a check's saved interval and the current plan's minimum interval.
 Existing checks use this interval for reads and execution without rewriting their
 saved configuration. New create/update requests must meet the current floor.
 
+## Worker Durability Terms
+
+### Worker Job Journal
+
+The Postgres-owned record of adopted worker jobs, downstream intents, retries and completion receipts. Ownership begins at worker adoption; API ingestion still writes S3 and Redis separately.
+
+### Staged Worker Activation
+
+Starting a candidate worker with dependency readiness enabled and processing paused until the deployment commits promotion and creates its activation marker. A previous Redis-only worker cannot consume jobs already owned by the journal.
+
 ## Worker Resource Terms
 
 ### Retained Heap

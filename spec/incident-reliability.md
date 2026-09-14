@@ -1,6 +1,6 @@
 # Incident reliability review and capacity gates
 
-Reviewed 2026-09-14. This describes local corrections and remaining work, not a production capacity certification. Production evidence and incident dispositions are retained in `spec/local/incident-reliability-review-2026-09-13.md`.
+Released in hosted core 1.9.1 on 2026-09-14. This records verified corrections and remaining work, not a production capacity certification. Production evidence and incident dispositions are retained in `spec/local/incident-reliability-review-2026-09-13.md`.
 
 ## Corrections in this change
 
@@ -19,7 +19,7 @@ Reviewed 2026-09-14. This describes local corrections and remaining work, not a 
 
 The worker durability extension adds the forward migration `202609130001_add_durable_worker_jobs`; upgrades run `db:migrate`, never `db:bootstrap`. Public API, SDK, CLI, MCP, and bundle formats remain compatible. The large worker and metadata modules are split by responsibility while their existing barrel imports remain available.
 
-## Durable worker handoffs in this candidate
+## Durable worker handoffs in core 1.9.1
 
 - Redis ingress is acknowledged only after Postgres owns the job. Normalization commits the processed-event marker with grouping and optional improvement intents. Grouping commits occurrence/dedupe/retention metadata with required follow-ups. Nested domain transactions use savepoints.
 - Jobs have fenced five-minute leases, heartbeats, exponential retry delays, eight automatic attempts, and inspectable failure metadata. Optional improvement evaluation is a separate durable job. Transient artifact failures propagate to the retry owner; quota/disabled/missing evidence remains an explicit unavailable outcome.
@@ -73,3 +73,13 @@ Use a bounded, resumable repair with dry-run inventory, per-project scope, dedup
 `make browser-evidence-check` exercises native Chromium runtime/rejection/resource/cross-origin errors through the actual local Node relay, normalization, deterministic bundle and OpenAI projection. JS SDK `make check` covers unit/privacy/safety, per-file coverage, builds and packed consumers; Java SDK `make verify` covers its unchanged relay plus servlet integrations. This is local proof, not evidence that installed SDKs have been upgraded.
 
 Server ingestion also removes credentials/query/fragment from frontend exception HTTP(S) stack locations before persistence, including submissions from installed older SDKs. This protects new ingested events; historical stored artifacts still follow the bounded repair policy.
+
+## Hosted release verification — 2026-09-14
+
+Core 1.9.1 passed full CI and the canonical release gates, then passed the hosted migration, paused-candidate, promotion and activation checks. The image build now also executes the pause-setting parser before publication. Core 1.9.0 was rejected by the promotion guard because that setting was omitted from environment parsing; use 1.9.1 for staged worker deployment.
+
+Published shared/Node/browser packages are 1.7.1, CLI/MCP packages are 1.8.1, and the WordPress wrapper is 1.4.3. The hosted app and paired site use the published browser dependency. Existing customer applications still need their own SDK upgrade and deployment.
+
+An isolated project with notifications disabled accepted four native Chromium errors through the published browser SDK and Node relay, plus ten warnings through the Node SDK. All four incident bundles and reproduction artifacts were readable; the ordinary error retained its application message, stack, source and route, while resource/cross-origin evidence retained explicit limitations. The warning produced a schema-valid improvement bundle with current ISO timestamps and no build failure. All 67 scoped jobs completed on their first attempt and cleared their payloads. API/MCP readiness, the exact app revision, updated documentation and OAuth boundaries passed independent checks.
+
+This is bounded live functional evidence. Limits and worker count remain unchanged; representative load/soak, customer SDK adoption and reviewed historical artifact repair remain separate follow-ups. Missing historical browser details cannot be reconstructed.

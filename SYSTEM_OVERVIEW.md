@@ -470,7 +470,7 @@ This working tree is now the public core repo checkout. Local multi-repo conveni
 
 Hosted bundle deployment and repository metadata comes from customer event evidence; the shared worker release environment is never a customer fallback. Unknown/background HTTP requests have no executable replay, and a missing origin leaves only an explicitly infeasible request template. OpenAI projections omit stored shell commands because they can embed excluded request fields. Missing S3 objects, intentional incident coverage, generation disabled, quota exhaustion, and build failures have distinct explanations.
 
-MCP keeps its existing Redis rate/concurrency limits. A bounded local admission gate waits at most one second (32 waiters total, eight per grant), and initialization advertises budgets/backoff. Sustained admission pressure creates at most one handled signal per kind per process per minute, after ten rejections; metadata logs retain individual outcomes. See `spec/incident-reliability.md` for completed local durability boundaries and remaining rollout/capacity gates.
+MCP keeps its existing Redis rate/concurrency limits. A bounded local admission gate waits at most one second (32 waiters total, eight per grant), and initialization advertises budgets/backoff. Sustained admission pressure creates at most one handled signal per kind per process per minute, after ten rejections; metadata logs retain individual outcomes. See `spec/incident-reliability.md` for durability boundaries, release verification and remaining capacity gates.
 
 ### Durable worker ownership
 
@@ -480,10 +480,12 @@ The worker adopts Redis ingress into the Postgres `worker_jobs` journal before a
 
 Optional improvement jobs retain only a scoped source reference and re-read retained evidence; they do not extend raw-event retention through queue payload copies. Full cleanup batches resume at a bounded one-second cadence while backlog logs remain once per minute. Analytics rollups acquire correlation locks before writing route/session evidence so overlapping incident writes cannot leave impact counts unlinked.
 
-## Incident evidence reliability extension (local candidate)
+## Incident evidence reliability extension
 
 The JS SDK companion owns guarded native error hooks/field readers and stack URL sanitization (`native-error-hooks.ts`, `native-fields.ts`, `browser-stack.ts`). Its existing Node relay and the Java relay preserve the bounded browser context. `scripts/check-browser-evidence.mjs` is a disposable native Chromium-to-relay-to-bundle verification path, not a production service.
 
-Core `event-normalizer/java-timer-message.ts` owns scoped v2 WildFly calendar normalization; ingestion supplies legacy v1 capture-rule aliases through the shared evaluator. `mcp-core/browser-evidence.ts` owns the additive bounded OpenAI browser projection. Worker `improvement-bundle-context.ts` canonicalizes storage timestamps before schema validation; storage occurrence recording preserves latest evidence on delayed arrivals. `storage/metadata-bundles.ts` resolves exact project/service/environment deployment history at the source occurrence; `bundle-engine/deployment-context.ts` reconciles it with time-scoped raw deployment evidence. See `spec/incident-reliability.md` for compatibility, verification and remaining promotion gates.
+Core `event-normalizer/java-timer-message.ts` owns scoped v2 WildFly calendar normalization; ingestion supplies legacy v1 capture-rule aliases through the shared evaluator. `mcp-core/browser-evidence.ts` owns the additive bounded OpenAI browser projection. Worker `improvement-bundle-context.ts` canonicalizes storage timestamps before schema validation; storage occurrence recording preserves latest evidence on delayed arrivals. `storage/metadata-bundles.ts` resolves exact project/service/environment deployment history at the source occurrence; `bundle-engine/deployment-context.ts` reconciles it with time-scoped raw deployment evidence. See `spec/incident-reliability.md` for compatibility, hosted release verification and remaining SDK adoption, repair and capacity gates.
 
 Server ingestion strips browser stack URL credentials/query/fragment before persistence for old and new SDK submissions; upgrading the browser SDK is still required to capture missing native error details.
+
+Core 1.9.1 forwards `WORKER_START_PAUSED` through `worker-env.ts` into startup activation. Environment and full-startup regressions cover the paused boundary; the private cloud image build also verifies this wiring before publication. Hosted migration/activation and a bounded native-browser/improvement canary passed; broader capacity and customer adoption remain separate.
