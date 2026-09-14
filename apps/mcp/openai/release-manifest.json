@@ -3,7 +3,7 @@
   "plugin_version": "1.0.0",
   "evidence_state": "local_connection_ready",
   "source": {
-    "commit": "62665f4f5e34e8952b6a03599d92b34091c255ef",
+    "commit": "578e5511d554fbda1aea41143c674b239bf01a7d",
     "tree_clean": true,
     "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
@@ -38,7 +38,7 @@
       "release-notes.md": "f96f0ae58b66fe326f00b6feb380a61025d5782a4568d2b012ae3ed42b5fa0b1",
       "review-checklist.md": "0192eaa55cd9f8b3127c46ea0a14f826ecdaf3e94b06f8c03a0b2d8b45c33078",
       "starter-prompts.json": "6d6461d82d0a0e2f429a8c776e8e9185cf8879637653a5fbf2b6235b62c6d7c2",
-      "test-cases.json": "80b45bc0d5969129ca55e0037d12c76244dd7afcc14c7d45b94a88a7a059c6f0",
+      "test-cases.json": "1c69817b09b68560bd8c980616976de8c7b15266980bc3ea72738b444d3cfac7",
       "tool-scan.json": "ff38eb57f13fc704659de6e039c2cdcc1dddc2472a6341132cd0defbe4b8fc48"
     }
   },
