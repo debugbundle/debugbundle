@@ -6,6 +6,12 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-09-14
+
+### Fixed
+
+- Pass `WORKER_START_PAUSED` through environment parsing so hosted candidates wait for activation before processing. Core 1.9.0 failed this promotion guard; use 1.9.1 for the durable worker rollout.
+
 ## [1.9.0] - 2026-09-14
 
 ### Fixed

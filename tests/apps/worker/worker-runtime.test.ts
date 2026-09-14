@@ -67,6 +67,25 @@ describe("worker runtime", () => {
     expect(env.AVAILABILITY_CHECK_CONCURRENCY).toBe(8);
     expect(env.RETENTION_CLEANUP_INTERVAL_MS).toBe(6 * 60 * 60 * 1000);
     expect(env.ANALYTICS_OPPORTUNITY_EVALUATION_INTERVAL_MS).toBe(6 * 60 * 60 * 1000);
+    expect(env.WORKER_START_PAUSED).toBe("0");
+  });
+
+  it.each(["0", "1"])("preserves worker startup pause setting %s", (value) => {
+    const env = parseWorkerEnv({
+      WORKER_START_PAUSED: value,
+      ANALYTICS_HASH_SECRET: "test-analytics-secret"
+    });
+
+    expect(env.WORKER_START_PAUSED).toBe(value);
+  });
+
+  it("rejects invalid worker startup pause settings", () => {
+    expect(() =>
+      parseWorkerEnv({
+        WORKER_START_PAUSED: "true",
+        ANALYTICS_HASH_SECRET: "test-analytics-secret"
+      })
+    ).toThrow("worker_env_invalid: WORKER_START_PAUSED");
   });
 
   it("registers worker dogfooding during startup", async (): Promise<void> => {

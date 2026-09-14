@@ -57,6 +57,8 @@ The atomic retry requires the exact project (or explicit global selector) and jo
 
 The worker advertises `worker_job_protocol: postgres-v1` and `processing_enabled` on its internal readiness response. `WORKER_START_PAUSED=1` checks dependencies but waits for `/tmp/debugbundle-worker-activated` before starting any processing lane. Default `0` preserves normal/self-host startup. Hosted image builds verify the source protocol constant and label the image; rollout scripts reject an incompatible worker, validate the candidate's paused state, commit promotion and release metadata, then activate and verify processing. Pre-promotion cleanup can safely discard a paused candidate.
 
+Use core 1.9.1 or later for staged activation. Core 1.9.0 omitted the pause setting from environment parsing; its hosted promotion guard rejected the candidate. Startup regressions now exercise the actual environment-to-processing path, including waiting for the marker and rejecting invalid pause settings. The additive migration can remain applied while the previously active release continues to run.
+
 Once any Postgres-owned jobs exist, a Redis-only worker rollback would strand work. Retain a `postgres-v1` worker when rolling an API image back, or ship a reviewed compatible worker fix. An additive table may remain when an older API runs; removing it or replaying its payloads into Redis is not a rollback procedure. If activation fails after promotion, keep the promoted compatible release, diagnose it and retry activation; do not restore a worker that cannot consume the journal. The private hosted runbook owns concrete release paths and image selection.
 
 ## Verification and launch evidence
