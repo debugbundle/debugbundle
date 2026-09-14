@@ -11,7 +11,7 @@
     "resource_origin": "https://mcp.debugbundle.com",
     "mcp_endpoint": "https://mcp.debugbundle.com/mcp",
     "oauth_issuer": "https://api.debugbundle.com",
-    "api_image_digest": null
+    "api_image_digest": "sha256:45bc764f0d3b194fa54c5c0ad953970c02020ce55e35d652039954ec928a42c9"
   },
   "registered_connection_id": "plugin_asdk_app_6a99ba6c1e7881919091a592738692c6",
   "package": {
@@ -74,7 +74,6 @@
     "reviewer_fixture_sha256": "7eeff32a1dd14b4cb0fe5126e04470e448cf3f73a54bfb4f7e9e8f64327c6758"
   },
   "manual_gates": [
-    "immutable_api_image_deployment_digest",
     "representative_capacity_load_evidence",
     "reviewer_synthetic_retained_corpus",
     "owner_submission_approval",
