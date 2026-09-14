@@ -6,6 +6,12 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.9.2] - 2026-09-14
+
+### Fixed
+
+- Route analytics bundle generation through the durable worker queue. Core 1.9.0 and 1.9.1 called an unavailable queue method on every analytics poll, generating repeated worker incidents and preventing analytics bundle jobs from running. The shared worker lane now owns adoption, completion and retry; a failed journal acknowledgement cannot mark a completed analytics generation failed.
+
 ## [1.9.1] - 2026-09-14
 
 ### Fixed

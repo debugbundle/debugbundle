@@ -72,10 +72,7 @@ import {
   processNextBuildImprovementBundleJob,
   type ImprovementBundleJobQueue
 } from "./improvement-bundle-processor.js";
-import {
-  processNextBuildAnalyticsBundleJob,
-  type BuildAnalyticsBundleWorkerQueue
-} from "./analytics-bundle-processor.js";
+import { processNextBuildAnalyticsBundleJob } from "./analytics-bundle-processor.js";
 import { scheduleTrialLifecycleEmails } from "./trial-lifecycle-scheduler.js";
 import { registerWorkerDogfooding } from "./dogfooding.js";
 import { createOpenAiOAuthMaintenance } from "./openai-oauth-maintenance.js";
@@ -783,7 +780,7 @@ export async function runWorkerFromEnv(
 
       await runClaimedProcessStep("build-analytics-bundle", async () =>
         processNextBuildAnalyticsBundleJob({
-          queue: queue as unknown as BuildAnalyticsBundleWorkerQueue,
+          queue,
           analyticsBundleGenerationStore,
           analyticsMetricsStore,
           analyticsJourneySampleStore,

@@ -19,7 +19,6 @@ import {
   type AnalyticsJourneySampleStore,
   type AnalyticsMetricsStore,
   type BuildAnalyticsBundleJob,
-  type ClaimedRedisJob,
   type ObjectStoreClient,
   type ObjectStoreReader
 } from "../../../packages/storage/src/index.js";
@@ -27,9 +26,7 @@ import type { WorkerProcessResult } from "./processor.js";
 import { readRepresentativeJourneySamples } from "./analytics-bundle-journey-evidence.js";
 
 export interface BuildAnalyticsBundleWorkerQueue {
-  claim(
-    jobName: "build-analytics-bundle"
-  ): Promise<ClaimedRedisJob<BuildAnalyticsBundleJob> | null>;
+  dequeue(jobName: "build-analytics-bundle"): Promise<BuildAnalyticsBundleJob | null>;
 }
 
 export interface BuildAnalyticsBundleWorkerDependencies {
@@ -64,12 +61,12 @@ const DEFAULT_METRIC_LIMIT = 25;
 export async function processNextBuildAnalyticsBundleJob(
   dependencies: BuildAnalyticsBundleWorkerDependencies
 ): Promise<WorkerProcessResult> {
-  const claimed = await dependencies.queue.claim("build-analytics-bundle");
-  if (claimed === null) {
+  // The runtime queue owns durable adoption, heartbeat, completion and retry.
+  const job = await dependencies.queue.dequeue("build-analytics-bundle");
+  if (job === null) {
     return { processed: false, reason: "no_jobs" };
   }
 
-  const job = claimed.payload;
   const generation =
     await dependencies.analyticsBundleGenerationStore.getAnalyticsBundleGenerationForProject({
       project_id: job.project_id,
@@ -80,12 +77,10 @@ export async function processNextBuildAnalyticsBundleJob(
       { generation_id: job.generation_id, project_id: job.project_id, trigger: job.trigger },
       "worker_analytics_bundle_generation_missing"
     );
-    await claimed.ack();
     return { processed: true, reason: "analytics_bundle_generation_missing" };
   }
 
   if (generation.status === "completed" || generation.status === "failed") {
-    await claimed.ack();
     return { processed: true, reason: `analytics_bundle_generation_${generation.status}` };
   }
 
@@ -96,7 +91,6 @@ export async function processNextBuildAnalyticsBundleJob(
       claimed_at: new Date().toISOString()
     });
   if (claimedGeneration === null) {
-    await claimed.ack();
     return { processed: true, reason: "analytics_bundle_generation_claim_conflict" };
   }
 
@@ -128,7 +122,6 @@ export async function processNextBuildAnalyticsBundleJob(
       throw new Error("analytics_bundle_generation_missing_after_write");
     }
 
-    await claimed.ack();
     return { processed: true };
   } catch (error) {
     dependencies.logger?.error?.(
@@ -147,7 +140,6 @@ export async function processNextBuildAnalyticsBundleJob(
       failed_at: new Date().toISOString(),
       reason: "build_error"
     });
-    await claimed.ack();
     return { processed: true, reason: "analytics_bundle_generation_failed" };
   }
 }

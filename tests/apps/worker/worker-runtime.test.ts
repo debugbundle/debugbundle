@@ -7,6 +7,7 @@ import {
   poolQueryMock,
   poolEndMock,
   queueEnqueueMock,
+  queueClaimMock,
   queueAcquireLeaseMock,
   queueCloseMock,
   redisFactoryMock,
@@ -382,6 +383,24 @@ describe("worker runtime", () => {
     expect(processNextBuildAnalyticsBundleJobMock).toHaveBeenCalledOnce();
     expect(processNextBuildReproductionJobMock).toHaveBeenCalledOnce();
     expect(processNextDeliverWebhookJobMock).toHaveBeenCalledOnce();
+  });
+
+  it("runs the real analytics bundle processor against the durable runtime queue without idle failures", async () => {
+    const actual = await vi.importActual<
+      typeof import("../../../apps/worker/src/analytics-bundle-processor.js")
+    >("../../../apps/worker/src/analytics-bundle-processor.js");
+    processNextBuildAnalyticsBundleJobMock.mockImplementation(
+      actual.processNextBuildAnalyticsBundleJob
+    );
+
+    await runWorkerFromEnv({
+      WORKER_RUN_ONCE: "1",
+      ANALYTICS_HASH_SECRET: "test-analytics-secret"
+    });
+
+    expect(queueClaimMock).toHaveBeenCalledWith("build-analytics-bundle");
+    expect(captureWorkerDogfoodingStepFailureMock).not.toHaveBeenCalled();
+    expect(processNextBuildReproductionJobMock).toHaveBeenCalledOnce();
   });
 
   it("should run build-analytics-bundle processor before reproduction when earlier queues are empty", async (): Promise<void> => {

@@ -10,6 +10,7 @@ import type {
   BuildReproductionJob,
   BundleBuildContextStore,
   BuildBundleJob,
+  BuildAnalyticsBundleJob,
   CleanupRetentionJob,
   DeliverAlertEmailDigestJob,
   DeliverGitHubDispatchJob,
@@ -46,6 +47,7 @@ export interface WorkerQueue {
   dequeue(jobName: "normalize-events"): Promise<NormalizeEventsJob | null>;
   dequeue(jobName: "group-incident"): Promise<GroupIncidentJob | null>;
   dequeue(jobName: "build-bundle"): Promise<BuildBundleJob | null>;
+  dequeue(jobName: "build-analytics-bundle"): Promise<BuildAnalyticsBundleJob | null>;
   dequeue(jobName: "build-reproduction"): Promise<BuildReproductionJob | null>;
   dequeue(
     jobName: "evaluate-analytics-opportunities"

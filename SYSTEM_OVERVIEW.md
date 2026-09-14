@@ -489,3 +489,5 @@ Core `event-normalizer/java-timer-message.ts` owns scoped v2 WildFly calendar no
 Server ingestion strips browser stack URL credentials/query/fragment before persistence for old and new SDK submissions; upgrading the browser SDK is still required to capture missing native error details.
 
 Core 1.9.1 forwards `WORKER_START_PAUSED` through `worker-env.ts` into startup activation. Environment and full-startup regressions cover the paused boundary; the private cloud image build also verifies this wiring before publication. Hosted migration/activation and a bounded native-browser/improvement canary passed; broader capacity and customer adoption remain separate.
+
+Core 1.9.2 aligns analytics bundle processing with the durable queue `dequeue` contract and removes its direct Redis acknowledgement. The shared worker lane owns completion/retry, including recovery after an artifact completes but its journal acknowledgement fails. Real runtime-composition and storage-backed analytics regressions cover this boundary.

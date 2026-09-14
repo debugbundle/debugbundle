@@ -21,7 +21,6 @@ const INPUT_FINGERPRINT = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
 describe("worker processor - build-analytics-bundle", () => {
   it("builds and stores a deterministic AnalyticsBundle artifact from aggregate metrics", async (): Promise<void> => {
-    const ack = vi.fn().mockResolvedValue(undefined);
     const putObject = vi.fn().mockResolvedValue(undefined);
     const getObject = vi.fn(async () => compressedJourneySampleArtifact());
     const markAnalyticsBundleGenerationCompleted = vi.fn().mockResolvedValue({
@@ -46,14 +45,11 @@ describe("worker processor - build-analytics-bundle", () => {
     await expect(
       processNextBuildAnalyticsBundleJob({
         queue: {
-          claim: vi.fn().mockResolvedValue({
-            payload: {
-              project_id: PROJECT_ID,
-              generation_id: GENERATION_ID,
-              requested_at: "2026-07-08T12:00:00.000Z",
-              trigger: "manual"
-            },
-            ack
+          dequeue: vi.fn().mockResolvedValue({
+            project_id: PROJECT_ID,
+            generation_id: GENERATION_ID,
+            requested_at: "2026-07-08T12:00:00.000Z",
+            trigger: "manual"
           })
         },
         analyticsBundleGenerationStore: generationStore,
@@ -128,25 +124,20 @@ describe("worker processor - build-analytics-bundle", () => {
       generation_id: GENERATION_ID,
       completed_at: expect.any(String)
     });
-    expect(ack).toHaveBeenCalledOnce();
   });
 
-  it("acks completed generations without rebuilding the artifact", async (): Promise<void> => {
-    const ack = vi.fn().mockResolvedValue(undefined);
+  it("skips completed generations without rebuilding the artifact", async (): Promise<void> => {
     const putObject = vi.fn();
     const getObject = vi.fn();
 
     await expect(
       processNextBuildAnalyticsBundleJob({
         queue: {
-          claim: vi.fn().mockResolvedValue({
-            payload: {
-              project_id: PROJECT_ID,
-              generation_id: GENERATION_ID,
-              requested_at: "2026-07-08T12:00:00.000Z",
-              trigger: "regeneration"
-            },
-            ack
+          dequeue: vi.fn().mockResolvedValue({
+            project_id: PROJECT_ID,
+            generation_id: GENERATION_ID,
+            requested_at: "2026-07-08T12:00:00.000Z",
+            trigger: "regeneration"
           })
         },
         analyticsBundleGenerationStore: {
@@ -168,7 +159,6 @@ describe("worker processor - build-analytics-bundle", () => {
     ).resolves.toEqual({ processed: true, reason: "analytics_bundle_generation_completed" });
 
     expect(putObject).not.toHaveBeenCalled();
-    expect(ack).toHaveBeenCalledOnce();
   });
 
   it("builds route-health bundles with route-exit sessions", async (): Promise<void> => {
@@ -602,7 +592,6 @@ describe("worker processor - build-analytics-bundle", () => {
   });
 
   it("marks the generation failed when artifact persistence throws", async (): Promise<void> => {
-    const ack = vi.fn().mockResolvedValue(undefined);
     const logger = { error: vi.fn() };
     const markAnalyticsBundleGenerationFailed = vi.fn().mockResolvedValue({
       ...createGenerationRecord(),
@@ -613,14 +602,11 @@ describe("worker processor - build-analytics-bundle", () => {
     await expect(
       processNextBuildAnalyticsBundleJob({
         queue: {
-          claim: vi.fn().mockResolvedValue({
-            payload: {
-              project_id: PROJECT_ID,
-              generation_id: GENERATION_ID,
-              requested_at: "2026-07-08T12:00:00.000Z",
-              trigger: "manual"
-            },
-            ack
+          dequeue: vi.fn().mockResolvedValue({
+            project_id: PROJECT_ID,
+            generation_id: GENERATION_ID,
+            requested_at: "2026-07-08T12:00:00.000Z",
+            trigger: "manual"
           })
         },
         analyticsBundleGenerationStore: {
@@ -657,7 +643,6 @@ describe("worker processor - build-analytics-bundle", () => {
       failed_at: expect.any(String),
       reason: "build_error"
     });
-    expect(ack).toHaveBeenCalledOnce();
   });
 });
 
@@ -703,14 +688,11 @@ async function buildBundleForGeneration(
   const putObject = vi.fn().mockResolvedValue(undefined);
   await processNextBuildAnalyticsBundleJob({
     queue: {
-      claim: vi.fn().mockResolvedValue({
-        payload: {
-          project_id: PROJECT_ID,
-          generation_id: GENERATION_ID,
-          requested_at: "2026-07-08T12:00:00.000Z",
-          trigger: "manual"
-        },
-        ack: vi.fn().mockResolvedValue(undefined)
+      dequeue: vi.fn().mockResolvedValue({
+        project_id: PROJECT_ID,
+        generation_id: GENERATION_ID,
+        requested_at: "2026-07-08T12:00:00.000Z",
+        trigger: "manual"
       })
     },
     analyticsBundleGenerationStore: {

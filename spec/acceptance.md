@@ -2391,6 +2391,8 @@ These checks cover specific correctness and resource bounds. They do not replace
 
 ### Worker durability acceptance checks
 
+- The real analytics bundle processor runs against the production durable queue without idle-loop errors. Redis adoption produces a schema-valid AnalyticsBundle and a completed payload-free receipt; metadata-read failures retry, and failed journal completion cannot fail or rebuild an already completed generation.
+
 - A forced interruption after a normalization/grouping follow-up insert rolls back its processed marker or occurrence update and all follow-ups. Restart produces one occurrence and readable bundle/reproduction artifacts.
 - Redis acknowledgement failure after journal insertion and later legacy replay do not lose work or duplicate occurrence accounting. A later explicit same-source regeneration still executes and schedules reproduction.
 - Four concurrent claimers consume 1,000 unique jobs without double claims. Concurrent same-fingerprint grouping preserves all occurrence identities and chronological first/last-seen bounds.

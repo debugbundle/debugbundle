@@ -734,3 +734,5 @@ The durable queue adapter treats reproduction `bundle_missing`/`bundle_invalid` 
 `storage/object-store-errors.ts` owns the shared explicit-absence classifier used by OpenAI artifact readers and incident/improvement context loaders. Non-absence storage failures propagate to bounded build retries instead of silently discarding available context.
 
 Core 1.9.1 forwards `WORKER_START_PAUSED` through `worker-env.ts` into startup activation. Environment and full-startup regressions cover the paused boundary; the private cloud image build also verifies this wiring before publication. Hosted migration/activation and a bounded native-browser/improvement canary passed; broader capacity and customer adoption remain separate.
+
+Core 1.9.2 aligns analytics bundle processing with the durable queue `dequeue` contract and removes its direct Redis acknowledgement. The shared worker lane owns completion/retry, including recovery after an artifact completes but its journal acknowledgement fails. Real runtime-composition and storage-backed analytics regressions cover this boundary.
