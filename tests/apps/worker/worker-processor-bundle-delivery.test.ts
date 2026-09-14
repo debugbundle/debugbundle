@@ -1887,7 +1887,7 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
       commit: "abcdef1234567890",
       commit_short: "abcdef1",
       branch: "main",
-      repo: process.env["GITHUB_REPOSITORY"] ?? null,
+      repo: null,
       dirty: false,
       source: "env"
     });

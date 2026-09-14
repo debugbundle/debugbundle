@@ -1,11 +1,14 @@
 import { gunzipSync, gzipSync } from "node:zlib";
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { processNextBuildBundleJob } from "../../../apps/worker/src/processor.js";
 import { createEventEnvelope } from "../../../packages/shared-types/src/index.js";
+
+afterEach(() => vi.unstubAllEnvs());
 
 it.each([false, true, "history"])(
   "never assigns the platform release to customer bundle metadata (customer deploy: %s)",
   async (hasDeploy) => {
+    vi.stubEnv("GITHUB_REPOSITORY", "platform/ci-repository");
     const occurredAt = "2026-09-13T12:00:00.000Z";
     const eventId = "00000000-0000-4000-8000-000000000001";
     const customerSha = "a".repeat(40);
