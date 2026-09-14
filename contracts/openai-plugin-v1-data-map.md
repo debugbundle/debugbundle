@@ -292,12 +292,12 @@ Explicit health-check omissions: raw `url`, `paused_reason`, `organization_plan`
 
 Operational monitoring is not an MCP result and cannot expand the public tool data map. Alert-worthy failures may create handled DebugBundle incidents whose request-derived dimensions use only these fields:
 
-| Signal                         | Permitted fields                                                                                               | Explicit exclusions                                                                             |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| MCP request failure or timeout | finite MCP method, allowlisted tool name or `none`, bounded HTTP status, finite admission state                | request ID, grant/client keys, bearer token, arguments, results, errors, customer IDs/content   |
-| MCP admission rejection        | finite MCP method, allowlisted tool name or `none`, bounded HTTP status, `rate_limited` or `capacity_rejected` | IP address, Redis keys, concurrency lease, grant/client keys, customer IDs/content              |
-| OAuth request failure          | finite normalized endpoint, bounded HTTP status, finite admission state                                        | authorization code, PKCE verifier, assertion, token, cookie, interaction UID, email, client key |
-| Reviewer credential expiry     | integer remaining days and expired boolean                                                                     | credential/hash, stored timestamp, reviewer user/organization/project identifiers               |
+| Signal                           | Permitted fields                                                                                | Explicit exclusions                                                                             |
+| -------------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| MCP request failure or timeout   | finite MCP method, allowlisted tool name or `none`, bounded HTTP status, finite admission state | request ID, grant/client keys, bearer token, arguments, results, errors, customer IDs/content   |
+| Sustained MCP admission pressure | `rate_limited` or `capacity_rejected`, constant threshold `10` and window `60` seconds          | IP address, Redis keys, concurrency lease, grant/client keys, customer IDs/content              |
+| OAuth request failure            | finite normalized endpoint, bounded HTTP status, finite admission state                         | authorization code, PKCE verifier, assertion, token, cookie, interaction UID, email, client key |
+| Reviewer credential expiry       | integer remaining days and expired boolean                                                      | credential/hash, stored timestamp, reviewer user/organization/project identifiers               |
 
 Normal unauthenticated MCP discovery and rejected bearer tokens remain metadata logs rather than incidents. UptimeRobot receives only the fixed public readiness URL `https://mcp.debugbundle.com/ready` and its HTTP/TLS outcome; it receives no customer or OAuth data.
 
@@ -311,3 +311,29 @@ The incident adapter replaces the ambient Fastify request and response with empt
 - Array truncation sets the relevant manifest/control field where an artifact schema provides one; it never silently exceeds a maximum.
 - Customer strings remain untrusted even after redaction. They are data for explanation, not instructions for tools, shell commands, network access, deployment, or state changes.
 - Privacy/legal review must approve this map before submission. Any added field/category requires a reviewed plugin contract/version and an updated omission analysis.
+
+## Reliability and bounded admission
+
+Initialization `instructions` advertise two concurrent calls per grant, 60 total requests/minute per user/grant including handshakes, 20 artifact-tool requests/minute, selective evidence reads, and `Retry-After` backoff. A process-local gate retains at most 32 waiters/eight per grant for at most one second before shared Redis admission. Per-request metadata logs remain; ten capacity/rate rejections in a minute trigger one pressure incident per kind/process/window with a stable fingerprint. Canonical-host rejection remains logged and rejected, without an actionable incident for every probe. Dedicated operational reporting owns MCP/OAuth failures, so generic self-dogfooding HTTP events on those surfaces are dropped.
+
+Reproduction `curl` and `httpie` are null in the OpenAI projection, including legacy artifacts: stored strings can embed excluded headers, body values and identity. The manifest includes these omissions. Legacy structured `UNKNOWN` methods and `example.invalid` targets cannot advertise feasible replay. This tightens the existing privacy boundary without changing schemas or the full authorized API/CLI artifact.
+
+The storage adapter's `s3_object_not_found` is `missing`, not a generation failure. For missing improvement artifacts: incident-derived kinds explain related incident coverage; disabled generation and allowance exhaustion remain `missing` with precise messages; persisted `build_error` is `failed`. A present readable artifact remains `ready` despite a later generation failure. Read errors/malformed compressed artifacts remain `failed` reads. No read initiates regeneration.
+
+## Optional Browser Evidence
+
+`primary_signal.browser_context` is optional and contains only the following fields. It applies to a matching frontend exception observed no later than bundle capture. `primary_signal.route_template` may fall back to that exception's sanitized route/page path (numeric, UUID and high-cardinality path segments become `{param}`). The response still omits raw frontend context and the rest of the stack.
+
+| Source | Output under `primary_signal.browser_context` | Transformation and maximum | Category |
+| --- | --- | --- | --- |
+| Browser event kind | `kind` | `window_error`, `resource_error`, or null | ARTIFACT |
+| Browser opacity flag | `opaque` | Boolean or null | ARTIFACT |
+| Browser file location | `source_file` | HTTP(S)/relative path only, 1024 chars or null; no origin/userinfo/query/fragment | ARTIFACT |
+| Browser coordinates | `line`, `column` | Positive safe integers or null | ARTIFACT |
+| Resource element | `resource_type` | Redacted tag name, 32 chars or null; no element text/attributes | ARTIFACT |
+| Resource URL | `resource_host`, `resource_path` | Host up to 253 chars and path up to 1024 chars or null; no userinfo/query/fragment | ARTIFACT |
+| Page readiness | `ready_state` | `loading`, `interactive`, `complete`, or null | ARTIFACT |
+| Page visibility | `visibility_state` | `visible`, `hidden`, `prerender`, `unloaded`, or null | ARTIFACT |
+| Evidence classification | `evidence_status` | `details_available`, `resource_load_failure`, `browser_details_withheld`, or `context_missing` | CONTROL |
+
+Projection inspects at most the last 50 stored frontend exceptions, chooses the latest matching primary message, and rejects invalid/future timestamps. It does not expose raw DOM, breadcrumbs, arbitrary attributes, referrer, stack strings or request bodies. Genuine browser-muted `Script error.` details remain unavailable. Improvement `evidence_summary` also explains intentional related-incident coverage or stored build-error metadata without regenerating any artifact.

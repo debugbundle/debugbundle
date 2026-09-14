@@ -76,8 +76,11 @@ export async function processNextBuildImprovementBundleJob(input: {
       opportunity_id: job.opportunity_id,
       reason: "build_error"
     });
+    throw error;
   } finally {
-    await input.queue.releaseLease?.(buildImprovementBundleRegenerationLeaseKey(job.opportunity_id));
+    await input.queue.releaseLease?.(
+      buildImprovementBundleRegenerationLeaseKey(job.opportunity_id)
+    );
   }
 
   return { processed: true };

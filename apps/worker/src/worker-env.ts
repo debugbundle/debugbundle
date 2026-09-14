@@ -56,6 +56,7 @@ const WorkerEnvSchema = z.object({
   LIFECYCLE_WEBHOOK_SECRET: z.string().min(1).optional(),
   WORKER_HEALTH_PORT: z.coerce.number().int().min(0).max(65535).default(0),
   WORKER_RUN_ONCE: z.enum(["0", "1"]).default("0"),
+  WORKER_START_PAUSED: z.enum(["0", "1"]).default("0"),
   ANALYTICS_HASH_SECRET: z.string().min(1),
   OPENAI_OAUTH_ENABLED: z.enum(["0", "1", "false", "true"]).default("false"),
   OPENAI_OAUTH_ADAPTER_ENCRYPTION_KEY: z.string().min(1).optional(),

@@ -13,6 +13,7 @@ import type {
   OpenAiOperationalSignal
 } from "./openai-operational-monitoring.js";
 import { createRuntimeLoggerFromEnv } from "../../../packages/runtime-logger/src/index.js";
+import { createOperationalPressureSampler } from "../../../packages/mcp-core/src/operational-pressure.js";
 
 const dogfoodingLogger = createRuntimeLoggerFromEnv({
   app: "api",
@@ -50,11 +51,20 @@ const OPENAI_OPERATIONAL_EVENT_NAMES = new Set([
   "openai_mcp_request_failure",
   "openai_mcp_request_timeout",
   "openai_mcp_admission_rejected",
+  "openai_mcp_admission_pressure",
   "openai_oauth_request_failure",
   "openai_reviewer_credential_expiring"
 ]);
 
-export function sanitizeApiDogfoodingEvent(event: EventEnvelope): EventEnvelope {
+export function sanitizeApiDogfoodingEvent(event: EventEnvelope): EventEnvelope | null {
+  // These routes have a dedicated metadata-only monitor. Generic HTTP capture
+  // duplicates failures and can retain OAuth/MCP arguments and caller metadata.
+  if (
+    event.event_type === "request_event" &&
+    (event.payload.path.split("?", 1)[0] === "/mcp" || event.payload.path.startsWith("/oauth/"))
+  ) {
+    return null;
+  }
   if (
     event.event_type !== "backend_exception" ||
     !OPENAI_OPERATIONAL_EVENT_NAMES.has(event.payload.message.split(" ", 1)[0] ?? "")
@@ -115,10 +125,20 @@ function formatOpenAiOperationalSignal(signal: OpenAiOperationalSignal): string 
 }
 
 export function createApiDogfoodingOpenAiMonitor(
-  sdk: Pick<ApiDogfoodingSdk, "captureError"> = debugbundle
+  sdk: Pick<ApiDogfoodingSdk, "captureError"> = debugbundle,
+  now: () => number = Date.now
 ): OpenAiOperationalMonitor {
+  const pressure = createOperationalPressureSampler(now);
   return (signal) => {
-    const error = new Error(formatOpenAiOperationalSignal(signal));
+    if ("admission" in signal && signal.admission === "canonical_host_rejected") return;
+    let message: string;
+    if (signal.category === "mcp_admission_rejected") {
+      if (!pressure(signal.admission)) return;
+      message = `openai_mcp_admission_pressure admission=${signal.admission} threshold=10 window_seconds=60`;
+    } else {
+      message = formatOpenAiOperationalSignal(signal);
+    }
+    const error = new Error(message);
     error.stack = `${error.name}: ${error.message}`;
     sdk.captureError(error, { handled: true, request: {} });
   };

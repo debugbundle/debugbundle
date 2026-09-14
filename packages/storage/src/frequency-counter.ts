@@ -3,6 +3,7 @@ import { Redis } from "ioredis";
 import type {
   CreateRedisQueueClientInput,
   FrequencySnapshotStore,
+  Queryable,
   IncidentFrequencyCounter,
   IncidentFrequencySnapshot,
   RequestAnomalyCounter
@@ -68,22 +69,15 @@ async function recordFrequencyOccurrence(input: {
   };
 }
 
-export function createRedisIncidentFrequencyCounter(
-  input: CreateRedisQueueClientInput
-): IncidentFrequencyCounter & { close(): Promise<void> } {
-  const redis = new Redis(input.redisUrl);
-  const snapshotIntervalSeconds =
-    input.frequencySnapshotIntervalSeconds ?? DEFAULT_FREQUENCY_SNAPSHOT_INTERVAL_SECONDS;
-  const lastSnapshotByIncidentId = new Map<string, number>();
-  const snapshotQueryable = input.snapshotStore;
-
-  const snapshotStore: FrequencySnapshotStore | null =
-    snapshotQueryable === undefined
-      ? null
-      : {
-          async persistIncidentFrequencySnapshot(snapshotInput): Promise<void> {
-            await snapshotQueryable.query(
-              `
+function createFrequencySnapshotStore(
+  snapshotQueryable: Queryable | undefined
+): FrequencySnapshotStore | null {
+  return snapshotQueryable === undefined
+    ? null
+    : {
+        async persistIncidentFrequencySnapshot(snapshotInput): Promise<void> {
+          await snapshotQueryable.query(
+            `
                 UPDATE incidents
                 SET
                   frequency_occurrences_1m = $2,
@@ -99,24 +93,37 @@ export function createRedisIncidentFrequencyCounter(
                 WHERE id = $1::uuid
                   AND (frequency_snapshot_at IS NULL OR frequency_snapshot_at <= $10::timestamptz)
               `,
-              [
-                snapshotInput.incident_id,
-                snapshotInput.occurrences_1m,
-                snapshotInput.occurrences_5m,
-                snapshotInput.occurrences_1h,
-                snapshotInput.occurrences_24h,
-                snapshotInput.baseline_1h_per_5m,
-                snapshotInput.spike_ratio_5m_to_1h,
-                snapshotInput.has_sufficient_baseline,
-                snapshotInput.is_spiking,
-                snapshotInput.occurred_at
-              ]
-            );
-          }
-        };
+            [
+              snapshotInput.incident_id,
+              snapshotInput.occurrences_1m,
+              snapshotInput.occurrences_5m,
+              snapshotInput.occurrences_1h,
+              snapshotInput.occurrences_24h,
+              snapshotInput.baseline_1h_per_5m,
+              snapshotInput.spike_ratio_5m_to_1h,
+              snapshotInput.has_sufficient_baseline,
+              snapshotInput.is_spiking,
+              snapshotInput.occurred_at
+            ]
+          );
+        }
+      };
+}
+
+export function createRedisIncidentFrequencyCounter(
+  input: CreateRedisQueueClientInput
+): IncidentFrequencyCounter & { close(): Promise<void> } {
+  const redis = new Redis(input.redisUrl);
+  const snapshotIntervalSeconds =
+    input.frequencySnapshotIntervalSeconds ?? DEFAULT_FREQUENCY_SNAPSHOT_INTERVAL_SECONDS;
+  const lastSnapshotByIncidentId = new Map<string, number>();
 
   return {
-    async recordOccurrence(event): Promise<IncidentFrequencySnapshot> {
+    async recordOccurrence(
+      event,
+      snapshotQueryable = input.snapshotStore
+    ): Promise<IncidentFrequencySnapshot> {
+      const snapshotStore = createFrequencySnapshotStore(snapshotQueryable);
       const windowKey = `incident-frequency:${event.incident_id}`;
       const occurredAt = toUnixSeconds(event.occurred_at);
       const snapshot = await recordFrequencyOccurrence({

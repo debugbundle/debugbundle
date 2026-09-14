@@ -65,7 +65,7 @@ const improvement = {
   first_detected_at: NOW,
   last_detected_at: NOW,
   bundle_generation_number: 1,
-  bundle_failure_reason: null
+  bundle_failure_reason: null as string | null
 };
 
 const bundle = gzipSync(
@@ -444,6 +444,118 @@ const toolInputs: Record<(typeof OPENAI_TOOL_NAMES)[number], Record<string, unkn
 };
 
 describe("dedicated OpenAI hosted readers", () => {
+  it("explains related-incident coverage without claiming failed generation", async () => {
+    const fixture = createDependencies();
+    fixture.dependencies.improvementManagement.getImprovementForOrganization.mockResolvedValue({
+      ...improvement,
+      kind: "recurring_incident",
+      bundle_generation_number: 0
+    });
+    fixture.dependencies.objectStoreReader.getObject.mockRejectedValue(
+      new Error("s3_object_not_found")
+    );
+    const handlers = createOpenAiHostedToolHandlers({
+      operations: createOpenAiHostedOperations({
+        dependencies: fixture.dependencies as never,
+        dashboardBaseUrl: "https://app.debugbundle.com"
+      })
+    });
+    const result = await handlers.get_improvement({
+      principal: PRINCIPAL,
+      input: toolInputs.get_improvement
+    });
+    expect(result.structuredContent).toMatchObject({
+      artifact_status: "missing",
+      evidence_summary: expect.arrayContaining([
+        "This improvement uses its related incident bundles; a separate improvement artifact is not generated."
+      ])
+    });
+  });
+  it.each([
+    [
+      "monthly_quota_exceeded",
+      "missing",
+      "Artifact generation is blocked by the monthly allowance. No regeneration was started."
+    ],
+    [
+      "bundle_generation_disabled",
+      "missing",
+      "Artifact generation is disabled for this project. No regeneration was started."
+    ],
+    ["build_error", "failed", "Artifact generation was unsuccessful. No regeneration was started."]
+  ])("distinguishes missing artifacts with %s", async (reason, status, message) => {
+    const fixture = createDependencies();
+    fixture.dependencies.improvementManagement.getImprovementForOrganization.mockResolvedValue({
+      ...improvement,
+      bundle_failure_reason: reason
+    });
+    fixture.dependencies.objectStoreReader.getObject.mockRejectedValue(
+      new Error("s3_object_not_found")
+    );
+    const handlers = createOpenAiHostedToolHandlers({
+      operations: createOpenAiHostedOperations({
+        dependencies: fixture.dependencies as never,
+        dashboardBaseUrl: "https://app.debugbundle.com"
+      })
+    });
+    const result = await handlers.get_improvement_bundle({
+      principal: PRINCIPAL,
+      input: toolInputs.get_improvement_bundle
+    });
+    expect(result.structuredContent).toMatchObject({ status, message });
+    const detail = await handlers.get_improvement({
+      principal: PRINCIPAL,
+      input: toolInputs.get_improvement
+    });
+    expect(detail.structuredContent).toMatchObject({ artifact_status: status });
+  });
+  it("recognizes the storage adapter's missing-object error without claiming generation failed", async () => {
+    const fixture = createDependencies();
+    fixture.dependencies.objectStoreReader.getObject.mockRejectedValue(
+      new Error("s3_object_not_found")
+    );
+    const operations = createOpenAiHostedOperations({
+      dependencies: fixture.dependencies as never,
+      dashboardBaseUrl: "https://app.debugbundle.com"
+    });
+    const handlers = createOpenAiHostedToolHandlers({ operations });
+    for (const name of ["get_bundle", "get_reproduction", "get_improvement_bundle"] as const) {
+      const result = await handlers[name]({ principal: PRINCIPAL, input: toolInputs[name] });
+      expect(result.structuredContent).toMatchObject({ status: "missing", artifact: null });
+    }
+    const detail = await handlers.get_improvement({
+      principal: PRINCIPAL,
+      input: toolInputs.get_improvement
+    });
+    expect(detail.structuredContent).toMatchObject({ artifact_status: "missing" });
+    expect(fixture.bundleRegeneration.requestRegeneration).not.toHaveBeenCalled();
+  });
+
+  it("explains incident-covered improvements without claiming a standalone generation failure", async () => {
+    const fixture = createDependencies();
+    fixture.dependencies.improvementManagement.getImprovementForOrganization.mockResolvedValue({
+      ...improvement,
+      kind: "recurring_incident"
+    });
+    fixture.dependencies.objectStoreReader.getObject.mockRejectedValue(
+      new Error("s3_object_not_found")
+    );
+    const handlers = createOpenAiHostedToolHandlers({
+      operations: createOpenAiHostedOperations({
+        dependencies: fixture.dependencies as never,
+        dashboardBaseUrl: "https://app.debugbundle.com"
+      })
+    });
+    const result = await handlers.get_improvement_bundle({
+      principal: PRINCIPAL,
+      input: toolInputs.get_improvement_bundle
+    });
+    expect(result.structuredContent).toMatchObject({
+      status: "missing",
+      message:
+        "This improvement uses its related incident bundles; a separate improvement artifact is not generated."
+    });
+  });
   it("returns schema-valid bounded projections for all twenty-three tools without side effects", async () => {
     const fixture = createDependencies();
     const operations = createOpenAiHostedOperations({

@@ -88,7 +88,11 @@ export function createOpenAiSdkServer(input: {
 }): Server {
   const server = new Server(
     { name: "debugbundle-openai-plugin", version: "1.0.0" },
-    { capabilities: { tools: {} } }
+    {
+      capabilities: { tools: {} },
+      instructions:
+        "Read-only DebugBundle. Prefer sequential calls; at most 2 concurrent calls per connection. Budgets per user/connection: 60 requests/minute including handshakes, 20 artifact reads/minute. Start with lists, then get_incident_context for selected incidents; avoid fetching the same evidence again with get_bundle/get_reproduction. On HTTP 429 or 503 honor Retry-After, reduce concurrency, and stop repeated retries. Missing artifacts are not proof of failed generation; reads never regenerate them."
+    }
   );
   const operationTimeoutMs = input.operationTimeoutMs ?? 24_000;
   const operations = Object.fromEntries(

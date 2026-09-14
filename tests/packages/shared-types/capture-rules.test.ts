@@ -336,7 +336,7 @@ describe("capture rule matching", () => {
     });
   });
 
-  it("supports exact fingerprint matching", () => {
+  it.each([false, true])("supports exact fingerprint matching with a prior-version alias: %s", (legacyAlias) => {
     const fingerprintRule: CaptureRule = {
       ...baseRule,
       id: "00000000-0000-4000-8000-000000000106",
@@ -358,9 +358,10 @@ describe("capture rule matching", () => {
         runtime: "browser",
         client_kind: "unknown",
         fingerprint: {
-          version: "v1",
-          value: "fp_browser_noise",
+          version: legacyAlias ? "v2" : "v1",
+          value: legacyAlias ? "new_fingerprint" : "fp_browser_noise",
         },
+        fingerprint_aliases: legacyAlias ? [{ version: "v1", value: "fp_browser_noise" }] : [],
       },
       "2026-05-26T10:00:00.000Z"
     );

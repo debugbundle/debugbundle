@@ -1,6 +1,9 @@
 import { REQUIRED_API_TABLES, REQUIRED_WORKER_TABLES, type Queryable } from "./migrations.js";
 
 const CURRENT_SCHEMA_SENTINEL_COLUMNS = [
+  { table_name: "worker_jobs", column_name: "depends_on" },
+  { table_name: "worker_jobs", column_name: "operator_retries" },
+  { table_name: "worker_jobs", column_name: "lease_token" },
   { table_name: "agent_webhooks", column_name: "created_by_user_id" },
   { table_name: "alert_rules", column_name: "created_by_user_id" },
   { table_name: "alert_rules", column_name: "cooldown_seconds" },

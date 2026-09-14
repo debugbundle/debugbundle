@@ -84,7 +84,9 @@ export function buildRequestPatternFingerprint(input: {
         environment: input.environment,
         http_method: input.http_method,
         route_template: input.route_template,
-        ...(input.kind === "request_failure_pattern" ? { response_status: input.response_status } : {})
+        ...(input.kind === "request_failure_pattern"
+          ? { response_status: input.response_status }
+          : {})
       })
     )
     .digest("hex");
@@ -110,15 +112,17 @@ export async function recordImprovementOpportunityOccurrence(
   db: Queryable,
   input: RecordImprovementOpportunityOccurrenceInput
 ): Promise<RecordedImprovementOpportunityOccurrence | null> {
-  const result = await db.query<{
-    opportunity_id: string;
-    occurrence_count: number;
-    bundle_generation_number: number;
-    event_recorded: boolean;
-    opportunity_created: boolean;
-    prior_status: "open" | "resolved" | "snoozed" | null;
-    prior_snoozed_until: string | null;
-  } & Record<string, unknown>>(
+  const result = await db.query<
+    {
+      opportunity_id: string;
+      occurrence_count: number;
+      bundle_generation_number: number;
+      event_recorded: boolean;
+      opportunity_created: boolean;
+      prior_status: "open" | "resolved" | "snoozed" | null;
+      prior_snoozed_until: string | null;
+    } & Record<string, unknown>
+  >(
     `
       WITH existing_opportunity AS (
         SELECT status
@@ -227,7 +231,7 @@ export async function recordImprovementOpportunityOccurrence(
             WHEN EXCLUDED.kind = 'warning_hotspot'
               THEN CASE WHEN improvement_opportunities.occurrence_count + 1 >= 10 THEN 'high' ELSE 'medium' END
             WHEN EXCLUDED.kind = 'slow_request'
-              THEN CASE WHEN ($19::int IS NOT NULL AND COALESCE($18::int, 0) >= $19::int * 2) OR improvement_opportunities.occurrence_count + 1 >= 10 THEN 'high' ELSE 'medium' END
+              THEN CASE WHEN ($19::double precision IS NOT NULL AND COALESCE($18::double precision, 0) >= $19::double precision * 2) OR improvement_opportunities.occurrence_count + 1 >= 10 THEN 'high' ELSE 'medium' END
             WHEN EXCLUDED.kind = 'request_failure_pattern'
               THEN CASE WHEN COALESCE($17::int, 0) >= 500 OR improvement_opportunities.occurrence_count + 1 >= 10 THEN 'high' ELSE 'medium' END
             ELSE EXCLUDED.severity
@@ -240,10 +244,12 @@ export async function recordImprovementOpportunityOccurrence(
           END,
           title = CASE
             WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.title
+            WHEN EXCLUDED.last_detected_at < improvement_opportunities.last_detected_at THEN improvement_opportunities.title
             ELSE EXCLUDED.title
           END,
           summary = CASE
             WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.summary
+            WHEN EXCLUDED.last_detected_at < improvement_opportunities.last_detected_at THEN improvement_opportunities.summary
             ELSE EXCLUDED.summary
           END,
           occurrence_count = improvement_opportunities.occurrence_count + CASE
@@ -252,14 +258,14 @@ export async function recordImprovementOpportunityOccurrence(
           END,
           evidence = CASE
             WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.evidence
+            WHEN EXCLUDED.last_detected_at < improvement_opportunities.last_detected_at THEN improvement_opportunities.evidence
             ELSE EXCLUDED.evidence
           END,
-          last_detected_at = CASE
-            WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.last_detected_at
-            ELSE EXCLUDED.last_detected_at
-          END,
+          first_detected_at = CASE WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.first_detected_at ELSE LEAST(improvement_opportunities.first_detected_at, EXCLUDED.first_detected_at) END,
+          last_detected_at = CASE WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.last_detected_at ELSE GREATEST(improvement_opportunities.last_detected_at, EXCLUDED.last_detected_at) END,
           last_source_event_id = CASE
             WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.last_source_event_id
+            WHEN EXCLUDED.last_detected_at < improvement_opportunities.last_detected_at THEN improvement_opportunities.last_source_event_id
             ELSE EXCLUDED.last_source_event_id
           END,
           related_incident_ids = CASE
@@ -352,9 +358,13 @@ export async function recordImprovementOpportunityOccurrence(
       input.source_event_type,
       input.related_incident_id ?? null,
       input.threshold,
-      typeof input.evidence["response_status"] === "number" ? input.evidence["response_status"] : null,
+      typeof input.evidence["response_status"] === "number"
+        ? input.evidence["response_status"]
+        : null,
       typeof input.evidence["duration_ms"] === "number" ? input.evidence["duration_ms"] : null,
-      typeof input.evidence["slow_request_duration_threshold_ms"] === "number" ? input.evidence["slow_request_duration_threshold_ms"] : null
+      typeof input.evidence["slow_request_duration_threshold_ms"] === "number"
+        ? input.evidence["slow_request_duration_threshold_ms"]
+        : null
     ]
   );
 
@@ -373,13 +383,17 @@ export async function recordImprovementOpportunityOccurrence(
     occurrence_count: row.occurrence_count,
     bundle_generation_number: row.bundle_generation_number,
     should_generate_bundle:
-      row.event_recorded && !priorSnoozeActive && row.bundle_generation_number === 0 && row.occurrence_count >= input.threshold,
+      row.event_recorded &&
+      !priorSnoozeActive &&
+      row.bundle_generation_number === 0 &&
+      row.occurrence_count >= input.threshold,
     lifecycle_transition:
       row.event_recorded !== true
         ? "none"
         : row.opportunity_created === true
           ? "opened"
-          : row.prior_status === "resolved" || (row.prior_status === "snoozed" && !priorSnoozeActive)
+          : row.prior_status === "resolved" ||
+              (row.prior_status === "snoozed" && !priorSnoozeActive)
             ? "reopened"
             : "none"
   };

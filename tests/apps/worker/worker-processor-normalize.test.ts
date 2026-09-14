@@ -121,7 +121,7 @@ describe("worker processor \u2013 normalize-events", () => {
       expect.objectContaining({
         severity: "high",
         event_type: "backend_exception",
-        fingerprint_version: "v1",
+        fingerprint_version: "v2",
         matched_fields: [
           "environment",
           "normalized_message",

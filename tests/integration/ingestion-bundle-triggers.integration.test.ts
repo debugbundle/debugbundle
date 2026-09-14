@@ -2430,9 +2430,9 @@ runIntegration("ingestion integration \u2013 bundle triggers", () => {
     });
     expect(reproductionResponse.statusCode).toBe(200);
     expect(reproductionResponse.json()).toEqual({
-      possible: true,
-      confidence: 0.8,
-      reason: "request_context_available",
+      possible: false,
+      confidence: 0.1,
+      reason: "request_target_unavailable",
       artifacts: {
         curl: "curl -X POST 'https://example.invalid/checkout?coupon=SAVE10' -H 'content-type: application/json' --data-raw '{\"amount\":42}'",
         httpie:
@@ -2471,7 +2471,7 @@ runIntegration("ingestion integration \u2013 bundle triggers", () => {
     expect(firstStoredReproduction.equals(secondStoredReproduction)).toBe(true);
   });
 
-  it("should persist low-confidence reproduction first and deterministically upgrade when request context first appears", async (): Promise<void> => {
+  it("should add a deterministic incomplete template when request context appears without an origin", async (): Promise<void> => {
     const projectId = randomUUID();
     const organizationId = randomUUID();
     const serviceId = randomUUID();
@@ -2755,9 +2755,9 @@ runIntegration("ingestion integration \u2013 bundle triggers", () => {
     });
     expect(upgradedReproductionResponse.statusCode).toBe(200);
     expect(upgradedReproductionResponse.json()).toEqual({
-      possible: true,
-      confidence: 0.8,
-      reason: "request_context_available",
+      possible: false,
+      confidence: 0.1,
+      reason: "request_target_unavailable",
       artifacts: {
         curl: "curl -X POST 'https://example.invalid/checkout?coupon=SAVE10' -H 'content-type: application/json' --data-raw '{\"amount\":42}'",
         httpie:

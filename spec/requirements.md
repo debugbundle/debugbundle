@@ -168,7 +168,7 @@ Execution eligibility under FR-AVC-04 must exclude checks beyond the per-project
 
 **FR-PROC-06:** Process jobs: `group-incident`, `build-bundle`, `build-reproduction`, `deliver-webhook`, `cleanup-retention`.
 
-**FR-PROC-07:** All processing jobs must be idempotent.
+**FR-PROC-07:** All processing jobs must be idempotent. Worker normalization/grouping must atomically commit processed/occurrence metadata and durable follow-up jobs. Redis ingress must be acknowledged only after durable worker ownership is established. Optional improvement evaluation must be independently retryable. Out-of-order occurrences must preserve the earliest first-seen and latest last-seen timestamps.
 
 ### 1.4 Grouping & Incident Lifecycle
 
@@ -800,7 +800,7 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **NFR-REL-02:** Fail visibly, not silently. Prefer degraded operation over total failure.
 
-**NFR-REL-03:** Processing jobs must be idempotent with bounded retries, deduplication, dead-letter/failed-job visibility.
+**NFR-REL-03:** Processing jobs must be idempotent with bounded retries, deduplication, dead-letter/failed-job visibility. Postgres-owned jobs use fenced leases, bounded retry delays/attempts, bounded payload retention, metadata-only operator inspection and explicit scoped recovery. Cleanup must preserve dependency receipts while children reference them. Lifecycle publication must wait for its required artifact build to complete; skipped/failed builds must not be reported as successful artifacts. Worker stages must make progress under sustained ingress, and outbound delivery must run independently of the incident loop using existing bounded resources. See `spec/worker-durability.md` for exact limits and rollout compatibility.
 
 **NFR-REL-04:** Health endpoints: `/health`, `/ready`, `/live` — machine-readable.
 
@@ -879,7 +879,7 @@ Self-hosted deployments have no enforced rate limits (configurable via environme
 
 **NFR-OBS-02:** Track: ingestion failures, queue backlog, bundle generation failures, webhook delivery failures, auth anomalies.
 
-**NFR-OBS-03:** The official OpenAI plugin must dogfood DebugBundle for alert-worthy MCP request failures, MCP timeouts, MCP admission rejection, OAuth failures, and reviewer-credential expiry using handled incidents whose request-derived dimensions are limited to finite endpoint/method/tool/status/admission fields. Before delivery, the capture must replace the ambient request and response with empty placeholders, clear correlation, remove probe data and executable stack frames, and reduce runtime context to the Node version; only the normal service/environment, SDK/version, event time/ID, and ingestion-authentication envelope may remain. Normal unauthenticated MCP discovery and rejected bearer tokens must remain logs rather than incidents. Independent public reachability and TLS coverage must monitor `https://mcp.debugbundle.com/ready` outside the DebugBundle/AWS runtime, while the existing AWS alarm baseline remains unchanged. The baseline monitoring installer must not create dedicated OpenAI CloudWatch custom metrics or alarms; a paid monitor or new recurring monitoring spend still requires explicit owner approval.
+**NFR-OBS-03:** The official OpenAI plugin must dogfood DebugBundle for alert-worthy MCP request failures, MCP timeouts, sustained MCP admission pressure, OAuth failures, and reviewer-credential expiry using handled incidents whose request-derived dimensions are limited to finite endpoint/method/tool/status/admission fields. Before delivery, the capture must replace the ambient request and response with empty placeholders, clear correlation, remove probe data and executable stack frames, and reduce runtime context to the Node version; only the normal service/environment, SDK/version, event time/ID, and ingestion-authentication envelope may remain. Normal unauthenticated MCP discovery and rejected bearer tokens must remain logs rather than incidents. Independent public reachability and TLS coverage must monitor `https://mcp.debugbundle.com/ready` outside the DebugBundle/AWS runtime, while the existing AWS alarm baseline remains unchanged. The baseline monitoring installer must not create dedicated OpenAI CloudWatch custom metrics or alarms; a paid monitor or new recurring monitoring spend still requires explicit owner approval.
 
 ### 2.8 Schema Evolution
 
@@ -904,3 +904,18 @@ Self-hosted deployments have no enforced rate limits (configurable via environme
 **NFR-MCP-05:** Consent, reviewer, and connection-management surfaces reuse the existing accessible app design system and remain keyboard/screen-reader usable at mobile and desktop widths. The API, not UI state, validates exact client, redirect, resource, requested/selected scopes, interaction freshness, browser session, verified email, membership, organization, reviewer identity, and grant ownership. Consent decisions are limited to 10/minute/IP and 30/minute per pseudonymous session-plus-client interaction with a global backstop, fail closed when Redis coordination is unavailable, preserve user scope selections across retryable failures, and never send identifiers, credentials, or scope toggles to product analytics.
 
 The repository must also provide an explicitly opted-in development/test-only synthetic preview at `/__dev/openai-plugin` that composes the production consent, reviewer, and connection components with deterministic non-customer fixtures. It must cover every state in `tests/fixtures/openai-plugin-v1/ui-preview-matrix.json`, all 64 product-scope subsets, and real 390 px, 768 px, and 1280 px iframe viewports. Preview actions stay in browser memory and issue no OAuth, reviewer, grant, or revocation request. The route must not mount in a production build even if its development opt-in variable is supplied. Preview evidence assists manual review but never satisfies deployed, live-client, reviewer, portal, or publication gates.
+
+### Incident reliability clarifications
+
+- **FR-BND-07 / FR-BND-01:** An SDK `UNKNOWN` request is not HTTP evidence. Invalid methods/URLs return explicit unavailable reasons without executable artifacts. A relative request without a captured origin retains compatible template artifacts but returns `possible: false`, confidence `0.1`, and `request_target_unavailable`; this is not verified replay. Hosted customer deploy/git context must never inherit the shared worker's deployment environment.
+- **NFR-MCP-01:** Before shared concurrency leases, a process-local wait may absorb short bursts for at most 1,000 ms, with at most 32 pending requests and eight pending per grant. Timeout/full queues return 503 with `Retry-After`; cancellation and shutdown remove waiters. Limits are advertised in MCP initialization instructions. No execution or rate limit is raised by waiting.
+- **NFR-OBS-03:** Admission pressure becomes alert-worthy after ten rejections of one kind within a process-local 60-second window, with at most one signal per kind/window. Fingerprints exclude method/tool dimensions for these aggregates. Individual rejections and canonical-host failures stay in metadata logs; real transport/tool/coordination failures remain immediate signals. Generic HTTP capture for the self-hosted MCP/OAuth surfaces must not duplicate the dedicated operational monitor or capture its request data.
+- **FR-MCP-07 / FR-BND-07:** The read-only OpenAI projection distinguishes storage absence from read failure and generation failure. Incident-derived improvements use related incident bundles; quota exhaustion and disabled generation explain missing artifacts without claiming worker failure. Existing artifacts remain readable after a later failed generation. Stored reproduction shell commands are omitted because serialized strings may contain excluded headers/bodies. Reads never regenerate or repair artifacts.
+
+### Incident evidence reliability refinements
+
+FR-SDK-03 / FR-REL-02 / FR-BND-01 require native prototype-backed browser error fields to survive SDK capture and relay forwarding, subject to the existing bounded privacy contract. A missing application stack must remain missing, HTTP(S) stack URLs must omit credentials/query/fragment, and instrumentation/getter failures must not escape into the host. Browser-muted cross-origin errors must be identified as unavailable rather than reconstructed.
+
+FR-GRP-09 / FR-EVT-08d require fingerprint v2 calendar normalization to remain confined to known WildFly timer diagnostics and require server-derived v1 aliases for installed exact-fingerprint rules. Aliases are internal evaluation context, never trusted ingestion fields. Existing incident fingerprints and versions are retained.
+
+FR-BND-01 / FR-RET-11 require ISO UTC bundle timestamps, occurrence-ordered improvement detection/evidence, and deployment attribution scoped to project, service, environment and triggering occurrence. Unknown workload deployment evidence must remain null. OpenAI browser evidence is an optional bounded projection of already-redacted frontend context; the public tool inventory and BundleV1 schema remain compatible.

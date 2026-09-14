@@ -814,8 +814,8 @@ If CLI says something is healthy and MCP says something different, that is a pro
 ### AC-MCP-16: Hybrid OpenAI Operational Monitoring
 
 - **Given** API dogfooding is connected for the hosted OpenAI runtime
-- **When** an alert-worthy MCP request fails or times out, MCP admission is rejected, OAuth fails, or the reviewer credential enters its warning horizon
-- **Then** DebugBundle receives a handled incident whose request-derived dimensions contain only bounded endpoint/method/tool/status/admission/expiry metadata; its delivery sanitizer empties request/response placeholders, clears correlation, removes probe data and executable stack frames, and retains only Node version from runtime context, while credentials, request arguments, tool results, customer content, customer IDs, and pseudonymous grant/client keys never appear
+- **When** an alert-worthy MCP request fails or times out, MCP admission pressure crosses the bounded reporting threshold, OAuth fails, or the reviewer credential enters its warning horizon
+- **Then** DebugBundle receives a handled incident whose request-derived dimensions contain only bounded endpoint/method/tool/status/admission/expiry metadata and constant pressure threshold/window fields; its delivery sanitizer empties request/response placeholders, clears correlation, removes probe data and executable stack frames, and retains only Node version from runtime context, while credentials, request arguments, tool results, customer content, customer IDs, and pseudonymous grant/client keys never appear
 - **And** normal unauthenticated MCP discovery and rejected bearer tokens remain metadata logs without creating incidents
 - **And** an independently operated free-tier monitor checks `https://mcp.debugbundle.com/ready` at five-minute intervals and alerts the account's existing email contact without rebooting the shared host or bypassing the MCP-only gate
 - **And** the existing AWS baseline remains intact, while its installer proves that no dedicated OpenAI CloudWatch custom metric or alarm can be added accidentally
@@ -2376,3 +2376,41 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Given** a stored GitHub Marketplace purchase snapshot with `installation_id = 42`
 - **When** that GitHub App installation is later linked to a DebugBundle organization through the normal installation completion flow
 - **Then** the stored Marketplace purchase snapshot is linked to that organization for attribution and export
+
+### Incident reliability regression coverage
+
+- Postgres accepts fractional and large request durations and preserves the evidence value.
+- Recovering 1,000 stale Redis claims uses atomic batches of at most 100 and concurrent recovery produces no duplicate/lost pending jobs.
+- Eight overlapping MCP HTTP reads complete with at most two executing calls. A 10,000-request local burst bounds waiters, expires/rejects excess work, and releases timers/capacity. Shared coordination remains mandatory.
+- 10,000 admission rejections produce one pressure signal per kind/process/window; isolated rejections remain logs and real execution failures still report immediately.
+- An actual missing S3 object returns `missing` through the OpenAI reader; quota, disabled generation, incident coverage, and build errors have distinct explanations.
+- Platform and customer deployment SHAs differ in worker tests: absent customer metadata yields null deploy/git; customer metadata never acquires the platform repository.
+- Unknown methods, invalid/credentialed URLs, and missing origins never advertise a usable replay. Legacy placeholder reproductions are downgraded at the OpenAI read boundary; serialized command strings cannot bypass header/body exclusions.
+
+These checks cover specific correctness and resource bounds. They do not replace the production load/soak and rollout gates in `spec/incident-reliability.md`.
+
+### Worker durability acceptance checks
+
+- A forced interruption after a normalization/grouping follow-up insert rolls back its processed marker or occurrence update and all follow-ups. Restart produces one occurrence and readable bundle/reproduction artifacts.
+- Redis acknowledgement failure after journal insertion and later legacy replay do not lose work or duplicate occurrence accounting. A later explicit same-source regeneration still executes and schedules reproduction.
+- Four concurrent claimers consume 1,000 unique jobs without double claims. Concurrent same-fingerprint grouping preserves all occurrence identities and chronological first/last-seen bounds.
+- A transactional stage works with a one-connection pool. A blocked delivery provider does not block incident passes. Optional improvement failure leaves incident evidence committed and its own job retryable.
+- A held incident-correlation transaction blocks the matching analytics write before it reads/updates route-session evidence. Once released, the route impact count is linked exactly once.
+- A full cleanup batch returns a continuation signal, preserves the 500-row bound, and resumes promptly until caught up; it must not leave a growing expired backlog at a fixed once-per-minute drain rate.
+- A replacement lease owner fences the stale owner; attempts stop at eight with visible failure metadata. An exact project/job retry cannot reset active/completed/skipped/expired work or cross project scope; payloads never appear in inspection output.
+- Lifecycle jobs cannot run before their build dependency completes. Quota-skipped builds suppress publication. Retention cannot remove a dependency receipt while a child references it; failed evidence expires without deleting an active lease.
+- Reproduction read failures, invalid input objects and output-write failures retain their durable job for bounded retry. Recovery produces a readable artifact and clears the payload only after successful completion.
+- Incident, probe, correlated-log and improvement context readers distinguish explicit object absence from storage outages. A failed raw read cannot publish an empty incident bundle; recovery retains one occurrence/generation and restores the captured error.
+- The predecessor database, including a pre-ledger installation, migrates forward while preserving existing events. Readiness rejects a missing migration; repeated migrations and checksums validate. Bootstrap remains empty-schema only.
+- A hosted candidate worker reports dependency readiness while processing is paused. It cannot consume jobs before promotion; activation verifies `postgres-v1` and enabled processing. Rollout scripts reject an incompatible worker image.
+
+These are local correctness gates. Production activation, representative traffic observation and full-path capacity/soak evidence remain required before capacity claims or worker scale-out.
+
+### Incident evidence reliability checks
+
+- Native Chromium global errors and unhandled rejections retain application message/stack/source coordinates through the relay and bundle; resource failures retain sanitized resource identity; genuine cross-origin muted errors retain an explicit unavailable status. Click/form breadcrumbs contain structure/count only, and disposal removes capture hooks.
+- Browser source/stack/page URLs omit credentials, query and fragment, including inline rejection frames; throwing native getters and capture callbacks cannot throw into the application. No arbitrary DOM enumeration or form-value collection occurs.
+- Parentheses inside browser stack URL credentials/query cannot terminate sanitization early; application filenames containing parentheses and stack coordinates remain readable.
+- PostgreSQL-backed warning, slow-request and request-failure improvement builders produce schema-valid BundleV1 output. Delayed older occurrences extend first detection without moving last detection backwards or replacing newer evidence; replay does not increment counts.
+- Calendar/day/month/timezone changes in the same WildFly timer diagnostic produce one v2 fingerprint; different components, error codes, causes and environments remain distinct. Existing v1 exact-match capture rules still match their server-derived legacy fingerprint.
+- Deployment attribution excludes other projects, services, environments and future releases; older raw metadata cannot override newer scoped history. Missing customer evidence yields null, never the worker platform release.

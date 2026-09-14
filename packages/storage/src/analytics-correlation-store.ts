@@ -121,7 +121,10 @@ export function hashAnalyticsCorrelationValue(value: string | null | undefined):
 
 export function hashAnalyticsSessionSubject(projectId: string, sessionId: string): string {
   return createHash("sha256")
-    .update(`{"project_id":${JSON.stringify(projectId)},"session_id":${JSON.stringify(sessionId)}}`, "utf8")
+    .update(
+      `{"project_id":${JSON.stringify(projectId)},"session_id":${JSON.stringify(sessionId)}}`,
+      "utf8"
+    )
     .digest("hex");
 }
 
@@ -147,8 +150,9 @@ async function linkExistingRouteSessions(
 }
 
 function buildRouteSessionLinkSql(source: "incident" | "route_session"): string {
-  const matches = source === "incident"
-    ? `
+  const matches =
+    source === "incident"
+      ? `
         SELECT
           $1::uuid AS project_id,
           $2::uuid AS incident_id,
@@ -175,7 +179,7 @@ function buildRouteSessionLinkSql(source: "incident" | "route_session"): string 
             OR ($7::text IS NOT NULL AND uniques.trace_id_hash = $7)
           )
       `
-    : `
+      : `
         SELECT
           $1::uuid AS project_id,
           correlations.incident_id,
@@ -335,8 +339,25 @@ function buildCorrelationLockKeys(
   sessionIdHash: string | null,
   traceIdHash: string | null
 ): string[] {
-  return [...new Set([
-    sessionIdHash === null ? null : `${projectId}:session:${sessionIdHash}`,
-    traceIdHash === null ? null : `${projectId}:trace:${traceIdHash}`
-  ].filter((value): value is string => value !== null))].sort();
+  return [
+    ...new Set(
+      [
+        sessionIdHash === null ? null : `${projectId}:session:${sessionIdHash}`,
+        traceIdHash === null ? null : `${projectId}:trace:${traceIdHash}`
+      ].filter((value): value is string => value !== null)
+    )
+  ].sort();
+}
+
+/** Acquire before reading matching rows: a lock inside their CTE can be skipped or retain a stale snapshot. */
+export async function lockAnalyticsCorrelation(
+  db: Queryable,
+  projectId: string,
+  sessionIdHash: string,
+  traceIdHash: string | null
+): Promise<void> {
+  await db.query(
+    `SELECT pg_advisory_xact_lock(hashtextextended(lock_key, 0)) FROM unnest($1::text[]) AS lock_key ORDER BY lock_key`,
+    [buildCorrelationLockKeys(projectId, sessionIdHash, traceIdHash)]
+  );
 }

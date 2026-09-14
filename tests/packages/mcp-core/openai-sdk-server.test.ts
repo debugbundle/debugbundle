@@ -91,6 +91,22 @@ async function sendRequest(input: {
 }
 
 describe("OpenAI SDK MCP server", () => {
+  it("advertises request budgets and backoff instructions during initialization", async () => {
+    const response = await sendRequest({
+      method: "initialize",
+      params: {
+        protocolVersion: "2025-06-18",
+        capabilities: {},
+        clientInfo: { name: "test", version: "1" }
+      },
+      authInfo: AUTH
+    });
+    const instructions = (response["result"] as { instructions: string }).instructions;
+    expect(instructions).toContain("60 requests/minute");
+    expect(instructions).toContain("20 artifact reads/minute");
+    expect(instructions).toContain("Retry-After");
+    expect(instructions.length).toBeLessThanOrEqual(512);
+  });
   it("advertises exactly the frozen twenty-three tools with schemas and annotations", async () => {
     const response = await sendRequest({ method: "tools/list", authInfo: AUTH });
     const tools = (response["result"] as { tools: Array<Record<string, unknown>> }).tools;

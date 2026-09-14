@@ -1,6 +1,7 @@
 import { gunzipSync } from "node:zlib";
 
 import { sanitizeHealthCheckUrl } from "../../../packages/mcp-core/src/index.js";
+import { projectBrowserEvidence } from "../../../packages/mcp-core/src/browser-evidence.js";
 
 const MAX_ARTIFACT_BYTES = 524_288;
 
@@ -194,6 +195,7 @@ export function mapHealthRollup(record: Record<string, unknown>): Record<string,
 }
 
 export function mapPrimarySignal(bundle: Record<string, unknown>): Record<string, unknown> {
+  const browser = projectBrowserEvidence(bundle);
   const summary = nestedRecord(bundle, "summary");
   const context = nestedRecord(bundle, "context");
   const request = nestedRecord(context, "request");
@@ -211,7 +213,8 @@ export function mapPrimarySignal(bundle: Record<string, unknown>): Record<string
     error_message: stringOrNull(summary["error_message"]) ?? stringOrNull(error["message"]),
     request_method: stringOrNull(request["method"]),
     request_path: stringOrNull(request["path"]),
-    route_template: stringOrNull(request["route_template"]),
+    route_template: browser?.route ?? stringOrNull(request["route_template"]),
+    ...(browser === null ? {} : { browser_context: browser.context }),
     response_status: httpStatusOrNull(response["status_code"]),
     first_application_frame:
       frame === null
@@ -249,12 +252,24 @@ export function mapRedaction(bundle: Record<string, unknown>): Record<string, un
 
 export function mapReproduction(body: Record<string, unknown>): Record<string, unknown> {
   const artifacts = nestedRecord(body, "artifacts");
+  const spec = nestedRecord(artifacts, "json_spec");
+  const legacyMethodMissing = spec["method"] === "UNKNOWN";
+  const legacyTargetMissing =
+    typeof spec["url"] === "string" &&
+    /^https?:\/\/example\.invalid(?:[/:?#]|$)/i.test(spec["url"]);
+  const unavailable = legacyMethodMissing || legacyTargetMissing;
   return {
-    possible: body["possible"] === true,
-    confidence: Number(body["confidence"] ?? 0),
-    reason: stringValue(body["reason"], "No bounded reproduction guidance is available."),
-    curl: stringOrNull(body["curl"]) ?? stringOrNull(artifacts["curl"]),
-    httpie: stringOrNull(body["httpie"]) ?? stringOrNull(artifacts["httpie"]),
+    possible: !unavailable && body["possible"] === true,
+    confidence: unavailable ? 0.1 : Number(body["confidence"] ?? 0),
+    reason: legacyMethodMissing
+      ? "request_method_unavailable"
+      : legacyTargetMissing
+        ? "request_target_unavailable"
+        : stringValue(body["reason"], "No bounded reproduction guidance is available."),
+    // Serialized commands can embed excluded headers, identity and request bodies.
+    // Omit legacy shell strings rather than trying to redact arbitrary shell syntax.
+    curl: null,
+    httpie: null,
     steps:
       stringArray(body["steps"]).length > 0
         ? stringArray(body["steps"])

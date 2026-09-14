@@ -385,7 +385,10 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
                         fingerprint: {
                           version: FINGERPRINT_VERSION,
                           value: fingerprint(normalizeEvent(entry.event))
-                        }
+                        },
+                        fingerprint_aliases: activeCaptureRules.some(rule => rule.matcher.fingerprint?.version === "v1")
+                          ? [{ version: "v1", value: fingerprint(normalizeEvent(entry.event, "v1")) }]
+                          : []
                       }
                     : {})
                 }),

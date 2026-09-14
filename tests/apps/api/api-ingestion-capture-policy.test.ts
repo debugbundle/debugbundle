@@ -795,7 +795,7 @@ describe("ingestion capture policy enforcement", () => {
     );
   });
 
-  it("should evaluate exact-fingerprint demotion rules during ingestion", async (): Promise<void> => {
+  it.each(["v1", FINGERPRINT_VERSION])("should evaluate %s exact-fingerprint demotion rules during ingestion", async (version): Promise<void> => {
     const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/p/k.json.gz" });
     const event = createEventEnvelope({
       event_type: "backend_exception",
@@ -824,7 +824,7 @@ describe("ingestion capture policy enforcement", () => {
         matcher: {
           event_types: ["backend_exception"],
           fingerprint: {
-            version: FINGERPRINT_VERSION,
+            version,
             value: fingerprint(normalizeEvent(event))
           }
         },

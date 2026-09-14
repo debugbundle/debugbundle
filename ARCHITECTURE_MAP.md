@@ -309,7 +309,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
 
 ### `apps/worker`
 
-- **Owns:** Background job processing via BullMQ
+- **Owns:** Background processing via durable Postgres jobs and compatible Redis ingress adoption
 - **Resource lifecycle:** `worker-env.ts` owns bounded interruptible polling waits and temporary readiness-client cleanup. `packages/storage/src/frequency-counter.ts` caps the internal snapshot-throttling cache at 10,000 IDs; authoritative Redis/Postgres data is unchanged. Status-only worker transports release unread responses. `scripts/check-worker-poll-memory.mjs` and focused lifecycle tests guard uptime-independent retention; see `spec/worker-resource-lifecycle.md`.
 - **Jobs:** `normalize-events`, `aggregate-analytics-events`, `group-incident`, `build-bundle`, `build-analytics-bundle`, `build-reproduction`, `evaluate-alerts`, `deliver-alert-email-digest`, `deliver-operational-email`, `deliver-webhook`, `generate-weekly-report`, `cleanup-retention`, `dispatch-github`
 - **Imports:** `bundle-engine`, `repro-engine`, `event-normalizer`, `shared-types`, `redaction`, `email`
@@ -320,7 +320,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
 - **OpenAI OAuth maintenance:** `openai-oauth-maintenance.ts` runs only when explicitly enabled, reuses the existing worker process, deletes bounded indexed batches of expired/consumed/revoked OAuth records, preserves active grants/current refresh families, emits counts/duration only, and monitors reviewer expiry without reading customer payloads.
 - **Saved funnel control plane:** `analytics_saved_funnels` stores reusable project definitions separately from per-visit analytics and generated AnalyticsBundles. The Postgres store enforces the lesser of stored project settings and current-tier active limits under a project transaction lock, archives definitions softly, and is exposed through the same API client to CLI and MCP. Saved-funnel limits remain independent from event, session, journey-sample, and bundle-generation allowances.
 - **Browser analytics capture:** the external `debugbundle-js` browser SDK adds explicit bounded journey markers and one unload-safe session summary on non-persisted `pagehide`, while preserving separate analytics/debug paths and treating back-forward-cache transitions as non-exits.
-- **Scheduled analytics opportunity evaluation:** the idle worker scheduler takes a six-hour Redis lease by default and enqueues `evaluate-analytics-opportunities`. Its processor scans enabled projects with recent daily session rollups in stable UUID cursor batches of 25, reuses the deterministic aggregate evaluator with one scheduled timestamp, and enqueues one continuation only for a full batch. It never reads raw analytics objects, and queued work remains below incident, aggregation, and bundle-build lanes.
+- **Scheduled analytics opportunity evaluation:** the bounded worker scheduler takes a six-hour Redis lease by default and enqueues `evaluate-analytics-opportunities`. Its processor scans enabled projects with recent daily session rollups in stable UUID cursor batches of 25, reuses the deterministic aggregate evaluator with one scheduled timestamp, and enqueues one continuation only for a full batch. It never reads raw analytics objects, and queued work remains below incident, aggregation, and bundle-build lanes.
 - **Incident-impact replay constraint:** retained sample IDs and hydrated journeys require an exact internal project-scoped affected-session subject match, matching service/environment, transition tag, bounded window, and a completed unexpired artifact. The correlation hash is never public; legacy samples without it are not selected.
 - **Local dev note:** the top-level `docker-compose.yml` `dev` profile now starts the worker alongside API and web so local dogfooding can exercise the full ingestion-to-bundle path without a separate manual worker launch
 
@@ -429,7 +429,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
   - `ingestion-rate-limiter.ts` — Redis-backed per-token ingestion rate limiting
   - `ingestion-services.ts` — ingestion metadata, member auth, persistence services
   - `s3-client.ts` — S3-compatible object store adapter
-  - `redis-queue.ts` — Redis queue client (enqueue/dequeue typed jobs)
+  - `redis-queue.ts` — Redis queue client (typed enqueue/claim/ack; atomic bounded stale-claim recovery)
   - `billing-sync-store.ts` — Postgres billing sync for Stripe webhooks (idempotent event dedup, entitlement updates, Stripe customer linking, entitlement revocation)
 - `github-store.ts` — Postgres GitHub automation persistence for installations, project repo connections, dispatch-rule CRUD, worker-side dispatch matching/cooldown/rate-limit counters, and project-scoped dispatch-delivery claim/history/retry state
 - `github-marketplace-store.ts` — Postgres GitHub Marketplace purchase snapshot persistence and webhook idempotency ledger, bridged to organizations by GitHub installation ID when available
@@ -486,11 +486,11 @@ The public documentation/marketing/blog site lives in the standalone public repo
 
 ## Storage Boundaries
 
-| Store      | Owned By                                              | Contents                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| ---------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PostgreSQL | `apps/api`, `apps/worker`                             | Core relational tables for auth, projects, incidents, improvements, alerts, webhooks, GitHub automation, billing, account analytics, availability checks, and AnalyticsBundle. The additive OpenAI migration adds normalized `oauth_authorization_grants`, `oauth_authorization_codes`, `oauth_refresh_tokens`, and encrypted/HMAC-indexed `oauth_provider_artifacts`; production must apply it before enablement.                                            |
-| Amazon S3  | `apps/api` (write), `apps/worker` (read/write/delete) | Raw events (`raw/{project_id}/{date}/{event_id}.json`) for retained sampled occurrences, failure bundles (`bundles/{project_id}/{incident_id}/bundle.json.gz`), hosted improvement bundles (`improvement-bundles/{project_id}/{opportunity_id}/bundle.json.gz`), reproductions (`reproductions/{project_id}/{incident_id}/reproduction.json.gz`), short-lived raw analytics events, redacted journey samples, and generated AnalyticsBundle artifacts         |
-| Redis      | `apps/api`, `apps/worker`                             | BullMQ job queues, incident frequency counters, ingestion rate-limit counters, GitHub App installation token cache (50m TTL), optional caches. The OpenAI path uses bounded CIMD metadata caching, `private_key_jwt` `jti` replay protection, identity-aware rate limits, refresh-family coordination where needed, and the fail-closed MCP concurrency bulkhead; loss of that coordination closes only MCP unless Redis is also a shared primary dependency. |
+| Store      | Owned By                                              | Contents                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ---------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PostgreSQL | `apps/api`, `apps/worker`                             | Core relational tables for auth, projects, incidents, improvements, alerts, webhooks, GitHub automation, billing, account analytics, availability checks, and AnalyticsBundle. The additive OpenAI migration adds normalized `oauth_authorization_grants`, `oauth_authorization_codes`, `oauth_refresh_tokens`, and encrypted/HMAC-indexed `oauth_provider_artifacts`; production must apply it before enablement.                                                   |
+| Amazon S3  | `apps/api` (write), `apps/worker` (read/write/delete) | Raw events (`raw/{project_id}/{date}/{event_id}.json`) for retained sampled occurrences, failure bundles (`bundles/{project_id}/{incident_id}/bundle.json.gz`), hosted improvement bundles (`improvement-bundles/{project_id}/{opportunity_id}/bundle.json.gz`), reproductions (`reproductions/{project_id}/{incident_id}/reproduction.json.gz`), short-lived raw analytics events, redacted journey samples, and generated AnalyticsBundle artifacts                |
+| Redis      | `apps/api`, `apps/worker`                             | Redis claimed-job queues, incident frequency counters, ingestion rate-limit counters, GitHub App installation token cache (50m TTL), optional caches. The OpenAI path uses bounded CIMD metadata caching, `private_key_jwt` `jti` replay protection, identity-aware rate limits, refresh-family coordination where needed, and the fail-closed MCP concurrency bulkhead; loss of that coordination closes only MCP unless Redis is also a shared primary dependency. |
 
 ---
 
@@ -499,7 +499,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
 ### Ingestion Flow
 
 ```
-SDK → POST /v1/events → API validates → split debug/analytics families → enforce capture policy/capture rules for debug or analytics settings/custom dimensions for analytics → S3 (raw accepted events only) → Redis queue → Worker processes
+SDK → POST /v1/events → API validates → split debug/analytics families → enforce capture policy/capture rules for debug or analytics settings/custom dimensions for analytics → S3 (raw accepted events only) → Redis queue → Postgres worker adoption → transactional incident stages / bounded follow-up jobs
 
 Current execution detail: API request path does not persist incident metadata synchronously; worker-owned `normalize-events` and `group-incident` jobs perform normalization, event_class classification, grouping lifecycle persistence, sampled-occurrence retention decisions, raw-object pruning for demoted summary-only events, and transition evaluation. Exceptions, `error`/`fatal`/`critical` logs, request events in the preset-specific immediate request-failure set, status-wide client-error incident overrides, and matching path-scoped client-error incident rules classify as `incident_signal`; other request events remain `context_signal` and repeated unpromoted `4xx` telemetry does not open normal incidents. Free-tier billing counts only `incident_signal` events (INV-15).
 ```
@@ -608,7 +608,7 @@ See `/spec/local-first-onboarding.md` for the full layout rationale, gitignore p
 ```
 docker-compose.yml
   ├── api        (Node.js / Fastify)        — startup preflight (DB schema + Redis + S3), GET /ready returns 503 on degradation
-  ├── worker     (Node.js / BullMQ)          — startup preflight (DB schema + Redis + S3), internal health server on WORKER_HEALTH_PORT
+  ├── worker     (Node.js / Redis claims)          — startup preflight (DB schema + Redis + S3), internal health server on WORKER_HEALTH_PORT
   ├── web        (React + Vite SPA)
   ├── postgres   (PostgreSQL 17+)
   ├── redis      (Redis 7+)
@@ -697,3 +697,38 @@ Environment-specific deployment configuration, operations runbooks, and other pr
 | `/rules/sdk-testing-strategy.md`          | Cross-SDK testing tiers, transport mocking, contract compliance, CI pipeline per language                                               |
 | `/rules/tdd-discipline.md`                | Red/green TDD protocol, test-before-code mandate, verification workflow                                                                 |
 | `/rules/test-organization.md`             | Test directory layout, placement rules, naming conventions                                                                              |
+
+### Incident reliability implementation
+
+- `packages/mcp-core/src/openai-admission.ts`: bounded cancellable local admission, before shared Redis concurrency leases.
+- `packages/mcp-core/src/operational-pressure.ts`: fixed-cardinality pressure sampling used by API dogfooding; endpoint guards and per-request logs remain authoritative.
+- `apps/api/src/openai-mcp-operations.ts`: storage-adapter-aware artifact absence and generation-state explanations.
+- `apps/api/src/openai-mcp-projections.ts`: command-string exclusion and conservative legacy placeholder replay feasibility.
+- Hosted `apps/worker/src/processor.ts` no longer supplies platform deployment configuration to customer bundle builds; explicit local bundle-engine configuration remains supported.
+- `packages/storage/src/improvement-opportunity-recording.ts`: numeric duration comparisons preserve fractional/large values without changing database shape.
+- `spec/incident-reliability.md`: reviewed fixes, remaining ingestion/repair/scale-out boundaries and required capacity evidence before expanding hosted limits.
+
+### Durable worker module boundaries
+
+- `packages/storage/src/worker-job-schema.ts`: additive ordered migration and separate clean-bootstrap statements; `schema-migrations.ts`, migration compatibility checks and readiness own the migration gate.
+- `packages/storage/src/worker-job-store.ts`: stable intent identities, fenced claims, dependency gating, bounded retries/retention and scoped metadata inspection/retry. `savepoint-queryable.ts` preserves nested transaction ownership; `processed-event-store.ts` owns normalization receipts.
+- `packages/storage/src/metadata-store.ts`: compatibility composition barrel. `metadata-grouping.ts` owns occurrence/dedupe/retention writes; sibling `metadata-*` modules own project/access, incident lifecycle/read, bundles, tokens, probes, alerts and reports. Shared helpers stay in storage.
+- `apps/worker/src/durable-queue.ts`: legacy Redis adoption, heartbeat/ack/failure orchestration and one-connection transactional callbacks. `durable-incident-processing.ts`: composition of scoped normalization/grouping/improvement stores and deferred lifecycle/object-delete work.
+- `apps/worker/src/processor.ts` and `improvement-bundles.ts`: compatible barrels over normalization/grouping, artifact/context, alert/delivery and improvement evaluation/generation/publishing modules.
+- `apps/worker/src/runtime.ts` / `worker-steps.ts`: fair incident passes plus a bounded independent delivery lane using shared resources. `worker-activation.ts`: explicit paused candidate state and activation marker; internal readiness exposes protocol and processing state.
+- `scripts/worker-jobs.ts` / `make worker-jobs`: internal database operator inspection and explicit one-job recovery. Hosted images, staged promotion/activation and compatible-worker rollback remain owned by `.local-repos/debugbundle-cloud`.
+- `spec/worker-durability.md`: exact transaction, retry, retention, resource, operator, migration and test contracts. API acceptance still spans S3 and Redis; the journal begins at worker adoption.
+
+Analytics correlation locking is acquired before rollup writes in a separate statement (`lockAnalyticsCorrelation`), so overlapping analytics/incident transactions cannot both miss the other side. Durable job maintenance resumes full bounded batches at one-second intervals while backlog summaries remain once per minute.
+
+## Incident evidence reliability extension (local candidate)
+
+The JS SDK companion owns guarded native error hooks/field readers and stack URL sanitization (`native-error-hooks.ts`, `native-fields.ts`, `browser-stack.ts`). Its existing Node relay and the Java relay preserve the bounded browser context. `scripts/check-browser-evidence.mjs` is a disposable native Chromium-to-relay-to-bundle verification path, not a production service.
+
+Core `event-normalizer/java-timer-message.ts` owns scoped v2 WildFly calendar normalization; ingestion supplies legacy v1 capture-rule aliases through the shared evaluator. `mcp-core/browser-evidence.ts` owns the additive bounded OpenAI browser projection. Worker `improvement-bundle-context.ts` canonicalizes storage timestamps before schema validation; storage occurrence recording preserves latest evidence on delayed arrivals. `storage/metadata-bundles.ts` resolves exact project/service/environment deployment history at the source occurrence; `bundle-engine/deployment-context.ts` reconciles it with time-scoped raw deployment evidence. See `spec/incident-reliability.md` for compatibility, verification and remaining promotion gates.
+
+`redaction/browser-stack.ts` provides the server ingestion backstop for HTTP(S) browser stack URL privacy, including legacy SDK submissions.
+
+The durable queue adapter treats reproduction `bundle_missing`/`bundle_invalid` outcomes as retryable failures instead of completed receipts. Browser stack sanitizers consume the full URL before separating stack punctuation, so parentheses within credentials/query cannot bypass redaction.
+
+`storage/object-store-errors.ts` owns the shared explicit-absence classifier used by OpenAI artifact readers and incident/improvement context loaders. Non-absence storage failures propagate to bounded build retries instead of silently discarding available context.

@@ -8,6 +8,7 @@ import type {
 import {
   createPostgresAnalyticsCorrelationStore,
   hashAnalyticsCorrelationValue,
+  lockAnalyticsCorrelation,
   hashAnalyticsSessionSubject
 } from "./analytics-correlation-store.js";
 import { recordAnalyticsUniqueRollupSubject } from "./analytics-rollup-uniques.js";
@@ -113,6 +114,12 @@ export function createPostgresAnalyticsRollupStore(db: Queryable): AnalyticsRoll
         const sessionSubjectHash = hashAnalyticsSessionSubject(
           input.project_id,
           input.event.correlation.session_id
+        );
+        await lockAnalyticsCorrelation(
+          tx,
+          input.project_id,
+          sessionSubjectHash,
+          hashAnalyticsCorrelationValue(input.event.correlation.trace_id)
         );
         const routeKey = getRouteKey(input.event);
         const transitionKey = getTransitionKey(input.event);

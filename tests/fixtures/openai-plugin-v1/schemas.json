@@ -279,6 +279,73 @@
         "function": { "type": ["string", "null"], "maxLength": 512 }
       }
     },
+    "browserContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "opaque",
+        "source_file",
+        "line",
+        "column",
+        "resource_type",
+        "resource_host",
+        "resource_path",
+        "ready_state",
+        "visibility_state",
+        "evidence_status"
+      ],
+      "properties": {
+        "kind": {
+          "type": ["string", "null"],
+          "enum": ["window_error", "resource_error", null]
+        },
+        "opaque": {
+          "type": ["boolean", "null"]
+        },
+        "source_file": {
+          "type": ["string", "null"],
+          "maxLength": 1024
+        },
+        "line": {
+          "type": ["integer", "null"],
+          "minimum": 1
+        },
+        "column": {
+          "type": ["integer", "null"],
+          "minimum": 1
+        },
+        "resource_type": {
+          "type": ["string", "null"],
+          "maxLength": 32
+        },
+        "resource_host": {
+          "type": ["string", "null"],
+          "maxLength": 253
+        },
+        "resource_path": {
+          "type": ["string", "null"],
+          "maxLength": 1024
+        },
+        "ready_state": {
+          "type": ["string", "null"],
+          "enum": ["loading", "interactive", "complete", null]
+        },
+        "visibility_state": {
+          "type": ["string", "null"],
+          "enum": ["visible", "hidden", "prerender", "unloaded", null]
+        },
+        "evidence_status": {
+          "type": "string",
+          "enum": [
+            "details_available",
+            "resource_load_failure",
+            "browser_details_withheld",
+            "context_missing"
+          ]
+        }
+      }
+    },
     "primarySignal": {
       "type": "object",
       "additionalProperties": false,
@@ -293,6 +360,7 @@
         "first_application_frame"
       ],
       "properties": {
+        "browser_context": { "$ref": "#/$defs/browserContext" },
         "description": { "$ref": "#/$defs/summaryString" },
         "error_type": { "type": ["string", "null"], "maxLength": 256 },
         "error_message": { "type": ["string", "null"], "maxLength": 4096 },
@@ -591,17 +659,21 @@
       }
     },
     "analyticsWindow": {
-      "type": "object", "additionalProperties": false,
+      "type": "object",
+      "additionalProperties": false,
       "required": ["project_id", "from", "to", "granularity", "service", "environment"],
       "properties": {
-        "project_id": { "$ref": "#/$defs/id" }, "from": { "$ref": "#/$defs/dateTime" },
-        "to": { "$ref": "#/$defs/dateTime" }, "granularity": { "enum": ["hour", "day"] },
+        "project_id": { "$ref": "#/$defs/id" },
+        "from": { "$ref": "#/$defs/dateTime" },
+        "to": { "$ref": "#/$defs/dateTime" },
+        "granularity": { "enum": ["hour", "day"] },
         "service": { "type": ["string", "null"], "maxLength": 120 },
         "environment": { "type": ["string", "null"], "maxLength": 120 }
       }
     },
     "analyticsSegment": {
-      "type": "object", "additionalProperties": false,
+      "type": "object",
+      "additionalProperties": false,
       "required": ["value", "sessions", "pageviews"],
       "properties": {
         "value": { "type": "string", "minLength": 1, "maxLength": 255 },
@@ -610,103 +682,221 @@
       }
     },
     "analyticsSummary": {
-      "type": "object", "additionalProperties": false,
-      "required": ["project_id", "from", "to", "granularity", "service", "environment", "sessions", "pageviews", "active_visitors", "new_visitors", "returning_visitors", "exits", "conversions"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "project_id",
+        "from",
+        "to",
+        "granularity",
+        "service",
+        "environment",
+        "sessions",
+        "pageviews",
+        "active_visitors",
+        "new_visitors",
+        "returning_visitors",
+        "exits",
+        "conversions"
+      ],
       "properties": {
-        "project_id": { "$ref": "#/$defs/id" }, "from": { "$ref": "#/$defs/dateTime" },
-        "to": { "$ref": "#/$defs/dateTime" }, "granularity": { "enum": ["hour", "day"] },
+        "project_id": { "$ref": "#/$defs/id" },
+        "from": { "$ref": "#/$defs/dateTime" },
+        "to": { "$ref": "#/$defs/dateTime" },
+        "granularity": { "enum": ["hour", "day"] },
         "service": { "type": ["string", "null"], "maxLength": 120 },
         "environment": { "type": ["string", "null"], "maxLength": 120 },
-        "sessions": { "type": "integer", "minimum": 0 }, "pageviews": { "type": "integer", "minimum": 0 },
-        "active_visitors": { "type": "integer", "minimum": 0 }, "new_visitors": { "type": "integer", "minimum": 0 },
-        "returning_visitors": { "type": "integer", "minimum": 0 }, "exits": { "type": "integer", "minimum": 0 },
+        "sessions": { "type": "integer", "minimum": 0 },
+        "pageviews": { "type": "integer", "minimum": 0 },
+        "active_visitors": { "type": "integer", "minimum": 0 },
+        "new_visitors": { "type": "integer", "minimum": 0 },
+        "returning_visitors": { "type": "integer", "minimum": 0 },
+        "exits": { "type": "integer", "minimum": 0 },
         "conversions": { "type": "integer", "minimum": 0 }
       }
     },
     "analyticsBreakdowns": {
-      "type": "object", "additionalProperties": false,
+      "type": "object",
+      "additionalProperties": false,
       "required": ["device_types", "browsers", "os", "languages", "referrers", "auth_states"],
       "properties": {
-        "device_types": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } },
-        "browsers": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } },
+        "device_types": {
+          "type": "array",
+          "maxItems": 25,
+          "items": { "$ref": "#/$defs/analyticsSegment" }
+        },
+        "browsers": {
+          "type": "array",
+          "maxItems": 25,
+          "items": { "$ref": "#/$defs/analyticsSegment" }
+        },
         "os": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } },
-        "languages": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } },
-        "referrers": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } },
-        "auth_states": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } }
+        "languages": {
+          "type": "array",
+          "maxItems": 25,
+          "items": { "$ref": "#/$defs/analyticsSegment" }
+        },
+        "referrers": {
+          "type": "array",
+          "maxItems": 25,
+          "items": { "$ref": "#/$defs/analyticsSegment" }
+        },
+        "auth_states": {
+          "type": "array",
+          "maxItems": 25,
+          "items": { "$ref": "#/$defs/analyticsSegment" }
+        }
       }
     },
     "analyticsRouteMetric": {
-      "type": "object", "additionalProperties": false,
-      "required": ["route_key", "pageviews", "unique_sessions", "entrances", "exits", "bounces", "linked_incident_sessions"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "route_key",
+        "pageviews",
+        "unique_sessions",
+        "entrances",
+        "exits",
+        "bounces",
+        "linked_incident_sessions"
+      ],
       "properties": {
         "route_key": { "type": "string", "minLength": 1, "maxLength": 2048 },
-        "pageviews": { "type": "integer", "minimum": 0 }, "unique_sessions": { "type": "integer", "minimum": 0 },
-        "entrances": { "type": "integer", "minimum": 0 }, "exits": { "type": "integer", "minimum": 0 },
-        "bounces": { "type": "integer", "minimum": 0 }, "linked_incident_sessions": { "type": "integer", "minimum": 0 }
+        "pageviews": { "type": "integer", "minimum": 0 },
+        "unique_sessions": { "type": "integer", "minimum": 0 },
+        "entrances": { "type": "integer", "minimum": 0 },
+        "exits": { "type": "integer", "minimum": 0 },
+        "bounces": { "type": "integer", "minimum": 0 },
+        "linked_incident_sessions": { "type": "integer", "minimum": 0 }
       }
     },
     "analyticsJourneyPattern": {
-      "type": "object", "additionalProperties": false,
-      "required": ["from_route_key", "to_route_key", "transition_count", "unique_sessions", "transition_share"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "from_route_key",
+        "to_route_key",
+        "transition_count",
+        "unique_sessions",
+        "transition_share"
+      ],
       "properties": {
         "from_route_key": { "type": "string", "minLength": 1, "maxLength": 2048 },
         "to_route_key": { "type": "string", "minLength": 1, "maxLength": 2048 },
-        "transition_count": { "type": "integer", "minimum": 0 }, "unique_sessions": { "type": "integer", "minimum": 0 },
+        "transition_count": { "type": "integer", "minimum": 0 },
+        "unique_sessions": { "type": "integer", "minimum": 0 },
         "transition_share": { "type": "number", "minimum": 0, "maximum": 1 }
       }
     },
     "analyticsActionMetric": {
-      "type": "object", "additionalProperties": false,
+      "type": "object",
+      "additionalProperties": false,
       "required": ["action_key", "kind", "event_count", "unique_sessions"],
       "properties": {
         "action_key": { "type": "string", "minLength": 1, "maxLength": 160 },
         "kind": { "enum": ["action", "conversion", "marker"] },
-        "event_count": { "type": "integer", "minimum": 0 }, "unique_sessions": { "type": "integer", "minimum": 0 }
+        "event_count": { "type": "integer", "minimum": 0 },
+        "unique_sessions": { "type": "integer", "minimum": 0 }
       }
     },
     "analyticsFunnelMetric": {
-      "type": "object", "additionalProperties": false,
-      "required": ["funnel_key", "sessions_entered", "sessions_completed", "dropoffs", "conversion_rate"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "funnel_key",
+        "sessions_entered",
+        "sessions_completed",
+        "dropoffs",
+        "conversion_rate"
+      ],
       "properties": {
         "funnel_key": { "type": "string", "minLength": 1, "maxLength": 120 },
-        "sessions_entered": { "type": "integer", "minimum": 0 }, "sessions_completed": { "type": "integer", "minimum": 0 },
-        "dropoffs": { "type": "integer", "minimum": 0 }, "conversion_rate": { "type": "number", "minimum": 0, "maximum": 1 }
+        "sessions_entered": { "type": "integer", "minimum": 0 },
+        "sessions_completed": { "type": "integer", "minimum": 0 },
+        "dropoffs": { "type": "integer", "minimum": 0 },
+        "conversion_rate": { "type": "number", "minimum": 0, "maximum": 1 }
       }
     },
     "analyticsFunnelStep": {
-      "type": "object", "additionalProperties": false,
-      "required": ["step_key", "step_order", "sessions_entered", "sessions_completed", "dropoffs", "conversion_rate"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "step_key",
+        "step_order",
+        "sessions_entered",
+        "sessions_completed",
+        "dropoffs",
+        "conversion_rate"
+      ],
       "properties": {
-        "step_key": { "type": "string", "minLength": 1, "maxLength": 120 }, "step_order": { "type": "integer", "minimum": 0 },
-        "sessions_entered": { "type": "integer", "minimum": 0 }, "sessions_completed": { "type": "integer", "minimum": 0 },
-        "dropoffs": { "type": "integer", "minimum": 0 }, "conversion_rate": { "type": "number", "minimum": 0, "maximum": 1 }
+        "step_key": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "step_order": { "type": "integer", "minimum": 0 },
+        "sessions_entered": { "type": "integer", "minimum": 0 },
+        "sessions_completed": { "type": "integer", "minimum": 0 },
+        "dropoffs": { "type": "integer", "minimum": 0 },
+        "conversion_rate": { "type": "number", "minimum": 0, "maximum": 1 }
       }
     },
     "analyticsFunnelSummary": {
-      "type": "object", "additionalProperties": false,
-      "required": ["project_id", "funnel_key", "from", "to", "granularity", "service", "environment", "sessions_entered", "sessions_completed", "dropoffs", "conversion_rate"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "project_id",
+        "funnel_key",
+        "from",
+        "to",
+        "granularity",
+        "service",
+        "environment",
+        "sessions_entered",
+        "sessions_completed",
+        "dropoffs",
+        "conversion_rate"
+      ],
       "properties": {
-        "project_id": { "$ref": "#/$defs/id" }, "funnel_key": { "type": "string", "minLength": 1, "maxLength": 120 },
-        "from": { "$ref": "#/$defs/dateTime" }, "to": { "$ref": "#/$defs/dateTime" }, "granularity": { "enum": ["hour", "day"] },
-        "service": { "type": ["string", "null"], "maxLength": 120 }, "environment": { "type": ["string", "null"], "maxLength": 120 },
-        "sessions_entered": { "type": "integer", "minimum": 0 }, "sessions_completed": { "type": "integer", "minimum": 0 },
-        "dropoffs": { "type": "integer", "minimum": 0 }, "conversion_rate": { "type": "number", "minimum": 0, "maximum": 1 }
+        "project_id": { "$ref": "#/$defs/id" },
+        "funnel_key": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "from": { "$ref": "#/$defs/dateTime" },
+        "to": { "$ref": "#/$defs/dateTime" },
+        "granularity": { "enum": ["hour", "day"] },
+        "service": { "type": ["string", "null"], "maxLength": 120 },
+        "environment": { "type": ["string", "null"], "maxLength": 120 },
+        "sessions_entered": { "type": "integer", "minimum": 0 },
+        "sessions_completed": { "type": "integer", "minimum": 0 },
+        "dropoffs": { "type": "integer", "minimum": 0 },
+        "conversion_rate": { "type": "number", "minimum": 0, "maximum": 1 }
       }
     },
     "analyticsImpactSegment": {
-      "type": "object", "additionalProperties": false, "required": ["value", "affected_sessions"],
-      "properties": { "value": { "type": "string", "minLength": 1, "maxLength": 255 }, "affected_sessions": { "type": "integer", "minimum": 0 } }
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "affected_sessions"],
+      "properties": {
+        "value": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "affected_sessions": { "type": "integer", "minimum": 0 }
+      }
     },
     "analyticsImpactRoute": {
-      "type": "object", "additionalProperties": false, "required": ["route_key", "affected_sessions"],
-      "properties": { "route_key": { "type": "string", "minLength": 1, "maxLength": 2048 }, "affected_sessions": { "type": "integer", "minimum": 0 } }
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["route_key", "affected_sessions"],
+      "properties": {
+        "route_key": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "affected_sessions": { "type": "integer", "minimum": 0 }
+      }
     },
     "analyticsImpactFunnel": {
-      "type": "object", "additionalProperties": false, "required": ["funnel_key", "affected_sessions"],
-      "properties": { "funnel_key": { "type": "string", "minLength": 1, "maxLength": 120 }, "affected_sessions": { "type": "integer", "minimum": 0 } }
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["funnel_key", "affected_sessions"],
+      "properties": {
+        "funnel_key": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "affected_sessions": { "type": "integer", "minimum": 0 }
+      }
     },
     "analyticsImpactJourney": {
-      "type": "object", "additionalProperties": false,
+      "type": "object",
+      "additionalProperties": false,
       "required": ["from_route_key", "to_route_key", "affected_sessions"],
       "properties": {
         "from_route_key": { "type": "string", "minLength": 1, "maxLength": 2048 },
@@ -715,9 +905,12 @@
       }
     },
     "analyticsConversionDelta": {
-      "type": "object", "additionalProperties": false, "required": ["availability", "value", "unit"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["availability", "value", "unit"],
       "properties": {
-        "availability": { "enum": ["available", "unavailable"] }, "value": { "type": ["number", "null"] },
+        "availability": { "enum": ["available", "unavailable"] },
+        "value": { "type": ["number", "null"] },
         "unit": { "enum": ["percentage_points"] }
       }
     },
@@ -875,62 +1068,174 @@
       }
     },
     "getUsageSummaryOutput": {
-      "type": "object", "additionalProperties": false, "required": ["summary", "breakdowns"],
-      "properties": { "summary": { "$ref": "#/$defs/analyticsSummary" }, "breakdowns": { "$ref": "#/$defs/analyticsBreakdowns" } }
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "breakdowns"],
+      "properties": {
+        "summary": { "$ref": "#/$defs/analyticsSummary" },
+        "breakdowns": { "$ref": "#/$defs/analyticsBreakdowns" }
+      }
     },
     "getRouteMetricsOutput": {
-      "type": "object", "additionalProperties": false, "required": ["window", "routes"],
-      "properties": { "window": { "$ref": "#/$defs/analyticsWindow" }, "routes": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsRouteMetric" } } }
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["window", "routes"],
+      "properties": {
+        "window": { "$ref": "#/$defs/analyticsWindow" },
+        "routes": {
+          "type": "array",
+          "maxItems": 25,
+          "items": { "$ref": "#/$defs/analyticsRouteMetric" }
+        }
+      }
     },
     "getJourneyPatternsOutput": {
-      "type": "object", "additionalProperties": false, "required": ["window", "patterns"],
-      "properties": { "window": { "$ref": "#/$defs/analyticsWindow" }, "patterns": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsJourneyPattern" } } }
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["window", "patterns"],
+      "properties": {
+        "window": { "$ref": "#/$defs/analyticsWindow" },
+        "patterns": {
+          "type": "array",
+          "maxItems": 25,
+          "items": { "$ref": "#/$defs/analyticsJourneyPattern" }
+        }
+      }
     },
     "getDeviceBreakdownOutput": {
-      "type": "object", "additionalProperties": false,
+      "type": "object",
+      "additionalProperties": false,
       "required": ["window", "device_types", "browsers", "os", "languages"],
       "properties": {
         "window": { "$ref": "#/$defs/analyticsWindow" },
-        "device_types": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } },
-        "browsers": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } },
+        "device_types": {
+          "type": "array",
+          "maxItems": 25,
+          "items": { "$ref": "#/$defs/analyticsSegment" }
+        },
+        "browsers": {
+          "type": "array",
+          "maxItems": 25,
+          "items": { "$ref": "#/$defs/analyticsSegment" }
+        },
         "os": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } },
-        "languages": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } }
+        "languages": {
+          "type": "array",
+          "maxItems": 25,
+          "items": { "$ref": "#/$defs/analyticsSegment" }
+        }
       }
     },
     "getReferrerMetricsOutput": {
-      "type": "object", "additionalProperties": false,
+      "type": "object",
+      "additionalProperties": false,
       "required": ["window", "referrers", "utm_sources", "utm_mediums", "utm_campaigns"],
       "properties": {
         "window": { "$ref": "#/$defs/analyticsWindow" },
-        "referrers": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } },
-        "utm_sources": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } },
-        "utm_mediums": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } },
-        "utm_campaigns": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsSegment" } }
+        "referrers": {
+          "type": "array",
+          "maxItems": 25,
+          "items": { "$ref": "#/$defs/analyticsSegment" }
+        },
+        "utm_sources": {
+          "type": "array",
+          "maxItems": 25,
+          "items": { "$ref": "#/$defs/analyticsSegment" }
+        },
+        "utm_mediums": {
+          "type": "array",
+          "maxItems": 25,
+          "items": { "$ref": "#/$defs/analyticsSegment" }
+        },
+        "utm_campaigns": {
+          "type": "array",
+          "maxItems": 25,
+          "items": { "$ref": "#/$defs/analyticsSegment" }
+        }
       }
     },
     "getActionMetricsOutput": {
-      "type": "object", "additionalProperties": false, "required": ["window", "actions"],
-      "properties": { "window": { "$ref": "#/$defs/analyticsWindow" }, "actions": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsActionMetric" } } }
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["window", "actions"],
+      "properties": {
+        "window": { "$ref": "#/$defs/analyticsWindow" },
+        "actions": {
+          "type": "array",
+          "maxItems": 25,
+          "items": { "$ref": "#/$defs/analyticsActionMetric" }
+        }
+      }
     },
     "listFunnelMetricsOutput": {
-      "type": "object", "additionalProperties": false, "required": ["window", "funnels"],
-      "properties": { "window": { "$ref": "#/$defs/analyticsWindow" }, "funnels": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsFunnelMetric" } } }
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["window", "funnels"],
+      "properties": {
+        "window": { "$ref": "#/$defs/analyticsWindow" },
+        "funnels": {
+          "type": "array",
+          "maxItems": 25,
+          "items": { "$ref": "#/$defs/analyticsFunnelMetric" }
+        }
+      }
     },
     "getFunnelAnalysisOutput": {
-      "type": "object", "additionalProperties": false, "required": ["funnel", "steps"],
-      "properties": { "funnel": { "$ref": "#/$defs/analyticsFunnelSummary" }, "steps": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsFunnelStep" } } }
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["funnel", "steps"],
+      "properties": {
+        "funnel": { "$ref": "#/$defs/analyticsFunnelSummary" },
+        "steps": {
+          "type": "array",
+          "maxItems": 25,
+          "items": { "$ref": "#/$defs/analyticsFunnelStep" }
+        }
+      }
     },
     "getIncidentImpactOutput": {
-      "type": "object", "additionalProperties": false,
-      "required": ["incident_id", "window", "affected_sessions", "affected_routes", "affected_funnels", "top_device_types", "top_browsers", "journey_patterns", "conversion_delta"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "incident_id",
+        "window",
+        "affected_sessions",
+        "affected_routes",
+        "affected_funnels",
+        "top_device_types",
+        "top_browsers",
+        "journey_patterns",
+        "conversion_delta"
+      ],
       "properties": {
-        "incident_id": { "$ref": "#/$defs/id" }, "window": { "$ref": "#/$defs/analyticsWindow" },
+        "incident_id": { "$ref": "#/$defs/id" },
+        "window": { "$ref": "#/$defs/analyticsWindow" },
         "affected_sessions": { "type": "integer", "minimum": 0 },
-        "affected_routes": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsImpactRoute" } },
-        "affected_funnels": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsImpactFunnel" } },
-        "top_device_types": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsImpactSegment" } },
-        "top_browsers": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsImpactSegment" } },
-        "journey_patterns": { "type": "array", "maxItems": 25, "items": { "$ref": "#/$defs/analyticsImpactJourney" } },
+        "affected_routes": {
+          "type": "array",
+          "maxItems": 25,
+          "items": { "$ref": "#/$defs/analyticsImpactRoute" }
+        },
+        "affected_funnels": {
+          "type": "array",
+          "maxItems": 25,
+          "items": { "$ref": "#/$defs/analyticsImpactFunnel" }
+        },
+        "top_device_types": {
+          "type": "array",
+          "maxItems": 25,
+          "items": { "$ref": "#/$defs/analyticsImpactSegment" }
+        },
+        "top_browsers": {
+          "type": "array",
+          "maxItems": 25,
+          "items": { "$ref": "#/$defs/analyticsImpactSegment" }
+        },
+        "journey_patterns": {
+          "type": "array",
+          "maxItems": 25,
+          "items": { "$ref": "#/$defs/analyticsImpactJourney" }
+        },
         "conversion_delta": { "$ref": "#/$defs/analyticsConversionDelta" }
       }
     },

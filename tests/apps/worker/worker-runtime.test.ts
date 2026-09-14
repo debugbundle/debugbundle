@@ -45,6 +45,14 @@ import {
   runWorkerFromEnv
 } from "../../../apps/worker/src/runtime.js";
 
+function persistedJobs(name: string): unknown[] {
+  return poolQueryMock.mock.calls
+    .filter(
+      ([sql, params]) => String(sql).includes("INSERT INTO worker_jobs") && params[1] === name
+    )
+    .map(([, params]) => JSON.parse(String(params[3])) as unknown);
+}
+
 describe("worker runtime", () => {
   beforeEach(resetWorkerRuntimeMocks);
 
@@ -192,11 +200,11 @@ describe("worker runtime", () => {
       forcePathStyle: true
     });
     expect(processNextNormalizeEventsJobMock).toHaveBeenCalledOnce();
-    expect(processNextGroupIncidentJobMock).not.toHaveBeenCalled();
-    expect(processNextBuildBundleJobMock).not.toHaveBeenCalled();
-    expect(processNextBuildAnalyticsBundleJobMock).not.toHaveBeenCalled();
-    expect(processNextBuildReproductionJobMock).not.toHaveBeenCalled();
-    expect(processNextDeliverWebhookJobMock).not.toHaveBeenCalled();
+    expect(processNextGroupIncidentJobMock).toHaveBeenCalledOnce();
+    expect(processNextBuildBundleJobMock).toHaveBeenCalledOnce();
+    expect(processNextBuildAnalyticsBundleJobMock).toHaveBeenCalledOnce();
+    expect(processNextBuildReproductionJobMock).toHaveBeenCalledOnce();
+    expect(processNextDeliverWebhookJobMock).toHaveBeenCalledOnce();
     expect(frequencyCounterCloseMock).toHaveBeenCalledOnce();
     expect(requestAnomalyCounterCloseMock).toHaveBeenCalledOnce();
     expect(queueCloseMock).toHaveBeenCalledOnce();
@@ -265,10 +273,10 @@ describe("worker runtime", () => {
 
     expect(processNextNormalizeEventsJobMock).toHaveBeenCalledOnce();
     expect(processNextGroupIncidentJobMock).toHaveBeenCalledOnce();
-    expect(processNextBuildBundleJobMock).not.toHaveBeenCalled();
-    expect(processNextBuildAnalyticsBundleJobMock).not.toHaveBeenCalled();
-    expect(processNextBuildReproductionJobMock).not.toHaveBeenCalled();
-    expect(processNextDeliverWebhookJobMock).not.toHaveBeenCalled();
+    expect(processNextBuildBundleJobMock).toHaveBeenCalledOnce();
+    expect(processNextBuildAnalyticsBundleJobMock).toHaveBeenCalledOnce();
+    expect(processNextBuildReproductionJobMock).toHaveBeenCalledOnce();
+    expect(processNextDeliverWebhookJobMock).toHaveBeenCalledOnce();
   });
 
   it("queues the webhook auto-disabled operational email for later delivery", async (): Promise<void> => {
@@ -352,9 +360,9 @@ describe("worker runtime", () => {
         })
       })
     );
-    expect(processNextBuildAnalyticsBundleJobMock).not.toHaveBeenCalled();
-    expect(processNextBuildReproductionJobMock).not.toHaveBeenCalled();
-    expect(processNextDeliverWebhookJobMock).not.toHaveBeenCalled();
+    expect(processNextBuildAnalyticsBundleJobMock).toHaveBeenCalledOnce();
+    expect(processNextBuildReproductionJobMock).toHaveBeenCalledOnce();
+    expect(processNextDeliverWebhookJobMock).toHaveBeenCalledOnce();
   });
 
   it("should run build-analytics-bundle processor before reproduction when earlier queues are empty", async (): Promise<void> => {
@@ -385,8 +393,8 @@ describe("worker runtime", () => {
         })
       })
     );
-    expect(processNextBuildReproductionJobMock).not.toHaveBeenCalled();
-    expect(processNextEvaluateAlertsJobMock).not.toHaveBeenCalled();
+    expect(processNextBuildReproductionJobMock).toHaveBeenCalledOnce();
+    expect(processNextEvaluateAlertsJobMock).toHaveBeenCalledOnce();
   });
 
   it("should run build-reproduction processor when normalize/group/build queues are empty", async (): Promise<void> => {
@@ -407,7 +415,7 @@ describe("worker runtime", () => {
     expect(processNextBuildBundleJobMock).toHaveBeenCalledOnce();
     expect(processNextBuildAnalyticsBundleJobMock).toHaveBeenCalledOnce();
     expect(processNextBuildReproductionJobMock).toHaveBeenCalledOnce();
-    expect(processNextDeliverWebhookJobMock).not.toHaveBeenCalled();
+    expect(processNextDeliverWebhookJobMock).toHaveBeenCalledOnce();
   });
 
   it("should run evaluate-alerts processor when normalize/group/build/reproduction queues are empty", async (): Promise<void> => {
@@ -433,7 +441,7 @@ describe("worker runtime", () => {
     expect(processNextBuildAnalyticsBundleJobMock).toHaveBeenCalledOnce();
     expect(processNextBuildReproductionJobMock).toHaveBeenCalledOnce();
     expect(processNextEvaluateAlertsJobMock).toHaveBeenCalledOnce();
-    expect(processNextDeliverWebhookJobMock).not.toHaveBeenCalled();
+    expect(processNextDeliverWebhookJobMock).toHaveBeenCalledOnce();
   });
 
   it("should run deliver-webhook processor when normalize/group/build/reproduction queues are empty", async (): Promise<void> => {
@@ -485,7 +493,7 @@ describe("worker runtime", () => {
       listEnabledWeeklyReportChannels: vi.fn().mockResolvedValue([
         {
           channel_id: "wr_123",
-          project_id: "proj_123",
+          project_id: "00000000-0000-4000-8000-000000000123",
           channel: "email",
           config: { to: ["team@example.com"] },
           schedule: { day_of_week: "monday", hour_of_day: 9, timezone: "UTC" },
@@ -510,7 +518,9 @@ describe("worker runtime", () => {
       upsertIncident: vi.fn(),
       insertIncidentEvent: vi.fn(),
       markIncidentSpiking: vi.fn(),
-      listProjectsWithWeeklyActivity: vi.fn().mockResolvedValue(["proj_123"]),
+      listProjectsWithWeeklyActivity: vi
+        .fn()
+        .mockResolvedValue(["00000000-0000-4000-8000-000000000123"]),
       getWeeklyProjectReport: vi.fn().mockResolvedValue(null)
     });
 
@@ -519,10 +529,10 @@ describe("worker runtime", () => {
       ANALYTICS_HASH_SECRET: "test-analytics-secret"
     });
 
-    expect(queueEnqueueMock).toHaveBeenCalledWith("generate-weekly-report", {
+    expect(persistedJobs("generate-weekly-report")).toContainEqual({
       delivery_id: "wrd_123",
       weekly_report_channel_id: "wr_123",
-      project_id: "proj_123",
+      project_id: "00000000-0000-4000-8000-000000000123",
       window_start: "2026-03-09T00:00:00.000Z",
       window_end: "2026-03-16T00:00:00.000Z"
     });
@@ -584,14 +594,14 @@ describe("worker runtime", () => {
     });
 
     expect(queueAcquireLeaseMock).toHaveBeenCalledWith("leases:cleanup-retention:schedule", 21600);
-    expect(queueEnqueueMock).toHaveBeenCalledWith("cleanup-retention", {
+    expect(persistedJobs("cleanup-retention")).toContainEqual({
       scheduled_at: expect.any(String)
     });
     expect(queueAcquireLeaseMock).toHaveBeenCalledWith(
       "leases:analytics-opportunities:schedule",
       21600
     );
-    expect(queueEnqueueMock).toHaveBeenCalledWith("evaluate-analytics-opportunities", {
+    expect(persistedJobs("evaluate-analytics-opportunities")).toContainEqual({
       scheduled_at: expect.any(String),
       cursor: null
     });

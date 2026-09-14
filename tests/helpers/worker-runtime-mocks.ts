@@ -208,6 +208,7 @@ vi.mock("pg", () => ({
   Pool: vi.fn(function MockPool() {
     return {
       query: poolQueryMock,
+      connect: vi.fn(async () => ({ query: poolQueryMock, release: vi.fn() })),
       end: poolEndMock
     };
   })
@@ -374,6 +375,7 @@ vi.mock("../../apps/worker/src/analytics-bundle-processor.js", () => ({
 }));
 
 export const WORKER_TABLE_ROWS = [
+  { table_name: "worker_jobs" },
   { table_name: "processed_events" },
   { table_name: "organizations" },
   { table_name: "projects" },

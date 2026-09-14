@@ -496,7 +496,7 @@ runIntegration("ingestion integration \u2013 core pipeline", () => {
       occurred_at: string;
       severity: "high";
     };
-    expect(groupJob.fingerprint_version).toBe("v1");
+    expect(groupJob.fingerprint_version).toBe("v2");
     expect(groupJob.matched_fields).toEqual([
       "environment",
       "normalized_message",

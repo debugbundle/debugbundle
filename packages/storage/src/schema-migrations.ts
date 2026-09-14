@@ -7,6 +7,7 @@ import {
 import { AVAILABILITY_CHECK_STORAGE_SCHEMA_MIGRATIONS } from "./availability-check-schema-migrations.js";
 import { ANALYTICS_STORAGE_SCHEMA_MIGRATIONS } from "./analytics-schema-migrations.js";
 import { OPENAI_OAUTH_STORAGE_SCHEMA_MIGRATIONS } from "./openai-oauth-schema-migrations.js";
+import { WORKER_JOB_SCHEMA_MIGRATIONS } from "./worker-job-schema.js";
 import {
   STORAGE_SCHEMA_MIGRATIONS as BASE_STORAGE_SCHEMA_MIGRATIONS,
   type StorageSchemaMigration
@@ -28,7 +29,8 @@ export const STORAGE_SCHEMA_MIGRATIONS: readonly StorageSchemaMigration[] = [
   ...BASE_STORAGE_SCHEMA_MIGRATIONS,
   ...AVAILABILITY_CHECK_STORAGE_SCHEMA_MIGRATIONS,
   ...ANALYTICS_STORAGE_SCHEMA_MIGRATIONS,
-  ...OPENAI_OAUTH_STORAGE_SCHEMA_MIGRATIONS
+  ...OPENAI_OAUTH_STORAGE_SCHEMA_MIGRATIONS,
+  ...WORKER_JOB_SCHEMA_MIGRATIONS
 ].sort((left, right) => left.id.localeCompare(right.id));
 
 function validateStorageSchemaMigrations(migrations: readonly StorageSchemaMigration[]): void {

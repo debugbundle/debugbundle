@@ -6,6 +6,23 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-09-14
+
+### Fixed
+
+- Make worker processing markers and downstream intents transactional through an additive durable job journal; fence retries and keep outbound delivery from blocking incident processing.
+- Retain reproduction jobs across missing/invalid input and storage failures until successful generation or bounded retry exhaustion.
+- Retry incident/improvement builds when retained context is temporarily unreadable; continue allowing explicitly expired or missing source objects.
+- Sanitize browser stack URL credentials/query/fragment before persistence, including older SDK submissions and URLs containing parentheses.
+- Bound MCP admission waits and aggregate expected limit pressure without hiding real operational failures.
+- Preserve truthful artifact/reproduction availability, canonicalize improvement timestamps, and keep latest detection evidence aligned during delayed arrivals.
+- Scope customer deployment attribution to the workload, environment and occurrence time; never substitute the DebugBundle platform release.
+- Normalize changing WildFly timer calendar diagnostics with fingerprint v2 while retaining installed v1 exact-match capture rules.
+
+### Added
+
+- Add bounded optional browser source/resource evidence and explicit unavailable reasons to OpenAI incident projections.
+
 ## [1.8.0] - 2026-09-12
 
 ### Changed

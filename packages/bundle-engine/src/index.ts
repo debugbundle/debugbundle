@@ -1,6 +1,7 @@
 import { BundleV1Schema, type BundleV1, type EventEnvelope } from "../../shared-types/src/index.js";
 import { redact, type JsonValue } from "../../redaction/src/index.js";
 import type { BundleBuildContext, BuildBundleJob } from "../../storage/src/index.js";
+import { selectScopedDeployments } from "./deployment-context.js";
 import {
   buildFrontendContext,
   deriveFirstApplicationFrame,
@@ -334,6 +335,9 @@ function buildRequestContext(envelopes: EventEnvelope[]): BundleRequestContext |
   if (exceptionEvent === null) {
     return null;
   }
+
+  // Background and sanitized operational events use an explicit SDK placeholder.
+  if (exceptionEvent.payload.request.method.toUpperCase() === "UNKNOWN") return null;
 
   return {
     version: 1,
@@ -757,13 +761,20 @@ export function buildBundle(input: BuildBundleInput): BundleV1 {
   const responseContext = buildResponseContext(sourceEnvelopes);
   const logsContext = buildLogsContext(sourceEnvelopes);
   const frontendContext = buildFrontendContext(sourceEnvelopes);
+  const deploymentEnvelopes = selectScopedDeployments({
+    envelopes: sourceEnvelopes,
+    service: input.incident.service_name,
+    environment: input.incident.environment,
+    occurredAt: input.bundleMetadata.source_occurred_at,
+    configuredDeployedAt: input.configuredDeploy?.deployed_at ?? null
+  });
   const deployContext = buildDeployContext(
-    sourceEnvelopes,
+    deploymentEnvelopes,
     input.job.trigger,
     input.configuredDeploy
   );
   const runtimeContext = buildRuntimeContext(sourceEnvelopes);
-  const gitContext = buildGitContext(sourceEnvelopes, input.configuredDeploy);
+  const gitContext = buildGitContext(deploymentEnvelopes, input.configuredDeploy);
   const deviceContext = buildDeviceContext(sourceEnvelopes);
   const dependenciesContext = buildDependenciesContext(
     input.incident,

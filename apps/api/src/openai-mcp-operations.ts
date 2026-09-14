@@ -1,3 +1,4 @@
+import { isObjectMissing } from "../../../packages/storage/src/object-store-errors.js";
 import type {
   OpenAiHostedOperations,
   OpenAiMcpPrincipal
@@ -146,18 +147,6 @@ async function requireProjectAccess(
   ) {
     throw new Error("openai_mcp_project_not_found");
   }
-}
-
-function isObjectMissing(error: unknown): boolean {
-  if (!isRecord(error)) {
-    return false;
-  }
-  const metadata = isRecord(error["$metadata"]) ? error["$metadata"] : {};
-  return (
-    error["name"] === "NoSuchKey" ||
-    error["code"] === "NoSuchKey" ||
-    metadata["httpStatusCode"] === 404
-  );
 }
 
 async function readArtifact(
@@ -483,7 +472,13 @@ export function createOpenAiHostedOperations(input: {
           dashboardBaseUrl,
           `/projects/${encodeURIComponent(projectId)}/incidents/${encodeURIComponent(incidentId)}`
         ),
-        omittedFields: ["request.headers", "request.body", "environment"]
+        omittedFields: [
+          "request.headers",
+          "request.body",
+          "environment",
+          "artifacts.curl",
+          "artifacts.httpie"
+        ]
       });
     },
 
@@ -556,8 +551,22 @@ export function createOpenAiHostedOperations(input: {
       );
       return {
         improvement: mapImprovement(record(improvement), dashboardBaseUrl),
-        evidence_summary: [improvement.summary],
-        artifact_status: improvement.bundle_failure_reason !== null ? "failed" : artifact.status
+        evidence_summary: [
+          improvement.summary,
+          ...(improvement.related_incident_ids.length > 0 &&
+          (improvement.kind === "recurring_incident" ||
+            improvement.kind === "post_deploy_regression")
+            ? [
+                "This improvement uses its related incident bundles; a separate improvement artifact is not generated."
+              ]
+            : improvement.bundle_failure_reason === "build_error"
+              ? ["Stored generation metadata reports a build error. No regeneration was started."]
+              : [])
+        ],
+        artifact_status:
+          artifact.status === "missing" && improvement.bundle_failure_reason === "build_error"
+            ? "failed"
+            : artifact.status
       };
     },
 
@@ -578,7 +587,7 @@ export function createOpenAiHostedOperations(input: {
         buildImprovementBundleObjectKey(projectId, improvementId)
       );
       const artifact = read.body === null ? null : improvementBundleArtifact(read.body);
-      return artifactEnvelope({
+      const envelope = artifactEnvelope({
         idKey: "improvement_id",
         id: improvementId,
         kind: "improvement_bundle",
@@ -590,6 +599,26 @@ export function createOpenAiHostedOperations(input: {
         ),
         omittedFields: ["context", "evidence", "metadata", "links"]
       });
+      if (read.status === "missing") {
+        if (
+          improvement.kind === "recurring_incident" ||
+          improvement.kind === "post_deploy_regression"
+        ) {
+          envelope["message"] =
+            "This improvement uses its related incident bundles; a separate improvement artifact is not generated.";
+        } else if (improvement.bundle_failure_reason === "monthly_quota_exceeded") {
+          envelope["message"] =
+            "Artifact generation is blocked by the monthly allowance. No regeneration was started.";
+        } else if (improvement.bundle_failure_reason === "bundle_generation_disabled") {
+          envelope["message"] =
+            "Artifact generation is disabled for this project. No regeneration was started.";
+        } else if (improvement.bundle_failure_reason === "build_error") {
+          envelope["status"] = "failed";
+          envelope["message"] =
+            "Artifact generation was unsuccessful. No regeneration was started.";
+        }
+      }
+      return envelope;
     },
 
     async list_health_checks({ principal, input: toolInput }) {

@@ -4,8 +4,8 @@
   "evidence_state": "local_connection_ready",
   "source": {
     "commit": "c4905ec3b679e362ab86df5354e486331c057276",
-    "tree_clean": true,
-    "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    "tree_clean": false,
+    "status_sha256": "f7b716cf27c4357c36ab595fd3366deb0d53d8949465f159406c0318b50b0141"
   },
   "runtime": {
     "resource_origin": "https://mcp.debugbundle.com",
@@ -69,8 +69,8 @@
       "list_health_check_daily_rollups"
     ],
     "tool_contract_sha256": "fcd3433e7d8ed5f3a8a743c91b0b45cd5ea330a2b13d02691144bdcbaca5aed7",
-    "schemas_sha256": "6b65362bf2cc60091c522acdd4f1200cf2ef2e53704c612089981b52f3e45b7b",
-    "data_map_sha256": "2303be70750234c7a9b134ba43bd03b35f7ae41c38c4f5fd4144d78b1f406d6a",
+    "schemas_sha256": "f676d7a1c71e1a98c374614e011a97e219df342c7334b0eaac4da3860994d999",
+    "data_map_sha256": "25d07f2934a6ea824ab314f2e7af3d9bed024859221058207753b16deedb43f2",
     "reviewer_fixture_sha256": "7eeff32a1dd14b4cb0fe5126e04470e448cf3f73a54bfb4f7e9e8f64327c6758"
   },
   "manual_gates": [

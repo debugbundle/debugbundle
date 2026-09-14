@@ -75,6 +75,7 @@ help:
 	@echo "  make openai-plugin-prepare   Build deterministic local candidate archives"
 	@echo "  make openai-plugin-verify    Verify source manifest and candidate hashes"
 	@echo "  make test-integration Run Compose-backed ingestion integration tests"
+	@echo "  make worker-jobs     Inspect scoped durable worker job metadata (read-only by default)"
 	@echo "  make api-check       Run API runtime bootstrap tests"
 	@echo "  make backend-restart Recreate API + worker so they reload current env"
 	@echo "  make dev             Start everything (infra + API + worker + web) and open http://localhost:5291"
@@ -179,6 +180,23 @@ perf-check:
 load-check:
 	$(NODE_RUN) "corepack enable && $(PNPM_INSTALL_RELAXED) && node --import tsx scripts/ingestion-load-check.ts"
 
+# Internal, metadata-only inspection by default. Retry requires an exact project and job.
+.PHONY: worker-jobs
+worker-jobs:
+	$(DOCKER_COMPOSE) exec -T -e WORKER_JOB_PROJECT_ID -e WORKER_JOB_ID -e WORKER_JOB_RETRY worker sh -lc "node --import tsx scripts/worker-jobs.ts"
+
+.PHONY: test-focused
+.PHONY: browser-evidence-check
+browser-evidence-check:
+	docker run --rm -v "$(CURDIR):/workspace" -w /workspace node:24-bookworm sh -lc 'apt-get update -qq && apt-get install -y -qq --no-install-recommends chromium >/dev/null && node --import tsx scripts/check-browser-evidence.mjs'
+
+test-focused:
+	$(NODE_RUN) "apk add --no-cache git >/dev/null && corepack enable && corepack pnpm vitest run $(TEST_FILES)"
+
+.PHONY: format-focused
+format-focused:
+	$(NODE_RUN) "corepack enable && corepack pnpm exec prettier --write $(FORMAT_FILES)"
+
 .PHONY: test-unit
 test-unit:
 	$(NODE_RUN) "apk add --no-cache git >/dev/null && corepack enable && BASE_SHA=$(BASE_SHA) HEAD_SHA=$(HEAD_SHA) corepack pnpm test"
@@ -261,6 +279,8 @@ openai-plugin-verify:
 .PHONY: ci
 ci: lint typecheck test build
 
+INTEGRATION_TEST_FILES ?= tests/integration/deployment-attribution.integration.test.ts tests/integration/improvement-occurrence-order.integration.test.ts tests/integration/alert-delivery-dedupe.integration.test.ts tests/integration/analytics-correlation.integration.test.ts tests/integration/analytics-incident-impact.integration.test.ts tests/integration/analytics-saved-funnels.integration.test.ts tests/integration/availability-checks.integration.test.ts tests/integration/ingestion-core.integration.test.ts tests/integration/incident-reliability.integration.test.ts tests/integration/worker-durability.integration.test.ts tests/integration/worker-job-migration.integration.test.ts tests/integration/worker-pipeline-recovery.integration.test.ts tests/integration/ingestion-bundle-triggers.integration.test.ts tests/integration/ingestion-replay-idempotency.integration.test.ts tests/integration/ingestion-lifecycle-webhooks.integration.test.ts tests/integration/billing-sync.integration.test.ts tests/integration/openai-coordination.integration.test.ts tests/integration/openai-oauth-grant-revocation.integration.test.ts tests/integration/openai-reviewer-fixtures.integration.test.ts tests/integration/project-deletion.integration.test.ts tests/integration/retention-cleanup.integration.test.ts tests/integration/retention-sampling.integration.test.ts tests/integration/storage-migrations.integration.test.ts
+
 .PHONY: test-integration
 test-integration:
 	@set -e; \
@@ -280,7 +300,7 @@ test-integration:
 		-e S3_ENDPOINT=http://localstack:4566 \
 		-e S3_REGION=us-east-1 \
 		-e S3_BUCKET=debugbundle-raw-events \
-		$(NODE_IMAGE) sh -lc "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm db:bootstrap && corepack pnpm db:migrate && corepack pnpm vitest run --no-file-parallelism --maxWorkers=1 tests/integration/alert-delivery-dedupe.integration.test.ts tests/integration/analytics-correlation.integration.test.ts tests/integration/analytics-incident-impact.integration.test.ts tests/integration/analytics-saved-funnels.integration.test.ts tests/integration/availability-checks.integration.test.ts tests/integration/ingestion-core.integration.test.ts tests/integration/ingestion-bundle-triggers.integration.test.ts tests/integration/ingestion-replay-idempotency.integration.test.ts tests/integration/ingestion-lifecycle-webhooks.integration.test.ts tests/integration/billing-sync.integration.test.ts tests/integration/openai-coordination.integration.test.ts tests/integration/openai-oauth-grant-revocation.integration.test.ts tests/integration/openai-reviewer-fixtures.integration.test.ts tests/integration/project-deletion.integration.test.ts tests/integration/retention-cleanup.integration.test.ts tests/integration/retention-sampling.integration.test.ts tests/integration/storage-migrations.integration.test.ts"
+		$(NODE_IMAGE) sh -lc "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm db:bootstrap && corepack pnpm db:migrate && corepack pnpm vitest run --no-file-parallelism --maxWorkers=1 $(INTEGRATION_TEST_FILES)"
 
 .PHONY: test-integration-down
 test-integration-down:

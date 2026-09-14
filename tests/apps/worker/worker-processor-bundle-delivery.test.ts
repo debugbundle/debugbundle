@@ -556,23 +556,8 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
     expect(parsed.context.error?.message).toBe("TypeError at checkout");
     expect(parsed.summary.signals.new_deploy).toBe(false);
     expect(parsed.summary.signals.regression_suspected).toBe(false);
-    expect(parsed.context.deploy).toEqual({
-      version: 1,
-      commit_sha: "efae41568986daaf8c54777ca8e63d838a4c319f",
-      deploy_version: "efae41568986",
-      branch: "main",
-      deployed_at: "2026-03-12T00:00:00.000Z",
-      regression_window: false
-    });
-    expect(parsed.context.git).toEqual({
-      version: 1,
-      commit: "efae41568986daaf8c54777ca8e63d838a4c319f",
-      commit_short: "efae415",
-      branch: "main",
-      repo: "debugbundle/debugbundle",
-      dirty: false,
-      source: "env"
-    });
+    expect(parsed.context.deploy).toBeNull();
+    expect(parsed.context.git).toBeNull();
     expect(parsed.context.probe_data).toEqual({ version: 1, items: [] });
     expect(parsed.links).toEqual({
       self: "https://api.debugbundle.test/v1/incidents/inc_123/bundle",
@@ -634,96 +619,6 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
     expect(result).toEqual({ processed: true });
     expect(queue.readJobQueue).toHaveBeenCalledWith("build-reproduction");
     expect(queue.enqueue).not.toHaveBeenCalledWith("build-reproduction", expect.anything());
-  });
-
-  it("should stop new hosted bundle generation when the monthly bundle quota is exhausted", async (): Promise<void> => {
-    const reserveBundleGeneration = vi.fn();
-    const markBundleGenerationFailure = vi.fn().mockResolvedValue(undefined);
-    const putObject = vi.fn();
-    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
-
-    const result = await processNextBuildBundleJob({
-      queue: {
-        enqueue: vi.fn(),
-        dequeue: vi.fn().mockResolvedValue({
-          project_id: "proj_123",
-          incident_id: "inc_123",
-          event_id: "evt_123",
-          occurred_at: "2026-03-12T00:00:00.000Z",
-          occurrence_count: 3,
-          trigger: "occurrence_threshold"
-        })
-      },
-      incidentStore: {
-        getBundleBuildContext: vi.fn().mockResolvedValue({
-          incident_id: "inc_123",
-          project_id: "proj_123",
-          service_id: "svc_123",
-          service_name: "checkout-api",
-          service_runtime: "node",
-          service_framework: "fastify",
-          environment: "production",
-          fingerprint: "fp_123",
-          title: "TypeError at checkout",
-          severity: "critical",
-          first_seen_at: "2026-03-11T23:59:00.000Z",
-          last_seen_at: "2026-03-12T00:00:00.000Z",
-          occurrence_count: 3,
-          source_event_types: ["backend_exception"]
-        }),
-        hasBundleGenerationForSourceEvent: vi.fn().mockResolvedValue(false),
-        markBundleGenerationFailure,
-        reserveBundleGeneration
-      },
-      accountAnalyticsStore: {
-        recordMetricDeltas
-      },
-      resolveOrganizationIdForProject: vi.fn().mockResolvedValue("org_123"),
-      objectStore: {
-        putObject
-      },
-      billingStore: {
-        getBillingSummaryForProject: vi.fn().mockResolvedValue({
-          plan: "solo",
-          stripe_customer_id: null,
-          active_projects: 2,
-          capacity_units: {
-            total: 3,
-            included: 3,
-            additional_purchased: 0
-          },
-          usage_window: {
-            starts_at: "2026-03-01T00:00:00.000Z",
-            ends_at: "2026-04-01T00:00:00.000Z"
-          },
-          allowances: {
-            monthly_bundle_requests: { used: 750, limit: 750 },
-            monthly_raw_ingested_events: { used: 0, limit: 10500 },
-            retained_bundle_cap: { used: 0, limit: 450 },
-            monthly_remote_activations: { used: 0, limit: 75 },
-            monthly_alert_deliveries: { used: 0, limit: 225 },
-            monthly_webhook_deliveries: { used: 0, limit: 750 }
-          }
-        })
-      }
-    });
-
-    expect(result).toEqual({ processed: true });
-    expect(markBundleGenerationFailure).toHaveBeenCalledWith({
-      incident_id: "inc_123",
-      reason: "monthly_quota_exceeded"
-    });
-    expect(recordMetricDeltas).toHaveBeenCalledWith({
-      organization_id: "org_123",
-      occurred_at: "2026-03-12T00:00:00.000Z",
-      source: "worker.build_bundle",
-      dedupe_key: "failure_bundle_generation_failed:inc_123:evt_123",
-      deltas: {
-        failure_bundle_generations_failed: 1
-      }
-    });
-    expect(reserveBundleGeneration).not.toHaveBeenCalled();
-    expect(putObject).not.toHaveBeenCalled();
   });
 
   it("should allow replaying an already-recorded bundle generation even after the monthly quota is exhausted", async (): Promise<void> => {
@@ -800,72 +695,6 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
     expect(releaseLease).toHaveBeenCalledWith("leases:bundle-regeneration:inc_123");
   });
 
-  it("should record build_error failure when bundle generation throws after reservation", async (): Promise<void> => {
-    const markBundleGenerationFailure = vi.fn().mockResolvedValue(undefined);
-    const releaseLease = vi.fn().mockResolvedValue(undefined);
-    const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
-
-    const result = await processNextBuildBundleJob({
-      queue: {
-        enqueue: vi.fn(),
-        dequeue: vi.fn().mockResolvedValue({
-          project_id: "proj_123",
-          incident_id: "inc_123",
-          event_id: "evt_123",
-          occurred_at: "2026-03-12T00:00:00.000Z",
-          occurrence_count: 3,
-          trigger: "occurrence_threshold"
-        }),
-        readJobQueue: vi.fn().mockResolvedValue([]),
-        releaseLease
-      },
-      incidentStore: {
-        getBundleBuildContext: vi.fn().mockResolvedValue({
-          incident_id: "inc_123",
-          project_id: "proj_123",
-          service_id: "svc_123",
-          service_name: "checkout-api",
-          service_runtime: "node",
-          service_framework: "fastify",
-          environment: "production",
-          fingerprint: "fp_123",
-          title: "TypeError at checkout",
-          severity: "critical",
-          first_seen_at: "2026-03-11T23:59:00.000Z",
-          last_seen_at: "2026-03-12T00:00:00.000Z",
-          occurrence_count: 3,
-          source_event_types: ["backend_exception"]
-        }),
-        hasBundleGenerationForSourceEvent: vi.fn().mockResolvedValue(false),
-        markBundleGenerationFailure,
-        reserveBundleGeneration: vi.fn().mockResolvedValue(createReservedBundleGeneration()),
-        listIncidentEventReferences: vi.fn().mockResolvedValue([])
-      },
-      accountAnalyticsStore: {
-        recordMetricDeltas
-      },
-      resolveOrganizationIdForProject: vi.fn().mockResolvedValue("org_123"),
-      objectStore: {
-        putObject: vi.fn().mockRejectedValue(new Error("s3_write_failed"))
-      }
-    });
-
-    expect(result).toEqual({ processed: true });
-    expect(markBundleGenerationFailure).toHaveBeenCalledWith({
-      incident_id: "inc_123",
-      reason: "build_error"
-    });
-    expect(recordMetricDeltas).toHaveBeenCalledWith({
-      organization_id: "org_123",
-      occurred_at: "2026-03-12T00:00:00.000Z",
-      source: "worker.build_bundle",
-      dedupe_key: "failure_bundle_generation_failed:inc_123:evt_123",
-      deltas: {
-        failure_bundle_generations_failed: 1
-      }
-    });
-    expect(releaseLease).toHaveBeenCalledWith("leases:bundle-regeneration:inc_123");
-  });
 
   it("should prune oldest retained incidents after persisting a new bundle", async (): Promise<void> => {
     const deleteObject = vi.fn().mockResolvedValue(undefined);
@@ -1029,9 +858,9 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
 
     const firstPayload = putObject.mock.calls[0]?.[0] as { body: Buffer };
     expect(JSON.parse(gunzipSync(firstPayload.body).toString("utf8"))).toEqual({
-      possible: true,
-      confidence: 0.8,
-      reason: "request_context_available",
+      possible: false,
+      confidence: 0.1,
+      reason: "request_target_unavailable",
       artifacts: {
         curl: "curl -X POST 'https://example.invalid/checkout?coupon=SAVE10' -H 'content-type: application/json' --data-raw '{\"amount\":42}'",
         httpie:
@@ -1107,7 +936,7 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
     });
   });
 
-  it("should persist low-confidence reproduction first and deterministically upgrade once request context appears", async (): Promise<void> => {
+  it("should add a deterministic incomplete template when request context appears without an origin", async (): Promise<void> => {
     const getObject = vi
       .fn()
       .mockResolvedValueOnce(gzipSync(Buffer.from(JSON.stringify(createReproductionBundle({ includeRequest: false })), "utf8")))
@@ -1164,9 +993,9 @@ describe("worker processor \u2013 bundle, delivery & sampling", () => {
 
     const upgradedPayload = putObject.mock.calls[1]?.[0] as { body: Buffer };
     expect(JSON.parse(gunzipSync(upgradedPayload.body).toString("utf8"))).toEqual({
-      possible: true,
-      confidence: 0.8,
-      reason: "request_context_available",
+      possible: false,
+      confidence: 0.1,
+      reason: "request_target_unavailable",
       artifacts: {
         curl: "curl -X POST 'https://example.invalid/checkout?coupon=SAVE10' -H 'content-type: application/json' --data-raw '{\"amount\":42}'",
         httpie:

@@ -293,6 +293,43 @@ describe("OpenAI hosted MCP HTTP boundary", () => {
     expect(response.headers["mcp-session-id"]).toBeUndefined();
   });
 
+  it("absorbs overlapping HTTP tool reads within the two-call execution limit", async () => {
+    let active = 0;
+    let peak = 0;
+    const app = createApp({
+      listProjects: async () => {
+        peak = Math.max(peak, ++active);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        active--;
+        return { projects: [], next_cursor: null, empty_state: null };
+      }
+    });
+    const responses = await Promise.all(
+      Array.from({ length: 8 }, (_, id) =>
+        app.inject({
+          method: "POST",
+          url: "/mcp",
+          headers: {
+            ...CANONICAL_HEADERS,
+            authorization: "Bearer access-token",
+            accept: "application/json, text/event-stream"
+          },
+          payload: {
+            jsonrpc: "2.0",
+            id,
+            method: "tools/call",
+            params: { name: "list_projects", arguments: {} }
+          }
+        })
+      )
+    );
+    for (const response of responses) {
+      expect(response.statusCode, response.body).toBe(200);
+      expect(response.json().result, response.body).not.toHaveProperty("isError", true);
+    }
+    expect(peak).toBe(2);
+  });
+
   it("fails closed when token verification fails or the MCP bulkhead is disabled", async () => {
     const rejectedMonitor = vi.fn();
     const rejected = createApp({

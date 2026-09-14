@@ -41,6 +41,8 @@ export const CaptureRuleEvaluationContextSchema = z.object({
   request_url: CaptureRuleEvaluationUrlSchema.optional(),
   status_code: z.number().int().min(0).max(599).optional(),
   fingerprint: CaptureRuleFingerprintSchema.optional(),
+  // Server-derived prior versions keep installed exact-match rules effective.
+  fingerprint_aliases: z.array(CaptureRuleFingerprintSchema).max(2).optional(),
 });
 
 export type CaptureRuleEvaluationContext = z.infer<typeof CaptureRuleEvaluationContextSchema>;
@@ -231,6 +233,7 @@ export function buildCaptureRuleEvaluationContext(input: {
   project_id: string;
   event: CaptureRuleEvaluableEvent;
   fingerprint?: CaptureRuleFingerprint;
+  fingerprint_aliases?: CaptureRuleFingerprint[];
 }): CaptureRuleEvaluationContext {
   const context: CaptureRuleEvaluationContext = {
     project_id: input.project_id,
@@ -241,6 +244,7 @@ export function buildCaptureRuleEvaluationContext(input: {
     runtime: normalizeRuntime(input.event.service.runtime),
     ...classifyCaptureRuleClientFromUserAgent(readEventUserAgent(input.event)),
     ...(input.fingerprint === undefined ? {} : { fingerprint: input.fingerprint }),
+    ...(input.fingerprint_aliases === undefined ? {} : { fingerprint_aliases: input.fingerprint_aliases }),
   };
 
   switch (input.event.event_type) {
@@ -475,14 +479,8 @@ export function matchesCaptureRule(rule: CaptureRule, contextInput: CaptureRuleE
   }
 
   if (matcher.fingerprint !== undefined) {
-    if (context.fingerprint === undefined) {
-      return false;
-    }
-
-    if (
-      context.fingerprint.version !== matcher.fingerprint.version ||
-      context.fingerprint.value !== matcher.fingerprint.value
-    ) {
+    const fingerprints = [...(context.fingerprint === undefined ? [] : [context.fingerprint]), ...(context.fingerprint_aliases ?? [])];
+    if (!fingerprints.some(candidate => candidate.version === matcher.fingerprint!.version && candidate.value === matcher.fingerprint!.value)) {
       return false;
     }
   }

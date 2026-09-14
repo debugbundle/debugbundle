@@ -5,7 +5,7 @@ Source requirements: `NFR-REL-03`, `NFR-REL-04`, `NFR-REL-08`, `NFR-SCALE-01`; a
 ## Invariants
 
 - Idle polls retain only active waits. Never repeatedly race a timeout against one unresolved process-lifetime promise: each losing reaction remains attached until shutdown.
-- Poll completion unregisters its shutdown callback. Shutdown resolves all active polls and clears their timers, including long configured intervals. Existing readiness draining, queue acknowledgement, leases, concurrency, and job priority stay unchanged.
+- Poll completion unregisters its shutdown callback. Shutdown resolves all active polls and clears their timers, including long configured intervals. The original lifecycle fix preserved readiness draining, queue acknowledgement, leases, concurrency and job priority. The later durable-worker candidate changes queue ownership and scheduling as documented in `spec/worker-durability.md`, while retaining bounded poll/shutdown registrations.
 - The incident-frequency snapshot cache is a write-throttling optimization capped at 10,000 IDs. A successful persistence refreshes entry order; overflow evicts the oldest persisted entry. A failed write does not update or evict entries. Cache eviction can cause an extra guarded database write, not lost counters or older durable snapshots. Closing the counter clears the cache.
 - Each temporary S3 readiness client is destroyed in `finally`; readiness still validates actual dependency and migration state on every probe.
 - Status-only alert, lifecycle webhook, weekly Slack, and worker dogfooding requests abort any unread response when the attempt ends. GitHub token errors and dispatch responses cancel unused bodies without changing status/retry handling. Availability checks cancel redirect bodies before validating the next target, including targets rejected by SSRF rules.
@@ -22,7 +22,7 @@ The original implementation retained about 69.6 MB and 300,000 promises per 100,
 
 This change needs no schema migration, data rewrite, customer configuration change, or new service. Ship through the normal approved immutable-image rollout and preserve the verified rollback release. Updating source alone does not fix an already running worker; a newly deployed process is required.
 
-After rollout, verify both polling lanes, normal job delivery, readiness, container restarts/OOM state, and the exact deployed revision. Compare worker memory after warm-up, then over 24–48 hours at comparable workload. Use existing metadata-only host/container observations; do not collect customer-bearing heap dumps or add paid monitoring without approval.
+After rollout, verify all active polling lanes, normal job delivery, readiness, container restarts/OOM state, and the exact deployed revision. Compare worker memory after warm-up, then over 24–48 hours at comparable workload. Use existing metadata-only host/container observations; do not collect customer-bearing heap dumps or add paid monitoring without approval.
 
 RSS includes native allocations, buffers, and allocator retention as well as the JavaScript heap. It may rise during warm-up and fluctuate with work; the objective is a bounded working range, not an identical byte count at every sample. Keep the existing host memory reserve of the greater of 30% or 512 MiB. A sustained post-warm-up slope or reserve breach needs further investigation before raising workload caps.
 

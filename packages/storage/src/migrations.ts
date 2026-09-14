@@ -79,6 +79,7 @@ export const REQUIRED_API_TABLES = [
 ] as const;
 
 export const REQUIRED_WORKER_TABLES = [
+  "worker_jobs",
   "processed_events",
   "organizations",
   "oauth_authorization_grants",

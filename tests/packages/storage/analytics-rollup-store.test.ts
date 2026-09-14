@@ -197,6 +197,9 @@ function createTransactionalDb(query: Queryable["query"]): Queryable {
 describe("analytics rollup store", () => {
   it("records accepted analytics events into hourly and daily rollups", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      if (sqlText.startsWith("SELECT pg_advisory_xact_lock")) {
+        return { rows: [] };
+      }
       void params;
       if (sqlText.includes("INSERT INTO analytics_ingestion_ledger")) {
         return { rows: [{ event_id: "550e8400-e29b-41d4-a716-446655440000" }] };
@@ -254,6 +257,9 @@ describe("analytics rollup store", () => {
 
   it("records route-change transitions into hourly and daily rollups", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      if (sqlText.startsWith("SELECT pg_advisory_xact_lock")) {
+        return { rows: [] };
+      }
       void params;
       if (sqlText.includes("INSERT INTO analytics_ingestion_ledger")) {
         return { rows: [{ event_id: "550e8400-e29b-41d4-a716-446655440001" }] };
@@ -304,6 +310,9 @@ describe("analytics rollup store", () => {
 
   it("reconciles incident links when an existing route session gains trace correlation", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string) => {
+      if (sqlText.startsWith("SELECT pg_advisory_xact_lock")) {
+        return { rows: [] };
+      }
       if (sqlText.includes("INSERT INTO analytics_ingestion_ledger")) {
         return { rows: [{ event_id: "550e8400-e29b-41d4-a716-446655440000" }] };
       }
@@ -342,6 +351,9 @@ describe("analytics rollup store", () => {
 
   it("does not update rollups when the event is already in the ingestion ledger", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      if (sqlText.startsWith("SELECT pg_advisory_xact_lock")) {
+        return { rows: [] };
+      }
       void params;
       if (sqlText.includes("INSERT INTO analytics_ingestion_ledger")) {
         return { rows: [] };
@@ -366,6 +378,9 @@ describe("analytics rollup store", () => {
 
   it("records saved-funnel steps without running an opportunity scan in the event transaction", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      if (sqlText.startsWith("SELECT pg_advisory_xact_lock")) {
+        return { rows: [] };
+      }
       void params;
       if (sqlText.includes("INSERT INTO analytics_ingestion_ledger")) {
         return { rows: [{ event_id: "550e8400-e29b-41d4-a716-446655440002" }] };
@@ -415,6 +430,9 @@ describe("analytics rollup store", () => {
 
   it("records journey transitions without running an opportunity scan in the event transaction", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      if (sqlText.startsWith("SELECT pg_advisory_xact_lock")) {
+        return { rows: [] };
+      }
       void params;
       if (sqlText.includes("INSERT INTO analytics_ingestion_ledger")) {
         return { rows: [{ event_id: "550e8400-e29b-41d4-a716-446655440001" }] };
@@ -457,6 +475,9 @@ describe("analytics rollup store", () => {
 
   it("records browser friction markers without running an opportunity scan in the event transaction", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      if (sqlText.startsWith("SELECT pg_advisory_xact_lock")) {
+        return { rows: [] };
+      }
       void params;
       if (sqlText.includes("INSERT INTO analytics_ingestion_ledger")) {
         return { rows: [{ event_id: "550e8400-e29b-41d4-a716-446655440003" }] };

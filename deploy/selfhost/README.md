@@ -7,6 +7,7 @@ This directory defines the self-host deployment baseline for DebugBundle.
 Self-host and local Docker setups must stay close to the hosted production model so the product remains lean to reason about and maintain.
 
 That means local development and self-host should preserve these boundaries even when everything runs on a single machine:
+
 - web SPA as its own service
 - API as its own service
 - worker as its own service
@@ -19,6 +20,7 @@ The public marketing/docs/blog site is separate from this core self-host topolog
 ## Auth Parity
 
 Local/self-host auth behavior must match hosted behavior:
+
 - SPA uses first-party cookie-backed sessions
 - CLI and MCP use member-token auth through the API
 - SDK ingestion uses project tokens only
@@ -29,29 +31,30 @@ Local convenience must not introduce a different auth model than hosted deployme
 
 1. Copy the checked-in defaults and set the required probe-trigger secret:
 
-	```sh
-	cp .env.example .env
-	```
+   ```sh
+   cp .env.example .env
+   ```
 
 2. Start the self-host stack:
 
-	```sh
-	docker compose up -d
-	```
+   ```sh
+   docker compose up -d
+   ```
 
 3. Wait for the stack to become healthy:
 
-	```sh
-	docker compose ps
-	```
+   ```sh
+   docker compose ps
+   ```
 
 4. Run the shipped smoke flow to prove member bootstrap, project-token ingestion, worker processing, browser analytics rollups, retained journeys, and both bundle families:
 
-	```sh
-	make selfhost-smoke
-	```
+   ```sh
+   make selfhost-smoke
+   ```
 
 The compose file now brings up the full authenticated product surface:
+
 - `workspace-init` installs the monorepo workspace once inside the repo checkout
 - `db-bootstrap` creates a clean empty schema, `db-migrate` applies ordered forward migrations, and `api` starts only after both complete
 - `worker` starts only after the API is healthy, so it sees a migrated database
@@ -71,6 +74,7 @@ ANALYTICS_HASH_SECRET=replace-with-a-long-random-secret
 ```
 
 When enabled:
+
 - All tier-gated features are unlocked (remote probes, GitHub automation, member invites, etc.)
 - Ingestion rate limits and monthly quota checks are skipped
 - Projects remain unlimited
@@ -96,6 +100,7 @@ The checked-in `.env.example` includes the baseline configuration needed to boot
 - GitHub OAuth, GitHub App, and GitHub Marketplace webhook variables remain optional until those features are enabled
 
 Default local endpoints after `docker compose up -d`:
+
 - Web SPA: `http://localhost:5291`
 - API: `http://localhost:3004`
 - Postgres: `localhost:5434`
@@ -108,10 +113,10 @@ AnalyticsBundle is disabled per project until an owner or admin enables it throu
 
 Analytics data uses three independent project settings:
 
-| Setting | Range | What expires |
-| --- | --- | --- |
-| `raw_retention_days` | 1-30 days | Short-lived raw analytics input objects and ingestion-ledger entries. |
-| `sample_retention_days` | 1-365 days | Retained redacted representative journey samples and their object-storage artifacts. |
+| Setting                      | Range        | What expires                                                                          |
+| ---------------------------- | ------------ | ------------------------------------------------------------------------------------- |
+| `raw_retention_days`         | 1-30 days    | Short-lived raw analytics input objects and ingestion-ledger entries.                 |
+| `sample_retention_days`      | 1-365 days   | Retained redacted representative journey samples and their object-storage artifacts.  |
 | `aggregate_retention_months` | 1-120 months | Aggregate rollups, completed/failed AnalyticsBundle generations, and their artifacts. |
 
 The worker cleanup lane deletes expired objects and metadata automatically. Aggregate metrics remain the normal query model; no analytics raw-event search surface exists. Generated journey timelines contain only redacted safe fields, and incident-impact replay remains restricted to correlation-backed retained samples.
@@ -123,6 +128,7 @@ For an existing installation, deploy the current `db-migrate` service before API
 ## Health Checks
 
 Every long-running service has a health check:
+
 - PostgreSQL uses `pg_isready`
 - Redis uses `redis-cli ping`
 - LocalStack verifies the configured raw-event bucket exists
@@ -153,6 +159,7 @@ Typical failure reasons now surface explicitly in container logs, for example:
 `make selfhost-smoke` boots the full self-host stack in an isolated Compose project, waits for API and web readiness, then runs the checked-in smoke runner at `scripts/selfhost-smoke.ts`.
 
 That smoke flow proves the core hosted-parity path end to end:
+
 - dev-only GitHub bootstrap to a write-once member token inside the isolated smoke environment
 - project creation and project-token minting through the member-authenticated management API
 - `POST /v1/events` ingestion with the minted project token
@@ -185,20 +192,20 @@ Go to **Settings → Developer settings → GitHub Apps → New GitHub App** in 
 
 Configure the app with these settings:
 
-| Field | Value |
-|---|---|
-| **App name** | Any name (e.g. `DebugBundle Self-Host`) |
-| **Homepage URL** | Your DebugBundle web app URL |
-| **Callback URL** | `https://<your-api-host>/v1/github/app/callback` |
-| **Webhook URL** | `https://<your-api-host>/v1/github/app/webhook` |
+| Field              | Value                                                       |
+| ------------------ | ----------------------------------------------------------- |
+| **App name**       | Any name (e.g. `DebugBundle Self-Host`)                     |
+| **Homepage URL**   | Your DebugBundle web app URL                                |
+| **Callback URL**   | `https://<your-api-host>/v1/github/app/callback`            |
+| **Webhook URL**    | `https://<your-api-host>/v1/github/app/webhook`             |
 | **Webhook secret** | A random secret (save this for `GITHUB_APP_WEBHOOK_SECRET`) |
 
 ### 2. Set Permissions
 
 Under **Permissions & events**, set:
 
-| Permission | Access |
-|---|---|
+| Permission                | Access    |
+| ------------------------- | --------- |
 | **Repository → Contents** | Read-only |
 | **Repository → Metadata** | Read-only |
 
@@ -211,6 +218,7 @@ After creating the app, go to the app settings page and click **Generate a priva
 ### 4. Note the App ID and Client Credentials
 
 From your GitHub App's settings page, record:
+
 - **App ID** (shown at the top)
 - **Client ID** (under "About" → "Client ID")
 - **Client secret** (generate one under "Client secrets")
@@ -244,3 +252,9 @@ After installation, the GitHub automation panel in Project Settings should show 
 
 - Your API must be reachable by GitHub for the installation callback (`/v1/github/app/callback`) and webhook delivery (`/v1/github/app/webhook`). This requires a public URL or a tunnel/proxy.
 - The worker must be able to reach `https://api.github.com` to acquire installation tokens and send `repository_dispatch` events.
+
+## Durable worker upgrade
+
+The durable worker release requires forward migration `202609130001_add_durable_worker_jobs`. Use the normal `db-migrate` dependency before starting the new worker; do not bootstrap an existing database. Pending work moves from Redis into Postgres when the worker adopts it. Internal worker `/ready` reports `worker_job_protocol: postgres-v1` and `processing_enabled: true` during normal processing. Self-host startup leaves `WORKER_START_PAUSED` at its compatible default `0`.
+
+Keep a compatible `postgres-v1` worker after upgrade, including during an API rollback: Redis-only workers cannot consume existing Postgres jobs. Start with one incident worker; adding replicas requires separate artifact-publication and capacity validation. Inspect/retry scoped failed jobs with the internal `make worker-jobs` workflow in [the worker durability specification](../../spec/worker-durability.md). Preserve database and Redis persistence/backup settings; worker adoption does not make the preceding S3/Redis ingestion handoff atomic.

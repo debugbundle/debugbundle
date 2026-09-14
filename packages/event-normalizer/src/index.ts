@@ -14,6 +14,7 @@ import {
   objectWrapCompatibleProbeData
 } from "./mobile-event-compatibility.js";
 import { normalizeInstalledJavaEvent } from "./java-event-compatibility.js";
+import { normalizeJavaTimerMessage } from "./java-timer-message.js";
 
 export {
   classifyInstalledJavaEventCompatibility,
@@ -42,7 +43,7 @@ export interface NormalizedEvent {
   payload: unknown;
 }
 
-export const FINGERPRINT_VERSION = "v1";
+export const FINGERPRINT_VERSION = "v2";
 
 type CorrelationKey = "request_id" | "trace_id" | "session_id" | "user_id_hash";
 
@@ -488,13 +489,13 @@ function normalizeKnownDatabaseMessage(message: string): string | null {
   return null;
 }
 
-function normalizeMessage(message: string): string {
+function normalizeMessage(message: string, version: "v1" | "v2"): string {
   const knownDatabaseMessage = normalizeKnownDatabaseMessage(message);
   if (knownDatabaseMessage !== null) {
     return knownDatabaseMessage;
   }
 
-  return collapseWhitespace(normalizeScalarTokens(message));
+  return collapseWhitespace(normalizeScalarTokens(version === "v1" ? message : normalizeJavaTimerMessage(message)));
 }
 
 function normalizeRoute(path: string | null): string | null {
@@ -624,7 +625,7 @@ export function validateEvent(
   return EventEnvelopeSchema.safeParse(normalizeCompatibleEventCandidate(candidate));
 }
 
-export function normalizeEvent(event: EventEnvelope): NormalizedEvent {
+export function normalizeEvent(event: EventEnvelope, version: "v1" | "v2" = FINGERPRINT_VERSION): NormalizedEvent {
   const redactedPayload = redact(event.payload as JsonValue).redacted;
 
   if (event.event_type === "backend_exception") {
@@ -632,7 +633,7 @@ export function normalizeEvent(event: EventEnvelope): NormalizedEvent {
       event_type: event.event_type,
       environment: event.service.environment,
       error_type: event.payload.name,
-      normalized_message: normalizeMessage(event.payload.message),
+      normalized_message: normalizeMessage(event.payload.message, version),
       route_template: normalizeRoute(event.payload.request.path),
       http_method: event.payload.request.method,
       http_status: event.payload.response.status_code,
@@ -666,7 +667,7 @@ export function normalizeEvent(event: EventEnvelope): NormalizedEvent {
       event_type: event.event_type,
       environment: event.service.environment,
       error_type: null,
-      normalized_message: normalizeMessage(event.payload.message),
+      normalized_message: normalizeMessage(event.payload.message, version),
       route_template: null,
       http_method: null,
       http_status: null,
@@ -690,7 +691,7 @@ export function normalizeEvent(event: EventEnvelope): NormalizedEvent {
       event_type: event.event_type,
       environment: event.service.environment,
       error_type: event.payload.name,
-      normalized_message: normalizeMessage(event.payload.message),
+      normalized_message: normalizeMessage(event.payload.message, version),
       route_template: normalizeRoute(event.payload.route ?? null),
       http_method: null,
       http_status: null,

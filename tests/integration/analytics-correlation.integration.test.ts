@@ -31,7 +31,12 @@ runIntegration("analytics incident correlation integration", () => {
   });
 
   it("links route sessions exactly once whether analytics or the incident arrives first", async (): Promise<void> => {
-    for (const order of ["analytics_first", "incident_first", "concurrent"] as const) {
+    for (const order of [
+      "analytics_first",
+      "incident_first",
+      "concurrent",
+      "blocked_analytics"
+    ] as const) {
       const projectId = randomUUID();
       const organizationId = randomUUID();
       const incidentId = randomUUID();
@@ -99,6 +104,71 @@ runIntegration("analytics incident correlation integration", () => {
       } else if (order === "incident_first") {
         await expect(incidentWrite()).resolves.toEqual({ recorded: true, linked_sessions: 0 });
         await expect(analyticsWrite()).resolves.toEqual({ recorded: true });
+      } else if (order === "blocked_analytics") {
+        let release!: () => void;
+        let inserted!: () => void;
+        const held = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        const ready = new Promise<void>((resolve) => {
+          inserted = resolve;
+        });
+        const heldStore = createPostgresAnalyticsCorrelationStore({
+          ...db,
+          transaction: (callback) =>
+            db.transaction!(async (tx) => {
+              const result = await callback(tx);
+              inserted();
+              await held;
+              return result;
+            })
+        });
+        const incidentPending = heldStore.recordIncidentCorrelation({
+          project_id: projectId,
+          incident_id: incidentId,
+          event_id: eventId,
+          service: "web",
+          environment: "production",
+          occurred_at: occurredAt,
+          session_id_hash: hashAnalyticsSessionSubject(projectId, sessionId),
+          trace_id_hash: hashAnalyticsCorrelationValue(traceId)
+        });
+        await ready;
+        const applicationName = `correlation-${projectId}`;
+        const waitingStore = createPostgresAnalyticsRollupStore({
+          ...db,
+          transaction: (callback) =>
+            db.transaction!(async (tx) => {
+              await tx.query("SELECT set_config('application_name', $1, true)", [applicationName]);
+              return callback(tx);
+            })
+        });
+        const analyticsPending = waitingStore.recordAnalyticsEvent({
+          project_id: projectId,
+          event: createAnalyticsPageView({
+            projectId,
+            eventId: randomUUID(),
+            sessionId,
+            traceId,
+            occurredAt
+          })
+        });
+        try {
+          await expect
+            .poll(
+              async () =>
+                (
+                  await pool.query<{ wait_event: string }>(
+                    "SELECT wait_event FROM pg_stat_activity WHERE application_name = $1",
+                    [applicationName]
+                  )
+                ).rows[0]?.wait_event
+            )
+            .toBe("advisory");
+        } finally {
+          release();
+        }
+        await Promise.all([incidentPending, analyticsPending]);
       } else {
         const [analyticsResult, incidentResult] = await Promise.all([
           analyticsWrite(),

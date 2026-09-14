@@ -457,7 +457,8 @@ describe("bundle-engine", () => {
             version: "v2.4.0",
             branch: "main",
             environment: "production",
-            deployed_at: "2026-03-12T00:00:39.000Z"
+            // Metadata arrived later, but the deployment preceded the 00:00:30 failure.
+            deployed_at: "2026-03-12T00:00:20.000Z"
           }
         })
       ],

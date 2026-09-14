@@ -1899,3 +1899,25 @@ Applies to: `bundle.reopened`, `incident.spike_detected`
 ```
 
 **Deploy correlation fields** are populated when `regression_after_deploy` is `true` (the regression occurred within 24 hours of a deploy). When `false`, all deploy fields are `null`.
+
+### Incident evidence integrity clarifications
+
+The hosted worker cannot use its own process release identity as a fallback for customer `context.deploy` or `context.git`. Without customer evidence those blocks are null. The direct bundle-engine `configuredDeploy` option remains available to explicitly scoped local callers. No stored schema changes are required.
+
+Reproduction feasibility is separate from the existence of a template. `UNKNOWN`/invalid HTTP methods and invalid or credentialed URLs return `possible: false`, confidence `0.1`, and null artifacts with `request_method_unavailable` or `request_url_invalid`. A relative request without a captured origin keeps the compatible `example.invalid` command template, but reports `possible: false`, confidence `0.1`, and `request_target_unavailable`. Consumers must check feasibility before attempting a replay.
+
+### Internal durable worker jobs
+
+Migration `202609130001_add_durable_worker_jobs` adds `worker_jobs`; it does not change public queue payloads or bundle schemas. Each row has a stable SHA-256 `id`, `job_name`, nullable project FK (scoped jobs cascade on project deletion), redacted JSON `payload` capped at 2 MiB, optional same-project `depends_on` FK, `status` (`pending`, `running`, `completed`, `failed`, `skipped`), automatic `attempts`, `operator_retries`, `available_at`, fenced `lease_token`/`lease_expires_at`, fixed `last_error_code`, and creation/update/expiry timestamps. Running status requires lease fields. Dependencies may be consumed only after successful completion; referenced receipts cannot be deleted independently.
+
+Postgres adopts legacy Redis payloads before their Redis acknowledgement. The internal `ClaimedRedisJob.claim_id` is optional additive claim metadata; Redis wire payloads remain unchanged. Hosted workers advertise internal readiness protocol `postgres-v1` plus `processing_enabled`. Public API/CLI/MCP clients do not need a version change to read existing incidents. Source-event and quota idempotency remain in their owning stores. Internal operator inspection excludes payloads/tokens and does not create a public raw-job access surface. See `spec/worker-durability.md` for retry, retention and compatible-worker rollback semantics.
+
+### Incident evidence compatibility notes
+
+Browser `payload.browser_event` and existing frontend context remain optional and retain their current schema. Native inherited fields are read explicitly; HTTP(S) stack locations omit credentials/query/fragment while retaining line/column. Synthetic SDK listener frames are not evidence of an application failure. The additive OpenAI browser projection is defined in `contracts/openai-plugin-v1-data-map.md`.
+
+Generated improvement timestamps are canonical ISO UTC, including when storage reads return PostgreSQL text timestamps. Opportunity first/last detection track occurrence bounds; artifact creation/update times track generation. Latest occurrence evidence and source identity remain aligned across delayed arrivals. Deployment context uses only the exact workload/environment history at the triggering occurrence; it is null when unavailable.
+
+New grouping uses fingerprint v2 for the scoped WildFly calendar normalization. Existing rows retain their stored version and hash. Internal capture-rule evaluation context accepts at most two server-derived `fingerprint_aliases` (version/value pairs) to preserve installed prior-version rules. The public ingestion event does not accept authoritative fingerprint aliases, and no stored rule is rewritten.
+
+Server ingestion also removes credentials/query/fragment from frontend exception HTTP(S) stack locations before persistence, including submissions from installed older SDKs. This protects new ingested events; historical stored artifacts still follow the bounded repair policy.

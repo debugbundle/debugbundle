@@ -6,7 +6,9 @@ function stableStringify(value: unknown): string {
   }
 
   if (value !== null && typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right));
+    const entries = Object.entries(value as Record<string, unknown>).sort(([left], [right]) =>
+      left.localeCompare(right)
+    );
     return `{${entries.map(([key, entryValue]) => `${JSON.stringify(key)}:${stableStringify(entryValue)}`).join(",")}}`;
   }
 
@@ -82,11 +84,16 @@ function isAmbiguousScalarLikeString(value: string): boolean {
 }
 
 function sanitizeHeaderText(value: string): string {
-  return value.replace(/[\u0000-\u001F\u007F]+/g, " ").replace(/ +/g, " ").trim();
+  return value
+    .replace(/[\u0000-\u001F\u007F]+/g, " ")
+    .replace(/ +/g, " ")
+    .trim();
 }
 
 function sanitizeReplayTextBody(value: string): string {
-  return value.replace(/\r\n?/g, "\n").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
+  return value
+    .replace(/\r\n?/g, "\n")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
 }
 
 function normalizeReplayJsonValue(value: unknown): unknown {
@@ -100,7 +107,10 @@ function normalizeReplayJsonValue(value: unknown): unknown {
 
   if (value !== null && typeof value === "object") {
     return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([key, entryValue]) => [key, normalizeReplayJsonValue(entryValue)])
+      Object.entries(value as Record<string, unknown>).map(([key, entryValue]) => [
+        key,
+        normalizeReplayJsonValue(entryValue)
+      ])
     );
   }
 
@@ -127,7 +137,10 @@ function normalizeReplayQueryValue(value: unknown): unknown {
 
   if (value !== null && typeof value === "object") {
     return Object.fromEntries(
-      sortRecordEntries(value as Record<string, unknown>).map(([key, entryValue]) => [key, normalizeReplayQueryValue(entryValue)])
+      sortRecordEntries(value as Record<string, unknown>).map(([key, entryValue]) => [
+        key,
+        normalizeReplayQueryValue(entryValue)
+      ])
     );
   }
 
@@ -148,13 +161,17 @@ function hasStructuredQueryAmbiguity(value: unknown): boolean {
   }
 
   if (value !== null && typeof value === "object") {
-    return Object.values(value as Record<string, unknown>).some((item) => hasStructuredQueryAmbiguity(item));
+    return Object.values(value as Record<string, unknown>).some((item) =>
+      hasStructuredQueryAmbiguity(item)
+    );
   }
 
   return false;
 }
 
-function buildStructuredReplayQuery(query: Record<string, unknown>): Record<string, unknown> | undefined {
+function buildStructuredReplayQuery(
+  query: Record<string, unknown>
+): Record<string, unknown> | undefined {
   const normalizedQuery = Object.fromEntries(
     sortRecordEntries(query).map(([key, value]) => [key, normalizeReplayQueryValue(value)])
   );
@@ -165,7 +182,10 @@ function buildStructuredReplayQuery(query: Record<string, unknown>): Record<stri
 function buildReplayHeaders(headers: Record<string, unknown>): Record<string, unknown> {
   const entries = sortRecordEntries(headers)
     .filter(([headerName]) => !DROPPED_REPLAY_HEADERS.has(headerName.toLowerCase()))
-    .map(([headerName, headerValue]) => [headerName, normalizeHeaderValue(headerValue)] as [string, unknown]);
+    .map(
+      ([headerName, headerValue]) =>
+        [headerName, normalizeHeaderValue(headerValue)] as [string, unknown]
+    );
 
   entries.sort(([left], [right]) => {
     const leftPriority = REPLAY_HEADER_PRIORITY.indexOf(left.toLowerCase());
@@ -197,7 +217,9 @@ function expandHeaderValues(headers: Record<string, unknown>): Array<[string, st
 }
 
 function getHeaderValues(headers: Record<string, unknown>, headerName: string): string[] {
-  const matchedEntry = sortRecordEntries(headers).find(([candidateName]) => candidateName.toLowerCase() === headerName.toLowerCase());
+  const matchedEntry = sortRecordEntries(headers).find(
+    ([candidateName]) => candidateName.toLowerCase() === headerName.toLowerCase()
+  );
   if (matchedEntry === undefined) {
     return [];
   }
@@ -268,11 +290,14 @@ function buildReplayBody(body: unknown, headers: Record<string, unknown>): strin
   return stableStringify(normalizeReplayJsonValue(body));
 }
 
-function buildDeterministicRequestUrl(request: NonNullable<BundleV1["context"]["request"]>): string {
+function buildDeterministicRequestUrl(
+  request: NonNullable<BundleV1["context"]["request"]>
+): string {
   const protoHeader = request.headers["x-forwarded-proto"];
   const hostHeader = request.headers["host"];
   const forwardedHostHeader = request.headers["x-forwarded-host"];
-  const protocol = typeof protoHeader === "string" && protoHeader.length > 0 ? protoHeader : "https";
+  const protocol =
+    typeof protoHeader === "string" && protoHeader.length > 0 ? protoHeader : "https";
   const host =
     typeof forwardedHostHeader === "string" && forwardedHostHeader.length > 0
       ? forwardedHostHeader
@@ -280,6 +305,9 @@ function buildDeterministicRequestUrl(request: NonNullable<BundleV1["context"]["
         ? hostHeader
         : "example.invalid";
   const url = new URL(request.path, `${protocol}://${host}`);
+  if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) {
+    throw new Error("request_url_invalid");
+  }
 
   for (const [key, rawValue] of sortRecordEntries(request.query)) {
     if (Array.isArray(rawValue)) {
@@ -308,12 +336,38 @@ export function buildReproduction(bundle: BundleV1): BundleV1["reproduction"] {
   }
 
   const method = request.method.toUpperCase();
-  const url = buildDeterministicRequestUrl(request);
+  // SDKs use UNKNOWN for background/metadata-only captures. A placeholder is
+  // not an HTTP snapshot, and untrusted methods must never become shell syntax.
+  if (!/^[A-Z][A-Z0-9_-]{0,31}$/.test(method) || method === "UNKNOWN") {
+    return {
+      possible: false,
+      confidence: 0.1,
+      reason: "request_method_unavailable",
+      artifacts: null,
+      feasibility_reference: null
+    };
+  }
+  let url: string;
+  try {
+    url = buildDeterministicRequestUrl(request);
+  } catch {
+    return {
+      possible: false,
+      confidence: 0.1,
+      reason: "request_url_invalid",
+      artifacts: null,
+      feasibility_reference: null
+    };
+  }
   const replayHeaders = buildReplayHeaders(request.headers);
   const contentType = getPrimaryContentType(replayHeaders);
   const structuredReplayQuery = buildStructuredReplayQuery(request.query);
-  const headerParts = expandHeaderValues(replayHeaders).map(([headerName, headerValue]) => `${headerName}:${headerValue}`);
-  const curlHeaderParts = headerParts.map((header) => `-H ${shellQuote(header.replace(":", ": "))}`);
+  const headerParts = expandHeaderValues(replayHeaders).map(
+    ([headerName, headerValue]) => `${headerName}:${headerValue}`
+  );
+  const curlHeaderParts = headerParts.map(
+    (header) => `-H ${shellQuote(header.replace(":", ": "))}`
+  );
   const requestBody = buildReplayBody(request.body, replayHeaders);
   const jsonSpecBody =
     contentType === "application/json"
@@ -326,14 +380,21 @@ export function buildReproduction(bundle: BundleV1): BundleV1["reproduction"] {
           ? null
           : request.body;
   const curlBodyPart = requestBody === null ? [] : [`--data-raw ${shellQuote(requestBody)}`];
-  const curl = [`curl -X ${method} ${shellQuote(url)}`, ...curlHeaderParts, ...curlBodyPart].join(" ");
-  const httpieBase = [`http ${method} ${shellQuote(url)}`, ...headerParts.map((header) => shellQuote(header))].join(" ");
-  const httpie = requestBody === null ? httpieBase : `printf '%s' ${shellQuote(requestBody)} | ${httpieBase}`;
+  const curl = [`curl -X ${method} ${shellQuote(url)}`, ...curlHeaderParts, ...curlBodyPart].join(
+    " "
+  );
+  const httpieBase = [
+    `http ${method} ${shellQuote(url)}`,
+    ...headerParts.map((header) => shellQuote(header))
+  ].join(" ");
+  const httpie =
+    requestBody === null ? httpieBase : `printf '%s' ${shellQuote(requestBody)} | ${httpieBase}`;
+  const hasRequestTarget = new URL(url).hostname !== "example.invalid";
 
   return {
-    possible: true,
-    confidence: 0.8,
-    reason: "request_context_available",
+    possible: hasRequestTarget,
+    confidence: hasRequestTarget ? 0.8 : 0.1,
+    reason: hasRequestTarget ? "request_context_available" : "request_target_unavailable",
     artifacts: {
       curl,
       httpie,

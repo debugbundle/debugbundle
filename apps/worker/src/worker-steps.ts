@@ -2,6 +2,20 @@ import { getErrorMessage, type RuntimeLogger } from "../../../packages/runtime-l
 import type { RedisQueueClient } from "../../../packages/storage/src/index.js";
 import { captureWorkerDogfoodingStepFailure } from "./dogfooding.js";
 import type { WorkerQueue } from "./processor.js";
+import type { WorkerShutdownState } from "./worker-env.js";
+
+export async function runWorkerLane(input: {
+  logger: RuntimeLogger;
+  name: string;
+  shutdown: WorkerShutdownState;
+  idleIntervalMs: number;
+  processPass(): Promise<{ processed: boolean }>;
+}): Promise<void> {
+  while (!input.shutdown.isShuttingDown()) {
+    const result = await runWorkerProcessStep(input.logger, input.name, () => input.processPass());
+    await input.shutdown.waitForNextPoll(result.processed ? 0 : input.idleIntervalMs);
+  }
+}
 
 export function delay(milliseconds: number): Promise<void> {
   return new Promise((resolve) => {
@@ -31,14 +45,22 @@ export async function runWorkerProcessStep<Result extends { processed: boolean; 
   logger: RuntimeLogger,
   jobName: string,
   work: () => Promise<Result>,
-  claimTracker?: { ackClaimedJobs(): Promise<void>; dropClaimedJobs(): void }
+  claimTracker?: {
+    ackClaimedJobs(result?: { processed: boolean; reason?: string }): Promise<void>;
+    dropClaimedJobs(): void;
+    failClaimedJobs?(): Promise<void>;
+  }
 ): Promise<Result> {
   try {
     const result = await work();
-    await claimTracker?.ackClaimedJobs();
+    await claimTracker?.ackClaimedJobs(result);
     return result;
   } catch (error) {
-    claimTracker?.dropClaimedJobs();
+    if (claimTracker?.failClaimedJobs) {
+      await claimTracker.failClaimedJobs().catch(() => claimTracker.dropClaimedJobs());
+    } else {
+      claimTracker?.dropClaimedJobs();
+    }
     logger.error(
       { error_message: getErrorMessage(error, "unknown_worker_step_error"), job_name: jobName },
       "worker_step_failed"
@@ -53,7 +75,7 @@ export async function runWorkerProcessStep<Result extends { processed: boolean; 
 
 export interface ClaimTrackingWorkerQueue extends WorkerQueue {
   acquireLease(key: string, ttlSeconds: number): Promise<boolean>;
-  ackClaimedJobs(): Promise<void>;
+  ackClaimedJobs(result?: { processed: boolean; reason?: string }): Promise<void>;
   close(): Promise<void>;
   dropClaimedJobs(): void;
   releaseLease(key: string): Promise<void>;

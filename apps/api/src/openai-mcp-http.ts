@@ -5,6 +5,7 @@ import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import { buildOpenAiProtectedResourceMetadata } from "../../../packages/auth/src/index.js";
+import { createOpenAiAdmissionGate } from "../../../packages/mcp-core/src/openai-admission.js";
 import {
   OPENAI_TOOL_NAMES,
   createOpenAiSdkServer,
@@ -226,8 +227,14 @@ export function registerOpenAiMcpHttpRoutes(
   const maxConcurrentRequestsPerGrant = options.maxConcurrentRequestsPerGrant ?? 2;
   const operationTimeoutMs = options.operationTimeoutMs ?? 24_000;
   const concurrencyLeaseMs = Math.max(60_000, operationTimeoutMs * 2);
-  let activeRequests = 0;
-  const activeRequestsByGrant = new Map<string, number>();
+  const admissionGate = createOpenAiAdmissionGate({
+    concurrency: maxConcurrentRequests,
+    perGrant: maxConcurrentRequestsPerGrant
+  });
+  app.addHook("onClose", (_instance, done) => {
+    admissionGate.close();
+    done();
+  });
 
   if (options.domainVerificationToken !== undefined) {
     app.get("/.well-known/openai-apps-challenge", async (request, reply) => {
@@ -525,11 +532,13 @@ export function registerOpenAiMcpHttpRoutes(
       return reply.status(503).send({ error: "openai_mcp_coordination_unavailable" });
     }
 
-    const grantConcurrency = activeRequestsByGrant.get(grantId) ?? 0;
-    if (
-      activeRequests >= maxConcurrentRequests ||
-      grantConcurrency >= maxConcurrentRequestsPerGrant
-    ) {
+    const admissionAbort = new AbortController();
+    const cancelAdmission = (): void => admissionAbort.abort();
+    request.raw.once("aborted", cancelAdmission);
+    if (request.raw.aborted) admissionAbort.abort();
+    const releaseAdmission = await admissionGate.acquire(grantId, admissionAbort.signal);
+    request.raw.removeListener("aborted", cancelAdmission);
+    if (releaseAdmission === null) {
       logMcpRequest(
         request,
         {
@@ -549,13 +558,14 @@ export function registerOpenAiMcpHttpRoutes(
           event: "openai_mcp_admission_rejected",
           request_id: request.id,
           grant_key: pseudonymousOpenAiSubject("grant", grantId),
-          decision: "capacity_rejected",
-          global_concurrency: activeRequests,
-          grant_concurrency: grantConcurrency
+          decision: "capacity_rejected"
         },
         "openai_mcp_admission_rejected"
       );
-      return reply.status(503).send({ error: "openai_mcp_capacity_unavailable" });
+      return reply
+        .header("Retry-After", "1")
+        .status(503)
+        .send({ error: "openai_mcp_capacity_unavailable" });
     }
 
     const grantSubject = pseudonymousOpenAiSubject("grant", grantId);
@@ -579,6 +589,7 @@ export function registerOpenAiMcpHttpRoutes(
         });
         if (!result.acquired) {
           await Promise.all(leases.map((lease) => options.rateLimiter.releaseConcurrency(lease)));
+          releaseAdmission();
           logMcpRequest(
             request,
             {
@@ -608,6 +619,7 @@ export function registerOpenAiMcpHttpRoutes(
       await Promise.allSettled(
         leases.map((lease) => options.rateLimiter.releaseConcurrency(lease))
       );
+      releaseAdmission();
       logMcpRequest(
         request,
         {
@@ -624,10 +636,6 @@ export function registerOpenAiMcpHttpRoutes(
       );
       return reply.status(503).send({ error: "openai_mcp_coordination_unavailable" });
     }
-    const admittedGrantConcurrency = activeRequestsByGrant.get(grantId) ?? 0;
-    activeRequests += 1;
-    activeRequestsByGrant.set(grantId, admittedGrantConcurrency + 1);
-
     let server: ReturnType<typeof createOpenAiSdkServer> | undefined;
     let transport: StreamableHTTPServerTransport | undefined;
     const rawRequest = request.raw as IncomingMessage & { auth?: AuthInfo };
@@ -681,18 +689,12 @@ export function registerOpenAiMcpHttpRoutes(
         },
         options.operationalMonitor
       );
-      activeRequests -= 1;
-      const remainingGrantRequests = (activeRequestsByGrant.get(grantId) ?? 1) - 1;
-      if (remainingGrantRequests <= 0) {
-        activeRequestsByGrant.delete(grantId);
-      } else {
-        activeRequestsByGrant.set(grantId, remainingGrantRequests);
-      }
       await transport?.close().catch(() => undefined);
       await server?.close().catch(() => undefined);
       const releases = await Promise.allSettled(
         leases.map((lease) => options.rateLimiter.releaseConcurrency(lease))
       );
+      releaseAdmission();
       if (releases.some((release) => release.status === "rejected")) {
         request.log.warn(
           {

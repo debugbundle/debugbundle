@@ -56,7 +56,9 @@ Jobs:
 - `deliver-webhook` — re-delivery is logged but does not duplicate business effects
 - `cleanup-retention` — re-running against already-cleaned data is a no-op
 
-**Enforcement:** Each job type has a dedicated idempotency test.
+Worker normalization and grouping must commit their dedupe/occurrence changes together with durable follow-up intents. A processed marker alone is insufficient. Redis ingress is acknowledged only after Postgres owns the job; optional improvements and provider delivery cannot be prerequisites for committing incident evidence. Retry leases are fenced by ownership token, attempts and retention are bounded, and unavailable artifacts cannot release successful-publication dependencies. External sends remain at-least-once and require recipient-side dedupe where appropriate.
+
+**Enforcement:** Each job type has a dedicated idempotency test. Real-storage crash, ownership, dependency and migration regressions are specified in `spec/worker-durability.md`.
 
 ---
 

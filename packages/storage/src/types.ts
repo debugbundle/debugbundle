@@ -835,6 +835,17 @@ export interface LogEventCandidateReference {
 }
 
 export interface BundleBuildContextStore {
+  getDeploymentForServiceAt?(input: {
+    project_id: string;
+    service_id: string;
+    environment: string;
+    occurred_at: string;
+  }): Promise<{
+    commit_sha: string;
+    deploy_version: string;
+    branch: string;
+    deployed_at: string;
+  } | null>;
   getBundleBuildContext(input: {
     project_id: string;
     incident_id: string;
@@ -892,11 +903,14 @@ export interface IncidentFrequencySnapshot {
 }
 
 export interface IncidentFrequencyCounter {
-  recordOccurrence(input: {
-    incident_id: string;
-    event_id: string;
-    occurred_at: string;
-  }): Promise<IncidentFrequencySnapshot>;
+  recordOccurrence(
+    input: {
+      incident_id: string;
+      event_id: string;
+      occurred_at: string;
+    },
+    snapshotStore?: Queryable
+  ): Promise<IncidentFrequencySnapshot>;
 }
 
 export interface RequestAnomalyCounter {

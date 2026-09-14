@@ -1,3 +1,10 @@
+import { createWorkerActivationState } from "./worker-activation.js";
+import { createDurableWorkerQueue } from "./durable-queue.js";
+import { createDurableIncidentProcessing } from "./durable-incident-processing.js";
+import {
+  createWorkerJobStore,
+  WORKER_JOB_PROTOCOL
+} from "../../../packages/storage/src/worker-job-store.js";
 import { Pool } from "pg";
 import { Redis } from "ioredis";
 
@@ -14,7 +21,6 @@ import {
   createPostgresAlertDeliveryStore,
   createPostgresAccountAnalyticsStore,
   createPostgresAnalyticsBundleGenerationStore,
-  createPostgresAnalyticsCorrelationStore,
   createPostgresAnalyticsJourneySampleStore,
   createPostgresAnalyticsMetricsStore,
   createPostgresAnalyticsOpportunityEvaluator,
@@ -39,11 +45,9 @@ import {
   createRedisIncidentFrequencyCounter,
   createRedisRequestAnomalyCounter,
   createRedisQueueClient,
-  createS3ObjectStoreClient,
-  type Queryable
+  createS3ObjectStoreClient
 } from "../../../packages/storage/src/index.js";
 import {
-  processNextGroupIncidentJob,
   processNextBuildBundleJob,
   processNextBuildReproductionJob,
   processNextEvaluateAlertsJob,
@@ -51,9 +55,7 @@ import {
   processNextDeliverAlertEmailDigestJob,
   processNextDeliverGitHubDispatchJob,
   processNextDeliverWebhookJob,
-  processNextGenerateWeeklyReportJob,
-  processNextNormalizeEventsJob,
-  type ProcessedEventStore
+  processNextGenerateWeeklyReportJob
 } from "./processor.js";
 import {
   processNextAggregateAnalyticsEventsJob,
@@ -105,39 +107,11 @@ import {
   scheduleRetentionCleanup,
   scheduleWeeklyReports
 } from "./worker-notifications.js";
-import {
-  createClaimTrackingWorkerQueue,
-  runWorkerProcessStep,
-  runWorkerStep
-} from "./worker-steps.js";
+import { runWorkerProcessStep, runWorkerStep, runWorkerLane } from "./worker-steps.js";
 
 const WORKER_SHUTDOWN_GRACE_MS = 30_000;
 
-export function createProcessedEventStore(db: Queryable): ProcessedEventStore {
-  return {
-    async upsertProcessedEvent(input): Promise<{ inserted: boolean }> {
-      const result = await db.query<{ event_id: string }>(
-        `
-          INSERT INTO processed_events (event_id, project_id, event_type, fingerprint, normalized_message, processed_at)
-          VALUES ($1, $2, $3, $4, $5, now())
-          ON CONFLICT (event_id) DO NOTHING
-          RETURNING event_id::text AS event_id
-        `,
-        [
-          input.event_id,
-          input.project_id,
-          input.event_type,
-          input.fingerprint,
-          input.normalized_message
-        ]
-      );
-
-      return {
-        inserted: result.rows.length > 0
-      };
-    }
-  };
-}
+export { createProcessedEventStore } from "../../../packages/storage/src/processed-event-store.js";
 
 export {
   assertWorkerRedisReady,
@@ -246,6 +220,7 @@ export async function runWorkerFromEnv(
     });
   }
   const shutdownState = createWorkerShutdownState();
+  const activationState = createWorkerActivationState(env.WORKER_START_PAUSED === "1");
   const readinessCheck = buildWorkerReadinessCheck({ env, queryable });
   const drainingReadinessCheck = async (): Promise<void> => {
     await shutdownState.readinessCheck(readinessCheck);
@@ -254,15 +229,25 @@ export async function runWorkerFromEnv(
     env.WORKER_HEALTH_PORT > 0
       ? createWorkerHealthServer({
           port: env.WORKER_HEALTH_PORT,
-          readinessCheck: drainingReadinessCheck
+          readinessCheck: drainingReadinessCheck,
+          processingState: () => ({
+            processing_enabled: activationState.isActive(),
+            worker_job_protocol: WORKER_JOB_PROTOCOL
+          })
         })
       : null;
 
-  const queue = createClaimTrackingWorkerQueue(
-    createRedisQueueClient({
-      redisUrl: env.REDIS_URL
-    })
-  );
+  const redisQueue = createRedisQueueClient({ redisUrl: env.REDIS_URL });
+  const queue = createDurableWorkerQueue(queryable, redisQueue);
+  const deliveryQueue = createDurableWorkerQueue(queryable, redisQueue, false);
+  const durableJobs = createWorkerJobStore(queryable);
+  // Background availability producers must not inherit an unrelated lane's active job identity.
+  const producerQueue = {
+    ...redisQueue,
+    enqueue: (async (name: string, payload: unknown) => {
+      await durableJobs.enqueue(name, payload);
+    }) as typeof redisQueue.enqueue
+  };
 
   const objectStore = createS3ObjectStoreClient({
     endpoint: env.S3_ENDPOINT,
@@ -273,11 +258,9 @@ export async function runWorkerFromEnv(
     forcePathStyle: true
   });
 
-  const processedEventStore = createProcessedEventStore(queryable);
   const incidentStore = createPostgresMetadataStore(queryable);
   const billingStore = createPostgresBillingStore(queryable);
   const analyticsRollupStore = createPostgresAnalyticsRollupStore(queryable);
-  const analyticsCorrelationStore = createPostgresAnalyticsCorrelationStore(queryable);
   const analyticsSettingsStore = createPostgresAnalyticsSettingsStore(queryable);
   const analyticsJourneySampleStore = createPostgresAnalyticsJourneySampleStore(queryable);
   const analyticsUsageStore = createPostgresAnalyticsUsageStore(queryable);
@@ -414,6 +397,44 @@ export async function runWorkerFromEnv(
       ? null
       : `${normalizeWorkerBaseUrl(envInput["PUBLIC_SITE_URL"])}/docs`);
 
+  const durableProcessingInput = {
+    queue,
+    objectStore,
+    logger,
+    analyticsHashSecret: env.ANALYTICS_HASH_SECRET,
+    frequencyCounter,
+    requestAnomalyCounter,
+    lifecycleWebhookPublisher,
+    githubDispatchPublisher,
+    improvementWorker: {
+      improvementOpportunityStore,
+      billingStore,
+      webhookDeliveryStore,
+      operationalEmailDeliveryStore,
+      accountAnalyticsStore,
+      resolveOrganizationIdForProject,
+      fallbackTargetUrl: env.LIFECYCLE_WEBHOOK_TARGET_URL ?? null,
+      fallbackSigningSecret: env.LIFECYCLE_WEBHOOK_SECRET ?? null,
+      objectStore,
+      apiBaseUrl: normalizeWorkerBaseUrl(
+        envInput["DEBUGBUNDLE_API_URL"] ?? envInput["API_BASE_URL"] ?? envInput["VITE_API_URL"]
+      ),
+      appBaseUrl: normalizeWorkerBaseUrl(envInput["APP_BASE_URL"]),
+      docsBaseUrl
+    }
+  };
+  const durableProcessing = createDurableIncidentProcessing(durableProcessingInput);
+  const deliveryProcessing = createDurableIncidentProcessing({
+    ...durableProcessingInput,
+    queue: deliveryQueue
+  });
+
+  let passDidWork = false;
+  let lastSchedulingAt = 0;
+  let lastJobMaintenanceAt = 0;
+  let jobMaintenanceIntervalMs = 60_000;
+  let lastJobSummaryAt = 0;
+
   logger.info(
     {
       poll_interval_ms: env.WORKER_POLL_INTERVAL_MS,
@@ -430,7 +451,11 @@ export async function runWorkerFromEnv(
   const runClaimedProcessStep = async <Result extends { processed: boolean; reason?: string }>(
     jobName: string,
     work: () => Promise<Result>
-  ): Promise<Result> => runWorkerProcessStep(logger, jobName, work, queue);
+  ): Promise<Result> => {
+    const result = await runWorkerProcessStep(logger, jobName, work, queue);
+    passDidWork ||= result.processed;
+    return result;
+  };
 
   let lastAvailabilityRetentionPurgeAt = 0;
   const processAvailabilityBatch = async (): Promise<{ processed: boolean; reason?: string }> => {
@@ -444,7 +469,7 @@ export async function runWorkerFromEnv(
       availabilityCheckStore,
       incidentStore,
       incidentLifecycle,
-      queue,
+      queue: producerQueue,
       objectStore,
       lifecycleWebhookPublisher,
       githubDispatchPublisher,
@@ -454,6 +479,184 @@ export async function runWorkerFromEnv(
       purgeRetainedDataOnNoDue
     });
   };
+
+  async function processDeliveryPass(): Promise<{ processed: boolean }> {
+    const queue = deliveryQueue;
+    let processed = false;
+    const runDeliveryProcessStep = async (
+      name: string,
+      work: () => Promise<{ processed: boolean; reason?: string }>
+    ): Promise<void> => {
+      // Match bounded incident fan-out without letting one lane monopolize the worker.
+      const budget =
+        env.WORKER_RUN_ONCE === "1"
+          ? 1
+          : ["evaluate-alerts", "publish-incident-lifecycle", "delete-retained-object"].includes(
+                name
+              )
+            ? 4
+            : 1;
+      for (let index = 0; index < budget && !shutdownState.isShuttingDown(); index++) {
+        const result = await runWorkerProcessStep(logger, name, work, queue);
+        processed ||= result.processed;
+        if (!result.processed) break;
+      }
+    };
+    await runDeliveryProcessStep("evaluate-alerts", async () =>
+      processNextEvaluateAlertsJob({
+        queue,
+        alertStore: alertDeliveryStore,
+        alertTransport,
+        billingStore,
+        operationalEmailDeliveryStore,
+        accountAnalyticsStore,
+        resolveOrganizationIdForProject
+      })
+    );
+
+    if (Date.now() - lastSchedulingAt >= env.WORKER_POLL_INTERVAL_MS) {
+      lastSchedulingAt = Date.now();
+      await runWorkerStep(logger, "schedule-alert-email-digests", async () => {
+        await scheduleDueAlertEmailDigests({
+          queue,
+          alertStore: alertDeliveryStore,
+          batchSize: env.WEBHOOK_DELIVERY_SCHEDULER_BATCH_SIZE
+        });
+      });
+      await runWorkerStep(logger, "schedule-webhook-deliveries", async () => {
+        await scheduleDueWebhookDeliveries({
+          queue,
+          webhookDeliveryStore,
+          batchSize: env.WEBHOOK_DELIVERY_SCHEDULER_BATCH_SIZE
+        });
+      });
+      await runWorkerStep(logger, "schedule-github-dispatches", async () => {
+        await scheduleDueGitHubDispatches({
+          queue,
+          githubStore,
+          batchSize: env.WEBHOOK_DELIVERY_SCHEDULER_BATCH_SIZE
+        });
+      });
+      await runWorkerStep(logger, "schedule-weekly-reports", async () => {
+        await scheduleWeeklyReports({
+          queue,
+          weeklyReportingStore: incidentStore,
+          weeklyReportChannelStore,
+          weeklyReportDeliveryStore,
+          batchSize: env.WEEKLY_REPORT_SCHEDULER_BATCH_SIZE
+        });
+      });
+      await runWorkerStep(logger, "schedule-retention-cleanup", async () => {
+        await scheduleRetentionCleanup({
+          queue,
+          intervalMs: env.RETENTION_CLEANUP_INTERVAL_MS
+        });
+      });
+      await runWorkerStep(logger, "schedule-analytics-opportunities", async () => {
+        await scheduleAnalyticsOpportunityEvaluation({
+          queue: queue as unknown as AnalyticsOpportunityEvaluationQueue,
+          intervalMs: env.ANALYTICS_OPPORTUNITY_EVALUATION_INTERVAL_MS
+        });
+      });
+      await runWorkerStep(logger, "schedule-trial-lifecycle-emails", async () => {
+        await scheduleTrialLifecycleEmails({
+          batchSize: env.WEEKLY_REPORT_SCHEDULER_BATCH_SIZE,
+          billingStore,
+          operationalEmailDeliveryStore
+        });
+      });
+    }
+    await runDeliveryProcessStep("deliver-alert-email-digest", async () =>
+      processNextDeliverAlertEmailDigestJob({
+        queue,
+        alertStore: alertDeliveryStore,
+        alertEmailDigestTransport,
+        accountAnalyticsStore,
+        resolveOrganizationIdForProject
+      })
+    );
+
+    if (emailTransport !== null) {
+      await runWorkerStep(logger, "deliver-operational-email", async () => {
+        await processNextDeliverOperationalEmailJob({
+          logger,
+          appBaseUrl,
+          emailAssetBaseUrl,
+          operationalEmailDeliveryStore,
+          emailTransport,
+          accountAnalyticsStore,
+          resolveOrganizationIdForProject
+        });
+      });
+    }
+
+    await runDeliveryProcessStep("deliver-webhook", async () =>
+      processNextDeliverWebhookJob({
+        queue,
+        logger,
+        webhookDeliveryStore,
+        lifecycleWebhookTransport,
+        accountAnalyticsStore,
+        resolveOrganizationIdForProject,
+        async onWebhookDisabled({ webhook_id, target_url }) {
+          try {
+            const webhook = await getWebhookOwnerNotificationRecipient(queryable, webhook_id);
+            if (webhook === null) {
+              return;
+            }
+            await operationalEmailDeliveryStore.queueProjectOperationalEmailDelivery({
+              project_id: webhook.projectId,
+              kind: "webhook_auto_disabled",
+              dedupe_key: `webhook_auto_disabled:${webhook_id}:${new Date().toISOString().slice(0, 10)}`,
+              payload: {
+                webhook_id,
+                target_url
+              }
+            });
+          } catch {
+            // Notification enqueue failure must not block delivery processing.
+          }
+        }
+      })
+    );
+
+    if (githubDispatchTransport !== null) {
+      await runDeliveryProcessStep("deliver-github-dispatch", async () =>
+        processNextDeliverGitHubDispatchJob({
+          queue,
+          logger,
+          githubStore,
+          githubDispatchTransport,
+          accountAnalyticsStore,
+          resolveOrganizationIdForProject
+        })
+      );
+    }
+
+    await runDeliveryProcessStep("generate-weekly-report", async () =>
+      processNextGenerateWeeklyReportJob({
+        queue,
+        logger,
+        weeklyReportingStore: incidentStore,
+        weeklyReportChannelStore,
+        weeklyReportDeliveryStore,
+        weeklyReportTransport,
+        accountAnalyticsStore,
+        resolveOrganizationIdForProject
+      })
+    );
+
+    await runDeliveryProcessStep("cleanup-retention", async () =>
+      processNextCleanupRetentionJob({
+        queue,
+        retentionCleanupRunner
+      })
+    );
+
+    await runDeliveryProcessStep("publish-incident-lifecycle", deliveryProcessing.publishLifecycle);
+    await runDeliveryProcessStep("delete-retained-object", deliveryProcessing.deleteRetainedObject);
+    return { processed };
+  }
 
   let workerShutdownStarted = false;
   let workerForceExitTimer: NodeJS.Timeout | null = null;
@@ -483,19 +686,30 @@ export async function runWorkerFromEnv(
   }
 
   let availabilityLoopPromise: Promise<void> | null = null;
-  if (env.WORKER_RUN_ONCE === "1") {
-    await runWorkerProcessStep(logger, "availability-checks", processAvailabilityBatch);
-  } else {
-    availabilityLoopPromise = runAvailabilityCheckLoop({
-      logger,
-      shutdownState,
-      intervalMs: env.AVAILABILITY_CHECK_LOOP_INTERVAL_MS,
-      processBatch: processAvailabilityBatch
-    });
-  }
-
+  let deliveryLoopPromise: Promise<void> | null = null;
   try {
+    if (!activationState.isActive()) logger.info({}, "worker_waiting_for_activation");
+    await activationState.wait(shutdownState);
+    if (shutdownState.isShuttingDown()) return;
+    if (env.WORKER_RUN_ONCE === "1") {
+      await runWorkerProcessStep(logger, "availability-checks", processAvailabilityBatch);
+    } else {
+      availabilityLoopPromise = runAvailabilityCheckLoop({
+        logger,
+        shutdownState,
+        intervalMs: env.AVAILABILITY_CHECK_LOOP_INTERVAL_MS,
+        processBatch: processAvailabilityBatch
+      });
+      deliveryLoopPromise = runWorkerLane({
+        logger,
+        name: "delivery-lane",
+        shutdown: shutdownState,
+        idleIntervalMs: env.WORKER_POLL_INTERVAL_MS,
+        processPass: processDeliveryPass
+      });
+    }
     do {
+      passDidWork = false;
       if (shutdownState.isShuttingDown()) {
         break;
       }
@@ -506,13 +720,47 @@ export async function runWorkerFromEnv(
         });
       }
 
-      const normalizeResult = await runClaimedProcessStep("normalize-events", async () =>
-        processNextNormalizeEventsJob({
-          queue,
+      await runClaimedProcessStep("normalize-events", durableProcessing.normalize);
+
+      await runClaimedProcessStep("aggregate-analytics-events", async () =>
+        processNextAggregateAnalyticsEventsJob({
+          queue: queue as unknown as AggregateAnalyticsWorkerQueue,
           objectStore,
-          processedEventStore,
-          requestAnomalyCounter,
-          improvementBundleWorker: {
+          analyticsRollupStore,
+          analyticsJourneySamples: {
+            analyticsSettingsStore,
+            analyticsJourneySampleStore,
+            analyticsUsageStore,
+            billingStore,
+            resolveOrganizationIdForProject,
+            acquireLease: (key, ttlSeconds) => queue.acquireLease(key, ttlSeconds),
+            releaseLease: (key) => queue.releaseLease(key),
+            objectStore
+          }
+        })
+      );
+
+      await runClaimedProcessStep("group-incident", durableProcessing.group);
+
+      await runClaimedProcessStep("build-bundle", async () =>
+        processNextBuildBundleJob({
+          queue,
+          logger,
+          env: envInput,
+          incidentStore,
+          objectStore,
+          billingStore,
+          operationalEmailDeliveryStore,
+          accountAnalyticsStore,
+          resolveOrganizationIdForProject
+        })
+      );
+
+      await runClaimedProcessStep("build-improvement-bundle", async () =>
+        processNextBuildImprovementBundleJob({
+          queue: queue as unknown as ImprovementBundleJobQueue,
+          logger,
+          dependencies: {
             improvementOpportunityStore,
             billingStore,
             webhookDeliveryStore,
@@ -533,327 +781,74 @@ export async function runWorkerFromEnv(
         })
       );
 
-      if (!normalizeResult.processed) {
-        const analyticsAggregateResult = await runClaimedProcessStep(
-          "aggregate-analytics-events",
-          async () =>
-            processNextAggregateAnalyticsEventsJob({
-              queue: queue as unknown as AggregateAnalyticsWorkerQueue,
-              objectStore,
-              analyticsRollupStore,
-              analyticsJourneySamples: {
-                analyticsSettingsStore,
-                analyticsJourneySampleStore,
-                analyticsUsageStore,
-                billingStore,
-                resolveOrganizationIdForProject,
-                acquireLease: (key, ttlSeconds) => queue.acquireLease(key, ttlSeconds),
-                releaseLease: (key) => queue.releaseLease(key),
-                objectStore
-              }
-            })
-        );
+      await runClaimedProcessStep("build-analytics-bundle", async () =>
+        processNextBuildAnalyticsBundleJob({
+          queue: queue as unknown as BuildAnalyticsBundleWorkerQueue,
+          analyticsBundleGenerationStore,
+          analyticsMetricsStore,
+          analyticsJourneySampleStore,
+          objectStore,
+          logger
+        })
+      );
 
-        if (!analyticsAggregateResult.processed) {
-          const groupResult = await runClaimedProcessStep("group-incident", async () =>
-            processNextGroupIncidentJob({
-              queue,
-              alertEvaluationQueue: queue,
-              logger,
-              incidentStore,
-              analyticsCorrelationStore,
-              frequencyCounter,
-              lifecycleWebhookPublisher,
-              githubDispatchPublisher,
-              objectStore,
-              improvementBundleWorker: {
-                improvementOpportunityStore,
-                billingStore,
-                webhookDeliveryStore,
-                operationalEmailDeliveryStore,
-                accountAnalyticsStore,
-                resolveOrganizationIdForProject,
-                fallbackTargetUrl: env.LIFECYCLE_WEBHOOK_TARGET_URL ?? null,
-                fallbackSigningSecret: env.LIFECYCLE_WEBHOOK_SECRET ?? null,
-                objectStore,
-                apiBaseUrl: normalizeWorkerBaseUrl(
-                  envInput["DEBUGBUNDLE_API_URL"] ??
-                    envInput["API_BASE_URL"] ??
-                    envInput["VITE_API_URL"]
-                ),
-                appBaseUrl: normalizeWorkerBaseUrl(envInput["APP_BASE_URL"]),
-                docsBaseUrl
-              }
-            })
-          );
+      await runClaimedProcessStep("evaluate-analytics-opportunities", async () =>
+        processNextEvaluateAnalyticsOpportunitiesJob({
+          queue: queue as unknown as AnalyticsOpportunityEvaluationQueue,
+          projectStore: analyticsOpportunitySchedulerStore,
+          opportunityEvaluator: analyticsOpportunityEvaluator
+        })
+      );
 
-          if (!groupResult.processed) {
-            const buildBundleResult = await runClaimedProcessStep("build-bundle", async () =>
-              processNextBuildBundleJob({
-                queue,
-                logger,
-                env: envInput,
-                incidentStore,
-                objectStore,
-                billingStore,
-                operationalEmailDeliveryStore,
-                accountAnalyticsStore,
-                resolveOrganizationIdForProject
-              })
-            );
+      await runClaimedProcessStep("build-reproduction", async () =>
+        processNextBuildReproductionJob({
+          queue,
+          accountAnalyticsStore,
+          objectStore,
+          resolveOrganizationIdForProject
+        })
+      );
 
-            if (!buildBundleResult.processed) {
-              const buildImprovementBundleResult = await runClaimedProcessStep(
-                "build-improvement-bundle",
-                async () =>
-                  processNextBuildImprovementBundleJob({
-                    queue: queue as unknown as ImprovementBundleJobQueue,
-                    logger,
-                    dependencies: {
-                      improvementOpportunityStore,
-                      billingStore,
-                      webhookDeliveryStore,
-                      operationalEmailDeliveryStore,
-                      accountAnalyticsStore,
-                      resolveOrganizationIdForProject,
-                      fallbackTargetUrl: env.LIFECYCLE_WEBHOOK_TARGET_URL ?? null,
-                      fallbackSigningSecret: env.LIFECYCLE_WEBHOOK_SECRET ?? null,
-                      objectStore,
-                      apiBaseUrl: normalizeWorkerBaseUrl(
-                        envInput["DEBUGBUNDLE_API_URL"] ??
-                          envInput["API_BASE_URL"] ??
-                          envInput["VITE_API_URL"]
-                      ),
-                      appBaseUrl: normalizeWorkerBaseUrl(envInput["APP_BASE_URL"]),
-                      docsBaseUrl
-                    }
-                  })
-              );
-
-              if (!buildImprovementBundleResult.processed) {
-                const buildAnalyticsBundleResult = await runWorkerProcessStep(
-                  logger,
-                  "build-analytics-bundle",
-                  async () =>
-                    processNextBuildAnalyticsBundleJob({
-                      queue: queue as unknown as BuildAnalyticsBundleWorkerQueue,
-                      analyticsBundleGenerationStore,
-                      analyticsMetricsStore,
-                      analyticsJourneySampleStore,
-                      objectStore,
-                      logger
-                    })
-                );
-
-                if (!buildAnalyticsBundleResult.processed) {
-                  const evaluateAnalyticsOpportunitiesResult = await runClaimedProcessStep(
-                    "evaluate-analytics-opportunities",
-                    async () =>
-                      processNextEvaluateAnalyticsOpportunitiesJob({
-                        queue: queue as unknown as AnalyticsOpportunityEvaluationQueue,
-                        projectStore: analyticsOpportunitySchedulerStore,
-                        opportunityEvaluator: analyticsOpportunityEvaluator
-                      })
-                  );
-
-                  if (!evaluateAnalyticsOpportunitiesResult.processed) {
-                    const buildReproductionResult = await runClaimedProcessStep(
-                      "build-reproduction",
-                      async () =>
-                        processNextBuildReproductionJob({
-                          queue,
-                          accountAnalyticsStore,
-                          objectStore,
-                          resolveOrganizationIdForProject
-                        })
-                    );
-
-                    if (!buildReproductionResult.processed) {
-                      const evaluateAlertsResult = await runClaimedProcessStep(
-                        "evaluate-alerts",
-                        async () =>
-                          processNextEvaluateAlertsJob({
-                            queue,
-                            alertStore: alertDeliveryStore,
-                            alertTransport,
-                            billingStore,
-                            operationalEmailDeliveryStore,
-                            accountAnalyticsStore,
-                            resolveOrganizationIdForProject
-                          })
-                      );
-
-                      if (!evaluateAlertsResult.processed) {
-                        await runWorkerStep(logger, "schedule-alert-email-digests", async () => {
-                          await scheduleDueAlertEmailDigests({
-                            queue,
-                            alertStore: alertDeliveryStore,
-                            batchSize: env.WEBHOOK_DELIVERY_SCHEDULER_BATCH_SIZE
-                          });
-                        });
-                        await runWorkerStep(logger, "schedule-webhook-deliveries", async () => {
-                          await scheduleDueWebhookDeliveries({
-                            queue,
-                            webhookDeliveryStore,
-                            batchSize: env.WEBHOOK_DELIVERY_SCHEDULER_BATCH_SIZE
-                          });
-                        });
-                        await runWorkerStep(logger, "schedule-github-dispatches", async () => {
-                          await scheduleDueGitHubDispatches({
-                            queue,
-                            githubStore,
-                            batchSize: env.WEBHOOK_DELIVERY_SCHEDULER_BATCH_SIZE
-                          });
-                        });
-                        await runWorkerStep(logger, "schedule-weekly-reports", async () => {
-                          await scheduleWeeklyReports({
-                            queue,
-                            weeklyReportingStore: incidentStore,
-                            weeklyReportChannelStore,
-                            weeklyReportDeliveryStore,
-                            batchSize: env.WEEKLY_REPORT_SCHEDULER_BATCH_SIZE
-                          });
-                        });
-                        await runWorkerStep(logger, "schedule-retention-cleanup", async () => {
-                          await scheduleRetentionCleanup({
-                            queue,
-                            intervalMs: env.RETENTION_CLEANUP_INTERVAL_MS
-                          });
-                        });
-                        await runWorkerStep(
-                          logger,
-                          "schedule-analytics-opportunities",
-                          async () => {
-                            await scheduleAnalyticsOpportunityEvaluation({
-                              queue: queue as unknown as AnalyticsOpportunityEvaluationQueue,
-                              intervalMs: env.ANALYTICS_OPPORTUNITY_EVALUATION_INTERVAL_MS
-                            });
-                          }
-                        );
-                        await runWorkerStep(logger, "schedule-trial-lifecycle-emails", async () => {
-                          await scheduleTrialLifecycleEmails({
-                            batchSize: env.WEEKLY_REPORT_SCHEDULER_BATCH_SIZE,
-                            billingStore,
-                            operationalEmailDeliveryStore
-                          });
-                        });
-
-                        await runClaimedProcessStep("deliver-alert-email-digest", async () =>
-                          processNextDeliverAlertEmailDigestJob({
-                            queue,
-                            alertStore: alertDeliveryStore,
-                            alertEmailDigestTransport,
-                            accountAnalyticsStore,
-                            resolveOrganizationIdForProject
-                          })
-                        );
-
-                        if (emailTransport !== null) {
-                          await runWorkerStep(logger, "deliver-operational-email", async () => {
-                            await processNextDeliverOperationalEmailJob({
-                              logger,
-                              appBaseUrl,
-                              emailAssetBaseUrl,
-                              operationalEmailDeliveryStore,
-                              emailTransport,
-                              accountAnalyticsStore,
-                              resolveOrganizationIdForProject
-                            });
-                          });
-                        }
-
-                        await runClaimedProcessStep("deliver-webhook", async () =>
-                          processNextDeliverWebhookJob({
-                            queue,
-                            logger,
-                            webhookDeliveryStore,
-                            lifecycleWebhookTransport,
-                            accountAnalyticsStore,
-                            resolveOrganizationIdForProject,
-                            async onWebhookDisabled({ webhook_id, target_url }) {
-                              try {
-                                const webhook = await getWebhookOwnerNotificationRecipient(
-                                  queryable,
-                                  webhook_id
-                                );
-                                if (webhook === null) {
-                                  return;
-                                }
-                                await operationalEmailDeliveryStore.queueProjectOperationalEmailDelivery(
-                                  {
-                                    project_id: webhook.projectId,
-                                    kind: "webhook_auto_disabled",
-                                    dedupe_key: `webhook_auto_disabled:${webhook_id}:${new Date().toISOString().slice(0, 10)}`,
-                                    payload: {
-                                      webhook_id,
-                                      target_url
-                                    }
-                                  }
-                                );
-                              } catch {
-                                // Notification enqueue failure must not block delivery processing.
-                              }
-                            }
-                          })
-                        );
-
-                        if (githubDispatchTransport !== null) {
-                          await runClaimedProcessStep("deliver-github-dispatch", async () =>
-                            processNextDeliverGitHubDispatchJob({
-                              queue,
-                              logger,
-                              githubStore,
-                              githubDispatchTransport,
-                              accountAnalyticsStore,
-                              resolveOrganizationIdForProject
-                            })
-                          );
-                        }
-
-                        const weeklyReportResult = await runClaimedProcessStep(
-                          "generate-weekly-report",
-                          async () =>
-                            processNextGenerateWeeklyReportJob({
-                              queue,
-                              logger,
-                              weeklyReportingStore: incidentStore,
-                              weeklyReportChannelStore,
-                              weeklyReportDeliveryStore,
-                              weeklyReportTransport,
-                              accountAnalyticsStore,
-                              resolveOrganizationIdForProject
-                            })
-                        );
-
-                        if (!weeklyReportResult.processed) {
-                          await runClaimedProcessStep("cleanup-retention", async () =>
-                            processNextCleanupRetentionJob({
-                              queue,
-                              retentionCleanupRunner
-                            })
-                          );
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
+      await runClaimedProcessStep(
+        "evaluate-event-improvement",
+        durableProcessing.evaluateEventImprovement
+      );
+      await runClaimedProcessStep(
+        "evaluate-incident-improvement",
+        durableProcessing.evaluateIncidentImprovement
+      );
+      if (Date.now() - lastJobMaintenanceAt >= jobMaintenanceIntervalMs) {
+        lastJobMaintenanceAt = Date.now();
+        await runWorkerStep(logger, "worker-job-maintenance", async () => {
+          // Drain full retention batches promptly without an unbounded cleanup loop or log flood.
+          jobMaintenanceIntervalMs = (await durableJobs.maintain()) ? 1000 : 60_000;
+          if (Date.now() - lastJobSummaryAt >= 60_000) {
+            lastJobSummaryAt = Date.now();
+            const summary = await durableJobs.summary();
+            if (summary.failed > 0) logger.warn(summary, "worker_jobs_require_attention");
+            else logger.info(summary, "worker_job_backlog");
           }
-        }
+        });
       }
 
       if (env.WORKER_RUN_ONCE === "1") {
+        await processDeliveryPass();
         break;
       }
 
-      await delayUntilNextPollOrShutdown(env.WORKER_POLL_INTERVAL_MS, shutdownState);
+      // A busy pass yields without the idle poll delay. Each lane still gets at most one job per pass.
+      await delayUntilNextPollOrShutdown(
+        passDidWork ? 0 : env.WORKER_POLL_INTERVAL_MS,
+        shutdownState
+      );
     } while (!shutdownState.isShuttingDown());
   } finally {
     shutdownState.requestShutdown();
     if (availabilityLoopPromise !== null) {
       await availabilityLoopPromise;
     }
+    if (deliveryLoopPromise !== null) await deliveryLoopPromise;
+    await deliveryQueue.close();
     if (healthServer !== null) {
       healthServer.close();
     }

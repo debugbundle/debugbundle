@@ -476,6 +476,7 @@ export function createGitHubDispatchTransport(input: {
 export function createWorkerHealthServer(input: {
   port: number;
   readinessCheck?: () => Promise<void>;
+  processingState?: () => { processing_enabled: boolean; worker_job_protocol: string };
 }): Server {
   const startedAtMs = Date.now();
 
@@ -492,14 +493,14 @@ export function createWorkerHealthServer(input: {
     if (url === "/ready") {
       if (input.readinessCheck === undefined) {
         res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({ status: "ready" }));
+        res.end(JSON.stringify({ status: "ready", ...input.processingState?.() }));
         return;
       }
 
       void input.readinessCheck().then(
         () => {
           res.writeHead(200, { "content-type": "application/json" });
-          res.end(JSON.stringify({ status: "ready" }));
+          res.end(JSON.stringify({ status: "ready", ...input.processingState?.() }));
         },
         (error: unknown) => {
           res.writeHead(503, { "content-type": "application/json" });

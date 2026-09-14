@@ -594,9 +594,11 @@ describe("storage adapters", () => {
 
     await claimed?.ack();
 
-    expect(redisZrangebyscoreMock).toHaveBeenCalledWith(
+    expect(redisEvalMock).toHaveBeenCalledWith(
+      expect.stringContaining("ZRANGEBYSCORE"),
+      2,
       "jobs:normalize-events:processing",
-      "-inf",
+      "jobs:normalize-events",
       expect.any(String)
     );
     expect(redisEvalMock).toHaveBeenCalledWith(
@@ -611,22 +613,19 @@ describe("storage adapters", () => {
   });
 
   it("should reclaim stale processing jobs", async (): Promise<void> => {
-    const payload =
-      '{"project_id":"proj_123","event_id":"evt_123","object_key":"raw-events/proj_123/e.json.gz"}';
-    const envelope = JSON.stringify({ claim_id: "claim_123", payload });
-    redisZrangebyscoreMock = vi.fn().mockResolvedValue([envelope]);
+    redisEvalMock = vi.fn().mockResolvedValue(1);
 
     const queue = createRedisQueueClient({ redisUrl: "redis://redis:6379" });
     const reclaimed = await queue.reclaimStaleProcessingJobs("normalize-events", 123456);
 
     expect(reclaimed).toBe(1);
-    expect(redisZrangebyscoreMock).toHaveBeenCalledWith(
+    expect(redisEvalMock).toHaveBeenCalledWith(
+      expect.stringContaining("ZRANGEBYSCORE"),
+      2,
       "jobs:normalize-events:processing",
-      "-inf",
+      "jobs:normalize-events",
       "123456"
     );
-    expect(redisZremMock).toHaveBeenCalledWith("jobs:normalize-events:processing", envelope);
-    expect(redisRpushMock).toHaveBeenCalledWith("jobs:normalize-events", payload);
   });
 
   it("should track rolling incident frequencies and compute spike ratio scaffolding", async (): Promise<void> => {
