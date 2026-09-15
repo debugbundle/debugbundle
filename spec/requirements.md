@@ -58,6 +58,8 @@ Last updated: 2026-09-10
 
 **FR-SDK-19:** SDKs must support configurable log level filtering via `logLevel` init config (default: `"warning"`). Events below the configured level are silently discarded.
 
+**FR-SDK-19a:** Automatic non-fatal error and logger capture must respect application suppression before SDK capture. PHP error hooks must check the current `error_reporting()` severity mask, including `@`; fatal shutdown and explicit capture APIs remain available. Logger integrations must respect native levels, disabled/silent modes and source processor filters without evaluating suppressed lazy messages, duplicating accepted message evaluation, capturing enabled-query calls, or changing application return values/errors. SDK capture failures and recursive SDK logging must not disrupt application logging. Detaching an adapter must stop capture through already-created logger wrappers.
+
 **FR-SDK-20:** SDKs must auto-detect installed logging libraries on `init()` and offer to register DebugBundle handlers automatically:
 
 - **Node.js:** Detect pino, winston, bunyan via `require.resolve`.

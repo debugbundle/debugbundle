@@ -60,6 +60,10 @@ Last updated: 2026-09-10
 - **And** fatal errors via `register_shutdown_function()` are captured
 - **And** all events flush at request termination
 
+### AC-SDK-07a: PHP Error Suppression
+
+Both actual `@` expressions and dynamically changed `error_reporting()` masks suppress automatic warning/notice/deprecation capture. Ordinary enabled severities, explicit exception capture and fatal shutdown capture continue working, including through WordPress's bundled SDK.
+
 ### AC-SDK-08: Python Vanilla Hooks
 
 - **Given** a vanilla Python application (no framework) with `debugbundle.init()` called
@@ -76,6 +80,10 @@ Last updated: 2026-09-10
 - **And** the log record is captured in-process via logging library handler (not by reading log files)
 - **And** redaction is applied before the log enters the batch buffer
 - **And** logs below the configured level are silently discarded
+
+### AC-SDK-09a: Native Logger Filtering
+
+Native logger level/silent/processor filtering runs before SDK capture; enabled-query calls emit no events; lazy message blocks run zero times when suppressed and once when accepted; native output, return values and application exceptions are preserved. SDK callback failures and recursive logging are isolated. A detached adapter no longer captures through cached wrappers or inherited child emitters. Test these behaviors against real supported logging libraries as well as failure-injection fixtures.
 
 ### AC-SDK-10: Logger Auto-Detection
 

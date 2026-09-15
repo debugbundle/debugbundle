@@ -411,6 +411,8 @@ See `/spec/local-first-onboarding.md` for the full artifact layout rationale.
 
 ## Key Invariants (Quick Reference)
 
+Automatic SDK error/log hooks respect caller suppression: PHP's current non-fatal reporting mask, native logger levels and source filters run before SDK capture. Explicit capture and fatal shutdown behavior remain available. Logger adapters preserve native evaluation/return/error behavior, isolate recursive or failing SDK callbacks, and stop cached-wrapper capture after detachment. The implementations live in the standalone SDK companions; WordPress receives the PHP fix through its bundled dependency.
+
 1. **Bundle determinism** — same events → same bundle output, always
 2. **SDK never crashes host** — all SDK failures caught internally
 3. **Redaction before storage** — sensitive data scrubbed before persistence

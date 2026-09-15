@@ -582,6 +582,10 @@ The DebugBundle handler sits alongside existing handlers. Logs flow to both dest
 
 Events below the configured level are silently discarded. This keeps SDK overhead minimal in production.
 
+Automatic logger capture also honors the source logger's effective level, global disabled/silent state and processor filters. SDK `logLevel` is an additional filter, not permission to bypass the application's logger filters. Destination-specific settings remain local to each logging destination. Adapters preserve native output, return values, exceptions, lazy evaluation and enabled-query calls; SDK failures and recursive SDK logs are isolated. Detachment stops capture through previously returned wrappers and inherited child emitters.
+
+PHP's `captureErrors()` reads the current `error_reporting()` bitmask before constructing an `ErrorException`, so `@` and severity exclusions suppress non-fatal automatic capture. Do not use `error_reporting() === 0` as the suppression test on PHP 8. Explicit `captureException()`/`captureLog()` calls retain SDK-owned filtering, and fatal shutdown capture remains enabled independently of the non-fatal reporting mask.
+
 ### Event Type Mapping
 
 Captured logs are emitted as `log_event` normalized events:

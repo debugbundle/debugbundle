@@ -6,6 +6,11 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Changed
+
+- Release shared-types and redaction 1.7.2 to align the JavaScript SDK patch release. Shared runtime behavior and schemas are unchanged.
+- Specify automatic SDK capture filtering and regression coverage for native suppression, logger levels, processor drops and lazy messages.
+
 ## [1.9.2] - 2026-09-14
 
 ### Fixed
