@@ -1,6 +1,6 @@
 # Browser resource incidents
 
-Status: final audit and release authorized on 2026-09-16; release verification in progress.
+Status: implemented, published and verified in production on 2026-09-16 (core 1.10.0).
 
 ## Objective and compatibility
 
@@ -28,12 +28,12 @@ Synthetic acceptance corpus: four GTM route variants, five Meta Pixel route vari
 
 ## Rollout boundaries
 
-Local implementation and validation first. The owner subsequently authorized final audit, commits, package publication and deployment. Do not apply rules to SayCheese, resolve customer incidents or rewrite historical artifacts. New grouping is forward-only; a separately reviewed historical reconciliation can follow. Grouping reduces incident/bundle churn, while demotion retains context and may remain billable on paid plans. SDK-side dropping/sampling reduces transmission; server-side dropping/sampling reduces accepted retention.
+Local implementation and validation first. The owner subsequently authorized final audit, commits, package publication and deployment. Do not apply rules to customer projects, resolve customer incidents or rewrite historical artifacts. New grouping is forward-only; a separately reviewed historical reconciliation can follow. Grouping reduces incident/bundle churn, while demotion retains context and may remain billable on paid plans. SDK-side dropping/sampling reduces transmission; server-side dropping/sampling reduces accepted retention.
 
 ## Evidence and progress
 
 - Initial core and JS SDK worktrees clean. Site has a pre-existing edit to `content/blog/structured-incident-bundles-for-ai-agent-debugging-context.mdx`; preserve it.
-- Live read-only review on 2026-09-16: 14 active SayCheese incidents, including 13 resource rows representing six targets and 15 occurrences. Resource captures do not establish Pi-hole or another blocker.
+- Read-only feedback review identified 13 resource rows representing six targets and 15 occurrences. Resource captures do not establish Pi-hole or another blocker.
 - Implemented shared resource interpretation, exact scoped suggestions, resource-only v3 grouping with v1/v2 rule aliases, shared frontend severity, sampled route metadata, optional Bundle v1 context and existing-pattern UI.
 - Synthetic local corpus: 15 resource occurrences become six groups; independent signup and traced backend exceptions remain separate. Replay is idempotent. Resource events no longer merge into local application incidents solely through trace correlation.
 - Isolated database verification covers predecessor migration/readiness, clean bootstrap, replay, raw sampling, delayed arrivals, old jobs with missing routes, top-20 bounds, missing attribution and project isolation. Full integration: 90 passed initially; one unrelated reviewer-seeding timeout passed on focused retry.
@@ -50,4 +50,6 @@ Local implementation and validation first. The owner subsequently authorized fin
 - Route writes use existing incident/event idempotency and retention paths; the nullable additive migration preserves old jobs, rows and rollback compatibility. The existing hosted source/image rollout scripts run migrations before new runtime consumers. No destructive migration, raw object scan for incident lists, schema backfill or history rewrite was added.
 - API/CLI/MCP use the same suggestion service. The web view uses existing card/table/dialog/checkbox components, wraps mobile actions, retains pending/error/existing-rule states and reports read-only access.
 - No new service, provider lookup, automatic rule engine, historical reconciliation job or public endpoint was introduced. Changes include mandatory file splits at existing size limits.
-- Final core CI passed before package publication. Shared JS and Node/browser 1.8.0 plus CLI 1.9.0 are published with registry integrity and installation verification. Hosted adoption, WordPress 1.4.5 and site 1.3.2 are proceeding through their release gates. The detailed operator ledger remains local; customer incidents and rules are outside this rollout.
+- Final core CI passed before package publication. Shared JS and Node/browser 1.8.0, CLI 1.9.0, WordPress 1.4.5 and site 1.3.3 are published with package/build verification. The site patch corrects the CLI example to use the returned resource suggestion ID.
+- Hosted rollout deployed core source `50bed98fcae9755a19a4d56eb02b944a16bae63f` and site source `a35641e852f4ef8c2a2e55dff1aefd2ed0d0a7e8`. Independent checks confirm the forward migration, active worker, correct installed SDK, empty durable backlog and retained previous stable images.
+- Notification-disabled live verification reproduced six resource groups from fifteen occurrences and a separate application exception. Reviewed tracker demotion/drop prevented new tracker incidents while Google sign-in and application-asset occurrences continued. All 135 scoped jobs completed; the disposable project/token were removed. Bundle v1, public readiness, app version, documentation and unchanged OAuth/MCP boundaries passed verification. Detailed evidence remains in the local operator ledger and private deployment runbook.
