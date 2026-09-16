@@ -38,11 +38,13 @@ export function BrowserResourceDetails({
         </p>
       ) : null}
       {routes.items.length > 0 ? (
-        <Table>
+        <Table className="table-fixed">
           <TableHeader>
             <TableRow>
-              <TableHead>Affected route</TableHead>
-              <TableHead className="text-right">Recorded occurrences</TableHead>
+              <TableHead className="w-3/5">Affected route</TableHead>
+              <TableHead className="w-2/5 whitespace-normal text-right">
+                Recorded occurrences
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
