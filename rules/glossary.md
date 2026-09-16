@@ -4,6 +4,16 @@ This glossary defines durable product terms used across requirements, contracts,
 and implementation documentation. Source-of-truth requirements and contracts remain
 authoritative when a term's behavior is specified in more detail.
 
+## Browser Resource Incident Terms
+
+### Browser Resource Incident
+
+A browser resource-load failure grouped by concrete resource host, path and element type within the existing project, service and environment boundaries. Affected page routes remain evidence rather than grouping keys. Other exception fingerprints remain unchanged.
+
+### Optional Tracker Candidate
+
+A recognized analytics, advertising or tag-manager script eligible for an operator-reviewed resource noise suggestion. Recognition neither proves the dependency is optional for that application nor automatically lowers severity or suppresses capture. Authentication and application assets are excluded from these suggestions.
+
 ## Hosted Health-Check Terms
 
 ### Monitored Project
