@@ -1,3 +1,4 @@
+import { formatCaptureRuleMatcher } from "../../lib/capture-rule-copy.js";
 import {
   LinkIcon,
   PlusIcon,
@@ -389,7 +390,7 @@ export function ProjectCaptureRulesCard({
                     </TableCell>
                     <TableCell className="align-top">
                       <div className="max-w-sm whitespace-normal break-words text-sm leading-6 text-muted-foreground [overflow-wrap:anywhere]">
-                        {formatMatcherSummary(rule)}
+                        {formatCaptureRuleMatcher(rule.matcher)}
                       </div>
                     </TableCell>
                     <TableCell className="align-top">
@@ -649,75 +650,6 @@ export function ProjectCaptureRulesCard({
   );
 }
 
-function formatMatcherSummary(rule: ProjectCaptureRule): string {
-  const parts: string[] = [];
-
-  if (rule.matcher.event_types?.length) {
-    parts.push(`events: ${rule.matcher.event_types.join(", ")}`);
-  }
-  if (rule.matcher.browser_event_kind !== undefined) {
-    parts.push(`browser: ${rule.matcher.browser_event_kind}`);
-  }
-  if (rule.matcher.browser_event_opaque !== undefined) {
-    parts.push(
-      rule.matcher.browser_event_opaque ? "opaque browser event" : "non-opaque browser event"
-    );
-  }
-  if (rule.matcher.runtime?.length) {
-    parts.push(`runtime: ${rule.matcher.runtime.join(", ")}`);
-  }
-  if (rule.matcher.services?.length) {
-    parts.push(`services: ${rule.matcher.services.join(", ")}`);
-  }
-  if (rule.matcher.environments?.length) {
-    parts.push(`environments: ${rule.matcher.environments.join(", ")}`);
-  }
-  if (rule.matcher.client_kind !== undefined) {
-    parts.push(`client: ${rule.matcher.client_kind}`);
-  }
-  if (rule.matcher.bot_family !== undefined) {
-    parts.push(`bot: ${rule.matcher.bot_family}`);
-  }
-  if (rule.matcher.error_name !== undefined) {
-    parts.push(`error: ${rule.matcher.error_name}`);
-  }
-  if (rule.matcher.message_equals !== undefined) {
-    parts.push(`message: ${rule.matcher.message_equals}`);
-  }
-  if (rule.matcher.message_contains !== undefined) {
-    parts.push(`message contains: ${rule.matcher.message_contains}`);
-  }
-  if (rule.matcher.resource_url !== undefined) {
-    parts.push(`resource: ${formatUrlMatcher(rule.matcher.resource_url)}`);
-  }
-  if (rule.matcher.request_url !== undefined) {
-    parts.push(`request: ${formatUrlMatcher(rule.matcher.request_url)}`);
-  }
-  if (rule.matcher.status_codes?.length) {
-    parts.push(`status: ${rule.matcher.status_codes.join(", ")}`);
-  }
-  if (rule.matcher.first_party !== undefined) {
-    parts.push(rule.matcher.first_party ? "first-party only" : "third-party allowed");
-  }
-  if (rule.matcher.fingerprint !== undefined) {
-    parts.push(
-      `fingerprint: ${rule.matcher.fingerprint.version}:${rule.matcher.fingerprint.value}`
-    );
-  }
-
-  return parts.length === 0 ? "Custom matcher" : parts.join(" • ");
-}
-
-function formatUrlMatcher(
-  matcher: NonNullable<ProjectCaptureRule["matcher"]["resource_url"]>
-): string {
-  const parts: string[] = [];
-  if (matcher.host !== undefined) parts.push(matcher.host);
-  if (matcher.host_suffix !== undefined) parts.push(`*.${matcher.host_suffix}`);
-  if (matcher.path_equals !== undefined) parts.push(matcher.path_equals);
-  if (matcher.path_prefix !== undefined) parts.push(`${matcher.path_prefix}*`);
-  return parts.join(" ");
-}
 
 function getActionVariant(
   action: ProjectCaptureRule["action"]

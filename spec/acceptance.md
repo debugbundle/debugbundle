@@ -2425,3 +2425,14 @@ These are local correctness gates. Production activation, representative traffic
 - PostgreSQL-backed warning, slow-request and request-failure improvement builders produce schema-valid BundleV1 output. Delayed older occurrences extend first detection without moving last detection backwards or replacing newer evidence; replay does not increment counts.
 - Calendar/day/month/timezone changes in the same WildFly timer diagnostic produce one v2 fingerprint; different components, error codes, causes and environments remain distinct. Existing v1 exact-match capture rules still match their server-derived legacy fingerprint.
 - Deployment attribution excludes other projects, services, environments and future releases; older raw metadata cannot override newer scoped history. Missing customer evidence yields null, never the worker platform release.
+
+
+### AC-GRP-RESOURCE: Browser resource identity and scoped noise control
+
+- The SayCheese-shaped synthetic corpus produces six resource groups from fifteen occurrences across thirteen legacy route-specific groups. An independent application exception stays separate, including when a resource and backend exception share a trace ID in local processing.
+- Distinct services, environments, hosts, paths, element types and immutable asset versions remain distinct. Missing identity uses legacy grouping. Every non-resource hash and existing v1/v2 fingerprint rule remains compatible.
+- Titles identify known GTM, Meta Pixel, Clarity and Google sign-in resources, with a filename/host fallback. Privacy blocking is a possible cause only; no Pi-hole diagnosis is inferred.
+- Only recognized optional tracker candidates receive reviewed, exact host/path/service/environment demote/drop suggestions. Application assets, authentication and unknown dependencies do not. Preview users cannot create rules; existing rule and failure/pending states remain usable through API/CLI/MCP/web.
+- Duplicate processing does not inflate occurrence or route counts. Sampled-out raw events retain sanitized routes. Top-20 summaries report omitted routes and missing attribution, and distinguish occurrence metadata from retained samples.
+- Old Bundle v1 artifacts remain readable, new resource context is optional, deterministic golden fixtures for unrelated bundles remain byte-identical, and the frozen OpenAI projection does not expand.
+- The additive production migration upgrades the predecessor schema, clean bootstrap includes the column, and API/worker readiness fails closed until the migration is applied. Existing deploy runners migrate before starting new code.

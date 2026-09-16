@@ -1,4 +1,6 @@
 import { ArrowLeftIcon, ClipboardCopyIcon, DownloadIcon, LoaderCircleIcon } from "lucide-react";
+import { BrowserResourceContextSchema } from "../../../../packages/shared-types/src/browser-resource-context.js";
+import { BrowserResourceDetails } from "../components/system/browser-resource-details.js";
 import { useEffect, useState } from "react";
 import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import { CalloutCard } from "../components/system/callout-card.js";
@@ -93,13 +95,13 @@ export function IncidentDetailPage(): JSX.Element {
       ) : (
         <>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1">
-              <h2 className="text-xl font-semibold">{incident.title}</h2>
+            <div className="min-w-0 space-y-1">
+              <h2 className="break-words text-xl font-semibold">{incident.title}</h2>
               <p className="text-sm text-muted-foreground">
                 {formatIncidentMatchedFields(incident.matched_fields)}
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {incident.status !== "resolved" ? (
                 <Button
                   type="button"
@@ -130,7 +132,7 @@ export function IncidentDetailPage(): JSX.Element {
                 size="sm"
                 onClick={() => setIsCaptureRulesOpen(true)}
               >
-                Capture rules
+                Reduce noise
               </Button>
               <Badge variant={severityVariantMap[incident.severity]}>{incident.severity}</Badge>
               <Badge variant={statusVariantMap[incident.status]}>{incident.status}</Badge>
@@ -199,7 +201,7 @@ export function IncidentDetailPage(): JSX.Element {
             incidentId={incident.incident_id}
             open={isCaptureRulesOpen}
             onOpenChange={setIsCaptureRulesOpen}
-            {...(projectId === undefined ? {} : { projectId })}
+            projectId={incident.project_id}
           />
         </>
       )}
@@ -268,6 +270,10 @@ function BundleTab({ incidentId }: { incidentId: string }): JSX.Element {
   }
 
   const bundleJson = JSON.stringify(bundleState.bundle, null, 2);
+  const context = bundleState.bundle["context"];
+  const resource = BrowserResourceContextSchema.safeParse(
+    context !== null && typeof context === "object" ? (context as Record<string, unknown>)["resource_failure"] : undefined
+  );
 
   return (
     <Card>
@@ -297,7 +303,8 @@ function BundleTab({ incidentId }: { incidentId: string }): JSX.Element {
           </Button>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex flex-col gap-4">
+        {resource.success ? <BrowserResourceDetails resource={resource.data} /> : null}
         <HighlightedCodeBlock code={bundleJson} />
       </CardContent>
     </Card>

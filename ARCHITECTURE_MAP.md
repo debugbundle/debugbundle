@@ -5,6 +5,8 @@
 
 `scripts/incident-recovery-check.py` owns disposable Docker orchestration for the real API/worker recovery exercise; `scripts/incident-recovery-check.mjs` owns its synthetic HTTP workload and storage/artifact assertions. Neither is a production service. Reviewer fixture seeding disables synthetic health execution while preserving retained review evidence. Hosted Redis persistence activation and existing-volume preservation are private-cloud operator responsibilities.
 
+Resource incident ownership: `packages/shared-types/src/browser-resource*.ts` owns deterministic identity, suggestions, origin and evidence schemas; `packages/event-normalizer/src/fingerprints.ts` owns v2/v3 hashes and grouping fields. Workers carry optional title/route metadata into `metadata-grouping.ts`; `metadata-bundles.ts` reads bounded SQL route summaries. `bundle-engine/src/browser-resource-context.ts` adds optional Bundle v1 context, and `BrowserResourceDetails` renders it with existing dashboard primitives. Shared UI matcher copy serves suggestions and project settings. CLI state parsing lives in `local-processing-state.ts`; storage bundle contracts and incident bootstrap SQL live in `bundle-types.ts` and `storage-bootstrap-incident-statements.ts`. Browser SDK origin evaluation lives in the JS companion's `resource-origin.ts`.
+
 ---
 
 ## Module Dependency Graph

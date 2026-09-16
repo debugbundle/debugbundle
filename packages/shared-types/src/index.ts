@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { RuntimeMemoryStatsSchema } from "./event-envelope.js";
+import { BrowserResourceContextSchema } from "./browser-resource-context.js";
 
 export {
   EventTypeValues,
@@ -267,6 +268,7 @@ const ContextDeviceSchema = z.object({
 });
 
 const BundleContextSchema = z.object({
+  resource_failure: BrowserResourceContextSchema.optional(),
   error: ContextErrorSchema.nullable().optional(),
   request: ContextRequestSchema.nullable().optional(),
   response: ContextResponseSchema.nullable().optional(),
@@ -490,6 +492,9 @@ export {
 } from "./improvement-settings.js";
 
 export * from "./analytics.js";
+export * from "./browser-resource.js";
+export * from "./browser-resource-routes.js";
+export * from "./frontend-severity.js";
 export * from "./analytics-product.js";
 export * from "./analytics-journey-samples.js";
 export * from "./analytics-saved-funnels.js";

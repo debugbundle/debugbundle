@@ -1,8 +1,11 @@
-import { createHash } from "node:crypto";
+import { RESOURCE_FINGERPRINT_VERSION, fingerprint, fingerprintVersion, type FingerprintVersion } from "./fingerprints.js";
+export { FINGERPRINT_VERSION, RESOURCE_FINGERPRINT_VERSION, fingerprint, fingerprintVersion, inferMatchedFields } from "./fingerprints.js";
+export type { FingerprintVersion } from "./fingerprints.js";
 
 import { redact, type JsonValue } from "../../redaction/src/index.js";
 import {
   EventEnvelopeSchema,
+  describeBrowserResource,
   classifyRequestStatus,
   type CapturePreset,
   type EventEnvelope,
@@ -40,10 +43,11 @@ export interface NormalizedEvent {
   browser_event_kind?: "window_error" | "resource_error" | null;
   resource_host?: string | null;
   resource_path?: string | null;
+  resource_type?: string;
+  incident_title?: string;
   payload: unknown;
 }
 
-export const FINGERPRINT_VERSION = "v2";
 
 type CorrelationKey = "request_id" | "trace_id" | "session_id" | "user_id_hash";
 
@@ -264,44 +268,6 @@ export function normalizeCompatibleEventCandidate(candidate: unknown): unknown {
   return event;
 }
 
-export function inferMatchedFields(event: NormalizedEvent): string[] {
-  const matchedFields: string[] = ["environment", "normalized_message"];
-
-  if (event.error_type !== null) {
-    matchedFields.push("error_type");
-  }
-
-  if (event.route_template !== null) {
-    matchedFields.push("route_template");
-  }
-
-  if (event.top_frames.length > 0) {
-    matchedFields.push("top_frames");
-  }
-
-  if (event.browser_event_kind != null) {
-    matchedFields.push("browser_event_kind");
-  }
-
-  if (event.resource_host != null) {
-    matchedFields.push("resource_host");
-  }
-
-  if (event.resource_path != null) {
-    matchedFields.push("resource_path");
-  }
-
-  if (event.http_method !== null) {
-    matchedFields.push("http_method");
-  }
-
-  if (event.http_status !== null) {
-    matchedFields.push("http_status");
-  }
-
-  return matchedFields;
-}
-
 const UUID_PATTERN =
   /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi;
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
@@ -489,7 +455,7 @@ function normalizeKnownDatabaseMessage(message: string): string | null {
   return null;
 }
 
-function normalizeMessage(message: string, version: "v1" | "v2"): string {
+function normalizeMessage(message: string, version: FingerprintVersion): string {
   const knownDatabaseMessage = normalizeKnownDatabaseMessage(message);
   if (knownDatabaseMessage !== null) {
     return knownDatabaseMessage;
@@ -602,30 +568,13 @@ function normalizeResourceIdentity(value: string | null): {
   }
 }
 
-function stableJson(value: unknown): string {
-  if (value === null || typeof value !== "object") {
-    return JSON.stringify(value);
-  }
-
-  if (Array.isArray(value)) {
-    return `[${value.map((entry) => stableJson(entry)).join(",")}]`;
-  }
-
-  const record = value as Record<string, unknown>;
-  const keys = Object.keys(record).sort();
-
-  const pairs = keys.map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`);
-
-  return `{${pairs.join(",")}}`;
-}
-
 export function validateEvent(
   candidate: unknown
 ): ReturnType<typeof EventEnvelopeSchema.safeParse> {
   return EventEnvelopeSchema.safeParse(normalizeCompatibleEventCandidate(candidate));
 }
 
-export function normalizeEvent(event: EventEnvelope, version: "v1" | "v2" = FINGERPRINT_VERSION): NormalizedEvent {
+export function normalizeEvent(event: EventEnvelope, version: FingerprintVersion = RESOURCE_FINGERPRINT_VERSION): NormalizedEvent {
   const redactedPayload = redact(event.payload as JsonValue).redacted;
 
   if (event.event_type === "backend_exception") {
@@ -686,6 +635,9 @@ export function normalizeEvent(event: EventEnvelope, version: "v1" | "v2" = FING
         ? normalizeResourceIdentity(browserEvent.target?.source_url ?? browserEvent.file_name)
         : { host: null, path: null };
     const topFrames = browserEvent?.opaque === true ? [] : selectTopFrames(event.payload.stack);
+    const resource = describeBrowserResource(browserEvent);
+    const concreteResource = version === RESOURCE_FINGERPRINT_VERSION && browserEvent?.opaque === true && resource?.host != null && resource.type !== null;
+
 
     return {
       event_type: event.event_type,
@@ -697,8 +649,10 @@ export function normalizeEvent(event: EventEnvelope, version: "v1" | "v2" = FING
       http_status: null,
       top_frames: topFrames,
       browser_event_kind: browserEvent?.kind ?? null,
-      resource_host: resourceIdentity.host,
-      resource_path: resourceIdentity.path,
+      resource_host: concreteResource ? resource.host : resourceIdentity.host,
+      resource_path: concreteResource ? resource.path : resourceIdentity.path,
+      ...(concreteResource ? { resource_type: resource.type! } : {}),
+      ...(resource === null ? {} : { incident_title: resource.title }),
       payload: redactedPayload
     };
   }
@@ -719,24 +673,22 @@ export function normalizeEvent(event: EventEnvelope, version: "v1" | "v2" = FING
   };
 }
 
-export function fingerprint(event: NormalizedEvent): string {
-  const canonical = {
-    error_type: event.error_type,
-    normalized_message: event.normalized_message,
-    top_frames: event.top_frames,
-    route_template: event.route_template,
-    browser_event_kind: event.browser_event_kind,
-    resource_host: event.resource_host,
-    resource_path: event.resource_path,
-    http_method: event.http_method,
-    http_status: event.http_status,
-    environment: event.environment
-  };
-
-  return createHash("sha256").update(stableJson(canonical)).digest("hex");
-}
-
 const INCIDENT_LOG_LEVELS = new Set(["error", "fatal", "critical"]);
+
+/** Only server-derived aliases may preserve rules created before a grouping upgrade. */
+export function buildEventFingerprintContext(event: EventEnvelope, requestedVersions: readonly string[] = []): {
+  fingerprint: { version: string; value: string };
+  fingerprint_aliases: { version: string; value: string }[];
+} {
+  const normalized = normalizeEvent(event);
+  const version = fingerprintVersion(normalized);
+  return {
+    fingerprint: { version, value: fingerprint(normalized) },
+    fingerprint_aliases: (["v1", "v2"] as const)
+      .filter(legacy => legacy !== version && requestedVersions.includes(legacy))
+      .map(legacy => ({ version: legacy, value: fingerprint(normalizeEvent(event, legacy)) }))
+  };
+}
 
 function getRequestResponseStatus(payload?: Record<string, unknown>): number | null {
   const status = payload?.["response_status"];

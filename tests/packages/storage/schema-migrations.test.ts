@@ -18,6 +18,11 @@ const ALL_REQUIRED_TABLES = Array.from(
 );
 
 describe("storage schema migrations", () => {
+  it("adds nullable resource route metadata without rewriting incident history", () => {
+    const migration = STORAGE_SCHEMA_MIGRATIONS.find(entry => entry.id === "202609160001_add_browser_resource_routes");
+    expect(migration?.statements.join("\n")).toContain("ADD COLUMN IF NOT EXISTS resource_route text");
+    expect(migration?.statements.join("\n")).not.toMatch(/UPDATE incidents|DELETE|DROP /);
+  });
   it("should replace the provisional saved-funnel default with tier capacity", (): void => {
     const migration = STORAGE_SCHEMA_MIGRATIONS.find(
       (entry) => entry.id === "202607130001_expand_default_saved_funnel_capacity"
@@ -288,6 +293,7 @@ describe("storage schema migrations", () => {
 
   it("should seed the migration ledger instead of replaying history for a current bootstrap schema", async (): Promise<void> => {
     const currentSchemaColumns = [
+      { table_name: "incident_events", column_name: "resource_route" },
       { table_name: "worker_jobs", column_name: "depends_on" },
       { table_name: "worker_jobs", column_name: "operator_retries" },
       { table_name: "worker_jobs", column_name: "lease_token" },

@@ -1,6 +1,6 @@
 {
   "name": "@debugbundle/cli",
-  "version": "1.8.1",
+  "version": "1.9.0",
   "private": false,
   "description": "Command-line interface for DebugBundle",
   "license": "Apache-2.0",

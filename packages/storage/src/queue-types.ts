@@ -120,6 +120,8 @@ export interface GroupIncidentJob {
   alert_notification_key?: string;
   fingerprint_version?: string;
   normalized_message: string;
+  incident_title?: string;
+  resource_route?: string;
   matched_fields?: string[];
   occurred_at: string;
   severity: "low" | "medium" | "high" | "critical";

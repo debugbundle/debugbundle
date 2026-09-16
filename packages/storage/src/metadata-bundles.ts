@@ -61,6 +61,27 @@ export function createMetadataBundles(
             i.first_seen_at::text AS first_seen_at,
             i.last_seen_at::text AS last_seen_at,
             i.occurrence_count,
+            CASE WHEN i.fingerprint_version = 'v3' THEN (
+              SELECT jsonb_build_object(
+                'items', COALESCE(jsonb_agg(
+                  jsonb_build_object('route', route, 'occurrences', occurrences)
+                  ORDER BY occurrences DESC, route COLLATE "C" ASC
+                ), '[]'::jsonb),
+                'recorded_occurrences', COALESCE(MAX(recorded), 0),
+                'unattributed_occurrences', GREATEST(0, i.occurrence_count - COALESCE(MAX(recorded), 0)),
+                'omitted_routes', GREATEST(0, COALESCE(MAX(total_routes), 0) - 20),
+                'coverage', 'occurrence_metadata'
+              )
+              FROM (
+                SELECT resource_route AS route, COUNT(*) AS occurrences,
+                  SUM(COUNT(*)) OVER () AS recorded, COUNT(*) OVER () AS total_routes
+                FROM incident_events resource_events
+                WHERE resource_events.incident_id = i.id AND resource_route IS NOT NULL
+                GROUP BY resource_route
+                ORDER BY COUNT(*) DESC, resource_route COLLATE "C" ASC
+                LIMIT 20
+              ) resource_summary
+            ) END AS resource_routes,
             COALESCE(
               ARRAY_AGG(DISTINCT ie.event_type ORDER BY ie.event_type)
                 FILTER (WHERE ie.event_type IS NOT NULL),
@@ -80,6 +101,7 @@ export function createMetadataBundles(
             s.framework,
             i.environment,
             i.fingerprint,
+            i.fingerprint_version,
             i.title,
             i.severity,
             i.first_seen_at,
@@ -90,7 +112,11 @@ export function createMetadataBundles(
         [input.project_id, input.incident_id]
       );
 
-      return result.rows[0] ?? null;
+      const row = result.rows[0];
+      if (row === undefined) return null;
+      // One statement keeps incident totals and bounded route counts on the same database snapshot.
+      const { resource_routes, ...context } = row;
+      return resource_routes == null ? context : { ...context, resource_routes };
     },
 
     async hasBundleGenerationForSourceEvent(input): Promise<boolean> {

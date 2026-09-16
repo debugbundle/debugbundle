@@ -119,6 +119,7 @@ export interface CaptureRuleSuggestion {
 }
 
 export interface CaptureRuleSuggestionsResponse {
+  access_mode?: "manage" | "preview";
   suggestions: CaptureRuleSuggestion[];
   bundle_status?: "ready" | "pending" | "failed";
   bundle_reason?: string | null;

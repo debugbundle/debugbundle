@@ -6,9 +6,16 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-09-16
+
 ### Changed
 
-- Release shared-types and redaction 1.7.2 to align the JavaScript SDK patch release. Shared runtime behavior and schemas are unchanged.
+- Group concrete browser resource failures across routes, with provider/asset titles and explicit possible-cause diagnosis. Preserve unrelated fingerprints and installed legacy fingerprint rules.
+- Add reviewed resource/service/environment noise suggestions, readable resource details, and bounded affected-route evidence in optional Bundle v1 context. Authentication, app assets and unknown dependencies receive no automatic suppression recommendation.
+- Add forward migration `202609160001_add_browser_resource_routes` so sampled-out occurrences retain sanitized route metadata. Run migrations before new API/worker code; historical incidents are not merged.
+- Publish shared-types/redaction 1.8.0 and CLI 1.9.0 for the additive resource evidence and local grouping behavior. Bundle schema remains v1. Suggestions follow the primary incident resource even when its bundle contains related exceptions.
+
+- Includes the earlier shared-types/redaction 1.7.2 alignment release and automatic SDK capture-filtering contract updates.
 - Specify automatic SDK capture filtering and regression coverage for native suppression, logger levels, processor drops and lazy messages.
 
 ## [1.9.2] - 2026-09-14

@@ -190,7 +190,7 @@ describe("web app — incident table interactions", () => {
     render(<App initialEntries={[`/incidents/${incident.incident_id}`]} />);
 
     await screen.findByRole("button", { name: /mark resolved/i });
-    await user.click(screen.getByRole("button", { name: /capture rules/i }));
+    await user.click(screen.getByRole("button", { name: /reduce noise/i }));
 
     expect(await screen.findByText(/demote resource errors from analytics\.example\.com/i)).toBeInTheDocument();
 
@@ -208,7 +208,7 @@ describe("web app — incident table interactions", () => {
     expect(await screen.findByRole("button", { name: /^rule exists$/i })).toBeInTheDocument();
 
     await user.click(screen.getAllByRole("button", { name: /^close$/i }).at(-1) as HTMLButtonElement);
-    await user.click(screen.getByRole("button", { name: /capture rules/i }));
+    await user.click(screen.getByRole("button", { name: /reduce noise/i }));
 
     expect(await screen.findByRole("button", { name: /^rule exists$/i })).toBeInTheDocument();
   });

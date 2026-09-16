@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildCaptureRuleSuggestions } from "../../../packages/shared-types/src/capture-rule-suggestions.ts";
 
 describe("capture rule suggestions", () => {
-  it("suggests demote and drop for third-party browser resource noise", () => {
+  it("does not suggest suppressing an unrecognized third-party resource", () => {
     const suggestions = buildCaptureRuleSuggestions({
       incident: {
         incident_id: "inc_123",
@@ -44,25 +44,10 @@ describe("capture rule suggestions", () => {
       }
     });
 
-    expect(suggestions.map((entry) => entry.suggestion_id)).toEqual([
-      "primary_resource_host_demote",
-      "primary_resource_host_drop",
-      "exact_fingerprint_demote"
-    ]);
-    expect(suggestions[0]).toMatchObject({
-      recommended_action: "demote",
-      confidence: "high",
-      rule: {
-        matcher: {
-          browser_event_kind: "resource_error",
-          resource_url: { host: "analytics.example.com" }
-        }
-      }
-    });
-    expect(suggestions[1]?.rule.action).toBe("drop");
+    expect(suggestions).toEqual([]);
   });
 
-  it("suggests sampling for first-party resource errors", () => {
+  it("does not suggest sampling application asset failures", () => {
     const suggestions = buildCaptureRuleSuggestions({
       incident: {
         incident_id: "inc_124",
@@ -103,23 +88,7 @@ describe("capture rule suggestions", () => {
       }
     });
 
-    expect(suggestions[0]).toMatchObject({
-      suggestion_id: "primary_resource_sample",
-      recommended_action: "sample",
-      rule: {
-        action: "sample",
-        sample_rate: 0.25,
-        sample_event_class: "preserve",
-        matcher: {
-          browser_event_kind: "resource_error",
-          resource_url: {
-            host: "app.example.com",
-            path_equals: "/assets/chunk-9.js"
-          }
-        }
-      }
-    });
-    expect(suggestions.some((entry) => entry.suggestion_id === "primary_resource_host_drop")).toBe(false);
+    expect(suggestions).toEqual([]);
   });
 
   it("suggests request-event sampling for repeated narrow route failures", () => {

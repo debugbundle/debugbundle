@@ -789,7 +789,7 @@ describe("event-normalizer", () => {
     expect(normalizedA.resource_path).toBe("/assets/app.js");
     expect(normalizedA.top_frames).toEqual([]);
     expect(inferMatchedFields(normalizedA)).toEqual(
-      expect.arrayContaining(["error_type", "route_template", "browser_event_kind", "resource_host", "resource_path"])
+      expect.arrayContaining(["environment", "browser_event_kind", "resource_host", "resource_path", "resource_type"])
     );
     expect(fingerprint(normalizedA)).toBe(fingerprint(normalizedB));
   });

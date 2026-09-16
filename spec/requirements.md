@@ -198,6 +198,8 @@ Execution eligibility under FR-AVC-04 must exclude checks beyond the per-project
 
 **FR-GRP-10:** Severity inference must preserve high severity for backend exceptions, non-opaque frontend exceptions, and immediate request-failure incident signals. Low-confidence opaque browser-native `frontend_exception` captures must not be stamped high by default: opaque `window_error` signals infer `low`, and opaque `resource_error` signals infer `medium`. `error_suppressed` events infer `medium`; other events infer `low` unless explicitly escalated by a later operator-controlled path.
 
+**FR-GRP-11:** Concrete opaque browser resource failures group across page routes by exact host/path/element type within the existing project/service/environment boundary. Human titles identify the provider or asset. Sanitized route counts survive raw sampling and remain bounded in bundle output. V3 is resource-only; historical groups, unrelated hashes and installed v1/v2 fingerprint rules remain compatible. Resource classification never proves the cause or automatically downgrades a dependency. See `spec/browser-resource-incidents.md`.
+
 ### 1.5 Bundle System
 
 **FR-BND-01:** Bundles must follow the bundle schema (see `/contracts/data-schemas.md`).

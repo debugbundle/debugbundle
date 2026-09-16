@@ -43,8 +43,9 @@ export function isMachineGeneratedIncidentTitle(
 }
 
 export function deriveIncidentTitle(
-  job: Pick<GroupIncidentJob, "event_type" | "normalized_message">
+  job: Pick<GroupIncidentJob, "event_type" | "normalized_message" | "incident_title">
 ): string {
+  if (job.incident_title !== undefined) return job.incident_title;
   if (!isMachineGeneratedIncidentTitle(job)) {
     return job.normalized_message;
   }
@@ -129,6 +130,7 @@ export async function processNextGroupIncidentJob(
       event_type: job.event_type,
       event_class: job.event_class,
       occurred_at: job.occurred_at,
+      ...(job.resource_route === undefined ? {} : { resource_route: job.resource_route }),
       is_sampled: false
     });
   } else {
@@ -142,6 +144,7 @@ export async function processNextGroupIncidentJob(
             occurred_at: job.occurred_at,
             occurrence_count: incident.occurrence_count,
             severity: job.severity,
+            ...(job.resource_route === undefined ? {} : { resource_route: job.resource_route }),
             level: null
           })
         : await (async () => {
@@ -151,6 +154,7 @@ export async function processNextGroupIncidentJob(
               event_type: job.event_type,
               event_class: job.event_class,
               occurred_at: job.occurred_at,
+              ...(job.resource_route === undefined ? {} : { resource_route: job.resource_route }),
               is_sampled: true
             });
 

@@ -5,6 +5,8 @@
 
 The incident reliability candidate also retains reproduction jobs when their input bundle is temporarily unreadable or invalid, applying bounded journal retries. Incident/improvement context loaders tolerate explicit object absence but retry other storage failures instead of publishing thinner evidence. Browser stack URL privacy covers parentheses inside credentials/query as well as ordinary URLs; file and stack-coordinate evidence is preserved.
 
+Browser resource incidents now use a resource-only fingerprint v3 (exact host/path/element type across page routes); other events remain v2. Shared evidence interpretation supplies provider/asset titles and cautious possible-cause wording. Operator-reviewed optional tracker rules match exact resource/service/environment and never automatically suppress authentication or app assets. Optional Bundle v1 `context.resource_failure` carries bounded route counts, sourced from nullable `incident_events.resource_route` after raw sampling. Deploy migration `202609160001_add_browser_resource_routes` before runtime; historical incidents remain unchanged. See `spec/browser-resource-incidents.md` for validation and release boundaries.
+
 ---
 
 ## What Is DebugBundle?

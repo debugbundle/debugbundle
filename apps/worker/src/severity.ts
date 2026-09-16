@@ -1,5 +1,6 @@
 import {
   classifyRequestStatus,
+  inferFrontendExceptionSeverity,
   type EventEnvelope,
   type ImmediateClientErrorPathRule
 } from "../../../packages/shared-types/src/index.js";
@@ -7,17 +8,6 @@ import {
 export type InferredSeverity = "low" | "medium" | "high" | "critical";
 
 type CapturePreset = "minimal" | "balanced" | "investigative";
-
-function inferFrontendExceptionSeverity(
-  event: Extract<EventEnvelope, { event_type: "frontend_exception" }>
-): InferredSeverity {
-  const browserEvent = event.payload.browser_event;
-  if (browserEvent?.opaque === true) {
-    return browserEvent.kind === "resource_error" ? "medium" : "low";
-  }
-
-  return "high";
-}
 
 export function inferSeverity(
   event: EventEnvelope,

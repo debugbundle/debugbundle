@@ -2192,16 +2192,17 @@ Response `200`:
 
 ```json
 {
+  "access_mode": "manage | preview",
   "bundle_status": "ready | pending | failed",
   "bundle_reason": "string | null",
   "suggestions": [
     {
-      "suggestion_id": "primary_resource_host_demote",
-      "label": "Demote resource errors from analytics.example.com",
+      "suggestion_id": "resource_context",
+      "label": "Keep Google Tag Manager failures as context",
       "recommended_action": "demote",
       "confidence": "high | medium | low",
       "reason": "string",
-      "requires_confirmation": false,
+      "requires_confirmation": true,
       "created_rule_id": "uuid | null",
       "created_rule_enabled": true,
       "rule": {}
@@ -2211,6 +2212,8 @@ Response `200`:
 ```
 
 Suggestions are deterministic from stored incident + bundle evidence. `created_rule_id` is populated when the suggested condition already has a matching project rule, including disabled rules. `pending` indicates the bundle is not ready yet. `failed` indicates the bundle cannot currently support suggestion generation.
+
+Resource suggestions recognize exact Google Tag Manager, Meta Pixel and Microsoft Clarity script targets. `resource_context` demotes future matching events; `resource_drop` discards them. Both require operator review and match `frontend_exception`, opaque `resource_error`, the exact resource host/path, service and environment. Authentication (including Google sign-in), application assets, and unrecognized dependencies receive no automatic resource noise recommendation. Existing manually configured rules remain supported. Provider recognition does not prove a blocker or establish that a dependency is optional for the application. `access_mode` is an optional additive UI capability hint; create authorization is still enforced server-side. Clients should use the suggestion IDs returned by the current response, not hard-code them.
 
 **Create a capture rule from a suggestion:**
 
@@ -2224,7 +2227,7 @@ Request body:
 
 ```json
 {
-  "suggestion_id": "primary_resource_host_demote",
+  "suggestion_id": "resource_context",
   "name": "Demote analytics resource noise",
   "description": null,
   "enabled": true,

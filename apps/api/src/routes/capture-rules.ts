@@ -307,6 +307,13 @@ export function registerCaptureRuleRoutes(app: FastifyInstance, dependencies: Ap
       return reply.status(404).send({ error: "incident_not_found" });
     }
 
+    const access = await dependencies.projectManagement?.resolveProjectAccessForUser?.({
+      user_id: member.member_id, project_id: incident.project_id
+    });
+    const accessMode = access != null && !isSharedProjectAccessSuspended(access) &&
+      (access.effective_role === "owner" || access.effective_role === "admin") && dependencies.captureRuleManagement !== undefined
+      ? "manage" : "preview";
+
     const bundle = await readBundleForCaptureRuleSuggestions({
       dependencies,
       organizationId: member.organization_id,
@@ -317,6 +324,7 @@ export function registerCaptureRuleRoutes(app: FastifyInstance, dependencies: Ap
     if (bundle.status === "pending") {
       return reply.status(200).send(
         buildCaptureRuleSuggestionsResponse({
+          access_mode: accessMode,
           suggestions: [],
           bundle_status: "pending"
         })
@@ -326,6 +334,7 @@ export function registerCaptureRuleRoutes(app: FastifyInstance, dependencies: Ap
     if (bundle.status === "failed") {
       return reply.status(200).send(
         buildCaptureRuleSuggestionsResponse({
+          access_mode: accessMode,
           suggestions: [],
           bundle_status: "failed",
           bundle_reason: bundle.reason
@@ -353,6 +362,7 @@ export function registerCaptureRuleRoutes(app: FastifyInstance, dependencies: Ap
 
     return reply.status(200).send(
       buildCaptureRuleSuggestionsResponse({
+          access_mode: accessMode,
         suggestions: annotateCaptureRuleSuggestions({
           suggestions,
           existingRules

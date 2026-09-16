@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { browserResourceLocation } from "./browser-resource.js";
 
 import {
   BrowserEventKindSchema,
@@ -291,10 +292,11 @@ export function buildCaptureRuleEvaluationContext(input: {
             ? browserEvent["file_name"]
             : undefined;
       const resourceUrl = normalizeEvaluationUrl(resourceSource);
+      const resourceLocation = browserResourceLocation(resourceSource, readRecord(browserEvent?.["page"])?.["url"]);
 
       return CaptureRuleEvaluationContextSchema.parse({
         ...context,
-        ...(resourceUrl.first_party === undefined ? {} : { first_party: resourceUrl.first_party }),
+        ...(resourceLocation?.first_party == null ? {} : { first_party: resourceLocation.first_party }),
         error_name: readString(input.event.payload["name"]),
         message: readString(input.event.payload["message"]),
         browser_event_kind:
@@ -303,7 +305,9 @@ export function buildCaptureRuleEvaluationContext(input: {
             : undefined,
         browser_event_opaque:
           typeof browserEvent?.["opaque"] === "boolean" ? browserEvent["opaque"] : undefined,
-        resource_url: resourceUrl.url,
+        resource_url: resourceLocation === null ? resourceUrl.url : {
+          ...(resourceLocation.host === null ? {} : { host: resourceLocation.host }), path: resourceLocation.path
+        },
       });
     }
 

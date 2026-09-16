@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { buildBrowserResourceSuggestions } from "./browser-resource-suggestions.js";
+import { describeBrowserResource, type BrowserResource } from "./browser-resource.js";
 
 import {
   CaptureRuleActionSchema,
@@ -28,6 +30,7 @@ export const CaptureRuleSuggestionSchema = z.object({
 export type CaptureRuleSuggestion = z.infer<typeof CaptureRuleSuggestionSchema>;
 
 export const CaptureRuleSuggestionsResponseSchema = z.object({
+  access_mode: z.enum(["manage", "preview"]).optional(),
   suggestions: z.array(CaptureRuleSuggestionSchema),
   bundle_status: z.enum(["ready", "pending", "failed"]).optional(),
   bundle_reason: z.string().nullable().optional()
@@ -56,38 +59,57 @@ export interface CaptureRuleSuggestionIncident {
 }
 
 export interface CaptureRuleSuggestionBundle {
-  project?: {
-    environment?: string | null;
-  } | null | undefined;
-  service?: {
-    name?: string | null;
-  } | null | undefined;
+  project?:
+    | {
+        environment?: string | null;
+      }
+    | null
+    | undefined;
+  service?:
+    | {
+        name?: string | null;
+      }
+    | null
+    | undefined;
   signal: {
     signal_type: string;
     source_event_types: string[];
     fingerprint: string;
   };
   context: {
-    request?: {
-      path?: string;
-      headers?: Record<string, unknown>;
-    } | null | undefined;
-    response?: {
-      status_code?: number;
-    } | null | undefined;
-    frontend?: {
-      exceptions?: unknown[];
-    } | null | undefined;
-    device?: {
-      user_agent?: string | null;
-    } | null | undefined;
+    resource_failure?: Pick<BrowserResource, "host" | "path" | "type"> | null | undefined;
+    error?: { name: string; message: string } | null | undefined;
+    request?:
+      | {
+          path?: string;
+          headers?: Record<string, unknown>;
+        }
+      | null
+      | undefined;
+    response?:
+      | {
+          status_code?: number;
+        }
+      | null
+      | undefined;
+    frontend?:
+      | {
+          exceptions?: unknown[];
+        }
+      | null
+      | undefined;
+    device?:
+      | {
+          user_agent?: string | null;
+        }
+      | null
+      | undefined;
   };
 }
 
 interface SuggestionEvidence {
   serviceName?: string;
   environment?: string;
-  requestHost?: string;
   requestPath?: string;
   responseStatusCode?: number;
   eventType?: CaptureRuleEventType;
@@ -96,24 +118,8 @@ interface SuggestionEvidence {
   browserEventKind?: "window_error" | "resource_error";
   browserEventOpaque?: boolean;
   resourceHost?: string;
-  resourcePath?: string;
-  resourceFirstParty?: boolean;
   clientKind?: "human" | "bot" | "unknown";
   botFamily?: string;
-}
-
-function normalizeHostHeader(value: unknown): string | undefined {
-  if (typeof value !== "string") {
-    return undefined;
-  }
-
-  const trimmed = value.trim().toLowerCase();
-  if (trimmed.length === 0) {
-    return undefined;
-  }
-
-  const withoutPort = trimmed.split(":", 1)[0];
-  return withoutPort && withoutPort.length > 0 ? withoutPort : undefined;
 }
 
 function normalizePath(value: string | undefined): string | undefined {
@@ -127,10 +133,16 @@ function normalizePath(value: string | undefined): string | undefined {
     return "/";
   }
 
-  return pathWithoutQueryOrFragment.startsWith("/") ? pathWithoutQueryOrFragment : `/${pathWithoutQueryOrFragment}`;
+  return pathWithoutQueryOrFragment.startsWith("/")
+    ? pathWithoutQueryOrFragment
+    : `/${pathWithoutQueryOrFragment}`;
 }
 
-function normalizeUrl(value: string | undefined): { host?: string; path?: string; firstParty?: boolean } {
+function normalizeUrl(value: string | undefined): {
+  host?: string;
+  path?: string;
+  firstParty?: boolean;
+} {
   const trimmed = value?.trim();
   if (trimmed === undefined || trimmed.length === 0) {
     return {};
@@ -150,7 +162,7 @@ function normalizeUrl(value: string | undefined): { host?: string; path?: string
       const normalizedPath = normalizePath(parsed.pathname);
       return {
         ...(parsed.hostname.length > 0 ? { host: parsed.hostname.toLowerCase() } : {}),
-        ...(normalizedPath === undefined ? {} : { path: normalizedPath }),
+        ...(normalizedPath === undefined ? {} : { path: normalizedPath })
       };
     }
   } catch {
@@ -169,13 +181,37 @@ function toCaptureRuleEventType(value: string | undefined): CaptureRuleEventType
   return parsed.success ? parsed.data : undefined;
 }
 
-function readFrontendException(bundle: CaptureRuleSuggestionBundle): Record<string, unknown> | null {
+function readFrontendException(
+  bundle: CaptureRuleSuggestionBundle
+): Record<string, unknown> | null {
   const exceptions = bundle.context.frontend?.exceptions;
   if (!Array.isArray(exceptions) || exceptions.length === 0) {
     return null;
   }
 
-  const candidate = exceptions[exceptions.length - 1];
+  const resource = bundle.context.resource_failure;
+  const primaryError = bundle.context.error;
+  // Related exceptions can follow the primary signal; only its resource may seed a noise rule.
+  const candidates =
+    resource == null && primaryError == null
+      ? exceptions
+      : exceptions.filter((value) => {
+          if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+          const exception = value as Record<string, unknown>;
+          if (resource == null)
+            return (
+              exception["name"] === primaryError!.name &&
+              exception["message"] === primaryError!.message
+            );
+          const candidate = describeBrowserResource(exception["browser_event"]);
+          return (
+            candidate !== null &&
+            candidate.host === resource.host &&
+            candidate.path === resource.path &&
+            candidate.type === resource.type
+          );
+        });
+  const candidate = candidates[candidates.length - 1];
   return typeof candidate === "object" && candidate !== null && !Array.isArray(candidate)
     ? (candidate as Record<string, unknown>)
     : null;
@@ -193,27 +229,35 @@ function buildSuggestionEvidence(
     typeof bundle.project?.environment === "string" && bundle.project.environment.trim().length > 0
       ? bundle.project.environment.trim()
       : undefined;
-  const requestHeaders = bundle.context.request?.headers;
-  const requestHost =
-    normalizeHostHeader(requestHeaders?.["host"]) ?? normalizeHostHeader(requestHeaders?.["x-forwarded-host"]);
+
   const requestPath = normalizePath(bundle.context.request?.path);
   const responseStatusCode =
-    typeof bundle.context.response?.status_code === "number" && Number.isInteger(bundle.context.response.status_code)
+    typeof bundle.context.response?.status_code === "number" &&
+    Number.isInteger(bundle.context.response.status_code)
       ? bundle.context.response.status_code
       : undefined;
-  const eventType = toCaptureRuleEventType(bundle.signal.source_event_types[0]);
+  const eventType =
+    bundle.context.resource_failure != null && bundle.signal.signal_type === "frontend_exception"
+      ? "frontend_exception"
+      : toCaptureRuleEventType(bundle.signal.source_event_types[0]);
   const frontendException = readFrontendException(bundle);
   const browserEvent =
-    typeof frontendException?.["browser_event"] === "object" && frontendException["browser_event"] !== null
+    typeof frontendException?.["browser_event"] === "object" &&
+    frontendException["browser_event"] !== null
       ? (frontendException["browser_event"] as Record<string, unknown>)
       : null;
   const browserEventKind =
     browserEvent?.["kind"] === "window_error" || browserEvent?.["kind"] === "resource_error"
       ? browserEvent["kind"]
       : undefined;
-  const browserEventOpaque = typeof browserEvent?.["opaque"] === "boolean" ? browserEvent["opaque"] : undefined;
-  const errorName = typeof frontendException?.["name"] === "string" ? frontendException["name"].trim() : undefined;
-  const message = typeof frontendException?.["message"] === "string" ? frontendException["message"].trim() : undefined;
+  const browserEventOpaque =
+    typeof browserEvent?.["opaque"] === "boolean" ? browserEvent["opaque"] : undefined;
+  const errorName =
+    typeof frontendException?.["name"] === "string" ? frontendException["name"].trim() : undefined;
+  const message =
+    typeof frontendException?.["message"] === "string"
+      ? frontendException["message"].trim()
+      : undefined;
   const target =
     typeof browserEvent?.["target"] === "object" && browserEvent["target"] !== null
       ? (browserEvent["target"] as Record<string, unknown>)
@@ -225,16 +269,16 @@ function buildSuggestionEvidence(
         ? browserEvent["file_name"]
         : undefined;
   const resourceUrl = normalizeUrl(sourceUrl);
-  const resourceFirstParty =
-    resourceUrl.firstParty ?? (resourceUrl.host !== undefined && requestHost !== undefined ? resourceUrl.host === requestHost : undefined);
+
   const client = classifyCaptureRuleClientFromUserAgent(
-    typeof bundle.context.device?.user_agent === "string" ? bundle.context.device.user_agent : undefined
+    typeof bundle.context.device?.user_agent === "string"
+      ? bundle.context.device.user_agent
+      : undefined
   );
 
   return {
     ...(serviceName === undefined ? {} : { serviceName }),
     ...(environment === undefined ? {} : { environment }),
-    ...(requestHost === undefined ? {} : { requestHost }),
     ...(requestPath === undefined ? {} : { requestPath }),
     ...(responseStatusCode === undefined ? {} : { responseStatusCode }),
     ...(eventType === undefined ? {} : { eventType }),
@@ -243,10 +287,8 @@ function buildSuggestionEvidence(
     ...(browserEventKind === undefined ? {} : { browserEventKind }),
     ...(browserEventOpaque === undefined ? {} : { browserEventOpaque }),
     ...(resourceUrl.host === undefined ? {} : { resourceHost: resourceUrl.host }),
-    ...(resourceUrl.path === undefined ? {} : { resourcePath: resourceUrl.path }),
-    ...(resourceFirstParty === undefined ? {} : { resourceFirstParty }),
     clientKind: client.client_kind,
-    ...(client.bot_family === undefined ? {} : { botFamily: client.bot_family }),
+    ...(client.bot_family === undefined ? {} : { botFamily: client.bot_family })
   };
 }
 
@@ -285,103 +327,14 @@ export function buildCaptureRuleSuggestions(input: {
 
   if (
     evidence.eventType === "frontend_exception" &&
-    evidence.browserEventKind === "resource_error" &&
-    evidence.resourceHost !== undefined
+    evidence.browserEventKind === "resource_error"
   ) {
-    if (evidence.resourceFirstParty === false) {
-      suggestions.push(
-        createSuggestion({
-          suggestion_id: "primary_resource_host_demote",
-          label: `Demote resource errors from ${evidence.resourceHost}`,
-          recommended_action: "demote",
-          confidence: "high",
-          reason: "The primary event is an opaque browser resource-load error from a third-party host.",
-          rule: {
-            name: `Demote resource errors from ${evidence.resourceHost}`,
-            description: "Known third-party browser resource-load noise.",
-            enabled: true,
-            action: "demote",
-            matcher: {
-              event_types: ["frontend_exception"],
-              browser_event_kind: "resource_error",
-              resource_url: { host: evidence.resourceHost }
-            },
-            sample_rate: null,
-            sample_event_class: null,
-            created_by_user_id: null,
-            created_from_incident_id: input.incident.incident_id,
-            created_from_event_id: null,
-            expires_at: null
-          }
-        }),
-        createSuggestion({
-          suggestion_id: "primary_resource_host_drop",
-          label: `Drop resource errors from ${evidence.resourceHost}`,
-          recommended_action: "drop",
-          confidence: "medium",
-          reason: "This third-party resource host appears to be known browser noise and can be dropped entirely if you do not need repeat context.",
-          requires_confirmation: true,
-          rule: {
-            name: `Drop resource errors from ${evidence.resourceHost}`,
-            description: "Drop recurring third-party browser resource-load noise.",
-            enabled: true,
-            action: "drop",
-            matcher: {
-              event_types: ["frontend_exception"],
-              browser_event_kind: "resource_error",
-              resource_url: { host: evidence.resourceHost }
-            },
-            sample_rate: null,
-            sample_event_class: null,
-            created_by_user_id: null,
-            created_from_incident_id: input.incident.incident_id,
-            created_from_event_id: null,
-            expires_at: null
-          }
-        })
-      );
-    } else {
-      const resourceMatcher =
-        evidence.resourceHost !== undefined
-          ? { host: evidence.resourceHost, ...(evidence.resourcePath === undefined ? {} : { path_equals: evidence.resourcePath }) }
-          : evidence.resourcePath === undefined
-            ? undefined
-            : { path_equals: evidence.resourcePath };
-      if (resourceMatcher !== undefined) {
-        suggestions.push(
-          createSuggestion({
-            suggestion_id: "primary_resource_sample",
-            label:
-              evidence.resourcePath !== undefined
-                ? `Sample resource errors for ${evidence.resourcePath}`
-                : "Sample recurring first-party resource errors",
-            recommended_action: "sample",
-            confidence: "medium",
-            reason: "The primary event is a first-party browser resource-load failure. Sampling keeps incident visibility without letting repeated chunk failures flood the queue.",
-            rule: {
-              name:
-                evidence.resourcePath !== undefined
-                  ? `Sample resource errors for ${evidence.resourcePath}`
-                  : "Sample recurring first-party resource errors",
-              description: "Sample recurring first-party browser resource-load failures.",
-              enabled: true,
-              action: "sample",
-              matcher: {
-                event_types: ["frontend_exception"],
-                browser_event_kind: "resource_error",
-                resource_url: resourceMatcher
-              },
-              sample_rate: 0.25,
-              sample_event_class: "preserve",
-              created_by_user_id: null,
-              created_from_incident_id: input.incident.incident_id,
-              created_from_event_id: null,
-              expires_at: null
-            }
-          })
-        );
-      }
-    }
+    return buildBrowserResourceSuggestions({
+      browserEvent: readFrontendException(input.bundle)?.["browser_event"],
+      service: evidence.serviceName,
+      environment: evidence.environment,
+      incident: input.incident
+    }).map((suggestion) => CaptureRuleSuggestionSchema.parse(suggestion));
   }
 
   if (
@@ -395,7 +348,8 @@ export function buildCaptureRuleSuggestions(input: {
         label: `Demote window errors from ${evidence.resourceHost}`,
         recommended_action: "demote",
         confidence: "medium",
-        reason: "The primary browser exception is opaque but tied to a specific host, so host-level demotion is safer than a broad ignore rule.",
+        reason:
+          "The primary browser exception is opaque but tied to a specific host, so host-level demotion is safer than a broad ignore rule.",
         rule: {
           name: `Demote window errors from ${evidence.resourceHost}`,
           description: "Demote opaque browser window errors tied to a specific host.",
@@ -434,7 +388,8 @@ export function buildCaptureRuleSuggestions(input: {
         requires_confirmation: true,
         rule: {
           name: "Demote opaque browser Window errors",
-          description: "Demote generic opaque browser Window error noise after confirming it is not an application exception.",
+          description:
+            "Demote generic opaque browser Window error noise after confirming it is not an application exception.",
           enabled: true,
           action: "demote",
           matcher: {
@@ -510,7 +465,8 @@ export function buildCaptureRuleSuggestions(input: {
         label: `Sample ${evidence.responseStatusCode} request events for ${evidence.requestPath}`,
         recommended_action: "sample",
         confidence: input.incident.occurrence_count >= 10 ? "high" : "medium",
-        reason: "The incident is driven by repeated request failures on a narrow route, so deterministic sampling reduces incident churn without hiding the pattern entirely.",
+        reason:
+          "The incident is driven by repeated request failures on a narrow route, so deterministic sampling reduces incident churn without hiding the pattern entirely.",
         rule: {
           name: `Sample ${evidence.responseStatusCode} request events for ${evidence.requestPath}`,
           description: "Sample repeated request-failure incidents on a narrow route.",
@@ -539,7 +495,8 @@ export function buildCaptureRuleSuggestions(input: {
       label: "Demote this exact fingerprint",
       recommended_action: "demote",
       confidence: suggestions.length > 0 ? "low" : "medium",
-      reason: "Fingerprint-based demotion is the safest fallback when broader structured evidence is unavailable or ambiguous.",
+      reason:
+        "Fingerprint-based demotion is the safest fallback when broader structured evidence is unavailable or ambiguous.",
       requires_confirmation: suggestions.length === 0,
       rule: {
         name: `Demote exact fingerprint ${input.incident.fingerprint}`,
@@ -587,7 +544,8 @@ export function buildCaptureRuleSuggestions(input: {
       }
     };
 
-    const actionDifference = actionRank(right.recommended_action) - actionRank(left.recommended_action);
+    const actionDifference =
+      actionRank(right.recommended_action) - actionRank(left.recommended_action);
     if (actionDifference !== 0) {
       return actionDifference;
     }

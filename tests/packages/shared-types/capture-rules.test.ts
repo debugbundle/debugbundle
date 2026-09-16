@@ -386,6 +386,7 @@ describe("capture rule matching", () => {
           message: "Failed to load resource",
           browser_event: {
             kind: "resource_error",
+            page: { url: "https://app.example.com/checkout" },
             file_name: "https://analytics.example.com/tag.js?v=1",
             target: {
               source_url: "https://analytics.example.com/tag.js?v=1",

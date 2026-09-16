@@ -1,4 +1,5 @@
-import { BundleV1Schema, type BundleV1, type EventEnvelope } from "../../shared-types/src/index.js";
+import { BundleV1Schema, browserResourceDiagnosis, describeBrowserResource, type BundleV1, type EventEnvelope } from "../../shared-types/src/index.js";
+import { buildBrowserResourceContext } from "./browser-resource-context.js";
 import { redact, type JsonValue } from "../../redaction/src/index.js";
 import type { BundleBuildContext, BuildBundleJob } from "../../storage/src/index.js";
 import { selectScopedDeployments } from "./deployment-context.js";
@@ -435,12 +436,12 @@ function buildSummaryGuidance(input: {
 
   if (input.opaqueBrowserError) {
     if (input.browserEvent?.kind === "resource_error") {
+      const resource = describeBrowserResource(input.browserEvent);
       return {
-        likely_cause:
-          "The browser reported a resource load error without a usable application stack.",
+        likely_cause: browserResourceDiagnosis(resource),
         confidence: 0.35,
         recommended_action:
-          "Inspect the captured resource target, browser network failures, CSP rules, and cross-origin asset configuration."
+          "Check the affected resource and routes, browser network failures, CSP and provider availability." + (resource?.optional_candidate === true ? " If the dependency is optional for your app, review a resource-scoped noise rule." : " Verify whether application functionality is affected.")
       };
     }
 
@@ -781,8 +782,11 @@ export function buildBundle(input: BuildBundleInput): BundleV1 {
     errorContext,
     requestContext
   );
-  const browserEvent = getPrimaryBrowserExceptionEvent(sourceEnvelopes, primarySignalEnvelope);
+  const browserEventCandidate = getPrimaryBrowserExceptionEvent(sourceEnvelopes, primarySignalEnvelope);
+  // Related resource context must not replace the diagnosis or frame of an application exception.
+  const browserEvent = browserEventCandidate?.kind === "resource_error" && primarySignalEnvelope !== null && !isFrontendExceptionEnvelope(primarySignalEnvelope) ? null : browserEventCandidate;
   const opaqueBrowserError = isOpaqueBrowserError(errorContext, browserEvent);
+  const resourceContext = buildBrowserResourceContext(browserEvent, input.incident, sourceEnvelopes);
   const primarySignalType =
     primarySignalEnvelope !== null
       ? mapSignalType(primarySignalEnvelope.event_type)
@@ -873,6 +877,7 @@ export function buildBundle(input: BuildBundleInput): BundleV1 {
       regression_suspected: input.job.trigger === "regression_reopen"
     },
     context: {
+      ...(resourceContext === undefined ? {} : { resource_failure: resourceContext }),
       error: errorContext,
       request: requestContext,
       response: responseContext,

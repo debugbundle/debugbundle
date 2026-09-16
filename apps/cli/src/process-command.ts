@@ -10,6 +10,7 @@ import { join } from "node:path";
 
 import {
   FINGERPRINT_VERSION,
+  fingerprintVersion,
   classifyEvent,
   fingerprint,
   inferMatchedFields,
@@ -20,8 +21,8 @@ import { buildBundle } from "../../../packages/bundle-engine/src/index.js";
 import { buildReproduction } from "../../../packages/repro-engine/src/index.js";
 import {
   BundleV1Schema,
-  EventTypeValues,
   classifyRequestStatus,
+  inferFrontendExceptionSeverity,
   getRequestAnomalyThreshold,
   isLowValueExternalProbeRequestFailure404,
   type CapturePreset,
@@ -30,6 +31,7 @@ import {
 } from "../../../packages/shared-types/src/index.js";
 import type { BundleBuildContext, BuildBundleJob } from "../../../packages/storage/src/index.js";
 import { isRecord } from "./cli-fs-helpers.js";
+import { compareEventEnvelopes, parseState, type LocalIncidentState, type LocalProcessingState } from "./local-processing-state.js";
 import type { CliCommandResult } from "./token-commands.js";
 
 type DirectoryMaker = (path: string, options: { recursive: true }) => Promise<void>;
@@ -70,39 +72,6 @@ export type ProcessSummary =
     message?: undefined;
   };
 
-type LocalIncidentState = {
-  incident_id: string;
-  source: "local";
-  project_id: string;
-  service_id: string;
-  service_name: string;
-  service_runtime: string | null;
-  service_framework: string | null;
-  environment: string;
-  fingerprint: string;
-  fingerprint_version: string;
-  title: string;
-  severity: Severity;
-  status: "open" | "resolved";
-  first_seen_at: string;
-  last_seen_at: string;
-  occurrence_count: number;
-  source_event_id: string;
-  source_occurred_at: string;
-  source_event_types: EventEnvelope["event_type"][];
-  matched_fields: string[];
-  bundle_path: string;
-  reproduction_path: string;
-  generation_number: number;
-  source_events: EventEnvelope[];
-};
-
-type LocalProcessingState = {
-  version: 1;
-  last_processed_event_file: string | null;
-  incidents: Record<string, LocalIncidentState>;
-};
-
 type EventBatch = {
   fileName: string;
   events: EventEnvelope[];
@@ -133,12 +102,6 @@ const CLI_SDK = {
   name: "debugbundle-cli",
   version: "0.1.0"
 } as const;
-const EVENT_TYPE_SET = new Set<string>(EventTypeValues);
-
-function isEventType(value: unknown): value is EventEnvelope["event_type"] {
-  return typeof value === "string" && EVENT_TYPE_SET.has(value);
-}
-
 function inferSeverity(
   event: EventEnvelope,
   capturePreset: CapturePreset,
@@ -154,7 +117,8 @@ function inferSeverity(
       : "low";
   }
 
-  if (event.event_type === "backend_exception" || event.event_type === "frontend_exception") {
+  if (event.event_type === "frontend_exception") return inferFrontendExceptionSeverity(event);
+  if (event.event_type === "backend_exception") {
     return "high";
   }
 
@@ -178,14 +142,6 @@ function severityRank(severity: Severity): number {
   }
 }
 
-function compareEventEnvelopes(left: EventEnvelope, right: EventEnvelope): number {
-  const occurredAtComparison = left.occurred_at.localeCompare(right.occurred_at);
-  if (occurredAtComparison !== 0) {
-    return occurredAtComparison;
-  }
-
-  return left.event_id.localeCompare(right.event_id);
-}
 
 function classifyEnvelope(envelope: EventEnvelope, capturePreset: CapturePreset): EventClass {
   return classifyEvent(
@@ -498,165 +454,6 @@ async function pathExists(path: string, stat: StatReader): Promise<boolean> {
   }
 }
 
-function parseIncidentState(candidate: unknown): LocalIncidentState | null {
-  if (!isRecord(candidate)) {
-    return null;
-  }
-
-  if (candidate["source"] !== "local" || candidate["status"] !== "open" && candidate["status"] !== "resolved") {
-    return null;
-  }
-
-  const sourceEvents = candidate["source_events"];
-  if (!Array.isArray(sourceEvents)) {
-    return null;
-  }
-
-  const validatedSourceEvents: EventEnvelope[] = [];
-  for (const sourceEvent of sourceEvents) {
-    const validated = validateEvent(sourceEvent);
-    if (!validated.success) {
-      return null;
-    }
-    validatedSourceEvents.push(validated.data);
-  }
-
-  const matchedFields = candidate["matched_fields"];
-  const sourceEventTypes = candidate["source_event_types"];
-
-  if (!Array.isArray(matchedFields) || !matchedFields.every((value) => typeof value === "string")) {
-    return null;
-  }
-
-  if (!Array.isArray(sourceEventTypes) || !sourceEventTypes.every(isEventType)) {
-    return null;
-  }
-
-  const severity = candidate["severity"];
-  if (severity !== "low" && severity !== "medium" && severity !== "high" && severity !== "critical") {
-    return null;
-  }
-
-  const status = candidate["status"];
-  if (status !== "open" && status !== "resolved") {
-    return null;
-  }
-
-  const requiredStringKeys = [
-    "incident_id",
-    "project_id",
-    "service_id",
-    "service_name",
-    "environment",
-    "fingerprint",
-    "fingerprint_version",
-    "title",
-    "first_seen_at",
-    "last_seen_at",
-    "source_event_id",
-    "source_occurred_at",
-    "bundle_path",
-    "reproduction_path"
-  ] as const;
-
-  for (const key of requiredStringKeys) {
-    if (typeof candidate[key] !== "string") {
-      return null;
-    }
-  }
-
-  if (typeof candidate["occurrence_count"] !== "number" || typeof candidate["generation_number"] !== "number") {
-    return null;
-  }
-
-  const serviceRuntime = candidate["service_runtime"];
-  const serviceFramework = candidate["service_framework"];
-  if (serviceRuntime !== null && typeof serviceRuntime !== "string") {
-    return null;
-  }
-  if (serviceFramework !== null && typeof serviceFramework !== "string") {
-    return null;
-  }
-
-  const incidentId = candidate["incident_id"] as string;
-  const projectId = candidate["project_id"] as string;
-  const serviceId = candidate["service_id"] as string;
-  const serviceName = candidate["service_name"] as string;
-  const environment = candidate["environment"] as string;
-  const incidentFingerprint = candidate["fingerprint"] as string;
-  const fingerprintVersion = candidate["fingerprint_version"] as string;
-  const title = candidate["title"] as string;
-  const firstSeenAt = candidate["first_seen_at"] as string;
-  const lastSeenAt = candidate["last_seen_at"] as string;
-  const occurrenceCount = candidate["occurrence_count"];
-  const sourceEventId = candidate["source_event_id"] as string;
-  const sourceOccurredAt = candidate["source_occurred_at"] as string;
-  const bundlePath = candidate["bundle_path"] as string;
-  const reproductionPath = candidate["reproduction_path"] as string;
-  const generationNumber = candidate["generation_number"];
-  const normalizedSourceEventTypes = [...sourceEventTypes].sort();
-
-  return {
-    incident_id: incidentId,
-    source: "local",
-    project_id: projectId,
-    service_id: serviceId,
-    service_name: serviceName,
-    service_runtime: serviceRuntime,
-    service_framework: serviceFramework,
-    environment,
-    fingerprint: incidentFingerprint,
-    fingerprint_version: fingerprintVersion,
-    title,
-    severity,
-    status,
-    first_seen_at: firstSeenAt,
-    last_seen_at: lastSeenAt,
-    occurrence_count: occurrenceCount,
-    source_event_id: sourceEventId,
-    source_occurred_at: sourceOccurredAt,
-    source_event_types: normalizedSourceEventTypes,
-    matched_fields: [...matchedFields].sort(),
-    bundle_path: bundlePath,
-    reproduction_path: reproductionPath,
-    generation_number: generationNumber,
-    source_events: validatedSourceEvents.sort(compareEventEnvelopes)
-  };
-}
-
-function parseState(rawState: string): LocalProcessingState | null {
-  const parsed = JSON.parse(rawState) as unknown;
-  if (!isRecord(parsed) || parsed["version"] !== 1) {
-    return null;
-  }
-
-  const lastProcessedEventFile = parsed["last_processed_event_file"];
-  if (lastProcessedEventFile !== null && typeof lastProcessedEventFile !== "string") {
-    return null;
-  }
-
-  const incidents = parsed["incidents"];
-  if (!isRecord(incidents)) {
-    return null;
-  }
-
-  const parsedIncidents: Record<string, LocalIncidentState> = {};
-  for (const [incidentId, incidentValue] of Object.entries(incidents).sort(([left], [right]) => left.localeCompare(right))) {
-    const incident = parseIncidentState(incidentValue);
-    if (incident === null || incident.incident_id !== incidentId) {
-      return null;
-    }
-
-    parsedIncidents[incidentId] = incident;
-  }
-
-  return {
-    version: 1,
-    last_processed_event_file: lastProcessedEventFile,
-    incidents: parsedIncidents
-  };
-}
-
 async function readState(statePath: string, readFile: FileReader, stat: StatReader): Promise<LocalProcessingState | null> {
   if (!(await pathExists(statePath, stat))) {
     return null;
@@ -824,7 +621,7 @@ export async function processCommand(
         mergedIncidentIds: new Set<string>([incidentId]),
         signalEventTypes: new Set<EventEnvelope["event_type"]>(),
         traceIds: new Set<string>(),
-        title: normalizedEvent.normalized_message,
+        title: normalizedEvent.incident_title ?? normalizedEvent.normalized_message,
         kind: "immediate",
         severity: inferSeverity(event, capturePreset)
       };
@@ -837,7 +634,8 @@ export async function processCommand(
       aggregate.signalEventTypes.add(event.event_type);
 
       const traceId = getTraceId(event);
-      if (traceId !== null) {
+      // A resource and an application exception may share a trace without sharing a failure.
+      if (traceId !== null && normalizedEvent.resource_type === undefined) {
         aggregate.traceIds.add(traceId);
         const traceCorrelationGroup = traceCorrelationGroups.get(traceId) ?? {
           incidentIds: new Set<string>(),
@@ -957,7 +755,7 @@ export async function processCommand(
       service_framework: latestSignalEvent.service.framework ?? existing?.service_framework ?? null,
       environment: aggregate.environment,
       fingerprint: aggregate.fingerprint,
-      fingerprint_version: FINGERPRINT_VERSION,
+      fingerprint_version: aggregate.kind === "request_anomaly" ? FINGERPRINT_VERSION : fingerprintVersion(normalizeEvent(latestSignalEvent)),
       title: aggregate.title,
       severity,
       status: existingIncidents.some((incidentState) => incidentState.status === "resolved") ? "open" : existing?.status ?? "open",

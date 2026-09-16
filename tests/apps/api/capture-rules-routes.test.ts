@@ -83,7 +83,10 @@ const rule = {
   matcher: {
     event_types: ["frontend_exception"] as const,
     browser_event_kind: "resource_error" as const,
-    resource_url: { host: "analytics.example.com" }
+    browser_event_opaque: true,
+    services: ["web"],
+    environments: ["production"],
+    resource_url: { host: "www.googletagmanager.com", path_equals: "/gtm.js" }
   },
   sample_rate: null,
   sample_event_class: null,
@@ -128,6 +131,8 @@ function createIncidentFixture(): Awaited<
 
 function createBrowserNoiseBundleBuffer(): Buffer {
   const bundle = createBundleWithRequestContext();
+  bundle.service.name = "web";
+  bundle.project.environment = "production";
   bundle.signal.signal_type = "frontend_exception";
   bundle.signal.source_event_types = ["frontend_exception"];
   bundle.signal.fingerprint = "fp_browser_noise";
@@ -161,8 +166,11 @@ function createBrowserNoiseBundleBuffer(): Buffer {
         route: "/checkout",
         browser_event: {
           kind: "resource_error",
+          opaque: true,
+          page: { url: "https://app.example.com/checkout" },
           target: {
-            source_url: "https://analytics.example.com/tag.js?token=secret#frag"
+            tag_name: "script",
+            source_url: "https://www.googletagmanager.com/gtm.js?token=secret#frag"
           }
         }
       }
@@ -299,16 +307,12 @@ describe("capture rule routes", () => {
       bundle_status: "ready",
       suggestions: [
         expect.objectContaining({
-          suggestion_id: "primary_resource_host_demote",
+          suggestion_id: "resource_context",
           recommended_action: "demote"
         }),
         expect.objectContaining({
-          suggestion_id: "primary_resource_host_drop",
+          suggestion_id: "resource_drop",
           recommended_action: "drop"
-        }),
-        expect.objectContaining({
-          suggestion_id: "exact_fingerprint_demote",
-          recommended_action: "demote"
         })
       ]
     });
@@ -347,7 +351,7 @@ describe("capture rule routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json().suggestions[0]).toMatchObject({
-      suggestion_id: "primary_resource_host_demote",
+      suggestion_id: "resource_context",
       created_rule_id: rule.id,
       created_rule_enabled: true
     });
@@ -379,6 +383,7 @@ describe("capture rule routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
+      access_mode: "preview",
       suggestions: [],
       bundle_status: "pending"
     });
@@ -419,7 +424,7 @@ describe("capture rule routes", () => {
       url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/capture-rules",
       headers: { authorization: "Bearer dbundle_mem_test_token" },
       payload: {
-        suggestion_id: "primary_resource_host_demote",
+        suggestion_id: "resource_context",
         name: "Demote analytics noise"
       }
     });
@@ -437,7 +442,10 @@ describe("capture rule routes", () => {
           matcher: {
             event_types: ["frontend_exception"],
             browser_event_kind: "resource_error",
-            resource_url: { host: "analytics.example.com" }
+            browser_event_opaque: true,
+    services: ["web"],
+    environments: ["production"],
+    resource_url: { host: "www.googletagmanager.com", path_equals: "/gtm.js" }
           }
         })
       })
@@ -478,7 +486,7 @@ describe("capture rule routes", () => {
       url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/capture-rules",
       headers: { authorization: "Bearer dbundle_mem_test_token" },
       payload: {
-        suggestion_id: "primary_resource_host_demote"
+        suggestion_id: "resource_context"
       }
     });
 

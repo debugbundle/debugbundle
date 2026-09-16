@@ -1,6 +1,7 @@
 import { gunzipSync } from "node:zlib";
 import {
   FINGERPRINT_VERSION,
+  fingerprintVersion,
   classifyEvent,
   fingerprint,
   inferMatchedFields,
@@ -8,6 +9,7 @@ import {
   validateEvent
 } from "../../../packages/event-normalizer/src/index.js";
 import {
+  normalizeResourceRoute,
   applyCaptureRuleEventClass,
   getRequestAnomalyThreshold
 } from "../../../packages/shared-types/src/index.js";
@@ -104,6 +106,8 @@ export async function processNextNormalizeEventsJob(
     });
   }
 
+  const resourceRoute = normalized.resource_type === undefined ? null : normalizeResourceRoute(normalized.route_template);
+
   await dependencies.queue.enqueue("group-incident", {
     project_id: job.project_id,
     event_id: validated.data.event_id,
@@ -117,8 +121,10 @@ export async function processNextNormalizeEventsJob(
       normalized,
       fingerprint: computedFingerprint
     }),
-    fingerprint_version: FINGERPRINT_VERSION,
+    fingerprint_version: fingerprintVersion(normalized),
     normalized_message: normalized.normalized_message,
+    ...(normalized.incident_title === undefined ? {} : { incident_title: normalized.incident_title }),
+    ...(resourceRoute === null ? {} : { resource_route: resourceRoute }),
     matched_fields: matchedFields,
     occurred_at: validated.data.occurred_at,
     severity,

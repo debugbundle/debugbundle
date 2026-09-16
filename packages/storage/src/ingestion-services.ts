@@ -1,7 +1,9 @@
 import { gzipSync } from "node:zlib";
 
-import { FINGERPRINT_VERSION, inferMatchedFields } from "../../event-normalizer/src/index.js";
+import { fingerprintVersion, inferMatchedFields } from "../../event-normalizer/src/index.js";
 import {
+  normalizeResourceRoute,
+  inferFrontendExceptionSeverity,
   type AnalyticsEventEnvelope,
   normalizeImmediateClientErrorStatuses,
   normalizeImmediateClientErrorPathRules,
@@ -55,7 +57,7 @@ export function createIngestionMetadataService(
     },
 
     async persistEventMetadata(input: PersistEventMetadataInput): Promise<UpsertIncidentResult> {
-      const severity = inferSeverity(input.event.event_type);
+      const severity = input.event.event_type === "frontend_exception" ? inferFrontendExceptionSeverity(input.event) : inferSeverity(input.event.event_type);
       const incident = await store.upsertIncident({
         event_id: input.event.event_id,
         event_type: input.event.event_type,
@@ -63,9 +65,9 @@ export function createIngestionMetadataService(
         service_name: input.event.service.name,
         environment: input.event.service.environment,
         fingerprint: input.fingerprint,
-        fingerprint_version: FINGERPRINT_VERSION,
+        fingerprint_version: fingerprintVersion(input.normalizedEvent),
         matched_fields: inferMatchedFields(input.normalizedEvent),
-        title: input.normalizedEvent.normalized_message,
+        title: input.normalizedEvent.incident_title ?? input.normalizedEvent.normalized_message,
         severity,
         occurred_at: input.event.occurred_at,
         ...(input.event.event_type === "deploy_metadata"
@@ -80,12 +82,14 @@ export function createIngestionMetadataService(
           : {})
       });
 
+      const resourceRoute = input.normalizedEvent.resource_type === undefined ? null : normalizeResourceRoute(input.normalizedEvent.route_template);
       await store.insertIncidentEvent({
         incident_id: incident.incident_id,
         event_id: input.event.event_id,
         event_type: input.event.event_type,
         occurred_at: input.event.occurred_at,
         is_sampled: true,
+        ...(resourceRoute === null ? {} : { resource_route: resourceRoute }),
         level: inferEventLogLevel(input.event)
       });
 

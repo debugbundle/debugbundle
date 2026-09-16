@@ -1,3 +1,4 @@
+import { normalizeResourceRoute } from "../../shared-types/src/browser-resource-routes.js";
 import { runInTransaction } from "./transaction.js";
 import { randomUUID } from "node:crypto";
 import type {
@@ -257,8 +258,8 @@ export function createMetadataGrouping(
     async insertIncidentEvent(input: InsertIncidentEventInput): Promise<void> {
       await db.query(
         `
-          INSERT INTO incident_events (incident_id, event_id, event_type, event_class, occurred_at, is_sampled, level)
-          VALUES ($1, $2, $3, $4, $5::timestamptz, $6, $7)
+          INSERT INTO incident_events (incident_id, event_id, event_type, event_class, occurred_at, is_sampled, level, resource_route)
+          VALUES ($1, $2, $3, $4, $5::timestamptz, $6, $7, $8)
           ON CONFLICT (incident_id, event_id) DO NOTHING
         `,
         [
@@ -268,7 +269,8 @@ export function createMetadataGrouping(
           input.event_class ?? "context_signal",
           input.occurred_at,
           input.is_sampled,
-          input.level ?? null
+          input.level ?? null,
+          normalizeResourceRoute(input.resource_route)
         ]
       );
     },
@@ -391,7 +393,8 @@ export function createMetadataGrouping(
               retain_after_deploy,
               retain_highest_severity,
               retain_deploy_metadata,
-              severity_rank
+              severity_rank,
+              resource_route
             )
             VALUES (
               $1,
@@ -406,7 +409,8 @@ export function createMetadataGrouping(
               $8,
               $9,
               $10,
-              $11
+              $11,
+              $12
             )
             ON CONFLICT (incident_id, event_id)
             DO UPDATE SET
@@ -414,6 +418,7 @@ export function createMetadataGrouping(
               occurred_at = EXCLUDED.occurred_at,
               is_sampled = incident_events.is_sampled OR EXCLUDED.is_sampled,
               level = COALESCE(EXCLUDED.level, incident_events.level),
+              resource_route = COALESCE(EXCLUDED.resource_route, incident_events.resource_route),
               retain_first = incident_events.retain_first OR EXCLUDED.retain_first,
               retain_latest = incident_events.retain_latest OR EXCLUDED.retain_latest,
               retain_after_deploy = incident_events.retain_after_deploy OR EXCLUDED.retain_after_deploy,
@@ -433,7 +438,8 @@ export function createMetadataGrouping(
             retainAfterDeploy,
             retainHighestSeverity,
             retainDeployMetadata,
-            severityRank
+            severityRank,
+            normalizeResourceRoute(input.resource_route)
           ]
         );
 

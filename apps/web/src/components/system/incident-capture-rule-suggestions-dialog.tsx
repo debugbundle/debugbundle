@@ -9,6 +9,10 @@ import {
   type CaptureRuleSuggestionsResponse
 } from "../../lib/capture-rules-api.js";
 import { showErrorToast, showSuccessToast } from "../../lib/notify.js";
+import { formatCaptureRuleMatcher } from "../../lib/capture-rule-copy.js";
+import { Checkbox } from "../ui/checkbox.js";
+import { Field, FieldLabel } from "../ui/field.js";
+import { CalloutCard } from "./callout-card.js";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
 import { Card, CardContent } from "../ui/card.js";
@@ -36,6 +40,7 @@ export function IncidentCaptureRuleSuggestionsDialog({
 }: IncidentCaptureRuleSuggestionsDialogProps): JSX.Element {
   const [suggestionState, setSuggestionState] = useState<SuggestionState>({ status: "idle" });
   const [isCreatingSuggestionId, setIsCreatingSuggestionId] = useState<string | null>(null);
+  const [reviewed, setReviewed] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!open) {
@@ -45,6 +50,7 @@ export function IncidentCaptureRuleSuggestionsDialog({
     }
 
     let isActive = true;
+    setReviewed({});
     setSuggestionState({ status: "loading" });
 
     void (async () => {
@@ -106,8 +112,8 @@ export function IncidentCaptureRuleSuggestionsDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogFormContent
-        title="Capture rule suggestions"
-        description="Use this incident to create a targeted demote, sample, or drop rule for future matching browser noise."
+        title="Reduce noise"
+        description="Choose how future matching events are captured. Review the exact scope; existing incidents and artifacts remain available."
         size="xl"
         onSubmit={(event) => {
           event.preventDefault();
@@ -161,6 +167,7 @@ export function IncidentCaptureRuleSuggestionsDialog({
           </Empty>
         ) : (
           <div className="space-y-4">
+            {readyResponse.access_mode === "preview" ? <CalloutCard eyebrow="Preview" title="Review suggestions" description="You can review these suggestions. A project owner or admin can create a rule." tone="neutral" /> : null}
             {readyResponse.suggestions.map((suggestion) => {
               const isCreated = suggestion.created_rule_id !== null;
               const isCreating = isCreatingSuggestionId === suggestion.suggestion_id;
@@ -184,14 +191,26 @@ export function IncidentCaptureRuleSuggestionsDialog({
                       </div>
                       <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{suggestion.reason}</p>
                       <p className="text-xs leading-5 text-muted-foreground">
-                        {formatSuggestionPreview(suggestion)}
+                        {formatCaptureRuleMatcher(suggestion.rule.matcher)}
                       </p>
+                      {suggestion.requires_confirmation && !isCreated && readyResponse.access_mode !== "preview" ? (
+                        <Field orientation="horizontal">
+                          <Checkbox
+                            id={`review-${suggestion.suggestion_id}`}
+                            checked={reviewed[suggestion.suggestion_id] === true}
+                            onCheckedChange={(checked) => setReviewed(current => ({ ...current, [suggestion.suggestion_id]: checked === true }))}
+                          />
+                          <FieldLabel htmlFor={`review-${suggestion.suggestion_id}`}>
+                            I reviewed this scope and want to {suggestion.recommended_action === "drop" ? "discard" : "change capture for"} future matching events.
+                          </FieldLabel>
+                        </Field>
+                      ) : null}
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <Button
                         type="button"
                         variant={suggestion.recommended_action === "drop" ? "destructive" : "outline"}
-                        disabled={isCreating || isCreated}
+                        disabled={isCreatingSuggestionId !== null || isCreated || readyResponse.access_mode === "preview" || (suggestion.requires_confirmation && reviewed[suggestion.suggestion_id] !== true)}
                         onClick={() => void handleCreateSuggestion(suggestion)}
                       >
                         {isCreating ? "Creating..." : isCreated ? "Rule exists" : "Create rule"}
@@ -217,27 +236,4 @@ function getActionVariant(action: CaptureRuleSuggestion["recommended_action"]): 
     case "drop":
       return "destructive";
   }
-}
-
-function formatSuggestionPreview(suggestion: CaptureRuleSuggestion): string {
-  const matcher = suggestion.rule.matcher;
-  const parts: string[] = [];
-
-  if (matcher.event_types?.length) {
-    parts.push(`events ${matcher.event_types.join(", ")}`);
-  }
-  if (matcher.browser_event_kind !== undefined) {
-    parts.push(`browser ${matcher.browser_event_kind}`);
-  }
-  if (matcher.resource_url?.host !== undefined) {
-    parts.push(`resource ${matcher.resource_url.host}`);
-  }
-  if (matcher.request_url?.path_equals !== undefined) {
-    parts.push(`request ${matcher.request_url.path_equals}`);
-  }
-  if (matcher.status_codes?.length) {
-    parts.push(`status ${matcher.status_codes.join(", ")}`);
-  }
-
-  return parts.length === 0 ? "Creates a targeted rule for this incident fingerprint." : parts.join(" • ");
 }

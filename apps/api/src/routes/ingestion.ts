@@ -6,12 +6,10 @@ import {
   requireProjectToken
 } from "../../../../packages/auth/src/index.js";
 import {
-  FINGERPRINT_VERSION,
+  buildEventFingerprintContext,
   classifyEvent,
   classifyInstalledJavaEventCompatibility,
   classifyInstalledMobileEventCompatibility,
-  fingerprint,
-  normalizeEvent,
   validateEvent
 } from "../../../../packages/event-normalizer/src/index.js";
 import {
@@ -382,13 +380,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
                   },
                   ...(captureRulesNeedFingerprint
                     ? {
-                        fingerprint: {
-                          version: FINGERPRINT_VERSION,
-                          value: fingerprint(normalizeEvent(entry.event))
-                        },
-                        fingerprint_aliases: activeCaptureRules.some(rule => rule.matcher.fingerprint?.version === "v1")
-                          ? [{ version: "v1", value: fingerprint(normalizeEvent(entry.event, "v1")) }]
-                          : []
+                        ...buildEventFingerprintContext(entry.event, activeCaptureRules.flatMap(rule => rule.matcher.fingerprint === undefined ? [] : [rule.matcher.fingerprint.version]))
                       }
                     : {})
                 }),
