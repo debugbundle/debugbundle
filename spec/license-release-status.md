@@ -1,5 +1,84 @@
 # Apache 2.0 release tracking
 
+## Current license audit — 2026-09-16
+
+The reported homepage/About inconsistency is no longer present. Direct reads of
+the homepage, About page, and licensing documentation show Apache 2.0. Of 131
+public URLs requested (the sitemap plus four machine-readable/license URLs),
+129 returned content and none contained retired-license references. The sitemap
+route `/docs/project-setup/split-frontend-backend/` and the additional
+`/llms-full.txt` probe returned HTTP 403 and are not counted as verified.
+
+Tracked-file searches covered the core, site, eleven SDK repositories, Action,
+private cloud, and organization profile. No first-party source, metadata, or
+documentation declared the retired license. The tracked third-party
+`sdks/debugbundle-php/composer.phar` contains SPDX license-name catalogs; these
+are not DebugBundle license declarations and remain intact. GitHub's current
+repository metadata reports Apache-2.0 for the public core, SDKs, Action, and
+organization profile, with the documented WordPress exception.
+
+Current registry checks:
+
+| Surface | Version checked | Result |
+| --- | --- | --- |
+| Node, browser, shared types, redaction | 1.8.0 | Apache-2.0 metadata and complete bundled license; no retired-license references in downloaded npm archive contents, excluding source maps |
+| React Native | 1.3.0 | Same npm metadata/archive checks passed |
+| CLI / MCP | 1.9.0 / 1.8.1 | Same npm metadata/archive checks passed |
+| Python / PHP / Ruby | 1.4.2 / 1.4.1 / 1.4.1 | Current registry metadata reports Apache-2.0 |
+| Java parent / Android | 1.4.0 / 1.3.1 | Current Maven POMs declare Apache License, Version 2.0 |
+| .NET | 1.4.0 | All ten current NuGet package manifests declare Apache-2.0 |
+| Go | v1.4.0 | Current module archive carries the Apache license |
+| Swift | 1.3.0 | CocoaPods trunk's latest podspec declares Apache-2.0 |
+
+Local cleanup corrected seven ignored working/planning documents: `TODO.md`,
+`STATUS.md`, three documents under `spec/local/`, and two under
+`starter-kit/specs-plans/`. The old licensing strategy was rewritten to match
+the approved policy rather than retaining obsolete copyleft claims. The tracked
+`rules/package-standards.md` now agrees with `spec/licensing.md` on both approved
+artifact-specific exceptions and their bundled license text. Rebuilt local CLI,
+MCP, and dashboard outputs contain no retired-license references.
+
+External follow-ups remain:
+
+- [CocoaPods rendered page](https://cocoapods.org/pods/DebugBundle): a live
+  browser visit shows version 1.3.0 but a stale README snapshot with old install
+  instructions, license text and badge, despite the current
+  [trunk podspec](https://trunk.cocoapods.org/api/v1/pods/DebugBundle/specs/latest)
+  and [Swift source README](https://github.com/debugbundle/debugbundle-swift/blob/main/README.md)
+  correctly declaring Apache-2.0. No existing DebugBundle report appeared in
+  the `CocoaPods/cocoapods.org` issue list. The site operator needs to refresh
+  the rendered README without changing the immutable 1.3.0 podspec. A focused
+  [correction issue](https://github.com/CocoaPods/cocoapods.org/issues/508) is
+  open; the site has not been corrected yet.
+- [ZBS MCP directory](https://index.zbs.gg/en/mcp/com-debugbundle-mcp/): direct
+  browser visit still displays the retired license and MCP 1.7.0, with GitHub
+  observations dated 2026-08-06. Its
+  [methodology](https://index.zbs.gg/en/methodology/) says the next source sweep
+  picks up upstream corrections. Current GitHub metadata and official MCP
+  Registry release data need a new sweep; no self-service refresh control is
+  exposed on the listing. A correction request to the site's linked
+  `@nikforester` account is drafted for the owner to send by direct message;
+  no public post or direct message was sent.
+- [AlternativeTo](https://alternativeto.net/software/debugbundle/about/): the
+  live browser page now shows Apache-2.0 in both license fields and its product
+  description. An older search snapshot is stale. This correction is verified;
+  no duplicate submission is needed.
+- OpenClaw's plugin page and MCPHQ now show Apache in direct HTML reads, despite
+  stale search snippets. Search snippets alone do not establish current metadata.
+
+Historical published versions retain their original metadata (confirmed for
+Node SDK 1.6.0). Old staging archives, dependency caches, and Next.js development
+cache files also retain old text. They were not relabeled as current releases;
+third-party licenses and generic SPDX catalogs were preserved.
+
+Validation: `make license-check` (32 tests), `make license-docs-check` (16 tests),
+and `make build` (root TypeScript check) passed. Docker builds for CLI, MCP, and
+dashboard passed, followed by a clean retired-license scan of their outputs.
+This documentation audit did not require package publication, deployment, or an
+external listing edit. It does not claim those external refreshes are complete.
+
+## Original migration authorization
+
 Owner authorization: 2026-09-12, public first-party releases use Apache-2.0,
 website implementation becomes private, and WordPress retains GPL-2.0-or-later.
 On 2026-09-13 the owner also approved scoped licenses required by distribution services, including MIT-0 for the portable ClawHub/Smithery instruction skill. See `spec/licensing.md`. Historical registry artifacts and release tags remain intact.

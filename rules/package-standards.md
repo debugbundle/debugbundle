@@ -1,7 +1,7 @@
 # Package Standards — DebugBundle
 
 Version: v1
-Last updated: 2026-05-31
+Last updated: 2026-09-16
 
 ---
 
@@ -197,8 +197,8 @@ Every published package must have a README.md containing:
 
 ## 7. License
 
-- All first-party public packages: `Apache-2.0`, including shared libraries and portable agent skills. The WordPress plugin is the sole exception (`GPL-2.0-or-later`); bundled dependencies retain their compatible license notices.
-- Each package directory contains a `LICENSE` file (copy of root).
+- All first-party public packages default to `Apache-2.0`, including shared libraries, executable tools, and agent plugins. The approved artifact-specific exceptions are the WordPress plugin (`GPL-2.0-or-later`) and the portable ClawHub/Smithery instruction skill (`MIT-0`). Bundled dependencies retain their own compatible license notices.
+- Each package directory contains the full `LICENSE` text matching its SPDX identifier: a copy of the root license for Apache-2.0 packages, or the documented exception's license for that artifact.
 - Private website and hosted operations source is proprietary. Published docs, examples, and generated reference artifacts remain Apache-2.0. See `spec/licensing.md` for the complete boundary and documentation workflow.
 
 ---
