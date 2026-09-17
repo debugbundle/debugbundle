@@ -21,6 +21,11 @@ import {
   writePendingBillingCheckout
 } from "../../../apps/web/src/pages/billing-page.tsx";
 import { ProjectTokensPage, ProjectsPage, sortProjects } from "../../../apps/web/src/pages/management-pages.tsx";
+import { RecentProjectsTable } from "../../../apps/web/src/components/system/recent-projects-table.tsx";
+import {
+  HeaderActionsProvider,
+  useHeaderActions
+} from "../../../apps/web/src/components/system/header-actions-context.tsx";
 import {
   OrganizationOverviewPage,
   formatActiveProjects,
@@ -62,6 +67,11 @@ function renderProjectTokensPage(): ReturnType<typeof render> {
       </routerDom.Routes>
     </MemoryRouter>
   );
+}
+
+function HeaderActionHost(): JSX.Element {
+  const { action } = useHeaderActions();
+  return <header>{action?.content}</header>;
 }
 
 function renderProjectMembersPage(project = createProject()): ReturnType<typeof render> {
@@ -287,6 +297,26 @@ describe("web page helper coverage", () => {
     ]);
   });
 
+  it("shows dashboard projects in the same name order as the Projects page", async () => {
+    vi.spyOn(api, "listProjects").mockResolvedValue([
+      createProject({ project_id: "proj_zeta", name: "Zeta" }),
+      createProject({ project_id: "proj_alpha", name: "Alpha" })
+    ]);
+
+    render(
+      <MemoryRouter>
+        <RecentProjectsTable />
+      </MemoryRouter>
+    );
+
+    await screen.findByText("Alpha");
+    const names = screen
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => row.querySelector("td")?.textContent?.trim());
+    expect(names).toEqual(["Alpha", "Zeta"]);
+  });
+
   it("creates the first project when the initial project load returns an invalid session", async () => {
     const user = userEvent.setup();
 
@@ -301,7 +331,10 @@ describe("web page helper coverage", () => {
 
     render(
       <MemoryRouter>
-        <ProjectsPage />
+        <HeaderActionsProvider>
+          <HeaderActionHost />
+          <ProjectsPage />
+        </HeaderActionsProvider>
       </MemoryRouter>
     );
 

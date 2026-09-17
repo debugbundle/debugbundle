@@ -830,7 +830,10 @@ describe("web app — management routes", () => {
     expect(within(mainAppRow as HTMLTableRowElement).getByText("12")).toBeInTheDocument();
     expect(within(mainAppRow as HTMLTableRowElement).getByText("120")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /create project/i }));
+    const createProjectButton = within(screen.getByRole("banner")).getByRole("button", {
+      name: /create project/i
+    });
+    await user.click(createProjectButton);
     expect((await screen.findByRole("dialog")).className.includes("sm:max-w-2xl")).toBe(true);
     await user.type(await screen.findByLabelText(/project name/i), "Ops API");
     expect(screen.getByLabelText(/project slug/i)).toHaveValue("ops-api");

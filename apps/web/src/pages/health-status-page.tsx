@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { PageHeader } from "../components/system/page-header.js";
+import { useHeaderActions } from "../components/system/header-actions-context.js";
 import { ProjectNameWithAccessIndicator } from "../components/system/project-name-with-access-indicator.js";
 import { ResourceListState } from "../components/system/resource-list-state.js";
 import { TableRefreshButton } from "../components/system/table-refresh-button.js";
@@ -54,6 +55,21 @@ export function HealthStatusPage(): JSX.Element {
     [refreshCount]
   );
   const isLoading = projects === null;
+  const { setAction: setHeaderAction } = useHeaderActions();
+
+  useEffect(() => {
+    setHeaderAction({
+      pathname: "/health-status",
+      content: (
+        <TableRefreshButton
+          isLoading={isLoading}
+          onRefresh={() => setRefreshCount((current) => current + 1)}
+        />
+      )
+    });
+
+    return () => setHeaderAction(null);
+  }, [isLoading, setHeaderAction]);
 
   useEffect(() => {
     let canceled = false;
@@ -88,15 +104,7 @@ export function HealthStatusPage(): JSX.Element {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        description="Workspace health status across hosted availability checks. Each block summarizes one retained day of check history."
-        actions={
-          <TableRefreshButton
-            isLoading={isLoading}
-            onRefresh={() => setRefreshCount((current) => current + 1)}
-          />
-        }
-      />
+      <PageHeader description="Workspace health status across hosted availability checks. Each block summarizes one retained day of check history." />
 
       {loadErrorMessage === null ? null : (
         <Notice tone="warning" title="Could not refresh health status">
@@ -104,7 +112,7 @@ export function HealthStatusPage(): JSX.Element {
         </Notice>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <StatusMetric label="Projects" value={String(summary.projectCount)} />
         <StatusMetric label="Checks" value={String(summary.checkCount)} />
         <StatusMetric label="Uptime" value={formatStatusUptime(summary.uptimePercentage)} />
@@ -312,9 +320,9 @@ function StatusBadge({ state }: { state: HealthStatusDayState }): JSX.Element {
 
 function StatusMetric({ label, value }: { label: string; value: string }): JSX.Element {
   return (
-    <div className="rounded-lg border border-border bg-card px-4 py-3">
+    <div className="min-w-0 rounded-lg border border-border bg-card px-2 py-3 sm:px-4">
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <p className="mt-1 text-lg font-semibold text-foreground">{value}</p>
+      <p className="mt-1 text-lg font-semibold text-foreground [overflow-wrap:anywhere]">{value}</p>
     </div>
   );
 }

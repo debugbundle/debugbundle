@@ -23,7 +23,7 @@ export function RecentProjectsTable(): JSX.Element {
     void (async () => {
       try {
         const data = await listProjects();
-        setProjects(data);
+        setProjects([...data].sort((left, right) => left.name.localeCompare(right.name)));
       } catch {
         setProjects([]);
       }

@@ -22,6 +22,7 @@ import { CalloutCard } from "./components/system/callout-card.js";
 import { DashboardIncidentsToday } from "./components/system/dashboard-incidents-today.js";
 import { RecentProjectsTable } from "./components/system/recent-projects-table.js";
 import { GitHubMark } from "./components/system/github-mark.js";
+import { HeaderActionsProvider } from "./components/system/header-actions-context.js";
 import {
   ProjectRouteProvider,
   type ActiveProjectRoute
@@ -362,20 +363,22 @@ function ProtectedShell({
 
   return (
     <ProjectRouteProvider value={{ activeProject, setActiveProject }}>
-      <SidebarProvider
-        style={
-          {
-            "--sidebar-width": "calc(var(--spacing) * 72)",
-            "--header-height": "calc(var(--spacing) * 12)"
-          } as React.CSSProperties
-        }
-      >
-        <AppSidebar variant="inset" session={session} onSignOut={handleSignOut} />
-        <SidebarInset>
-          <SiteHeader />
-          <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-hidden p-6">{children}</div>
-        </SidebarInset>
-      </SidebarProvider>
+      <HeaderActionsProvider>
+        <SidebarProvider
+          style={
+            {
+              "--sidebar-width": "calc(var(--spacing) * 72)",
+              "--header-height": "calc(var(--spacing) * 12)"
+            } as React.CSSProperties
+          }
+        >
+          <AppSidebar variant="inset" session={session} onSignOut={handleSignOut} />
+          <SidebarInset>
+            <SiteHeader />
+            <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-hidden p-6">{children}</div>
+          </SidebarInset>
+        </SidebarProvider>
+      </HeaderActionsProvider>
     </ProjectRouteProvider>
   );
 }

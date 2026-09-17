@@ -118,7 +118,7 @@ export function RawIngestedEventsBreakdownDialog({
         </DialogHeader>
 
         <div className="flex flex-col gap-5">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
             <UsageSummaryItem label="Used" value={allowance.used.toLocaleString()} />
             <UsageSummaryItem label="Limit" value={allowance.limit.toLocaleString()} />
             <UsageSummaryItem
@@ -234,9 +234,9 @@ export function RawIngestedEventsBreakdownDialog({
 
 function UsageSummaryItem({ label, value }: { label: string; value: string }): JSX.Element {
   return (
-    <div className="rounded-lg border bg-background p-3">
+    <div className="min-w-0 rounded-lg border bg-background p-2 sm:p-3">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-sm font-medium">{value}</p>
+      <p className="text-sm font-medium [overflow-wrap:anywhere]">{value}</p>
     </div>
   );
 }

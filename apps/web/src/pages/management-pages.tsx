@@ -2,6 +2,7 @@ import { FolderIcon, KeyRoundIcon, PlusIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { CreateProjectDialog } from "../components/system/create-project-dialog.js";
+import { useHeaderActions } from "../components/system/header-actions-context.js";
 import { PageHeader } from "../components/system/page-header.js";
 import { PlaintextTokenReveal } from "../components/system/plaintext-token-reveal.js";
 import { ProjectNameWithAccessIndicator } from "../components/system/project-name-with-access-indicator.js";
@@ -54,6 +55,21 @@ export function ProjectsPage(): JSX.Element {
     direction: "asc"
   });
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const { setAction: setHeaderAction } = useHeaderActions();
+
+  useEffect(() => {
+    setHeaderAction({
+      pathname: "/projects",
+      content: (
+        <Button type="button" size="sm" onClick={() => setIsCreateOpen(true)}>
+          <PlusIcon data-icon="inline-start" />
+          Create project
+        </Button>
+      )
+    });
+
+    return () => setHeaderAction(null);
+  }, [setHeaderAction]);
 
   useEffect(() => {
     void (async () => {
@@ -74,23 +90,13 @@ export function ProjectsPage(): JSX.Element {
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        description="Create and manage projects in this workspace."
-        actions={
-          <CreateProjectDialog
-            open={isCreateOpen}
-            onOpenChange={setIsCreateOpen}
-            onCreated={(created) => {
-              setProjects((current) => [...(current ?? []), created]);
-            }}
-            trigger={
-              <Button type="button">
-                <PlusIcon data-icon="inline-start" />
-                Create project
-              </Button>
-            }
-          />
-        }
+      <PageHeader description="Create and manage projects in this workspace." />
+      <CreateProjectDialog
+        open={isCreateOpen}
+        onOpenChange={setIsCreateOpen}
+        onCreated={(created) => {
+          setProjects((current) => [...(current ?? []), created]);
+        }}
       />
 
       <Card>

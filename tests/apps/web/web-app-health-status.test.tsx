@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../../../apps/web/src/app.tsx";
@@ -24,9 +24,7 @@ describe("web app — health status", () => {
       organization_plan: "team"
     });
 
-    vi.stubGlobal(
-      "fetch",
-      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
         const url = requestUrl(input);
 
         if (url.endsWith("/v1/auth/session")) {
@@ -125,8 +123,8 @@ describe("web app — health status", () => {
         }
 
         return jsonResponse(404, { error: "not_found" });
-      })
-    );
+    });
+    vi.stubGlobal("fetch", fetchMock);
 
     render(<App initialEntries={["/health-status"]} />);
 
@@ -136,6 +134,15 @@ describe("web app — health status", () => {
     expect(await screen.findByText(/main app/i)).toBeInTheDocument();
     expect((await screen.findAllByText("100%")).length).toBeGreaterThan(0);
     expect(document.querySelector('[data-project-color-tag="emerald"]')).not.toBeNull();
+
+    const refreshButton = within(screen.getByRole("banner")).getByRole("button", {
+      name: "Refresh"
+    });
+    const projectListRequests = () =>
+      fetchMock.mock.calls.filter(([input]) => requestUrl(input).endsWith("/v1/projects")).length;
+    const requestsBeforeRefresh = projectListRequests();
+    fireEvent.click(refreshButton);
+    await waitFor(() => expect(projectListRequests()).toBeGreaterThan(requestsBeforeRefresh));
   });
 
   it("does not count resolved linked incidents as active", async () => {
