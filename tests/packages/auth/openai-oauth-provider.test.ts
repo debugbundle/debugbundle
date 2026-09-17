@@ -167,7 +167,7 @@ describe("OpenAI OAuth/OIDC provider profile", () => {
     { field: "iss", value: "https://attacker.example/client.json" },
     { field: "sub", value: "https://attacker.example/client.json" },
     { field: "aud", value: "https://api.debugbundle.com" },
-    { field: "exp", value: Math.floor(Date.now() / 1_000) + 301 },
+    { field: "exp", value: null },
     { field: "kid", value: "" }
   ])("rejects non-exact private_key_jwt assertion field $field", async ({ field, value }) => {
     const now = Math.floor(Date.now() / 1_000);
@@ -192,7 +192,7 @@ describe("OpenAI OAuth/OIDC provider profile", () => {
       jti: "assertion-jti"
     };
     const header: Record<string, unknown> = { alg: "RS256", kid: "openai-key" };
-    (field === "kid" ? header : claims)[field] = value;
+    (field === "kid" ? header : claims)[field] = field === "exp" ? now + 301 : value;
 
     await expect(
       configuration.assertJwtClientAuthClaimsAndHeader({}, claims, header, {
