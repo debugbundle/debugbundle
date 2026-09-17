@@ -32,6 +32,7 @@ function parseArgs(argv) {
   const parsed = {
     command: "plan",
     version: undefined,
+    clawhubVersion: undefined,
     targets: undefined,
     json: false,
     dryRun: false
@@ -54,6 +55,15 @@ function parseArgs(argv) {
 
     if (token === "--version") {
       parsed.version = argv[index + 1];
+      index += 1;
+      continue;
+    }
+
+    if (token === "--clawhub-version") {
+      if (argv[index + 1] === undefined) {
+        throw new Error("missing_clawhub_version");
+      }
+      parsed.clawhubVersion = argv[index + 1];
       index += 1;
       continue;
     }
@@ -108,12 +118,20 @@ function listTargetEntries(manifest, selectedTargets) {
   return allTargets.filter(([key]) => selectedKeys.has(key));
 }
 
-function buildContext(manifest, version, selectedTargets) {
+function buildContext(manifest, version, selectedTargets, clawhubVersion) {
   const packageJsonPath = join(repoRoot, manifest.package.packageJsonPath);
   const serverJsonPath = join(repoRoot, manifest.package.serverJsonPath);
   const packageJson = readJson(packageJsonPath);
   const serverJson = readJson(serverJsonPath);
-  const stageRoot = join(repoRoot, ".tmp", "mcp-ecosystem", version);
+  if (clawhubVersion !== undefined && selectedTargets?.trim() !== "clawhub") {
+    throw new Error("clawhub_version_requires_clawhub_only");
+  }
+  if (clawhubVersion !== undefined && !/^\d+\.\d+\.\d+$/u.test(clawhubVersion)) {
+    throw new Error("invalid_clawhub_version");
+  }
+  const resolvedClawhubVersion = clawhubVersion ?? version;
+  const stageName = resolvedClawhubVersion === version ? version : `${version}-clawhub-${resolvedClawhubVersion}`;
+  const stageRoot = join(repoRoot, ".tmp", "mcp-ecosystem", stageName);
   const tarballDirectory = join(stageRoot, "tarball");
   const stagePackageDirectory = join(stageRoot, "package");
   const reportPath = join(stageRoot, "report.json");
@@ -132,6 +150,7 @@ function buildContext(manifest, version, selectedTargets) {
   return {
     manifest,
     version,
+    clawhubVersion: resolvedClawhubVersion,
     packageJson,
     serverJson,
     packageJsonPath,
@@ -169,6 +188,7 @@ function buildPlan(context) {
 
   return {
     version: context.version,
+    clawhubVersion: context.clawhubVersion,
     packageName: context.packageJson.name,
     serverName: context.serverJson.name,
     mcpb: {
@@ -595,9 +615,9 @@ async function publishTarget(context, targetKey, target, dryRun) {
       "--source-path",
       target.skillPath,
       "--version",
-      context.version,
+      context.clawhubVersion,
       "--changelog",
-      `DebugBundle MCP ecosystem release ${context.version}`
+      `DebugBundle skill release ${context.clawhubVersion}`
     ];
 
     if (dryRun) {
@@ -772,10 +792,11 @@ async function verify(context) {
           ? { status: "missing", discoveryChecks: [] }
           : await verifyClawHubDiscovery(target);
         report.verify.clawhub = {
-          status: discovery.status,
+          status: latestVersion?.version === context.clawhubVersion ? discovery.status : "partial",
           slug: target.slug,
           pageUrl: `https://clawhub.ai/${target.owner}/skills/${target.slug}`,
           owner: owner?.handle ?? null,
+          expectedVersion: context.clawhubVersion,
           latestVersion: latestVersion?.version ?? null,
           license: latestVersion?.license ?? null,
           expectedCatalog: target.catalog ?? null,
@@ -923,6 +944,7 @@ function printHelp() {
       "",
       "Options:",
       "  --version <version>   Override the MCP package version (defaults to apps/mcp/package.json)",
+      "  --clawhub-version <version>   Release a ClawHub-only skill patch at this version",
       "  --targets <csv>       Limit execution to a subset of targets",
       "  --json                Emit JSON output",
       "  --dry-run             Print intended actions without mutating remote state"
@@ -941,7 +963,7 @@ async function main() {
   const manifest = readJson(manifestPath);
   const packageJson = readJson(join(repoRoot, manifest.package.packageJsonPath));
   const version = parsed.version ?? packageJson.version;
-  const context = buildContext(manifest, version, parsed.targets);
+  const context = buildContext(manifest, version, parsed.targets, parsed.clawhubVersion);
 
   if (parsed.command === "plan") {
     outputResult(buildPlan(context), parsed.json);

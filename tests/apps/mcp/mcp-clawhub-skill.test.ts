@@ -37,8 +37,11 @@ describe("mcp ClawHub skill", () => {
     expect(skill).toContain("openclaw:");
     expect(skill).toContain("DEBUGBUNDLE_MEMBER_TOKEN");
     expect(skill).toContain("DEBUGBUNDLE_API_URL");
-    expect(skill).toContain("package: \"@debugbundle/mcp\"");
-    expect(skill).toContain("\"args\": [\"@debugbundle/mcp\"]");
+    expect(skill).toMatch(/^\s+package: "@debugbundle\/mcp@\d+\.\d+\.\d+"$/mu);
+    expect(skill).toMatch(/^\s+package: "@debugbundle\/cli@\d+\.\d+\.\d+"$/mu);
+    expect(skill).toContain('"command": "debugbundle-mcp"');
+    expect(skill).toContain("debugbundle setup");
+    expect(skill).not.toMatch(/\bnpx\s+@debugbundle\/(?:mcp|cli)\b/u);
     expect(skill).toContain("a separate `list_incidents` call with `source: \"cloud\"` and `projectId: <cloud_project_id>`");
     expect(skill).toContain("keep the local incident call separate so the cloud project filter does not hide local evidence");
     expect(skill).toContain("Do not run organization-wide or cross-project incident inventory unless the user explicitly asks");

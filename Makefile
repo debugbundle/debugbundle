@@ -239,7 +239,7 @@ license-check:
 
 .PHONY: release-mcp-ecosystem-plan
 release-mcp-ecosystem-plan:
-	node scripts/release-mcp-ecosystem.mjs plan $(if $(VERSION),--version $(VERSION),) $(if $(TARGETS),--targets $(TARGETS),)
+	node scripts/release-mcp-ecosystem.mjs plan $(if $(VERSION),--version $(VERSION),) $(if $(TARGETS),--targets $(TARGETS),) $(if $(CLAWHUB_VERSION),--clawhub-version $(CLAWHUB_VERSION),)
 
 .PHONY: release-mcp-ecosystem-prepare
 release-mcp-ecosystem-prepare:
@@ -247,11 +247,11 @@ release-mcp-ecosystem-prepare:
 
 .PHONY: release-mcp-ecosystem-publish
 release-mcp-ecosystem-publish:
-	node scripts/release-mcp-ecosystem.mjs publish $(if $(VERSION),--version $(VERSION),) $(if $(TARGETS),--targets $(TARGETS),)
+	node scripts/release-mcp-ecosystem.mjs publish $(if $(VERSION),--version $(VERSION),) $(if $(TARGETS),--targets $(TARGETS),) $(if $(CLAWHUB_VERSION),--clawhub-version $(CLAWHUB_VERSION),)
 
 .PHONY: release-mcp-ecosystem-verify
 release-mcp-ecosystem-verify:
-	node scripts/release-mcp-ecosystem.mjs verify $(if $(VERSION),--version $(VERSION),) $(if $(TARGETS),--targets $(TARGETS),)
+	node scripts/release-mcp-ecosystem.mjs verify $(if $(VERSION),--version $(VERSION),) $(if $(TARGETS),--targets $(TARGETS),) $(if $(CLAWHUB_VERSION),--clawhub-version $(CLAWHUB_VERSION),)
 
 .PHONY: release-mcp-ecosystem
 release-mcp-ecosystem:

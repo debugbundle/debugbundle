@@ -331,3 +331,11 @@ publish target list and still include it in verification. If it changed, publish
 a fresh portable-skill version with the pinned ClawHub CLI and immutable source
 commit, then verify its actual license, files, moderation, and discovery. The
 MCP package version and portable-skill patch version need not match.
+
+For a ClawHub-only skill patch, use `TARGETS=clawhub` with
+`CLAWHUB_VERSION=<next-skill-patch>` on the plan, publish, and verify Make targets.
+The release driver keeps the current MCP package version for source validation,
+uses a separate report directory for the skill patch, and checks that ClawHub's
+latest version matches the requested skill version. Publish only from a committed
+source path; after publication, inspect the new ClawHub security audit because
+local skill folders cannot receive a ClawHub scan.

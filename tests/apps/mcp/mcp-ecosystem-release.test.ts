@@ -79,7 +79,7 @@ describe("mcp ecosystem release pipeline", () => {
     expect(releaseSources).toContain("metadata?.isLatest === true");
     expect(releaseSources).toContain("server?.version === version");
     expect(script).toContain('"mcp", "publish", context.bundlePath, "-n", qualifiedName');
-    expect(script).toContain('"--version",\n      context.version');
+    expect(script).toContain('"--version",\n      context.clawhubVersion');
     expect(releaseSources).toContain('https://api.smithery.ai/servers?namespace=');
     expect(releaseSources).toContain('https://api.smithery.ai/skills/');
     expect(releaseSources).toContain('https://api.smithery.ai/skills?namespace=');
@@ -213,6 +213,30 @@ describe("mcp ecosystem release pipeline", () => {
       expect.objectContaining({ key: "mcpSo", type: "discovery" }),
       expect.objectContaining({ key: "lobehub", type: "discovery" })
     ]);
+  });
+
+  it("plans a ClawHub-only skill patch without changing the MCP package version", () => {
+    const packageVersion = (JSON.parse(readFileSync(join(repoRoot, "apps/mcp/package.json"), "utf8")) as { version: string }).version;
+    const output = execFileSync("node", [
+      "scripts/release-mcp-ecosystem.mjs", "plan", "--targets", "clawhub", "--clawhub-version", "1.8.2", "--json"
+    ], { cwd: repoRoot, encoding: "utf8" });
+    const plan = JSON.parse(output) as {
+      version: string;
+      clawhubVersion: string;
+      mcpb: { reportPath: string };
+      publishTargets: Array<{ key: string }>;
+    };
+
+    expect(plan.version).toBe(packageVersion);
+    expect(plan.clawhubVersion).toBe("1.8.2");
+    expect(plan.mcpb.reportPath).toContain(`${packageVersion}-clawhub-1.8.2`);
+    expect(plan.publishTargets).toEqual([expect.objectContaining({ key: "clawhub" })]);
+    expect(() => execFileSync("node", [
+      "scripts/release-mcp-ecosystem.mjs", "plan", "--targets", "clawhub,smithery", "--clawhub-version", "1.8.2"
+    ], { cwd: repoRoot, encoding: "utf8", stdio: "pipe" })).toThrow("clawhub_version_requires_clawhub_only");
+    expect(() => execFileSync("node", [
+      "scripts/release-mcp-ecosystem.mjs", "plan", "--targets", "clawhub", "--clawhub-version"
+    ], { cwd: repoRoot, encoding: "utf8", stdio: "pipe" })).toThrow("missing_clawhub_version");
   });
 
   it("wires the root workspace and makefile to the ecosystem release entrypoints", () => {
