@@ -5,6 +5,7 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 
 import packageJson from "../package.json" with { type: "json" };
 import { MCP_TOOL_CATALOG } from "./tool-catalog.js";
+import { LOCAL_AUTH_MCP_TOOL_CATALOG } from "./local-auth-catalog.js";
 import type { ToolRegistry } from "./default-tools.js";
 
 export const MCP_SERVER_VERSION = packageJson.version;
@@ -56,7 +57,9 @@ function buildError(id: unknown, code: number, message: string): JsonRpcResponse
   };
 }
 
-function parseToolCallParams(params: unknown): { name: string; arguments: Record<string, unknown> } | null {
+function parseToolCallParams(
+  params: unknown
+): { name: string; arguments: Record<string, unknown> } | null {
   if (!isRecord(params) || typeof params["name"] !== "string") {
     return null;
   }
@@ -100,9 +103,10 @@ function toJsonSchema(schema: unknown): Record<string, unknown> {
   }) as Record<string, unknown>;
 }
 
-export function createMcpServer(input: { tools: ToolRegistry }): {
+export function createMcpServer(input: { tools: ToolRegistry; localAuth?: boolean }): {
   handleRequest(request: JsonRpcRequest): Promise<JsonRpcResponse | null>;
 } {
+  const catalog = input.localAuth === true ? LOCAL_AUTH_MCP_TOOL_CATALOG : MCP_TOOL_CATALOG;
   return {
     async handleRequest(request) {
       if (request.method === "notifications/initialized") {
@@ -131,7 +135,7 @@ export function createMcpServer(input: { tools: ToolRegistry }): {
           jsonrpc: "2.0",
           id: readRequestId(request.id),
           result: {
-            tools: MCP_TOOL_CATALOG.map((tool) => ({
+            tools: catalog.map((tool) => ({
               name: tool.name,
               description: tool.description,
               inputSchema: toJsonSchema(tool.inputSchema)
@@ -146,7 +150,7 @@ export function createMcpServer(input: { tools: ToolRegistry }): {
           return buildError(request.id, -32602, "Invalid tools/call params.");
         }
 
-        const catalogEntry = MCP_TOOL_CATALOG.find((tool) => tool.name === params.name);
+        const catalogEntry = catalog.find((tool) => tool.name === params.name);
         const handler = input.tools[params.name];
         if (catalogEntry === undefined || handler === undefined) {
           return buildError(request.id, -32602, `Unknown tool: ${params.name}`);

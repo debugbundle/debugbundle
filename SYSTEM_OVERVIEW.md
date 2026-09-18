@@ -26,6 +26,8 @@ The system is built around three current primitives: **bundle** (versioned debug
 
 ---
 
+Codex developer distribution lives in `plugins/debugbundle-codex/`, registered by `.agents/plugins/marketplace.json`. It bundles a workflow skill and the pinned stdio MCP server with the opt-in `--local-auth` profile, reusing existing CLI/member auth and local/connected tools. The hosted OpenAI plugin remains an independent read-only distribution. `tests/contracts/codex-developer-plugin.test.ts` guards package/release alignment; `scripts/smoke-codex-plugin.mjs` validates a disposable real Codex installation. See `spec/codex-developer-integration.md`.
+
 ## System Shape
 
 DebugBundle supports two runtime modes: **local-only** (no cloud account required, SDK writes to filesystem, CLI processes where those files live) and **connected** (cloud ingestion, team features, alerts). Local-only is the default starting point and can run on a developer machine or self-managed server with persistent storage and CLI access; connected is the recommended production path for team visibility, ephemeral infrastructure, alerts, webhooks, and hosted automation. See `/spec/local-first-onboarding.md`.

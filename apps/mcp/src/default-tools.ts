@@ -10,6 +10,7 @@ import { createWeeklyReportApi } from "../../../packages/weekly-report-client/sr
 import { analyzeCommand } from "../../cli/src/analyze-command.js";
 import { createCliHttpClient } from "../../cli/src/auth-context.js";
 import { readCliAuthState } from "../../cli/src/auth-state.js";
+import { LOCAL_AUTH_REQUIRED_TOOLS } from "./local-auth-catalog.js";
 import { createAnalyticsBundleApi } from "../../cli/src/analytics-bundle-commands.js";
 import { createAnalyticsJourneySampleApi } from "../../cli/src/analytics-journey-sample-commands.js";
 import { createAnalyticsMetricsApi } from "../../cli/src/analytics-metrics-commands.js";
@@ -83,22 +84,35 @@ async function readLocalAuthState(): Promise<{ bearer_token: string; base_url: s
   }
 }
 
-function withDefaultBearerToken(tools: ToolRegistry, bearerToken: string | null): ToolRegistry {
+function withDefaultBearerToken(
+  tools: ToolRegistry,
+  bearerToken: string | null,
+  localAuth: boolean
+): ToolRegistry {
   return Object.fromEntries(
     Object.entries(tools).map(([name, handler]) => [
       name,
-      async (input: Record<string, unknown>) =>
-        handler({
-          ...(bearerToken === null || typeof input["bearerToken"] === "string" ? {} : { bearerToken }),
+      async (input: Record<string, unknown>) => {
+        if (localAuth && bearerToken === null && LOCAL_AUTH_REQUIRED_TOOLS.has(name)) {
+          throw new Error("mcp_tool_error:auth_state_missing");
+        }
+        return handler({
+          ...(bearerToken === null || typeof input["bearerToken"] === "string"
+            ? {}
+            : { bearerToken }),
           ...input
-        })
+        });
+      }
     ])
   );
 }
 
-export async function createDefaultMcpTools(input: { apiBaseUrl?: string } = {}): Promise<ToolRegistry> {
+export async function createDefaultMcpTools(
+  input: { apiBaseUrl?: string; localAuth?: boolean } = {}
+): Promise<ToolRegistry> {
   const authState = await readLocalAuthState();
-  const baseUrl = input.apiBaseUrl ?? readEnvApiBaseUrl() ?? authState?.base_url ?? DEFAULT_API_BASE_URL;
+  const baseUrl =
+    input.apiBaseUrl ?? readEnvApiBaseUrl() ?? authState?.base_url ?? DEFAULT_API_BASE_URL;
   const defaultBearerToken = readEnvMemberToken() ?? authState?.bearer_token ?? null;
   const httpClient = createCliHttpClient({ baseUrl });
   const retrievalApi = createRetrievalApi(httpClient);
@@ -143,7 +157,8 @@ export async function createDefaultMcpTools(input: { apiBaseUrl?: string } = {})
       ...createMemberMcpTools(createMemberApi(httpClient)),
       ...createGitHubMcpTools(createGitHubManagementApi(httpClient))
     },
-    defaultBearerToken
+    defaultBearerToken,
+    input.localAuth === true
   );
 }
 

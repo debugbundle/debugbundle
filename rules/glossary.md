@@ -4,6 +4,16 @@ This glossary defines durable product terms used across requirements, contracts,
 and implementation documentation. Source-of-truth requirements and contracts remain
 authoritative when a term's behavior is specified in more detail.
 
+## Agent Connection Terms
+
+### Codex Developer Plugin
+
+The repository-distributed `debugbundle-codex` package combines the local stdio MCP server and a workflow skill for Codex. It supports existing local evidence and authorized member operations. It is separate from the hosted read-only OpenAI plugin and its directory approval.
+
+### Local Authentication Profile
+
+The opt-in MCP `--local-auth` mode obtains member credentials from the server environment or saved CLI login instead of tool arguments. It preserves the remaining tool validation and domain behavior; the default stdio contract remains unchanged.
+
 ## Browser Resource Incident Terms
 
 ### Browser Resource Incident

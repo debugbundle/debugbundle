@@ -681,6 +681,17 @@ Each MCP tool must produce results that match its API/CLI equivalent:
 
 If CLI says something is healthy and MCP says something different, that is a product bug.
 
+### AC-MCP-17: Codex Developer Installation And Compatibility
+
+- **Given** the repository Codex marketplace and a fresh supported Codex host
+- **When** the developer plugin is installed, refreshed, or removed
+- **Then** package paths and skill discovery resolve, the pinned published stdio server starts, and local retrieval works in the application repository without hosted credentials
+- **And** direct MCP registration remains available for app, CLI, and IDE clients on the same host
+- **And** `--local-auth` removes bearer arguments, rejects their injection and unknown fields, preserves cross-field validation, and fails before authenticated requests without local credentials
+- **And** CLI auth and explicit environment forwarding are verified against a local synthetic API, without contacting customer services
+- **And** existing Claude, OpenClaw, stdio MCP, CLI, and read-only OpenAI contracts remain unchanged
+- **And** site navigation, public documentation, version pins, release gates, and distribution status agree
+
 ### AC-MCP-03: OpenAI V1 Product Surface
 
 - **Given** the official DebugBundle OpenAI Plugin `1.0.0`

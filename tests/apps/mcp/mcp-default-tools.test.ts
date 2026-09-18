@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createDefaultMcpTools } from "../../../apps/mcp/src/default-tools.js";
+import * as authState from "../../../apps/cli/src/auth-state.js";
+import { createMcpServer } from "../../../apps/mcp/src/server.js";
 
 const projectRecord = {
   project_id: "proj_1",
@@ -31,6 +33,63 @@ const projectRecord = {
 };
 
 describe("mcp default tools", () => {
+  it("uses stored credentials through the local-auth wire schema", async () => {
+    const auth = vi
+      .spyOn(authState, "readCliAuthState")
+      .mockResolvedValue({
+        bearer_token: "synthetic-member",
+        base_url: "https://stored.example.test"
+      });
+    vi.stubEnv("DEBUGBUNDLE_MEMBER_TOKEN", "");
+    vi.stubEnv("DEBUGBUNDLE_API_URL", "");
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        new Response(JSON.stringify({ projects: [projectRecord] }), { status: 200 })
+      );
+    try {
+      const server = createMcpServer({
+        tools: await createDefaultMcpTools({ localAuth: true }),
+        localAuth: true
+      });
+      const response = await server.handleRequest({
+        id: 1,
+        method: "tools/call",
+        params: { name: "list_projects", arguments: {} }
+      });
+      expect(response).toMatchObject({
+        result: { content: [{ text: JSON.stringify({ projects: [projectRecord] }) }] }
+      });
+      expect(fetchMock).toHaveBeenCalledWith(
+        "https://stored.example.test/v1/projects",
+        expect.objectContaining({
+          headers: expect.objectContaining({ authorization: "Bearer synthetic-member" })
+        })
+      );
+    } finally {
+      auth.mockRestore();
+      fetchMock.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("fails closed before a hosted request when local-auth credentials are unavailable", async () => {
+    const auth = vi.spyOn(authState, "readCliAuthState").mockRejectedValue(new Error("missing"));
+    vi.stubEnv("DEBUGBUNDLE_MEMBER_TOKEN", "");
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    try {
+      const tools = await createDefaultMcpTools({ localAuth: true });
+      await expect(tools["list_projects"]!({})).rejects.toThrow(
+        "mcp_tool_error:auth_state_missing"
+      );
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      auth.mockRestore();
+      fetchMock.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("uses DEBUGBUNDLE_MEMBER_TOKEN as the default bearer token for marketplace installs", async () => {
     const previousMemberToken = process.env["DEBUGBUNDLE_MEMBER_TOKEN"];
     const previousApiUrl = process.env["DEBUGBUNDLE_API_URL"];

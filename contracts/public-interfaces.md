@@ -3040,6 +3040,8 @@ debugbundle github deliveries retry <delivery-id> [--project-id <id>] [--auth-fi
 
 ## 3. MCP Tool Interface
 
+Codex developer distribution: `.agents/plugins/marketplace.json` exposes `debugbundle-codex@debugbundle` from `plugins/debugbundle-codex`. It starts the pinned stdio package with `--local-auth` and a self-contained skill. This opt-in profile removes `bearerToken` from tool inputs, rejects unknown fields, preserves other input constraints, and injects environment member auth or saved CLI auth. Tools requiring member auth fail with `mcp_tool_error:auth_state_missing` before the API request when neither is available. Default stdio authentication precedence and tool contracts below remain unchanged. Direct Codex MCP configuration is an alternative. Local tools use the server process working directory, not a per-call `cwd` argument. The developer plugin has independent semver and does not modify the hosted OpenAI projection or its publication status. See `spec/codex-developer-integration.md`.
+
 Package: `apps/mcp/`
 
 Install surface: `@debugbundle/mcp` publishes a standalone stdio MCP server with the `debugbundle-mcp` bin. External MCP clients should invoke it with `npx @debugbundle/mcp` or a global `debugbundle-mcp` install. The package ships MCP Registry metadata in `apps/mcp/server.json`, and npm ownership verification uses `mcpName: "com.debugbundle/mcp"` in `apps/mcp/package.json`. The server resolves hosted auth in this order: explicit per-tool `bearerToken`, `DEBUGBUNDLE_MEMBER_TOKEN` from the MCP server environment, then CLI auth state from `~/.debugbundle/auth.json`. `DEBUGBUNDLE_API_URL` may override the default `https://api.debugbundle.com` endpoint for self-hosted or non-production environments.

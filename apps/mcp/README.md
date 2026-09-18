@@ -41,6 +41,8 @@ Use `npx -y @debugbundle/mcp` in clients that require noninteractive package exe
 | Generic local MCP client      | `npx @debugbundle/mcp`                            | stdio transport                                   |
 | Claude Desktop local MCP      | local MCP server config                           | uses local machine auth/config                    |
 | Claude Code plugin            | `/plugin marketplace add debugbundle/debugbundle` | installs bundled MCP config and DebugBundle skill |
+| Codex developer plugin | `codex plugin add debugbundle-codex@debugbundle` | repository marketplace; local MCP and workflow skill |
+| Codex direct MCP | `codex mcp add debugbundle -- npx -y @debugbundle/mcp@1.9.0 --local-auth` | app, CLI, and IDE on the same host |
 | Cursor                        | MCP config with `npx @debugbundle/mcp`            | stdio transport                                   |
 | VS Code / GitHub MCP Registry | `com.debugbundle/mcp`                             | official registry metadata                        |
 | OpenClaw / ClawHub            | DebugBundle skill plus MCP config                 | use the published skill for workflow guidance     |
@@ -48,6 +50,14 @@ Use `npx -y @debugbundle/mcp` in clients that require noninteractive package exe
 | Self-hosted DebugBundle       | `DEBUGBUNDLE_API_URL` plus member auth            | points the server at your API base URL            |
 
 This package is the supported public local stdio path. A separate OpenAI Plugin `1.0.0` source candidate targets an OAuth-protected read-only remote endpoint at `https://mcp.debugbundle.com/mcp`; it is not deployed, submitted, published, or publicly installable yet and does not alter this package's catalog or authentication.
+
+## Local authentication profile
+
+MCP 1.9.0 adds `npx @debugbundle/mcp --local-auth`. This opt-in profile removes `bearerToken` from tool schemas, rejects per-call credentials and unknown fields, and uses only the server's startup CLI/environment member authentication. Hosted tools that require a member token fail with `mcp_tool_error:auth_state_missing` before an API request when auth is absent; run `debugbundle login` on that host or configure the server environment and restart the connection. Local-only retrieval remains available without a token. The default invocation preserves the legacy schemas and explicit per-tool token precedence.
+
+## Codex
+
+Codex can use the existing stdio server independently of the hosted OpenAI plugin. See the [Codex developer package](../../plugins/debugbundle-codex/README.md) and [Codex setup guide](https://debugbundle.com/docs/mcp/codex/) for the repository marketplace, direct configuration, authentication, verification, and removal. The repository plugin must be released on the default branch before GitHub installation works; local checkout installation is available for candidate validation.
 
 ## Claude Desktop
 

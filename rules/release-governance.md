@@ -48,8 +48,9 @@ The public repository must contain these root-level files:
 1. Validate the MCP release manifest and version
 2. Run focused MCP package tests
 3. Pack and smoke-test the staged artifact
-4. Publish `@debugbundle/mcp` to npm
-5. Smoke-test a clean install from the registry
+4. Verify the candidate with native Codex on Node 22, 24, and 26, and build/validate the version-aligned OpenClaw companion
+5. Publish `@debugbundle/mcp` to npm
+6. Smoke-test clean stdio and native Codex installs from the registry
 
 The MCP package release manifest must include package-level MCP Registry metadata (`server.json`) alongside `package.json`, `README.md`, `LICENSE`, and the executable bin wrapper so public registry and marketplace submissions can be validated from the same release artifact.
 
@@ -77,6 +78,14 @@ Before deploying changed core/runtime behavior, explicitly choose the next root 
 Verify the root version inside the deployed API/worker images and retain the exact deployed commit/digests as separate build identifiers. Do not change independent CLI, MCP, OpenAI plugin, shared JS, or SDK versions merely to match the core release. Confirm whether the owner also authorized the canonical GitHub tag/Release; a hosted deploy alone must not silently publish other distribution surfaces.
 
 Public CI must NEVER contain deployment config, cloud credentials, or infrastructure code.
+
+### Codex Developer Plugin
+
+The repository marketplace at `.agents/plugins/marketplace.json` distributes `plugins/debugbundle-codex` with independent plugin semver and an exact published `@debugbundle/mcp` pin. Keep its MCP config, package README, public Codex guide, and package contract test aligned when releasing MCP. Changes to the package or its pinned dependency require a plugin version/changelog update. `make codex-plugin-check` preserves existing client contracts; `make codex-plugin-smoke` builds and tests the candidate tarball through a pinned real Codex client in a disposable container with local synthetic auth and no model turn or customer API call.
+
+`make codex-plugin-smoke-published` repeats the clean native-client test against npm after publication. The MCP release workflow gates publication on the candidate test and checks the registry artifact afterward. Publish MCP 1.9.0 before advertising this initial plugin, then complete the existing MCP ecosystem follow-through below.
+
+A GitHub install becomes available only after the reviewed package and catalog are pushed to the public default branch. Keep candidates that pin an unpublished MCP version on a release branch; run the MCP release workflow from that reviewed ref and verify the registry artifact before promoting the catalog to the default branch. Publish the matching site guide and article only after the public GitHub installation succeeds; do not advertise an OpenAI directory listing. The hosted OpenAI plugin remains independently versioned, authenticated, and gated. Repository publication, site deployment, and the existing MCP ecosystem pipeline remain separate authorized release actions.
 
 ### MCP Ecosystem Follow-Through
 

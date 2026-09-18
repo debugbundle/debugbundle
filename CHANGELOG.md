@@ -6,6 +6,13 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Added
+
+- OpenClaw companion 1.9.0 aligns the bundled MCP release while preserving its default tool and authentication contracts.
+- MCP 1.9.0 adds opt-in `--local-auth` for schema-valid saved-login/environment authentication without per-call credential arguments; the default MCP and OpenClaw contracts are preserved.
+- Dedicated Codex developer plugin, repository marketplace, and setup guide using the existing MCP server and authentication.
+- Codex package compatibility gates and isolated real-client installation/retrieval verification.
+
 ### Changed
 
 - CLI 1.9.1 and agent skill updates explain scoped browser-resource noise handling, context versus drop, protected dependencies and cautious privacy-blocking diagnosis. Existing projects can refresh guidance without rerunning setup or replacing their profile/connection.

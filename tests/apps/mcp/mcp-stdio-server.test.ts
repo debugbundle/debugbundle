@@ -3,19 +3,108 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { MCP_SERVER_VERSION, createMcpServer, runMcpStdioServer } from "../../../apps/mcp/src/server.js";
+import {
+  MCP_SERVER_VERSION,
+  createMcpServer,
+  runMcpStdioServer
+} from "../../../apps/mcp/src/server.js";
 
-const mcpPackageJson = JSON.parse(readFileSync(new URL("../../../apps/mcp/package.json", import.meta.url), "utf8")) as {
+const mcpPackageJson = JSON.parse(
+  readFileSync(new URL("../../../apps/mcp/package.json", import.meta.url), "utf8")
+) as {
   version: string;
 };
 
 describe("mcp stdio server", () => {
+  it("preserves cross-field validation in the local-auth catalog", async () => {
+    const update = vi.fn().mockResolvedValue({ updated: true });
+    const server = createMcpServer({
+      tools: { update_saved_analytics_funnel: update },
+      localAuth: true
+    });
+    const call = (args: Record<string, unknown>) =>
+      server.handleRequest({
+        id: 1,
+        method: "tools/call",
+        params: { name: "update_saved_analytics_funnel", arguments: args }
+      });
+    const args = { projectId: "project", funnelKey: "checkout" };
+    await expect(call(args)).resolves.toMatchObject({ error: { code: -32602 } });
+    expect(update).not.toHaveBeenCalled();
+    await expect(call({ ...args, displayName: " Checkout " })).resolves.toMatchObject({
+      result: { content: [{ text: '{"updated":true}' }] }
+    });
+    expect(update).toHaveBeenCalledWith({ ...args, displayName: "Checkout" });
+  });
+
+  it("supports local-auth project discovery without exposing per-tool credentials", async () => {
+    const listProjects = vi.fn().mockResolvedValue({ projects: [] });
+    const server = createMcpServer({ tools: { list_projects: listProjects }, localAuth: true });
+    const response = await server.handleRequest({ id: 1, method: "tools/list" });
+    const catalog = (
+      response as {
+        result: {
+          tools: Array<{
+            name: string;
+            inputSchema: { properties: Record<string, unknown>; required?: string[] };
+          }>;
+        };
+      }
+    ).result.tools;
+    for (const tool of catalog) {
+      expect(tool.inputSchema.properties).not.toHaveProperty("bearerToken");
+      expect(tool.inputSchema.required ?? []).not.toContain("bearerToken");
+    }
+    await expect(
+      server.handleRequest({
+        id: 2,
+        method: "tools/call",
+        params: { name: "list_projects", arguments: {} }
+      })
+    ).resolves.toMatchObject({ result: { content: [{ text: '{"projects":[]}' }] } });
+    expect(listProjects).toHaveBeenCalledWith({});
+  });
+
+  it("rejects credential injection and unknown fields in local-auth mode before calling a handler", async () => {
+    const listProjects = vi.fn();
+    const server = createMcpServer({ tools: { list_projects: listProjects }, localAuth: true });
+    for (const args of [
+      { bearerToken: "must-not-be-used" },
+      { unknown: true },
+      { limit: "invalid" }
+    ]) {
+      await expect(
+        server.handleRequest({
+          id: 1,
+          method: "tools/call",
+          params: { name: "list_projects", arguments: args }
+        })
+      ).resolves.toMatchObject({ error: { code: -32602 } });
+    }
+    expect(listProjects).not.toHaveBeenCalled();
+  });
+
+  it("keeps the default credential schema and validation unchanged", async () => {
+    const listProjects = vi.fn();
+    const server = createMcpServer({ tools: { list_projects: listProjects } });
+    await expect(
+      server.handleRequest({
+        id: 1,
+        method: "tools/call",
+        params: { name: "list_projects", arguments: {} }
+      })
+    ).resolves.toMatchObject({ error: { code: -32602 } });
+    expect(listProjects).not.toHaveBeenCalled();
+  });
+
   it("reports the published package version during initialize", async () => {
     const server = createMcpServer({
       tools: {}
     });
 
-    await expect(server.handleRequest({ jsonrpc: "2.0", id: 1, method: "initialize" })).resolves.toMatchObject({
+    await expect(
+      server.handleRequest({ jsonrpc: "2.0", id: 1, method: "initialize" })
+    ).resolves.toMatchObject({
       jsonrpc: "2.0",
       id: 1,
       result: {
@@ -35,7 +124,9 @@ describe("mcp stdio server", () => {
       }
     });
 
-    await expect(server.handleRequest({ jsonrpc: "2.0", id: 1, method: "tools/list" })).resolves.toMatchObject({
+    await expect(
+      server.handleRequest({ jsonrpc: "2.0", id: 1, method: "tools/list" })
+    ).resolves.toMatchObject({
       jsonrpc: "2.0",
       id: 1,
       result: {
@@ -111,7 +202,9 @@ describe("mcp stdio server", () => {
       })
     });
 
-    input.write(`${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "doctor", arguments: {} } })}\n`);
+    input.write(
+      `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "doctor", arguments: {} } })}\n`
+    );
     await new Promise((resolve) => setImmediate(resolve));
 
     const response = JSON.parse(chunks.join("")) as {

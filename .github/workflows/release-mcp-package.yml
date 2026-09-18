@@ -33,6 +33,7 @@ jobs:
 
       - name: Setup pnpm via Corepack
         run: |
+          npm install --global corepack@0.34.6
           corepack enable
           corepack prepare pnpm@11.3.0 --activate
 
@@ -106,7 +107,7 @@ jobs:
           RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
 
       - name: Run focused MCP package tests
-        run: pnpm vitest run tests/apps/mcp/mcp-workspace-package.test.ts tests/apps/mcp/mcp-stdio-server.test.ts tests/apps/mcp/mcp-default-tools.test.ts tests/apps/mcp/mcp-clawhub-skill.test.ts
+        run: pnpm vitest run tests/apps/mcp/mcp-workspace-package.test.ts tests/apps/mcp/mcp-stdio-server.test.ts tests/apps/mcp/mcp-main.test.ts tests/apps/mcp/mcp-legacy-contract.test.ts tests/apps/mcp/mcp-default-tools.test.ts tests/apps/mcp/mcp-clawhub-skill.test.ts tests/contracts/codex-developer-plugin.test.ts
 
       - name: Pack MCP artifact
         run: |
@@ -134,11 +135,28 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
 
+  codex:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22, 24, 26]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Install build dependencies
+        run: make install
+      - name: Validate the OpenClaw companion
+        if: matrix.node-version == 24
+        run: make openclaw-plugin-check
+      - name: Verify candidate with native Codex
+        run: make codex-plugin-smoke CODEX_SMOKE_NODE_IMAGE=node:${{ matrix.node-version }}-bookworm
+
   release:
     permissions:
       contents: read
       id-token: write
-    needs: validate
+    needs: [validate, codex]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -155,6 +173,7 @@ jobs:
 
       - name: Setup pnpm via Corepack
         run: |
+          npm install --global corepack@0.34.6
           corepack enable
           corepack prepare pnpm@11.3.0 --activate
 
@@ -265,7 +284,7 @@ jobs:
           RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
 
       - name: Run focused MCP package tests
-        run: pnpm vitest run tests/apps/mcp/mcp-workspace-package.test.ts tests/apps/mcp/mcp-stdio-server.test.ts tests/apps/mcp/mcp-default-tools.test.ts tests/apps/mcp/mcp-clawhub-skill.test.ts
+        run: pnpm vitest run tests/apps/mcp/mcp-workspace-package.test.ts tests/apps/mcp/mcp-stdio-server.test.ts tests/apps/mcp/mcp-main.test.ts tests/apps/mcp/mcp-legacy-contract.test.ts tests/apps/mcp/mcp-default-tools.test.ts tests/apps/mcp/mcp-clawhub-skill.test.ts tests/contracts/codex-developer-plugin.test.ts
 
       - name: Pack MCP artifact
         if: steps.published_state.outputs.state == 'none'
@@ -332,3 +351,6 @@ jobs:
           node scripts/smoke-mcp-stdio.mjs "$tmpdir/node_modules/.bin/debugbundle-mcp"
         env:
           RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
+
+      - name: Verify published package with native Codex
+        run: make codex-plugin-smoke-published

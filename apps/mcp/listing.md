@@ -138,6 +138,14 @@ debugbundle-mcp
 - `resolve_incident`
 - `list_health_checks`
 
+## Codex
+
+- Repository marketplace: `.agents/plugins/marketplace.json`.
+- Developer package: `plugins/debugbundle-codex`, with a pinned local stdio MCP server and workflow skill.
+- Install and release status: [Codex package README](../../plugins/debugbundle-codex/README.md). GitHub installation requires the package to be released on the default branch.
+- Direct configuration: `codex mcp add debugbundle -- npx -y @debugbundle/mcp@1.9.0 --local-auth`.
+- This is separate from the hosted read-only OpenAI plugin candidate and does not imply OpenAI directory approval.
+
 ## Claude Code
 
 - Current first-party marketplace state: repository-hosted marketplace catalog at `.claude-plugin/marketplace.json`, plugin package at `apps/mcp/claude-code/debugbundle`.

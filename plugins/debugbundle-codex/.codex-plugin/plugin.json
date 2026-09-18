@@ -1,0 +1,44 @@
+{
+  "name": "debugbundle-codex",
+  "version": "1.0.0",
+  "description": "Runtime error reporting, incident response, health checks, debug bundles, and product analytics for Codex.",
+  "author": {
+    "name": "DebugBundle",
+    "email": "support@debugbundle.com",
+    "url": "https://debugbundle.com"
+  },
+  "homepage": "https://debugbundle.com/docs/mcp/codex/",
+  "repository": "https://github.com/debugbundle/debugbundle",
+  "license": "Apache-2.0",
+  "keywords": [
+    "debugbundle",
+    "codex",
+    "mcp",
+    "runtime-errors",
+    "incident-response",
+    "debug-bundles",
+    "health-checks",
+    "product-analytics"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "DebugBundle for Codex",
+    "shortDescription": "Investigate runtime failures with your coding agent.",
+    "longDescription": "Connect Codex to the existing DebugBundle local MCP server and a debugging workflow skill. Inspect local or hosted evidence, investigate code, and use authorized management tools. Hosted access uses your existing DebugBundle CLI login. This developer plugin includes write tools and is separate from the read-only OpenAI connection.",
+    "developerName": "DebugBundle",
+    "category": "Developer Tools",
+    "capabilities": ["Read", "Write"],
+    "websiteURL": "https://debugbundle.com/docs/mcp/codex/",
+    "privacyPolicyURL": "https://debugbundle.com/privacy/",
+    "termsOfServiceURL": "https://debugbundle.com/terms/",
+    "defaultPrompt": [
+      "Investigate a production incident and propose a tested fix.",
+      "Inspect this repository\u2019s local DebugBundle incidents.",
+      "Explain the last 7 days of aggregate product usage."
+    ],
+    "brandColor": "#7C3AED",
+    "composerIcon": "./assets/icon-512.png",
+    "logo": "./assets/icon-512.png"
+  }
+}

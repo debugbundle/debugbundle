@@ -69,6 +69,9 @@ help:
 	@echo "  make release-mcp-ecosystem-publish VERSION=x.y.z TARGETS=officialRegistry,smithery,clawhub"
 	@echo "  make release-mcp-ecosystem-verify VERSION=x.y.z TARGETS=officialRegistry,smithery,clawhub,glama,lobehub"
 	@echo "  make release-mcp-ecosystem VERSION=x.y.z"
+	@echo "  make codex-plugin-check     Check Codex packaging and existing MCP compatibility"
+	@echo "  make codex-plugin-smoke     Verify a fresh Codex client against synthetic data"
+	@echo "  make openclaw-plugin-check  Build and validate the OpenClaw companion package"
 	@echo "  make openai-plugin-validate  Validate the source-ready OpenAI plugin package"
 	@echo "  make openai-plugin-check     Run package, skill, and release contract tests"
 	@echo "  make openai-plugin-inspector-check Validate the exact data-free catalog with MCP Inspector"
@@ -185,6 +188,33 @@ load-check:
 .PHONY: worker-jobs
 worker-jobs:
 	$(DOCKER_COMPOSE) exec -T -e WORKER_JOB_PROJECT_ID -e WORKER_JOB_ID -e WORKER_JOB_RETRY worker sh -lc "node --import tsx scripts/worker-jobs.ts"
+
+.PHONY: codex-plugin-check
+codex-plugin-check:
+	$(NODE_RUN) "corepack enable && corepack pnpm vitest run tests/contracts/codex-developer-plugin.test.ts tests/apps/mcp tests/contracts/openai-plugin-skill-parity.test.ts tests/apps/openclaw-plugin"
+
+.PHONY: openclaw-plugin-check
+openclaw-plugin-check:
+	$(NODE_RUN) "corepack enable && corepack pnpm --dir apps/openclaw-plugin plugin:check"
+
+# A fresh container home prevents access to personal Codex or DebugBundle auth.
+CODEX_SMOKE_VERSION ?= 0.153.1
+CODEX_SMOKE_NODE_IMAGE ?= node:24-bookworm
+.PHONY: codex-plugin-pack
+codex-plugin-pack:
+	$(NODE_RUN) "corepack enable && corepack pnpm --dir apps/mcp build && mkdir -p .tmp/codex-plugin && npm pack ./apps/mcp --ignore-scripts --pack-destination .tmp/codex-plugin"
+
+.PHONY: codex-plugin-smoke
+codex-plugin-smoke: codex-plugin-pack
+	docker run --rm -v "$(PWD):/source:ro" -e CODEX_SMOKE_VERSION="$(CODEX_SMOKE_VERSION)" -e MCP_SMOKE_CANDIDATE=1 $(CODEX_SMOKE_NODE_IMAGE) node /source/scripts/smoke-codex-plugin.mjs
+
+.PHONY: codex-plugin-smoke-published
+codex-plugin-smoke-published:
+	docker run --rm -v "$(PWD):/source:ro" -e CODEX_SMOKE_VERSION="$(CODEX_SMOKE_VERSION)" $(CODEX_SMOKE_NODE_IMAGE) node /source/scripts/smoke-codex-plugin.mjs
+
+.PHONY: codex-plugin-smoke-github
+codex-plugin-smoke-github:
+	docker run --rm -v "$(PWD):/source:ro" -e CODEX_SMOKE_VERSION="$(CODEX_SMOKE_VERSION)" -e MCP_SMOKE_GITHUB=1 $(CODEX_SMOKE_NODE_IMAGE) node /source/scripts/smoke-codex-plugin.mjs
 
 .PHONY: test-focused
 .PHONY: incident-recovery-check

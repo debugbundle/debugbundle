@@ -1,0 +1,20 @@
+{
+  "name": "debugbundle",
+  "interface": {
+    "displayName": "Debugbundle"
+  },
+  "plugins": [
+    {
+      "name": "debugbundle-codex",
+      "source": {
+        "source": "local",
+        "path": "./plugins/debugbundle-codex"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

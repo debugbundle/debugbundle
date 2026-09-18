@@ -203,7 +203,7 @@ describe("mcp workspace package", () => {
     expect(workflow).toContain('mcp-v*');
     expect(workflow).toContain('0.1.0');
     expect(workflow).toContain('node-version: [22, 24, 26]');
-    expect(workflow).toContain('needs: validate');
+    expect(workflow).toContain('needs: [validate, codex]');
     expect(workflow).toContain('steps.published_state.outputs.state == \'all\'');
     expect(workflow).toContain('unexpected_prerelease_version');
     expect(workflow).toContain('tests/apps/mcp/mcp-workspace-package.test.ts');

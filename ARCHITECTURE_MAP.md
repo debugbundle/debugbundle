@@ -58,6 +58,8 @@ no private repository. See `spec/licensing.md` for paired documentation changes.
 
 ---
 
+Codex developer distribution lives in `plugins/debugbundle-codex/`, registered by `.agents/plugins/marketplace.json`. It bundles a workflow skill and the pinned stdio MCP server with the opt-in `--local-auth` profile, reusing existing CLI/member auth and local/connected tools. The hosted OpenAI plugin remains an independent read-only distribution. `tests/contracts/codex-developer-plugin.test.ts` guards package/release alignment; `scripts/smoke-codex-plugin.mjs` validates a disposable real Codex installation. See `spec/codex-developer-integration.md`.
+
 ## Package Boundaries
 
 > **Note:** `shared-types`, `redaction`, `sdk-node`, and `sdk-browser` have moved to the separate JS SDK monorepo (`github.com/debugbundle/debugbundle-js`). Their package boundaries are documented below for reference since core monorepo packages (`event-normalizer`, `bundle-engine`, etc.) still depend on the published npm packages. See the "JavaScript SDK Monorepo" section for the full repo layout.
