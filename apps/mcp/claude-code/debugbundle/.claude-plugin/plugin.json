@@ -2,13 +2,13 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "debugbundle",
   "displayName": "DebugBundle",
-  "version": "1.8.2",
+  "version": "1.9.0",
   "description": "Production debugging bundles for AI agents. Connect Claude Code to DebugBundle incidents, deterministic bundles, reproductions, health checks, probes, alerts, webhooks, projects, and verification workflows.",
   "author": {
     "name": "DebugBundle",
     "url": "https://debugbundle.com"
   },
-  "homepage": "https://debugbundle.com/docs/mcp",
+  "homepage": "https://debugbundle.com/docs/mcp/claude-code/",
   "repository": "https://github.com/debugbundle/debugbundle",
   "license": "Apache-2.0",
   "keywords": [

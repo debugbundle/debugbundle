@@ -85,7 +85,7 @@ Claude Code users can add DebugBundle's first-party marketplace from this reposi
 /plugin install debugbundle@debugbundle
 ```
 
-The plugin package lives at `apps/mcp/claude-code/debugbundle`, bundles a Claude Code skill, and starts the MCP server with the current published `@debugbundle/mcp` version. It is also structured for Claude community marketplace review; do not describe it as listed in `claude-community` until Anthropic accepts and publishes it.
+The plugin package lives at `apps/mcp/claude-code/debugbundle` and bundles a Claude Code skill. See the [Claude Code setup guide](https://debugbundle.com/docs/mcp/claude-code/) for the plugin's pinned MCP version, direct MCP configuration, authentication, verification, updates, and removal. It is also structured for Claude community marketplace review; do not describe it as listed in `claude-community` until Anthropic accepts and publishes it.
 
 ## Authentication
 

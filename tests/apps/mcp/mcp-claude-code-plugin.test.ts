@@ -71,7 +71,9 @@ describe("mcp Claude Code plugin marketplace package", () => {
         tags?: string[];
       }>;
     };
-    const advertisedPlugin = JSON.parse(readFileSync(pluginManifestPath, "utf8")) as { version: string };
+    const advertisedPlugin = JSON.parse(readFileSync(pluginManifestPath, "utf8")) as {
+      version: string;
+    };
 
     expect(marketplace.$schema).toBe("https://json.schemastore.org/claude-code-marketplace.json");
     expect(marketplace.name).toBe("debugbundle");
@@ -104,10 +106,16 @@ describe("mcp Claude Code plugin marketplace package", () => {
       description?: string;
       version?: string;
       keywords?: string[];
-      userConfig?: Record<string, { type?: string; title?: string; sensitive?: boolean; default?: string }>;
+      userConfig?: Record<
+        string,
+        { type?: string; title?: string; sensitive?: boolean; default?: string }
+      >;
     };
     const pluginMcp = JSON.parse(readFileSync(pluginMcpPath, "utf8")) as {
-      mcpServers?: Record<string, { type?: string; command?: string; args?: string[]; env?: Record<string, string> }>;
+      mcpServers?: Record<
+        string,
+        { type?: string; command?: string; args?: string[]; env?: Record<string, string> }
+      >;
     };
     expect(pluginManifest.version).toMatch(/^\d+\.\d+\.\d+$/u);
 
@@ -132,7 +140,7 @@ describe("mcp Claude Code plugin marketplace package", () => {
     expect(pluginMcp.mcpServers?.["debugbundle"]).toEqual({
       type: "stdio",
       command: "npx",
-      args: ["-y", `@debugbundle/mcp@${pluginManifest.version}`],
+      args: ["-y", `@debugbundle/mcp@${pluginManifest.version}`, "--local-auth"],
       env: {
         DEBUGBUNDLE_MEMBER_TOKEN: "${user_config.member_token}",
         DEBUGBUNDLE_API_URL: "${user_config.api_url}"

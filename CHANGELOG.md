@@ -6,6 +6,10 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed
+
+- Claude Code plugin 1.9.0 opts into MCP's local-auth profile, allowing saved login and existing member-token settings to satisfy hosted tool authentication without per-call credentials.
+
 ### Added
 
 - OpenClaw companion 1.9.0 aligns the bundled MCP release while preserving its default tool and authentication contracts.

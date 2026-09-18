@@ -692,6 +692,14 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** existing Claude, OpenClaw, stdio MCP, CLI, and read-only OpenAI contracts remain unchanged
 - **And** site navigation, public documentation, version pins, release gates, and distribution status agree
 
+### AC-MCP-18: Claude Code Local Authentication And Setup
+
+- A disposable native Claude Code installation validates, installs and removes the repository plugin using its unchanged marketplace/package identity and updated version.
+- The exact packaged MCP command exposes no per-call bearer argument, uses saved CLI login when optional plugin settings are blank, and lets explicit plugin member/API settings override saved values.
+- Synthetic loopback tests prove authenticated project retrieval, rejection of per-call credential injection, and missing-auth failure before HTTP, without a model turn or customer API access.
+- The dedicated `/docs/mcp/claude-code/` page is registered under MCP and included in canonical routes, search, sitemap and redirects; its version and release status match the prepared package.
+- Default MCP/OpenClaw schemas, Codex packaging and the hosted OpenAI connection remain unchanged.
+
 ### AC-MCP-03: OpenAI V1 Product Surface
 
 - **Given** the official DebugBundle OpenAI Plugin `1.0.0`

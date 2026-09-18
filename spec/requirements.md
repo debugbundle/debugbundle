@@ -346,6 +346,8 @@ Project list/detail metrics must include `attention_incidents_today`, counting i
 
 **FR-MCP-14:** Codex developer support must offer a repository plugin and documented direct stdio MCP configuration, reusing the existing published MCP server, CLI/member authentication, tool contracts, and local/connected semantics. The plugin has an independent version, an exact MCP version pin, no embedded credentials or hosted app mapping, and a self-contained workflow skill. The opt-in `--local-auth` profile removes model-visible bearer arguments while preserving all remaining validation, rejects credential injection, and fails before authenticated API requests when local auth is missing. Default stdio schemas and behavior remain compatible. Its repository marketplace and install/update/remove instructions must be validated independently of OpenAI hosted-plugin approval. See `spec/codex-developer-integration.md`.
 
+**FR-MCP-15:** The Claude Code repository plugin must pin a published MCP version supporting `--local-auth` and enable that profile. Its existing plugin identity and optional member-token/API-host settings remain stable; hosted tools use server-side credentials without per-call tokens. A dedicated MCP setup guide must document plugin and direct installation, authentication, verification, update/removal, and current release status. Default stdio and other agent contracts remain unchanged.
+
 ### 1.11 Web App
 
 **FR-WEB-01:** Signup/login/logout plus session-aware account bootstrap using first-party auth, with passwordless email-code auth and GitHub sign-in in V1.

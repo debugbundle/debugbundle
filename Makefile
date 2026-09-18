@@ -197,6 +197,16 @@ codex-plugin-check:
 openclaw-plugin-check:
 	$(NODE_RUN) "corepack enable && corepack pnpm --dir apps/openclaw-plugin plugin:check"
 
+# A disposable home keeps native Claude verification separate from personal auth.
+CLAUDE_SMOKE_VERSION ?= 2.1.277
+.PHONY: claude-plugin-smoke
+claude-plugin-smoke:
+	docker run --rm -v "$(PWD):/source:ro" -e CLAUDE_SMOKE_VERSION="$(CLAUDE_SMOKE_VERSION)" node:24-bookworm node /source/scripts/smoke-claude-plugin.mjs
+
+.PHONY: claude-plugin-smoke-github
+claude-plugin-smoke-github:
+	docker run --rm -v "$(PWD):/source:ro" -e CLAUDE_SMOKE_VERSION="$(CLAUDE_SMOKE_VERSION)" -e CLAUDE_SMOKE_GITHUB=1 node:24-bookworm node /source/scripts/smoke-claude-plugin.mjs
+
 # A fresh container home prevents access to personal Codex or DebugBundle auth.
 CODEX_SMOKE_VERSION ?= 0.153.1
 CODEX_SMOKE_NODE_IMAGE ?= node:24-bookworm

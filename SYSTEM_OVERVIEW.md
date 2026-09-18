@@ -30,6 +30,8 @@ Codex developer distribution lives in `plugins/debugbundle-codex/`, registered b
 
 ## System Shape
 
+The public MCP docs provide dedicated setup guides at `/docs/mcp/codex/` and `/docs/mcp/claude-code/`, with plugin/direct-connection choices and version-specific authentication guidance. The Claude Code plugin 1.9.0 also uses MCP 1.9.0's `--local-auth` profile while preserving its existing member-token/API settings. Default stdio schemas and the hosted OpenAI connection are unchanged.
+
 DebugBundle supports two runtime modes: **local-only** (no cloud account required, SDK writes to filesystem, CLI processes where those files live) and **connected** (cloud ingestion, team features, alerts). Local-only is the default starting point and can run on a developer machine or self-managed server with persistent storage and CLI access; connected is the recommended production path for team visibility, ephemeral infrastructure, alerts, webhooks, and hosted automation. See `/spec/local-first-onboarding.md`.
 
 ```

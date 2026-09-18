@@ -13,6 +13,7 @@ Do not use this skill for deterministic source-only edits, layout work, copy cha
 
 - Prefer local CLI auth state from `debugbundle login` on developer machines.
 - Use a DebugBundle member token for Claude Code plugin, headless, or managed MCP workflows.
+- The plugin's `--local-auth` connection reads credentials at startup. Never put tokens in tool arguments or chat; restart the connection after login or credential changes.
 - Project tokens are SDK write-only ingestion credentials. Do not use them for MCP retrieval or management.
 - Do not print credential values, signing material, or raw sensitive payloads.
 

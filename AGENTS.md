@@ -100,6 +100,7 @@ This workspace may include ignored companion repositories under `.local-repos/`.
 - Prefer Docker-backed Make targets over host package manager commands.
 
 Frontend-specific rule:
+- Work from code and tests; do not investigate in a browser or capture/review screenshots unless the user explicitly asks. Visual confirmation is not a completion requirement.
 - Run `npm`/bundlers in Docker-scoped environments to avoid host/system file exposure.
 - If host package management is intentionally used, document it explicitly in `/rules/` with pinned versions.
 - For any frontend, UI, UX, interaction, layout, component, accessibility, visual polish, or design-system task, load and follow `/rules/design-discipline.md` and `.agents/skills/design-discipline/SKILL.md`.
@@ -193,6 +194,7 @@ Project tokens → SDK write-only (ingestion). Member tokens → CLI/API/MCP rea
 
 ## 9) Git and Safety Rules
 
+- Never commit, push, publish, or deploy unless the user explicitly requests that action for the current changes. A fix/revert request or approval for an earlier release is not authorization.
 - Never revert unrelated local changes.
 - Never use destructive git commands unless explicitly requested.
 - Do not amend commits unless explicitly requested.

@@ -9,7 +9,7 @@ Production debugging bundles for AI agents, with runtime error reporting and inc
 
 DebugBundle provides runtime error reporting, crash reporting, incident response, endpoint health checks, and product analytics for humans and AI agents. It captures runtime failures, groups them into incidents, and publishes deterministic debug bundles. Its monitoring scope is customer-facing runtime behavior and endpoint health, not generic infrastructure metrics.
 
-Works with Codex, Claude Code, Cursor, GitHub Copilot, and other MCP clients. [Set up Codex](https://debugbundle.com/docs/mcp/codex/) through the dedicated developer plugin or a direct MCP connection.
+Works with AI coding agents including Codex, Claude Code, Cursor, and GitHub Copilot. See the [Codex](https://debugbundle.com/docs/mcp/codex/) and [Claude Code](https://debugbundle.com/docs/mcp/claude-code/) setup guides for developer plugins and direct MCP connections.
 
 ## Why DebugBundle?
 
