@@ -27,6 +27,7 @@ Use the same runtime-evidence-gated workflow through MCP when an agent is operat
 - `get_capture_policy`, `update_capture_policy` — review or update capture policy, including path-scoped client-error incident rules.
 
 Use these tools for repeated low-value operational noise only after inspecting incident evidence. Keep frontend suppression scoped by structured browser and client signals, and use path-scoped capture policy for known 4xx routes.
+For browser resource failures, follow the skill's Browser resource failures guidance and use the suggestion ID returned by the server. These management tools belong to the member-authenticated MCP surface; the official OpenAI connection is read-only and cannot suggest or apply capture rules.
 
 ## Product Analytics Tools
 

@@ -25,7 +25,7 @@ Then reload plugins if Claude Code does not connect the bundled MCP server immed
 The plugin ships a bundled MCP server definition that runs:
 
 ```bash
-npx -y @debugbundle/mcp@1.8.1
+npx -y @debugbundle/mcp@1.8.2
 ```
 
 ## Authentication

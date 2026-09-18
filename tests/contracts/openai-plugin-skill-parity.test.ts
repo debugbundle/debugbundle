@@ -30,7 +30,12 @@ describe("OpenAI plugin skill parity", () => {
       "generate_analytics_bundle",
       "update_analytics_settings",
       "create_saved_funnel",
-      "resolve_incident"
+      "resolve_incident",
+      "suggest_capture_rules_from_incident",
+      "create_capture_rule_from_incident_suggestion",
+      "create_capture_rule",
+      "update_capture_rule",
+      "delete_capture_rule"
     ]) {
       expect(skillText).not.toContain(forbidden);
     }

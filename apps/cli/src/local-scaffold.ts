@@ -145,6 +145,15 @@ export function buildSkill(): string {
     "- Scope frontend noise by structured evidence such as service, environment, `browser_event_kind`, `browser_event_opaque`, `client_kind`, `bot_family`, and message fields. Do not broadly demote generic `Unhandled promise rejection` incidents without bot-scoped or otherwise narrow evidence.",
     "- For expected or intentionally promoted 4xx responses on known routes, use capture-policy client-error path rules instead of promoting all client errors: `debugbundle capture-policy set --client-error-path-rule <status=/path/*@GET>`.",
     "",
+    "### Browser resource failures",
+    "",
+    "- Inspect the primary failure and routes: one resource can span pages, route coverage may be incomplete, and historical incidents stay separate. Related tracker evidence does not explain an application exception.",
+    "- If the cause is unknown, say \"possibly blocked by privacy tools.\" Network/CSP/provider failures remain possible; provider recognition proves neither Pi-hole blocking nor optionality.",
+    "- Review exact host/path, service, environment and opaque resource-error scope; never widen to a whole host. Google sign-in, app assets and unknown dependencies have no automatic resource noise recommendation.",
+    "- For confirmed optional dependencies, context (demote) retains diagnostics without new incidents/alerts/automation and may remain billable. Drop discards future matches; choose it only when evidence has no diagnostic value. Explain the tradeoff; neither deletes history. Use the returned suggestion ID.",
+    "- Check existing/disabled rules. Empty suggestions or pending/failed bundles do not justify broader rules. Applying requires user authorization and owner/admin access; preview is read-only. Verify subsequent matching and protected captures before claiming improvement; live tests need authorization.",
+    "- The official OpenAI connection cannot suggest or apply rules. When it is the only connection, review returned evidence and hand off through a returned safe dashboard URL; never invent tools or switch credentials.",
+    "",
     "## Notification Delivery",
     "",
     "When notification or automation delivery is the reported failure, inspect configuration and delivery records before changing incident logic.",
@@ -253,6 +262,7 @@ export function buildCliReference(): string {
     "- `debugbundle capture-policy set [--project <id>] --client-error-path-rule <404=/path/*@GET,POST> [--json]`",
     "",
     "Use capture-rule suggestions for repeated operational noise after inspecting an incident bundle. Use capture-policy client-error path rules for route-scoped 4xx incidents instead of promoting all client errors.",
+    "For browser resource failures, follow the skill's Browser resource failures guidance. Use the current response's suggestion ID, inspect `bundle_status`, `access_mode` and existing-rule state, and review the complete matcher before applying.",
     "",
     "## Probes",
     "",
@@ -402,6 +412,7 @@ export function buildMcpReference(): string {
     "- `get_capture_policy`, `update_capture_policy` — review or update capture policy, including path-scoped client-error incident rules.",
     "",
     "Use these tools for repeated low-value operational noise only after inspecting incident evidence. Keep frontend suppression scoped by structured browser and client signals, and use path-scoped capture policy for known 4xx routes.",
+    "For browser resource failures, follow the skill's Browser resource failures guidance and use the suggestion ID returned by the server. These management tools belong to the member-authenticated MCP surface; the official OpenAI connection is read-only and cannot suggest or apply capture rules.",
     "",
     "## Product Analytics Tools",
     "",
@@ -606,6 +617,43 @@ export function buildSkillEvals(): string {
             "Use capture-rule suggestions for repeated operational noise.",
             "Keep generic frontend suppression narrow with structured browser or bot signals.",
             "Use capture-policy path rules for known route-scoped 4xx incidents."
+          ]
+        },
+        {
+          name: "browser_resource_noise_review",
+          prompt: "GTM failed on four routes. The owner says analytics is optional and asks to keep useful diagnostics without repeated alerts. The suggestion response offers resource_context and resource_drop with exact host/path/service/environment matchers. Explain and apply the appropriate authorized choice.",
+          expected_behavior: [
+            "Inspect the primary failure and bounded route coverage; do not count each route as a separate application defect.",
+            "Describe privacy blocking as possible, not proven; do not diagnose Pi-hole.",
+            "Review the exact matcher and use the returned context suggestion ID; explain retained evidence and possible paid usage.",
+            "Verify the returned rule without claiming historical incidents were removed or live noise reduction was already observed."
+          ]
+        },
+        {
+          name: "protected_resource_noise_review",
+          prompt: "A checkout TypeError has related GTM evidence. Separate incidents show Google sign-in and an unknown script failing. The user asks whether ignoring all Google or third-party hosts would clean this up.",
+          expected_behavior: [
+            "Keep the primary checkout exception separate from related tracker evidence.",
+            "Do not broaden rules to whole hosts or infer that sign-in, app assets or unknown dependencies are optional.",
+            "Inspect evidence and available suggestions before proposing any narrowly scoped change."
+          ]
+        },
+        {
+          name: "unavailable_resource_noise_suggestions",
+          prompt: "Resource suggestions are pending or empty, the current member has preview access, and a matching rule is disabled. The user asks why the resource still opens incidents.",
+          expected_behavior: [
+            "Explain the missing evidence and access limits without inventing a rule or bypassing authorization.",
+            "Inspect the disabled rule; do not assume it is active, create a duplicate or silently enable it.",
+            "Do not claim noise was reduced or resolve historical incidents based solely on a policy proposal."
+          ]
+        },
+        {
+          name: "readonly_resource_noise_handoff",
+          prompt: "Only the official read-only OpenAI connection is available. The user asks to ignore recurring tracker failures.",
+          expected_behavior: [
+            "Inspect only available incident evidence; distinguish possible privacy blocking from a proven cause.",
+            "Explain that this connection cannot fetch capture-rule suggestions or apply rules; do not invent a management tool or switch credentials.",
+            "Use a returned safe dashboard URL for a reviewed handoff when available, and never claim a rule was applied."
           ]
         },
         {

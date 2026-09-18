@@ -23,11 +23,11 @@ metadata:
         description: Optional DebugBundle API base URL for self-hosted or non-production environments.
     install:
       - kind: node
-        package: "@debugbundle/mcp@1.8.1"
+        package: "@debugbundle/mcp@1.8.2"
         bins:
           - debugbundle-mcp
       - kind: node
-        package: "@debugbundle/cli@1.9.0"
+        package: "@debugbundle/cli@1.9.1"
         bins:
           - debugbundle
     skillKey: debugbundle
@@ -118,6 +118,17 @@ Analytics is browser-first, opt-in, aggregate-first product evidence. Use it whe
 - Read `get_analytics_settings` and `list_saved_analytics_funnels` before changing configuration. `update_analytics_settings`, saved-funnel create/update/archive tools, and bundle generation are mutations; explain the intended change and proceed only when the user explicitly asks.
 - Use member authentication for analytics reads and management. Project tokens remain write-only ingestion credentials.
 - Preserve consent, redaction, retention, and approved custom-dimension limits. Never request or store raw form values, raw click text, credentials, direct identifiers, or unbounded high-cardinality values.
+
+## Browser resource noise
+
+Use `suggest_capture_rules_from_incident`, then `create_capture_rule_from_incident_suggestion` for an authorized choice.
+
+- Inspect the primary failure and routes: one resource can span pages, route coverage may be incomplete, and historical incidents stay separate. Related tracker evidence does not explain an application exception.
+- If the cause is unknown, say "possibly blocked by privacy tools." Network/CSP/provider failures remain possible; provider recognition proves neither Pi-hole blocking nor optionality.
+- Review exact host/path, service, environment and opaque resource-error scope; never widen to a whole host. Google sign-in, app assets and unknown dependencies have no automatic resource noise recommendation.
+- For confirmed optional dependencies, context (demote) retains diagnostics without new incidents/alerts/automation and may remain billable. Drop discards future matches; choose it only when evidence has no diagnostic value. Explain the tradeoff; neither deletes history. Use the returned suggestion ID.
+- Check existing/disabled rules. Empty suggestions or pending/failed bundles do not justify broader rules. Applying requires user authorization and owner/admin access; preview is read-only. Verify subsequent matching and protected captures before claiming improvement; live tests need authorization.
+- The official OpenAI connection cannot suggest or apply rules. When it is the only connection, review returned evidence and hand off through a returned safe dashboard URL; never invent tools or switch credentials.
 
 ## Operations Surfaces
 

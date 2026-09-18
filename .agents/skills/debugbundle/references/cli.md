@@ -32,6 +32,7 @@
 - `debugbundle capture-policy set [--project <id>] --client-error-path-rule <404=/path/*@GET,POST> [--json]`
 
 Use capture-rule suggestions for repeated operational noise after inspecting an incident bundle. Use capture-policy client-error path rules for route-scoped 4xx incidents instead of promoting all client errors.
+For browser resource failures, follow the skill's Browser resource failures guidance. Use the current response's suggestion ID, inspect `bundle_status`, `access_mode` and existing-rule state, and review the complete matcher before applying.
 
 ## Probes
 

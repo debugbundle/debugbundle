@@ -45,6 +45,43 @@
       ]
     },
     {
+      "name": "browser_resource_noise_review",
+      "prompt": "GTM failed on four routes. The owner says analytics is optional and asks to keep useful diagnostics without repeated alerts. The suggestion response offers resource_context and resource_drop with exact host/path/service/environment matchers. Explain and apply the appropriate authorized choice.",
+      "expected_behavior": [
+        "Inspect the primary failure and bounded route coverage; do not count each route as a separate application defect.",
+        "Describe privacy blocking as possible, not proven; do not diagnose Pi-hole.",
+        "Review the exact matcher and use the returned context suggestion ID; explain retained evidence and possible paid usage.",
+        "Verify the returned rule without claiming historical incidents were removed or live noise reduction was already observed."
+      ]
+    },
+    {
+      "name": "protected_resource_noise_review",
+      "prompt": "A checkout TypeError has related GTM evidence. Separate incidents show Google sign-in and an unknown script failing. The user asks whether ignoring all Google or third-party hosts would clean this up.",
+      "expected_behavior": [
+        "Keep the primary checkout exception separate from related tracker evidence.",
+        "Do not broaden rules to whole hosts or infer that sign-in, app assets or unknown dependencies are optional.",
+        "Inspect evidence and available suggestions before proposing any narrowly scoped change."
+      ]
+    },
+    {
+      "name": "unavailable_resource_noise_suggestions",
+      "prompt": "Resource suggestions are pending or empty, the current member has preview access, and a matching rule is disabled. The user asks why the resource still opens incidents.",
+      "expected_behavior": [
+        "Explain the missing evidence and access limits without inventing a rule or bypassing authorization.",
+        "Inspect the disabled rule; do not assume it is active, create a duplicate or silently enable it.",
+        "Do not claim noise was reduced or resolve historical incidents based solely on a policy proposal."
+      ]
+    },
+    {
+      "name": "readonly_resource_noise_handoff",
+      "prompt": "Only the official read-only OpenAI connection is available. The user asks to ignore recurring tracker failures.",
+      "expected_behavior": [
+        "Inspect only available incident evidence; distinguish possible privacy blocking from a proven cause.",
+        "Explain that this connection cannot fetch capture-rule suggestions or apply rules; do not invent a management tool or switch credentials.",
+        "Use a returned safe dashboard URL for a reviewed handoff when available, and never claim a rule was applied."
+      ]
+    },
+    {
       "name": "operational_controls_guidance",
       "prompt": "The user reports missing webhook deliveries and asks whether probes or alerts are available. Confirm the skill points the agent to the relevant operational controls and docs.",
       "expected_behavior": [

@@ -217,8 +217,10 @@ describe("mcp ecosystem release pipeline", () => {
 
   it("plans a ClawHub-only skill patch without changing the MCP package version", () => {
     const packageVersion = (JSON.parse(readFileSync(join(repoRoot, "apps/mcp/package.json"), "utf8")) as { version: string }).version;
+    const [major, minor, patch] = packageVersion.split(".").map(Number);
+    const skillVersion = `${major}.${minor}.${patch! + 1}`;
     const output = execFileSync("node", [
-      "scripts/release-mcp-ecosystem.mjs", "plan", "--targets", "clawhub", "--clawhub-version", "1.8.2", "--json"
+      "scripts/release-mcp-ecosystem.mjs", "plan", "--targets", "clawhub", "--clawhub-version", skillVersion, "--json"
     ], { cwd: repoRoot, encoding: "utf8" });
     const plan = JSON.parse(output) as {
       version: string;
@@ -228,11 +230,11 @@ describe("mcp ecosystem release pipeline", () => {
     };
 
     expect(plan.version).toBe(packageVersion);
-    expect(plan.clawhubVersion).toBe("1.8.2");
-    expect(plan.mcpb.reportPath).toContain(`${packageVersion}-clawhub-1.8.2`);
+    expect(plan.clawhubVersion).toBe(skillVersion);
+    expect(plan.mcpb.reportPath).toContain(`${packageVersion}-clawhub-${skillVersion}`);
     expect(plan.publishTargets).toEqual([expect.objectContaining({ key: "clawhub" })]);
     expect(() => execFileSync("node", [
-      "scripts/release-mcp-ecosystem.mjs", "plan", "--targets", "clawhub,smithery", "--clawhub-version", "1.8.2"
+      "scripts/release-mcp-ecosystem.mjs", "plan", "--targets", "clawhub,smithery", "--clawhub-version", skillVersion
     ], { cwd: repoRoot, encoding: "utf8", stdio: "pipe" })).toThrow("clawhub_version_requires_clawhub_only");
     expect(() => execFileSync("node", [
       "scripts/release-mcp-ecosystem.mjs", "plan", "--targets", "clawhub", "--clawhub-version"

@@ -6,6 +6,11 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Changed
+
+- CLI 1.9.1 and agent skill updates explain scoped browser-resource noise handling, context versus drop, protected dependencies and cautious privacy-blocking diagnosis. Existing projects can refresh guidance without rerunning setup or replacing their profile/connection.
+- Coordinate MCP/Claude/OpenClaw 1.8.2 and portable skill 1.8.3 distribution. The OpenAI skill retains its read-only boundary; no SDK, bundle schema or hosted runtime upgrade is required.
+
 ## [1.10.0] - 2026-09-16
 
 ### Changed
