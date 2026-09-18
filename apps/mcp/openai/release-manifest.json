@@ -3,7 +3,7 @@
   "plugin_version": "1.0.0",
   "evidence_state": "local_connection_ready",
   "source": {
-    "commit": "56a8e2a75eebd11180db9c3774fc7a5343ecd56a",
+    "commit": "805ec6eea1f121a662fe1a3827cf166b2711d378",
     "tree_clean": true,
     "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
@@ -11,20 +11,20 @@
     "resource_origin": "https://mcp.debugbundle.com",
     "mcp_endpoint": "https://mcp.debugbundle.com/mcp",
     "oauth_issuer": "https://api.debugbundle.com",
-    "api_image_digest": "sha256:9c1cd62d69712ed97241a40b69bea5d07691c3b765d42d6050b7c1db934e5ea8"
+    "api_image_digest": null
   },
   "registered_connection_id": "plugin_asdk_app_6a99ba6c1e7881919091a592738692c6",
   "package": {
     "archive_file": "debugbundle-openai-plugin-1.0.0.zip",
-    "archive_sha256": "a5b984b02f72887bdc1000b8c6698d231edc2fb76917dc98b9caa69f858fcbdb",
-    "archive_bytes": 49955,
+    "archive_sha256": "f51d4a67604e04440ced80811bad2610a1ed41579e16238d9e491dc52d7cd9c2",
+    "archive_bytes": 50921,
     "files": {
       ".app.json": "137807180af48e9e6f6df967ebcb23925ed87fc051d219d153a1bc604c174f31",
       ".codex-plugin/plugin.json": "dcecda2c8257e08110a3ee7a3eb89fe9af1d41ddb5c9e5f8efe63d07f425b831",
       "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
       "README.md": "05b8efe9c870f5ce85ef76f19a394569aad0b772e6b4577bf0d124d7fbc9bebf",
       "assets/icon-512.png": "a05a29674a75a945b1a378c73c27322c9b1f14456329bec1fc1d986453696e30",
-      "skills/debugbundle/SKILL.md": "795a0915bd7a27720c8f4e710fc29c79784985a149b18875896fef9b4ffcc607",
+      "skills/debugbundle/SKILL.md": "9642b581840247de09ee3b17b609615e34ef57dc684b37c6f357d4033a9b5b27",
       "skills/debugbundle/references/privacy-and-safety.md": "5266d4110ff8f586694da427d0cf9fb6dca08f0368af3afca87b3908dba8ac97",
       "skills/debugbundle/references/tools.md": "d294c7b6827baa6f8df4680434ea672f25c8a82c45e8f57ecc204fe2341fd240"
     }
@@ -74,6 +74,7 @@
     "reviewer_fixture_sha256": "7eeff32a1dd14b4cb0fe5126e04470e448cf3f73a54bfb4f7e9e8f64327c6758"
   },
   "manual_gates": [
+    "immutable_api_image_deployment_digest",
     "representative_capacity_load_evidence",
     "reviewer_synthetic_retained_corpus",
     "owner_submission_approval",
