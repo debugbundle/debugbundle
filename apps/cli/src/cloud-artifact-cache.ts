@@ -8,6 +8,7 @@ import {
 } from "node:fs/promises";
 import { join } from "node:path";
 
+import { sanitizeTelemetry } from "../../../packages/redaction/src/index.js";
 import { isRecord, isMissingPathError } from "./cli-fs-helpers.js";
 import { attachSourceToPayload } from "./retrieval-source.js";
 
@@ -33,13 +34,19 @@ const CLOUD_BUNDLE_DIRECTORY_PATH = ".debugbundle/bundles/cloud";
 const CLOUD_REPRODUCTION_DIRECTORY_PATH = ".debugbundle/bundles/cloud/reproductions";
 const CLOUD_CACHE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
+function safeCachedArtifact(value: unknown): unknown {
+  const result = sanitizeTelemetry(value, { maxTotalBytes: 512 * 1024 });
+  if (!result.ok) throw new Error("privacy_projection_unavailable");
+  return result.value;
+}
+
 export async function cacheCloudBundleArtifact(
   input: { incidentId: string; bundle: unknown },
   dependencies?: CloudArtifactCacheDependencies
 ): Promise<unknown> {
   await pruneExpiredCloudArtifacts(dependencies);
 
-  const bundle = attachSourceToPayload(input.bundle, "cloud");
+  const bundle = safeCachedArtifact(attachSourceToPayload(input.bundle, "cloud"));
 
   await persistCloudArtifact(
     join(getWorkspaceRoot(dependencies), CLOUD_BUNDLE_DIRECTORY_PATH),
@@ -57,7 +64,7 @@ export async function cacheCloudReproductionArtifact(
 ): Promise<unknown> {
   await pruneExpiredCloudArtifacts(dependencies);
 
-  const reproduction = attachSourceToPayload(input.reproduction, "cloud");
+  const reproduction = safeCachedArtifact(attachSourceToPayload(input.reproduction, "cloud"));
 
   await persistCloudArtifact(
     join(getWorkspaceRoot(dependencies), CLOUD_REPRODUCTION_DIRECTORY_PATH),
@@ -93,6 +100,25 @@ export async function syncCloudIncidentCacheStatus(
       dependencies
     )
   ]);
+}
+
+// Called only after the lifecycle API has returned a validated success. An
+// optional local cache failure must not turn that confirmed write into failure.
+export async function syncCloudIncidentMutationCache(
+  incident: Record<string, unknown>,
+  dependencies?: CloudArtifactCacheDependencies
+): Promise<void> {
+  try {
+    await syncCloudIncidentCacheStatus({
+      incidentId: String(incident["incident_id"]),
+      incident: {
+        ...(typeof incident["status"] === "string" ? { status: incident["status"] } : {}),
+        resolved_at: incident["status"] === "resolved" && typeof incident["resolved_at"] === "string" ? incident["resolved_at"] : null
+      }
+    }, dependencies);
+  } catch {
+    incident["cache_warning"] = "cloud_cache_update_unavailable";
+  }
 }
 
 function getWorkspaceRoot(dependencies?: CloudArtifactCacheDependencies): string {
@@ -199,7 +225,9 @@ async function updateCachedArtifactStatus(
 
   let payload: unknown;
   try {
-    payload = JSON.parse(await readFile(filePath, "utf8"));
+    const raw = await readFile(filePath, "utf8");
+    if (Buffer.byteLength(raw, "utf8") > 512 * 1024) return;
+    payload = JSON.parse(raw);
   } catch (error) {
     if (isMissingPathError(error) || error instanceof SyntaxError) {
       return;
@@ -209,7 +237,7 @@ async function updateCachedArtifactStatus(
   }
 
   const nextPayload = applyIncidentStatusToPayload(payload, input.incidentId, input.incident);
-  await writeFile(filePath, `${JSON.stringify(attachSourceToPayload(nextPayload, "cloud"), null, 2)}\n`, "utf8");
+  await writeFile(filePath, `${JSON.stringify(safeCachedArtifact(attachSourceToPayload(nextPayload, "cloud")), null, 2)}\n`, "utf8");
 }
 
 function applyIncidentStatusToPayload(

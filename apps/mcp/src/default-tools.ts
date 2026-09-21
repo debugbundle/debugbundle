@@ -10,6 +10,8 @@ import { createWeeklyReportApi } from "../../../packages/weekly-report-client/sr
 import { analyzeCommand } from "../../cli/src/analyze-command.js";
 import { createCliHttpClient } from "../../cli/src/auth-context.js";
 import { readCliAuthState } from "../../cli/src/auth-state.js";
+import { readAgentAuthState } from "../../cli/src/agent-auth-state.js";
+import { createAgentReadClient } from "../../../packages/agent-read-client/src/index.js";
 import { LOCAL_AUTH_REQUIRED_TOOLS } from "./local-auth-catalog.js";
 import { createAnalyticsBundleApi } from "../../cli/src/analytics-bundle-commands.js";
 import { createAnalyticsJourneySampleApi } from "../../cli/src/analytics-journey-sample-commands.js";
@@ -108,8 +110,26 @@ function withDefaultBearerToken(
 }
 
 export async function createDefaultMcpTools(
-  input: { apiBaseUrl?: string; localAuth?: boolean } = {}
+  input: { apiBaseUrl?: string; localAuth?: boolean; agentRead?: boolean } = {}
 ): Promise<ToolRegistry> {
+  if (input.agentRead === true) {
+    const saved = await readAgentAuthState().catch(() => null);
+    const token = process.env["DEBUGBUNDLE_AGENT_TOKEN"] ?? saved?.bearer_token;
+    if (token === undefined) throw new Error("agent_read_credential_required");
+    const client = createAgentReadClient({
+      baseUrl: input.apiBaseUrl ?? readEnvApiBaseUrl() ?? saved?.base_url ?? DEFAULT_API_BASE_URL,
+      token
+    });
+    return {
+      agent_project_summary: (value) => client.read({ name: "project_summary", projectId: String(value["projectId"]) }),
+      agent_list_incidents: (value) => client.read({ name: "list_incidents", projectId: String(value["projectId"]),
+        ...(typeof value["limit"] === "number" ? { limit: value["limit"] } : {}),
+        ...(typeof value["cursor"] === "string" ? { cursor: value["cursor"] } : {}) }),
+      agent_get_incident: (value) => client.read({ name: "get_incident", projectId: String(value["projectId"]), incidentId: String(value["incidentId"]) }),
+      agent_get_incident_context: (value) => client.read({ name: "get_incident_context", projectId: String(value["projectId"]), incidentId: String(value["incidentId"]) }),
+      agent_get_bundle: (value) => client.read({ name: "get_bundle", projectId: String(value["projectId"]), incidentId: String(value["incidentId"]) })
+    };
+  }
   const authState = await readLocalAuthState();
   const baseUrl =
     input.apiBaseUrl ?? readEnvApiBaseUrl() ?? authState?.base_url ?? DEFAULT_API_BASE_URL;

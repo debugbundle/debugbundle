@@ -4,6 +4,7 @@ import {
   type AnalyticsEventEnvelope,
   type AnalyticsSettings
 } from "../../../../packages/shared-types/src/index.js";
+import { protectAnalyticsEvent } from "../../../../packages/event-normalizer/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 
 export type ValidAnalyticsEvent = { index: number; event: AnalyticsEventEnvelope };
@@ -100,10 +101,12 @@ export async function selectAcceptedAnalyticsEvents(input: {
       continue;
     }
 
-    acceptedEvents.push({
-      ...entry,
-      event: enforceAnalyticsPrivacy(entry.event, analyticsSettings)
-    });
+    const protectedEvent = protectAnalyticsEvent(enforceAnalyticsPrivacy(entry.event, analyticsSettings));
+    if (protectedEvent === null) {
+      errors.push({ index: entry.index, reason: "analytics_privacy_unavailable" });
+      continue;
+    }
+    acceptedEvents.push({ ...entry, event: protectedEvent });
   }
 
   return { acceptedEvents, errors };

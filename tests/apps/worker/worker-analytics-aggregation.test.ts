@@ -60,6 +60,29 @@ function createAnalyticsEvent(
 }
 
 describe("worker processor - aggregate-analytics-events", () => {
+  it("does not copy historical analytics secrets into rollups and rejects oversized objects", async () => {
+    const event = createAnalyticsEvent();
+    event.payload.route = { path: "/pricing", normalized_path: "/pricing",
+      title: "password=raw-worker-canary" };
+    const job = { project_id: "11111111-1111-4111-8111-111111111111", event_id: event.event_id,
+      object_key: "analytics-events/old.json.gz" };
+    const recordAnalyticsEvent = vi.fn().mockResolvedValue({ recorded: true });
+    const dependencies = {
+      queue: { dequeue: vi.fn().mockResolvedValue(job) },
+      objectStore: { getObject: vi.fn().mockResolvedValue(gzipSync(Buffer.from(JSON.stringify(event)))) },
+      analyticsRollupStore: { recordAnalyticsEvent }
+    };
+    expect(await processNextAggregateAnalyticsEventsJob(dependencies)).toEqual({ processed: true });
+    expect(JSON.stringify(recordAnalyticsEvent.mock.calls)).not.toContain("raw-worker-canary");
+    expect(recordAnalyticsEvent.mock.calls[0]?.[0].event.correlation.session_id).toBe("sess_123");
+
+    dependencies.objectStore.getObject.mockResolvedValue(gzipSync(Buffer.from("x".repeat(300_000))));
+    expect(await processNextAggregateAnalyticsEventsJob(dependencies)).toEqual({
+      processed: false, reason: "invalid_analytics_event"
+    });
+    expect(recordAnalyticsEvent).toHaveBeenCalledTimes(1);
+  });
+
   it("loads raw analytics event objects and records aggregate rollups", async (): Promise<void> => {
     const event = createAnalyticsEvent();
     const queue = {

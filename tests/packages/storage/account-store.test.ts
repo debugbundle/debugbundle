@@ -99,6 +99,10 @@ describe("postgres account store", () => {
       if (sqlText.includes("FROM agent_webhooks")) {
         return rowsResult([{ data: { webhook_id: "wh_123", project_id: "proj_123" } }]);
       }
+      if (sqlText.includes("FROM agent_tokens")) {
+        expect(sqlText).not.toContain("token_hash");
+        return rowsResult([{ data: { token_id: "at_123", project_id: "proj_123", scope: "incident:read-minimized" } }]);
+      }
       if (sqlText.includes("FROM webhook_deliveries")) {
         return rowsResult([{ data: { delivery_id: "whd_123", project_id: "proj_123" } }]);
       }
@@ -160,6 +164,7 @@ describe("postgres account store", () => {
         user: expect.objectContaining({ user_id: "usr_123" }),
         organization: expect.objectContaining({ organization_id: "org_123" }),
         projects: [expect.objectContaining({ project_id: "proj_123" })],
+        agent_tokens: [expect.objectContaining({ token_id: "at_123", scope: "incident:read-minimized" })],
         project_members: [expect.objectContaining({ project_member_id: "pm_123" })],
         probe_activations: [expect.objectContaining({ activation_id: "probe_123" })],
         improvement_opportunities: [expect.objectContaining({ improvement_opportunity_id: "imp_123" })],

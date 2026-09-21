@@ -1,3 +1,4 @@
+import { protectRuntimeLogMessage, protectRuntimeLogRecord } from "./privacy.js";
 import pino, { type LevelWithSilent, type Logger } from "pino";
 
 export type RuntimeApp = "api" | "worker";
@@ -59,9 +60,11 @@ export function resolveRuntimeLogLevel(env: Record<string, string | undefined>):
 }
 
 export function resolveRuntimeEnvironment(env: Record<string, string | undefined>): string {
-  return normalizeText(env["DEBUGBUNDLE_LOG_ENVIRONMENT"])
-    ?? normalizeText(env["NODE_ENV"])
-    ?? "development";
+  return (
+    normalizeText(env["DEBUGBUNDLE_LOG_ENVIRONMENT"]) ??
+    normalizeText(env["NODE_ENV"]) ??
+    "development"
+  );
 }
 
 export function resolveRuntimeService(
@@ -72,7 +75,7 @@ export function resolveRuntimeService(
 }
 
 export function createRuntimeLogger(input: CreateRuntimeLoggerInput): RuntimeLogger {
-  return pino({
+  const logger = pino({
     level: input.level ?? DEFAULT_LOG_LEVEL,
     timestamp: pino.stdTimeFunctions.isoTime,
     base: {
@@ -81,15 +84,41 @@ export function createRuntimeLogger(input: CreateRuntimeLoggerInput): RuntimeLog
       service: input.service,
       ...(input.version === undefined ? {} : { version: input.version })
     },
+    hooks: {
+      logMethod(args, method) {
+        const first = args[0];
+        const label = typeof first === "string" ? first : args[1];
+        method.call(
+          this,
+          first !== null && typeof first === "object" ? first : {},
+          protectRuntimeLogMessage(label)
+        );
+      }
+    },
     formatters: {
+      bindings: protectRuntimeLogRecord,
+      log: protectRuntimeLogRecord,
       level(label) {
         return { level: label };
       }
     },
     serializers: {
-      err: pino.stdSerializers.err
+      // Projection runs before serializers; do not re-expand HTTP objects or errors.
+      err: (value: unknown) => value,
+      req: (value: unknown) => value,
+      res: (value: unknown) => value
     }
   });
+  return protectChildBindings(logger);
+}
+
+function protectChildBindings<Levels extends string, OnlyCustom extends boolean>(
+  logger: Logger<Levels, OnlyCustom>
+): Logger<Levels, OnlyCustom> {
+  const createChild = logger.child.bind(logger);
+  logger.child = (bindings, options) =>
+    protectChildBindings(createChild(protectRuntimeLogRecord(bindings), options));
+  return logger;
 }
 
 export function createRuntimeLoggerFromEnv(input: CreateRuntimeLoggerFromEnvInput): RuntimeLogger {

@@ -8,6 +8,11 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ### Fixed
 
+- CLI candidate fixes compressed HTTP/2 response decoding on Node 26.0.0 by pairing fetch with its bundled Undici dispatcher. Existing Node 22–26 support is preserved and exact-version installed-consumer tests cover the regression.
+- Incident and improvement lifecycle clients, CLI, and ordinary MCP distinguish unconfirmed mutation outcomes from definite rejections. Malformed success responses, transport loss, and server errors warn against automatic retries and require a read to check current state.
+- Confirmed cloud lifecycle mutations remain successful when an optional local cache update fails; CLI/MCP show a fixed cache warning without exposing filesystem errors.
+- CLI `doctor` now exits 1 for error reports and retains exit 0 for healthy/warning-only reports. It also accepts `--auth-file`; an invalid response is described as a client validation failure without assuming a cloud outage.
+
 - Claude Code plugin 1.9.0 opts into MCP's local-auth profile, allowing saved login and existing member-token settings to satisfy hosted tool authentication without per-call credentials.
 
 ### Added

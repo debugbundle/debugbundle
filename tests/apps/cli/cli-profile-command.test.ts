@@ -375,7 +375,7 @@ describe("cli profile validate command", () => {
     };
 
     expect(profileResult.exitCode).toBe(4);
-    expect(doctorResult.exitCode).toBe(0);
+    expect(doctorResult.exitCode).toBe(1);
     expect(parsedProfile.valid).toBe(false);
     expect(parsedProfile.errors).toEqual(
       expect.arrayContaining([

@@ -1,12 +1,14 @@
-import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import { RetrievalApiError } from "../../../packages/retrieval-client/src/index.js";
+import { cacheCloudBundleArtifact } from "../../../apps/cli/src/cloud-artifact-cache.js";
 import {
   getLocalBundle,
+  getLocalIncident,
   getLocalReproduction,
   listLocalIncidents,
   readLocalConnectionConfig,
@@ -85,6 +87,30 @@ function createState(): LocalState {
 }
 
 describe("local retrieval store", () => {
+  it("projects retained local and newly cached cloud evidence without rewriting historical files", async () => {
+    const rootDirectory = await createLocalStoreRoot();
+    const state = createState();
+    state.incidents["inc_recent"]!.title = "Authorization: Bearer SYNTHETIC_TITLE_SECRET";
+    await writeLocalState(state, { cwd: () => rootDirectory });
+    const localPath = join(rootDirectory, ".debugbundle", "bundles", "local", "inc_recent.bundle.json");
+    await writeFile(localPath, JSON.stringify({ message: "password=SYNTHETIC_BUNDLE_SECRET", route: "/checkout" }), "utf8");
+
+    expect((await getLocalIncident({ incidentId: "inc_recent" }, { cwd: () => rootDirectory })).title)
+      .toBe("Authorization: [REDACTED]");
+    expect((await listLocalIncidents({}, { cwd: () => rootDirectory })).incidents[0]?.title)
+      .toBe("Authorization: [REDACTED]");
+    expect(await getLocalBundle({ incidentId: "inc_recent" }, { cwd: () => rootDirectory }))
+      .toEqual({ message: "password=[REDACTED]", route: "/checkout" });
+    expect(await readFile(localPath, "utf8")).toContain("SYNTHETIC_BUNDLE_SECRET");
+
+    const cached = await cacheCloudBundleArtifact(
+      { incidentId: "inc_recent", bundle: { message: "token=SYNTHETIC_CACHE_SECRET", route: "/checkout" } },
+      { cwd: () => rootDirectory }
+    );
+    expect(cached).toEqual({ message: "token=[REDACTED]", route: "/checkout", source: "cloud" });
+    const cachePath = join(rootDirectory, ".debugbundle", "bundles", "cloud", "inc_recent.bundle.json");
+    expect(await readFile(cachePath, "utf8")).not.toContain("SYNTHETIC_CACHE_SECRET");
+  });
   it("returns null when the connection config is missing and parses connected mode when present", async () => {
     const rootDirectory = await createLocalStoreRoot();
 

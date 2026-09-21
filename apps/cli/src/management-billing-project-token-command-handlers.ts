@@ -36,6 +36,7 @@ import {
 } from "./argv-helpers.js";
 import type { ManagementCommandDependencies, CliCommandResult } from "./management-command-dependencies.js";
 import {
+  agentTokenWithAuthCommand,
   createMemberTokenWithAuthCommand as defaultCreateMemberTokenCommand,
   createProjectTokenWithAuthCommand as defaultCreateProjectTokenCommand,
   listMemberTokensWithAuthCommand as defaultListMemberTokensCommand,
@@ -340,6 +341,35 @@ export async function handleProjectCommand(parsedArgv: ParsedArgv, dependencies:
 export async function handleTokenCommand(parsedArgv: ParsedArgv, dependencies: ManagementCommandDependencies): Promise<CliCommandResult> {
   const scope = requirePositional(parsedArgv, 1, "scope");
   const action = requirePositional(parsedArgv, 2, "action");
+
+  if (scope === "agent") {
+    if (action === "list") {
+      expectNoUnknownOptions(parsedArgv, ["auth-file", "json"]);
+      ensureNoExtraPositionals(parsedArgv, 4);
+      return agentTokenWithAuthCommand(appendCommonAuthOptions(parsedArgv, {
+        action, projectId: requirePositional(parsedArgv, 3, "project-id")
+      }));
+    }
+    if (action === "create") {
+      expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "label", "expires-at"]);
+      ensureNoExtraPositionals(parsedArgv, 4);
+      const label = readStringOption(parsedArgv, "label");
+      if (label === undefined) throw new CliInputError("Missing required option --label.");
+      const expiresAt = readStringOption(parsedArgv, "expires-at");
+      return agentTokenWithAuthCommand(appendCommonAuthOptions(parsedArgv, {
+        action, projectId: requirePositional(parsedArgv, 3, "project-id"), label,
+        ...(expiresAt === undefined ? {} : { expiresAt })
+      }));
+    }
+    if (action === "revoke") {
+      expectNoUnknownOptions(parsedArgv, ["auth-file", "json"]);
+      ensureNoExtraPositionals(parsedArgv, 5);
+      return agentTokenWithAuthCommand(appendCommonAuthOptions(parsedArgv, {
+        action, projectId: requirePositional(parsedArgv, 3, "project-id"),
+        tokenId: requirePositional(parsedArgv, 4, "token-id")
+      }));
+    }
+  }
 
   if (scope === "project") {
     if (action === "list") {

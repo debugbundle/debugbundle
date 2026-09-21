@@ -1,7 +1,8 @@
 import type { FastifyBaseLogger } from "fastify";
-import type { ZodIssue } from "zod";
+import { z, type ZodIssue } from "zod";
 
 import { buildIngestionMetricBatch } from "../../../../packages/storage/src/index.js";
+import { sanitizeTelemetry } from "../../../../packages/redaction/src/index.js";
 import type { EventClass } from "../../../../packages/shared-types/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import { redactEvent } from "../api-helpers.js";
@@ -13,6 +14,7 @@ export type IngestionRejectedMetricEvent = {
     | "capture_rule_dropped"
     | "capture_rule_sampled_out"
     | "invalid_event"
+    | "unsafe_event"
     | "monthly_quota_exceeded"
     | "rate_limited"
     | "remote_probes_disabled";
@@ -25,7 +27,7 @@ export type IngestionAcceptedMetricEvent = {
 };
 
 export type IngestionRejectedDiagnosticEvent = {
-  rejection_reason: IngestionRejectedMetricEvent["reason"];
+  rejection_reason: Exclude<IngestionRejectedMetricEvent["reason"], "unsafe_event">;
   project_id: string;
   sdk_name: string | null;
   sdk_version: string | null;
@@ -48,7 +50,7 @@ export function getQuotaRetryAfterMs(resetAt: string, now: Date): number {
 export function readRejectedMetricEventId(candidate: unknown, index: number): string {
   if (typeof candidate === "object" && candidate !== null) {
     const eventId = (candidate as Record<string, unknown>)["event_id"];
-    if (typeof eventId === "string" && eventId.length > 0) return eventId;
+    if (z.string().uuid().safeParse(eventId).success) return eventId as string;
   }
   return `invalid_event_index_${index}`;
 }
@@ -84,9 +86,9 @@ export async function recordIngestionMetricBatchBestEffort(input: {
       deltas: metricBatch.deltas
     });
     return result === "recorded" ? "recorded" : "skipped";
-  } catch (error) {
+  } catch {
     input.log.warn(
-      { err: error, project_id: input.project_id, organization_id: input.organization_id },
+      { project_id: input.project_id, organization_id: input.organization_id },
       "ingestion_account_analytics_record_failed"
     );
     return "skipped";
@@ -101,7 +103,7 @@ export function buildRejectedDiagnosticFromCandidate(input: {
 }): IngestionRejectedDiagnosticEvent {
   const service = readObjectField(input.candidate, "service");
   return {
-    rejection_reason: input.rejection_reason,
+    rejection_reason: input.rejection_reason === "unsafe_event" ? "invalid_event" : input.rejection_reason,
     project_id: input.project_id,
     sdk_name: readStringField(input.candidate, "sdk_name", 120),
     sdk_version: readStringField(input.candidate, "sdk_version", 64),
@@ -120,7 +122,7 @@ export function buildRejectedDiagnosticFromEvent(input: {
   event: ReturnType<typeof redactEvent>;
 }): IngestionRejectedDiagnosticEvent {
   return {
-    rejection_reason: input.rejection_reason,
+    rejection_reason: input.rejection_reason === "unsafe_event" ? "invalid_event" : input.rejection_reason,
     project_id: input.project_id,
     sdk_name: sanitizeDiagnosticText(input.event.sdk_name, 120),
     sdk_version: sanitizeDiagnosticText(input.event.sdk_version, 64),
@@ -152,9 +154,9 @@ export async function recordRejectedDiagnosticsBestEffort(input: {
       occurred_at: input.occurred_at,
       events: input.rejected_events
     });
-  } catch (error) {
+  } catch {
     input.log.warn(
-      { err: error, organization_id: input.organization_id },
+      { organization_id: input.organization_id },
       "ingestion_rejection_diagnostics_record_failed"
     );
   }
@@ -165,7 +167,10 @@ function sanitizeDiagnosticText(
   maxLength = 160
 ): string | null {
   if (typeof candidate !== "string") return null;
-  const normalized = candidate.replace(/\s+/g, " ").trim();
+  // Inspect the full bounded input before shortening a diagnostic field.
+  const sanitized = sanitizeTelemetry(candidate);
+  if (!sanitized.ok || typeof sanitized.value !== "string") return null;
+  const normalized = sanitized.value.replace(/\s+/g, " ").trim();
   return normalized.length === 0 ? null : normalized.slice(0, maxLength);
 }
 

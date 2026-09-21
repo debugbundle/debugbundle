@@ -1,6 +1,106 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-import { redact, type JsonValue } from "../../../packages/redaction/src/index.js";
+import { redact, sanitizeTelemetry, type JsonValue } from "../../../packages/redaction/src/index.js";
+
+const privacyFixtures = JSON.parse(readFileSync(new URL("../../fixtures/privacy-conformance.json", import.meta.url), "utf8")) as {
+  policy: string;
+  cases: Array<{ id: string; input: JsonValue; expected: JsonValue }>;
+};
+
+describe("mandatory telemetry sanitization", () => {
+  it("keeps the portable corpus tied to the policy version", () => {
+    expect(privacyFixtures.policy).toBe("telemetry-privacy-v1");
+  });
+
+  for (const fixture of privacyFixtures.cases) {
+    it(`sanitizes ${fixture.id} without losing safe evidence`, () => {
+      const original = JSON.stringify(fixture.input);
+      const result = sanitizeTelemetry(fixture.input);
+      expect(result).toMatchObject({ ok: true });
+      if (!result.ok) {
+        return;
+      }
+      expect(result.value).toEqual(fixture.expected);
+      expect(JSON.stringify(fixture.input)).toBe(original);
+      expect(sanitizeTelemetry(result.value)).toMatchObject({ ok: true, value: result.value });
+    });
+  }
+
+  it("adds custom fields without replacing credential protection", () => {
+    expect(sanitizeTelemetry({ password: "SYNTHETIC_SECRET", businessField: "SYNTHETIC_SECRET" }, {
+      additionalKeys: ["businessField"]
+    })).toMatchObject({
+      ok: true,
+      value: { password: "[REDACTED]", businessField: "[REDACTED]" }
+    });
+  });
+
+  it("withholds strings too large to scan instead of retaining an unchecked prefix", () => {
+    const huge = `${"x".repeat(16_384)}password=SYNTHETIC_SECRET`;
+    expect(sanitizeTelemetry({ message: huge })).toMatchObject({ ok: true, value: { message: "[REDACTED]" } });
+  });
+
+  it("fails closed on a hostile getter and does not throw into its caller", () => {
+    const hostile = Object.defineProperty({}, "message", {
+      enumerable: true,
+      get() { throw new Error("SYNTHETIC_SECRET"); }
+    });
+    expect(sanitizeTelemetry(hostile)).toEqual({ ok: false, reason: "unsafe_input" });
+  });
+
+  it("does not execute application getters while scanning telemetry", () => {
+    let calls = 0;
+    const input = Object.defineProperty({}, "message", { enumerable: true, get() { calls += 1; return "safe"; } });
+    expect(sanitizeTelemetry(input)).toEqual({ ok: false, reason: "unsafe_input" });
+    expect(calls).toBe(0);
+  });
+
+  it("bounds deep traversal and preserves distinct aliases", () => {
+    const nested: { password: string; parent?: unknown } = { password: "SYNTHETIC_SECRET" };
+    nested.parent = nested;
+    expect(sanitizeTelemetry({ first: nested, second: nested })).toMatchObject({
+      ok: true,
+      value: {
+        first: { password: "[REDACTED]", parent: "[Circular]" },
+        second: { password: "[REDACTED]", parent: "[Circular]" }
+      }
+    });
+    let deep: JsonValue = "safe";
+    for (let depth = 0; depth < 20; depth += 1) {
+      deep = { nested: deep };
+    }
+    expect(sanitizeTelemetry({ body: deep })).toMatchObject({ ok: true });
+    expect(JSON.stringify(sanitizeTelemetry({ body: deep }))).not.toContain('"safe"');
+  });
+
+  it("withholds a collection and total output that exceed their budgets", () => {
+    expect(sanitizeTelemetry({ items: Array.from({ length: 257 }, (_, index) => index) })).toMatchObject({
+      ok: true,
+      value: { items: "[REDACTED]" }
+    });
+    expect(sanitizeTelemetry({ safe: "x".repeat(40) }, { maxTotalBytes: 8 })).toEqual({
+      ok: false,
+      reason: "budget_exceeded"
+    });
+  });
+
+  it("never emits user-controlled credential-bearing object keys in its result", () => {
+    expect(sanitizeTelemetry({ "Authorization: Bearer SYNTHETIC_SECRET": "value", safe: 1 })).toMatchObject({
+      ok: true,
+      value: { safe: 1 }
+    });
+  });
+
+  it("withholds oversized segmented field names before matching them", () => {
+    const hostileKey = "field_".repeat(200);
+    const result = sanitizeTelemetry({ [hostileKey]: "value", safe: "diagnostic" });
+    expect(result).toMatchObject({ ok: true, value: { safe: "diagnostic" } });
+    expect(JSON.stringify(result)).not.toContain(hostileKey);
+    const urlResult = sanitizeTelemetry(`https://example.test/?${hostileKey}=value&route=checkout`);
+    expect(urlResult).toMatchObject({ ok: true, value: "https://example.test/?route=checkout" });
+  });
+});
 
 describe("redaction", () => {
   it("should redact sensitive keys recursively", (): void => {

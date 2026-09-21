@@ -165,6 +165,27 @@ Every capability must be available through all applicable interfaces. Operations
 
 ## 1. HTTP API
 
+### Project-scoped agent evidence connection (`telemetry-privacy-v1`)
+
+This additive credential is separate from member, project, probe, and hosted OAuth tokens. `dbundle_agent_` is hashed in `agent_tokens`, returned once with `Cache-Control: no-store`, bound to one project and `incident:read-minimized`, and expires after 30 days by default (at most 90). Old API versions reject its prefix. Issuer loss of project access, organization suspension, expiry, revocation, unknown scope, or unknown policy version denies reads. Creation is disabled by default and returns `503 agent_token_issuance_unavailable` until `AGENT_TOKEN_ISSUANCE_ENABLED=true` is set on every serving API replica **after** the forward migration and full replica rollout. List, revoke, and already-issued restricted reads do not use this creation gate. Rollback may make agent reads unavailable but cannot promote authority.
+
+| Operation | HTTP API | CLI | Ordinary management MCP / restricted `--agent-read` MCP |
+| --- | --- | --- | --- |
+| List scoped credentials | `GET /v1/projects/{id}/agent-tokens` | `token agent list <project-id>` | `list_agent_tokens` / unavailable |
+| Create scoped credential | `POST /v1/projects/{id}/agent-tokens` (`label`, optional `expires_at`) | `token agent create <project-id> --label <label> [--expires-at <ISO8601>]` | `create_agent_token` / unavailable |
+| Revoke scoped credential | `POST /v1/projects/{id}/agent-tokens/{tokenId}/revoke` | `token agent revoke <project-id> <token-id>` | `revoke_agent_token` / unavailable |
+| Project summary | `GET /v1/agent/projects/{id}` | `agent project_summary <project-id>` | `agent_project_summary` |
+| Incident list | `GET /v1/agent/projects/{id}/incidents` | `agent list_incidents <project-id>` | `agent_list_incidents` |
+| Incident detail | `GET /v1/agent/projects/{id}/incidents/{incidentId}` | `agent get_incident <project-id> <incident-id>` | `agent_get_incident` |
+| Existing context | `GET /v1/agent/projects/{id}/incidents/{incidentId}/context` | `agent get_incident_context <project-id> <incident-id>` | `agent_get_incident_context` |
+| Existing minimized bundle | `GET /v1/agent/projects/{id}/incidents/{incidentId}/bundle` | `agent get_bundle <project-id> <incident-id>` | `agent_get_bundle` |
+
+Management routes require an authorized member/session with effective project owner/admin role. Agent routes require an agent bearer token, matching path project, live issuer project access, and rate limiting; they never accept a saved member login as fallback. Successful restricted reads return `Cache-Control: no-store` and use strict incident/artifact allowlists with a 512 KiB projected output bound. Missing, failed, or oversized existing artifacts return a status, without enqueuing generation or returning a raw object URL. No agent route serves raw logs, request bodies, arbitrary artifacts, or mutations. The four incident shapes share the hosted OpenAI bounded projector but the hosted OAuth connection and its 23-tool contract remain separate.
+
+`DEBUGBUNDLE_AGENT_TOKEN=<credential> debugbundle agent connect` stores a distinct owner-only `~/.debugbundle/agent-auth.json` profile; `debugbundle-mcp --agent-read` loads this profile or the explicit `DEBUGBUNDLE_AGENT_TOKEN`, never `~/.debugbundle/auth.json` or `DEBUGBUNDLE_MEMBER_TOKEN`. Set `DEBUGBUNDLE_API_URL` for self-hosted MCP, or `--base-url` for CLI. The restricted MCP catalog lists exactly the five read tools above and rejects direct calls to undisclosed tools. The default/local-auth MCP catalog remains the broader member-authorized surface. The protected CLI profile is separate from the project's SDK connection profile.
+
+Redaction handles defined credential patterns and sensitive keys, not arbitrary private prose or prompt injection. Recipients should still review capture settings and choose the agent/provider boundary deliberately.
+
 Base URL: `https://api.debugbundle.com/v1` (cloud). Self-hosted: configurable.
 
 Auth model:
@@ -240,7 +261,7 @@ When GitHub sign-in returns a profile image URL, the API may fetch and cache tha
 
 The CLI bootstrap flow is additive and issues the same member-token credential used by normal CLI/MCP auth. `POST /v1/auth/github/device/start` plus `poll`/`claim` implement the official GitHub device flow. `POST /v1/auth/github/token/exchange` accepts an already-authenticated GitHub access token such as the output of `gh auth token`.
 
-`GET /v1/account/export` returns a JSON attachment with top-level `export_version: 1` plus the retained organization-account record set, including organization and project members, projects, tokens, capture policies, probes, hosted improvement opportunities, reusable Slack destinations, alerts, weekly reports, webhooks, GitHub automation, incidents, audit logs, billing-processing rows, retryable plan-cleanup rows, operational email rows, and retained raw-event, bundle, improvement-bundle, and reproduction artifacts when present in object storage.
+`GET /v1/account/export` returns a JSON attachment with top-level `export_version: 1` plus the retained organization-account record set, including organization and project members, projects, tokens, capture policies, probes, hosted improvement opportunities, reusable Slack destinations, alerts, weekly reports, webhooks, GitHub automation, incidents, audit logs, billing-processing rows, retryable plan-cleanup rows, operational email rows, and retained raw-event, bundle, improvement-bundle, and reproduction artifacts when present in object storage. Stored debugging artifacts are bounded and projected through the current telemetry privacy policy before inclusion, including artifacts captured before an SDK upgrade; missing or unprojectable objects receive a fixed artifact error. Account-administration records remain owner-only export data and may contain personal or operational details, so this browser-session export is not part of the restricted agent read surface.
 
 `GET /v1/account/avatar` returns the signed-in user's cached avatar bytes with a first-party URL shape of `/v1/account/avatar`. `POST /v1/account/avatar/import-gravatar` performs a server-side fetch against Gravatar only after explicit user action, stores the resulting avatar in object storage, and returns:
 
@@ -426,7 +447,11 @@ When the shared `monthly_raw_ingested_events` allowance is exhausted, new hosted
 
 When a batch has fewer remaining raw-ingestion units than eligible metered events, the response may be partially accepted. For example, with one unit remaining, a three-event metered batch returns `202` with `accepted: 1`, `rejected: 2`, and `monthly_quota_exceeded` errors for indexes `1` and `2`. Free-tier Class B and Class C events, and Class C events on paid tiers, do not consume this allowance and are not rejected solely because it is exhausted.
 
+An invalid debug event receives the fixed indexed `invalid_event` reason; a validated event that cannot pass mandatory privacy projection receives `unsafe_event`. Validation details and submitted field values are not reflected in the response or metric dedupe key. Both are terminal SDK acknowledgements.
+
 Analytics events use separate analytics allowances. Currently implemented analytics-specific rejection reasons include `analytics_disabled`, `analytics_invalid_event`, `analytics_invalid_dimension`, and `analytics_quota_exceeded`; planned consent-specific reasons include `analytics_consent_required`. Analytics-only quota exhaustion returns `429` with `Retry-After`; a batch that has at least one atomically claimed analytics event returns `202` and indexed `analytics_quota_exceeded` errors only for events that do not fit every applicable event/session meter. Mixed batches can return `202` with only analytics events rejected. These rejections must not reject otherwise-valid debug events in the same batch unless a shared request-level limit is exceeded.
+
+Completed AnalyticsBundle artifacts, generation metadata, opportunity list/detail, and aggregate analytics read responses apply the current bounded privacy policy to historical content and revalidate their response schemas. Successful projected responses identify the policy in `x-debugbundle-privacy-policy`; unavailable or unprojectable retained evidence returns a fixed failure rather than raw retained text. This read-time guard does not rewrite historical objects or account metrics.
 
 Rate-limited responses also include `Retry-After: <seconds>` so SDKs can back off without guessing.
 
@@ -491,6 +516,7 @@ Current API implementation scope (Phase 1 continuation):
 
 - `GET /v1/incidents/{id}/bundle` response body: artifact JSON when present; `{ "status": "pending" }` when artifact is missing; `{ "status": "failed", "reason": "..." }` when artifact is unreadable/invalid
 - `GET /v1/incidents/{id}/reproduction` response body: artifact JSON when present; `{ "status": "pending" }` while the reproduction artifact is not yet available; `404 { "error": "reproduction_not_found" }` on non-not-found artifact read failures
+- Successful artifact JSON responses from these two endpoints include `x-debugbundle-privacy-policy: telemetry-privacy-v1` after bounded historical read-time projection. Pending, failed, and error statuses do not certify an artifact and omit this header. Consumers that require projected artifacts can fail closed on a missing or unknown value; older servers do not send it.
 - `GET /v1/logs` requires `incident_id` and supports `level`, `cursor`, `limit` (1-100, default 20); response body: `{ logs: [{ event_id, event_type, occurred_at, is_sampled, level }], next_cursor }`
 - Authorization failure: `401 { "error": "invalid_member_token" }`
 - Out-of-scope or missing incident: `404 { "error": "incident_not_found" }`
@@ -2713,7 +2739,7 @@ Current local CLI behavior: `debugbundle login` accepts an explicit member token
 ```
 debugbundle setup [--non-interactive] [--json]
 debugbundle connect [--auth-file <path>] [--json]
-debugbundle doctor [--check-relay] [--privacy] [--json]
+debugbundle doctor [--check-relay] [--privacy] [--auth-file <path>] [--json]
 debugbundle validate [--fix] [--json]
 debugbundle ingest <file> --format <debugbundle-ndjson|php-error|apache-error> [--json]
 debugbundle watch --log <file> --format <debugbundle-ndjson|php-error|apache-error> [--json]
@@ -3025,6 +3051,10 @@ debugbundle github deliveries retry <delivery-id> [--project-id <id>] [--auth-fi
 ```
 
 `github status` shows the organization's GitHub App installation status and any assigned repo for the current project. `github repos` lists repositories available to the installation for owner/admin callers. `github repo set` assigns a primary repo to the project for owner/admin callers. `github rules create` is available to any authorized collaborator on an eligible shared project, while rule update/delete and delivery retry obey creator ownership for plain members. `github deliveries` lists recent delivery history for a project, and `github deliveries retry` retries a failed delivery within that project scope when the caller owns the underlying rule or has admin rights. Multi-value flags (`--event`, `--environment`, `--service`) accept comma-separated values. Eligibility is determined from the target project's owner plan, not the acting collaborator's personal plan.
+
+Incident/improvement lifecycle mutations can return an explicit `mutation_outcome_unconfirmed` error when the client cannot confirm the result after dispatch (unreadable HTTP success, transport failure, or HTTP 5xx). CLI JSON error output has `error`, `outcome: "unknown"`, `retry_safe: false`, and a fixed `message`; it retains exit code 1 and the existing error stream. Ordinary MCP preserves the same code and no-retry guidance. Never automatically repeat the write; use a read to check current state first. A confirmed cloud lifecycle result remains successful if only the optional local cache fails; CLI/MCP attach the fixed incident field `cache_warning: "cloud_cache_update_unavailable"`. This does not alter the hosted read-only OpenAI catalog.
+
+Doctor exits 1 when its structured report has `status: "error"`; healthy and warning-only reports still exit 0. Its JSON report shape is unchanged. `--auth-file <path>` selects an explicit saved login.
 
 ### Exit Codes
 

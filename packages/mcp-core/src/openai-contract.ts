@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
 
-import { redact, type JsonValue } from "../../redaction/src/index.js";
+import { redact, sanitizeTelemetry, type JsonValue } from "../../redaction/src/index.js";
 
 import schemaContract from "./contracts/schemas.json" with { type: "json" };
 import toolContracts from "./contracts/tool-contracts.json" with { type: "json" };
@@ -437,7 +437,11 @@ export function projectOpenAiToolOutput(name: string, value: unknown): unknown {
   if (Buffer.byteLength(JSON.stringify(projected), "utf8") > MAX_OUTPUT_BYTES) {
     throw new Error(`openai_mcp_output_too_large:${name}`);
   }
-  return projected;
+  const sanitized = sanitizeTelemetry(projected, { maxTotalBytes: MAX_OUTPUT_BYTES });
+  if (!sanitized.ok) {
+    throw new Error(`openai_mcp_output_redaction_failed:${name}`);
+  }
+  return validateSchemaValue(readSchemaReference(tool.output_schema_ref), sanitized.value, "output");
 }
 
 export function validateOpenAiToolOutput(name: string, value: unknown): unknown {

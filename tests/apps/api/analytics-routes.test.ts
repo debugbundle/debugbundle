@@ -319,6 +319,46 @@ describe("analytics metrics routes", () => {
     });
   });
 
+  it("reprojects historical opportunity prose and evidence before API reads", async () => {
+    const opportunity = createOpportunity({
+      title: "Checkout token=SYNTHETIC_OPPORTUNITY_SECRET",
+      summary: "Authorization: Bearer SYNTHETIC_SUMMARY_SECRET",
+      evidence: { password: "SYNTHETIC_EVIDENCE_SECRET", sessions: 120 }
+    });
+    const app = createDependencies({ analyticsOpportunities: createAnalyticsOpportunitiesDependency({
+      listAnalyticsOpportunitiesForProject: vi.fn().mockResolvedValue({ opportunities: [opportunity], next_cursor: null }),
+      getAnalyticsOpportunityForProject: vi.fn().mockResolvedValue({ opportunity })
+    }) });
+    const headers = { authorization: "Bearer dbundle_mem_test_token" };
+    const list = await app.inject({ method: "GET", url: `/v1/analytics/opportunities?project_id=${PROJECT_ID}`, headers });
+    const detail = await app.inject({ method: "GET",
+      url: `/v1/analytics/opportunities/${opportunity.opportunity_id}?project_id=${PROJECT_ID}`, headers });
+    expect(list.statusCode).toBe(200);
+    expect(detail.statusCode).toBe(200);
+    for (const response of [list, detail]) {
+      expect(response.body).not.toContain("SYNTHETIC_");
+      expect(response.body).toContain("[REDACTED]");
+    }
+    expect(detail.json().opportunity.evidence).toMatchObject({ password: "[REDACTED]", sessions: 120 });
+  });
+
+  it("withholds credential text from retained aggregate route keys", async () => {
+    const routes = {
+      window: metricsWindow,
+      routes: [{ route_key: "/checkout?token=SYNTHETIC_ROUTE_SECRET", pageviews: 10,
+        unique_sessions: 8, entrances: 3, exits: 2, bounces: 1, linked_incident_sessions: 0 }]
+    };
+    const app = createDependencies({ analyticsMetrics: createAnalyticsMetricsDependency({
+      getRouteMetricsForProject: vi.fn().mockResolvedValue(routes)
+    }) });
+    const response = await app.inject({ method: "GET",
+      url: `/v1/analytics/routes?project_id=${PROJECT_ID}&from=${encodeURIComponent(FROM)}&to=${encodeURIComponent(TO)}`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" } });
+    expect(response.statusCode).toBe(200);
+    expect(response.body).not.toContain("SYNTHETIC_ROUTE_SECRET");
+    expect(response.body).toContain("[REDACTED]");
+  });
+
   it("lists analytics opportunities across the caller organization without a project id", async () => {
     const listAnalyticsOpportunitiesForOrganization = vi.fn().mockResolvedValue({
       opportunities: [createOpportunity()],

@@ -19,6 +19,13 @@ function getServiceBlock(compose: string, service: string): string {
 }
 
 describe("local Docker Compose development stack", () => {
+  it("keeps agent credential issuance off unless explicitly enabled after rollout", () => {
+    for (const relative of ["docker-compose.yml", "deploy/selfhost/docker-compose.yml"]) {
+      const compose = readFileSync(join(process.cwd(), relative), "utf8");
+      expect(getServiceBlock(compose, "api")).toContain("AGENT_TOKEN_ISSUANCE_ENABLED: ${AGENT_TOKEN_ISSUANCE_ENABLED:-false}");
+    }
+  });
+
   it("shares the prepared Corepack cache with every Node service", () => {
     const compose = readFileSync(composePath, "utf8");
 

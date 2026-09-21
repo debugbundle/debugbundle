@@ -365,6 +365,23 @@ describe("api ingestion validation and compatibility", () => {
       ]
     });
     expect(persistAndEnqueue).not.toHaveBeenCalled();
+
+    const secretMarker = "password=synthetic-metric-secret";
+    const hostileResponse = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: { authorization: "Bearer dbundle_proj_test" },
+      payload: { events: [{ event_id: secretMarker }] }
+    });
+    expect(hostileResponse.statusCode).toBe(202);
+    expect(hostileResponse.json()).toMatchObject({
+      accepted: 0,
+      rejected: 1,
+      errors: [{ index: 0, reason: "invalid_event" }]
+    });
+    expect(JSON.stringify(hostileResponse.json())).not.toContain(secretMarker);
+    expect(recordMetricDeltas.mock.lastCall?.[0].dedupe_key).not.toContain(secretMarker);
+    expect(recordMetricDeltas.mock.lastCall?.[0].dedupe_key).toContain("invalid_event_index_0");
   });
 
   it("does not record rejection diagnostics for duplicate analytics batches", async (): Promise<void> => {

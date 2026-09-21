@@ -1,5 +1,7 @@
 # Go SDK Implementation Plan
 
+The published v1 module remains `github.com/debugbundle/debugbundle-go`. The privacy-protected major-version source candidate uses `github.com/debugbundle/debugbundle-go/v2` and matching `/v2` imports for the root and every integration subpackage. The v2 tag is not yet published; existing v1 installations remain on their current behavior until deliberately upgraded.
+
 Version: v1
 Last updated: 2026-07-27
 

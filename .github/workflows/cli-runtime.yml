@@ -1,0 +1,41 @@
+name: CLI runtime compatibility
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  installed-consumer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22, 24, "26.0.0", "26.2.0", 26]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Install pinned workspace tooling
+        run: |
+          npm install --global corepack@0.34.1
+          corepack enable
+          corepack prepare pnpm@11.3.0 --activate
+          pnpm install --frozen-lockfile
+      - name: Build, pack, and exercise an installed CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          package_dir="$(mktemp -d)"
+          consumer_dir="$(mktemp -d)"
+          trap 'rm -rf "$package_dir" "$consumer_dir"' EXIT
+          npm pack ./apps/cli --pack-destination "$package_dir"
+          cli_version="$(node -p 'require("./apps/cli/package.json").version')"
+          npm install --prefix "$consumer_dir" --no-audit --no-fund --ignore-scripts "$package_dir/debugbundle-cli-$cli_version.tgz"
+          node scripts/check-cli-runtime.mjs "$consumer_dir/node_modules/@debugbundle/cli/bin/debugbundle.js"

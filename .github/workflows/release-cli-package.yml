@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: [22, 24, 26]
+        node-version: [22, 24, "26.0.0", "26.2.0", 26]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -33,6 +33,7 @@ jobs:
 
       - name: Setup pnpm via Corepack
         run: |
+          npm install --global corepack@0.34.1
           corepack enable
           corepack prepare pnpm@11.3.0 --activate
 
@@ -106,7 +107,7 @@ jobs:
           RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
 
       - name: Run focused CLI package tests
-        run: pnpm vitest run tests/apps/cli/cli-main-core.test.ts tests/apps/cli/cli-workspace-package.test.ts tests/apps/cli/cli-smoke-command.test.ts
+        run: pnpm vitest run tests/apps/cli/cli-main-core.test.ts tests/apps/cli/cli-workspace-package.test.ts tests/apps/cli/cli-smoke-command.test.ts tests/apps/cli/cli-mutation-outcomes.test.ts tests/packages/retrieval-client/retrieval-client-mutations.test.ts
 
       - name: Pack CLI artifact
         run: |
@@ -132,6 +133,7 @@ jobs:
 
           "$tmpdir/node_modules/.bin/debugbundle" --version >/dev/null
           "$tmpdir/node_modules/.bin/debugbundle" --help >/dev/null
+          node scripts/check-cli-runtime.mjs "$tmpdir/node_modules/@debugbundle/cli/bin/debugbundle.js"
         env:
           RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
 

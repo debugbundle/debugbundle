@@ -1,4 +1,3 @@
-import { gunzipSync } from "node:zlib";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
@@ -13,6 +12,7 @@ import {
   AnalyticsOpportunityStatusSchema,
   getTierCapabilities
 } from "../../../../packages/shared-types/src/index.js";
+import { readSanitizedArtifact } from "../../../../packages/storage/src/artifact-privacy.js";
 import type { ApiDependencies } from "../api-types.js";
 import {
   isObjectNotFoundError,
@@ -302,16 +302,17 @@ export async function sendAnalyticsBundleGenerationResponse(
     const compressed = await dependencies.objectStoreReader.getObject({
       key: generation.object_key
     });
-    bundleArtifact = JSON.parse(gunzipSync(compressed).toString("utf8"));
+    bundleArtifact = readSanitizedArtifact(compressed);
   } catch (error) {
     if (isObjectNotFoundError(error)) {
       return reply.status(404).send({ error: "analytics_bundle_artifact_not_found" });
     }
     return reply.status(500).send({ error: "analytics_bundle_artifact_unavailable" });
   }
+  if (bundleArtifact === null) return reply.status(503).send({ error: "privacy_projection_unavailable" });
   const parsedBundle = AnalyticsBundleV1Schema.safeParse(bundleArtifact);
   return parsedBundle.success
-    ? reply.status(200).send(parsedBundle.data)
+    ? reply.header("x-debugbundle-privacy-policy", "telemetry-privacy-v1").status(200).send(parsedBundle.data)
     : reply.status(500).send({ error: "analytics_bundle_artifact_invalid" });
 }
 

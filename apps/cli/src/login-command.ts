@@ -1,3 +1,4 @@
+import { nodeFetch } from "../../../packages/node-http/src/index.js";
 import { execFile as execFileFromNode } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -284,7 +285,7 @@ async function requestJson(
   },
   dependencies?: { fetchImpl?: typeof fetch }
 ): Promise<unknown> {
-  const fetchImpl = dependencies?.fetchImpl ?? fetch;
+  const fetchImpl = dependencies?.fetchImpl ?? nodeFetch;
   const response = await fetchImpl(`${normalizeBaseUrl(input.baseUrl)}${input.path}`, {
     method: input.method,
     headers: {

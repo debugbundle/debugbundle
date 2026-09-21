@@ -6,7 +6,10 @@ export const TOKEN_MCP_TOOL_NAMES = [
   "revoke_project_token",
   "list_member_tokens",
   "create_member_token",
-  "revoke_member_token"
+  "revoke_member_token",
+  "list_agent_tokens",
+  "create_agent_token",
+  "revoke_agent_token"
 ] as const;
 
 function mapMcpError(error: unknown): never {
@@ -24,8 +27,29 @@ export function createTokenMcpTools(api: {
   listMemberTokens(input: { bearerToken: string; limit?: number }): Promise<unknown[]>;
   createMemberToken(input: { bearerToken: string; label: string }): Promise<unknown>;
   revokeMemberToken(input: { bearerToken: string; tokenId: string }): Promise<unknown>;
+  listAgentTokens(input: { bearerToken: string; projectId: string }): Promise<unknown[]>;
+  createAgentToken(input: { bearerToken: string; projectId: string; label: string; expiresAt?: string }): Promise<unknown>;
+  revokeAgentToken(input: { bearerToken: string; projectId: string; tokenId: string }): Promise<unknown>;
 }): Record<(typeof TOKEN_MCP_TOOL_NAMES)[number], (input: Record<string, unknown>) => Promise<unknown>> {
   return {
+    async list_agent_tokens(input) {
+      try {
+        return { tokens: await api.listAgentTokens({ bearerToken: String(input["bearerToken"]), projectId: String(input["projectId"]) }) };
+      } catch (error) { mapMcpError(error); }
+    },
+    async create_agent_token(input) {
+      try {
+        return { token: await api.createAgentToken({ bearerToken: String(input["bearerToken"]),
+          projectId: String(input["projectId"]), label: String(input["label"]),
+          ...(typeof input["expiresAt"] === "string" ? { expiresAt: input["expiresAt"] } : {}) }) };
+      } catch (error) { mapMcpError(error); }
+    },
+    async revoke_agent_token(input) {
+      try {
+        return { token: await api.revokeAgentToken({ bearerToken: String(input["bearerToken"]),
+          projectId: String(input["projectId"]), tokenId: String(input["tokenId"]) }) };
+      } catch (error) { mapMcpError(error); }
+    },
     async list_project_tokens(input) {
       try {
         const requestInput: { bearerToken: string; projectId: string; limit?: number } = {

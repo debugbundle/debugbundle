@@ -110,6 +110,7 @@ function buildMigratedRuntimeSchemaRows(sql: string): { rows: Record<string, unk
         { table_name: "project_invites" },
         { table_name: "project_tokens" },
         { table_name: "member_tokens" },
+        { table_name: "agent_tokens" },
         { table_name: "github_device_authorizations" },
         { table_name: "probe_activations" },
         { table_name: "availability_checks" },

@@ -4,6 +4,27 @@ import { createGitHubDispatchTransport } from "../../../apps/worker/src/worker-n
 import { createGitHubInstallationTokenFixture } from "../../helpers/github-installation-token.js";
 
 describe("GitHub dispatch transport", () => {
+  it("scrubs historical dispatch payloads before GitHub delivery", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    const transport = createGitHubDispatchTransport({
+      appId: "123",
+      privateKey: "test-only",
+      tokenCache: { get: vi.fn().mockResolvedValue("test-token"), set: vi.fn() },
+      fetchImpl
+    });
+    await transport.deliver({
+      delivery_id: "gdd_old",
+      installation_id: 99,
+      repo_owner: "test-owner",
+      repo_name: "test-repo",
+      dispatch_payload: { title: "Failure token=old-secret", debugbundle: { apiKey: "raw-key", occurrence_count: 3 } }
+    });
+    const body = (fetchImpl.mock.calls[0]?.[1] as { body: string }).body;
+    expect(body).not.toContain("old-secret");
+    expect(body).not.toContain("raw-key");
+    expect(JSON.parse(body)).toMatchObject({ client_payload: { debugbundle: { apiKey: "[REDACTED]", occurrence_count: 3 } } });
+  });
+
   it.each(["token-error", "dispatch-error", "dispatch-success"] as const)(
     "cancels unused response bodies after %s",
     async (scenario) => {

@@ -101,7 +101,7 @@ Current cross-repo release sequencing for the JS family is intentional: publish 
 TypeScript and JavaScript are delivered as one shared npm SDK surface, exactly as this document recommends.
 
 **Published SDK expansion and prepared plans:**
-- `github.com/debugbundle/debugbundle-go` — Go SDK published through Go modules. Detailed implementation plan: `spec/sdks/go-sdk.md`.
+- `github.com/debugbundle/debugbundle-go` — Go SDK v1 published through Go modules; the privacy-protected major candidate uses `github.com/debugbundle/debugbundle-go/v2` and is not yet tagged. Detailed implementation plan: `spec/sdks/go-sdk.md`.
 - `debugbundle` (RubyGems) — Ruby SDK published through RubyGems. Detailed implementation plan: `spec/sdks/ruby-sdk.md`.
 - `github.com/debugbundle/debugbundle-android` — Kotlin Android SDK 1.2.0 is published with canonical mobile envelopes, indexed ingestion acknowledgement, durable queueing, crash/ANR replay, native trace propagation, capture policy, probes, `beforeSend`, OkHttp/Ktor, Navigation/Compose, Timber, testkit, BOM, per-file coverage, and a Kotlin 2.1 consumer-metadata gate. The detailed plan lives in `spec/sdks/kotlin-sdk.md`.
 - `github.com/debugbundle/debugbundle-swift` — Swift iOS SDK 1.2.0 is published through Swift Package Manager and CocoaPods with canonical `{events}` delivery, indexed acknowledgement, durable queueing, URLSession/Alamofire, UIKit/SwiftUI, SwiftLog, crash replay, capture policy, probes, `beforeSend`, and per-file coverage. The detailed plan lives in `spec/sdks/swift-sdk.md`.

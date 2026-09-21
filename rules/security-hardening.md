@@ -92,6 +92,7 @@ Temp files must use `crypto.randomBytes()` suffixes. No predictable timestamp-on
 ### SEC-16: Object Sanitization Depth and Size Limits
 
 SDK serialization of user-provided objects must enforce maximum depth, string-length truncation, and array/object size caps. Deep or oversized payloads degrade to truncation markers instead of unbounded recursion or memory growth.
+Mandatory telemetry sanitization must also bound field and URL query-key matching work. Oversized names are withheld as complete fields/query pairs before any segment matcher runs; never emit an unchecked long key or a supposedly safe prefix.
 
 ### SEC-17: Retry-After Bounding
 
@@ -124,6 +125,12 @@ Sensitive-key detection must use segment-aware matching (tokenized comparison af
 ### SEC-23: Circular Reference Protection
 
 Redaction traversal must track visited objects via `WeakSet` and replace circular references with a stable `[Circular]` marker instead of recursing infinitely.
+
+### SEC-23a: Mandatory Telemetry Sanitization Boundary
+
+For the protected SDK line, SEC-21 keys remain mandatory when custom fields are configured. Bounded value rules cover recognized authorization/cookie/credential assignments, DebugBundle and other high-confidence token formats, PEM private keys, URL userinfo and sensitive query values, and supported JSON/form-encoded containers. Apply the policy before SDK-owned buffers/offline storage/transmission, after valid `beforeSend` replacements, before server persistence for every supported context/payload shape, and before customer evidence leaves any retrieval/agent/export/notification surface. Keep the legacy generic helper's public override contract during its deprecation window if it is externally consumed; production telemetry paths must use the mandatory entry point. A published SDK override-semantic change follows an explicit major-version migration unless a documented source-of-truth security exception applies.
+
+Sanitization has fixed byte, depth, node, collection, and parsing budgets; budget exhaustion or invalid output never returns an unexamined original. No user-supplied regular expressions or secret-bearing field paths/matches in diagnostics. A protected SDK must never throw a sanitizer failure into its host application. This rule does not claim universal detection of domain-specific confidential prose. Preserve typed protocol/correlation fields by schema-aware handling.
 
 ---
 
@@ -205,3 +212,8 @@ Every rule above must be enforced by at least one of:
 - **Code review** — as a complementary check, never the sole enforcement.
 
 When adding a new API route, SDK feature, or storage surface, review this list and confirm which SEC-\* rules apply to the change. If a rule applies, the enforcement mechanism must be present before the change ships.
+
+
+### Runtime logger payload boundary
+
+The shared API/worker runtime logger projects request/response objects to method/status metadata, removes exception message/stack/cause and payload fields, and applies the mandatory bounded sanitizer to records and child bindings. Message arguments must be fixed event identifiers; interpolation arguments and free-form message text are withheld. Keep diagnostic detail in protected incident evidence, not infrastructure logs. Proxy access and error log sinks require separate effective-configuration and synthetic failure checks.

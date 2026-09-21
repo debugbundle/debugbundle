@@ -1,0 +1,242 @@
+{
+  "policy": "telemetry-privacy-v1",
+  "cases": [
+    {
+      "id": "nested_sensitive_key",
+      "input": {
+        "context": {
+          "user_password": "SYNTHETIC_SECRET",
+          "route": "/checkout"
+        }
+      },
+      "expected": {
+        "context": {
+          "user_password": "[REDACTED]",
+          "route": "/checkout"
+        }
+      }
+    },
+    {
+      "id": "camel_and_segment_keys",
+      "input": {
+        "apiKey": 12345,
+        "my_secret_field": false,
+        "status": 503
+      },
+      "expected": {
+        "apiKey": "[REDACTED]",
+        "my_secret_field": "[REDACTED]",
+        "status": 503
+      }
+    },
+    {
+      "id": "authorization_text",
+      "input": {
+        "message": "Authorization: Bearer SYNTHETIC_SECRET\nRetry after 5s"
+      },
+      "expected": {
+        "message": "Authorization: [REDACTED]\nRetry after 5s"
+      }
+    },
+    {
+      "id": "credential_assignment",
+      "input": {
+        "message": "Request failed password=SYNTHETIC_SECRET at /checkout"
+      },
+      "expected": {
+        "message": "Request failed password=[REDACTED] at /checkout"
+      }
+    },
+    {
+      "id": "camel_credential_assignment",
+      "input": {
+        "message": "accessToken=SYNTHETIC_ACCESS refreshToken=SYNTHETIC_REFRESH privateKey=SYNTHETIC_PRIVATE clientSecret=SYNTHETIC_CLIENT"
+      },
+      "expected": {
+        "message": "accessToken=[REDACTED] refreshToken=[REDACTED] privateKey=[REDACTED] clientSecret=[REDACTED]"
+      }
+    },
+    {
+      "id": "authorization_scheme_without_header",
+      "input": {
+        "message": "upstream said Bearer SYNTHETIC_SECRET"
+      },
+      "expected": {
+        "message": "upstream said Bearer [REDACTED]"
+      }
+    },
+    {
+      "id": "single_percent_decode",
+      "input": {
+        "message": "token%3DSYNTHETIC_SECRET"
+      },
+      "expected": {
+        "message": "token=[REDACTED]"
+      }
+    },
+    {
+      "id": "url_query_and_fragment",
+      "input": {
+        "url": "https://example.test/api?token=SYNTHETIC_SECRET&filter=ok#secret-fragment"
+      },
+      "expected": {
+        "url": "https://example.test/api?token=%5BREDACTED%5D&filter=ok"
+      }
+    },
+    {
+      "id": "url_userinfo",
+      "input": {
+        "url": "https://alice:SYNTHETIC_SECRET@example.test/checkout"
+      },
+      "expected": {
+        "url": "https://REDACTED@example.test/checkout"
+      }
+    },
+    {
+      "id": "json_string",
+      "input": {
+        "body": "{\"password\":\"SYNTHETIC_SECRET\",\"route\":\"/checkout\"}"
+      },
+      "expected": {
+        "body": "{\"password\":\"[REDACTED]\",\"route\":\"/checkout\"}"
+      }
+    },
+    {
+      "id": "cookie_header_text",
+      "input": {
+        "message": "Cookie: sid=SYNTHETIC_SECRET; theme=dark"
+      },
+      "expected": {
+        "message": "Cookie: [REDACTED]"
+      }
+    },
+    {
+      "id": "private_key_block",
+      "input": {
+        "message": "-----BEGIN PRIVATE KEY-----\nSYNTHETIC_SECRET\n-----END PRIVATE KEY-----"
+      },
+      "expected": {
+        "message": "[REDACTED]"
+      }
+    },
+    {
+      "id": "unclosed_private_key",
+      "input": {
+        "message": "-----BEGIN PRIVATE KEY-----\nSYNTHETIC_SECRET"
+      },
+      "expected": {
+        "message": "[REDACTED]"
+      }
+    },
+    {
+      "id": "debugbundle_token",
+      "input": {
+        "message": "bad token dbundle_proj_SYNTHETIC_SECRET; retry"
+      },
+      "expected": {
+        "message": "bad token [REDACTED]; retry"
+      }
+    },
+    {
+      "id": "validated_card",
+      "input": {
+        "message": "payment card 4111 1111 1111 1111 declined"
+      },
+      "expected": {
+        "message": "payment card [REDACTED] declined"
+      }
+    },
+    {
+      "id": "safe_evidence",
+      "input": {
+        "message": "Error: checkout failed",
+        "stack": "at submit (/app/checkout.ts:42:7)",
+        "route": "/checkout",
+        "status": 503,
+        "trace_id": "ca6b1f6a-1b63-4f02-829c-17c3dfe847e0"
+      },
+      "expected": {
+        "message": "Error: checkout failed",
+        "stack": "at submit (/app/checkout.ts:42:7)",
+        "route": "/checkout",
+        "status": 503,
+        "trace_id": "ca6b1f6a-1b63-4f02-829c-17c3dfe847e0"
+      }
+    },
+    {
+      "id": "invalid_card_negative_control",
+      "input": {
+        "message": "ticket 4111111111111112 not found"
+      },
+      "expected": {
+        "message": "ticket 4111111111111112 not found"
+      }
+    },
+    {
+      "id": "numeric_uuid_negative_control",
+      "input": {
+        "activation_id": "11111111-1111-4111-8111-111111111111"
+      },
+      "expected": {
+        "activation_id": "11111111-1111-4111-8111-111111111111"
+      }
+    },
+    {
+      "id": "oversized_field_name",
+      "input": {
+        "field_field_field_field_field_field_field_field_field_field_field_field_field_field_field_field_field_field_field_field_field_field_field_field_": "SYNTHETIC_SECRET",
+        "safe": 1
+      },
+      "expected": {
+        "safe": 1
+      }
+    },
+    {
+      "id": "oversized_query_name",
+      "input": {
+        "url": "https://example.test/?field_field_field_field_field_field_field_field_field_field_field_field_field_field_field_field_field_field_field_field_field_field_field_field_=SYNTHETIC_SECRET&route=checkout"
+      },
+      "expected": {
+        "url": "https://example.test/?route=checkout"
+      }
+    },
+    {
+      "id": "encoded_query_credential",
+      "input": {
+        "url": "https://example.test/?q=%64bundle_proj_SYNTHETIC_SECRET&route=checkout"
+      },
+      "expected": {
+        "url": "https://example.test/?q=%5BREDACTED%5D&route=checkout"
+      }
+    },
+    {
+      "id": "encoded_query_key",
+      "input": {
+        "url": "https://example.test/?%64bundle_proj_SYNTHETIC_SECRET=value&route=checkout"
+      },
+      "expected": {
+        "url": "https://example.test/?route=checkout"
+      }
+    },
+    {
+      "id": "malformed_url_userinfo",
+      "input": {
+        "url": "https://alice:SYNTHETIC_SECRET@host:bad/path"
+      },
+      "expected": {
+        "url": "[REDACTED]"
+      }
+    },
+    {
+      "id": "punctuation_sensitive_key",
+      "input": {
+        "account/password": "SYNTHETIC_SECRET",
+        "safe": 1
+      },
+      "expected": {
+        "account/password": "[REDACTED]",
+        "safe": 1
+      }
+    }
+  ]
+}

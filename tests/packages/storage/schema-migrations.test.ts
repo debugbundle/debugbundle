@@ -18,6 +18,15 @@ const ALL_REQUIRED_TABLES = Array.from(
 );
 
 describe("storage schema migrations", () => {
+  it("adds isolated agent credentials through an ordered, additive migration and requires the table at startup", () => {
+    const migration = STORAGE_SCHEMA_MIGRATIONS.find((entry) => entry.id === "202609200001_add_project_scoped_agent_tokens");
+    expect(migration).toBeDefined();
+    expect(migration?.statements.join("\n")).toContain("CREATE TABLE IF NOT EXISTS agent_tokens");
+    expect(migration?.statements.join("\n")).toContain("token_hash text NOT NULL UNIQUE");
+    expect(migration?.statements.join("\n")).toContain("expires_at > created_at");
+    expect(migration?.statements.join("\n")).not.toMatch(/DROP TABLE|ALTER TABLE member_tokens|UPDATE member_tokens/);
+    expect(REQUIRED_API_TABLES).toContain("agent_tokens");
+  });
   it("adds nullable resource route metadata without rewriting incident history", () => {
     const migration = STORAGE_SCHEMA_MIGRATIONS.find(entry => entry.id === "202609160001_add_browser_resource_routes");
     expect(migration?.statements.join("\n")).toContain("ADD COLUMN IF NOT EXISTS resource_route text");

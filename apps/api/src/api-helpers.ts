@@ -1,9 +1,7 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 
 import { SESSION_COOKIE_NAME, readCookieValue, requireMemberToken } from "../../../packages/auth/src/index.js";
-import { validateEvent } from "../../../packages/event-normalizer/src/index.js";
-import { redact } from "../../../packages/redaction/src/index.js";
-import { sanitizeBrowserStackUrls } from "../../../packages/redaction/src/browser-stack.js";
+import { sanitizeEvent } from "../../../packages/event-normalizer/src/index.js";
 import { isSelfHostMode } from "../../../packages/shared-types/src/index.js";
 import type { EventEnvelope } from "../../../packages/shared-types/src/index.js";
 import type { ProjectAccessRecord, ResolveMemberResult } from "../../../packages/storage/src/index.js";
@@ -25,26 +23,7 @@ function toRetryAfterSeconds(retryAfterMs: number): string {
 }
 
 export function redactEvent(event: EventEnvelope): EventEnvelope {
-  if (event.event_type === "frontend_exception") {
-    event = { ...event, payload: { ...event.payload, stack: sanitizeBrowserStackUrls(event.payload.stack) } };
-  }
-  const redactedPayload = redact(event.payload as Parameters<typeof redact>[0]).redacted;
-  const reparsed = validateEvent({
-    ...event,
-    payload: redactedPayload
-  });
-
-  if (!reparsed.success) {
-    return omitProjectToken(event);
-  }
-
-  return omitProjectToken(reparsed.data);
-}
-
-function omitProjectToken(event: EventEnvelope): EventEnvelope {
-  const sanitized = { ...event };
-  delete sanitized.project_token;
-  return sanitized;
+  return sanitizeEvent(event);
 }
 
 export function isObjectNotFoundError(error: unknown): boolean {

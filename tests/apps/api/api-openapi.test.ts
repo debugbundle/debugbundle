@@ -3,6 +3,27 @@ import { describe, expect, it } from "vitest";
 import { buildPublicOpenApiSpec } from "../../../apps/api/src/openapi.ts";
 
 describe("api openapi spec", () => {
+  it("documents only the five agent reads with distinct agent authentication", () => {
+    const document = buildPublicOpenApiSpec() as {
+      paths: Record<string, Record<string, { security?: unknown; responses?: unknown }>>;
+      components: { securitySchemes: Record<string, unknown> };
+    };
+    const paths = Object.entries(document.paths).filter(([path]) => path.startsWith("/v1/agent/"));
+    expect(paths).toHaveLength(5);
+    for (const [, operations] of paths) {
+      expect(Object.keys(operations)).toEqual(["get"]);
+      expect(operations["get"]?.security).toEqual([{ agentBearerToken: [] }]);
+    }
+    expect(document.components.securitySchemes).toHaveProperty("agentBearerToken");
+    expect(document.paths["/v1/projects/{id}/agent-tokens"]?.["post"]?.security).toEqual([
+      { browserSession: [] },
+      { memberBearerToken: [] }
+    ]);
+    expect(document.paths["/v1/projects/{id}/agent-tokens/{tokenId}/revoke"]).toHaveProperty(
+      "post"
+    );
+  });
+
   it("publishes github bootstrap routes and browser-session security directly from source", () => {
     const document = buildPublicOpenApiSpec() as {
       openapi?: string;

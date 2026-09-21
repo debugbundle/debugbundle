@@ -21,6 +21,8 @@ import {
 } from "./dogfooding.ts";
 import { SMALL_REQUEST_BODY_LIMIT_BYTES } from "./http-limits.ts";
 import { registerAuthRoutes } from "./routes/auth.js";
+import { registerAgentTokenRoutes } from "./routes/agent-tokens.js";
+import { registerAgentEvidenceRoutes } from "./routes/agent-evidence.js";
 import { registerAlertRoutes } from "./routes/alerts.js";
 import { registerAccountRoutes } from "./routes/account.js";
 import { registerAdminAnalyticsRoutes } from "./routes/admin-analytics.js";
@@ -408,6 +410,8 @@ export function createApiServer(
   registerAdminAnalyticsRoutes(app, dependencies);
   registerAdminBillingRoutes(app, dependencies);
   registerAuthRoutes(app, dependencies);
+  registerAgentTokenRoutes(app, dependencies, dogfoodingEnv["AGENT_TOKEN_ISSUANCE_ENABLED"] === "true");
+  registerAgentEvidenceRoutes(app, dependencies);
   registerBillingRoutes(app, dependencies);
   registerGitHubRoutes(app, dependencies);
   registerHealthRoutes(app, dependencies, context);

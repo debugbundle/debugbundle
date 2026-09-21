@@ -268,6 +268,26 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
     ON project_members (user_id, created_at DESC)
   `,
   `
+    CREATE TABLE agent_tokens (
+      id uuid PRIMARY KEY,
+      token_hash text NOT NULL UNIQUE,
+      issuer_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      label text NOT NULL CHECK (length(label) BETWEEN 1 AND 120),
+      scope text NOT NULL CHECK (scope = 'incident:read-minimized'),
+      policy_version text NOT NULL CHECK (policy_version = 'telemetry-privacy-v1'),
+      created_at timestamptz NOT NULL DEFAULT now(),
+      expires_at timestamptz NOT NULL,
+      revoked_at timestamptz,
+      CHECK (expires_at > created_at AND expires_at <= created_at + interval '90 days')
+    )
+  `,
+  `
+    CREATE INDEX agent_tokens_project_idx
+    ON agent_tokens (project_id, created_at DESC)
+  `,
+  `
     CREATE TABLE project_invites (
       id uuid PRIMARY KEY,
       project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

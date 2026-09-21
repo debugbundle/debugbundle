@@ -1,4 +1,3 @@
-import { gunzipSync } from "node:zlib";
 import { randomUUID } from "node:crypto";
 
 import type { FastifyInstance } from "fastify";
@@ -20,6 +19,7 @@ import {
   type BundleV1,
 } from "../../../../packages/shared-types/src/index.js";
 import { buildBundleObjectKey } from "../../../../packages/storage/src/index.js";
+import { readSanitizedArtifact } from "../../../../packages/storage/src/artifact-privacy.js";
 import type { ApiDependencies } from "../api-types.js";
 import { recordAuditLog, resolveAuditActorType } from "../audit-logging.js";
 import {
@@ -123,7 +123,8 @@ async function readBundleForCaptureRuleSuggestions(input: {
 
   try {
     const compressed = await input.dependencies.objectStoreReader.getObject({ key });
-    const parsed = BundleV1Schema.safeParse(JSON.parse(gunzipSync(compressed).toString("utf8")));
+    const artifact = readSanitizedArtifact(compressed);
+    const parsed = BundleV1Schema.safeParse(artifact);
     if (!parsed.success) {
       return {
         status: "failed",

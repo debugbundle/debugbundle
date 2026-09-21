@@ -1,5 +1,6 @@
 import { createHmac, createPrivateKey, createSign } from "node:crypto";
 import { createServer, type Server } from "node:http";
+import { sanitizeTelemetry } from "../../../packages/redaction/src/index.js";
 
 import {
   queueAllowanceLimitReachedNotification,
@@ -31,6 +32,14 @@ interface CreateLifecycleWebhookPublisherInput extends WorkerAccountAnalyticsDep
     OperationalEmailDeliveryStore,
     "queueProjectOperationalEmailDelivery"
   >;
+}
+
+function safeDeliveryPayload(payload: unknown): Record<string, unknown> {
+  const result = sanitizeTelemetry(payload);
+  if (!result.ok || result.value === null || Array.isArray(result.value) || typeof result.value !== "object") {
+    throw new Error("notification_payload_unsafe");
+  }
+  return result.value;
 }
 
 interface GitHubDispatchTokenCache {
@@ -117,7 +126,7 @@ export function createGitHubDispatchPublisher(
                 reproduction: `/v1/incidents/${incidentId}/reproduction`,
                 dashboard: `/incidents/${incidentId}`
               };
-        const dispatchPayload = {
+        const dispatchPayload = safeDeliveryPayload({
           debugbundle_event: event.event_type,
           incident_id: incidentId,
           improvement_id: improvementId,
@@ -133,7 +142,7 @@ export function createGitHubDispatchPublisher(
             occurrence_count: event.occurrence_count ?? 1,
             first_seen_at: event.first_seen_at ?? event.occurred_at
           }
-        };
+        });
 
         const withinCooldown = await input.githubStore.hasRecentGitHubDispatch({
           rule_id: rule.rule_id,
@@ -296,7 +305,7 @@ export function createLifecycleWebhookPublisher(
           occurred_at: event.occurred_at,
           target_url: target.target_url,
           signing_secret: target.signing_secret,
-          payload: {
+          payload: safeDeliveryPayload({
             event: event.event_type,
             event_type: event.event_type,
             incident_id: event.incident_id,
@@ -319,7 +328,7 @@ export function createLifecycleWebhookPublisher(
             deploy_branch: event.regression_deploy?.branch ?? null,
             deploy_deployed_at: event.regression_deploy?.deployed_at ?? null,
             minutes_since_deploy: event.regression_deploy?.minutes_since_deploy ?? null
-          }
+          })
         });
         await recordProjectMetricDeltas(input, {
           projectId: event.project_id,
@@ -444,11 +453,11 @@ export function createGitHubDispatchTransport(input: {
           body: JSON.stringify({
             event_type: "debugbundle.incident",
             client_payload: {
-              ...event.dispatch_payload,
+              ...safeDeliveryPayload(event.dispatch_payload),
               debugbundle: {
                 ...(typeof event.dispatch_payload["debugbundle"] === "object" &&
                 event.dispatch_payload["debugbundle"] !== null
-                  ? event.dispatch_payload["debugbundle"]
+                  ? safeDeliveryPayload(event.dispatch_payload["debugbundle"])
                   : {}),
                 dispatch_id: event.delivery_id,
                 dispatched_at: now().toISOString()
@@ -547,7 +556,7 @@ export function createLifecycleWebhookTransport(
       const timeout = setTimeout(() => controller.abort(), input.timeoutMs);
 
       try {
-        const serializedPayload = JSON.stringify(event.payload);
+        const serializedPayload = JSON.stringify(safeDeliveryPayload(event.payload));
         const response = await fetch(event.target_url, {
           method: "POST",
           headers: {
@@ -576,8 +585,7 @@ export function createLifecycleWebhookTransport(
           throw new LifecycleWebhookDeliveryError("webhook_timeout", null);
         }
 
-        const message = error instanceof Error ? error.message : String(error);
-        throw new LifecycleWebhookDeliveryError(`webhook_transport_error:${message}`, null);
+        throw new LifecycleWebhookDeliveryError("webhook_transport_error", null);
       } finally {
         // Delivery is decided from status, not an arbitrarily large response body.
         controller.abort();

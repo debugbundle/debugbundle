@@ -1,10 +1,15 @@
+import { nodeFetch } from "../../../packages/node-http/src/index.js";
 import { readdir as readdirFromFs, readFile as readFileFromFs, stat as statFromFs } from "node:fs/promises";
 import { join } from "node:path";
 
 import { z } from "zod";
 
-import { classifyEvent } from "../../../packages/event-normalizer/src/index.js";
-import { redact, type JsonValue } from "../../../packages/redaction/src/index.js";
+import { classifyEvent, sanitizeEvent } from "../../../packages/event-normalizer/src/index.js";
+import {
+  sanitizeTelemetry,
+  TELEMETRY_PRIVACY_POLICY_VERSION,
+  type JsonValue
+} from "../../../packages/redaction/src/index.js";
 import { createEventEnvelope } from "../../../packages/shared-types/src/index.js";
 import { CliAuthStateError, readCliAuthState } from "./auth-state.js";
 import type { CliAuthState } from "./auth-state.js";
@@ -34,6 +39,10 @@ type DoctorCheck = {
 };
 
 type DoctorPrivacyPreview = {
+  policy_version: string;
+  rule_families: string[];
+  redaction_count: number;
+  limits: { max_depth: number; max_string_bytes: number; max_event_bytes: number };
   sample_event_type: "request_event";
   sample_event_class: "incident_signal" | "context_signal" | "operational_signal";
   sample_can_create_incident: boolean;
@@ -49,6 +58,7 @@ type DoctorPrivacyPreview = {
   };
   redacted_sample: {
     payload: JsonValue;
+    context: JsonValue;
   };
 };
 
@@ -115,6 +125,9 @@ function formatDoctorOutput(status: "healthy" | "warning" | "error", checks: Doc
       ? []
       : [
           "Privacy preview:",
+          `- policy_version: ${privacyPreview.policy_version}`,
+          `- rule_families: ${privacyPreview.rule_families.join(", ")}`,
+          `- redaction_count: ${privacyPreview.redaction_count}`,
           `- sample_event_type: ${privacyPreview.sample_event_type}`,
           `- sample_event_class: ${privacyPreview.sample_event_class}`,
           `- sample_can_create_incident: ${privacyPreview.sample_can_create_incident ? "yes" : "no"}`,
@@ -168,6 +181,10 @@ function buildPrivacyPreview(): DoctorPrivacyPreview {
       session_id: null,
       user_id_hash: "usr_preview_hash"
     },
+    context: {
+      apiKey: buildPrivacyPreviewSensitiveValue("api-key"),
+      operation: "checkout"
+    },
     payload: {
       method: "POST",
       path: "/checkout/ord_preview_123",
@@ -201,10 +218,19 @@ function buildPrivacyPreview(): DoctorPrivacyPreview {
     throw new Error("invalid_privacy_preview_sample_event");
   }
 
-  const { redacted, redacted_fields } = redact(sampleEvent.payload as JsonValue);
+  const projected = sanitizeTelemetry({ payload: sampleEvent.payload, context: sampleEvent.context });
+  if (!projected.ok) throw new Error("privacy_preview_unavailable");
+  const protectedEvent = sanitizeEvent(sampleEvent);
+  const redacted_fields = [
+    "headers.authorization", "headers.cookie", "body.password", "body.card_number", "body.otp", "context.apiKey"
+  ];
   const sampleEventClass = classifyEvent(sampleEvent.event_type, undefined, undefined, sampleEvent.payload as Record<string, unknown>);
 
   return {
+    policy_version: TELEMETRY_PRIVACY_POLICY_VERSION,
+    rule_families: ["sensitive_keys", "credential_text", "urls", "private_keys", "payment_cards"],
+    redaction_count: projected.redactionCount,
+    limits: { max_depth: 16, max_string_bytes: 16 * 1024, max_event_bytes: 256 * 1024 },
     sample_event_type: sampleEvent.event_type,
     sample_event_class: sampleEventClass,
     sample_can_create_incident: sampleEventClass === "incident_signal",
@@ -220,7 +246,8 @@ function buildPrivacyPreview(): DoctorPrivacyPreview {
       response_status: sampleEvent.payload.response_status
     },
     redacted_sample: {
-      payload: redacted
+      payload: protectedEvent.payload as JsonValue,
+      context: protectedEvent.context as JsonValue
     }
   };
 }
@@ -569,7 +596,7 @@ async function buildConnectedApiCheck(input: {
     return {
       name: "connected-api",
       status: "error",
-      message: `Connected API ${baseUrl} returned an invalid incidents response.`
+      message: `Connected API ${baseUrl} returned HTTP success, but this client could not validate the incidents response. Check the CLI and Node.js versions.`
     };
   }
 
@@ -657,7 +684,7 @@ export async function doctorCommand(
 ): Promise<CliCommandResult> {
   const cwd = dependencies.cwd ?? (() => process.cwd());
   const now = dependencies.now ?? (() => new Date());
-  const fetchImpl = dependencies.fetchImpl ?? fetch;
+  const fetchImpl = dependencies.fetchImpl ?? nodeFetch;
   const readAuthStateImpl = dependencies.readAuthState ?? readCliAuthState;
   const readdir = dependencies.readdir ?? readdirFromFs;
   const readFile = dependencies.readFile ?? ((filePath: string) => readFileFromFs(filePath, "utf8"));
@@ -688,7 +715,7 @@ export async function doctorCommand(
   const privacyPreview = input.privacy === true ? buildPrivacyPreview() : undefined;
 
   return {
-    exitCode: 0,
+    exitCode: resolveOverallStatus(checks) === "error" ? 1 : 0,
     output: input.json
       ? buildDoctorJsonOutput(checks, privacyPreview)
       : formatDoctorOutput(resolveOverallStatus(checks), checks, privacyPreview)

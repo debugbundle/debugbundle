@@ -1,7 +1,9 @@
 # SDK Interface Contract — DebugBundle
 
-Version: v1
-Last updated: 2026-07-27
+Version: v2
+Last updated: 2026-09-20
+
+The protected redaction contract below describes the next coordinated SDK release. Published v1 packages retain their prior behavior until upgraded, while compatible old events receive the server-side backstop. Package major versions and migration examples are required where an expressly supported custom-list override changes to additive behavior.
 
 This contract defines the standard interface that ALL DebugBundle SDKs must implement, regardless of language. It ensures behavioral consistency across Node.js, browser, Python, PHP/WordPress, Java, Go, Ruby, .NET, Android, Swift, React Native, and future language SDKs.
 
@@ -22,7 +24,7 @@ Every SDK must expose an init function that accepts a configuration object and r
 **Optional config fields:**
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `redactFields` | string[] | `["password", "secret", "token", "authorization", "cookie", "ssn", "credit_card"]` | Fields to redact. |
+| `redactFields` | string[] | `[]` in protected SDK versions | Additional fields to redact beyond the mandatory credential baseline. Existing published versions may use a smaller/replacement default; changing an expressly documented override uses a major-version migration. |
 | `sampleRate` | number (0.0–1.0) | `1.0` | Sampling rate for events. |
 | `batchSize` | number | `25` | Max events per batch. Language SDKs override: Node.js uses `50` (FR-SDK-06). |
 | `flushInterval` | number (ms) | `5000` | Max time before batch is sent. Language SDKs override: Node.js uses `2000` (FR-SDK-06). |
@@ -51,6 +53,7 @@ Rules:
 - A valid replacement may change any event field allowed by the canonical event schema; implementations must not invent additional identity immutability restrictions.
 - The SDK must validate the complete returned envelope against the canonical closed event schema.
 - If the hook throws, panics, or returns an invalid event, the SDK must keep the SDK-owned original event, emit only a bounded internal diagnostic where supported, and must not throw into host code.
+- The SDK-owned original is already sanitized. Every valid returned event must pass mandatory sanitization and complete canonical schema validation again before policy evaluation, buffering, persistence, or transmission. Failure of mandatory sanitization withholds the unsafe field or event without throwing into host code.
 - Mutating the hook input without returning a valid replacement must not mutate the SDK-owned original.
 - Hook execution must not block request/response handling beyond normal synchronous JavaScript/runtime execution.
 - Fatal signal handlers, hard-crash handlers, and shutdown paths may skip application hook execution when invoking user code is unsafe. Each affected SDK must document the restriction; replayed crash events use the normal hook pipeline when safe.
@@ -297,7 +300,9 @@ debugbundle.capture_async()         # asyncio loop exception handler
 | structlog | Processor | `structlog.configure(processors=[..., debugbundle_processor])` |
 | loguru | Custom sink | `logger.add(debugbundle.loguru_sink)` |
 
-### 3.4 Go — Vanilla Hooks
+### 3.4 Go — Vanilla Hooks (legacy v1 example)
+
+The protected v2 candidate uses `github.com/debugbundle/debugbundle-go/v2` for the root and every subpackage, with the current instance-first `debugbundle.New` API. Existing v1 imports remain supported by their published tags. Review replacement-style `RedactFields` rules before upgrading; they are additive to the mandatory baseline in v2. The historical example below describes the original v1 interface, not an installation instruction for the unreleased v2 candidate.
 
 ```go
 package main
@@ -660,12 +665,14 @@ All SDKs must implement duplicate suppression:
 
 ## 8. Redaction
 
-All SDKs must implement field redaction before transmission:
+Protected SDK versions must implement bounded field and recognized credential-value redaction before any DebugBundle-owned buffer, local persistence, or transmission:
 
-- Default redact list applied to all captured data.
-- Users can extend or override the redact list via config.
+- The SEC-21/22 key baseline and documented credential-value rules apply to all supported captured application data, including context and free-text fields.
+- Users can extend this baseline with language-idiomatic `redactFields` configuration and app-owned hooks, but cannot override or disable mandatory credential rules. A documented legacy override remains available only in legacy package versions through their deprecation/migration window; a protected SDK release that changes this public behavior follows the major-version policy.
 - Redacted values replaced with `[REDACTED]`.
-- Redaction is applied before any network call — sensitive data must never leave the process.
+- Accepted `beforeSend` replacements pass the mandatory scrub again before any retention or network call; hook exceptions/invalid returns keep an already-safe original.
+- Unscannable/over-budget sensitive containers are withheld rather than sending an uninspected original. Native fatal paths may store only a pre-sanitized snapshot or fixed safe fields and recheck during recovery.
+- No automatic detector guarantees removal of unknown private prose or business identifiers. Customers can reduce capture and add rules for their domain; server ingestion and agent output also enforce a backstop.
 
 ---
 
@@ -705,7 +712,7 @@ Framework integrations must auto-register log capture alongside error/request ca
 
 ### V1 SDK Targets (Wave 1)
 
-> Node.js, Browser, shared-types, and redaction live in the JS SDK monorepo: `github.com/debugbundle/debugbundle-js`
+> Node.js and Browser live in the JS SDK monorepo: `github.com/debugbundle/debugbundle-js`. The maintained shared-types and redaction source remains in the core repository; the SDK monorepo consumes their published packages.
 
 | Language | Package | Registry | Phase | Status |
 |----------|---------|----------|-------|--------|
@@ -714,7 +721,7 @@ Framework integrations must auto-register log capture alongside error/request ca
 | Python | `debugbundle-python` | PyPI | Phase 18 | Released v1.3.0 |
 | PHP | `debugbundle/sdk-php` | Packagist | Phase 18a | Released v1.3.0 |
 | Java | `com.debugbundle:debugbundle-java-core`, servlet/JAX-RS adapters, `com.debugbundle:debugbundle-spring-boot-starter`, and `com.debugbundle:debugbundle-java-agent` | Maven Central | Java SDK | Released v1.3.0 |
-| Go | `github.com/debugbundle/debugbundle-go` | Go modules | Phase 18b | Released v1.3.0 |
+| Go | Published v1: `github.com/debugbundle/debugbundle-go`; protected v2 candidate: `github.com/debugbundle/debugbundle-go/v2` | Go modules | Phase 18b | v1 published; v2 source candidate only |
 | Ruby | `debugbundle` | RubyGems | Phase 18c | Released v1.3.0 |
 
 ### V1 SDK Targets (Wave 2 — Enterprise & Platform Depth)

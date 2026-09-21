@@ -1,7 +1,7 @@
 # Requirements — DebugBundle
 
 Version: v1
-Last updated: 2026-09-10
+Last updated: 2026-09-20
 
 ---
 
@@ -9,7 +9,7 @@ Last updated: 2026-09-10
 
 ### 1.1 SDK Capture
 
-> **Repo note:** Node.js and Browser SDK packages (`@debugbundle/sdk-node`, `@debugbundle/sdk-browser`) along with `@debugbundle/shared-types` and `@debugbundle/redaction` live in the JS SDK monorepo: `github.com/debugbundle/debugbundle-js`.
+> **Repo note:** Node.js and Browser SDK packages (`@debugbundle/sdk-node`, `@debugbundle/sdk-browser`) live in the JS SDK monorepo: `github.com/debugbundle/debugbundle-js`. The maintained source for `@debugbundle/shared-types` and `@debugbundle/redaction` lives in this core repository's `packages/`; the SDK repo consumes their published packages.
 
 **FR-SDK-01:** Provide a Node.js backend SDK (`@debugbundle/sdk-node`) supporting Express, Fastify, and Next.js API routes.
 
@@ -41,7 +41,7 @@ Last updated: 2026-09-10
 
 **FR-SDK-13:** SDKs must support configurable sampling (0.0–1.0) to control the fraction of events captured. Default: 1.0 (capture all). Sampling applies before network transmission to reduce overhead.
 
-**FR-SDK-13a:** SDKs must support an optional synchronous `beforeSend` init hook where the runtime can safely inspect a fully built event before buffering. Returning `null` drops the event locally. Hook failures or invalid returned events must not throw into host code and must preserve the original event. The hook is for app-owned local policy such as final redaction or tenant-specific suppression; project capture rules remain the preferred operational noise-control surface.
+**FR-SDK-13a:** SDKs must support an optional synchronous `beforeSend` init hook where the runtime can safely inspect a fully built, already-sanitized event before buffering. Returning `null` drops the event locally. Hook failures or invalid returned events must not throw into host code and must preserve the SDK-owned, already-sanitized original event. A valid returned event must pass mandatory sanitization and schema validation again before any DebugBundle-owned retention or transmission. The hook is for app-owned local policy such as additional redaction or tenant-specific suppression; project capture rules remain the preferred operational noise-control surface. A failure of mandatory sanitization withholds unsafe telemetry without throwing into host code.
 
 **FR-SDK-22:** Browser SDK must inject `X-DebugBundle-Trace-Id` header (UUID v4) into same-origin `fetch`/`XMLHttpRequest` requests and cross-origin first-party requests that match explicit `tracePropagationTargets`. It must not inject trace headers into arbitrary third-party requests by default. Backend SDKs must read this header and attach the trace ID to all events from that request. If header is absent, backend events are ungrouped from frontend — no failure. The browser fetch wrapper must preserve native fetch behavior, including `Request` inputs and all valid `HeadersInit` shapes (`Headers`, header tuple arrays, and header records), so trace injection never drops application headers such as `Authorization`.
 
@@ -82,7 +82,7 @@ Last updated: 2026-09-10
 
 **FR-SDK-29:** Browser SDK must collect device and browser metadata on `init()` and attach it to all outgoing frontend event payloads as a `device` field. Collected data: raw user agent string (`navigator.userAgent`), parsed browser name/version (prefer `navigator.userAgentData` with `navigator.userAgent` fallback), parsed client OS name/version, device type classification (`desktop`/`mobile`/`tablet`/`unknown`), screen resolution (`screen.width` × `screen.height`), viewport size (`window.innerWidth` × `window.innerHeight`), device pixel ratio (`window.devicePixelRatio`), touch capability (`navigator.maxTouchPoints`), language/locale (`navigator.language`), network connection type (`navigator.connection.effectiveType` when available), and color scheme preference (`prefers-color-scheme` media query). Collection is a one-time snapshot on `init()` — values are not live-updated. Unavailable fields are set to `null`. No fine-grained hardware identifiers (GPU model, serial numbers) are collected. Device context is subject to the same redaction rules as all other captured data. The bundle generation pipeline populates `context.device` from `frontend_exception` device data.
 
-**FR-SDK-30:** Provide a Go backend SDK (`github.com/debugbundle/debugbundle-go`) supporting net/http middleware, Gin middleware, and Echo middleware. Must implement the universal SDK interface with Go-idiomatic naming (`Init`, `CaptureException`, `CaptureError`, `CaptureLog`, `CaptureRequest`, `CaptureMessage`, `SetContext`, `Flush`, `Probe`). Must use `context.Context` for per-request correlation, support panic recovery via `recover()`, keep performance overhead low with minimal allocations, and follow the detailed implementation plan in `spec/sdks/go-sdk.md`.
+**FR-SDK-30:** Provide a Go backend SDK (published v1 module `github.com/debugbundle/debugbundle-go`, protected v2 candidate `github.com/debugbundle/debugbundle-go/v2`) supporting net/http middleware, Gin middleware, and Echo middleware. A breaking major release must use Go's `/v2` semantic import path while preserving existing v1 installs and tags. Must implement the universal SDK interface with Go-idiomatic naming (`Init`, `CaptureException`, `CaptureError`, `CaptureLog`, `CaptureRequest`, `CaptureMessage`, `SetContext`, `Flush`, `Probe`). Must use `context.Context` for per-request correlation, support panic recovery via `recover()`, keep performance overhead low with minimal allocations, and follow the detailed implementation plan in `spec/sdks/go-sdk.md`.
 
 **FR-SDK-31:** Provide a Ruby backend SDK (`debugbundle` on RubyGems) supporting Rails (Railtie + middleware), Rack middleware, and Sidekiq server middleware. Must implement the universal SDK interface with Ruby-idiomatic naming (`init`, `capture_exception`, `capture_error`, `capture_log`, `capture_request`, `capture_message`, `set_context`, `flush`, `probe`). Must support background job context capture alongside web request capture and follow the detailed implementation plan in `spec/sdks/ruby-sdk.md`.
 
@@ -293,6 +293,8 @@ Project list/detail metrics must include `attention_incidents_today`, counting i
 **FR-CLI-04:** All commands must support human-readable output and `--json` for machine-readable output.
 
 **FR-CLI-05:** Exit codes: 0 (success), 1 (general failure), 2 (auth/config error), 3 (resource not found), 4 (validation error).
+
+Incident/improvement lifecycle writes with an unreadable success response, a transport failure, or an HTTP 5xx must report `mutation_outcome_unconfirmed` with no automatic retry. JSON includes `outcome: "unknown"` and `retry_safe: false`; callers must inspect current state before retrying. Exit 1 in this case means unavailable confirmation, not a proven failed write. Doctor reports with errors exit 1; healthy or warning-only reports retain exit 0.
 
 **FR-CLI-06:** CLI auth must support three bootstrap paths that all converge on the same stored member-token state in `~/.debugbundle/auth.json`: (a) direct member-token login, (b) GitHub device flow via `debugbundle login --github` / `--github-device`, and (c) GitHub CLI token bootstrap via `debugbundle login --github-cli` when `gh` is already authenticated. No dashboard dependency for daily operations.
 
@@ -839,6 +841,10 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 **NFR-SEC-08:** Object storage access restricted via signed credentials.
 
 **NFR-SEC-09:** No internal stack traces or secrets exposed to clients.
+
+**NFR-SEC-12:** For supported event application data, apply the mandatory credential/key and bounded value policy before SDK buffering, file/native queue persistence, or transmission; validate and apply it again before server event persistence. All supported SDK languages, browser relays, installed-client ingestion compatibility shapes, and `beforeSend` replacements must meet the same required policy. Custom fields add protection and cannot remove the mandatory baseline in protected SDK versions. Changes to published override semantics use an explicit versioned migration path. Unknown private prose and customer-specific identifiers still require capture minimization and customer rules; automatic detection cannot promise universal removal.
+
+**NFR-SEC-13:** Sanitize new and historical customer evidence at every API/CLI/MCP/download/notification/agent output boundary, in addition to collection-time controls. Restricted agent credentials must be distinct from member and project tokens, scoped to one project, enforced by server/domain authorization, read-only over existing minimized evidence, and rejected rather than promoted by old servers. Do not regenerate, enqueue, write customer-visible state, or expose raw logs/bodies through the restricted surface.
 
 **NFR-SEC-10:** Config environment-driven; no hard-coded credentials.
 

@@ -101,6 +101,8 @@ DebugBundle supports two runtime modes: **local-only** (no cloud account require
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+The CLI keeps its `retrieval-commands.ts` import path while list/detail/context and lifecycle/artifact commands live in separate modules and share bounded evidence formatting. API, CLI, MCP, and hosted output projection protect supported retained evidence at read time; old raw objects are not rewritten.
+
 The approved official OpenAI Plugin adds one isolated read-only retrieval path without changing the diagram's existing stdio MCP/CLI surface:
 
 ```text
@@ -229,6 +231,8 @@ apps/
         github.ts            — GitHub App callback, installation webhook intake, installation status, project repo assignment, dispatch-rule CRUD, and dispatch-delivery history/retry routes
         github-marketplace-webhook.ts — GitHub Marketplace webhook intake for listing purchase/subscription tracking and install attribution
         tokens.ts            — Token lifecycle CRUD (project + member)
+        agent-tokens.ts      — Owner/admin lifecycle for expiring, hashed single-project agent credentials
+        agent-evidence.ts    — Fixed minimized incident reads; distinct agent authentication and live project access
         webhooks.ts          — Webhook CRUD, synthetic test delivery, and delivery history retrieval
         weekly-report-channels.ts — Weekly report channel CRUD
         stripe-webhook.ts    — Stripe webhook ingestion (POST /v1/billing/stripe-webhook, signature verification, idempotency, entitlement recompute, and Stripe-period sync)
@@ -343,7 +347,8 @@ site/                    — Real standalone clone of github.com/debugbundle/sit
   shared-types/  — Zod schemas, TypeScript types, constants, tier capabilities
   auth/          — Sessions, passwords, verification, token validation/generation, auth middleware
   redaction/     — Sensitive data scrubbing
-  token-management/ — HTTP client for token lifecycle (shared by CLI/MCP)
+  token-management/ — HTTP client for project/member/agent token lifecycle (shared by CLI/MCP)
+  agent-read-client/ — Bounded GET-only restricted evidence transport and output projection for CLI/MCP
   project-management-client/ — HTTP client for project lifecycle selection/creation/deletion used by CLI and MCP parity flows
   billing-client/ — HTTP client for billing summary and allowance-capacity management shared by CLI and MCP parity flows
   retrieval-client/ — HTTP client for retrieval parity surfaces shared by CLI/MCP
@@ -426,7 +431,7 @@ Automatic SDK error/log hooks respect caller suppression: PHP's current non-fata
 5. **Interface parity** — API = CLI = MCP capabilities
 6. **Tokens hashed at rest** — plaintext shown once, stored as SHA-256
 7. **Webhook signing** — HMAC-SHA256 on all outgoing payloads
-8. **Auth split by client type** — SPA uses cookie sessions, CLI/stdio MCP/OpenClaw use member tokens, SDKs use project tokens, and the official OpenAI-hosted MCP resource uses audience-bound OAuth access tokens; none are interchangeable. Member-authorized routes may accept either browser sessions or member tokens, but project-scoped actions must converge on the same explicit per-project access checks. Project invite acceptance is browser-session-authenticated against the signed-in user's email and creates `project_members` access without adding the invitee to the owner's billing/account container. GitHub auth now has two additive tracks: browser redirect auth through `GET /v1/auth/github/start` and `GET /v1/auth/github/callback`, plus CLI bootstrap through `POST /v1/auth/github/device/start|poll|claim` and `POST /v1/auth/github/token/exchange`, both of which ultimately issue the same member-token auth state used by CLI and stdio MCP. Google sign-in remains deferred (see `/spec/auth-architecture.md`)
+8. **Auth split by client type** — SPA uses cookie sessions, ordinary CLI/stdio MCP/OpenClaw use member tokens, SDKs use project tokens, restricted agent CLI/MCP uses expiring single-project `dbundle_agent_` credentials for five existing minimized read operations, and the official OpenAI-hosted MCP resource uses audience-bound OAuth access tokens; none are interchangeable. Member-authorized routes may accept either browser sessions or member tokens, but project-scoped actions must converge on the same explicit per-project access checks. Project invite acceptance is browser-session-authenticated against the signed-in user's email and creates `project_members` access without adding the invitee to the owner's billing/account container. GitHub auth now has two additive tracks: browser redirect auth through `GET /v1/auth/github/start` and `GET /v1/auth/github/callback`, plus CLI bootstrap through `POST /v1/auth/github/device/start|poll|claim` and `POST /v1/auth/github/token/exchange`, both of which ultimately issue the same member-token auth state used by CLI and stdio MCP. Google sign-in remains deferred (see `/spec/auth-architecture.md`)
 9. **Event class billing integrity** — Free counts only `incident_signal`, paid counts `incident_signal` + `context_signal`, `operational_signal` excluded all tiers; `event_class` immutable after normalization (INV-15)
 10. **Capture policy and capture-rule server-side enforcement** — ingestion API rejects events violating project capture policy with `capture_policy_rejected`, and applies project capture rules before persistence so matching events can be dropped, sampled out, or demoted deterministically (INV-16)
 11. **Relay wire format alignment** — browser relay output uses the same file format as server SDK file transport; `debugbundle process` consumes relay-written files without special-casing (INV-17)
@@ -501,3 +506,7 @@ Core 1.9.1 forwards `WORKER_START_PAUSED` through `worker-env.ts` into startup a
 Core 1.9.2 aligns analytics bundle processing with the durable queue `dequeue` contract and removes its direct Redis acknowledgement. The shared worker lane owns completion/retry, including recovery after an artifact completes but its journal acknowledgement fails. Real runtime-composition and storage-backed analytics regressions cover this boundary.
 
 The retained OpenAI reviewer health fixture is seeded disabled so privacy-test URLs cannot enter live scheduling; its historical results and rollups remain readable. `make incident-recovery-check` exercises the actual API/worker and real disposable Postgres, Redis and object storage, including ingress persistence and worker-lease recovery under traffic. See `spec/incident-recovery-validation.md`; hosted Redis persistence and exact-volume rollout belong to the private cloud companion.
+
+Public HTTP documentation is composed in `apps/api/src/openapi.ts` from functional operation modules and shared schema/components; `openapi-agent.ts` documents the distinct restricted credential boundary.
+
+CLI runtime compatibility: `packages/node-http/src/index.ts` pairs the pinned Undici fetch and dispatcher for CLI/default MCP/scoped-agent reads, avoiding Node 26.0.0 compressed HTTP/2 header loss. `packages/retrieval-client/src/mutation-outcome.ts` carries fixed no-retry guidance for unconfirmed lifecycle mutations. `make cli-runtime-check` verifies clean installed CLI packages against synthetic loopback HTTP/1 and HTTP/2 servers across the supported Node matrix.

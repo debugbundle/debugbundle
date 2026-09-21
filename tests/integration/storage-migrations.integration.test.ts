@@ -175,6 +175,21 @@ runIntegration("storage bootstrap integration", () => {
     expect((await migrateStorageSchema(db)).applied).toEqual([]);
   });
 
+  it("upgrades an existing database to isolated agent tokens before new API readiness", async () => {
+    await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
+    await pool.query("CREATE SCHEMA public");
+    const db = createQueryable(pool);
+    await bootstrapStorageSchema(db);
+    await migrateStorageSchema(db);
+    await pool.query("DROP TABLE agent_tokens");
+    const migrationId = "202609200001_add_project_scoped_agent_tokens";
+    await pool.query("DELETE FROM storage_migration_ledger WHERE id = $1", [migrationId]);
+    await expect(assertStorageSchemaMigrationsApplied(db)).rejects.toThrow(`storage_schema_missing_migrations: ${migrationId}`);
+    expect((await migrateStorageSchema(db)).applied).toEqual([migrationId]);
+    await expect(assertStorageSchemaMigrationsApplied(db)).resolves.toBeUndefined();
+    expect((await pool.query("SELECT to_regclass('public.agent_tokens')::text AS table_name")).rows[0]?.table_name).toBe("agent_tokens");
+  });
+
   it("adds the internal journey sample correlation hash through the ordered forward migration", async (): Promise<void> => {
     await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
     await pool.query("CREATE SCHEMA public");

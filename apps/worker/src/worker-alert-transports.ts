@@ -10,6 +10,7 @@ import {
   decryptIntegrationSecret,
   type SlackDestinationStore
 } from "../../../packages/storage/src/index.js";
+import { sanitizeTelemetry } from "../../../packages/redaction/src/index.js";
 import {
   AlertDeliveryError,
   type AlertDeliveryTransport,
@@ -25,6 +26,21 @@ interface CreateAlertTransportInput {
   emailAssetBaseUrl?: string | null;
   apiBaseUrl?: string | null;
   resolveProjectName?: (projectId: string) => Promise<string | null>;
+}
+
+function safeAlertPayload(payload: unknown): Record<string, unknown> {
+  const result = sanitizeTelemetry(payload);
+  if (!result.ok || result.value === null || Array.isArray(result.value) || typeof result.value !== "object") {
+    throw new AlertDeliveryError("alert_payload_unsafe");
+  }
+  return result.value;
+}
+
+function safeAlertText(value: string | null | undefined): string | null {
+  if (value === undefined || value === null) return null;
+  const result = sanitizeTelemetry(value);
+  if (!result.ok || typeof result.value !== "string") throw new AlertDeliveryError("alert_payload_unsafe");
+  return result.value;
 }
 
 function buildAlertNotificationInput(
@@ -109,7 +125,7 @@ export function createAlertTransport(input: CreateAlertTransportInput): AlertDel
         headers: {
           "content-type": "application/json"
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(safeAlertPayload(payload)),
         signal: controller.signal
       });
 
@@ -125,8 +141,7 @@ export function createAlertTransport(input: CreateAlertTransportInput): AlertDel
         throw new AlertDeliveryError("alert_timeout");
       }
 
-      const message = error instanceof Error ? error.message : String(error);
-      throw new AlertDeliveryError(`alert_transport_error:${message}`);
+      throw new AlertDeliveryError("alert_transport_error");
     } finally {
       // Only status is consumed; release any unread response body/connection.
       controller.abort();
@@ -136,7 +151,8 @@ export function createAlertTransport(input: CreateAlertTransportInput): AlertDel
 
   return {
     async deliver(event): Promise<void> {
-      const projectName = await input.resolveProjectName?.(event.project_id);
+      const projectName = safeAlertText(await input.resolveProjectName?.(event.project_id));
+      const safePayload = safeAlertPayload(event.payload);
 
       if (event.channel === "email") {
         if (input.emailTransport === null) {
@@ -152,6 +168,7 @@ export function createAlertTransport(input: CreateAlertTransportInput): AlertDel
         const rendered = renderAlertEmail(
           buildAlertNotificationInput(input, {
             ...event,
+            payload: safePayload,
             project_name: projectName ?? null
           })
         );
@@ -163,9 +180,8 @@ export function createAlertTransport(input: CreateAlertTransportInput): AlertDel
             text: rendered.text,
             html: rendered.html
           });
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          throw new AlertDeliveryError(`alert_email_error:${message}`);
+        } catch {
+          throw new AlertDeliveryError("alert_email_error");
         }
         return;
       }
@@ -208,6 +224,7 @@ export function createAlertTransport(input: CreateAlertTransportInput): AlertDel
         const slackPayload = renderAlertSlackMessage(
           buildAlertNotificationInput(input, {
             ...event,
+            payload: safePayload,
             project_name: projectName ?? null
           })
         );
@@ -223,11 +240,11 @@ export function createAlertTransport(input: CreateAlertTransportInput): AlertDel
         }
 
         const summary =
-          typeof event.payload["summary"] === "string"
-            ? event.payload["summary"]
+          typeof safePayload["summary"] === "string"
+            ? safePayload["summary"]
             : "Alert triggered";
         const eventType =
-          typeof event.payload["event_type"] === "string" ? event.payload["event_type"] : "alert";
+          typeof safePayload["event_type"] === "string" ? safePayload["event_type"] : "alert";
         const discordPayload = {
           content:
             projectName === undefined || projectName === null
@@ -264,8 +281,8 @@ export function createAlertTransport(input: CreateAlertTransportInput): AlertDel
         }
 
         await deliverViaWebhook(targetUrlValue, {
-          ...event.payload,
-          ...(typeof event.payload["project_name"] === "string" ||
+          ...safePayload,
+          ...(typeof safePayload["project_name"] === "string" ||
           projectName === undefined ||
           projectName === null
             ? {}
@@ -291,13 +308,14 @@ export function createAlertEmailDigestTransport(
         throw new AlertDeliveryError("alert_email_not_configured");
       }
 
-      const projectName = await input.resolveProjectName?.(event.project_id);
+      const projectName = safeAlertText(await input.resolveProjectName?.(event.project_id));
 
       const rendered = renderAlertDigestEmail({
         brandMarkUrl: buildEmailBrandMarkUrl(input.emailAssetBaseUrl ?? input.appBaseUrl),
         alerts: event.items.map((item) =>
           buildAlertDigestEntryInput(input, {
             ...item,
+            payload: safeAlertPayload(item.payload),
             project_name: projectName ?? null
           })
         )
@@ -310,9 +328,8 @@ export function createAlertEmailDigestTransport(
           text: rendered.text,
           html: rendered.html
         });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        throw new AlertDeliveryError(`alert_email_error:${message}`);
+      } catch {
+        throw new AlertDeliveryError("alert_email_error");
       }
     }
   };

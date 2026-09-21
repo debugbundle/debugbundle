@@ -522,6 +522,12 @@ describe("cli main core routing", () => {
     });
   });
 
+  it("passes an explicit doctor authentication file without changing other options", async () => {
+    const doctorCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "doctor" });
+    await runCli(["doctor", "--auth-file", "/tmp/synthetic-auth.json", "--json"], { doctorCommand });
+    expect(doctorCommand).toHaveBeenCalledWith({ authFilePath: "/tmp/synthetic-auth.json", json: true });
+  });
+
   it("routes doctor --privacy arguments into the doctor command", async () => {
     const doctorCommand = vi.fn().mockResolvedValue({
       exitCode: 0,

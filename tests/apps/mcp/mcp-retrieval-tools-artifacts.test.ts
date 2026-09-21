@@ -4,6 +4,25 @@ import { RetrievalApiError } from "../../../packages/retrieval-client/src/index.
 import { createRetrievalMcpTools } from "../../../apps/mcp/src/retrieval-tools.js";
 
 describe("mcp retrieval tools artifacts", () => {
+  it("scrubs historical incident, log, and context output at the final tool boundary", async () => {
+    const tools = createRetrievalMcpTools({
+      listIncidents: vi.fn(),
+      getIncident: vi.fn().mockResolvedValue({ incident_id: "inc_123", title: "password=SYNTHETIC_TITLE_SECRET" }),
+      getIncidentContext: vi.fn().mockResolvedValue({
+        incident: { incident_id: "inc_123", title: "token=SYNTHETIC_CONTEXT_SECRET" }
+      }),
+      resolveIncident: vi.fn(),
+      reopenIncident: vi.fn(),
+      getBundle: vi.fn(),
+      getLogs: vi.fn().mockResolvedValue({ logs: [{ message: "Authorization: Bearer SYNTHETIC_LOG_SECRET" }] }),
+      getReproduction: vi.fn()
+    });
+
+    const input = { bearerToken: "dbundle_mem_test", source: "cloud", incidentId: "inc_123" };
+    expect(JSON.stringify(await tools.get_incident(input))).not.toContain("SYNTHETIC_");
+    expect(JSON.stringify(await tools.get_incident_context(input))).not.toContain("SYNTHETIC_");
+    expect(await tools.get_logs(input)).toEqual({ logs: [{ message: "Authorization: [REDACTED]" }] });
+  });
   it("returns bundle and reproduction payloads and maps errors", async () => {
     const tools = createRetrievalMcpTools({
       listIncidents: vi.fn().mockResolvedValue([]),

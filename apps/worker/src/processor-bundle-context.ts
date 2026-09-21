@@ -1,19 +1,12 @@
-import { gunzipSync } from "node:zlib";
 import { isObjectMissing } from "../../../packages/storage/src/object-store-errors.js";
-import { validateEvent } from "../../../packages/event-normalizer/src/index.js";
+import { parseStoredEvent } from "../../../packages/event-normalizer/src/index.js";
 import type { BundleBuildContext } from "../../../packages/storage/src/index.js";
 import { buildRawEventObjectKey } from "../../../packages/storage/src/index.js";
 import { type EventEnvelope } from "../../../packages/shared-types/src/index.js";
 import { type BuildBundleWorkerDependencies } from "./processor-shared.js";
 
 export function parseEventEnvelopeFromRaw(rawBody: Buffer): EventEnvelope | null {
-  try {
-    const parsed = JSON.parse(gunzipSync(rawBody).toString("utf8")) as unknown;
-    const validated = validateEvent(parsed);
-    return validated.success ? validated.data : null;
-  } catch {
-    return null;
-  }
+  return parseStoredEvent(rawBody);
 }
 
 export function toIsoTimestamp(value: string): string {

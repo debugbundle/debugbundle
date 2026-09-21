@@ -13,6 +13,7 @@ import {
 } from "../../../packages/shared-types/src/index.js";
 import {
   buildUserAvatarObjectKey,
+  createAgentTokenStore,
   createPostgresAvailabilityCheckStore,
   createPostgresAccountAnalyticsStore,
   createPostgresAccountStore,
@@ -45,6 +46,7 @@ import {
 } from "../../../packages/storage/src/index.js";
 import { createBillingManagement } from "./billing-management.js";
 import { createDefaultAnalyticsDependencies } from "./default-analytics-dependencies.js";
+import { createOpenAiHostedReadDependencies } from "./openai-mcp-dependencies.js";
 import { createEnvBillingLinkProvider } from "./billing-links.js";
 import { createDefaultGitHubManagement } from "./default-github-management.js";
 import { createDefaultRegenerationDependencies } from "./default-regeneration-dependencies.js";
@@ -287,6 +289,9 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
     ...(input.authRateLimiter === undefined ? {} : { authRateLimiter: input.authRateLimiter }),
     auditLogging: auditLogStore,
     memberAuth,
+    agentTokens: createAgentTokenStore(input.db),
+    agentReads: createOpenAiHostedReadDependencies({ db: input.db, objectStoreReader: input.objectStore }),
+    agentDashboardBaseUrl: input.appBaseUrl ?? "https://app.debugbundle.com",
     webAuth,
     accountDeletionAuth,
     githubCliAuth,

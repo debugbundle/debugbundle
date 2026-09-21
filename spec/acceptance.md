@@ -1,7 +1,7 @@
 # Acceptance Criteria — DebugBundle
 
 Version: v1
-Last updated: 2026-09-10
+Last updated: 2026-09-20
 
 ---
 
@@ -128,8 +128,96 @@ Native logger level/silent/processor filtering runs before SDK capture; enabled-
 - **And** returning a valid event ships that event
 - **And** returning `null` drops the event locally
 - **And** hook exceptions or invalid returned events keep the original event and never throw into host code
+- **And** the kept original has already passed mandatory sanitization
+- **And** a valid returned event is sanitized and schema-validated again before any DebugBundle-owned buffer, file, queue, or transport
+- **And** a failure of mandatory sanitization withholds the unsafe field or event without throwing into host code
 - **And** mutating the hook input cannot mutate the SDK-owned original unless that valid returned event is selected
 - **And** a runtime may skip application hook execution only on an unsafe fatal/crash/shutdown path, and documents that restriction
+
+### AC-PRIV-01: Mandatory Baseline Across SDKs
+
+- **Given** the versioned shared conformance corpus with sensitive keys and credential values in supported event application-data fields
+- **When** each of Node.js, Browser, Python, PHP, WordPress backend/browser, Java, Go, Ruby, .NET, Android, Swift, and React Native captures the corresponding event
+- **Then** mandatory matches are absent from the first DebugBundle-owned buffer, disk queue, local file, relay spool, and outbound bytes
+- **And** positive-control diagnostic fields and canonical correlation remain useful and schema-valid
+
+### AC-PRIV-02: Server Storage And Derived Records
+
+- **Given** a valid old, new, or exact installed-client compatibility event with sensitive context, payload, and supported value strings
+- **When** ingestion accepts and processes it
+- **Then** no mandatory marker reaches compressed object bytes, queue diagnostics, normalized records, incident metadata, or generated artifacts
+- **And** indexed acceptance/rejection and safe unrelated batch entries preserve their existing contracts
+
+### AC-PRIV-03: Additive Customization And Hook Isolation
+
+- **Given** custom sensitive fields, an empty custom list, a hook that reintroduces a credential, or a throwing/invalid hook
+- **When** an updated SDK captures the event
+- **Then** custom fields extend the mandatory baseline, the returned valid event is sanitized again, and invalid hooks retain only the already-safe SDK original
+- **And** a sanitizer failure withholds unsafe data while preserving application behavior
+- **And** published legacy override behavior is changed only with a documented versioned migration
+
+### AC-PRIV-04: Bounded Deterministic Sanitization
+
+- **Given** deep, wide, cyclic, aliased, oversized, malformed, encoded, or adversarial near-match input
+- **When** each applicable sanitizer runs twice
+- **Then** it terminates within the documented budgets, yields identical safe output, never mutates caller-owned input, and does not disclose user values or keys in diagnostics
+- **And** budget exhaustion never forwards an unexamined prefix or original container
+
+### AC-PRIV-05: Historical Egress
+
+- **Given** an artifact or local cache created before the new policy
+- **When** it is retrieved, downloaded, projected, dispatched, or delivered
+- **Then** every supported output enforces current policy without rewriting old stored records on a read
+- **And** unscannable or unsafe historical executable text is withheld with a bounded status
+
+### AC-PRIV-06: Rich And Minimized Interface Compatibility
+
+- **Given** ordinary API/CLI/MCP and hosted OpenAI clients
+- **When** they retrieve equivalent existing evidence
+- **Then** established response schemas and authorized capabilities remain compatible while customer strings are scrubbed
+- **And** hosted OpenAI and restricted profiles retain their stricter field allowlists, scope checks, and output bounds
+
+### AC-PRIV-07: Enforced Agent Scope
+
+- **Given** a restricted credential issued for one project
+- **When** it calls each allowed and forbidden route/tool/domain operation, including guessed cross-project IDs and direct HTTP access
+- **Then** only bounded reads of existing minimized evidence in that project succeed
+- **And** mutation, raw log/body/download, regeneration, queueing, or credential fallback has zero reachable domain calls
+
+### AC-PRIV-08: Migration And Rollback Safety
+
+- **Given** the pre-upgrade schema and a previous supported API image
+- **When** the additive credential migration and mixed-version deployment run
+- **Then** migration ledger/checksum and readiness gates pass in order, previous member/project tokens retain behavior, and previous code rejects the distinct restricted prefix
+- **And** missing migration, unknown policy, expiry, revocation, lost issuer access, and rollback fail closed
+
+### AC-PRIV-09: SDK Package And Native Runtime Proof
+
+- **Given** committed fixture snapshots in every standalone SDK checkout
+- **When** functional, integration, coverage, packed-consumer, and published-artifact gates run
+- **Then** all supported language/platform rows pass independently; Android, Swift, and both React Native bridges also demonstrate durable-queue and actual runtime paths
+- **And** package availability, server deployment, and customer adoption are reported as distinct states
+
+### AC-PRIV-10: Debugging Utility And Stable Grouping
+
+- **Given** synthetic safe errors that must remain distinct and secret variants that should group together
+- **When** sanitization, normalization, and bundle/reproduction generation run or replay
+- **Then** useful safe method, route, status, stack coordinate, deploy, and correlation evidence survives
+- **And** grouping changes are explicitly versioned, worker replays are idempotent, and identical bundle inputs remain byte-identical
+
+### AC-PRIV-11: Safe Preview And Diagnostics
+
+- **Given** synthetic privacy previews and fault-injected redaction, parser, retrieval, or authorization failures
+- **When** the CLI and operational diagnostics report them
+- **Then** only fixed reason codes, rule IDs, safe counts, and policy/limit information appear
+- **And** preview performs no network upload by default or payload-sampling telemetry
+
+### AC-PRIV-12: Evidence-Qualified Public Claims
+
+- **Given** the homepage safety section, security page, SDK documentation, and published integration guides
+- **When** their claims and examples are checked against released artifacts and operational evidence
+- **Then** option names, scope, current authentication, SDK upgrade requirements, retention boundaries, and AI-provider responsibilities are accurate
+- **And** no unverified universal-privacy, external-audit, or certification claim appears
 
 ### AC-SDK-14: Browser Device Context Capture
 
@@ -497,6 +585,8 @@ Native logger level/silent/processor filtering runs before SDK capture; enabled-
 - **When** `debugbundle resolve inc_42` is run
 - **Then** the CLI resolves the incident through the same lifecycle service used by the HTTP API
 - **And** the returned output includes the updated status and `resolved_at` timestamp
+- **And** if a lifecycle write receives an unreadable success response, loses its connection, or receives HTTP 5xx, CLI/MCP explicitly report an unconfirmed outcome without retrying the write; JSON CLI results set `outcome: "unknown"` and `retry_safe: false`
+- **And** clean installed CLI consumers on Node 22, 24, exact 26.0.0, exact 26.2.0, and current 26 can list incidents, read capture rules/suggestions, and resolve/reopen synthetic incidents over plain and compressed HTTP/1 and HTTP/2
 
 ### AC-CLI-04: Doctor Command
 
@@ -504,6 +594,7 @@ Native logger level/silent/processor filtering runs before SDK capture; enabled-
 - **When** `debugbundle doctor` is run
 - **Then** a structured status report is returned with check-by-check results
 - **And** `debugbundle doctor --json` returns machine-readable JSON
+- **And** error reports exit 1, healthy/warning-only reports exit 0, and `--auth-file <path>` uses the explicit login without modifying the default saved login
 
 ### AC-CLI-05: Local Verification
 

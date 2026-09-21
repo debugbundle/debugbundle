@@ -10,6 +10,16 @@ npm install -g @debugbundle/cli
 
 Supported Node.js versions: 22.x through 26.x.
 
+An unreadable response, connection loss, or server error during an
+incident/improvement lifecycle write reports `mutation_outcome_unconfirmed`.
+JSON output includes `outcome: "unknown"` and `retry_safe: false`; exit code 1
+means confirmation is unavailable, not that the write failed. Check the current
+state with a read before retrying. The CLI does not automatically repeat writes.
+A confirmed cloud result remains successful if only the local cache update fails;
+the incident carries `cache_warning: "cloud_cache_update_unavailable"`.
+`doctor` exits 1 when its report contains errors; warning-only reports still
+exit 0. `doctor --auth-file <path>` can check an explicit saved login.
+
 Check the installed CLI version with `debugbundle --version` or `debugbundle -v`.
 
 Or install it as a project development dependency:

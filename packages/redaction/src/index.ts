@@ -12,71 +12,13 @@ export interface RedactionOptions {
   replacement?: string;
 }
 
-const DEFAULT_SENSITIVE_KEYS = [
-  "password",
-  "secret",
-  "token",
-  "api_key",
-  "apikey",
-  "access_token",
-  "refresh_token",
-  "private_key",
-  "authorization",
-  "bearer",
-  "cookie",
-  "session_id",
-  "passwd",
-  "ssn",
-  "credit_card",
-  "card_number",
-  "cvv",
-  "cvc",
-  "pin",
-  "expiry",
-  "phone",
-  "otp",
-  "verification_code"
-] as const;
-
-function canonicalizeSensitiveKey(value: string): string {
-  return value.replace(/[^a-z0-9]+/g, "");
-}
-
-function splitKeyIntoSegments(key: string): string[] {
-  return key
-    .trim()
-    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((segment) => segment.length > 0);
-}
-
-function buildKeyCandidates(key: string): string[] {
-  const segments = splitKeyIntoSegments(key);
-  const candidates = new Set<string>();
-
-  for (let start = 0; start < segments.length; start += 1) {
-    let combined = "";
-    for (let end = start; end < segments.length; end += 1) {
-      combined += segments[end];
-      candidates.add(combined);
-    }
-  }
-
-  return [...candidates];
-}
-
-function isSensitiveKey(key: string, sensitiveKeys: readonly string[]): boolean {
-  const normalized = key.trim().toLowerCase();
-  if (sensitiveKeys.includes(normalized)) {
-    return true;
-  }
-
-  const canonicalSensitiveKeys = new Set(sensitiveKeys.map(canonicalizeSensitiveKey));
-  const candidates = buildKeyCandidates(key);
-
-  return candidates.some((candidate) => canonicalSensitiveKeys.has(candidate));
-}
+import { DEFAULT_SENSITIVE_KEYS, isSensitiveKey } from "./keys.js";
+export {
+  sanitizeTelemetry,
+  TELEMETRY_PRIVACY_POLICY_VERSION,
+  type TelemetrySanitizationResult,
+  type TelemetrySanitizationOptions
+} from "./telemetry.js";
 
 function redactInternal(
   value: JsonValue,

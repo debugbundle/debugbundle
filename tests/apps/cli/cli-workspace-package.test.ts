@@ -118,7 +118,8 @@ describe("cli workspace package", () => {
     expect(workflow).toContain("apps/cli/release-manifest.json");
     expect(workflow).toContain('cli-v*');
     expect(workflow).toContain('0.1.0');
-    expect(workflow).toContain('node-version: [22, 24, 26]');
+    expect(workflow).toContain('node-version: [22, 24, "26.0.0", "26.2.0", 26]');
+    expect(workflow).toContain('node scripts/check-cli-runtime.mjs');
     expect(workflow).toContain('needs: validate');
     expect(workflow).toContain('steps.published_state.outputs.state == \'all\'');
     expect(workflow).toContain('unexpected_prerelease_version');

@@ -6,6 +6,7 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 import packageJson from "../package.json" with { type: "json" };
 import { MCP_TOOL_CATALOG } from "./tool-catalog.js";
 import { LOCAL_AUTH_MCP_TOOL_CATALOG } from "./local-auth-catalog.js";
+import { AGENT_READ_MCP_TOOL_CATALOG } from "./agent-read-catalog.js";
 import type { ToolRegistry } from "./default-tools.js";
 
 export const MCP_SERVER_VERSION = packageJson.version;
@@ -103,10 +104,11 @@ function toJsonSchema(schema: unknown): Record<string, unknown> {
   }) as Record<string, unknown>;
 }
 
-export function createMcpServer(input: { tools: ToolRegistry; localAuth?: boolean }): {
+export function createMcpServer(input: { tools: ToolRegistry; localAuth?: boolean; agentRead?: boolean }): {
   handleRequest(request: JsonRpcRequest): Promise<JsonRpcResponse | null>;
 } {
-  const catalog = input.localAuth === true ? LOCAL_AUTH_MCP_TOOL_CATALOG : MCP_TOOL_CATALOG;
+  const catalog = input.agentRead === true ? AGENT_READ_MCP_TOOL_CATALOG
+    : input.localAuth === true ? LOCAL_AUTH_MCP_TOOL_CATALOG : MCP_TOOL_CATALOG;
   return {
     async handleRequest(request) {
       if (request.method === "notifications/initialized") {

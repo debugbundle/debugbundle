@@ -1,4 +1,4 @@
-import { RetrievalApiError } from "../../../packages/retrieval-client/src/index.js";
+import { RetrievalApiError, formatMutationOutcomeError } from "../../../packages/retrieval-client/src/index.js";
 import { createAuthenticatedRetrievalApi, runAuthenticatedCliCommand } from "./auth-context.js";
 import type { CliCommandResult } from "./token-commands.js";
 
@@ -117,7 +117,7 @@ export async function listImprovementsCommand(
   } catch (error) {
     return {
       exitCode: mapErrorToExitCode(error),
-      output: error instanceof Error ? error.message : String(error)
+      output: formatMutationOutcomeError(error, input.json) ?? (error instanceof Error ? error.message : String(error))
     };
   }
 }
@@ -137,7 +137,7 @@ export async function getImprovementCommand(
   } catch (error) {
     return {
       exitCode: mapErrorToExitCode(error),
-      output: error instanceof Error ? error.message : String(error)
+      output: formatMutationOutcomeError(error, input.json) ?? (error instanceof Error ? error.message : String(error))
     };
   }
 }
@@ -157,7 +157,7 @@ export async function resolveImprovementCommand(
   } catch (error) {
     return {
       exitCode: mapErrorToExitCode(error),
-      output: error instanceof Error ? error.message : String(error)
+      output: formatMutationOutcomeError(error, input.json) ?? (error instanceof Error ? error.message : String(error))
     };
   }
 }
@@ -177,7 +177,7 @@ export async function reopenImprovementCommand(
   } catch (error) {
     return {
       exitCode: mapErrorToExitCode(error),
-      output: error instanceof Error ? error.message : String(error)
+      output: formatMutationOutcomeError(error, input.json) ?? (error instanceof Error ? error.message : String(error))
     };
   }
 }
@@ -203,7 +203,7 @@ export async function snoozeImprovementCommand(
   } catch (error) {
     return {
       exitCode: mapErrorToExitCode(error),
-      output: error instanceof Error ? error.message : String(error)
+      output: formatMutationOutcomeError(error, input.json) ?? (error instanceof Error ? error.message : String(error))
     };
   }
 }
@@ -227,7 +227,7 @@ export async function getImprovementBundleCommand(
   } catch (error) {
     return {
       exitCode: mapErrorToExitCode(error),
-      output: error instanceof Error ? error.message : String(error)
+      output: formatMutationOutcomeError(error, input.json) ?? (error instanceof Error ? error.message : String(error))
     };
   }
 }

@@ -70,7 +70,7 @@ describe("worker notification transports", () => {
       } as never)
     ).rejects.toMatchObject({ message: "alert_email_not_configured" });
 
-    const emailSend = vi.fn().mockRejectedValue(new Error("smtp_down"));
+    const emailSend = vi.fn().mockRejectedValue(new Error("smtp_down password=mail-secret"));
     const transport = createAlertTransport({
       timeoutMs: 1000,
       emailTransport: { send: emailSend }
@@ -90,13 +90,13 @@ describe("worker notification transports", () => {
         config: { to: "alerts@example.com" },
         payload: { summary: "Broken", event_type: "incident.spike_detected" }
       } as never)
-    ).rejects.toMatchObject({ message: "alert_email_error:smtp_down" });
+    ).rejects.toMatchObject({ message: "alert_email_error" });
 
     const abortError = new Error("timed out");
     abortError.name = "AbortError";
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockRejectedValueOnce(new Error("offline")).mockRejectedValueOnce(abortError)
+      vi.fn().mockRejectedValueOnce(new Error("offline token=transport-secret")).mockRejectedValueOnce(abortError)
     );
 
     await expect(
@@ -105,7 +105,7 @@ describe("worker notification transports", () => {
         config: { webhook_url: "https://hooks.slack.test/alert" },
         payload: { summary: "Slack broken", event_type: "bundle.created" }
       } as never)
-    ).rejects.toMatchObject({ message: "alert_transport_error:offline" });
+    ).rejects.toMatchObject({ message: "alert_transport_error" });
 
     await expect(
       transport.deliver({
@@ -130,6 +130,35 @@ describe("worker notification transports", () => {
         payload: {}
       } as never)
     ).rejects.toMatchObject({ message: "alert_channel_not_supported:pagerduty" });
+  });
+
+  it("scrubs historical alert fields and webhook bodies before delivery", async (): Promise<void> => {
+    const emailSend = vi.fn().mockResolvedValue(undefined);
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+    const transport = createAlertTransport({
+      timeoutMs: 1000,
+      emailTransport: { send: emailSend },
+      resolveProjectName: async () => "Main app"
+    });
+    const payload = {
+      summary: "A normal summary token=historical-secret",
+      service_name: "api password=service-secret",
+      event_type: "bundle.created",
+      context: { apiKey: "raw-key", reason: "Unexpected failure" }
+    };
+    await transport.deliver({ channel: "email", config: { to: "team@example.com" }, payload } as never);
+    await transport.deliver({ channel: "discord", config: { webhook_url: "https://discord.test/alert" }, payload } as never);
+    await transport.deliver({ channel: "webhook", config: { target_url: "https://alerts.test/webhook" }, payload } as never);
+
+    const bytes = JSON.stringify(emailSend.mock.calls) + JSON.stringify(fetchMock.mock.calls);
+    expect(bytes).not.toContain("historical-secret");
+    expect(bytes).not.toContain("service-secret");
+    expect(bytes).not.toContain("raw-key");
+    expect(bytes).toContain("Unexpected failure");
+    expect(JSON.parse(fetchMock.mock.calls[1]?.[1]?.body as string)).toMatchObject({
+      context: { apiKey: "[REDACTED]", reason: "Unexpected failure" }
+    });
   });
 
   it("should validate weekly report email and slack delivery configuration", async (): Promise<void> => {
@@ -289,7 +318,7 @@ describe("worker notification transports", () => {
         signing_secret: "secret_123",
         payload: { event: "bundle.reopened" }
       })
-    ).rejects.toThrow("webhook_transport_error:network_down");
+    ).rejects.toThrow("webhook_transport_error");
 
     fetchSpy.mockRestore();
   });
@@ -311,12 +340,15 @@ describe("worker notification transports", () => {
       occurred_at: "2026-03-11T00:00:00.000Z",
       target_url: "https://hooks.example.test/debugbundle",
       signing_secret: "secret_123",
-      payload: { event: "bundle.reopened", incident_id: "inc_1" }
+      payload: { event: "bundle.reopened", incident_id: "inc_1", summary: "token=old-secret", context: { apiKey: "raw-key" } }
     });
 
     expect(fetchSpy).toHaveBeenCalledOnce();
-    const requestOptions = fetchSpy.mock.calls[0]?.[1] as { headers: Record<string, string> };
+    const requestOptions = fetchSpy.mock.calls[0]?.[1] as { headers: Record<string, string>; body: string };
     expect(requestOptions.headers["x-debugbundle-signature"]).toMatch(/^sha256=[0-9a-f]{64}$/);
+    expect(requestOptions.body).not.toContain("old-secret");
+    expect(requestOptions.body).not.toContain("raw-key");
+    expect(JSON.parse(requestOptions.body)).toMatchObject({ context: { apiKey: "[REDACTED]" } });
     fetchSpy.mockRestore();
   });
 });

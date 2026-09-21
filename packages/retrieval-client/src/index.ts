@@ -1,3 +1,5 @@
+import { MutationOutcomeUnconfirmedError } from "./mutation-outcome.js";
+export { MutationOutcomeUnconfirmedError, formatMutationOutcomeError } from "./mutation-outcome.js";
 import { z } from "zod";
 import { ProjectColorTagSchema, type ProjectColorTag } from "../../shared-types/src/index.js";
 
@@ -341,6 +343,25 @@ async function expectParsed<TParsed>(
   return parsed.data;
 }
 
+// A transport failure or unreadable success response cannot prove a write failed.
+// Preserve definite HTTP rejections and never retry a mutation here.
+async function expectMutation<TParsed>(
+  responsePromise: Promise<HttpResponse>,
+  schema: z.ZodType<TParsed, z.ZodTypeDef, unknown>
+): Promise<TParsed> {
+  let response: HttpResponse;
+  try {
+    response = await responsePromise;
+  } catch {
+    throw new MutationOutcomeUnconfirmedError();
+  }
+  if (response.status >= 500) throw new MutationOutcomeUnconfirmedError(response.status);
+  if (response.status < 200 || response.status >= 300) parseApiError(response.status, response.body);
+  const parsed = schema.safeParse(response.body);
+  if (!parsed.success) throw new MutationOutcomeUnconfirmedError(response.status);
+  return parsed.data;
+}
+
 async function expectServices(responsePromise: Promise<HttpResponse>): Promise<Array<z.infer<typeof ServiceSchema>>> {
   const parsed = await expectParsed(responsePromise, ServicesResponseSchema);
   return parsed.services;
@@ -492,7 +513,7 @@ export function createRetrievalApi(client: HttpClient): {
       return normalizeIncidentContext(parsed);
     },
     async resolveIncident(input) {
-      const parsed = await expectParsed(
+      const parsed = await expectMutation(
         client.request({
           method: "POST",
           path: `/v1/incidents/${input.incidentId}/resolve`,
@@ -504,7 +525,7 @@ export function createRetrievalApi(client: HttpClient): {
       return normalizeIncidentRecord(parsed.incident);
     },
     async resolveIncidents(input) {
-      const parsed = await expectParsed(
+      const parsed = await expectMutation(
         client.request({
           method: "POST",
           path: "/v1/incidents/resolve",
@@ -519,7 +540,7 @@ export function createRetrievalApi(client: HttpClient): {
       return parsed.incidents.map(normalizeIncidentRecord);
     },
     async reopenIncident(input) {
-      const parsed = await expectParsed(
+      const parsed = await expectMutation(
         client.request({
           method: "POST",
           path: `/v1/incidents/${input.incidentId}/reopen`,
@@ -531,7 +552,7 @@ export function createRetrievalApi(client: HttpClient): {
       return normalizeIncidentRecord(parsed.incident);
     },
     async reopenIncidents(input) {
-      const parsed = await expectParsed(
+      const parsed = await expectMutation(
         client.request({
           method: "POST",
           path: "/v1/incidents/reopen",
@@ -664,7 +685,7 @@ export function createRetrievalApi(client: HttpClient): {
       return normalizeImprovementRecord(parsed.improvement);
     },
     async resolveImprovement(input) {
-      const parsed = await expectParsed(
+      const parsed = await expectMutation(
         client.request({
           method: "POST",
           path: `/v1/improvements/${input.improvementId}/resolve`,
@@ -676,7 +697,7 @@ export function createRetrievalApi(client: HttpClient): {
       return normalizeImprovementRecord(parsed.improvement);
     },
     async reopenImprovement(input) {
-      const parsed = await expectParsed(
+      const parsed = await expectMutation(
         client.request({
           method: "POST",
           path: `/v1/improvements/${input.improvementId}/reopen`,
@@ -688,7 +709,7 @@ export function createRetrievalApi(client: HttpClient): {
       return normalizeImprovementRecord(parsed.improvement);
     },
     async snoozeImprovement(input) {
-      const parsed = await expectParsed(
+      const parsed = await expectMutation(
         client.request({
           method: "POST",
           path: `/v1/improvements/${input.improvementId}/snooze`,

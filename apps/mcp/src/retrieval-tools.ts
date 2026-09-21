@@ -1,9 +1,11 @@
+import { MutationOutcomeUnconfirmedError } from "../../../packages/retrieval-client/src/mutation-outcome.js";
 import { RetrievalApiError } from "../../../packages/retrieval-client/src/index.js";
+import { sanitizeTelemetry } from "../../../packages/redaction/src/index.js";
 import { buildIncidentContextRecord } from "../../../packages/storage/src/index.js";
 import {
   cacheCloudBundleArtifact,
   cacheCloudReproductionArtifact,
-  syncCloudIncidentCacheStatus
+  syncCloudIncidentMutationCache
 } from "../../cli/src/cloud-artifact-cache.js";
 import {
   attachSourceToIncidentContext,
@@ -36,6 +38,10 @@ export const RETRIEVAL_MCP_TOOL_NAMES = [
 ] as const;
 
 function mapMcpError(error: unknown): never {
+  if (error instanceof MutationOutcomeUnconfirmedError) {
+    throw new Error(`mcp_tool_error:${error.message}`);
+  }
+
   if (error instanceof RetrievalApiError) {
     throw new Error(`mcp_tool_error:${error.code}`);
   }
@@ -279,7 +285,7 @@ export function createRetrievalMcpTools(api: {
     last_seen_at: string;
   } & Record<string, unknown>;
 
-  return {
+  const handlers: Record<(typeof RETRIEVAL_MCP_TOOL_NAMES)[number], (input: Record<string, unknown>) => Promise<unknown>> = {
     async list_incidents(input) {
       try {
         const incidentFilters = readIncidentListFilters(input);
@@ -466,16 +472,7 @@ export function createRetrievalMcpTools(api: {
               "cloud"
             );
 
-            await syncCloudIncidentCacheStatus({
-              incidentId: String(input["incidentId"]),
-              incident: {
-                ...(typeof incident["status"] === "string" ? { status: incident["status"] } : {}),
-                resolved_at:
-                  typeof incident["resolved_at"] === "string" || incident["resolved_at"] === null
-                    ? incident["resolved_at"]
-                    : null
-              }
-            });
+            await syncCloudIncidentMutationCache(incident);
 
             return incident;
           })()
@@ -536,16 +533,7 @@ export function createRetrievalMcpTools(api: {
                 })) as Record<string, unknown>[]).map((incident) => attachSourceToRecord(incident, "cloud"));
 
           for (const incident of cloudIncidents) {
-            await syncCloudIncidentCacheStatus({
-              incidentId: String(incident["incident_id"]),
-              incident: {
-                ...(typeof incident["status"] === "string" ? { status: incident["status"] } : {}),
-                resolved_at:
-                  typeof incident["resolved_at"] === "string" || incident["resolved_at"] === null
-                    ? incident["resolved_at"]
-                    : null
-              }
-            });
+            await syncCloudIncidentMutationCache(incident);
             localIncidents.set(String(incident["incident_id"]), incident);
           }
         }
@@ -591,13 +579,7 @@ export function createRetrievalMcpTools(api: {
               "cloud"
             );
 
-            await syncCloudIncidentCacheStatus({
-              incidentId: String(input["incidentId"]),
-              incident: {
-                ...(typeof incident["status"] === "string" ? { status: incident["status"] } : {}),
-                resolved_at: null
-              }
-            });
+            await syncCloudIncidentMutationCache(incident);
 
             return incident;
           })()
@@ -658,13 +640,7 @@ export function createRetrievalMcpTools(api: {
                 })) as Record<string, unknown>[]).map((incident) => attachSourceToRecord(incident, "cloud"));
 
           for (const incident of cloudIncidents) {
-            await syncCloudIncidentCacheStatus({
-              incidentId: String(incident["incident_id"]),
-              incident: {
-                ...(typeof incident["status"] === "string" ? { status: incident["status"] } : {}),
-                resolved_at: null
-              }
-            });
+            await syncCloudIncidentMutationCache(incident);
             localIncidents.set(String(incident["incident_id"]), incident);
           }
         }
@@ -770,4 +746,17 @@ export function createRetrievalMcpTools(api: {
       }
     }
   };
+
+  // The final tool boundary also protects historical responses from older servers.
+  return Object.fromEntries(
+    RETRIEVAL_MCP_TOOL_NAMES.map((name) => [
+      name,
+      async (input: Record<string, unknown>): Promise<unknown> => {
+        const result = await handlers[name](input);
+        const protectedResult = sanitizeTelemetry(result, { maxTotalBytes: 512 * 1024 });
+        if (!protectedResult.ok) throw new Error("mcp_tool_error:privacy_projection_unavailable");
+        return protectedResult.value;
+      }
+    ])
+  ) as Record<(typeof RETRIEVAL_MCP_TOOL_NAMES)[number], (input: Record<string, unknown>) => Promise<unknown>>;
 }

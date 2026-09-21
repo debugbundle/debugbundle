@@ -233,6 +233,32 @@ describe("improvement routes", () => {
     expect(response.json()).toEqual({ improvement });
   });
 
+  it("scrubs historical improvement titles and evidence in list and detail responses", async () => {
+    const improvement = createImprovementRecord({
+      title: "Authorization: Bearer abcdef123456",
+      evidence: { normalized_message: "password=canary-private-value", status: 503 }
+    });
+    const app = createDependencies({
+      improvementManagement: {
+        listImprovementsForOrganization: vi.fn().mockResolvedValue([improvement]),
+        getImprovementForOrganization: vi.fn().mockResolvedValue(improvement),
+        resolveImprovementForOrganization: vi.fn(),
+        reopenImprovementForOrganization: vi.fn()
+      }
+    });
+    for (const url of ["/v1/improvements", "/v1/improvements/imp_123"]) {
+      const response = await app.inject({
+        method: "GET", url, headers: { authorization: "Bearer dbundle_mem_test_token" }
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.body).not.toContain("abcdef123456");
+      expect(response.body).not.toContain("canary-private-value");
+      expect(response.json()).toMatchObject(url.endsWith("imp_123")
+        ? { improvement: { title: "Authorization: [REDACTED]", evidence: { status: 503 } } }
+        : { improvements: [{ title: "Authorization: [REDACTED]", evidence: { status: 503 } }] });
+    }
+  });
+
   it("returns improvement_not_found when the improvement is missing", async () => {
     const app = createDependencies({
       improvementManagement: {
@@ -651,6 +677,36 @@ describe("improvement routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual(bundle);
+  });
+
+  it("scrubs a historical improvement artifact before returning it", async () => {
+    const app = createDependencies({
+      improvementManagement: {
+        listImprovementsForOrganization: vi.fn(),
+        getImprovementForOrganization: vi.fn().mockResolvedValue(createImprovementRecord()),
+        resolveImprovementForOrganization: vi.fn(),
+        reopenImprovementForOrganization: vi.fn()
+      },
+      objectStoreReader: {
+        getObject: vi.fn().mockResolvedValue(gzipSync(Buffer.from(JSON.stringify({
+          bundle_version: 1,
+          bundle_type: "improvement",
+          summary: { title: "Authorization: Bearer abcdef123456", status: 503 }
+        }), "utf8")))
+      }
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/projects/00000000-0000-0000-0000-000000000001/improvements/imp_123/bundle",
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).not.toContain("abcdef123456");
+    expect(response.json()).toMatchObject({
+      summary: { title: "Authorization: [REDACTED]", status: 503 }
+    });
   });
 
   it("rejects invalid bundle params and missing bundle access", async () => {

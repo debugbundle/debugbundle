@@ -242,3 +242,4 @@ export {
   assertStorageSchemaMigrationsApplied,
   STORAGE_SCHEMA_MIGRATIONS
 } from "./schema-migrations.js";
+export { createAgentTokenStore, type AgentTokenStore, type AgentTokenRecord } from "./agent-token-store.js";

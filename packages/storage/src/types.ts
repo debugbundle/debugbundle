@@ -234,6 +234,7 @@ export interface AccountDataExportRecord extends Record<string, unknown> {
   project_members: Record<string, unknown>[];
   project_invites: Record<string, unknown>[];
   member_tokens: Record<string, unknown>[];
+  agent_tokens: Record<string, unknown>[];
   projects: Record<string, unknown>[];
   project_tokens: Record<string, unknown>[];
   probe_activations: Record<string, unknown>[];

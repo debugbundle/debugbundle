@@ -24,6 +24,39 @@ export interface CliCommandResult {
   output: string;
 }
 
+export async function agentTokenWithAuthCommand(input: {
+  authFilePath?: string; projectId: string; action: "list" | "create" | "revoke";
+  label?: string; expiresAt?: string; tokenId?: string; json?: boolean;
+}): Promise<CliCommandResult> {
+  return runAuthenticatedCliCommand(input, {
+    createApi: createAuthenticatedTokenManagementApi,
+    dependencies: undefined,
+    runCommand: async (authState, api) => {
+      try {
+        const bearerToken = authState.bearer_token;
+        const projectId = input.projectId;
+        if (input.action === "list") {
+          const tokens = await api.listAgentTokens({ bearerToken, projectId });
+          return { exitCode: 0, output: input.json ? JSON.stringify({ tokens }) : formatTokenTable(tokens) };
+        }
+        if (input.action === "create" && input.label !== undefined) {
+          const token = await api.createAgentToken({ bearerToken, projectId, label: input.label,
+            ...(input.expiresAt === undefined ? {} : { expiresAt: input.expiresAt }) });
+          return { exitCode: 0, output: input.json ? JSON.stringify({ token }) :
+            `Agent credential created: ${token.token_id}\nExpires: ${token.expires_at}\nPlaintext (shown once): ${token.plaintext ?? "<none>"}` };
+        }
+        if (input.action === "revoke" && input.tokenId !== undefined) {
+          const token = await api.revokeAgentToken({ bearerToken, projectId, tokenId: input.tokenId });
+          return { exitCode: 0, output: input.json ? JSON.stringify({ token }) : `Agent credential revoked: ${token.token_id}` };
+        }
+        return { exitCode: 4, output: "Invalid agent token command." };
+      } catch (error) {
+        return { exitCode: mapErrorToExitCode(error), output: error instanceof TokenManagementApiError ? error.message : "Agent credential operation failed." };
+      }
+    }
+  });
+}
+
 function mapErrorToExitCode(error: unknown): number {
   if (!(error instanceof TokenManagementApiError)) {
     return 1;

@@ -1,3 +1,4 @@
+import { MutationOutcomeUnconfirmedError } from "../../../packages/retrieval-client/src/mutation-outcome.js";
 import { RetrievalApiError } from "../../../packages/retrieval-client/src/index.js";
 
 export const IMPROVEMENT_MCP_TOOL_NAMES = [
@@ -10,6 +11,10 @@ export const IMPROVEMENT_MCP_TOOL_NAMES = [
 ] as const;
 
 function mapMcpError(error: unknown): never {
+  if (error instanceof MutationOutcomeUnconfirmedError) {
+    throw new Error(`mcp_tool_error:${error.message}`);
+  }
+
   if (error instanceof RetrievalApiError) {
     throw new Error(`mcp_tool_error:${error.code}`);
   }

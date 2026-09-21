@@ -81,6 +81,23 @@ describe("analytics artifact routes", () => {
     });
   });
 
+  it("scrubs retained AnalyticsBundle list labels and analysis specifications", async () => {
+    const generation = createAnalyticsBundleGeneration({
+      analysis_spec: { route: "/checkout?token=raw-list-canary" },
+      project_name: "password=raw-project-canary"
+    });
+    const app = createDependencies({ analyticsBundles: createAnalyticsBundlesDependency({
+      listAnalyticsBundleGenerationsForProject: vi.fn().mockResolvedValue({ bundles: [generation], next_cursor: null })
+    }) });
+    const response = await app.inject({ method: "GET",
+      url: `/v1/analytics/bundles?project_id=${PROJECT_ID}`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" } });
+    expect(response.statusCode).toBe(200);
+    expect(JSON.stringify(response.json())).not.toContain("raw-list-canary");
+    expect(JSON.stringify(response.json())).not.toContain("raw-project-canary");
+    expect(response.json().bundles[0].generation_id).toBe(BUNDLE_GENERATION_ID);
+  });
+
   it("lists AnalyticsBundle generations across the caller organization with project metadata", async () => {
     const generation = createAnalyticsBundleGeneration({
       project_name: "Marketing site",
@@ -195,6 +212,20 @@ describe("analytics artifact routes", () => {
       ],
       next_cursor: null
     });
+    listAnalyticsJourneySamplesForProject.mockResolvedValue({
+      samples: [{ ...createJourneySample(), dimensions_summary: { error: "Authorization: Bearer abcdef123456" } }],
+      next_cursor: null
+    });
+    const historical = await app.inject({
+      method: "GET",
+      url: `/v1/analytics/journey-samples?project_id=${PROJECT_ID}`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+    expect(historical.statusCode).toBe(200);
+    expect(historical.body).not.toContain("abcdef123456");
+    expect(historical.json()).toMatchObject({
+      samples: [{ session_id_hash: "sha256:session", dimensions_summary: { error: "Authorization: [REDACTED]" } }]
+    });
     expect(listAnalyticsJourneySamplesForProject).toHaveBeenCalledWith({
       organization_id: "org_123",
       project_id: PROJECT_ID,
@@ -271,6 +302,26 @@ describe("analytics artifact routes", () => {
         created_at: TO
       },
       journey
+    });
+    objectStoreReader.getObject.mockResolvedValue(gzipSync(Buffer.from(JSON.stringify({
+      ...journey,
+      events: [{
+        ...journey.events[0],
+        route: { path: "/pricing", normalized_path: "/pricing", title: "Authorization: Bearer abcdef123456" }
+      }]
+    }), "utf8")));
+    const historical = await app.inject({
+      method: "GET",
+      url: `/v1/analytics/journey-samples/${JOURNEY_SAMPLE_ID}?project_id=${PROJECT_ID}`,
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+    expect(historical.statusCode).toBe(200);
+    expect(historical.body).not.toContain("abcdef123456");
+    expect(historical.json()).toMatchObject({
+      journey: {
+        session_id_hash: "sha256:session",
+        events: [{ route: { title: "Authorization: [REDACTED]", path: "/pricing" } }]
+      }
     });
     expect(analyticsJourneySamples.getAnalyticsJourneySampleForProject).toHaveBeenCalledWith({
       organization_id: "org_123",
@@ -785,6 +836,42 @@ describe("analytics artifact routes", () => {
       generation_id: BUNDLE_GENERATION_ID
     });
     expect(objectStoreReader.getObject).toHaveBeenCalledWith({ key: generation.object_key });
+  });
+
+  it("scrubs historical AnalyticsBundle prose and bounds decompression before returning it", async () => {
+    const bundle = buildAnalyticsBundle({
+      analysis_kind: "usage_summary",
+      input_fingerprint: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      project: { project_id: PROJECT_ID, service: "web", environment: "production" },
+      analysis_window: { from: FROM, to: TO, granularity: "day" },
+      summary: { title: "Usage summary", description: "password=raw-analytics-canary", confidence: "high", severity: "low" },
+      metrics: { sessions_analyzed: 12, affected_sessions: 0 },
+      segments: [{ route: "/checkout?api_key=raw-route-canary" }],
+      journey_patterns: [], representative_journeys: [], linked_incidents: [], linked_deploys: [],
+      recommendations: [], redaction: { rules_applied: ["analytics-aggregate-only"], omitted_fields: [] }
+    });
+    const generation = createAnalyticsBundleGeneration();
+    const analyticsBundles = createAnalyticsBundlesDependency({
+      getAnalyticsBundleGenerationForProject: vi.fn().mockResolvedValue(generation)
+    });
+    const app = createDependencies({ analyticsBundles, objectStoreReader: {
+      getObject: vi.fn().mockResolvedValue(gzipSync(Buffer.from(JSON.stringify(bundle), "utf8")))
+    } });
+    const url = `/v1/analytics/bundles/${BUNDLE_GENERATION_ID}?project_id=${PROJECT_ID}`;
+    const headers = { authorization: "Bearer dbundle_mem_test_token" };
+    const response = await app.inject({ method: "GET", url, headers });
+    expect(response.statusCode).toBe(200);
+    expect(JSON.stringify(response.json())).not.toContain("raw-analytics-canary");
+    expect(JSON.stringify(response.json())).not.toContain("raw-route-canary");
+    expect(response.json().summary.title).toBe("Usage summary");
+
+    const oversized = createDependencies({ analyticsBundles, objectStoreReader: {
+      getObject: vi.fn().mockResolvedValue(gzipSync(Buffer.from("x".repeat(600_000))))
+    } });
+    const denied = await oversized.inject({ method: "GET", url, headers });
+    expect(denied.statusCode).toBe(503);
+    expect(denied.json()).toEqual({ error: "privacy_projection_unavailable" });
+    expect(JSON.stringify(denied.json())).not.toContain("raw-");
   });
 
   it("returns AnalyticsBundle generation state when bundles are pending or failed", async () => {

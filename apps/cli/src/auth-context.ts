@@ -1,3 +1,5 @@
+import { formatMutationOutcomeError } from "../../../packages/retrieval-client/src/mutation-outcome.js";
+import { nodeFetch } from "../../../packages/node-http/src/index.js";
 import {
   createRetrievalApi,
   type HttpClient as RetrievalHttpClient,
@@ -77,7 +79,7 @@ export function createCliHttpClient(
   BillingHttpClient &
   GitHubManagementHttpClient &
   SlackHttpClient {
-  const fetchImpl = dependencies?.fetchImpl ?? fetch;
+  const fetchImpl = dependencies?.fetchImpl ?? nodeFetch;
   const baseUrl = normalizeBaseUrl(input.baseUrl);
 
   return {
@@ -131,7 +133,7 @@ export function mapCliAuthErrorToResult(error: unknown): CliCommandResult | null
 }
 
 export async function runAuthenticatedCliCommand<TDependencies, TApi>(
-  input: { authFilePath?: string },
+  input: { authFilePath?: string; json?: boolean | undefined },
   options: {
     createApi: (
       input: { authFilePath?: string },
@@ -147,7 +149,7 @@ export async function runAuthenticatedCliCommand<TDependencies, TApi>(
   } catch (error) {
     return mapCliAuthErrorToResult(error) ?? {
       exitCode: 1,
-      output: error instanceof Error ? error.message : String(error)
+      output: formatMutationOutcomeError(error, input.json) ?? (error instanceof Error ? error.message : String(error))
     };
   }
 }

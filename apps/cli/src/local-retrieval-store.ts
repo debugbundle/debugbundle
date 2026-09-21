@@ -1,6 +1,7 @@
 import { readFile as readFileFromFs, writeFile as writeFileToFs } from "node:fs/promises";
 import { join } from "node:path";
 
+import { sanitizeTelemetry } from "../../../packages/redaction/src/index.js";
 import { RetrievalApiError } from "../../../packages/retrieval-client/src/index.js";
 import {
   deriveIncidentReasonFromSignal,
@@ -59,6 +60,29 @@ export type LocalState = {
 
 const CONNECTION_FILE_PATH = ".debugbundle/local/connection.json";
 const STATE_FILE_PATH = ".debugbundle/local/state.json";
+const MAX_ARTIFACT_BYTES = 512 * 1024;
+
+function projectLocalEvidence<T>(value: T): T {
+  const projected = sanitizeTelemetry(value, { maxTotalBytes: MAX_ARTIFACT_BYTES });
+  if (!projected.ok) {
+    throw createReadError(503, "privacy_projection_unavailable");
+  }
+  return projected.value as T;
+}
+
+async function readLocalArtifact(path: string, dependencies?: LocalRetrievalStoreDependencies): Promise<unknown> {
+  const readFile = dependencies?.readFile ?? readFileFromFs;
+  const raw = await readFile(path, "utf8");
+  if (Buffer.byteLength(raw, "utf8") > MAX_ARTIFACT_BYTES) {
+    throw createReadError(503, "privacy_projection_unavailable");
+  }
+  try {
+    return projectLocalEvidence(JSON.parse(raw));
+  } catch (error) {
+    if (error instanceof RetrievalApiError) throw error;
+    throw createReadError(400, "invalid_local_json");
+  }
+}
 
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
@@ -289,7 +313,7 @@ async function updateLocalIncidentStatus(
 
   state.incidents[input.incidentId] = nextIncident;
   await writeLocalState(state, dependencies);
-  return nextIncident;
+  return projectLocalEvidence(nextIncident);
 }
 
 export async function listLocalIncidents(
@@ -336,7 +360,7 @@ export async function listLocalIncidents(
   const hasMore = input.limit !== undefined && startIndex + input.limit < incidents.length;
 
   return {
-    incidents: pagedIncidents,
+    incidents: pagedIncidents.map(projectLocalEvidence),
     next_cursor: hasMore && pagedIncidents.length > 0 ? buildCursor(pagedIncidents[pagedIncidents.length - 1]!) : null
   };
 }
@@ -350,7 +374,7 @@ export async function getLocalIncident(
     throw createReadError(404, "incident_not_found");
   }
 
-  return incident;
+  return projectLocalEvidence(incident);
 }
 
 export async function getLocalBundle(
@@ -358,9 +382,10 @@ export async function getLocalBundle(
   dependencies?: LocalRetrievalStoreDependencies
 ): Promise<unknown> {
   const rootDirectory = getWorkspaceRoot(dependencies);
-  const incident = await getLocalIncident(input, dependencies);
+  const incident = (await readLocalState(dependencies)).incidents[input.incidentId];
+  if (incident === undefined) throw createReadError(404, "incident_not_found");
   try {
-    return await readJsonFile(resolveWorkspacePath(rootDirectory, incident.bundle_path), dependencies);
+    return await readLocalArtifact(resolveWorkspacePath(rootDirectory, incident.bundle_path), dependencies);
   } catch (error) {
     if (isRecord(error) && error["code"] === "ENOENT") {
       throw createReadError(404, "bundle_not_found");
@@ -379,9 +404,10 @@ export async function getLocalReproduction(
   dependencies?: LocalRetrievalStoreDependencies
 ): Promise<unknown> {
   const rootDirectory = getWorkspaceRoot(dependencies);
-  const incident = await getLocalIncident(input, dependencies);
+  const incident = (await readLocalState(dependencies)).incidents[input.incidentId];
+  if (incident === undefined) throw createReadError(404, "incident_not_found");
   try {
-    return await readJsonFile(resolveWorkspacePath(rootDirectory, incident.reproduction_path), dependencies);
+    return await readLocalArtifact(resolveWorkspacePath(rootDirectory, incident.reproduction_path), dependencies);
   } catch (error) {
     if (isRecord(error) && error["code"] === "ENOENT") {
       throw createReadError(404, "reproduction_not_found");

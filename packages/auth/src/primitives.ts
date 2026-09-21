@@ -4,6 +4,7 @@ import { hash as argon2Hash, verify as argon2Verify, type Options as Argon2Optio
 
 export const PROJECT_TOKEN_PREFIX = "dbundle_proj_";
 export const MEMBER_TOKEN_PREFIX = "dbundle_mem_";
+export const AGENT_TOKEN_PREFIX = "dbundle_agent_";
 export const PROBE_TRIGGER_TOKEN_PREFIX = "dbundle_probe_";
 export const SESSION_COOKIE_NAME = "dbundle_session";
 export const GITHUB_OAUTH_STATE_COOKIE_NAME = "dbundle_github_oauth_state";
@@ -42,6 +43,17 @@ export interface MemberTokenContext {
   organization_id: string;
   revoked_at?: string | null;
   expires_at?: string | null;
+}
+
+export interface AgentTokenContext {
+  token_id: string;
+  user_id: string;
+  organization_id: string;
+  project_id: string;
+  scope: "incident:read-minimized";
+  policy_version: "telemetry-privacy-v1";
+  revoked_at: string | null;
+  expires_at: string;
 }
 
 export interface WebSessionRecord {
@@ -279,6 +291,10 @@ export function generateMemberToken(_memberId: string): { plaintext: string; has
   return generateTokenWithPrefix(MEMBER_TOKEN_PREFIX);
 }
 
+export function generateAgentToken(): { plaintext: string; hash: string } {
+  return generateTokenWithPrefix(AGENT_TOKEN_PREFIX);
+}
+
 export function generateEmailAuthCode(): { plaintext: string; hash: string } {
   const code = String(randomBytes(4).readUInt32BE(0) % 1_000_000).padStart(6, "0");
   return {
@@ -465,6 +481,20 @@ export async function validateMemberToken(
   options: { now?: Date } = {}
 ): Promise<AuthValidationResult<MemberTokenContext>> {
   return validateToken(token, MEMBER_TOKEN_PREFIX, resolveByTokenHash, options.now ?? new Date());
+}
+
+export async function validateAgentToken(
+  token: string,
+  resolveByTokenHash: TokenHashResolver<AgentTokenContext>,
+  options: { now?: Date } = {}
+): Promise<AuthValidationResult<AgentTokenContext>> {
+  const result = await validateToken(token, AGENT_TOKEN_PREFIX, resolveByTokenHash, options.now ?? new Date());
+  if (!result.ok) return result;
+  if (result.context.scope !== "incident:read-minimized" ||
+      result.context.policy_version !== "telemetry-privacy-v1" || !result.context.expires_at) {
+    return { ok: false, error: "invalid_token" };
+  }
+  return result;
 }
 
 export async function requireProjectToken(input: {

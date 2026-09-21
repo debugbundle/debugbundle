@@ -1,8 +1,7 @@
-import { gunzipSync } from "node:zlib";
 import { createWorkerJobStore } from "../../../packages/storage/src/worker-job-store.js";
 import { z } from "zod";
 import { EventClassSchema, EventTypeSchema } from "../../../packages/shared-types/src/index.js";
-import { normalizeEvent, validateEvent } from "../../../packages/event-normalizer/src/index.js";
+import { normalizeEvent, parseStoredEvent } from "../../../packages/event-normalizer/src/index.js";
 import {
   createPostgresAccountAnalyticsStore,
   createPostgresAnalyticsCorrelationStore,
@@ -222,14 +221,14 @@ export function createDurableIncidentProcessing(input: {
           throw new Error("worker_improvement_scope_invalid");
         // Reuse the retained source so an optional backlog cannot extend raw-event retention.
         const body = await input.objectStore.getObject({ key: job.object_key });
-        const event = validateEvent(JSON.parse(gunzipSync(body).toString("utf8")) as unknown);
-        if (!event.success || event.data.event_id !== job.event_id)
+        const event = parseStoredEvent(body);
+        if (event === null || event.event_id !== job.event_id)
           throw new Error("worker_improvement_event_invalid");
         await maybeGenerateHostedImprovementBundle({
           project_id: job.project_id,
-          event: event.data,
+          event,
           event_class: job.event_class,
-          normalized: normalizeEvent(event.data),
+          normalized: normalizeEvent(event),
           dependencies: improvementDependencies(tx, queue)
         });
         return { processed: true };

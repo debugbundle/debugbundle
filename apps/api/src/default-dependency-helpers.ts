@@ -1,5 +1,3 @@
-import { gunzipSync } from "node:zlib";
-
 import type { AuthEmailSender, GitHubOAuthConfig } from "../../../packages/auth/src/index.js";
 import { createGitHubOAuthClient } from "../../../packages/auth/src/index.js";
 import {
@@ -18,6 +16,7 @@ import {
   type ObjectStoreReader,
   type Queryable
 } from "../../../packages/storage/src/index.js";
+import { readSanitizedArtifact } from "../../../packages/storage/src/artifact-privacy.js";
 
 const DEV_GITHUB_MOCK_CODE = "debugbundle-dev-mock-code";
 const DEV_GITHUB_MOCK_USER_ID = "debugbundle-dev-mock-user";
@@ -84,17 +83,10 @@ async function readStoredJsonArtifact(
   try {
     const compressed = await objectStoreReader.getObject({ key });
 
-    try {
-      return {
-        key,
-        content: JSON.parse(gunzipSync(compressed).toString("utf8")),
-      };
-    } catch {
-      return {
-        key,
-        content: { error: "artifact_invalid" },
-      };
-    }
+    return {
+      key,
+      content: readSanitizedArtifact(compressed) ?? { error: "artifact_invalid" },
+    };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {

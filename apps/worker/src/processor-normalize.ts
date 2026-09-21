@@ -1,4 +1,3 @@
-import { gunzipSync } from "node:zlib";
 import {
   FINGERPRINT_VERSION,
   fingerprintVersion,
@@ -6,7 +5,7 @@ import {
   fingerprint,
   inferMatchedFields,
   normalizeEvent,
-  validateEvent
+  parseStoredEvent
 } from "../../../packages/event-normalizer/src/index.js";
 import {
   normalizeResourceRoute,
@@ -32,23 +31,22 @@ export async function processNextNormalizeEventsJob(
   }
 
   const rawBody = await dependencies.objectStore.getObject({ key: job.object_key });
-  const parsed = JSON.parse(gunzipSync(rawBody).toString("utf8")) as unknown;
-  const validated = validateEvent(parsed);
-  if (!validated.success) {
+  const event = parseStoredEvent(rawBody);
+  if (event === null) {
     return { processed: false, reason: "invalid_event" };
   }
 
-  const normalized = normalizeEvent(validated.data);
+  const normalized = normalizeEvent(event);
   const computedFingerprint = fingerprint(normalized);
   const captureRule = job.capture_rule ?? null;
   const capturePreset = job.capture_preset ?? "minimal";
   const immediateClientErrorStatuses = job.immediate_client_error_statuses ?? [];
   const immediateClientErrorPathRules = job.immediate_client_error_path_rules ?? [];
   const baseEventClass = classifyEvent(
-    validated.data.event_type,
-    validated.data.event_type === "log_event" ? validated.data.payload?.level : undefined,
-    validated.data.event_type === "probe_event" ? validated.data.payload?.activation_id : undefined,
-    validated.data.payload as Record<string, unknown>,
+    event.event_type,
+    event.event_type === "log_event" ? event.payload?.level : undefined,
+    event.event_type === "probe_event" ? event.payload?.activation_id : undefined,
+    event.payload as Record<string, unknown>,
     capturePreset,
     immediateClientErrorStatuses,
     immediateClientErrorPathRules
@@ -64,16 +62,16 @@ export async function processNextNormalizeEventsJob(
     matchedFields.push("capture_rule_sample_context");
   }
   const severity = inferSeverity(
-    validated.data,
+    event,
     capturePreset,
     immediateClientErrorStatuses,
     immediateClientErrorPathRules
   );
 
   const processedEvent = await dependencies.processedEventStore.upsertProcessedEvent({
-    event_id: validated.data.event_id,
+    event_id: event.event_id,
     project_id: job.project_id,
-    event_type: validated.data.event_type,
+    event_type: event.event_type,
     fingerprint: computedFingerprint,
     normalized_message: normalized.normalized_message
   });
@@ -84,15 +82,15 @@ export async function processNextNormalizeEventsJob(
 
   const improvementInput = {
     project_id: job.project_id,
-    event: validated.data,
+    event,
     normalized,
     event_class: eventClass
   };
   if (dependencies.deferImprovement) {
     // Only eligible context signals need the optional lane; exception ingestion stays lightweight.
     if (
-      validated.data.event_type === "request_event" ||
-      (validated.data.event_type === "log_event" && validated.data.payload.level === "warning")
+      event.event_type === "request_event" ||
+      (event.event_type === "log_event" && event.payload.level === "warning")
     ) {
       await dependencies.deferImprovement({ ...improvementInput, object_key: job.object_key });
     }
@@ -110,14 +108,14 @@ export async function processNextNormalizeEventsJob(
 
   await dependencies.queue.enqueue("group-incident", {
     project_id: job.project_id,
-    event_id: validated.data.event_id,
-    event_type: validated.data.event_type,
+    event_id: event.event_id,
+    event_type: event.event_type,
     event_class: eventClass,
-    service_name: validated.data.service.name,
-    environment: validated.data.service.environment,
+    service_name: event.service.name,
+    environment: event.service.environment,
     fingerprint: computedFingerprint,
     alert_notification_key: buildAlertNotificationKey({
-      event: validated.data,
+      event,
       normalized,
       fingerprint: computedFingerprint
     }),
@@ -126,16 +124,16 @@ export async function processNextNormalizeEventsJob(
     ...(normalized.incident_title === undefined ? {} : { incident_title: normalized.incident_title }),
     ...(resourceRoute === null ? {} : { resource_route: resourceRoute }),
     matched_fields: matchedFields,
-    occurred_at: validated.data.occurred_at,
+    occurred_at: event.occurred_at,
     severity,
-    ...buildAnalyticsIncidentCorrelationJobFields(job.project_id, validated.data.correlation),
-    ...(validated.data.event_type === "deploy_metadata"
+    ...buildAnalyticsIncidentCorrelationJobFields(job.project_id, event.correlation),
+    ...(event.event_type === "deploy_metadata"
       ? {
           deploy_metadata: {
-            commit_sha: validated.data.payload.commit_sha,
-            version: validated.data.payload.version,
-            branch: validated.data.payload.branch,
-            deployed_at: validated.data.payload.deployed_at
+            commit_sha: event.payload.commit_sha,
+            version: event.payload.version,
+            branch: event.payload.branch,
+            deployed_at: event.payload.deployed_at
           }
         }
       : {})
@@ -143,14 +141,14 @@ export async function processNextNormalizeEventsJob(
 
   if (
     dependencies.requestAnomalyCounter !== undefined &&
-    validated.data.event_type === "request_event" &&
+    event.event_type === "request_event" &&
     eventClass === "context_signal" &&
     captureRule?.outcome !== "demote" &&
     !(captureRule?.action === "sample" && captureRule.sample_event_class === "context") &&
     getRequestAnomalyThreshold({ responseStatus: normalized.http_status, capturePreset }) !== null
   ) {
     const anomalyJob = await evaluateRequestAnomalyCandidate({
-      event: validated.data,
+      event,
       normalized,
       project_id: job.project_id,
       capture_preset: capturePreset,

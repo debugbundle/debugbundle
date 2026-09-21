@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 
 import {
@@ -17,6 +17,7 @@ import {
   getTierCapabilities
 } from "../../../../packages/shared-types/src/index.js";
 import { buildAnalyticsBundleInputFingerprint } from "../../../../packages/storage/src/index.js";
+import { sanitizeTelemetry } from "../../../../packages/redaction/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import {
   claimAnalyticsBundleGenerationQuota,
@@ -56,6 +57,20 @@ import {
   toMetricsInput,
   type AnalyticsBundleOpportunityContext
 } from "./analytics-route-services.js";
+
+function projectAnalyticsRead<T>(value: unknown, schema: z.ZodType<T>): T | null {
+  const projected = sanitizeTelemetry(value, { maxTotalBytes: 512 * 1024 });
+  if (!projected.ok) return null;
+  const parsed = schema.safeParse(projected.value);
+  return parsed.success ? parsed.data : null;
+}
+
+function sendProjectedAnalyticsRead<T>(reply: FastifyReply, value: unknown, schema: z.ZodType<T>): FastifyReply {
+  const projected = projectAnalyticsRead(value, schema);
+  return projected === null
+    ? reply.status(503).send({ error: "privacy_projection_unavailable" })
+    : reply.header("x-debugbundle-privacy-policy", "telemetry-privacy-v1").status(200).send(projected);
+}
 
 export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   registerAnalyticsJourneySampleRoutes(app, dependencies);
@@ -101,7 +116,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
       return;
     }
 
-    return reply.status(200).send(AnalyticsOpportunitiesListResponseSchema.parse(opportunities));
+    return sendProjectedAnalyticsRead(reply, opportunities, AnalyticsOpportunitiesListResponseSchema);
   });
 
   app.get("/v1/analytics/opportunities/:id", async (request, reply) => {
@@ -143,7 +158,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
       return reply.status(404).send({ error: "analytics_opportunity_not_found" });
     }
 
-    return reply.status(200).send(AnalyticsOpportunityResponseSchema.parse(opportunity));
+    return sendProjectedAnalyticsRead(reply, opportunity, AnalyticsOpportunityResponseSchema);
   });
 
   app.post("/v1/analytics/bundles", async (request, reply) => {
@@ -317,12 +332,15 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
       return;
     }
 
-    return reply.status(200).send(
-      AnalyticsBundleGenerationsListResponseSchema.parse({
-        bundles: generations.bundles.map(toAnalyticsBundleGenerationListRecord),
-        next_cursor: generations.next_cursor
-      })
-    );
+    const projected = sanitizeTelemetry({
+      bundles: generations.bundles.map(toAnalyticsBundleGenerationListRecord),
+      next_cursor: generations.next_cursor
+    });
+    if (!projected.ok) return reply.status(503).send({ error: "privacy_projection_unavailable" });
+    const response = AnalyticsBundleGenerationsListResponseSchema.safeParse(projected.value);
+    return response.success
+      ? reply.header("x-debugbundle-privacy-policy", "telemetry-privacy-v1").status(200).send(response.data)
+      : reply.status(503).send({ error: "privacy_projection_unavailable" });
   });
 
   app.get("/v1/analytics/bundles/:id", async (request, reply) => {
@@ -372,7 +390,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
       toMetricsInput(input)
     );
 
-    return reply.status(200).send(AnalyticsUsageSummaryResponseSchema.parse(summary));
+    return sendProjectedAnalyticsRead(reply, summary, AnalyticsUsageSummaryResponseSchema);
   });
 
   app.get("/v1/analytics/routes", async (request, reply) => {
@@ -385,7 +403,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
       toMetricsInput(input)
     );
 
-    return reply.status(200).send(AnalyticsRouteMetricsResponseSchema.parse(routes));
+    return sendProjectedAnalyticsRead(reply, routes, AnalyticsRouteMetricsResponseSchema);
   });
 
   app.get("/v1/analytics/journey-patterns", async (request, reply) => {
@@ -398,7 +416,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
       toMetricsInput(input)
     );
 
-    return reply.status(200).send(AnalyticsJourneyPatternsResponseSchema.parse(journeys));
+    return sendProjectedAnalyticsRead(reply, journeys, AnalyticsJourneyPatternsResponseSchema);
   });
 
   app.get("/v1/analytics/devices", async (request, reply) => {
@@ -411,7 +429,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
       toMetricsInput(input)
     );
 
-    return reply.status(200).send(AnalyticsDeviceBreakdownResponseSchema.parse(devices));
+    return sendProjectedAnalyticsRead(reply, devices, AnalyticsDeviceBreakdownResponseSchema);
   });
 
   app.get("/v1/analytics/referrers", async (request, reply) => {
@@ -424,7 +442,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
       toMetricsInput(input)
     );
 
-    return reply.status(200).send(AnalyticsReferrerMetricsResponseSchema.parse(referrers));
+    return sendProjectedAnalyticsRead(reply, referrers, AnalyticsReferrerMetricsResponseSchema);
   });
 
   app.get("/v1/analytics/actions", async (request, reply) => {
@@ -437,7 +455,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
       toMetricsInput(input)
     );
 
-    return reply.status(200).send(AnalyticsActionMetricsResponseSchema.parse(actions));
+    return sendProjectedAnalyticsRead(reply, actions, AnalyticsActionMetricsResponseSchema);
   });
 
   app.get("/v1/analytics/funnels", async (request, reply) => {
@@ -450,7 +468,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
       toMetricsInput(input)
     );
 
-    return reply.status(200).send(AnalyticsFunnelsResponseSchema.parse(funnels));
+    return sendProjectedAnalyticsRead(reply, funnels, AnalyticsFunnelsResponseSchema);
   });
 
   app.get("/v1/analytics/funnels/:key", async (request, reply) => {
@@ -469,7 +487,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
       funnel_key: parsedParams.data.key
     });
 
-    return reply.status(200).send(AnalyticsFunnelAnalysisResponseSchema.parse(funnel));
+    return sendProjectedAnalyticsRead(reply, funnel, AnalyticsFunnelAnalysisResponseSchema);
   });
 
   app.get("/v1/analytics/incidents/:id/impact", async (request, reply) => {
@@ -489,6 +507,6 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
     }
 
     const impact = await dependencies.analyticsMetrics!.getIncidentImpactForProject(input);
-    return reply.status(200).send(AnalyticsIncidentImpactResponseSchema.parse(impact));
+    return sendProjectedAnalyticsRead(reply, impact, AnalyticsIncidentImpactResponseSchema);
   });
 }

@@ -223,6 +223,23 @@ describe("api analytics ingestion split", () => {
     });
   });
 
+  it("protects analytics route and title strings before raw analytics persistence", async () => {
+    const persistAnalyticsAndEnqueue = vi.fn().mockResolvedValue({ object_key: "analytics-events/p/k.json.gz" });
+    const app = createDependencies({ persistAnalyticsAndEnqueue });
+    const event = createAnalyticsEvent({ eventId: "10000000-0000-4000-8000-000000000011" });
+    event.payload.dimensions.utm_campaign = "api_key=raw-analytics-key";
+    event.payload.route = { path: "/pricing", normalized_path: "/pricing",
+      title: "password=raw-analytics-password" };
+    const response = await app.inject({ method: "POST", url: "/v1/events",
+      headers: { authorization: "Bearer dbundle_proj_test" }, payload: { events: [event] } });
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toEqual({ accepted: 1, rejected: 0, errors: [] });
+    const persisted = persistAnalyticsAndEnqueue.mock.calls[0]?.[0];
+    expect(JSON.stringify(persisted)).not.toContain("raw-analytics-key");
+    expect(JSON.stringify(persisted)).not.toContain("raw-analytics-password");
+    expect(persisted.payload.route.normalized_path).toBe("/pricing");
+  });
+
   it("removes project credentials before persisting debug and analytics events", async () => {
     const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/p/k.json.gz" });
     const persistAnalyticsAndEnqueue = vi

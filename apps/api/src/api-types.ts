@@ -15,6 +15,7 @@ import type {
 import type { EmailMessage } from "../../../packages/email/src/index.js";
 import type {
   AuditLogStore,
+  AgentTokenStore,
   AlertChannel,
   AlertConditionType,
   AuthRateLimiter,
@@ -40,6 +41,7 @@ import type {
 } from "../../../packages/storage/src/index.js";
 import type { ApiAnalyticsDependencies } from "./api-analytics-types.js";
 import type { ApiManagementDependencies } from "./api-management-types.js";
+import type { OpenAiHostedReadDependencies } from "./openai-mcp-operations.js";
 
 export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagementDependencies {
   ingestionPersistence: Pick<IngestionPersistenceService, "persistAndEnqueue"> &
@@ -74,6 +76,9 @@ export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagement
     | undefined;
   auditLogging?: Pick<AuditLogStore, "createAuditLog"> | undefined;
   memberAuth: Pick<MemberAuthService, "resolveMemberByTokenHash">;
+  agentTokens?: AgentTokenStore;
+  agentReads?: OpenAiHostedReadDependencies;
+  agentDashboardBaseUrl?: string;
   webAuth?:
     | Pick<
         WebSessionAuthService,

@@ -1,3 +1,4 @@
+import { nodeFetch } from "../../../packages/node-http/src/index.js";
 import { readFile as readFileFromFs, stat as statFromFs, rename as renameFromFs, writeFile as writeFileFromFs, mkdir as mkdirFromFs } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -46,7 +47,7 @@ async function sendEventsToApi(
   input: { baseUrl: string; projectToken: string; events: Array<unknown> },
   dependencies?: { fetchImpl?: typeof fetch }
 ): Promise<{ accepted: number; rejected: number; errors: Array<{ index: number; reason: string }> }> {
-  const fetchImpl = dependencies?.fetchImpl ?? fetch;
+  const fetchImpl = dependencies?.fetchImpl ?? nodeFetch;
   const response = await fetchImpl(`${normalizeBaseUrl(input.baseUrl)}/v1/events`, {
     method: "POST",
     headers: {

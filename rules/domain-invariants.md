@@ -29,6 +29,8 @@ All SDK internal failures must be caught and silently swallowed (with optional i
 
 Sensitive data must be redacted BEFORE leaving the SDK (client-side) and BEFORE any event payload is persisted (server-side). The pipeline must never persist unredacted sensitive fields.
 
+For the protected SDK line, this includes DebugBundle-owned in-memory buffers and durable offline queues, supported application context as well as payload, and accepted `beforeSend` replacements. The ingestion backstop also protects compatible older clients before storage, but cannot undo a legacy SDK's prior local queue or transmission. Historical artifacts require current-policy sanitization before retrieval; a read does not retroactively erase old stored bytes or previously shared data. A sanitizer failure withholds unsafe telemetry rather than returning the original event.
+
 Targets for automatic redaction:
 
 - Passwords / password fields

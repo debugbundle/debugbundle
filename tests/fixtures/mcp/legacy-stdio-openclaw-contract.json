@@ -892,6 +892,76 @@
           }
         },
         {
+          "name": "list_agent_tokens",
+          "description": "List project-scoped read-only agent credentials. Requires owner or project admin.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "bearerToken": {
+                "type": "string"
+              },
+              "projectId": {
+                "type": "string",
+                "format": "uuid"
+              }
+            },
+            "required": ["bearerToken", "projectId"],
+            "additionalProperties": false,
+            "$schema": "https://json-schema.org/draft/2019-09/schema#"
+          }
+        },
+        {
+          "name": "create_agent_token",
+          "description": "Create a single-project minimized read credential, returned once. Requires owner or project admin.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "bearerToken": {
+                "type": "string"
+              },
+              "projectId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": ["bearerToken", "projectId", "label"],
+            "additionalProperties": false,
+            "$schema": "https://json-schema.org/draft/2019-09/schema#"
+          }
+        },
+        {
+          "name": "revoke_agent_token",
+          "description": "Revoke a project-scoped agent credential. Requires owner or project admin.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "bearerToken": {
+                "type": "string"
+              },
+              "projectId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "tokenId": {
+                "type": "string",
+                "format": "uuid"
+              }
+            },
+            "required": ["bearerToken", "projectId", "tokenId"],
+            "additionalProperties": false,
+            "$schema": "https://json-schema.org/draft/2019-09/schema#"
+          }
+        },
+        {
           "name": "list_member_tokens",
           "description": "List member tokens for the authenticated member.",
           "inputSchema": {
@@ -3838,6 +3908,9 @@
       "debugbundle_list_project_tokens",
       "debugbundle_create_project_token",
       "debugbundle_revoke_project_token",
+      "debugbundle_list_agent_tokens",
+      "debugbundle_create_agent_token",
+      "debugbundle_revoke_agent_token",
       "debugbundle_list_member_tokens",
       "debugbundle_create_member_token",
       "debugbundle_revoke_member_token",
@@ -4858,6 +4931,82 @@
             },
             "tokenId": {
               "type": "string"
+            }
+          },
+          "required": ["bearerToken", "projectId", "tokenId"],
+          "additionalProperties": false,
+          "$schema": "https://json-schema.org/draft/2019-09/schema#"
+        }
+      },
+      {
+        "mcpToolName": "list_agent_tokens",
+        "openClawToolName": "debugbundle_list_agent_tokens",
+        "description": "List project-scoped read-only agent credentials. Requires owner or project admin.",
+        "optional": false,
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "bearerToken": {
+              "type": "string"
+            },
+            "projectId": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "required": ["bearerToken", "projectId"],
+          "additionalProperties": false,
+          "$schema": "https://json-schema.org/draft/2019-09/schema#"
+        }
+      },
+      {
+        "mcpToolName": "create_agent_token",
+        "openClawToolName": "debugbundle_create_agent_token",
+        "description": "Create a single-project minimized read credential, returned once. Requires owner or project admin.",
+        "optional": false,
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "bearerToken": {
+              "type": "string"
+            },
+            "projectId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "expiresAt": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          "required": ["bearerToken", "projectId", "label"],
+          "additionalProperties": false,
+          "$schema": "https://json-schema.org/draft/2019-09/schema#"
+        }
+      },
+      {
+        "mcpToolName": "revoke_agent_token",
+        "openClawToolName": "debugbundle_revoke_agent_token",
+        "description": "Revoke a project-scoped agent credential. Requires owner or project admin.",
+        "optional": false,
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "bearerToken": {
+              "type": "string"
+            },
+            "projectId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "tokenId": {
+              "type": "string",
+              "format": "uuid"
             }
           },
           "required": ["bearerToken", "projectId", "tokenId"],

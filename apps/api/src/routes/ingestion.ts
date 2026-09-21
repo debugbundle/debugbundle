@@ -169,7 +169,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
       if (!validation.success) {
         errors.push({
           index,
-          reason: validation.error.issues[0]?.message ?? "invalid_event"
+          reason: "invalid_event"
         });
         rejectedMetricEvents.push({
           event_id: readRejectedMetricEventId(candidate, index),
@@ -188,10 +188,13 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
         continue;
       }
 
-      validEvents.push({
-        index,
-        event: redactEvent(validation.data)
-      });
+      try {
+        validEvents.push({ index, event: redactEvent(validation.data) });
+      } catch {
+        // Mandatory sanitization failure is a permanent per-index rejection, never a raw fallback.
+        errors.push({ index, reason: "unsafe_event" });
+        rejectedMetricEvents.push({ event_id: validation.data.event_id, reason: "unsafe_event" });
+      }
     }
 
     const sharedRateLimitedEventCount = validEvents.length + validAnalyticsEvents.length;
@@ -690,10 +693,9 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
           period_starts_at: usageWindowStartsAt,
           count: billingCountedEventsCount
         });
-      } catch (error) {
+      } catch {
         request.log.warn(
           {
-            err: error,
             project_id: project.project_id,
             period_starts_at: usageWindowStartsAt
           },

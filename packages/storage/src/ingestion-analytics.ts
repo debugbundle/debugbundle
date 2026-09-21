@@ -14,6 +14,7 @@ type RejectedIngestionEvent = {
     | "capture_rule_dropped"
     | "capture_rule_sampled_out"
     | "invalid_event"
+    | "unsafe_event"
     | "monthly_quota_exceeded"
     | "rate_limited"
     | "remote_probes_disabled";
@@ -26,6 +27,7 @@ const REJECTION_REASON_METRIC_KEYS: Partial<
   capture_rule_dropped: "events_rejected_capture_rule",
   capture_rule_sampled_out: "events_rejected_capture_rule",
   invalid_event: "events_rejected_malformed",
+  unsafe_event: "events_rejected_malformed",
   monthly_quota_exceeded: "events_rejected_quota",
   rate_limited: "events_rejected_rate_limited"
 };

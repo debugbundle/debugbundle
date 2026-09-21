@@ -1,5 +1,6 @@
-import { gunzipSync } from "node:zlib";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
+
+import { sanitizeTelemetry } from "../../../../packages/redaction/src/index.js";
 
 import {
   buildBundleObjectKey,
@@ -8,6 +9,8 @@ import {
   type IncidentContextArtifactRecord,
   type IncidentRetrievalRecord
 } from "../../../../packages/storage/src/index.js";
+import { readSanitizedArtifact } from "../../../../packages/storage/src/artifact-privacy.js";
+import { TELEMETRY_PRIVACY_POLICY_VERSION } from "../../../../packages/redaction/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import {
   isObjectNotFoundError,
@@ -17,6 +20,13 @@ import {
   serializeCursorTimestamp
 } from "../api-helpers.js";
 import { BulkIncidentMutationBodySchema, IncidentParamsSchema, IncidentsQuerySchema, LogsQuerySchema } from "../schemas.js";
+
+function sendSafeIncidentResponse(reply: FastifyReply, value: unknown): FastifyReply {
+  const result = sanitizeTelemetry(value, { maxTotalBytes: 512 * 1024 });
+  return result.ok
+    ? reply.status(200).send(result.value)
+    : reply.status(503).send({ error: "privacy_projection_unavailable" });
+}
 
 async function readBundleArtifactForIncident(input: {
   dependencies: ApiDependencies;
@@ -28,10 +38,10 @@ async function readBundleArtifactForIncident(input: {
 
   try {
     const compressed = await input.dependencies.objectStoreReader.getObject({ key });
-    return {
-      status: "ready",
-      body: JSON.parse(gunzipSync(compressed).toString("utf8"))
-    };
+    const body = readSanitizedArtifact(compressed);
+    return body === null
+      ? { status: "failed", reason: "bundle_artifact_unavailable" }
+      : { status: "ready", body };
   } catch (error) {
     if (isObjectNotFoundError(error)) {
       const failureReason = await input.dependencies.incidentRetrieval.getBundleFailureReasonForOrganization?.({
@@ -82,10 +92,10 @@ async function readReproductionArtifactForIncident(input: {
 
   try {
     const compressed = await input.dependencies.objectStoreReader.getObject({ key });
-    return {
-      status: "ready",
-      body: JSON.parse(gunzipSync(compressed).toString("utf8"))
-    };
+    const body = readSanitizedArtifact(compressed);
+    return body === null
+      ? { status: "failed", reason: "reproduction_artifact_unavailable" }
+      : { status: "ready", body };
   } catch (error) {
     if (isObjectNotFoundError(error)) {
       return {
@@ -233,7 +243,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
     const nextCursor =
       nextCursorRecord === undefined ? null : `${serializeCursorTimestamp(nextCursorRecord.last_seen_at)}|${nextCursorRecord.incident_id}`;
 
-    return reply.status(200).send({
+    return sendSafeIncidentResponse(reply, {
       incidents,
       next_cursor: nextCursor
     });
@@ -291,7 +301,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
       });
     }
 
-    return reply.status(200).send({
+    return sendSafeIncidentResponse(reply, {
       incidents: incidentIds.map((incidentId) => incidentsById.get(incidentId)!)
     });
   });
@@ -345,7 +355,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
       });
     }
 
-    return reply.status(200).send({
+    return sendSafeIncidentResponse(reply, {
       incidents: incidentIds.map((incidentId) => incidentsById.get(incidentId)!)
     });
   });
@@ -375,7 +385,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
       });
     }
 
-    return reply.status(200).send({
+    return sendSafeIncidentResponse(reply, {
       incident
     });
   });
@@ -432,7 +442,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
       })
     ]);
 
-    return reply.status(200).send(
+    return sendSafeIncidentResponse(reply,
       buildIncidentContextRecord({
         incident,
         bundle,
@@ -497,7 +507,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
       });
     }
 
-    return reply.status(200).send({
+    return sendSafeIncidentResponse(reply, {
       incident
     });
   });
@@ -552,7 +562,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
       });
     }
 
-    return reply.status(200).send({
+    return sendSafeIncidentResponse(reply, {
       incident
     });
   });
@@ -637,8 +647,9 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
     }
 
     try {
-      const parsedBundle: unknown = JSON.parse(gunzipSync(compressed).toString("utf8"));
-      return reply.status(200).send(parsedBundle);
+      const parsedBundle = readSanitizedArtifact(compressed);
+      if (parsedBundle === null) throw new Error("bundle_artifact_invalid");
+      return reply.header("x-debugbundle-privacy-policy", TELEMETRY_PRIVACY_POLICY_VERSION).status(200).send(parsedBundle);
     } catch {
       return reply.status(200).send({
         status: "failed",
@@ -676,8 +687,9 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
 
     try {
       const body = await dependencies.objectStoreReader.getObject({ key });
-      const parsedReproduction: unknown = JSON.parse(gunzipSync(body).toString("utf8"));
-      return reply.status(200).send(parsedReproduction);
+      const parsedReproduction = readSanitizedArtifact(body);
+      if (parsedReproduction === null) throw new Error("reproduction_artifact_unavailable");
+      return reply.header("x-debugbundle-privacy-policy", TELEMETRY_PRIVACY_POLICY_VERSION).status(200).send(parsedReproduction);
     } catch (error) {
       if (isObjectNotFoundError(error)) {
         return reply.status(200).send({
@@ -738,7 +750,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
     const nextCursor =
       nextCursorRecord === undefined ? null : `${serializeCursorTimestamp(nextCursorRecord.occurred_at)}|${nextCursorRecord.event_id}`;
 
-    return reply.status(200).send({
+    return sendSafeIncidentResponse(reply, {
       logs,
       next_cursor: nextCursor
     });

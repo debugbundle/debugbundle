@@ -35,7 +35,8 @@ describe("worker delivery intents", () => {
       occurred_at: "2026-03-11T00:00:00.000Z",
       service_name: "checkout-api",
       environment: "production",
-      severity: "high"
+      severity: "high",
+      title: "Incident token=historical-secret"
     });
 
     expect(listMatchingWebhooks).toHaveBeenCalledWith({
@@ -58,7 +59,7 @@ describe("worker delivery intents", () => {
           severity: "high",
           bundle_type: "failure",
           verification: false,
-          summary: null,
+          summary: "Incident token=[REDACTED]",
           links: {
             bundle: "/v1/incidents/inc_123/bundle",
             reproduction: "/v1/incidents/inc_123/reproduction"

@@ -25,6 +25,7 @@ export const REQUIRED_API_TABLES = [
   "project_invites",
   "project_tokens",
   "member_tokens",
+  "agent_tokens",
   "audit_logs",
   "probe_activations",
   "capture_policies",

@@ -62,6 +62,7 @@ help:
 	@echo "  make test-all        Run unit+coverage and integration tests"
 	@echo "  make test-all-quick  Run unit (no coverage) and integration tests"
 	@echo "  make selfhost-smoke  Prove self-host auth, debug ingestion, browser analytics, rollups, and bundles"
+	@echo "  make cli-runtime-check  Verify clean installed CLI packages across Node 22/24/26, including 26.0.0"
 	@echo "  make build           Run build via Docker"
 	@echo "  make ci              Run lint + typecheck + test + build via Docker"
 	@echo "  make release-mcp-ecosystem-plan VERSION=x.y.z"
@@ -79,6 +80,7 @@ help:
 	@echo "  make openai-plugin-prepare   Build deterministic local candidate archives"
 	@echo "  make openai-plugin-verify    Verify source manifest and candidate hashes"
 	@echo "  make test-integration Run Compose-backed ingestion integration tests"
+	@echo "  make test-mixed-version-api PREVIOUS_API_REVISION=<deployed core SHA>  Verify old/new API on an isolated forward-migrated DB"
 	@echo "  make worker-jobs     Inspect scoped durable worker job metadata (read-only by default)"
 	@echo "  make api-check       Run API runtime bootstrap tests"
 	@echo "  make backend-restart Recreate API + worker so they reload current env"
@@ -227,6 +229,22 @@ codex-plugin-smoke-github:
 	docker run --rm -v "$(PWD):/source:ro" -e CODEX_SMOKE_VERSION="$(CODEX_SMOKE_VERSION)" -e MCP_SMOKE_GITHUB=1 $(CODEX_SMOKE_NODE_IMAGE) node /source/scripts/smoke-codex-plugin.mjs
 
 .PHONY: test-focused
+.PHONY: privacy-fixtures-sync privacy-fixtures-check
+privacy-fixtures-sync:
+	$(NODE_RUN) "node scripts/sync-privacy-fixtures.mjs --write"
+
+privacy-fixtures-check:
+	$(NODE_RUN) "node scripts/sync-privacy-fixtures.mjs --check"
+
+.PHONY: privacy-js-local-test privacy-js-verify
+privacy-js-local-test: license-prepare-shared privacy-js-verify
+privacy-js-verify:
+	$(NODE_RUN) "corepack enable && node scripts/test-js-sdk-with-local-redaction.mjs $(TEST_FILES)"
+
+.PHONY: privacy-js-local-smoke
+privacy-js-local-smoke: license-prepare-shared
+	docker run --rm -t -v "$(PWD):$(WORKDIR)" --tmpfs "$(WORKDIR)/sdks/debugbundle-js/.tmp" -w "$(WORKDIR)" node:26-alpine sh -lc 'npm install --global corepack@0.34.1 >/dev/null && corepack enable && node scripts/test-js-sdk-with-local-redaction.mjs --consumer'
+
 .PHONY: incident-recovery-check
 incident-recovery-check:
 	python3 scripts/incident-recovery-check.py
@@ -241,6 +259,16 @@ test-focused:
 .PHONY: format-focused
 format-focused:
 	$(NODE_RUN) "corepack enable && corepack pnpm exec prettier --write $(FORMAT_FILES)"
+
+CLI_RUNTIME_IMAGES ?= node:22-alpine node:24-alpine node:26.0.0-alpine node:26.2.0-alpine node:26-alpine
+.PHONY: cli-runtime-pack cli-runtime-check
+cli-runtime-pack:
+	$(NODE_RUN) 'corepack enable && mkdir -p .tmp/cli-runtime-package && npm pack ./apps/cli --pack-destination .tmp/cli-runtime-package'
+
+cli-runtime-check: cli-runtime-pack
+	@set -e; for runtime_image in $(CLI_RUNTIME_IMAGES); do \
+		docker run --rm -v "$(PWD):/source:ro" -w /tmp "$$runtime_image" sh -lc 'apk add --no-cache openssl >/dev/null && cli_version=$$(node -p "require(\"/source/apps/cli/package.json\").version") && npm install --prefix /tmp/cli-consumer --no-audit --no-fund --ignore-scripts "/source/.tmp/cli-runtime-package/debugbundle-cli-$$cli_version.tgz" >/dev/null && node /source/scripts/check-cli-runtime.mjs /tmp/cli-consumer/node_modules/@debugbundle/cli/bin/debugbundle.js'; \
+	done
 
 .PHONY: test-unit
 test-unit:
@@ -327,6 +355,7 @@ ci: lint typecheck test build
 INTEGRATION_TEST_FILES ?= tests/integration/browser-resource-retention.integration.test.ts tests/integration/worker-analytics-bundle.integration.test.ts tests/integration/deployment-attribution.integration.test.ts tests/integration/improvement-occurrence-order.integration.test.ts tests/integration/alert-delivery-dedupe.integration.test.ts tests/integration/analytics-correlation.integration.test.ts tests/integration/analytics-incident-impact.integration.test.ts tests/integration/analytics-saved-funnels.integration.test.ts tests/integration/availability-checks.integration.test.ts tests/integration/ingestion-core.integration.test.ts tests/integration/incident-reliability.integration.test.ts tests/integration/worker-durability.integration.test.ts tests/integration/worker-job-migration.integration.test.ts tests/integration/worker-pipeline-recovery.integration.test.ts tests/integration/ingestion-bundle-triggers.integration.test.ts tests/integration/ingestion-replay-idempotency.integration.test.ts tests/integration/ingestion-lifecycle-webhooks.integration.test.ts tests/integration/billing-sync.integration.test.ts tests/integration/openai-coordination.integration.test.ts tests/integration/openai-oauth-grant-revocation.integration.test.ts tests/integration/openai-reviewer-fixtures.integration.test.ts tests/integration/project-deletion.integration.test.ts tests/integration/retention-cleanup.integration.test.ts tests/integration/retention-sampling.integration.test.ts tests/integration/storage-migrations.integration.test.ts
 
 .PHONY: test-integration
+INTEGRATION_TEST_FILES += tests/integration/agent-token.integration.test.ts
 test-integration:
 	@set -e; \
 	trap 'POSTGRES_PORT=$(INTEGRATION_POSTGRES_PORT) REDIS_PORT=$(INTEGRATION_REDIS_PORT) LOCALSTACK_PORT=$(INTEGRATION_LOCALSTACK_PORT) API_PORT=$(INTEGRATION_API_PORT) WEB_PORT=$(INTEGRATION_WEB_PORT) APP_BASE_URL=$(INTEGRATION_APP_BASE_URL) VITE_API_URL=$(INTEGRATION_WEB_API_URL) CONTAINER_PREFIX=$(INTEGRATION_CONTAINER_PREFIX) DEBUGBUNDLE_PROBE_TRIGGER_SECRET=$(INTEGRATION_PROBE_TRIGGER_SECRET) ANALYTICS_HASH_SECRET=$(INTEGRATION_ANALYTICS_HASH_SECRET) $(INTEGRATION_COMPOSE) down -v' EXIT; \
@@ -346,6 +375,10 @@ test-integration:
 		-e S3_REGION=us-east-1 \
 		-e S3_BUCKET=debugbundle-raw-events \
 		$(NODE_IMAGE) sh -lc "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm db:bootstrap && corepack pnpm db:migrate && corepack pnpm vitest run --no-file-parallelism --maxWorkers=1 $(INTEGRATION_TEST_FILES)"
+
+.PHONY: test-mixed-version-api
+test-mixed-version-api: install
+	bash scripts/verify-mixed-version-api.sh
 
 .PHONY: test-integration-down
 test-integration-down:
@@ -468,7 +501,8 @@ license-docs-check:
 
 .PHONY: license-site-check
 license-site-check:
-	$(NODE_RUN) 'corepack enable && corepack pnpm public-site:artifacts && corepack pnpm --dir site test && corepack pnpm --dir site build && corepack pnpm --dir site typecheck'
+	$(NODE_RUN) 'corepack enable && corepack pnpm public-site:artifacts'
+	$(MAKE) -C site test build typecheck NODE_IMAGE=$(NODE_IMAGE)
 
 .PHONY: mcp-ecosystem-check
 mcp-ecosystem-check:

@@ -52,7 +52,12 @@ type OperationSpec = {
   responses: Record<string, ResponseSpec>;
 };
 
-const AnalyticsSafeRouteSchema = z.string().trim().min(1).max(2048).regex(/^[^?#]+$/);
+const AnalyticsSafeRouteSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(2048)
+  .regex(/^[^?#]+$/);
 
 const AnalyticsSummaryQuerySchema = z
   .object({

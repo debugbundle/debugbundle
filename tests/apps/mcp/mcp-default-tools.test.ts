@@ -1,3 +1,4 @@
+import * as nodeHttp from "../../../packages/node-http/src/index.js";
 import { describe, expect, it, vi } from "vitest";
 
 import { createDefaultMcpTools } from "../../../apps/mcp/src/default-tools.js";
@@ -43,7 +44,7 @@ describe("mcp default tools", () => {
     vi.stubEnv("DEBUGBUNDLE_MEMBER_TOKEN", "");
     vi.stubEnv("DEBUGBUNDLE_API_URL", "");
     const fetchMock = vi
-      .spyOn(globalThis, "fetch")
+      .spyOn(nodeHttp, "nodeFetch")
       .mockResolvedValue(
         new Response(JSON.stringify({ projects: [projectRecord] }), { status: 200 })
       );
@@ -76,7 +77,7 @@ describe("mcp default tools", () => {
   it("fails closed before a hosted request when local-auth credentials are unavailable", async () => {
     const auth = vi.spyOn(authState, "readCliAuthState").mockRejectedValue(new Error("missing"));
     vi.stubEnv("DEBUGBUNDLE_MEMBER_TOKEN", "");
-    const fetchMock = vi.spyOn(globalThis, "fetch");
+    const fetchMock = vi.spyOn(nodeHttp, "nodeFetch");
     try {
       const tools = await createDefaultMcpTools({ localAuth: true });
       await expect(tools["list_projects"]!({})).rejects.toThrow(
@@ -95,7 +96,7 @@ describe("mcp default tools", () => {
     const previousApiUrl = process.env["DEBUGBUNDLE_API_URL"];
     process.env["DEBUGBUNDLE_MEMBER_TOKEN"] = " dbundle_mem_env ";
     process.env["DEBUGBUNDLE_API_URL"] = "https://env-api.example.test";
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    const fetchMock = vi.spyOn(nodeHttp, "nodeFetch").mockResolvedValue(
       new Response(JSON.stringify({ projects: [projectRecord] }), {
         status: 200,
         headers: {
@@ -140,7 +141,7 @@ describe("mcp default tools", () => {
     const previousApiUrl = process.env["DEBUGBUNDLE_API_URL"];
     process.env["DEBUGBUNDLE_MEMBER_TOKEN"] = " dbundle_mem_env ";
     process.env["DEBUGBUNDLE_API_URL"] = "   ";
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    const fetchMock = vi.spyOn(nodeHttp, "nodeFetch").mockResolvedValue(
       new Response(JSON.stringify({ projects: [projectRecord] }), {
         status: 200,
         headers: {

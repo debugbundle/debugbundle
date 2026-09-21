@@ -1,4 +1,5 @@
 import { analyzeCommand as defaultAnalyzeCommand } from "./analyze-command.js";
+import { agentReadCommand as defaultAgentReadCommand } from "./agent-read-command.js";
 import { cleanCommand as defaultCleanCommand } from "./clean-command.js";
 import { connectCommand as defaultConnectCommand } from "./connect-command.js";
 import { doctorCommand as defaultDoctorCommand } from "./doctor-command.js";
@@ -32,6 +33,7 @@ import { CapturePresetSchema } from "../../../packages/shared-types/src/index.js
 import packageJson from "../package.json" with { type: "json" };
 
 export type CliDependencies = ManagementCommandDependencies & CaptureRuleCommandDependencies & {
+  agentReadCommand?: typeof defaultAgentReadCommand;
   analyzeCommand?: typeof defaultAnalyzeCommand;
   cleanCommand?: typeof defaultCleanCommand;
   connectCommand?: typeof defaultConnectCommand;
@@ -105,14 +107,43 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
 
     const command = requirePositional(parsedArgv, 0, "command");
 
+    if (command === "agent") {
+      const action = requirePositional(parsedArgv, 1, "action");
+      if (action === "connect") {
+        expectNoUnknownOptions(parsedArgv, ["base-url", "auth-file"]);
+        ensureNoExtraPositionals(parsedArgv, 2);
+        const baseUrl = readStringOption(parsedArgv, "base-url");
+        const authFilePath = readStringOption(parsedArgv, "auth-file");
+        return (dependencies.agentReadCommand ?? defaultAgentReadCommand)({ action,
+          ...(baseUrl === undefined ? {} : { baseUrl }), ...(authFilePath === undefined ? {} : { authFilePath }) });
+      }
+      const names = ["project_summary", "list_incidents", "get_incident", "get_incident_context", "get_bundle"] as const;
+      if (!names.includes(action as typeof names[number])) throw new CliInputError("Unknown agent read command.");
+      expectNoUnknownOptions(parsedArgv, ["base-url", "auth-file", "limit", "cursor"]);
+      ensureNoExtraPositionals(parsedArgv, action === "project_summary" || action === "list_incidents" ? 3 : 4);
+      const baseUrl = readStringOption(parsedArgv, "base-url");
+      const authFilePath = readStringOption(parsedArgv, "auth-file");
+      const cursor = readStringOption(parsedArgv, "cursor");
+      const limit = readLimitOption(parsedArgv);
+      if (action !== "list_incidents" && (cursor !== undefined || limit !== undefined)) throw new CliInputError("List options apply only to list_incidents.");
+      return (dependencies.agentReadCommand ?? defaultAgentReadCommand)({
+        action: action as typeof names[number], projectId: requirePositional(parsedArgv, 2, "project-id"),
+        ...(action === "project_summary" || action === "list_incidents" ? {} : { incidentId: requirePositional(parsedArgv, 3, "incident-id") }),
+        ...(baseUrl === undefined ? {} : { baseUrl }), ...(authFilePath === undefined ? {} : { authFilePath }),
+        ...(cursor === undefined ? {} : { cursor }), ...(limit === undefined ? {} : { limit })
+      });
+    }
+
     if (command === "doctor") {
-      expectNoUnknownOptions(parsedArgv, ["check-relay", "json", "privacy"]);
+      expectNoUnknownOptions(parsedArgv, ["check-relay", "json", "privacy", "auth-file"]);
       ensureNoExtraPositionals(parsedArgv, 1);
 
+      const authFilePath = readStringOption(parsedArgv, "auth-file");
       const checkRelay = readBooleanOption(parsedArgv, "check-relay");
       const json = readBooleanOption(parsedArgv, "json");
       const privacy = readBooleanOption(parsedArgv, "privacy");
       return await (dependencies.doctorCommand ?? defaultDoctorCommand)({
+        ...(authFilePath === undefined ? {} : { authFilePath }),
         ...(checkRelay === true ? { checkRelay: true } : {}),
         ...(privacy === true ? { privacy: true } : {}),
         ...(json === true ? { json: true } : {})

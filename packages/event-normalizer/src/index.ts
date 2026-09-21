@@ -1,6 +1,9 @@
 import { RESOURCE_FINGERPRINT_VERSION, fingerprint, fingerprintVersion, type FingerprintVersion } from "./fingerprints.js";
 export { FINGERPRINT_VERSION, RESOURCE_FINGERPRINT_VERSION, fingerprint, fingerprintVersion, inferMatchedFields } from "./fingerprints.js";
 export type { FingerprintVersion } from "./fingerprints.js";
+export { sanitizeEvent } from "./event-privacy.js";
+export { protectAnalyticsEvent } from "./analytics-privacy.js";
+export { parseStoredEvent } from "./stored-event.js";
 
 import { redact, type JsonValue } from "../../redaction/src/index.js";
 import {

@@ -134,6 +134,7 @@ services:
       <<: *node-pnpm-env
       API_HOST: "0.0.0.0"
       API_PORT: "3000"
+      AGENT_TOKEN_ISSUANCE_ENABLED: ${AGENT_TOKEN_ISSUANCE_ENABLED:-false}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:5291}
       SES_REGION: ${SES_REGION:-us-east-1}
       SES_FROM_EMAIL: ${SES_FROM_EMAIL:-}

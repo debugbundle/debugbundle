@@ -1,7 +1,8 @@
-import { gunzipSync } from "node:zlib";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 
+import { sanitizeTelemetry } from "../../../../packages/redaction/src/index.js";
 import { buildImprovementBundleObjectKey } from "../../../../packages/storage/src/index.js";
+import { readSanitizedArtifact } from "../../../../packages/storage/src/artifact-privacy.js";
 import type { ApiDependencies } from "../api-types.js";
 import {
   isObjectNotFoundError,
@@ -16,6 +17,13 @@ import {
   ImprovementsQuerySchema,
   ProjectImprovementParamsSchema
 } from "../schemas.js";
+
+function sendSafeImprovement(reply: FastifyReply, value: unknown): FastifyReply {
+  const safe = sanitizeTelemetry(value, { maxTotalBytes: 512 * 1024 });
+  return safe.ok
+    ? reply.status(200).send(safe.value)
+    : reply.status(503).send({ error: "privacy_projection_unavailable" });
+}
 
 async function buildBundlePendingOrFailureState(input: {
   dependencies: ApiDependencies;
@@ -127,7 +135,7 @@ export function registerImprovementRoutes(app: FastifyInstance, dependencies: Ap
     const nextCursor =
       nextCursorRecord === undefined ? null : `${serializeCursorTimestamp(nextCursorRecord.last_detected_at)}|${nextCursorRecord.improvement_id}`;
 
-    return reply.status(200).send({
+    return sendSafeImprovement(reply, {
       improvements,
       next_cursor: nextCursor
     });
@@ -158,7 +166,7 @@ export function registerImprovementRoutes(app: FastifyInstance, dependencies: Ap
       return reply.status(404).send({ error: "improvement_not_found" });
     }
 
-    return reply.status(200).send({ improvement });
+    return sendSafeImprovement(reply, { improvement });
   });
 
   app.post("/v1/improvements/:id/resolve", async (request, reply) => {
@@ -188,7 +196,7 @@ export function registerImprovementRoutes(app: FastifyInstance, dependencies: Ap
       return reply.status(404).send({ error: "improvement_not_found" });
     }
 
-    return reply.status(200).send({ improvement });
+    return sendSafeImprovement(reply, { improvement });
   });
 
   app.post("/v1/improvements/:id/reopen", async (request, reply) => {
@@ -216,7 +224,7 @@ export function registerImprovementRoutes(app: FastifyInstance, dependencies: Ap
       return reply.status(404).send({ error: "improvement_not_found" });
     }
 
-    return reply.status(200).send({ improvement });
+    return sendSafeImprovement(reply, { improvement });
   });
 
   app.post("/v1/improvements/:id/snooze", async (request, reply) => {
@@ -254,7 +262,7 @@ export function registerImprovementRoutes(app: FastifyInstance, dependencies: Ap
       return reply.status(404).send({ error: "improvement_not_found" });
     }
 
-    return reply.status(200).send({ improvement });
+    return sendSafeImprovement(reply, { improvement });
   });
 
   app.get("/v1/projects/:id/improvements/:improvementId/bundle", async (request, reply) => {
@@ -288,7 +296,10 @@ export function registerImprovementRoutes(app: FastifyInstance, dependencies: Ap
 
     try {
       const compressed = await dependencies.objectStoreReader.getObject({ key });
-      return reply.status(200).send(JSON.parse(gunzipSync(compressed).toString("utf8")));
+      const artifact = readSanitizedArtifact(compressed);
+      return reply.status(200).send(artifact ?? {
+        status: "failed", reason: "bundle_artifact_unavailable"
+      });
     } catch (error) {
       if (isObjectNotFoundError(error)) {
         return reply.status(200).send(

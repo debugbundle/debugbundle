@@ -11,7 +11,10 @@ describe("mcp token tools", () => {
       "revoke_project_token",
       "list_member_tokens",
       "create_member_token",
-      "revoke_member_token"
+      "revoke_member_token",
+      "list_agent_tokens",
+      "create_agent_token",
+      "revoke_agent_token"
     ]);
   });
 
@@ -22,7 +25,8 @@ describe("mcp token tools", () => {
       revokeProjectToken: vi.fn(),
       listMemberTokens: vi.fn(),
       createMemberToken: vi.fn(),
-      revokeMemberToken: vi.fn()
+      revokeMemberToken: vi.fn(),
+      listAgentTokens: vi.fn(), createAgentToken: vi.fn(), revokeAgentToken: vi.fn()
     });
 
     await expect(
@@ -42,7 +46,8 @@ describe("mcp token tools", () => {
       revokeProjectToken: vi.fn(),
       listMemberTokens: vi.fn(),
       createMemberToken: vi.fn(),
-      revokeMemberToken: vi.fn()
+      revokeMemberToken: vi.fn(),
+      listAgentTokens: vi.fn(), createAgentToken: vi.fn(), revokeAgentToken: vi.fn()
     });
 
     await expect(
@@ -61,7 +66,8 @@ describe("mcp token tools", () => {
       revokeProjectToken: vi.fn().mockResolvedValue({ token_id: "ptok_2", revoked_at: "2026-03-11T00:00:00.000Z" }),
       listMemberTokens: vi.fn().mockResolvedValue([{ token_id: "mtok_1" }]),
       createMemberToken: vi.fn().mockResolvedValue({ token_id: "mtok_2" }),
-      revokeMemberToken: vi.fn().mockResolvedValue({ token_id: "mtok_2", revoked_at: "2026-03-11T00:00:00.000Z" })
+      revokeMemberToken: vi.fn().mockResolvedValue({ token_id: "mtok_2", revoked_at: "2026-03-11T00:00:00.000Z" }),
+      listAgentTokens: vi.fn().mockResolvedValue([]), createAgentToken: vi.fn().mockResolvedValue({ token_id: "at_1" }), revokeAgentToken: vi.fn().mockResolvedValue({ token_id: "at_1" })
     });
 
     await expect(
@@ -116,7 +122,8 @@ describe("mcp token tools", () => {
       revokeProjectToken: vi.fn(),
       listMemberTokens: vi.fn(),
       createMemberToken: vi.fn(),
-      revokeMemberToken: vi.fn()
+      revokeMemberToken: vi.fn(),
+      listAgentTokens: vi.fn(), createAgentToken: vi.fn(), revokeAgentToken: vi.fn()
     });
 
     await expect(
@@ -134,7 +141,8 @@ describe("mcp token tools", () => {
       revokeProjectToken: vi.fn().mockResolvedValue({ token_id: "ptok_1" }),
       listMemberTokens: vi.fn().mockResolvedValue([]),
       createMemberToken: vi.fn().mockResolvedValue({ token_id: "mtok_1" }),
-      revokeMemberToken: vi.fn().mockResolvedValue({ token_id: "mtok_1" })
+      revokeMemberToken: vi.fn().mockResolvedValue({ token_id: "mtok_1" }),
+      listAgentTokens: vi.fn(), createAgentToken: vi.fn(), revokeAgentToken: vi.fn()
     };
     const tools = createTokenMcpTools(api);
 
@@ -176,7 +184,8 @@ describe("mcp token tools", () => {
       revokeProjectToken: vi.fn().mockResolvedValue({ token_id: "ptok_1" }),
       listMemberTokens: vi.fn().mockResolvedValue([]),
       createMemberToken: vi.fn().mockRejectedValue(new TokenManagementApiError(400, "invalid_payload")),
-      revokeMemberToken: vi.fn().mockRejectedValue(new TokenManagementApiError(404, "token_not_found"))
+      revokeMemberToken: vi.fn().mockRejectedValue(new TokenManagementApiError(404, "token_not_found")),
+      listAgentTokens: vi.fn(), createAgentToken: vi.fn(), revokeAgentToken: vi.fn()
     });
 
     await expect(

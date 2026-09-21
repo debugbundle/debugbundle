@@ -7,6 +7,32 @@ import {
 } from "../../../packages/mcp-core/src/index.js";
 
 describe("OpenAI MCP output projection", () => {
+  it("removes credentials embedded in allowlisted incident strings", () => {
+    const output = projectOpenAiToolOutput("get_incident_context", {
+      incident: {
+        incident_id: "inc_1", project_id: "proj_1", service_name: "checkout", environment: "production",
+        title: "Checkout failed password=SYNTHETIC_AUDIT_SECRET", severity: "high", status: "open",
+        first_seen_at: "2026-09-20T10:00:00.000Z", last_seen_at: "2026-09-20T10:01:00.000Z",
+        occurrence_count: 1, regressed_at: null, dashboard_url: "https://debugbundle.com/incidents/inc_1"
+      },
+      primary_signal: {
+        description: "Checkout failed", error_type: "Error",
+        error_message: "Authorization: Bearer SYNTHETIC_AUDIT_SECRET",
+        request_method: "GET", request_path: "/checkout", route_template: "/checkout",
+        response_status: 500, first_application_frame: null
+      },
+      bundle_status: "missing", reproduction_status: "missing", redaction: null,
+      deploy: { commit_sha: null, deploy_version: null, branch: null, deployed_at: null, regression_window: null },
+      suggested_next_checks: [], continuation_url: "https://debugbundle.com/incidents/inc_1",
+      logs: [{ message: "SYNTHETIC_RAW_LOG" }]
+    });
+
+    expect(validateOpenAiToolOutput("get_incident_context", output)).toEqual(output);
+    expect(JSON.stringify(output)).not.toContain("SYNTHETIC_AUDIT_SECRET");
+    expect(JSON.stringify(output)).not.toContain("SYNTHETIC_RAW_LOG");
+    expect(output).toMatchObject({ primary_signal: { request_method: "GET", response_status: 500 } });
+  });
+
   it("removes hidden fields and keeps prompt-injection strings inert", () => {
     const output = projectOpenAiToolOutput("get_incident_context", {
       incident: {

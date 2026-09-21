@@ -1,6 +1,6 @@
 import { gzipSync } from "node:zlib";
 
-import { fingerprintVersion, inferMatchedFields } from "../../event-normalizer/src/index.js";
+import { fingerprintVersion, inferMatchedFields, sanitizeEvent } from "../../event-normalizer/src/index.js";
 import {
   normalizeResourceRoute,
   inferFrontendExceptionSeverity,
@@ -205,7 +205,8 @@ export function createIngestionPersistenceService(
         occurredAt: new Date(event.occurred_at)
       });
 
-      const body = gzipSync(Buffer.from(JSON.stringify(event), "utf8"));
+      // The storage boundary also protects direct callers that bypass the HTTP adapter.
+      const body = gzipSync(Buffer.from(JSON.stringify(sanitizeEvent(event)), "utf8"));
 
       await input.objectStore.putObject({
         key: objectKey,

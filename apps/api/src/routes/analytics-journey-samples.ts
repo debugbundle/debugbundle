@@ -1,4 +1,3 @@
-import { gunzipSync } from "node:zlib";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { z } from "zod";
 
@@ -9,6 +8,10 @@ import {
   getTierCapabilities
 } from "../../../../packages/shared-types/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
+import {
+  readSanitizedAnalyticsJourneyArtifact,
+  sanitizeAnalyticsJourneyMetadata
+} from "../../../../packages/storage/src/artifact-privacy.js";
 import { isObjectNotFoundError, requireRateLimitedProjectAccess } from "../api-helpers.js";
 
 const AnalyticsJourneySampleParamsSchema = z.object({
@@ -68,8 +71,12 @@ export function registerAnalyticsJourneySampleRoutes(app: FastifyInstance, depen
       now: new Date().toISOString()
     });
 
+    const projected = samples.samples.map((sample) => sanitizeAnalyticsJourneyMetadata(toAnalyticsJourneySampleMetadata(sample)));
+    if (projected.some((sample) => sample === null)) {
+      return reply.status(503).send({ error: "privacy_projection_unavailable" });
+    }
     return reply.status(200).send(AnalyticsJourneySamplesListResponseSchema.parse({
-      samples: samples.samples.map(toAnalyticsJourneySampleMetadata),
+      samples: projected,
       next_cursor: samples.next_cursor
     }));
   });
@@ -107,7 +114,7 @@ export function registerAnalyticsJourneySampleRoutes(app: FastifyInstance, depen
     let journeyArtifact: unknown;
     try {
       const compressed = await dependencies.objectStoreReader.getObject({ key: sample.object_key });
-      journeyArtifact = JSON.parse(gunzipSync(compressed).toString("utf8"));
+      journeyArtifact = readSanitizedAnalyticsJourneyArtifact(compressed);
     } catch (error) {
       if (isObjectNotFoundError(error)) {
         return reply.status(404).send({ error: "analytics_journey_sample_artifact_not_found" });
@@ -121,8 +128,10 @@ export function registerAnalyticsJourneySampleRoutes(app: FastifyInstance, depen
       return reply.status(500).send({ error: "analytics_journey_sample_artifact_invalid" });
     }
 
+    const safeMetadata = sanitizeAnalyticsJourneyMetadata(toAnalyticsJourneySampleMetadata(sample));
+    if (safeMetadata === null) return reply.status(503).send({ error: "privacy_projection_unavailable" });
     return reply.status(200).send(AnalyticsJourneySampleResponseSchema.parse({
-      sample: toAnalyticsJourneySampleMetadata(sample),
+      sample: safeMetadata,
       journey: parsedArtifact.data
     }));
   });

@@ -189,6 +189,23 @@ export function createPostgresAccountStore(
         [input.organization_id],
       );
 
+      const agentTokens = await queryJsonRows(
+        db,
+        `
+          SELECT to_jsonb(t) AS data
+          FROM (
+            SELECT agent_tokens.id AS token_id, agent_tokens.issuer_user_id,
+                   agent_tokens.organization_id, agent_tokens.project_id, agent_tokens.label,
+                   agent_tokens.scope, agent_tokens.policy_version, agent_tokens.created_at,
+                   agent_tokens.expires_at, agent_tokens.revoked_at
+            FROM agent_tokens
+            WHERE organization_id = $1
+            ORDER BY created_at ASC, id ASC
+          ) t
+        `,
+        [input.organization_id],
+      );
+
       const projects = await queryJsonRows(
         db,
         `
@@ -519,6 +536,7 @@ export function createPostgresAccountStore(
         project_members: projectMembers,
         project_invites: projectInvites,
         member_tokens: memberTokens,
+        agent_tokens: agentTokens,
         projects,
         project_tokens: projectTokens,
         probe_activations: probeActivations,

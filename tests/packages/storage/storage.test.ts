@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { gunzipSync } from "node:zlib";
 
 import {
   buildAnalyticsRawEventObjectKey,
@@ -72,6 +73,31 @@ describe("storage wiring", () => {
       object_key: enqueued.object_key
     });
     expect(enqueued.object_key).toContain(`raw-events/proj_123/`);
+  });
+
+  it("scrubs direct persistence calls and withholds unscannable events before object writes", async () => {
+    const putObject = vi.fn().mockResolvedValue(undefined);
+    const enqueue = vi.fn().mockResolvedValue(undefined);
+    const service = createIngestionPersistenceService({ objectStore: { putObject }, queue: { enqueue } });
+    const event = createEventEnvelope({
+      event_type: "log_event", service: { name: "worker", environment: "test" },
+      context: { password: "STORAGE_SECRET" },
+      payload: { level: "error", message: "Bearer STORAGE_SECRET", attributes: {} }
+    });
+    await service.persistAndEnqueue(event, "proj_123");
+    const body = (putObject.mock.calls[0]?.[0] as { body: Buffer }).body;
+    const stored = gunzipSync(body).toString("utf8");
+    expect(stored).not.toContain("STORAGE_SECRET");
+    expect(stored).toContain("[REDACTED]");
+
+    putObject.mockClear();
+    enqueue.mockClear();
+    const unsafe = { ...event, context: { many: Object.fromEntries(
+      Array.from({ length: 220 }, (_, index) => [`key_${index}`, Array.from({ length: 20 }, () => 0)])
+    ) } };
+    await expect(service.persistAndEnqueue(unsafe, "proj_123")).rejects.toThrow("unsafe_event");
+    expect(putObject).not.toHaveBeenCalled();
+    expect(enqueue).not.toHaveBeenCalled();
   });
 
   it("should persist raw analytics events and enqueue analytics aggregation jobs", async (): Promise<void> => {
