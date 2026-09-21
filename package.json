@@ -9,7 +9,7 @@
     "node": ">=22 <27"
   },
   "scripts": {
-    "lint": "eslint .",
+    "lint": "node scripts/run-chunked-eslint.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node scripts/run-chunked-coverage.mjs",
     "coverage:changed": "node scripts/check-changed-file-coverage.mjs",
