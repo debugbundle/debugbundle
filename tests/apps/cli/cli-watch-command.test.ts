@@ -1,4 +1,5 @@
 import { mkdtemp, mkdir, readFile, readdir, stat, truncate, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -420,6 +421,114 @@ describe("cli watch command", () => {
       batches_shipped: 1
     });
     expect(await readdir(join(rootDirectory, ".debugbundle", "local", "events"))).toEqual([]);
+  });
+
+  it("uses the compatible Node transport for cloud watch delivery by default", async () => {
+    const rootDirectory = await createWatchFixtureRepository();
+    const logPath = join(rootDirectory, "var", "log", "debugbundle.ndjson");
+    const abortController = new AbortController();
+    const requests: Array<{ authorization: string | undefined; body: string }> = [];
+    let sleepCount = 0;
+    const server = createServer((request, response) => {
+      const chunks: Array<Buffer> = [];
+      request.on("data", (chunk: Buffer) => chunks.push(chunk));
+      request.on("end", () => {
+        requests.push({
+          authorization: request.headers.authorization,
+          body: Buffer.concat(chunks).toString("utf8")
+        });
+        response.writeHead(202, { "content-type": "application/json" });
+        response.end(JSON.stringify({ accepted: 1, rejected: 0, errors: [] }));
+      });
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", resolve);
+    });
+
+    try {
+      const address = server.address();
+      if (address === null || typeof address === "string") {
+        throw new Error("missing_test_server_address");
+      }
+
+      await writeFile(
+        join(rootDirectory, ".debugbundle", "local", "connection.json"),
+        `${JSON.stringify(
+          {
+            mode: "connected",
+            cloud_project_id: "proj_cloud_transport",
+            cloud_base_url: `http://127.0.0.1:${address.port}`,
+            environments: {
+              local: { delivery: "local-only" },
+              development: { delivery: "local-only" },
+              staging: { delivery: "local-only" },
+              production: { delivery: "cloud-enabled" }
+            }
+          },
+          null,
+          2
+        )}\n`,
+        "utf8"
+      );
+      await mkdir(join(rootDirectory, "var", "log"), { recursive: true });
+      await writeFile(logPath, "", "utf8");
+
+      const result = await watchCommand(
+        {
+          logPath,
+          format: "debugbundle-ndjson",
+          cloud: true,
+          json: true
+        },
+        {
+          cwd: () => rootDirectory,
+          pollIntervalMs: 1,
+          readEnv: (name) => (name === "DEBUGBUNDLE_PROJECT_TOKEN" ? "dbundle_proj_transport" : undefined),
+          signal: abortController.signal,
+          sleep: async () => {
+            sleepCount += 1;
+            if (sleepCount === 1) {
+              await writeFile(
+                logPath,
+                `${JSON.stringify({
+                  type: "error",
+                  error_type: "TypeError",
+                  message: "Transport compatibility event",
+                  stack: "TypeError: Transport compatibility event",
+                  file: "/srv/app/transport.php",
+                  line: 7,
+                  timestamp: "2026-03-21T10:20:30.000Z",
+                  environment: "production",
+                  service: "checkout-api"
+                })}\n`,
+                "utf8"
+              );
+              return;
+            }
+
+            abortController.abort();
+          }
+        }
+      );
+
+      expect(result.exitCode).toBe(0);
+      expect(requests).toHaveLength(1);
+      expect(requests[0]?.authorization).toBe("Bearer dbundle_proj_transport");
+      expect(JSON.parse(requests[0]?.body ?? "{}")).toEqual({
+        events: [
+          expect.objectContaining({
+            event_type: "backend_exception",
+            payload: expect.objectContaining({ message: "Transport compatibility event" })
+          })
+        ]
+      });
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => (error === undefined ? resolve() : reject(error)));
+      });
+    }
   });
 
   it("requires connected config and DEBUGBUNDLE_PROJECT_TOKEN for --cloud mode", async () => {
