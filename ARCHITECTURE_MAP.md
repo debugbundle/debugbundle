@@ -64,7 +64,7 @@ Codex developer distribution lives in `plugins/debugbundle-codex/`, registered b
 
 ## Package Boundaries
 
-The private site's `content/docs/mcp/codex.mdx` and `content/docs/mcp/claude-code.mdx` own the dedicated agent setup guides. `src/content-source.ts` registers both under MCP; the shared route pipeline supplies their canonicals, sitemap entries, search indexing, and redirects. The Claude Code plugin 1.9.0 remains under `apps/mcp/claude-code/debugbundle`, registered by `.claude-plugin/marketplace.json`, and opts into the existing local-auth profile without changing default MCP schemas. `make claude-plugin-smoke` validates native installation/removal and the packaged MCP command's authentication against synthetic loopback HTTP in a disposable home.
+The private site's `content/docs/mcp/codex.mdx` and `content/docs/mcp/claude-code.mdx` own the dedicated agent setup guides. `src/content-source.ts` registers both under MCP; the shared route pipeline supplies their canonicals, sitemap entries, search indexing, and redirects. The Claude Code plugin 1.10.0 remains under `apps/mcp/claude-code/debugbundle`, registered by `.claude-plugin/marketplace.json`, and opts into MCP 1.10.0's existing local-auth profile without changing default MCP schemas. `make claude-plugin-smoke` validates native installation/removal and the packaged MCP command's authentication against synthetic loopback HTTP in a disposable home.
 
 > **Note:** `shared-types` and `redaction` are maintained in this core repository and published for the separate JS SDK monorepo (`github.com/debugbundle/debugbundle-js`) to consume. `sdk-node` and `sdk-browser` live in that companion repository. See the "JavaScript SDK Monorepo" section below.
 

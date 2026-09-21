@@ -6,25 +6,31 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-09-21
+
 ### Fixed
 
-- CLI candidate fixes compressed HTTP/2 response decoding on Node 26.0.0 by pairing fetch with its bundled Undici dispatcher. Existing Node 22–26 support is preserved and exact-version installed-consumer tests cover the regression.
+- CLI 1.10.0 fixes compressed HTTP/2 response decoding on Node 26.0.0 by pairing fetch with its bundled Undici dispatcher. Existing Node 22–26 support is preserved and exact-version installed-consumer tests cover the regression.
 - Incident and improvement lifecycle clients, CLI, and ordinary MCP distinguish unconfirmed mutation outcomes from definite rejections. Malformed success responses, transport loss, and server errors warn against automatic retries and require a read to check current state.
 - Confirmed cloud lifecycle mutations remain successful when an optional local cache update fails; CLI/MCP show a fixed cache warning without exposing filesystem errors.
 - CLI `doctor` now exits 1 for error reports and retains exit 0 for healthy/warning-only reports. It also accepts `--auth-file`; an invalid response is described as a client validation failure without assuming a cloud outage.
 
-- Claude Code plugin 1.9.0 opts into MCP's local-auth profile, allowing saved login and existing member-token settings to satisfy hosted tool authentication without per-call credentials.
+- Claude Code plugin 1.10.0 retains MCP's local-auth profile, allowing saved login and existing member-token settings to satisfy hosted tool authentication without per-call credentials.
 
 ### Added
 
-- OpenClaw companion 1.9.0 aligns the bundled MCP release while preserving its default tool and authentication contracts.
-- MCP 1.9.0 adds opt-in `--local-auth` for schema-valid saved-login/environment authentication without per-call credential arguments; the default MCP and OpenClaw contracts are preserved.
+- OpenClaw companion 1.10.0 aligns the bundled MCP release while preserving its default tool and authentication contracts.
+- MCP 1.10.0 projects the expanded bounded agent-evidence surface while preserving opt-in `--local-auth`, default MCP schemas, and OpenClaw contracts.
+- Add agent-scoped, short-lived, revocable credentials for bounded evidence retrieval without exposing project ingestion tokens or unrestricted member credentials.
 - Dedicated Codex developer plugin, repository marketplace, and setup guide using the existing MCP server and authentication.
 - Codex package compatibility gates and isolated real-client installation/retrieval verification.
 
 ### Changed
 
-- CLI 1.9.1 and agent skill updates explain scoped browser-resource noise handling, context versus drop, protected dependencies and cautious privacy-blocking diagnosis. Existing projects can refresh guidance without rerunning setup or replacing their profile/connection.
+- CLI 1.10.0 and agent skill updates explain scoped browser-resource noise handling, context versus drop, protected dependencies and cautious privacy-blocking diagnosis. Existing projects can refresh guidance without rerunning setup or replacing their profile/connection.
+- Upgrade hosted dogfooding to the published 2.0.0 shared redaction, Node SDK, and browser SDK packages so local capture and hosted ingestion use the same privacy contract.
+- Scrub sensitive values before durable event, analytics, artifact, notification, and runtime-log storage; keep bounded structural diagnostics while preventing raw secret-bearing payloads from reaching agent evidence.
+- Add ordered storage migration and mixed-version rollout guards for agent-token support, preserving old API/worker compatibility throughout staged deployment.
 - Coordinate MCP/Claude/OpenClaw 1.8.2 and portable skill 1.8.3 distribution. The OpenAI skill retains its read-only boundary; no SDK, bundle schema or hosted runtime upgrade is required.
 
 ## [1.10.0] - 2026-09-16

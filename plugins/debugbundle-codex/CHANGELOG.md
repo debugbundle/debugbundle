@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.1] - 2026-09-21
+
+### Changed
+
+- Pin the developer integration to `@debugbundle/mcp@1.10.0` for the bounded agent-evidence and mutation-outcome protections.
+
 ## [1.0.0] - 2026-09-18
 
 ### Added
