@@ -14,6 +14,30 @@ The repository-distributed `debugbundle-codex` package combines the local stdio 
 
 The opt-in MCP `--local-auth` mode obtains member credentials from the server environment or saved CLI login instead of tool arguments. It preserves the remaining tool validation and domain behavior; the default stdio contract remains unchanged.
 
+### Project-Scoped Agent Credential
+
+An expiring `dbundle_agent_` credential hashed at rest and bound to one project with the
+`incident:read-minimized` scope. Its restricted CLI/MCP profile exposes five fixed evidence reads
+and cannot regenerate artifacts or perform management actions. Issuance is disabled by default
+until the migration and all serving API replicas support the credential.
+
+## Sensitive-Data Protection Terms
+
+### `telemetry-privacy-v1`
+
+The versioned mandatory protection policy applied to supported telemetry fields before upgraded
+SDK-owned buffering or transport, again before server persistence, and before protected evidence
+egress. It covers the defined sensitive keys and high-confidence credential patterns with bounded
+processing. It is not a universal detector for arbitrary confidential prose, and applying it does
+not erase historical stored objects or past external deliveries.
+
+### Privacy-Projected Artifact
+
+An incident bundle or reproduction response that the server has bounded and re-scrubbed at read
+time under `telemetry-privacy-v1`. Certified responses carry the matching response header so
+consumers such as `debugbundle/action@v2` can reject legacy or unknown server output before writing
+an artifact.
+
 ## Browser Resource Incident Terms
 
 ### Browser Resource Incident
