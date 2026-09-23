@@ -36,5 +36,6 @@ EventEnvelopeSchema.parse(event);
 
 ## Notes
 
+- Version 2.1 adds browser page lifecycle and bounded target-attribute capture matchers, alert noise policies, and optional correlated recovery evidence. Bundle schemas remain version 1 and existing SDK event envelopes stay compatible.
 - Published from the core-owned shared-package release workflow in `debugbundle/debugbundle`.
 - Source remains core-owned in the DebugBundle workspace and is published through the shared-package release workflow.

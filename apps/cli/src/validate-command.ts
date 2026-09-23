@@ -1,5 +1,7 @@
-import { mkdir as mkdirFromFs, readFile as readFileFromFs, stat as statFromFs, writeFile as writeFileFromFs } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { manageAgentSetup, projectRoot, readManaged, safePath, writeManaged, ensureGitignore } from "../../../packages/agent-setup/src/index.js";
+import { agentChecks, appendAgentReport, localScaffoldFailure, buildManagedAgentsSection, legacyHashes, canonicalFiles } from "./agent-setup.js";
+import { mkdir as mkdirFromFs, stat as statFromFs } from "node:fs/promises";
+import { dirname, join, relative } from "node:path";
 
 import {
   BUNDLE_SCHEMA_REFERENCE_FILE_PATH,
@@ -165,57 +167,14 @@ function buildValidateJsonOutput(
   });
 }
 
-async function fixMissingFile(rootDirectory: string, filePath: string, buildContent: () => string, dependencies: { mkdir: DirectoryMaker; writeFile: FileWriter }): Promise<void> {
+async function fixMissingFile(rootDirectory: string, filePath: string, buildContent: () => string, dependencies: { mkdir: DirectoryMaker; writeFile?: FileWriter }): Promise<void> {
   const absoluteFilePath = join(rootDirectory, filePath);
   await dependencies.mkdir(dirname(absoluteFilePath), { recursive: true });
-  await dependencies.writeFile(absoluteFilePath, buildContent());
+  if (dependencies.writeFile) await dependencies.writeFile(absoluteFilePath, buildContent());
+  else await writeManaged(rootDirectory, filePath, buildContent(), undefined);
 }
 
-async function ensureManagedGitignore(rootDirectory: string, input: { fix?: boolean }, dependencies: { readFile: FileReader; writeFile: FileWriter }): Promise<ValidateCheck> {
-  const gitignorePath = join(rootDirectory, GITIGNORE_FILE_PATH);
-  const managedSection = buildManagedGitignoreSection().trimEnd();
-
-  let existingContents = "";
-  try {
-    existingContents = await dependencies.readFile(gitignorePath);
-  } catch (error) {
-    if (!(typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT")) {
-      throw error;
-    }
-  }
-
-  const hasManagedEntries = existingContents.includes(".debugbundle/local/*")
-    && existingContents.includes("!.debugbundle/local/connection.json")
-    && existingContents.includes(".debugbundle/bundles/");
-
-  if (hasManagedEntries) {
-    return {
-      name: "gitignore",
-      status: "ok",
-      message: `Found managed ${GITIGNORE_FILE_PATH} entries`
-    };
-  }
-
-  if (input.fix === true) {
-    const nextContents = existingContents.trimEnd().length > 0
-      ? `${existingContents.trimEnd()}\n\n${managedSection}\n`
-      : `${managedSection}\n`;
-    await dependencies.writeFile(gitignorePath, nextContents);
-    return {
-      name: "gitignore",
-      status: "ok",
-      message: `Updated ${GITIGNORE_FILE_PATH}`
-    };
-  }
-
-  return {
-    name: "gitignore",
-    status: "missing",
-    message: `Missing managed ${GITIGNORE_FILE_PATH} entries`
-  };
-}
-
-export async function validateCommand(
+async function runValidateCommand(
   input: { fix?: boolean; json?: boolean },
   dependencies: ValidateCommandDependencies = {}
 ): Promise<CliCommandResult> {
@@ -223,10 +182,14 @@ export async function validateCommand(
   const mkdir = dependencies.mkdir ?? (async (path: string, options: { recursive: true }) => {
     await mkdirFromFs(path, options);
   });
-  const readFile = dependencies.readFile ?? ((filePath: string) => readFileFromFs(filePath, "utf8"));
+  const readFile = dependencies.readFile ?? (async (filePath: string) => {
+    const content = await readManaged(rootDirectory, relative(rootDirectory, filePath));
+    if (content === undefined) throw Object.assign(new Error("Missing local scaffold file."), { code: "ENOENT" });
+    return content;
+  });
   const stat = dependencies.stat ?? statFromFs;
-  const writeFile = dependencies.writeFile ?? (async (filePath: string, content: string) => writeFileFromFs(filePath, content, "utf8"));
-  const rootDirectory = cwd();
+  const rootDirectory = await projectRoot(cwd());
+  for (const file of [PROFILE_FILE_PATH, CONNECTION_FILE_PATH, GITIGNORE_FILE_PATH]) await safePath(rootDirectory, file);
 
   const profileValidation = await validateProfile(rootDirectory, { readFile, stat });
   const checks: ValidateCheck[] = [
@@ -245,60 +208,34 @@ export async function validateCommand(
 
   let autoFixAvailable = false;
 
+  const before = await manageAgentSetup({ root: rootDirectory, files: canonicalFiles(), legacyHashes, instruction: buildManagedAgentsSection() });
+  const report = input.fix ? await manageAgentSetup({ root: rootDirectory, files: canonicalFiles(), legacyHashes, instruction: buildManagedAgentsSection(), fix: true }) : before;
   for (const fixableFile of FIXABLE_FILES) {
-    const absoluteFilePath = join(rootDirectory, fixableFile.filePath);
-    if (await pathExists(absoluteFilePath, stat)) {
-      if (fixableFile.checkContent) {
-        const currentContents = await readFile(absoluteFilePath);
-        const expectedContents = fixableFile.buildContent();
-        if (currentContents !== expectedContents) {
-          if (input.fix === true) {
-            await writeFile(absoluteFilePath, expectedContents);
-            checks.push({
-              name: fixableFile.name,
-              status: "ok",
-              message: `Updated stale ${fixableFile.filePath}`
-            });
-            continue;
-          }
-
-          autoFixAvailable = true;
-          checks.push({
-            name: fixableFile.name,
-            status: "warning",
-            message: `Stale ${fixableFile.filePath}; run debugbundle validate --fix to refresh it.`
-          });
-          continue;
-        }
-      }
-
-      checks.push({
-        name: fixableFile.name,
-        status: "ok",
-        message: `Found ${fixableFile.filePath}`
-      });
+    if (fixableFile.checkContent) {
+      const file = report.canonical.find(file => file.path === fixableFile.filePath)!;
+      const previous = before.canonical.find(file => file.path === fixableFile.filePath)!;
+      const status = file.status === "ok" ? "ok" : file.status === "stale" ? "warning" : file.status === "missing" ? "missing" : "error";
+      autoFixAvailable ||= file.status === "missing" || file.status === "stale";
+      checks.push({ name: fixableFile.name, status, message: file.status === "ok"
+        ? previous.status === "missing" ? `Wrote missing ${file.path}` : previous.status === "stale" ? `Updated stale ${file.path}` : `Found ${file.path}`
+        : file.status === "missing" ? `Missing ${file.path}` : file.status === "stale" ? `Stale ${file.path}; run debugbundle validate --fix to refresh it.` : file.message });
       continue;
     }
-
-    if (input.fix === true) {
-      await fixMissingFile(rootDirectory, fixableFile.filePath, fixableFile.buildContent, { mkdir, writeFile });
-      checks.push({
-        name: fixableFile.name,
-        status: "ok",
-        message: `Wrote missing ${fixableFile.filePath}`
-      });
-      continue;
+    if (await pathExists(join(rootDirectory, fixableFile.filePath), stat)) {
+      checks.push({ name: fixableFile.name, status: "ok", message: `Found ${fixableFile.filePath}` });
+    } else if (input.fix) {
+      await fixMissingFile(rootDirectory, fixableFile.filePath, fixableFile.buildContent, { mkdir, ...(dependencies.writeFile ? { writeFile: dependencies.writeFile } : {}) });
+      checks.push({ name: fixableFile.name, status: "ok", message: `Wrote missing ${fixableFile.filePath}` });
+    } else {
+      autoFixAvailable = true;
+      checks.push({ name: fixableFile.name, status: "missing", message: `Missing ${fixableFile.filePath}` });
     }
-
-    autoFixAvailable = true;
-    checks.push({
-      name: fixableFile.name,
-      status: "missing",
-      message: `Missing ${fixableFile.filePath}`
-    });
   }
+  checks.push(...agentChecks(report).filter(check => check.name !== "canonical-skill"));
+  autoFixAvailable ||= report.agents.some(agent => [agent.instruction, agent.discovery].some(state => state === "missing" || state === "stale"));
 
-  const gitignoreCheck = await ensureManagedGitignore(rootDirectory, input, { readFile, writeFile });
+  const ignore = await ensureGitignore(rootDirectory, buildManagedGitignoreSection(), input.fix === true);
+  const gitignoreCheck: ValidateCheck = { name: "gitignore", status: ignore.present ? "ok" : "missing", message: ignore.changed ? `Updated ${GITIGNORE_FILE_PATH}` : `${ignore.present ? "Found" : "Missing"} managed ${GITIGNORE_FILE_PATH} entries` };
   if (gitignoreCheck.status === "missing") {
     autoFixAvailable = true;
   }
@@ -307,6 +244,10 @@ export async function validateCommand(
   const status = resolveOverallStatus(checks);
   return {
     exitCode: status === "error" ? 4 : 0,
-    output: input.json ? buildValidateJsonOutput(checks, profileValidation.errors, autoFixAvailable) : formatValidateOutput(status, checks)
+    output: appendAgentReport(input.json ? buildValidateJsonOutput(checks, profileValidation.errors, autoFixAvailable) : formatValidateOutput(status, checks), report, input.json === true)
   };
+}
+export async function validateCommand(input: { fix?: boolean; json?: boolean }, dependencies: ValidateCommandDependencies = {}): Promise<CliCommandResult> {
+  try { return await runValidateCommand(input, dependencies); }
+  catch (error) { return localScaffoldFailure(error, input.json); }
 }

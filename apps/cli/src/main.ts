@@ -1,3 +1,4 @@
+import { parseAgents } from "../../../packages/agent-setup/src/index.js";
 import { analyzeCommand as defaultAnalyzeCommand } from "./analyze-command.js";
 import { agentReadCommand as defaultAgentReadCommand } from "./agent-read-command.js";
 import { cleanCommand as defaultCleanCommand } from "./clean-command.js";
@@ -25,7 +26,7 @@ import { formatUsage } from "./usage.js";
 import { validateCommand as defaultValidateCommand } from "./validate-command.js";
 import { verifyCloudCommand as defaultVerifyCloudCommand, verifyLocalCommand as defaultVerifyLocalCommand } from "./verify-command.js";
 import { whoamiCommand as defaultWhoamiCommand } from "./whoami-command.js";
-import { appendCommonAuthOptions, CliInputError, ensureNoExtraPositionals, expectNoUnknownOptions, parseArgv, readBooleanOption, readIntegerOption, readLimitOption, readStringOption, requirePositional } from "./argv-helpers.js";
+import { appendCommonAuthOptions, CliInputError, ensureNoExtraPositionals, expectNoUnknownOptions, parseArgv, readBooleanOption, readIntegerOption, readLimitOption, readStringOption, readStringListOption, requirePositional } from "./argv-helpers.js";
 import { handleAlertCommand, handleAnalyticsCommand, handleBillingCommand, handleCapturePolicyCommand, handleGithubCommand, handleHealthCommand, handleImprovementsCommand, handleMemberCommand, handleProbeCommand, handleProjectCommand, handleSlackCommand, handleTokenCommand, handleWebhookCommand, handleWeeklyReportCommand, type ManagementCommandDependencies } from "./management-command-handlers.js";
 import { handleCaptureRuleCommand, type CaptureRuleCommandDependencies } from "./capture-rule-command-handler.js";
 import type { CliCommandResult } from "./token-commands.js";
@@ -170,12 +171,17 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
     }
 
     if (command === "setup") {
-      expectNoUnknownOptions(parsedArgv, ["json", "non-interactive"]);
+      expectNoUnknownOptions(parsedArgv, ["json", "non-interactive", "agent"]);
       ensureNoExtraPositionals(parsedArgv, 1);
 
       const json = readBooleanOption(parsedArgv, "json");
       const nonInteractive = readBooleanOption(parsedArgv, "non-interactive");
+      const agents = readStringListOption(parsedArgv, "agent");
+      if (agents !== undefined) {
+        try { parseAgents(agents); } catch (error) { throw new CliInputError(error instanceof Error ? error.message : String(error)); }
+      }
       return await (dependencies.setupCommand ?? defaultSetupCommand)({
+        ...(agents === undefined ? {} : { agents }),
         ...(nonInteractive === true ? { nonInteractive: true } : {}),
         ...(json === true ? { json: true } : {})
       });

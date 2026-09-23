@@ -3,6 +3,8 @@ import { browserResourceLocation } from "./browser-resource.js";
 
 import {
   BrowserEventKindSchema,
+  BrowserPageReadyStateSchema,
+  BrowserPageVisibilityStateSchema,
   CaptureRuleClientKindSchema,
   CaptureRuleEventTypeSchema,
   CaptureRuleFingerprintSchema,
@@ -10,6 +12,7 @@ import {
   type CaptureRule,
   type CaptureRuleAction,
   type CaptureRuleClientKind,
+  type CaptureRuleBrowserTargetAttributes,
   type CaptureRuleEventType,
   type CaptureRuleFingerprint,
   type CaptureRuleRuntime,
@@ -36,6 +39,21 @@ export const CaptureRuleEvaluationContextSchema = z.object({
   message: z.string().min(1).optional(),
   browser_event_kind: BrowserEventKindSchema.optional(),
   browser_event_opaque: z.boolean().optional(),
+  browser_page_visibility_state: BrowserPageVisibilityStateSchema.optional(),
+  browser_page_ready_state: BrowserPageReadyStateSchema.optional(),
+  browser_target_tag_name: z.string().min(1).max(120).optional(),
+  browser_target_attributes: z
+    .object({
+      rel: z.string().min(1).max(120).optional(),
+      as: z.string().min(1).max(120).optional(),
+      type: z.string().min(1).max(255).optional(),
+      media: z.string().min(1).max(500).optional(),
+      cross_origin: z.string().min(1).max(120).optional(),
+      async: z.boolean().optional(),
+      defer: z.boolean().optional(),
+      integrity_present: z.boolean().optional()
+    })
+    .optional(),
   client_kind: CaptureRuleClientKindSchema.optional(),
   bot_family: z.string().min(1).max(120).optional(),
   resource_url: CaptureRuleEvaluationUrlSchema.optional(),
@@ -150,6 +168,35 @@ function readString(value: unknown): string | undefined {
 
 function readNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function readBoolean(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function readBrowserTargetString(value: unknown, maxLength: number): string | undefined {
+  const normalized = readString(value)?.trim().toLowerCase();
+  // Installed SDKs permit longer DOM values. Omit them from matching, rather
+  // than rejecting their event or truncating into an unintended rule match.
+  return normalized !== undefined && normalized.length <= maxLength ? normalized : undefined;
+}
+
+function readBrowserTargetAttributes(
+  value: Record<string, unknown> | undefined
+): CaptureRuleBrowserTargetAttributes | undefined {
+  if (value === undefined) return undefined;
+  const attributes: CaptureRuleBrowserTargetAttributes = {};
+  for (const [key, maxLength] of [
+    ["rel", 120], ["as", 120], ["type", 255], ["media", 500], ["cross_origin", 120]
+  ] as const) {
+    const attribute = readBrowserTargetString(value[key], maxLength);
+    if (attribute !== undefined) attributes[key] = attribute;
+  }
+  for (const key of ["async", "defer", "integrity_present"] as const) {
+    const attribute = readBoolean(value[key]);
+    if (attribute !== undefined) attributes[key] = attribute;
+  }
+  return Object.keys(attributes).length === 0 ? undefined : attributes;
 }
 
 function readRecord(value: unknown): Record<string, unknown> | undefined {
@@ -284,6 +331,8 @@ export function buildCaptureRuleEvaluationContext(input: {
     case "frontend_exception": {
       const browserEvent = readRecord(input.event.payload["browser_event"]);
       const target = readRecord(browserEvent?.["target"]);
+      const page = readRecord(browserEvent?.["page"]);
+      const targetAttributes = readBrowserTargetAttributes(readRecord(target?.["attributes"]));
       const browserEventKind = browserEvent?.["kind"];
       const resourceSource =
         typeof target?.["source_url"] === "string"
@@ -292,7 +341,10 @@ export function buildCaptureRuleEvaluationContext(input: {
             ? browserEvent["file_name"]
             : undefined;
       const resourceUrl = normalizeEvaluationUrl(resourceSource);
-      const resourceLocation = browserResourceLocation(resourceSource, readRecord(browserEvent?.["page"])?.["url"]);
+      const resourceLocation = browserResourceLocation(resourceSource, page?.["url"]);
+      const visibilityState = page?.["visibility_state"];
+      const readyState = page?.["ready_state"];
+      const targetTagName = readBrowserTargetString(target?.["tag_name"], 120);
 
       return CaptureRuleEvaluationContextSchema.parse({
         ...context,
@@ -303,8 +355,20 @@ export function buildCaptureRuleEvaluationContext(input: {
           browserEventKind === "window_error" || browserEventKind === "resource_error"
             ? browserEventKind
             : undefined,
-        browser_event_opaque:
-          typeof browserEvent?.["opaque"] === "boolean" ? browserEvent["opaque"] : undefined,
+        ...(typeof browserEvent?.["opaque"] === "boolean"
+          ? { browser_event_opaque: browserEvent["opaque"] }
+          : {}),
+        ...(visibilityState === "visible" || visibilityState === "hidden" ||
+        visibilityState === "prerender" || visibilityState === "unloaded"
+          ? { browser_page_visibility_state: visibilityState }
+          : {}),
+        ...(readyState === "loading" || readyState === "interactive" || readyState === "complete"
+          ? { browser_page_ready_state: readyState }
+          : {}),
+        ...(targetTagName === undefined
+          ? {}
+          : { browser_target_tag_name: targetTagName }),
+        ...(targetAttributes === undefined ? {} : { browser_target_attributes: targetAttributes }),
         resource_url: resourceLocation === null ? resourceUrl.url : {
           ...(resourceLocation.host === null ? {} : { host: resourceLocation.host }), path: resourceLocation.path
         },
@@ -458,6 +522,30 @@ export function matchesCaptureRule(rule: CaptureRule, contextInput: CaptureRuleE
     return false;
   }
 
+  if (
+    matcher.browser_page_visibility_state !== undefined &&
+    context.browser_page_visibility_state !== matcher.browser_page_visibility_state
+  ) return false;
+
+  if (
+    matcher.browser_page_ready_state !== undefined &&
+    context.browser_page_ready_state !== matcher.browser_page_ready_state
+  ) return false;
+
+  if (
+    matcher.browser_target_tag_name !== undefined &&
+    context.browser_target_tag_name !== matcher.browser_target_tag_name
+  ) return false;
+
+  if (matcher.browser_target_attributes !== undefined) {
+    if (context.browser_target_attributes === undefined) return false;
+    for (const [key, expected] of Object.entries(matcher.browser_target_attributes)) {
+      if (context.browser_target_attributes[key as keyof CaptureRuleBrowserTargetAttributes] !== expected) {
+        return false;
+      }
+    }
+  }
+
   if (matcher.client_kind !== undefined && context.client_kind !== matcher.client_kind) {
     return false;
   }
@@ -529,6 +617,12 @@ export function getCaptureRuleSpecificityScore(rule: CaptureRule): number {
   if (matcher.browser_event_opaque !== undefined) {
     score += 100;
   }
+  if (matcher.browser_page_visibility_state !== undefined) score += 75;
+  if (matcher.browser_page_ready_state !== undefined) score += 75;
+  if (matcher.browser_target_tag_name !== undefined) score += 75;
+  if (matcher.browser_target_attributes !== undefined) {
+    score += 75 + Object.keys(matcher.browser_target_attributes).length * 5;
+  }
   if (matcher.resource_url?.host_suffix !== undefined || matcher.request_url?.host_suffix !== undefined) {
     score += 90;
   }
@@ -567,6 +661,19 @@ export function getCaptureRuleSpecificityScore(rule: CaptureRule): number {
   }
 
   return score;
+}
+
+/** New browser DOM predicates are evaluated by hosted ingestion until every installed SDK supports them. */
+export function captureRuleRequiresServerEvaluation(
+  rule: Pick<CaptureRule, "matcher">
+): boolean {
+  const matcher = rule.matcher;
+  return (
+    matcher.browser_page_visibility_state !== undefined ||
+    matcher.browser_page_ready_state !== undefined ||
+    matcher.browser_target_tag_name !== undefined ||
+    matcher.browser_target_attributes !== undefined
+  );
 }
 
 function compareCaptureRules(left: CaptureRule, right: CaptureRule): number {

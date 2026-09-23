@@ -175,6 +175,25 @@ runIntegration("storage bootstrap integration", () => {
     expect((await migrateStorageSchema(db)).applied).toEqual([]);
   });
 
+  it("requires the additive recovery index migration and preserves installed project data", async () => {
+    await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
+    await pool.query("CREATE SCHEMA public");
+    const db = createQueryable(pool);
+    await bootstrapStorageSchema(db);
+    await migrateStorageSchema(db);
+    const projectId = randomUUID();
+    await seedOwnedProject({ pool, projectId, organizationId: randomUUID(), organizationName: "Recovery migration", organizationSlug: `recovery-${projectId}`, projectName: "Existing", projectSlug: "existing" });
+    await pool.query("DROP TABLE browser_recovery_events");
+    await pool.query("ALTER TABLE alert_deliveries DROP COLUMN coalescing_key");
+    const id = "202609220001_add_browser_recovery_context";
+    await pool.query("DELETE FROM storage_migration_ledger WHERE id = $1", [id]);
+    await expect(assertStorageSchemaMigrationsApplied(db)).rejects.toThrow(`storage_schema_missing_migrations: ${id}`);
+    expect((await migrateStorageSchema(db)).applied).toEqual([id]);
+    await expect(assertStorageSchemaMigrationsApplied(db)).resolves.toBeUndefined();
+    expect((await pool.query("SELECT name FROM projects WHERE id = $1", [projectId])).rows[0].name).toBe("Existing");
+    expect((await migrateStorageSchema(db)).applied).toEqual([]);
+  });
+
   it("upgrades an existing database to isolated agent tokens before new API readiness", async () => {
     await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
     await pool.query("CREATE SCHEMA public");

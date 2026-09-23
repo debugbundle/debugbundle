@@ -42,6 +42,7 @@ export interface BuildBundleInput {
     source_occurred_at: string;
   };
   sourceEnvelopes: EventEnvelope[];
+  correlatedRecoveryEnvelopes?: EventEnvelope[];
   probeDataItems: BundleProbeDataItem[];
 }
 
@@ -425,6 +426,7 @@ function buildSummaryGuidance(input: {
   firstApplicationFrame: BundleV1["summary"]["first_application_frame"];
   browserEvent: BrowserExceptionEventContext | null;
   opaqueBrowserError: boolean;
+  resourceContext: BundleV1["context"]["resource_failure"];
 }): Pick<BundleV1["summary"], "likely_cause" | "confidence" | "recommended_action"> {
   if (input.errorContext === null) {
     return {
@@ -436,6 +438,23 @@ function buildSummaryGuidance(input: {
 
   if (input.opaqueBrowserError) {
     if (input.browserEvent?.kind === "resource_error") {
+      const recoveryFailure = input.resourceContext?.recovery_failures?.[0];
+      if (recoveryFailure !== undefined) {
+        return {
+          likely_cause: `The browser resource failure was followed by ${recoveryFailure.method} ${recoveryFailure.path} returning HTTP ${recoveryFailure.status_code}. This correlated recovery failure is the most actionable captured signal; it does not establish why the original resource load was interrupted.`,
+          confidence: 0.65,
+          recommended_action: `Inspect the ${recoveryFailure.path} recovery route and its HTTP ${recoveryFailure.status_code} response, including any refresh, retry, or signed-URL handling, before investigating the generic resource error.`
+        };
+      }
+      if (input.resourceContext?.interruption !== undefined) {
+        const interruption = input.resourceContext.interruption;
+        return {
+          likely_cause: `The browser reported an opaque ${interruption.rel} failure while the page was ${interruption.visibility_state} and ${interruption.ready_state}. This is consistent with a browser-aborted speculative load, but the captured lifecycle state does not prove the cause.`,
+          confidence: 0.55,
+          recommended_action:
+            "Confirm whether the page was navigating or suspended, then review only lifecycle-scoped demotion if the asset succeeds during active page loads."
+        };
+      }
       const resource = describeBrowserResource(input.browserEvent);
       return {
         likely_cause: browserResourceDiagnosis(resource),
@@ -786,7 +805,12 @@ export function buildBundle(input: BuildBundleInput): BundleV1 {
   // Related resource context must not replace the diagnosis or frame of an application exception.
   const browserEvent = browserEventCandidate?.kind === "resource_error" && primarySignalEnvelope !== null && !isFrontendExceptionEnvelope(primarySignalEnvelope) ? null : browserEventCandidate;
   const opaqueBrowserError = isOpaqueBrowserError(errorContext, browserEvent);
-  const resourceContext = buildBrowserResourceContext(browserEvent, input.incident, sourceEnvelopes);
+  const resourceContext = buildBrowserResourceContext(
+    browserEvent,
+    input.incident,
+    sourceEnvelopes,
+    input.correlatedRecoveryEnvelopes ?? []
+  );
   const primarySignalType =
     primarySignalEnvelope !== null
       ? mapSignalType(primarySignalEnvelope.event_type)
@@ -820,7 +844,8 @@ export function buildBundle(input: BuildBundleInput): BundleV1 {
     dependenciesContext,
     firstApplicationFrame,
     browserEvent,
-    opaqueBrowserError
+    opaqueBrowserError,
+    resourceContext
   });
 
   const candidate = {

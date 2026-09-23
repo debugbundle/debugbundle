@@ -48,6 +48,8 @@ describe("worker alert evaluation", () => {
           service_name: "checkout-api",
           environment: "production",
           fingerprint: "fp_123",
+          alert_coalescing_window_seconds: 10,
+          alert_coalescing_key: "burst-key",
           normalized_message: "boom",
           occurred_at: "2026-03-15T12:00:00.000Z",
           severity: "high"
@@ -99,6 +101,8 @@ describe("worker alert evaluation", () => {
       condition_type: "new_incident",
       dedupe_key: "new_incident",
       notification_key: "fp_123",
+      coalescing_window_seconds: 10,
+      coalescing_key: "burst-key",
       occurred_at: "2026-03-15T12:00:00.000Z",
       summary: "boom",
       service_name: "checkout-api",
@@ -111,6 +115,8 @@ describe("worker alert evaluation", () => {
       condition_type: "severity_threshold",
       dedupe_key: "severity_threshold:high",
       notification_key: "fp_123",
+      coalescing_window_seconds: 10,
+      coalescing_key: "burst-key",
       lifecycle_event: "new_incident",
       occurred_at: "2026-03-15T12:00:00.000Z",
       summary: "boom",
@@ -302,6 +308,81 @@ describe("worker alert evaluation", () => {
       delivered: true,
       error_message: null
     });
+  });
+
+  it("applies burst cooldowns to immediate channels while retaining every email digest item", async () => {
+    const createAlertDeliveryIntent = vi.fn().mockResolvedValue({
+      delivery_id: null,
+      created: false
+    });
+    const queueAlertEmailDigestItem = vi.fn().mockResolvedValue({
+      digest_id: "dig_1",
+      created: true,
+      created_digest: true
+    });
+    const alertBase = {
+      project_id: "proj_123",
+      service_id: null,
+      condition_type: "new_incident" as const,
+      severity_min: null,
+      severity_lifecycle_scope: null,
+      cooldown_seconds: 0,
+      is_enabled: true,
+      created_at: "2026-03-15T00:00:00.000Z",
+      updated_at: "2026-03-15T00:00:00.000Z"
+    };
+
+    await processNextEvaluateAlertsJob({
+      queue: {
+        enqueue: vi.fn(),
+        dequeue: vi.fn().mockResolvedValue({
+          project_id: "proj_123",
+          incident_id: "inc_123",
+          condition_type: "new_incident",
+          dedupe_key: "new_incident",
+          notification_key: "resource-burst",
+          coalescing_window_seconds: 10,
+          occurred_at: "2026-03-15T12:00:00.000Z",
+          service_name: "web",
+          environment: "production",
+          severity: "low"
+        })
+      },
+      alertStore: {
+        listMatchingAlerts: vi.fn().mockResolvedValue([
+          {
+            ...alertBase,
+            alert_id: "alt_webhook",
+            channel: "webhook",
+            config: { target_url: "https://hooks.example.test/alerts" }
+          },
+          {
+            ...alertBase,
+            alert_id: "alt_email",
+            channel: "email",
+            config: { to: "alerts@example.com" }
+          }
+        ]),
+        createAlertDeliveryIntent,
+        markAlertDeliveryResult: vi.fn(),
+        queueAlertEmailDigestItem,
+        claimDueAlertEmailDigests: vi.fn(),
+        getAlertEmailDigest: vi.fn(),
+        markAlertEmailDigestResult: vi.fn()
+      },
+      alertTransport: { deliver: vi.fn() }
+    });
+
+    expect(createAlertDeliveryIntent).toHaveBeenCalledWith(
+      expect.objectContaining({ cooldown_seconds: 10, notification_key: "resource-burst" })
+    );
+    expect(queueAlertEmailDigestItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cooldown_seconds: 0,
+        aggregation_window_seconds: 10,
+        notification_key: "inc_123"
+      })
+    );
   });
 
   it("queues regressed severity emails with transition dedupe and incident cooldown keys", async (): Promise<void> => {

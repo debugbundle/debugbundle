@@ -5,12 +5,57 @@ import {
   buildSeverityThresholdDedupeKey
 } from "../../../packages/storage/src/alert-lifecycle.js";
 import { createPostgresAlertDeliveryStore } from "../../../packages/storage/src/alert-delivery-store.js";
+import type { Queryable } from "../../../packages/storage/src/types.js";
 
 describe("alert delivery store", () => {
+  it.each(["direct", "email"] as const)(
+    "takes one transaction even when %s delivery uses a savepoint-capable queryable",
+    async (channel) => {
+      const query = vi.fn().mockResolvedValue({ rows: [] });
+      let transactions = 0;
+      const db: Queryable = {
+        query,
+        async transaction(callback) {
+          if (++transactions > 1) throw new Error("unexpected_nested_transaction");
+          return callback(db);
+        }
+      };
+      const store = createPostgresAlertDeliveryStore(db);
+      const input = {
+        alert_id: "00000000-0000-4000-8000-000000000001",
+        project_id: "project",
+        incident_id: "incident",
+        condition_type: "new_incident" as const,
+        dedupe_key: "new_incident",
+        notification_key: "resource",
+        cooldown_seconds: 300,
+        payload: {}
+      };
+      if (channel === "direct") {
+        await store.createAlertDeliveryIntent({
+          ...input,
+          channel: "webhook",
+          coalescing_key: "burst",
+          coalescing_window_seconds: 10
+        });
+      } else {
+        await store.queueAlertEmailDigestItem({
+          ...input,
+          recipient: "ops@example.com",
+          aggregation_window_seconds: 10,
+          allow_new_digest: true
+        });
+      }
+      expect(transactions).toBe(1);
+      expect(query.mock.calls[0]![0]).toContain("SELECT pg_advisory_xact_lock");
+      expect(query.mock.calls.at(-1)![0]).toContain("INSERT INTO alert_");
+    }
+  );
+
   it("keeps new-incident keys compatible and gives each regression a replay-stable key", () => {
-    expect(buildSeverityThresholdDedupeKey({ severity: "high", lifecycleEvent: "new_incident" })).toBe(
-      "severity_threshold:high"
-    );
+    expect(
+      buildSeverityThresholdDedupeKey({ severity: "high", lifecycleEvent: "new_incident" })
+    ).toBe("severity_threshold:high");
     expect(
       buildSeverityThresholdDedupeKey({
         severity: "high",
@@ -29,7 +74,10 @@ describe("alert delivery store", () => {
       buildRegressionAlertDedupeKey({ conditionType: "incident_regressed", transitionId: "evt_1" })
     ).toBe("incident_regressed:evt_1");
     expect(
-      buildRegressionAlertDedupeKey({ conditionType: "regression_after_deploy", transitionId: "evt_1" })
+      buildRegressionAlertDedupeKey({
+        conditionType: "regression_after_deploy",
+        transitionId: "evt_1"
+      })
     ).toBe("regression_after_deploy:evt_1");
     expect(() =>
       buildSeverityThresholdDedupeKey({ severity: "high", lifecycleEvent: "incident_regressed" })

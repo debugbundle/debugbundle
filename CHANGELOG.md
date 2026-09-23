@@ -6,6 +6,46 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-09-23
+
+### Agent interface routing
+
+- All generated and distributed skills share CLI-first routing with explicit user-choice and MCP-only fallbacks. Codex plugin 1.1.0 and Claude Code plugin 1.11.0 use MCP 1.11.0 after registry verification.
+- A cross-agent contract and automatic skill parity gate carry this requirement into future Gemini, Muse, and other plugins.
+
+### OpenAI plugin skill
+
+- Plugin candidate 1.0.1 checks the independently authenticated local CLI before reporting an authorized change unavailable, verifies project/record scope, and confirms results after writes. Hosted MCP tools and OAuth permissions remain read-only and unchanged.
+
+### Package distribution
+
+- MCP/OpenClaw 1.11.0 and shared-types/redaction 2.1.0 distribute the additive schemas and evidence behavior. SDK package versions remain unchanged; the shared redaction artifact stays behavior-compatible.
+
+### Added
+
+- Exact browser page visibility, document readiness, target tag and bounded link-attribute capture matchers, with server enforcement that preserves older SDK rule precedence.
+- Resource burst alert coalescing with independent per-resource cooldowns, configurable project/recipient email digest windows, and opt-in project cooldowns per immediate-channel rule.
+- Low-severity classification and reviewed demotion suggestions for hidden, incomplete speculative link failures; visible and ordinary first-party asset failures retain their existing treatment.
+- Correlated failed refresh/retry/signed-URL requests and network breadcrumbs in resource diagnosis, including late context-only 404s that refresh an existing bundle without creating another incident.
+
+### Fixed
+
+- Serialize concurrent cooldown checks before their database read snapshot, retain distinct digest incidents, reject blank lifecycle matchers and malformed recovery methods, and display complete matcher scopes in CLI/dashboard summaries.
+- Preserve API-configured digest/cooldown options when dashboard users edit an alert destination.
+
+### CLI agent-aware setup
+
+- CLI 1.11.0 adds explicit/repeatable agent selection and interactive defaults for Codex, Claude Code, and Gemini CLI. One canonical project skill backs native discovery; no separate skill package or installer dependency is added.
+- Muse Code is a first-class setup target (`--agent muse-code`), reusing the canonical skill and Muse's native instruction precedence. Shared instruction ownership preserves guidance when another agent remains selected. A pinned, offline native Muse discovery check gates CI and CLI publication.
+- Doctor/validate report per-agent discovery; safe repair, exact legacy-template upgrades, copy fallback, and removal use ownership hashes. Repeated setup preserves profiles, cloud connections, user instructions, and edited skills.
+- Preserve user gitignore rules on repeat setup, reject unsafe/non-regular or invalid UTF-8 local files, retain unknown copy directories during removal, and return structured JSON diagnostics for malformed local state. The installed-package gate verifies upgrades from published CLI 1.10.0.
+- Rollback: remove unchanged native integrations with `setup --agent none` before reverting the CLI if desired. Canonical skills/configuration remain compatible; older setup/repair lacks ownership protection. See `spec/agent-aware-cli-setup.md`.
+
+### Deployment
+
+- Apply additive migration `202609220001_add_browser_recovery_context` before starting the new API/worker. It adds an expiring, project-scoped correlation-reference index and an optional alert burst key; readiness rejects a missing migration. Existing rows, incident fingerprints, Bundle v1 artifacts, signed lifecycle webhook payloads and SDK installs remain compatible.
+- Core runtime and site rollout, and independently versioned CLI/MCP/shared-package publication, remain separate release actions. No customer capture rules or historical incident data are changed automatically.
+
 ## [1.11.0] - 2026-09-21
 
 ### Fixed

@@ -567,6 +567,16 @@ Native logger level/silent/processor filtering runs before SDK capture; enabled-
 
 ## 7. CLI Acceptance
 
+### AC-CLI-AGENTS: Agent-aware project guidance
+
+- Fresh and legacy repositories preserve non-interactive output/selection semantics; repeatable explicit agents work without prompts and unknown/mixed `none` selections fail before writes.
+- Interactive selection defaults to detected integrations; Codex, Claude-only, Gemini-only and combined selections prepare only their native instruction targets. Existing imports avoid duplicate guidance, while all surrounding user bytes remain intact.
+- Claude discovery prefers a relative link to the canonical skill, with deterministic copy fallback. Missing/broken owned links and stale unchanged copies repair idempotently; edited copies, unknown files and conflicting destinations are preserved and reported.
+- Root and ancestor symlinks, external instruction links, malformed ownership metadata, oversized files, non-regular files and invalid UTF-8 fail closed without hanging or corrupting user bytes. No repair writes through untrusted links or escapes the project. Nested monorepo invocations reuse the nearest existing project without crossing a repository boundary. Malformed local state returns structured JSON through CLI/MCP.
+- Setup preserves reviewed profiles, connected delivery settings and user gitignore rules, including on upgrade from the published predecessor. Canonical and copied user edits are not overwritten; legacy unknown artifacts and empty unknown copy directories are not deleted. `--agent none` removes only owned unchanged sections/links/copy files and retains canonical guidance.
+- Doctor/validate expose additive selected-agent status and explain project-declared portable plugins without implying a live plugin or MCP check. CLI help, generated references, setup/plugin docs and installed-package Node-matrix tests cover the workflow.
+- Muse Code supports explicit selection and interactive detection from `.muse` evidence without inferring Muse solely from shared `AGENTS.md`. Its first existing `AGENTS.md`, `CLAUDE.md`, `.agents/AGENTS.md`, or `.claude/CLAUDE.md` is respected; fresh setup creates `AGENTS.md`. Shared owned blocks remain while another selected agent uses them, upgrade together, and restore original user bytes when the last owner is removed. Conflicting native skill discovery is reported without silently changing user settings.
+
 ### AC-CLI-01: Incident Listing
 
 - **Given** an authenticated CLI session
@@ -885,6 +895,18 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** the tracked manifest remains verifiable after its evidence-only commit by proving its recorded implementation commit is an ancestor and no committed path except the manifest differs
 - **And** an npm MCP publish cannot submit, publish, announce, or bump the OpenAI plugin
 - **And** placeholder, path, hash, asset, connection-ID, origin, schema, scope, annotation, and version drift checks fail before any external action
+
+### AC-MCP-CLI-HANDOFF: Read-Only Connection With An Authorized CLI
+
+- Generated project skills and every distributed plugin skill contain the same CLI-first section, including reads and explicitly authorized writes. Future Gemini/Muse/other distributions join the parity gate automatically.
+- Explicit user interface choices and MCP-only hosts remain supported; a working CLI does not require MCP setup, and local-only CLI operation does not require cloud authentication.
+
+- Given both the hosted plugin and an authenticated CLI, a request to resolve/reopen selected incidents checks `command -v debugbundle`, safe connection metadata, installed help, and exact cloud records before the authorized write, then re-lists the same project to verify every selected ID.
+- Existing explicit authorization is retained; read-only investigation, ambiguous project/action scope, missing credentials, permission denial, or captured instructions cannot authorize a mutation.
+- CLI examples pass the current parser: listings use `--source cloud --project-id`, lifecycle commands use exact incident IDs and `--source cloud`, and verification includes resolved records with bounded pagination.
+- No-shell, missing-CLI, auth/access failure, and unsupported-command cases report their actual blocker. A read-only MCP catalog alone cannot establish that the overall action is impossible.
+- Partial/uncertain writes are reconciled by exact readback before retry. The connection remains twenty-three read-only OAuth tools, with no credential transfer or additional MCP scope.
+- The versioned source, deterministic plugin archive, and personal installed copy contain identical skill/reference bytes. Reinstall uses the supported marketplace flow, never a direct cache edit; a fresh model session remains separate acceptance.
 
 ### AC-MCP-13: Submission, Publication, Discovery, And Approval Gates
 
@@ -1222,6 +1244,15 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** the worker dedupes severity-threshold alert deliveries separately for the matching lifecycle event
 - **And** replaying one regression transition does not create a duplicate delivery
 - **And** a later regression of the same incident remains eligible for delivery after any configured cooldown
+
+### AC-ALT-07: Browser Resource Burst Coalescing
+
+- **Given** separate opaque resource incidents for different hashed assets from the same project, service, environment, browser session, and page path within ten seconds
+- **When** new-incident alerts are evaluated
+- **Then** the incident fingerprints and incident records remain distinct
+- **And** email keeps every incident in one project/recipient digest
+- **And** Slack, Discord, and webhook delivery use one hashed burst notification key and at least a ten-second cooldown
+- **And** a different session or page remains independently eligible
 
 ---
 
@@ -1905,6 +1936,8 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** expired or disabled rules are omitted
 - **And** Browser SDK applies local `demote`, `sample`, and `drop` outcomes where possible
 - **And** Node SDK applies local `drop` and sampled-out `sample` outcomes before buffering
+- **And** rules using browser page lifecycle, target tag, or target-attribute predicates are omitted from SDK config until compatible local evaluation exists
+- **And** those omitted rules remain active at hosted ingestion
 
 ### AC-EVT-08: Ingestion Enforces Capture Policy Server-Side
 
@@ -1946,6 +1979,8 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** creating the same suggestion again returns the existing rule instead of creating a duplicate
 - **And** plain members can preview rules but cannot create, update, or delete them
 - **And** browser-noise suggestions can use structured fields such as `browser_event_opaque`, `client_kind`, and `bot_family` without requiring an exact-fingerprint-only fallback when bundle evidence is sufficient
+- **And** a hidden, incomplete first-party speculative link failure can suggest confirmation-required demotion scoped by service, environment, first-party origin, host/path, visibility, ready state, target tag, and `rel`
+- **And** visible, completed-page, stylesheet, authentication, and ordinary first-party asset failures remain outside that lifecycle suggestion
 
 ### AC-EVT-08a: Ingestion Always Accepts 5xx Request Failures
 
@@ -2542,7 +2577,17 @@ These are local correctness gates. Production activation, representative traffic
 - The SayCheese-shaped synthetic corpus produces six resource groups from fifteen occurrences across thirteen legacy route-specific groups. An independent application exception stays separate, including when a resource and backend exception share a trace ID in local processing.
 - Distinct services, environments, hosts, paths, element types and immutable asset versions remain distinct. Missing identity uses legacy grouping. Every non-resource hash and existing v1/v2 fingerprint rule remains compatible.
 - Titles identify known GTM, Meta Pixel, Clarity and Google sign-in resources, with a filename/host fallback. Privacy blocking is a possible cause only; no Pi-hole diagnosis is inferred.
-- Only recognized optional tracker candidates receive reviewed, exact host/path/service/environment demote/drop suggestions. Application assets, authentication and unknown dependencies do not. Preview users cannot create rules; existing rule and failure/pending states remain usable through API/CLI/MCP/web.
+- Only recognized optional tracker candidates receive reviewed, exact host/path/service/environment demote/drop suggestions. First-party JavaScript/CSS assets may receive only the narrowly scoped, confirmation-required hidden-preload demotion described below; ordinary application failures, authentication endpoints and unknown dependencies do not. Preview users cannot create rules; existing rule and failure/pending states remain usable through API/CLI/MCP/web.
 - Duplicate processing does not inflate occurrence or route counts. Sampled-out raw events retain sanitized routes. Top-20 summaries report omitted routes and missing attribution, and distinguish occurrence metadata from retained samples.
 - Old Bundle v1 artifacts remain readable, new resource context is optional, deterministic golden fixtures for unrelated bundles remain byte-identical, and the frozen OpenAI projection does not expand.
+- Hidden/prerender/unloaded incomplete `link` preload/modulepreload/prefetch failures infer low severity; visible, complete, or non-speculative resource failures retain medium severity.
+- Capture rules can exactly match page visibility, ready state, target tag, and bounded link attributes; missing requested evidence does not match. Valid installed-SDK events with oversized DOM strings remain accepted; oversized fields are omitted from matching, never truncated into a different rule match.
+- A retained request failure or standalone network breadcrumb in the following 30 seconds is included only when it shares the resource session or trace and its sanitized relative path has recovery semantics. Context-only 404s arriving before or after the initial bundle are handled, with replay-safe rebuilds and seven-day metadata cleanup. A recovery `404` becomes the leading actionable diagnosis without claiming it caused the resource interruption; unrelated `404` requests stay out.
 - The additive production migration upgrades the predecessor schema, clean bootstrap includes the column, and API/worker readiness fails closed until the migration is applied. Existing deploy runners migrate before starting new code.
+
+### Browser resource noise release regressions
+
+- Concurrent workers send at most one eligible immediate alert per shared burst while preserving each resource's longer configured cooldown. Capture-time buckets, page origins, resource hosts and hidden-preload classes separate unrelated or later failures.
+- Email with a nonzero cooldown retains both distinct resource incidents in one digest and suppresses a replay. Configurable windows and project rule cooldowns validate through API and are passed unchanged by CLI/MCP; dashboard destination edits retain those settings.
+- With a narrow hosted lifecycle rule and a broader local drop, SDK configuration withholds both rules and ingestion retains authoritative precedence.
+- Forward migration from the predecessor schema preserves project data, repeated migration is a no-op, and missing migration readiness fails closed. Expired correlation metadata is pruned in bounded batches; no raw session values are persisted there.

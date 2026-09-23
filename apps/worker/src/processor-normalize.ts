@@ -18,7 +18,7 @@ import { maybeGenerateHostedImprovementBundle } from "./improvement-bundles.js";
 import { buildAnalyticsIncidentCorrelationJobFields } from "./analytics-incident-correlation.js";
 import {
   type NormalizeWorkerDependencies,
-  buildAlertNotificationKey,
+  buildAlertNotificationContext,
   type WorkerProcessResult
 } from "./processor-shared.js";
 
@@ -80,6 +80,8 @@ export async function processNextNormalizeEventsJob(
     return { processed: true };
   }
 
+  await dependencies.recordBrowserRecoveryContext?.(job.project_id, event);
+
   const improvementInput = {
     project_id: job.project_id,
     event,
@@ -105,6 +107,12 @@ export async function processNextNormalizeEventsJob(
   }
 
   const resourceRoute = normalized.resource_type === undefined ? null : normalizeResourceRoute(normalized.route_template);
+  const alertNotification = buildAlertNotificationContext({
+    projectId: job.project_id,
+    event,
+    normalized,
+    fingerprint: computedFingerprint
+  });
 
   await dependencies.queue.enqueue("group-incident", {
     project_id: job.project_id,
@@ -114,11 +122,11 @@ export async function processNextNormalizeEventsJob(
     service_name: event.service.name,
     environment: event.service.environment,
     fingerprint: computedFingerprint,
-    alert_notification_key: buildAlertNotificationKey({
-      event,
-      normalized,
-      fingerprint: computedFingerprint
-    }),
+    alert_notification_key: alertNotification.notification_key,
+    ...(alertNotification.coalescing_window_seconds === undefined
+      ? {}
+      : { alert_coalescing_window_seconds: alertNotification.coalescing_window_seconds }),
+    ...(alertNotification.coalescing_key === undefined ? {} : { alert_coalescing_key: alertNotification.coalescing_key }),
     fingerprint_version: fingerprintVersion(normalized),
     normalized_message: normalized.normalized_message,
     ...(normalized.incident_title === undefined ? {} : { incident_title: normalized.incident_title }),

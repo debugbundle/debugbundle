@@ -1,0 +1,54 @@
+# Agent-aware CLI setup
+
+Implements FR-CLI-15/16 and AC-CLI-AGENTS. The sensitive-data release is already complete; this additive CLI slice joins the next release candidate. It introduces no SDK requirement, hosted migration, separate skill package, or `skills add` dependency.
+
+## Selection and discovery
+
+`debugbundle setup --agent codex --agent claude-code --agent gemini-cli --agent muse-code --non-interactive` explicitly selects integrations. Repeat `--agent`; supported values are `codex`, `claude-code`, `gemini-cli`, `muse-code`, or `none` alone. Selection replaces the previous selection. Interactive terminals offer comma-separated selection defaulting to detected repository instructions/configuration (or the saved selection). JSON, non-interactive, and non-TTY invocations never prompt or infer new vendors. Without explicit/saved selection, the legacy flow still generates the canonical skill and updates only an existing `AGENTS.md`.
+
+| Agent       | Managed instructions                          | Skill discovery                                                                                                                            |
+| ----------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Codex       | `AGENTS.md`, or existing `AGENTS.override.md` | Canonical `.agents/skills/debugbundle/`                                                                                                    |
+| Claude Code | `CLAUDE.md`, or existing `.claude/CLAUDE.md`  | Relative directory link `.claude/skills/debugbundle` → `../../.agents/skills/debugbundle`; bounded generated copy if links are unavailable |
+| Gemini CLI  | `GEMINI.md`                                   | Canonical `.agents/skills/debugbundle/`                                                                                                    |
+| Muse Code   | First existing `AGENTS.md`, `CLAUDE.md`, `.agents/AGENTS.md`, or `.claude/CLAUDE.md`; otherwise creates `AGENTS.md` | Canonical `.agents/skills/debugbundle/` |
+
+Muse Code's executable is `muse`; its DebugBundle selection identifier is `muse-code`. Interactive detection uses project `.muse` evidence; shared `AGENTS.md` alone does not imply Muse is installed or selected. Muse does not use Codex's `AGENTS.override.md`. A shared managed instruction block has shared ownership: upgrades update its owners together, deselecting one owner retains the block for another selected owner, and final removal restores the original user bytes. Version 1 metadata from the earlier three-agent layout remains readable.
+
+Muse project skills and instructions require workspace trust. Setup does not grant trust, enable disabled skills, read personal Muse settings, or change authentication. With Muse 1.3.0-R3401.1, the Claude discovery symlink is deduplicated; a separate Claude fallback copy produces a `skill-shadowed` diagnostic while the canonical skill remains enabled. Doctor's project-file checks do not attest to a live client's trust/activation state. Inspect the actual catalog with `muse skills list --source project --json` from a trusted workspace; inspect individual content with `muse skills inspect debugbundle`.
+
+Native instructions already referencing the canonical skill or importing a configured `AGENTS.md` are retained. Imported guidance is checked locally; unknown/external links are not followed. Custom Gemini `context.fileName` excluding `GEMINI.md` is reported as undiscoverable, with manual configuration guidance. Changing native instruction precedence after setup requires manual review. Restart/reload the agent to pick up changed guidance. Doctor checks project files, not a live agent session; global overrides, disabled skills, workspace trust, context budgets, and running-client caches can still affect actual loading.
+
+## Ownership, repair, and removal
+
+`apps/cli/src/local-scaffold.ts` remains the only project-skill content generator. `packages/agent-setup` owns bounded filesystem discovery, ownership checks, repairs, and removal; CLI adapters pass generated content into it. `.debugbundle/agent-setup.json` version 1 stores selection, generated-file SHA-256 hashes, instruction ownership, and native link/copy mode. It contains no credentials, user instruction text, timestamps, or absolute paths. Commit it alongside the canonical skill and project configuration.
+
+`doctor --json` and `validate --json` add `agent_setup` after explicit or interactive selection, while retaining existing top-level fields. The report separates canonical files from each agent's `instruction` and `discovery` states: `ok`, `missing`, `stale`, `conflict`, and `undiscoverable`. Existing MCP doctor/validate adapters expose the same report. Setup remains a local CLI-only operation. Reported conflicts make doctor exit 1 and setup/validate exit 4; filesystem/configuration exceptions use exit 1. JSON failures remain structured even when ownership metadata is malformed, so MCP and automation retain actionable diagnostics.
+
+`validate --fix` creates missing generated files and refreshes unchanged owned content. Exact known CLI 1.10.0 templates can be adopted using the shipped fingerprints in `legacy-skill-hashes.json`. Unknown legacy content, edited generated content, malformed markers, unowned native directories, and unsafe symlinks are preserved and reported for manual review. No force-overwrite option exists. Review conflicts, keep user guidance outside managed blocks, and remove/restore only the intended generated artifact before retrying. Repeated setup preserves the reviewed profile and cloud connection. Legacy obsolete scaffold directories are retained because their ownership cannot be proven safely.
+
+Writes use exclusive sibling temporary files, compare-before-replace, bounded reads, and parent-link checks. Reads reject non-regular files (including FIFOs), oversized files, and invalid UTF-8 without rewriting them. Missing profile/connection creation uses the same safe writer. Gitignore updates append only missing generated rules and preserve existing bytes, including user rules following the managed section. Concurrent agent repairs are serialized by the ignored `.debugbundle/agent-setup.lock`; a crash can leave this lock. Remove it only after confirming no setup/repair process is active. Partial failures preserve ownership records where possible and otherwise require manual review rather than guessing ownership.
+
+`setup --agent none --non-interactive` removes only unchanged owned native links/copies and instruction sections. It retains canonical files, profile, connection, SDK configuration, and runtime data. Edited artifacts cause an error and remain in place. Selecting a smaller set performs the same safe removal for deselected integrations. Unknown files or directories (including empty directories) in a managed copy prevent removal; nothing is recursively deleted.
+
+Portable plugin skills provide general DebugBundle guidance; project skills add the local profile and workflows. Known project-level Claude/Codex enabled-plugin settings are reported as hints, not proof of installation. Setup does not scan private home configuration, install plugins, configure MCP, or modify authentication. Use the existing first-party plugins or direct MCP setup separately.
+
+## Verification and rollback
+
+Regression coverage includes every agent subset, repeat/legacy/interactive setup, profiles/connections, native imports/precedence, nested repositories and paths with spaces, links and unavailable-link fallback, copy upgrades, broken links, edits/conflicts, bounded reads, metadata errors, concurrent repair, plugin hints, and owned removal. `make cli-runtime-check` exercises a clean installed tarball on Node 22, 24, 26.0.0, 26.2.0, and current 26, including setup, doctor, repair, removal, and existing HTTP behavior. It also runs `make cli-setup-upgrade-check`: generate a project with the published CLI 1.10.0, upgrade using the candidate, and verify byte-preserved reviewed profiles, cloud connections, user instructions/ignore rules, repeatability, edited-skill protection, and structured failure output.
+
+For rollback, first use the new CLI's `setup --agent none` if native integrations should be removed, review any preserved conflicts, then install the previous CLI version. Canonical files and configuration remain readable by the previous CLI. Older CLI setup/repair lacked ownership protection, so do not use it to overwrite reviewed scaffolds. No database rollback or coordinated SDK publication is needed.
+
+`make muse-setup-check` downloads and checksum-verifies the pinned official Muse 1.3.0-R3401.1 Linux binary for arm64/x64, installs the CLI tarball in an isolated container directory, then disables container networking before Muse execution. It asserts generated-skill validation, the untrusted-workspace diagnostic, canonical discovery, symlink deduplication and copy precedence. It runs in the Node 24 CI/release lane without credentials or model calls. Updating the pin requires rechecking Meta's conventions and artifact checksums. This integration covers project setup and CLI/MCP doctor/validate reports; it does not publish a separate Muse plugin or configure a Muse MCP connection.
+
+## Verified upstream conventions (2026-09-22)
+
+- [Codex skills](https://developers.openai.com/codex/skills) and [instruction precedence](https://developers.openai.com/codex/guides/agents-md).
+- [Claude Code skills and symlink support](https://code.claude.com/docs/en/skills) and [native memory/imports](https://code.claude.com/docs/en/memory).
+- [Gemini CLI skill aliases](https://geminicli.com/docs/cli/skills/) and [context filenames/imports](https://geminicli.com/docs/cli/gemini-md/).
+- [Codex project plugin configuration](https://developers.openai.com/plugins/build/plugins).
+- [Muse Code instruction precedence](https://dev.meta.ai/docs/muse-code/configuration), [project skills](https://dev.meta.ai/docs/muse-code/extending), and [native skill diagnostics](https://meta-models.github.io/muse-code-sdk/next/guides/extend/skills/). Native binary evidence takes precedence over ambiguous same-rank collision wording for the pinned version.
+
+## Interface routing across agents
+
+The canonical generated skill and distributed plugins follow [the agent interface routing contract](../contracts/agent-interface-routing.md). CLI is primary where available, with scoped authentication, explicit authorization, and readback; MCP-only hosts and explicit user interface choices remain supported. Gemini and Muse setup discovery uses this same canonical skill today. Any future dedicated Gemini/Muse plugin must join the shared routing/parity gate before release.

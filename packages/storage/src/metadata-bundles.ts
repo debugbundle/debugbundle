@@ -7,6 +7,7 @@ import type {
   LogEventCandidateReference,
   PostgresMetadataStore,
   ProbeEventCandidateReference,
+  RequestEventCandidateReference,
   Queryable
 } from "./types.js";
 
@@ -23,6 +24,7 @@ export function createMetadataBundles(
   | "listIncidentEventReferences"
   | "listProbeEventCandidatesForServiceWindow"
   | "listLogEventCandidatesForServiceWindow"
+  | "listRequestEventCandidatesForServiceWindow"
 > {
   return {
     async getDeploymentForServiceAt(input) {
@@ -353,6 +355,55 @@ export function createMetadataBundles(
           input.service_name,
           input.window_start,
           input.window_end
+        ]
+      );
+
+      return result.rows;
+    },
+
+    async listRequestEventCandidatesForServiceWindow(
+      input
+    ): Promise<RequestEventCandidateReference[]> {
+      const result = await db.query<RequestEventCandidateReference & Record<string, unknown>>(
+        `
+          SELECT event_id, occurred_at FROM (
+          SELECT
+            ie.event_id,
+            ie.occurred_at::text AS occurred_at, 1 AS priority
+          FROM incident_events ie
+          JOIN incidents i ON i.id = ie.incident_id
+          LEFT JOIN services s ON s.id = i.service_id
+          WHERE i.project_id = $1
+            AND i.environment = $2
+            AND COALESCE(s.name, 'unknown') = $3
+            AND ie.event_type = 'request_event'
+            AND ie.is_sampled = true
+            AND ie.occurred_at >= $4::timestamptz
+            AND ie.occurred_at <= $5::timestamptz
+          UNION
+          SELECT recovery.event_id, recovery.occurred_at::text AS occurred_at, 0 AS priority
+          FROM browser_recovery_events recovery
+          WHERE recovery.project_id = $1 AND recovery.environment = $2 AND recovery.service_name = $3
+            AND recovery.kind = 'recovery' AND recovery.expires_at > now()
+            AND recovery.occurred_at BETWEEN $4::timestamptz AND $5::timestamptz
+            AND EXISTS (
+              SELECT 1 FROM browser_recovery_events resource
+              WHERE resource.event_id = ANY($6::uuid[]) AND resource.project_id = recovery.project_id
+                AND resource.service_name = recovery.service_name AND resource.environment = recovery.environment
+                AND resource.kind = 'resource' AND resource.expires_at > now()
+                AND recovery.occurred_at BETWEEN resource.occurred_at AND resource.occurred_at + interval '30 seconds'
+                AND ((resource.session_hash IS NOT NULL AND resource.session_hash = recovery.session_hash)
+                  OR (resource.trace_hash IS NOT NULL AND resource.trace_hash = recovery.trace_hash))
+            )
+          ) candidates GROUP BY event_id, occurred_at ORDER BY MIN(priority), occurred_at ASC, event_id ASC LIMIT 50
+        `,
+        [
+          input.project_id,
+          input.environment,
+          input.service_name,
+          input.window_start,
+          input.window_end,
+          input.resource_event_ids ?? []
         ]
       );
 

@@ -33,7 +33,9 @@ export const reviewerFixturePath = join(
 export const dataMapPath = join(repoRoot, "contracts", "openai-plugin-v1-data-map.md");
 export const releaseManifestPath = join(openAiRoot, "release-manifest.json");
 
-const expectedVersion = "1.0.0";
+const expectedVersion = "1.0.1";
+// Skill-only patch releases retain the independently frozen MCP wire contract.
+const expectedContractVersion = "1.0.0";
 const expectedResource = "https://mcp.debugbundle.com";
 const expectedEndpoint = `${expectedResource}/mcp`;
 const expectedIssuer = "https://api.debugbundle.com";
@@ -48,6 +50,7 @@ const requiredPackageFiles = [
   "README.md",
   "assets/icon-512.png",
   "skills/debugbundle/SKILL.md",
+  "skills/debugbundle/references/cli-handoff.md",
   "skills/debugbundle/references/privacy-and-safety.md",
   "skills/debugbundle/references/tools.md"
 ];
@@ -58,7 +61,8 @@ const requiredSubmissionFiles = [
   "release-notes.md",
   "review-checklist.md",
   "starter-prompts.json",
-  "test-cases.json"
+  "test-cases.json",
+  "cli-handoff-cases.json"
 ];
 const allowedManifestFields = new Set([
   "name",
@@ -416,7 +420,11 @@ function validateSkill(contract, failures) {
     "generic infrastructure",
     "local source",
     "never returns raw logs",
-    "never regenerates or queues"
+    "never regenerates or queues",
+    "before declaring a requested mutation unavailable",
+    "command -v debugbundle",
+    "explicit authorization",
+    "before retrying"
   ]) {
     if (!text.toLowerCase().includes(phrase))
       failures.push(`skill:missing_safety_invariant:${phrase}`);
@@ -480,7 +488,7 @@ export function validateOpenAiPluginSource({ requireConnection = false } = {}) {
 
   const contract = readJson(contractFixturePath);
   if (
-    contract.contract_version !== expectedVersion ||
+    contract.contract_version !== expectedContractVersion ||
     contract.product_shape !== "skill_plus_remote_mcp" ||
     contract.resource !== expectedResource ||
     contract.endpoint !== expectedEndpoint ||

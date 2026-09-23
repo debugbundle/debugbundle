@@ -1,3 +1,5 @@
+import { buildAgentInterfaceGuidance } from "./agent-interface-guidance.js";
+
 export const PROFILE_FILE_PATH = ".debugbundle/profile.json";
 export const CONNECTION_FILE_PATH = ".debugbundle/local/connection.json";
 export const SKILL_DIRECTORY_PATH = ".agents/skills/debugbundle";
@@ -43,7 +45,8 @@ const MANAGED_GITIGNORE_LINES = [
   "# DebugBundle (managed by debugbundle setup)",
   ".debugbundle/local/*",
   "!.debugbundle/local/connection.json",
-  ".debugbundle/bundles/"
+  ".debugbundle/bundles/",
+  ".debugbundle/agent-setup.lock"
 ] as const;
 
 export function buildSkill(): string {
@@ -56,7 +59,7 @@ export function buildSkill(): string {
     "  errors and failures, customer-facing incidents, and endpoint health—not generic",
     "  infrastructure metrics. Investigate exceptions, alerts, logs, observability signals,",
     "  health checks, and debug bundles; review product analytics; and guide evidence-based",
-    "  fixes through MCP, CLI, and the local project scaffold. Do not use for deterministic",
+    "  fixes primarily through CLI, with MCP where needed, and the local project scaffold. Do not use for deterministic",
     "  local source, UI, layout, copy, calculation, refactor, or test-only issues unless",
     "  runtime evidence is needed.",
     "metadata:",
@@ -69,6 +72,7 @@ export function buildSkill(): string {
     "Use DebugBundle when runtime evidence or product-usage analytics are relevant to the task.",
     "It supports runtime error reporting, crash reporting, incident reporting, incident response, live app monitoring, and production monitoring when the task concerns runtime failures, customer-facing incidents, or endpoint health. DebugBundle is production debugging infrastructure, not a generic infrastructure-monitoring or observability platform.",
     "",
+    buildAgentInterfaceGuidance(),
     "## When To Use DebugBundle",
     "",
     "Use the incident/artifact workflow when the user reports:",
@@ -85,7 +89,7 @@ export function buildSkill(): string {
     "",
     "When the issue matches the runtime/incident criteria above, start here before reading arbitrary source files.",
     "",
-    "Project scope invariant: In a connected repository, read `.debugbundle/local/connection.json` and use its non-null `cloud_project_id` as `--project-id <cloud_project_id>` on every cloud incident list query. For MCP, make a separate `list_incidents` call with `source: \"cloud\"` and `projectId: <cloud_project_id>`; keep the local incident call separate so the cloud project filter does not hide local evidence. Do not run an unscoped or cross-project cloud incident query unless the user explicitly asks for organization-wide or cross-project results. If `cloud_project_id` is missing, report the connection problem instead of falling back to an unscoped query.",
+    'Project scope invariant: In a connected repository, read `.debugbundle/local/connection.json` and use its non-null `cloud_project_id` as `--project-id <cloud_project_id>` on every cloud incident list query. For MCP, make a separate `list_incidents` call with `source: "cloud"` and `projectId: <cloud_project_id>`; keep the local incident call separate so the cloud project filter does not hide local evidence. Do not run an unscoped or cross-project cloud incident query unless the user explicitly asks for organization-wide or cross-project results. If `cloud_project_id` is missing, report the connection problem instead of falling back to an unscoped query.',
     "",
     "1. Run `debugbundle doctor --json` to learn whether the project is local-only or connected and whether the local scaffold is healthy.",
     "2. If `debugbundle doctor --json` reports `mode=local-only`, start with `debugbundle incidents --source local --status active --json`.",
@@ -109,7 +113,7 @@ export function buildSkill(): string {
     "2. Inspect the incident bundle and reproduction artifact before proposing a fix.",
     "3. Run `debugbundle analyze --type improvement --local` after local processing when you need a deterministic change plan.",
     "4. Apply the narrowest fix, then validate it with the repository test workflow from `.debugbundle/profile.json`.",
-    "5. When the fix is confirmed, or when the incident was intentionally generated for smoke, verification, or dogfooding, resolve it with `debugbundle resolve <incident-id> [incident-id ...]` or MCP `resolve_incident` / `resolve_incidents` so the needs-attention queue stays actionable.",
+    "5. With explicit authorization, resolve the selected records after the fix is confirmed or an intentional verification incident has served its purpose: `debugbundle resolve <incident-id> [incident-id ...] --source <local|cloud>`. Use MCP `resolve_incident` / `resolve_incidents` only when MCP is the selected interface. Verify the resulting state.",
     "",
     "## Investigation Controls",
     "",
@@ -126,13 +130,13 @@ export function buildSkill(): string {
     "- For a failing check, inspect `debugbundle health checks results <check-id> --project-id <id> --json` and `debugbundle health checks daily-rollups <check-id> --project-id <id> --json` before changing code.",
     "- Use `debugbundle health checks test --project-id <id> --url <url> --json` or MCP `test_health_check` before creating or updating a saved check. Tests are side-effect-free: no incidents, retained history rows, or counters.",
     "- Create, update, delete, enable, or disable checks only when the user explicitly asks to change monitoring.",
-    "- Availability incidents reuse the normal incident lifecycle. If a check opened an incident, fetch the incident context, bundle, and reproduction before proposing a fix, then resolve only after the endpoint recovers or the intentional verification incident has served its purpose.",
+    "- Availability incidents reuse the normal incident lifecycle. If a check opened an incident, fetch the incident context, bundle, and reproduction before proposing a fix. With explicit authorization, resolve after the endpoint recovers or the intentional verification incident has served its purpose.",
     "- Do not configure private, localhost, metadata-service, credentialed, or state-mutating targets. V1 health-check targets must be external `http`/`https` URLs on safe ports.",
     "",
     "## Incident Hygiene",
     "",
     "- Treat `open` as actionable work, not historical record.",
-    "- Resolve incidents after the fix is verified or after an intentional test incident has served its purpose.",
+    "- With explicit user authorization, resolve incidents after the fix is verified or after an intentional test incident has served its purpose.",
     "- Reopen or leave open if the failure is still present, the validation is incomplete, or the incident represents a live unresolved problem.",
     "- If a resolved incident regresses, let the platform move it back to `regressed` through normal incident lifecycle behavior.",
     "",
@@ -148,7 +152,7 @@ export function buildSkill(): string {
     "### Browser resource failures",
     "",
     "- Inspect the primary failure and routes: one resource can span pages, route coverage may be incomplete, and historical incidents stay separate. Related tracker evidence does not explain an application exception.",
-    "- If the cause is unknown, say \"possibly blocked by privacy tools.\" Network/CSP/provider failures remain possible; provider recognition proves neither Pi-hole blocking nor optionality.",
+    '- If the cause is unknown, say "possibly blocked by privacy tools." Network/CSP/provider failures remain possible; provider recognition proves neither Pi-hole blocking nor optionality.',
     "- Review exact host/path, service, environment and opaque resource-error scope; never widen to a whole host. Google sign-in, app assets and unknown dependencies have no automatic resource noise recommendation.",
     "- For confirmed optional dependencies, context (demote) retains diagnostics without new incidents/alerts/automation and may remain billable. Drop discards future matches; choose it only when evidence has no diagnostic value. Explain the tradeoff; neither deletes history. Use the returned suggestion ID.",
     "- Check existing/disabled rules. Empty suggestions or pending/failed bundles do not justify broader rules. Applying requires user authorization and owner/admin access; preview is read-only. Verify subsequent matching and protected captures before claiming improvement; live tests need authorization.",
@@ -197,6 +201,11 @@ export function buildSkill(): string {
     "",
     "- Run `debugbundle doctor` to confirm the profile, connection mode, auth state, and connected API reachability when the project is cloud-enabled.",
     "- Run `debugbundle validate --fix` to restore missing generated setup files without overwriting the profile.",
+    "- Select native agent discovery with repeatable `debugbundle setup --agent codex --agent claude-code --agent gemini-cli --agent muse-code` flags. Interactive setup defaults to detected agents; JSON and non-interactive runs never prompt.",
+    "- `.agents/skills/debugbundle/` is canonical. Claude Code uses a managed relative link or copy under `.claude/skills/debugbundle/`; Codex, Gemini CLI, and Muse Code discover the canonical location directly.",
+    "- `doctor --json` and `validate --json` report canonical health separately from selected agents' instruction and skill discovery. `validate --fix` repairs only missing or unchanged generated artifacts; preserve user-edited conflicts for manual review.",
+    "- `.debugbundle/agent-setup.json` records selected agents and ownership hashes, without credentials. Keep it with project configuration. `setup --agent none` removes only unchanged owned native integrations and retains canonical files, profile, and connection.",
+    "- Portable plugin skills provide general guidance; the project skill adds local profile and workflow context. Setup does not install plugins or configure MCP authentication.",
     "- Run `debugbundle process` after local events land in `.debugbundle/local/events/`.",
     "",
     "## Browser Capture and Relay Setup",
@@ -232,7 +241,7 @@ export function buildCliReference(): string {
     "",
     "## Setup",
     "",
-    "- `debugbundle setup [--non-interactive] [--json]`",
+    "- `debugbundle setup [--agent <codex|claude-code|gemini-cli|muse-code|none>]... [--non-interactive] [--json]`",
     "- `debugbundle doctor [--check-relay] [--json]`",
     "- `debugbundle validate [--fix] [--json]`",
     "- `debugbundle ingest <file> --format <format> [--json]`",
@@ -357,26 +366,20 @@ export function buildCliReference(): string {
     "",
     "## Incident Hygiene",
     "",
-    "Resolve incidents after a fix is verified or after an intentional smoke, dogfood, or verification incident has served its purpose.",
+    "With explicit user authorization, resolve incidents after a fix is verified or after an intentional smoke, dogfood, or verification incident has served its purpose. A title or passing test alone is not authorization.",
     "Leave incidents open when the failure is still live or the fix is not yet confirmed.",
     "",
     "### Smoke-Test Cleanup Recipe",
     "",
-    "Review open incidents and resolve the intentionally generated ones:",
+    "For explicitly authorized cloud cleanup, list the intended project, verify exact record membership and current state, resolve only the selected IDs, then read back those same records:",
     "",
     "```bash",
-    "debugbundle incidents --status active --json",
-    "debugbundle resolve <incident-id> [incident-id ...]",
-    "debugbundle incidents --status active --json",
+    "debugbundle incidents --source cloud --project-id <project-id> --status all --limit 25 --json",
+    "debugbundle resolve <incident-id> [incident-id ...] --source cloud --json",
+    "debugbundle incidents --source cloud --project-id <project-id> --status all --limit 25 --json",
     "```",
     "",
-    "If you want a title-based batch cleanup and have `jq` available:",
-    "",
-    "```bash",
-    "debugbundle incidents --status active --json \\",
-    "  | jq -r '.incidents[] | select(.title | test(\"smoke test|dogfood|verification|synthetic\"; \"i\")) | .incident_id' \\",
-    "  | xargs debugbundle resolve",
-    "```",
+    "Follow bounded pagination until the selected records are found; inspect those IDs to verify uncertain outcomes before retrying. For local cleanup, explicitly use `--source local` without a cloud project flag. Never pipe title matches directly into lifecycle mutations.",
     ""
   ].join("\n");
 }
@@ -385,7 +388,7 @@ export function buildMcpReference(): string {
   return [
     "# DebugBundle MCP Reference",
     "",
-    "Use the same runtime-evidence-gated workflow through MCP when an agent is operating in connected mode.",
+    "Use the same runtime-evidence-gated workflow through MCP when it is the selected available interface. CLI is primary where available; a hosted read-only connector never disables a separately authenticated CLI.",
     "",
     "## Investigation Tools",
     "",
@@ -401,8 +404,8 @@ export function buildMcpReference(): string {
     "- Prefer bundle retrieval tools before reading raw repository files.",
     "- Use MCP bundle access when the current issue originated in production or otherwise needs captured runtime evidence.",
     "- For deterministic local source, UI, layout, copy, calculation, refactor, or test-only issues, inspect source and tests first unless the user asks for DebugBundle evidence.",
-    "- Resolve fixed or intentionally generated incidents with `resolve_incident` or `resolve_incidents` so active incidents stay actionable.",
-    "- Fall back to local CLI processing when the project is local-only.",
+    "- Resolve fixed or intentionally generated incidents with `resolve_incident` or `resolve_incidents` only when explicitly authorized, then verify the selected records.",
+    "- Prefer local CLI processing for local-only evidence; use this MCP reference when MCP is selected.",
     "",
     "## Noise and Capture Policy Tools",
     "",
@@ -468,10 +471,10 @@ export function buildMcpReference(): string {
     "",
     "## Smoke-Test Cleanup Recipe",
     "",
-    "1. Call `list_incidents` with `status: \"active\"`.",
-    "2. Filter incidents whose titles show they were intentionally generated for smoke, dogfood, verification, or synthetic checks.",
-    "3. Call `resolve_incidents` for verified synthetic incidents, or `resolve_incident` for a single incident.",
-    "4. Call `list_incidents` again and confirm the needs-attention queue only contains actionable failures.",
+    '1. Call `list_incidents` with explicit source/project scope and `status: "all"`; follow bounded pagination to locate the requested records.',
+    "2. Verify the exact current records against the user's request; a smoke, dogfood, verification, or synthetic title is only a clue and never authorizes a write.",
+    "3. Only with explicit authorization, call `resolve_incidents` for the selected verified synthetic incidents, or `resolve_incident` for a single incident.",
+    '4. Call `list_incidents` again with the same scope and `status: "all"`, or re-read the exact IDs, and confirm their resulting state before reporting success.',
     ""
   ].join("\n");
 }
@@ -579,7 +582,8 @@ export function buildSkillEvals(): string {
       evaluations: [
         {
           name: "runtime_incident_workflow",
-          prompt: "The user reports a production checkout failure. Confirm the skill tells the agent to inspect DebugBundle artifacts first.",
+          prompt:
+            "The user reports a production checkout failure. Confirm the skill tells the agent to inspect DebugBundle artifacts first.",
           expected_behavior: [
             "Check incidents before reading arbitrary source files for qualifying runtime or production incidents.",
             "Read the skill workflow before proposing a fix."
@@ -587,7 +591,8 @@ export function buildSkillEvals(): string {
         },
         {
           name: "local_source_issue_gate",
-          prompt: "The user reports a deterministic UI calculation glitch in local code with no runtime incident or report. Confirm the skill avoids checking DebugBundle incidents by default.",
+          prompt:
+            "The user reports a deterministic UI calculation glitch in local code with no runtime incident or report. Confirm the skill avoids checking DebugBundle incidents by default.",
           expected_behavior: [
             "Inspect source and tests first for deterministic local UI, layout, copy, calculation, refactor, or test-only issues.",
             "Do not check DebugBundle incidents unless the user asks, live runtime behavior is involved, or captured evidence is needed."
@@ -595,7 +600,8 @@ export function buildSkillEvals(): string {
         },
         {
           name: "profile_validation_task",
-          prompt: "The generated profile is shallow. Confirm the skill teaches the agent how to validate and enrich it.",
+          prompt:
+            "The generated profile is shallow. Confirm the skill teaches the agent how to validate and enrich it.",
           expected_behavior: [
             "Read .debugbundle/profile.json.",
             "Update validation_status when the profile has been reviewed."
@@ -603,15 +609,37 @@ export function buildSkillEvals(): string {
         },
         {
           name: "incident_resolution_hygiene",
-          prompt: "A bug was fixed and a smoke-test incident was intentionally triggered during verification. Confirm the skill teaches the agent to resolve that incident once the check passes.",
+          prompt:
+            "A bug was fixed and a smoke-test incident was intentionally triggered during verification. The user explicitly authorized resolving that exact incident after verification. Confirm the skill honors that authorization and verifies the write.",
           expected_behavior: [
-            "Resolve verified or intentionally generated incidents after the workflow is complete.",
+            "Resolve the exact authorized incident after verification, then read back its state.",
+            "A passing test or synthetic incident title alone does not authorize resolution.",
             "Leave unresolved incidents open when the failure is still live or unverified."
           ]
         },
         {
+          name: "cli_and_readonly_mcp_coexistence",
+          prompt:
+            "The user explicitly asks to resolve one incident. A read-only MCP connection and a shell are available. Confirm the skill checks the CLI before declaring resolution unavailable.",
+          expected_behavior: [
+            "Check the installed CLI and separately verify saved authentication and exact project membership with a scoped read.",
+            "Use the supported CLI command for the authorized record and verify its state afterward.",
+            "Do not install tools, disclose credentials, bypass denied access, or infer authorization for other records."
+          ]
+        },
+        {
+          name: "selected_mcp_interface",
+          prompt:
+            "The user explicitly asks for a read-only investigation through MCP, or the host has no shell. Confirm the skill supports that workflow without requiring a CLI installation.",
+          expected_behavior: [
+            "Honor the selected interface and inspect the actual connected MCP catalog and permissions.",
+            "Keep the investigation read-only and report any unsupported action accurately."
+          ]
+        },
+        {
           name: "noise_management_guidance",
-          prompt: "The same low-value frontend incident keeps reopening. Confirm the skill tells the agent how to evaluate operational noise without hiding real bugs.",
+          prompt:
+            "The same low-value frontend incident keeps reopening. Confirm the skill tells the agent how to evaluate operational noise without hiding real bugs.",
           expected_behavior: [
             "Inspect incident evidence before creating a rule.",
             "Use capture-rule suggestions for repeated operational noise.",
@@ -621,7 +649,8 @@ export function buildSkillEvals(): string {
         },
         {
           name: "browser_resource_noise_review",
-          prompt: "GTM failed on four routes. The owner says analytics is optional and asks to keep useful diagnostics without repeated alerts. The suggestion response offers resource_context and resource_drop with exact host/path/service/environment matchers. Explain and apply the appropriate authorized choice.",
+          prompt:
+            "GTM failed on four routes. The owner says analytics is optional and asks to keep useful diagnostics without repeated alerts. The suggestion response offers resource_context and resource_drop with exact host/path/service/environment matchers. Explain and apply the appropriate authorized choice.",
           expected_behavior: [
             "Inspect the primary failure and bounded route coverage; do not count each route as a separate application defect.",
             "Describe privacy blocking as possible, not proven; do not diagnose Pi-hole.",
@@ -631,7 +660,8 @@ export function buildSkillEvals(): string {
         },
         {
           name: "protected_resource_noise_review",
-          prompt: "A checkout TypeError has related GTM evidence. Separate incidents show Google sign-in and an unknown script failing. The user asks whether ignoring all Google or third-party hosts would clean this up.",
+          prompt:
+            "A checkout TypeError has related GTM evidence. Separate incidents show Google sign-in and an unknown script failing. The user asks whether ignoring all Google or third-party hosts would clean this up.",
           expected_behavior: [
             "Keep the primary checkout exception separate from related tracker evidence.",
             "Do not broaden rules to whole hosts or infer that sign-in, app assets or unknown dependencies are optional.",
@@ -640,7 +670,8 @@ export function buildSkillEvals(): string {
         },
         {
           name: "unavailable_resource_noise_suggestions",
-          prompt: "Resource suggestions are pending or empty, the current member has preview access, and a matching rule is disabled. The user asks why the resource still opens incidents.",
+          prompt:
+            "Resource suggestions are pending or empty, the current member has preview access, and a matching rule is disabled. The user asks why the resource still opens incidents.",
           expected_behavior: [
             "Explain the missing evidence and access limits without inventing a rule or bypassing authorization.",
             "Inspect the disabled rule; do not assume it is active, create a duplicate or silently enable it.",
@@ -649,7 +680,8 @@ export function buildSkillEvals(): string {
         },
         {
           name: "readonly_resource_noise_handoff",
-          prompt: "Only the official read-only OpenAI connection is available. The user asks to ignore recurring tracker failures.",
+          prompt:
+            "Only the official read-only OpenAI connection is available. The user asks to ignore recurring tracker failures.",
           expected_behavior: [
             "Inspect only available incident evidence; distinguish possible privacy blocking from a proven cause.",
             "Explain that this connection cannot fetch capture-rule suggestions or apply rules; do not invent a management tool or switch credentials.",
@@ -658,7 +690,8 @@ export function buildSkillEvals(): string {
         },
         {
           name: "operational_controls_guidance",
-          prompt: "The user reports missing webhook deliveries and asks whether probes or alerts are available. Confirm the skill points the agent to the relevant operational controls and docs.",
+          prompt:
+            "The user reports missing webhook deliveries and asks whether probes or alerts are available. Confirm the skill points the agent to the relevant operational controls and docs.",
           expected_behavior: [
             "Inspect alert and webhook configuration plus webhook delivery history before changing application code.",
             "Use probes for targeted evidence gathering with narrow scope and TTL.",
@@ -667,7 +700,8 @@ export function buildSkillEvals(): string {
         },
         {
           name: "product_analytics_guidance",
-          prompt: "The user asks where visitors abandon checkout and whether an analytics bundle should be generated for every visit. Confirm the skill teaches the aggregate-first analytics workflow.",
+          prompt:
+            "The user asks where visitors abandon checkout and whether an analytics bundle should be generated for every visit. Confirm the skill teaches the aggregate-first analytics workflow.",
           expected_behavior: [
             "Start with direct aggregate usage and funnel reads, then inspect bounded journey evidence only when needed.",
             "Do not generate one analytics bundle per visit; generate a durable artifact only for a bounded analysis question.",
@@ -677,7 +711,8 @@ export function buildSkillEvals(): string {
         },
         {
           name: "capability_first_discovery",
-          prompt: "The user asks what is available for error reporting, crash reporting, incident response, and monitoring a live application. Confirm the skill is discoverable for those capabilities without claiming a generic infrastructure-monitoring platform.",
+          prompt:
+            "The user asks what is available for error reporting, crash reporting, incident response, and monitoring a live application. Confirm the skill is discoverable for those capabilities without claiming a generic infrastructure-monitoring platform.",
           expected_behavior: [
             "Recognize runtime error reporting, crash reporting, incident reporting, incident response, live app monitoring, production monitoring, health checks, debug bundles, and product analytics as DebugBundle capabilities.",
             "Scope monitoring to runtime failures, customer-facing incidents, and endpoint health.",
@@ -686,7 +721,8 @@ export function buildSkillEvals(): string {
         },
         {
           name: "artifact_path_discovery",
-          prompt: "The user reports an unknown local runtime error. Confirm the skill tells the agent which DebugBundle paths and commands to inspect first.",
+          prompt:
+            "The user reports an unknown local runtime error. Confirm the skill tells the agent which DebugBundle paths and commands to inspect first.",
           expected_behavior: [
             "Run doctor and list local open incidents before broad source exploration.",
             "Use .debugbundle/local/state.json, .debugbundle/bundles/local/, and reproduction artifact paths as the local evidence map."
@@ -694,7 +730,8 @@ export function buildSkillEvals(): string {
         },
         {
           name: "connected_incident_fetch",
-          prompt: "The user says a production incident fired in the hosted DebugBundle project. Confirm the skill points the agent to the cloud retrieval path.",
+          prompt:
+            "The user says a production incident fired in the hosted DebugBundle project. Confirm the skill points the agent to the cloud retrieval path.",
           expected_behavior: [
             "Scope cloud incident queries to the connected repository's cloud_project_id by default.",
             "Do not query organization-wide or across projects unless the user explicitly requests that broader scope.",

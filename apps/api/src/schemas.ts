@@ -1,3 +1,4 @@
+import { AlertEmailConfigSchema, AlertSlackConfigSchema, AlertDiscordConfigSchema, AlertWebhookConfigSchema } from "../../../packages/shared-types/src/alert-notification-policy.js";
 import { GITHUB_OAUTH_ISSUER } from "../../../packages/auth/src/index.js";
 import {
   MAX_BILLING_ADDITIONAL_CAPACITY_UNITS,
@@ -324,37 +325,6 @@ export const AlertSeverityLifecycleScopeSchema = z.enum([
   "incident_regressed",
   "both"
 ]);
-
-const AlertEmailConfigSchema = z
-  .object({
-    to: z.string().email()
-  })
-  .strict();
-
-const AlertSlackConfigSchema = z.union([
-  z
-    .object({
-      webhook_url: z.string().url().max(2000)
-    })
-    .strict(),
-  z
-    .object({
-      slack_destination_id: z.string().uuid()
-    })
-    .strict()
-]);
-
-const AlertDiscordConfigSchema = z
-  .object({
-    webhook_url: z.string().url().max(2000)
-  })
-  .strict();
-
-const AlertWebhookConfigSchema = z
-  .object({
-    target_url: z.string().url().max(2000)
-  })
-  .strict();
 
 const WebhookFiltersSchema = z
   .object({

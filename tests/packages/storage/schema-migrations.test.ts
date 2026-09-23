@@ -303,6 +303,7 @@ describe("storage schema migrations", () => {
   it("should seed the migration ledger instead of replaying history for a current bootstrap schema", async (): Promise<void> => {
     const currentSchemaColumns = [
       { table_name: "incident_events", column_name: "resource_route" },
+      { table_name: "alert_deliveries", column_name: "coalescing_key" },
       { table_name: "worker_jobs", column_name: "depends_on" },
       { table_name: "worker_jobs", column_name: "operator_retries" },
       { table_name: "worker_jobs", column_name: "lease_token" },

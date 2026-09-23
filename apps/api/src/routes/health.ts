@@ -9,7 +9,8 @@ import {
   getTierCapabilities,
   resolvePolicy,
   PRESET_DEFAULTS,
-  getDefaultPreset
+  getDefaultPreset,
+  captureRuleRequiresServerEvaluation
 } from "../../../../packages/shared-types/src/index.js";
 import type {
   AnalyticsSdkConfig,
@@ -129,13 +130,19 @@ export function registerHealthRoutes(
       }
     }
 
-    const captureRules =
+    const activeCaptureRules =
       dependencies.captureRuleManagement === undefined
         ? []
         : await dependencies.captureRuleManagement.listActiveCaptureRulesForProject({
             project_id: projectAuth.context.project_id,
             now: nowIso
           });
+    // An older SDK can ignore lifecycle predicates or execute a broader drop before
+    // a server-only exception to it. Evaluate the whole rule set at ingestion when
+    // any rule requires server evidence, preserving specificity and precedence.
+    const captureRules = activeCaptureRules.some(captureRuleRequiresServerEvaluation)
+      ? []
+      : activeCaptureRules;
 
     const includesAnalyticsConfig = request.headers["x-debugbundle-analytics-config"] === "1";
     let analyticsConfig = DISABLED_ANALYTICS_SDK_CONFIG;

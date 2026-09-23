@@ -22,7 +22,8 @@ import {
 import {
   loadIncidentEnvelopes,
   collectProbeDataItems,
-  collectCorrelatedLogEnvelopes
+  collectCorrelatedLogEnvelopes,
+  collectCorrelatedRecoveryEnvelopes
 } from "./processor-bundle-context.js";
 import {
   type BuildBundleWorkerDependencies,
@@ -150,6 +151,11 @@ export async function processNextBuildBundleJob(
       incident,
       incidentEnvelopes
     });
+    const correlatedRecoveryEnvelopes = await collectCorrelatedRecoveryEnvelopes({
+      dependencies,
+      incident,
+      incidentEnvelopes
+    });
     const probeDataItems = await collectProbeDataItems({
       dependencies,
       incident,
@@ -182,6 +188,7 @@ export async function processNextBuildBundleJob(
       sourceEnvelopes: [...incidentEnvelopes, ...correlatedLogEnvelopes].map(
         (incidentEnvelope) => incidentEnvelope.envelope
       ),
+      correlatedRecoveryEnvelopes,
       probeDataItems: probeDataItems
     });
 

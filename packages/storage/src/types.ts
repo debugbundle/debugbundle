@@ -1,5 +1,5 @@
 import type { BundleBuildContextStore } from "./bundle-types.js";
-export type { BundleBuildContext, BundleBuildContextStore, RetainedBundleOwnerReference, IncidentEventReference, ProbeEventCandidateReference, LogEventCandidateReference } from "./bundle-types.js";
+export type { BundleBuildContext, BundleBuildContextStore, RetainedBundleOwnerReference, IncidentEventReference, ProbeEventCandidateReference, LogEventCandidateReference, RequestEventCandidateReference } from "./bundle-types.js";
 import type { NormalizedEvent } from "../../event-normalizer/src/index.js";
 import type {
   CapturePreset,

@@ -28,6 +28,13 @@ function readPackageJson(relativePath: string): PackageJsonLike {
 const repoRoot = process.cwd();
 
 describe("cli workspace package", () => {
+  it.each(["cli-runtime.yml", "release-cli-package.yml"])("gates %s on an installed predecessor upgrade", (name) => {
+    const workflow = readFileSync(join(repoRoot, ".github/workflows", name), "utf8");
+    expect(workflow).toContain("@debugbundle/cli@1.10.0");
+    expect(workflow).toContain("node scripts/check-cli-setup-upgrade.mjs");
+    expect(workflow).toContain("make muse-setup-check");
+  });
+
   it("defines apps/cli as a publishable package with its own debugbundle bin", () => {
     const packageJson = readPackageJson("../../../apps/cli/package.json");
 

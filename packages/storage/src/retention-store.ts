@@ -98,6 +98,12 @@ async function pruneExpiredAnalyticsRollupTable(input: {
 
 export function createPostgresRetentionStore(db: Queryable): RetentionStore {
   return {
+    async pruneExpiredBrowserRecoveryEvents(input) {
+      const result = await db.query(`DELETE FROM browser_recovery_events WHERE event_id IN (
+        SELECT event_id FROM browser_recovery_events WHERE expires_at <= $1::timestamptz
+        ORDER BY expires_at, event_id LIMIT $2) RETURNING event_id`, [input.now, input.limit]);
+      return result.rows.length;
+    },
     async listExpiredSampledRawEvents(input): Promise<RetentionRawEventReference[]> {
       const result = await db.query<RetentionRawEventReference & Record<string, unknown>>(
         `
@@ -482,6 +488,7 @@ export function createRetentionCleanupService(input: {
       }
 
       for (let batchIndex = 0; batchIndex < maxBatches; batchIndex += 1) {
+        const prunedRecovery = await input.retentionStore.pruneExpiredBrowserRecoveryEvents?.({ now: job.scheduled_at, limit: batchSize }) ?? 0;
         const expiredReferences = await input.retentionStore.listExpiredSampledRawEvents({
           now: job.scheduled_at,
           limit: batchSize
@@ -510,6 +517,7 @@ export function createRetentionCleanupService(input: {
         });
 
         if (
+          prunedRecovery === 0 &&
           expiredReferences.length === 0 &&
           expiredAnalyticsRawEvents.length === 0 &&
           expiredAnalyticsJourneySamples.length === 0 &&
@@ -633,6 +641,7 @@ export function createRetentionCleanupService(input: {
           prunedAnalyticsRollups.deleted_rows === 0 &&
           deletedAnalyticsBundleGenerations.length === 0 &&
           deletedIncidents.length === 0 &&
+          prunedRecovery < batchSize &&
           expiredReferences.length < batchSize &&
           expiredAnalyticsRawEvents.length < batchSize &&
           expiredAnalyticsJourneySamples.length < batchSize &&
@@ -644,6 +653,7 @@ export function createRetentionCleanupService(input: {
         }
 
         if (
+          prunedRecovery < batchSize &&
           expiredReferences.length < batchSize &&
           expiredAnalyticsRawEvents.length < batchSize &&
           expiredAnalyticsJourneySamples.length < batchSize &&

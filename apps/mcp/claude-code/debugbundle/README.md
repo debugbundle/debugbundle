@@ -25,8 +25,12 @@ Then reload plugins if Claude Code does not connect the bundled MCP server immed
 The plugin ships a bundled MCP server definition that runs:
 
 ```bash
-npx -y @debugbundle/mcp@1.10.0 --local-auth
+npx -y @debugbundle/mcp@1.11.0 --local-auth
 ```
+
+## CLI-first workflow
+
+The skill checks the local DebugBundle CLI first for supported reads and authorized changes. It verifies project/auth context and reads back writes. MCP remains available when the CLI cannot perform the task or the user selects MCP; a read-only hosted connector does not disable the CLI. Shared routing also preserves read-only requests and existing authorization.
 
 ## Authentication
 
@@ -38,11 +42,11 @@ Use one of these auth paths:
 
 Use member tokens for MCP read and management tools. Project tokens are SDK write-only ingestion credentials and are not valid for incident retrieval, bundle access, billing, project management, or other MCP workflows.
 
-Plugin 1.10.0 uses the local-auth profile: tools use saved CLI login or the configured member token without exposing a `bearerToken` argument. Restart the connection after login or credential changes. Never paste credentials into chat or tool arguments.
+Plugin 1.11.0 retains MCP 1.11.0 and uses the local-auth profile: tools use saved CLI login or the configured member token without exposing a `bearerToken` argument. Restart the connection after login or credential changes. Never paste credentials into chat or tool arguments.
 
 ## Update
 
-To update to plugin 1.10.0, refresh the repository marketplace with `/plugin marketplace update debugbundle`, run `claude plugin update debugbundle@debugbundle` in your terminal, and reload plugins. Existing installs keep their configured `member_token` and `api_url` settings; the package name and marketplace are unchanged.
+Refresh the repository marketplace with `/plugin marketplace update debugbundle`, run `claude plugin update debugbundle@debugbundle` in your terminal, and reload plugins. Existing installs keep their configured `member_token` and `api_url` settings; the package name and marketplace are unchanged.
 
 ## Community Marketplace
 
@@ -60,3 +64,7 @@ After publication, `make claude-plugin-smoke-github` repeats the check using the
 - Distribution status: https://debugbundle.com/docs/mcp/distribution
 - Source: https://github.com/debugbundle/debugbundle/tree/main/apps/mcp/claude-code/debugbundle
 - Security policy: https://github.com/debugbundle/debugbundle/security/policy
+
+## Project-specific guidance
+
+The plugin bundles portable guidance. Use CLI `debugbundle setup --agent codex` or `debugbundle setup --agent claude-code` in an instrumented repository to add native discovery of its canonical `.agents/skills/debugbundle/` project skill and local profile workflows. `doctor` reports discovery; `validate --fix` repairs unchanged owned artifacts. Setup preserves plugin settings and authentication and never installs or configures MCP implicitly. See [agent-aware setup](https://github.com/debugbundle/debugbundle/blob/main/spec/agent-aware-cli-setup.md).

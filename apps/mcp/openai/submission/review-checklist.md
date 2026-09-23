@@ -1,5 +1,8 @@
 # OpenAI Plugin 1.0.0 Review Checklist
 
+The 1.0.1 skill-routing patch retains this 1.0.0 remote-MCP evidence. Its optional local CLI handoff uses separate existing authentication and explicit user authorization; no MCP permission or data projection expands. Fresh model handoff acceptance and public review/publication remain pending.
+
+
 Status markers in this file are deliberately manual. A repository-local green result does not satisfy a live, owner, reviewer, or publication gate.
 
 ## Source and privacy

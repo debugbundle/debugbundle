@@ -1,8 +1,35 @@
 import { describe, expect, it, vi } from "vitest";
+import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { doctorCommand as realDoctorCommand } from "../../../apps/cli/src/doctor-command.js";
+import { validateCommand as realValidateCommand } from "../../../apps/cli/src/validate-command.js";
 
 import { SETUP_MCP_TOOL_NAMES, createSetupMcpTools } from "../../../apps/mcp/src/setup-tools.js";
 
 describe("mcp setup tools", () => {
+  it("preserves actionable local setup errors through the real CLI adapters", async () => {
+    const root = await mkdtemp(join(tmpdir(), "mcp-agent-setup-"));
+    try {
+      await mkdir(join(root, ".debugbundle"));
+      await writeFile(join(root, ".debugbundle/agent-setup.json"), '{"version":999}');
+      const tools = createSetupMcpTools({
+        doctorCommand: (input) => realDoctorCommand(input, { cwd: () => root, readAuthState: async () => { throw new Error("Not logged in."); } }),
+        validateCommand: (input) => realValidateCommand(input, { cwd: () => root }),
+        verifyLocalCommand: vi.fn(),
+        verifyCloudCommand: vi.fn(),
+        smokeCommand: vi.fn()
+      });
+      for (const command of ["doctor", "validate"] as const) {
+        await expect(tools[command]({})).resolves.toMatchObject({
+          status: "error", errors: expect.arrayContaining([expect.stringMatching(/agent.setup|metadata/i)])
+        });
+      }
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("declares setup and verification tool parity", () => {
     expect(SETUP_MCP_TOOL_NAMES).toEqual([
       "doctor",

@@ -1,9 +1,9 @@
 {
   "schema_version": "1.0.0",
-  "plugin_version": "1.0.0",
+  "plugin_version": "1.0.1",
   "evidence_state": "local_connection_ready",
   "source": {
-    "commit": "e31542677babdd46f619c76512c58805e0162988",
+    "commit": "3ac479651984c0d2e7143c2c23d7108cd85c4b66",
     "tree_clean": true,
     "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
@@ -15,30 +15,32 @@
   },
   "registered_connection_id": "plugin_asdk_app_6a99ba6c1e7881919091a592738692c6",
   "package": {
-    "archive_file": "debugbundle-openai-plugin-1.0.0.zip",
-    "archive_sha256": "f51d4a67604e04440ced80811bad2610a1ed41579e16238d9e491dc52d7cd9c2",
-    "archive_bytes": 50921,
+    "archive_file": "debugbundle-openai-plugin-1.0.1.zip",
+    "archive_sha256": "c89d24c7f72fcfe25512054c5e35a473e2153b880867bb24da258e1559e722b7",
+    "archive_bytes": 62469,
     "files": {
       ".app.json": "137807180af48e9e6f6df967ebcb23925ed87fc051d219d153a1bc604c174f31",
-      ".codex-plugin/plugin.json": "dcecda2c8257e08110a3ee7a3eb89fe9af1d41ddb5c9e5f8efe63d07f425b831",
+      ".codex-plugin/plugin.json": "fd355a806e971d45b8ee8576ff03a2c682d5a2f5cafe68bbcdcf7c1c9a09b286",
       "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
-      "README.md": "05b8efe9c870f5ce85ef76f19a394569aad0b772e6b4577bf0d124d7fbc9bebf",
+      "README.md": "911e666560e068eea7838887a9bfe72e481698d17ef96ab30ae492c304330f84",
       "assets/icon-512.png": "a05a29674a75a945b1a378c73c27322c9b1f14456329bec1fc1d986453696e30",
-      "skills/debugbundle/SKILL.md": "9642b581840247de09ee3b17b609615e34ef57dc684b37c6f357d4033a9b5b27",
-      "skills/debugbundle/references/privacy-and-safety.md": "5266d4110ff8f586694da427d0cf9fb6dca08f0368af3afca87b3908dba8ac97",
+      "skills/debugbundle/SKILL.md": "c1b8405390bc0b7d16157eec05472f251e9ccc51288ebb8511c27a83d7b73b05",
+      "skills/debugbundle/references/cli-handoff.md": "0327b8f03ff1d59b572fe732dfec3f6b962baec881b6a5b1c2fa848d525ca40c",
+      "skills/debugbundle/references/privacy-and-safety.md": "436983b21e6570654ff18c148c1099b64f5e051353b02ac7b002b91430ce9682",
       "skills/debugbundle/references/tools.md": "d294c7b6827baa6f8df4680434ea672f25c8a82c45e8f57ecc204fe2341fd240"
     }
   },
   "submission": {
     "files": {
+      "cli-handoff-cases.json": "af939c6aa2c3f2f263c985068702d06b68e7eaeaa422ac6e32688a828a29190b",
       "data-map.md": "90751261d20abbe9fcb80da3423e03927be5561f8a990bdb1734fab3c909162f",
-      "listing.md": "cc7675c5b562ae4f03186d0689a86ef6419a869ba3d35095d823a15f013d844e",
-      "policy-review.md": "c9e19f156241d0f02528a7f0e5b6c1fbaa09af5c8b688863b3b81bc890abaa62",
+      "listing.md": "1517c2d65e1fb507e03c223f58c8a014ae8c696c69c2167de04d9f0a14136523",
+      "policy-review.md": "283bd69177318e34d9cb46aa2f50f272e956865d462cb9bdf026c21d5cfc694c",
       "post-launch-article-draft.md": "6ce0f34a4ce8261eb4a0f10e0f3c5fcc89de9677ffdcd988075ed296d97db7cd",
-      "release-notes.md": "f96f0ae58b66fe326f00b6feb380a61025d5782a4568d2b012ae3ed42b5fa0b1",
-      "review-checklist.md": "0192eaa55cd9f8b3127c46ea0a14f826ecdaf3e94b06f8c03a0b2d8b45c33078",
-      "starter-prompts.json": "6d6461d82d0a0e2f429a8c776e8e9185cf8879637653a5fbf2b6235b62c6d7c2",
-      "test-cases.json": "1c69817b09b68560bd8c980616976de8c7b15266980bc3ea72738b444d3cfac7",
+      "release-notes.md": "6b913b3e64487faf73d05801e8a3f818e03d2760eff2e730c9768b83d5cc39f9",
+      "review-checklist.md": "99c68cd3c2342c4defa4259915a57fbce341135fa5d58f6571efbc7c4619a712",
+      "starter-prompts.json": "35702070ebd292aee377b85a4d339f354c0b23080856211d45ec2c08c8c637f1",
+      "test-cases.json": "3be1576775520e85babaff8cf23662a13a040c7ad21fd5fb18dfe5a477a1e764",
       "tool-scan.json": "ff38eb57f13fc704659de6e039c2cdcc1dddc2472a6341132cd0defbe4b8fc48"
     }
   },

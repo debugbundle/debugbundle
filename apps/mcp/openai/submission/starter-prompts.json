@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.0.1",
   "prompts": [
     "Investigate my latest production incident.",
     "Summarize product usage and checkout funnel performance for the last 7 days.",

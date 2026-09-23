@@ -7,6 +7,7 @@ import {
 } from "../../../packages/shared-types/src/capture-rules.js";
 import { browserResourceEvent } from "../../helpers/browser-resource-fixtures.js";
 import { describeBrowserResource } from "../../../packages/shared-types/src/browser-resource.js";
+import { buildBrowserResourceSuggestions } from "../../../packages/shared-types/src/browser-resource-suggestions.js";
 
 function suggestions(url: string, page?: string | null, relatedUrl?: string) {
   const event = browserResourceEvent({ url, page });
@@ -169,4 +170,96 @@ describe("resource noise policy", () => {
     });
     expect(withoutOrigin.first_party).toBeUndefined();
   });
+
+  it("suggests only lifecycle-scoped demotion for hidden first-party preloads", () => {
+    const event = browserResourceEvent({
+      url: "https://app.example.com/assets/app-8f3a.js?signature=secret",
+      page: "https://app.example.com/gallery",
+      tag: "link",
+      readyState: "interactive",
+      visibilityState: "hidden",
+      attributes: { rel: "modulepreload", as: "script" }
+    });
+    const result = buildCaptureRuleSuggestions({
+      incident: {
+        incident_id: "incident",
+        project_id: "project",
+        fingerprint: "hash",
+        fingerprint_version: "v2",
+        title: "Browser resource load error",
+        occurrence_count: 3,
+        matched_fields: []
+      },
+      bundle: {
+        project: { environment: "production" },
+        service: { name: "web" },
+        signal: {
+          signal_type: "frontend_exception",
+          source_event_types: ["frontend_exception"],
+          fingerprint: "hash"
+        },
+        context: {
+          resource_failure: describeBrowserResource(event.payload.browser_event)!,
+          frontend: { exceptions: [event.payload] }
+        }
+      }
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      suggestion_id: "hidden_preload_demote",
+      recommended_action: "demote",
+      confidence: "medium",
+      requires_confirmation: true,
+      rule: {
+        matcher: {
+          event_types: ["frontend_exception"],
+          services: ["web"],
+          environments: ["production"],
+          first_party: true,
+          browser_event_kind: "resource_error",
+          browser_event_opaque: true,
+          browser_page_visibility_state: "hidden",
+          browser_page_ready_state: "interactive",
+          browser_target_tag_name: "link",
+          browser_target_attributes: { rel: "modulepreload" },
+          resource_url: { host: "app.example.com", path_prefix: "/assets/" }
+        }
+      }
+    });
+    expect(JSON.stringify(result)).not.toContain("secret");
+  });
+
+  it.each([
+    ["https://accounts.google.com/gsi/client", "https://accounts.google.com/login"],
+    ["https://app.example.com/api/session", "https://app.example.com/gallery"]
+  ])(
+    "does not infer a safe asset suppression rule for a hidden non-asset preload: %s",
+    (url, page) => {
+      const event = browserResourceEvent({
+        url,
+        page,
+        tag: "link",
+        readyState: "interactive",
+        visibilityState: "hidden",
+        attributes: { rel: "preload", as: "script" }
+      });
+      expect(
+        buildBrowserResourceSuggestions({
+          browserEvent: event.payload.browser_event,
+          service: "web",
+          environment: "production",
+          incident: {
+            incident_id: "incident",
+            project_id: "project",
+            fingerprint: "hash",
+            fingerprint_version: "v2",
+            title: "Resource failed",
+            occurrence_count: 1,
+            matched_fields: []
+          }
+        })
+      ).toEqual([]);
+    }
+  );
 });

@@ -39,6 +39,17 @@ export type CaptureRuleEventType = z.infer<typeof CaptureRuleEventTypeSchema>;
 export const BrowserEventKindSchema = z.enum(["window_error", "resource_error"]);
 export type BrowserEventKind = z.infer<typeof BrowserEventKindSchema>;
 
+export const BrowserPageVisibilityStateSchema = z.enum([
+  "visible",
+  "hidden",
+  "prerender",
+  "unloaded"
+]);
+export type BrowserPageVisibilityState = z.infer<typeof BrowserPageVisibilityStateSchema>;
+
+export const BrowserPageReadyStateSchema = z.enum(["loading", "interactive", "complete"]);
+export type BrowserPageReadyState = z.infer<typeof BrowserPageReadyStateSchema>;
+
 export const CaptureRuleClientKindSchema = z.enum(["human", "bot", "unknown"]);
 export type CaptureRuleClientKind = z.infer<typeof CaptureRuleClientKindSchema>;
 
@@ -71,6 +82,44 @@ export interface CaptureRuleUrlMatcher {
   path_prefix?: string;
   path_equals?: string;
 }
+
+export interface CaptureRuleBrowserTargetAttributes {
+  rel?: string;
+  as?: string;
+  type?: string;
+  media?: string;
+  cross_origin?: string;
+  async?: boolean;
+  defer?: boolean;
+  integrity_present?: boolean;
+}
+
+const BrowserTargetAttributesSchema = z
+  .object({
+    rel: z.string().trim().min(1).max(120).optional(),
+    as: z.string().trim().min(1).max(120).optional(),
+    type: z.string().trim().min(1).max(255).optional(),
+    media: z.string().trim().min(1).max(500).optional(),
+    cross_origin: z.string().trim().min(1).max(120).optional(),
+    async: z.boolean().optional(),
+    defer: z.boolean().optional(),
+    integrity_present: z.boolean().optional()
+  })
+  .strict()
+  .transform((value) => {
+    const normalized: CaptureRuleBrowserTargetAttributes = {};
+    for (const key of ["rel", "as", "type", "media", "cross_origin"] as const) {
+      const attribute = normalizeOptionalTrimmedString(value[key]);
+      if (attribute !== undefined) normalized[key] = attribute.toLowerCase();
+    }
+    for (const key of ["async", "defer", "integrity_present"] as const) {
+      if (value[key] !== undefined) normalized[key] = value[key];
+    }
+    return normalized;
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "Browser target attribute matchers must include at least one attribute."
+  });
 
 const UrlMatcherSchema = z
   .object({
@@ -148,6 +197,10 @@ export interface CaptureRuleMatcher {
   message_equals?: string;
   browser_event_kind?: BrowserEventKind;
   browser_event_opaque?: boolean;
+  browser_page_visibility_state?: BrowserPageVisibilityState;
+  browser_page_ready_state?: BrowserPageReadyState;
+  browser_target_tag_name?: string;
+  browser_target_attributes?: CaptureRuleBrowserTargetAttributes;
   client_kind?: CaptureRuleClientKind;
   bot_family?: string;
   resource_url?: CaptureRuleUrlMatcher;
@@ -169,6 +222,10 @@ export const CaptureRuleMatcherSchema = z
     message_equals: z.string().min(1).max(500).optional(),
     browser_event_kind: BrowserEventKindSchema.optional(),
     browser_event_opaque: z.boolean().optional(),
+    browser_page_visibility_state: BrowserPageVisibilityStateSchema.optional(),
+    browser_page_ready_state: BrowserPageReadyStateSchema.optional(),
+    browser_target_tag_name: z.string().trim().min(1).max(120).optional(),
+    browser_target_attributes: BrowserTargetAttributesSchema.optional(),
     client_kind: CaptureRuleClientKindSchema.optional(),
     bot_family: z.string().min(1).max(120).optional(),
     resource_url: UrlMatcherSchema.optional(),
@@ -187,6 +244,7 @@ export const CaptureRuleMatcherSchema = z
     const messageContains = normalizeOptionalTrimmedString(value.message_contains);
     const messageEquals = normalizeOptionalTrimmedString(value.message_equals);
     const botFamily = normalizeOptionalTrimmedString(value.bot_family);
+    const browserTargetTagName = normalizeOptionalTrimmedString(value.browser_target_tag_name);
     const statusCodes = normalizeNumberArray(value.status_codes);
 
     if (eventTypes !== undefined) {
@@ -218,6 +276,18 @@ export const CaptureRuleMatcherSchema = z
     }
     if (value.browser_event_opaque !== undefined) {
       normalized.browser_event_opaque = value.browser_event_opaque;
+    }
+    if (value.browser_page_visibility_state !== undefined) {
+      normalized.browser_page_visibility_state = value.browser_page_visibility_state;
+    }
+    if (value.browser_page_ready_state !== undefined) {
+      normalized.browser_page_ready_state = value.browser_page_ready_state;
+    }
+    if (browserTargetTagName !== undefined) {
+      normalized.browser_target_tag_name = browserTargetTagName.toLowerCase();
+    }
+    if (value.browser_target_attributes !== undefined) {
+      normalized.browser_target_attributes = value.browser_target_attributes;
     }
     if (value.client_kind !== undefined) {
       normalized.client_kind = value.client_kind;
@@ -254,6 +324,10 @@ export const CaptureRuleMatcherSchema = z
       "message_equals",
       "browser_event_kind",
       "browser_event_opaque",
+      "browser_page_visibility_state",
+      "browser_page_ready_state",
+      "browser_target_tag_name",
+      "browser_target_attributes",
       "client_kind",
       "bot_family",
       "resource_url",

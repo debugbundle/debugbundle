@@ -1,6 +1,6 @@
 {
   "name": "debugbundle-codex",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Runtime error reporting, incident response, health checks, debug bundles, and product analytics for Codex.",
   "author": {
     "name": "DebugBundle",
@@ -37,7 +37,7 @@
     "termsOfServiceURL": "https://debugbundle.com/terms/",
     "defaultPrompt": [
       "Investigate a production incident and propose a tested fix.",
-      "Inspect this repository’s local DebugBundle incidents.",
+      "Inspect this repository\u2019s local DebugBundle incidents.",
       "Explain the last 7 days of aggregate product usage."
     ],
     "brandColor": "#7C3AED",

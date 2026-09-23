@@ -1,3 +1,5 @@
+import { processNextEvaluateAlertsJob } from "../../apps/worker/src/processor-alerts.js";
+import type { EvaluateAlertsWorkerDependencies } from "../../apps/worker/src/processor-shared.js";
 import { randomUUID } from "node:crypto";
 
 import { afterAll, beforeAll, expect, it } from "vitest";
@@ -207,4 +209,51 @@ runIntegration("alert delivery transition dedupe integration", () => {
       created_digest: false
     });
   });
+  async function cloneIncident(projectId: string, sourceId: string): Promise<string> {
+    const id = randomUUID();
+    await pool.query(`INSERT INTO incidents (id, project_id, environment, fingerprint, title, severity, status, first_seen_at, last_seen_at)
+      SELECT $1::uuid, project_id, environment, ($1::uuid)::text, title, severity, status, first_seen_at, last_seen_at FROM incidents WHERE id = $2 AND project_id = $3`, [id, sourceId, projectId]);
+    return id;
+  }
+
+  it("serializes concurrent notifications sharing a burst cooldown", async () => {
+    const context = await seedAlertContext({ channel: "webhook", suffix: `concurrent-${randomUUID()}` });
+    const secondId = await cloneIncident(context.projectId, context.incidentId);
+    const blocker = await pool.connect();
+    const key = "resource-burst";
+    await blocker.query("SELECT pg_advisory_lock(hashtext(($1::uuid)::text), hashtext($2))", [context.alertId, key]);
+    const store = createPostgresAlertDeliveryStore(createQueryable(pool));
+    const create = (incidentId: string) => store.createAlertDeliveryIntent({ alert_id: context.alertId, project_id: context.projectId, incident_id: incidentId, condition_type: "new_incident", dedupe_key: "new_incident", notification_key: incidentId, coalescing_key: key, coalescing_window_seconds: 10, cooldown_seconds: 300, channel: "webhook", payload: {} });
+    const pending = Promise.all([create(context.incidentId), create(secondId)]);
+    try {
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        if (Number((await pool.query("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted")).rows[0].count) >= 2) break;
+        await new Promise(resolve => setTimeout(resolve, 5));
+      }
+    } finally {
+      await blocker.query("SELECT pg_advisory_unlock(hashtext(($1::uuid)::text), hashtext($2))", [context.alertId, key]);
+      blocker.release();
+    }
+    const results = await pending;
+    expect(results.filter(result => result.created)).toHaveLength(1);
+    const notifiedId = results[0].created ? context.incidentId : secondId;
+    expect((await store.createAlertDeliveryIntent({ alert_id: context.alertId, project_id: context.projectId, incident_id: notifiedId, condition_type: "incident_regressed", dedupe_key: "later-transition", notification_key: notifiedId, coalescing_key: "later-page-load", coalescing_window_seconds: 10, cooldown_seconds: 300, channel: "webhook", payload: {} })).created).toBe(false);
+  });
+
+  it("keeps distinct resource incidents in one email digest with a configured cooldown", async () => {
+    const context = await seedAlertContext({ channel: "email", suffix: `burst-${randomUUID()}` });
+    const secondId = await cloneIncident(context.projectId, context.incidentId);
+    await pool.query("UPDATE alert_rules SET cooldown_seconds = 300 WHERE id = $1", [context.alertId]);
+    const store = createPostgresAlertDeliveryStore(createQueryable(pool));
+    for (const incidentId of [context.incidentId, secondId, secondId]) {
+      await processNextEvaluateAlertsJob({
+        queue: { dequeue: async () => ({ project_id: context.projectId, incident_id: incidentId, condition_type: "severity_threshold", lifecycle_event: "new_incident", dedupe_key: "new_incident", notification_key: "resource-burst", coalescing_window_seconds: 10, occurred_at: new Date().toISOString(), service_name: "web", environment: "production", severity: "high" }) },
+        alertStore: store
+      } as unknown as EvaluateAlertsWorkerDependencies);
+    }
+    const items = (await pool.query<{ incident_id: string; digest_id: string }>("SELECT incident_id, digest_id FROM alert_email_digest_items WHERE project_id = $1", [context.projectId])).rows;
+    expect(items.map(item => item.incident_id).sort()).toEqual([context.incidentId, secondId].sort());
+    expect(new Set(items.map(item => item.digest_id)).size).toBe(1);
+  });
+
 });

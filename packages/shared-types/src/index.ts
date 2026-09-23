@@ -462,6 +462,7 @@ export {
   getCaptureRuleSpecificityScore,
   shouldSampleCaptureRuleEvent,
   classifyCaptureRuleClientFromUserAgent,
+  captureRuleRequiresServerEvaluation,
   evaluateCaptureRules
 } from "./capture-rules.js";
 

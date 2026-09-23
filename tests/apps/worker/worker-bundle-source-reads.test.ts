@@ -1,17 +1,20 @@
 import { expect, it, vi } from "vitest";
+import { gzipSync } from "node:zlib";
 import { createEventEnvelope } from "../../../packages/shared-types/src/index.js";
 import type { BundleBuildContext, ObjectStoreReader } from "../../../packages/storage/src/index.js";
 import type { BuildBundleWorkerDependencies } from "../../../apps/worker/src/processor-shared.js";
 import {
   loadIncidentEnvelopes,
   collectProbeDataItems,
-  collectCorrelatedLogEnvelopes
+  collectCorrelatedLogEnvelopes,
+  collectCorrelatedRecoveryEnvelopes
 } from "../../../apps/worker/src/processor-bundle-context.js";
 import {
   loadImprovementBundleSdk,
   loadSampleLogItems,
   loadRepresentativeRequestContext
 } from "../../../apps/worker/src/improvement-bundle-context.js";
+import { browserResourceEvent } from "../../helpers/browser-resource-fixtures.js";
 
 const projectId = "00000000-0000-4000-8000-000000000001";
 const eventId = "00000000-0000-4000-8000-000000000002";
@@ -49,6 +52,29 @@ const incidentEnvelopes = [
     })
   }
 ];
+const resourceEnvelope = browserResourceEvent({
+  url: "https://app.example.com/assets/app.js",
+  page: "https://app.example.com/gallery",
+  tag: "link",
+  readyState: "interactive",
+  visibilityState: "hidden",
+  attributes: { rel: "modulepreload" }
+});
+resourceEnvelope.occurred_at = occurredAt;
+resourceEnvelope.correlation = {
+  request_id: null,
+  session_id: "session-1",
+  trace_id: "trace",
+  user_id_hash: null
+};
+const resourceIncidentEnvelopes = [
+  {
+    eventId: resourceEnvelope.event_id,
+    eventType: "frontend_exception" as const,
+    occurredAt,
+    envelope: resourceEnvelope
+  }
+];
 
 function dependencies(objectStore: ObjectStoreReader): BuildBundleWorkerDependencies {
   return {
@@ -56,7 +82,8 @@ function dependencies(objectStore: ObjectStoreReader): BuildBundleWorkerDependen
     incidentStore: {
       listIncidentEventReferences: vi.fn().mockResolvedValue(references),
       listProbeEventCandidatesForServiceWindow: vi.fn().mockResolvedValue(references),
-      listLogEventCandidatesForServiceWindow: vi.fn().mockResolvedValue(references)
+      listLogEventCandidatesForServiceWindow: vi.fn().mockResolvedValue(references),
+      listRequestEventCandidatesForServiceWindow: vi.fn().mockResolvedValue(references)
     }
   } as unknown as BuildBundleWorkerDependencies;
 }
@@ -93,6 +120,16 @@ const loaders: Array<[string, (objectStore: ObjectStoreReader) => Promise<unknow
     []
   ],
   [
+    "correlated recovery requests",
+    (objectStore) =>
+      collectCorrelatedRecoveryEnvelopes({
+        dependencies: dependencies(objectStore),
+        incident,
+        incidentEnvelopes: resourceIncidentEnvelopes
+      }),
+    []
+  ],
+  [
     "improvement SDK",
     (objectStore) =>
       loadImprovementBundleSdk({ objectStore, projectId, sourceEventId: eventId, references }),
@@ -121,4 +158,50 @@ it.each(loaders)("still permits expired retained %s to be absent", async (_name,
   const getObject = vi.fn().mockRejectedValue(new Error("s3_object_not_found"));
   await expect(load({ getObject })).resolves.toEqual(empty);
   expect(getObject).toHaveBeenCalledTimes(1);
+});
+
+it("loads only session-correlated recovery request candidates", async () => {
+  const recovery = createEventEnvelope({
+    event_type: "request_event",
+    occurred_at: "2026-09-14T00:00:02.000Z",
+    service: { name: "web", environment: "production", runtime: "browser" },
+    correlation: { session_id: "session-1" },
+    payload: {
+      method: "POST",
+      path: "/api/signed-url/refresh",
+      query: {},
+      headers: {},
+      response_status: 404,
+      duration_ms: 10
+    }
+  });
+  const getObject = vi.fn().mockResolvedValue(
+    gzipSync(Buffer.from(JSON.stringify(recovery), "utf8"))
+  );
+  const deps = dependencies({ getObject });
+  deps.incidentStore.listRequestEventCandidatesForServiceWindow = vi.fn().mockResolvedValue([
+    {
+      event_id: recovery.event_id,
+      event_type: "request_event",
+      occurred_at: recovery.occurred_at
+    }
+  ]);
+
+  await expect(
+    collectCorrelatedRecoveryEnvelopes({
+      dependencies: deps,
+      incident,
+      incidentEnvelopes: resourceIncidentEnvelopes
+    })
+  ).resolves.toEqual([recovery]);
+
+  const wrongService = { ...recovery, service: { ...recovery.service, name: "api" } };
+  getObject.mockResolvedValueOnce(gzipSync(Buffer.from(JSON.stringify(wrongService), "utf8")));
+  await expect(
+    collectCorrelatedRecoveryEnvelopes({
+      dependencies: deps,
+      incident,
+      incidentEnvelopes: resourceIncidentEnvelopes
+    })
+  ).resolves.toEqual([]);
 });

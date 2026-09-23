@@ -227,6 +227,12 @@ function formatMatcherFromValue(matcher: CaptureRuleCreate["matcher"]): string {
   if (matcher.browser_event_opaque !== undefined) {
     parts.push(`browser_event_opaque=${String(matcher.browser_event_opaque)}`);
   }
+  for (const key of ["browser_page_visibility_state", "browser_page_ready_state", "browser_target_tag_name"] as const) {
+    if (matcher[key] !== undefined) parts.push(`${key}=${matcher[key]}`);
+  }
+  if (matcher.browser_target_attributes !== undefined) {
+    parts.push(`browser_target_attributes=${JSON.stringify(matcher.browser_target_attributes)}`);
+  }
   if (matcher.client_kind !== undefined) {
     parts.push(`client_kind=${matcher.client_kind}`);
   }

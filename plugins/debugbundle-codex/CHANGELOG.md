@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.0] - 2026-09-23
+
+- Make CLI the primary supported interface and assess MCP as a fallback or explicit user choice.
+- Share scoped auth, existing authorization, write verification, and unavailable-path guidance across agent distributions.
+- Pin MCP 1.11.0 for lifecycle-aware capture matchers and correlated recovery evidence, preserving existing plugin settings.
+
 ## [1.0.1] - 2026-09-21
 
 ### Changed

@@ -143,6 +143,8 @@ export interface AlertEmailDigestItemRecord extends Record<string, unknown> {
 }
 
 export interface CreateAlertDeliveryIntentInput {
+  coalescing_key?: string;
+  coalescing_window_seconds?: number;
   alert_id: string;
   project_id: string;
   incident_id: string;

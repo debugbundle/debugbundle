@@ -1,6 +1,8 @@
+import { manageAgentSetup, projectRoot, readManaged, type Report } from "../../../packages/agent-setup/src/index.js";
+import { agentChecks, appendAgentReport, localScaffoldFailure, buildManagedAgentsSection, legacyHashes, canonicalFiles } from "./agent-setup.js";
 import { nodeFetch } from "../../../packages/node-http/src/index.js";
-import { readdir as readdirFromFs, readFile as readFileFromFs, stat as statFromFs } from "node:fs/promises";
-import { join } from "node:path";
+import { readdir as readdirFromFs, stat as statFromFs } from "node:fs/promises";
+import { join, relative } from "node:path";
 
 import { z } from "zod";
 
@@ -678,7 +680,7 @@ async function buildRelaySpoolCheck(
   };
 }
 
-export async function doctorCommand(
+async function runDoctorCommand(
   input: { json?: boolean; authFilePath?: string; checkRelay?: boolean; privacy?: boolean },
   dependencies: DoctorCommandDependencies = {}
 ): Promise<CliCommandResult> {
@@ -687,9 +689,13 @@ export async function doctorCommand(
   const fetchImpl = dependencies.fetchImpl ?? nodeFetch;
   const readAuthStateImpl = dependencies.readAuthState ?? readCliAuthState;
   const readdir = dependencies.readdir ?? readdirFromFs;
-  const readFile = dependencies.readFile ?? ((filePath: string) => readFileFromFs(filePath, "utf8"));
+  const readFile = dependencies.readFile ?? (async (filePath: string) => {
+    const content = await readManaged(rootDirectory, relative(rootDirectory, filePath));
+    if (content === undefined) throw Object.assign(new Error("Missing local scaffold file."), { code: "ENOENT" });
+    return content;
+  });
   const stat = dependencies.stat ?? statFromFs;
-  const rootDirectory = cwd();
+  const rootDirectory = await projectRoot(cwd());
   const currentTime = now();
 
   const { check: profileCheck, profile, validationErrors } = await loadProfile(rootDirectory, { readFile, stat });
@@ -712,12 +718,23 @@ export async function doctorCommand(
     buildProfileFreshnessCheck(profile, currentTime),
     ...(input.checkRelay === true ? [await buildRelaySpoolCheck(rootDirectory, currentTime, { readdir, stat })] : [])
   ] satisfies DoctorCheck[];
+  let agentReport: Report | undefined;
+  try {
+    agentReport = await manageAgentSetup({ root: rootDirectory, files: canonicalFiles(), legacyHashes, instruction: buildManagedAgentsSection() });
+    if (agentReport.selection_declared) checks.push(...agentChecks(agentReport));
+  } catch {
+    checks.push({ name: "agent-setup", status: "error", message: "Cannot safely read agent setup metadata; review .debugbundle/agent-setup.json and directory links." });
+  }
   const privacyPreview = input.privacy === true ? buildPrivacyPreview() : undefined;
 
+  const output = input.json ? buildDoctorJsonOutput(checks, privacyPreview) : formatDoctorOutput(resolveOverallStatus(checks), checks, privacyPreview);
   return {
     exitCode: resolveOverallStatus(checks) === "error" ? 1 : 0,
-    output: input.json
-      ? buildDoctorJsonOutput(checks, privacyPreview)
-      : formatDoctorOutput(resolveOverallStatus(checks), checks, privacyPreview)
+    output: agentReport ? appendAgentReport(output, agentReport, input.json === true) : output
   };
+}
+
+export async function doctorCommand(input: { json?: boolean; authFilePath?: string; checkRelay?: boolean; privacy?: boolean }, dependencies: DoctorCommandDependencies = {}): Promise<CliCommandResult> {
+  try { return await runDoctorCommand(input, dependencies); }
+  catch (error) { return localScaffoldFailure(error, input.json); }
 }

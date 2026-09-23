@@ -121,6 +121,8 @@ jobs:
           set -euo pipefail
 
           tmpdir="$(mktemp -d)"
+          previous_dir="$(mktemp -d)"
+          trap 'rm -rf "$tmpdir" "$previous_dir"' EXIT
           cat > "$tmpdir/package.json" <<'EOF'
           {
             "name": "debugbundle-cli-release-smoke",
@@ -133,9 +135,15 @@ jobs:
 
           "$tmpdir/node_modules/.bin/debugbundle" --version >/dev/null
           "$tmpdir/node_modules/.bin/debugbundle" --help >/dev/null
+          npm install --prefix "$previous_dir" --no-audit --no-fund --ignore-scripts @debugbundle/cli@1.10.0
+          node scripts/check-cli-setup-upgrade.mjs "$previous_dir/node_modules/@debugbundle/cli/bin/debugbundle.js" "$tmpdir/node_modules/@debugbundle/cli/bin/debugbundle.js"
           node scripts/check-cli-runtime.mjs "$tmpdir/node_modules/@debugbundle/cli/bin/debugbundle.js"
         env:
           RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
+
+      - name: Verify native Muse Code discovery offline
+        if: matrix.node-version == 24
+        run: make muse-setup-check NODE_RUN='docker run --rm -e CI=1 -v "$(PWD):/workspace" -w /workspace node:24-alpine sh -lc'
 
   release:
     permissions:
