@@ -101,6 +101,8 @@ After the GitHub-managed npm publish for `@debugbundle/mcp` succeeds, maintainer
 8. Verifying ClawHub discovery against the bounded capability-first query/rank checks in `apps/mcp/ecosystem-release-manifest.json`, with limited retries for index propagation. Exact-slug lookup alone is not sufficient.
 9. Emitting the follow-up discovery checklist for pull-based directories such as Glama and LobeHub, which should be treated as verification surfaces unless they later document a first-party publish API.
 
+Verification must reject an older official Registry version. Smithery's public directory does not expose a reliable release version, so an existing indexed MCP or skill listing counts as an update only when the current release report also records an accepted publish for that target.
+
 Because these registry-authenticated workflows depend on local browser login state, host-installed publisher tools, and marketplace-specific credentials, they intentionally run through the host-side `make release-mcp-ecosystem-*` targets instead of the Docker-backed CI lanes. The source-of-truth config for this follow-through lives in `apps/mcp/ecosystem-release-manifest.json`.
 
 #### Official MCP Registry maintainer renewal

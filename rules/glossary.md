@@ -6,6 +6,13 @@ authoritative when a term's behavior is specified in more detail.
 
 ## Agent Connection Terms
 
+### Agent-Aware Setup
+
+The CLI setup flow that records a repository's selected agents, manages only its owned native
+instruction and skill-discovery artifacts, and preserves user-authored content. The generated
+`.agents/skills/debugbundle/` skill is canonical; agent-specific links or bounded copies point
+back to that source rather than becoming independently maintained skills.
+
 ### Codex Developer Plugin
 
 The repository-distributed `debugbundle-codex` package combines the local stdio MCP server and a workflow skill for Codex. It supports existing local evidence and authorized member operations. It is separate from the hosted read-only OpenAI plugin and its directory approval.
@@ -43,6 +50,25 @@ an artifact.
 ### Browser Resource Incident
 
 A browser resource-load failure grouped by concrete resource host, path and element type within the existing project, service and environment boundaries. Affected page routes remain evidence rather than grouping keys. Other exception fingerprints remain unchanged.
+
+### Browser Resource Burst
+
+A privacy-safe, ten-second capture-time grouping for eligible resource notifications from one
+project, service, environment, browser session, page and resource host with the same interruption
+class. It coalesces delivery without merging the separate per-resource incidents or changing their
+fingerprints.
+
+### Alert Email Digest
+
+A bounded project-and-recipient email delivery that retains distinct eligible incident items
+during a configured one-to-300-second window (ten seconds by default). The first queued item sets
+the deadline; later items do not extend it.
+
+### Correlated Recovery Failure
+
+A retained failed refresh, retry, renewal or signed-URL request within 30 seconds of a sampled
+browser resource failure, linked by the same session or trace. It can make bundle guidance more
+actionable but does not prove the cause of the original resource failure.
 
 ### Optional Tracker Candidate
 
