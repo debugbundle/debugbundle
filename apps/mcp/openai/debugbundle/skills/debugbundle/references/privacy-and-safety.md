@@ -12,7 +12,9 @@ Allowed data categories are:
 - verified identity used only for login and workspace-domain restrictions; and
 - fixed navigation and pagination/control metadata.
 
-Excluded data includes raw logs, raw endpoint URLs with query or userinfo, individual analytics journeys/sample IDs, raw analytics events, analytics opportunities/bundles/generation state, tokens and authentication material, object-store keys and signed URLs, database-only IDs and internal hashes, billing/member/organization inventory, request or form bodies, arbitrary custom dimensions, mutation results, and local filesystem state.
+Excluded MCP output includes raw logs, raw endpoint URLs with query or userinfo, individual analytics journeys/sample IDs, raw analytics events, analytics opportunities/bundles/generation state, tokens and authentication material, object-store keys and signed URLs, database-only IDs and internal hashes, billing/member/organization inventory, request or form bodies, arbitrary custom dimensions, mutation results, and local filesystem state.
+
+These restrictions describe this remote connection. In a host with shell access, the skill may inspect minimal non-secret project connection metadata and use a separately authenticated CLI for an explicitly authorized change, following `cli-handoff.md`. That handoff grants no additional OAuth scope, does not expose local files through MCP, and does not authorize credential extraction, access-denial bypass, raw-log retrieval, or unrelated private data. The host's permissions and the user's scope still apply.
 
 Health-check display URLs retain only the normalized HTTP(S) scheme, hostname, non-default safe port, and path. Userinfo, query strings, and fragments are removed. Results expose a normalized checked host and sanitized final display URL, never redirect chains or response bodies.
 

@@ -49,6 +49,11 @@ export interface LogEventCandidateReference {
   occurred_at: string;
 }
 
+export interface RequestEventCandidateReference {
+  event_id: string;
+  occurred_at: string;
+}
+
 export interface BundleBuildContextStore {
   getDeploymentForServiceAt?(input: {
     project_id: string;
@@ -105,4 +110,12 @@ export interface BundleBuildContextStore {
     window_start: string;
     window_end: string;
   }): Promise<LogEventCandidateReference[]>;
+  listRequestEventCandidatesForServiceWindow(input: {
+    resource_event_ids?: string[];
+    project_id: string;
+    service_name: string;
+    environment: string;
+    window_start: string;
+    window_end: string;
+  }): Promise<RequestEventCandidateReference[]>;
 }

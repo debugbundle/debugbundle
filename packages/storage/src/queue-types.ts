@@ -118,6 +118,8 @@ export interface GroupIncidentJob {
   environment: string;
   fingerprint: string;
   alert_notification_key?: string;
+  alert_coalescing_window_seconds?: number;
+  alert_coalescing_key?: string;
   fingerprint_version?: string;
   normalized_message: string;
   incident_title?: string;
@@ -164,6 +166,8 @@ export interface EvaluateAlertsJob {
   condition_type: AlertConditionType;
   dedupe_key: string;
   notification_key?: string;
+  coalescing_window_seconds?: number;
+  coalescing_key?: string;
   lifecycle_event?: AlertSeverityLifecycleEvent;
   occurred_at: string;
   summary?: string;

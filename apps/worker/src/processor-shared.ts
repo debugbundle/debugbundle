@@ -36,7 +36,7 @@ import type {
   WebhookDeliveryStore,
   NormalizeEventsJob
 } from "../../../packages/storage/src/index.js";
-import { type EventEnvelope } from "../../../packages/shared-types/src/index.js";
+import { describeBrowserResourceInterruption, type EventEnvelope } from "../../../packages/shared-types/src/index.js";
 import { type ImprovementBundleWorkerDependencies } from "./improvement-bundles.js";
 import { type WorkerAccountAnalyticsDependencies } from "./account-analytics.js";
 import { type AnalyticsIncidentCorrelationRecorder } from "./analytics-incident-correlation.js";
@@ -92,6 +92,7 @@ export interface ProcessedEventStore {
 }
 
 export interface NormalizeWorkerDependencies {
+  recordBrowserRecoveryContext?: (projectId: string, event: EventEnvelope) => Promise<void>;
   deferImprovement?: (
     input: Omit<
       Parameters<typeof import("./improvement-bundles.js").maybeGenerateHostedImprovementBundle>[0],
@@ -184,6 +185,7 @@ export interface BuildBundleWorkerDependencies {
         | "getDeploymentForServiceAt"
         | "listProbeEventCandidatesForServiceWindow"
         | "listLogEventCandidatesForServiceWindow"
+        | "listRequestEventCandidatesForServiceWindow"
         | "hasBundleGenerationForSourceEvent"
         | "markBundleGenerationFailure"
         | "pruneRetainedBundleOwnersForProject"
@@ -229,7 +231,8 @@ export function stableJson(value: unknown): string {
   return `{${keys.map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`).join(",")}}`;
 }
 
-export function buildAlertNotificationKey(input: {
+export function buildAlertNotificationContext(input: {
+  projectId: string;
   event: EventEnvelope;
   normalized: {
     error_type: string | null;
@@ -240,12 +243,77 @@ export function buildAlertNotificationKey(input: {
     resource_path?: string | null;
   };
   fingerprint: string;
-}): string {
+}): { notification_key: string; coalescing_key?: string; coalescing_window_seconds?: number } {
+  const browserEvent =
+    input.event.event_type === "frontend_exception" ? input.event.payload.browser_event : undefined;
+  const sessionId = input.event.correlation?.session_id?.trim();
+  if (
+    browserEvent?.kind === "resource_error" &&
+    browserEvent.opaque === true &&
+    typeof sessionId === "string" &&
+    sessionId.length > 0
+  ) {
+    const pageUrl = browserEvent.page?.url;
+    let pagePath = input.normalized.route_template ?? null;
+    let pageOrigin: string | null = null;
+    if (typeof pageUrl === "string") {
+      try {
+        const parsed = new URL(pageUrl);
+        pagePath = parsed.pathname || "/";
+        pageOrigin = parsed.origin;
+      } catch {
+        pagePath = pageUrl.split(/[?#]/, 1)[0] || pagePath;
+      }
+    }
+    if (typeof pagePath !== "string" || pagePath.length === 0) {
+      return buildPathSpecificAlertNotificationContext(input);
+    }
+    return {
+      notification_key: buildPathSpecificAlertNotificationContext(input).notification_key,
+      coalescing_key: createHash("sha256")
+        .update(
+          stableJson({
+            kind: "browser_resource_page_burst",
+            project_id: input.projectId,
+            service_name: input.event.service.name,
+            environment: input.event.service.environment,
+            session_id: sessionId,
+            page_path: pagePath,
+            page_origin: pageOrigin,
+            resource_host: input.normalized.resource_host ?? null,
+            hidden_preload: describeBrowserResourceInterruption(browserEvent) !== null,
+            // Capture-time buckets keep delayed worker batches from merging later visits.
+            burst_window: Math.floor(Date.parse(input.event.occurred_at) / 10_000),
+            browser_event_kind: browserEvent.kind
+          })
+        )
+        .digest("hex"),
+      coalescing_window_seconds: 10
+    };
+  }
+
   if (
     input.event.event_type === "frontend_exception" &&
     input.event.payload.browser_event?.opaque === true
   ) {
-    return createHash("sha256")
+    return buildPathSpecificAlertNotificationContext(input);
+  }
+
+  return { notification_key: input.fingerprint };
+}
+
+function buildPathSpecificAlertNotificationContext(input: {
+  event: EventEnvelope;
+  normalized: {
+    error_type: string | null;
+    normalized_message: string;
+    browser_event_kind?: string | null;
+    resource_host?: string | null;
+    resource_path?: string | null;
+  };
+}): { notification_key: string } {
+  return {
+    notification_key: createHash("sha256")
       .update(
         stableJson({
           kind: "opaque_browser_alert",
@@ -259,10 +327,8 @@ export function buildAlertNotificationKey(input: {
           resource_path: input.normalized.resource_path ?? null
         })
       )
-      .digest("hex");
-  }
-
-  return input.fingerprint;
+      .digest("hex")
+  };
 }
 
 export function buildWorkerBundleLinkBaseUrls(

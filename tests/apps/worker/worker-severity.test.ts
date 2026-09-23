@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createEventEnvelope } from "../../../packages/shared-types/src/index.js";
 import { processNextNormalizeEventsJob } from "../../../apps/worker/src/processor.js";
 import { inferSeverity } from "../../../apps/worker/src/severity.js";
+import { browserResourceEvent } from "../../helpers/browser-resource-fixtures.js";
 
 describe("worker severity inference", () => {
   it("keeps backend and non-opaque frontend exceptions high severity", (): void => {
@@ -86,6 +87,34 @@ describe("worker severity inference", () => {
 
     expect(inferSeverity(opaqueWindowError)).toBe("low");
     expect(inferSeverity(opaqueResourceError)).toBe("medium");
+  });
+
+  it("treats hidden incomplete preloads as low-confidence interruption evidence", () => {
+    const hiddenPreload = browserResourceEvent({
+      url: "https://app.example.com/assets/app.js",
+      tag: "link",
+      readyState: "interactive",
+      visibilityState: "hidden",
+      attributes: { rel: "modulepreload", as: "script" }
+    });
+    const visiblePreload = browserResourceEvent({
+      url: "https://app.example.com/assets/app.js",
+      tag: "link",
+      readyState: "interactive",
+      visibilityState: "visible",
+      attributes: { rel: "modulepreload", as: "script" }
+    });
+    const hiddenStylesheet = browserResourceEvent({
+      url: "https://app.example.com/assets/app.css",
+      tag: "link",
+      readyState: "interactive",
+      visibilityState: "hidden",
+      attributes: { rel: "stylesheet" }
+    });
+
+    expect(inferSeverity(hiddenPreload)).toBe("low");
+    expect(inferSeverity(visiblePreload)).toBe("medium");
+    expect(inferSeverity(hiddenStylesheet)).toBe("medium");
   });
 
   it("enqueues opaque window errors below high severity during normalization", async (): Promise<void> => {

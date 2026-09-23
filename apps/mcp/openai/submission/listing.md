@@ -1,6 +1,6 @@
 # DebugBundle OpenAI Plugin Listing
 
-Version: 1.0.0
+Version: 1.0.1
 Evidence state: production candidate with Developer Mode connection and bounded live-client evidence; not submitted, approved, published, or directory-discoverable
 
 ## Portal fields
@@ -19,7 +19,7 @@ Evidence state: production candidate with Developer Mode connection and bounded 
 
 ## Long description
 
-DebugBundle helps developers investigate production runtime failures and aggregate product usage from ChatGPT and Codex. Connect a DebugBundle project, list active incidents, inspect structured context, retrieve redacted deterministic bundles and reproductions, review stored runtime improvements, analyze bounded aggregate usage/routes/devices/acquisition/actions/funnels/journey patterns/incident impact, and examine endpoint health. Version 1 is read-only: it does not expose individual journeys or custom dimensions and does not modify projects, resolve incidents, revoke access, generate artifacts, reconfigure checks, or send external messages.
+DebugBundle helps developers investigate production runtime failures and aggregate product usage from ChatGPT and Codex. Connect a DebugBundle project, list active incidents, inspect structured context, retrieve redacted deterministic bundles and reproductions, review stored runtime improvements, analyze bounded aggregate usage/routes/devices/acquisition/actions/funnels/journey patterns/incident impact, and examine endpoint health. The MCP connection is read-only: it does not expose individual journeys or custom dimensions and does not modify projects, resolve incidents, revoke access, generate artifacts, reconfigure checks, or send external messages. In an environment with shell access and an independently installed, authenticated DebugBundle CLI, the skill checks that separate capability for explicitly authorized changes and verifies the result. The plugin does not install the CLI or grant additional permissions.
 
 ## Positioning boundaries
 

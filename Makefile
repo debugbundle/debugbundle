@@ -64,6 +64,7 @@ help:
 	@echo "  make selfhost-smoke  Prove self-host auth, debug ingestion, browser analytics, rollups, and bundles"
 	@echo "  make cli-runtime-check  Verify clean installed CLI packages across Node 22/24/26, including 26.0.0"
 	@echo "  make build           Run build via Docker"
+	@echo "  make candidate-build Build shared schemas, CLI, MCP and web artifacts without publishing"
 	@echo "  make ci              Run lint + typecheck + test + build via Docker"
 	@echo "  make release-mcp-ecosystem-plan VERSION=x.y.z"
 	@echo "  make release-mcp-ecosystem-prepare VERSION=x.y.z"
@@ -192,8 +193,15 @@ worker-jobs:
 	$(DOCKER_COMPOSE) exec -T -e WORKER_JOB_PROJECT_ID -e WORKER_JOB_ID -e WORKER_JOB_RETRY worker sh -lc "node --import tsx scripts/worker-jobs.ts"
 
 .PHONY: codex-plugin-check
+.PHONY: agent-guidance-sync agent-guidance-check
+agent-guidance-sync:
+	$(NODE_RUN) "node --import tsx scripts/sync-agent-interface-guidance.ts --write"
+
+agent-guidance-check:
+	$(NODE_RUN) "node --import tsx scripts/sync-agent-interface-guidance.ts && corepack enable && corepack pnpm vitest run tests/contracts/agent-interface-routing.test.ts"
+
 codex-plugin-check:
-	$(NODE_RUN) "corepack enable && corepack pnpm vitest run tests/contracts/codex-developer-plugin.test.ts tests/apps/mcp tests/contracts/openai-plugin-skill-parity.test.ts tests/apps/openclaw-plugin"
+	$(NODE_RUN) "corepack enable && corepack pnpm vitest run tests/contracts/codex-developer-plugin.test.ts tests/apps/mcp tests/contracts/openai-plugin-skill-parity.test.ts tests/contracts/openai-plugin-cli-handoff.test.ts tests/contracts/agent-interface-routing.test.ts tests/apps/openclaw-plugin"
 
 .PHONY: openclaw-plugin-check
 openclaw-plugin-check:
@@ -256,19 +264,38 @@ browser-evidence-check:
 test-focused:
 	$(NODE_RUN) "apk add --no-cache git >/dev/null && corepack enable && corepack pnpm vitest run $(TEST_FILES)"
 
+.PHONY: coverage-focused
+coverage-focused:
+	$(NODE_RUN) "apk add --no-cache git >/dev/null && corepack enable && VITEST_COVERAGE_SHARD=1 corepack pnpm vitest run --coverage $(TEST_FILES) && node scripts/check-changed-file-coverage.mjs"
+
 .PHONY: format-focused
 format-focused:
 	$(NODE_RUN) "corepack enable && corepack pnpm exec prettier --write $(FORMAT_FILES)"
 
+.PHONY: lint-focused
+lint-focused:
+	$(NODE_RUN) "corepack enable && corepack pnpm exec eslint $(LINT_FILES)"
+
 CLI_RUNTIME_IMAGES ?= node:22-alpine node:24-alpine node:26.0.0-alpine node:26.2.0-alpine node:26-alpine
+.PHONY: muse-setup-check
+muse-setup-check: cli-runtime-pack
+	docker run --rm -v "$(PWD)/scripts:/scripts:ro" -v "$(PWD)/.tmp/muse-runtime:/artifacts" node:24-bookworm node /scripts/check-muse-setup.mjs --download /artifacts/muse
+	docker run --rm -v "$(PWD):/source:ro" -v "$(PWD)/.tmp/muse-consumer:/consumer" -w /tmp node:24-bookworm sh -lc 'cli_version=$$(node -p "require(\"/source/apps/cli/package.json\").version") && npm install --prefix /consumer --no-audit --no-fund --ignore-scripts "/source/.tmp/cli-runtime-package/debugbundle-cli-$$cli_version.tgz" >/dev/null'
+	docker run --rm --network none -v "$(PWD):/source:ro" -w /tmp node:24-bookworm node /source/scripts/check-muse-setup.mjs /source/.tmp/muse-consumer/node_modules/@debugbundle/cli/bin/debugbundle.js /source/.tmp/muse-runtime/muse
+
 .PHONY: cli-runtime-pack cli-runtime-check
 cli-runtime-pack:
 	$(NODE_RUN) 'corepack enable && mkdir -p .tmp/cli-runtime-package && npm pack ./apps/cli --pack-destination .tmp/cli-runtime-package'
 
-cli-runtime-check: cli-runtime-pack
+cli-runtime-check: cli-runtime-pack cli-setup-upgrade-check
 	@set -e; for runtime_image in $(CLI_RUNTIME_IMAGES); do \
 		docker run --rm -v "$(PWD):/source:ro" -w /tmp "$$runtime_image" sh -lc 'apk add --no-cache openssl >/dev/null && cli_version=$$(node -p "require(\"/source/apps/cli/package.json\").version") && npm install --prefix /tmp/cli-consumer --no-audit --no-fund --ignore-scripts "/source/.tmp/cli-runtime-package/debugbundle-cli-$$cli_version.tgz" >/dev/null && node /source/scripts/check-cli-runtime.mjs /tmp/cli-consumer/node_modules/@debugbundle/cli/bin/debugbundle.js'; \
 	done
+
+# Compare against the actual published predecessor, not regenerated test fixtures.
+.PHONY: cli-setup-upgrade-check
+cli-setup-upgrade-check: cli-runtime-pack
+	docker run --rm -v "$(PWD):/source:ro" -w /tmp node:24-alpine sh -lc 'cli_version=$$(node -p "require(\"/source/apps/cli/package.json\").version") && npm install --prefix /tmp/cli-previous --no-audit --no-fund --ignore-scripts @debugbundle/cli@1.10.0 >/dev/null && npm install --prefix /tmp/cli-candidate --no-audit --no-fund --ignore-scripts "/source/.tmp/cli-runtime-package/debugbundle-cli-$$cli_version.tgz" >/dev/null && node /source/scripts/check-cli-setup-upgrade.mjs /tmp/cli-previous/node_modules/@debugbundle/cli/bin/debugbundle.js /tmp/cli-candidate/node_modules/@debugbundle/cli/bin/debugbundle.js'
 
 .PHONY: test-unit
 test-unit:
@@ -286,6 +313,10 @@ test-all:
 test-all-quick:
 	$(NODE_RUN) "apk add --no-cache git >/dev/null && corepack enable && corepack pnpm vitest run"
 	$(MAKE) test-integration
+
+.PHONY: candidate-build
+candidate-build:
+	$(NODE_RUN) "corepack enable && corepack pnpm --dir packages/shared-types build && corepack pnpm --dir apps/cli build && corepack pnpm --dir apps/mcp build && corepack pnpm --dir apps/web build"
 
 .PHONY: build
 build:
@@ -331,7 +362,7 @@ openai-plugin-validate:
 
 .PHONY: openai-plugin-check
 openai-plugin-check:
-	$(NODE_RUN) "apk add --no-cache git >/dev/null && corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm vitest run tests/apps/mcp/mcp-openai-plugin.test.ts tests/contracts/openai-plugin-skill-parity.test.ts tests/infrastructure/openai-plugin-release.test.ts"
+	$(NODE_RUN) "apk add --no-cache git >/dev/null && corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm vitest run tests/apps/mcp/mcp-openai-plugin.test.ts tests/contracts/openai-plugin-skill-parity.test.ts tests/contracts/openai-plugin-cli-handoff.test.ts tests/contracts/agent-interface-routing.test.ts tests/infrastructure/openai-plugin-release.test.ts"
 
 .PHONY: openai-plugin-inspector-check
 openai-plugin-inspector-check:
@@ -356,6 +387,7 @@ INTEGRATION_TEST_FILES ?= tests/integration/browser-resource-retention.integrati
 
 .PHONY: test-integration
 INTEGRATION_TEST_FILES += tests/integration/agent-token.integration.test.ts
+INTEGRATION_TEST_FILES += tests/integration/browser-resource-recovery.integration.test.ts
 test-integration:
 	@set -e; \
 	trap 'POSTGRES_PORT=$(INTEGRATION_POSTGRES_PORT) REDIS_PORT=$(INTEGRATION_REDIS_PORT) LOCALSTACK_PORT=$(INTEGRATION_LOCALSTACK_PORT) API_PORT=$(INTEGRATION_API_PORT) WEB_PORT=$(INTEGRATION_WEB_PORT) APP_BASE_URL=$(INTEGRATION_APP_BASE_URL) VITE_API_URL=$(INTEGRATION_WEB_API_URL) CONTAINER_PREFIX=$(INTEGRATION_CONTAINER_PREFIX) DEBUGBUNDLE_PROBE_TRIGGER_SECRET=$(INTEGRATION_PROBE_TRIGGER_SECRET) ANALYTICS_HASH_SECRET=$(INTEGRATION_ANALYTICS_HASH_SECRET) $(INTEGRATION_COMPOSE) down -v' EXIT; \

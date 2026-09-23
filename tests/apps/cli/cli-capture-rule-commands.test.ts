@@ -24,6 +24,10 @@ const rule = {
   matcher: {
     event_types: ["frontend_exception"] as const,
     browser_event_kind: "resource_error" as const,
+    browser_page_visibility_state: "hidden" as const,
+    browser_page_ready_state: "interactive" as const,
+    browser_target_tag_name: "link",
+    browser_target_attributes: { rel: "modulepreload" },
     resource_url: { host: "analytics.example.com" }
   },
   sample_rate: null,
@@ -57,6 +61,8 @@ describe("cli capture-rule commands", () => {
     expect(result.output).toContain("enabled");
     expect(result.output).toContain(rule.name);
     expect(result.output).toContain("browser_event_kind=resource_error");
+    expect(result.output).toContain("browser_page_visibility_state=hidden");
+    expect(result.output).toContain('browser_target_attributes={"rel":"modulepreload"}');
   });
 
   it("renders create/update/delete results", async () => {

@@ -99,7 +99,7 @@ describe("mcp Claude Code plugin marketplace package", () => {
     ]);
   });
 
-  it("pins the bundled Claude Code plugin to its advertised published MCP release", () => {
+  it("pins the matching published MCP release while retaining existing settings", () => {
     const pluginManifest = JSON.parse(readFileSync(pluginManifestPath, "utf8")) as {
       name?: string;
       displayName?: string;
@@ -117,7 +117,7 @@ describe("mcp Claude Code plugin marketplace package", () => {
         { type?: string; command?: string; args?: string[]; env?: Record<string, string> }
       >;
     };
-    expect(pluginManifest.version).toMatch(/^\d+\.\d+\.\d+$/u);
+    expect(pluginManifest.version).toBe("1.11.0");
 
     expect(pluginManifest).toMatchObject({
       name: "debugbundle",
@@ -140,7 +140,7 @@ describe("mcp Claude Code plugin marketplace package", () => {
     expect(pluginMcp.mcpServers?.["debugbundle"]).toEqual({
       type: "stdio",
       command: "npx",
-      args: ["-y", `@debugbundle/mcp@${pluginManifest.version}`, "--local-auth"],
+      args: ["-y", "@debugbundle/mcp@1.11.0", "--local-auth"],
       env: {
         DEBUGBUNDLE_MEMBER_TOKEN: "${user_config.member_token}",
         DEBUGBUNDLE_API_URL: "${user_config.api_url}"
@@ -165,7 +165,8 @@ describe("mcp Claude Code plugin marketplace package", () => {
     expect(readme).not.toContain("dbundle_proj_");
 
     expect(skill).toContain("name: debugbundle");
-    expect(skill).toContain("description: Use DebugBundle MCP tools in Claude Code");
+    expect(skill).toContain("description: Use DebugBundle primarily through CLI");
+    expect(skill).toContain("with available MCP tools as needed, in Claude Code");
     expect(skill).toContain("deterministic debug bundles");
     expect(skill).toContain("verification evidence");
     expect(skill).toContain("list_incidents");

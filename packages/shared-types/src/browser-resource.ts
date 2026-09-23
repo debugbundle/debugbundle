@@ -16,6 +16,13 @@ export interface BrowserResource {
   optional_candidate: boolean;
 }
 
+export interface BrowserResourceInterruptionEvidence {
+  visibility_state: "hidden" | "prerender" | "unloaded";
+  ready_state: "loading" | "interactive";
+  target_tag_name: "link";
+  rel: "preload" | "modulepreload" | "prefetch";
+}
+
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -139,6 +146,33 @@ export function describeBrowserResource(value: unknown): BrowserResource | null 
       event["opaque"] === true &&
       location.first_party !== true &&
       ["analytics", "advertising", "tag_manager"].includes(role)
+  };
+}
+
+/** Strongly scoped evidence of a browser-aborted speculative load; it does not prove the cause. */
+export function describeBrowserResourceInterruption(
+  value: unknown
+): BrowserResourceInterruptionEvidence | null {
+  const event = record(value);
+  if (event?.["kind"] !== "resource_error" || event["opaque"] !== true) return null;
+  const page = record(event["page"]);
+  const target = record(event["target"]);
+  const attributes = record(target?.["attributes"]);
+  const visibility = page?.["visibility_state"];
+  const readyState = page?.["ready_state"];
+  const tag = typeof target?.["tag_name"] === "string" ? target["tag_name"].toLowerCase() : null;
+  const rel = typeof attributes?.["rel"] === "string" ? attributes["rel"].trim().toLowerCase() : null;
+  if (
+    (visibility !== "hidden" && visibility !== "prerender" && visibility !== "unloaded") ||
+    (readyState !== "loading" && readyState !== "interactive") ||
+    tag !== "link" ||
+    (rel !== "preload" && rel !== "modulepreload" && rel !== "prefetch")
+  ) return null;
+  return {
+    visibility_state: visibility,
+    ready_state: readyState,
+    target_tag_name: "link",
+    rel
   };
 }
 

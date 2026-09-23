@@ -72,6 +72,8 @@ export async function enqueueAlertEvaluation(
     condition_type: AlertConditionType;
     dedupe_key: string;
     notification_key?: string;
+    coalescing_window_seconds?: number;
+    coalescing_key?: string;
     lifecycle_event?: "new_incident" | "incident_regressed";
     occurred_at: string;
     summary?: string;
@@ -107,6 +109,10 @@ export async function processNextGroupIncidentJob(
   }
 
   const incidentTitle = deriveIncidentTitle(job);
+  const alertCoalescing =
+    job.alert_coalescing_window_seconds === undefined
+      ? {}
+      : { coalescing_window_seconds: job.alert_coalescing_window_seconds, ...(job.alert_coalescing_key === undefined ? {} : { coalescing_key: job.alert_coalescing_key }) };
 
   const incident = await dependencies.incidentStore.upsertIncident({
     event_id: job.event_id,
@@ -323,6 +329,7 @@ export async function processNextGroupIncidentJob(
         condition_type: "new_incident",
         dedupe_key: "new_incident",
         notification_key: job.alert_notification_key ?? job.fingerprint,
+        ...alertCoalescing,
         occurred_at: job.occurred_at,
         summary: incidentTitle,
         service_name: job.service_name,
@@ -341,6 +348,7 @@ export async function processNextGroupIncidentJob(
         transitionId: job.event_id
       }),
       notification_key: job.alert_notification_key ?? job.fingerprint,
+      ...alertCoalescing,
       lifecycle_event: severityLifecycleEvent,
       occurred_at: job.occurred_at,
       summary: incidentTitle,
@@ -359,6 +367,7 @@ export async function processNextGroupIncidentJob(
           transitionId: job.event_id
         }),
         notification_key: job.alert_notification_key ?? job.fingerprint,
+        ...alertCoalescing,
         occurred_at: job.occurred_at,
         summary: incidentTitle,
         service_name: job.service_name,
@@ -377,6 +386,7 @@ export async function processNextGroupIncidentJob(
             transitionId: job.event_id
           }),
           notification_key: job.alert_notification_key ?? job.fingerprint,
+          ...alertCoalescing,
           occurred_at: job.occurred_at,
           summary: incidentTitle,
           service_name: job.service_name,
@@ -438,6 +448,7 @@ export async function processNextGroupIncidentJob(
           condition_type: "error_spike",
           dedupe_key: "error_spike",
           notification_key: job.alert_notification_key ?? job.fingerprint,
+          ...alertCoalescing,
           occurred_at: job.occurred_at,
           summary: incidentTitle,
           service_name: job.service_name,

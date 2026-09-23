@@ -1,4 +1,6 @@
-import { mkdir as mkdirFromFs, readdir as readdirFromFs, readFile as readFileFromFs, rm as rmFromFs, stat as statFromFs, writeFile as writeFileFromFs } from "node:fs/promises";
+import { manageAgentSetup, projectRoot, readManaged, safePath, writeManaged, ensureGitignore } from "../../../packages/agent-setup/src/index.js";
+import { agentChecks, appendAgentReport, localScaffoldFailure, buildManagedAgentsSection, legacyHashes, canonicalFiles, chooseAgents } from "./agent-setup.js";
+import { mkdir as mkdirFromFs, readdir as readdirFromFs, readFile as readFileFromFs, stat as statFromFs, writeFile as writeFileFromFs } from "node:fs/promises";
 import { join } from "node:path";
 
 import {
@@ -15,31 +17,16 @@ import {
 import { selectSetupTargets } from "./setup-target-selection.js";
 
 import {
-  BUNDLE_SCHEMA_REFERENCE_FILE_PATH,
-  CLI_REFERENCE_FILE_PATH,
   CONNECTION_FILE_PATH,
   ENSURED_DIRECTORY_PATHS,
   EVALS_FILE_PATH,
   GENERATED_FILE_PATHS,
   GITIGNORE_FILE_PATH,
-  IMPROVEMENT_ANALYSIS_RECIPE_FILE_PATH,
-  OBSOLETE_GENERATED_SCAFFOLD_PATHS,
-  MCP_REFERENCE_FILE_PATH,
-  PERFORMANCE_ANALYSIS_RECIPE_FILE_PATH,
-  PROFILE_ENRICHMENT_REFERENCE_FILE_PATH,
   PROFILE_FILE_PATH,
   SKILL_DIRECTORY_PATH,
   SKILL_FILE_PATH,
-  buildBundleSchemaReference,
-  buildCliReference,
   buildConnectionConfig,
-  buildImprovementAnalysisRecipe,
-  buildManagedGitignoreSection,
-  buildMcpReference,
-  buildPerformanceAnalysisRecipe,
-  buildProfileEnrichmentReference,
-  buildSkill,
-  buildSkillEvals
+  buildManagedGitignoreSection
 } from "./local-scaffold.js";
 import type { CliCommandResult } from "./token-commands.js";
 
@@ -47,7 +34,6 @@ type DirectoryReader = (path: string) => Promise<string[]>;
 type FileReader = (path: string) => Promise<string>;
 type FileWriter = (path: string, content: string) => Promise<void>;
 type DirectoryMaker = (path: string, options: { recursive: true }) => Promise<void>;
-type Remover = (path: string, options: { force: true; recursive: true }) => Promise<void>;
 type StatReader = (path: string) => Promise<{ isDirectory(): boolean }>;
 
 type SetupCommandDependencies = {
@@ -58,14 +44,11 @@ type SetupCommandDependencies = {
   promptUser?: (prompt: string) => Promise<string>;
   readFile?: FileReader;
   readdir?: DirectoryReader;
-  remove?: Remover;
   selectTargetNames?: (services: DetectedService[]) => Promise<string[]>;
   stat?: StatReader;
   writeFile?: FileWriter;
 };
 
-const MANAGED_AGENTS_START = "<!-- debugbundle:start -->";
-const MANAGED_AGENTS_END = "<!-- debugbundle:end -->";
 const STATIC_ANALYSIS_WARNING = "Profile generated from static analysis; validate it before relying on framework or ownership details.";
 
 function formatSetupOutput(updatedAgents: boolean, selectedTargets: string[], relayGuidance: RelayGuidance[]): string {
@@ -137,18 +120,6 @@ function buildSetupJsonOutput(
     ],
     auto_fix_available: false
   });
-}
-
-function buildManagedAgentsSection(): string {
-  return [
-    MANAGED_AGENTS_START,
-    "## DebugBundle",
-    "- Use DebugBundle for runtime error reporting, crash reporting, incident reporting, incident response, and live app monitoring when the task concerns runtime failures, production/customer-facing incidents, endpoint health, notification/webhook delivery failures, or captured events; it is not a generic infrastructure-monitoring platform.",
-    "- Use DebugBundle product analytics for visits, active users, routes, devices, actions, funnels, journeys, friction, and analytics opportunities; start with aggregate reads and generate an analytics bundle only for a bounded durable analysis.",
-    "- For deterministic local code, UI, layout, copy, calculation, refactor, or test-only issues, inspect source and tests first; do not check DebugBundle incidents unless runtime evidence is needed or the user asks.",
-    "- Read `.agents/skills/debugbundle/SKILL.md` for the full DebugBundle workflow.",
-    MANAGED_AGENTS_END
-  ].join("\n");
 }
 
 function detectPackageManagers(rootDirectory: string, packageJson: PackageJsonLike | null, existingPaths: Set<string>): string[] {
@@ -349,57 +320,6 @@ async function detectInfrastructure(rootDirectory: string, readFile: FileReader)
   };
 }
 
-async function updateAgentsFile(rootDirectory: string, readFile: FileReader, writeFile: FileWriter): Promise<boolean> {
-  const agentsPath = join(rootDirectory, "AGENTS.md");
-  let existingContents: string;
-
-  try {
-    existingContents = await readFile(agentsPath);
-  } catch (error) {
-    if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") {
-      return false;
-    }
-
-    throw error;
-  }
-
-  const managedSection = buildManagedAgentsSection();
-  const nextContents = existingContents.includes(MANAGED_AGENTS_START)
-    ? existingContents.replace(/<!-- debugbundle:start -->[\s\S]*?<!-- debugbundle:end -->/u, managedSection)
-    : `${existingContents.trimEnd()}\n\n${managedSection}\n`;
-
-  await writeFile(agentsPath, nextContents);
-  return true;
-}
-
-async function updateGitignore(rootDirectory: string, readFile: FileReader, writeFile: FileWriter): Promise<void> {
-  const gitignorePath = join(rootDirectory, GITIGNORE_FILE_PATH);
-  const managedSection = buildManagedGitignoreSection().trimEnd();
-
-  let existingContents = "";
-  try {
-    existingContents = await readFile(gitignorePath);
-  } catch (error) {
-    if (!(typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT")) {
-      throw error;
-    }
-  }
-
-  const nextContents = existingContents.includes("# DebugBundle (managed by debugbundle setup)")
-    ? existingContents.replace(/# DebugBundle \(managed by debugbundle setup\)[\s\S]*?(?=\n# |$)/u, managedSection)
-    : existingContents.trimEnd().length > 0
-      ? `${existingContents.trimEnd()}\n\n${managedSection}\n`
-      : `${managedSection}\n`;
-
-  await writeFile(gitignorePath, nextContents);
-}
-
-async function removeObsoleteGeneratedScaffold(rootDirectory: string, remove: Remover): Promise<void> {
-  for (const obsoletePath of OBSOLETE_GENERATED_SCAFFOLD_PATHS) {
-    await remove(join(rootDirectory, obsoletePath), { recursive: true, force: true });
-  }
-}
-
 async function buildProfile(rootDirectory: string, dependencies: Required<Pick<SetupCommandDependencies, "now" | "readFile" | "readdir" | "stat">>): Promise<{
   profile_version: string;
   project: {
@@ -502,26 +422,27 @@ async function buildProfile(rootDirectory: string, dependencies: Required<Pick<S
 }
 
 export async function setupCommand(
-  input: { json?: boolean; nonInteractive?: boolean },
+  input: { json?: boolean; nonInteractive?: boolean; agents?: string[] },
   dependencies: SetupCommandDependencies = {}
 ): Promise<CliCommandResult> {
   const cwd = dependencies.cwd ?? (() => process.cwd());
   const mkdir = dependencies.mkdir ?? (async (path: string, options: { recursive: true }) => { await mkdirFromFs(path, options); });
   const readFile = dependencies.readFile ?? (async (path: string) => readFileFromFs(path, "utf8"));
   const readdir = dependencies.readdir ?? (async (path: string) => readdirFromFs(path));
-  const remove = dependencies.remove ?? (async (path: string, options: { force: true; recursive: true }) => rmFromFs(path, options));
   const stat = dependencies.stat ?? (async (path: string) => statFromFs(path));
   const writeFile = dependencies.writeFile ?? (async (path: string, content: string) => writeFileFromFs(path, content, "utf8"));
   const now = dependencies.now ?? (() => new Date());
-  const rootDirectory = cwd();
   try {
+    const rootDirectory = await projectRoot(cwd());
+    const selectedAgents = await chooseAgents(rootDirectory, input, dependencies);
     const packageJson = await readJsonFile<PackageJsonLike>(join(rootDirectory, "package.json"), readFile);
 
+    for (const filePath of [...GENERATED_FILE_PATHS, GITIGNORE_FILE_PATH]) await safePath(rootDirectory, filePath);
     for (const directoryPath of ENSURED_DIRECTORY_PATHS) {
+      await safePath(rootDirectory, directoryPath);
       await mkdir(join(rootDirectory, directoryPath), { recursive: true });
     }
 
-    await removeObsoleteGeneratedScaffold(rootDirectory, remove);
 
     const profile = await buildProfile(rootDirectory, {
       now,
@@ -537,16 +458,18 @@ export async function setupCommand(
       ? await dependencies.selectTargetNames(profile.services)
       : await selectSetupTargets(profile.services, input, targetSelectionDependencies);
 
-    await writeFile(join(rootDirectory, PROFILE_FILE_PATH), `${JSON.stringify(profile, null, 2)}\n`);
-    await writeFile(join(rootDirectory, CONNECTION_FILE_PATH), buildConnectionConfig());
-    await writeFile(join(rootDirectory, SKILL_FILE_PATH), buildSkill());
-    await writeFile(join(rootDirectory, CLI_REFERENCE_FILE_PATH), buildCliReference());
-    await writeFile(join(rootDirectory, MCP_REFERENCE_FILE_PATH), buildMcpReference());
-    await writeFile(join(rootDirectory, BUNDLE_SCHEMA_REFERENCE_FILE_PATH), buildBundleSchemaReference());
-    await writeFile(join(rootDirectory, PROFILE_ENRICHMENT_REFERENCE_FILE_PATH), buildProfileEnrichmentReference());
-    await writeFile(join(rootDirectory, IMPROVEMENT_ANALYSIS_RECIPE_FILE_PATH), buildImprovementAnalysisRecipe());
-    await writeFile(join(rootDirectory, PERFORMANCE_ANALYSIS_RECIPE_FILE_PATH), buildPerformanceAnalysisRecipe());
-    await writeFile(join(rootDirectory, EVALS_FILE_PATH), buildSkillEvals());
+    const preservedProfile = await readManaged(rootDirectory, PROFILE_FILE_PATH) !== undefined;
+    const preservedConnection = await readManaged(rootDirectory, CONNECTION_FILE_PATH) !== undefined;
+    if (!preservedProfile) {
+      const contents = `${JSON.stringify(profile, null, 2)}\n`;
+      if (dependencies.writeFile) await dependencies.writeFile(join(rootDirectory, PROFILE_FILE_PATH), contents);
+      else await writeManaged(rootDirectory, PROFILE_FILE_PATH, contents, undefined);
+    }
+    if (!preservedConnection) {
+      if (dependencies.writeFile) await dependencies.writeFile(join(rootDirectory, CONNECTION_FILE_PATH), buildConnectionConfig());
+      else await writeManaged(rootDirectory, CONNECTION_FILE_PATH, buildConnectionConfig(), undefined);
+    }
+    const agentReport = await manageAgentSetup({ root: rootDirectory, files: canonicalFiles(), legacyHashes, instruction: buildManagedAgentsSection(), fix: true, legacyInstructions: true, ...(selectedAgents === undefined ? {} : { selected: selectedAgents }) });
 
     const { relayCheck, relayGuidance } = await resolveRelaySetup(rootDirectory, profile.services, selectedTargetNames, packageJson, {
       mkdir,
@@ -555,19 +478,19 @@ export async function setupCommand(
       writeFile
     });
 
-    await updateGitignore(rootDirectory, readFile, writeFile);
-    const updatedAgents = await updateAgentsFile(rootDirectory, readFile, writeFile);
+    await ensureGitignore(rootDirectory, buildManagedGitignoreSection(), true);
+    const updatedAgents = !agentReport.selection_declared && await readManaged(rootDirectory, "AGENTS.md") !== undefined;
 
     const checks: SetupCheck[] = [
       {
         name: "profile",
         status: "ok",
-        message: `Wrote ${PROFILE_FILE_PATH}`
+        message: `${preservedProfile ? "Preserved" : "Wrote"} ${PROFILE_FILE_PATH}`
       },
       {
         name: "connection-config",
         status: "ok",
-        message: `Wrote ${CONNECTION_FILE_PATH}`
+        message: `${preservedConnection ? "Preserved" : "Wrote"} ${CONNECTION_FILE_PATH}`
       },
       {
         name: "agent-skill",
@@ -595,17 +518,18 @@ export async function setupCommand(
         message: `Updated ${GITIGNORE_FILE_PATH}`
       },
       ...(relayCheck === null ? [] : [relayCheck]),
-      updatedAgents
+      ...(!agentReport.selection_declared ? [updatedAgents
         ? {
             name: "agents-integration",
-            status: "ok",
+            status: "ok" as const,
             message: "Updated AGENTS.md"
           }
         : {
             name: "agents-integration",
-            status: "warning",
+            status: "warning" as const,
             message: "AGENTS.md not found; skipped managed DebugBundle section."
-          },
+          }] : []),
+      ...agentChecks(agentReport),
       {
         name: "profile-validation",
         status: "warning",
@@ -613,16 +537,16 @@ export async function setupCommand(
       }
     ];
 
+    let humanOutput = formatSetupOutput(updatedAgents, selectedTargetNames, relayGuidance);
+    if (preservedProfile || preservedConnection) humanOutput = humanOutput.replace("Created files:", "Scaffold files (existing profile and connection preserved):");
+    if (checks.some(check => check.status === "error")) humanOutput = humanOutput.replace("Completed DebugBundle setup.", "DebugBundle setup needs attention.");
     return {
-      exitCode: 0,
-      output: input.json
+      exitCode: checks.some(check => check.status === "error") ? 4 : 0,
+      output: appendAgentReport(input.json
         ? buildSetupJsonOutput(checks, profile.services, selectedTargetNames, relayGuidance)
-        : formatSetupOutput(updatedAgents, selectedTargetNames, relayGuidance)
+        : humanOutput, agentReport, input.json === true)
     };
   } catch (error) {
-    return {
-      exitCode: 1,
-      output: error instanceof Error ? error.message : String(error)
-    };
+    return localScaffoldFailure(error, input.json);
   }
 }

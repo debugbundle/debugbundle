@@ -1,3 +1,4 @@
+import { checkAgentSetup } from "./check-cli-agent-setup.mjs";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createServer } from "node:http";
@@ -147,6 +148,7 @@ try {
     JSON.stringify({ name: "synthetic-runtime-fixture", private: true })
   );
   await run(["setup", "--non-interactive"], 0, false);
+  await checkAgentSetup(root, run);
   await mkdir(join(root, ".debugbundle", "local"), { recursive: true });
   const options = {
     key: await readFile(keyFile),

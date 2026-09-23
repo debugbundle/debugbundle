@@ -1,3 +1,4 @@
+import type { CaptureRuleMatcher as SharedCaptureRuleMatcher } from "../../../../packages/shared-types/src/capture-rule-schemas.js";
 import { buildApiUrl, buildBrowserSessionHeaders, InvalidSessionError } from "./api.js";
 
 export type CaptureRuleAction = "demote" | "sample" | "drop";
@@ -21,7 +22,7 @@ export interface CaptureRuleUrlMatcher {
   path_equals?: string;
 }
 
-export interface CaptureRuleMatcher {
+export interface CaptureRuleMatcher extends Pick<SharedCaptureRuleMatcher, "browser_page_visibility_state" | "browser_page_ready_state" | "browser_target_tag_name" | "browser_target_attributes"> {
   event_types?: CaptureRuleEventType[];
   services?: string[];
   environments?: string[];

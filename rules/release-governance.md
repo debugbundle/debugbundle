@@ -174,6 +174,10 @@ Our own source-deployed surfaces intentionally dogfood the published JS packages
 
 Do not bump those dogfooding manifests ahead of a registry publish. The hosted source deploy workflow installs from those manifests and should always resolve packages that already exist in the target registry.
 
+### Agent Skill Routing Parity
+
+Every changed or new agent plugin, including future Gemini and Muse plugins, must satisfy `contracts/agent-interface-routing.md` and `make agent-guidance-check`. CLI-first defaults must coexist with explicit user interface choices, MCP-only hosts, independent authentication, exact project scope, authorization, and readback. Skill-only plugin patches may increment plugin semver while retaining an exact already-published MCP server pin; update the plugin catalog and changelog without fabricating a server release. Source changes reach installed users only through the existing package/plugin update flow.
+
 ### Official OpenAI Plugin Release Discipline
 
 The official OpenAI plugin is an independent public surface. It starts at strict semver `1.0.0` and does not inherit the root, CLI, npm MCP, OpenClaw, or shared-package version. Local reinstall cachebusters may use semver build metadata, but public packages and portal versions must not.

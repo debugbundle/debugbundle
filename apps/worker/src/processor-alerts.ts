@@ -1,3 +1,4 @@
+import { resolveAlertNoisePolicy } from "../../../packages/shared-types/src/alert-notification-policy.js";
 import type { AlertConditionType } from "../../../packages/storage/src/index.js";
 import {
   queueAllowanceLimitReachedNotification,
@@ -62,6 +63,11 @@ export async function processNextEvaluateAlertsJob(
   }
 
   for (const alert of alerts) {
+    const noisePolicy = resolveAlertNoisePolicy({ channel: alert.channel, config: alert.config,
+      projectId: job.project_id, incidentId: job.incident_id, environment: job.environment,
+      severity: job.severity, notificationKey, cooldownSeconds: alert.cooldown_seconds,
+      ...(job.coalescing_key === undefined ? {} : { coalescingKey: job.coalescing_key }),
+      ...(job.coalescing_window_seconds === undefined ? {} : { coalescingWindowSeconds: job.coalescing_window_seconds }) });
     const payload: Record<string, unknown> = {
       alert_id: alert.alert_id,
       condition_type: job.condition_type,
@@ -94,11 +100,11 @@ export async function processNextEvaluateAlertsJob(
         incident_id: job.incident_id,
         condition_type: job.condition_type,
         dedupe_key: job.dedupe_key,
-        notification_key: notificationKey,
-        cooldown_seconds: alert.cooldown_seconds,
+        notification_key: noisePolicy.notification_key,
+        cooldown_seconds: noisePolicy.cooldown_seconds,
         recipient,
         payload,
-        aggregation_window_seconds: ALERT_EMAIL_DIGEST_WINDOW_SECONDS,
+        aggregation_window_seconds: noisePolicy.aggregation_window_seconds,
         allow_new_digest: remainingAlertDeliveries === null || remainingAlertDeliveries > 0
       });
 
@@ -166,9 +172,10 @@ export async function processNextEvaluateAlertsJob(
       incident_id: job.incident_id,
       condition_type: job.condition_type,
       dedupe_key: job.dedupe_key,
-      notification_key: notificationKey,
-      cooldown_seconds: alert.cooldown_seconds,
+      notification_key: noisePolicy.notification_key,
+      cooldown_seconds: noisePolicy.cooldown_seconds,
       channel: alert.channel,
+      ...(job.coalescing_key === undefined ? {} : { coalescing_key: job.coalescing_key, coalescing_window_seconds: job.coalescing_window_seconds ?? 10 }),
       payload
     });
 

@@ -6,6 +6,18 @@ export function browserResourceEvent(
     route?: string;
     page?: string | null | undefined;
     tag?: string | null;
+    readyState?: "loading" | "interactive" | "complete" | null;
+    visibilityState?: "visible" | "hidden" | "prerender" | "unloaded" | null;
+    attributes?: {
+      rel?: string;
+      as?: string;
+      type?: string;
+      media?: string;
+      cross_origin?: string;
+      async?: boolean;
+      defer?: boolean;
+      integrity_present?: boolean;
+    };
   } = {}
 ) {
   const event = createEventEnvelope({
@@ -28,13 +40,14 @@ export function browserResourceEvent(
           source_url:
             input.url === undefined
               ? "https://www.googletagmanager.com/gtm.js?id=secret#fragment"
-              : input.url
+              : input.url,
+          ...(input.attributes === undefined ? {} : { attributes: input.attributes })
         },
         page: {
           url: input.page === undefined ? "https://app.example.com/login" : input.page,
           referrer: null,
-          ready_state: "complete",
-          visibility_state: "visible"
+          ready_state: input.readyState === undefined ? "complete" : input.readyState,
+          visibility_state: input.visibilityState === undefined ? "visible" : input.visibilityState
         },
         opaque: true
       }

@@ -122,6 +122,8 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
     },
 
     async createAlertDeliveryIntent(input: {
+      coalescing_key?: string;
+      coalescing_window_seconds?: number;
       alert_id: string;
       project_id: string;
       incident_id: string;
@@ -132,6 +134,17 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
       channel: AlertChannel;
       payload: Record<string, unknown>;
     }): Promise<{ delivery_id: string | null; created: boolean }> {
+      if (db.transaction !== undefined) {
+        return db.transaction(async (tx) => {
+          // Acquire before the INSERT statement takes its READ COMMITTED snapshot.
+          // An advisory lock inside that INSERT cannot see a concurrent winner.
+          for (const key of [input.notification_key, input.coalescing_key].filter((key): key is string => key !== undefined).sort()) {
+            await tx.query("SELECT pg_advisory_xact_lock(hashtext(($1::uuid)::text), hashtext($2))", [input.alert_id, key]);
+          }
+          return createPostgresAlertDeliveryStore({ query: (sql, params) => tx.query(sql, params) })
+            .createAlertDeliveryIntent(input);
+        });
+      }
       const result = await db.query<{ delivery_id: string }>(
         `
           INSERT INTO alert_deliveries (
@@ -142,6 +155,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
             condition_type,
             dedupe_key,
             notification_key,
+            coalescing_key,
             channel,
             status,
             payload,
@@ -158,6 +172,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
             $5,
             $6,
             $7,
+            $11,
             $8,
             'pending',
             $9::jsonb,
@@ -168,7 +183,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
           FROM (
             SELECT pg_advisory_xact_lock(hashtext(($2::uuid)::text), hashtext($7))
           ) lock_row
-          WHERE $10 <= 0
+          WHERE ($10 <= 0
             OR NOT EXISTS (
               SELECT 1
               FROM (
@@ -193,6 +208,11 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
               ) recent_notifications
               WHERE recent_notifications.notified_at >= now() - make_interval(secs => $10)
             )
+          ) AND ($11::text IS NULL OR NOT EXISTS (
+            SELECT 1 FROM alert_deliveries
+            WHERE alert_id = $2::uuid AND coalescing_key = $11 AND status IN ('pending', 'delivered')
+              AND COALESCE(delivered_at, created_at) >= now() - make_interval(secs => $12)
+          ))
           ON CONFLICT (alert_id, incident_id, dedupe_key) DO NOTHING
           RETURNING id AS delivery_id
         `,
@@ -206,7 +226,9 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
           input.notification_key,
           input.channel,
           JSON.stringify(input.payload),
-          input.cooldown_seconds
+          input.cooldown_seconds,
+          input.coalescing_key ?? null,
+          input.coalescing_window_seconds ?? 0
         ]
       );
 
@@ -244,6 +266,13 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
       created: boolean;
       created_digest: boolean;
     }> {
+      if (db.transaction !== undefined) {
+        return db.transaction(async (tx) => {
+          await tx.query("SELECT pg_advisory_xact_lock(hashtext(($1::uuid)::text), hashtext($2))", [input.alert_id, input.notification_key]);
+          return createPostgresAlertDeliveryStore({ query: (sql, params) => tx.query(sql, params) })
+            .queueAlertEmailDigestItem(input);
+        });
+      }
       const result = await db.query<{
         digest_id: string | null;
         created: boolean;

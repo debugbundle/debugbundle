@@ -38,6 +38,7 @@ export interface RetentionExpiredIncidentReference {
 }
 
 export interface RetentionStore {
+  pruneExpiredBrowserRecoveryEvents?(input: { now: string; limit: number }): Promise<number>;
   listExpiredSampledRawEvents(input: {
     now: string;
     limit: number;

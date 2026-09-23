@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { browserResourceEvent } from "../../helpers/browser-resource-fixtures.js";
 
 import {
   CaptureRuleActionSchema,
@@ -10,6 +11,7 @@ import {
   applyCaptureRuleEventClass,
   buildCaptureRuleEvaluationContext,
   classifyCaptureRuleClientFromUserAgent,
+  captureRuleRequiresServerEvaluation,
   evaluateCaptureRules,
   getCaptureRuleSpecificityScore,
   isCaptureRuleActive,
@@ -87,6 +89,35 @@ describe("capture rule schemas", () => {
       bot_family: "Googlebot",
       message_equals: "Window error",
     });
+  });
+
+  it("normalizes browser page, target, and link-attribute matchers", () => {
+    const parsed = CaptureRuleMatcherSchema.parse({
+      event_types: ["frontend_exception"],
+      browser_event_kind: "resource_error",
+      browser_page_visibility_state: "hidden",
+      browser_page_ready_state: "interactive",
+      browser_target_tag_name: " LINK ",
+      browser_target_attributes: { rel: " MODULEPRELOAD ", as: " SCRIPT " },
+      resource_url: { host: "APP.EXAMPLE.COM", path_prefix: "/assets/" }
+    });
+
+    expect(parsed).toMatchObject({
+      browser_page_visibility_state: "hidden",
+      browser_page_ready_state: "interactive",
+      browser_target_tag_name: "link",
+      browser_target_attributes: { rel: "modulepreload", as: "script" }
+    });
+  });
+
+  it("rejects empty browser target-attribute matchers", () => {
+    expect(
+      CaptureRuleMatcherSchema.safeParse({
+        browser_event_kind: "resource_error",
+        browser_target_attributes: {},
+        resource_url: { path_prefix: "/assets/" }
+      }).success
+    ).toBe(false);
   });
 
   it("classifies capture rule clients from user agents", () => {
@@ -386,10 +417,16 @@ describe("capture rule matching", () => {
           message: "Failed to load resource",
           browser_event: {
             kind: "resource_error",
-            page: { url: "https://app.example.com/checkout" },
+            page: {
+              url: "https://app.example.com/checkout",
+              ready_state: "interactive",
+              visibility_state: "hidden"
+            },
             file_name: "https://analytics.example.com/tag.js?v=1",
             target: {
+              tag_name: "LINK",
               source_url: "https://analytics.example.com/tag.js?v=1",
+              attributes: { rel: "modulepreload", as: "script", integrity_present: true }
             },
           },
         },
@@ -407,12 +444,71 @@ describe("capture rule matching", () => {
       error_name: "ResourceLoadError",
       message: "Failed to load resource",
       browser_event_kind: "resource_error",
+      browser_page_visibility_state: "hidden",
+      browser_page_ready_state: "interactive",
+      browser_target_tag_name: "link",
+      browser_target_attributes: {
+        rel: "modulepreload",
+        as: "script",
+        integrity_present: true
+      },
       client_kind: "unknown",
       resource_url: {
         host: "analytics.example.com",
         path: "/tag.js",
       },
     });
+  });
+
+  it("matches browser lifecycle fields only when every requested value is present", () => {
+    const interruptionRule: CaptureRule = {
+      ...baseRule,
+      id: "00000000-0000-4000-8000-000000000108",
+      matcher: {
+        event_types: ["frontend_exception"],
+        browser_event_kind: "resource_error",
+        browser_event_opaque: true,
+        browser_page_visibility_state: "hidden",
+        browser_page_ready_state: "interactive",
+        browser_target_tag_name: "link",
+        browser_target_attributes: { rel: "modulepreload", as: "script" },
+        resource_url: { host: "app.example.com", path_prefix: "/assets/" }
+      }
+    };
+    const matchingContext = {
+      project_id: baseRule.project_id,
+      event_id: "00000000-0000-4000-8000-000000000208",
+      event_type: "frontend_exception" as const,
+      runtime: "browser" as const,
+      browser_event_kind: "resource_error" as const,
+      browser_event_opaque: true,
+      browser_page_visibility_state: "hidden" as const,
+      browser_page_ready_state: "interactive" as const,
+      browser_target_tag_name: "link",
+      browser_target_attributes: { rel: "modulepreload", as: "script" },
+      resource_url: { host: "app.example.com", path: "/assets/app-123.js" }
+    };
+
+    expect(
+      evaluateCaptureRules([interruptionRule], matchingContext, "2026-05-26T10:00:00.000Z")
+        ?.rule_id
+    ).toBe(interruptionRule.id);
+    expect(
+      evaluateCaptureRules(
+        [interruptionRule],
+        { ...matchingContext, browser_page_visibility_state: "visible" },
+        "2026-05-26T10:00:00.000Z"
+      )
+    ).toBeNull();
+    expect(
+      evaluateCaptureRules(
+        [interruptionRule],
+        { ...matchingContext, browser_target_attributes: undefined },
+        "2026-05-26T10:00:00.000Z"
+      )
+    ).toBeNull();
+    expect(captureRuleRequiresServerEvaluation(interruptionRule)).toBe(true);
+    expect(captureRuleRequiresServerEvaluation(baseRule)).toBe(false);
   });
 
   it("builds evaluation context for prefixed project identifiers", () => {
@@ -512,4 +608,28 @@ describe("capture rule matching", () => {
       })
     ).toBe("context_signal");
   });
+});
+
+it("rejects blank browser predicates instead of silently broadening a compound rule", () => {
+  for (const predicate of [
+    { browser_target_tag_name: " " },
+    { browser_target_attributes: { rel: " ", as: "script" } }
+  ]) {
+    expect(CaptureRuleMatcherSchema.safeParse({ services: ["web"], ...predicate }).success).toBe(false);
+  }
+});
+
+it("keeps valid existing events ingestible when captured DOM strings exceed matcher limits", () => {
+  const event = browserResourceEvent({
+    url: "https://app.example.com/assets/app.js",
+    tag: "x".repeat(121),
+    attributes: {
+      rel: "r".repeat(121), as: "a".repeat(121), type: "t".repeat(256),
+      media: "m".repeat(501), cross_origin: "c".repeat(121), defer: false
+    }
+  });
+  const context = buildCaptureRuleEvaluationContext({ project_id: baseRule.project_id, event });
+  expect(context.browser_target_tag_name).toBeUndefined();
+  expect(context.browser_target_attributes).toEqual({ defer: false });
+  expect(evaluateCaptureRules([{ ...baseRule, matcher: { browser_target_attributes: { rel: "r".repeat(120) } } }], context, "2026-05-26T10:00:00.000Z")).toBeNull();
 });

@@ -141,4 +141,63 @@ runIntegration("browser resource route retention", () => {
     expect(snapshot?.resource_routes?.recorded_occurrences).toBe(25);
     expect(snapshot?.resource_routes?.unattributed_occurrences).toBe(1);
   });
+
+  it("bounds correlated recovery request candidates by project, service, environment, and time", async () => {
+    const projectId = randomUUID();
+    await seedOwnedProject({
+      pool,
+      organizationId: randomUUID(),
+      projectId,
+      organizationName: "Recovery candidate test",
+      organizationSlug: `recovery-${projectId}`,
+      projectName: "Recovery candidate test",
+      projectSlug: `recovery-${projectId}`
+    });
+    const store = createPostgresMetadataStore(createQueryable(pool));
+    const jobs: GroupIncidentJob[] = [
+      ["before", "production", "2026-09-16T09:59:59.000Z"],
+      ["first", "production", "2026-09-16T10:00:05.000Z"],
+      ["second", "production", "2026-09-16T10:00:20.000Z"],
+      ["wrong-environment", "staging", "2026-09-16T10:00:10.000Z"],
+      ["after", "production", "2026-09-16T10:00:31.000Z"]
+    ].map(([name, environment, occurredAt]) => ({
+      project_id: projectId,
+      event_id: randomUUID(),
+      event_type: "request_event",
+      event_class: "incident_signal",
+      service_name: "web",
+      environment: environment!,
+      fingerprint: `recovery-${name}`,
+      fingerprint_version: "v3",
+      normalized_message: `Recovery request ${name}`,
+      incident_title: `Recovery request ${name}`,
+      occurred_at: occurredAt!,
+      severity: "medium"
+    }));
+    for (const job of jobs) {
+      await processNextGroupIncidentJob({
+        queue: {
+          dequeue: async () => job,
+          enqueue: async () => undefined
+        } as unknown as Parameters<typeof processNextGroupIncidentJob>[0]["queue"],
+        incidentStore: store,
+        frequencyCounter: createNonSpikingFrequencyCounter(),
+        lifecycleWebhookPublisher: createNoopWebhookPublisher(),
+        objectStore: { deleteObject: async () => undefined }
+      });
+    }
+
+    const candidates = await store.listRequestEventCandidatesForServiceWindow({
+      project_id: projectId,
+      service_name: "web",
+      environment: "production",
+      window_start: "2026-09-16T10:00:00.000Z",
+      window_end: "2026-09-16T10:00:30.000Z"
+    });
+
+    expect(candidates).toEqual([
+      { event_id: jobs[1]!.event_id, occurred_at: "2026-09-16 10:00:05+00" },
+      { event_id: jobs[2]!.event_id, occurred_at: "2026-09-16 10:00:20+00" }
+    ]);
+  });
 });

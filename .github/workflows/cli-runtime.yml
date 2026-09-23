@@ -34,8 +34,14 @@ jobs:
           set -euo pipefail
           package_dir="$(mktemp -d)"
           consumer_dir="$(mktemp -d)"
-          trap 'rm -rf "$package_dir" "$consumer_dir"' EXIT
+          previous_dir="$(mktemp -d)"
+          trap 'rm -rf "$package_dir" "$consumer_dir" "$previous_dir"' EXIT
           npm pack ./apps/cli --pack-destination "$package_dir"
           cli_version="$(node -p 'require("./apps/cli/package.json").version')"
           npm install --prefix "$consumer_dir" --no-audit --no-fund --ignore-scripts "$package_dir/debugbundle-cli-$cli_version.tgz"
+          npm install --prefix "$previous_dir" --no-audit --no-fund --ignore-scripts @debugbundle/cli@1.10.0
+          node scripts/check-cli-setup-upgrade.mjs "$previous_dir/node_modules/@debugbundle/cli/bin/debugbundle.js" "$consumer_dir/node_modules/@debugbundle/cli/bin/debugbundle.js"
           node scripts/check-cli-runtime.mjs "$consumer_dir/node_modules/@debugbundle/cli/bin/debugbundle.js"
+      - name: Verify native Muse Code discovery offline
+        if: matrix.node-version == 24
+        run: make muse-setup-check NODE_RUN='docker run --rm -e CI=1 -v "$(PWD):/workspace" -w /workspace node:24-alpine sh -lc'

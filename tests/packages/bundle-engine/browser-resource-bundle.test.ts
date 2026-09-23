@@ -111,4 +111,160 @@ describe("browser resource bundles", () => {
     });
     expect(bundle.summary.likely_cause).not.toContain("Possibly blocked");
   });
+
+  it("prioritizes a correlated failed recovery request after a hidden preload interruption", () => {
+    const args = input();
+    const resource = browserResourceEvent({
+      url: "https://app.example.com/assets/app-8f3a.js",
+      page: "https://app.example.com/gallery",
+      tag: "link",
+      readyState: "interactive",
+      visibilityState: "hidden",
+      attributes: { rel: "modulepreload", as: "script" }
+    });
+    resource.occurred_at = "2026-09-22T10:00:00.000Z";
+    resource.correlation = {
+      request_id: null,
+      trace_id: null,
+      session_id: "session-1",
+      user_id_hash: null
+    };
+    args.sourceEnvelopes = [resource];
+    args.bundleMetadata.source_event_id = resource.event_id;
+    args.bundleMetadata.source_occurred_at = resource.occurred_at;
+    args.incident.first_seen_at = resource.occurred_at;
+    args.incident.last_seen_at = resource.occurred_at;
+    args.correlatedRecoveryEnvelopes = [
+      createEventEnvelope({
+        event_type: "request_event",
+        occurred_at: "2026-09-22T10:00:02.000Z",
+        service: { name: "web", environment: "production", runtime: "browser" },
+        correlation: { session_id: "session-1" },
+        payload: {
+          method: "POST",
+          path: "/api/media/signed-url/refresh?token=secret",
+          query: {},
+          headers: {},
+          response_status: 404,
+          duration_ms: 24
+        }
+      })
+    ];
+
+    const bundle = buildBundle(args);
+    expect(bundle.context.resource_failure).toMatchObject({
+      interruption: {
+        visibility_state: "hidden",
+        ready_state: "interactive",
+        target_tag_name: "link",
+        rel: "modulepreload"
+      },
+      recovery_failures: [
+        {
+          source: "request_event",
+          method: "POST",
+          path: "/api/media/signed-url/refresh",
+          status_code: 404,
+          delay_ms: 2000
+        }
+      ]
+    });
+    expect(bundle.summary.likely_cause).toContain("followed");
+    expect(bundle.summary.likely_cause).toContain("HTTP 404");
+    expect(bundle.summary.likely_cause).toContain("most actionable captured signal");
+    expect(JSON.stringify(bundle)).not.toContain("secret");
+  });
+
+  it("does not label an unrelated failed request as resource recovery", () => {
+    const args = input();
+    const resource = args.sourceEnvelopes[0]!;
+    resource.occurred_at = "2026-09-22T10:00:00.000Z";
+    args.correlatedRecoveryEnvelopes = [
+      createEventEnvelope({
+        event_type: "request_event",
+        occurred_at: "2026-09-22T10:00:02.000Z",
+        service: { name: "web", environment: "production", runtime: "browser" },
+        payload: {
+          method: "GET",
+          path: "/favicon.ico",
+          query: {},
+          headers: {},
+          response_status: 404,
+          duration_ms: 12
+        }
+      })
+    ];
+
+    expect(buildBundle(args).context.resource_failure?.recovery_failures).toBeUndefined();
+  });
+
+  it("requires recovery requests to share the resource session or trace", () => {
+    const args = input();
+    const resource = args.sourceEnvelopes[0]!;
+    resource.occurred_at = "2026-09-22T10:00:00.000Z";
+    resource.correlation = {
+      request_id: null,
+      trace_id: null,
+      session_id: "resource-session",
+      user_id_hash: null
+    };
+    args.correlatedRecoveryEnvelopes = [
+      createEventEnvelope({
+        event_type: "request_event",
+        occurred_at: "2026-09-22T10:00:02.000Z",
+        service: { name: "web", environment: "production", runtime: "browser" },
+        correlation: { session_id: "different-session" },
+        payload: {
+          method: "POST",
+          path: "/api/media/signed-url/refresh",
+          query: {},
+          headers: {},
+          response_status: 404,
+          duration_ms: 12
+        }
+      })
+    ];
+
+    expect(buildBundle(args).context.resource_failure?.recovery_failures).toBeUndefined();
+  });
+
+  it("uses a failed recovery breadcrumb from the same resource occurrence", () => {
+    const args = input();
+    const resource = args.sourceEnvelopes[0]!;
+    if (resource.event_type !== "frontend_exception") throw new Error("expected frontend event");
+    resource.occurred_at = "2026-09-22T10:00:00.000Z";
+    resource.payload.breadcrumbs = [
+      {
+        breadcrumb_type: "network_request",
+        route: "/gallery",
+        ts: "2026-09-22T10:00:01.000Z",
+        data: {
+          method: "POST",
+          url: "/api/media/refresh?token=secret",
+          status_code: 503
+        }
+      }
+    ];
+
+    expect(buildBundle(args).context.resource_failure?.recovery_failures).toEqual([
+      {
+        source: "frontend_breadcrumb",
+        method: "POST",
+        path: "/api/media/refresh",
+        status_code: 503,
+        occurred_at: "2026-09-22T10:00:01.000Z",
+        delay_ms: 1000
+      }
+    ]);
+  });
+});
+
+it("ignores invalid breadcrumb methods and produces schema-valid recovery evidence", () => {
+  const args = input();
+  const resource = args.sourceEnvelopes[0]!;
+  if (resource.event_type !== "frontend_exception") throw new Error("expected resource");
+  resource.payload.breadcrumbs = [{ breadcrumb_type: "network_request", route: "/", ts: resource.occurred_at,
+    data: { method: "x".repeat(100), url: "/api/refresh", status: 404 } }];
+  expect(BundleV1Schema.safeParse(buildBundle(args)).success).toBe(true);
+  expect(buildBundle(args).context.resource_failure?.recovery_failures).toBeUndefined();
 });

@@ -1,3 +1,4 @@
+import { browserRecoveryFailureFromEvent } from "../../../packages/shared-types/src/browser-recovery.js";
 import { isObjectMissing } from "../../../packages/storage/src/object-store-errors.js";
 import { parseStoredEvent } from "../../../packages/event-normalizer/src/index.js";
 import type { BundleBuildContext } from "../../../packages/storage/src/index.js";
@@ -303,5 +304,87 @@ export async function collectCorrelatedLogEnvelopes(input: {
       return left.eventId.localeCompare(right.eventId);
     }
     return left.occurredAt.localeCompare(right.occurredAt);
+  });
+}
+
+/** Load a bounded set of later request failures that share a browser session or trace. */
+export async function collectCorrelatedRecoveryEnvelopes(input: {
+  dependencies: BuildBundleWorkerDependencies;
+  incident: BundleBuildContext;
+  incidentEnvelopes: LoadedIncidentEnvelope[];
+}): Promise<EventEnvelope[]> {
+  if (
+    input.dependencies.incidentStore.listRequestEventCandidatesForServiceWindow === undefined ||
+    input.dependencies.objectStore.getObject === undefined
+  ) {
+    return [];
+  }
+
+  const resourceEnvelopes = input.incidentEnvelopes.filter(
+    (item) =>
+      item.envelope.event_type === "frontend_exception" &&
+      item.envelope.payload.browser_event?.kind === "resource_error"
+  );
+  if (resourceEnvelopes.length === 0) return [];
+
+  const sessionIds = new Set<string>();
+  const traceIds = new Set<string>();
+  for (const item of resourceEnvelopes) {
+    addNonEmptyCorrelationValue(sessionIds, item.envelope.correlation?.session_id);
+    addNonEmptyCorrelationValue(traceIds, item.envelope.correlation?.trace_id);
+  }
+  if (sessionIds.size === 0 && traceIds.size === 0) return [];
+
+  // Each retained occurrence has its own bounded window; long-lived incidents must
+  // not scan days of unrelated requests or starve the newest recovery evidence.
+  const candidatesById = new Map<string, { event_id: string; occurred_at: string }>();
+  for (const resource of [...resourceEnvelopes].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt) || a.eventId.localeCompare(b.eventId)).slice(0, 3)) {
+    const candidates = await input.dependencies.incidentStore.listRequestEventCandidatesForServiceWindow({
+      project_id: input.incident.project_id,
+      service_name: input.incident.service_name,
+      environment: input.incident.environment,
+      window_start: new Date(resource.occurredAt).toISOString(),
+      window_end: new Date(Date.parse(resource.occurredAt) + 30_000).toISOString(),
+      resource_event_ids: [resource.eventId]
+    });
+    for (const candidate of candidates) candidatesById.set(candidate.event_id, candidate);
+  }
+  const candidates = [...candidatesById.values()];
+  const existingEventIds = new Set(input.incidentEnvelopes.map((item) => item.eventId));
+  const envelopes: EventEnvelope[] = [];
+
+  for (const candidate of candidates) {
+    if (existingEventIds.has(candidate.event_id)) continue;
+    const key = buildRawEventObjectKey({
+      projectId: input.incident.project_id,
+      occurredAt: new Date(candidate.occurred_at),
+      eventId: candidate.event_id
+    });
+    try {
+      const rawBody = await input.dependencies.objectStore.getObject({ key });
+      const envelope = parseEventEnvelopeFromRaw(rawBody);
+      if (envelope === null || browserRecoveryFailureFromEvent(envelope) === null) continue;
+      if (
+        envelope.service.name !== input.incident.service_name ||
+        envelope.service.environment !== input.incident.environment
+      ) {
+        continue;
+      }
+      const sessionId = envelope.correlation?.session_id;
+      const traceId = envelope.correlation?.trace_id;
+      const matchesSession = typeof sessionId === "string" && sessionIds.has(sessionId);
+      const matchesTrace = typeof traceId === "string" && traceIds.has(traceId);
+      if (matchesSession || matchesTrace) envelopes.push(envelope);
+    } catch (error) {
+      // Missing retained context is optional; unreadable storage is not absence.
+      if (!isObjectMissing(error)) throw error;
+    }
+  }
+
+  return envelopes.sort((left, right) => {
+    const occurredAtComparison = left.occurred_at.localeCompare(right.occurred_at);
+    return occurredAtComparison !== 0
+      ? occurredAtComparison
+      : left.event_id.localeCompare(right.event_id);
   });
 }

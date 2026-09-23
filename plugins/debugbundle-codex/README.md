@@ -4,6 +4,8 @@ Give Codex runtime error reports, incidents, deterministic debug bundles, reprod
 
 This developer integration uses the existing `@debugbundle/mcp` stdio server with the opt-in `--local-auth` profile, including authorized management tools. This profile removes per-tool credential arguments and uses the server's saved CLI login or explicitly forwarded environment. MCP 1.9.0 is the minimum version; older releases can reject hosted calls before applying saved auth. It is separate from the read-only [OpenAI plugin for ChatGPT and Codex](https://debugbundle.com/docs/mcp/openai-plugin/), which is not publicly installable yet. No hosted OAuth change is required for the developer integration.
 
+Plugin 1.1.0 makes the local CLI the primary interface for supported DebugBundle operations, with explicit user interface choices and MCP-only hosts preserved. The MCP server pin remains the published 1.11.0. Authorization, exact project scope, and readback apply to every write.
+
 ## Choose one installation path
 
 - **Codex app or CLI:** install the repository plugin to get MCP and the bundled workflow skill together.
@@ -15,7 +17,7 @@ Prerequisites: Node.js 22–26 with `npx` available on the Codex host, and a cur
 
 ## Repository plugin
 
-After MCP 1.10.0 is published to npm and this package is released on the repository's default branch:
+After MCP 1.11.0 is published to npm and this package is released on the repository's default branch:
 
 ```bash
 codex plugin marketplace add debugbundle/debugbundle
@@ -29,14 +31,14 @@ codex plugin marketplace add /absolute/path/to/debugbundle
 codex plugin add debugbundle-codex@debugbundle
 ```
 
-The marketplace is `.agents/plugins/marketplace.json`; its package is `plugins/debugbundle-codex`. This repository marketplace is a distribution source, not an OpenAI directory approval. The plugin pins `@debugbundle/mcp@1.10.0` with `--local-auth` and includes no credentials, custom transport, background hooks, or hosted app mapping.
+The marketplace is `.agents/plugins/marketplace.json`; its package is `plugins/debugbundle-codex`. This repository marketplace is a distribution source, not an OpenAI directory approval. The plugin pins `@debugbundle/mcp@1.11.0` with `--local-auth` and includes no credentials, custom transport, background hooks, or hosted app mapping.
 
 Start a fresh Codex conversation after installation. In the app, open Plugins and select the DebugBundle marketplace to inspect the installed package. In the CLI, `codex plugin list --marketplace debugbundle` shows its state; `/mcp` shows the connected server. A managed workspace may restrict repository sources or tool access.
 
 ## Direct MCP connection
 
 ```bash
-codex mcp add debugbundle -- npx -y @debugbundle/mcp@1.10.0 --local-auth
+codex mcp add debugbundle -- npx -y @debugbundle/mcp@1.11.0 --local-auth
 ```
 
 Equivalent entry in `~/.codex/config.toml`, or `.codex/config.toml` for a trusted project:
@@ -44,7 +46,7 @@ Equivalent entry in `~/.codex/config.toml`, or `.codex/config.toml` for a truste
 ```toml
 [mcp_servers.debugbundle]
 command = "npx"
-args = ["-y", "@debugbundle/mcp@1.10.0", "--local-auth"]
+args = ["-y", "@debugbundle/mcp@1.11.0", "--local-auth"]
 ```
 
 The app, CLI, and IDE extension share this configuration when they use the same Codex host. This is a local process connection; do not substitute the hosted OpenAI endpoint or run `codex mcp login debugbundle` for this path.
@@ -126,3 +128,7 @@ See [Codex MCP documentation](https://learn.chatgpt.com/docs/extend/mcp), [OpenA
 ## License
 
 Apache-2.0. See the included `LICENSE`.
+
+## Project-specific guidance
+
+The plugin bundles portable guidance. Use CLI `debugbundle setup --agent codex` or `debugbundle setup --agent claude-code` in an instrumented repository to add native discovery of its canonical `.agents/skills/debugbundle/` project skill and local profile workflows. `doctor` reports discovery; `validate --fix` repairs unchanged owned artifacts. Setup preserves plugin settings and authentication and never installs or configures MCP implicitly. See [agent-aware setup](https://github.com/debugbundle/debugbundle/blob/main/spec/agent-aware-cli-setup.md).

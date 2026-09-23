@@ -1,0 +1,10 @@
+{
+  "SKILL.md": "9e6aaf3b6327626f19a02c8c20cc65bd8bb8e66d56f3a88f6ad979a9a3048717",
+  "references/cli.md": "272ea8d8a6d5ed0c88ce9347a50c5f4c6e21cb9a8a0bb71d74310c14577f5506",
+  "references/mcp.md": "52f844be7a6d072b821d2d13d3d572137f32e71dc4b9b1155474f71757053658",
+  "references/bundle-schema.md": "5153042a4dbfbaf433de1c55b75448c7adaef74f4c380e9ecd29ca79c3dcbeb3",
+  "references/profile-enrichment.md": "424a207cf49561457bdad67c5b7bdeb343b0daa74e286f0e41e8440bc008a72b",
+  "assets/schemas/improvement-analysis.json": "7eccd1cbf8044ebfa38dc9d941ad6fb612082f54fc3a67efec00324eb0d02b83",
+  "assets/schemas/performance-analysis.json": "1c24f8ad8915d379a2c6e63537babf09bc1eccf76e7b52b60d455d8bc9d2f8ee",
+  "evals/evals.json": "c8811bb81e4cc1f177e8b9bc1f723e2722d4b8ce41cb324d3d1c5cd16a41cab2"
+}

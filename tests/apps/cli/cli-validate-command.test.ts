@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -215,6 +216,11 @@ describe("cli validate command", () => {
     );
 
     await writeFile(join(rootDirectory, ".agents", "skills", "debugbundle", "SKILL.md"), "---\nname: debugbundle\ndescription: stale\n---\n", "utf8");
+    // Model an unchanged file from an older generator, with its recorded ownership hash.
+    const metadataPath = join(rootDirectory, ".debugbundle/agent-setup.json");
+    const metadata = JSON.parse(await readFile(metadataPath, "utf8")) as { canonical: Record<string, string> };
+    metadata.canonical["SKILL.md"] = createHash("sha256").update("---\nname: debugbundle\ndescription: stale\n---\n").digest("hex");
+    await writeFile(metadataPath, JSON.stringify(metadata));
 
     const staleResult = await validateCommand(
       {

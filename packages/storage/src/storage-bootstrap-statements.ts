@@ -519,6 +519,7 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
       condition_type text NOT NULL,
       dedupe_key text NOT NULL,
       notification_key text NOT NULL DEFAULT '',
+      coalescing_key text,
       channel text NOT NULL,
       status text NOT NULL,
       payload jsonb NOT NULL,

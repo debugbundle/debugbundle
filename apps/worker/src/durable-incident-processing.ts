@@ -1,3 +1,4 @@
+import { createBrowserRecoveryStore, lockBrowserRecoveryEvent } from "../../../packages/storage/src/browser-recovery-store.js";
 import { createWorkerJobStore } from "../../../packages/storage/src/worker-job-store.js";
 import { z } from "zod";
 import { EventClassSchema, EventTypeSchema } from "../../../packages/shared-types/src/index.js";
@@ -126,6 +127,7 @@ export function createDurableIncidentProcessing(input: {
           queue,
           objectStore: input.objectStore,
           processedEventStore: createProcessedEventStore(tx),
+          recordBrowserRecoveryContext: (projectId, event) => createBrowserRecoveryStore(tx).record(projectId, event),
           requestAnomalyCounter: input.requestAnomalyCounter,
           deferImprovement: ({ project_id, event, event_class, object_key }) =>
             queue.enqueueInternal("evaluate-event-improvement", {
@@ -155,6 +157,9 @@ export function createDurableIncidentProcessing(input: {
           incidentStore: {
             ...metadata,
             async upsertIncident(data) {
+              if (data.event_type === "frontend_exception") {
+                await lockBrowserRecoveryEvent(tx, data.project_id, data.event_id);
+              }
               // Serialize one fingerprint through its dedupe check, occurrence update, and follow-ups.
               // Different incidents remain independent across workers.
               await tx.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [

@@ -19,5 +19,26 @@ export const BrowserResourceContextSchema = z.object({
   title: z.string(),
   optional_candidate: z.boolean(),
   diagnosis: z.string(),
-  routes: BrowserResourceRoutesSchema
+  routes: BrowserResourceRoutesSchema,
+  interruption: z
+    .object({
+      visibility_state: z.enum(["hidden", "prerender", "unloaded"]),
+      ready_state: z.enum(["loading", "interactive"]),
+      target_tag_name: z.literal("link"),
+      rel: z.enum(["preload", "modulepreload", "prefetch"])
+    })
+    .optional(),
+  recovery_failures: z
+    .array(
+      z.object({
+        source: z.enum(["request_event", "frontend_breadcrumb"]),
+        method: z.string().min(1).max(32),
+        path: z.string().min(1).max(1024),
+        status_code: z.number().int().min(400).max(599),
+        occurred_at: z.string().datetime(),
+        delay_ms: z.number().int().nonnegative().max(30_000)
+      })
+    )
+    .max(10)
+    .optional()
 });

@@ -1,6 +1,6 @@
 {
   "name": "debugbundle",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Investigate production incidents and aggregate product analytics with read-only DebugBundle evidence.",
   "author": {
     "name": "DebugBundle",
@@ -25,7 +25,7 @@
   "interface": {
     "displayName": "DebugBundle",
     "shortDescription": "Investigate incidents and aggregate product analytics.",
-    "longDescription": "Connect DebugBundle to inspect authorized production incidents, deterministic redacted bundles, reproductions, runtime improvements, aggregate product analytics, and endpoint-health evidence. Version 1 is read-only and cannot modify projects, incident state, analytics settings, or customer data.",
+    "longDescription": "Connect DebugBundle to inspect authorized production incidents, deterministic redacted bundles, reproductions, runtime improvements, aggregate product analytics, and endpoint-health evidence. The MCP connection is read-only. In a host with an independently installed and authenticated DebugBundle CLI, the skill can route explicitly authorized changes through that CLI and verify the result; the plugin does not install the CLI or grant write access.",
     "developerName": "DebugBundle",
     "category": "Developer Tools",
     "capabilities": ["Read"],

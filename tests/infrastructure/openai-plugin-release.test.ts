@@ -113,7 +113,7 @@ describe("OpenAI plugin release automation", () => {
       prohibited_actions: string[];
     };
 
-    expect(plan.version).toBe("1.0.0");
+    expect(plan.version).toBe("1.0.1");
     expect(plan.independent_from_npm_mcp_version).toBe(true);
     expect(plan.allowed_actions).toEqual([
       "validate_source",
@@ -159,8 +159,8 @@ describe("OpenAI plugin release automation", () => {
   it("fails closed when generated release artifacts drift", () => {
     const outputRoot = mkdtempSync(join(tmpdir(), "debugbundle-openai-artifacts-"));
     try {
-      writeFileSync(join(outputRoot, "debugbundle-openai-plugin-1.0.0.zip"), "stale-plugin");
-      writeFileSync(join(outputRoot, "debugbundle-openai-submission-1.0.0.zip"), "stale-packet");
+      writeFileSync(join(outputRoot, "debugbundle-openai-plugin-1.0.1.zip"), "stale-plugin");
+      writeFileSync(join(outputRoot, "debugbundle-openai-submission-1.0.1.zip"), "stale-packet");
       writeFileSync(join(outputRoot, "SHA256SUMS"), "stale-checksums\n");
 
       const completed = spawnSync(
@@ -200,7 +200,7 @@ describe("OpenAI plugin release automation", () => {
 
     expect(result.ok).toBe(true);
     expect(result.failures).toEqual([]);
-    expect(result.manifest.plugin_version).toBe("1.0.0");
+    expect(result.manifest.plugin_version).toBe("1.0.1");
     expect(result.manifest.registered_connection_id).toBe(
       "plugin_asdk_app_6a99ba6c1e7881919091a592738692c6"
     );

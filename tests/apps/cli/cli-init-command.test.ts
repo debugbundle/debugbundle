@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -203,7 +203,9 @@ describe("cli setup command", () => {
     expect(skillContents).toContain("## When To Use DebugBundle");
     expect(skillContents).toContain("Use DebugBundle when runtime evidence or product-usage analytics are relevant to the task.");
     expect(skillContents).toContain("For deterministic local source-code, UI, layout, copy, calculation, refactor, or test-only issues, inspect source and tests first.");
-    expect(skillContents).toContain("resolve it with `debugbundle resolve <incident-id> [incident-id ...]` or MCP `resolve_incident` / `resolve_incidents`");
+    expect(skillContents).toContain("With explicit authorization, resolve the selected records");
+    expect(skillContents).toContain("`debugbundle resolve <incident-id> [incident-id ...] --source <local|cloud>`");
+    expect(skillContents).toContain("only when MCP is the selected interface");
     expect(skillContents).toContain("If `debugbundle doctor --json` reports `mode=connected` and the target environment is cloud-enabled, check both");
     expect(skillContents).toContain(
       "use its non-null `cloud_project_id` as `--project-id <cloud_project_id>` on every cloud incident list query"
@@ -258,7 +260,9 @@ describe("cli setup command", () => {
     expect(cliReferenceContents).toContain("Smoke-Test Cleanup Recipe");
     expect(cliReferenceContents).toContain("capture-rule create-from-suggestion");
     expect(cliReferenceContents).toContain("capture-policy set [--project <id>] --client-error-path-rule");
-    expect(cliReferenceContents).toContain("smoke test|dogfood|verification|synthetic");
+    expect(cliReferenceContents).toContain("For explicitly authorized cloud cleanup");
+    expect(cliReferenceContents).toContain("--source cloud --project-id <project-id> --status all");
+    expect(cliReferenceContents).not.toContain("xargs debugbundle resolve");
     expect(cliReferenceContents).toContain("## Product Analytics");
     expect(cliReferenceContents).toContain("debugbundle analytics funnel <key> --project <id> --last 30d");
     expect(cliReferenceContents).toContain("debugbundle analytics saved-funnels list --project <id>");
@@ -717,28 +721,16 @@ describe("cli setup command", () => {
       }
     );
 
-    const agentsResult = await setupCommand(
-      {},
-      {
-        cwd: () => rootDirectory,
-        now: () => new Date("2026-03-14T00:00:00.000Z"),
-        readFile: vi.fn().mockImplementation(async (path: string): Promise<string> => {
-          if (path.endsWith("AGENTS.md")) {
-            throw new Error("agents_read_failed");
-          }
-
-          return realReadFile(path);
-        })
-      }
-    );
+    // Native instruction I/O now lives behind the bounded domain filesystem.
+    await rm(join(rootDirectory, "AGENTS.md"));
+    await mkdir(join(rootDirectory, "AGENTS.md"));
+    const agentsResult = await setupCommand({}, { cwd: () => rootDirectory });
 
     expect(infrastructureResult).toEqual({
       exitCode: 1,
       output: "compose_read_failed"
     });
-    expect(agentsResult).toEqual({
-      exitCode: 1,
-      output: "agents_read_failed"
-    });
+    expect(agentsResult.exitCode).toBe(1);
+    expect(agentsResult.output).toContain("Invalid or oversized managed file: AGENTS.md");
   });
 });

@@ -12,6 +12,12 @@ export function formatCaptureRuleMatcher(matcher: CaptureRuleMatcher): string {
   if (matcher.browser_event_opaque !== undefined) {
     parts.push(matcher.browser_event_opaque ? "opaque browser event" : "non-opaque browser event");
   }
+  if (matcher.browser_page_visibility_state !== undefined) parts.push(`page visibility: ${matcher.browser_page_visibility_state}`);
+  if (matcher.browser_page_ready_state !== undefined) parts.push(`document state: ${matcher.browser_page_ready_state}`);
+  if (matcher.browser_target_tag_name !== undefined) parts.push(`target: ${matcher.browser_target_tag_name}`);
+  if (matcher.browser_target_attributes !== undefined) {
+    parts.push(`target attributes: ${Object.entries(matcher.browser_target_attributes).map(([key, value]) => `${key}=${String(value)}`).join(", ")}`);
+  }
   if (matcher.runtime?.length) {
     parts.push(`runtime: ${matcher.runtime.join(", ")}`);
   }

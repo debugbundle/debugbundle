@@ -1,3 +1,4 @@
+import { BROWSER_RECOVERY_MIGRATIONS } from "./browser-recovery-schema.js";
 import { type Queryable } from "./migrations.js";
 import {
   ensureLegacyGitHubDispatchFingerprintCompatibility,
@@ -27,6 +28,7 @@ const STORAGE_MIGRATION_LEDGER_TABLE = "storage_migration_ledger";
 
 export const STORAGE_SCHEMA_MIGRATIONS: readonly StorageSchemaMigration[] = [
   ...BASE_STORAGE_SCHEMA_MIGRATIONS,
+  ...BROWSER_RECOVERY_MIGRATIONS,
   ...AVAILABILITY_CHECK_STORAGE_SCHEMA_MIGRATIONS,
   ...ANALYTICS_STORAGE_SCHEMA_MIGRATIONS,
   ...OPENAI_OAUTH_STORAGE_SCHEMA_MIGRATIONS,

@@ -28,7 +28,7 @@ describe("OpenAI plugin package", () => {
       ok: true,
       evidenceState: "local_connection_ready",
       connectionId: "plugin_asdk_app_6a99ba6c1e7881919091a592738692c6",
-      version: "1.0.0",
+      version: "1.0.1",
       manualGates: [],
       failures: []
     });
@@ -51,7 +51,7 @@ describe("OpenAI plugin package", () => {
     };
 
     expect(manifest.name).toBe("debugbundle");
-    expect(manifest.version).toBe("1.0.0");
+    expect(manifest.version).toBe("1.0.1");
     expect(manifest.interface.category).toBe("Developer Tools");
     expect(manifest.interface.capabilities).toEqual(["Read"]);
     expect(manifest.interface.defaultPrompt).toEqual([
