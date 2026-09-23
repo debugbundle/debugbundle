@@ -166,6 +166,23 @@ export function collectVerificationFailures(context, report) {
     const status = report.verify?.[targetKey]?.status;
     if (status !== "found") {
       failures.push(`${targetKey}:${status ?? "missing"}`);
+      continue;
+    }
+
+    if (
+      targetKey === "officialRegistry" &&
+      report.verify.officialRegistry.version !== context.version
+    ) {
+      failures.push(`${targetKey}:version_mismatch`);
+    }
+
+    // Smithery's public directory proves indexing but does not expose a release version.
+    // Require this run's accepted write before treating an existing listing as an update.
+    if (
+      (targetKey === "smithery" || targetKey === "smitherySkill") &&
+      report.publish?.[targetKey]?.status !== "published"
+    ) {
+      failures.push(`${targetKey}:unpublished`);
     }
   }
 

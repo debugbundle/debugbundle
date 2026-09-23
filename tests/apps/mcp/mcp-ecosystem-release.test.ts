@@ -124,6 +124,44 @@ describe("mcp ecosystem release pipeline", () => {
     expect(verifyClawHubPluginRecord({}, target, "1.8.0").status).toBe("missing");
   });
 
+  it("requires the requested Registry version and accepted Smithery writes before release verification passes", async () => {
+    const helperUrl = pathToFileURL(
+      join(repoRoot, "scripts", "mcp-ecosystem-verification.mjs")
+    ).href;
+    const { collectVerificationFailures } = (await import(helperUrl)) as {
+      collectVerificationFailures: (context: unknown, report: unknown) => string[];
+    };
+    const context = {
+      version: "1.11.0",
+      targetEntries: [
+        ["officialRegistry", { type: "push" }],
+        ["smithery", { type: "push" }],
+        ["smitherySkill", { type: "push" }]
+      ]
+    };
+    const report = {
+      verify: {
+        officialRegistry: { status: "found", version: "1.10.0" },
+        smithery: { status: "found", registryIndexed: true },
+        smitherySkill: { status: "found", registryIndexed: true }
+      },
+      publish: {}
+    };
+
+    expect(collectVerificationFailures(context, report)).toEqual([
+      "officialRegistry:version_mismatch",
+      "smithery:unpublished",
+      "smitherySkill:unpublished"
+    ]);
+
+    report.verify.officialRegistry.version = "1.11.0";
+    Object.assign(report.publish, {
+      smithery: { status: "published" },
+      smitherySkill: { status: "published" }
+    });
+    expect(collectVerificationFailures(context, report)).toEqual([]);
+  });
+
   it("ranks ClawHub search results and retries bounded discovery checks", async () => {
     const helperUrl = pathToFileURL(join(repoRoot, "scripts", "mcp-ecosystem-verification.mjs")).href;
     const {
