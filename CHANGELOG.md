@@ -6,6 +6,10 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Added
+
+- Prepare a native Gemini CLI extension with the published local-auth MCP server, shared investigation skill, deterministic standalone archive, disposable native smoke, and dedicated setup documentation. Public repository publication and Gemini gallery indexing remain separate gates.
+
 ## [1.13.2] - 2026-09-25
 
 ### Reliability

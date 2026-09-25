@@ -3326,7 +3326,7 @@ These tools manage GitHub repository automation. Project-scoped read operations 
 
 This is an additive public projection and does not replace or modify the stdio MCP contract above. The official distribution version starts at independent semver `1.0.0`, combines one tailored DebugBundle skill with remote MCP, and has no custom MCP UI.
 
-All agent distributions follow the [agent interface routing contract](agent-interface-routing.md): CLI is primary where available, explicit user choices and MCP-only use remain supported, and connector restrictions apply to their own surface. This requirement also governs future Gemini, Muse, and other plugins.
+All agent distributions follow the [agent interface routing contract](agent-interface-routing.md): CLI is primary where available, explicit user choices and MCP-only use remain supported, and connector restrictions apply to their own surface. The Gemini CLI developer extension packages the existing stdio MCP server and workflow skill without changing tool schemas; this requirement also governs future Muse and other plugins.
 
 The `1.0.1` skill candidate adds [local CLI handoff guidance](../spec/openai-plugin-cli-handoff.md) for explicitly authorized changes when the host has a separately installed, authenticated CLI. It does not expand this MCP catalog or OAuth scopes; the frozen wire contract remains `1.0.0`. CLI project/record scope, existing user authorization, separate saved credentials, and post-write verification govern that host workflow.
 

@@ -842,6 +842,16 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - The dedicated `/docs/mcp/claude-code/` page is registered under MCP and included in canonical routes, search, sitemap and redirects; its version and release status match the prepared package.
 - Default MCP/OpenClaw schemas, Codex packaging and the hosted OpenAI connection remain unchanged.
 
+### AC-MCP-19: Gemini CLI Extension And Direct Setup
+
+- A disposable native Gemini CLI installs the extracted release archive, lists and discovers the DebugBundle skill and MCP server, updates, reconnects, and removes the extension. Recorded responses exercise real native tool execution without a model API or customer API request.
+- Native calls retrieve local incidents, bundles and reproductions from the active application workspace; real CLI setup generates discoverable project guidance and Gemini activates that project skill ahead of the extension skill.
+- The packaged MCP command uses the active workspace, pins a published release with `--local-auth`, exposes no per-call bearer field, uses saved CLI login for synthetic hosted retrieval, rejects credential injection, and fails before HTTP when authentication is absent.
+- Direct Gemini MCP registration, local retrieval, protected environment forwarding, and removal work after extension removal. Access denials remain errors without credential fallback or retries; unrelated user settings and generated project guidance survive removal. Duplicate same-name settings precedence is documented.
+- The deterministic release archive has its manifest and skill at Gemini's required paths, contains no credentials or unrelated monorepo files, and carries independent extension semver and a changelog. Unsupported manifest/server capabilities, embedded credential settings, invalid versions and symlinked source paths fail packaging.
+- The dedicated `/docs/mcp/gemini/` guide is registered in navigation, canonical routes, search, sitemap and redirects; it covers installation, project setup, auth, verification, updates/removal, troubleshooting, and honest publication state.
+- Existing Codex, Claude Code, CLI, stdio MCP, OpenClaw, and hosted OpenAI contracts remain unchanged.
+
 ### AC-MCP-03: OpenAI V1 Product Surface
 
 - **Given** the official DebugBundle OpenAI Plugin `1.0.0`
