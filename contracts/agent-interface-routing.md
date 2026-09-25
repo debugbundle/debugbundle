@@ -1,6 +1,6 @@
 # Agent interface routing contract
 
-Applies to FR-MCP-16 and AC-MCP-CLI-HANDOFF. This is a cross-agent contract for the canonical generated project skill and all DebugBundle plugin/portable skills, including Codex, Claude Code, the OpenAI plugin, and ClawHub/Smithery/OpenClaw. Future Gemini, Muse, or other agent plugins must implement the same policy before release; agent-aware setup support alone does not imply a dedicated plugin exists.
+Applies to FR-MCP-16 and AC-MCP-CLI-HANDOFF. This is a cross-agent contract for the canonical generated project skill and all DebugBundle plugin/portable skills, including Codex, Claude Code, Gemini CLI, the OpenAI plugin, and ClawHub/Smithery/OpenClaw. Future Muse or other agent plugins must implement the same policy before release; agent-aware setup support alone does not imply a dedicated plugin exists.
 
 ## Primary interface and fallbacks
 
@@ -22,7 +22,7 @@ This preference does not authorize tool installation, login/account changes, pro
 
 `apps/cli/src/agent-interface-guidance.ts` owns the shared portable section. CLI setup embeds it in the canonical project skill. `make agent-guidance-sync` copies that section into maintained plugin/portable source skills while preserving their agent-specific content. The sync never edits installed caches. `make agent-guidance-check` and `tests/contracts/agent-interface-routing.test.ts` enforce parity and discover every `SKILL.md` under `plugins/` and `apps/mcp/` so a new plugin cannot omit the routing policy silently.
 
-Before adding Gemini, Muse, or another plugin:
+Before adding or updating Gemini, Muse, or another plugin:
 
 1. Verify native instruction/skill discovery and host tool availability separately.
 2. Include the shared section and keep surrounding examples consistent with CLI-first routing. Explain MCP examples as the fallback/selected-interface workflow.

@@ -72,6 +72,9 @@ help:
 	@echo "  make release-mcp-ecosystem-verify VERSION=x.y.z TARGETS=officialRegistry,smithery,clawhub,glama,lobehub"
 	@echo "  make release-mcp-ecosystem VERSION=x.y.z"
 	@echo "  make codex-plugin-check     Check Codex packaging and existing MCP compatibility"
+	@echo "  make gemini-extension-check Check Gemini extension contracts and guidance"
+	@echo "  make gemini-extension-package Build the standalone Gemini extension archive"
+	@echo "  make gemini-extension-smoke Verify a fresh Gemini CLI without customer access"
 	@echo "  make codex-plugin-smoke     Verify a fresh Codex client against synthetic data"
 	@echo "  make openclaw-plugin-check  Build and validate the OpenClaw companion package"
 	@echo "  make openai-plugin-validate  Validate the source-ready OpenAI plugin package"
@@ -202,6 +205,18 @@ agent-guidance-check:
 
 codex-plugin-check:
 	$(NODE_RUN) "corepack enable && corepack pnpm vitest run tests/contracts/codex-developer-plugin.test.ts tests/apps/mcp tests/contracts/openai-plugin-skill-parity.test.ts tests/contracts/openai-plugin-cli-handoff.test.ts tests/contracts/agent-interface-routing.test.ts tests/apps/openclaw-plugin"
+
+.PHONY: gemini-extension-check gemini-extension-package gemini-extension-smoke
+gemini-extension-check:
+	$(NODE_RUN) "corepack enable && corepack pnpm vitest run tests/contracts/gemini-developer-extension.test.ts tests/infrastructure/gemini-extension-package.test.ts tests/contracts/agent-interface-routing.test.ts tests/packages/agent-setup tests/apps/cli/cli-agent-setup.test.ts"
+
+gemini-extension-package:
+	$(NODE_RUN) "node scripts/package-gemini-extension.mjs"
+
+GEMINI_SMOKE_VERSION ?= 0.61.0
+GEMINI_SMOKE_NODE_IMAGE ?= node:24-bookworm
+gemini-extension-smoke:
+	docker run --rm -v "$(PWD):/source:ro" -e GEMINI_SMOKE_VERSION="$(GEMINI_SMOKE_VERSION)" $(GEMINI_SMOKE_NODE_IMAGE) node /source/scripts/smoke-gemini-extension.mjs
 
 .PHONY: openclaw-plugin-check
 openclaw-plugin-check:
