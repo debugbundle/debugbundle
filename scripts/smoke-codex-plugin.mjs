@@ -30,10 +30,16 @@ assert.ok(
 const plugin = JSON.parse(
   await readFile(join(source, "plugins/debugbundle-codex/.mcp.json"), "utf8")
 );
-const mcpSpec = plugin.mcpServers.debugbundle.args[1];
+const candidate = process.env.MCP_SMOKE_CANDIDATE === "1";
+const candidateVersion = candidate
+  ? JSON.parse(await readFile(join(source, "apps/mcp/package.json"), "utf8")).version
+  : null;
+const mcpSpec = candidate
+  ? `@debugbundle/mcp@${candidateVersion}`
+  : plugin.mcpServers.debugbundle.args[1];
 const mcpTarball =
-  process.env.MCP_SMOKE_CANDIDATE === "1"
-    ? join(source, ".tmp/codex-plugin", `debugbundle-mcp-${mcpSpec.split("@").at(-1)}.tgz`)
+  candidate
+    ? join(source, ".tmp/codex-plugin", `debugbundle-mcp-${candidateVersion}.tgz`)
     : null;
 const marketplace = join(scratch, "marketplace");
 const project = join(scratch, "application");
@@ -125,6 +131,14 @@ try {
     join(marketplace, "plugins/debugbundle-codex"),
     { recursive: true }
   );
+  if (candidate) {
+    const candidatePlugin = structuredClone(plugin);
+    candidatePlugin.mcpServers.debugbundle.args[1] = mcpSpec;
+    await writeFile(
+      join(marketplace, "plugins/debugbundle-codex/.mcp.json"),
+      `${JSON.stringify(candidatePlugin, null, 2)}\n`
+    );
+  }
   // Both catalogs coexist in the public repository. Codex must choose its own.
   await cp(join(source, ".claude-plugin"), join(marketplace, ".claude-plugin"), {
     recursive: true
