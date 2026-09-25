@@ -149,7 +149,10 @@ function classifyEnvelope(envelope: EventEnvelope, capturePreset: CapturePreset)
     envelope.event_type === "log_event" ? envelope.payload.level : undefined,
     envelope.event_type === "probe_event" ? envelope.payload.activation_id : undefined,
     envelope.payload as Record<string, unknown>,
-    capturePreset
+    capturePreset,
+    [],
+    [],
+    envelope.service.runtime
   );
 }
 

@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import {
   defaultSeverityLifecycleScopeForCondition,
   normalizeSeverityLifecycleScopeForCondition
@@ -133,11 +133,13 @@ export function createMetadataAlerts(
             severity_lifecycle_scope,
             cooldown_seconds,
             config,
+            signing_secret,
+            webhook_payload_version,
             is_enabled,
             created_at,
             updated_at
           )
-          VALUES ($1, $2, $3::uuid, $4::uuid, $5, $6, $7, $8, $9, $10::jsonb, $11, now(), now())
+          VALUES ($1, $2, $3::uuid, $4::uuid, $5, $6, $7, $8, $9, $10::jsonb, $11, $13, $12, now(), now())
           RETURNING
             id AS alert_id,
             project_id,
@@ -164,7 +166,9 @@ export function createMetadataAlerts(
           severityLifecycleScope,
           input.cooldown_seconds,
           JSON.stringify(input.config),
-          input.is_enabled
+          input.channel === "webhook" ? input.signing_secret ?? `dbundle_asec_${randomBytes(32).toString("base64url")}` : null,
+          input.is_enabled,
+          input.channel === "webhook" && input.signing_secret !== undefined ? 1 : 0
         ]
       );
 
@@ -215,6 +219,15 @@ export function createMetadataAlerts(
             END,
             cooldown_seconds = CASE WHEN $11::boolean THEN $12 ELSE ar.cooldown_seconds END,
             config = CASE WHEN $13::boolean THEN COALESCE($14::jsonb, '{}'::jsonb) ELSE ar.config END,
+            signing_secret = CASE
+              WHEN COALESCE($5::text, ar.channel) <> 'webhook' THEN NULL
+              ELSE COALESCE($19::text, NULLIF(ar.signing_secret, ''), $20::text)
+            END,
+            webhook_payload_version = CASE
+              WHEN COALESCE($5::text, ar.channel) <> 'webhook' THEN 0
+              WHEN $19::text IS NOT NULL THEN 1
+              ELSE ar.webhook_payload_version
+            END,
             is_enabled = COALESCE($15::boolean, ar.is_enabled),
             updated_at = now()
           FROM projects p
@@ -229,6 +242,7 @@ export function createMetadataAlerts(
               OR ar.created_by_user_id = $17::uuid
             )
             AND ($4::uuid IS NULL OR $3::boolean = false OR s.project_id = ar.project_id)
+            AND ($19::text IS NULL OR COALESCE($5::text, ar.channel) = 'webhook')
           RETURNING
             ar.id AS alert_id,
             ar.project_id,
@@ -262,7 +276,9 @@ export function createMetadataAlerts(
           input.is_enabled ?? null,
           input.project_id ?? null,
           input.actor_user_id ?? null,
-          input.actor_role ?? null
+          input.actor_role ?? null,
+          input.signing_secret ?? null,
+          `dbundle_asec_${randomBytes(32).toString("base64url")}`
         ]
       );
 

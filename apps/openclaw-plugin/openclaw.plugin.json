@@ -2,7 +2,7 @@
   "id": "debugbundle",
   "name": "DebugBundle",
   "description": "Use DebugBundle for runtime error reporting, incident response, live app monitoring, health checks, debug bundles, and product analytics.",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "configSchema": {
     "type": "object",
     "properties": {
@@ -75,8 +75,11 @@
       "debugbundle_update_weekly_report_channel",
       "debugbundle_delete_weekly_report_channel",
       "debugbundle_list_alerts",
+      "debugbundle_list_alert_groups",
+      "debugbundle_get_alert_group",
       "debugbundle_create_alert",
       "debugbundle_update_alert",
+      "debugbundle_rotate_alert_webhook_secret",
       "debugbundle_delete_alert",
       "debugbundle_list_projects",
       "debugbundle_create_project",
@@ -241,6 +244,9 @@
       "optional": true
     },
     "debugbundle_update_alert": {
+      "optional": true
+    },
+    "debugbundle_rotate_alert_webhook_secret": {
       "optional": true
     },
     "debugbundle_delete_alert": {

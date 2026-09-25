@@ -12,6 +12,7 @@ import {
   type WeeklyReportChannelRecord,
   type WeeklyReportingStore
 } from "../../../packages/storage/src/index.js";
+import { fetchGuardedOutbound } from "../../../packages/storage/src/alert-outbound-guard.js";
 import type { WeeklyReportTransport } from "./processor.js";
 
 const RETENTION_CLEANUP_LEASE_KEY = "leases:cleanup-retention:schedule";
@@ -409,7 +410,7 @@ export function createWeeklyReportTransport(input: {
       const timeout = setTimeout(() => controller.abort(), 5000);
 
       try {
-        const response = await fetch(webhookUrl, {
+        const response = await fetchGuardedOutbound(webhookUrl, {
           method: "POST",
           headers: {
             "content-type": "application/json"
@@ -419,6 +420,10 @@ export function createWeeklyReportTransport(input: {
           }),
           signal: controller.signal
         });
+
+        if (response.status >= 300 && response.status < 400) {
+          throw new Error("weekly_report_slack_redirect_blocked");
+        }
 
         if (!response.ok) {
           throw new Error(`weekly_report_slack_http_error_${response.status}`);

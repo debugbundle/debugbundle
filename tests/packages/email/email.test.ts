@@ -227,6 +227,35 @@ describe("email package", () => {
     expect(rendered.html).toContain('src="https://app.debugbundle.com/email/debugbundle-mark.png"');
   });
 
+  it("bounds a hundred-incident digest while reporting the full count and inspection link", () => {
+    const rendered = renderAlertDigestEmail({
+      totalIncidentCount: 100,
+      allIncidentsUrl: "https://app.debugbundle.com/projects/proj_123/incidents",
+      alerts: Array.from({ length: 100 }, (_, index) => ({
+        conditionType: "new_incident", incidentId: `inc_${index}`,
+        occurredAt: "2026-05-17T10:00:00.000Z", serviceName: "checkout-api",
+        environment: "production", severity: "high" as const,
+        summary: `Failure ${index}`
+      }))
+    });
+    expect(rendered.subject).toContain("100 incidents");
+    expect(rendered.text.match(/Incident ID:/g)).toHaveLength(25);
+    expect(rendered.text).toContain("75 more incidents");
+    expect(rendered.html).toContain("https://app.debugbundle.com/projects/proj_123/incidents");
+    expect(rendered.html).toContain("100 incidents matched alerts");
+    expect(rendered.html).not.toContain("Failure 99");
+  });
+
+  it("keeps every matched condition label on a sampled incident", () => {
+    const rendered = renderAlertDigestEmail({ alerts: [{
+      conditionType: "new_incident", conditionTypes: ["new_incident", "error_spike"],
+      incidentId: "inc_1", occurredAt: "2026-05-17T10:00:00.000Z",
+      serviceName: "checkout-api", environment: "production", severity: "critical",
+      summary: "Checkout root failure"
+    }] });
+    expect(rendered.text).toContain("Alerts: New incident, Error spike");
+  });
+
   it("contains long alert content within alert email cards", () => {
     const longSummary =
       "rename(/var/www/vendor/laravel/framework/src/Illuminate/Console/resources/views/components/two-column-detail.php,/var/www/vendor/laravel/framework/src/Illuminate/Console/resources/views/components/two-column-detail.php.bak):Permissiondenied";

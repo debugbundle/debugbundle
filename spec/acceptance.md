@@ -85,6 +85,43 @@ Both actual `@` expressions and dynamically changed `error_reporting()` masks su
 
 Native logger level/silent/processor filtering runs before SDK capture; enabled-query calls emit no events; lazy message blocks run zero times when suppressed and once when accepted; native output, return values and application exceptions are preserved. SDK callback failures and recursive logging are isolated. A detached adapter no longer captures through cached wrappers or inherited child emitters. Test these behaviors against real supported logging libraries as well as failure-injection fixtures.
 
+### AC-SDK-SAFETY-FILTER: Cheap Rejection Before Construction
+
+- **Given** a WARNING effective threshold and 10,000 INFO records, with and without `beforeSend`
+- **When** an installed SDK or native logger adapter receives the records
+- **Then** no event builder, formatter, user hook, privacy traversal, transport, or SDK-owned buffer is invoked for those records
+- **And** accepted WARNING and ERROR records retain their documented structured fields and privacy protection
+- **And** an explicit breadcrumb policy, when enabled, admits only its bounded sample without changing the default filter
+
+### AC-SDK-SAFETY-CALLER: Slow Dependencies Do Not Stall Capture
+
+- **Given** a held sender, unavailable configuration endpoint, or full event queue
+- **When** multiple application threads or event-loop callers capture accepted and filtered records
+- **Then** automatic capture and logger adapters return without waiting for delivery, configuration, disk persistence, or another event's expensive work
+- **And** no SDK failure or hostile application accessor escapes into the host
+- **And** accepted events, retries, pressure counters, and lower-priority drops stay within explicit count, byte, age, and concurrency limits
+- **And** explicit flush and shutdown obey their documented finite deadlines without blocking concurrent capture
+- **And** JavaScript application hooks run after capture returns, with documented event-loop callback responsibility and bounded SDK-owned pending work
+- **Except** PHP/WordPress may perform the owner-approved single bounded-size best-effort request-end HTTP attempt, which can occupy one PHP worker; capture and initialization remain free of automatic network calls, and a transport outage may lose events
+
+### AC-SDK-SAFETY-OVERLOAD: Every Captured Event Type Has Finite Ownership
+
+- **Given** a full queue, an in-flight stalled batch, or a stream of 10,000 rapid records at each supported log severity
+- **When** the SDK receives logs, exceptions, failed requests, probes, and automatic framework events
+- **Then** lower-priority records are rejected before expensive application context traversal where capacity is already exhausted, while eligible ERROR, exception, and failed-request incidents can displace pending lower-priority work
+- **And** an all-high-priority burst still returns promptly within finite count and byte limits, with bounded aggregate loss reporting instead of per-drop events
+- **And** transport snapshots held by a slow sender count against the same browser queue budget; new ERROR or exception events may displace only unsent lower-priority work
+- **And** normal-volume delivery order, redaction, policy, structured fields, and acknowledgement behavior remain intact
+
+### AC-SDK-SAFETY-INSTALL: No Required Auxiliary Service
+
+- **Given** a clean installation of each supported SDK package, including PHP Composer and the WordPress plugin
+- **When** the host uses the documented standard setup without an additional collector, daemon, sidecar, or telemetry-specific queue service
+- **Then** the SDK retains its documented capture and delivery behavior and passes the applicable caller-safety, overload, privacy, and installed-runtime gates
+- **And** failure of an optional integration cannot silently enable blocking delivery, unbounded retention, or an unprotected handoff
+- **And** a runtime unable to meet these conditions remains unqualified rather than being presented as a safe default
+- **And** PHP/WordPress qualify under the documented request-end exception only after installed CLI/FPM/Apache/WordPress tests measure the worker cost and confirm a single attempt, error priority, bounded payload, no inline batch sends, no ordinary-request config fetch, and explicit outage loss behavior
+
 ### AC-SDK-10: Logger Auto-Detection
 
 - **Given** a Node.js application with pino or winston installed
@@ -1251,8 +1288,25 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **When** new-incident alerts are evaluated
 - **Then** the incident fingerprints and incident records remain distinct
 - **And** email keeps every incident in one project/recipient digest
-- **And** Slack, Discord, and webhook delivery use one hashed burst notification key and at least a ten-second cooldown
-- **And** a different session or page remains independently eligible
+- **And** Slack, Discord, and alert-webhook delivery use one hashed burst notification key per capture-time bucket, even when worker processing crosses the ten-second wall-clock window
+- **And** a different session, page, capture-time bucket, or lifecycle transition remains independently eligible when its configured cooldown permits it
+
+### AC-ALT-08: Coherent Incident Bursts Across Destinations
+
+- **Given** 100 causally related Java stderr fragments spanning more than 17 seconds, concurrent workers, and enabled Slack, email, Discord, and alert-webhook rules
+- **When** the fragments and a separate failure, a critical escalation, and a later regression are processed
+- **Then** each eligible destination sends at most one initial notification for the related burst, with a durable member count and a project-scoped way to inspect every incident
+- **And** the separate failure, critical escalation, and later regression remain independently visible; recipient, severity, environment, and rule boundaries never merge unrelated alerts
+- **And** signed lifecycle webhooks retain their compatible per-event identities unless a recipient explicitly opts into a versioned summary mode
+- **And** replay, retry, provider timeout, and worker restart do not multiply logical delivery intents or lose accepted group members
+
+### AC-ALT-09: Signed Custom Alert Webhooks And Public Outbound Targets
+
+- **Given** a custom alert-webhook rule created with `signing: "hmac_sha256_v1"` or an explicit signing-secret rotation on an existing rule
+- **When** the rule is delivered
+- **Then** its exact JSON body has a per-rule `X-DebugBundle-Signature` HMAC-SHA256 header, and creation or rotation reveals that secret once through API, CLI, and MCP
+- **And** list and ordinary update responses never reveal the secret; existing clients without the signed-protocol opt-in retain the old create response and JSON body; all custom deliveries are signed, with independent keys provisioned before sending legacy rules
+- **And** private/reserved literal or DNS answers, unsafe ports, embedded credentials, and webhook redirects never reach a remote socket; availability redirects are revalidated and pinned before each connection
 
 ---
 
@@ -1272,6 +1326,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **When** multiple equivalent notifications would fire within the same dedupe window
 - **Then** repeated sends are suppressed by durable dedupe rather than sent individually
 - **And** user-configured alert emails are batched into digests instead of sent as bursty individual messages
+- **And** a digest with more than 25 matches sends one bounded email with the exact distinct-incident count, selects up to 25 distinct incidents with critical entries first, retains their matched alert conditions, links to the project incident list when the application base URL is configured, and retains the accepted digest items
 - **And** critical emails (email sign-in codes and security alerts) are never suppressed
 
 ### AC-EMAIL-03: Operational Owner Notifications

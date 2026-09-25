@@ -3,6 +3,7 @@ import { type FastifyInstance } from "fastify";
 import { readCookieValue } from "../../../../packages/auth/src/index.js";
 import { getTierCapabilities } from "../../../../packages/shared-types/src/index.js";
 import { decryptIntegrationSecret, encryptIntegrationSecret } from "../../../../packages/storage/src/index.js";
+import { fetchGuardedOutbound } from "../../../../packages/storage/src/alert-outbound-guard.js";
 import type { ApiDependencies } from "../api-types.js";
 import { recordAuditLog, resolveAuditActorType } from "../audit-logging.js";
 import {
@@ -62,8 +63,10 @@ function resolveIntegrationEncryptionKey(): string | null {
 }
 
 async function deliverSlackTestMessage(webhookUrl: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
   try {
-    const response = await fetch(webhookUrl, {
+    const response = await fetchGuardedOutbound(webhookUrl, {
       method: "POST",
       headers: {
         "content-type": "application/json"
@@ -88,16 +91,15 @@ async function deliverSlackTestMessage(webhookUrl: string): Promise<{ ok: true }
             ]
           }
         ]
-      })
+      }),
+      signal: controller.signal
     });
 
     if (response.ok) {
       return { ok: true };
     }
 
-    const errorBody = await response.text().catch(() => "");
-    const normalizedBody = errorBody.trim().toLowerCase();
-    if (response.status === 404 || response.status === 410 || normalizedBody.includes("channel_not_found")) {
+    if (response.status === 404 || response.status === 410) {
       return { ok: false, error: "slack_destination_unavailable" };
     }
     if (response.status === 403) {
@@ -107,9 +109,27 @@ async function deliverSlackTestMessage(webhookUrl: string): Promise<{ ok: true }
       return { ok: false, error: "slack_rate_limited" };
     }
 
+    // Keep the historical provider-body classification without buffering an
+    // arbitrary response body from a remote endpoint.
+    const reader = response.body?.getReader();
+    if (reader !== undefined) {
+      try {
+        const chunk = await reader.read();
+        const prefix = new TextDecoder().decode(chunk.value?.subarray(0, 256)).toLowerCase();
+        if (prefix.includes("channel_not_found")) {
+          return { ok: false, error: "slack_destination_unavailable" };
+        }
+      } finally {
+        await reader.cancel().catch(() => undefined);
+      }
+    }
+
     return { ok: false, error: "slack_delivery_failed" };
   } catch {
     return { ok: false, error: "slack_delivery_failed" };
+  } finally {
+    controller.abort();
+    clearTimeout(timeout);
   }
 }
 

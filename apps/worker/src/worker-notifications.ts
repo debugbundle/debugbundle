@@ -1,6 +1,10 @@
 import { createHmac, createPrivateKey, createSign } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { sanitizeTelemetry } from "../../../packages/redaction/src/index.js";
+import {
+  assertAlertOutboundTarget,
+  fetchGuardedOutbound
+} from "../../../packages/storage/src/alert-outbound-guard.js";
 
 import {
   queueAllowanceLimitReachedNotification,
@@ -552,12 +556,17 @@ export function createLifecycleWebhookTransport(
 ): LifecycleWebhookTransport {
   return {
     async deliver(event): Promise<void> {
+      try {
+        assertAlertOutboundTarget(event.target_url);
+      } catch {
+        throw new LifecycleWebhookDeliveryError("webhook_target_blocked", null);
+      }
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), input.timeoutMs);
 
       try {
         const serializedPayload = JSON.stringify(safeDeliveryPayload(event.payload));
-        const response = await fetch(event.target_url, {
+        const response = await fetchGuardedOutbound(event.target_url, {
           method: "POST",
           headers: {
             "content-type": "application/json",
@@ -569,6 +578,10 @@ export function createLifecycleWebhookTransport(
           body: serializedPayload,
           signal: controller.signal
         });
+
+        if (response.status >= 300 && response.status < 400) {
+          throw new LifecycleWebhookDeliveryError("webhook_redirect_blocked", response.status);
+        }
 
         if (!response.ok) {
           throw new LifecycleWebhookDeliveryError(

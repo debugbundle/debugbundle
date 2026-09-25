@@ -33,6 +33,7 @@ const {
   createWebSessionAuthServiceMock,
   createIngestionPersistenceServiceMock,
   createPostgresMetadataStoreMock,
+  createPostgresAlertGroupInspectionStoreMock,
   createPostgresSlackDestinationStoreMock,
   createPostgresOperationalEmailDeliveryStoreMock,
   createPostgresWeeklyReportChannelStoreMock,
@@ -83,6 +84,7 @@ const {
   createWebSessionAuthServiceMock: vi.fn(),
   createIngestionPersistenceServiceMock: vi.fn(),
   createPostgresMetadataStoreMock: vi.fn(),
+  createPostgresAlertGroupInspectionStoreMock: vi.fn(),
   createPostgresSlackDestinationStoreMock: vi.fn(),
   createPostgresOperationalEmailDeliveryStoreMock: vi.fn(),
   createPostgresWeeklyReportChannelStoreMock: vi.fn(),
@@ -166,6 +168,7 @@ vi.mock("../../packages/storage/src/index.js", () => ({
   createMemberAuthService: createMemberAuthServiceMock,
   createIngestionPersistenceService: createIngestionPersistenceServiceMock,
   createPostgresMetadataStore: createPostgresMetadataStoreMock,
+  createPostgresAlertGroupInspectionStore: createPostgresAlertGroupInspectionStoreMock,
   createPostgresSlackDestinationStore: createPostgresSlackDestinationStoreMock,
   createPostgresOperationalEmailDeliveryStore: createPostgresOperationalEmailDeliveryStoreMock,
   createPostgresWeeklyReportChannelStore: createPostgresWeeklyReportChannelStoreMock,
@@ -257,6 +260,7 @@ beforeEach(() => {
   createWebSessionAuthServiceMock.mockReset();
   createIngestionPersistenceServiceMock.mockReset();
   createPostgresMetadataStoreMock.mockReset();
+  createPostgresAlertGroupInspectionStoreMock.mockReset();
   createPostgresSlackDestinationStoreMock.mockReset();
   createPostgresOperationalEmailDeliveryStoreMock.mockReset();
   createPostgresWeeklyReportChannelStoreMock.mockReset();
@@ -447,6 +451,10 @@ beforeEach(() => {
     html: "invite-html"
   });
   createIngestionPersistenceServiceMock.mockReturnValue({ persistAndEnqueue: vi.fn() });
+  createPostgresAlertGroupInspectionStoreMock.mockReturnValue({
+    listGroupsForOrganization: vi.fn(),
+    getGroupForOrganization: vi.fn()
+  });
   createPostgresMetadataStoreMock.mockReturnValue({
     listProjectsForOrganization: vi.fn(),
     createProjectForOrganization: vi.fn(),

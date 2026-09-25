@@ -31,6 +31,7 @@ export type {
   AlertEmailDigestItemRecord,
   AlertEmailDigestRecord,
   AlertManagementStore,
+  AlertRuleForDelivery,
   AlertRuleRecord,
   CreateAlertDeliveryIntentInput,
   DeleteAlertResult,

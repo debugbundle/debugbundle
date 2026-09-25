@@ -27,10 +27,19 @@ it("closes a real streaming HTTP response once webhook status is known", async (
   await once(server, "listening");
   const address = server.address();
   let deadline: ReturnType<typeof setTimeout> | undefined;
+  const nativeFetch = globalThis.fetch;
+  const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((_target, init) => {
+    if (address === null || typeof address === "string") throw new Error("missing_test_port");
+    // Keep the production target public while routing this resource-cleanup
+    // assertion to a local streaming fixture after the guard has run.
+    const requestInit = { ...init } as RequestInit & { dispatcher?: unknown };
+    delete requestInit.dispatcher;
+    return nativeFetch(`http://127.0.0.1:${address.port}/hook`, requestInit);
+  });
   try {
     if (address === null || typeof address === "string") throw new Error("missing_test_port");
     await createLifecycleWebhookTransport({ timeoutMs: 1000 }).deliver({
-      target_url: `http://127.0.0.1:${address.port}/hook`,
+      target_url: "https://hooks.example.test/hook",
       signing_secret: "test-only",
       payload: {}
     } as never);
@@ -41,6 +50,7 @@ it("closes a real streaming HTTP response once webhook status is known", async (
       })
     ]);
   } finally {
+    fetchSpy.mockRestore();
     clearTimeout(deadline);
     server.closeAllConnections();
     await new Promise<void>((resolve, reject) =>
@@ -54,7 +64,7 @@ const deliveries = [
     "alert",
     () =>
       createAlertTransport({ timeoutMs: 1000, emailTransport: null }).deliver({
-        channel: "webhook",
+        channel: "webhook", signing_secret: "test-signing-key",
         config: { target_url: "https://example.test/hook" },
         payload: {}
       } as never)

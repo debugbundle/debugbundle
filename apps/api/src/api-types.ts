@@ -18,6 +18,7 @@ import type {
   AgentTokenStore,
   AlertChannel,
   AlertConditionType,
+  AlertGroupInspectionStore,
   AuthRateLimiter,
   IngestionRateLimiter,
   IncidentRetrievalRecord,
@@ -44,6 +45,7 @@ import type { ApiManagementDependencies } from "./api-management-types.js";
 import type { OpenAiHostedReadDependencies } from "./openai-mcp-operations.js";
 
 export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagementDependencies {
+  alertGroupInspection?: AlertGroupInspectionStore;
   ingestionPersistence: Pick<IngestionPersistenceService, "persistAndEnqueue"> &
     Partial<AnalyticsIngestionPersistenceService>;
   ingestionMetadata: Pick<IngestionMetadataService, "resolveProjectByTokenHash">;

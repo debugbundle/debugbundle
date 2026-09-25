@@ -474,6 +474,8 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
       severity_lifecycle_scope text,
       cooldown_seconds integer NOT NULL DEFAULT 0,
       config jsonb NOT NULL DEFAULT '{}'::jsonb,
+      signing_secret text,
+      webhook_payload_version smallint NOT NULL DEFAULT 0 CHECK (webhook_payload_version IN (0, 1)),
       is_enabled boolean NOT NULL DEFAULT true,
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now(),
@@ -520,6 +522,7 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
       dedupe_key text NOT NULL,
       notification_key text NOT NULL DEFAULT '',
       coalescing_key text,
+      evaluation_job_id text,
       channel text NOT NULL,
       status text NOT NULL,
       payload jsonb NOT NULL,
@@ -537,6 +540,21 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
   `
     CREATE INDEX alert_deliveries_alert_notification_idx
     ON alert_deliveries (alert_id, notification_key, created_at DESC)
+  `,
+  `
+    CREATE TABLE alert_delivery_members (
+      id uuid PRIMARY KEY,
+      delivery_id uuid NOT NULL REFERENCES alert_deliveries(id) ON DELETE CASCADE,
+      incident_id uuid NOT NULL,
+      condition_type text NOT NULL,
+      dedupe_key text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE (delivery_id, incident_id, condition_type, dedupe_key)
+    )
+  `,
+  `
+    CREATE INDEX alert_delivery_members_delivery_created_idx
+    ON alert_delivery_members (delivery_id, created_at ASC, id ASC)
   `,
   `
     CREATE TABLE alert_email_digests (

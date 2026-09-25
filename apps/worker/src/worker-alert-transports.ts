@@ -1,3 +1,5 @@
+import { createHmac } from "node:crypto";
+
 import {
   buildEmailBrandMarkUrl,
   renderAlertDigestEmail,
@@ -11,6 +13,10 @@ import {
   type SlackDestinationStore
 } from "../../../packages/storage/src/index.js";
 import { sanitizeTelemetry } from "../../../packages/redaction/src/index.js";
+import {
+  assertAlertOutboundTarget,
+  fetchGuardedOutbound
+} from "../../../packages/storage/src/alert-outbound-guard.js";
 import {
   AlertDeliveryError,
   type AlertDeliveryTransport,
@@ -43,10 +49,21 @@ function safeAlertText(value: string | null | undefined): string | null {
   return result.value;
 }
 
+function directGroupUrl(
+  apiBaseUrl: string | null | undefined,
+  event: { delivery_id?: string; project_id?: string }
+): string | undefined {
+  if (apiBaseUrl === undefined || apiBaseUrl === null ||
+    event.delivery_id === undefined || event.project_id === undefined) return undefined;
+  return `${apiBaseUrl}/v1/alert-groups/direct/${encodeURIComponent(event.delivery_id)}?project_id=${encodeURIComponent(event.project_id)}`;
+}
+
 function buildAlertNotificationInput(
   input: Pick<CreateAlertTransportInput, "appBaseUrl" | "emailAssetBaseUrl" | "apiBaseUrl">,
   event: {
     incident_id?: string | null;
+    delivery_id?: string;
+    project_id?: string;
     payload: Record<string, unknown>;
     project_name?: string | null;
   }
@@ -58,6 +75,7 @@ function buildAlertNotificationInput(
         ? event.incident_id
         : "unknown";
   const brandMarkUrl = buildEmailBrandMarkUrl(input.emailAssetBaseUrl ?? input.appBaseUrl);
+  const groupUrl = directGroupUrl(input.apiBaseUrl, event);
 
   return {
     conditionType:
@@ -89,6 +107,7 @@ function buildAlertNotificationInput(
     ...(input.apiBaseUrl === undefined || input.apiBaseUrl === null
       ? {}
       : { bundleUrl: `${input.apiBaseUrl}/v1/incidents/${incidentId}/bundle` }),
+    ...(groupUrl === undefined ? {} : { groupUrl }),
     ...(brandMarkUrl === undefined ? {} : { brandMarkUrl })
   };
 }
@@ -97,6 +116,7 @@ function buildAlertDigestEntryInput(
   input: Pick<CreateAlertTransportInput, "appBaseUrl" | "apiBaseUrl">,
   item: {
     incident_id: string;
+    condition_types?: string[];
     payload: Record<string, unknown>;
     project_name?: string | null;
   }
@@ -107,6 +127,7 @@ function buildAlertDigestEntryInput(
       payload: item.payload,
       ...(item.project_name === undefined ? {} : { project_name: item.project_name })
     }),
+    ...(item.condition_types === undefined ? {} : { conditionTypes: item.condition_types }),
     summary: typeof item.payload["summary"] === "string" ? item.payload["summary"] : null
   };
 }
@@ -114,20 +135,34 @@ function buildAlertDigestEntryInput(
 export function createAlertTransport(input: CreateAlertTransportInput): AlertDeliveryTransport {
   async function deliverViaWebhook(
     targetUrl: string,
-    payload: Record<string, unknown>
+    payload: Record<string, unknown>,
+    signingSecret?: string | null
   ): Promise<void> {
+    try {
+      assertAlertOutboundTarget(targetUrl);
+    } catch {
+      throw new AlertDeliveryError("alert_target_blocked");
+    }
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), input.timeoutMs);
+    const serializedPayload = JSON.stringify(safeAlertPayload(payload));
 
     try {
-      const response = await fetch(targetUrl, {
+      const response = await fetchGuardedOutbound(targetUrl, {
         method: "POST",
         headers: {
-          "content-type": "application/json"
+          "content-type": "application/json",
+          ...(signingSecret === undefined || signingSecret === null ? {} : {
+            "x-debugbundle-signature": `sha256=${createHmac("sha256", signingSecret).update(serializedPayload).digest("hex")}`
+          })
         },
-        body: JSON.stringify(safeAlertPayload(payload)),
+        body: serializedPayload,
         signal: controller.signal
       });
+
+      if (response.status >= 300 && response.status < 400) {
+        throw new AlertDeliveryError("alert_redirect_blocked");
+      }
 
       if (!response.ok) {
         throw new AlertDeliveryError(`alert_http_error_${response.status}`);
@@ -245,11 +280,12 @@ export function createAlertTransport(input: CreateAlertTransportInput): AlertDel
             : "Alert triggered";
         const eventType =
           typeof safePayload["event_type"] === "string" ? safePayload["event_type"] : "alert";
+        const groupUrl = buildAlertNotificationInput(input, { ...event, payload: safePayload }).groupUrl;
+        const content = projectName === undefined || projectName === null
+          ? `**[DebugBundle]** ${eventType}: ${summary}`
+          : `**[DebugBundle]** ${eventType}: ${summary}\nProject: ${projectName}`;
         const discordPayload = {
-          content:
-            projectName === undefined || projectName === null
-              ? `**[DebugBundle]** ${eventType}: ${summary}`
-              : `**[DebugBundle]** ${eventType}: ${summary}\nProject: ${projectName}`,
+          content: `${content}${groupUrl === undefined ? "" : `\nGroup: ${groupUrl}`}`,
           embeds: [
             {
               title: eventType,
@@ -279,6 +315,10 @@ export function createAlertTransport(input: CreateAlertTransportInput): AlertDel
         if (typeof targetUrlValue !== "string" || targetUrlValue.length === 0) {
           throw new AlertDeliveryError("alert_target_url_missing");
         }
+        if (typeof event.signing_secret !== "string" || event.signing_secret.length === 0) {
+          throw new AlertDeliveryError("alert_signing_secret_missing");
+        }
+        const groupUrl = directGroupUrl(input.apiBaseUrl, event);
 
         await deliverViaWebhook(targetUrlValue, {
           ...safePayload,
@@ -286,8 +326,15 @@ export function createAlertTransport(input: CreateAlertTransportInput): AlertDel
           projectName === undefined ||
           projectName === null
             ? {}
-            : { project_name: projectName })
-        });
+            : { project_name: projectName }),
+          ...(event.webhook_payload_version !== 1 ||
+            event.delivery_id === undefined || event.project_id === undefined
+            ? {}
+            : {
+                alert_group_id: event.delivery_id,
+                ...(groupUrl === undefined ? {} : { alert_group_url: groupUrl })
+              })
+        }, event.signing_secret);
         return;
       }
 
@@ -312,7 +359,11 @@ export function createAlertEmailDigestTransport(
 
       const rendered = renderAlertDigestEmail({
         brandMarkUrl: buildEmailBrandMarkUrl(input.emailAssetBaseUrl ?? input.appBaseUrl),
-        alerts: event.items.map((item) =>
+        ...(event.total_incident_count === undefined ? {} : { totalIncidentCount: event.total_incident_count }),
+        ...(input.appBaseUrl === undefined || input.appBaseUrl === null ? {} : {
+          allIncidentsUrl: `${input.appBaseUrl}/projects/${event.project_id}/incidents`
+        }),
+        alerts: event.items.slice(0, 25).map((item) =>
           buildAlertDigestEntryInput(input, {
             ...item,
             payload: safeAlertPayload(item.payload),

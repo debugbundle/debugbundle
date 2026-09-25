@@ -33,19 +33,23 @@ Every SDK must expose an init function that accepts a configuration object and r
 | `maxProbeLabels` | number | `50` | Max distinct probe labels tracked in ring buffer. New labels beyond this are silently dropped. |
 | `maxProbeEntriesPerLabel` | number | `10` | Ring buffer capacity per label. Oldest entry discarded when full. |
 | `probeFlushOnError` | boolean | `true` | Whether probe ring buffers flush alongside error events. |
-| `beforeSend` | `(event) → event \| null` | — | Optional synchronous final hook after SDK event construction/redaction and before buffering. Returning `null` drops the event locally. |
+| `beforeSend` | `(event) → event \| null` | — | Optional final hook for admitted events. Returning `null` drops the event locally. Published versions may run it synchronously; a hardened major version defers it from capture calls as described in §1.1, with the approved PHP request-end exception. |
 
 **Node.js local-first config fields (`@debugbundle/sdk-node`):**
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `projectMode` | `"connected" \| "local-only"` | `"connected"` | Selects transport behavior. `local-only` uses file transport and requires filesystem plus CLI access on the machine doing capture. `connected` keeps local/dev on file transport and staging/production on HTTP transport. |
 | `localEventsDir` | string | `<cwd>/.debugbundle/local/events` | Filesystem destination for Node file transport batches. |
+| `maxBufferedEvents` | positive number | `1000` | Combined queued and in-flight event limit; queued low-priority logs yield to exceptions. |
+| `maxBufferedBytes` | positive number | `8388608` | Combined queued and in-flight serialized-byte limit; an event that cannot fit is discarded. |
 
 **Capture policy note:** SDKs do NOT accept capture policy fields in the init config. The capture policy is server-owned and delivered to SDKs via the `capture_policy` field in the `GET /v1/sdk/config` response. SDKs must respect the server-side policy and filter events locally before transmission. See Section 12 (Capture Policy Integration) for details.
 
 ### 1.1 Local beforeSend hook
 
-SDKs must expose a language-idiomatic synchronous `beforeSend` hook as an optional init config field for app-owned local policy such as final redaction, tenant-specific suppression, or dropping events that must never leave the runtime. The hook receives an isolated copy of a fully built canonical DebugBundle event after SDK redaction and before local capture-policy/rule evaluation, sampling, duplicate suppression, persistence, buffering, and transport.
+SDKs must expose a language-idiomatic `beforeSend` hook as an optional init config field for app-owned local policy such as final redaction, tenant-specific suppression, or dropping events that must never leave the runtime. Published legacy versions give it an isolated, sanitized canonical event synchronously before local policy/rule evaluation, sampling, duplicate suppression, persistence, buffering, and transport. A hardened major version may change that ordering only with a documented migration and must preserve valid replacement, drop, and safe-original fallback semantics for admitted events.
+
+**Hardened release boundary:** Existing published hook timing and accepted-event replacement semantics remain the compatibility baseline for those versions. A hardened SDK first rejects log records below the effective level and metadata-only capture policy, before constructing an event or invoking this hook. The hook cannot promote a rejected INFO record. Java3.0, Python2.0, Go3.0, Swift3.0, Android3.0 and .NET2.0 candidates run their hooks on existing bounded background delivery workers; see their versioned migration guides. Node3.0, browser3.0 and React Native3.0 defer hooks until capture returns on their JavaScript event loops. Every timing change has a versioned migration. Every accepted replacement receives complete canonical validation, mandatory sanitization and authoritative policy/rule evaluation before delivery. A backend/native callback that hangs may stall its bounded worker, but must not stall application capture or cause unbounded replacement workers. JavaScript callbacks retain the explicit event-loop responsibility below. Privacy-safe bounded admission before hook execution is allowed; unprotected input retention is not.
 
 Rules:
 - Return the event to keep shipping it.
@@ -55,9 +59,11 @@ Rules:
 - If the hook throws, panics, or returns an invalid event, the SDK must keep the SDK-owned original event, emit only a bounded internal diagnostic where supported, and must not throw into host code.
 - The SDK-owned original is already sanitized. Every valid returned event must pass mandatory sanitization and complete canonical schema validation again before policy evaluation, buffering, persistence, or transmission. Failure of mandatory sanitization withholds the unsafe field or event without throwing into host code.
 - Mutating the hook input without returning a valid replacement must not mutate the SDK-owned original.
-- Hook execution must not block request/response handling beyond normal synchronous JavaScript/runtime execution.
+- Hardened hook execution must not run application callbacks inline on request/response or logger capture calls. Node, browser and React Native hooks are deferred until capture returns on their JavaScript event loop: arbitrary closures cannot be isolated without breaking application state access, so application callbacks must return promptly and can delay that event loop if they block. This explicit JavaScript callback responsibility does not relax SDK queue, network, or overload bounds. Published legacy synchronous behavior remains version-specific until migrated.
 - Fatal signal handlers, hard-crash handlers, and shutdown paths may skip application hook execution when invoking user code is unsafe. Each affected SDK must document the restriction; replayed crash events use the normal hook pipeline when safe.
 - Project capture rules remain the preferred operational noise-control surface because they are centralized, auditable, and enforced again by ingestion and worker backstops.
+
+The .NET2 candidate projects admitted exception metadata and custom reference-state logger formatting through its existing sender using weak application references. Ordinary structured logging snapshots bounded primitive values; unsupported custom value-state formatters and untrusted collection implementations use safe fallback values instead of executing arbitrary accessors/enumerators on capture callers. Logger formatting and container projection remain bounded, and worker results receive mandatory privacy before hooks and again after valid hook replacement. Configured custom sampling callbacks run on the sender once per admitted event and are not repeated on retry. Its major migration guide defines the supported snapshot and fallback behavior.
 
 ### 1.2 Node.js local-first transport selection
 
@@ -133,7 +139,7 @@ Rules:
 | `tracePropagationTargets` | string[] | same-origin only | Cross-origin first-party URL substrings allowed to receive `X-DebugBundle-Trace-Id`. Third-party absolute URLs are not traced by default. |
 | `sessionSampleRate` | number (0.0–1.0) | `1.0` | Session-level sampling. Decision made once per session — entire journey captured or nothing. Independent of `sampleRate`. |
 | `maxEventsPerSession` | number | `100` | Hard cap on events per session. After cap, only `frontend_exception` events are captured. |
-| `beforeSend` | `(event) → event \| null` | — | Browser-supported synchronous final hook before buffering. Returning `null` drops the event locally. |
+| `beforeSend` | `(event) → event \| null` | — | Synchronous-return hook; Browser3 defers invocation until after capture returns and bounded admission. Application callbacks must return promptly. Returning `null` drops the event locally. |
 | `analytics` | object | `{ enabled: false }` | Opt-in AnalyticsBundle product-usage capture. Analytics events use the analytics lane and are not debug incident events. |
 
 **Browser analytics config fields (sdk-browser only, opt-in):**
@@ -270,7 +276,9 @@ DebugBundle::captureShutdown();     // register_shutdown_function() for fatal er
 | Laravel Log | Log channel | Add `'debugbundle'` channel to `config/logging.php` |
 | Symfony Log | Monolog config | Add handler in `monolog.yaml` |
 
-PHP's shared-nothing model (one process per request) means logs accumulate during the request and flush at request termination automatically.
+Published PHP 1.x accumulates logs during the request and flushes synchronously at request termination. WordPress also calls `flush()` during its shutdown hook, and a batch-full capture can send inline. Existing installed 1.x behavior remains unchanged until an explicit major upgrade.
+
+The owner-approved hardened PHP/WordPress standard-install profile requires no extra collector. It never sends when capture reaches batch size or fetches remote configuration on an ordinary PHP initialization. The request-end hook makes at most one best-effort HTTP attempt, selecting up to 25 events and 256 KiB with exceptions ahead of routine logs; overload drops are summarized when a reporting slot is available. The built-in HTTP stream has an advisory 250 ms timeout, not a hard wall-clock deadline for DNS, slow/trickling peers, or user-supplied transports. This attempt may occupy the PHP worker and data may be lost at exit or during an outage. Explicit `refreshRemoteConfig()` includes the project-token Authorization header. WordPress reads locally cached capture policy on visitor requests and refreshes it with project authentication through WP-Cron; the transient is scoped to endpoint and project-token hash, and a missing cache uses the minimal policy. Explicit `flush()` and `refreshRemoteConfig()` remain synchronous administrative operations. The release remains unqualified until a versioned migration and final installed PHP/WordPress artifact cost/loss checks pass. Do not call this asynchronous or strict zero-wait delivery.
 
 ### 3.3 Python — Vanilla Hooks
 
@@ -358,6 +366,7 @@ DebugBundle.capture_exceptions   # at_exit + Thread exception handler
 | Semantic Logger | Appender | `SemanticLogger.add_appender(appender: DebugBundle::SemanticAppender.new)` |
 
 Ruby's Rack middleware captures request context automatically. Sidekiq server middleware captures job context for background job errors.
+In the unreleased Ruby 2.0 safety candidate, automatic `at_exit` and unhandled-thread hooks wake the owned sender without waiting for transport. Delivery at immediate process exit is best-effort; applications that require a delivery attempt use an explicit, finite `flush` in a controlled shutdown window. A separate bounded poller retrieves remote configuration, leaving the sender available if that fetch stalls. On first use after a fork, the child discards inherited buffered events, request context, probes, locks, and worker state before starting fresh workers. The parent's effective capture restrictions remain active until the child refreshes remote configuration. Installed Ruby 1.x behavior remains unchanged until a versioned upgrade.
 
 ### 3.6 Browser — Vanilla Hooks
 
@@ -1265,3 +1274,5 @@ Future server SDKs must implement the same full relay handler contract before th
 | Kotlin (server) | Ktor plugin |
 
 All server SDKs must implement sections 1–8, section 11, section 12, and section 13 of this contract before release.
+
+Exception projection in the hardened native releases: Java3/Android3 and genuine reference errors in Swift3 may use bounded non-owning weak handles inspected only by the existing delivery worker. Queued telemetry remains privacy-protected; weak handles do not extend raw exception lifetime. At most one current raw exception graph is inspected by each worker, with no arbitrary graph byte-bound claim and no replacement workers if an accessor stalls. Collected/unavailable details use an explicit safe fallback. Swift custom value-error/formatter details that require arbitrary caller accessors use documented type/stack or placeholder fallback. Python2 uses built-in exception descriptors to preserve standard details without overridable metadata access.

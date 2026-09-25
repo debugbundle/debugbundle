@@ -100,5 +100,6 @@ describe("api runtime", () => {
 
     await expect(assertDatabaseSchema(db)).rejects.toThrow("db_schema_missing_tables");
     await expect(assertDatabaseSchema(db)).rejects.toThrow("project_tokens");
+    await expect(assertDatabaseSchema(db)).rejects.toThrow("alert_delivery_members");
   });
 });

@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { createEventEnvelope } from "../../packages/shared-types/src/index.js";
 import {
   createPostgresMetadataStore,
+  createPostgresAlertDeliveryStore,
   createRedisQueueClient,
   createRedisIncidentFrequencyCounter,
   buildRawEventObjectKey,
@@ -16,6 +17,8 @@ import { createWorkerJobStore } from "../../packages/storage/src/worker-job-stor
 import { createDurableWorkerQueue } from "../../apps/worker/src/durable-queue.js";
 import { runWorkerProcessStep } from "../../apps/worker/src/worker-steps.js";
 import { createDurableIncidentProcessing } from "../../apps/worker/src/durable-incident-processing.js";
+import { processNextEvaluateAlertsJob } from "../../apps/worker/src/processor-alerts.js";
+import type { EvaluateAlertsWorkerDependencies } from "../../apps/worker/src/processor-shared.js";
 import {
   processNextBuildBundleJob,
   processNextBuildReproductionJob
@@ -39,19 +42,22 @@ runIntegration("worker pipeline crash recovery", () => {
   const objectStore = createTestObjectStore();
   const frequencyCounter = createRedisIncidentFrequencyCounter({ redisUrl, snapshotStore: db });
   const projectId = randomUUID();
+  let ownerUserId = "";
   const store = createWorkerJobStore(db);
   const logger = { warn: vi.fn(), error: vi.fn(), info: vi.fn() } as never;
   beforeAll(async () => {
     await bootstrapStorageAndCreateBucket(pool, s3);
-    await seedOwnedProject({
+    const owner = await seedOwnedProject({
       pool,
       projectId,
       organizationId: randomUUID(),
       organizationName: "Recovery",
       organizationSlug: `recovery-${projectId}`,
+      organizationPlan: "team",
       projectName: "Recovery",
       projectSlug: "recovery"
     });
+    ownerUserId = owner.ownerUserId;
   });
   beforeEach(async () => {
     await pool.query("DELETE FROM worker_jobs WHERE project_id = $1", [projectId]);
@@ -125,6 +131,129 @@ runIntegration("worker pipeline crash recovery", () => {
     });
     return event;
   }
+
+  it("keeps a delayed 100-line redirected Java trace to one incident while retaining a separate failure", async () => {
+    const base = Date.parse("2026-09-22T14:59:52.754Z");
+    const lines = [
+      "java.util.concurrent.ExecutionException: java.util.ConcurrentModificationException",
+      ...Array.from({ length: 48 }, (_, index) => `    at example.ChartService.render(ChartService.java:${index + 10})`),
+      "Caused by: java.util.ConcurrentModificationException",
+      ...Array.from({ length: 49 }, (_, index) => `\tat example.ChartModel.read(ChartModel.java:${index + 20})`),
+      "    ... 12 more"
+    ];
+    expect(lines).toHaveLength(100);
+
+    for (const [index, message] of [...lines, "java.lang.IllegalArgumentException: separate failure"].entries()) {
+      const event = createEventEnvelope({
+        event_id: randomUUID(),
+        occurred_at: new Date(base + (index < lines.length ? index * 190 : 30_000)).toISOString(),
+        event_type: "log_event",
+        service: { name: "hcp", environment: "staging", runtime: "java" },
+        payload: { level: "error", message, attributes: { logger: "org.jboss.stdio" } }
+      });
+      const key = buildRawEventObjectKey({ projectId, eventId: event.event_id, occurredAt: new Date(event.occurred_at) });
+      await objectStore.putObject({
+        key,
+        body: gzipSync(Buffer.from(JSON.stringify(event))),
+        contentType: "application/json",
+        contentEncoding: "gzip"
+      });
+      await redis.enqueue("normalize-events", { project_id: projectId, event_id: event.event_id, object_key: key });
+    }
+
+    const active = worker();
+    for (let index = 0; index < lines.length + 1; index += 1) {
+      expect(await active.processing.normalize()).toMatchObject({ processed: true });
+    }
+    for (let index = 0; index < lines.length + 1; index += 1) {
+      expect(await active.processing.group()).toMatchObject({ processed: true });
+    }
+
+    const incidents = await pool.query<{ id: string; title: string }>(
+      "SELECT id::text, title FROM incidents WHERE project_id = $1 ORDER BY title", [projectId]
+    );
+    expect(incidents.rows).toHaveLength(2);
+    expect(incidents.rows.map((row) => row.title)).toEqual(expect.arrayContaining([
+      expect.stringContaining("ExecutionException"),
+      expect.stringContaining("IllegalArgumentException")
+    ]));
+    const lifecycleIncidentIds = (await pool.query<{ incident_id: string }>(
+      `SELECT payload->'input'->>'incident_id' AS incident_id FROM worker_jobs
+       WHERE project_id = $1 AND job_name = 'publish-incident-lifecycle'
+         AND payload->>'channel' = 'webhook'`, [projectId]
+    )).rows.map((row) => row.incident_id).sort();
+    expect(lifecycleIncidentIds).toEqual(incidents.rows.map((incident) => incident.id).sort());
+    const evaluations = await pool.query<{ condition_type: string; count: string }>(
+      `SELECT payload->>'condition_type' AS condition_type, count(*)::text AS count
+       FROM worker_jobs WHERE project_id = $1 AND job_name = 'evaluate-alerts'
+       GROUP BY payload->>'condition_type' ORDER BY condition_type`,
+      [projectId]
+    );
+    expect(evaluations.rows).toEqual([
+      { condition_type: "new_incident", count: "2" },
+      { condition_type: "severity_threshold", count: "2" }
+    ]);
+
+    const alertIds: string[] = [];
+    try {
+      for (const channel of ["slack", "discord", "webhook", "email"] as const) {
+        const alertId = randomUUID();
+        alertIds.push(alertId);
+        const config = channel === "email" ? { to: "synthetic-alerts@example.test" }
+          : channel === "webhook" ? { target_url: "https://example.test/alerts" }
+            : { webhook_url: "https://example.test/alerts" };
+        await pool.query(
+          `INSERT INTO alert_rules (
+            id, project_id, created_by_user_id, channel, condition_type, severity_min,
+            severity_lifecycle_scope, cooldown_seconds, config, is_enabled
+          ) VALUES ($1, $2, $3, $4, 'new_incident', NULL, NULL, 0, $5::jsonb, true)`,
+          [alertId, projectId, ownerUserId, channel, JSON.stringify(config)]
+        );
+      }
+
+      const newIncidentJobs = await pool.query<{ payload: Record<string, unknown> }>(
+        `SELECT payload FROM worker_jobs
+         WHERE project_id = $1 AND job_name = 'evaluate-alerts'
+           AND payload->>'condition_type' = 'new_incident' ORDER BY created_at`,
+        [projectId]
+      );
+      const delivered = vi.fn().mockResolvedValue(undefined);
+      const alertStore = createPostgresAlertDeliveryStore(db);
+      for (const { payload } of newIncidentJobs.rows) {
+        await processNextEvaluateAlertsJob({
+          queue: { dequeue: async () => payload },
+          alertStore,
+          alertTransport: { deliver: delivered }
+        } as unknown as EvaluateAlertsWorkerDependencies);
+      }
+
+      const incidentIds = (await pool.query<{ id: string }>(
+        "SELECT id::text FROM incidents WHERE project_id = $1 ORDER BY id", [projectId]
+      )).rows.map((row) => row.id);
+      expect(delivered).toHaveBeenCalledTimes(6);
+      for (const channel of ["slack", "discord", "webhook"] as const) {
+        const channelIncidentIds = delivered.mock.calls
+          .map((call) => call[0] as { channel: string; incident_id: string })
+          .filter((delivery) => delivery.channel === channel)
+          .map((delivery) => delivery.incident_id)
+          .sort();
+        expect(channelIncidentIds).toEqual(incidentIds);
+      }
+      const digest = await pool.query<{ digest_count: string; member_count: string }>(
+        `SELECT count(DISTINCT digests.id)::text AS digest_count,
+                count(DISTINCT items.incident_id)::text AS member_count
+         FROM alert_email_digests digests
+         JOIN alert_email_digest_items items ON items.digest_id = digests.id
+         WHERE digests.project_id = $1`, [projectId]
+      );
+      expect(digest.rows[0]).toEqual({ digest_count: "1", member_count: "2" });
+    } finally {
+      await pool.query("DELETE FROM alert_email_digests WHERE project_id = $1 AND recipient = $2", [
+        projectId, "synthetic-alerts@example.test"
+      ]);
+      await pool.query("DELETE FROM alert_rules WHERE id = ANY($1::uuid[])", [alertIds]);
+    }
+  }, 30_000);
 
   function crashAfterEnqueue(jobName: string): Queryable {
     return {

@@ -1,6 +1,6 @@
 import { AlertApiError } from "../../../packages/alert-client/src/index.js";
 
-export const ALERT_MCP_TOOL_NAMES = ["list_alerts", "create_alert", "update_alert", "delete_alert"] as const;
+export const ALERT_MCP_TOOL_NAMES = ["list_alerts", "list_alert_groups", "get_alert_group", "create_alert", "update_alert", "rotate_alert_webhook_secret", "delete_alert"] as const;
 
 function mapMcpError(error: unknown): never {
   if (error instanceof AlertApiError) {
@@ -12,6 +12,8 @@ function mapMcpError(error: unknown): never {
 
 export function createAlertMcpTools(api: {
   listAlerts(input: { bearerToken: string; projectId: string; limit?: number }): Promise<unknown[]>;
+  listAlertGroups(input: { bearerToken: string; projectId: string; limit?: number; cursor?: string }): Promise<unknown>;
+  getAlertGroup(input: { bearerToken: string; projectId: string; kind: "direct" | "email_digest"; groupId: string; limit?: number; cursor?: string }): Promise<unknown>;
   createAlert(input: {
     bearerToken: string;
     projectId: string;
@@ -35,6 +37,7 @@ export function createAlertMcpTools(api: {
     severityLifecycleScope?: string | null;
     cooldownSeconds?: number;
     config?: Record<string, unknown> | null;
+    rotateSigningSecret?: boolean;
     isEnabled?: boolean;
   }): Promise<unknown>;
   deleteAlert(input: { bearerToken: string; projectId: string; alertId: string }): Promise<unknown>;
@@ -51,6 +54,33 @@ export function createAlertMcpTools(api: {
         }
 
         return { alerts: await api.listAlerts(requestInput) };
+      } catch (error) {
+        mapMcpError(error);
+      }
+    },
+
+    async list_alert_groups(input) {
+      try {
+        return await api.listAlertGroups({
+          bearerToken: String(input["bearerToken"]), projectId: String(input["projectId"]),
+          ...(typeof input["limit"] === "number" ? { limit: input["limit"] } : {}),
+          ...(typeof input["cursor"] === "string" ? { cursor: input["cursor"] } : {})
+        });
+      } catch (error) {
+        mapMcpError(error);
+      }
+    },
+
+    async get_alert_group(input) {
+      try {
+        const kind = input["kind"];
+        if (kind !== "direct" && kind !== "email_digest") throw new Error("invalid_group_kind");
+        return await api.getAlertGroup({
+          bearerToken: String(input["bearerToken"]), projectId: String(input["projectId"]),
+          kind, groupId: String(input["groupId"]),
+          ...(typeof input["limit"] === "number" ? { limit: input["limit"] } : {}),
+          ...(typeof input["cursor"] === "string" ? { cursor: input["cursor"] } : {})
+        });
       } catch (error) {
         mapMcpError(error);
       }
@@ -149,6 +179,20 @@ export function createAlertMcpTools(api: {
         }
 
         return { alert: await api.updateAlert(requestInput) };
+      } catch (error) {
+        mapMcpError(error);
+      }
+    },
+
+    async rotate_alert_webhook_secret(input) {
+      try {
+        return { alert: await api.updateAlert({
+          bearerToken: String(input["bearerToken"]),
+          projectId: String(input["projectId"]),
+          alertId: String(input["alertId"]),
+          channel: "webhook",
+          rotateSigningSecret: true
+        }) };
       } catch (error) {
         mapMcpError(error);
       }

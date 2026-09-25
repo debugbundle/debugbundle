@@ -17,7 +17,7 @@ Given the same set of normalized events for an incident, the bundle generator mu
 
 ## INV-2: SDK Never Crashes Host
 
-SDK code (both `@debugbundle/sdk-node` and `@debugbundle/sdk-browser`) must NEVER throw uncaught exceptions into user code, block the request/response cycle, or crash the host process.
+SDK code in every supported backend, browser, native, and React Native SDK must NEVER throw uncaught exceptions into user code, block the request/response cycle, or crash the host process.
 
 All SDK internal failures must be caught and silently swallowed (with optional internal diagnostic output). The SDK must degrade gracefully under all conditions: network failure, queue overflow, invalid configuration, missing API key, server errors.
 
@@ -94,7 +94,7 @@ Member tokens authenticate CLI/API/MCP operations. They cannot be used for SDK i
 
 ## INV-7: Webhook Signing
 
-Every outgoing webhook payload must include an HMAC-SHA256 signature in the `X-DebugBundle-Signature` header, computed using the webhook's secret. Recipients must be able to verify payload integrity.
+Every outgoing custom DebugBundle webhook payload (direct alerts and lifecycle subscriptions) must include an HMAC-SHA256 signature in the `X-DebugBundle-Signature` header, computed using that webhook's secret. Missing signing material fails delivery closed. Legacy direct-alert receivers keep their JSON body and management response shape; storage provisions a key and the existing explicit rotation API reveals a replacement key to the owner. Provider-native Slack and Discord integrations use their provider-issued authenticated webhook URLs and required payload formats; they do not implement the custom DebugBundle signature protocol.
 
 **Enforcement:** Webhook delivery tests verify signature presence and correctness.
 

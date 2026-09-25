@@ -8,6 +8,27 @@ import { inferSeverity } from "../../../apps/worker/src/severity.js";
 import { browserResourceEvent } from "../../helpers/browser-resource-fixtures.js";
 
 describe("worker severity inference", () => {
+  it("treats a redirected Java exception root as high severity without promoting frame fragments", (): void => {
+    for (const logger of ["stderr", "org.jboss.stdio", "org.jboss.stdio.Stderr"]) {
+      const root = createEventEnvelope({
+        event_type: "log_event",
+        service: { name: "hcp", environment: "staging", runtime: "java", framework: "wildfly" },
+        payload: {
+          level: "error",
+          message: "java.util.concurrent.ExecutionException: java.util.ConcurrentModificationException",
+          attributes: { logger }
+        }
+      });
+      const continuation = createEventEnvelope({
+        event_type: "log_event",
+        service: { name: "hcp", environment: "staging", runtime: "java", framework: "wildfly" },
+        payload: { level: "error", message: "Caused by: java.util.ConcurrentModificationException", attributes: { logger } }
+      });
+      expect(inferSeverity(root)).toBe("high");
+      expect(inferSeverity(continuation)).toBe("low");
+    }
+  });
+
   it("keeps backend and non-opaque frontend exceptions high severity", (): void => {
     const backendException = createEventEnvelope({
       event_type: "backend_exception",

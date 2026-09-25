@@ -2,6 +2,8 @@ import {
   createAlertWithAuthCommand as defaultCreateAlertCommand,
   deleteAlertWithAuthCommand as defaultDeleteAlertCommand,
   listAlertsWithAuthCommand as defaultListAlertsCommand,
+  listAlertGroupsWithAuthCommand as defaultListAlertGroupsCommand,
+  getAlertGroupWithAuthCommand as defaultGetAlertGroupCommand,
   updateAlertWithAuthCommand as defaultUpdateAlertCommand
 } from "./alert-commands.js";
 import {
@@ -329,6 +331,35 @@ export async function handleWebhookCommand(parsedArgv: ParsedArgv, dependencies:
 export async function handleAlertCommand(parsedArgv: ParsedArgv, dependencies: ManagementCommandDependencies): Promise<CliCommandResult> {
   const action = requirePositional(parsedArgv, 1, "action");
 
+  if (action === "groups" || action === "group") {
+    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id", "limit", "cursor"]);
+    ensureNoExtraPositionals(parsedArgv, action === "groups" ? 2 : 4);
+    const projectId = readStringOption(parsedArgv, "project-id");
+    if (projectId === undefined) throw new CliInputError("Missing required option --project-id.");
+    const limit = readLimitOption(parsedArgv);
+    const cursor = readStringOption(parsedArgv, "cursor");
+    if (action === "groups") {
+      return await (dependencies.listAlertGroupsCommand ?? defaultListAlertGroupsCommand)(
+        appendCommonAuthOptions(parsedArgv, {
+          projectId,
+          ...(limit === undefined ? {} : { limit }),
+          ...(cursor === undefined ? {} : { cursor })
+        })
+      );
+    }
+    const kind = requirePositional(parsedArgv, 2, "kind");
+    if (kind !== "direct" && kind !== "email_digest") {
+      throw new CliInputError("Alert group kind must be direct or email_digest.");
+    }
+    return await (dependencies.getAlertGroupCommand ?? defaultGetAlertGroupCommand)(
+      appendCommonAuthOptions(parsedArgv, {
+        projectId, kind, groupId: requirePositional(parsedArgv, 3, "group-id"),
+        ...(limit === undefined ? {} : { limit }),
+        ...(cursor === undefined ? {} : { cursor })
+      })
+    );
+  }
+
   if (action === "list") {
     expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id", "limit"]);
     ensureNoExtraPositionals(parsedArgv, 2);
@@ -437,6 +468,7 @@ export async function handleAlertCommand(parsedArgv: ParsedArgv, dependencies: M
       "severity-lifecycle-scope",
       "cooldown",
       "config-json",
+      "rotate-signing-secret",
       "is-enabled"
     ]);
     ensureNoExtraPositionals(parsedArgv, 3);
@@ -458,6 +490,7 @@ export async function handleAlertCommand(parsedArgv: ParsedArgv, dependencies: M
       severityLifecycleScope?: string | null;
       cooldownSeconds?: number;
       config?: Record<string, unknown> | null;
+      rotateSigningSecret?: boolean;
       isEnabled?: boolean;
       authFilePath?: string;
       json?: boolean;
@@ -491,6 +524,9 @@ export async function handleAlertCommand(parsedArgv: ParsedArgv, dependencies: M
     if (config !== undefined) {
       input.config = config as Record<string, unknown> | null;
     }
+    if (readBooleanStringOption(parsedArgv, "rotate-signing-secret") === true) {
+      input.rotateSigningSecret = true;
+    }
     const isEnabled = readBooleanStringOption(parsedArgv, "is-enabled");
     if (isEnabled !== undefined) {
       input.isEnabled = isEnabled;
@@ -504,6 +540,7 @@ export async function handleAlertCommand(parsedArgv: ParsedArgv, dependencies: M
       input.severityLifecycleScope === undefined &&
       input.cooldownSeconds === undefined &&
       input.config === undefined &&
+      input.rotateSigningSecret === undefined &&
       input.isEnabled === undefined
     ) {
       throw new CliInputError("At least one alert field must be provided.");

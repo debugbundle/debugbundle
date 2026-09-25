@@ -477,6 +477,36 @@ describe("api slack routes", () => {
     expect(response.json()).toEqual({ error: "slack_destination_unavailable" });
   });
 
+  it("does not send a Slack test message to a private destination", async () => {
+    process.env["INTEGRATION_SECRET_ENCRYPTION_KEY"] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    const webhookCiphertext = encryptIntegrationSecret(
+      "http://127.0.0.1/latest/meta-data/",
+      process.env["INTEGRATION_SECRET_ENCRYPTION_KEY"]
+    );
+    const slackManagement = mockedObject<NonNullable<ApiServerDependencies["slackManagement"]>>({
+      listSlackDestinationsForProjectInOrganization: vi.fn().mockResolvedValue([]),
+      getSlackDestinationForOrganization: vi.fn().mockResolvedValue(null),
+      getSlackDestinationSecretForOrganization: vi.fn().mockResolvedValue({
+        webhook_url_ciphertext: webhookCiphertext
+      }),
+      upsertSlackDestinationForOrganization: vi.fn().mockResolvedValue({ slack_destination_id: slackDestinationId }),
+      deleteSlackDestinationForProjectInOrganization: vi.fn().mockResolvedValue(null)
+    });
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const app = createServer({ slackManagement });
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/projects/00000000-0000-4000-8000-000000000001/slack/destinations/${slackDestinationId}/test`,
+      headers: { authorization: "Bearer dbundle_mem_test" }
+    });
+
+    expect(response.statusCode).toBe(502);
+    expect(response.json()).toEqual({ error: "slack_delivery_failed" });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it("rejects non-team Slack management and invalid callback state", async () => {
     process.env["APP_BASE_URL"] = "https://app.debugbundle.com";
     process.env["SLACK_CLIENT_ID"] = "111.222";

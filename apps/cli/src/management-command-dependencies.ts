@@ -2,6 +2,8 @@ import type {
   createAlertWithAuthCommand as defaultCreateAlertCommand,
   deleteAlertWithAuthCommand as defaultDeleteAlertCommand,
   listAlertsWithAuthCommand as defaultListAlertsCommand,
+  listAlertGroupsWithAuthCommand as defaultListAlertGroupsCommand,
+  getAlertGroupWithAuthCommand as defaultGetAlertGroupCommand,
   updateAlertWithAuthCommand as defaultUpdateAlertCommand
 } from "./alert-commands.js";
 import type {
@@ -155,6 +157,8 @@ export type ManagementCommandDependencies = {
   createMemberTokenCommand?: typeof defaultCreateMemberTokenCommand;
   revokeMemberTokenCommand?: typeof defaultRevokeMemberTokenCommand;
   listAlertsCommand?: typeof defaultListAlertsCommand;
+  listAlertGroupsCommand?: typeof defaultListAlertGroupsCommand;
+  getAlertGroupCommand?: typeof defaultGetAlertGroupCommand;
   createAlertCommand?: typeof defaultCreateAlertCommand;
   updateAlertCommand?: typeof defaultUpdateAlertCommand;
   deleteAlertCommand?: typeof defaultDeleteAlertCommand;

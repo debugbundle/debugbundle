@@ -44,6 +44,8 @@ import { type AnalyticsIncidentCorrelationRecorder } from "./analytics-incident-
 export type BundleLinkBaseUrls = NonNullable<BuildBundleInput["linkBaseUrls"]>;
 
 export interface WorkerQueue {
+  /** Stable durable identity for the currently claimed job, never its lease token. */
+  getActiveJobId?(): string | null;
   dequeue(jobName: "normalize-events"): Promise<NormalizeEventsJob | null>;
   dequeue(jobName: "group-incident"): Promise<GroupIncidentJob | null>;
   dequeue(jobName: "build-bundle"): Promise<BuildBundleJob | null>;
@@ -443,6 +445,8 @@ export interface AlertDeliveryTransport {
     incident_id: string;
     channel: AlertRuleRecord["channel"];
     config: Record<string, unknown>;
+    signing_secret?: string | null;
+    webhook_payload_version?: number;
     payload: Record<string, unknown>;
   }): Promise<void>;
 }
@@ -452,9 +456,11 @@ export interface AlertEmailDigestTransport {
     digest_id: string;
     project_id: string;
     recipient: string;
+    total_incident_count?: number;
     items: Array<{
       incident_id: string;
       condition_type: AlertConditionType;
+      condition_types?: AlertConditionType[];
       payload: Record<string, unknown>;
     }>;
   }): Promise<void>;

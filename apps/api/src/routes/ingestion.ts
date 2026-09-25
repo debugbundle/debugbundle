@@ -360,7 +360,8 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
           entry.event.payload as Record<string, unknown>,
           capturePolicy.preset,
           capturePolicy.immediate_client_error_statuses,
-          capturePolicy.immediate_client_error_path_rules
+          capturePolicy.immediate_client_error_path_rules,
+          entry.event.service.runtime
         );
         const captureRule =
           activeCaptureRules.length === 0

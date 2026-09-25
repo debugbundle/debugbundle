@@ -114,3 +114,33 @@ it("uses the configured digest window and keeps per-incident cooldown identity i
     })
   );
 });
+
+it.each([
+  ["slack", { webhook_url: "https://hooks.slack.test/alerts" }],
+  ["discord", { webhook_url: "https://discord.test/alerts" }],
+  ["webhook", { target_url: "https://example.com/alerts" }]
+])("keeps a higher-severity burst eligible on %s", async (channel, config) => {
+  const createAlertDeliveryIntent = vi.fn().mockResolvedValue({ created: false, delivery_id: null });
+  for (const severity of ["low", "low", "critical"]) {
+    await processNextEvaluateAlertsJob({
+      queue: { dequeue: vi.fn().mockResolvedValue({
+        project_id: "project", incident_id: `incident-${severity}`,
+        condition_type: "new_incident", dedupe_key: "new_incident",
+        notification_key: "same-resource", coalescing_key: "same-burst",
+        coalescing_window_seconds: 10, occurred_at: "2026-09-22T10:00:00.000Z",
+        service_name: "web", environment: "production", severity
+      }) },
+      alertStore: {
+        listMatchingAlerts: vi.fn().mockResolvedValue([{
+          alert_id: "alert", channel, config, cooldown_seconds: 0
+        }]),
+        createAlertDeliveryIntent
+      }
+    } as unknown as EvaluateAlertsWorkerDependencies);
+  }
+  const keyAt = (index: number): string =>
+    (createAlertDeliveryIntent.mock.calls[index]?.[0] as { coalescing_key: string }).coalescing_key;
+  expect(keyAt(0)).toMatch(/^[a-f0-9]{64}$/);
+  expect(keyAt(0)).toBe(keyAt(1));
+  expect(keyAt(2)).not.toBe(keyAt(0));
+});

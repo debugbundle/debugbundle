@@ -107,6 +107,7 @@ export function createDurableWorkerQueue(
   }
 
   const queue: DurableWorkerQueue = {
+    getActiveJobId: () => pending?.id ?? null,
     // Durable inserts deduplicate directly; never scan an unbounded legacy reproduction queue.
     acquireLease: (key, ttlSeconds) => redis.acquireLease(key, ttlSeconds),
     releaseLease: (key) => redis.releaseLease(key),

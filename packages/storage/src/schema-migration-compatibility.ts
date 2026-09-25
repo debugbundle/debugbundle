@@ -2,6 +2,8 @@ import { REQUIRED_API_TABLES, REQUIRED_WORKER_TABLES, type Queryable } from "./m
 
 const CURRENT_SCHEMA_SENTINEL_COLUMNS = [
   { table_name: "alert_deliveries", column_name: "coalescing_key" },
+  { table_name: "alert_deliveries", column_name: "evaluation_job_id" },
+  { table_name: "alert_rules", column_name: "webhook_payload_version" },
   { table_name: "incident_events", column_name: "resource_route" },
   { table_name: "worker_jobs", column_name: "depends_on" },
   { table_name: "worker_jobs", column_name: "operator_retries" },

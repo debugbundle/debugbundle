@@ -1,6 +1,8 @@
+import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 
 import { getTierCapabilities } from "../../../../packages/shared-types/src/index.js";
+import { assertAlertOutboundTarget } from "../../../../packages/storage/src/alert-outbound-guard.js";
 import type { ApiDependencies } from "../api-types.js";
 import { recordAuditLog, resolveAuditActorType } from "../audit-logging.js";
 import { requireRateLimitedProjectAccess } from "../api-helpers.js";
@@ -49,6 +51,29 @@ async function ensureScopedSlackDestination(
   return destination === null ? "slack_destination_not_found" : "ok";
 }
 
+function hasBlockedAlertTarget(
+  channel: "email" | "slack" | "discord" | "webhook" | undefined,
+  config: Record<string, unknown> | null | undefined
+): boolean {
+  if (config === null || config === undefined) return false;
+  const target = channel === "webhook"
+    ? config["target_url"]
+    : channel === "discord" || channel === "slack"
+      ? config["webhook_url"]
+      : undefined;
+  if (typeof target !== "string") return false;
+  try {
+    assertAlertOutboundTarget(target);
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+function createAlertSigningSecret(): string {
+  return `dbundle_asec_${randomBytes(32).toString("base64url")}`;
+}
+
 export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   app.get("/v1/alerts", async (request, reply) => {
     const parsedQuery = AlertsQuerySchema.safeParse(request.query);
@@ -95,6 +120,9 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
     if (dependencies.alertManagement === undefined) {
       return reply.status(404).send({ error: "project_not_found" });
     }
+    if (hasBlockedAlertTarget(parsedBody.data.channel, parsedBody.data.config)) {
+      return reply.status(400).send({ error: "alert_target_blocked" });
+    }
     const scopedSlackDestination = await ensureScopedSlackDestination(dependencies, {
       organization_id: auth.access.organization_id,
       channel: parsedBody.data.channel,
@@ -123,6 +151,7 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
       severity_lifecycle_scope?: "new_incident" | "incident_regressed" | "both" | null;
       cooldown_seconds: number;
       config: Record<string, unknown>;
+      signing_secret?: string;
       is_enabled: boolean;
     } = {
       organization_id: auth.access.organization_id,
@@ -134,6 +163,13 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
       config: parsedBody.data.config,
       is_enabled: parsedBody.data.is_enabled
     };
+    // Old strict v1 management clients cannot parse a new response field. They
+    // retain their response/body shape; storage still provisions a signing key.
+    const signingSecret = parsedBody.data.channel === "webhook" &&
+      parsedBody.data.signing === "hmac_sha256_v1"
+      ? createAlertSigningSecret()
+      : null;
+    if (signingSecret !== null) alertInput.signing_secret = signingSecret;
 
     if (parsedBody.data.service_id !== undefined) {
       alertInput.service_id = parsedBody.data.service_id;
@@ -187,7 +223,9 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
       }
     });
 
-    return reply.status(201).send({ alert });
+    return reply.status(201).send({
+      alert: signingSecret === null ? alert : { ...alert, signing_secret: signingSecret }
+    });
   });
 
   app.patch("/v1/alerts/:id", async (request, reply) => {
@@ -219,6 +257,9 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
       "config" in parsedBody.data && parsedBody.data.config !== undefined
         ? (parsedBody.data.config as Record<string, unknown> | null)
         : undefined;
+    if (hasBlockedAlertTarget(parsedBody.data.channel, updateConfig)) {
+      return reply.status(400).send({ error: "alert_target_blocked" });
+    }
     const scopedSlackDestination = await ensureScopedSlackDestination(dependencies, {
       organization_id: auth.access.organization_id,
       ...(parsedBody.data.channel === undefined ? {} : { channel: parsedBody.data.channel }),
@@ -249,6 +290,7 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
       severity_lifecycle_scope?: "new_incident" | "incident_regressed" | "both" | null;
       cooldown_seconds?: number;
       config?: Record<string, unknown> | null;
+      signing_secret?: string;
       is_enabled?: boolean;
     } = {
       organization_id: auth.access.organization_id,
@@ -291,6 +333,11 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
         updateInput.config = config;
       }
     }
+    const rotatedSigningSecret = "rotate_signing_secret" in parsedBody.data &&
+      parsedBody.data.rotate_signing_secret === true
+      ? createAlertSigningSecret()
+      : null;
+    if (rotatedSigningSecret !== null) updateInput.signing_secret = rotatedSigningSecret;
     if (parsedBody.data.is_enabled !== undefined) {
       updateInput.is_enabled = parsedBody.data.is_enabled;
     }
@@ -332,7 +379,9 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
       }
     });
 
-    return reply.status(200).send({ alert });
+    return reply.status(200).send({
+      alert: rotatedSigningSecret === null ? alert : { ...alert, signing_secret: rotatedSigningSecret }
+    });
   });
 
   app.delete("/v1/alerts/:id", async (request, reply) => {

@@ -12,6 +12,49 @@ type BillingManagementDependency = MockedMethods<NonNullable<ApiServerDependenci
 type SlackManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["slackManagement"]>>;
 type ProjectManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["projectManagement"]>>;
 
+describe("alert outbound target validation", () => {
+  it.each([
+    ["webhook", "target_url", "http://169.254.169.254/latest/meta-data/"],
+    ["discord", "webhook_url", "http://127.0.0.1/alerts"],
+    ["slack", "webhook_url", "https://user:pass@hooks.example.com/alerts"]
+  ] as const)("rejects an unsafe %s URL on create and update", async (channel, key, target) => {
+    const alertManagement = mockedObject<NonNullable<ApiServerDependencies["alertManagement"]>>({
+      listAlertsForOrganization: vi.fn().mockResolvedValue([]),
+      createAlertForOrganization: vi.fn(),
+      updateAlertForOrganization: vi.fn(),
+      deleteAlertForOrganization: vi.fn()
+    });
+    const app = createServer({ alertManagement });
+    const headers = { authorization: "Bearer dbundle_mem_test" };
+    const config = { [key]: target };
+    const create = await app.inject({
+      method: "POST",
+      url: "/v1/alerts",
+      headers,
+      payload: {
+        project_id: defaultProjectAccess.project_id,
+        channel,
+        condition_type: "new_incident",
+        config
+      }
+    });
+    const update = await app.inject({
+      method: "PATCH",
+      url: `/v1/alerts/22222222-2222-4222-8222-222222222222?project_id=${defaultProjectAccess.project_id}`,
+      headers,
+      payload: { channel, config }
+    });
+
+    expect(create.statusCode).toBe(400);
+    expect(create.json()).toEqual({ error: "alert_target_blocked" });
+    expect(update.statusCode).toBe(400);
+    expect(update.json()).toEqual({ error: "alert_target_blocked" });
+    expect(alertManagement.createAlertForOrganization).not.toHaveBeenCalled();
+    expect(alertManagement.updateAlertForOrganization).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
 const defaultProjectAccess = {
   project_id: "00000000-0000-4000-8000-000000000001",
   organization_id: "org_123",
@@ -347,6 +390,65 @@ describe("api alert routes", () => {
         updated_at: "2026-03-15T00:00:00.000Z"
       }
     });
+  });
+
+  it("reveals a custom alert-webhook secret only on creation and explicit rotation", async (): Promise<void> => {
+    const alert = {
+      alert_id: "22222222-2222-4222-8222-222222222222",
+      project_id: defaultProjectAccess.project_id,
+      created_by_user_id: "usr_123",
+      service_id: null,
+      channel: "webhook",
+      condition_type: "new_incident",
+      severity_min: null,
+      severity_lifecycle_scope: null,
+      cooldown_seconds: 0,
+      config: { target_url: "https://hooks.example.test/alert" },
+      is_enabled: true,
+      created_at: "2026-03-15T00:00:00.000Z",
+      updated_at: "2026-03-15T00:00:00.000Z"
+    };
+    const alertManagement = {
+      listAlertsForOrganization: vi.fn().mockResolvedValue([alert]),
+      createAlertForOrganization: vi.fn().mockResolvedValue(alert),
+      updateAlertForOrganization: vi.fn().mockResolvedValue(alert),
+      deleteAlertForOrganization: vi.fn().mockResolvedValue(null)
+    };
+    const app = createServer({ alertManagement });
+    const headers = { authorization: "Bearer dbundle_mem_test" };
+    const legacy = await app.inject({ method: "POST", url: "/v1/alerts", headers, payload: {
+      project_id: alert.project_id, channel: "webhook", condition_type: "new_incident",
+      config: alert.config
+    } });
+    expect(legacy.statusCode).toBe(201);
+    expect(legacy.json().alert).not.toHaveProperty("signing_secret");
+    const created = await app.inject({ method: "POST", url: "/v1/alerts", headers, payload: {
+      project_id: alert.project_id, channel: "webhook", condition_type: "new_incident",
+      config: alert.config, signing: "hmac_sha256_v1"
+    } });
+    const firstSecret = created.json().alert.signing_secret as string;
+    expect(created.statusCode).toBe(201);
+    expect(firstSecret).toMatch(/^dbundle_asec_[A-Za-z0-9_-]{43}$/);
+    expect(alertManagement.createAlertForOrganization).toHaveBeenCalledWith(
+      expect.objectContaining({ signing_secret: firstSecret })
+    );
+
+    const rotated = await app.inject({ method: "PATCH", headers,
+      url: `/v1/alerts/${alert.alert_id}?project_id=${alert.project_id}`,
+      payload: { channel: "webhook", rotate_signing_secret: true }
+    });
+    const nextSecret = rotated.json().alert.signing_secret as string;
+    expect(rotated.statusCode).toBe(200);
+    expect(nextSecret).toMatch(/^dbundle_asec_[A-Za-z0-9_-]{43}$/);
+    expect(nextSecret).not.toBe(firstSecret);
+    expect(alertManagement.updateAlertForOrganization).toHaveBeenCalledWith(
+      expect.objectContaining({ signing_secret: nextSecret })
+    );
+
+    const listed = await app.inject({ method: "GET", headers,
+      url: `/v1/alerts?project_id=${alert.project_id}` });
+    expect(listed.json().alerts[0]).not.toHaveProperty("signing_secret");
+    await app.close();
   });
 
   it("defaults severity-threshold alert lifecycle scope to both on create", async (): Promise<void> => {

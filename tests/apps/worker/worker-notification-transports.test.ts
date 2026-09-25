@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resetWorkerRuntimeMocks } from "../../helpers/worker-runtime-mocks.js";
 import { encryptIntegrationSecret } from "../../../packages/storage/src/index.ts";
@@ -46,6 +47,7 @@ describe("worker notification transports", () => {
     } as never);
     await transport.deliver({
       channel: "webhook",
+      signing_secret: "test-signing-secret",
       config: { target_url: "https://alerts.test/webhook" },
       payload: { summary: "Disk alert" }
     } as never);
@@ -57,6 +59,64 @@ describe("worker notification transports", () => {
       })
     );
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("signs custom alert webhooks with the exact serialized payload", async (): Promise<void> => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    vi.stubGlobal("fetch", fetchMock);
+    await createAlertTransport({ timeoutMs: 100, emailTransport: null }).deliver({
+      channel: "webhook",
+      config: { target_url: "https://hooks.example.test/alert" },
+      signing_secret: "dbundle_asec_test-secret",
+      payload: { incident_id: "inc_1", summary: "Failure" }
+    } as never);
+    const request = fetchMock.mock.calls[0]?.[1];
+    const body = request?.body as string;
+    const expected = `sha256=${createHmac("sha256", "dbundle_asec_test-secret").update(body).digest("hex")}`;
+    expect(request?.headers).toMatchObject({ "x-debugbundle-signature": expected });
+  });
+
+  it.each([undefined, null, ""])("refuses a custom webhook without a usable signing key (%s)", async (signingSecret) => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(createAlertTransport({ timeoutMs: 100, emailTransport: null }).deliver({
+      channel: "webhook", config: { target_url: "https://alerts.test/webhook" },
+      signing_secret: signingSecret, payload: { summary: "Failure" }
+    } as never)).rejects.toThrow("alert_signing_secret_missing");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("points direct provider alerts to their inspectable member group", async (): Promise<void> => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    vi.stubGlobal("fetch", fetchMock);
+    const transport = createAlertTransport({
+      timeoutMs: 100,
+      emailTransport: null,
+      apiBaseUrl: "https://api.debugbundle.com"
+    });
+    const event = {
+      delivery_id: "00000000-0000-4000-8000-000000000011",
+      project_id: "00000000-0000-4000-8000-000000000012",
+      payload: { incident_id: "00000000-0000-4000-8000-000000000013" }
+    };
+    const groupUrl = `https://api.debugbundle.com/v1/alert-groups/direct/${event.delivery_id}?project_id=${event.project_id}`;
+
+    await transport.deliver({ ...event, channel: "slack", config: { webhook_url: "https://hooks.slack.test/alert" } } as never);
+    await transport.deliver({ ...event, channel: "discord", config: { webhook_url: "https://discord.test/alert" } } as never);
+    await transport.deliver({ ...event, channel: "webhook", config: { target_url: "https://alerts.test/webhook" }, signing_secret: "secret", webhook_payload_version: 1 } as never);
+    await transport.deliver({ ...event, channel: "webhook", config: { target_url: "https://alerts.test/legacy" }, signing_secret: "legacy-secret", webhook_payload_version: 0 } as never);
+
+    expect(JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string).text).toContain(groupUrl);
+    expect(JSON.parse(fetchMock.mock.calls[1]?.[1]?.body as string).content).toContain(groupUrl);
+    const signedRequest = fetchMock.mock.calls[2]?.[1];
+    expect(JSON.parse(signedRequest?.body as string)).toMatchObject({
+      alert_group_id: event.delivery_id,
+      alert_group_url: groupUrl
+    });
+    expect(signedRequest?.headers["x-debugbundle-signature"]).toBe(
+      `sha256=${createHmac("sha256", "secret").update(signedRequest?.body as string).digest("hex")}`
+    );
+    expect(JSON.parse(fetchMock.mock.calls[3]?.[1]?.body as string)).not.toHaveProperty("alert_group_id");
   });
 
   it("should surface alert transport configuration and delivery failures", async (): Promise<void> => {
@@ -149,7 +209,7 @@ describe("worker notification transports", () => {
     };
     await transport.deliver({ channel: "email", config: { to: "team@example.com" }, payload } as never);
     await transport.deliver({ channel: "discord", config: { webhook_url: "https://discord.test/alert" }, payload } as never);
-    await transport.deliver({ channel: "webhook", config: { target_url: "https://alerts.test/webhook" }, payload } as never);
+    await transport.deliver({ channel: "webhook", signing_secret: "secret", config: { target_url: "https://alerts.test/webhook" }, payload } as never);
 
     const bytes = JSON.stringify(emailSend.mock.calls) + JSON.stringify(fetchMock.mock.calls);
     expect(bytes).not.toContain("historical-secret");
@@ -224,6 +284,14 @@ describe("worker notification transports", () => {
       } as never)
     ).rejects.toThrow("weekly_report_slack_http_error_503");
 
+    const privateFetch = vi.fn();
+    vi.stubGlobal("fetch", privateFetch);
+    await expect(createWeeklyReportTransport({ emailTransport: null }).deliver({
+      ...reportEvent,
+      channel: { channel: "slack", config: { webhook_url: "http://127.0.0.1/weekly" } }
+    } as never)).rejects.toThrow("alert_target_blocked");
+    expect(privateFetch).not.toHaveBeenCalled();
+
     const encryptedWebhookUrl = encryptIntegrationSecret(
       "https://hooks.slack.test/weekly",
       "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
@@ -297,6 +365,34 @@ describe("worker notification transports", () => {
       })
     ).rejects.toThrow("webhook_http_error_503");
 
+    fetchSpy.mockRestore();
+  });
+
+  it("blocks private lifecycle webhook targets before fetch", async (): Promise<void> => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({ ok: true } as Response);
+    await expect(createLifecycleWebhookTransport({ timeoutMs: 100 }).deliver({
+      target_url: "http://169.254.169.254/latest/meta-data/",
+      signing_secret: "test-only",
+      payload: {}
+    } as never)).rejects.toThrow("webhook_target_blocked");
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it("does not follow lifecycle webhook redirects", async (): Promise<void> => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      ok: false,
+      status: 302
+    } as Response);
+    await expect(createLifecycleWebhookTransport({ timeoutMs: 100 }).deliver({
+      target_url: "https://hooks.example.test/alert",
+      signing_secret: "test-only",
+      payload: {}
+    } as never)).rejects.toThrow("webhook_redirect_blocked");
+    expect(fetchSpy).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
+      redirect: "manual",
+      dispatcher: expect.any(Object)
+    }));
     fetchSpy.mockRestore();
   });
 

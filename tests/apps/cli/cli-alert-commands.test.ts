@@ -21,6 +21,21 @@ const AlertCreateOutputSchema = z
   .strict();
 
 describe("cli alert commands", () => {
+  it("shows a custom webhook secret once and forwards explicit rotation", async () => {
+    const alert = { alert_id: "al_1", signing_secret: "dbundle_asec_one-time" };
+    const created = await createAlertCommand({ bearerToken: "member", projectId: "proj_1",
+      channel: "webhook", conditionType: "new_incident",
+      config: { target_url: "https://hooks.example.test/alert" } }, {
+      createAlert: vi.fn().mockResolvedValue(alert)
+    });
+    expect(created.output).toContain("Signing secret (shown once): dbundle_asec_one-time");
+
+    const updateAlert = vi.fn().mockResolvedValue({ ...alert, signing_secret: "dbundle_asec_rotated" });
+    const rotated = await updateAlertCommand({ bearerToken: "member", projectId: "proj_1",
+      alertId: "al_1", channel: "webhook", rotateSigningSecret: true }, { updateAlert });
+    expect(updateAlert).toHaveBeenCalledWith(expect.objectContaining({ rotateSigningSecret: true }));
+    expect(rotated.output).toContain("Signing secret (shown once): dbundle_asec_rotated");
+  });
   it("renders alert list output in human mode", async () => {
     const result = await listAlertsCommand(
       {

@@ -249,6 +249,10 @@ privacy-js-local-test: license-prepare-shared privacy-js-verify
 privacy-js-verify:
 	$(NODE_RUN) "corepack enable && node scripts/test-js-sdk-with-local-redaction.mjs $(TEST_FILES)"
 
+.PHONY: privacy-js-candidate-check
+privacy-js-candidate-check: license-prepare-shared
+	docker run --rm -v "$(PWD):$(WORKDIR)" --tmpfs "$(WORKDIR)/sdks/debugbundle-js/.tmp" -w "$(WORKDIR)" node:24-alpine sh -lc 'corepack enable && node scripts/test-js-sdk-with-local-redaction.mjs --candidate && mkdir -p .tmp/sdk-js-candidate && cp sdks/debugbundle-js/.tmp/npm-packages/*.tgz .tmp/sdk-js-candidate/'
+
 .PHONY: privacy-js-local-smoke
 privacy-js-local-smoke: license-prepare-shared
 	docker run --rm -t -v "$(PWD):$(WORKDIR)" --tmpfs "$(WORKDIR)/sdks/debugbundle-js/.tmp" -w "$(WORKDIR)" node:26-alpine sh -lc 'npm install --global corepack@0.34.1 >/dev/null && corepack enable && node scripts/test-js-sdk-with-local-redaction.mjs --consumer'
@@ -388,6 +392,7 @@ INTEGRATION_TEST_FILES ?= tests/integration/browser-resource-retention.integrati
 .PHONY: test-integration
 INTEGRATION_TEST_FILES += tests/integration/agent-token.integration.test.ts
 INTEGRATION_TEST_FILES += tests/integration/browser-resource-recovery.integration.test.ts
+INTEGRATION_TEST_FILES += tests/integration/alert-retry-ownership.integration.test.ts
 test-integration:
 	@set -e; \
 	trap 'POSTGRES_PORT=$(INTEGRATION_POSTGRES_PORT) REDIS_PORT=$(INTEGRATION_REDIS_PORT) LOCALSTACK_PORT=$(INTEGRATION_LOCALSTACK_PORT) API_PORT=$(INTEGRATION_API_PORT) WEB_PORT=$(INTEGRATION_WEB_PORT) APP_BASE_URL=$(INTEGRATION_APP_BASE_URL) VITE_API_URL=$(INTEGRATION_WEB_API_URL) CONTAINER_PREFIX=$(INTEGRATION_CONTAINER_PREFIX) DEBUGBUNDLE_PROBE_TRIGGER_SECRET=$(INTEGRATION_PROBE_TRIGGER_SECRET) ANALYTICS_HASH_SECRET=$(INTEGRATION_ANALYTICS_HASH_SECRET) $(INTEGRATION_COMPOSE) down -v' EXIT; \

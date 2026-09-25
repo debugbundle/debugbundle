@@ -1124,7 +1124,8 @@ describe("postgres metadata store", () => {
       true,
       null,
       null,
-      null
+      null,
+      null, expect.stringMatching(/^dbundle_asec_[A-Za-z0-9_-]{43}$/)
     ]);
   });
 

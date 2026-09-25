@@ -93,6 +93,8 @@ describe("alert delivery store", () => {
           created_by_user_id: "usr_123",
           service_id: null,
           channel: "webhook",
+          signing_secret: "existing-key",
+          webhook_payload_version: 0,
           condition_type: "severity_threshold",
           severity_min: "medium",
           severity_lifecycle_scope: "both",
@@ -122,6 +124,8 @@ describe("alert delivery store", () => {
         created_by_user_id: "usr_123",
         service_id: null,
         channel: "webhook",
+        signing_secret: "existing-key",
+        webhook_payload_version: 0,
         condition_type: "severity_threshold",
         severity_min: "medium",
         severity_lifecycle_scope: "both",
@@ -133,6 +137,31 @@ describe("alert delivery store", () => {
       }
     ]);
     expect(query).toHaveBeenCalledOnce();
+  });
+
+  it("upgrades a legacy rule with its persisted concurrent winner key without changing its payload version", async () => {
+    const query = vi.fn().mockResolvedValueOnce({ rows: [{
+      alert_id: "legacy", project_id: "project", channel: "webhook", condition_type: "new_incident",
+      severity_min: null, cooldown_seconds: 0, config: {}, signing_secret: null, webhook_payload_version: 0
+    }] }).mockResolvedValueOnce({ rows: [{ signing_secret: "concurrent-winner" }] });
+    const alerts = await createPostgresAlertDeliveryStore({ query }).listMatchingAlerts({
+      project_id: "project", condition_type: "new_incident", service_name: "api", environment: "prod",
+      severity: "high", lifecycle_event: "new_incident"
+    });
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({ signing_secret: "concurrent-winner", webhook_payload_version: 0 });
+    expect(query.mock.calls[1]?.[1]).toEqual(["legacy", "project", expect.stringMatching(/^dbundle_asec_[A-Za-z0-9_-]{43}$/)]);
+  });
+
+  it("does not deliver a legacy rule removed while provisioning its key", async () => {
+    const query = vi.fn().mockResolvedValueOnce({ rows: [{
+      alert_id: "removed", project_id: "project", channel: "webhook", condition_type: "new_incident",
+      severity_min: null, cooldown_seconds: 0, config: {}, signing_secret: null, webhook_payload_version: 0
+    }] }).mockResolvedValueOnce({ rows: [] });
+    expect(await createPostgresAlertDeliveryStore({ query }).listMatchingAlerts({
+      project_id: "project", condition_type: "new_incident", service_name: "api", environment: "prod",
+      severity: "high", lifecycle_event: "new_incident"
+    })).toEqual([]);
   });
 
   it("filters severity-threshold alerts by configured lifecycle scope", async (): Promise<void> => {
@@ -205,7 +234,7 @@ describe("alert delivery store", () => {
   it("creates deduplicated alert delivery intents", async (): Promise<void> => {
     const query = vi
       .fn()
-      .mockResolvedValueOnce({ rows: [{ delivery_id: "ad_123" }] })
+      .mockResolvedValueOnce({ rows: [{ delivery_id: "ad_123", created: true }] })
       .mockResolvedValueOnce({ rows: [] });
 
     const store = createPostgresAlertDeliveryStore({ query });
@@ -369,9 +398,11 @@ describe("alert delivery store", () => {
             project_id: "proj_123",
             incident_id: "inc_1",
             condition_type: "new_incident",
+            condition_types: ["new_incident", "error_spike"],
             dedupe_key: "new_incident",
             notification_key: "new_incident",
             payload: { incident_id: "inc_1" },
+            total_incident_count: 100,
             created_at: "2026-05-17T10:00:00.000Z"
           }
         ]
@@ -393,6 +424,7 @@ describe("alert delivery store", () => {
         created_at: "2026-05-17T10:00:00.000Z",
         updated_at: "2026-05-17T10:00:11.000Z"
       },
+      total_incident_count: 100,
       items: [
         {
           item_id: "item_1",
@@ -401,6 +433,7 @@ describe("alert delivery store", () => {
           project_id: "proj_123",
           incident_id: "inc_1",
           condition_type: "new_incident",
+          condition_types: ["new_incident", "error_spike"],
           dedupe_key: "new_incident",
           notification_key: "new_incident",
           payload: { incident_id: "inc_1" },
@@ -408,6 +441,9 @@ describe("alert delivery store", () => {
         }
       ]
     });
+    expect(String(query.mock.calls[2]?.[0])).toContain("LIMIT 25");
+    expect(String(query.mock.calls[2]?.[0])).toContain("DISTINCT ON (items.incident_id)");
+    expect(String(query.mock.calls[2]?.[0])).toContain("GROUP BY incident_id");
   });
 
   it("marks alert deliveries and email digests delivered or failed", async (): Promise<void> => {

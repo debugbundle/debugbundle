@@ -7,8 +7,11 @@ describe("mcp alert tools", () => {
   it("declares alert tool parity", () => {
     expect(ALERT_MCP_TOOL_NAMES).toEqual([
       "list_alerts",
+      "list_alert_groups",
+      "get_alert_group",
       "create_alert",
       "update_alert",
+      "rotate_alert_webhook_secret",
       "delete_alert"
     ]);
   });
@@ -16,6 +19,8 @@ describe("mcp alert tools", () => {
   it("returns alert payloads", async () => {
     const tools = createAlertMcpTools({
       listAlerts: vi.fn().mockResolvedValue([{ alert_id: "al_1" }]),
+      listAlertGroups: vi.fn().mockResolvedValue({ groups: [], next_cursor: null }),
+      getAlertGroup: vi.fn().mockResolvedValue({ group: { group_id: "group-id" }, members: [], next_cursor: null }),
       createAlert: vi.fn().mockResolvedValue({ alert_id: "al_2" }),
       updateAlert: vi.fn().mockResolvedValue({ alert_id: "al_2", is_enabled: false }),
       deleteAlert: vi.fn().mockResolvedValue({ alert_id: "al_2" })
@@ -30,6 +35,12 @@ describe("mcp alert tools", () => {
     ).resolves.toEqual({
       alerts: [{ alert_id: "al_1" }]
     });
+
+    await expect(tools.list_alert_groups({ bearerToken: "dbundle_mem_x", projectId: "proj_1" }))
+      .resolves.toEqual({ groups: [], next_cursor: null });
+    await expect(tools.get_alert_group({
+      bearerToken: "dbundle_mem_x", projectId: "proj_1", kind: "direct", groupId: "group-id"
+    })).resolves.toEqual({ group: { group_id: "group-id" }, members: [], next_cursor: null });
 
     await expect(
       tools.create_alert({
@@ -69,6 +80,8 @@ describe("mcp alert tools", () => {
   it("maps alert api and unknown errors to mcp tool errors", async () => {
     const tools = createAlertMcpTools({
       listAlerts: vi.fn().mockRejectedValue(new AlertApiError(401, "invalid_member_token")),
+      listAlertGroups: vi.fn(),
+      getAlertGroup: vi.fn(),
       createAlert: vi.fn().mockRejectedValue(new Error("boom")),
       updateAlert: vi.fn(),
       deleteAlert: vi.fn()
@@ -95,6 +108,8 @@ describe("mcp alert tools", () => {
   it("forwards optional alert fields through create and update tools", async () => {
     const api = {
       listAlerts: vi.fn().mockResolvedValue([]),
+      listAlertGroups: vi.fn(),
+      getAlertGroup: vi.fn(),
       createAlert: vi.fn().mockResolvedValue({ alert_id: "al_3" }),
       updateAlert: vi.fn().mockResolvedValue({ alert_id: "al_3" }),
       deleteAlert: vi.fn().mockResolvedValue({ alert_id: "al_3" })
@@ -151,6 +166,12 @@ describe("mcp alert tools", () => {
       cooldownSeconds: 0,
       config: null,
       isEnabled: true
+    });
+    await tools.rotate_alert_webhook_secret({ bearerToken: "dbundle_mem_x", projectId: "proj_1",
+      alertId: "al_3" });
+    expect(api.updateAlert).toHaveBeenLastCalledWith({
+      bearerToken: "dbundle_mem_x", projectId: "proj_1", alertId: "al_3",
+      channel: "webhook", rotateSigningSecret: true
     });
   });
 });

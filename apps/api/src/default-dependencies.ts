@@ -34,6 +34,7 @@ import {
   createIngestionMetadataService,
   createIngestionPersistenceService,
   createPostgresMetadataStore,
+  createPostgresAlertGroupInspectionStore,
   createPostgresSlackDestinationStore,
   createPostgresWeeklyReportChannelStore,
   createPostgresWebhookDeliveryStore,
@@ -772,6 +773,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
       updateAlertForOrganization: (input) => metadataStore.updateAlertForOrganization(input),
       deleteAlertForOrganization: (input) => metadataStore.deleteAlertForOrganization(input)
     },
+    alertGroupInspection: createPostgresAlertGroupInspectionStore(input.db),
     slackManagement: slackDestinationStore,
     weeklyReportManagement: weeklyReportChannelStore,
     operationalEmailDelivery,

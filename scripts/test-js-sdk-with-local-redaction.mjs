@@ -38,17 +38,27 @@ try {
     await symlink(path.relative(path.dirname(link), prepared), link);
   }
 
-  const commands = process.argv.includes("--consumer")
+  const commands = process.argv.includes("--candidate")
+    ? [["lint"], ["typecheck"], ["test:coverage"], ["build"], ["smoke:packed"]]
+    : process.argv.includes("--consumer")
     ? [["build"], ["smoke:packed"]]
     : [["lint"], ["typecheck"], ["exec", "vitest", "run", "--config", "vitest.config.ts", "--reporter=dot", ...process.argv.slice(2)]];
   for (const command of commands) {
     const child = spawnSync("corepack", ["pnpm", "--dir", sdkRoot, ...command], {
       cwd: root,
-      env: { ...process.env, DEBUGBUNDLE_SMOKE_REDACTION_TARBALL: tarball },
+      // pnpm's automatic pre-run install would replace this candidate link
+      // with the registry package. Keep this override scoped to the harness.
+      env: { ...process.env, npm_config_verify_deps_before_run: "false", PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN: "false", CI: "true", DEBUGBUNDLE_SMOKE_REDACTION_TARBALL: tarball,
+        DEBUGBUNDLE_SMOKE_SHARED_TYPES_TARBALL: path.join(root, ".tmp", "apache-packages", `debugbundle-shared-types-${JSON.parse(await readFile(path.join(root, "packages", "shared-types", "package.json"), "utf8")).version}.tgz`) },
       stdio: "inherit"
     });
     if (child.error) throw child.error;
     if (child.status !== 0) throw new Error(`js_sdk_${command[0]}_failed:${child.status}`);
+    for (const link of links) {
+      if (path.resolve(path.dirname(link), await readlink(link)) !== prepared) {
+        throw new Error("redaction_candidate_link_replaced_during_verification");
+      }
+    }
   }
 } finally {
   try {

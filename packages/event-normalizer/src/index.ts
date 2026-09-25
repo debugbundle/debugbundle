@@ -20,6 +20,7 @@ import {
   objectWrapCompatibleProbeData
 } from "./mobile-event-compatibility.js";
 import { normalizeInstalledJavaEvent } from "./java-event-compatibility.js";
+import { isJavaRedirectedStderrLogger } from "./java-stderr.js";
 import { normalizeJavaTimerMessage } from "./java-timer-message.js";
 
 export {
@@ -698,6 +699,16 @@ function getRequestResponseStatus(payload?: Record<string, unknown>): number | n
   return typeof status === "number" && Number.isFinite(status) ? status : null;
 }
 
+function isJavaStackContinuation(payload?: Record<string, unknown>): boolean {
+  const message = payload?.["message"];
+  if (typeof message !== "string" || message.length > 16_384 || /[\r\n]/.test(message)) return false;
+  const attributes = payload?.["attributes"];
+  if (attributes === null || typeof attributes !== "object" || Array.isArray(attributes)) return false;
+  if (!isJavaRedirectedStderrLogger((attributes as Record<string, unknown>)["logger"])) return false;
+  if ("throwable" in attributes && attributes.throwable !== null) return false;
+  return /^\s*(?:at\s+[\w.$/]+\([^\r\n]*\)|\.\.\.\s+\d+\s+more|(?:Caused by|Suppressed):\s+[\w.$/]+(?:Exception|Error|Throwable)(?::[^\r\n]*|\s|$))\s*$/.test(message);
+}
+
 /**
  * Classify an event into one of three event classes:
  * - incident_signal: failure events that create/update incidents and count toward Free billing
@@ -711,7 +722,8 @@ export function classifyEvent(
   payload?: Record<string, unknown>,
   capturePreset: CapturePreset = "minimal",
   immediateClientErrorStatuses: readonly number[] = [],
-  immediateClientErrorPathRules: readonly ImmediateClientErrorPathRule[] = []
+  immediateClientErrorPathRules: readonly ImmediateClientErrorPathRule[] = [],
+  runtime?: string | null
 ): EventClass {
   switch (eventType) {
     case "backend_exception":
@@ -719,6 +731,7 @@ export function classifyEvent(
       return "incident_signal";
 
     case "log_event":
+      if (runtime === "java" && isJavaStackContinuation(payload)) return "context_signal";
       if (logLevel !== undefined && INCIDENT_LOG_LEVELS.has(logLevel)) {
         return "incident_signal";
       }

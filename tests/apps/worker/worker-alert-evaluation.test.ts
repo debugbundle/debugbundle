@@ -460,7 +460,7 @@ describe("worker alert evaluation", () => {
   });
 
   it("skips new alert deliveries when the monthly delivery quota is exhausted", async (): Promise<void> => {
-    const createAlertDeliveryIntent = vi.fn();
+    const createAlertDeliveryIntent = vi.fn().mockResolvedValue({ delivery_id: null, created: false });
     const deliver = vi.fn();
 
     const result = await processNextEvaluateAlertsJob({
@@ -531,7 +531,7 @@ describe("worker alert evaluation", () => {
     });
 
     expect(result).toEqual({ processed: true });
-    expect(createAlertDeliveryIntent).not.toHaveBeenCalled();
+    expect(createAlertDeliveryIntent).toHaveBeenCalledWith(expect.objectContaining({ allow_new_delivery: false }));
     expect(deliver).not.toHaveBeenCalled();
   });
 
@@ -582,6 +582,37 @@ describe("worker alert evaluation", () => {
     expect(result).toEqual({ processed: true });
     expect(deliver).not.toHaveBeenCalled();
     expect(markAlertEmailDigestResult).not.toHaveBeenCalled();
+  });
+
+  it("passes the full incident count with a bounded pending digest sample", async () => {
+    const deliver = vi.fn().mockResolvedValue(undefined);
+    const markAlertEmailDigestResult = vi.fn().mockResolvedValue({ status: "delivered" });
+    await processNextDeliverAlertEmailDigestJob({
+      queue: { dequeue: vi.fn().mockResolvedValue({ digest_id: "dig_1" }) },
+      alertStore: {
+        getAlertEmailDigest: vi.fn().mockResolvedValue({
+          digest: {
+            digest_id: "dig_1", project_id: "proj_123", recipient: "alerts@example.com",
+            status: "pending", created_at: "2026-05-17T10:00:00.000Z"
+          },
+          total_incident_count: 101,
+          items: [{ incident_id: "critical_1", condition_type: "new_incident",
+            condition_types: ["new_incident", "error_spike"],
+            payload: { severity: "critical" } }]
+        }),
+        markAlertEmailDigestResult
+      },
+      alertEmailDigestTransport: { deliver }
+    } as never);
+    expect(deliver).toHaveBeenCalledWith(expect.objectContaining({
+      total_incident_count: 101,
+      items: [{ incident_id: "critical_1", condition_type: "new_incident",
+        condition_types: ["new_incident", "error_spike"],
+        payload: { severity: "critical" } }]
+    }));
+    expect(markAlertEmailDigestResult).toHaveBeenCalledWith({
+      digest_id: "dig_1", delivered: true, error_message: null
+    });
   });
 });
 
@@ -686,6 +717,7 @@ describe("alert delivery transport – multi-channel", () => {
     const slackCall = fetchSpy.mock.calls[0];
     expect(slackCall?.[0]).toBe("https://hooks.slack.com/services/T/B/X");
     expect(slackCall?.[1]?.method).toBe("POST");
+    expect(slackCall?.[1]).toMatchObject({ redirect: "manual", dispatcher: expect.any(Object) });
     const slackBody = slackCall?.[1]?.body;
     expect(typeof slackBody).toBe("string");
     if (typeof slackBody !== "string") {
@@ -721,6 +753,7 @@ describe("alert delivery transport – multi-channel", () => {
         {
           incident_id: "inc_123",
           condition_type: "new_incident",
+          condition_types: ["new_incident", "error_spike"],
           payload: {
             condition_type: "new_incident",
             incident_id: "inc_123",
@@ -737,6 +770,7 @@ describe("alert delivery transport – multi-channel", () => {
     const email = send.mock.calls[0]?.[0];
     expect(email?.to).toEqual(["alerts@example.com"]);
     expect(email?.text).toContain("Project: Checkout API");
+    expect(email?.text).toContain("Alerts: New incident, Error spike");
     expect(email?.html).toContain("Checkout API");
   });
 
@@ -831,7 +865,7 @@ describe("alert delivery transport – multi-channel", () => {
       alert_id: "alert_6",
       project_id: "proj_1",
       incident_id: "inc_1",
-      channel: "webhook",
+      channel: "webhook", signing_secret: "test-signing-key",
       config: { target_url: "https://custom.hooks.test/alerts" },
       payload: { event_type: "new_incident", incident_id: "inc_1" }
     });
@@ -847,6 +881,39 @@ describe("alert delivery transport – multi-channel", () => {
         })
       })
     );
+  });
+
+  it("rejects a private alert webhook target before any network request", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    await expect(createAlertTransport({ timeoutMs: 5000, emailTransport: null }).deliver({
+      delivery_id: "adel_private", alert_id: "alert_private", project_id: "proj_1",
+      incident_id: "inc_1", channel: "webhook", signing_secret: "test-signing-key",
+      config: { target_url: "http://169.254.169.254/latest/meta-data/" }, payload: { incident_id: "inc_1" }
+    })).rejects.toThrow("alert_target_blocked");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it.each(["slack", "discord"] as const)("rejects a private %s URL before sending", async (channel) => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    await expect(createAlertTransport({ timeoutMs: 5000, emailTransport: null }).deliver({
+      delivery_id: "adel_private", alert_id: "alert_private", project_id: "proj_1",
+      incident_id: "inc_1", channel,
+      config: { webhook_url: "http://127.0.0.1/alerts" }, payload: { incident_id: "inc_1" }
+    })).rejects.toThrow("alert_target_blocked");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("does not follow a redirect from an alert destination", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue({ ok: false, status: 302 });
+    vi.stubGlobal("fetch", fetchSpy);
+    await expect(createAlertTransport({ timeoutMs: 5000, emailTransport: null }).deliver({
+      delivery_id: "adel_redirect", alert_id: "alert_redirect", project_id: "proj_1",
+      incident_id: "inc_1", channel: "webhook", signing_secret: "test-signing-key",
+      config: { target_url: "https://example.com/alerts" }, payload: { incident_id: "inc_1" }
+    })).rejects.toThrow("alert_redirect_blocked");
+    expect(fetchSpy.mock.calls[0]?.[1]).toMatchObject({ redirect: "manual" });
   });
 
   it("should reject slack alerts when webhook_url is missing", async (): Promise<void> => {

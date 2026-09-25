@@ -1,5 +1,6 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
+import { fetchGuardedOutbound } from "./alert-outbound-guard.js";
 
 export type AvailabilityCheckMethod = "GET" | "HEAD";
 
@@ -263,6 +264,15 @@ function classifyNetworkError(
   }
 
   const message = error instanceof Error ? error.message : String(error);
+  const cause = error instanceof Error ? error.cause : undefined;
+  if (message === "alert_target_blocked" ||
+    (cause instanceof Error && cause.message === "alert_target_blocked")) {
+    return {
+      status: "security_blocked",
+      error_kind: "blocked_address",
+      error_message: "The availability check target was blocked."
+    };
+  }
   const normalized = message.toLowerCase();
   if (normalized.includes("certificate") || normalized.includes("tls")) {
     return {
@@ -321,7 +331,7 @@ export async function executeAvailabilityCheck(
 
   try {
     for (;;) {
-      const response = await fetch(currentUrl, {
+      const response = await fetchGuardedOutbound(currentUrl.toString(), {
         method: input.method,
         redirect: "manual",
         headers: {

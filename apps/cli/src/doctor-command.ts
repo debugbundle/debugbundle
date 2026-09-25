@@ -226,7 +226,7 @@ function buildPrivacyPreview(): DoctorPrivacyPreview {
   const redacted_fields = [
     "headers.authorization", "headers.cookie", "body.password", "body.card_number", "body.otp", "context.apiKey"
   ];
-  const sampleEventClass = classifyEvent(sampleEvent.event_type, undefined, undefined, sampleEvent.payload as Record<string, unknown>);
+  const sampleEventClass = classifyEvent(sampleEvent.event_type, undefined, undefined, sampleEvent.payload as Record<string, unknown>, "minimal", [], [], sampleEvent.service.runtime);
 
   return {
     policy_version: TELEMETRY_PRIVACY_POLICY_VERSION,

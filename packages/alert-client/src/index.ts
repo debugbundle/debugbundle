@@ -22,6 +22,7 @@ export const AlertSchema = z
     severity_lifecycle_scope: AlertSeverityLifecycleScopeSchema.nullable().optional().default(null),
     cooldown_seconds: z.number().int().min(0),
     config: z.record(z.string(), z.unknown()),
+    signing_secret: z.string().optional(),
     is_enabled: z.boolean(),
     created_at: z.string(),
     updated_at: z.string()
@@ -30,7 +31,7 @@ export const AlertSchema = z
 
 export const AlertListResponseSchema = z
   .object({
-    alerts: z.array(AlertSchema)
+    alerts: z.array(AlertSchema.omit({ signing_secret: true }).strict())
   })
   .strict();
 
@@ -39,6 +40,33 @@ export const AlertResponseSchema = z
     alert: AlertSchema
   })
   .strict();
+
+export const AlertGroupSummarySchema = z.object({
+  group_id: z.string().uuid(),
+  kind: z.enum(["direct", "email_digest"]),
+  project_id: z.string().uuid(),
+  alert_id: z.string().uuid().nullable(),
+  root_incident_id: z.string().uuid().nullable(),
+  channel: AlertChannelSchema,
+  status: z.enum(["pending", "delivered", "failed"]),
+  member_count: z.number().int().min(0),
+  created_at: z.string(),
+  delivered_at: z.string().nullable()
+}).strict();
+export const AlertGroupMemberSchema = z.object({
+  incident_id: z.string().uuid(),
+  condition_type: z.string(),
+  created_at: z.string()
+}).strict();
+export const AlertGroupListResponseSchema = z.object({
+  groups: z.array(AlertGroupSummarySchema),
+  next_cursor: z.string().nullable()
+}).strict();
+export const AlertGroupResponseSchema = z.object({
+  group: AlertGroupSummarySchema,
+  members: z.array(AlertGroupMemberSchema),
+  next_cursor: z.string().nullable()
+}).strict();
 
 export const ApiErrorResponseSchema = z
   .object({
@@ -50,6 +78,8 @@ export type AlertRecord = z.infer<typeof AlertSchema>;
 export type AlertChannel = z.infer<typeof AlertChannelSchema>;
 export type AlertConditionType = z.infer<typeof AlertConditionTypeSchema>;
 export type AlertSeverityLifecycleScope = z.infer<typeof AlertSeverityLifecycleScopeSchema>;
+export type AlertGroupListResponse = z.infer<typeof AlertGroupListResponseSchema>;
+export type AlertGroupResponse = z.infer<typeof AlertGroupResponseSchema>;
 
 export interface HttpRequestInput {
   method: "GET" | "POST" | "PATCH" | "DELETE";
@@ -130,6 +160,8 @@ async function expectAlert(responsePromise: Promise<HttpResponse>): Promise<Aler
 
 export function createAlertApi(client: HttpClient): {
   listAlerts(input: { bearerToken: string; projectId: string; limit?: number }): Promise<AlertRecord[]>;
+  listAlertGroups(input: { bearerToken: string; projectId: string; limit?: number; cursor?: string }): Promise<AlertGroupListResponse>;
+  getAlertGroup(input: { bearerToken: string; projectId: string; kind: "direct" | "email_digest"; groupId: string; limit?: number; cursor?: string }): Promise<AlertGroupResponse>;
   createAlert(input: {
     bearerToken: string;
     projectId: string;
@@ -153,6 +185,7 @@ export function createAlertApi(client: HttpClient): {
     severityLifecycleScope?: AlertSeverityLifecycleScope | null;
     cooldownSeconds?: number;
     config?: Record<string, unknown> | null;
+    rotateSigningSecret?: boolean;
     isEnabled?: boolean;
   }): Promise<AlertRecord>;
   deleteAlert(input: { bearerToken: string; projectId: string; alertId: string }): Promise<{ alert_id: string }>;
@@ -168,6 +201,30 @@ export function createAlertApi(client: HttpClient): {
       );
     },
 
+    async listAlertGroups(input) {
+      const response = await client.request({
+        method: "GET",
+        path: `/v1/alert-groups${buildQuery({ project_id: input.projectId, limit: input.limit, cursor: input.cursor })}`,
+        bearerToken: input.bearerToken
+      });
+      if (response.status < 200 || response.status >= 300) parseApiError(response.status, response.body);
+      const parsed = AlertGroupListResponseSchema.safeParse(response.body);
+      if (!parsed.success) throw new AlertApiError(response.status, "invalid_response_shape");
+      return parsed.data;
+    },
+
+    async getAlertGroup(input) {
+      const response = await client.request({
+        method: "GET",
+        path: `/v1/alert-groups/${input.kind}/${encodeURIComponent(input.groupId)}${buildQuery({ project_id: input.projectId, limit: input.limit, cursor: input.cursor })}`,
+        bearerToken: input.bearerToken
+      });
+      if (response.status < 200 || response.status >= 300) parseApiError(response.status, response.body);
+      const parsed = AlertGroupResponseSchema.safeParse(response.body);
+      if (!parsed.success) throw new AlertApiError(response.status, "invalid_response_shape");
+      return parsed.data;
+    },
+
     async createAlert(input) {
       const body: {
         project_id: string;
@@ -178,6 +235,7 @@ export function createAlertApi(client: HttpClient): {
         severity_lifecycle_scope?: AlertSeverityLifecycleScope;
         cooldown_seconds?: number;
         config: Record<string, unknown>;
+        signing?: "hmac_sha256_v1";
         is_enabled?: boolean;
       } = {
         project_id: input.projectId,
@@ -185,6 +243,9 @@ export function createAlertApi(client: HttpClient): {
         condition_type: input.conditionType,
         config: input.config
       };
+      if (input.channel === "webhook") {
+        body.signing = "hmac_sha256_v1";
+      }
 
       if (input.serviceId !== undefined) {
         body.service_id = input.serviceId;
@@ -221,6 +282,7 @@ export function createAlertApi(client: HttpClient): {
         severity_lifecycle_scope?: AlertSeverityLifecycleScope | null;
         cooldown_seconds?: number;
         config?: Record<string, unknown> | null;
+        rotate_signing_secret?: true;
         is_enabled?: boolean;
       } = {};
 
@@ -244,6 +306,9 @@ export function createAlertApi(client: HttpClient): {
       }
       if (input.config !== undefined) {
         body.config = input.config;
+      }
+      if (input.rotateSigningSecret === true) {
+        body.rotate_signing_secret = true;
       }
       if (input.isEnabled !== undefined) {
         body.is_enabled = input.isEnabled;

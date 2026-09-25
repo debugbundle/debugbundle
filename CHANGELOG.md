@@ -6,6 +6,24 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-09-25
+
+### Added
+
+- Reconstruct bounded redirected Java stack traces before incident creation, so one exception produces one incident while unrelated failures remain separate.
+- Add durable, project-scoped alert groups with API, CLI, and MCP inspection and stable group links for direct notifications. Slack, Discord, and alert webhooks coalesce related initial notifications without suppressing distinct failures or escalation.
+
+### Reliability
+
+- Preserve grouped alert delivery ownership and retry state across provider failures without consuming another notification quota or creating duplicate direct sends. Existing lifecycle webhook event identities remain intact.
+- Require both additive alert migrations before starting the API or worker; migration and readiness checks fail closed when either is absent.
+
+### Security
+
+- Direct alert, signed lifecycle-webhook, weekly Slack report, connected-Slack test, and availability-check sends now validate the address used by the socket and reject private/reserved destinations and unsafe ports. Alert create/update also rejects unsafe literal targets; webhooks do not follow redirects, while availability checks revalidate each redirect. Previously configured blocked targets remain stored but delivery fails until the owner changes the URL to a direct public endpoint.
+- Updated API, CLI, and MCP clients can opt into signed custom alert-webhook creation with `signing: "hmac_sha256_v1"`. The exact JSON body receives a per-rule HMAC-SHA256 signature, with its secret shown only on creation or explicit rotation. Every custom webhook is signed, including legacy rules upgraded atomically before delivery. Legacy clients keep their strict response/body shape until opted in or rotated; an explicit payload-version column and forward migration preserve that boundary without exposing keys in readable config.
+
+
 ## [1.12.0] - 2026-09-23
 
 ### Agent interface routing

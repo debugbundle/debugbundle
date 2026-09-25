@@ -790,6 +790,38 @@ describe("worker processor \u2013 normalize-events", () => {
     );
   });
 
+  it("retains redirected Java stack frames without opening another incident", async (): Promise<void> => {
+    const event = createEventEnvelope({
+      event_type: "log_event",
+      service: { name: "hcp", environment: "staging", runtime: "java", framework: "wildfly" },
+      payload: {
+        level: "error",
+        message: "\tat example.ChartService.render(ChartService.java:42)",
+        attributes: { logger: "org.jboss.stdio", thread_id: 117 }
+      }
+    });
+    const queue = {
+      enqueue: vi.fn().mockResolvedValue(undefined),
+      dequeue: vi.fn().mockResolvedValue({
+        project_id: "proj_hcp",
+        event_id: event.event_id,
+        object_key: "raw-events/proj_hcp/frame.json.gz"
+      })
+    };
+
+    await processNextNormalizeEventsJob({
+      queue,
+      objectStore: { getObject: vi.fn().mockResolvedValue(gzipSync(Buffer.from(JSON.stringify(event), "utf8"))) },
+      processedEventStore: { upsertProcessedEvent: vi.fn().mockResolvedValue(undefined) }
+    });
+
+    expect(queue.enqueue).toHaveBeenCalledWith("group-incident", expect.objectContaining({
+      event_class: "context_signal",
+      event_type: "log_event",
+      event_id: event.event_id
+    }));
+  });
+
   it("should classify 5xx request_event as incident_signal with high severity", async (): Promise<void> => {
     const event = createEventEnvelope({
       event_type: "request_event",

@@ -33,7 +33,10 @@ describe("openclaw plugin package", () => {
     };
 
     expect(packageJson.name).toBe("@debugbundle/openclaw-plugin");
-    expect(packageJson.version).toBe("1.11.0");
+    const mcpVersion = JSON.parse(
+      readFileSync(join(repoRoot, "apps", "mcp", "package.json"), "utf8")
+    ).version as string;
+    expect(packageJson.version).toBe(mcpVersion);
     expect(packageJson.private).toBe(false);
     expect(packageJson.description).toBe(
       "OpenClaw tools for runtime error reporting, incident response, live app monitoring, health checks, debug bundles, and product analytics."

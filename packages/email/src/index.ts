@@ -138,11 +138,13 @@ export interface AlertEmailInput {
   severity: "low" | "medium" | "high" | "critical";
   incidentUrl?: string | null;
   bundleUrl?: string | null;
+  groupUrl?: string | null;
   brandMarkUrl?: string | undefined;
 }
 
 export interface AlertDigestEmailEntryInput extends AlertEmailInput {
   summary: string | null;
+  conditionTypes?: string[];
 }
 
 function escapeSlackMrkdwn(value: string): string {
@@ -494,7 +496,10 @@ export function renderAlertSlackMessage(input: AlertEmailInput): { text: string;
       : [`<${input.incidentUrl}|Open incident>`]),
     ...(input.bundleUrl === undefined || input.bundleUrl === null
       ? []
-      : [`<${input.bundleUrl}|View bundle JSON>`])
+      : [`<${input.bundleUrl}|View bundle JSON>`]),
+    ...(input.groupUrl === undefined || input.groupUrl === null
+      ? []
+      : [`<${input.groupUrl}|Inspect alert group>`])
   ];
 
   const text = [
@@ -507,7 +512,8 @@ export function renderAlertSlackMessage(input: AlertEmailInput): { text: string;
     `Incident ID: ${input.incidentId}`,
     `Detected at: ${input.occurredAt}`,
     ...(input.incidentUrl === undefined || input.incidentUrl === null ? [] : [`Open incident: ${input.incidentUrl}`]),
-    ...(input.bundleUrl === undefined || input.bundleUrl === null ? [] : [`View bundle: ${input.bundleUrl}`])
+    ...(input.bundleUrl === undefined || input.bundleUrl === null ? [] : [`View bundle: ${input.bundleUrl}`]),
+    ...(input.groupUrl === undefined || input.groupUrl === null ? [] : [`Inspect alert group: ${input.groupUrl}`])
   ].join("\n");
 
   const blocks: Array<Record<string, unknown>> = [
@@ -640,6 +646,8 @@ export function renderAlertEmail(input: AlertEmailInput): { subject: string; tex
 export function renderAlertDigestEmail(input: {
   alerts: AlertDigestEmailEntryInput[];
   brandMarkUrl?: string | undefined;
+  totalIncidentCount?: number;
+  allIncidentsUrl?: string;
 }): { subject: string; text: string; html: string } {
   const groupedAlerts = new Map<
     string,
@@ -648,25 +656,30 @@ export function renderAlertDigestEmail(input: {
     }
   >();
 
-  for (const alert of input.alerts) {
+  for (const alert of input.alerts.slice(0, 25)) {
     const existing = groupedAlerts.get(alert.incidentId);
-    const conditionLabel = formatAlertConditionLabel(alert.conditionType);
+    const conditionLabels = [...new Set((alert.conditionTypes ?? [alert.conditionType])
+      .map(formatAlertConditionLabel))];
 
     if (existing === undefined) {
       groupedAlerts.set(alert.incidentId, {
         ...alert,
-        conditionLabels: [conditionLabel]
+        conditionLabels
       });
       continue;
     }
 
-    if (!existing.conditionLabels.includes(conditionLabel)) {
-      existing.conditionLabels.push(conditionLabel);
+    for (const conditionLabel of conditionLabels) {
+      if (!existing.conditionLabels.includes(conditionLabel)) existing.conditionLabels.push(conditionLabel);
     }
   }
 
   const alerts = Array.from(groupedAlerts.values());
-  const incidentCount = alerts.length;
+  const incidentCount = Math.max(alerts.length, input.totalIncidentCount ?? alerts.length);
+  const omittedCount = incidentCount - alerts.length;
+  const omittedText = omittedCount > 0
+    ? `${omittedCount} more incidents are available in DebugBundle.`
+    : null;
   const subject =
     incidentCount === 1
       ? "[DebugBundle Alerts] 1 incident matched your alerts"
@@ -676,6 +689,8 @@ export function renderAlertDigestEmail(input: {
     incidentCount === 1
       ? "DebugBundle batched 1 incident into this alert digest."
       : `DebugBundle batched ${incidentCount} incidents into this alert digest.`,
+    ...(omittedText === null ? [] : [omittedText,
+      ...(input.allIncidentsUrl === undefined ? [] : [`Review all incidents: ${input.allIncidentsUrl}`])]),
     "",
     ...alerts.flatMap((alert, index) => [
       `${index + 1}. ${alert.summary ?? "Alert triggered"}`,
@@ -702,9 +717,13 @@ export function renderAlertDigestEmail(input: {
       incidentCount === 1
         ? "DebugBundle batched 1 incident into this alert digest."
         : `DebugBundle batched ${incidentCount} incidents into this alert digest.`,
-    preheader: formatAlertDigestPreheader(alerts),
-    bodyHtml: alerts
-      .map((alert, index) =>
+    preheader: formatAlertDigestPreheader(alerts, incidentCount),
+    bodyHtml: [
+      ...(omittedText === null ? [] : [renderEmailParagraph(
+        input.allIncidentsUrl === undefined ? omittedText
+          : `${escapeHtml(omittedText)} ${renderEmailTextLink({ label: "Review all incidents", url: input.allIncidentsUrl })}`
+      )]),
+      ...alerts.map((alert, index) =>
         renderEmailPanel(
           [
             `<p class="db-email-alert-summary" style="margin:0 0 14px;color:#1c1917;font-size:16px;line-height:24px;font-weight:600;word-wrap:break-word;word-break:break-word;overflow-wrap:anywhere;">${index + 1}. ${escapeHtml(alert.summary ?? "Alert triggered")}</p>`,
@@ -736,7 +755,7 @@ export function renderAlertDigestEmail(input: {
           ].join("")
         )
       )
-      .join("")
+    ].join("")
   });
 
   return { subject, text, html };

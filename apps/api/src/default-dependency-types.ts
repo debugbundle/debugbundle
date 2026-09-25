@@ -194,6 +194,7 @@ export interface DefaultApiDependencies
     MetadataStore,
     "listAlertsForOrganization" | "createAlertForOrganization" | "updateAlertForOrganization" | "deleteAlertForOrganization"
   >;
+  alertGroupInspection: NonNullable<ApiDependencies["alertGroupInspection"]>;
   availabilityCheckManagement: ReturnType<typeof createPostgresAvailabilityCheckStore> & {
     testCheck: NonNullable<ApiDependencies["availabilityCheckManagement"]>["testCheck"];
   };

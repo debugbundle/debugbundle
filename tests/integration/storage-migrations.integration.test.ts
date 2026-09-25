@@ -175,6 +175,121 @@ runIntegration("storage bootstrap integration", () => {
     expect((await migrateStorageSchema(db)).applied).toEqual([]);
   });
 
+  it("adds alert delivery membership through a forward migration before worker readiness", async () => {
+    await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
+    await pool.query("CREATE SCHEMA public");
+    const db = createQueryable(pool);
+    await bootstrapStorageSchema(db);
+    await migrateStorageSchema(db);
+
+    const projectId = randomUUID();
+    await seedOwnedProject({
+      pool,
+      projectId,
+      organizationId: randomUUID(),
+      organizationName: "Alert membership migration",
+      organizationSlug: `alert-members-${projectId}`,
+      projectName: "Existing alerts",
+      projectSlug: "existing-alerts"
+    });
+    await pool.query("DROP TABLE alert_delivery_members");
+    const migrationId = "202609240001_add_alert_delivery_members";
+    await pool.query("DELETE FROM storage_migration_ledger WHERE id = $1", [migrationId]);
+
+    await expect(assertStorageSchemaMigrationsApplied(db)).rejects.toThrow(
+      `storage_schema_missing_migrations: ${migrationId}`
+    );
+    expect((await migrateStorageSchema(db)).applied).toEqual([migrationId]);
+    await expect(assertStorageSchemaMigrationsApplied(db)).resolves.toBeUndefined();
+    expect((await pool.query("SELECT name FROM projects WHERE id = $1", [projectId])).rows[0]?.name).toBe("Existing alerts");
+    expect((await pool.query("SELECT to_regclass('public.alert_delivery_members')::text AS table_name")).rows[0]?.table_name).toBe("alert_delivery_members");
+    expect((await migrateStorageSchema(db)).applied).toEqual([]);
+  });
+
+  it("adds a nullable custom alert-webhook secret without changing existing rules", async () => {
+    await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
+    await pool.query("CREATE SCHEMA public");
+    const db = createQueryable(pool);
+    await bootstrapStorageSchema(db);
+    await migrateStorageSchema(db);
+    const projectId = randomUUID();
+    const { ownerUserId } = await seedOwnedProject({ pool, projectId,
+      organizationId: randomUUID(), organizationName: "Alert signing migration",
+      organizationSlug: `alert-signing-${projectId}`, projectName: "Existing",
+      projectSlug: "existing-alerts" });
+    const alertId = randomUUID();
+    await pool.query(`INSERT INTO alert_rules (id, project_id, created_by_user_id, channel,
+      condition_type, config) VALUES ($1, $2, $3, 'webhook', 'new_incident',
+      '{"target_url":"https://hooks.example.test/alert"}'::jsonb)`,
+    [alertId, projectId, ownerUserId]);
+    await pool.query("ALTER TABLE alert_rules DROP COLUMN signing_secret");
+    const migrationId = "202609240002_add_alert_webhook_signing_secret";
+    await pool.query("DELETE FROM storage_migration_ledger WHERE id = $1", [migrationId]);
+
+    await expect(assertStorageSchemaMigrationsApplied(db)).rejects.toThrow(
+      `storage_schema_missing_migrations: ${migrationId}`);
+    expect((await migrateStorageSchema(db)).applied).toEqual([migrationId]);
+    const existing = await pool.query<{ signing_secret: string | null }>(
+      "SELECT signing_secret FROM alert_rules WHERE id = $1", [alertId]);
+    expect(existing.rows[0]?.signing_secret).toBeNull();
+    await expect(assertStorageSchemaMigrationsApplied(db)).resolves.toBeUndefined();
+  });
+
+  it("separates legacy webhook bodies from signing and fails readiness before the forward migration", async () => {
+    await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
+    await pool.query("CREATE SCHEMA public");
+    const db = createQueryable(pool);
+    await bootstrapStorageSchema(db);
+    await migrateStorageSchema(db);
+    const projectId = randomUUID();
+    const { ownerUserId } = await seedOwnedProject({ pool, projectId,
+      organizationId: randomUUID(), organizationName: "Payload migration",
+      organizationSlug: `payload-${projectId}`, projectName: "Existing", projectSlug: "existing" });
+    const legacy = randomUUID(), modern = randomUUID();
+    for (const [id, key] of [[legacy, null], [modern, "existing-secret"]]) {
+      await pool.query(`INSERT INTO alert_rules (id, project_id, created_by_user_id, channel,
+        condition_type, config, signing_secret) VALUES ($1, $2, $3, 'webhook', 'new_incident', '{}', $4)`,
+      [id, projectId, ownerUserId, key]);
+    }
+    await pool.query("ALTER TABLE alert_rules DROP COLUMN webhook_payload_version");
+    const migrationId = "202609250002_version_alert_webhook_payloads";
+    await pool.query("DELETE FROM storage_migration_ledger WHERE id = $1", [migrationId]);
+    await expect(assertStorageSchemaMigrationsApplied(db)).rejects.toThrow(`storage_schema_missing_migrations: ${migrationId}`);
+    expect((await migrateStorageSchema(db)).applied).toEqual([migrationId]);
+    expect((await pool.query("SELECT webhook_payload_version FROM alert_rules WHERE id = $1", [legacy])).rows).toEqual([{ webhook_payload_version: 0 }]);
+    expect((await pool.query("SELECT signing_secret, webhook_payload_version FROM alert_rules WHERE id = $1", [modern])).rows).toEqual([{ signing_secret: "existing-secret", webhook_payload_version: 1 }]);
+    await expect(assertStorageSchemaMigrationsApplied(db)).resolves.toBeUndefined();
+    expect((await migrateStorageSchema(db)).applied).toEqual([]);
+  });
+
+  it("requires the alert retry ownership migration and leaves historical deliveries unclaimed", async () => {
+    await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
+    await pool.query("CREATE SCHEMA public");
+    const db = createQueryable(pool);
+    await bootstrapStorageSchema(db);
+    await migrateStorageSchema(db);
+    const projectId = randomUUID(), incidentId = randomUUID(), alertId = randomUUID(), deliveryId = randomUUID();
+    const { ownerUserId } = await seedOwnedProject({ pool, projectId,
+      organizationId: randomUUID(), organizationName: "Retry ownership migration",
+      organizationSlug: `alert-retry-${projectId}`, projectName: "Existing",
+      projectSlug: "existing-alerts" });
+    await pool.query(`INSERT INTO incidents (id, project_id, environment, fingerprint, title, severity, status, first_seen_at, last_seen_at)
+      VALUES ($1::uuid, $2, 'production', ($1::uuid)::text, 'Existing', 'high', 'open', now(), now())`, [incidentId, projectId]);
+    await pool.query(`INSERT INTO alert_rules (id, project_id, created_by_user_id, channel, condition_type, config)
+      VALUES ($1, $2, $3, 'webhook', 'new_incident', '{}'::jsonb)`, [alertId, projectId, ownerUserId]);
+    await pool.query(`INSERT INTO alert_deliveries (id, alert_id, project_id, incident_id, condition_type, dedupe_key, channel, status, payload)
+      VALUES ($1, $2, $3, $4, 'new_incident', 'new_incident', 'webhook', 'delivered', '{}'::jsonb)`, [deliveryId, alertId, projectId, incidentId]);
+    await pool.query("ALTER TABLE alert_deliveries DROP COLUMN evaluation_job_id");
+    const migrationId = "202609250001_add_alert_evaluation_owner";
+    await pool.query("DELETE FROM storage_migration_ledger WHERE id = $1", [migrationId]);
+    await expect(assertStorageSchemaMigrationsApplied(db)).rejects.toThrow(`storage_schema_missing_migrations: ${migrationId}`);
+    expect((await migrateStorageSchema(db)).applied).toEqual([migrationId]);
+    expect((await pool.query("SELECT status, evaluation_job_id FROM alert_deliveries WHERE id = $1", [deliveryId])).rows)
+      .toEqual([{ status: "delivered", evaluation_job_id: null }]);
+    await expect(assertStorageSchemaMigrationsApplied(db)).resolves.toBeUndefined();
+    expect((await migrateStorageSchema(db)).applied).toEqual([]);
+  });
+
   it("requires the additive recovery index migration and preserves installed project data", async () => {
     await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
     await pool.query("CREATE SCHEMA public");

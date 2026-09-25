@@ -14,8 +14,12 @@ const legacyContractPath = new URL(
 );
 
 describe("legacy MCP and OpenClaw contract", () => {
-  it("matches the frozen stdio and OpenClaw public surface", async () => {
-    const expected = JSON.parse(await readFile(legacyContractPath, "utf8")) as unknown;
+  it("preserves the frozen stdio and OpenClaw public surface as tools are added", async () => {
+    const expected = JSON.parse(await readFile(legacyContractPath, "utf8")) as {
+      initialization: { result: { serverInfo: { version: string } } };
+      tools: { result: { tools: Array<{ name: string }> } };
+      openClaw: { names: string[]; tools: Array<{ openClawToolName: string }> };
+    };
     const successfulServer = createMcpServer({
       tools: {
         doctor: vi.fn().mockResolvedValue({ status: "healthy" })
@@ -60,6 +64,42 @@ describe("legacy MCP and OpenClaw contract", () => {
       }
     };
 
-    expect(actual).toEqual(expected);
+    const toolsResponse = actual.tools as { result: { tools: Array<{ name: string }> } };
+    const initialization = actual.initialization as {
+      result: { serverInfo: { version: string } };
+    };
+    const mcpPackage = JSON.parse(
+      await readFile(new URL("../../../apps/mcp/package.json", import.meta.url), "utf8")
+    ) as { version: string };
+    expect(initialization.result.serverInfo.version).toBe(mcpPackage.version);
+    const legacyToolNames = new Set(expected.tools.result.tools.map((tool) => tool.name));
+    const legacyOpenClawNames = new Set(expected.openClaw.names);
+    expect({
+      ...actual,
+      initialization: {
+        ...initialization,
+        result: {
+          ...initialization.result,
+          serverInfo: {
+            ...initialization.result.serverInfo,
+            version: expected.initialization.result.serverInfo.version
+          }
+        }
+      },
+      tools: {
+        ...toolsResponse,
+        result: { tools: toolsResponse.result.tools.filter((tool) => legacyToolNames.has(tool.name)) }
+      },
+      openClaw: {
+        names: actual.openClaw.names.filter((name) => legacyOpenClawNames.has(name)),
+        tools: actual.openClaw.tools.filter((tool) => legacyOpenClawNames.has(tool.openClawToolName))
+      }
+    }).toEqual(expected);
+    expect(toolsResponse.result.tools.map((tool) => tool.name)).toEqual(expect.arrayContaining([
+      "list_alert_groups", "get_alert_group", "rotate_alert_webhook_secret"
+    ]));
+    expect(actual.openClaw.names).toEqual(expect.arrayContaining([
+      "debugbundle_list_alert_groups", "debugbundle_get_alert_group", "debugbundle_rotate_alert_webhook_secret"
+    ]));
   });
 });

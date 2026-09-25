@@ -40,6 +40,10 @@ describe("availability check executor validation", () => {
 
     expect(result.status).toBe("security_blocked");
     expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
+      redirect: "manual",
+      dispatcher: expect.any(Object)
+    }));
     expect(cancel).toHaveBeenCalledOnce();
   });
 
@@ -369,6 +373,7 @@ describe("availability check executor validation", () => {
       .mockRejectedValueOnce(new Error("certificate expired"))
       .mockRejectedValueOnce(new Error("ENOTFOUND app.example.test"))
       .mockRejectedValueOnce(new Error("ECONNREFUSED"))
+      .mockRejectedValueOnce(new TypeError("fetch failed", { cause: new Error("alert_target_blocked") }))
       .mockRejectedValueOnce(new Error("unexpected parser failure"));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -391,6 +396,9 @@ describe("availability check executor validation", () => {
     );
     await expect(executeAvailabilityCheck(base)).resolves.toEqual(
       expect.objectContaining({ status: "connection_error", error_kind: "connection_error" })
+    );
+    await expect(executeAvailabilityCheck(base)).resolves.toEqual(
+      expect.objectContaining({ status: "security_blocked", error_kind: "blocked_address" })
     );
     await expect(executeAvailabilityCheck(base)).resolves.toEqual(
       expect.objectContaining({ status: "internal_error", error_kind: "internal_error" })

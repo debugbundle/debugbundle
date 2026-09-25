@@ -85,13 +85,13 @@ export function formatAlertPreheader(input: AlertPreheaderInput): string {
   return `${projectPrefix}${titleCase(input.severity)} ${input.conditionLabel.toLowerCase()} for ${input.serviceName} in ${input.environment} at ${formatEmailDate(input.occurredAt)}.`;
 }
 
-export function formatAlertDigestPreheader(alerts: AlertDigestPreheaderEntry[]): string {
+export function formatAlertDigestPreheader(alerts: AlertDigestPreheaderEntry[], totalIncidentCount = alerts.length): string {
   if (alerts.length === 0) {
     return "No incidents were included in this alert digest.";
   }
 
   const firstAlert = alerts[0]!;
   const projectPrefix = firstAlert.projectName === undefined || firstAlert.projectName === null ? "" : `${firstAlert.projectName}: `;
-  const additionalIncidents = alerts.length > 1 ? ` and ${formatCount(alerts.length - 1, "other incident")}` : "";
-  return `${projectPrefix}${formatCount(alerts.length, "incident")} matched alerts. First: ${titleCase(firstAlert.severity)} ${firstAlert.summary ?? firstAlert.incidentId} on ${firstAlert.serviceName} in ${firstAlert.environment}${additionalIncidents}.`;
+  const additionalIncidents = totalIncidentCount > 1 ? ` and ${formatCount(totalIncidentCount - 1, "other incident")}` : "";
+  return `${projectPrefix}${formatCount(totalIncidentCount, "incident")} matched alerts. First: ${titleCase(firstAlert.severity)} ${firstAlert.summary ?? firstAlert.incidentId} on ${firstAlert.serviceName} in ${firstAlert.environment}${additionalIncidents}.`;
 }

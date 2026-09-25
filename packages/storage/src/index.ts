@@ -55,6 +55,14 @@ export {
 export type { BuildImprovementBundleJob } from "./improvement-bundle-jobs.js";
 export * from "./alert-lifecycle.js";
 export { createPostgresAlertDeliveryStore } from "./alert-delivery-store.js";
+export {
+  createPostgresAlertGroupInspectionStore,
+  type AlertGroupCursor,
+  type AlertGroupInspectionStore,
+  type AlertGroupKind,
+  type AlertGroupMember,
+  type AlertGroupSummary
+} from "./alert-group-inspection.js";
 export { createPostgresAccountStore } from "./account-store.js";
 export { createPostgresAuditLogStore } from "./audit-log-store.js";
 export { createPostgresAuthStore } from "./auth-store.js";

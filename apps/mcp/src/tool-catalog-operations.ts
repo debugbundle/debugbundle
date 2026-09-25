@@ -187,6 +187,25 @@ export const MCP_TOOL_CATALOG_OPERATIONS = [
     })
   },
   {
+    name: "list_alert_groups",
+    group: "alerts",
+    description: "List project-scoped alert delivery and email digest groups with bounded incident counts and no payloads or destination secrets.",
+    inputSchema: z.object({
+      bearerToken: z.string(), projectId: z.string().uuid(),
+      limit: z.number().int().min(1).max(100).optional(), cursor: z.string().max(256).optional()
+    })
+  },
+  {
+    name: "get_alert_group",
+    group: "alerts",
+    description: "Inspect one project-scoped alert group and a paginated page of member incident IDs without raw logs or destination secrets.",
+    inputSchema: z.object({
+      bearerToken: z.string(), projectId: z.string().uuid(),
+      kind: z.enum(["direct", "email_digest"]), groupId: z.string().uuid(),
+      limit: z.number().int().min(1).max(100).optional(), cursor: z.string().max(256).optional()
+    })
+  },
+  {
     name: "create_alert",
     group: "alerts",
     description: "Create an alert rule, including optional severity-threshold lifecycle scope.",
@@ -222,6 +241,16 @@ export const MCP_TOOL_CATALOG_OPERATIONS = [
       cooldownSeconds: z.number().int().min(0).max(604800).optional(),
       config: jsonObjectSchema.nullable().optional(),
       isEnabled: z.boolean().optional()
+    })
+  },
+  {
+    name: "rotate_alert_webhook_secret",
+    group: "alerts",
+    description: "Rotate a custom alert-webhook signing secret and reveal the new secret once.",
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      projectId: z.string(),
+      alertId: z.string()
     })
   },
   {

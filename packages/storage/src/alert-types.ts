@@ -30,6 +30,12 @@ export interface AlertRuleRecord extends Record<string, unknown> {
   updated_at: string;
 }
 
+/** Internal worker projection; management reads never include the secret. */
+export interface AlertRuleForDelivery extends AlertRuleRecord {
+  signing_secret?: string | null;
+    webhook_payload_version?: number;
+}
+
 export interface DeleteAlertResult {
   alert_id: string;
 }
@@ -51,6 +57,7 @@ export interface AlertManagementStore {
     severity_lifecycle_scope?: AlertSeverityLifecycleScope | null;
     cooldown_seconds: number;
     config: Record<string, unknown>;
+    signing_secret?: string;
     is_enabled: boolean;
   }): Promise<AlertRuleRecord | null>;
   updateAlertForOrganization(input: {
@@ -66,6 +73,7 @@ export interface AlertManagementStore {
     severity_lifecycle_scope?: AlertSeverityLifecycleScope | null;
     cooldown_seconds?: number;
     config?: Record<string, unknown>;
+    signing_secret?: string;
     is_enabled?: boolean;
   }): Promise<AlertRuleRecord | null>;
   deleteAlertForOrganization(input: {
@@ -136,6 +144,7 @@ export interface AlertEmailDigestItemRecord extends Record<string, unknown> {
   project_id: string;
   incident_id: string;
   condition_type: AlertConditionType;
+  condition_types?: AlertConditionType[];
   dedupe_key: string;
   notification_key: string;
   payload: Record<string, unknown>;
@@ -143,8 +152,10 @@ export interface AlertEmailDigestItemRecord extends Record<string, unknown> {
 }
 
 export interface CreateAlertDeliveryIntentInput {
+  evaluation_job_id?: string | null;
   coalescing_key?: string;
   coalescing_window_seconds?: number;
+  allow_new_delivery?: boolean;
   alert_id: string;
   project_id: string;
   incident_id: string;
@@ -184,7 +195,7 @@ export interface AlertDeliveryStore {
     environment: string;
     severity: "low" | "medium" | "high" | "critical";
     lifecycle_event?: AlertSeverityLifecycleEvent;
-  }): Promise<AlertRuleRecord[]>;
+  }): Promise<AlertRuleForDelivery[]>;
   createAlertDeliveryIntent(input: CreateAlertDeliveryIntentInput): Promise<{ delivery_id: string | null; created: boolean }>;
   markAlertDeliveryResult(input: MarkAlertDeliveryResultInput): Promise<{ status: "delivered" | "failed" }>;
   queueAlertEmailDigestItem(input: QueueAlertEmailDigestItemInput): Promise<{
@@ -195,6 +206,7 @@ export interface AlertDeliveryStore {
   claimDueAlertEmailDigests(limit: number): Promise<DeliverAlertEmailDigestJob[]>;
   getAlertEmailDigest(digestId: string): Promise<{
     digest: AlertEmailDigestRecord;
+    total_incident_count: number;
     items: AlertEmailDigestItemRecord[];
   } | null>;
   markAlertEmailDigestResult(input: {

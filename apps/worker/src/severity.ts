@@ -1,3 +1,4 @@
+import { isJavaRedirectedStderrLogger } from "../../../packages/event-normalizer/src/java-stderr.js";
 import {
   classifyRequestStatus,
   inferFrontendExceptionSeverity,
@@ -30,6 +31,13 @@ export function inferSeverity(
   }
 
   if (event.event_type === "backend_exception") {
+    return "high";
+  }
+
+  if (event.event_type === "log_event" && event.service.runtime === "java"
+    && ["error", "critical", "fatal"].includes(event.payload.level.toLowerCase())
+    && isJavaRedirectedStderrLogger(event.payload.attributes["logger"])
+    && /^(?:Exception in thread "[^"]{1,128}"\s+)?[\w.$/]+(?:Exception|Error|Throwable)(?::|$)/.test(event.payload.message)) {
     return "high";
   }
 

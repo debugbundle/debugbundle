@@ -50,6 +50,7 @@ const MUTATION_MCP_TOOLS = new Set<DebugBundleMcpToolName>([
   "delete_weekly_report_channel",
   "create_alert",
   "update_alert",
+  "rotate_alert_webhook_secret",
   "delete_alert",
   "create_project",
   "update_project",

@@ -76,7 +76,7 @@ The complete docs page tree for `/docs`. Every entry below is a page that must e
 | 5 | `/docs/cli/log-ingestion` | Log Ingestion | Guide | `debugbundle ingest` and `debugbundle watch` for log-based capture. `debugbundle-ndjson` format. First-party parsers (PHP error, Apache error). Custom format documentation. |
 | 6 | `/docs/cli/tokens` | Token Management | Guide | `token project list/create/revoke`, `token member list/create/revoke`. When to use which token type. |
 | 7 | `/docs/cli/webhooks` | Webhook Management | Guide | `webhook list/create/update/delete/test/deliveries/retry` commands with examples. |
-| 8 | `/docs/cli/alerts` | Alert Management | Guide | `alert list/create/update/delete` with channel examples (email, Slack, Discord, webhook). |
+| 8 | `/docs/cli/alerts` | Alert Management | Guide | `alert list/create/update/delete` plus project-scoped `alert groups/group` inspection and channel examples (email, Slack, Discord, webhook). |
 | 9 | `/docs/cli/analytics` | AnalyticsBundle CLI | Guide | Aggregate metrics, opportunities, journey sample reads, AnalyticsBundle generation/status, settings, required member auth, and JSON examples. |
 
 ### 1.4 API

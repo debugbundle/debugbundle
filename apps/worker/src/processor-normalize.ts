@@ -49,7 +49,8 @@ export async function processNextNormalizeEventsJob(
     event.payload as Record<string, unknown>,
     capturePreset,
     immediateClientErrorStatuses,
-    immediateClientErrorPathRules
+    immediateClientErrorPathRules,
+    event.service.runtime
   );
   const eventClass = applyCaptureRuleEventClass({
     event_class: baseEventClass,

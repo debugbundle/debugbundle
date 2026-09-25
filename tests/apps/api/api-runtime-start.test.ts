@@ -127,6 +127,7 @@ function buildMigratedRuntimeSchemaRows(sql: string): { rows: Record<string, unk
         { table_name: "incident_events" },
         { table_name: "browser_recovery_events" },
         { table_name: "alert_rules" },
+        { table_name: "alert_delivery_members" },
         { table_name: "agent_webhooks" },
         { table_name: "webhook_deliveries" },
         { table_name: "slack_destinations" },

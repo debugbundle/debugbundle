@@ -478,7 +478,8 @@ export const CreateAlertBodySchema = z.discriminatedUnion("channel", [
     .object({
       ...BaseCreateAlertBodySchema,
       channel: z.literal("webhook"),
-      config: AlertWebhookConfigSchema
+      config: AlertWebhookConfigSchema,
+      signing: z.literal("hmac_sha256_v1").optional()
     })
     .strict()
 ]);
@@ -519,7 +520,8 @@ export const UpdateAlertBodySchema = z
       .object({
         ...BaseUpdateAlertBodySchema,
         channel: z.literal("webhook"),
-        config: AlertWebhookConfigSchema.nullable().optional()
+        config: AlertWebhookConfigSchema.nullable().optional(),
+        rotate_signing_secret: z.literal(true).optional()
       })
       .strict(),
     z
