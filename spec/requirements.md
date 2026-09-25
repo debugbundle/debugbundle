@@ -27,7 +27,7 @@ Last updated: 2026-09-20
 
 **FR-SDK-06:** SDKs must implement local buffering with batched delivery (browser: ≥10 events or 3s; Node: ≥50 events or 2s).
 
-**FR-SDK-07:** Browser SDK must flush on `pagehide`, `visibilitychange` using `navigator.sendBeacon()` with `fetch(keepalive)` fallback.
+**FR-SDK-07:** Browser SDK must attempt bounded best-effort delivery on `pagehide` and hidden `visibilitychange`. Credential-free relay mode uses `navigator.sendBeacon()` with `fetch(keepalive)` fallback. Direct ingestion uses authenticated `fetch(keepalive)` because a beacon cannot attach its required project-token header. Lifecycle requests must share a bounded budget below the browser's 64-KiB outstanding-body limit across the instance's debug and analytics lanes; unsent or failed events remain eligible for ordinary delivery while the page survives. Page shutdown cannot guarantee delivery.
 
 **FR-SDK-08:** Node SDK must flush on `SIGINT`, `SIGTERM`, `beforeExit`.
 

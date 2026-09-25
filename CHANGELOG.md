@@ -6,6 +6,13 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.13.3] - 2026-09-25
+
+### Reliability
+
+- Adopt JavaScript SDK 3.0.2 for API/worker/app dogfooding, including bounded browser lifecycle ownership, canonical direct acknowledgements, shared unload budgets, and bounded retry/flush handling.
+- Clarify default SDK redaction and optional application-hook responsibility in browser delivery contracts and documentation.
+
 ### Added
 
 - Add a native Gemini CLI extension with the published local-auth MCP server, shared investigation skill, deterministic standalone archive, disposable native smoke, and dedicated setup documentation. Public installation uses the separate `debugbundle/debugbundle-gemini` repository; gallery indexing remains an independently verified gate.

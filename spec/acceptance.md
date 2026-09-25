@@ -122,6 +122,20 @@ Native logger level/silent/processor filtering runs before SDK capture; enabled-
 - **And** a runtime unable to meet these conditions remains unqualified rather than being presented as a safe default
 - **And** PHP/WordPress qualify under the documented request-end exception only after installed CLI/FPM/Apache/WordPress tests measure the worker cost and confirm a single attempt, error priority, bounded payload, no inline batch sends, no ordinary-request config fetch, and explicit outage loss behavior
 
+### AC-SDK-BROWSER-UNLOAD: Authenticated, Bounded Lifecycle Delivery
+
+- **Given** a direct browser SDK with queued events and a project token
+- **When** the page becomes hidden or emits `pagehide`
+- **Then** the SDK uses authenticated `fetch(keepalive)` without attempting an unauthenticated beacon
+- **And** a relay SDK may use a credential-free beacon, falling back to credential-free keepalive if beacon is unavailable, declined, or throws
+- **And** debug and analytics share a 60-KiB lifecycle budget per instance across outstanding requests and repeated callbacks, with unsent events retained for ordinary delivery while the page remains active
+- **And** accepted beacons keep their reservation without a completion signal, while settled keepalive requests release capacity
+- **And** overlapping acknowledgements cannot escape the combined count/byte cap or resurrect acknowledged events
+- **And** explicit flush waits for existing lifecycle sends within its finite deadline; lifecycle retries honor bounded Retry-After and authorization rejection
+- **And** built-in direct HTTP delivery retains malformed or missing acknowledgements with backoff, while bodyless custom and legacy relay responses remain compatible
+- **And** a failed or timed-out keepalive does not acknowledge its events, including when only part of a queued batch fit the lifecycle body
+- **And** a single event too large for lifecycle delivery remains queued for the ordinary transport
+
 ### AC-SDK-10: Logger Auto-Detection
 
 - **Given** a Node.js application with pino or winston installed

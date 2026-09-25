@@ -20,8 +20,8 @@ importers:
         specifier: 2.1.0
         version: 2.1.0
       "@debugbundle/sdk-node":
-        specifier: 3.0.0
-        version: 3.0.0
+        specifier: 3.0.2
+        version: 3.0.2
       "@debugbundle/shared-types":
         specifier: 2.1.0
         version: 2.1.0
@@ -186,8 +186,8 @@ importers:
   apps/web:
     dependencies:
       "@debugbundle/sdk-browser":
-        specifier: 3.0.0
-        version: 3.0.0
+        specifier: 3.0.2
+        version: 3.0.2
       "@fontsource-variable/geist":
         specifier: ^5.2.8
         version: 5.2.8
@@ -901,16 +901,16 @@ packages:
         integrity: sha512-+IXVGehnYXwYE2niSRg0KVkPCmqm4FPhbHlz3XWCEIqrsPopSNcay14VMmdAPInsBy9FdVhP1J4CRWM8VCj8Cg==
       }
 
-  "@debugbundle/sdk-browser@3.0.0":
+  "@debugbundle/sdk-browser@3.0.2":
     resolution:
       {
-        integrity: sha512-39OgBm5BeXi/ZRyYTKHzdNk1laAxKy1JmpqAhQhhZrKTcbUWw32OKY2c9GhN6LHFRDVI6zR/PdJ6EtCnVm8YJA==
+        integrity: sha512-a/8nADfVVuzJcjXCobRZuPU1m3FJbh5sL8sgGVjps4LGL++ZkaX7YvkOFrm2B4kP6uXo82zABHN9tjSF9PEYkQ==
       }
 
-  "@debugbundle/sdk-node@3.0.0":
+  "@debugbundle/sdk-node@3.0.2":
     resolution:
       {
-        integrity: sha512-/IHWXH0cFva62J5VnUxlgYa6DFUafpjpYnFE6cEiGh2sRiY1EhFFFNUxnXeYPAAaRoeRMpiHBHGY8jVw1e4rdg==
+        integrity: sha512-k4bDOQMg/eQ9NBoA/8cwq3tBoCdAXgJjEnXG3dihm8zfGu81rqD/cB1C92JZG+marape66bzVvtxC6ys/YtIpQ==
       }
 
   "@debugbundle/shared-types@2.1.0":
@@ -9330,12 +9330,12 @@ snapshots:
 
   "@debugbundle/redaction@2.1.0": {}
 
-  "@debugbundle/sdk-browser@3.0.0":
+  "@debugbundle/sdk-browser@3.0.2":
     dependencies:
       "@debugbundle/redaction": 2.1.0
       "@debugbundle/shared-types": 2.1.0
 
-  "@debugbundle/sdk-node@3.0.0":
+  "@debugbundle/sdk-node@3.0.2":
     dependencies:
       "@debugbundle/redaction": 2.1.0
       "@debugbundle/shared-types": 2.1.0
