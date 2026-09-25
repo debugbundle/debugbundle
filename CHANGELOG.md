@@ -16,6 +16,10 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 - Use the packed MCP candidate version inside the disposable native Codex smoke while the public Codex plugin remains pinned to the last published MCP release. The corrected MCP and OpenClaw companion candidate is 1.12.1; the failed 1.12.0 tag remains immutable and unpublished.
 
+### Distribution
+
+- Advance the Codex and Claude Code repository plugins and portable ClawHub skill to published MCP 1.12.1, and pin the portable CLI install to published CLI 1.12.0. Existing local-auth and plugin settings remain unchanged.
+
 ## [1.13.0] - 2026-09-25
 
 ### Added

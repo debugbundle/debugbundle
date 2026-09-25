@@ -1,6 +1,6 @@
 {
   "name": "debugbundle-codex",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Runtime error reporting, incident response, health checks, debug bundles, and product analytics for Codex.",
   "author": {
     "name": "DebugBundle",

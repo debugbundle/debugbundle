@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.12.1] - 2026-09-25
+
+- Pin the published MCP 1.12.1 release while retaining the existing local-auth flow and member-token/API settings.
+
 ## [1.11.0] - 2026-09-23
 
 - Make CLI the primary supported interface and assess MCP as a fallback or explicit user choice.

@@ -117,7 +117,7 @@ describe("mcp Claude Code plugin marketplace package", () => {
         { type?: string; command?: string; args?: string[]; env?: Record<string, string> }
       >;
     };
-    expect(pluginManifest.version).toBe("1.11.0");
+    expect(pluginManifest.version).toBe("1.12.1");
 
     expect(pluginManifest).toMatchObject({
       name: "debugbundle",
@@ -140,7 +140,7 @@ describe("mcp Claude Code plugin marketplace package", () => {
     expect(pluginMcp.mcpServers?.["debugbundle"]).toEqual({
       type: "stdio",
       command: "npx",
-      args: ["-y", "@debugbundle/mcp@1.11.0", "--local-auth"],
+      args: ["-y", "@debugbundle/mcp@1.12.1", "--local-auth"],
       env: {
         DEBUGBUNDLE_MEMBER_TOKEN: "${user_config.member_token}",
         DEBUGBUNDLE_API_URL: "${user_config.api_url}"
