@@ -45,7 +45,8 @@ describe("Gemini CLI developer extension", () => {
     expect(readme).toContain("gemini extensions update debugbundle-gemini");
     expect(readme).toContain("gemini extensions uninstall debugbundle-gemini");
     expect(readme).toContain("gemini mcp list");
-    expect(readme).toContain("not published");
+    expect(readme).toContain("https://github.com/debugbundle/debugbundle-gemini");
+    expect(readme).toContain("gallery discovery is verified separately");
   });
 
   it("makes the standalone release layout and core documentation explicit", () => {

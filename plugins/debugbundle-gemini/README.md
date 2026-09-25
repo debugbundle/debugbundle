@@ -1,17 +1,16 @@
 # DebugBundle for Gemini CLI
 
-Native Gemini CLI extension for runtime incident investigation and product analytics. It bundles the DebugBundle workflow skill and starts the published `@debugbundle/mcp@1.12.1` stdio server with `--local-auth`. The extension is a local release candidate; its standalone GitHub repository and Gemini gallery listing are not published yet.
+Native Gemini CLI extension for runtime incident investigation and product analytics. It bundles the DebugBundle workflow skill and starts the published `@debugbundle/mcp@1.12.1` stdio server with `--local-auth`. The [standalone extension repository](https://github.com/debugbundle/debugbundle-gemini) is the public installation source; Gemini gallery discovery is verified separately.
 
-## Install the local candidate
+## Install
 
-Prerequisites: Gemini CLI, Node.js 22–26, `npx`, and a trusted application workspace. The documented setup is verified with Gemini CLI 0.61.0, DebugBundle CLI 1.12.0, and Node 22, 24, and 26. After changing client versions, repeat the connection and investigation checks below. From a checkout of the [DebugBundle core repository](https://github.com/debugbundle/debugbundle):
+Prerequisites: Gemini CLI, Node.js 22–26, `npx`, and a trusted application workspace. The documented setup is verified with Gemini CLI 0.61.0, DebugBundle CLI 1.12.0, and Node 22, 24, and 26. After changing client versions, repeat the connection and investigation checks below:
 
 ```bash
-gemini extensions install /absolute/path/to/debugbundle/plugins/debugbundle-gemini
+gemini extensions install https://github.com/debugbundle/debugbundle-gemini
 ```
 
-Gemini installs a copy. Restart Gemini CLI, then check `gemini extensions list`, `gemini skills list`, and `gemini mcp list` from the application directory. The extension package contains `gemini-extension.json` at its root and the skill at `skills/debugbundle/SKILL.md`. It adds no hooks, commands, credentials, or hosted OAuth connection.
-Gemini may separately ask you to trust the local source folder. Review the path and its manifest before accepting; `--consent` does not replace folder trust.
+Gemini installs a copy. Review the source and declared MCP server when prompted, then restart Gemini CLI and check `gemini extensions list`, `gemini skills list`, and `gemini mcp list` from the application directory. The extension package contains `gemini-extension.json` at its root and the skill at `skills/debugbundle/SKILL.md`. It adds no hooks, commands, credentials, or hosted OAuth connection.
 
 If `debugbundle` already appears in `gemini mcp list` from a direct setup, remove that direct entry before enabling the extension. A project `settings.json` server named `debugbundle` takes precedence over an extension server with the same name. Review that configuration rather than allowing two DebugBundle connections to give different results.
 
@@ -50,7 +49,7 @@ For deterministic local copy, layout, calculation, refactor, or test-only issues
 
 ## Update and remove
 
-After checking out a newer extension version, run `gemini extensions update debugbundle-gemini` and restart Gemini CLI. Gemini compares the local source's manifest version with the installed version and may ask you to approve the extension's declared capabilities again. For direct MCP, replace only its `debugbundle` entry with the newly documented pinned version. Refresh owned project guidance with `debugbundle validate --fix`; edited conflicts remain for review.
+Run `gemini extensions update debugbundle-gemini` and restart Gemini CLI when a new version is available. Git installs compare the tracked repository commit with the remote branch and may ask you to approve changed capabilities. For direct MCP, replace only its `debugbundle` entry with the newly documented pinned version. Refresh owned project guidance with `debugbundle validate --fix`; edited conflicts remain for review.
 
 ```bash
 gemini extensions uninstall debugbundle-gemini

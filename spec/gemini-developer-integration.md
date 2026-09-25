@@ -10,7 +10,7 @@ Implements FR-MCP-17 and AC-MCP-19 alongside the existing Codex and Claude Code 
 - Installation configures the connection and portable skill. Application setup, SDK capture, login, and authorized writes remain separate actions.
 - Local reads require no member login. Hosted reads use saved CLI authentication on the same machine/account, or explicit protected environment forwarding for a direct MCP connection. Credentials never enter per-call schemas.
 - No hooks, custom commands, automatic permission grants, domain services, database changes, or hosted OAuth changes are introduced.
-- Public guides and the blog remain accurate about candidate status until the public source is verified.
+- Public guides and the blog distinguish verified Git installation from gallery discovery.
 
 ## Local qualification
 
@@ -36,13 +36,13 @@ Recorded responses drive Gemini's real tool scheduler and MCP transport without 
 
 Native checks pass on Node 22/24/26, including all 123 MCP tool schemas. Core lint and typecheck pass; 81 focused Gemini/setup/package tests, 172 existing agent/MCP compatibility tests, shared guidance parity, and 32 site tests plus the static build pass. Both new site routes have valid local canonicals, sitemap entries, and internal links.
 
-All 79 unit-test groups were exercised: 3,721 tests passed and one existing OpenAI release-provenance test failed. The ordinary full runner stopped at that failure; its remaining 30 groups were run separately without changing or skipping test expectations. Read-only manifest comparison confirms that only the source working-tree record differs; the OpenAI package, contract, and runtime sections are unchanged. The aggregate coverage gate and clean committed CI are not marked passed. Refresh provenance after the authorized implementation commit and rerun the normal gate before publication.
+The implementation and immediately following evidence-only commits refreshed OpenAI source provenance without changing its package, contract, runtime, or connection metadata. Core PR CI passed lint, typecheck, the full test suite, build, native Gemini matrix on Node 22/24/26, and installed-consumer compatibility on supported Node runtimes. Site PR CI passed its build, typecheck, tests, dependency audit, and public-contract checks. A duplicate local full-suite run was interrupted after the local Docker host stalled; independent CI completed successfully.
 
-The final standalone ZIP contains exactly the five reviewed source files and has SHA-256 `0eb44ed01e1a06842704542e64f4dd4acbebdff8ed3521872fe89f3e09b224a1`. The implementation is a locally verified release candidate; public-source installation, deployment, and gallery discovery remain unperformed.
+The final standalone ZIP contains exactly the five reviewed source files and has SHA-256 `16719d47e15bdbe987cd74be42bcb21a3a461c1818c5f94880f8d3c3b258f025`. Public-source installation, deployment, and gallery discovery remain separate release checks.
 
 ## Public release sequence
 
-The candidate is locally prepared. Source publication, a public install, site deployment, and gallery discovery are not implied by local checks.
+Source publication, a public install, site deployment, and gallery discovery are separate checks; local qualification alone does not prove them.
 
 1. With release authorization, freeze the reviewed core and site changes at immutable commits and pass CI. Record the extension version, MCP pin, source commit, and archive SHA-256. The existing repository-wide OpenAI source-attestation check includes unrelated core changes: refresh only its provenance packet using the recorded API image digest and connection metadata, verify its plugin/contract/runtime hashes remain unchanged, and follow the existing immediately-following evidence-only commit rule. This does not publish or change the OpenAI connection.
 2. Publish the exact standalone files at the root of a public extension repository, or attach the verified root-layout ZIP to its GitHub release. Keep core as the maintained source; do not independently edit the published copy.
