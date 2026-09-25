@@ -5,19 +5,13 @@ import { lstat, readFile, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { buildDeterministicZip } from "./deterministic-zip.mjs";
+import { GEMINI_EXTENSION_FILES } from "./gemini-extension-files.mjs";
 
 const source = "plugins/debugbundle-gemini";
-const files = [
-  "gemini-extension.json",
-  "skills/debugbundle/SKILL.md",
-  "README.md",
-  "CHANGELOG.md",
-  "LICENSE"
-];
 // Only regular, reviewed files enter the archive, including every parent path.
 // A symlink must not silently package content from outside the extension source.
 const entries = await Promise.all(
-  files.map(async (path) => {
+  GEMINI_EXTENSION_FILES.map(async (path) => {
     const parts = `${source}/${path}`.split("/");
     for (let index = 0; index < parts.length; index++) {
       const stat = await lstat(join(...parts.slice(0, index + 1)));

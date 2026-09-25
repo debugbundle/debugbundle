@@ -1,5 +1,7 @@
 # Codex developer integration
 
+The [agent distribution ledger](agent-distribution-ledger.md) records the current Codex package version, MCP pin, public channel, and release evidence alongside Claude Code and Gemini CLI. The record below covers the initial Codex release.
+
 Status: released, 2026-09-18. Codex developer plugin 1.0.0, MCP 1.9.0, OpenClaw companion 1.9.0, and site 1.4.0 are published. Public installation and deployed site checks pass. The unchanged portable skill has a separate discovery-ranking follow-up below.
 
 ## Scope and ownership

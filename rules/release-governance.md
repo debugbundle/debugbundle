@@ -12,7 +12,7 @@ The public repository must contain these root-level files:
 | File                                         | Purpose                                                 | Status   |
 | -------------------------------------------- | ------------------------------------------------------- | -------- |
 | `README.md`                                  | Project overview, quick start, badges, links            | Required |
-| `LICENSE`                                    | Apache-2.0 full text                                 | Required |
+| `LICENSE`                                    | Apache-2.0 full text                                    | Required |
 | `CONTRIBUTING.md`                            | How to contribute (fork, branch, test, PR)              | Required |
 | `CODE_OF_CONDUCT.md`                         | Community conduct standards (Contributor Covenant v2.1) | Required |
 | `SECURITY.md`                                | Vulnerability disclosure process                        | Required |
@@ -91,7 +91,9 @@ A GitHub install becomes available only after the reviewed package and catalog a
 
 `plugins/debugbundle-gemini/` is the core-owned Gemini CLI extension source. Its root `gemini-extension.json` and `skills/debugbundle/SKILL.md` must remain valid as a standalone package, use independent extension semver and an exact already-published `@debugbundle/mcp` pin, and preserve the shared agent interface guidance. `make gemini-extension-check` validates source contracts, archive boundaries, and agent setup; `make gemini-extension-package` makes a deterministic, root-layout ZIP. Packaging rejects extra manifest/server capabilities, embedded credential settings, invalid versions, and non-regular source paths. `make gemini-extension-smoke` installs the extracted archive through a pinned native Gemini CLI in a disposable container, drives real tool calls using recorded model responses, and verifies local evidence, project-skill activation, auth boundaries, updates, and removal. No model API or customer API request is part of that smoke. See `spec/gemini-developer-integration.md` for the release sequence and acceptance limits.
 
-Gemini installs from a repository or release archive with the manifest at its absolute root. The core monorepo subdirectory is a local-path install source; it must not be advertised as a GitHub one-command install. Publish the reviewed package through a standalone public `debugbundle-gemini` repository or a validated standalone release source, then verify install/update/removal from that exact public source before claiming public availability. For Gemini gallery discovery, the public repository needs the `gemini-cli-extension` GitHub topic, a root manifest or root-layout release archive, and the gallery's own indexing. A Git release tag is needed when selecting a tagged release, not for gallery indexing of a root-manifest repository. Source preparation, public repository publication, site deployment, and gallery indexing are separate gates. Do not alter Codex/Claude packages or the hosted OpenAI endpoint merely to publish Gemini.
+Gemini installs from a repository or release archive with the manifest at its absolute root. The core monorepo subdirectory is a local-path install source; it must not be advertised as a GitHub one-command install. Publish the reviewed package through a standalone public `debugbundle-gemini` repository or a validated standalone release source, then run `make gemini-extension-verify-public` to compare every tracked public file with core and confirm the version tag resolves to public `main`. Verify install/update/removal from that exact public source before claiming availability. For Gemini gallery discovery, the public repository needs the `gemini-cli-extension` GitHub topic, a root manifest or root-layout release archive, a version tag for the gallery's daily crawl, and the gallery's own indexing. A successful Git installation does not establish gallery visibility. Source preparation, public repository publication, site deployment, and gallery indexing are separate gates. Do not alter Codex/Claude packages or the hosted OpenAI endpoint merely to publish Gemini.
+
+The [agent distribution ledger](../spec/agent-distribution-ledger.md) records the independently versioned Codex, Claude Code, and Gemini CLI developer packages, their MCP pins, public channels, and last verified release evidence. Update it with each package release. A new MCP npm release triggers a review of their exact pins, not an automatic republish. The MCP ecosystem manifest/report remains responsible for the npm server and its registry, marketplace, and discovery follow-through; it must not imply that the three developer packages were republished.
 
 ### MCP Ecosystem Follow-Through
 
@@ -335,7 +337,6 @@ Each example must include:
 - Cloud service health should be exposed at `status.debugbundle.com`.
 - Health check endpoints: `GET /healthz` (API), `GET /readyz` (Worker).
 - Downtime notifications via status page and optional webhook.
-
 
 ### Distribution-service license requirements
 
