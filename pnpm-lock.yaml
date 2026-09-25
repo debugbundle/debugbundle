@@ -20,8 +20,8 @@ importers:
         specifier: 2.1.0
         version: 2.1.0
       "@debugbundle/sdk-node":
-        specifier: 2.0.0
-        version: 2.0.0
+        specifier: 3.0.0
+        version: 3.0.0
       "@debugbundle/shared-types":
         specifier: 2.1.0
         version: 2.1.0
@@ -186,8 +186,8 @@ importers:
   apps/web:
     dependencies:
       "@debugbundle/sdk-browser":
-        specifier: 2.0.0
-        version: 2.0.0
+        specifier: 3.0.0
+        version: 3.0.0
       "@fontsource-variable/geist":
         specifier: ^5.2.8
         version: 5.2.8
@@ -895,34 +895,22 @@ packages:
       }
     engines: { node: ">=18" }
 
-  "@debugbundle/redaction@2.0.0":
-    resolution:
-      {
-        integrity: sha512-H6R0QuqsTHMSa0DWezn/A4X7cmM9NOq3KwwnsLMT8WCJcnh4UmrhNkQzGLeiUQgseS2uqpWFs4fKimepdms8eQ==
-      }
-
   "@debugbundle/redaction@2.1.0":
     resolution:
       {
         integrity: sha512-+IXVGehnYXwYE2niSRg0KVkPCmqm4FPhbHlz3XWCEIqrsPopSNcay14VMmdAPInsBy9FdVhP1J4CRWM8VCj8Cg==
       }
 
-  "@debugbundle/sdk-browser@2.0.0":
+  "@debugbundle/sdk-browser@3.0.0":
     resolution:
       {
-        integrity: sha512-PWlbsd0J79nN7X8mr5kzse2ssgXNHilenAe0RV/4LCZzPvTGJmNEFHZy6y+g4Imi+G86DTjcb+GpBe7Ci6OKrw==
+        integrity: sha512-39OgBm5BeXi/ZRyYTKHzdNk1laAxKy1JmpqAhQhhZrKTcbUWw32OKY2c9GhN6LHFRDVI6zR/PdJ6EtCnVm8YJA==
       }
 
-  "@debugbundle/sdk-node@2.0.0":
+  "@debugbundle/sdk-node@3.0.0":
     resolution:
       {
-        integrity: sha512-0Agu4XRVf4DlUUZUZTyGDL8kyjKl+9bpXmdMcQQmekMidNwQo4Q0kTi+tA64xIvQ6qW/oVK0Auk9FEl80XMLqg==
-      }
-
-  "@debugbundle/shared-types@2.0.0":
-    resolution:
-      {
-        integrity: sha512-QMrN5r6Q/N+GyVyBlYSR00SSd1S3usp74FaBR4yI8Bef4gyVwGrgFYZLQ/ji/2abriN34DJ2cKMclWTCUygEDA==
+        integrity: sha512-/IHWXH0cFva62J5VnUxlgYa6DFUafpjpYnFE6cEiGh2sRiY1EhFFFNUxnXeYPAAaRoeRMpiHBHGY8jVw1e4rdg==
       }
 
   "@debugbundle/shared-types@2.1.0":
@@ -9340,23 +9328,17 @@ snapshots:
 
   "@csstools/css-tokenizer@3.0.4": {}
 
-  "@debugbundle/redaction@2.0.0": {}
-
   "@debugbundle/redaction@2.1.0": {}
 
-  "@debugbundle/sdk-browser@2.0.0":
+  "@debugbundle/sdk-browser@3.0.0":
     dependencies:
-      "@debugbundle/redaction": 2.0.0
-      "@debugbundle/shared-types": 2.0.0
+      "@debugbundle/redaction": 2.1.0
+      "@debugbundle/shared-types": 2.1.0
 
-  "@debugbundle/sdk-node@2.0.0":
+  "@debugbundle/sdk-node@3.0.0":
     dependencies:
-      "@debugbundle/redaction": 2.0.0
-      "@debugbundle/shared-types": 2.0.0
-      zod: 3.25.76
-
-  "@debugbundle/shared-types@2.0.0":
-    dependencies:
+      "@debugbundle/redaction": 2.1.0
+      "@debugbundle/shared-types": 2.1.0
       zod: 3.25.76
 
   "@debugbundle/shared-types@2.1.0":

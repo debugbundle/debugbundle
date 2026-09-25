@@ -264,16 +264,31 @@ function classifyNetworkError(
   }
 
   const message = error instanceof Error ? error.message : String(error);
-  const cause = error instanceof Error ? error.cause : undefined;
-  if (message === "alert_target_blocked" ||
-    (cause instanceof Error && cause.message === "alert_target_blocked")) {
+  const causes: string[] = [];
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && current instanceof Error; depth += 1) {
+    causes.push(current.message);
+    if ("code" in current && typeof current.code === "string") {
+      causes.push(current.code);
+    }
+    current = current.cause;
+  }
+  if (message === "alert_target_blocked" || causes.includes("alert_target_blocked")) {
     return {
       status: "security_blocked",
       error_kind: "blocked_address",
       error_message: "The availability check target was blocked."
     };
   }
-  const normalized = message.toLowerCase();
+  // Fetch commonly wraps endpoint errors; inspect bounded causes before calling them monitor faults.
+  const normalized = (causes.length === 0 ? message : causes.join(" ")).toLowerCase();
+  if (normalized.includes("und_err_connect_timeout") || normalized.includes("etimedout")) {
+    return {
+      status: "timeout",
+      error_kind: "timeout",
+      error_message: "The availability check timed out."
+    };
+  }
   if (normalized.includes("certificate") || normalized.includes("tls")) {
     return {
       status: "tls_error",
@@ -281,7 +296,11 @@ function classifyNetworkError(
       error_message: message
     };
   }
-  if (normalized.includes("dns") || normalized.includes("enotfound")) {
+  if (
+    normalized.includes("dns") ||
+    normalized.includes("enotfound") ||
+    normalized.includes("eai_again")
+  ) {
     return {
       status: "dns_error",
       error_kind: "dns_error",
@@ -289,10 +308,13 @@ function classifyNetworkError(
     };
   }
   if (
-    normalized.includes("connect") ||
-    normalized.includes("socket") ||
     normalized.includes("econnrefused") ||
-    normalized.includes("ehostunreach")
+    normalized.includes("econnreset") ||
+    normalized.includes("ehostunreach") ||
+    normalized.includes("enetunreach") ||
+    normalized.includes("epipe") ||
+    normalized.includes("und_err_socket") ||
+    normalized.includes("socket hang up")
   ) {
     return {
       status: "connection_error",
@@ -304,7 +326,7 @@ function classifyNetworkError(
   return {
     status: "internal_error",
     error_kind: "internal_error",
-    error_message: message
+    error_message: "DebugBundle could not complete this check; the website status is unverified."
   };
 }
 

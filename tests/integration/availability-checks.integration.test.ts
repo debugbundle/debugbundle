@@ -167,6 +167,57 @@ runIntegration("availability checks integration", () => {
       [created.check_id]
     );
     expect(persisted.rows[0]?.interval_seconds).toBe(30);
+
+    const nextClaim = await store.claimNextDueCheck({
+      now: "2026-06-15T10:01:00.000Z",
+      claim_timeout_before: "2026-06-15T09:56:00.000Z"
+    });
+    expect(nextClaim?.check_id).toBe(created.check_id);
+    if (nextClaim === null) {
+      throw new Error("availability_check_second_claim_failed");
+    }
+    const unverified = await store.recordCheckExecution({
+      check_id: nextClaim.check_id,
+      scheduled_for: nextClaim.due_at,
+      claimed_at: nextClaim.claimed_at,
+      started_at: "2026-06-15T10:01:01.000Z",
+      completed_at: "2026-06-15T10:01:01.180Z",
+      result: {
+        status: "internal_error",
+        http_status: null,
+        duration_ms: 180,
+        error_kind: "internal_error",
+        error_message: "fetch failed",
+        checked_url_host: "app.example.com",
+        checked_url_path: "/login",
+        checked_url_query: {},
+        final_url: "https://app.example.com/login",
+        redirect_count: 0
+      }
+    });
+    expect(unverified).toEqual(
+      expect.objectContaining({
+        next_status: "passing",
+        emit_failure_event: false,
+        resolve_incident_id: null
+      })
+    );
+    const retainedResults = await store.listResultsForCheckInOrganization({
+      organization_id: organizationId,
+      project_id: projectId,
+      check_id: created.check_id,
+      limit: 10
+    });
+    expect(retainedResults?.map((result) => result.status)).toEqual(["internal_error", "success"]);
+    const retainedRollups = await store.listDailyRollupsForCheckInOrganization({
+      organization_id: organizationId,
+      project_id: projectId,
+      check_id: created.check_id,
+      limit: 10
+    });
+    expect(retainedRollups).toEqual([
+      expect.objectContaining({ total_checks: 1, successful_checks: 1, failed_checks: 0 })
+    ]);
   });
 
   it("enforces Free monitored-project capacity when creating and re-enabling checks", async () => {

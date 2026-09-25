@@ -840,6 +840,63 @@ describe("availability check store", () => {
     );
   });
 
+  it.each(["passing", "failing"] as const)(
+    "retains raw internal errors without changing %s customer health or uptime",
+    async (priorStatus) => {
+      const db = createSequentialDb([
+        {
+          rows: [
+            {
+              ...buildClaimedRow({
+                prior_status: priorStatus,
+                consecutive_failures: 2,
+                consecutive_successes: 1,
+                linked_incident_id: "inc_1"
+              }),
+              status: priorStatus,
+              linked_incident_status: "open"
+            }
+          ]
+        },
+        { rows: [] },
+        { rows: [] }
+      ]);
+      const store = createPostgresAvailabilityCheckStore(db as never);
+
+      await expect(
+        store.recordCheckExecution({
+          check_id: "chk_1",
+          scheduled_for: "2026-06-15T10:00:00.000Z",
+          claimed_at: "2026-06-15T10:00:00.000Z",
+          started_at: "2026-06-15T10:00:00.000Z",
+          completed_at: "2026-06-15T10:00:00.180Z",
+          result: {
+            ...successResult,
+            status: "internal_error",
+            http_status: null,
+            error_kind: "internal_error",
+            error_message: "fetch failed"
+          }
+        })
+      ).resolves.toEqual(
+        expect.objectContaining({
+          next_status: priorStatus,
+          emit_failure_event: false,
+          resolve_incident_id: null
+        })
+      );
+      expect(db.query).toHaveBeenCalledTimes(3);
+      expect(db.query.mock.calls[2]?.[1]).toEqual(
+        expect.arrayContaining([priorStatus, 2, 1, "internal_error"])
+      );
+      expect(
+        db.query.mock.calls.some(([sql]) =>
+          String(sql).includes("availability_check_daily_rollups")
+        )
+      ).toBe(false);
+    }
+  );
+
   it("links incidents, appends rollup incidents, and purges expired history", async () => {
     const db = createSequentialDb([
       { rows: [] },

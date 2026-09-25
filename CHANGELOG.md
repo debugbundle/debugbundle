@@ -6,6 +6,13 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.13.2] - 2026-09-25
+
+### Reliability
+
+- Keep monitor-internal health-check failures as operator signals without changing customer endpoint status, uptime, or incident thresholds; classify wrapped endpoint failures as real checks and aggregate monitor-fault reporting.
+- Align the hosted API, worker, and app dogfooding installs with the published JavaScript SDK 3.0.0 release.
+
 ## [1.13.1] - 2026-09-25
 
 ### Reliability

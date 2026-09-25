@@ -16,6 +16,7 @@ const dogfoodingLogger = createRuntimeLoggerFromEnv({
 
 let workerDogfoodingEnabled = false;
 let lastCapacityWarningAtMs = 0;
+let lastAvailabilityMonitorErrorAtMs = 0;
 
 const CAPACITY_WARNING_MIN_INTERVAL_MS = 15 * 60 * 1000;
 
@@ -146,6 +147,7 @@ export function registerWorkerDogfooding(
 ): WorkerDogfoodingConfig | null {
   workerDogfoodingEnabled = false;
   lastCapacityWarningAtMs = 0;
+  lastAvailabilityMonitorErrorAtMs = 0;
 
   try {
     const config = resolveWorkerDogfoodingConfig(env);
@@ -192,6 +194,22 @@ export function captureWorkerDogfoodingStepFailure(
   }
 
   sdk.captureError(reportedError, { handled: true });
+}
+
+export function captureWorkerDogfoodingAvailabilityMonitorError(
+  sdk: WorkerDogfoodingSdk = debugbundle,
+  now: Date = new Date()
+): void {
+  if (!workerDogfoodingEnabled) {
+    return;
+  }
+
+  const nowMs = now.getTime();
+  if (nowMs - lastAvailabilityMonitorErrorAtMs < CAPACITY_WARNING_MIN_INTERVAL_MS) {
+    return;
+  }
+  lastAvailabilityMonitorErrorAtMs = nowMs;
+  sdk.captureError(new Error("availability_check_monitor_internal_error"), { handled: true });
 }
 
 export function captureWorkerDogfoodingCapacityWarning(

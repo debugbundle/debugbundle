@@ -630,13 +630,25 @@ export function createPostgresAvailabilityCheckStore(db: Queryable): Availabilit
           ]
         );
 
-        const failed = input.result.status !== "success";
-        const nextConsecutiveFailures = failed ? claimedCheck.consecutive_failures + 1 : 0;
-        const nextConsecutiveSuccesses = failed ? 0 : claimedCheck.consecutive_successes + 1;
+        // A monitor-internal error says nothing about the customer's endpoint.
+        const unverified = input.result.status === "internal_error";
+        const failed = input.result.status !== "success" && !unverified;
+        const nextConsecutiveFailures = unverified
+          ? claimedCheck.consecutive_failures
+          : failed
+            ? claimedCheck.consecutive_failures + 1
+            : 0;
+        const nextConsecutiveSuccesses = unverified
+          ? claimedCheck.consecutive_successes
+          : failed
+            ? 0
+            : claimedCheck.consecutive_successes + 1;
 
         let nextStatus: Exclude<AvailabilityCheckHealthStatus, "paused"> =
           claimedCheck.prior_status;
-        if (failed) {
+        if (unverified) {
+          nextStatus = claimedCheck.prior_status;
+        } else if (failed) {
           if (
             claimedCheck.prior_status === "failing" ||
             nextConsecutiveFailures >= claimedCheck.failure_threshold
@@ -672,6 +684,7 @@ export function createPostgresAvailabilityCheckStore(db: Queryable): Availabilit
 
         const resolveIncidentId =
           !failed &&
+          !unverified &&
           claimedCheck.prior_status === "failing" &&
           nextStatus === "passing" &&
           nextConsecutiveSuccesses >= claimedCheck.recovery_threshold &&
@@ -718,10 +731,11 @@ export function createPostgresAvailabilityCheckStore(db: Queryable): Availabilit
           ]
         );
 
-        const day = availabilityCheckDayBucket(input.completed_at);
-        const rollupState = deriveAvailabilityCheckDailyState(input.result);
-        await tx.query(
-          `
+        if (!unverified) {
+          const day = availabilityCheckDayBucket(input.completed_at);
+          const rollupState = deriveAvailabilityCheckDailyState(input.result);
+          await tx.query(
+            `
             INSERT INTO availability_check_daily_rollups (
               id,
               check_id,
@@ -781,21 +795,22 @@ export function createPostgresAvailabilityCheckStore(db: Queryable): Availabilit
               downtime_seconds = availability_check_daily_rollups.downtime_seconds + EXCLUDED.downtime_seconds,
               updated_at = now()
           `,
-          [
-            randomUUID(),
-            input.check_id,
-            claimedCheck.project_id,
-            day,
-            rollupState,
-            input.result.status === "success" ? 1 : 0,
-            input.result.status === "success" ? 0 : 1,
-            rollupState === "degraded" ? 1 : 0,
-            input.result.duration_ms,
-            input.started_at,
-            input.completed_at,
-            input.result.status === "success" ? 0 : claimedCheck.interval_seconds
-          ]
-        );
+            [
+              randomUUID(),
+              input.check_id,
+              claimedCheck.project_id,
+              day,
+              rollupState,
+              input.result.status === "success" ? 1 : 0,
+              input.result.status === "success" ? 0 : 1,
+              rollupState === "degraded" ? 1 : 0,
+              input.result.duration_ms,
+              input.started_at,
+              input.completed_at,
+              input.result.status === "success" ? 0 : claimedCheck.interval_seconds
+            ]
+          );
+        }
 
         return {
           check: claimedCheck,

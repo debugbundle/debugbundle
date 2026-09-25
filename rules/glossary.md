@@ -76,6 +76,13 @@ A recognized analytics, advertising or tag-manager script eligible for an operat
 
 ## Hosted Health-Check Terms
 
+### Monitor-Internal Check Error
+
+An unverified execution caused by DebugBundle's own health-check monitor. It remains in raw
+diagnostic results but does not change the last known customer status, incident thresholds, or
+customer uptime. Operators receive a bounded signal; a confirmed endpoint failure remains a
+separate result and is still counted.
+
 ### Monitored Project
 
 A project with at least one enabled hosted health check. The organization-wide

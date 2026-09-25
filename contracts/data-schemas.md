@@ -1276,6 +1276,7 @@ The worker's in-memory snapshot-throttling cache holds at most 10,000 incident I
 | created_at       | timestamptz | NOT NULL DEFAULT now()                                                                                                                                                    |
 
 Detailed execution history is retained for 30 days and then purged by retention cleanup. Response bodies and raw resolved IP addresses are intentionally not stored.
+`internal_error` records an unverified failure of the DebugBundle monitor. It does not establish customer endpoint health and does not advance availability incident thresholds.
 
 **Indexes:**
 
@@ -1305,6 +1306,7 @@ Detailed execution history is retained for 30 days and then purged by retention 
 | UNIQUE            | `(check_id, day)` |
 
 Daily rollups are retained for at least 30 days so project status-history surfaces can be layered on later without reshaping the data model.
+The counters and uptime denominator include only verified endpoint outcomes. Monitor-internal errors remain in raw results but do not create or advance a customer daily rollup.
 
 **Index:** `availability_check_daily_rollups_project_day_idx` on `(project_id, day DESC)`
 

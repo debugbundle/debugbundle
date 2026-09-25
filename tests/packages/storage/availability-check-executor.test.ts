@@ -44,10 +44,13 @@ describe("availability check executor validation", () => {
 
     expect(result.status).toBe("security_blocked");
     expect(fetchMock).toHaveBeenCalledOnce();
-    expect(fetchMock).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
-      redirect: "manual",
-      dispatcher: expect.any(Object)
-    }));
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        redirect: "manual",
+        dispatcher: expect.any(Object)
+      })
+    );
     expect(cancel).toHaveBeenCalledOnce();
   });
 
@@ -377,7 +380,37 @@ describe("availability check executor validation", () => {
       .mockRejectedValueOnce(new Error("certificate expired"))
       .mockRejectedValueOnce(new Error("ENOTFOUND app.example.test"))
       .mockRejectedValueOnce(new Error("ECONNREFUSED"))
-      .mockRejectedValueOnce(new TypeError("fetch failed", { cause: new Error("alert_target_blocked") }))
+      .mockRejectedValueOnce(
+        new TypeError("fetch failed", {
+          cause: Object.assign(new Error("connection timed out"), {
+            code: "UND_ERR_CONNECT_TIMEOUT"
+          })
+        })
+      )
+      .mockRejectedValueOnce(
+        new TypeError("fetch failed", { cause: new Error("alert_target_blocked") })
+      )
+      .mockRejectedValueOnce("alert_target_blocked")
+      .mockRejectedValueOnce(
+        new TypeError("fetch failed", {
+          cause: Object.assign(new Error("connection refused"), { code: "ECONNREFUSED" })
+        })
+      )
+      .mockRejectedValueOnce(
+        new TypeError("fetch failed", {
+          cause: Object.assign(new Error("read failed"), { code: "ECONNRESET" })
+        })
+      )
+      .mockRejectedValueOnce(
+        new TypeError("fetch failed", {
+          cause: Object.assign(new Error("invalid onRequestStart method"), {
+            code: "UND_ERR_INVALID_ARG"
+          })
+        })
+      )
+      .mockRejectedValueOnce(
+        new TypeError("fetch failed", { cause: new Error("invalid connection configuration") })
+      )
       .mockRejectedValueOnce(new Error("unexpected parser failure"));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -402,10 +435,43 @@ describe("availability check executor validation", () => {
       expect.objectContaining({ status: "connection_error", error_kind: "connection_error" })
     );
     await expect(executeAvailabilityCheck(base)).resolves.toEqual(
+      expect.objectContaining({ status: "timeout", error_kind: "timeout" })
+    );
+    await expect(executeAvailabilityCheck(base)).resolves.toEqual(
       expect.objectContaining({ status: "security_blocked", error_kind: "blocked_address" })
     );
     await expect(executeAvailabilityCheck(base)).resolves.toEqual(
-      expect.objectContaining({ status: "internal_error", error_kind: "internal_error" })
+      expect.objectContaining({ status: "security_blocked", error_kind: "blocked_address" })
+    );
+    await expect(executeAvailabilityCheck(base)).resolves.toEqual(
+      expect.objectContaining({ status: "connection_error", error_kind: "connection_error" })
+    );
+    await expect(executeAvailabilityCheck(base)).resolves.toEqual(
+      expect.objectContaining({ status: "connection_error", error_kind: "connection_error" })
+    );
+    await expect(executeAvailabilityCheck(base)).resolves.toEqual(
+      expect.objectContaining({
+        status: "internal_error",
+        error_kind: "internal_error",
+        error_message:
+          "DebugBundle could not complete this check; the website status is unverified."
+      })
+    );
+    await expect(executeAvailabilityCheck(base)).resolves.toEqual(
+      expect.objectContaining({
+        status: "internal_error",
+        error_kind: "internal_error",
+        error_message:
+          "DebugBundle could not complete this check; the website status is unverified."
+      })
+    );
+    await expect(executeAvailabilityCheck(base)).resolves.toEqual(
+      expect.objectContaining({
+        status: "internal_error",
+        error_kind: "internal_error",
+        error_message:
+          "DebugBundle could not complete this check; the website status is unverified."
+      })
     );
   });
 });

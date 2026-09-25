@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  captureWorkerDogfoodingAvailabilityMonitorError,
   captureWorkerDogfoodingCapacityWarning,
   captureWorkerDogfoodingStepFailure,
   createHostedDogfoodingTransport,
@@ -11,7 +12,9 @@ import { createEventEnvelope } from "../../../packages/shared-types/src/index.js
 
 describe("worker dogfooding", () => {
   it("stays disabled when no project token is configured", () => {
-    expect(resolveWorkerDogfoodingConfig({ DEBUGBUNDLE_API_URL: "http://127.0.0.1:3000" })).toBeNull();
+    expect(
+      resolveWorkerDogfoodingConfig({ DEBUGBUNDLE_API_URL: "http://127.0.0.1:3000" })
+    ).toBeNull();
   });
 
   it("derives the hosted ingestion endpoint and worker service defaults from env", () => {
@@ -63,24 +66,34 @@ describe("worker dogfooding", () => {
       dogfoodingSdk
     );
 
-    captureWorkerDogfoodingStepFailure("schedule-weekly-reports", new Error("weekly_conflict"), dogfoodingSdk);
+    captureWorkerDogfoodingStepFailure(
+      "schedule-weekly-reports",
+      new Error("weekly_conflict"),
+      dogfoodingSdk
+    );
 
-    expect(config).toEqual(expect.objectContaining({
-      service: "debugbundle-worker",
-      endpoint: "https://api.debugbundle.com/v1/events"
-    }));
-    expect(dogfoodingSdk.init).toHaveBeenCalledWith(expect.objectContaining({
-      projectToken: "dbundle_proj_worker",
-      endpoint: "https://api.debugbundle.com/v1/events",
-      environment: "production",
-      service: "debugbundle-worker",
-      framework: "worker",
-      captureConsole: false,
-      projectMode: "connected",
-      transport: expect.any(Function)
-    }));
+    expect(config).toEqual(
+      expect.objectContaining({
+        service: "debugbundle-worker",
+        endpoint: "https://api.debugbundle.com/v1/events"
+      })
+    );
+    expect(dogfoodingSdk.init).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectToken: "dbundle_proj_worker",
+        endpoint: "https://api.debugbundle.com/v1/events",
+        environment: "production",
+        service: "debugbundle-worker",
+        framework: "worker",
+        captureConsole: false,
+        projectMode: "connected",
+        transport: expect.any(Function)
+      })
+    );
     expect(dogfoodingSdk.captureError).toHaveBeenCalledWith(
-      expect.objectContaining({ message: "worker_step_failed:schedule-weekly-reports:weekly_conflict" }),
+      expect.objectContaining({
+        message: "worker_step_failed:schedule-weekly-reports:weekly_conflict"
+      }),
       { handled: true }
     );
   });
@@ -111,14 +124,43 @@ describe("worker dogfooding", () => {
       saturated: true
     };
 
-    captureWorkerDogfoodingCapacityWarning(warning, dogfoodingSdk, new Date("2026-06-15T10:00:00.000Z"));
-    captureWorkerDogfoodingCapacityWarning(warning, dogfoodingSdk, new Date("2026-06-15T10:05:00.000Z"));
+    captureWorkerDogfoodingCapacityWarning(
+      warning,
+      dogfoodingSdk,
+      new Date("2026-06-15T10:00:00.000Z")
+    );
+    captureWorkerDogfoodingCapacityWarning(
+      warning,
+      dogfoodingSdk,
+      new Date("2026-06-15T10:05:00.000Z")
+    );
 
     expect(dogfoodingSdk.captureError).toHaveBeenCalledTimes(1);
     expect(dogfoodingSdk.captureError).toHaveBeenCalledWith(
       expect.objectContaining({
         message: expect.stringContaining("availability_check_capacity_warning severity=critical")
       }),
+      { handled: true }
+    );
+  });
+
+  it("reports repeated monitor-internal failures as one bounded operator incident", () => {
+    const sdk = { init: vi.fn(), captureError: vi.fn() };
+    registerWorkerDogfooding(
+      {
+        DEBUGBUNDLE_API_URL: "https://api.debugbundle.com",
+        DEBUGBUNDLE_WORKER_DOGFOOD_PROJECT_TOKEN: "dbundle_proj_worker"
+      },
+      sdk
+    );
+
+    captureWorkerDogfoodingAvailabilityMonitorError(sdk, new Date("2026-06-15T10:00:00.000Z"));
+    captureWorkerDogfoodingAvailabilityMonitorError(sdk, new Date("2026-06-15T10:05:00.000Z"));
+    captureWorkerDogfoodingAvailabilityMonitorError(sdk, new Date("2026-06-15T10:16:00.000Z"));
+
+    expect(sdk.captureError).toHaveBeenCalledTimes(2);
+    expect(sdk.captureError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "availability_check_monitor_internal_error" }),
       { handled: true }
     );
   });

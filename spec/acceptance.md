@@ -392,6 +392,9 @@ Native logger level/silent/processor filtering runs before SDK capture; enabled-
 - **And** bundle generation, alerts, and webhook delivery behave the same as other incident sources
 - **When** two consecutive executions later succeed
 - **Then** DebugBundle auto-resolves the linked availability incident
+- **When** a monitor-internal error interrupts either sequence
+- **Then** the raw result remains inspectable, both threshold counters and the last known customer status remain unchanged, and no customer incident or alert is opened or resolved
+- **And** repeated monitor-internal errors produce a bounded operator signal
 
 ### AC-AVC-03: Tier Capacity Preserves Existing Checks Gracefully
 
@@ -424,7 +427,8 @@ Native logger level/silent/processor filtering runs before SDK capture; enabled-
 - **Given** a project with health-check executions across more than 30 days
 - **When** retention cleanup runs
 - **Then** raw results and daily rollups older than 30 days are purged
-- **And** at least one retained daily state row remains available for each in-window day that had health-check activity
+- **And** at least one retained daily state row remains available for each in-window day that had a verified endpoint outcome
+- **And** monitor-internal errors are excluded from customer uptime and downtime calculations while remaining in raw execution history
 
 ### AC-AVC-06: Workspace Health Status Page
 

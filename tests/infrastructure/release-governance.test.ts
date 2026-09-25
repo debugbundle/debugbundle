@@ -17,6 +17,22 @@ const requiredRootFiles = [
 const requiredExamples = ["express-basic", "fastify-basic", "nextjs-basic"] as const;
 
 describe("release governance baseline", () => {
+  it("keeps hosted Node and browser dogfooding on the same exact SDK release", () => {
+    const rootManifest = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8")) as {
+      dependencies: Record<string, string>;
+    };
+    const webManifest = JSON.parse(
+      readFileSync(join(repoRoot, "apps/web/package.json"), "utf8")
+    ) as {
+      dependencies: Record<string, string>;
+    };
+
+    expect(rootManifest.dependencies["@debugbundle/sdk-node"]).toBe(
+      webManifest.dependencies["@debugbundle/sdk-browser"]
+    );
+    expect(rootManifest.dependencies["@debugbundle/sdk-node"]).toMatch(/^\d+\.\d+\.\d+$/);
+  });
+
   it("ships a repo CI workflow that runs on pull requests and main pushes", () => {
     const ciWorkflowPath = join(repoRoot, ".github", "workflows", "ci.yml");
 

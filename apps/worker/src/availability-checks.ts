@@ -1,7 +1,10 @@
 import { gzipSync } from "node:zlib";
 
 import type { RuntimeLogger } from "../../../packages/runtime-logger/src/index.js";
-import { createEventEnvelope, type EventEnvelope } from "../../../packages/shared-types/src/index.js";
+import {
+  createEventEnvelope,
+  type EventEnvelope
+} from "../../../packages/shared-types/src/index.js";
 import {
   buildRawEventObjectKey,
   buildRegressionAlertDedupeKey,
@@ -12,7 +15,10 @@ import {
   type IncidentLifecycleService,
   type MetadataStore
 } from "../../../packages/storage/src/index.js";
-import { captureWorkerDogfoodingCapacityWarning } from "./dogfooding.js";
+import {
+  captureWorkerDogfoodingAvailabilityMonitorError,
+  captureWorkerDogfoodingCapacityWarning
+} from "./dogfooding.js";
 
 type AvailabilityAlertConditionType =
   | "new_incident"
@@ -144,6 +150,7 @@ interface ClaimedCheckProcessResult {
   reason?: "check_missing" | "check_failed";
   duration_ms?: number;
   timed_out?: boolean;
+  internal_error?: boolean;
 }
 
 interface AvailabilityCapacitySummary {
@@ -152,6 +159,7 @@ interface AvailabilityCapacitySummary {
   failed_count: number;
   oldest_due_lag_ms: number;
   timeout_count: number;
+  internal_error_count: number;
   avg_duration_ms: number | null;
   capacity_warning: "none" | "warning" | "critical";
   saturated: boolean;
@@ -512,7 +520,10 @@ async function recordAvailabilityIncident(input: {
       project_id: input.check.project_id,
       incident_id: incident.incident_id,
       condition_type: "incident_regressed",
-      dedupe_key: buildRegressionAlertDedupeKey({ conditionType: "incident_regressed", transitionId: input.event_id }),
+      dedupe_key: buildRegressionAlertDedupeKey({
+        conditionType: "incident_regressed",
+        transitionId: input.event_id
+      }),
       notification_key: fingerprint,
       occurred_at: input.occurred_at,
       summary: title,
@@ -613,7 +624,8 @@ async function processClaimedAvailabilityCheck(
   return {
     completed: true,
     duration_ms: recorded.result.duration_ms,
-    timed_out: recorded.result.status === "timeout"
+    timed_out: recorded.result.status === "timeout",
+    internal_error: recorded.result.status === "internal_error"
   };
 }
 
@@ -625,7 +637,10 @@ function summarizeAvailabilityCapacity(input: {
   results: ClaimedCheckProcessResult[];
 }): AvailabilityCapacitySummary {
   const completedResults = input.results.filter((result) => result.completed);
-  const durationTotal = completedResults.reduce((sum, result) => sum + (result.duration_ms ?? 0), 0);
+  const durationTotal = completedResults.reduce(
+    (sum, result) => sum + (result.duration_ms ?? 0),
+    0
+  );
   const oldestDueLagMs = input.checks.reduce((oldest, check) => {
     const lag = input.now.getTime() - new Date(check.due_at).getTime();
     return Math.max(oldest, Number.isFinite(lag) ? lag : 0);
@@ -649,6 +664,7 @@ function summarizeAvailabilityCapacity(input: {
     failed_count: input.results.filter((result) => result.reason === "check_failed").length,
     oldest_due_lag_ms: Math.max(0, oldestDueLagMs),
     timeout_count: input.results.filter((result) => result.timed_out === true).length,
+    internal_error_count: input.results.filter((result) => result.internal_error === true).length,
     avg_duration_ms: completedResults.length === 0 ? null : durationTotal / completedResults.length,
     capacity_warning: capacityWarning,
     saturated
@@ -672,9 +688,9 @@ export async function processAvailabilityCheckBatch(
           ...claimInput,
           limit: batchSize
         })
-      : await input.availabilityCheckStore.claimNextDueCheck(claimInput).then((check) =>
-          check === null ? [] : [check]
-        );
+      : await input.availabilityCheckStore
+          .claimNextDueCheck(claimInput)
+          .then((check) => (check === null ? [] : [check]));
 
   if (claimed.length === 0) {
     if (input.purgeRetainedDataOnNoDue !== false) {
@@ -719,6 +735,7 @@ export async function processAvailabilityCheckBatch(
         failed_count: summary.failed_count,
         oldest_due_lag_ms: summary.oldest_due_lag_ms,
         timeout_count: summary.timeout_count,
+        internal_error_count: summary.internal_error_count,
         avg_duration_ms: summary.avg_duration_ms,
         concurrency,
         batch_size: batchSize,
@@ -726,6 +743,17 @@ export async function processAvailabilityCheckBatch(
       },
       "availability_check_batch_processed"
     );
+  }
+
+  if (summary.internal_error_count > 0) {
+    input.logger?.error(
+      {
+        internal_error_count: summary.internal_error_count,
+        claimed_count: summary.claimed_count
+      },
+      "availability_check_monitor_internal_error"
+    );
+    captureWorkerDogfoodingAvailabilityMonitorError();
   }
 
   if (summary.capacity_warning !== "none") {
@@ -756,7 +784,9 @@ export async function processAvailabilityCheckBatch(
 
   return {
     processed: true,
-    ...(claimed.length === 1 && results[0]?.reason === "check_missing" ? { reason: "check_missing" as const } : {}),
+    ...(claimed.length === 1 && results[0]?.reason === "check_missing"
+      ? { reason: "check_missing" as const }
+      : {}),
     claimed_count: summary.claimed_count,
     completed_count: summary.completed_count,
     failed_count: summary.failed_count,

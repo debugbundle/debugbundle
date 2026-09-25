@@ -1,6 +1,6 @@
 {
   "name": "debugbundle",
-  "version": "1.13.1",
+  "version": "1.13.2",
   "private": true,
   "type": "module",
   "description": "DebugBundle monorepo",
@@ -72,7 +72,7 @@
     "@aws-sdk/client-sesv2": "^3.1024.0",
     "@debugbundle/auth": "workspace:*",
     "@debugbundle/redaction": "2.1.0",
-    "@debugbundle/sdk-node": "2.0.0",
+    "@debugbundle/sdk-node": "3.0.0",
     "@debugbundle/shared-types": "2.1.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@node-rs/argon2": "^2.0.2",

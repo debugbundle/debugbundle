@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { gunzipSync } from "node:zlib";
 
-const { captureCapacityWarningMock, executeAvailabilityCheckMock } = vi.hoisted(() => ({
-  captureCapacityWarningMock: vi.fn(),
-  executeAvailabilityCheckMock: vi.fn()
-}));
+const { captureCapacityWarningMock, captureMonitorErrorMock, executeAvailabilityCheckMock } =
+  vi.hoisted(() => ({
+    captureCapacityWarningMock: vi.fn(),
+    captureMonitorErrorMock: vi.fn(),
+    executeAvailabilityCheckMock: vi.fn()
+  }));
 
 vi.mock("../../../packages/storage/src/index.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../packages/storage/src/index.js")>();
@@ -16,7 +18,8 @@ vi.mock("../../../packages/storage/src/index.js", async (importOriginal) => {
 });
 
 vi.mock("../../../apps/worker/src/dogfooding.js", () => ({
-  captureWorkerDogfoodingCapacityWarning: captureCapacityWarningMock
+  captureWorkerDogfoodingCapacityWarning: captureCapacityWarningMock,
+  captureWorkerDogfoodingAvailabilityMonitorError: captureMonitorErrorMock
 }));
 
 import {
@@ -29,7 +32,9 @@ import type {
 } from "../../../packages/storage/src/index.js";
 import type { AvailabilityCheckExecutionResult } from "../../../packages/storage/src/availability-check-executor.js";
 
-function createClaimedCheck(overrides: Partial<ClaimedAvailabilityCheck> = {}): ClaimedAvailabilityCheck {
+function createClaimedCheck(
+  overrides: Partial<ClaimedAvailabilityCheck> = {}
+): ClaimedAvailabilityCheck {
   return {
     check_id: "11111111-1111-4111-8111-111111111111",
     project_id: "22222222-2222-4222-8222-222222222222",
@@ -103,6 +108,7 @@ describe("worker availability checks", () => {
   beforeEach(() => {
     executeAvailabilityCheckMock.mockReset();
     captureCapacityWarningMock.mockReset();
+    captureMonitorErrorMock.mockReset();
   });
 
   it("purges retained availability data when no checks are due", async () => {
@@ -148,9 +154,11 @@ describe("worker availability checks", () => {
     });
     const availabilityCheckStore = {
       claimDueChecks: vi.fn().mockResolvedValue(checks),
-      recordCheckExecution: vi.fn().mockImplementation(async ({ check_id }: { check_id: string }) =>
-        createRecordedExecution(checks.find((check) => check.check_id === check_id) ?? checks[0]!)
-      ),
+      recordCheckExecution: vi
+        .fn()
+        .mockImplementation(async ({ check_id }: { check_id: string }) =>
+          createRecordedExecution(checks.find((check) => check.check_id === check_id) ?? checks[0]!)
+        ),
       purgeExpiredResults: vi.fn(),
       purgeExpiredDailyRollups: vi.fn()
     };
@@ -192,6 +200,59 @@ describe("worker availability checks", () => {
     expect(availabilityCheckStore.recordCheckExecution).toHaveBeenCalledTimes(3);
   });
 
+  it("reports monitor-internal errors to operators once per batch without customer alerts", async () => {
+    const checks = [
+      createClaimedCheck({ check_id: "11111111-1111-4111-8111-111111111111" }),
+      createClaimedCheck({ check_id: "11111111-1111-4111-8111-111111111112" })
+    ];
+    const monitorResult = createExecutionResult({
+      status: "internal_error",
+      http_status: null,
+      error_kind: "internal_error",
+      error_message: "fetch failed"
+    });
+    executeAvailabilityCheckMock.mockResolvedValue(monitorResult);
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const enqueue = vi.fn();
+    const persist = vi.fn();
+
+    await processAvailabilityCheckBatch({
+      availabilityCheckStore: {
+        claimDueChecks: vi.fn().mockResolvedValue(checks),
+        recordCheckExecution: vi
+          .fn()
+          .mockImplementation(async ({ check_id }: { check_id: string }) =>
+            createRecordedExecution(
+              checks.find((check) => check.check_id === check_id) ?? checks[0]!,
+              {
+                result: monitorResult
+              }
+            )
+          ),
+        purgeExpiredResults: vi.fn(),
+        purgeExpiredDailyRollups: vi.fn()
+      } as never,
+      incidentStore: {} as never,
+      incidentLifecycle: { resolveIncidentForOrganization: vi.fn() },
+      queue: { enqueue } as never,
+      objectStore: { putObject: persist } as never,
+      lifecycleWebhookPublisher: { publish: vi.fn() } as never,
+      logger,
+      batchSize: 2,
+      concurrency: 2,
+      now: new Date("2026-06-15T10:00:00.000Z")
+    });
+
+    expect(logger.error).toHaveBeenCalledTimes(1);
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ internal_error_count: 2 }),
+      "availability_check_monitor_internal_error"
+    );
+    expect(captureMonitorErrorMock).toHaveBeenCalledTimes(1);
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(persist).not.toHaveBeenCalled();
+  });
+
   it("emits a rate-limited dogfood capacity warning when due checks are late", async () => {
     const checks = [
       createClaimedCheck({
@@ -215,11 +276,16 @@ describe("worker availability checks", () => {
     await processAvailabilityCheckBatch({
       availabilityCheckStore: {
         claimDueChecks: vi.fn().mockResolvedValue(checks),
-        recordCheckExecution: vi.fn().mockImplementation(async ({ check_id }: { check_id: string }) =>
-          createRecordedExecution(checks.find((check) => check.check_id === check_id) ?? checks[0]!, {
-            result: { status: "timeout", duration_ms: 2500 }
-          })
-        ),
+        recordCheckExecution: vi
+          .fn()
+          .mockImplementation(async ({ check_id }: { check_id: string }) =>
+            createRecordedExecution(
+              checks.find((check) => check.check_id === check_id) ?? checks[0]!,
+              {
+                result: { status: "timeout", duration_ms: 2500 }
+              }
+            )
+          ),
         purgeExpiredResults: vi.fn(),
         purgeExpiredDailyRollups: vi.fn()
       } as never,
@@ -279,9 +345,13 @@ describe("worker availability checks", () => {
     await processAvailabilityCheckBatch({
       availabilityCheckStore: {
         claimDueChecks: vi.fn().mockResolvedValue(checks),
-        recordCheckExecution: vi.fn().mockImplementation(async ({ check_id }: { check_id: string }) =>
-          createRecordedExecution(checks.find((check) => check.check_id === check_id) ?? checks[0]!)
-        ),
+        recordCheckExecution: vi
+          .fn()
+          .mockImplementation(async ({ check_id }: { check_id: string }) =>
+            createRecordedExecution(
+              checks.find((check) => check.check_id === check_id) ?? checks[0]!
+            )
+          ),
         purgeExpiredResults: vi.fn(),
         purgeExpiredDailyRollups: vi.fn()
       } as never,
@@ -304,7 +374,10 @@ describe("worker availability checks", () => {
       now: new Date("2026-06-15T10:00:00.000Z")
     });
 
-    expect(logger.warn).not.toHaveBeenCalledWith(expect.anything(), "availability_check_capacity_warning");
+    expect(logger.warn).not.toHaveBeenCalledWith(
+      expect.anything(),
+      "availability_check_capacity_warning"
+    );
     expect(captureCapacityWarningMock).not.toHaveBeenCalled();
   });
 

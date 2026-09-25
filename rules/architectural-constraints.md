@@ -164,6 +164,7 @@ Scale when the product proves broader needs.
 ## 13. Frontend Sandboxing
 
 Frontend toolchain (npm, bundlers) should run in Docker-scoped environments to avoid host/system file exposure. If host package management is used, document explicitly in `/rules/` with pinned versions.
+For local macOS workstation repair after Docker's forced install replaces native modules, Node 26.0.0 with pnpm 11.3.0 may run a frozen-lockfile reinstall (offline when the package cache is complete); validation and builds remain Docker-backed.
 
 ## 13a. UI Design-System Approval Gate
 
