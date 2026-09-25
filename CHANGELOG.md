@@ -6,6 +6,8 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.13.1] - 2026-09-25
+
 ### Reliability
 
 - Fix the hosted guarded HTTP transport to use Undici's fetch with its matching dispatcher. The previous mixed implementation made health checks and guarded notification sends fail immediately in the Node 24 hosted runtime after the 1.13.0 rollout; private-address and redirect protections remain in place.
