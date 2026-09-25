@@ -2,6 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { once } from "node:events";
 import { createServer } from "node:http";
 
+vi.mock("../../../packages/node-http/src/index.js", () => ({
+  nodeFetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args)
+}));
+
 import { createHostedDogfoodingTransport } from "../../../apps/worker/src/dogfooding.js";
 import { createAlertTransport } from "../../../apps/worker/src/worker-alert-transports.js";
 import { createLifecycleWebhookTransport } from "../../../apps/worker/src/worker-notifications.js";

@@ -1,6 +1,7 @@
 import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
 import { Agent } from "undici";
+import { nodeFetch } from "../../node-http/src/index.js";
 
 type ResolvedAddress = { address: string; family: number };
 type AddressResolver = (
@@ -105,7 +106,7 @@ const outboundAgent = new Agent({
 /** Send only to a validated public destination and expose redirects to the caller. */
 export function fetchGuardedOutbound(target: string, init: RequestInit): Promise<Response> {
   assertAlertOutboundTarget(target);
-  return fetch(target, {
+  return nodeFetch(target, {
     ...init,
     redirect: "manual",
     dispatcher: outboundAgent

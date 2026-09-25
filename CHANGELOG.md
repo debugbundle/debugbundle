@@ -6,6 +6,10 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Reliability
+
+- Fix the hosted guarded HTTP transport to use Undici's fetch with its matching dispatcher. The previous mixed implementation made health checks and guarded notification sends fail immediately in the Node 24 hosted runtime after the 1.13.0 rollout; private-address and redirect protections remain in place.
+
 ### Release tooling
 
 - Use the packed MCP candidate version inside the disposable native Codex smoke while the public Codex plugin remains pinned to the last published MCP release. The corrected MCP and OpenClaw companion candidate is 1.12.1; the failed 1.12.0 tag remains immutable and unpublished.

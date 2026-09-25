@@ -8,6 +8,10 @@ vi.mock("node:dns/promises", () => ({
   lookup: lookupMock
 }));
 
+vi.mock("../../../packages/node-http/src/index.js", () => ({
+  nodeFetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args)
+}));
+
 import {
   AvailabilityCheckValidationError,
   executeAvailabilityCheck,

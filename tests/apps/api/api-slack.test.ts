@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("../../../packages/node-http/src/index.js", () => ({
+  nodeFetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args)
+}));
+
 import { createApiServer } from "../../../apps/api/src/server.ts";
 import { encryptIntegrationSecret } from "../../../packages/storage/src/index.ts";
 import { mockedObject, type MockedMethods } from "../../helpers/vitest.ts";

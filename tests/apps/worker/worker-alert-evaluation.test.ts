@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { describe, expect, it, vi } from "vitest";
 
+vi.mock("../../../packages/node-http/src/index.js", () => ({
+  nodeFetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args)
+}));
+
 import { encryptIntegrationSecret } from "../../../packages/storage/src/index.js";
 import {
   processNextDeliverAlertEmailDigestJob,

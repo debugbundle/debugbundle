@@ -1,5 +1,9 @@
 import { createHmac } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../../../packages/node-http/src/index.js", () => ({
+  nodeFetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args)
+}));
 import { resetWorkerRuntimeMocks } from "../../helpers/worker-runtime-mocks.js";
 import { encryptIntegrationSecret } from "../../../packages/storage/src/index.ts";
 import {

@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
+const { nodeFetchMock } = vi.hoisted(() => ({ nodeFetchMock: vi.fn() }));
+
+vi.mock("../../../packages/node-http/src/index.js", () => ({ nodeFetch: nodeFetchMock }));
+
 import {
   assertAlertOutboundTarget,
+  fetchGuardedOutbound,
   resolveAlertOutboundAddress
 } from "../../../packages/storage/src/alert-outbound-guard.js";
 
@@ -46,5 +51,22 @@ describe("alert outbound target guard", () => {
     const resolve = vi.fn().mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
     await expect(resolveAlertOutboundAddress("alerts.example.com", resolve))
       .resolves.toEqual({ address: "93.184.216.34", family: 4 });
+  });
+
+  it("uses the fetch implementation paired with the guarded Undici dispatcher", async () => {
+    const globalFetch = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("wrong_fetch"));
+    const response = { status: 200 } as Response;
+    nodeFetchMock.mockResolvedValueOnce(response);
+    try {
+      await expect(fetchGuardedOutbound("https://api.debugbundle.com/ready", { method: "GET" }))
+        .resolves.toBe(response);
+      expect(nodeFetchMock).toHaveBeenCalledWith(
+        "https://api.debugbundle.com/ready",
+        expect.objectContaining({ redirect: "manual", dispatcher: expect.any(Object) })
+      );
+      expect(globalFetch).not.toHaveBeenCalled();
+    } finally {
+      globalFetch.mockRestore();
+    }
   });
 });
