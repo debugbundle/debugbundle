@@ -122,6 +122,18 @@ Native logger level/silent/processor filtering runs before SDK capture; enabled-
 - **And** a runtime unable to meet these conditions remains unqualified rather than being presented as a safe default
 - **And** PHP/WordPress qualify under the documented request-end exception only after installed CLI/FPM/Apache/WordPress tests measure the worker cost and confirm a single attempt, error priority, bounded payload, no inline batch sends, no ordinary-request config fetch, and explicit outage loss behavior
 
+### AC-SDK-ACK-RETRY: Confirmed Delivery and Bounded Retry
+
+- **Given** an SDK using its built-in connected HTTP transport
+- **When** a successful HTTP status has no canonical acknowledgement, malformed counts/types, an invalid errors list, or duplicate/out-of-range rejection indices
+- **Then** retain the entire submitted batch, apply bounded backoff, and leave `lastEventAt` unchanged
+- **And** a subsequent valid acknowledgement reconciles those same events without duplicating accepted events
+- **And** explicit custom/legacy and local file transports preserve their documented bodyless success behavior
+- **And** every retry deadline caps transport hints at five minutes before arithmetic; invalid/nonfinite hints must use a safe bounded delay
+- **And** valid HTTP-date/delay hints apply from response receipt to partial/protocol/server failures; no-hint server failures retain their existing retry timing
+- **And** extreme acknowledgement counts cannot trap the host, contended Java close releases retained events without waiting, and oversized Go HTTP responses cannot be accepted as truncated acknowledgements
+- **And** caller safety, queue count/byte limits, redaction and valid partial-acknowledgement behavior remain intact
+
 ### AC-SDK-BROWSER-UNLOAD: Authenticated, Bounded Lifecycle Delivery
 
 - **Given** a direct browser SDK with queued events and a project token
@@ -1529,6 +1541,17 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** public builds require no private-site access
 - **And** published docs, examples, and reference artifacts remain publicly readable and Apache-2.0
 - **And** public contributors can report corrections through public issues or PRs
+
+### AC-DOC-17: Public Site Missing Routes
+
+- **Given** the production static public site
+- **When** a visitor requests an unknown marketing, docs, blog, or asset URL with `GET` or `HEAD`
+- **Then** the final response is HTTP `404` with HTML content type; `GET` displays the site's “Page not found” page with Home and Docs recovery links
+- **And** extensionless slashless requests retain the standard `308` canonical-slash redirect before returning `404`
+- **And** no response exposes storage-provider XML or substitutes a homepage with HTTP `200`
+- **And** the exported error HTML declares `noindex`, has no valid-page canonical, contains production copy, and is excluded from the sitemap
+- **And** both site-only and full-stack hosted deployment validate `404.html` before publishing, apply missing-object edge configuration after publishing, invalidate cached errors, and verify missing routes after invalidation
+- **And** missing-object error cache TTL is ten seconds; unrelated error rules and private-bucket permissions remain unchanged
 
 ---
 

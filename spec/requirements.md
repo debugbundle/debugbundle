@@ -533,6 +533,8 @@ When a collaborator is removed from a project or leaves a shared project, DebugB
 
 **FR-DOC-11:** The static public site must preserve SEO-friendly behavior via standard Next.js metadata, sitemap, robots, canonical URLs, clean route structure, and one shared 1200×630 Open Graph/Twitter image across marketing, legal, `/docs`, and `/blog` pages. The authenticated app entry point must provide baseline description, canonical, icon, theme, and social-preview metadata while remaining explicitly `noindex, nofollow`.
 
+**FR-DOC-11a:** Unknown public-site page and asset URLs must return HTTP `404`, using the exported site-styled HTML error page rather than storage-provider XML or a successful homepage fallback. The error page must provide working recovery links, declare `noindex`, omit a valid-page canonical, and remain outside the sitemap. Static-host deployment must configure missing-object handling, use bounded short error caching, and verify missing-route responses after publication. This applies only to the public static site, not authenticated app/API authorization failures.
+
 **FR-DOC-12:** The private website implementation must not restrict access to published documentation or require private-repository access for public product builds. Documentation, examples, and generated reference artifacts remain Apache-2.0. Maintainers must pair handwritten site documentation changes with related core/SDK changes; public contributors may supply documentation corrections through public issues and PRs. See `spec/licensing.md`.
 
 ### 1.18 Onboarding & Installation

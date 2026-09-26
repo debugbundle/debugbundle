@@ -6,6 +6,14 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.13.4] - 2026-09-26
+
+### Reliability
+
+- Adopt JavaScript SDK 3.0.3 for API, worker and app capture, including strict Node HTTP acknowledgements and bounded server-failure retry hints.
+- Align SDK acknowledgement, retry, privacy and caller-safety contracts with the qualified transport patches.
+- Define and verify public missing-route 404 behavior; hosted edge configuration remains in the private cloud repository.
+
 ## [1.13.3] - 2026-09-25
 
 ### Reliability

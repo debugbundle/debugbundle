@@ -99,7 +99,7 @@ These behaviors are mandatory across all SDKs. A new language SDK is non-complia
 
 - Non-success transport responses must not drop buffered events.
 - When ingestion returns `429 Too Many Requests`, SDKs must preserve the buffered events and back off before retrying.
-- SDKs must respect `Retry-After` when present; otherwise they must apply a safe default backoff.
+- SDKs must respect valid `Retry-After` when present, capped at five minutes (SEC-17) before deadline arithmetic. Honor hints on retryable partial acknowledgements, protocol failures and server failures, measured from response receipt; retain existing no-hint retry timing. Accept delay-seconds and HTTP-date headers. Apply the cap to custom transport retry hints as well as parsed HTTP headers; invalid/nonfinite hints must use a safe bounded delay.
 - Backoff and retry behavior must not block the host request/response path or crash the host application/page.
 
 ### Per-event ingestion acknowledgement
@@ -116,14 +116,14 @@ Connected transports must reconcile the canonical ingestion acknowledgement body
 
 Rules:
 
-- `accepted` and `rejected` are non-negative integers whose sum equals the submitted batch length.
+- `accepted` and `rejected` are non-negative integers whose sum equals the submitted batch length. Count validation must remain safe at integer limits: malformed counts cannot crash the host or become accepted totals through overflow.
 - `errors` contains exactly one unique, in-range index for every rejected event and a non-empty reason.
 - Accepted events are removed exactly once and never requeued.
 - `rate_limited`, `monthly_quota_exceeded`, and `analytics_quota_exceeded` are retryable indexed reasons. Only those indexed events are retained and retried.
 - Other indexed rejection reasons are terminal. Those events are removed with a bounded internal diagnostic.
 - An all-rejected acknowledgement must not advance `lastEventAt` or report a successful delivery.
 - Missing acknowledgement fields are allowed only for an explicitly compatible custom/legacy transport that cannot expose a response body. The SDK may use its documented HTTP-success fallback for that transport.
-- A production HTTP transport that requires acknowledgement must treat a missing, malformed, duplicate-index, out-of-range, or internally inconsistent acknowledgement as a protocol failure and retain the full submitted batch with safe backoff.
+- Every SDK-owned production HTTP transport that receives an ingestion response requires canonical acknowledgement and must treat a missing, malformed, duplicate-index, out-of-range, or internally inconsistent acknowledgement as a protocol failure and retain the full submitted batch with safe backoff. Browser beacon handoff retains its separately documented best-effort lifecycle semantics because it exposes no ingestion response.
 - The response may also contain `probe_directives`; processing those directives does not bypass acknowledgement validation.
 
 **Browser-specific config fields (sdk-browser only):**
