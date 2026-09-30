@@ -1,6 +1,43 @@
 import { REQUIRED_API_TABLES, REQUIRED_WORKER_TABLES, type Queryable } from "./migrations.js";
 
 const CURRENT_SCHEMA_SENTINEL_COLUMNS = [
+  { table_name: "analytics_spaces", column_name: "namespace_source_project_ids" },
+  { table_name: "analytics_spaces", column_name: "namespace_key_fingerprint" },
+  { table_name: "analytics_space_identity_namespace_mutations", column_name: "result" },
+  { table_name: "analytics_project_identity_namespaces", column_name: "key_fingerprint" },
+  { table_name: "analytics_project_identity_namespace_mutations", column_name: "result" },
+  { table_name: "analytics_project_identity_contexts", column_name: "binding_hash" },
+  { table_name: "analytics_project_identity_associations", column_name: "user_id_hash" },
+  { table_name: "analytics_project_subject_erasures", column_name: "cutoff_at" },
+  { table_name: "analytics_project_identity_revocations", column_name: "revoked_at" },
+  { table_name: "analytics_project_identity_epoch_revocations", column_name: "revoked_at" },
+  { table_name: "semantic_analytics_receipts", column_name: "identity_context_id" },
+  { table_name: "semantic_analytics_receipts", column_name: "identity_writer_id" },
+  { table_name: "semantic_analytics_receipts", column_name: "identity_producer_epoch" },
+  { table_name: "semantic_analytics_receipt_subjects", column_name: "subject_ref" },
+  { table_name: "semantic_analytics_funnel_facts", column_name: "fact" },
+  { table_name: "semantic_analytics_portfolio_funnel_facts", column_name: "source_entry_revision" },
+  { table_name: "semantic_analytics_loss_days", column_name: "lost_count" },
+  { table_name: "project_object_erasure_tasks", column_name: "next_attempt_at" },
+  { table_name: "semantic_analytics_receipts", column_name: "raw_status" },
+  { table_name: "semantic_analytics_receipts", column_name: "occurred_at" },
+  { table_name: "analytics_project_plans", column_name: "business_measurement_enabled" },
+  { table_name: "analytics_project_plan_revisions", column_name: "business_measurement_enabled" },
+  { table_name: "semantic_analytics_orphan_sweep_state", column_name: "last_key" },
+  { table_name: "semantic_analytics_catalog_observations", column_name: "accepted_count" },
+  { table_name: "semantic_analytics_producer_observations", column_name: "sdk_version" },
+  { table_name: "semantic_analytics_receipts", column_name: "worker_job_id" },
+  { table_name: "semantic_analytics_operations", column_name: "first_content_hash" },
+  { table_name: "semantic_analytics_pending_objects", column_name: "status" },
+  { table_name: "analytics_space_plans", column_name: "source_catalog_revisions" },
+  { table_name: "analytics_space_plan_revisions", column_name: "review_hash" },
+  { table_name: "analytics_space_report_revisions", column_name: "available_from" },
+  { table_name: "analytics_project_plans", column_name: "catalog" },
+  { table_name: "analytics_project_plan_revisions", column_name: "review_hash" },
+  { table_name: "analytics_project_report_revisions", column_name: "available_from" },
+  { table_name: "analytics_writers", column_name: "token_hash" },
+  { table_name: "analytics_writer_state", column_name: "revision" },
+  { table_name: "analytics_writer_mutations", column_name: "result" },
   { table_name: "alert_deliveries", column_name: "coalescing_key" },
   { table_name: "alert_deliveries", column_name: "evaluation_job_id" },
   { table_name: "alert_rules", column_name: "webhook_payload_version" },
@@ -99,6 +136,23 @@ export async function isCurrentStorageSchemaBaseline(db: Queryable): Promise<boo
   if (sentinelColumns.has("github_dispatch_deliveries.incident_fingerprint")) {
     return false;
   }
+
+  // A pre-ledger database with only the new tables is not a complete baseline:
+  // deletion and ownership fences must exist before their migration can be seeded.
+  const requiredTriggers = [
+    "project_object_erasure_enqueue",
+    "analytics_space_project_validate",
+    "analytics_space_project_deleted",
+    "analytics_space_project_organization"
+  ];
+  const triggers = await db.query<{ tgname: string }>(
+    `SELECT tgname FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
+     JOIN pg_namespace n ON n.oid=c.relnamespace
+     WHERE n.nspname='public' AND NOT t.tgisinternal AND t.tgenabled IN ('O','A') AND t.tgname=ANY($1::text[])`,
+    [requiredTriggers]
+  );
+  const presentTriggers = new Set(triggers.rows.map((row) => row.tgname));
+  if (requiredTriggers.some((name) => !presentTriggers.has(name))) return false;
 
   return true;
 }

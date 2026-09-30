@@ -291,7 +291,10 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
     auditLogging: auditLogStore,
     memberAuth,
     agentTokens: createAgentTokenStore(input.db),
-    agentReads: createOpenAiHostedReadDependencies({ db: input.db, objectStoreReader: input.objectStore }),
+    agentReads: createOpenAiHostedReadDependencies({
+      db: input.db,
+      objectStoreReader: input.objectStore
+    }),
     agentDashboardBaseUrl: input.appBaseUrl ?? "https://app.debugbundle.com",
     webAuth,
     accountDeletionAuth,
@@ -386,7 +389,11 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
       saveUserAvatar: (request) => accountStore.saveUserAvatar(request)
     },
     billingManagement,
-    ...createDefaultAnalyticsDependencies({ db: input.db, queue: input.queue }),
+    ...createDefaultAnalyticsDependencies({
+      db: input.db,
+      queue: input.queue,
+      objectStore: input.objectStore
+    }),
     ...(billingAdminEmails === null
       ? {}
       : {

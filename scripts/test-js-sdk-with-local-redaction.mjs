@@ -9,6 +9,8 @@ const root = process.cwd();
 const sdkRoot = path.join(root, "sdks", "debugbundle-js");
 const packageVersion = JSON.parse(await readFile(path.join(root, "packages", "redaction", "package.json"), "utf8")).version;
 const tarball = path.join(root, ".tmp", "apache-packages", `debugbundle-redaction-${packageVersion}.tgz`);
+const sharedVersion = JSON.parse(await readFile(path.join(root, "packages", "shared-types", "package.json"), "utf8")).version;
+const sharedTarball = path.join(root, ".tmp", "apache-packages", `debugbundle-shared-types-${sharedVersion}.tgz`);
 // Source and packed-consumer checks temporarily share dependency links. Refuse
 // overlapping runs so one process cannot restore another process's temporary link.
 const lockPath = path.join(root, ".tmp", "privacy-js-verification.lock");
@@ -18,24 +20,40 @@ const lock = await open(lockPath, "wx").catch(() => {
 });
 const unpackRoot = mkdtempSync(path.join(tmpdir(), "debugbundle-redaction-"));
 const prepared = path.join(unpackRoot, "package");
+const sharedUnpackRoot = mkdtempSync(path.join(tmpdir(), "debugbundle-shared-types-"));
+const sharedPrepared = path.join(sharedUnpackRoot, "package");
 const links = ["sdk-node", "sdk-browser"].map((name) =>
   path.join(sdkRoot, "packages", name, "node_modules", "@debugbundle", "redaction")
 );
 links.push(path.join(sdkRoot, "node_modules", "@debugbundle", "redaction"));
+const sharedLinks = ["sdk-node", "sdk-browser"].map((name) =>
+  path.join(sdkRoot, "packages", name, "node_modules", "@debugbundle", "shared-types")
+);
+sharedLinks.push(path.join(sdkRoot, "node_modules", "@debugbundle", "shared-types"));
+const candidateLinks = [...links.map((link) => ({ link, prepared })), ...sharedLinks.map((link) => ({ link, prepared: sharedPrepared }))];
 const originals = [];
 
 try {
   const extraction = spawnSync("tar", ["-xzf", tarball, "-C", unpackRoot], { stdio: "inherit" });
   if (extraction.error) throw extraction.error;
   if (extraction.status !== 0) throw new Error("redaction_package_extract_failed");
-  for (const link of links) {
+  const sharedExtraction = spawnSync("tar", ["-xzf", sharedTarball, "-C", sharedUnpackRoot], { stdio: "inherit" });
+  if (sharedExtraction.error) throw sharedExtraction.error;
+  if (sharedExtraction.status !== 0) throw new Error("shared_types_package_extract_failed");
+  // TypeScript resolves dependencies from the extracted candidate, outside the SDK workspace.
+  await mkdir(path.join(sharedPrepared, "node_modules"), { recursive: true });
+  await symlink(
+    path.join(sdkRoot, "packages", "sdk-node", "node_modules", "zod"),
+    path.join(sharedPrepared, "node_modules", "zod")
+  );
+  for (const { link, prepared: candidate } of candidateLinks) {
     const existing = await lstat(link).catch(() => null);
     if (existing !== null && !existing.isSymbolicLink()) throw new Error(`expected dependency symlink: ${link}`);
     const original = existing === null ? null : await readlink(link);
     if (original !== null) await access(link); // Refuse pre-existing dangling dependencies.
     originals.push({ link, original });
     if (existing !== null) await unlink(link);
-    await symlink(path.relative(path.dirname(link), prepared), link);
+    await symlink(path.relative(path.dirname(link), candidate), link);
   }
 
   const commands = process.argv.includes("--candidate")
@@ -49,14 +67,14 @@ try {
       // pnpm's automatic pre-run install would replace this candidate link
       // with the registry package. Keep this override scoped to the harness.
       env: { ...process.env, npm_config_verify_deps_before_run: "false", PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN: "false", CI: "true", DEBUGBUNDLE_SMOKE_REDACTION_TARBALL: tarball,
-        DEBUGBUNDLE_SMOKE_SHARED_TYPES_TARBALL: path.join(root, ".tmp", "apache-packages", `debugbundle-shared-types-${JSON.parse(await readFile(path.join(root, "packages", "shared-types", "package.json"), "utf8")).version}.tgz`) },
+        DEBUGBUNDLE_SMOKE_SHARED_TYPES_TARBALL: sharedTarball },
       stdio: "inherit"
     });
     if (child.error) throw child.error;
     if (child.status !== 0) throw new Error(`js_sdk_${command[0]}_failed:${child.status}`);
-    for (const link of links) {
-      if (path.resolve(path.dirname(link), await readlink(link)) !== prepared) {
-        throw new Error("redaction_candidate_link_replaced_during_verification");
+    for (const { link, prepared: candidate } of candidateLinks) {
+      if (path.resolve(path.dirname(link), await readlink(link)) !== candidate) {
+        throw new Error("sdk_candidate_link_replaced_during_verification");
       }
     }
   }
@@ -68,6 +86,7 @@ try {
     }
   } finally {
     rmSync(unpackRoot, { recursive: true, force: true });
+    rmSync(sharedUnpackRoot, { recursive: true, force: true });
     await lock.close();
     await unlink(lockPath);
   }

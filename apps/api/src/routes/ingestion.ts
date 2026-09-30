@@ -8,8 +8,6 @@ import {
 import {
   buildEventFingerprintContext,
   classifyEvent,
-  classifyInstalledJavaEventCompatibility,
-  classifyInstalledMobileEventCompatibility,
   validateEvent
 } from "../../../../packages/event-normalizer/src/index.js";
 import {
@@ -42,7 +40,10 @@ import {
 } from "../analytics-quota.js";
 import { redactEvent } from "../api-helpers.js";
 import { SMALL_REQUEST_BODY_LIMIT_BYTES } from "../http-limits.js";
-import { parseCompatibleIngestionRequest } from "../ingestion-request-compatibility.js";
+import {
+  logInstalledIngestionCompatibility,
+  parseCompatibleIngestionRequest
+} from "../ingestion-request-compatibility.js";
 import { isProjectTokenOriginAllowed } from "../project-token-origins.js";
 import {
   isAnalyticsEventCandidate,
@@ -50,6 +51,12 @@ import {
   selectAcceptedAnalyticsEvents,
   type ValidAnalyticsEvent
 } from "./analytics-ingestion.js";
+import {
+  isSemanticClientCandidate,
+  parseSemanticClientCandidate,
+  persistSemanticClientEvents,
+  type ValidSemanticClientEvent
+} from "./semantic-analytics-ingestion.js";
 import {
   buildRejectedDiagnosticFromCandidate,
   buildRejectedDiagnosticFromEvent,
@@ -113,43 +120,29 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
         ]
       });
     }
-    const compatibilityEventCounts = {
-      legacy_java_runtime_event: 0,
-      legacy_android_event: 0,
-      legacy_swift_event: 0
-    };
-    for (const candidate of parsedBody.data.events) {
-      const eventCompatibility = classifyInstalledMobileEventCompatibility(candidate);
-      if (eventCompatibility !== null) {
-        compatibilityEventCounts[eventCompatibility]++;
-      }
-      if (classifyInstalledJavaEventCompatibility(candidate) !== null) {
-        compatibilityEventCounts.legacy_java_runtime_event++;
-      }
-    }
-    const compatibilityEventCount =
-      compatibilityEventCounts.legacy_java_runtime_event +
-      compatibilityEventCounts.legacy_android_event +
-      compatibilityEventCounts.legacy_swift_event;
-    if (compatibility !== null || compatibilityEventCount > 0) {
-      request.log.info(
-        {
-          compatibility_wrapper: compatibility,
-          compatibility_event_counts: compatibilityEventCounts,
-          compatibility_event_count: compatibilityEventCount,
-          request_event_count: parsedBody.data.events.length
-        },
-        "ingestion_installed_sdk_compatibility_used"
-      );
-    }
+    logInstalledIngestionCompatibility({
+      events: parsedBody.data.events,
+      wrapper: compatibility,
+      log: request.log
+    });
 
     const errors: Array<{ index: number; reason: string }> = [];
     const rejectedMetricEvents: IngestionRejectedMetricEvent[] = [];
     const rejectedDiagnosticEvents: IngestionRejectedDiagnosticEvent[] = [];
     const validEvents: ValidDebugEvent[] = [];
     const validAnalyticsEvents: ValidAnalyticsEvent[] = [];
+    const validSemanticClientEvents: ValidSemanticClientEvent[] = [];
 
     for (const [index, candidate] of parsedBody.data.events.entries()) {
+      if (
+        dependencies.semanticAnalyticsClientDelivery?.enabled === true &&
+        isSemanticClientCandidate(candidate)
+      ) {
+        const semanticEvent = parseSemanticClientCandidate({ candidate, index });
+        if (semanticEvent.error !== undefined) errors.push(semanticEvent.error);
+        else validSemanticClientEvents.push(semanticEvent.event);
+        continue;
+      }
       if (isAnalyticsEventCandidate(candidate)) {
         const analyticsEvent = parseAnalyticsEventCandidate({
           candidate,
@@ -197,7 +190,8 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
       }
     }
 
-    const sharedRateLimitedEventCount = validEvents.length + validAnalyticsEvents.length;
+    const sharedRateLimitedEventCount =
+      validEvents.length + validAnalyticsEvents.length + validSemanticClientEvents.length;
 
     if (
       sharedRateLimitedEventCount > 0 &&
@@ -221,6 +215,10 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
               reason: "rate_limited"
             })),
             ...validAnalyticsEvents.map(({ index }) => ({
+              index,
+              reason: "rate_limited"
+            })),
+            ...validSemanticClientEvents.map(({ index }) => ({
               index,
               reason: "rate_limited"
             }))
@@ -384,7 +382,14 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
                   },
                   ...(captureRulesNeedFingerprint
                     ? {
-                        ...buildEventFingerprintContext(entry.event, activeCaptureRules.flatMap(rule => rule.matcher.fingerprint === undefined ? [] : [rule.matcher.fingerprint.version]))
+                        ...buildEventFingerprintContext(
+                          entry.event,
+                          activeCaptureRules.flatMap((rule) =>
+                            rule.matcher.fingerprint === undefined
+                              ? []
+                              : [rule.matcher.fingerprint.version]
+                          )
+                        )
                       }
                     : {})
                 }),
@@ -552,7 +557,11 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
               });
             }
 
-            if (debugEventsToPersist.length === 0 && acceptedAnalyticsEvents.length === 0) {
+            if (
+              debugEventsToPersist.length === 0 &&
+              acceptedAnalyticsEvents.length === 0 &&
+              validSemanticClientEvents.length === 0
+            ) {
               const metricRecordResult = await recordIngestionMetricBatchBestEffort({
                 dependencies,
                 log: request.log,
@@ -616,7 +625,11 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
           }))
         );
         acceptedAnalyticsEvents = analyticsQuota.accepted_events;
-        if (accepted === 0 && acceptedAnalyticsEvents.length === 0) {
+        if (
+          accepted === 0 &&
+          acceptedAnalyticsEvents.length === 0 &&
+          validSemanticClientEvents.length === 0
+        ) {
           const retryAfterMs = analyticsQuota.retry_after_ms ?? 1_000;
           return reply
             .header("Retry-After", toAnalyticsRetryAfterSeconds(retryAfterMs))
@@ -649,6 +662,24 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
         }
         throw error;
       }
+    }
+
+    if (validSemanticClientEvents.length > 0) {
+      const delivery = dependencies.semanticAnalyticsClientDelivery;
+      const bearer = readBearerToken(request.headers.authorization);
+      if (delivery === undefined || delivery.enabled !== true || bearer === null)
+        return reply.status(503).send({ error: "analytics_delivery_unavailable" });
+      const result = await persistSemanticClientEvents({
+        delivery,
+        events: validSemanticClientEvents,
+        projectId: project.project_id,
+        credentialHash: hashToken(bearer),
+        isRequestClosed: () => reply.raw.writableEnded || reply.raw.destroyed || request.raw.aborted
+      });
+      if (result.kind === "unavailable")
+        return reply.status(503).send({ error: "analytics_delivery_unavailable" });
+      accepted += result.accepted;
+      errors.push(...result.errors);
     }
 
     const captureRuleManagement = dependencies.captureRuleManagement;

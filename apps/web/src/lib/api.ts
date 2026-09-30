@@ -98,6 +98,8 @@ export {
   getProjectAnalyticsDevices,
   getProjectAnalyticsFunnel,
   getProjectAnalyticsFunnels,
+  getProjectAnalyticsPlan,
+  getProjectOrderedFunnelReport,
   getProjectAnalyticsJourneyPatterns,
   getProjectAnalyticsJourneySample,
   getProjectAnalyticsIncidentImpact,

@@ -17,6 +17,7 @@ import {
   CapturePolicyResponseSchema as SharedCapturePolicyResponseSchema,
   CapturePolicyUpdateSchema,
   AnalyticsEventEnvelopeSchema,
+  AnalyticsCapabilitiesSchema,
   AnalyticsSdkConfigSchema as SharedAnalyticsSdkConfigSchema,
   AnalyticsSettingsResponseSchema,
   AnalyticsSettingsUpdateSchema,
@@ -265,6 +266,9 @@ export type OperationSpec = {
 export const browserSessionSecurity: SecurityRequirement = { browserSession: [] };
 export const memberBearerTokenSecurity: SecurityRequirement = { memberBearerToken: [] };
 export const projectBearerTokenSecurity: SecurityRequirement = { projectBearerToken: [] };
+export const analyticsWriterBearerTokenSecurity: SecurityRequirement = {
+  analyticsWriterBearerToken: []
+};
 
 export const anyMemberAuth = [browserSessionSecurity, memberBearerTokenSecurity];
 export const browserSessionAuth = [browserSessionSecurity];
@@ -539,10 +543,14 @@ export const SdkConfigResponseSchema = z
     active_probes: z.array(ProbeActivationSchema),
     poll_interval_ms: z.number().int().nonnegative(),
     analytics: SharedAnalyticsSdkConfigSchema.optional(),
+    analytics_semantic: AnalyticsCapabilitiesSchema.optional(),
     capture_policy: ResolvedCapturePolicySchema,
     capture_rules: z.array(CaptureRuleResponseSchema.shape.rule),
     trigger_token_key: z.string().optional()
   })
+  .strict();
+export const SdkWriterCapabilityResponseSchema = z
+  .object({ analytics_semantic: AnalyticsCapabilitiesSchema })
   .strict();
 export const IngestionErrorSchema = z
   .object({ index: z.number().int(), reason: z.string() })

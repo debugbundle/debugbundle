@@ -19,17 +19,105 @@ const ALL_REQUIRED_TABLES = Array.from(
 
 describe("storage schema migrations", () => {
   it("adds isolated agent credentials through an ordered, additive migration and requires the table at startup", () => {
-    const migration = STORAGE_SCHEMA_MIGRATIONS.find((entry) => entry.id === "202609200001_add_project_scoped_agent_tokens");
+    const migration = STORAGE_SCHEMA_MIGRATIONS.find(
+      (entry) => entry.id === "202609200001_add_project_scoped_agent_tokens"
+    );
     expect(migration).toBeDefined();
     expect(migration?.statements.join("\n")).toContain("CREATE TABLE IF NOT EXISTS agent_tokens");
     expect(migration?.statements.join("\n")).toContain("token_hash text NOT NULL UNIQUE");
     expect(migration?.statements.join("\n")).toContain("expires_at > created_at");
-    expect(migration?.statements.join("\n")).not.toMatch(/DROP TABLE|ALTER TABLE member_tokens|UPDATE member_tokens/);
+    expect(migration?.statements.join("\n")).not.toMatch(
+      /DROP TABLE|ALTER TABLE member_tokens|UPDATE member_tokens/
+    );
     expect(REQUIRED_API_TABLES).toContain("agent_tokens");
   });
+  it("retains minimal identity revocations through an additive forward migration", () => {
+    const migration = STORAGE_SCHEMA_MIGRATIONS.find(
+      (entry) => entry.id === "202609280016_add_analytics_project_identity_revocations"
+    );
+    expect(migration?.statements.join("\n")).toContain(
+      "CREATE TABLE analytics_project_identity_revocations"
+    );
+    expect(migration?.statements.join("\n")).toContain("WHERE revoked_at IS NOT NULL");
+    expect(REQUIRED_API_TABLES).toContain("analytics_project_identity_revocations");
+    expect(REQUIRED_WORKER_TABLES).toContain("analytics_project_identity_revocations");
+  });
+  it("adds durable nullable relay provenance without rewriting old receipts", () => {
+    const migration = STORAGE_SCHEMA_MIGRATIONS.find(
+      (entry) => entry.id === "202609280017_add_semantic_identity_receipt_provenance"
+    );
+    expect(migration?.statements.join("\n")).toContain("ADD COLUMN identity_context_id uuid");
+    expect(migration?.statements.join("\n")).toContain("ADD COLUMN identity_writer_id uuid");
+    expect(migration?.statements.join("\n")).not.toMatch(/UPDATE semantic_analytics_receipts/);
+  });
+  it("backfills durable producer epoch fences and receipt provenance", () => {
+    const migration = STORAGE_SCHEMA_MIGRATIONS.find(
+      (entry) => entry.id === "202609280018_fence_analytics_identity_producer_epochs"
+    );
+    expect(migration?.statements.join("\n")).toContain(
+      "CREATE TABLE analytics_project_identity_epoch_revocations"
+    );
+    expect(migration?.statements.join("\n")).toContain("ADD COLUMN identity_producer_epoch uuid");
+    expect(migration?.statements.join("\n")).toContain(
+      "FROM analytics_project_identity_revocations"
+    );
+    expect(REQUIRED_API_TABLES).toContain("analytics_project_identity_epoch_revocations");
+    expect(REQUIRED_WORKER_TABLES).toContain("analytics_project_identity_epoch_revocations");
+  });
+  it("indexes only protected subject references attached to accepted identity receipts", () => {
+    const migration = STORAGE_SCHEMA_MIGRATIONS.find(
+      (entry) => entry.id === "202609280019_index_semantic_receipt_subjects"
+    );
+    expect(migration?.statements.join("\n")).toContain(
+      "CREATE TABLE semantic_analytics_receipt_subjects"
+    );
+    expect(migration?.statements.join("\n")).toContain(
+      "REFERENCES semantic_analytics_receipts(project_id,event_id) ON DELETE CASCADE"
+    );
+    expect(migration?.statements.join("\n")).toContain("JOIN analytics_project_identity_contexts");
+    expect(REQUIRED_API_TABLES).toContain("semantic_analytics_receipt_subjects");
+    expect(REQUIRED_WORKER_TABLES).toContain("semantic_analytics_receipt_subjects");
+  });
+  it("retains bounded protected association edges after short-lived contexts expire", () => {
+    const migration = STORAGE_SCHEMA_MIGRATIONS.find(
+      (entry) => entry.id === "202609280020_retain_analytics_identity_associations"
+    );
+    expect(migration?.statements.join("\n")).toContain(
+      "CREATE TABLE analytics_project_identity_associations"
+    );
+    expect(migration?.statements.join("\n")).toContain("associated_at+interval '90 days'");
+    expect(migration?.statements.join("\n")).toContain("FROM analytics_project_identity_contexts");
+    expect(REQUIRED_API_TABLES).toContain("analytics_project_identity_associations");
+    expect(REQUIRED_WORKER_TABLES).toContain("analytics_project_identity_associations");
+  });
+  it("requires an additive subject cutoff and deletion task", () => {
+    const migration = STORAGE_SCHEMA_MIGRATIONS.find(
+      (entry) => entry.id === "202609280021_add_analytics_subject_erasure_tasks"
+    );
+    expect(migration?.statements.join("\n")).toContain(
+      "CREATE TABLE analytics_project_subject_erasures"
+    );
+    expect(migration?.statements.join("\n")).toContain(
+      "UNIQUE(project_id,writer_id,idempotency_key)"
+    );
+    expect(REQUIRED_API_TABLES).toContain("analytics_project_subject_erasures");
+    expect(REQUIRED_WORKER_TABLES).toContain("analytics_project_subject_erasures");
+  });
+  it("distinguishes deliberate subject deletion from lost raw evidence", () => {
+    const migration = STORAGE_SCHEMA_MIGRATIONS.find(
+      (entry) => entry.id === "202609280022_add_subject_erasure_raw_outcome"
+    );
+    expect(migration?.statements.join("\n")).toContain(
+      "raw_retention_outcome IN ('job_completed','lost','erased')"
+    );
+  });
   it("adds nullable resource route metadata without rewriting incident history", () => {
-    const migration = STORAGE_SCHEMA_MIGRATIONS.find(entry => entry.id === "202609160001_add_browser_resource_routes");
-    expect(migration?.statements.join("\n")).toContain("ADD COLUMN IF NOT EXISTS resource_route text");
+    const migration = STORAGE_SCHEMA_MIGRATIONS.find(
+      (entry) => entry.id === "202609160001_add_browser_resource_routes"
+    );
+    expect(migration?.statements.join("\n")).toContain(
+      "ADD COLUMN IF NOT EXISTS resource_route text"
+    );
     expect(migration?.statements.join("\n")).not.toMatch(/UPDATE incidents|DELETE|DROP /);
   });
   it("should replace the provisional saved-funnel default with tier capacity", (): void => {
@@ -302,6 +390,48 @@ describe("storage schema migrations", () => {
 
   it("should seed the migration ledger instead of replaying history for a current bootstrap schema", async (): Promise<void> => {
     const currentSchemaColumns = [
+      { table_name: "analytics_spaces", column_name: "namespace_source_project_ids" },
+      { table_name: "analytics_spaces", column_name: "namespace_key_fingerprint" },
+      { table_name: "analytics_space_identity_namespace_mutations", column_name: "result" },
+      { table_name: "analytics_project_identity_namespaces", column_name: "key_fingerprint" },
+      { table_name: "analytics_project_identity_namespace_mutations", column_name: "result" },
+      { table_name: "analytics_project_identity_contexts", column_name: "binding_hash" },
+      { table_name: "analytics_project_identity_associations", column_name: "user_id_hash" },
+      { table_name: "analytics_project_subject_erasures", column_name: "cutoff_at" },
+      { table_name: "analytics_project_identity_revocations", column_name: "revoked_at" },
+      { table_name: "analytics_project_identity_epoch_revocations", column_name: "revoked_at" },
+      { table_name: "semantic_analytics_receipts", column_name: "identity_context_id" },
+      { table_name: "semantic_analytics_receipts", column_name: "identity_writer_id" },
+      { table_name: "semantic_analytics_receipts", column_name: "identity_producer_epoch" },
+      { table_name: "semantic_analytics_receipt_subjects", column_name: "subject_ref" },
+      { table_name: "semantic_analytics_funnel_facts", column_name: "fact" },
+      {
+        table_name: "semantic_analytics_portfolio_funnel_facts",
+        column_name: "source_entry_revision"
+      },
+      { table_name: "semantic_analytics_loss_days", column_name: "lost_count" },
+      { table_name: "semantic_analytics_receipts", column_name: "raw_status" },
+      { table_name: "semantic_analytics_receipts", column_name: "occurred_at" },
+      { table_name: "analytics_project_plans", column_name: "business_measurement_enabled" },
+      {
+        table_name: "analytics_project_plan_revisions",
+        column_name: "business_measurement_enabled"
+      },
+      { table_name: "semantic_analytics_orphan_sweep_state", column_name: "last_key" },
+      { table_name: "semantic_analytics_catalog_observations", column_name: "accepted_count" },
+      { table_name: "semantic_analytics_producer_observations", column_name: "sdk_version" },
+      { table_name: "semantic_analytics_receipts", column_name: "worker_job_id" },
+      { table_name: "semantic_analytics_operations", column_name: "first_content_hash" },
+      { table_name: "semantic_analytics_pending_objects", column_name: "status" },
+      { table_name: "analytics_space_plans", column_name: "source_catalog_revisions" },
+      { table_name: "analytics_space_plan_revisions", column_name: "review_hash" },
+      { table_name: "analytics_space_report_revisions", column_name: "available_from" },
+      { table_name: "analytics_project_plans", column_name: "catalog" },
+      { table_name: "analytics_project_plan_revisions", column_name: "review_hash" },
+      { table_name: "analytics_project_report_revisions", column_name: "available_from" },
+      { table_name: "analytics_writers", column_name: "token_hash" },
+      { table_name: "analytics_writer_state", column_name: "revision" },
+      { table_name: "analytics_writer_mutations", column_name: "result" },
       { table_name: "incident_events", column_name: "resource_route" },
       { table_name: "alert_deliveries", column_name: "coalescing_key" },
       { table_name: "alert_deliveries", column_name: "evaluation_job_id" },
@@ -331,6 +461,7 @@ describe("storage schema migrations", () => {
       { table_name: "analytics_usage_counters", column_name: "analytics_events" },
       { table_name: "analytics_usage_counters", column_name: "analytics_journey_samples" },
       { table_name: "plan_cleanup_tasks", column_name: "cleanup_type" },
+      { table_name: "project_object_erasure_tasks", column_name: "next_attempt_at" },
       { table_name: "project_analytics_settings", column_name: "enabled" },
       { table_name: "project_analytics_settings", column_name: "hourly_retention_days" },
       { table_name: "project_usage_counters", column_name: "updated_at" },
@@ -352,6 +483,14 @@ describe("storage schema migrations", () => {
       .mockResolvedValueOnce({
         rows: currentSchemaColumns
       })
+      .mockResolvedValueOnce({
+        rows: [
+          "analytics_space_project_validate",
+          "analytics_space_project_deleted",
+          "analytics_space_project_organization",
+          "project_object_erasure_enqueue"
+        ].map((tgname) => ({ tgname }))
+      })
       .mockResolvedValue({ rows: [] });
 
     const result = await migrateStorageSchema({ query } as Queryable);
@@ -366,6 +505,24 @@ describe("storage schema migrations", () => {
       ),
       []
     );
+    const incompleteQuery = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: ALL_REQUIRED_TABLES.map((table_name) => ({ table_name })) })
+      .mockResolvedValueOnce({
+        rows: currentSchemaColumns.filter(
+          (column) =>
+            !(
+              column.table_name === "analytics_project_plan_revisions" &&
+              column.column_name === "review_hash"
+            )
+        )
+      });
+    await expect(
+      seedStorageMigrationLedgerForCurrentSchema({ query: incompleteQuery } as Queryable)
+    ).resolves.toBe("not_current_schema");
   });
 
   it("should rollback and surface rollback failures during migration application", async (): Promise<void> => {

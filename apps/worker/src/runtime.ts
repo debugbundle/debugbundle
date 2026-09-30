@@ -7,6 +7,8 @@ import {
 } from "../../../packages/storage/src/worker-job-store.js";
 import { Pool } from "pg";
 import { Redis } from "ioredis";
+import { processProjectAnalyticsSubjectErasurePass } from "../../../packages/storage/src/analytics-subject-erasure-processor.js";
+import { createAnalyticsSubjectErasureRetention } from "../../../packages/storage/src/analytics-subject-erasure-retention.js";
 
 import {
   createRuntimeLoggerFromEnv,
@@ -28,6 +30,10 @@ import {
   createPostgresAnalyticsRollupStore,
   createPostgresAnalyticsSettingsStore,
   createPostgresAnalyticsUsageStore,
+  createSemanticAnalyticsReceiptStore,
+  createSemanticAnalyticsRawRetentionService,
+  createAnalyticsIdentityContextRetention,
+  createProjectObjectErasureService,
   createPostgresAvailabilityCheckStore,
   createPostgresBillingStore,
   createIncidentLifecycleService,
@@ -73,6 +79,7 @@ import {
   type ImprovementBundleJobQueue
 } from "./improvement-bundle-processor.js";
 import { processNextBuildAnalyticsBundleJob } from "./analytics-bundle-processor.js";
+import { processNextSemanticAnalyticsObservationJob } from "./semantic-analytics-observation.js";
 import { scheduleTrialLifecycleEmails } from "./trial-lifecycle-scheduler.js";
 import { registerWorkerDogfooding } from "./dogfooding.js";
 import { createOpenAiOAuthMaintenance } from "./openai-oauth-maintenance.js";
@@ -102,6 +109,7 @@ import {
   scheduleDueGitHubDispatches,
   scheduleDueWebhookDeliveries,
   scheduleRetentionCleanup,
+  scheduleSemanticAnalyticsRetentionCatchUp,
   scheduleWeeklyReports
 } from "./worker-notifications.js";
 import { runWorkerProcessStep, runWorkerStep, runWorkerLane } from "./worker-steps.js";
@@ -136,6 +144,7 @@ export {
   scheduleDueGitHubDispatches,
   scheduleDueWebhookDeliveries,
   scheduleRetentionCleanup,
+  scheduleSemanticAnalyticsRetentionCatchUp,
   scheduleWeeklyReports
 } from "./worker-notifications.js";
 
@@ -386,8 +395,32 @@ export async function runWorkerFromEnv(
   const emailAssetBaseUrl = resolveWorkerEmailAssetBaseUrl(envInput);
   const retentionCleanupRunner = createRetentionCleanupService({
     retentionStore,
-    objectStore
+    objectStore,
+    semanticOrphans: createSemanticAnalyticsReceiptStore(queryable),
+    semanticRawRetention: createSemanticAnalyticsRawRetentionService(queryable),
+    semanticIdentityContexts: createAnalyticsIdentityContextRetention(queryable),
+    semanticSubjectErasure: {
+      runPass: (request) => processProjectAnalyticsSubjectErasurePass(queryable, objectStore, request)
+    },
+    semanticSubjectErasureRetention: createAnalyticsSubjectErasureRetention(queryable),
+    onSemanticCatchUp: (progress) => {
+      if (
+        progress.raw_deleted > 0 ||
+        progress.raw_delete_failures > 0 ||
+        progress.receipts_pruned > 0 ||
+        progress.identity_contexts_pruned > 0 ||
+        progress.identity_associations_pruned > 0 ||
+        progress.subject_erasure_objects_deleted > 0 ||
+        progress.subject_erasure_failed_objects > 0 ||
+        progress.subject_erasure_tasks_completed > 0 ||
+        progress.subject_erasure_tasks_pruned > 0 ||
+        progress.subject_erasure_has_more ||
+        progress.work_remains_hint
+      )
+        logger.info(progress, "semantic_raw_retention_progress");
+    }
   });
+  const projectObjectErasure = createProjectObjectErasureService(queryable, objectStore);
   const docsBaseUrl =
     normalizeWorkerBaseUrl(envInput["DEBUGBUNDLE_DOCS_URL"]) ??
     (normalizeWorkerBaseUrl(envInput["PUBLIC_SITE_URL"]) === null
@@ -547,6 +580,12 @@ export async function runWorkerFromEnv(
         await scheduleRetentionCleanup({
           queue,
           intervalMs: env.RETENTION_CLEANUP_INTERVAL_MS
+        });
+      });
+      await runWorkerStep(logger, "schedule-semantic-raw-retention", async () => {
+        await scheduleSemanticAnalyticsRetentionCatchUp({
+          queue,
+          intervalMs: env.SEMANTIC_ANALYTICS_RETENTION_INTERVAL_MS
         });
       });
       await runWorkerStep(logger, "schedule-analytics-opportunities", async () => {
@@ -736,6 +775,20 @@ export async function runWorkerFromEnv(
           }
         })
       );
+
+      await runClaimedProcessStep("process-semantic-analytics-event", async () =>
+        processNextSemanticAnalyticsObservationJob({ queue, objectStore })
+      );
+
+      await runWorkerStep(logger, "project-object-erasure", async () => {
+        const result = await projectObjectErasure.processNext();
+        passDidWork ||= result.processed;
+        if (result.processed && (result.deleted > 0 || result.failed || result.verified))
+          logger.info(
+            { deleted: result.deleted, failed: result.failed, verified: result.verified },
+            "project_object_erasure_progress"
+          );
+      });
 
       await runClaimedProcessStep("group-incident", durableProcessing.group);
 

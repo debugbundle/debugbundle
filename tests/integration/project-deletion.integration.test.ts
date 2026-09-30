@@ -4,7 +4,11 @@ import { gzipSync } from "node:zlib";
 import { ListObjectsV2Command } from "@aws-sdk/client-s3";
 import { afterAll, beforeAll, expect, it } from "vitest";
 
-import { createPostgresBillingStore, createPostgresMetadataStore, deleteProjectObjects } from "../../packages/storage/src/index.js";
+import {
+  createPostgresBillingStore,
+  createPostgresMetadataStore,
+  deleteProjectObjects
+} from "../../packages/storage/src/index.js";
 
 import {
   createIntegrationPool,
@@ -181,7 +185,14 @@ runIntegration("project deletion integration", () => {
         )
         VALUES ($1, $2, $3, $4, $5::timestamptz, $6)
       `,
-      [incidentId, eventId, "backend_exception", "incident_signal", "2026-03-21T00:00:00.000Z", true]
+      [
+        incidentId,
+        eventId,
+        "backend_exception",
+        "incident_signal",
+        "2026-03-21T00:00:00.000Z",
+        true
+      ]
     );
 
     await pool.query(
@@ -195,7 +206,13 @@ runIntegration("project deletion integration", () => {
         )
         VALUES ($1, $2, $3, $4, $5)
       `,
-      [processedEventId, projectId, "backend_exception", "fp_project_deletion", "TypeError at checkout"]
+      [
+        processedEventId,
+        projectId,
+        "backend_exception",
+        "fp_project_deletion",
+        "TypeError at checkout"
+      ]
     );
 
     await pool.query(
@@ -214,7 +231,18 @@ runIntegration("project deletion integration", () => {
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::timestamptz, $10::jsonb)
       `,
-      [deploymentId, projectId, serviceId, "production", randomUUID(), "abc123", "1.2.3", "main", "2026-03-20T23:55:00.000Z", "{}"]
+      [
+        deploymentId,
+        projectId,
+        serviceId,
+        "production",
+        randomUUID(),
+        "abc123",
+        "1.2.3",
+        "main",
+        "2026-03-20T23:55:00.000Z",
+        "{}"
+      ]
     );
 
     await pool.query(
@@ -233,7 +261,18 @@ runIntegration("project deletion integration", () => {
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7::timestamptz, $8, $9::timestamptz, $10::timestamptz)
       `,
-      [bundleGenerationId, projectId, incidentId, "failure", 1, eventId, "2026-03-21T00:00:00.000Z", "occurrence_threshold", "2026-03-21T00:01:00.000Z", "2026-03-21T00:01:00.000Z"]
+      [
+        bundleGenerationId,
+        projectId,
+        incidentId,
+        "failure",
+        1,
+        eventId,
+        "2026-03-21T00:00:00.000Z",
+        "occurrence_threshold",
+        "2026-03-21T00:01:00.000Z",
+        "2026-03-21T00:01:00.000Z"
+      ]
     );
 
     await pool.query(
@@ -269,7 +308,17 @@ runIntegration("project deletion integration", () => {
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
       `,
-      [alertDeliveryId, alertRuleId, projectId, incidentId, "new_incident", "dedupe_123", "email", "pending", "{}"]
+      [
+        alertDeliveryId,
+        alertRuleId,
+        projectId,
+        incidentId,
+        "new_incident",
+        "dedupe_123",
+        "email",
+        "pending",
+        "{}"
+      ]
     );
 
     await pool.query(
@@ -286,7 +335,16 @@ runIntegration("project deletion integration", () => {
         )
         VALUES ($1, $2, $3, $4, $5, $6::text[], $7::jsonb, $8)
       `,
-      [webhookId, projectId, ownerUserId, "https://hooks.example.test/debugbundle", "secret_hash_123", ["bundle.created"], "{}", true]
+      [
+        webhookId,
+        projectId,
+        ownerUserId,
+        "https://hooks.example.test/debugbundle",
+        "secret_hash_123",
+        ["bundle.created"],
+        "{}",
+        true
+      ]
     );
 
     await pool.query(
@@ -304,7 +362,17 @@ runIntegration("project deletion integration", () => {
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::timestamptz, $9::jsonb)
       `,
-      [webhookDeliveryId, webhookId, projectId, incidentId, "bundle.created", "https://hooks.example.test/debugbundle", "secret_123", "2026-03-21T00:02:00.000Z", "{}"]
+      [
+        webhookDeliveryId,
+        webhookId,
+        projectId,
+        incidentId,
+        "bundle.created",
+        "https://hooks.example.test/debugbundle",
+        "secret_123",
+        "2026-03-21T00:02:00.000Z",
+        "{}"
+      ]
     );
 
     await pool.query(
@@ -321,7 +389,16 @@ runIntegration("project deletion integration", () => {
         )
         VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8)
       `,
-      [weeklyReportChannelId, projectId, "email", '{"to":["ops@example.com"]}', "monday", 9, "UTC", true]
+      [
+        weeklyReportChannelId,
+        projectId,
+        "email",
+        '{"to":["ops@example.com"]}',
+        "monday",
+        9,
+        "UTC",
+        true
+      ]
     );
 
     await pool.query(
@@ -337,7 +414,15 @@ runIntegration("project deletion integration", () => {
         )
         VALUES ($1, $2, $3, $4::timestamptz, $5::timestamptz, $6, $7)
       `,
-      [weeklyReportDeliveryId, weeklyReportChannelId, projectId, "2026-03-14T00:00:00.000Z", "2026-03-21T00:00:00.000Z", "email", "pending"]
+      [
+        weeklyReportDeliveryId,
+        weeklyReportChannelId,
+        projectId,
+        "2026-03-14T00:00:00.000Z",
+        "2026-03-21T00:00:00.000Z",
+        "email",
+        "pending"
+      ]
     );
 
     const store = createPostgresMetadataStore(createQueryable(pool));
@@ -397,27 +482,100 @@ runIntegration("project deletion integration", () => {
     const otherProjectId = randomUUID();
     const dummyBody = gzipSync(Buffer.from("{}", "utf8"));
 
-    await objectStore.putObject({ key: `raw-events/${projectId}/2026/03/21/00/evt1.json.gz`, body: dummyBody, contentType: "application/json", contentEncoding: "gzip" });
-    await objectStore.putObject({ key: `raw-events/${projectId}/2026/03/21/01/evt2.json.gz`, body: dummyBody, contentType: "application/json", contentEncoding: "gzip" });
-    await objectStore.putObject({ key: `bundles/${projectId}/inc1/bundle.json.gz`, body: dummyBody, contentType: "application/json", contentEncoding: "gzip" });
-    await objectStore.putObject({ key: `improvement-bundles/${projectId}/opp1/bundle.json.gz`, body: dummyBody, contentType: "application/json", contentEncoding: "gzip" });
-    await objectStore.putObject({ key: `reproductions/${projectId}/inc1/reproduction.json.gz`, body: dummyBody, contentType: "application/json", contentEncoding: "gzip" });
-    await objectStore.putObject({ key: `raw-events/${otherProjectId}/2026/03/21/00/evt3.json.gz`, body: dummyBody, contentType: "application/json", contentEncoding: "gzip" });
+    await objectStore.putObject({
+      key: `raw-events/${projectId}/2026/03/21/00/evt1.json.gz`,
+      body: dummyBody,
+      contentType: "application/json",
+      contentEncoding: "gzip"
+    });
+    await objectStore.putObject({
+      key: `raw-events/${projectId}/2026/03/21/01/evt2.json.gz`,
+      body: dummyBody,
+      contentType: "application/json",
+      contentEncoding: "gzip"
+    });
+    await objectStore.putObject({
+      key: `bundles/${projectId}/inc1/bundle.json.gz`,
+      body: dummyBody,
+      contentType: "application/json",
+      contentEncoding: "gzip"
+    });
+    await objectStore.putObject({
+      key: `improvement-bundles/${projectId}/opp1/bundle.json.gz`,
+      body: dummyBody,
+      contentType: "application/json",
+      contentEncoding: "gzip"
+    });
+    await objectStore.putObject({
+      key: `reproductions/${projectId}/inc1/reproduction.json.gz`,
+      body: dummyBody,
+      contentType: "application/json",
+      contentEncoding: "gzip"
+    });
+    await objectStore.putObject({
+      key: `raw-events/${otherProjectId}/2026/03/21/00/evt3.json.gz`,
+      body: dummyBody,
+      contentType: "application/json",
+      contentEncoding: "gzip"
+    });
 
     await deleteProjectObjects(objectStore, projectId);
 
-    const targetRaw = await s3Admin.send(new ListObjectsV2Command({ Bucket: s3Bucket, Prefix: `raw-events/${projectId}/` }));
-    const targetBundles = await s3Admin.send(new ListObjectsV2Command({ Bucket: s3Bucket, Prefix: `bundles/${projectId}/` }));
-    const targetImprovementBundles = await s3Admin.send(new ListObjectsV2Command({ Bucket: s3Bucket, Prefix: `improvement-bundles/${projectId}/` }));
-    const targetRepros = await s3Admin.send(new ListObjectsV2Command({ Bucket: s3Bucket, Prefix: `reproductions/${projectId}/` }));
+    const targetRaw = await s3Admin.send(
+      new ListObjectsV2Command({ Bucket: s3Bucket, Prefix: `raw-events/${projectId}/` })
+    );
+    const targetBundles = await s3Admin.send(
+      new ListObjectsV2Command({ Bucket: s3Bucket, Prefix: `bundles/${projectId}/` })
+    );
+    const targetImprovementBundles = await s3Admin.send(
+      new ListObjectsV2Command({ Bucket: s3Bucket, Prefix: `improvement-bundles/${projectId}/` })
+    );
+    const targetRepros = await s3Admin.send(
+      new ListObjectsV2Command({ Bucket: s3Bucket, Prefix: `reproductions/${projectId}/` })
+    );
 
     expect(targetRaw.Contents ?? [], "raw-events should be empty").toHaveLength(0);
     expect(targetBundles.Contents ?? [], "bundles should be empty").toHaveLength(0);
-    expect(targetImprovementBundles.Contents ?? [], "improvement-bundles should be empty").toHaveLength(0);
+    expect(
+      targetImprovementBundles.Contents ?? [],
+      "improvement-bundles should be empty"
+    ).toHaveLength(0);
     expect(targetRepros.Contents ?? [], "reproductions should be empty").toHaveLength(0);
 
-    const otherRaw = await s3Admin.send(new ListObjectsV2Command({ Bucket: s3Bucket, Prefix: `raw-events/${otherProjectId}/` }));
+    const otherRaw = await s3Admin.send(
+      new ListObjectsV2Command({ Bucket: s3Bucket, Prefix: `raw-events/${otherProjectId}/` })
+    );
     expect(otherRaw.Contents ?? [], "other project raw-events should survive").toHaveLength(1);
+  });
+
+  it("records durable object-erasure work in the project deletion transaction", async () => {
+    await resetProjectDeletionTables();
+    const organizationId = randomUUID();
+    const projectId = randomUUID();
+    await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Erasure Org",
+      organizationSlug: `erasure-org-${organizationId.slice(0, 8)}`,
+      projectName: "Deleted App",
+      projectSlug: "deleted-app"
+    });
+    const metadataStore = createPostgresMetadataStore(createQueryable(pool));
+    expect(
+      await metadataStore.deleteProjectForOrganization({
+        organization_id: organizationId,
+        project_id: projectId
+      })
+    ).not.toBeNull();
+    const task = await pool.query(
+      `SELECT project_id::text,prefix_index,cursor_key,verified_at
+       FROM project_object_erasure_tasks WHERE project_id=$1::uuid`,
+      [projectId]
+    );
+    expect(task.rows).toEqual([
+      { project_id: projectId, prefix_index: 0, cursor_key: null, verified_at: null }
+    ]);
   });
 
   it("should preserve organization usage counters across project deletion and recreation", async (): Promise<void> => {
@@ -462,7 +620,14 @@ runIntegration("project deletion integration", () => {
         INSERT INTO projects (id, organization_id, owner_user_id, name, slug, environment_default)
         VALUES ($1, $2, $3, $4, $5, $6)
       `,
-      [recreatedProjectId, organizationId, ownerUserId, "Recreated Project", "recreated-project", "production"]
+      [
+        recreatedProjectId,
+        organizationId,
+        ownerUserId,
+        "Recreated Project",
+        "recreated-project",
+        "production"
+      ]
     );
 
     const summary = await billingStore.getBillingSummaryForOrganization({
@@ -492,11 +657,23 @@ runIntegration("project deletion integration", () => {
 function projectScopedAssertions(): Array<{ name: string; sql: string }> {
   return [
     { name: "projects", sql: `SELECT COUNT(*)::int AS count FROM projects WHERE id = $1` },
-    { name: "project_tokens", sql: `SELECT COUNT(*)::int AS count FROM project_tokens WHERE project_id = $1` },
-    { name: "probe_activations", sql: `SELECT COUNT(*)::int AS count FROM probe_activations WHERE project_id = $1` },
-    { name: "capture_policies", sql: `SELECT COUNT(*)::int AS count FROM capture_policies WHERE project_id = $1` },
+    {
+      name: "project_tokens",
+      sql: `SELECT COUNT(*)::int AS count FROM project_tokens WHERE project_id = $1`
+    },
+    {
+      name: "probe_activations",
+      sql: `SELECT COUNT(*)::int AS count FROM probe_activations WHERE project_id = $1`
+    },
+    {
+      name: "capture_policies",
+      sql: `SELECT COUNT(*)::int AS count FROM capture_policies WHERE project_id = $1`
+    },
     { name: "services", sql: `SELECT COUNT(*)::int AS count FROM services WHERE project_id = $1` },
-    { name: "incidents", sql: `SELECT COUNT(*)::int AS count FROM incidents WHERE project_id = $1` },
+    {
+      name: "incidents",
+      sql: `SELECT COUNT(*)::int AS count FROM incidents WHERE project_id = $1`
+    },
     {
       name: "incident_events",
       sql: `
@@ -506,14 +683,41 @@ function projectScopedAssertions(): Array<{ name: string; sql: string }> {
         WHERE i.project_id = $1
       `
     },
-    { name: "processed_events", sql: `SELECT COUNT(*)::int AS count FROM processed_events WHERE project_id = $1` },
-    { name: "deployments", sql: `SELECT COUNT(*)::int AS count FROM deployments WHERE project_id = $1` },
-    { name: "bundle_generations", sql: `SELECT COUNT(*)::int AS count FROM bundle_generations WHERE project_id = $1` },
-    { name: "alert_rules", sql: `SELECT COUNT(*)::int AS count FROM alert_rules WHERE project_id = $1` },
-    { name: "alert_deliveries", sql: `SELECT COUNT(*)::int AS count FROM alert_deliveries WHERE project_id = $1` },
-    { name: "agent_webhooks", sql: `SELECT COUNT(*)::int AS count FROM agent_webhooks WHERE project_id = $1` },
-    { name: "webhook_deliveries", sql: `SELECT COUNT(*)::int AS count FROM webhook_deliveries WHERE project_id = $1` },
-    { name: "weekly_report_channels", sql: `SELECT COUNT(*)::int AS count FROM weekly_report_channels WHERE project_id = $1` },
-    { name: "weekly_report_deliveries", sql: `SELECT COUNT(*)::int AS count FROM weekly_report_deliveries WHERE project_id = $1` }
+    {
+      name: "processed_events",
+      sql: `SELECT COUNT(*)::int AS count FROM processed_events WHERE project_id = $1`
+    },
+    {
+      name: "deployments",
+      sql: `SELECT COUNT(*)::int AS count FROM deployments WHERE project_id = $1`
+    },
+    {
+      name: "bundle_generations",
+      sql: `SELECT COUNT(*)::int AS count FROM bundle_generations WHERE project_id = $1`
+    },
+    {
+      name: "alert_rules",
+      sql: `SELECT COUNT(*)::int AS count FROM alert_rules WHERE project_id = $1`
+    },
+    {
+      name: "alert_deliveries",
+      sql: `SELECT COUNT(*)::int AS count FROM alert_deliveries WHERE project_id = $1`
+    },
+    {
+      name: "agent_webhooks",
+      sql: `SELECT COUNT(*)::int AS count FROM agent_webhooks WHERE project_id = $1`
+    },
+    {
+      name: "webhook_deliveries",
+      sql: `SELECT COUNT(*)::int AS count FROM webhook_deliveries WHERE project_id = $1`
+    },
+    {
+      name: "weekly_report_channels",
+      sql: `SELECT COUNT(*)::int AS count FROM weekly_report_channels WHERE project_id = $1`
+    },
+    {
+      name: "weekly_report_deliveries",
+      sql: `SELECT COUNT(*)::int AS count FROM weekly_report_deliveries WHERE project_id = $1`
+    }
   ];
 }

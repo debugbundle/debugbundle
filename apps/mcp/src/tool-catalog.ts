@@ -8,6 +8,38 @@ import { ANALYTICS_SETTINGS_MCP_TOOL_CATALOG } from "./analytics-settings-tool-c
 import { ANALYTICS_SETTINGS_MCP_TOOL_NAMES } from "./analytics-settings-tools.js";
 import { ANALYTICS_SAVED_FUNNEL_MCP_TOOL_CATALOG } from "./analytics-saved-funnel-tool-catalog.js";
 import { ANALYTICS_SAVED_FUNNEL_MCP_TOOL_NAMES } from "./analytics-saved-funnel-tools.js";
+import {
+  ANALYTICS_SPACE_MCP_TOOL_CATALOG,
+  ANALYTICS_SPACE_MCP_TOOL_NAMES
+} from "./analytics-space-tool-catalog.js";
+import {
+  ANALYTICS_WRITER_MCP_TOOL_CATALOG,
+  ANALYTICS_WRITER_MCP_TOOL_NAMES
+} from "./analytics-writer-tool-catalog.js";
+import {
+  ANALYTICS_IDENTITY_NAMESPACE_MCP_TOOL_CATALOG,
+  ANALYTICS_IDENTITY_NAMESPACE_MCP_TOOL_NAMES
+} from "./analytics-identity-namespace-tool-catalog.js";
+import {
+  ANALYTICS_PLAN_MCP_TOOL_CATALOG,
+  ANALYTICS_PLAN_MCP_TOOL_NAMES
+} from "./analytics-plan-tool-catalog.js";
+import {
+  ANALYTICS_SPACE_PLAN_MCP_TOOL_CATALOG,
+  ANALYTICS_SPACE_PLAN_MCP_TOOL_NAMES
+} from "./analytics-space-plan-tool-catalog.js";
+import {
+  ANALYTICS_REPORT_MCP_TOOL_CATALOG,
+  ANALYTICS_REPORT_MCP_TOOL_NAMES
+} from "./analytics-report-tool-catalog.js";
+import {
+  ANALYTICS_ERASURE_STATUS_MCP_TOOL_CATALOG,
+  ANALYTICS_ERASURE_STATUS_MCP_TOOL_NAMES
+} from "./analytics-erasure-status-tool-catalog.js";
+import {
+  ANALYTICS_JOB_RECOVERY_MCP_TOOL_CATALOG,
+  ANALYTICS_JOB_RECOVERY_MCP_TOOL_NAMES
+} from "./analytics-job-recovery-tool-catalog.js";
 import { BILLING_MCP_TOOL_NAMES } from "./billing-tools.js";
 import { CAPTURE_RULE_MCP_TOOL_NAMES } from "./capture-rule-tools.js";
 import { CAPTURE_POLICY_MCP_TOOL_NAMES } from "./capture-policy-tools.js";
@@ -35,6 +67,14 @@ type McpToolName =
   | (typeof ANALYTICS_METRICS_MCP_TOOL_NAMES)[number]
   | (typeof ANALYTICS_SETTINGS_MCP_TOOL_NAMES)[number]
   | (typeof ANALYTICS_SAVED_FUNNEL_MCP_TOOL_NAMES)[number]
+  | (typeof ANALYTICS_SPACE_MCP_TOOL_NAMES)[number]
+  | (typeof ANALYTICS_WRITER_MCP_TOOL_NAMES)[number]
+  | (typeof ANALYTICS_IDENTITY_NAMESPACE_MCP_TOOL_NAMES)[number]
+  | (typeof ANALYTICS_PLAN_MCP_TOOL_NAMES)[number]
+  | (typeof ANALYTICS_SPACE_PLAN_MCP_TOOL_NAMES)[number]
+  | (typeof ANALYTICS_REPORT_MCP_TOOL_NAMES)[number]
+  | (typeof ANALYTICS_ERASURE_STATUS_MCP_TOOL_NAMES)[number]
+  | (typeof ANALYTICS_JOB_RECOVERY_MCP_TOOL_NAMES)[number]
   | (typeof BILLING_MCP_TOOL_NAMES)[number]
   | (typeof CAPTURE_RULE_MCP_TOOL_NAMES)[number]
   | (typeof CAPTURE_POLICY_MCP_TOOL_NAMES)[number]
@@ -59,6 +99,14 @@ type McpToolGroup =
   | "analytics_metrics"
   | "analytics_settings"
   | "analytics_saved_funnels"
+  | "analytics_spaces"
+  | "analytics_writers"
+  | "analytics_identity_namespace"
+  | "analytics_plan"
+  | "analytics_space_plan"
+  | "analytics_reports"
+  | "analytics_erasure"
+  | "analytics_job_recovery"
   | "billing"
   | "capture_rules"
   | "capture_policy"
@@ -92,6 +140,14 @@ export const MCP_TOOL_CATALOG = [
   ...ANALYTICS_METRICS_MCP_TOOL_CATALOG,
   ...ANALYTICS_SETTINGS_MCP_TOOL_CATALOG,
   ...ANALYTICS_SAVED_FUNNEL_MCP_TOOL_CATALOG,
+  ...ANALYTICS_SPACE_MCP_TOOL_CATALOG,
+  ...ANALYTICS_WRITER_MCP_TOOL_CATALOG,
+  ...ANALYTICS_IDENTITY_NAMESPACE_MCP_TOOL_CATALOG,
+  ...ANALYTICS_PLAN_MCP_TOOL_CATALOG,
+  ...ANALYTICS_SPACE_PLAN_MCP_TOOL_CATALOG,
+  ...ANALYTICS_REPORT_MCP_TOOL_CATALOG,
+  ...ANALYTICS_ERASURE_STATUS_MCP_TOOL_CATALOG,
+  ...ANALYTICS_JOB_RECOVERY_MCP_TOOL_CATALOG,
   {
     name: "get_capture_policy",
     group: "capture_policy",

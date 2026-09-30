@@ -185,10 +185,10 @@ Native logger level/silent/processor filtering runs before SDK capture; enabled-
 
 - **Given** an SDK initialized with a `beforeSend` hook
 - **When** the SDK captures an event
-- **Then** the hook receives the fully built event before buffering and transport
+- **Then** the hook receives an isolated fully built debug event at its published version's timing: legacy inline before buffering, hardened versions deferred after privacy-safe bounded admission
 - **And** default redaction has already run
-- **And** local capture-policy evaluation, capture rules, sampling, duplicate suppression, and persistence have not yet run
-- **And** returning a valid event ships that event
+- **And** hardened versions reject ineligible logs before construction/hooks, then evaluate final replacement policy/rules/sampling/suppression before delivery; legacy versions preserve their documented ordering
+- **And** a valid returned event remains eligible for delivery only after mandatory privacy, schema and final policy checks
 - **And** returning `null` drops the event locally
 - **And** hook exceptions or invalid returned events keep the original event and never throw into host code
 - **And** the kept original has already passed mandatory sanitization
@@ -196,6 +196,7 @@ Native logger level/silent/processor filtering runs before SDK capture; enabled-
 - **And** a failure of mandatory sanitization withholds the unsafe field or event without throwing into host code
 - **And** mutating the hook input cannot mutate the SDK-owned original unless that valid returned event is selected
 - **And** a runtime may skip application hook execution only on an unsafe fatal/crash/shutdown path, and documents that restriction
+- **And** existing debug hooks never receive analytics envelopes implicitly
 
 ### AC-PRIV-01: Mandatory Baseline Across SDKs
 
@@ -2178,6 +2179,8 @@ If CLI says something is healthy and MCP says something different, that is a pro
 ---
 
 ## 24. AnalyticsBundle & Product Analytics Acceptance
+
+The additive semantic extension also requires `AC-ANL-SEMANTIC-*` in `spec/semantic-analytics.md`; existing V1 criteria below remain required and unchanged in scope.
 
 ### AC-ANL-01: Analytics Disabled By Default
 

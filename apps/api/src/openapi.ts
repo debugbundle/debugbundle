@@ -171,6 +171,13 @@ export function buildPublicOpenApiSpec(): Record<string, unknown> {
           scheme: "bearer",
           bearerFormat: "Opaque project token",
           description: "Bearer project token used by ingestion and SDK config routes."
+        },
+        analyticsWriterBearerToken: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "dbundle_anl_ or dbundle_anr_ credential",
+          description:
+            "Project-bound semantic server or relay writer token; each operation requires its matching kind and grants no debug or management authority."
         }
       },
       schemas: Object.fromEntries(components.entries())

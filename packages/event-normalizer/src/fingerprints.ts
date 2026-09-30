@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { stableJson } from "./canonical-json.js";
 import type { NormalizedEvent } from "./index.js";
 
 export const FINGERPRINT_VERSION = "v2";
@@ -7,16 +8,6 @@ export type FingerprintVersion = "v1" | "v2" | "v3";
 
 export function fingerprintVersion(event: NormalizedEvent): "v2" | "v3" {
   return event.resource_type != null ? RESOURCE_FINGERPRINT_VERSION : FINGERPRINT_VERSION;
-}
-
-function stableJson(value: unknown): string {
-  if (value === null || typeof value !== "object") return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
-  const object = value as Record<string, unknown>;
-  return `{${Object.keys(object)
-    .sort()
-    .map((key) => `${JSON.stringify(key)}:${stableJson(object[key])}`)
-    .join(",")}}`;
 }
 
 export function fingerprint(event: NormalizedEvent): string {

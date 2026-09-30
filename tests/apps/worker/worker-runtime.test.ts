@@ -13,6 +13,7 @@ import {
   redisFactoryMock,
   s3FactoryMock,
   processNextNormalizeEventsJobMock,
+  processNextSemanticAnalyticsObservationJobMock,
   processNextGroupIncidentJobMock,
   processNextBuildBundleJobMock,
   processNextBuildAnalyticsBundleJobMock,
@@ -67,6 +68,7 @@ describe("worker runtime", () => {
     expect(env.AVAILABILITY_CHECK_CLAIM_BATCH_SIZE).toBe(20);
     expect(env.AVAILABILITY_CHECK_CONCURRENCY).toBe(8);
     expect(env.RETENTION_CLEANUP_INTERVAL_MS).toBe(6 * 60 * 60 * 1000);
+    expect(env.SEMANTIC_ANALYTICS_RETENTION_INTERVAL_MS).toBe(60_000);
     expect(env.ANALYTICS_OPPORTUNITY_EVALUATION_INTERVAL_MS).toBe(6 * 60 * 60 * 1000);
     expect(env.WORKER_START_PAUSED).toBe("0");
   });
@@ -132,6 +134,15 @@ describe("worker runtime", () => {
     expect(() =>
       parseWorkerEnv({
         RETENTION_CLEANUP_INTERVAL_MS: String(24 * 60 * 60 * 1000 + 1),
+        ANALYTICS_HASH_SECRET: "test-analytics-secret"
+      })
+    ).toThrow("worker_env_invalid");
+  });
+
+  it("should reject a semantic raw catch-up interval shorter than one minute", (): void => {
+    expect(() =>
+      parseWorkerEnv({
+        SEMANTIC_ANALYTICS_RETENTION_INTERVAL_MS: "59999",
         ANALYTICS_HASH_SECRET: "test-analytics-secret"
       })
     ).toThrow("worker_env_invalid");
@@ -229,6 +240,19 @@ describe("worker runtime", () => {
     expect(requestAnomalyCounterCloseMock).toHaveBeenCalledOnce();
     expect(queueCloseMock).toHaveBeenCalledOnce();
     expect(poolEndMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("polls the durable semantic observation lane once per worker pass", async (): Promise<void> => {
+    await runWorkerFromEnv({
+      WORKER_RUN_ONCE: "1",
+      ANALYTICS_HASH_SECRET: "test-analytics-secret"
+    });
+
+    expect(processNextSemanticAnalyticsObservationJobMock).toHaveBeenCalledOnce();
+    expect(processNextSemanticAnalyticsObservationJobMock).toHaveBeenCalledWith({
+      queue: expect.any(Object),
+      objectStore: expect.any(Object)
+    });
   });
 
   it("should run the availability-check loop until shutdown is requested", async (): Promise<void> => {
@@ -634,6 +658,14 @@ describe("worker runtime", () => {
     expect(queueAcquireLeaseMock).toHaveBeenCalledWith("leases:cleanup-retention:schedule", 21600);
     expect(persistedJobs("cleanup-retention")).toContainEqual({
       scheduled_at: expect.any(String)
+    });
+    expect(queueAcquireLeaseMock).toHaveBeenCalledWith(
+      "leases:cleanup-retention:semantic-raw:schedule",
+      60
+    );
+    expect(persistedJobs("cleanup-retention")).toContainEqual({
+      scheduled_at: expect.any(String),
+      scope: "semantic_raw"
     });
     expect(queueAcquireLeaseMock).toHaveBeenCalledWith(
       "leases:analytics-opportunities:schedule",

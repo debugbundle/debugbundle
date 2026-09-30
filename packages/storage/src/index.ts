@@ -41,6 +41,7 @@ export type {
 export {
   buildRawEventObjectKey,
   buildAnalyticsRawEventObjectKey,
+  buildSemanticAnalyticsRawEventObjectKey,
   buildBundleObjectKey,
   buildImprovementBundleObjectKey,
   buildAnalyticsJourneyObjectKey,
@@ -82,6 +83,71 @@ export type {
   CreateAnalyticsSavedFunnelResult
 } from "./analytics-saved-funnel-store.js";
 export { createPostgresAnalyticsSavedFunnelStore } from "./analytics-saved-funnel-store.js";
+export { createAnalyticsSpaceStore } from "./analytics-space-store.js";
+export {
+  readSpaceAnalyticsIdentityNamespace,
+  previewSpaceAnalyticsIdentityNamespaceChange,
+  applySpaceAnalyticsIdentityNamespaceChange
+} from "./analytics-space-identity-namespace-store.js";
+export { loadSpacePlanCatalogSnapshot } from "./analytics-space-plan-snapshot.js";
+export type { SpacePlanCatalogSnapshot } from "./analytics-space-plan-snapshot.js";
+export { createAnalyticsWriterStore } from "./analytics-writer-store.js";
+export { createAnalyticsProjectCatalogStore } from "./analytics-project-catalog-store.js";
+export { createAnalyticsMeasurementPlanStore } from "./analytics-measurement-plan-store.js";
+export {
+  createAnalyticsSpacePlanStore,
+  type AnalyticsSpacePlanStore
+} from "./analytics-space-plan-store.js";
+export { createSemanticAnalyticsReceiptStore } from "./semantic-analytics-receipt-store.js";
+export { createSemanticAnalyticsRawRetentionService } from "./semantic-analytics-raw-retention.js";
+export { createAnalyticsIdentityContextRetention } from "./analytics-identity-context-retention.js";
+export type { SemanticAnalyticsRawRetentionService } from "./semantic-analytics-raw-retention.js";
+export { createProjectObjectErasureService } from "./project-object-erasure.js";
+export {
+  persistProtectedSemanticAnalyticsEvent,
+  persistCurrentProjectSemanticAnalyticsEvent
+} from "./semantic-analytics-persistence.js";
+export {
+  loadCurrentProjectSemanticAnalyticsPolicy,
+  recheckProjectSemanticAnalyticsAdmission
+} from "./semantic-analytics-policy.js";
+export { resolveCurrentProjectSemanticAnalyticsCapability } from "./semantic-analytics-capability.js";
+export { loadVerifiedSemanticAnalyticsWorkerInput } from "./semantic-analytics-worker-input.js";
+export type { VerifiedSemanticAnalyticsWorkerInput } from "./semantic-analytics-worker-input.js";
+export { recordSemanticAnalyticsCatalogObservationInTransaction } from "./semantic-analytics-observation-store.js";
+export type {
+  SemanticAnalyticsAcceptedReceipt,
+  SemanticAnalyticsReceiptInput,
+  SemanticAnalyticsReceiptResult,
+  SemanticAnalyticsReceiptStore
+} from "./semantic-analytics-receipt-store.js";
+export type {
+  AnalyticsMeasurementPlanStore,
+  AnalyticsProjectMeasurementPlanRecord,
+  AnalyticsProjectMeasurementPlanPreview,
+  AnalyticsProjectMeasurementPlanPreviewResult,
+  AnalyticsProjectMeasurementPlanApplyResult
+} from "./analytics-measurement-plan-store.js";
+export type {
+  AnalyticsProjectCatalogStore,
+  AnalyticsProjectCatalogChange,
+  AnalyticsProjectCatalogRecord,
+  AnalyticsProjectCatalogPreview,
+  AnalyticsProjectCatalogPreviewResult,
+  AnalyticsProjectCatalogApplyResult
+} from "./analytics-project-catalog-store.js";
+export type {
+  AnalyticsWriterStore,
+  AnalyticsWriterChangeInput,
+  AnalyticsWriterMutationResult,
+  AnalyticsWriterPreviewResult
+} from "./analytics-writer-store.js";
+export type {
+  AnalyticsSpaceStore,
+  AnalyticsSpaceChangeInput,
+  AnalyticsSpaceMutationResult,
+  AnalyticsSpacePreviewResult
+} from "./analytics-space-store.js";
 export type { AnalyticsRollupStore } from "./analytics-rollup-store.js";
 export { createPostgresAnalyticsRollupStore } from "./analytics-rollup-store.js";
 export type {
@@ -250,4 +316,8 @@ export {
   assertStorageSchemaMigrationsApplied,
   STORAGE_SCHEMA_MIGRATIONS
 } from "./schema-migrations.js";
-export { createAgentTokenStore, type AgentTokenStore, type AgentTokenRecord } from "./agent-token-store.js";
+export {
+  createAgentTokenStore,
+  type AgentTokenStore,
+  type AgentTokenRecord
+} from "./agent-token-store.js";

@@ -40,7 +40,12 @@ interface CreateLifecycleWebhookPublisherInput extends WorkerAccountAnalyticsDep
 
 function safeDeliveryPayload(payload: unknown): Record<string, unknown> {
   const result = sanitizeTelemetry(payload);
-  if (!result.ok || result.value === null || Array.isArray(result.value) || typeof result.value !== "object") {
+  if (
+    !result.ok ||
+    result.value === null ||
+    Array.isArray(result.value) ||
+    typeof result.value !== "object"
+  ) {
     throw new Error("notification_payload_unsafe");
   }
   return result.value;
@@ -619,5 +624,6 @@ export {
   scheduleDueGitHubDispatches,
   scheduleDueWebhookDeliveries,
   scheduleRetentionCleanup,
+  scheduleSemanticAnalyticsRetentionCatchUp,
   scheduleWeeklyReports
 } from "./worker-weekly-reports.js";

@@ -9,6 +9,7 @@ import {
   type TierName
 } from "../../shared-types/src/index.js";
 import { runInTransaction } from "./transaction.js";
+import { readActiveSpaceReportSlotsInTransaction } from "./analytics-report-slot-capacity.js";
 import type { Queryable } from "./types.js";
 
 export type CreateAnalyticsSavedFunnelResult =
@@ -71,16 +72,13 @@ export function createPostgresAnalyticsSavedFunnelStore(db: Queryable): Analytic
       const definition = AnalyticsSavedFunnelCreateSchema.parse(input.definition);
       return runInTransaction(db, async (tx) => {
         const project = await tx.query<{
-          max_saved_funnels: unknown;
           organization_plan: unknown;
         }>(
           `
             SELECT
-              settings.max_saved_funnels,
               organizations.plan AS organization_plan
             FROM projects p
             JOIN organizations ON organizations.id = p.organization_id
-            LEFT JOIN project_analytics_settings settings ON settings.project_id = p.id
             WHERE p.organization_id = $1::uuid
               AND p.id = $2::uuid
             FOR UPDATE OF p
@@ -89,6 +87,11 @@ export function createPostgresAnalyticsSavedFunnelStore(db: Queryable): Analytic
         );
         const projectRow = project.rows[0];
         if (projectRow === undefined) return { status: "project_not_found" };
+        const settings = await tx.query<{ max_saved_funnels: unknown }>(
+          `SELECT max_saved_funnels FROM project_analytics_settings
+           WHERE project_id=$1::uuid FOR SHARE`,
+          [input.project_id]
+        );
 
         const existing = await tx.query<{ archived_at: unknown }>(
           `
@@ -106,10 +109,14 @@ export function createPostgresAnalyticsSavedFunnelStore(db: Queryable): Analytic
 
         const count = await tx.query<{ active_count: unknown }>(
           `
-            SELECT COUNT(*) AS active_count
-            FROM analytics_funnel_definitions
-            WHERE project_id = $1::uuid
-              AND archived_at IS NULL
+            SELECT
+              (SELECT COUNT(*) FROM analytics_funnel_definitions
+               WHERE project_id = $1::uuid AND archived_at IS NULL)
+              + COALESCE(
+                (SELECT jsonb_array_length(reports) FROM analytics_project_plans
+                 WHERE project_id = $1::uuid),
+                0
+              ) AS active_count
           `,
           [input.project_id]
         );
@@ -117,9 +124,13 @@ export function createPostgresAnalyticsSavedFunnelStore(db: Queryable): Analytic
           parseTierName(projectRow.organization_plan)
         ).max_analytics_saved_funnels;
         const projectLimit =
-          projectRow.max_saved_funnels == null ? tierLimit : toNumber(projectRow.max_saved_funnels);
+          settings.rows[0] === undefined ? tierLimit : toNumber(settings.rows[0].max_saved_funnels);
         const effectiveLimit = Math.min(projectLimit, tierLimit);
-        if (toNumber(count.rows[0]?.active_count) >= effectiveLimit) {
+        const spaceReportSlots = await readActiveSpaceReportSlotsInTransaction(
+          tx,
+          input.project_id
+        );
+        if (toNumber(count.rows[0]?.active_count) + spaceReportSlots >= effectiveLimit) {
           return { status: "limit_reached" };
         }
 

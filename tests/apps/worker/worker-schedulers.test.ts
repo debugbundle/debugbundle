@@ -5,6 +5,7 @@ import {
   scheduleDueAlertEmailDigests,
   scheduleDueWebhookDeliveries,
   scheduleRetentionCleanup,
+  scheduleSemanticAnalyticsRetentionCatchUp,
   scheduleWeeklyReports
 } from "../../../apps/worker/src/runtime.js";
 
@@ -83,6 +84,22 @@ describe("worker schedulers", () => {
     expect(acquireLease).toHaveBeenCalledWith("leases:cleanup-retention:schedule", 3600);
     expect(enqueue).toHaveBeenCalledWith("cleanup-retention", {
       scheduled_at: "2026-04-04T12:00:00.000Z"
+    });
+  });
+
+  it("should schedule semantic raw catch-up with its own minute lease", async (): Promise<void> => {
+    const enqueue = vi.fn().mockResolvedValue(undefined);
+    const acquireLease = vi.fn().mockResolvedValue(true);
+    const scheduled = await scheduleSemanticAnalyticsRetentionCatchUp({
+      queue: { enqueue, acquireLease },
+      intervalMs: 60_000,
+      now: new Date("2026-04-04T12:00:00.000Z")
+    });
+    expect(scheduled).toBe(true);
+    expect(acquireLease).toHaveBeenCalledWith("leases:cleanup-retention:semantic-raw:schedule", 60);
+    expect(enqueue).toHaveBeenCalledWith("cleanup-retention", {
+      scheduled_at: "2026-04-04T12:00:00.000Z",
+      scope: "semantic_raw"
     });
   });
 

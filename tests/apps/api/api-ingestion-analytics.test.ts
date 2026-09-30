@@ -1,115 +1,17 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
 import { createApiServer } from "../../../apps/api/src/server.ts";
 import {
-  createEventEnvelope,
-  type AnalyticsEventEnvelope,
-  type AnalyticsSettings
-} from "../../../packages/shared-types/src/index.js";
+  createSettings,
+  createAnalyticsEvent,
+  createDebugEvent
+} from "../../helpers/api-analytics-ingestion-fixtures.js";
+import { type AnalyticsSettings } from "../../../packages/shared-types/src/index.js";
 
 type ApiServerDependencies = Parameters<typeof createApiServer>[0];
 
 const PROJECT_ID = "00000000-0000-4000-8000-000000000123";
-
-function createSettings(overrides: Partial<AnalyticsSettings> = {}): AnalyticsSettings {
-  return {
-    enabled: true,
-    privacy_mode: "strict",
-    consent_required: false,
-    capture_page_views: true,
-    capture_route_changes: true,
-    capture_actions: false,
-    capture_friction_signals: true,
-    journey_sample_rate: 0,
-    raw_retention_days: 1,
-    sample_retention_days: 7,
-    hourly_retention_days: 30,
-    aggregate_retention_months: 12,
-    max_saved_funnels: 3,
-    max_custom_dimensions: 0,
-    approved_custom_dimensions: [],
-    ...overrides
-  };
-}
-
-function createAnalyticsEvent(input: {
-  eventId: string;
-  kind?: AnalyticsEventEnvelope["payload"]["kind"];
-  sessionId?: string;
-  customDimensions?: Record<string, string>;
-  privacy?: AnalyticsEventEnvelope["payload"]["privacy"];
-  projectToken?: string;
-  visitorIdHash?: string | null;
-  userIdHash?: string | null;
-}): AnalyticsEventEnvelope {
-  return {
-    schema_version: "2026-07-analytics-01",
-    event_id: input.eventId,
-    event_type: "analytics_event",
-    ...(input.projectToken === undefined ? {} : { project_token: input.projectToken }),
-    occurred_at: "2026-03-10T13:45:27.000Z",
-    sdk_name: "@debugbundle/sdk-browser",
-    sdk_version: "1.0.0",
-    service: {
-      name: "web",
-      runtime: "browser",
-      framework: "react",
-      environment: "production"
-    },
-    correlation: {
-      session_id: input.sessionId ?? "sess_123",
-      visitor_id_hash: input.visitorIdHash ?? null,
-      user_id_hash: input.userIdHash ?? null,
-      trace_id: null,
-      deploy_id: null
-    },
-    payload: {
-      kind: input.kind ?? "page_view",
-      privacy: input.privacy ?? { mode: "strict", consent_granted: false },
-      route: {
-        path: "/pricing",
-        normalized_path: "/pricing",
-        title: "Pricing"
-      },
-      dimensions: {
-        auth_state: "anonymous",
-        device_type: "desktop",
-        browser_family: "Chrome",
-        browser_major: 125,
-        os_family: "macOS",
-        os_major: 14,
-        language: "en",
-        locale: "en-US",
-        viewport_bucket: "large",
-        referrer_domain: null,
-        utm_source: null,
-        utm_medium: null,
-        utm_campaign: null,
-        country_code: null,
-        region_code: null
-      },
-      custom_dimensions: input.customDimensions ?? {}
-    }
-  };
-}
-
-function createDebugEvent() {
-  return createEventEnvelope({
-    event_type: "log_event",
-    project_token: "dbundle_proj_test",
-    service: {
-      name: "api",
-      environment: "production",
-      runtime: "node",
-      framework: "fastify"
-    },
-    payload: {
-      level: "error",
-      message: "checkout failed",
-      attributes: {}
-    }
-  });
-}
 
 function createDependencies(
   overrides: {
@@ -224,14 +126,23 @@ describe("api analytics ingestion split", () => {
   });
 
   it("protects analytics route and title strings before raw analytics persistence", async () => {
-    const persistAnalyticsAndEnqueue = vi.fn().mockResolvedValue({ object_key: "analytics-events/p/k.json.gz" });
+    const persistAnalyticsAndEnqueue = vi
+      .fn()
+      .mockResolvedValue({ object_key: "analytics-events/p/k.json.gz" });
     const app = createDependencies({ persistAnalyticsAndEnqueue });
     const event = createAnalyticsEvent({ eventId: "10000000-0000-4000-8000-000000000011" });
     event.payload.dimensions.utm_campaign = "api_key=raw-analytics-key";
-    event.payload.route = { path: "/pricing", normalized_path: "/pricing",
-      title: "password=raw-analytics-password" };
-    const response = await app.inject({ method: "POST", url: "/v1/events",
-      headers: { authorization: "Bearer dbundle_proj_test" }, payload: { events: [event] } });
+    event.payload.route = {
+      path: "/pricing",
+      normalized_path: "/pricing",
+      title: "password=raw-analytics-password"
+    };
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: { authorization: "Bearer dbundle_proj_test" },
+      payload: { events: [event] }
+    });
     expect(response.statusCode).toBe(202);
     expect(response.json()).toEqual({ accepted: 1, rejected: 0, errors: [] });
     const persisted = persistAnalyticsAndEnqueue.mock.calls[0]?.[0];
@@ -365,6 +276,38 @@ describe("api analytics ingestion split", () => {
     expect(response.statusCode).toBe(202);
     expect(response.json()).toMatchObject({ accepted: 2, rejected: 0, errors: [] });
     expect(claimEvents).toHaveBeenCalledWith(expect.objectContaining({ event_count: 2 }));
+    expect(persistAndEnqueue).toHaveBeenCalledOnce();
+    expect(persistAnalyticsAndEnqueue).toHaveBeenCalledOnce();
+  });
+
+  it("rejects a V2 semantic event at its original index while preserving installed V1 lanes", async () => {
+    const persistAndEnqueue = vi.fn().mockResolvedValue({ object_key: "raw-events/p/k.json.gz" });
+    const persistAnalyticsAndEnqueue = vi.fn().mockResolvedValue({
+      object_key: "analytics-events/p/k.json.gz"
+    });
+    const app = createDependencies({ persistAndEnqueue, persistAnalyticsAndEnqueue });
+    const semantic = JSON.parse(
+      readFileSync(new URL("../../fixtures/analytics-semantic-event.json", import.meta.url), "utf8")
+    ) as unknown;
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/events",
+      headers: { authorization: "Bearer dbundle_proj_test" },
+      payload: {
+        events: [
+          createDebugEvent(),
+          semantic,
+          createAnalyticsEvent({ eventId: "10000000-0000-4000-8000-000000000008" })
+        ]
+      }
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(response.json()).toEqual({
+      accepted: 2,
+      rejected: 1,
+      errors: [{ index: 1, reason: "analytics_invalid_event" }]
+    });
     expect(persistAndEnqueue).toHaveBeenCalledOnce();
     expect(persistAnalyticsAndEnqueue).toHaveBeenCalledOnce();
   });

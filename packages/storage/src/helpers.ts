@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { hashToken as hashTokenFromAuth } from "../../auth/src/index.js";
 import type { EventEnvelope } from "../../shared-types/src/index.js";
 import type { BuildRawEventObjectKeyInput } from "./types.js";
@@ -22,6 +23,28 @@ export function buildAnalyticsRawEventObjectKey(input: BuildRawEventObjectKeyInp
   const hour = toTwoDigits(input.occurredAt.getUTCHours());
 
   return `analytics-events/${input.projectId}/${year}/${month}/${day}/${hour}/${input.eventId}.json.gz`;
+}
+
+/** V2 content addressing prevents a conflicting event ID from overwriting protected evidence. */
+export function buildSemanticAnalyticsRawEventObjectKey(
+  input: BuildRawEventObjectKeyInput & { contentHash: string }
+): string {
+  const project = z.string().uuid().safeParse(input.projectId);
+  const event = z.string().uuid().safeParse(input.eventId);
+  const digest = /^sha256:([a-f0-9]{64})$/.exec(input.contentHash);
+  if (
+    !project.success ||
+    !event.success ||
+    digest === null ||
+    !(input.occurredAt instanceof Date) ||
+    !Number.isFinite(input.occurredAt.getTime())
+  )
+    throw new Error("semantic_analytics_object_key_invalid");
+  const year = input.occurredAt.getUTCFullYear().toString();
+  const month = toTwoDigits(input.occurredAt.getUTCMonth() + 1);
+  const day = toTwoDigits(input.occurredAt.getUTCDate());
+  const hour = toTwoDigits(input.occurredAt.getUTCHours());
+  return `semantic-events/${project.data.toLowerCase()}/${year}/${month}/${day}/${hour}/${event.data.toLowerCase()}/${digest[1]}.json.gz`;
 }
 
 export function buildBundleObjectKey(projectId: string, incidentId: string): string {
@@ -56,12 +79,13 @@ export function buildImprovementBundleRegenerationLeaseKey(opportunityId: string
   return `leases:improvement-bundle-regeneration:${opportunityId}`;
 }
 
-const PROJECT_OBJECT_PREFIXES = [
+export const PROJECT_OBJECT_PREFIXES = [
   "raw-events",
   "bundles",
   "improvement-bundles",
   "reproductions",
   "analytics-events",
+  "semantic-events",
   "analytics-journeys",
   "analytics-bundles"
 ] as const;
@@ -75,7 +99,9 @@ export async function deleteProjectObjects(
   }
 }
 
-export function inferSeverity(eventType: EventEnvelope["event_type"]): "low" | "medium" | "high" | "critical" {
+export function inferSeverity(
+  eventType: EventEnvelope["event_type"]
+): "low" | "medium" | "high" | "critical" {
   if (eventType === "backend_exception" || eventType === "frontend_exception") {
     return "high";
   }

@@ -1,4 +1,5 @@
 import { TIER_CAPABILITIES } from "../../shared-types/src/index.js";
+import type { ObjectStoreBulkDeleter } from "./object-store-types.js";
 
 import {
   buildAnalyticsRawEventObjectKey,
@@ -9,6 +10,7 @@ import {
 import type {
   CleanupRetentionJob,
   ObjectStoreClient,
+  ObjectStoreLister,
   Queryable,
   RetentionAnalyticsBundleGenerationReference,
   RetentionAnalyticsJourneySampleReference,
@@ -18,9 +20,37 @@ import type {
   RetentionRawEventReference,
   RetentionStore
 } from "./types.js";
+import type { SemanticAnalyticsReceiptStore } from "./semantic-analytics-receipt-store.js";
+import type {
+  SemanticAnalyticsRawRetentionCursor,
+  SemanticAnalyticsRawRetentionService
+} from "./semantic-analytics-raw-retention.js";
+import type { AnalyticsIdentityContextRetention } from "./analytics-identity-context-retention.js";
+import type { SubjectErasurePass } from "./analytics-subject-erasure-processor.js";
+import type { createAnalyticsSubjectErasureRetention } from "./analytics-subject-erasure-retention.js";
 
 const DEFAULT_RETENTION_CLEANUP_BATCH_SIZE = 100;
 const DEFAULT_RETENTION_CLEANUP_MAX_BATCHES = 10;
+
+export interface SemanticRetentionCatchUpProgress {
+  raw_deleted: number;
+  raw_delete_failures: number;
+  /** Earliest due time encountered, not the age of the remaining backlog. */
+  oldest_selected_due_at: string | null;
+  receipts_pruned: number;
+  identity_contexts_pruned: number;
+  identity_associations_pruned: number;
+  subject_erasure_objects_deleted: number;
+  subject_erasure_failed_objects: number;
+  subject_erasure_tasks_completed: number;
+  subject_erasure_tasks_pruned: number;
+  subject_erasure_has_more: boolean;
+  batches: number;
+  work_remains_hint: boolean;
+  reached_batch_limit: boolean;
+  reached_deadline: boolean;
+  duration_ms: number;
+}
 
 const ANALYTICS_ROLLUP_TABLES = [
   "analytics_rollup_uniques",
@@ -34,6 +64,9 @@ const ANALYTICS_ROLLUP_TABLES = [
 
 type AnalyticsRetentionTable =
   | (typeof ANALYTICS_ROLLUP_TABLES)[number]
+  | "semantic_analytics_catalog_observations"
+  | "semantic_analytics_producer_observations"
+  | "semantic_analytics_loss_days"
   | "analytics_incident_correlations"
   | "analytics_ingestion_ledger"
   | "analytics_visitor_first_seen";
@@ -60,7 +93,7 @@ function buildAnalyticsBundleGenerationValuesPlaceholders(count: number): string
 async function pruneExpiredAnalyticsRollupTable(input: {
   db: Queryable;
   tableName: AnalyticsRetentionTable;
-  dateColumn?: "bucket_start" | "occurred_at" | "last_seen_at";
+  dateColumn?: "bucket_start" | "occurred_at" | "last_seen_at" | "observed_on" | "occurred_on";
   hasBucketGranularity?: boolean;
   now: string;
   limit: number;
@@ -99,9 +132,12 @@ async function pruneExpiredAnalyticsRollupTable(input: {
 export function createPostgresRetentionStore(db: Queryable): RetentionStore {
   return {
     async pruneExpiredBrowserRecoveryEvents(input) {
-      const result = await db.query(`DELETE FROM browser_recovery_events WHERE event_id IN (
+      const result = await db.query(
+        `DELETE FROM browser_recovery_events WHERE event_id IN (
         SELECT event_id FROM browser_recovery_events WHERE expires_at <= $1::timestamptz
-        ORDER BY expires_at, event_id LIMIT $2) RETURNING event_id`, [input.now, input.limit]);
+        ORDER BY expires_at, event_id LIMIT $2) RETURNING event_id`,
+        [input.now, input.limit]
+      );
       return result.rows.length;
     },
     async listExpiredSampledRawEvents(input): Promise<RetentionRawEventReference[]> {
@@ -273,6 +309,68 @@ export function createPostgresRetentionStore(db: Queryable): RetentionStore {
         deletedRows += deletedFromTable;
         reachedBatchLimit = reachedBatchLimit || deletedFromTable >= input.limit;
       }
+
+      const deletedSemanticObservations = await pruneExpiredAnalyticsRollupTable({
+        db,
+        tableName: "semantic_analytics_catalog_observations",
+        dateColumn: "observed_on",
+        now: input.now,
+        limit: input.limit
+      });
+      deletedRows += deletedSemanticObservations;
+      reachedBatchLimit = reachedBatchLimit || deletedSemanticObservations >= input.limit;
+
+      const deletedProducerObservations = await pruneExpiredAnalyticsRollupTable({
+        db,
+        tableName: "semantic_analytics_producer_observations",
+        dateColumn: "observed_on",
+        now: input.now,
+        limit: input.limit
+      });
+      deletedRows += deletedProducerObservations;
+      reachedBatchLimit = reachedBatchLimit || deletedProducerObservations >= input.limit;
+
+      // Funnel facts retain protected per-subject evidence only for the effective
+      // detailed-history window, capped at ninety days even on longer plans.
+      const deletedFunnelFacts = (
+        await db.query<{ deleted: number }>(
+          `DELETE FROM semantic_analytics_funnel_facts target WHERE target.ctid IN (
+             SELECT candidate.ctid FROM semantic_analytics_funnel_facts candidate
+             LEFT JOIN project_analytics_settings settings ON settings.project_id=candidate.project_id
+             WHERE candidate.occurred_at < $1::timestamptz
+               - make_interval(days => LEAST(COALESCE(settings.hourly_retention_days,7),90)::int)
+             ORDER BY candidate.occurred_at,candidate.project_id,candidate.event_id LIMIT $2
+           ) RETURNING 1 AS deleted`,
+          [input.now, input.limit]
+        )
+      ).rows.length;
+      deletedRows += deletedFunnelFacts;
+      reachedBatchLimit = reachedBatchLimit || deletedFunnelFacts >= input.limit;
+
+      const deletedPortfolioFunnelFacts = (
+        await db.query<{ deleted: number }>(
+          `DELETE FROM semantic_analytics_portfolio_funnel_facts target WHERE target.ctid IN (
+             SELECT candidate.ctid FROM semantic_analytics_portfolio_funnel_facts candidate
+             LEFT JOIN project_analytics_settings settings ON settings.project_id=candidate.project_id
+             WHERE candidate.occurred_at < $1::timestamptz
+               - make_interval(days => LEAST(COALESCE(settings.hourly_retention_days,7),90)::int)
+             ORDER BY candidate.occurred_at,candidate.project_id,candidate.event_id LIMIT $2
+           ) RETURNING 1 AS deleted`,
+          [input.now, input.limit]
+        )
+      ).rows.length;
+      deletedRows += deletedPortfolioFunnelFacts;
+      reachedBatchLimit = reachedBatchLimit || deletedPortfolioFunnelFacts >= input.limit;
+
+      const deletedSemanticLossDays = await pruneExpiredAnalyticsRollupTable({
+        db,
+        tableName: "semantic_analytics_loss_days",
+        dateColumn: "occurred_on",
+        now: input.now,
+        limit: input.limit
+      });
+      deletedRows += deletedSemanticLossDays;
+      reachedBatchLimit = reachedBatchLimit || deletedSemanticLossDays >= input.limit;
 
       const deletedCorrelations = await pruneExpiredAnalyticsRollupTable({
         db,
@@ -472,7 +570,17 @@ export function createPostgresRetentionStore(db: Queryable): RetentionStore {
 
 export function createRetentionCleanupService(input: {
   retentionStore: RetentionStore;
-  objectStore: Pick<ObjectStoreClient, "deleteObject">;
+  objectStore: Pick<ObjectStoreClient, "deleteObject"> &
+    Partial<ObjectStoreLister & ObjectStoreBulkDeleter>;
+  semanticOrphans?: Pick<SemanticAnalyticsReceiptStore, "cleanOldOrphans"> &
+    Partial<Pick<SemanticAnalyticsReceiptStore, "sweepOldUnownedObjects">>;
+  semanticRawRetention?: SemanticAnalyticsRawRetentionService;
+  semanticIdentityContexts?: AnalyticsIdentityContextRetention;
+  semanticSubjectErasure?: {
+    runPass(input: { limit: number }): Promise<SubjectErasurePass>;
+  };
+  semanticSubjectErasureRetention?: ReturnType<typeof createAnalyticsSubjectErasureRetention>;
+  onSemanticCatchUp?: (progress: SemanticRetentionCatchUpProgress) => void;
   batchSize?: number;
   maxBatches?: number;
 }): {
@@ -486,9 +594,192 @@ export function createRetentionCleanupService(input: {
       if (input.objectStore.deleteObject === undefined) {
         return;
       }
+      const semanticObjectStore = {
+        deleteObject: input.objectStore.deleteObject,
+        ...(input.objectStore.deleteObjects === undefined
+          ? {}
+          : { deleteObjects: input.objectStore.deleteObjects })
+      };
+
+      if (job.scope === "semantic_raw") {
+        if (input.semanticRawRetention === undefined) return;
+        let subjectError: Error | undefined;
+        let subjectPass: SubjectErasurePass | null = null;
+        if (input.semanticSubjectErasure !== undefined) {
+          try {
+            subjectPass = await input.semanticSubjectErasure.runPass({
+              limit: Math.min(batchSize, 100)
+            });
+          } catch (error) {
+            subjectError =
+              error instanceof Error ? error : new Error("semantic_subject_erasure_failed");
+          }
+        }
+        const startedMs = Date.now();
+        const deadlineMs = startedMs + 30_000;
+        let rawDeleted = 0;
+        let rawDeleteFailures = 0;
+        let oldestSelectedDueAt: string | null = null;
+        let receiptsPruned = 0;
+        let identityContextsPruned = 0;
+        let identityAssociationsPruned = 0;
+        let subjectErasureTasksPruned = 0;
+        let batches = 0;
+        let workRemainsHint = false;
+        let selectionCursor: SemanticAnalyticsRawRetentionCursor | undefined;
+        for (
+          let batchIndex = 0;
+          batchIndex < maxBatches && Date.now() < deadlineMs;
+          batchIndex += 1
+        ) {
+          const raw = await input.semanticRawRetention.cleanExpired({
+            now: job.scheduled_at,
+            limit: Math.min(batchSize, 100),
+            objectStore: semanticObjectStore,
+            deadlineMs,
+            ...(selectionCursor === undefined ? {} : { startAfter: selectionCursor }),
+            onCursor: (next) => {
+              selectionCursor = next ?? undefined;
+            },
+            onProgress: (progress) => {
+              rawDeleteFailures += progress.failed_deletes;
+              if (
+                progress.oldest_selected_due_at !== null &&
+                (oldestSelectedDueAt === null ||
+                  progress.oldest_selected_due_at < oldestSelectedDueAt)
+              )
+                oldestSelectedDueAt = progress.oldest_selected_due_at;
+            }
+          });
+          const receipts = await input.semanticRawRetention.pruneExpired({
+            now: job.scheduled_at,
+            limit: Math.min(batchSize, 100)
+          });
+          const identities =
+            input.semanticIdentityContexts === undefined
+              ? { pruned: 0, hasMore: false }
+              : Date.now() >= deadlineMs
+                ? { pruned: 0, hasMore: true }
+                : await input.semanticIdentityContexts.pruneExpired({
+                    now: job.scheduled_at,
+                    limit: Math.min(batchSize, 100)
+                  });
+          const associations =
+            input.semanticIdentityContexts === undefined
+              ? { pruned: 0, hasMore: false }
+              : Date.now() >= deadlineMs
+                ? { pruned: 0, hasMore: true }
+                : await input.semanticIdentityContexts.pruneExpiredAssociations({
+                    now: job.scheduled_at,
+                    limit: Math.min(batchSize, 100)
+                  });
+          const erasures =
+            input.semanticSubjectErasureRetention === undefined
+              ? { pruned: 0, hasMore: false }
+              : Date.now() >= deadlineMs
+                ? { pruned: 0, hasMore: true }
+                : await input.semanticSubjectErasureRetention.pruneCompleted({
+                    now: job.scheduled_at,
+                    limit: Math.min(batchSize, 100)
+                  });
+          rawDeleted += raw.deleted;
+          receiptsPruned += receipts.pruned;
+          identityContextsPruned += identities.pruned;
+          identityAssociationsPruned += associations.pruned;
+          subjectErasureTasksPruned += erasures.pruned;
+          batches += 1;
+          workRemainsHint =
+            raw.hasMore ||
+            receipts.hasMore ||
+            identities.hasMore ||
+            associations.hasMore ||
+            erasures.hasMore;
+          if (!workRemainsHint) break;
+        }
+        const finishedMs = Date.now();
+        input.onSemanticCatchUp?.({
+          raw_deleted: rawDeleted,
+          raw_delete_failures: rawDeleteFailures,
+          oldest_selected_due_at: oldestSelectedDueAt,
+          receipts_pruned: receiptsPruned,
+          identity_contexts_pruned: identityContextsPruned,
+          identity_associations_pruned: identityAssociationsPruned,
+          subject_erasure_objects_deleted: subjectPass?.objects_deleted ?? 0,
+          subject_erasure_failed_objects: subjectPass?.failed_objects ?? 0,
+          subject_erasure_tasks_completed: subjectPass?.complete ? 1 : 0,
+          subject_erasure_tasks_pruned: subjectErasureTasksPruned,
+          subject_erasure_has_more: subjectPass?.has_more ?? false,
+          batches,
+          work_remains_hint: workRemainsHint,
+          reached_batch_limit: batches >= maxBatches && workRemainsHint,
+          reached_deadline: finishedMs >= deadlineMs && workRemainsHint,
+          duration_ms: Math.max(0, finishedMs - startedMs)
+        });
+        if (subjectError !== undefined) throw subjectError;
+        return;
+      }
 
       for (let batchIndex = 0; batchIndex < maxBatches; batchIndex += 1) {
-        const prunedRecovery = await input.retentionStore.pruneExpiredBrowserRecoveryEvents?.({ now: job.scheduled_at, limit: batchSize }) ?? 0;
+        let semanticAcceptedCleaned = 0;
+        let semanticAcceptedHasMore = false;
+        let semanticReceiptsPruned = 0;
+        let semanticReceiptsHasMore = false;
+        if (input.semanticRawRetention !== undefined) {
+          try {
+            const result = await input.semanticRawRetention.cleanExpired({
+              now: job.scheduled_at,
+              limit: Math.min(batchSize, 100),
+              objectStore: semanticObjectStore
+            });
+            semanticAcceptedCleaned = result.deleted;
+            semanticAcceptedHasMore = result.hasMore;
+          } catch {
+            // The receipt stays in deleting state; a later schedule retries the S3 call.
+          }
+          try {
+            const result = await input.semanticRawRetention.pruneExpired({
+              now: job.scheduled_at,
+              limit: Math.min(batchSize, 100)
+            });
+            semanticReceiptsPruned = result.pruned;
+            semanticReceiptsHasMore = result.hasMore;
+          } catch {
+            // Keep expired metadata for retry without blocking installed retention work.
+          }
+        }
+        let semanticOrphansCleaned = 0;
+        let semanticSweepHasMore = false;
+        if (input.semanticOrphans !== undefined) {
+          try {
+            semanticOrphansCleaned = await input.semanticOrphans.cleanOldOrphans({
+              deleteObject: input.objectStore.deleteObject
+            });
+          } catch {
+            // Leave the staged row for retry without blocking existing retention work.
+          }
+          if (
+            input.objectStore.listObjects !== undefined &&
+            input.semanticOrphans.sweepOldUnownedObjects !== undefined
+          ) {
+            try {
+              const result = await input.semanticOrphans.sweepOldUnownedObjects({
+                objectStore: {
+                  deleteObject: input.objectStore.deleteObject,
+                  listObjects: input.objectStore.listObjects
+                },
+                now: job.scheduled_at
+              });
+              semanticSweepHasMore = result.hasMore;
+            } catch {
+              // Keep listing progress unchanged and retry on the next scheduled run.
+            }
+          }
+        }
+        const prunedRecovery =
+          (await input.retentionStore.pruneExpiredBrowserRecoveryEvents?.({
+            now: job.scheduled_at,
+            limit: batchSize
+          })) ?? 0;
         const expiredReferences = await input.retentionStore.listExpiredSampledRawEvents({
           now: job.scheduled_at,
           limit: batchSize
@@ -517,6 +808,12 @@ export function createRetentionCleanupService(input: {
         });
 
         if (
+          semanticAcceptedCleaned === 0 &&
+          !semanticAcceptedHasMore &&
+          semanticReceiptsPruned === 0 &&
+          !semanticReceiptsHasMore &&
+          semanticOrphansCleaned === 0 &&
+          !semanticSweepHasMore &&
           prunedRecovery === 0 &&
           expiredReferences.length === 0 &&
           expiredAnalyticsRawEvents.length === 0 &&
@@ -635,6 +932,9 @@ export function createRetentionCleanupService(input: {
         }
 
         if (
+          !semanticAcceptedHasMore &&
+          !semanticReceiptsHasMore &&
+          semanticOrphansCleaned < 100 &&
           deletedReferences.length === 0 &&
           deletedAnalyticsRawEvents.length === 0 &&
           deletedAnalyticsJourneySamples.length === 0 &&
@@ -653,6 +953,9 @@ export function createRetentionCleanupService(input: {
         }
 
         if (
+          !semanticAcceptedHasMore &&
+          !semanticReceiptsHasMore &&
+          semanticOrphansCleaned < 100 &&
           prunedRecovery < batchSize &&
           expiredReferences.length < batchSize &&
           expiredAnalyticsRawEvents.length < batchSize &&

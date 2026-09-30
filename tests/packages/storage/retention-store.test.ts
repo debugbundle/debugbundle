@@ -258,6 +258,11 @@ describe("retention cleanup service", () => {
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] });
     const store = createPostgresRetentionStore({ query });
 
@@ -268,7 +273,7 @@ describe("retention cleanup service", () => {
       reached_batch_limit: true
     });
 
-    expect(query).toHaveBeenCalledTimes(11);
+    expect(query).toHaveBeenCalledTimes(16);
     expect(query).toHaveBeenNthCalledWith(
       1,
       expect.stringContaining("DELETE FROM analytics_rollup_uniques target"),
@@ -306,21 +311,46 @@ describe("retention cleanup service", () => {
     );
     expect(query).toHaveBeenNthCalledWith(
       8,
-      expect.stringContaining("DELETE FROM analytics_incident_correlations target"),
+      expect.stringContaining("DELETE FROM semantic_analytics_catalog_observations target"),
       ["2026-07-08T12:00:00.000Z", 2]
     );
     expect(query).toHaveBeenNthCalledWith(
       9,
-      expect.stringContaining("DELETE FROM analytics_ingestion_ledger target"),
+      expect.stringContaining("DELETE FROM semantic_analytics_producer_observations target"),
       ["2026-07-08T12:00:00.000Z", 2]
     );
     expect(query).toHaveBeenNthCalledWith(
       10,
-      expect.stringContaining("DELETE FROM analytics_visitor_first_seen target"),
+      expect.stringContaining("DELETE FROM semantic_analytics_funnel_facts target"),
       ["2026-07-08T12:00:00.000Z", 2]
     );
     expect(query).toHaveBeenNthCalledWith(
       11,
+      expect.stringContaining("DELETE FROM semantic_analytics_portfolio_funnel_facts target"),
+      ["2026-07-08T12:00:00.000Z", 2]
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      12,
+      expect.stringContaining("DELETE FROM semantic_analytics_loss_days target"),
+      ["2026-07-08T12:00:00.000Z", 2]
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      13,
+      expect.stringContaining("DELETE FROM analytics_incident_correlations target"),
+      ["2026-07-08T12:00:00.000Z", 2]
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      14,
+      expect.stringContaining("DELETE FROM analytics_ingestion_ledger target"),
+      ["2026-07-08T12:00:00.000Z", 2]
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      15,
+      expect.stringContaining("DELETE FROM analytics_visitor_first_seen target"),
+      ["2026-07-08T12:00:00.000Z", 2]
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      16,
       expect.stringContaining("DELETE FROM analytics_usage_claims claims"),
       ["2026-07-08T12:00:00.000Z", 2]
     );
@@ -330,10 +360,16 @@ describe("retention cleanup service", () => {
       expect(String(call[0])).toContain("candidate.bucket_start");
       expect(String(call[0])).toContain("candidate.bucket_granularity = 'hour'");
     }
-    expect(String(query.mock.calls[7]?.[0])).toContain("candidate.occurred_at");
-    expect(String(query.mock.calls[8]?.[0])).toContain("candidate.occurred_at");
-    expect(String(query.mock.calls[9]?.[0])).toContain("candidate.last_seen_at");
-    expect(String(query.mock.calls[10]?.[0])).toContain("interval '13 months'");
+    expect(String(query.mock.calls[7]?.[0])).toContain("candidate.observed_on");
+    expect(String(query.mock.calls[7]?.[0])).toContain("settings.aggregate_retention_months");
+    expect(String(query.mock.calls[8]?.[0])).toContain("candidate.observed_on");
+    expect(String(query.mock.calls[9]?.[0])).toContain("settings.hourly_retention_days");
+    expect(String(query.mock.calls[10]?.[0])).toContain("settings.hourly_retention_days");
+    expect(String(query.mock.calls[11]?.[0])).toContain("candidate.occurred_on");
+    expect(String(query.mock.calls[12]?.[0])).toContain("candidate.occurred_at");
+    expect(String(query.mock.calls[13]?.[0])).toContain("candidate.occurred_at");
+    expect(String(query.mock.calls[14]?.[0])).toContain("candidate.last_seen_at");
+    expect(String(query.mock.calls[15]?.[0])).toContain("interval '13 months'");
   });
 
   it("returns early when the retention cleanup object store is unavailable", async (): Promise<void> => {
@@ -357,6 +393,206 @@ describe("retention cleanup service", () => {
     expect(listExpiredSampledRawEvents).not.toHaveBeenCalled();
     expect(pruneExpiredAnalyticsRollups).not.toHaveBeenCalled();
     expect(listExpiredIncidents).not.toHaveBeenCalled();
+  });
+
+  it("runs bounded semantic orphan cleanup even when legacy retention has no expired rows", async (): Promise<void> => {
+    const deleteObject = vi.fn().mockResolvedValue(undefined);
+    const cleanOldOrphans = vi.fn().mockResolvedValue(1);
+    const retentionCleanup = createRetentionCleanupService({
+      retentionStore: createMockRetentionStore(),
+      objectStore: { deleteObject },
+      semanticOrphans: { cleanOldOrphans },
+      maxBatches: 1
+    });
+
+    await retentionCleanup.runCleanup({ scheduled_at: "2026-09-28T20:00:00.000Z" });
+    expect(cleanOldOrphans).toHaveBeenCalledWith({ deleteObject });
+  });
+
+  it("runs accepted semantic raw retention on the scheduled cleanup lane", async (): Promise<void> => {
+    const deleteObject = vi.fn().mockResolvedValue(undefined);
+    const cleanExpired = vi.fn().mockResolvedValue({ deleted: 1, hasMore: false });
+    const pruneExpired = vi.fn().mockResolvedValue({ pruned: 1, hasMore: false });
+    const retentionCleanup = createRetentionCleanupService({
+      retentionStore: createMockRetentionStore(),
+      objectStore: { deleteObject },
+      semanticRawRetention: { cleanExpired, pruneExpired },
+      maxBatches: 1
+    });
+
+    await retentionCleanup.runCleanup({ scheduled_at: "2026-09-28T20:00:00.000Z" });
+    expect(cleanExpired).toHaveBeenCalledWith({
+      now: "2026-09-28T20:00:00.000Z",
+      limit: expect.any(Number),
+      objectStore: { deleteObject }
+    });
+    expect(pruneExpired).toHaveBeenCalledWith({
+      now: "2026-09-28T20:00:00.000Z",
+      limit: expect.any(Number)
+    });
+  });
+
+  it("runs a bounded semantic-only catch-up without invoking installed retention", async (): Promise<void> => {
+    const deleteObject = vi.fn().mockResolvedValue(undefined);
+    const cleanExpired = vi
+      .fn()
+      .mockImplementationOnce(async (request: { onProgress?: (progress: unknown) => void }) => {
+        request.onProgress?.({
+          failed_deletes: 1,
+          oldest_selected_due_at: "2026-09-25T12:00:00.000Z"
+        });
+        return { deleted: 100, hasMore: true };
+      })
+      .mockResolvedValueOnce({ deleted: 2, hasMore: false });
+    const pruneExpired = vi.fn().mockResolvedValue({ pruned: 0, hasMore: false });
+    const listExpiredSampledRawEvents = vi.fn();
+    const onSemanticCatchUp = vi.fn();
+    const retentionCleanup = createRetentionCleanupService({
+      retentionStore: createMockRetentionStore({ listExpiredSampledRawEvents }),
+      objectStore: { deleteObject },
+      semanticRawRetention: { cleanExpired, pruneExpired },
+      onSemanticCatchUp,
+      maxBatches: 3
+    });
+
+    await retentionCleanup.runCleanup({
+      scheduled_at: "2026-09-28T20:00:00.000Z",
+      scope: "semantic_raw"
+    });
+    expect(cleanExpired).toHaveBeenCalledTimes(2);
+    expect(cleanExpired).toHaveBeenCalledWith(
+      expect.objectContaining({ deadlineMs: expect.any(Number) })
+    );
+    expect(pruneExpired).toHaveBeenCalledTimes(2);
+    expect(listExpiredSampledRawEvents).not.toHaveBeenCalled();
+    expect(onSemanticCatchUp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        raw_deleted: 102,
+        raw_delete_failures: 1,
+        oldest_selected_due_at: "2026-09-25T12:00:00.000Z",
+        receipts_pruned: 0,
+        batches: 2,
+        work_remains_hint: false,
+        reached_batch_limit: false,
+        reached_deadline: false,
+        duration_ms: expect.any(Number)
+      })
+    );
+  });
+
+  it("prunes expired identity contexts only on the bounded semantic catch-up lane", async (): Promise<void> => {
+    const pruneIdentity = vi
+      .fn()
+      .mockResolvedValueOnce({ pruned: 100, hasMore: true })
+      .mockResolvedValueOnce({ pruned: 2, hasMore: false });
+    const pruneAssociations = vi
+      .fn()
+      .mockResolvedValueOnce({ pruned: 100, hasMore: true })
+      .mockResolvedValueOnce({ pruned: 1, hasMore: false });
+    const listExpiredSampledRawEvents = vi.fn();
+    const onSemanticCatchUp = vi.fn();
+    const retentionCleanup = createRetentionCleanupService({
+      retentionStore: createMockRetentionStore({ listExpiredSampledRawEvents }),
+      objectStore: { deleteObject: vi.fn().mockResolvedValue(undefined) },
+      semanticRawRetention: {
+        cleanExpired: vi.fn().mockResolvedValue({ deleted: 0, hasMore: false }),
+        pruneExpired: vi.fn().mockResolvedValue({ pruned: 0, hasMore: false })
+      },
+      semanticIdentityContexts: {
+        pruneExpired: pruneIdentity,
+        pruneExpiredAssociations: pruneAssociations
+      },
+      onSemanticCatchUp,
+      maxBatches: 3
+    });
+    await retentionCleanup.runCleanup({
+      scheduled_at: "2026-09-28T20:00:00.000Z",
+      scope: "semantic_raw"
+    });
+    expect(pruneIdentity).toHaveBeenCalledTimes(2);
+    expect(pruneAssociations).toHaveBeenCalledTimes(2);
+    expect(pruneIdentity).toHaveBeenCalledWith({
+      now: "2026-09-28T20:00:00.000Z",
+      limit: 100
+    });
+    expect(listExpiredSampledRawEvents).not.toHaveBeenCalled();
+    expect(onSemanticCatchUp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity_contexts_pruned: 102,
+        identity_associations_pruned: 101,
+        batches: 2,
+        work_remains_hint: false
+      })
+    );
+  });
+
+  it("runs one bounded subject erasure page on the semantic lane before raw cleanup", async (): Promise<void> => {
+    const runPass = vi.fn().mockResolvedValue({
+      task_id: "task",
+      objects_deleted: 2,
+      facts_deleted: 1,
+      failed_objects: 1,
+      complete: false,
+      has_more: true
+    });
+    const cleanExpired = vi.fn().mockResolvedValue({ deleted: 0, hasMore: false });
+    const pruneCompleted = vi.fn().mockResolvedValue({ pruned: 1, hasMore: false });
+    const onSemanticCatchUp = vi.fn();
+    const cleanup = createRetentionCleanupService({
+      retentionStore: createMockRetentionStore(),
+      objectStore: { deleteObject: vi.fn() },
+      semanticRawRetention: {
+        cleanExpired,
+        pruneExpired: vi.fn().mockResolvedValue({ pruned: 0, hasMore: false })
+      },
+      semanticSubjectErasure: { runPass },
+      semanticSubjectErasureRetention: { pruneCompleted },
+      onSemanticCatchUp
+    });
+    await cleanup.runCleanup({ scheduled_at: "2026-09-28T20:00:00.000Z", scope: "semantic_raw" });
+    expect(runPass).toHaveBeenCalledExactlyOnceWith({ limit: 100 });
+    expect(cleanExpired).toHaveBeenCalledTimes(1);
+    expect(pruneCompleted).toHaveBeenCalledExactlyOnceWith({
+      now: "2026-09-28T20:00:00.000Z",
+      limit: 100
+    });
+    expect(onSemanticCatchUp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subject_erasure_objects_deleted: 2,
+        subject_erasure_failed_objects: 1,
+        subject_erasure_tasks_completed: 0,
+        subject_erasure_tasks_pruned: 1
+      })
+    );
+  });
+
+  it("caps semantic-only catch-up even when every batch remains full", async (): Promise<void> => {
+    const cleanExpired = vi.fn().mockResolvedValue({ deleted: 100, hasMore: true });
+    const pruneExpired = vi.fn().mockResolvedValue({ pruned: 100, hasMore: true });
+    const onSemanticCatchUp = vi.fn();
+    const retentionCleanup = createRetentionCleanupService({
+      retentionStore: createMockRetentionStore(),
+      objectStore: { deleteObject: vi.fn().mockResolvedValue(undefined) },
+      semanticRawRetention: { cleanExpired, pruneExpired },
+      onSemanticCatchUp,
+      maxBatches: 2
+    });
+    await retentionCleanup.runCleanup({
+      scheduled_at: "2026-09-28T20:00:00.000Z",
+      scope: "semantic_raw"
+    });
+    expect(cleanExpired).toHaveBeenCalledTimes(2);
+    expect(pruneExpired).toHaveBeenCalledTimes(2);
+    expect(onSemanticCatchUp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        raw_deleted: 200,
+        receipts_pruned: 200,
+        batches: 2,
+        work_remains_hint: true,
+        reached_batch_limit: true,
+        reached_deadline: false
+      })
+    );
   });
 
   it("marks raw events expired after successful raw-object cleanup", async (): Promise<void> => {

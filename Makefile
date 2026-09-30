@@ -85,6 +85,11 @@ help:
 	@echo "  make openai-plugin-prepare   Build deterministic local candidate archives"
 	@echo "  make openai-plugin-verify    Verify source manifest and candidate hashes"
 	@echo "  make test-integration Run Compose-backed ingestion integration tests"
+	@echo "  make semantic-retention-capacity-check Measure V2 raw cleanup on disposable Postgres/LocalStack"
+	@echo "  make semantic-retention-loss-stress-check Measure V2 cleanup when jobs must be marked lost"
+	@echo "  make semantic-retention-loss-latency-check Repeat lost-job cleanup with test-only S3 latency"
+	@echo "  make project-erasure-capacity-check Measure deleted-project prefix scans on disposable Postgres/LocalStack"
+	@echo "  make project-erasure-capacity-latency-check Repeat project erasure scans with test-only S3 list latency"
 	@echo "  make test-mixed-version-api PREVIOUS_API_REVISION=<deployed core SHA>  Verify old/new API on an isolated forward-migrated DB"
 	@echo "  make worker-jobs     Inspect scoped durable worker job metadata (read-only by default)"
 	@echo "  make api-check       Run API runtime bootstrap tests"
@@ -272,6 +277,11 @@ privacy-js-verify:
 privacy-js-candidate-check: license-prepare-shared
 	docker run --rm -v "$(PWD):$(WORKDIR)" --tmpfs "$(WORKDIR)/sdks/debugbundle-js/.tmp" -w "$(WORKDIR)" node:24-alpine sh -lc 'corepack enable && node scripts/test-js-sdk-with-local-redaction.mjs --candidate && mkdir -p .tmp/sdk-js-candidate && cp sdks/debugbundle-js/.tmp/npm-packages/*.tgz .tmp/sdk-js-candidate/'
 
+.PHONY: semantic-js-local-evaluation
+semantic-js-local-evaluation: license-prepare-shared
+	docker run --rm -v "$(PWD):$(WORKDIR)" --tmpfs "$(WORKDIR)/sdks/debugbundle-js/.tmp" -w "$(WORKDIR)" node:24-alpine sh -lc 'corepack enable && mkdir -p .tmp/sdk-js-candidate && cd sdks/debugbundle-js && DEBUGBUNDLE_SMOKE_REDACTION_TARBALL=$(WORKDIR)/.tmp/apache-packages/debugbundle-redaction-2.1.0.tgz DEBUGBUNDLE_SMOKE_SHARED_TYPES_TARBALL=$(WORKDIR)/.tmp/apache-packages/debugbundle-shared-types-2.1.0.tgz DEBUGBUNDLE_SEMANTIC_SMOKE_OUTPUT=$(WORKDIR)/.tmp/sdk-js-candidate/semantic-events.json corepack pnpm smoke:packed'
+	$(MAKE) test-integration INTEGRATION_TEST_FILES=tests/integration/semantic-analytics-local-path.integration.test.ts INTEGRATION_PROJECT=debugbundle-semantic-js-eval INTEGRATION_CONTAINER_PREFIX=debugbundle-semantic-js-eval SEMANTIC_PACKED_EVENTS_FILE=$(WORKDIR)/.tmp/sdk-js-candidate/semantic-events.json
+
 .PHONY: privacy-js-local-smoke
 privacy-js-local-smoke: license-prepare-shared
 	docker run --rm -t -v "$(PWD):$(WORKDIR)" --tmpfs "$(WORKDIR)/sdks/debugbundle-js/.tmp" -w "$(WORKDIR)" node:26-alpine sh -lc 'npm install --global corepack@0.34.1 >/dev/null && corepack enable && node scripts/test-js-sdk-with-local-redaction.mjs --consumer'
@@ -412,6 +422,11 @@ INTEGRATION_TEST_FILES ?= tests/integration/browser-resource-retention.integrati
 INTEGRATION_TEST_FILES += tests/integration/agent-token.integration.test.ts
 INTEGRATION_TEST_FILES += tests/integration/browser-resource-recovery.integration.test.ts
 INTEGRATION_TEST_FILES += tests/integration/alert-retry-ownership.integration.test.ts
+INTEGRATION_TEST_FILES += tests/integration/analytics-spaces.integration.test.ts
+INTEGRATION_TEST_FILES += tests/integration/semantic-analytics-local-path.integration.test.ts
+INTEGRATION_TEST_FILES += tests/integration/project-object-erasure.integration.test.ts
+INTEGRATION_VITEST_ARGS ?=
+INTEGRATION_COVERAGE_SHARD ?=
 test-integration:
 	@set -e; \
 	trap 'POSTGRES_PORT=$(INTEGRATION_POSTGRES_PORT) REDIS_PORT=$(INTEGRATION_REDIS_PORT) LOCALSTACK_PORT=$(INTEGRATION_LOCALSTACK_PORT) API_PORT=$(INTEGRATION_API_PORT) WEB_PORT=$(INTEGRATION_WEB_PORT) APP_BASE_URL=$(INTEGRATION_APP_BASE_URL) VITE_API_URL=$(INTEGRATION_WEB_API_URL) CONTAINER_PREFIX=$(INTEGRATION_CONTAINER_PREFIX) DEBUGBUNDLE_PROBE_TRIGGER_SECRET=$(INTEGRATION_PROBE_TRIGGER_SECRET) ANALYTICS_HASH_SECRET=$(INTEGRATION_ANALYTICS_HASH_SECRET) $(INTEGRATION_COMPOSE) down -v' EXIT; \
@@ -430,7 +445,47 @@ test-integration:
 		-e S3_ENDPOINT=http://localstack:4566 \
 		-e S3_REGION=us-east-1 \
 		-e S3_BUCKET=debugbundle-raw-events \
-		$(NODE_IMAGE) sh -lc "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm db:bootstrap && corepack pnpm db:migrate && corepack pnpm vitest run --no-file-parallelism --maxWorkers=1 $(INTEGRATION_TEST_FILES)"
+		-e SEMANTIC_RETENTION_CAPACITY_STRESS=$(SEMANTIC_RETENTION_CAPACITY_STRESS) \
+		-e SEMANTIC_RETENTION_SELECTION_STRESS=$(SEMANTIC_RETENTION_SELECTION_STRESS) \
+		-e SEMANTIC_RETENTION_S3_LATENCY_MS=$(SEMANTIC_RETENTION_S3_LATENCY_MS) \
+		-e SEMANTIC_RETENTION_LOSS_STRESS=$(SEMANTIC_RETENTION_LOSS_STRESS) \
+		-e PROJECT_ERASURE_CAPACITY_STRESS=$(PROJECT_ERASURE_CAPACITY_STRESS) \
+		-e PROJECT_ERASURE_CAPACITY_PROJECTS=$(PROJECT_ERASURE_CAPACITY_PROJECTS) \
+		-e PROJECT_ERASURE_LIST_LATENCY_MS=$(PROJECT_ERASURE_LIST_LATENCY_MS) \
+		-e SEMANTIC_PACKED_EVENTS_FILE="$(SEMANTIC_PACKED_EVENTS_FILE)" \
+		$(NODE_IMAGE) sh -lc "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm db:bootstrap && corepack pnpm db:migrate && VITEST_COVERAGE_SHARD=$(INTEGRATION_COVERAGE_SHARD) corepack pnpm vitest run --no-file-parallelism --maxWorkers=1 $(INTEGRATION_VITEST_ARGS) $(INTEGRATION_TEST_FILES)"
+
+.PHONY: semantic-retention-capacity-check
+semantic-retention-capacity-check:
+	$(MAKE) test-integration INTEGRATION_TEST_FILES=tests/integration/semantic-analytics-retention-capacity.integration.test.ts INTEGRATION_PROJECT=debugbundle-semantic-capacity INTEGRATION_CONTAINER_PREFIX=debugbundle-semantic-capacity
+
+.PHONY: project-erasure-capacity-check
+project-erasure-capacity-check:
+	$(MAKE) test-integration INTEGRATION_TEST_FILES=tests/integration/project-object-erasure.integration.test.ts INTEGRATION_PROJECT=debugbundle-project-erasure-capacity INTEGRATION_CONTAINER_PREFIX=debugbundle-project-erasure-capacity PROJECT_ERASURE_CAPACITY_STRESS=1
+
+.PHONY: project-erasure-capacity-latency-check
+project-erasure-capacity-latency-check:
+	$(MAKE) test-integration INTEGRATION_TEST_FILES=tests/integration/project-object-erasure.integration.test.ts INTEGRATION_PROJECT=debugbundle-project-erasure-latency INTEGRATION_CONTAINER_PREFIX=debugbundle-project-erasure-latency PROJECT_ERASURE_CAPACITY_STRESS=1 PROJECT_ERASURE_CAPACITY_PROJECTS=20 PROJECT_ERASURE_LIST_LATENCY_MS=50
+
+.PHONY: semantic-retention-capacity-stress-check
+semantic-retention-capacity-stress-check:
+	$(MAKE) test-integration INTEGRATION_TEST_FILES=tests/integration/semantic-analytics-retention-capacity.integration.test.ts INTEGRATION_PROJECT=debugbundle-semantic-capacity-stress INTEGRATION_CONTAINER_PREFIX=debugbundle-semantic-capacity-stress SEMANTIC_RETENTION_CAPACITY_STRESS=1
+
+.PHONY: semantic-retention-loss-stress-check
+semantic-retention-loss-stress-check:
+	$(MAKE) test-integration INTEGRATION_TEST_FILES=tests/integration/semantic-analytics-retention-capacity.integration.test.ts INTEGRATION_PROJECT=debugbundle-semantic-loss-stress INTEGRATION_CONTAINER_PREFIX=debugbundle-semantic-loss-stress SEMANTIC_RETENTION_CAPACITY_STRESS=1 SEMANTIC_RETENTION_LOSS_STRESS=1
+
+.PHONY: semantic-retention-loss-latency-check
+semantic-retention-loss-latency-check:
+	$(MAKE) test-integration INTEGRATION_TEST_FILES=tests/integration/semantic-analytics-retention-capacity.integration.test.ts INTEGRATION_PROJECT=debugbundle-semantic-loss-latency INTEGRATION_CONTAINER_PREFIX=debugbundle-semantic-loss-latency SEMANTIC_RETENTION_CAPACITY_STRESS=1 SEMANTIC_RETENTION_LOSS_STRESS=1 SEMANTIC_RETENTION_S3_LATENCY_MS=50
+
+.PHONY: semantic-retention-selection-stress-check
+semantic-retention-selection-stress-check:
+	$(MAKE) test-integration INTEGRATION_TEST_FILES=tests/integration/semantic-analytics-retention-capacity.integration.test.ts INTEGRATION_PROJECT=debugbundle-semantic-selection-stress INTEGRATION_CONTAINER_PREFIX=debugbundle-semantic-selection-stress SEMANTIC_RETENTION_SELECTION_STRESS=1
+
+.PHONY: semantic-retention-capacity-latency-check
+semantic-retention-capacity-latency-check:
+	$(MAKE) test-integration INTEGRATION_TEST_FILES=tests/integration/semantic-analytics-retention-capacity.integration.test.ts INTEGRATION_PROJECT=debugbundle-semantic-capacity-latency INTEGRATION_CONTAINER_PREFIX=debugbundle-semantic-capacity-latency SEMANTIC_RETENTION_CAPACITY_STRESS=1 SEMANTIC_RETENTION_S3_LATENCY_MS=50
 
 .PHONY: test-mixed-version-api
 test-mixed-version-api: install

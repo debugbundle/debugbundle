@@ -59,6 +59,7 @@ export function createDurableWorkerQueue(
     if (
       !claim &&
       ![
+        "process-semantic-analytics-event",
         "evaluate-event-improvement",
         "evaluate-incident-improvement",
         "publish-incident-lifecycle",

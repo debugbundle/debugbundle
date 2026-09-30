@@ -30,7 +30,7 @@ vi.mock("pg", () => ({
 }));
 
 vi.mock("../../packages/storage/src/migrations.js", () => ({
-  bootstrapStorageSchema: bootstrapStorageSchemaMock
+  prepareStorageBootstrap: bootstrapStorageSchemaMock
 }));
 
 vi.mock("../../packages/storage/src/schema-migrations.js", () => ({
@@ -40,6 +40,16 @@ vi.mock("../../packages/storage/src/schema-migrations.js", () => ({
 import { isDirectExecution, runStorageBootstrapScript } from "../../scripts/bootstrap-storage.ts";
 
 describe("storage bootstrap script", () => {
+  it("does not seed the migration ledger when bootstrap skips an installed predecessor", async () => {
+    bootstrapStorageSchemaMock.mockResolvedValueOnce({status: "existing_schema"});
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    await runStorageBootstrapScript({});
+    expect(seedStorageMigrationLedgerForCurrentSchemaMock).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith("db_bootstrap_skipped: existing_schema; run_db_migrate_required");
+    expect(releaseMock).toHaveBeenCalledOnce();
+    expect(endMock).toHaveBeenCalledOnce();
+    logSpy.mockRestore();
+  });
   beforeEach(() => {
     queryMock.mockReset();
     endMock.mockClear();

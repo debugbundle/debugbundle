@@ -1,3 +1,11 @@
+import type { analyticsSpacesWithAuthCommand } from "./analytics-space-commands.js";
+import type { analyticsWritersWithAuthCommand } from "./analytics-writer-commands.js";
+import type { analyticsIdentityNamespaceWithAuthCommand } from "./analytics-identity-namespace-commands.js";
+import type { analyticsPlanWithAuthCommand } from "./analytics-plan-commands.js";
+import type { analyticsSpacePlanWithAuthCommand } from "./analytics-space-plan-commands.js";
+import type { analyticsReportWithAuthCommand } from "./analytics-report-commands.js";
+import type { analyticsErasureStatusWithAuthCommand } from "./analytics-erasure-status-commands.js";
+import type { analyticsJobRecoveryWithAuthCommand } from "./analytics-job-recovery-commands.js";
 import type {
   createAlertWithAuthCommand as defaultCreateAlertCommand,
   deleteAlertWithAuthCommand as defaultDeleteAlertCommand,
@@ -224,6 +232,14 @@ export type ManagementCommandDependencies = {
   testHealthCheckCommand?: typeof defaultTestHealthCheckCommand;
   listHealthCheckResultsCommand?: typeof defaultListHealthCheckResultsCommand;
   listHealthCheckDailyRollupsCommand?: typeof defaultListHealthCheckDailyRollupsCommand;
+  analyticsSpacesCommand?: typeof analyticsSpacesWithAuthCommand;
+  analyticsWritersCommand?: typeof analyticsWritersWithAuthCommand;
+  analyticsIdentityNamespaceCommand?: typeof analyticsIdentityNamespaceWithAuthCommand;
+  analyticsPlanCommand?: typeof analyticsPlanWithAuthCommand;
+  analyticsSpacePlanCommand?: typeof analyticsSpacePlanWithAuthCommand;
+  analyticsReportCommand?: typeof analyticsReportWithAuthCommand;
+  analyticsErasureStatusCommand?: typeof analyticsErasureStatusWithAuthCommand;
+  analyticsJobRecoveryCommand?: typeof analyticsJobRecoveryWithAuthCommand;
   listMembersCommand?: typeof defaultListMembersCommand;
   listInvitesCommand?: typeof defaultListInvitesCommand;
   inviteMemberCommand?: typeof defaultInviteMemberCommand;

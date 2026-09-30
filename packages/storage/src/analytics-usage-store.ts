@@ -65,7 +65,9 @@ export interface AnalyticsUsageStore {
     organization_id: string;
     period_starts_at: string;
   }): Promise<AnalyticsAllowanceUsageSummary>;
-  claimAnalyticsUsageForOrganization(input: AnalyticsAllowanceClaimInput): Promise<AnalyticsAllowanceClaimResult>;
+  claimAnalyticsUsageForOrganization(
+    input: AnalyticsAllowanceClaimInput
+  ): Promise<AnalyticsAllowanceClaimResult>;
   releaseAnalyticsUsageForOrganization(input: AnalyticsAllowanceReleaseInput): Promise<void>;
 }
 
@@ -119,8 +121,7 @@ function findExceededMetric(input: {
     };
   }
   if (
-    input.usage.monthly_analytics_journey_samples >
-    input.limits.monthly_analytics_journey_samples
+    input.usage.monthly_analytics_journey_samples > input.limits.monthly_analytics_journey_samples
   ) {
     return {
       allowed: false,
@@ -255,22 +256,28 @@ export function createPostgresAnalyticsUsageStore(db: Queryable): AnalyticsUsage
       const currentUsage = await getAnalyticsUsageForOrganization(input);
       const exceeded = findExceededMetric({
         usage: {
-          monthly_analytics_events: currentUsage.monthly_analytics_events + requested.monthly_analytics_events,
-          monthly_analytics_sessions: currentUsage.monthly_analytics_sessions + requested.monthly_analytics_sessions,
+          monthly_analytics_events:
+            currentUsage.monthly_analytics_events + requested.monthly_analytics_events,
+          monthly_analytics_sessions:
+            currentUsage.monthly_analytics_sessions + requested.monthly_analytics_sessions,
           monthly_analytics_journey_samples:
-            currentUsage.monthly_analytics_journey_samples + requested.monthly_analytics_journey_samples,
+            currentUsage.monthly_analytics_journey_samples +
+            requested.monthly_analytics_journey_samples,
           monthly_analytics_bundle_generations:
-            currentUsage.monthly_analytics_bundle_generations + requested.monthly_analytics_bundle_generations
+            currentUsage.monthly_analytics_bundle_generations +
+            requested.monthly_analytics_bundle_generations
         },
         limits: input.limits
       });
-      return exceeded ?? {
-        allowed: false,
-        metric: "monthly_analytics_events",
-        used: currentUsage.monthly_analytics_events,
-        limit: input.limits.monthly_analytics_events,
-        usage: currentUsage
-      };
+      return (
+        exceeded ?? {
+          allowed: false,
+          metric: "monthly_analytics_events",
+          used: currentUsage.monthly_analytics_events,
+          limit: input.limits.monthly_analytics_events,
+          usage: currentUsage
+        }
+      );
     },
 
     async releaseAnalyticsUsageForOrganization(input) {
@@ -310,18 +317,25 @@ async function claimIdempotentAnalyticsUsage(
   db: Queryable,
   input: AnalyticsAllowanceClaimInput
 ): Promise<AnalyticsAllowanceClaimResult> {
+  return runInTransaction(db, (tx) => claimAnalyticsUsageInTransaction(tx, input));
+}
+
+/** Caller-owned transaction: V2 acceptance must commit its quota, receipt and job together. */
+export async function claimAnalyticsUsageInTransaction(
+  tx: Queryable,
+  input: AnalyticsAllowanceClaimInput
+): Promise<AnalyticsAllowanceClaimResult> {
   const claims = normalizeIdempotencyClaims(input.claims ?? []);
-  return runInTransaction(db, async (tx) => {
-    await tx.query(
-      `
+  await tx.query(
+    `
         INSERT INTO analytics_usage_counters (organization_id, period_starts_at)
         VALUES ($1::uuid, $2::timestamptz)
         ON CONFLICT DO NOTHING
       `,
-      [input.organization_id, input.period_starts_at]
-    );
-    const locked = await tx.query<AnalyticsUsageCounterRow>(
-      `
+    [input.organization_id, input.period_starts_at]
+  );
+  const locked = await tx.query<AnalyticsUsageCounterRow>(
+    `
         SELECT analytics_events, analytics_sessions, analytics_journey_samples,
           analytics_bundle_generations
         FROM analytics_usage_counters
@@ -329,35 +343,35 @@ async function claimIdempotentAnalyticsUsage(
           AND period_starts_at = $2::timestamptz
         FOR UPDATE
       `,
-      [input.organization_id, input.period_starts_at]
-    );
-    const current = toUsageSummary(locked.rows[0]);
-    if (claims.length === 0) {
-      return { allowed: true, usage: current, claimed_keys: [] };
-    }
+    [input.organization_id, input.period_starts_at]
+  );
+  const current = toUsageSummary(locked.rows[0]);
+  if (claims.length === 0) {
+    return { allowed: true, usage: current, claimed_keys: [] };
+  }
 
-    const existing = await tx.query<{ claim_key: string }>(
-      `
+  const existing = await tx.query<{ claim_key: string }>(
+    `
         SELECT claim_key
         FROM analytics_usage_claims
         WHERE organization_id = $1::uuid
           AND period_starts_at = $2::timestamptz
           AND claim_key = ANY($3::text[])
       `,
-      [input.organization_id, input.period_starts_at, claims.map((claim) => claim.claim_key)]
-    );
-    const existingKeys = new Set(existing.rows.map((row) => row.claim_key));
-    const newClaims = claims.filter((claim) => !existingKeys.has(claim.claim_key));
-    const deltas = usageFromClaims(newClaims);
-    const projected = addUsage(current, deltas);
-    const exceeded = findExceededMetric({ usage: projected, limits: input.limits });
-    if (exceeded !== null) {
-      return exceeded;
-    }
+    [input.organization_id, input.period_starts_at, claims.map((claim) => claim.claim_key)]
+  );
+  const existingKeys = new Set(existing.rows.map((row) => row.claim_key));
+  const newClaims = claims.filter((claim) => !existingKeys.has(claim.claim_key));
+  const deltas = usageFromClaims(newClaims);
+  const projected = addUsage(current, deltas);
+  const exceeded = findExceededMetric({ usage: projected, limits: input.limits });
+  if (exceeded !== null) {
+    return exceeded;
+  }
 
-    if (newClaims.length > 0) {
-      await tx.query(
-        `
+  if (newClaims.length > 0) {
+    await tx.query(
+      `
           UPDATE analytics_usage_counters
           SET
             analytics_events = analytics_events + $3,
@@ -368,17 +382,17 @@ async function claimIdempotentAnalyticsUsage(
           WHERE organization_id = $1::uuid
             AND period_starts_at = $2::timestamptz
         `,
-        [
-          input.organization_id,
-          input.period_starts_at,
-          deltas.monthly_analytics_events,
-          deltas.monthly_analytics_sessions,
-          deltas.monthly_analytics_journey_samples,
-          deltas.monthly_analytics_bundle_generations
-        ]
-      );
-      await tx.query(
-        `
+      [
+        input.organization_id,
+        input.period_starts_at,
+        deltas.monthly_analytics_events,
+        deltas.monthly_analytics_sessions,
+        deltas.monthly_analytics_journey_samples,
+        deltas.monthly_analytics_bundle_generations
+      ]
+    );
+    await tx.query(
+      `
           INSERT INTO analytics_usage_claims (
             organization_id,
             period_starts_at,
@@ -389,20 +403,19 @@ async function claimIdempotentAnalyticsUsage(
           FROM unnest($3::text[], $4::text[]) AS claims(claim_key, metric)
           ON CONFLICT DO NOTHING
         `,
-        [
-          input.organization_id,
-          input.period_starts_at,
-          newClaims.map((claim) => claim.claim_key),
-          newClaims.map((claim) => claim.metric)
-        ]
-      );
-    }
-    return {
-      allowed: true,
-      usage: projected,
-      claimed_keys: newClaims.map((claim) => claim.claim_key)
-    };
-  });
+      [
+        input.organization_id,
+        input.period_starts_at,
+        newClaims.map((claim) => claim.claim_key),
+        newClaims.map((claim) => claim.metric)
+      ]
+    );
+  }
+  return {
+    allowed: true,
+    usage: projected,
+    claimed_keys: newClaims.map((claim) => claim.claim_key)
+  };
 }
 
 async function releaseIdempotentAnalyticsUsage(
@@ -454,7 +467,9 @@ function normalizeIdempotencyClaims(
   return [...unique.values()];
 }
 
-function usageFromClaims(claims: AnalyticsAllowanceIdempotencyClaim[]): AnalyticsAllowanceUsageSummary {
+function usageFromClaims(
+  claims: AnalyticsAllowanceIdempotencyClaim[]
+): AnalyticsAllowanceUsageSummary {
   const usage: AnalyticsAllowanceUsageSummary = {
     monthly_analytics_events: 0,
     monthly_analytics_sessions: 0,
@@ -473,7 +488,8 @@ function addUsage(
 ): AnalyticsAllowanceUsageSummary {
   return {
     monthly_analytics_events: current.monthly_analytics_events + delta.monthly_analytics_events,
-    monthly_analytics_sessions: current.monthly_analytics_sessions + delta.monthly_analytics_sessions,
+    monthly_analytics_sessions:
+      current.monthly_analytics_sessions + delta.monthly_analytics_sessions,
     monthly_analytics_journey_samples:
       current.monthly_analytics_journey_samples + delta.monthly_analytics_journey_samples,
     monthly_analytics_bundle_generations:

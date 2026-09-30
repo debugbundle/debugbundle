@@ -11,7 +11,7 @@ const HEADER = /\b(Authorization|Proxy-Authorization|Cookie|Set-Cookie)\s*:\s*[^
 const PEM = /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/gi;
 const PEM_COMPLETE = new RegExp(PEM.source, "i");
 const PEM_START = /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/i;
-const DEBUGBUNDLE_TOKEN = /\bdbundle_(?:proj|mem|probe|agent)_[A-Za-z0-9_-]+\b/g;
+const DEBUGBUNDLE_TOKEN = /\bdbundle_(?:proj|mem|probe|agent|anl|anr|ah)_[A-Za-z0-9_-]+\b/g;
 const BEARER = /\b(Bearer|Basic)\s+[A-Za-z0-9._~+\/-]{6,}/gi;
 const URL_TEXT = /\bhttps?:\/\/[^\s<>"']+/gi;
 // Do not treat numeric substrings inside UUIDs, hashes, or identifier slugs as cards.

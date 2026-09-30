@@ -1,0 +1,42 @@
+{
+  "schema_version": "2026-09-analytics-02",
+  "event_type": "analytics_event",
+  "event_id": "00000000-0000-4000-8000-000000000901",
+  "occurred_at": "2026-09-28T10:00:00.000Z",
+  "sdk_name": "@debugbundle/sdk-node",
+  "sdk_version": "3.1.0-rc.1",
+  "service": {
+    "name": "accounts-api",
+    "runtime": "node",
+    "framework": null,
+    "environment": "test"
+  },
+  "producer": { "kind": "server", "stream_id": null, "sequence": null },
+  "operation_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "correlation": {
+    "session_id": null,
+    "anonymous_id_hash": null,
+    "user_id_hash": null,
+    "account_id_hash": null,
+    "namespace_revision": null,
+    "trace_id": null,
+    "deploy_id": null
+  },
+  "payload": {
+    "kind": "semantic",
+    "name": "account.created",
+    "event_revision": 1,
+    "purpose": "business_measurement",
+    "privacy": { "mode": "strict", "consent_granted": false },
+    "route": null,
+    "previous_route": null,
+    "screen": null,
+    "session": null,
+    "acquisition": null,
+    "client": null,
+    "properties": { "signup_method": "email" },
+    "measurements": {},
+    "money": null,
+    "financial": null
+  }
+}

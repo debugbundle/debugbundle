@@ -1,3 +1,11 @@
+import { handleAnalyticsSpacesCommand } from "./analytics-space-command-handler.js";
+import { handleAnalyticsWritersCommand } from "./analytics-writer-command-handler.js";
+import { handleAnalyticsIdentityNamespaceCommand } from "./analytics-identity-namespace-command-handler.js";
+import { handleAnalyticsPlanCommand } from "./analytics-plan-command-handler.js";
+import { handleAnalyticsSpacePlanCommand } from "./analytics-space-plan-command-handler.js";
+import { handleAnalyticsReportCommand } from "./analytics-report-command-handler.js";
+import { handleAnalyticsErasureStatusCommand } from "./analytics-erasure-status-command-handler.js";
+import { handleAnalyticsJobRecoveryCommand } from "./analytics-job-recovery-command-handler.js";
 import {
   AnalyticsBundleAnalysisKindSchema,
   AnalyticsBundleSeveritySchema,
@@ -322,6 +330,15 @@ export async function handleAnalyticsCommand(
   dependencies: ManagementCommandDependencies
 ): Promise<CliCommandResult> {
   const resource = requirePositional(parsedArgv, 1, "analytics resource");
+  if (resource === "spaces") return handleAnalyticsSpacesCommand(parsedArgv, dependencies);
+  if (resource === "writers") return handleAnalyticsWritersCommand(parsedArgv, dependencies);
+  if (resource === "identity-namespace")
+    return handleAnalyticsIdentityNamespaceCommand(parsedArgv, dependencies);
+  if (resource === "plan") return handleAnalyticsPlanCommand(parsedArgv, dependencies);
+  if (resource === "space-plan") return handleAnalyticsSpacePlanCommand(parsedArgv, dependencies);
+  if (resource === "reports") return handleAnalyticsReportCommand(parsedArgv, dependencies);
+  if (resource === "erasures") return handleAnalyticsErasureStatusCommand(parsedArgv, dependencies);
+  if (resource === "jobs") return handleAnalyticsJobRecoveryCommand(parsedArgv, dependencies);
   if (
     resource === "summary" ||
     resource === "routes" ||

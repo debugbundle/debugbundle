@@ -36,18 +36,18 @@ Use `npx -y @debugbundle/mcp` in clients that require noninteractive package exe
 
 ## Install Matrix
 
-| Environment                   | Recommended path                                  | Notes                                             |
-| ----------------------------- | ------------------------------------------------- | ------------------------------------------------- |
-| Generic local MCP client      | `npx @debugbundle/mcp`                            | stdio transport                                   |
-| Claude Desktop local MCP      | local MCP server config                           | uses local machine auth/config                    |
-| Claude Code plugin            | `/plugin marketplace add debugbundle/debugbundle` | installs bundled MCP config and DebugBundle skill |
-| Codex developer plugin | `codex plugin add debugbundle-codex@debugbundle` | repository marketplace; local MCP and workflow skill |
-| Codex direct MCP | `codex mcp add debugbundle -- npx -y @debugbundle/mcp@1.12.1 --local-auth` | app, CLI, and IDE on the same host |
-| Cursor                        | MCP config with `npx @debugbundle/mcp`            | stdio transport                                   |
-| VS Code / GitHub MCP Registry | `com.debugbundle/mcp`                             | official registry metadata                        |
-| OpenClaw / ClawHub            | DebugBundle skill plus MCP config                 | use the published skill for workflow guidance     |
-| CI/headless agents            | `DEBUGBUNDLE_MEMBER_TOKEN`                        | never use a project token                         |
-| Self-hosted DebugBundle       | `DEBUGBUNDLE_API_URL` plus member auth            | points the server at your API base URL            |
+| Environment                   | Recommended path                                                           | Notes                                                |
+| ----------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Generic local MCP client      | `npx @debugbundle/mcp`                                                     | stdio transport                                      |
+| Claude Desktop local MCP      | local MCP server config                                                    | uses local machine auth/config                       |
+| Claude Code plugin            | `/plugin marketplace add debugbundle/debugbundle`                          | installs bundled MCP config and DebugBundle skill    |
+| Codex developer plugin        | `codex plugin add debugbundle-codex@debugbundle`                           | repository marketplace; local MCP and workflow skill |
+| Codex direct MCP              | `codex mcp add debugbundle -- npx -y @debugbundle/mcp@1.12.1 --local-auth` | app, CLI, and IDE on the same host                   |
+| Cursor                        | MCP config with `npx @debugbundle/mcp`                                     | stdio transport                                      |
+| VS Code / GitHub MCP Registry | `com.debugbundle/mcp`                                                      | official registry metadata                           |
+| OpenClaw / ClawHub            | DebugBundle skill plus MCP config                                          | use the published skill for workflow guidance        |
+| CI/headless agents            | `DEBUGBUNDLE_MEMBER_TOKEN`                                                 | never use a project token                            |
+| Self-hosted DebugBundle       | `DEBUGBUNDLE_API_URL` plus member auth                                     | points the server at your API base URL               |
 
 This package is the supported public local stdio path. A separate OpenAI Plugin `1.0.0` source candidate targets an OAuth-protected read-only remote endpoint at `https://mcp.debugbundle.com/mcp`; it is not deployed, submitted, published, or publicly installable yet and does not alter this package's catalog or authentication.
 
@@ -107,6 +107,24 @@ The plugin package lives at `apps/mcp/claude-code/debugbundle` and bundles a Cla
 - Inspect hosted health checks, probes, alerts, webhooks, projects, members, billing, capture policy, and GitHub automation state.
 - Run local and hosted verification through tools such as `verify_local`, `verify_cloud`, `doctor`, `smoke`, and `analyze`.
 - Resolve or reopen incidents after verification.
+
+The local semantic-analytics candidate adds `analytics_spaces_list`, `analytics_space_get`, `analytics_space_preview`, and `analytics_space_apply` to ordinary stdio/local-auth profiles. Apply requires an explicitly approved change, the matching preview hash, expected revision and idempotency key. Preview is read-only; it cannot grant authority. All-source access, owner management, audit and plan-downgrade rules remain API-owned. These tools are absent from the hosted OpenAI and restricted agent-read profiles. See [the control contract](../../contracts/analytics-semantic-control.md).
+
+The candidate also adds `analytics_writers_list`, `analytics_writer_preview` and `analytics_writer_apply` to those ordinary profiles. List returns active project credential metadata only. Preview reviews a create/revoke without a write. Apply requires the matching `previewHash`, expected revision and idempotency key; project owner/admin authority is rechecked by the API. A newly issued server/relay writer secret appears once in the apply response, so keep that tool output private. A replay returns `secret_unavailable`. These tools are absent from the restricted agent-read and hosted OpenAI profiles, and the credential does not yet enable V2 ingestion.
+
+The local project-owner identity namespace candidate adds `analytics_identity_namespace_get`, `analytics_identity_namespace_preview` and `analytics_identity_namespace_apply` to ordinary stdio/local-auth profiles over the same API client as the CLI. Preview is read-only; apply requires matching `previewHash`, expected revision and idempotency UUID. Inputs accept only a key fingerprint, never the HMAC key. The default API composition still returns `503`; restricted agent-read and hosted OpenAI profiles do not gain these tools. No identity-bearing V2 capture is enabled.
+
+The local project declaration flow adds `analytics_plan_get`, `analytics_plan_validate`, `analytics_plan_preview` and `analytics_plan_apply` to ordinary stdio/local-auth profiles. They use the same owner/admin API as `analytics plan` CLI commands. Get returns the current catalog and prospective report definitions, plus bounded retained observation counts/dates for current catalog entry revisions and producers. Separate `producer_observations` rows include submitted SDK name/version, capped at 300 with an explicit truncation flag; old producer totals are not backfilled. These observations do not verify package authenticity or a business success boundary. Validate returns fixed issues without writing; preview shows the report diff, effective shared V1/V2 saved-report capacity and the resulting project-only `business_measurement_enabled` grant (false when omitted); apply requires the matching reviewed `previewHash`, expected revision and idempotency key. Current authority, catalog state and capacity are rechecked. The local `analytics_report_query` tool uses the same project ordered-funnel reader as API and CLI; it returns partial or unavailable quality with unverified source coverage and is disabled in default API composition. These tools are absent from restricted agent-read and hosted OpenAI profiles. V2 capture and complete growth reports remain unavailable.
+
+The ordinary stdio/local-auth `analytics_space_plan_get`, `analytics_space_plan_validate`, `analytics_space_plan_preview` and `analytics_space_plan_apply` tools share the CLI/API space-plan service. Preview checks current all-source authority, membership and catalog revisions; apply requires its reviewed hash. Only zero-report space declarations can be saved. These tools are absent from restricted agent-read and hosted OpenAI profiles and do not activate space reports or capture.
+
+The local `analytics_report_query` result exposes `failed_events` as a subset of unprojected `pending_events` for failed/skipped/missing worker jobs. It stays partial while source and rebuild quality are unverified; this metadata never includes raw event data.
+
+The ordinary stdio/local-auth `analytics_job_retry` tool calls the same owner/admin event retry as API and CLI. It accepts only project and event UUIDs, returns queued metadata without raw input, and is absent from restricted agent-read and hosted OpenAI profiles. The default recovery service is disabled.
+
+`analytics_report_query` accepts `report_key` with either `from` and `to` UTC timestamps or `last: "7d" | "30d" | "90d"`; the forms are exclusive. Relative boundaries come from PostgreSQL time. A window before the current definition's `available_from` returns an insufficient-history error rather than a partial-period count.
+
+The local ordinary stdio/local-auth `analytics_erasure_status` tool reads one project task by `projectId` and `taskId` through the owner/admin API. The payload-free response does not reveal the erased subject. It is absent from restricted agent-read and hosted OpenAI profiles, and default API composition still returns `503 analytics_identity_unavailable`.
 
 For analytics questions, use direct aggregate tools first and generate an AnalyticsBundle only when a bounded analysis needs a durable artifact. The product does not create one bundle per visit.
 

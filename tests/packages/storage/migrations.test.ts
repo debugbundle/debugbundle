@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   bootstrapStorageSchema,
+  prepareStorageBootstrap,
+  validateStorageBootstrapStatements,
   REQUIRED_API_TABLES,
   REQUIRED_WORKER_TABLES,
   STORAGE_BOOTSTRAP_SQL
@@ -11,6 +13,23 @@ import { STORAGE_SCHEMA_MIGRATIONS } from "../../../packages/storage/src/schema-
 const ALL_REQUIRED_TABLES = Array.from(new Set([...REQUIRED_API_TABLES, ...REQUIRED_WORKER_TABLES]));
 
 describe("storage bootstrap schema", () => {
+  it("leaves a populated predecessor for forward migration without running bootstrap SQL", async () => {
+    const query = vi.fn().mockResolvedValue({rows: ["users", "organizations", "projects"].map((table_name) => ({table_name}))});
+    expect(await prepareStorageBootstrap({query})).toEqual({status: "existing_schema"});
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(query.mock.calls[0]?.[0]).not.toMatch(/CREATE|ALTER|INSERT|DELETE/);
+  });
+  it("still rejects partial initialization with no valid installed project schema", async () => {
+    const query = vi.fn().mockResolvedValue({rows: [{table_name: "users"}]});
+    await expect(prepareStorageBootstrap({query})).rejects.toThrow("storage_bootstrap_partial_schema_detected");
+  });
+  it("accepts creation of a trigger function but rejects top-level transaction control", () => {
+    const statement = "CREATE FUNCTION scoped_guard() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$";
+    expect(() => validateStorageBootstrapStatements([statement])).not.toThrow();
+    expect(() => validateStorageBootstrapStatements([`${statement}; COMMIT`])).toThrow("storage_bootstrap_contains_transaction_sql");
+    expect(() => validateStorageBootstrapStatements(["BEGIN"])).toThrow("storage_bootstrap_contains_transaction_sql");
+    expect(() => validateStorageBootstrapStatements(["ALTER TABLE projects ADD COLUMN unsafe text"])).toThrow("storage_bootstrap_contains_schema_evolution_sql");
+  });
   it("should bootstrap an empty schema inside a transaction", async (): Promise<void> => {
     const query = vi
       .fn()

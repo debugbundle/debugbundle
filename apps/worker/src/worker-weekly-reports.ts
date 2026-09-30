@@ -16,6 +16,7 @@ import { fetchGuardedOutbound } from "../../../packages/storage/src/alert-outbou
 import type { WeeklyReportTransport } from "./processor.js";
 
 const RETENTION_CLEANUP_LEASE_KEY = "leases:cleanup-retention:schedule";
+const SEMANTIC_RAW_CATCHUP_LEASE_KEY = "leases:cleanup-retention:semantic-raw:schedule";
 
 export async function scheduleDueAlertEmailDigests(input: {
   queue: {
@@ -209,6 +210,30 @@ export async function scheduleRetentionCleanup(input: {
 
   await input.queue.enqueue("cleanup-retention", {
     scheduled_at: now.toISOString()
+  });
+  return true;
+}
+
+export async function scheduleSemanticAnalyticsRetentionCatchUp(input: {
+  queue: {
+    enqueue(
+      jobName: "cleanup-retention",
+      payload: { scheduled_at: string; scope: "semantic_raw" }
+    ): Promise<void>;
+    acquireLease?(key: string, ttlSeconds: number): Promise<boolean>;
+  };
+  intervalMs: number;
+  now?: Date;
+}): Promise<boolean> {
+  const now = input.now ?? new Date();
+  const ttlSeconds = Math.max(60, Math.ceil(input.intervalMs / 1000));
+  if (input.queue.acquireLease !== undefined) {
+    const acquired = await input.queue.acquireLease(SEMANTIC_RAW_CATCHUP_LEASE_KEY, ttlSeconds);
+    if (!acquired) return false;
+  }
+  await input.queue.enqueue("cleanup-retention", {
+    scheduled_at: now.toISOString(),
+    scope: "semantic_raw"
   });
   return true;
 }

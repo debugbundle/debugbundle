@@ -7,6 +7,7 @@ export const WORKER_JOB_PROTOCOL = "postgres-v1";
 export const WorkerJobNameSchema = z.enum([
   "normalize-events",
   "aggregate-analytics-events",
+  "process-semantic-analytics-event",
   "group-incident",
   "build-bundle",
   "build-analytics-bundle",

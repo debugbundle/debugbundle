@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 
 import { AnalyticsSectionHeader } from "../components/system/analytics-section-header.js";
+import { ProjectAnalyticsFunnelModes } from "../components/system/project-analytics-funnel-modes.js";
 import { TableRefreshButton } from "../components/system/table-refresh-button.js";
 import { Button } from "../components/ui/button.js";
 import {
@@ -86,6 +87,12 @@ export function ProjectAnalyticsFunnelsPage(): JSX.Element {
         isLoading={isLoading}
         onRefresh={() => setAttempt((current) => current + 1)}
       />
+
+      <ProjectAnalyticsFunnelModes projectId={projectId} value="legacy" />
+
+      <Notice title="Legacy step counts">
+        These step aggregates do not prove that the same sessions completed each step in order.
+      </Notice>
 
       {isLoading && response === null ? <Skeleton className="h-64 w-full" /> : null}
 
@@ -239,7 +246,7 @@ function FunnelStepAnalysis({
             {title} funnel steps
           </h3>
           <p className="text-sm text-muted-foreground">
-            Ordered completion and dropoff metrics for each captured step.
+            Saved step order and aggregate counts for each captured step.
           </p>
         </div>
         <TableRefreshButton

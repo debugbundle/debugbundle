@@ -21,6 +21,7 @@ const {
   s3FactoryMock,
   processNextNormalizeEventsJobMock,
   processNextAggregateAnalyticsEventsJobMock,
+  processNextSemanticAnalyticsObservationJobMock,
   processNextGroupIncidentJobMock,
   processNextBuildBundleJobMock,
   processNextBuildAnalyticsBundleJobMock,
@@ -64,6 +65,7 @@ const {
   s3FactoryMock: vi.fn(),
   processNextNormalizeEventsJobMock: vi.fn(),
   processNextAggregateAnalyticsEventsJobMock: vi.fn(),
+  processNextSemanticAnalyticsObservationJobMock: vi.fn(),
   processNextGroupIncidentJobMock: vi.fn(),
   processNextBuildBundleJobMock: vi.fn(),
   processNextBuildAnalyticsBundleJobMock: vi.fn(),
@@ -370,6 +372,10 @@ vi.mock("../../apps/worker/src/analytics-aggregation.js", () => ({
   processNextAggregateAnalyticsEventsJob: processNextAggregateAnalyticsEventsJobMock
 }));
 
+vi.mock("../../apps/worker/src/semantic-analytics-observation.js", () => ({
+  processNextSemanticAnalyticsObservationJob: processNextSemanticAnalyticsObservationJobMock
+}));
+
 vi.mock("../../apps/worker/src/analytics-bundle-processor.js", () => ({
   processNextBuildAnalyticsBundleJob: processNextBuildAnalyticsBundleJobMock
 }));
@@ -448,6 +454,7 @@ export function resetWorkerRuntimeMocks(): void {
   s3FactoryMock.mockReset();
   processNextNormalizeEventsJobMock.mockReset();
   processNextAggregateAnalyticsEventsJobMock.mockReset();
+  processNextSemanticAnalyticsObservationJobMock.mockReset();
   processNextGroupIncidentJobMock.mockReset();
   processNextBuildBundleJobMock.mockReset();
   processNextBuildAnalyticsBundleJobMock.mockReset();
@@ -461,6 +468,10 @@ export function resetWorkerRuntimeMocks(): void {
   processNextGenerateWeeklyReportJobMock.mockReset();
   processNextNormalizeEventsJobMock.mockResolvedValue({ processed: false, reason: "no_jobs" });
   processNextAggregateAnalyticsEventsJobMock.mockResolvedValue({
+    processed: false,
+    reason: "no_jobs"
+  });
+  processNextSemanticAnalyticsObservationJobMock.mockResolvedValue({
     processed: false,
     reason: "no_jobs"
   });
@@ -534,6 +545,7 @@ export {
   s3FactoryMock,
   processNextNormalizeEventsJobMock,
   processNextAggregateAnalyticsEventsJobMock,
+  processNextSemanticAnalyticsObservationJobMock,
   processNextGroupIncidentJobMock,
   processNextBuildBundleJobMock,
   processNextBuildAnalyticsBundleJobMock,

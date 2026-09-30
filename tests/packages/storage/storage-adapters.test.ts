@@ -146,6 +146,79 @@ describe("storage adapters", () => {
     expect(sendMock).toHaveBeenCalledTimes(2);
   });
 
+  it("passes a bounded upload abort signal to S3", async (): Promise<void> => {
+    sendMock.mockResolvedValue(undefined);
+    const client = createS3ObjectStoreClient({
+      endpoint: "http://localstack:4566",
+      region: "us-east-1",
+      bucket: "debugbundle-raw-events",
+      accessKeyId: "test",
+      secretAccessKey: "test"
+    });
+    const signal = AbortSignal.timeout(1_000);
+    await client.putObject({
+      key: "semantic-events/project/event.json.gz",
+      body: Buffer.from("protected"),
+      contentType: "application/json",
+      contentEncoding: "gzip",
+      signal
+    });
+    expect(sendMock).toHaveBeenCalledWith(expect.any(Object), { abortSignal: signal });
+  });
+
+  it("passes a bounded protected-object read abort signal to S3", async (): Promise<void> => {
+    sendMock.mockResolvedValue({ Body: Buffer.from("protected") });
+    const client = createS3ObjectStoreClient({
+      endpoint: "http://localstack:4566",
+      region: "us-east-1",
+      bucket: "debugbundle-raw-events",
+      accessKeyId: "test",
+      secretAccessKey: "test"
+    });
+    const signal = AbortSignal.timeout(1_000);
+    await expect(
+      client.getObject({ key: "semantic-events/project/event.json.gz", signal })
+    ).resolves.toEqual(Buffer.from("protected"));
+    expect(sendMock).toHaveBeenCalledWith(expect.any(Object), { abortSignal: signal });
+  });
+
+  it("lists bounded semantic objects with modification times and a resume cursor", async (): Promise<void> => {
+    const modified = new Date("2026-09-28T10:00:00.000Z");
+    sendMock.mockResolvedValue({
+      Contents: [{ Key: "semantic-events/a", LastModified: modified }],
+      IsTruncated: true
+    });
+    const client = createS3ObjectStoreClient({
+      endpoint: "http://localstack:4566",
+      region: "us-east-1",
+      bucket: "debugbundle-raw-events",
+      accessKeyId: "test",
+      secretAccessKey: "test"
+    });
+    const signal = AbortSignal.timeout(1_000);
+    await expect(
+      client.listObjects({
+        prefix: "semantic-events/",
+        startAfter: "semantic-events/0",
+        maxKeys: 100,
+        signal
+      })
+    ).resolves.toEqual({
+      objects: [{ key: "semantic-events/a", lastModifiedAt: modified }],
+      hasMore: true
+    });
+    expect(sendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: expect.objectContaining({
+          Prefix: "semantic-events/",
+          StartAfter: "semantic-events/0",
+          MaxKeys: 100
+        })
+      }),
+      { abortSignal: signal }
+    );
+  });
+
   it("should delete objects with S3 adapter", async (): Promise<void> => {
     sendMock.mockResolvedValue(undefined);
 
@@ -158,7 +231,7 @@ describe("storage adapters", () => {
       forcePathStyle: true
     });
 
-    await client.deleteObject!({ key: "raw-events/proj/e.json.gz" });
+    await client.deleteObject({ key: "raw-events/proj/e.json.gz" });
 
     expect(sendMock).toHaveBeenCalledTimes(1);
   });
@@ -194,6 +267,102 @@ describe("storage adapters", () => {
       { Key: "raw-events/proj_1/2026/03/21/00/b.json.gz" }
     ]);
     expect(deleteCall.input.Delete.Quiet).toBe(true);
+  });
+
+  it("does not report project-prefix deletion complete when S3 reports a per-object failure", async () => {
+    sendMock
+      .mockResolvedValueOnce({
+        Contents: [{ Key: "semantic-events/project/event.json.gz" }],
+        IsTruncated: false
+      })
+      .mockResolvedValueOnce({
+        Errors: [{ Key: "semantic-events/project/event.json.gz", Code: "AccessDenied" }]
+      });
+    const client = createS3ObjectStoreClient({
+      endpoint: "http://localstack:4566",
+      region: "us-east-1",
+      bucket: "debugbundle-raw-events",
+      accessKeyId: "test",
+      secretAccessKey: "test"
+    });
+
+    await expect(client.deleteObjectsByPrefix("semantic-events/project/")).rejects.toThrow(
+      "s3_object_deletion_incomplete"
+    );
+  });
+
+  it("returns exact per-key outcomes for a bounded semantic bulk delete", async () => {
+    const first = "semantic-events/project/first.json.gz";
+    const second = "semantic-events/project/second.json.gz";
+    sendMock.mockResolvedValueOnce({
+      Deleted: [{ Key: first }],
+      Errors: [{ Key: second, Code: "ServiceUnavailable" }]
+    });
+    const client = createS3ObjectStoreClient({
+      endpoint: "http://localstack:4566",
+      region: "us-east-1",
+      bucket: "debugbundle-raw-events",
+      accessKeyId: "test",
+      secretAccessKey: "test"
+    });
+    const signal = AbortSignal.timeout(1_000);
+    await expect(client.deleteObjects({ keys: [first, second], signal })).resolves.toEqual({
+      deleted: [first],
+      failed: [second]
+    });
+    expect(sendMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: expect.objectContaining({
+          Delete: { Objects: [{ Key: first }, { Key: second }], Quiet: false }
+        })
+      }),
+      { abortSignal: signal }
+    );
+  });
+
+  it("rejects an incomplete bulk response instead of claiming absent objects were deleted", async () => {
+    sendMock.mockResolvedValueOnce({ Deleted: [] });
+    const client = createS3ObjectStoreClient({
+      endpoint: "http://localstack:4566",
+      region: "us-east-1",
+      bucket: "debugbundle-raw-events",
+      accessKeyId: "test",
+      secretAccessKey: "test"
+    });
+    await expect(
+      client.deleteObjects({ keys: ["semantic-events/project/event.json.gz"] })
+    ).rejects.toThrow("s3_object_deletion_response_invalid");
+    await expect(client.deleteObjects({ keys: [] })).rejects.toThrow("s3_object_deletion_invalid");
+  });
+
+  it("accepts valid S3-length keys and rejects a cursor or bulk key beyond 1024 UTF-8 bytes", async () => {
+    const client = createS3ObjectStoreClient({
+      endpoint: "http://localstack:4566",
+      region: "us-east-1",
+      bucket: "debugbundle-raw-events",
+      accessKeyId: "test",
+      secretAccessKey: "test"
+    });
+    const validKey = "x".repeat(1024);
+    sendMock.mockResolvedValueOnce({ Deleted: [{ Key: validKey }] });
+    await expect(client.deleteObjects({ keys: [validKey] })).resolves.toEqual({
+      deleted: [validKey],
+      failed: []
+    });
+    sendMock.mockResolvedValueOnce({ Contents: [], IsTruncated: false });
+    await expect(
+      client.listObjects({ prefix: "raw-events/", startAfter: validKey, maxKeys: 1 })
+    ).resolves.toEqual({
+      objects: [],
+      hasMore: false
+    });
+    const invalidKey = "é".repeat(513);
+    await expect(client.deleteObjects({ keys: [invalidKey] })).rejects.toThrow(
+      "s3_object_deletion_invalid"
+    );
+    await expect(
+      client.listObjects({ prefix: "raw-events/", startAfter: invalidKey, maxKeys: 1 })
+    ).rejects.toThrow("s3_object_listing_invalid");
   });
 
   it("should paginate through large prefix listings", async (): Promise<void> => {

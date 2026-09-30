@@ -3,6 +3,122 @@ import { describe, expect, it } from "vitest";
 import { buildPublicOpenApiSpec } from "../../../apps/api/src/openapi.ts";
 
 describe("api openapi spec", () => {
+  it("documents the gated server outbox route with its distinct writer credential", () => {
+    const document = buildPublicOpenApiSpec() as {
+      paths: Record<
+        string,
+        Record<string, { operationId?: string; security?: unknown; responses?: unknown }>
+      >;
+    };
+    const delivery = document.paths["/v1/analytics/deliver"]?.["post"];
+    expect(delivery?.operationId).toBe("deliverSemanticAnalyticsOutbox");
+    expect(delivery?.security).toEqual([{ analyticsWriterBearerToken: [] }]);
+    expect(delivery?.responses).toHaveProperty("429");
+    expect(delivery?.responses).toHaveProperty("503");
+    const relay = document.paths["/v1/analytics/relay/events"]?.["post"];
+    expect(relay?.operationId).toBe("deliverSemanticAnalyticsRelayEvents");
+    expect(relay?.security).toEqual([{ analyticsWriterBearerToken: [] }]);
+    expect(relay?.responses).toHaveProperty("429");
+    expect(relay?.responses).toHaveProperty("503");
+  });
+
+  it("documents the disabled first-party relay identity lifecycle", () => {
+    const document = buildPublicOpenApiSpec() as {
+      paths: Record<
+        string,
+        Record<string, { operationId?: string; security?: unknown; responses?: unknown }>
+      >;
+    };
+    for (const [path, operationId] of [
+      ["/v1/analytics/identity/contexts", "createSemanticAnalyticsIdentityContext"],
+      [
+        "/v1/analytics/identity/contexts/{id}/associate",
+        "associateSemanticAnalyticsIdentityContext"
+      ],
+      ["/v1/analytics/identity/contexts/revoke", "revokeSemanticAnalyticsIdentityContext"]
+    ] as const) {
+      const operation = document.paths[path]?.["post"];
+      expect(operation?.operationId).toBe(operationId);
+      expect(operation?.security).toEqual([{ analyticsWriterBearerToken: [] }]);
+      expect(operation?.responses).toHaveProperty("503");
+    }
+    const erasure = document.paths["/v1/analytics/identity/erasures"]?.["post"];
+    expect(erasure?.operationId).toBe("requestSemanticAnalyticsSubjectErasure");
+    expect(erasure?.security).toEqual([{ analyticsWriterBearerToken: [] }]);
+    expect(erasure?.responses).toHaveProperty("202");
+    expect(erasure?.responses).toHaveProperty("503");
+  });
+
+  it("documents disabled owner namespace management without a key", () => {
+    const document = buildPublicOpenApiSpec() as {
+      paths: Record<
+        string,
+        Record<string, { operationId?: string; security?: unknown; responses?: unknown }>
+      >;
+    };
+    for (const [method, path, operationId] of [
+      ["get", "/v1/projects/{id}/analytics/identity-namespace", "getAnalyticsIdentityNamespace"],
+      [
+        "post",
+        "/v1/projects/{id}/analytics/identity-namespace/preview",
+        "previewAnalyticsIdentityNamespace"
+      ],
+      [
+        "post",
+        "/v1/projects/{id}/analytics/identity-namespace/apply",
+        "applyAnalyticsIdentityNamespace"
+      ]
+    ] as const) {
+      const operation = document.paths[path]?.[method];
+      expect(operation?.operationId).toBe(operationId);
+      expect(operation?.security).toEqual([{ browserSession: [] }, { memberBearerToken: [] }]);
+      expect(operation?.responses).toHaveProperty("503");
+    }
+  });
+
+  it("documents semantic space, writer and project-plan management with member authentication", () => {
+    const document = buildPublicOpenApiSpec() as {
+      paths: Record<
+        string,
+        Record<string, { operationId?: string; security?: unknown; requestBody?: unknown }>
+      >;
+    };
+    const expected = [
+      ["get", "/v1/analytics/spaces", "listAnalyticsSpaces"],
+      ["get", "/v1/analytics/spaces/{id}", "getAnalyticsSpace"],
+      ["post", "/v1/analytics/spaces/preview", "previewAnalyticsSpaceCreate"],
+      ["post", "/v1/analytics/spaces/apply", "applyAnalyticsSpaceCreate"],
+      ["post", "/v1/analytics/spaces/{id}/preview", "previewAnalyticsSpaceChange"],
+      ["post", "/v1/analytics/spaces/{id}/apply", "applyAnalyticsSpaceChange"],
+      ["get", "/v1/projects/{id}/analytics/writers", "listAnalyticsWriters"],
+      ["post", "/v1/projects/{id}/analytics/writers/preview", "previewAnalyticsWriter"],
+      ["post", "/v1/projects/{id}/analytics/writers/apply", "applyAnalyticsWriter"],
+      ["get", "/v1/projects/{id}/analytics/plan", "getAnalyticsProjectPlan"],
+      ["post", "/v1/projects/{id}/analytics/plan/validate", "validateAnalyticsProjectPlan"],
+      ["post", "/v1/projects/{id}/analytics/plan/preview", "previewAnalyticsProjectPlan"],
+      ["post", "/v1/projects/{id}/analytics/plan/apply", "applyAnalyticsProjectPlan"],
+      ["get", "/v1/analytics/spaces/{id}/plan", "getAnalyticsSpacePlan"],
+      ["post", "/v1/analytics/spaces/{id}/plan/validate", "validateAnalyticsSpacePlan"],
+      ["post", "/v1/analytics/spaces/{id}/plan/preview", "previewAnalyticsSpacePlan"],
+      ["post", "/v1/analytics/spaces/{id}/plan/apply", "applyAnalyticsSpacePlan"],
+      [
+        "post",
+        "/v1/projects/{id}/analytics/events/{eventId}/retry",
+        "retryFailedSemanticAnalyticsEvent"
+      ]
+    ] as const;
+    for (const [method, path, operationId] of expected) {
+      const operation = document.paths[path]?.[method];
+      expect(operation?.operationId).toBe(operationId);
+      expect(operation?.security).toEqual([{ browserSession: [] }, { memberBearerToken: [] }]);
+      if (method === "post" && operationId !== "retryFailedSemanticAnalyticsEvent")
+        expect(operation?.requestBody).toBeDefined();
+    }
+    expect(
+      document.paths["/v1/projects/{id}/analytics/events/{eventId}/retry"]?.["post"]?.requestBody
+    ).toBeUndefined();
+  });
+
   it("documents only the five agent reads with distinct agent authentication", () => {
     const document = buildPublicOpenApiSpec() as {
       paths: Record<string, Record<string, { security?: unknown; responses?: unknown }>>;

@@ -51,7 +51,8 @@ const analyticsSections = [
   { value: "audiences", label: "Audiences", suffix: "/audiences" },
   { value: "journeys", label: "Journeys", suffix: "/journeys" },
   { value: "opportunities", label: "Opportunities", suffix: "/opportunities" },
-  { value: "bundles", label: "Bundles", suffix: "/bundles" }
+  { value: "bundles", label: "Bundles", suffix: "/bundles" },
+  { value: "tracking", label: "Tracking", suffix: "/tracking" }
 ] as const;
 type AnalyticsSection = (typeof analyticsSections)[number]["value"];
 
@@ -97,6 +98,7 @@ export function ProjectAnalyticsLayout(): JSX.Element {
   }, [projectId, settingsAttempt]);
 
   const activeSection = resolveAnalyticsSection(location.pathname);
+  const orderedFunnel = location.pathname.endsWith("/funnels/ordered");
   const query: AnalyticsMetricsQuery = {
     last: filters.last,
     granularity: "day",
@@ -203,23 +205,47 @@ export function ProjectAnalyticsLayout(): JSX.Element {
 
   return (
     <div className="flex flex-col gap-6">
-      <Tabs value={activeSection} onValueChange={changeSection}>
-        <div className="overflow-x-auto overscroll-x-contain pb-1">
-          <TabsList
-            variant="line"
-            aria-label="Analytics sections"
-            className="min-w-max justify-start"
-          >
-            {analyticsSections.map((section) => (
-              <TabsTrigger key={section.value} value={section.value} className="shrink-0 flex-none">
-                {section.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </div>
-      </Tabs>
+      <Field className="sm:hidden">
+        <FieldLabel htmlFor="analytics-section">Analytics section</FieldLabel>
+        <Select value={activeSection} onValueChange={changeSection}>
+          <SelectTrigger id="analytics-section" className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent position="popper">
+            <SelectGroup>
+              {analyticsSections.map((section) => (
+                <SelectItem key={section.value} value={section.value}>
+                  {section.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </Field>
 
-      {location.pathname.endsWith("/bundles/new") ? null : (
+      <div className="hidden sm:block">
+        <Tabs value={activeSection} onValueChange={changeSection}>
+          <div className="overflow-x-auto overscroll-x-contain pb-1">
+            <TabsList
+              variant="line"
+              aria-label="Analytics sections"
+              className="min-w-max justify-start"
+            >
+              {analyticsSections.map((section) => (
+                <TabsTrigger
+                  key={section.value}
+                  value={section.value}
+                  className="shrink-0 flex-none"
+                >
+                  {section.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
+        </Tabs>
+      </div>
+
+      {location.pathname.endsWith("/bundles/new") || activeSection === "tracking" ? null : (
         <div
           role="group"
           aria-label="Project analytics filter controls"
@@ -256,52 +282,54 @@ export function ProjectAnalyticsLayout(): JSX.Element {
                 </SelectContent>
               </Select>
             </Field>
-            <AnalyticsFilterPanel
-              triggerLabel="More filters"
-              title="More analytics filters"
-              description="Limit analytics to a specific service or environment."
-              activeFilterCount={appliedFilters.length}
-              onApply={applyScopeFilters}
-              onReset={resetScopeFilters}
-              onDismiss={() => setDraftFilters(filters)}
-            >
-              <FieldGroup className="gap-4">
-                <Field>
-                  <FieldLabel htmlFor="analytics-service">Service</FieldLabel>
-                  <ProjectScopeSelect
-                    id="analytics-service"
-                    label="Service"
-                    value={draftFilters.service}
-                    options={scopeOptions.services}
-                    allLabel="All services"
-                    onValueChange={(service) =>
-                      setDraftFilters((current) => ({ ...current, service }))
-                    }
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="analytics-environment">Environment</FieldLabel>
-                  <ProjectScopeSelect
-                    id="analytics-environment"
-                    label="Environment"
-                    value={draftFilters.environment}
-                    options={scopeOptions.environments}
-                    allLabel="All environments"
-                    onValueChange={(environment) =>
-                      setDraftFilters((current) => ({ ...current, environment }))
-                    }
-                  />
-                </Field>
-              </FieldGroup>
-            </AnalyticsFilterPanel>
-            {appliedFilters.length === 0 ? null : (
+            {orderedFunnel ? null : (
+              <AnalyticsFilterPanel
+                triggerLabel="More filters"
+                title="More analytics filters"
+                description="Limit analytics to a specific service or environment."
+                activeFilterCount={appliedFilters.length}
+                onApply={applyScopeFilters}
+                onReset={resetScopeFilters}
+                onDismiss={() => setDraftFilters(filters)}
+              >
+                <FieldGroup className="gap-4">
+                  <Field>
+                    <FieldLabel htmlFor="analytics-service">Service</FieldLabel>
+                    <ProjectScopeSelect
+                      id="analytics-service"
+                      label="Service"
+                      value={draftFilters.service}
+                      options={scopeOptions.services}
+                      allLabel="All services"
+                      onValueChange={(service) =>
+                        setDraftFilters((current) => ({ ...current, service }))
+                      }
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="analytics-environment">Environment</FieldLabel>
+                    <ProjectScopeSelect
+                      id="analytics-environment"
+                      label="Environment"
+                      value={draftFilters.environment}
+                      options={scopeOptions.environments}
+                      allLabel="All environments"
+                      onValueChange={(environment) =>
+                        setDraftFilters((current) => ({ ...current, environment }))
+                      }
+                    />
+                  </Field>
+                </FieldGroup>
+              </AnalyticsFilterPanel>
+            )}
+            {orderedFunnel || appliedFilters.length === 0 ? null : (
               <Button type="button" variant="outline" onClick={resetScopeFilters}>
                 <RotateCcwIcon data-icon="inline-start" />
                 Reset filters
               </Button>
             )}
           </div>
-          <AppliedAnalyticsFilterList filters={appliedFilters} />
+          {orderedFunnel ? null : <AppliedAnalyticsFilterList filters={appliedFilters} />}
         </div>
       )}
 
@@ -320,7 +348,8 @@ export function ProjectAnalyticsLayout(): JSX.Element {
 
 function resolveAnalyticsSection(pathname: string): AnalyticsSection {
   if (pathname.endsWith("/routes")) return "routes";
-  if (pathname.endsWith("/funnels")) return "funnels";
+  if (pathname.endsWith("/tracking")) return "tracking";
+  if (pathname.endsWith("/funnels") || pathname.endsWith("/funnels/ordered")) return "funnels";
   if (pathname.endsWith("/audiences")) return "audiences";
   if (pathname.endsWith("/journeys")) return "journeys";
   if (pathname.endsWith("/opportunities")) return "opportunities";

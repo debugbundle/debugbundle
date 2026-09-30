@@ -18,6 +18,22 @@ import { createAnalyticsJourneySampleApi } from "../../cli/src/analytics-journey
 import { createAnalyticsMetricsApi } from "../../cli/src/analytics-metrics-commands.js";
 import { createAnalyticsSettingsApi } from "../../cli/src/analytics-settings-commands.js";
 import { createAnalyticsSavedFunnelApi } from "../../cli/src/analytics-saved-funnel-commands.js";
+import { createAnalyticsSpaceApi } from "../../cli/src/analytics-space-api.js";
+import { createAnalyticsSpaceMcpTools } from "./analytics-space-tools.js";
+import { createAnalyticsWriterApi } from "../../cli/src/analytics-writer-api.js";
+import { createAnalyticsWriterMcpTools } from "./analytics-writer-tools.js";
+import { createAnalyticsIdentityNamespaceApi } from "../../cli/src/analytics-identity-namespace-api.js";
+import { createAnalyticsIdentityNamespaceMcpTools } from "./analytics-identity-namespace-tools.js";
+import { createAnalyticsPlanApi } from "../../cli/src/analytics-plan-api.js";
+import { createAnalyticsPlanMcpTools } from "./analytics-plan-tools.js";
+import { createAnalyticsSpacePlanApi } from "../../cli/src/analytics-space-plan-api.js";
+import { createAnalyticsSpacePlanMcpTools } from "./analytics-space-plan-tools.js";
+import { createAnalyticsReportApi } from "../../cli/src/analytics-report-api.js";
+import { createAnalyticsReportMcpTools } from "./analytics-report-tools.js";
+import { createAnalyticsErasureStatusApi } from "../../cli/src/analytics-erasure-status-api.js";
+import { createAnalyticsErasureStatusMcpTools } from "./analytics-erasure-status-tools.js";
+import { createAnalyticsJobRecoveryApi } from "../../cli/src/analytics-job-recovery-api.js";
+import { createAnalyticsJobRecoveryMcpTools } from "./analytics-job-recovery-tools.js";
 import { createCaptureRuleApi } from "../../cli/src/capture-rule-commands.js";
 import { createCapturePolicyApi } from "../../cli/src/capture-policy-commands.js";
 import { createImprovementSettingsApi } from "../../cli/src/improvement-settings-commands.js";
@@ -121,13 +137,33 @@ export async function createDefaultMcpTools(
       token
     });
     return {
-      agent_project_summary: (value) => client.read({ name: "project_summary", projectId: String(value["projectId"]) }),
-      agent_list_incidents: (value) => client.read({ name: "list_incidents", projectId: String(value["projectId"]),
-        ...(typeof value["limit"] === "number" ? { limit: value["limit"] } : {}),
-        ...(typeof value["cursor"] === "string" ? { cursor: value["cursor"] } : {}) }),
-      agent_get_incident: (value) => client.read({ name: "get_incident", projectId: String(value["projectId"]), incidentId: String(value["incidentId"]) }),
-      agent_get_incident_context: (value) => client.read({ name: "get_incident_context", projectId: String(value["projectId"]), incidentId: String(value["incidentId"]) }),
-      agent_get_bundle: (value) => client.read({ name: "get_bundle", projectId: String(value["projectId"]), incidentId: String(value["incidentId"]) })
+      agent_project_summary: (value) =>
+        client.read({ name: "project_summary", projectId: String(value["projectId"]) }),
+      agent_list_incidents: (value) =>
+        client.read({
+          name: "list_incidents",
+          projectId: String(value["projectId"]),
+          ...(typeof value["limit"] === "number" ? { limit: value["limit"] } : {}),
+          ...(typeof value["cursor"] === "string" ? { cursor: value["cursor"] } : {})
+        }),
+      agent_get_incident: (value) =>
+        client.read({
+          name: "get_incident",
+          projectId: String(value["projectId"]),
+          incidentId: String(value["incidentId"])
+        }),
+      agent_get_incident_context: (value) =>
+        client.read({
+          name: "get_incident_context",
+          projectId: String(value["projectId"]),
+          incidentId: String(value["incidentId"])
+        }),
+      agent_get_bundle: (value) =>
+        client.read({
+          name: "get_bundle",
+          projectId: String(value["projectId"]),
+          incidentId: String(value["incidentId"])
+        })
     };
   }
   const authState = await readLocalAuthState();
@@ -168,6 +204,14 @@ export async function createDefaultMcpTools(
       }),
       ...createAnalyticsSettingsMcpTools(createAnalyticsSettingsApi(httpClient)),
       ...createAnalyticsSavedFunnelMcpTools(createAnalyticsSavedFunnelApi(httpClient)),
+      ...createAnalyticsSpaceMcpTools(createAnalyticsSpaceApi(httpClient)),
+      ...createAnalyticsWriterMcpTools(createAnalyticsWriterApi(httpClient)),
+      ...createAnalyticsIdentityNamespaceMcpTools(createAnalyticsIdentityNamespaceApi(httpClient)),
+      ...createAnalyticsPlanMcpTools(createAnalyticsPlanApi(httpClient)),
+      ...createAnalyticsSpacePlanMcpTools(createAnalyticsSpacePlanApi(httpClient)),
+      ...createAnalyticsReportMcpTools(createAnalyticsReportApi(httpClient)),
+      ...createAnalyticsErasureStatusMcpTools(createAnalyticsErasureStatusApi(httpClient)),
+      ...createAnalyticsJobRecoveryMcpTools(createAnalyticsJobRecoveryApi(httpClient)),
       ...createCaptureRuleMcpTools(createCaptureRuleApi(httpClient)),
       ...createCapturePolicyMcpTools(createCapturePolicyApi(httpClient)),
       ...createImprovementSettingsMcpTools(createImprovementSettingsApi(httpClient)),

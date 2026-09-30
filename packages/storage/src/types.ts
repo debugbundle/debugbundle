@@ -1,5 +1,13 @@
 import type { BundleBuildContextStore } from "./bundle-types.js";
-export type { BundleBuildContext, BundleBuildContextStore, RetainedBundleOwnerReference, IncidentEventReference, ProbeEventCandidateReference, LogEventCandidateReference, RequestEventCandidateReference } from "./bundle-types.js";
+export type {
+  BundleBuildContext,
+  BundleBuildContextStore,
+  RetainedBundleOwnerReference,
+  IncidentEventReference,
+  ProbeEventCandidateReference,
+  LogEventCandidateReference,
+  RequestEventCandidateReference
+} from "./bundle-types.js";
 import type { NormalizedEvent } from "../../event-normalizer/src/index.js";
 import type {
   CapturePreset,
@@ -110,11 +118,14 @@ export type {
 
 export type {
   ObjectStoreClient,
+  ObjectStoreBulkDeleter,
+  ObjectStoreDeleter,
   ObjectStoreDeleteInput,
   ObjectStorePrefixDeleter,
   ObjectStorePutInput,
   ObjectStoreReader,
-  ObjectStoreReadInput
+  ObjectStoreReadInput,
+  ObjectStoreLister
 } from "./object-store-types.js";
 export type {
   AuthRateLimiter,

@@ -1,4 +1,11 @@
 import { z } from "zod";
+export * from "./analytics-definitions.js";
+export * from "./analytics-plan-management.js";
+export * from "./analytics-space-plan-management.js";
+export * from "./analytics-protocol.js";
+export * from "./analytics-outbox.js";
+export * from "./analytics-writers.js";
+export * from "./analytics-currencies.js";
 import { RuntimeMemoryStatsSchema } from "./event-envelope.js";
 import { BrowserResourceContextSchema } from "./browser-resource-context.js";
 
@@ -493,6 +500,12 @@ export {
 } from "./improvement-settings.js";
 
 export * from "./analytics.js";
+export * from "./analytics-semantic.js";
+export * from "./analytics-spaces.js";
+export * from "./analytics-identity.js";
+export * from "./analytics-identity-namespace.js";
+export * from "./analytics-space-identity-namespace.js";
+export * from "./analytics-job-recovery.js";
 export * from "./browser-resource.js";
 export * from "./browser-resource-routes.js";
 export * from "./frontend-severity.js";

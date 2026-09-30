@@ -60,6 +60,7 @@ import {
   CaptureRulesResponseSchema,
   CapturePolicyResponseSchema,
   SdkConfigResponseSchema,
+  SdkWriterCapabilityResponseSchema,
   IngestionAcceptedResponseSchema,
   OpenApiIngestionRequestSchema,
   HealthResponseSchema,
@@ -236,6 +237,10 @@ export const improvementSettingsResponse = component(
   ImprovementSettingsResponseSchema
 );
 export const sdkConfigResponse = component("SdkConfigResponse", SdkConfigResponseSchema);
+export const sdkWriterCapabilityResponse = component(
+  "SdkWriterCapabilityResponse",
+  SdkWriterCapabilityResponseSchema
+);
 export const healthResponse = component("HealthResponse", HealthResponseSchema);
 export const readyResponse = component("ReadyResponse", ReadyResponseSchema);
 export const notReadyResponse = component("NotReadyResponse", NotReadyResponseSchema);

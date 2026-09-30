@@ -1,7 +1,7 @@
 # SDK Testing Strategy — DebugBundle
 
 Version: v1
-Last updated: 2026-05-28
+Last updated: 2026-09-28
 
 ---
 
@@ -152,11 +152,9 @@ SDK repos can fetch these from the public site URL or vendor them as test fixtur
 
 ## 7. JS SDK (debugbundle-js) — Current Setup
 
-The JS SDK tests run as part of the core monorepo's Vitest suite during the workspace-bridge period:
+Node and Browser are maintained in the standalone `github.com/debugbundle/debugbundle-js` repository. An ignored checkout may be available at `sdks/debugbundle-js/`; it is a companion repository, not a member of the core pnpm/Vitest workspace. The core `make test` and root typecheck do not qualify its source or packages.
 
-- **Test location:** `sdks/debugbundle-js/tests/packages/sdk-node/` and `sdks/debugbundle-js/tests/packages/sdk-browser/`
-- **Included by:** Root `vitest.config.ts` includes `sdks/debugbundle-js/tests/**/*.test.ts`
-- **TypeScript:** Root `tsconfig.json` includes `sdks/debugbundle-js/**/*.ts`
-- **Dependencies:** `@debugbundle/shared-types`, `@debugbundle/redaction`, `@debugbundle/auth` resolved via `workspace:*` through `pnpm-workspace.yaml`
-
-When the JS SDK repo becomes standalone, it will have its own `vitest.config.ts` and the workspace deps will become published npm packages.
+- **Tests and typecheck:** Run the companion's own `make check` for lint, TypeScript, per-file coverage, build and packed-consumer smoke. Its tests live under `tests/packages/sdk-node/` and `tests/packages/sdk-browser/` and use the companion's own `vitest.config.ts`.
+- **Dependency boundary:** `@debugbundle/sdk-node` and `@debugbundle/sdk-browser` consume pinned published `@debugbundle/shared-types` and `@debugbundle/redaction` versions, not root `workspace:*` aliases. When candidate shared packages differ from the registry, stage exact archives and verify an installed consumer against those archives before claiming compatibility. Update package and lockfile pins only as part of the coordinated release plan.
+- **Runtime boundary:** The JS repository's Docker tooling uses Node 24; the published Node SDK declares Node >=22. Installed-consumer gates must exercise claimed Node lanes, and browser-engine acceptance remains a separate result.
+- **Release boundary:** `make release-prepare-check` and the packed/registry smokes qualify the exact candidate or published artifacts at their respective stages. A source-only test is not proof that a registry package or installed app contains the change.

@@ -1,5 +1,13 @@
-import type { AnalyticsSettingsUpdate } from "../../../packages/shared-types/src/index.js";
 import {
+  getTierCapabilities,
+  TIER_CAPABILITIES,
+  type AnalyticsSettingsUpdate
+} from "../../../packages/shared-types/src/index.js";
+import {
+  createAnalyticsSpaceStore,
+  createAnalyticsSpacePlanStore,
+  createAnalyticsWriterStore,
+  createAnalyticsMeasurementPlanStore,
   createPostgresAnalyticsBundleGenerationStore,
   createPostgresAnalyticsJourneySampleStore,
   createPostgresAnalyticsMetricsStore,
@@ -7,13 +15,51 @@ import {
   createPostgresAnalyticsSavedFunnelStore,
   createPostgresAnalyticsSettingsStore,
   createPostgresAnalyticsUsageStore,
+  createSemanticAnalyticsReceiptStore,
+  persistCurrentProjectSemanticAnalyticsEvent,
+  resolveCurrentProjectSemanticAnalyticsCapability,
+  type ObjectStoreClient,
   type Queryable,
   type QueueClient
 } from "../../../packages/storage/src/index.js";
+import {
+  associateProjectAnalyticsIdentityContext,
+  createProjectAnalyticsIdentityContext,
+  revokeProjectAnalyticsIdentityContext
+} from "../../../packages/storage/src/analytics-identity-context-store.js";
+import {
+  applyProjectAnalyticsIdentityNamespaceChange,
+  previewProjectAnalyticsIdentityNamespaceChange,
+  readProjectAnalyticsIdentityNamespace
+} from "../../../packages/storage/src/analytics-identity-namespace-store.js";
+import {
+  readProjectAnalyticsSubjectErasureStatus,
+  requestProjectAnalyticsSubjectErasure
+} from "../../../packages/storage/src/analytics-subject-erasure-store.js";
+import {
+  readProjectSemanticFunnelReport,
+  readRecentProjectSemanticFunnelReport
+} from "../../../packages/storage/src/semantic-analytics-funnel-report.js";
+import { retryFailedSemanticAnalyticsEvent } from "../../../packages/storage/src/semantic-analytics-job-recovery.js";
 import type { ApiDependencies } from "./api-types.js";
 
 type ProjectScoped<T> = T & { organization_id: string };
 type DefaultAnalyticsDependencies = {
+  semanticAnalyticsCapabilities: NonNullable<ApiDependencies["semanticAnalyticsCapabilities"]>;
+  semanticAnalyticsReports: NonNullable<ApiDependencies["semanticAnalyticsReports"]>;
+  semanticAnalyticsJobRecovery: NonNullable<ApiDependencies["semanticAnalyticsJobRecovery"]>;
+  analyticsIdentityNamespace: NonNullable<ApiDependencies["analyticsIdentityNamespace"]>;
+  semanticAnalyticsIdentityContexts: NonNullable<
+    ApiDependencies["semanticAnalyticsIdentityContexts"]
+  >;
+  semanticAnalyticsSubjectErasure: NonNullable<ApiDependencies["semanticAnalyticsSubjectErasure"]>;
+  analyticsSpaces: NonNullable<ApiDependencies["analyticsSpaces"]>;
+  analyticsSpacePlans: NonNullable<ApiDependencies["analyticsSpacePlans"]>;
+  analyticsWriters: NonNullable<ApiDependencies["analyticsWriters"]>;
+  semanticAnalyticsDelivery: NonNullable<ApiDependencies["semanticAnalyticsDelivery"]>;
+  semanticAnalyticsRelayDelivery: NonNullable<ApiDependencies["semanticAnalyticsRelayDelivery"]>;
+  semanticAnalyticsClientDelivery: NonNullable<ApiDependencies["semanticAnalyticsClientDelivery"]>;
+  analyticsPlans: NonNullable<ApiDependencies["analyticsPlans"]>;
   analyticsBundles: NonNullable<ApiDependencies["analyticsBundles"]>;
   analyticsJourneySamples: NonNullable<ApiDependencies["analyticsJourneySamples"]>;
   analyticsMetrics: NonNullable<ApiDependencies["analyticsMetrics"]>;
@@ -26,6 +72,7 @@ type DefaultAnalyticsDependencies = {
 export function createDefaultAnalyticsDependencies(input: {
   db: Queryable;
   queue: QueueClient;
+  objectStore: Pick<ObjectStoreClient, "putObject">;
 }): DefaultAnalyticsDependencies {
   const bundleGenerationStore = createPostgresAnalyticsBundleGenerationStore(input.db);
   const journeySampleStore = createPostgresAnalyticsJourneySampleStore(input.db);
@@ -33,8 +80,86 @@ export function createDefaultAnalyticsDependencies(input: {
   const opportunityStore = createPostgresAnalyticsOpportunityStore(input.db);
   const savedFunnelStore = createPostgresAnalyticsSavedFunnelStore(input.db);
   const settingsStore = createPostgresAnalyticsSettingsStore(input.db);
+  const semanticReceipts = createSemanticAnalyticsReceiptStore(input.db);
+  const getSemanticRateLimitPerMinute = async (projectId: string): Promise<number | null> => {
+    const row = (
+      await input.db.query<{ plan: string }>(
+        `SELECT org.plan FROM projects p JOIN organizations org ON org.id=p.organization_id
+         WHERE p.id=$1::uuid AND org.suspended_at IS NULL`,
+        [projectId]
+      )
+    ).rows[0];
+    if (row === undefined || !Object.hasOwn(TIER_CAPABILITIES, row.plan)) return null;
+    return getTierCapabilities(row.plan).ingestion_rate_per_min;
+  };
 
   return {
+    semanticAnalyticsCapabilities: {
+      enabled: false,
+      resolve: (request) => resolveCurrentProjectSemanticAnalyticsCapability(input.db, request)
+    },
+    semanticAnalyticsReports: {
+      enabled: false,
+      read: (request) => readProjectSemanticFunnelReport(input.db, request),
+      readRecent: (request) => readRecentProjectSemanticFunnelReport(input.db, request)
+    },
+    semanticAnalyticsJobRecovery: {
+      enabled: false,
+      retry: (request) => retryFailedSemanticAnalyticsEvent(input.db, request)
+    },
+    analyticsIdentityNamespace: {
+      enabled: false,
+      read: (actorUserId, projectId) =>
+        readProjectAnalyticsIdentityNamespace(input.db, actorUserId, projectId),
+      preview: (change) => previewProjectAnalyticsIdentityNamespaceChange(input.db, change),
+      apply: (change) => applyProjectAnalyticsIdentityNamespaceChange(input.db, change)
+    },
+    semanticAnalyticsIdentityContexts: {
+      enabled: false,
+      create: (credentialHash, request) =>
+        createProjectAnalyticsIdentityContext(input.db, credentialHash, request),
+      associate: (credentialHash, request) =>
+        associateProjectAnalyticsIdentityContext(input.db, credentialHash, request),
+      revoke: (credentialHash, request) =>
+        revokeProjectAnalyticsIdentityContext(input.db, credentialHash, request)
+    },
+    semanticAnalyticsSubjectErasure: {
+      enabled: false,
+      readStatus: (request) => readProjectAnalyticsSubjectErasureStatus(input.db, request),
+      request: (credentialHash, request) =>
+        requestProjectAnalyticsSubjectErasure(input.db, credentialHash, request)
+    },
+    analyticsSpaces: createAnalyticsSpaceStore(input.db),
+    analyticsSpacePlans: createAnalyticsSpacePlanStore(input.db),
+    analyticsWriters: createAnalyticsWriterStore(input.db),
+    semanticAnalyticsDelivery: {
+      enabled: false,
+      getRateLimitPerMinute: getSemanticRateLimitPerMinute,
+      persist: ({ projectId, credentialHash, event }) =>
+        persistCurrentProjectSemanticAnalyticsEvent(input.db, semanticReceipts, input.objectStore, {
+          policy: { projectId, credentialHash, principal: "server_writer" },
+          event
+        })
+    },
+    semanticAnalyticsRelayDelivery: {
+      enabled: false,
+      getRateLimitPerMinute: getSemanticRateLimitPerMinute,
+      persist: ({ projectId, credentialHash, event, identityContext }) =>
+        persistCurrentProjectSemanticAnalyticsEvent(input.db, semanticReceipts, input.objectStore, {
+          policy: { projectId, credentialHash, principal: "relay" },
+          event,
+          ...(identityContext === undefined ? {} : { identityContext })
+        })
+    },
+    semanticAnalyticsClientDelivery: {
+      enabled: false,
+      persist: ({ projectId, credentialHash, event }) =>
+        persistCurrentProjectSemanticAnalyticsEvent(input.db, semanticReceipts, input.objectStore, {
+          policy: { projectId, credentialHash, principal: "project_token" },
+          event
+        })
+    },
+    analyticsPlans: createAnalyticsMeasurementPlanStore(input.db),
     analyticsSettingsManagement: {
       getAnalyticsSettingsForProject: (request: {
         organization_id: string;

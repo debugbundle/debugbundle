@@ -3,7 +3,7 @@
 Version: v2
 Last updated: 2026-09-20
 
-The protected redaction contract below describes the next coordinated SDK release. Published v1 packages retain their prior behavior until upgraded, while compatible old events receive the server-side backstop. Package major versions and migration examples are required where an expressly supported custom-list override changes to additive behavior.
+The protected redaction and deferred-hook contract below is published in the hardened SDK major lines. Legacy packages retain their prior behavior until upgraded, while compatible old events receive the server-side backstop. Package major versions and migration examples remain required where an expressly supported custom-list override changes to additive behavior. See each SDK's versioned migration guide; generic legacy wording does not override §1.1 or NFR-PERF-01.
 
 This contract defines the standard interface that ALL DebugBundle SDKs must implement, regardless of language. It ensures behavioral consistency across Node.js, browser, Python, PHP/WordPress, Java, Go, Ruby, .NET, Android, Swift, React Native, and future language SDKs.
 
@@ -49,7 +49,7 @@ Every SDK must expose an init function that accepts a configuration object and r
 
 SDKs must expose a language-idiomatic `beforeSend` hook as an optional init config field for app-owned local policy such as final redaction, tenant-specific suppression, or dropping events that must never leave the runtime. Published legacy versions give it an isolated, sanitized canonical event synchronously before local policy/rule evaluation, sampling, duplicate suppression, persistence, buffering, and transport. A hardened major version may change that ordering only with a documented migration and must preserve valid replacement, drop, and safe-original fallback semantics for admitted events.
 
-**Hardened release boundary:** Existing published hook timing and accepted-event replacement semantics remain the compatibility baseline for those versions. A hardened SDK first rejects log records below the effective level and metadata-only capture policy, before constructing an event or invoking this hook. The hook cannot promote a rejected INFO record. Java3.0, Python2.0, Go3.0, Swift3.0, Android3.0 and .NET2.0 candidates run their hooks on existing bounded background delivery workers; see their versioned migration guides. Node3.0, browser3.0 and React Native3.0 defer hooks until capture returns on their JavaScript event loops. Every timing change has a versioned migration. Every accepted replacement receives complete canonical validation, mandatory sanitization and authoritative policy/rule evaluation before delivery. A backend/native callback that hangs may stall its bounded worker, but must not stall application capture or cause unbounded replacement workers. JavaScript callbacks retain the explicit event-loop responsibility below. Privacy-safe bounded admission before hook execution is allowed; unprotected input retention is not.
+**Hardened release boundary:** Existing published hook timing and accepted-event replacement semantics remain the compatibility baseline for those versions. A hardened SDK first rejects log records below the effective level and metadata-only capture policy, before constructing an event or invoking this hook. The hook cannot promote a rejected INFO record. The released Java3.0, Python2.0, Go3.0, Swift3.0, Android3.0 and .NET2.0 lines run their hooks on existing bounded background delivery workers; see their versioned migration guides. Node3.0, browser3.0 and React Native3.0 defer hooks until capture returns on their JavaScript event loops. Every timing change has a versioned migration. Every accepted replacement receives complete canonical validation, mandatory sanitization and authoritative policy/rule evaluation before delivery. A backend/native callback that hangs may stall its bounded worker, but must not stall application capture or cause unbounded replacement workers. JavaScript callbacks retain the explicit event-loop responsibility below. Privacy-safe bounded admission before hook execution is allowed; unprotected input retention is not.
 
 Rules:
 - Return the event to keep shipping it.
@@ -63,7 +63,7 @@ Rules:
 - Fatal signal handlers, hard-crash handlers, and shutdown paths may skip application hook execution when invoking user code is unsafe. Each affected SDK must document the restriction; replayed crash events use the normal hook pipeline when safe.
 - Project capture rules remain the preferred operational noise-control surface because they are centralized, auditable, and enforced again by ingestion and worker backstops.
 
-The .NET2 candidate projects admitted exception metadata and custom reference-state logger formatting through its existing sender using weak application references. Ordinary structured logging snapshots bounded primitive values; unsupported custom value-state formatters and untrusted collection implementations use safe fallback values instead of executing arbitrary accessors/enumerators on capture callers. Logger formatting and container projection remain bounded, and worker results receive mandatory privacy before hooks and again after valid hook replacement. Configured custom sampling callbacks run on the sender once per admitted event and are not repeated on retry. Its major migration guide defines the supported snapshot and fallback behavior.
+The released .NET2 line projects admitted exception metadata and custom reference-state logger formatting through its existing sender using weak application references. Ordinary structured logging snapshots bounded primitive values; unsupported custom value-state formatters and untrusted collection implementations use safe fallback values instead of executing arbitrary accessors/enumerators on capture callers. Logger formatting and container projection remain bounded, and worker results receive mandatory privacy before hooks and again after valid hook replacement. Configured custom sampling callbacks run on the sender once per admitted event and are not repeated on retry. Its major migration guide defines the supported snapshot and fallback behavior.
 
 ### 1.2 Node.js local-first transport selection
 
@@ -154,7 +154,7 @@ Rules:
 | `analytics.trackReferrers` | boolean | `true` | Captures referrer domain and bounded UTM fields. |
 | `analytics.trackActions` | boolean | `false` | Enables structural action/click capture. Must not capture raw text or form values. Semantic `track()` calls are preferred. |
 | `analytics.trackFrictionSignals` | boolean | `true` | Captures only fixed friction journey markers: three rapid clicks on the same in-memory interactive target yield `friction.repeated_click`, three rapid clicks on an eligible non-interactive target yield `friction.dead_click`, and a quick safe route reversal yields `friction.backtrack`. No target-derived data leaves the page. |
-| `analytics.sampleRate` | number (0.0–1.0) | `1.0` | Analytics event sampling, separate from debug event sampling. |
+| `analytics.sampleRate` | number (0.0–1.0) | `1.0` | V1 browser analytics sampling decided once per initialized analytics session, separate from debug event sampling. |
 | `analytics.journeySampleRate` | number (0.0–1.0) | tier/project default | Controls retained representative journey samples. |
 
 Browser debug breadcrumbs and AnalyticsBundle events should reuse shared frontend primitives where possible: session id management, route/path normalization, device/browser context collection, referrer/UTM parsing, action/click sanitization, and structured journey timeline formatting. Reuse is an SDK implementation concern only. Debug and analytics capture remain independently configured and emitted as separate envelopes with separate consent, sampling, quota, retention, and processing behavior.
@@ -310,7 +310,7 @@ debugbundle.capture_async()         # asyncio loop exception handler
 
 ### 3.4 Go — Vanilla Hooks (legacy v1 example)
 
-The protected v2 candidate uses `github.com/debugbundle/debugbundle-go/v2` for the root and every subpackage, with the current instance-first `debugbundle.New` API. Existing v1 imports remain supported by their published tags. Review replacement-style `RedactFields` rules before upgrading; they are additive to the mandatory baseline in v2. The historical example below describes the original v1 interface, not an installation instruction for the unreleased v2 candidate.
+The current Go 3.x line uses `github.com/debugbundle/debugbundle-go/v3` for the root and every subpackage, with the instance-first `debugbundle.New` API. Existing v1/v2 imports remain available through their published tags. Mandatory protection introduced in v2 remains additive to `RedactFields`; v3 additionally moves hooks and transport off capture callers. Follow `MIGRATION-3.0.md` in the Go SDK repository. The historical example below describes the original v1 interface.
 
 ```go
 package main
@@ -366,7 +366,7 @@ DebugBundle.capture_exceptions   # at_exit + Thread exception handler
 | Semantic Logger | Appender | `SemanticLogger.add_appender(appender: DebugBundle::SemanticAppender.new)` |
 
 Ruby's Rack middleware captures request context automatically. Sidekiq server middleware captures job context for background job errors.
-In the unreleased Ruby 2.0 safety candidate, automatic `at_exit` and unhandled-thread hooks wake the owned sender without waiting for transport. Delivery at immediate process exit is best-effort; applications that require a delivery attempt use an explicit, finite `flush` in a controlled shutdown window. A separate bounded poller retrieves remote configuration, leaving the sender available if that fetch stalls. On first use after a fork, the child discards inherited buffered events, request context, probes, locks, and worker state before starting fresh workers. The parent's effective capture restrictions remain active until the child refreshes remote configuration. Installed Ruby 1.x behavior remains unchanged until a versioned upgrade.
+In the released Ruby 2.x line, automatic `at_exit` and unhandled-thread hooks wake the owned sender without waiting for transport. Delivery at immediate process exit is best-effort; applications that require a delivery attempt use an explicit, finite `flush` in a controlled shutdown window. A separate bounded poller retrieves remote configuration, leaving the sender available if that fetch stalls. On first use after a fork, the child discards inherited buffered events, request context, probes, locks, and worker state before starting fresh workers. The parent's effective capture restrictions remain active until the child refreshes remote configuration. Installed Ruby 1.x behavior remains unchanged until a versioned upgrade.
 
 ### 3.6 Browser — Vanilla Hooks
 
@@ -464,6 +464,14 @@ Browser `unhandledrejection` captures may include `frontend_exception.payload.re
 
 Analytics APIs live under `debugbundle.analytics` so product-usage capture remains distinct from debug/error capture.
 
+The unpublished direct V2 browser candidate now adds coarse schema-checked client dimensions to accepted events without sending the raw user agent. Explicit `trackReferrers: true` allows one protected first-touch acquisition object with an allowlisted landing route, validated referrer hostname and static source/medium/campaign keys. It snapshots only after current capability and consent permit capture, preserving that touch through later route changes and local admission retries. The false setting prevents referrer/query reads before acquisition construction. This partial candidate does not establish delivery-complete attribution or identified audiences.
+
+The first-touch marker advances only after the shared analytics transport admits that event into its bounded lane. A byte-limit admission drop leaves the touch eligible for the next locally admitted event. Later queue eviction or delivery failure still means acquisition coverage can be partial; reports must not claim guaranteed delivery from local admission alone.
+
+Explicit V2 `analytics.pageView({path?})` accepts only a current or supplied exact locally allowlisted pathname after current capability, consent and remote page permission; it does not read V1 page titles. Omitted-schema V1 retains its published `pageView` implementation.
+
+The additive semantic extension is specified separately in `contracts/analytics-semantic.md` and `spec/semantic-analytics.md`. The first release candidate is scoped to JavaScript browser and Node. In the current unpublished candidate, an omitted browser `analytics.schemaVersion` retains this V1 API; the selector is a temporary implementation gate and cannot become a second first-install Analytics product choice. Explicit V2 opt-in uses a separate candidate direct browser `track(name, properties, {eventRevision})` path: it admits strict-privacy product observations under current authenticated capability and consent, then uses the existing bounded analytics transport lane and indexed ACK. Explicit local session/page/route flags provide a partial automatic lifecycle path only after current capability and consent; page/route capture uses an exact static-path allowlist and fixed catalog-declared revision-one names. Current remote analytics disablement, consent and page/route restrictions apply before capture. The initial/refresh wait retains at most 16 protected manual snapshots / 64 KiB for two seconds, charged to that lane; an unavailable capability or consent withdrawal clears them. Activity can request a coalesced capability refresh at most once per minute, with no periodic polling. V2 sampling is stable for a project/session across equivalent capability refreshes. Additive `analytics.getStatus()` reports only semantic state and pending count/bytes; V1 returns a legacy-mode result. Connected identity and relay transport remain open. The composed API capability remains disabled, so this source-only path cannot collect V2 against the default runtime. Existing debug `beforeSend` receives debug envelopes only. The local JS Node companion's separate, default-disabled server candidate has explicit-capability-gated best-effort `track`/`flush`, application-owned outbox `prepare`/`deliver`, metadata-only `getStatus()` and a correlation-only `withContext({traceId?,deployId?})` scope with isolated unsent-work withdrawal/reset. It does not alter debug `init` or `flush`; it remains unreleased and cannot dispatch against the composed disabled V2 capability.
+
 ```ts
 debugbundle.analytics.setConsent(true);
 debugbundle.analytics.setConsent(false);
@@ -502,6 +510,8 @@ Required behavior:
 
 - Analytics APIs are no-ops unless analytics is enabled and consent rules allow capture.
 - Analytics API failures never throw into host pages.
+- A V2 browser capability intersects the local `analytics.sampleRate` with the negotiated remote sample rate for one stable project/session decision; it cannot widen a local zero or lower rate. Its five-minute maximum lifetime also expires by elapsed monotonic time, so a backward wall-clock change cannot extend capture authority.
+- The unpublished Node best-effort writer also expires a cached capture grant and volatile records by elapsed monotonic time as well as wall time. Missing or reset monotonic time closes cached capture and drops uncertain volatile ownership; an explicit outbox `deliver` still rechecks authenticated current capability for each attempt.
 - Analytics batching, retry, unload flushing, and backoff must not block debug event capture or host page behavior.
 - Existing debug capture must continue to work when analytics is disabled, tier-unavailable, missing consent, sampled out, quota-blocked, or internally failing.
 - A direct browser SDK with a project token explicitly requests and reads the bounded `analytics` block from `GET /v1/sdk/config` once at initialization. The request adds `X-DebugBundle-Analytics-Config: 1`, so legacy SDK-config clients receive their unchanged response shape. This remote block may only make a local analytics opt-in more restrictive: it can disable capture, disable page/route/action capture, require explicit consent, or force `strict` privacy. It must not enable a locally analytics-disabled SDK or widen a local capture setting. Relay-mode browser SDKs do not fetch this block because relay transport must remain credential-free; server-side ingestion still enforces project settings for every transport.
@@ -509,8 +519,8 @@ Required behavior:
 - Analytics events must use `event_type: "analytics_event"` with a `payload.kind` rather than adding many top-level event types.
 - SDKs may derive debug breadcrumbs and analytics events from the same sanitized browser signal, but they must decide independently whether to emit a debug breadcrumb, an analytics event, or both.
 - Semantic analytics keys are stored in `payload.signal`: `track(name)` emits `kind: "action"` plus `signal.action_key`, `funnel(name, step)` emits `kind: "funnel_step"` plus `signal.funnel_key` and `signal.step_key`, `convert(name)` emits `kind: "conversion"` plus `signal.conversion_key`, and journey friction markers emit `kind: "journey_marker"` plus `signal.marker_key`.
-- With `analytics.trackActions: true`, browser structural auto-capture emits only a fixed allowlist of generic action keys, currently `click.link`, `click.button`, `click.input`, `click.input.button`, `click.input.checkbox`, `click.input.radio`, `click.input.reset`, `click.input.submit`, `click.select`, `click.summary`, `click.checkbox`, `click.menuitem`, `click.radio`, `click.switch`, and `click.tab`. It uses the last safe route when available, never stores selectors, IDs, target attributes, URLs, input values, or visible text, and is independent from `captureClicks` debug-breadcrumb configuration.
-- With `analytics.trackFrictionSignals: true`, the browser SDK keeps only ephemeral in-memory target-object identity and timing. Three clicks within two seconds on the same structural target emit `friction.repeated_click`; three on the same eligible non-interactive target emit `friction.dead_click`; a safe `A -> B -> A` route reversal within ten seconds emits `friction.backtrack`. Each target has a ten-second local cooldown. Markers contain no target-derived dimensions and remote `capture_friction_signals: false` disables them without changing debug or permitted route analytics.
+- With `analytics.trackActions: true`, browser structural auto-capture emits only a fixed allowlist of generic action keys, currently `click.link`, `click.button`, `click.input`, `click.input.button`, `click.input.checkbox`, `click.input.radio`, `click.input.reset`, `click.input.submit`, `click.select`, `click.summary`, `click.checkbox`, `click.menuitem`, `click.radio`, `click.switch`, and `click.tab`. The V2 direct writer sends each as a revision-one `semantic` fact, requiring its project catalog declaration and current browser capability. It uses the last safe route when available, never stores selectors, IDs, target attributes, URLs, input values, or visible text, and is independent from `captureClicks` debug-breadcrumb configuration.
+- With `analytics.trackFrictionSignals: true`, the browser SDK keeps only ephemeral in-memory target-object identity and timing. Three clicks within two seconds on the same structural target emit `friction.repeated_click`; three on the same eligible non-interactive target emit `friction.dead_click`; a safe `A -> B -> A` route reversal within ten seconds emits `friction.backtrack`. Each target has a ten-second local cooldown. V2 emits fixed revision-one `journey_marker` facts requiring matching catalog definitions, and requires an explicit local friction opt-in. Markers contain no target-derived dimensions and remote `capture_friction_signals: false` disables them without changing debug or permitted route analytics.
 - `marker(name, dimensions?)` is an explicit bounded semantic journey marker. It uses the last safe route when available and must apply the same custom-dimension sanitization as other analytics methods.
 - When session tracking is enabled, the browser SDK emits one `session_summary` before a non-persisted `pagehide` and uses the bounded lifecycle delivery path for its configured transport mode. It must not emit a summary for a page entering the back-forward cache.
 - Browser `route_change` analytics events may include `payload.previous_route` with the same privacy-safe route shape as `payload.route`; both routes must strip query strings and fragments so workers can aggregate route transitions without retaining raw URLs.
@@ -719,35 +729,35 @@ Framework integrations must auto-register log capture alongside error/request ca
 
 ## 10. Language-Specific SDKs
 
-### V1 SDK Targets (Wave 1)
+### SDK Targets (Wave 1)
 
 > Node.js and Browser live in the JS SDK monorepo: `github.com/debugbundle/debugbundle-js`. The maintained shared-types and redaction source remains in the core repository; the SDK monorepo consumes their published packages.
 
 | Language | Package | Registry | Phase | Status |
 |----------|---------|----------|-------|--------|
-| Node.js | `@debugbundle/sdk-node` | npm | Phase 8 | Released v1.6.0 (in `debugbundle-js` repo) |
-| Browser | `@debugbundle/sdk-browser` | npm | Phase 9 | Released v1.6.0 (in `debugbundle-js` repo) |
-| Python | `debugbundle-python` | PyPI | Phase 18 | Released v1.3.0 |
-| PHP | `debugbundle/sdk-php` | Packagist | Phase 18a | Released v1.3.0 |
-| Java | `com.debugbundle:debugbundle-java-core`, servlet/JAX-RS adapters, `com.debugbundle:debugbundle-spring-boot-starter`, and `com.debugbundle:debugbundle-java-agent` | Maven Central | Java SDK | Released v1.3.0 |
-| Go | Published v1: `github.com/debugbundle/debugbundle-go`; protected v2 candidate: `github.com/debugbundle/debugbundle-go/v2` | Go modules | Phase 18b | v1 published; v2 source candidate only |
-| Ruby | `debugbundle` | RubyGems | Phase 18c | Released v1.3.0 |
+| Node.js | `@debugbundle/sdk-node` | npm | Phase 8 | Released v3.0.3 (in `debugbundle-js` repo) |
+| Browser | `@debugbundle/sdk-browser` | npm | Phase 9 | Released v3.0.3 (in `debugbundle-js` repo) |
+| Python | `debugbundle-python` | PyPI | Phase 18 | Released v2.0.1 |
+| PHP | `debugbundle/sdk-php` | Packagist | Phase 18a | Released v2.0.1 |
+| Java | `com.debugbundle:debugbundle-java-core`, servlet/JAX-RS adapters, `com.debugbundle:debugbundle-spring-boot-starter`, and `com.debugbundle:debugbundle-java-agent` | Maven Central | Java SDK | Released v3.0.1 |
+| Go | Current: `github.com/debugbundle/debugbundle-go/v3`; historical v1/v2 tags retained | Go modules | Phase 18b | Released v3.0.1 |
+| Ruby | `debugbundle` | RubyGems | Phase 18c | Released v2.0.1 |
 
-### V1 SDK Targets (Wave 2 — Enterprise & Platform Depth)
+### SDK Targets (Wave 2 — Enterprise & Platform Depth)
 
 | Language | Package | Registry | Status |
 |----------|---------|----------|--------|
-| C# | `DebugBundle.Sdk` plus `DebugBundle.*` integrations | NuGet | Released v1.3.0 |
+| C# | `DebugBundle.Sdk` plus `DebugBundle.*` integrations | NuGet | Released v2.0.1 |
 | Kotlin (server) | `com.debugbundle:debugbundle-kotlin` | Maven Central | Planned |
 | Rust | `debugbundle` | crates.io | Planned |
 
-### V1 SDK Targets (Wave 3 — Client & Mobile Expansion)
+### SDK Targets (Wave 3 — Client & Mobile Expansion)
 
 | Language | Package | Registry | Status |
 |----------|---------|----------|--------|
-| Kotlin (Android) | `com.debugbundle:debugbundle-android` | Maven Central | Released v1.2.0 |
-| Swift (iOS) | `DebugBundle` | Swift Package Manager and CocoaPods | Released v1.2.0 through both registries |
-| React Native | `@debugbundle/sdk-react-native` | npm | Released v1.2.0 |
+| Kotlin (Android) | `com.debugbundle:debugbundle-android` | Maven Central | Released v3.0.1 |
+| Swift (iOS) | `DebugBundle` | Swift Package Manager and CocoaPods | Released v3.0.1 through both registries |
+| React Native | `@debugbundle/sdk-react-native` | npm | Released v3.0.1 |
 | Dart / Flutter | `debugbundle` | pub.dev | Planned |
 
 ### V1 Framework Support Matrix

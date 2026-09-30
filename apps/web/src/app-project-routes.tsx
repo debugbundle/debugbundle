@@ -10,6 +10,7 @@ import { ProjectAnalyticsBundleDetailPage } from "./pages/project-analytics-bund
 import { ProjectAnalyticsBundlesPage } from "./pages/project-analytics-bundles-page.js";
 import { ProjectAnalyticsBundleCreatePage } from "./pages/project-analytics-bundle-create-page.js";
 import { ProjectAnalyticsFunnelsPage } from "./pages/project-analytics-funnels-page.js";
+import { ProjectAnalyticsOrderedFunnelsPage } from "./pages/project-analytics-ordered-funnels-page.js";
 import { ProjectAnalyticsJourneySamplePage } from "./pages/project-analytics-journey-sample-page.js";
 import { ProjectAnalyticsJourneysPage } from "./pages/project-analytics-journeys-page.js";
 import { ProjectAnalyticsLayout } from "./pages/project-analytics-layout.js";
@@ -17,6 +18,7 @@ import { ProjectAnalyticsOpportunitiesPage } from "./pages/project-analytics-opp
 import { ProjectAnalyticsOpportunityDetailPage } from "./pages/project-analytics-opportunity-detail-page.js";
 import { ProjectAnalyticsPage } from "./pages/project-analytics-page.js";
 import { ProjectAnalyticsRoutesPage } from "./pages/project-analytics-routes-page.js";
+import { ProjectAnalyticsTrackingPage } from "./pages/project-analytics-tracking-page.js";
 import { ProjectGitHubPage } from "./pages/project-github-page.js";
 import { ProjectHealthPage } from "./pages/project-health-page.js";
 import { ProjectImprovementsPage } from "./pages/project-improvements-page.js";
@@ -50,7 +52,9 @@ export function createProjectRoutes(): JSX.Element {
       <Route path="analytics" element={<ProjectAnalyticsLayout />}>
         <Route index element={<ProjectAnalyticsPage />} />
         <Route path="routes" element={<ProjectAnalyticsRoutesPage />} />
+        <Route path="tracking" element={<ProjectAnalyticsTrackingPage />} />
         <Route path="funnels" element={<ProjectAnalyticsFunnelsPage />} />
+        <Route path="funnels/ordered" element={<ProjectAnalyticsOrderedFunnelsPage />} />
         <Route path="audiences" element={<ProjectAnalyticsAudiencesPage />} />
         <Route path="journeys" element={<ProjectAnalyticsJourneysPage />} />
         <Route path="opportunities" element={<ProjectAnalyticsOpportunitiesPage />} />

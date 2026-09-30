@@ -31,6 +31,11 @@ import { registerAdminBillingRoutes } from "./routes/admin-billing.js";
 import { registerAnalyticsRoutes } from "./routes/analytics.js";
 import { registerAnalyticsSettingsRoutes } from "./routes/analytics-settings.js";
 import { registerAnalyticsSavedFunnelRoutes } from "./routes/analytics-saved-funnels.js";
+import { registerAnalyticsSpaceRoutes } from "./routes/analytics-spaces.js";
+import { registerAnalyticsSpacePlanRoutes } from "./routes/analytics-space-plan.js";
+import { registerAnalyticsWriterRoutes } from "./routes/analytics-writers.js";
+import { registerAnalyticsPlanRoutes } from "./routes/analytics-plan.js";
+import { registerAnalyticsReportRoutes } from "./routes/analytics-reports.js";
 import { registerAvailabilityCheckRoutes } from "./routes/availability-checks.js";
 import { registerBillingRoutes } from "./routes/billing.js";
 import { registerCapturePolicyRoutes } from "./routes/capture-policy.js";
@@ -58,6 +63,11 @@ import { registerWebhookRoutes } from "./routes/webhooks.js";
 import { registerWeeklyReportChannelRoutes } from "./routes/weekly-report-channels.js";
 import { registerIncidentRoutes } from "./routes/incidents.js";
 import { registerIngestionRoutes } from "./routes/ingestion.js";
+import { registerSemanticAnalyticsDeliveryRoutes } from "./routes/semantic-analytics-delivery.js";
+import { registerSemanticAnalyticsIdentityRoutes } from "./routes/semantic-analytics-identity.js";
+import { registerAnalyticsErasureStatusRoutes } from "./routes/analytics-erasure-status.js";
+import { registerAnalyticsJobRecoveryRoutes } from "./routes/analytics-job-recovery.js";
+import { registerAnalyticsIdentityNamespaceRoutes } from "./routes/analytics-identity-namespace.js";
 import { registerOpenAiConnectionRoutes } from "./routes/openai-connections.js";
 
 export type { ApiDependencies } from "./api-types.js";
@@ -80,6 +90,7 @@ const ALLOWED_CORS_HEADERS = [
   "Content-Type",
   "X-CSRF-Token",
   "X-DebugBundle-Analytics-Config",
+  "X-DebugBundle-Analytics-Schema",
   "X-Debugbundle-Trace-Id"
 ];
 const ALLOWED_CORS_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
@@ -258,7 +269,10 @@ function registerApiCors(app: FastifyInstance, allowedOrigins: string[]): void {
           appendVaryHeader(reply.getHeader("Vary"), "Access-Control-Request-Headers")
         );
         reply.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        reply.header("Access-Control-Allow-Headers", "Authorization, Content-Type");
+        reply.header(
+          "Access-Control-Allow-Headers",
+          "Authorization, Content-Type, X-DebugBundle-Analytics-Schema"
+        );
         reply.header("Access-Control-Max-Age", "86400");
 
         return reply.status(204).send();
@@ -411,7 +425,11 @@ export function createApiServer(
   registerAdminAnalyticsRoutes(app, dependencies);
   registerAdminBillingRoutes(app, dependencies);
   registerAuthRoutes(app, dependencies);
-  registerAgentTokenRoutes(app, dependencies, dogfoodingEnv["AGENT_TOKEN_ISSUANCE_ENABLED"] === "true");
+  registerAgentTokenRoutes(
+    app,
+    dependencies,
+    dogfoodingEnv["AGENT_TOKEN_ISSUANCE_ENABLED"] === "true"
+  );
   registerAgentEvidenceRoutes(app, dependencies);
   registerBillingRoutes(app, dependencies);
   registerGitHubRoutes(app, dependencies);
@@ -428,6 +446,11 @@ export function createApiServer(
   registerAnalyticsRoutes(app, dependencies);
   registerAnalyticsSettingsRoutes(app, dependencies);
   registerAnalyticsSavedFunnelRoutes(app, dependencies);
+  registerAnalyticsSpaceRoutes(app, dependencies);
+  registerAnalyticsSpacePlanRoutes(app, dependencies);
+  registerAnalyticsWriterRoutes(app, dependencies);
+  registerAnalyticsPlanRoutes(app, dependencies);
+  registerAnalyticsReportRoutes(app, dependencies);
   registerCapturePolicyRoutes(app, dependencies);
   registerCaptureRuleRoutes(app, dependencies);
   registerImprovementSettingsRoutes(app, dependencies);
@@ -437,6 +460,11 @@ export function createApiServer(
   registerIncidentRoutes(app, dependencies);
   registerImprovementRoutes(app, dependencies);
   registerIngestionRoutes(app, dependencies);
+  registerSemanticAnalyticsDeliveryRoutes(app, dependencies);
+  registerSemanticAnalyticsIdentityRoutes(app, dependencies);
+  registerAnalyticsErasureStatusRoutes(app, dependencies);
+  registerAnalyticsJobRecoveryRoutes(app, dependencies);
+  registerAnalyticsIdentityNamespaceRoutes(app, dependencies);
 
   if (options.openAiMcp !== undefined) {
     const operationalMonitor = options.openAiMcp.operationalMonitor ?? dogfoodingOpenAiMonitor;

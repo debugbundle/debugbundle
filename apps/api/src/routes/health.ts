@@ -3,9 +3,14 @@ import type { FastifyInstance } from "fastify";
 
 import {
   deriveProbeTriggerTokenKey,
-  requireProjectToken
+  hashToken,
+  readBearerToken,
+  requireProjectToken,
+  validateAnalyticsWriterToken
 } from "../../../../packages/auth/src/index.js";
 import {
+  AnalyticsCapabilitiesSchema,
+  SEMANTIC_ANALYTICS_SCHEMA_VERSION,
   getTierCapabilities,
   resolvePolicy,
   PRESET_DEFAULTS,
@@ -13,6 +18,7 @@ import {
   captureRuleRequiresServerEvaluation
 } from "../../../../packages/shared-types/src/index.js";
 import type {
+  AnalyticsCapabilities,
   AnalyticsSdkConfig,
   AnalyticsSettings,
   ResolvedCapturePolicy
@@ -87,6 +93,40 @@ export function registerHealthRoutes(
   });
 
   app.get("/v1/sdk/config", async (request, reply) => {
+    const requestedSchema = request.headers["x-debugbundle-analytics-schema"];
+    const negotiated = requestedSchema !== undefined;
+    if (negotiated) {
+      reply.header("Cache-Control", "private, no-store");
+      reply.header(
+        "Vary",
+        "Authorization, Origin, X-DebugBundle-Analytics-Schema, X-DebugBundle-Analytics-Config"
+      );
+    }
+
+    const bearer = readBearerToken(request.headers.authorization);
+    if (negotiated && bearer?.startsWith("dbundle_an") === true) {
+      const writerStore = dependencies.analyticsWriters;
+      if (request.headers.origin !== undefined || writerStore === undefined) {
+        return reply.status(401).send({ error: "invalid_analytics_writer" });
+      }
+      const writer = await validateAnalyticsWriterToken(
+        bearer,
+        (hash) => writerStore.resolveByTokenHash(hash),
+        { allowedKinds: ["server"] }
+      );
+      if (!writer.ok) return reply.status(401).send({ error: "invalid_analytics_writer" });
+      if (requestedSchema !== SEMANTIC_ANALYTICS_SCHEMA_VERSION)
+        return reply.status(406).send({ error: "unsupported_analytics_schema" });
+      return reply.status(200).send({
+        analytics_semantic: await resolveSemanticCapability(dependencies, {
+          projectId: writer.context.project_id,
+          principal: "server_writer",
+          credentialHash: hashToken(bearer),
+          receivedAt: new Date().toISOString()
+        })
+      });
+    }
+
     const projectAuth = await requireProjectToken({
       authorizationHeader: request.headers.authorization,
       resolveByTokenHash: (tokenHash) =>
@@ -97,6 +137,7 @@ export function registerHealthRoutes(
         error: "invalid_project_token"
       });
     }
+    if (bearer === null) return reply.status(401).send({ error: "invalid_project_token" });
     if (
       !isProjectTokenOriginAllowed({ headers: request.headers, projectToken: projectAuth.context })
     ) {
@@ -104,6 +145,8 @@ export function registerHealthRoutes(
         error: "origin_not_allowed"
       });
     }
+    if (negotiated && requestedSchema !== SEMANTIC_ANALYTICS_SCHEMA_VERSION)
+      return reply.status(406).send({ error: "unsupported_analytics_schema" });
 
     const caps = getTierCapabilities(projectAuth.context.organization_plan);
     const nowIso = new Date().toISOString();
@@ -146,12 +189,17 @@ export function registerHealthRoutes(
 
     const includesAnalyticsConfig = request.headers["x-debugbundle-analytics-config"] === "1";
     let analyticsConfig = DISABLED_ANALYTICS_SDK_CONFIG;
-    if (includesAnalyticsConfig && caps.analytics_bundle && dependencies.analyticsSettingsManagement !== undefined) {
+    if (
+      includesAnalyticsConfig &&
+      caps.analytics_bundle &&
+      dependencies.analyticsSettingsManagement !== undefined
+    ) {
       try {
-        const analyticsSettings = await dependencies.analyticsSettingsManagement.getAnalyticsSettingsForProject({
-          organization_id: "",
-          project_id: projectAuth.context.project_id
-        });
+        const analyticsSettings =
+          await dependencies.analyticsSettingsManagement.getAnalyticsSettingsForProject({
+            organization_id: "",
+            project_id: projectAuth.context.project_id
+          });
         if (analyticsSettings !== null) {
           analyticsConfig = toAnalyticsSdkConfig(analyticsSettings);
         }
@@ -170,9 +218,20 @@ export function registerHealthRoutes(
       capture_rules: captureRules,
       ...(caps.remote_probes
         ? { trigger_token_key: deriveProbeTriggerTokenKey(projectAuth.context.project_id) }
+        : {}),
+      ...(negotiated
+        ? {
+            analytics_semantic: await resolveSemanticCapability(dependencies, {
+              projectId: projectAuth.context.project_id,
+              principal: "project_token",
+              credentialHash: hashToken(bearer),
+              receivedAt: nowIso
+            })
+          }
         : {})
     };
 
+    if (negotiated) return reply.status(200).send(responseBody);
     const etag = `"${createHash("sha256").update(JSON.stringify(responseBody), "utf8").digest("hex").slice(0, 16)}"`;
     reply.header("Cache-Control", "public, s-maxage=30");
     reply.header("Vary", "X-DebugBundle-Analytics-Config");
@@ -184,6 +243,78 @@ export function registerHealthRoutes(
     }
 
     return reply.status(200).send(responseBody);
+  });
+}
+
+async function resolveSemanticCapability(
+  dependencies: ApiDependencies,
+  input: {
+    projectId: string;
+    principal: "server_writer" | "project_token";
+    credentialHash: string;
+    receivedAt: string;
+  }
+): Promise<AnalyticsCapabilities> {
+  const ready =
+    dependencies.semanticAnalyticsCapabilities?.enabled === true &&
+    dependencies.semanticAnalyticsReports?.enabled === true &&
+    (input.principal === "server_writer"
+      ? dependencies.semanticAnalyticsDelivery?.enabled === true
+      : dependencies.semanticAnalyticsClientDelivery?.enabled === true);
+  if (!ready) return disabledSemanticCapability(input.projectId, input.principal);
+  try {
+    const result = await dependencies.semanticAnalyticsCapabilities!.resolve(input);
+    const parsed = AnalyticsCapabilitiesSchema.safeParse(result);
+    if (
+      parsed.success &&
+      parsed.data.project_id === input.projectId &&
+      parsed.data.principal === input.principal &&
+      parsed.data.scope.kind === "project" &&
+      parsed.data.scope.project_id === input.projectId &&
+      Date.parse(parsed.data.expires_at) > Date.parse(input.receivedAt)
+    )
+      return parsed.data;
+  } catch {
+    // Policy and schema failures are private disabled responses, never a broad grant.
+  }
+  return disabledSemanticCapability(input.projectId, input.principal, "policy_rejected");
+}
+
+function disabledSemanticCapability(
+  projectId: string,
+  principal: "server_writer" | "project_token",
+  unavailableReason: "not_enabled" | "policy_rejected" = "not_enabled"
+): AnalyticsCapabilities {
+  const now = new Date();
+  return AnalyticsCapabilitiesSchema.parse({
+    protocol: "2026-09-analytics-capabilities-01",
+    project_id: projectId,
+    principal,
+    server_time: now.toISOString(),
+    expires_at: new Date(now.getTime() + 300_000).toISOString(),
+    enabled: false,
+    unavailable_reason: unavailableReason,
+    schema_version: SEMANTIC_ANALYTICS_SCHEMA_VERSION,
+    scope: { kind: "project", project_id: projectId },
+    scope_revision: 1,
+    catalog_revision: null,
+    namespace_revision: null,
+    identity_scope: null,
+    known_identity_allowed: false,
+    allowed_producers: [],
+    allowed_purposes: [],
+    consent_required: true,
+    privacy_mode: "strict",
+    sample_rate: 1,
+    max_event_bytes: 16_384,
+    max_batch_events: 256,
+    max_batch_bytes: 262_144,
+    max_properties: 0,
+    detailed_retention_days: 90,
+    max_event_age_seconds: 604_800,
+    correction_seconds: 172_800,
+    receipt_retention_days: 90,
+    retry_after_max_ms: 300_000
   });
 }
 

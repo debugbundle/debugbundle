@@ -1,7 +1,7 @@
 # SDK Language Targets — DebugBundle
 
 Version: v1
-Last updated: 2026-05-30
+Last updated: 2026-09-28
 
 ---
 
@@ -92,7 +92,7 @@ Do not treat an SDK as release-ready until those gates are defined in the plan a
 - `debugbundle-wordpress` — WordPress plugin wrapper over the PHP SDK plus browser relay
 - `com.debugbundle:debugbundle-spring-boot-starter` — Java SDK with Spring Boot MVC starter backed by `debugbundle-java-core`
 
-The JS packages live in the JS SDK monorepo: `github.com/debugbundle/debugbundle-js` (alongside `@debugbundle/shared-types` and `@debugbundle/redaction`). Python, PHP, WordPress, Java, Ruby, and Go live in their own dedicated repositories.
+The JS packages live in the standalone JS SDK monorepo: `github.com/debugbundle/debugbundle-js`. `@debugbundle/shared-types` and `@debugbundle/redaction` remain core-owned packages consumed at published, pinned versions by that SDK repository. Python, PHP, WordPress, Java, Ruby, and Go live in their own dedicated repositories.
 
 Current cross-repo release sequencing for the JS family is intentional: publish core-owned `@debugbundle/shared-types` and `@debugbundle/redaction` first, then publish `@debugbundle/sdk-node` and `@debugbundle/sdk-browser` from `debugbundle-js`, then update dependent wrappers such as WordPress after their prerequisite packages are live and verified.
 
@@ -100,13 +100,13 @@ Current cross-repo release sequencing for the JS family is intentional: publish 
 
 TypeScript and JavaScript are delivered as one shared npm SDK surface, exactly as this document recommends.
 
-**Published SDK expansion and prepared plans:**
-- `github.com/debugbundle/debugbundle-go` — Go SDK v1 published through Go modules; the privacy-protected major candidate uses `github.com/debugbundle/debugbundle-go/v2` and is not yet tagged. Detailed implementation plan: `spec/sdks/go-sdk.md`.
+**SDK expansion and prepared plans:** The versions below describe inspected local source or historical milestones; exact registry availability must be checked separately before a release claim.
+- `github.com/debugbundle/debugbundle-go/v3` — the inspected standalone checkout is tagged `v3.0.1` and uses the `/v3` module path. Existing `/v1` and `/v2` imports remain historical installed-base paths. Detailed implementation plan: `spec/sdks/go-sdk.md`.
 - `debugbundle` (RubyGems) — Ruby SDK published through RubyGems. Detailed implementation plan: `spec/sdks/ruby-sdk.md`.
-- `github.com/debugbundle/debugbundle-android` — Kotlin Android SDK 1.2.0 is published with canonical mobile envelopes, indexed ingestion acknowledgement, durable queueing, crash/ANR replay, native trace propagation, capture policy, probes, `beforeSend`, OkHttp/Ktor, Navigation/Compose, Timber, testkit, BOM, per-file coverage, and a Kotlin 2.1 consumer-metadata gate. The detailed plan lives in `spec/sdks/kotlin-sdk.md`.
-- `github.com/debugbundle/debugbundle-swift` — Swift iOS SDK 1.2.0 is published through Swift Package Manager and CocoaPods with canonical `{events}` delivery, indexed acknowledgement, durable queueing, URLSession/Alamofire, UIKit/SwiftUI, SwiftLog, crash replay, capture policy, probes, `beforeSend`, and per-file coverage. The detailed plan lives in `spec/sdks/swift-sdk.md`.
-- `github.com/debugbundle/debugbundle-react-native` — `@debugbundle/sdk-react-native` 1.2.0 is published after clean consumers verified the Android and Swift 1.2 dependencies. It preserves its canonical RN envelope and JavaScript error identity through native queueing, composes native capture policy/probes/config, exposes actual asynchronous trigger-token validation, implements `beforeSend`, and tracks a frozen npm lockfile.
-- `github.com/debugbundle/debugbundle-dotnet` — C#/.NET SDK 1.3.0 implements the NuGet package family, remote config/capture policy/probes, canonical transport acknowledgement, `beforeSend`, secure local transports, and browser relay parity. The detailed plan lives in `spec/sdks/csharp-sdk.md`.
+- `github.com/debugbundle/debugbundle-android` — inspected local checkout `v3.0.1`; the prior 1.2.0 line introduced canonical mobile envelopes, indexed acknowledgement, durable queueing, crash/ANR replay, native trace propagation, capture policy, probes, `beforeSend`, OkHttp/Ktor, Navigation/Compose, Timber, testkit, BOM, per-file coverage, and a Kotlin 2.1 consumer-metadata gate. The detailed plan lives in `spec/sdks/kotlin-sdk.md`.
+- `github.com/debugbundle/debugbundle-swift` — inspected local checkout `v3.0.1`; the prior 1.2.0 line introduced canonical `{events}` delivery, indexed acknowledgement, durable queueing, URLSession/Alamofire, UIKit/SwiftUI, SwiftLog, crash replay, capture policy, probes, `beforeSend`, and per-file coverage. The detailed plan lives in `spec/sdks/swift-sdk.md`.
+- `github.com/debugbundle/debugbundle-react-native` — inspected local package version `3.0.1`; the prior 1.2.0 line added native queueing/capture policy/probes/config, asynchronous trigger-token validation and `beforeSend`. Native bridge/dependency pins and both bridge modes must be verified against the exact candidate before any new analytics release.
+- `github.com/debugbundle/debugbundle-dotnet` — inspected local package version `2.0.1`; its package family implements remote config/capture policy/probes, canonical acknowledgement, `beforeSend`, secure local transports, and browser relay parity. The detailed plan lives in `spec/sdks/csharp-sdk.md`.
 
 ---
 
@@ -822,7 +822,7 @@ For the next phase of SDK implementation, DebugBundle should prioritize these tw
 - **Immediate implementation focus (Wave 1):** TS/JS, Python, PHP, WordPress plugin, Java core + Spring Boot + servlet/JAX-RS app-server support, Ruby, Go
 - **Pre-release expansion:** Ruby and Go publication handoff
 - **Next depth layer (Wave 2):** C#/.NET is on 1.3.0; Kotlin server and Rust remain future work.
-- **Strategic product expansion (Wave 3):** Kotlin Android, Swift iOS, and React Native are published on the coordinated 1.2.0 remediation line; Dart/Flutter remains future work.
+- **Strategic product expansion (Wave 3):** Kotlin Android, Swift iOS, and React Native reached a coordinated 1.2.0 remediation milestone; the inspected local source is now on the 3.0.1 line. Exact registry status is a separate release check. Dart/Flutter remains future work.
 
 ### V1 framework scope per SDK
 

@@ -3,6 +3,8 @@ export { FINGERPRINT_VERSION, RESOURCE_FINGERPRINT_VERSION, fingerprint, fingerp
 export type { FingerprintVersion } from "./fingerprints.js";
 export { sanitizeEvent } from "./event-privacy.js";
 export { protectAnalyticsEvent } from "./analytics-privacy.js";
+export { admitSemanticAnalyticsEvent, type SemanticAnalyticsAdmissionContext, type SemanticAnalyticsAdmissionResult } from "./semantic-analytics-admission.js";
+export { validatePreparedAnalyticsBatch, matchAnalyticsDeliveryReceipt, type PreparedAnalyticsBatchResult, type AnalyticsReceiptMatch } from "./semantic-analytics-outbox.js";
 export { parseStoredEvent } from "./stored-event.js";
 
 import { redact, type JsonValue } from "../../redaction/src/index.js";

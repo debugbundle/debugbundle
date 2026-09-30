@@ -2,7 +2,7 @@ import { Pool } from "pg";
 import { pathToFileURL } from "url";
 import { z } from "zod";
 
-import { bootstrapStorageSchema } from "../packages/storage/src/migrations.js";
+import { prepareStorageBootstrap } from "../packages/storage/src/migrations.js";
 import { seedStorageMigrationLedgerForCurrentSchema } from "../packages/storage/src/schema-migrations.js";
 import { buildPostgresSslConfig } from "../packages/storage/src/postgres-ssl.js";
 
@@ -33,9 +33,13 @@ export async function runStorageBootstrapScript(
   const client = await pool.connect();
 
   try {
-    const result = await bootstrapStorageSchema({
+    const result = await prepareStorageBootstrap({
       query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) => client.query<Row>(sql, params)
     });
+    if (result.status === "existing_schema") {
+      console.log("db_bootstrap_skipped: existing_schema; run_db_migrate_required");
+      return;
+    }
     const ledgerStatus = await seedStorageMigrationLedgerForCurrentSchema({
       query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) => client.query<Row>(sql, params)
     });

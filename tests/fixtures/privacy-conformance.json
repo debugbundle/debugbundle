@@ -237,6 +237,66 @@
         "account/password": "[REDACTED]",
         "safe": 1
       }
+    },
+    {
+      "id": "analytics_anl_credential",
+      "input": {
+        "message": "rejected dbundle_anl_SYNTHETIC_ANALYTICS_CREDENTIAL; retry",
+        "context": {
+          "safe_label": "checkout",
+          "note": "dbundle_anl_SYNTHETIC_ANALYTICS_CREDENTIAL"
+        }
+      },
+      "expected": {
+        "message": "rejected [REDACTED]; retry",
+        "context": {
+          "safe_label": "checkout",
+          "note": "[REDACTED]"
+        }
+      }
+    },
+    {
+      "id": "analytics_anr_credential",
+      "input": {
+        "message": "rejected dbundle_anr_SYNTHETIC_ANALYTICS_CREDENTIAL; retry",
+        "context": {
+          "safe_label": "checkout",
+          "note": "dbundle_anr_SYNTHETIC_ANALYTICS_CREDENTIAL"
+        }
+      },
+      "expected": {
+        "message": "rejected [REDACTED]; retry",
+        "context": {
+          "safe_label": "checkout",
+          "note": "[REDACTED]"
+        }
+      }
+    },
+    {
+      "id": "analytics_ah_credential",
+      "input": {
+        "message": "rejected dbundle_ah_SYNTHETIC_ANALYTICS_CREDENTIAL; retry",
+        "context": {
+          "safe_label": "checkout",
+          "note": "dbundle_ah_SYNTHETIC_ANALYTICS_CREDENTIAL"
+        }
+      },
+      "expected": {
+        "message": "rejected [REDACTED]; retry",
+        "context": {
+          "safe_label": "checkout",
+          "note": "[REDACTED]"
+        }
+      }
+    },
+    {
+      "id": "analytics_handoff_fragment",
+      "input": {
+        "url": "https://app.example.test/onboarding#dbundle_ah_SYNTHETIC_ANALYTICS_CREDENTIAL"
+      },
+      "expected": {
+        "url": "https://app.example.test/onboarding"
+      }
     }
   ]
 }

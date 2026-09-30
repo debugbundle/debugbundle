@@ -1,4 +1,30 @@
 import { BROWSER_RECOVERY_MIGRATIONS } from "./browser-recovery-schema.js";
+import { ANALYTICS_SPACE_STORAGE_SCHEMA_MIGRATIONS } from "./analytics-space-schema.js";
+import { ANALYTICS_WRITER_STORAGE_SCHEMA_MIGRATIONS } from "./analytics-writer-schema.js";
+import { ANALYTICS_PROJECT_CATALOG_SCHEMA_MIGRATIONS } from "./analytics-project-catalog-schema.js";
+import { ANALYTICS_MEASUREMENT_PLAN_SCHEMA_MIGRATIONS } from "./analytics-measurement-plan-schema.js";
+import { ANALYTICS_SPACE_PLAN_SCHEMA_MIGRATIONS } from "./analytics-space-plan-schema.js";
+import { ANALYTICS_SPACE_REPORT_SCHEMA_MIGRATIONS } from "./analytics-space-report-schema.js";
+import { SEMANTIC_ANALYTICS_PORTFOLIO_FUNNEL_SCHEMA_MIGRATIONS } from "./semantic-analytics-portfolio-funnel-schema.js";
+import { SEMANTIC_ANALYTICS_SERVER_IDENTITY_MIGRATIONS } from "./semantic-analytics-server-identity-schema.js";
+import { ANALYTICS_SPACE_IDENTITY_NAMESPACE_MIGRATIONS } from "./analytics-space-identity-namespace-schema.js";
+import { SEMANTIC_ANALYTICS_RECEIPT_SCHEMA_MIGRATIONS } from "./semantic-analytics-receipt-schema.js";
+import { SEMANTIC_ANALYTICS_OBSERVATION_SCHEMA_MIGRATIONS } from "./semantic-analytics-observation-schema.js";
+import { SEMANTIC_ANALYTICS_ORPHAN_SWEEP_SCHEMA_MIGRATIONS } from "./semantic-analytics-orphan-sweep-schema.js";
+import { ANALYTICS_BUSINESS_PURPOSE_SCHEMA_MIGRATIONS } from "./analytics-business-purpose-schema.js";
+import { SEMANTIC_ANALYTICS_RAW_RETENTION_SCHEMA_MIGRATIONS } from "./semantic-analytics-raw-retention-schema.js";
+import { PROJECT_OBJECT_ERASURE_SCHEMA_MIGRATIONS } from "./project-object-erasure-schema.js";
+import { SEMANTIC_ANALYTICS_LOSS_SCHEMA_MIGRATIONS } from "./semantic-analytics-loss-schema.js";
+import { SEMANTIC_ANALYTICS_FUNNEL_SCHEMA_MIGRATIONS } from "./semantic-analytics-funnel-schema.js";
+import { ANALYTICS_IDENTITY_CONTEXT_SCHEMA_MIGRATIONS } from "./analytics-identity-context-schema.js";
+import { SEMANTIC_ANALYTICS_PRODUCER_OBSERVATION_MIGRATIONS } from "./semantic-analytics-producer-observation-schema.js";
+import { ANALYTICS_IDENTITY_REVOCATION_SCHEMA_MIGRATIONS } from "./analytics-identity-revocation-schema.js";
+import { SEMANTIC_ANALYTICS_IDENTITY_RECEIPT_MIGRATIONS } from "./semantic-analytics-identity-receipt-schema.js";
+import { ANALYTICS_IDENTITY_EPOCH_SCHEMA_MIGRATIONS } from "./analytics-identity-epoch-schema.js";
+import { SEMANTIC_ANALYTICS_RECEIPT_SUBJECT_MIGRATIONS } from "./semantic-analytics-receipt-subject-schema.js";
+import { ANALYTICS_IDENTITY_ASSOCIATION_SCHEMA_MIGRATIONS } from "./analytics-identity-association-schema.js";
+import { ANALYTICS_SUBJECT_ERASURE_SCHEMA_MIGRATIONS } from "./analytics-subject-erasure-schema.js";
+import { ANALYTICS_SUBJECT_ERASURE_OUTCOME_SCHEMA_MIGRATIONS } from "./analytics-subject-erasure-outcome-schema.js";
 import { type Queryable } from "./migrations.js";
 import {
   ensureLegacyGitHubDispatchFingerprintCompatibility,
@@ -32,7 +58,33 @@ export const STORAGE_SCHEMA_MIGRATIONS: readonly StorageSchemaMigration[] = [
   ...AVAILABILITY_CHECK_STORAGE_SCHEMA_MIGRATIONS,
   ...ANALYTICS_STORAGE_SCHEMA_MIGRATIONS,
   ...OPENAI_OAUTH_STORAGE_SCHEMA_MIGRATIONS,
-  ...WORKER_JOB_SCHEMA_MIGRATIONS
+  ...WORKER_JOB_SCHEMA_MIGRATIONS,
+  ...ANALYTICS_SPACE_STORAGE_SCHEMA_MIGRATIONS,
+  ...ANALYTICS_WRITER_STORAGE_SCHEMA_MIGRATIONS,
+  ...ANALYTICS_PROJECT_CATALOG_SCHEMA_MIGRATIONS,
+  ...ANALYTICS_MEASUREMENT_PLAN_SCHEMA_MIGRATIONS,
+  ...ANALYTICS_SPACE_PLAN_SCHEMA_MIGRATIONS,
+  ...SEMANTIC_ANALYTICS_RECEIPT_SCHEMA_MIGRATIONS,
+  ...SEMANTIC_ANALYTICS_OBSERVATION_SCHEMA_MIGRATIONS,
+  ...SEMANTIC_ANALYTICS_ORPHAN_SWEEP_SCHEMA_MIGRATIONS,
+  ...ANALYTICS_BUSINESS_PURPOSE_SCHEMA_MIGRATIONS,
+  ...SEMANTIC_ANALYTICS_RAW_RETENTION_SCHEMA_MIGRATIONS,
+  ...PROJECT_OBJECT_ERASURE_SCHEMA_MIGRATIONS,
+  ...SEMANTIC_ANALYTICS_LOSS_SCHEMA_MIGRATIONS,
+  ...SEMANTIC_ANALYTICS_FUNNEL_SCHEMA_MIGRATIONS,
+  ...ANALYTICS_IDENTITY_CONTEXT_SCHEMA_MIGRATIONS,
+  ...SEMANTIC_ANALYTICS_PRODUCER_OBSERVATION_MIGRATIONS,
+  ...ANALYTICS_IDENTITY_REVOCATION_SCHEMA_MIGRATIONS,
+  ...SEMANTIC_ANALYTICS_IDENTITY_RECEIPT_MIGRATIONS,
+  ...ANALYTICS_IDENTITY_EPOCH_SCHEMA_MIGRATIONS,
+  ...SEMANTIC_ANALYTICS_RECEIPT_SUBJECT_MIGRATIONS,
+  ...ANALYTICS_IDENTITY_ASSOCIATION_SCHEMA_MIGRATIONS,
+  ...ANALYTICS_SUBJECT_ERASURE_SCHEMA_MIGRATIONS,
+  ...ANALYTICS_SUBJECT_ERASURE_OUTCOME_SCHEMA_MIGRATIONS,
+  ...ANALYTICS_SPACE_REPORT_SCHEMA_MIGRATIONS,
+  ...SEMANTIC_ANALYTICS_PORTFOLIO_FUNNEL_SCHEMA_MIGRATIONS,
+  ...SEMANTIC_ANALYTICS_SERVER_IDENTITY_MIGRATIONS,
+  ...ANALYTICS_SPACE_IDENTITY_NAMESPACE_MIGRATIONS
 ].sort((left, right) => left.id.localeCompare(right.id));
 
 function validateStorageSchemaMigrations(migrations: readonly StorageSchemaMigration[]): void {

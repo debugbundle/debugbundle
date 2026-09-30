@@ -1,3 +1,8 @@
+import type { FastifyBaseLogger } from "fastify";
+import {
+  classifyInstalledJavaEventCompatibility,
+  classifyInstalledMobileEventCompatibility
+} from "../../../packages/event-normalizer/src/index.js";
 import { IngestionRequestSchema } from "./schemas.js";
 
 function isRecord(candidate: unknown): candidate is Record<string, unknown> {
@@ -38,4 +43,35 @@ export function parseCompatibleIngestionRequest(candidate: unknown): {
     parsedBody: IngestionRequestSchema.safeParse({ events: batch }),
     compatibility: "legacy_swift_batch"
   };
+}
+
+/** Preserve bounded use metrics for installed Java, Android and Swift envelopes. */
+export function logInstalledIngestionCompatibility(input: {
+  events: unknown[];
+  wrapper: "legacy_swift_batch" | null;
+  log: Pick<FastifyBaseLogger, "info">;
+}): void {
+  const counts = {
+    legacy_java_runtime_event: 0,
+    legacy_android_event: 0,
+    legacy_swift_event: 0
+  };
+  for (const candidate of input.events) {
+    const mobile = classifyInstalledMobileEventCompatibility(candidate);
+    if (mobile !== null) counts[mobile]++;
+    if (classifyInstalledJavaEventCompatibility(candidate) !== null)
+      counts.legacy_java_runtime_event++;
+  }
+  const count =
+    counts.legacy_java_runtime_event + counts.legacy_android_event + counts.legacy_swift_event;
+  if (input.wrapper !== null || count > 0)
+    input.log.info(
+      {
+        compatibility_wrapper: input.wrapper,
+        compatibility_event_counts: counts,
+        compatibility_event_count: count,
+        request_event_count: input.events.length
+      },
+      "ingestion_installed_sdk_compatibility_used"
+    );
 }

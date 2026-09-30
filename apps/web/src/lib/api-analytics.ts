@@ -1,5 +1,7 @@
 import { API_BASE, buildBrowserSessionHeaders, readJson } from "./api-client.js";
 import { ANALYTICS_BUNDLE_GENERATION_ID_HEADER } from "../../../../packages/shared-types/src/index.js";
+import type { AnalyticsProjectPlanRecord } from "../../../../packages/shared-types/src/index.js";
+import type { ProjectSemanticFunnelReportResponse } from "../../../../packages/analytics-engine/src/funnel-report-protocol.js";
 import type {
   AnalyticsBundleGenerationsListResponse,
   AnalyticsBundleInventoryQuery,
@@ -35,6 +37,34 @@ export async function getProjectAnalyticsSettings(
     await fetch(`${API_BASE}/v1/projects/${projectId}/analytics-settings`, {
       credentials: "include"
     })
+  );
+}
+
+export async function getProjectAnalyticsPlan(
+  projectId: string
+): Promise<AnalyticsProjectPlanRecord> {
+  return readJson<AnalyticsProjectPlanRecord>(
+    await fetch(`${API_BASE}/v1/projects/${encodeURIComponent(projectId)}/analytics/plan`, {
+      credentials: "include"
+    })
+  );
+}
+
+export async function getProjectOrderedFunnelReport(
+  projectId: string,
+  reportKey: string,
+  last: "7d" | "30d" | "90d"
+): Promise<ProjectSemanticFunnelReportResponse> {
+  return readJson<ProjectSemanticFunnelReportResponse>(
+    await fetch(
+      `${API_BASE}/v1/analytics/scopes/project/${encodeURIComponent(projectId)}/reports/query`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: buildBrowserSessionHeaders(true),
+        body: JSON.stringify({ report_key: reportKey, last })
+      }
+    )
   );
 }
 

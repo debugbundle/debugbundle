@@ -204,6 +204,7 @@ export interface GenerateWeeklyReportJob {
 
 export interface CleanupRetentionJob {
   scheduled_at: string;
+  scope?: "semantic_raw";
 }
 
 export interface CreateRedisQueueClientInput {

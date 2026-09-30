@@ -184,6 +184,9 @@ it("never asks Redis for internal jobs and rejects nontransactional configuratio
   await worker.transaction("evaluate-event-improvement", async (_tx, scoped) => {
     expect(await scoped.dequeueInternal("evaluate-event-improvement")).toBeNull();
   });
+  await worker.transaction("process-semantic-analytics-event", async (_tx, scoped) => {
+    expect(await scoped.dequeueInternal("process-semantic-analytics-event")).toBeNull();
+  });
   expect(redis.claim).not.toHaveBeenCalled();
   expect(journal.lock).not.toHaveBeenCalled();
   await worker.close();
