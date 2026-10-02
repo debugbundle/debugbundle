@@ -1,3 +1,5 @@
+> Current analytics task (2026-10-02): follow [the focused visits/activation plan](spec/analytics-visit-flows-plan-20261002.md) and [scope reset](spec/analytics-scope-reset-20261002.md). The expanded `update/analytics` work is parked; its unfinished roadmap is not the active scope. See [STATUS.md](STATUS.md) for the handoff.
+
 # ARCHITECTURE MAP — DebugBundle
 
 > Module boundary map for agent navigation.
