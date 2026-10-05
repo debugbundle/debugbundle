@@ -2,6 +2,7 @@
 
 The 1.0.1 skill-routing patch retains this 1.0.0 remote-MCP evidence. Its optional local CLI handoff uses separate existing authentication and explicit user authorization; no MCP permission or data projection expands. Fresh model handoff acceptance and public review/publication remain pending.
 
+Current portal status (2026-10-05): the 1.0.1 ZIP draft is accepted and its MCP domain is verified, but the lower **Connect** action fails before authorization or tool scanning with a pre-defined OAuth client ID error. The owner reports sending the drafted follow-up about the new ZIP flow and the prolonged wait in support case `15122330`; a support response is pending. The exact lower-Connect error was observed after that email and has not been confirmed as separately sent to support. No review submission, approval, or publication has occurred.
 
 Status markers in this file are deliberately manual. A repository-local green result does not satisfy a live, owner, reviewer, or publication gate.
 
@@ -9,7 +10,7 @@ Status markers in this file are deliberately manual. A repository-local green re
 
 - [x] Source contract freezes exactly twenty-three read-only tools and eight OAuth/OIDC scopes.
 - [x] Field-level data map, threat model, OAuth decision record, schemas, and synthetic reviewer fixture exist.
-- [x] Package contains no `.mcp.json`, credential, challenge token, OAuth key, client assertion, or customer data.
+- [x] The local Developer Mode source contains no `.mcp.json`; the generated portal ZIP contains a remote `.mcp.json`. Neither contains a credential, challenge token, OAuth key, client assertion, or customer data.
 - [x] Engineering privacy review reconciles the exact data map, implementation exclusions, public disclosure categories, OpenAI as recipient, purpose, retention, and user controls in `policy-review.md`.
 - [x] Engineering security pre-ship review on 2026-09-08 found no new trust-boundary, resource-cleanup, schema, deployment-order, secret, or compatibility risk in the accessibility evidence, client corpus, tool-scan archive, and three-starter-prompt package correction.
 - [x] Reconciled public privacy, terms, support, and OpenAI documentation are deployed at the exact listing URLs by site-only run `33954101292` and reviewed as rendered.
@@ -55,7 +56,14 @@ Status markers in this file are deliberately manual. A repository-local green re
 
 ## Submission and publication
 
-- [x] Official OpenAI requirements were revalidated against primary documentation on 2026-09-05. Recheck after 2026-09-12 or if the live portal differs before submission.
+- [x] Official OpenAI ZIP-first submission guidance was rechecked on 2026-10-05. The deterministic portal package uses one remote `.mcp.json`, excludes the local Developer Mode `.app.json`, includes four listing URLs, and embeds exactly five positive and three negative review cases. Local validation is separate from a portal upload or scan.
+- [ ] An accessible demo recording of the reviewer cases and main plugin behavior is supplied to the portal. Follow `demo-recording-plan.md`; the owner confirmed on 2026-10-05 that no recording exists yet.
+- [ ] The synthetic reviewer credential's exact expiry is checked and outside-network login remains valid for review.
+- [x] The generated 1.0.1 ZIP was accepted as a new initial Platform draft. The owner screenshot shows public name `DebugBundle`, package name `debugbundle`, version `1.0.1 · Draft`, the imported skill, and the exact production MCP URL. This is package upload evidence only, not completed skill/MCP review. The installed local plugin-creator validator rejects the current documented `extensions` and `supportURL` fields, so portal findings remain authoritative.
+- [x] The owner-approved protected config-only run `37320276604` completed on 2026-10-05 with existing OAuth, hosted MCP, reviewer access, and Caddy gate settings preserved. An outside-network check immediately afterward returned HTTP `200` with `text/plain` from the portal's challenge URL, and the response body matched the configured repository variable. The owner's subsequent portal screenshot shows **Domain verified** for the 1.0.1 draft. No challenge value is stored in this package.
+- [ ] The imported skill finishes its portal safety scan without a blocking finding. The upload screenshot still shows `Checking` and `0 of 1 skills checked`; the privacy-policy automated assessment shows a warning that additional review may be requested.
+- [ ] The production MCP connection is established with CIMD and `private_key_jwt`, and a current tool scan passes. Domain verification passed, but the lower **Connect** action on 2026-10-05 failed with `MCP details save failed: OAuth client ID is required when using pre-defined OAuth client credentials.` The drawer retained `Authorization unavailable`; OAuth could not proceed and no tool scan ran. The ZIP's remote `.mcp.json` contains only the production URL, matching the documented package example. Fresh public checks return the protected-resource metadata, authorization-server metadata advertising CIMD, PKCE `S256`, and `private_key_jwt`, plus the expected `401` MCP initialization challenge with a protected-resource metadata URL. The portal's registration-method choice remains unexplained; retain the OAuth contract and escalate this exact new-flow failure with the existing support case.
+- [ ] Every tool's `readOnlyHint: true`, `openWorldHint: false`, and `destructiveHint: false` annotations and explanations are checked in the imported scan: each reads bounded authorized DebugBundle records, no tool reaches an open-ended external entity, and none changes customer state.
 - [x] Country/region availability is owner-approved as every country supported by the live OpenAI portal.
 - [ ] Live portal category is recorded as `Developer Tools` if offered; otherwise the closest category requires owner review before submission.
 - [x] The fresh authenticated 23-tool scan matches the release manifest exactly; its non-secret catalog and aggregate pass/fail evidence are archived in `tool-scan.json` and enforced by the release contract test.

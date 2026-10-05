@@ -990,6 +990,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Given** a production-ready candidate
 - **When** submission evidence is assembled
 - **Then** it includes verified publisher/legal URLs, the universal production MCP URL submitted from scratch, exact scanned tools, an outside-network reviewer login, five positive and three negative reproducible cases, privacy/data-map review, threat-model closure, and production monitoring evidence
+- **And** the ZIP-first **With MCP** artifact declares the hosted endpoint in `.mcp.json`, excludes the local Developer Mode `.app.json` mapping, carries submission-compliant listing fields and exactly five positive/three negative cases, and records the generated ZIP hash independently of the local source package
 - **And** submission or Cancel Review requires explicit owner approval after exact packet review
 - **And** approval does not publish; publication requires a separate explicit owner approval and post-publication verification in the shared ChatGPT/Codex Plugins Directory
 - **And** directory edits, announcements, press/social outreach, or recurring spend remain separate explicit approval gates

@@ -228,6 +228,8 @@ An OpenAI candidate is not submission-ready until all of the following are indep
 
 Developer Mode connection/scan is testing evidence only. It does not authorize submission and the portal must submit the production MCP URL from scratch, not reference an existing integration/app ID.
 
+The current portal submission begins with a ZIP on the **With MCP** path. The local Developer Mode package contains `.app.json` and an `apps` reference; the repository release driver must exclude both from the portal ZIP, declare the permanent production endpoint in `.mcp.json`, include the current listing URLs and exactly five positive/three negative cases, and record the resulting ZIP hashes. Portal validation and skill scans do not replace domain verification, a current MCP tool scan, a reviewer-accessible demo recording, or valid private reviewer credentials. The generated ZIP must not contain credentials or the domain challenge token. If CIMD is unavailable during MCP connection, retain the approved `private_key_jwt` OAuth contract and escalate the exact portal finding rather than switching registration modes.
+
 #### Approval And Portal Gates
 
 - Creating or editing non-live local packet files is reversible preparation. Opening/altering a portal draft, submitting for review, selecting Cancel Review, appealing, publishing, unpublishing, deleting a plugin, or changing a live directory record is an external action.

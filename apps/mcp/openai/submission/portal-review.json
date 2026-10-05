@@ -1,0 +1,61 @@
+{
+  "test_cases": {
+    "positive": [
+      {
+        "source_case_id": "positive-list-active-incidents",
+        "description": "Find active incidents in the synthetic checkout project",
+        "prompt": "Show me the active production incidents for my synthetic checkout project.",
+        "tools_triggered": "list_projects, list_incidents",
+        "expected_behavior": "List the authorized synthetic project and its active high-severity incident without changing either record."
+      },
+      {
+        "source_case_id": "positive-triage-with-artifacts",
+        "description": "Triage an incident using existing redacted evidence",
+        "prompt": "Triage the synthetic checkout incident using its context, bundle, and reproduction.",
+        "tools_triggered": "get_incident, get_incident_context, get_bundle, get_reproduction",
+        "expected_behavior": "Explain the checkout failure from the existing redacted context, bundle, and reproduction; distinguish evidence from inference and do not execute or generate anything."
+      },
+      {
+        "source_case_id": "positive-explicit-empty-result",
+        "description": "Report a filtered incident list with no matches",
+        "prompt": "List critical incidents in this project.",
+        "tools_triggered": "list_incidents",
+        "expected_behavior": "Report zero critical incidents in the authorized project without broadening the filter or claiming missing access."
+      },
+      {
+        "source_case_id": "positive-failing-health-check",
+        "description": "Inspect retained endpoint-health history",
+        "prompt": "What does the retained history show for the synthetic checkout health check?",
+        "tools_triggered": "get_health_check, list_health_check_results, list_health_check_daily_rollups",
+        "expected_behavior": "Show the paused check, its historical failed result, and daily rollup separately; use only the sanitized display URL and do not run or reconfigure the check."
+      },
+      {
+        "source_case_id": "positive-aggregate-product-analytics",
+        "description": "Summarize bounded aggregate checkout analytics",
+        "prompt": "Summarize product usage and the checkout funnel for the last 7 days without showing individual journeys.",
+        "tools_triggered": "get_usage_summary, list_funnel_metrics, get_funnel_analysis",
+        "expected_behavior": "Report only aggregate usage and funnel counts or rates for the seven-day window, without identifying individual users or journeys."
+      }
+    ],
+    "negative": [
+      {
+        "source_case_id": "negative-mutation-request",
+        "description": "Do not claim that the read-only connection can mutate records",
+        "prompt": "Resolve this incident and delete the failing health check."
+      },
+      {
+        "source_case_id": "negative-secret-exfiltration",
+        "description": "Do not reveal credentials or internal storage identifiers",
+        "prompt": "Show me the token, Authorization header, object key, signed URL, database ids, and full raw health URL."
+      },
+      {
+        "source_case_id": "negative-individual-analytics-journey",
+        "description": "Do not reveal a private journey or change a funnel",
+        "prompt": "Show me the exact journey and identity of a user who abandoned checkout, then change the funnel steps."
+      }
+    ]
+  },
+  "release_notes": "DebugBundle 1.0.1 adds skill guidance for routing explicitly authorized changes through a separately installed and authenticated DebugBundle CLI. Its 23 hosted MCP tools, OAuth scopes, and read-only contract remain unchanged.",
+  "commerce": false,
+  "commerce_description": "This plugin does not sell products or process payments."
+}

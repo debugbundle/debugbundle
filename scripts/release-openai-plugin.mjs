@@ -11,7 +11,7 @@ import {
   contractFixturePath,
   dataMapPath,
   openAiPluginConstants,
-  pluginRoot,
+  portalPluginArchiveEntries,
   readJson,
   releaseManifestPath,
   repoRoot,
@@ -65,10 +65,7 @@ function parseArgs(argv) {
 }
 
 function pluginArchiveEntries() {
-  return walkRegularFiles(pluginRoot).map((entry) => ({
-    path: `debugbundle/${entry.relativePath}`,
-    bytes: entry.bytes
-  }));
+  return portalPluginArchiveEntries();
 }
 
 function packetArchiveEntries(manifestBytes) {
@@ -90,6 +87,12 @@ function manualGates(validation, apiImageDigest) {
   const gates = [
     "representative_capacity_load_evidence",
     "reviewer_synthetic_retained_corpus",
+    "current_reviewer_credential",
+    "reviewer_demo_recording_url",
+    "verified_publisher_identity",
+    "portal_cimd_connection",
+    "portal_domain_verification",
+    "portal_current_tool_scan",
     "owner_submission_approval",
     "openai_review_and_approval",
     "separate_owner_publication_approval",

@@ -56,9 +56,11 @@ const requiredPackageFiles = [
 ];
 const requiredSubmissionFiles = [
   "data-map.md",
+  "demo-recording-plan.md",
   "listing.md",
   "policy-review.md",
   "release-notes.md",
+  "portal-review.json",
   "review-checklist.md",
   "starter-prompts.json",
   "test-cases.json",
@@ -499,6 +501,7 @@ export function validateOpenAiPluginSource({ requireConnection = false } = {}) {
   }
   validateSkill(contract, failures);
   validateCorpus(contract, failures);
+  validatePortalPluginPackage(failures);
 
   return {
     ok: failures.length === 0,
@@ -516,9 +519,142 @@ export function collectHashInventory(root) {
   );
 }
 
+function portalReviewCases() {
+  const review = readJson(join(submissionRoot, "portal-review.json"));
+  const sourceCases = readJson(join(submissionRoot, "test-cases.json")).cases;
+  const failures = [];
+  const output = {};
+  const seenSourceIds = new Set();
+
+  for (const kind of ["positive", "negative"]) {
+    const selected = review.test_cases?.[kind];
+    const expectedCount = kind === "positive" ? 5 : 3;
+    if (!Array.isArray(selected) || selected.length !== expectedCount) {
+      failures.push(`portal_review:${kind}_count_mismatch`);
+      continue;
+    }
+    output[kind] = selected.map(({ source_case_id: sourceCaseId, ...fields }) => {
+      const allowedFields = new Set(
+        kind === "positive"
+          ? ["description", "prompt", "tools_triggered", "expected_behavior"]
+          : ["description", "prompt"]
+      );
+      requireExactKeys(fields, allowedFields, `portal_review:case:${sourceCaseId}`, failures);
+      if (seenSourceIds.has(sourceCaseId)) {
+        failures.push(`portal_review:duplicate_source_case:${sourceCaseId}`);
+      }
+      seenSourceIds.add(sourceCaseId);
+      const source = sourceCases.find((entry) => entry.id === sourceCaseId);
+      if (source?.kind !== kind || source.prompt !== fields.prompt) {
+        failures.push(`portal_review:source_case_drift:${sourceCaseId}`);
+      }
+      if (kind === "positive" && fields.tools_triggered !== source?.expected_sequence.join(", ")) {
+        failures.push(`portal_review:tools_drift:${sourceCaseId}`);
+      }
+      if (
+        typeof fields.description !== "string" ||
+        !fields.description.trim() ||
+        typeof fields.prompt !== "string" ||
+        !fields.prompt.trim() ||
+        (kind === "positive" &&
+          (typeof fields.expected_behavior !== "string" || !fields.expected_behavior.trim()))
+      ) {
+        failures.push(`portal_review:incomplete_case:${sourceCaseId}`);
+      }
+      return fields;
+    });
+  }
+
+  if (typeof review.release_notes !== "string" || !review.release_notes.trim()) {
+    failures.push("portal_review:release_notes_missing");
+  }
+  if (review.commerce !== false) failures.push("portal_review:commerce_drift");
+  if (typeof review.commerce_description !== "string" || !review.commerce_description.trim()) {
+    failures.push("portal_review:commerce_description_missing");
+  }
+  if (failures.length > 0) throw new Error(failures.join("\n"));
+  return { review, testCases: output };
+}
+
+export function portalPluginArchiveEntries() {
+  const localManifest = readJson(join(pluginRoot, ".codex-plugin", "plugin.json"));
+  const { review, testCases } = portalReviewCases();
+  const { apps: _localApp, ...manifest } = localManifest;
+  manifest.mcpServers = "./.mcp.json";
+  manifest.interface = {
+    ...manifest.interface,
+    shortDescription: "Investigate runtime incidents",
+    supportURL: "https://debugbundle.com/contact"
+  };
+  manifest.extensions = {
+    "com.openai": {
+      review: {
+        test_cases: testCases,
+        commerce: review.commerce,
+        commerce_description: review.commerce_description
+      },
+      publication: { release_notes: review.release_notes }
+    }
+  };
+
+  const entries = walkRegularFiles(pluginRoot)
+    .filter((entry) => ![".app.json", ".codex-plugin/plugin.json"].includes(entry.relativePath))
+    .map((entry) => ({ path: `debugbundle/${entry.relativePath}`, bytes: entry.bytes }));
+  entries.push({
+    path: "debugbundle/.codex-plugin/plugin.json",
+    bytes: Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`, "utf8")
+  });
+  entries.push({
+    path: "debugbundle/.mcp.json",
+    bytes: Buffer.from(
+      `${JSON.stringify({ mcpServers: { debugbundle: { url: expectedEndpoint } } }, null, 2)}\n`,
+      "utf8"
+    )
+  });
+  return entries;
+}
+
+export function validatePortalPluginPackage(failures) {
+  let files;
+  try {
+    files = new Map(portalPluginArchiveEntries().map((entry) => [entry.path, entry.bytes]));
+  } catch (error) {
+    failures.push(`portal_package:${error.message}`);
+    return;
+  }
+  const manifest = JSON.parse(files.get("debugbundle/.codex-plugin/plugin.json").toString("utf8"));
+  if (manifest.name !== "debugbundle" || manifest.interface?.displayName !== "DebugBundle") {
+    failures.push("portal_package:plugin_identity_drift");
+  }
+  if (files.has("debugbundle/.app.json") || manifest.apps !== undefined) {
+    failures.push("portal_package:app_reference_forbidden");
+  }
+  if (manifest.mcpServers !== "./.mcp.json") {
+    failures.push("portal_package:mcp_configuration_missing");
+  }
+  if (manifest.interface?.shortDescription?.length > 30) {
+    failures.push("portal_package:short_description_too_long");
+  }
+  for (const field of ["websiteURL", "supportURL", "privacyPolicyURL", "termsOfServiceURL"]) {
+    requireHttpsUrl(manifest.interface?.[field], `portal_package:${field}`, failures);
+  }
+  if (manifest.extensions?.["com.openai"]?.review?.demo_recording_url !== undefined) {
+    requireHttpsUrl(
+      manifest.extensions["com.openai"].review.demo_recording_url,
+      "portal_package:demo_recording_url",
+      failures
+    );
+  }
+}
+
 export function collectReleaseInputs() {
   return {
-    plugin: collectHashInventory(pluginRoot),
+    plugin: Object.fromEntries(
+      portalPluginArchiveEntries().map((entry) => [
+        entry.path.slice("debugbundle/".length),
+        sha256Bytes(entry.bytes)
+      ])
+    ),
     submission: collectHashInventory(submissionRoot),
     contracts: {
       "tests/fixtures/openai-plugin-v1/tool-contracts.json": sha256File(contractFixturePath),

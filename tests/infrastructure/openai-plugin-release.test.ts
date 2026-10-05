@@ -17,6 +17,64 @@ function runJson(args: string[]): unknown {
 }
 
 describe("OpenAI plugin release automation", () => {
+  it("builds a portal ZIP source with remote MCP and exact review metadata", () => {
+    const program = [
+      'import { portalPluginArchiveEntries } from "./scripts/openai-plugin-release-lib.mjs";',
+      'process.stdout.write(JSON.stringify(portalPluginArchiveEntries().map((entry) => ({path:entry.path,base64:entry.bytes.toString("base64")}))));'
+    ].join("");
+    const entries = JSON.parse(
+      execFileSync(process.execPath, ["--input-type=module", "--eval", program], {
+        cwd: repoRoot,
+        encoding: "utf8"
+      })
+    ) as Array<{ path: string; base64: string }>;
+    const files = new Map(
+      entries.map((entry) => [entry.path, Buffer.from(entry.base64, "base64")])
+    );
+    const manifest = JSON.parse(
+      files.get("debugbundle/.codex-plugin/plugin.json")!.toString("utf8")
+    ) as {
+      name: string;
+      apps?: string;
+      mcpServers: string;
+      interface: { displayName: string; shortDescription: string; supportURL: string };
+      extensions: {
+        "com.openai": {
+          review: {
+            test_cases: { positive: unknown[]; negative: unknown[] };
+            demo_recording_url?: string;
+          };
+        };
+      };
+    };
+    const mcp = JSON.parse(files.get("debugbundle/.mcp.json")!.toString("utf8")) as {
+      mcpServers: { debugbundle: { url: string } };
+    };
+
+    expect(files.has("debugbundle/.app.json")).toBe(false);
+    expect(manifest.name).toBe("debugbundle");
+    expect(manifest.interface.displayName).toBe("DebugBundle");
+    expect(
+      JSON.parse(
+        readFileSync(
+          join(repoRoot, "apps/mcp/openai/debugbundle/.codex-plugin/plugin.json"),
+          "utf8"
+        )
+      ).name
+    ).toBe("debugbundle");
+    expect(manifest.apps).toBeUndefined();
+    expect(manifest.mcpServers).toBe("./.mcp.json");
+    expect(mcp.mcpServers.debugbundle.url).toBe("https://mcp.debugbundle.com/mcp");
+    expect(manifest.interface.shortDescription.length).toBeLessThanOrEqual(30);
+    expect(manifest.interface.supportURL).toBe("https://debugbundle.com/contact");
+    expect(manifest.extensions["com.openai"].review.test_cases.positive).toHaveLength(5);
+    expect(manifest.extensions["com.openai"].review.test_cases.negative).toHaveLength(3);
+    expect(manifest.extensions["com.openai"].review.demo_recording_url).toBeUndefined();
+    expect(files.get("debugbundle/skills/debugbundle/SKILL.md")).toEqual(
+      readFileSync(join(repoRoot, "apps/mcp/openai/debugbundle/skills/debugbundle/SKILL.md"))
+    );
+  });
+
   it("keeps completed rollback evidence out of the remaining manual gates", () => {
     const sources = [
       "SYSTEM_OVERVIEW.md",

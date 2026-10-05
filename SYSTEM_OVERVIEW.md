@@ -140,6 +140,8 @@ The CLI keeps its `retrieval-commands.ts` import path while list/detail/context 
 
 The approved official OpenAI Plugin adds one isolated read-only retrieval path without changing the diagram's existing stdio MCP/CLI surface:
 
+The OpenAI portal now uses a ZIP-first **With MCP** flow. The repository's local combined-plugin source retains the Developer Mode `.app.json` mapping, while its deterministic portal ZIP replaces that mapping with `.mcp.json` pointing to the permanent hosted endpoint and embeds five positive and three negative review cases. The old unpublished form-created 1.0.0 draft rejected ZIP updates, but the owner has now uploaded the new initial 1.0.1 ZIP: the portal displays `DebugBundle`, package name `debugbundle`, its skill, and the production MCP URL. The portal verified the production domain challenge, but its lower **Connect** action fails before authorization or tool scanning with a pre-defined OAuth client ID error. The latest skill-scan evidence was still pending, and the privacy-policy automated assessment showed a warning. That packaging change does not change hosted OAuth or the twenty-three-tool contract. The installed personal plugin is a separate surface. The video recording, current reviewer login, verified publisher, current MCP scan, review decision, and publication require independent evidence.
+
 ```text
 ChatGPT / Codex
   → Streamable HTTP + OAuth access token
