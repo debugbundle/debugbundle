@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { CliAuthStateError } from "../../../apps/cli/src/auth-state.js";
 import {
   createAuthenticatedBillingApi,
+  createAuthenticatedProjectManagementApi,
+  createAuthenticatedGitHubManagementApi,
   createAuthenticatedAlertApi,
   createAuthenticatedRetrievalApi,
   createAuthenticatedSlackApi,
@@ -15,6 +17,28 @@ import {
 } from "../../../apps/cli/src/auth-context.js";
 
 describe("cli auth context", () => {
+  it("preserves project and GitHub management requests through the shared HTTP transport", async () => {
+    const auth = { bearer_token: "dbundle_mem_saved", base_url: "https://selfhost.example" };
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response('{"projects":[]}'))
+      .mockResolvedValueOnce(new Response('{"repositories":[]}'));
+    const dependencies = { readAuthState: vi.fn().mockResolvedValue(auth), fetchImpl };
+    const projects = await createAuthenticatedProjectManagementApi({}, dependencies);
+    expect(await projects.api.listProjects({ bearerToken: auth.bearer_token })).toEqual([]);
+    const github = await createAuthenticatedGitHubManagementApi({}, dependencies);
+    expect(await github.api.listRepositories({ bearerToken: auth.bearer_token })).toEqual([]);
+    expect(fetchImpl.mock.calls.map(([url]) => url)).toEqual([
+      "https://selfhost.example/v1/projects",
+      "https://selfhost.example/v1/github/repositories"
+    ]);
+    for (const [, init] of fetchImpl.mock.calls) {
+      expect(init).toMatchObject({
+        method: "GET",
+        headers: { authorization: "Bearer dbundle_mem_saved" }
+      });
+    }
+  });
   it("builds authenticated GET requests from stored base url", async () => {
     const fetchImpl = vi.fn().mockResolvedValue({
       status: 200,
@@ -190,7 +214,9 @@ describe("cli auth context", () => {
         authFilePath: "/tmp/auth.json"
       },
       {
-        createApi: vi.fn().mockRejectedValue(new CliAuthStateError("auth_state_missing", "Not logged in.")),
+        createApi: vi
+          .fn()
+          .mockRejectedValue(new CliAuthStateError("auth_state_missing", "Not logged in.")),
         dependencies: undefined,
         runCommand: vi.fn()
       }
@@ -268,7 +294,9 @@ describe("cli auth context", () => {
     });
     const httpClient = { request: vi.fn() };
     const createHttpClient = vi.fn().mockReturnValue(httpClient);
-    const listMemberTokens = vi.fn().mockResolvedValue([{ token_id: "mtok_1", label: "cli", revoked_at: null }]);
+    const listMemberTokens = vi
+      .fn()
+      .mockResolvedValue([{ token_id: "mtok_1", label: "cli", revoked_at: null }]);
     const createApi = vi.fn().mockReturnValue({
       listProjectTokens: vi.fn(),
       createProjectToken: vi.fn(),
@@ -355,8 +383,12 @@ describe("cli auth context", () => {
     });
     const createHttpClient = vi.fn().mockReturnValue({ request: vi.fn() });
     const createAlertApi = vi.fn().mockReturnValue({ listAlerts: vi.fn().mockResolvedValue([]) });
-    const createWebhookApi = vi.fn().mockReturnValue({ listWebhooks: vi.fn().mockResolvedValue([]) });
-    const createSlackApi = vi.fn().mockReturnValue({ listSlackDestinations: vi.fn().mockResolvedValue([]) });
+    const createWebhookApi = vi
+      .fn()
+      .mockReturnValue({ listWebhooks: vi.fn().mockResolvedValue([]) });
+    const createSlackApi = vi
+      .fn()
+      .mockReturnValue({ listSlackDestinations: vi.fn().mockResolvedValue([]) });
     const createWeeklyReportApi = vi.fn().mockReturnValue({
       listWeeklyReportChannels: vi.fn().mockResolvedValue([])
     });
@@ -400,7 +432,9 @@ describe("cli auth context", () => {
     expect(webhookResult.authState.bearer_token).toBe("dbundle_mem_saved");
     expect(slackResult.authState.bearer_token).toBe("dbundle_mem_saved");
     expect(weeklyReportResult.authState.bearer_token).toBe("dbundle_mem_saved");
-    expect(createHttpClient).toHaveBeenCalledWith({ baseUrl: "https://selfhost.debugbundle.test/" });
+    expect(createHttpClient).toHaveBeenCalledWith({
+      baseUrl: "https://selfhost.debugbundle.test/"
+    });
     expect(createAlertApi).toHaveBeenCalled();
     expect(createWebhookApi).toHaveBeenCalled();
     expect(createSlackApi).toHaveBeenCalled();
@@ -438,11 +472,19 @@ describe("cli auth context", () => {
       }
     );
 
-    await expect(webhookApi.listWebhooks({ bearerToken: "dbundle_mem_saved", projectId: "proj_1" })).resolves.toEqual([]);
     await expect(
-      weeklyReportApi.listWeeklyReportChannels({ bearerToken: "dbundle_mem_saved", projectId: "proj_1" })
+      webhookApi.listWebhooks({ bearerToken: "dbundle_mem_saved", projectId: "proj_1" })
     ).resolves.toEqual([]);
-    expect(fetchImpl).toHaveBeenCalledWith("https://selfhost.debugbundle.test/v1/webhooks?project_id=proj_1", expect.any(Object));
+    await expect(
+      weeklyReportApi.listWeeklyReportChannels({
+        bearerToken: "dbundle_mem_saved",
+        projectId: "proj_1"
+      })
+    ).resolves.toEqual([]);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://selfhost.debugbundle.test/v1/webhooks?project_id=proj_1",
+      expect.any(Object)
+    );
     expect(fetchImpl).toHaveBeenCalledWith(
       "https://selfhost.debugbundle.test/v1/weekly-report-channels?project_id=proj_1",
       expect.any(Object)

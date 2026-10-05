@@ -218,6 +218,7 @@ export {
   queueRetentionRotationNotice
 } from "./operational-email-notifications.js";
 export { createPostgresRetentionStore, createRetentionCleanupService } from "./retention-store.js";
+export type { RetentionCleanupResult } from "./retention-store.js";
 export type {
   SlackDestinationRecord,
   SlackDestinationSecretRecord,
@@ -250,4 +251,14 @@ export {
   assertStorageSchemaMigrationsApplied,
   STORAGE_SCHEMA_MIGRATIONS
 } from "./schema-migrations.js";
-export { createAgentTokenStore, type AgentTokenStore, type AgentTokenRecord } from "./agent-token-store.js";
+export {
+  createAgentTokenStore,
+  type AgentTokenStore,
+  type AgentTokenRecord
+} from "./agent-token-store.js";
+
+export {
+  createPostgresAnalyticsFlowStore,
+  AnalyticsFlowError,
+  type AnalyticsFlowStore
+} from "./analytics-flow-store.js";

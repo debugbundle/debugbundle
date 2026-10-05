@@ -77,6 +77,7 @@ import {
   CreateWebhookBodySchema,
   CreateWeeklyReportChannelBodySchema,
   GithubAuthCallbackQuerySchema,
+  GithubSignupStartQuerySchema,
   GithubDeviceClaimBodySchema,
   GithubDevicePollBodySchema,
   GithubDeviceStartBodySchema,
@@ -185,6 +186,7 @@ export {
   CreateWebhookBodySchema,
   CreateWeeklyReportChannelBodySchema,
   GithubAuthCallbackQuerySchema,
+  GithubSignupStartQuerySchema,
   GithubDeviceClaimBodySchema,
   GithubDevicePollBodySchema,
   GithubDeviceStartBodySchema,
@@ -250,7 +252,7 @@ export type ResponseSpec = {
 };
 
 export type OperationSpec = {
-  method: "get" | "post" | "patch" | "delete";
+  method: "get" | "post" | "put" | "patch" | "delete";
   path: string;
   operationId: string;
   summary: string;

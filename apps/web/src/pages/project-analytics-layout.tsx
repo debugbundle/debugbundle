@@ -1,3 +1,4 @@
+import { getProjectEffectiveRole } from "../lib/project-access.js";
 import { RotateCcwIcon, Settings2Icon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate, useOutletContext } from "react-router-dom";
@@ -39,6 +40,7 @@ interface AnalyticsFilters {
 }
 
 export interface ProjectAnalyticsContext {
+  canManageFlows?: boolean;
   projectId: string;
   environmentDefault: string;
   query: AnalyticsMetricsQuery;
@@ -47,6 +49,7 @@ export interface ProjectAnalyticsContext {
 const analyticsSections = [
   { value: "overview", label: "Overview", suffix: "" },
   { value: "routes", label: "Routes", suffix: "/routes" },
+  { value: "flows", label: "Flows", suffix: "/flows" },
   { value: "funnels", label: "Funnels", suffix: "/funnels" },
   { value: "audiences", label: "Audiences", suffix: "/audiences" },
   { value: "journeys", label: "Journeys", suffix: "/journeys" },
@@ -256,58 +259,63 @@ export function ProjectAnalyticsLayout(): JSX.Element {
                 </SelectContent>
               </Select>
             </Field>
-            <AnalyticsFilterPanel
-              triggerLabel="More filters"
-              title="More analytics filters"
-              description="Limit analytics to a specific service or environment."
-              activeFilterCount={appliedFilters.length}
-              onApply={applyScopeFilters}
-              onReset={resetScopeFilters}
-              onDismiss={() => setDraftFilters(filters)}
-            >
-              <FieldGroup className="gap-4">
-                <Field>
-                  <FieldLabel htmlFor="analytics-service">Service</FieldLabel>
-                  <ProjectScopeSelect
-                    id="analytics-service"
-                    label="Service"
-                    value={draftFilters.service}
-                    options={scopeOptions.services}
-                    allLabel="All services"
-                    onValueChange={(service) =>
-                      setDraftFilters((current) => ({ ...current, service }))
-                    }
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="analytics-environment">Environment</FieldLabel>
-                  <ProjectScopeSelect
-                    id="analytics-environment"
-                    label="Environment"
-                    value={draftFilters.environment}
-                    options={scopeOptions.environments}
-                    allLabel="All environments"
-                    onValueChange={(environment) =>
-                      setDraftFilters((current) => ({ ...current, environment }))
-                    }
-                  />
-                </Field>
-              </FieldGroup>
-            </AnalyticsFilterPanel>
-            {appliedFilters.length === 0 ? null : (
+            {activeSection === "flows" ? null : (
+              <AnalyticsFilterPanel
+                triggerLabel="More filters"
+                title="More analytics filters"
+                description="Limit analytics to a specific service or environment."
+                activeFilterCount={appliedFilters.length}
+                onApply={applyScopeFilters}
+                onReset={resetScopeFilters}
+                onDismiss={() => setDraftFilters(filters)}
+              >
+                <FieldGroup className="gap-4">
+                  <Field>
+                    <FieldLabel htmlFor="analytics-service">Service</FieldLabel>
+                    <ProjectScopeSelect
+                      id="analytics-service"
+                      label="Service"
+                      value={draftFilters.service}
+                      options={scopeOptions.services}
+                      allLabel="All services"
+                      onValueChange={(service) =>
+                        setDraftFilters((current) => ({ ...current, service }))
+                      }
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="analytics-environment">Environment</FieldLabel>
+                    <ProjectScopeSelect
+                      id="analytics-environment"
+                      label="Environment"
+                      value={draftFilters.environment}
+                      options={scopeOptions.environments}
+                      allLabel="All environments"
+                      onValueChange={(environment) =>
+                        setDraftFilters((current) => ({ ...current, environment }))
+                      }
+                    />
+                  </Field>
+                </FieldGroup>
+              </AnalyticsFilterPanel>
+            )}
+            {activeSection === "flows" || appliedFilters.length === 0 ? null : (
               <Button type="button" variant="outline" onClick={resetScopeFilters}>
                 <RotateCcwIcon data-icon="inline-start" />
                 Reset filters
               </Button>
             )}
           </div>
-          <AppliedAnalyticsFilterList filters={appliedFilters} />
+          {activeSection === "flows" ? null : (
+            <AppliedAnalyticsFilterList filters={appliedFilters} />
+          )}
         </div>
       )}
 
       <Outlet
         context={
           {
+            canManageFlows: ["owner", "admin"].includes(getProjectEffectiveRole(project)),
             projectId,
             environmentDefault: project.environment_default,
             query
@@ -320,6 +328,7 @@ export function ProjectAnalyticsLayout(): JSX.Element {
 
 function resolveAnalyticsSection(pathname: string): AnalyticsSection {
   if (pathname.endsWith("/routes")) return "routes";
+  if (pathname.endsWith("/flows")) return "flows";
   if (pathname.endsWith("/funnels")) return "funnels";
   if (pathname.endsWith("/audiences")) return "audiences";
   if (pathname.endsWith("/journeys")) return "journeys";

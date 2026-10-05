@@ -2697,3 +2697,8 @@ These are local correctness gates. Production activation, representative traffic
 - Email with a nonzero cooldown retains both distinct resource incidents in one digest and suppresses a replay. Configurable windows and project rule cooldowns validate through API and are passed unchanged by CLI/MCP; dashboard destination edits retain those settings.
 - With a narrow hosted lifecycle rule and a broader local drop, SDK configuration withholds both rules and ingestion retains authoritative precedence.
 - Forward migration from the predecessor schema preserves project data, repeated migration is a no-op, and missing migration readiness fails closed. Expired correlation metadata is pruned in bounded batches; no raw session values are persisted there.
+
+
+### AC-ANL-21: Public connected flows
+
+The seven acceptance cases in [public project flows](analytics-public-flows-20261003.md) are required. Verify independent projects, site/blog and site/auth/app continuity, ordered observations, permission and origin boundaries, expiry/replay/withdrawal, aggregate retention, compatibility and public interface parity. DebugBundle-only fixtures do not satisfy this criterion.

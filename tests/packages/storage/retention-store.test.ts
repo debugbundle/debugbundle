@@ -29,6 +29,44 @@ function createMockRetentionStore(overrides: Partial<RetentionStore> = {}): Rete
 }
 
 describe("retention cleanup service", () => {
+  it("signals continuation after a full bounded cleanup and stops after the backlog drains", async () => {
+    const pruneExpiredAnalyticsRollups = vi
+      .fn()
+      .mockResolvedValueOnce({ deleted_rows: 100, reached_batch_limit: true })
+      .mockResolvedValueOnce({ deleted_rows: 100, reached_batch_limit: true })
+      .mockResolvedValueOnce({ deleted_rows: 25, reached_batch_limit: false });
+    const cleanup = createRetentionCleanupService({
+      retentionStore: createMockRetentionStore({ pruneExpiredAnalyticsRollups }),
+      objectStore: { deleteObject: vi.fn() },
+      maxBatches: 2
+    });
+    const job = { scheduled_at: "2026-10-03T00:00:00.000Z" };
+    await expect(cleanup.runCleanup(job)).resolves.toEqual({ has_more: true });
+    expect(pruneExpiredAnalyticsRollups).toHaveBeenCalledTimes(2);
+    await expect(cleanup.runCleanup(job)).resolves.toBeUndefined();
+    expect(pruneExpiredAnalyticsRollups).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not continue a full batch when object deletions make no progress", async () => {
+    const listExpiredSampledRawEvents = vi.fn().mockResolvedValue([
+      {
+        project_id: "project",
+        event_id: "event",
+        occurred_at: "2026-01-01T00:00:00.000Z"
+      }
+    ]);
+    const cleanup = createRetentionCleanupService({
+      retentionStore: createMockRetentionStore({ listExpiredSampledRawEvents }),
+      objectStore: { deleteObject: vi.fn().mockRejectedValue(new Error("unavailable")) },
+      batchSize: 1,
+      maxBatches: 2
+    });
+    await expect(
+      cleanup.runCleanup({ scheduled_at: "2026-10-03T00:00:00.000Z" })
+    ).resolves.toBeUndefined();
+    expect(listExpiredSampledRawEvents).toHaveBeenCalledTimes(1);
+  });
+
   it("queries and updates retention records through the postgres store", async (): Promise<void> => {
     const query = vi
       .fn()
@@ -258,6 +296,9 @@ describe("retention cleanup service", () => {
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] });
     const store = createPostgresRetentionStore({ query });
 
@@ -268,7 +309,7 @@ describe("retention cleanup service", () => {
       reached_batch_limit: true
     });
 
-    expect(query).toHaveBeenCalledTimes(11);
+    expect(query).toHaveBeenCalledTimes(14);
     expect(query).toHaveBeenNthCalledWith(
       1,
       expect.stringContaining("DELETE FROM analytics_rollup_uniques target"),
@@ -324,6 +365,11 @@ describe("retention cleanup service", () => {
       expect.stringContaining("DELETE FROM analytics_usage_claims claims"),
       ["2026-07-08T12:00:00.000Z", 2]
     );
+    expect(query).toHaveBeenNthCalledWith(
+      12,
+      expect.stringContaining("DELETE FROM analytics_flow_handoffs"),
+      ["2026-07-08T12:00:00.000Z", 2]
+    );
     for (const call of query.mock.calls.slice(0, 7)) {
       expect(String(call[0])).toContain("settings.aggregate_retention_months");
       expect(String(call[0])).toContain("settings.hourly_retention_days");
@@ -334,6 +380,18 @@ describe("retention cleanup service", () => {
     expect(String(query.mock.calls[8]?.[0])).toContain("candidate.occurred_at");
     expect(String(query.mock.calls[9]?.[0])).toContain("candidate.last_seen_at");
     expect(String(query.mock.calls[10]?.[0])).toContain("interval '13 months'");
+  });
+
+  it("prunes expired public flow state in bounded batches", async (): Promise<void> => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const store = createPostgresRetentionStore({ query });
+
+    await store.pruneExpiredAnalyticsRollups({ now: "2026-10-02T12:00:00.000Z", limit: 25 });
+
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("DELETE FROM analytics_flow_handoffs"),
+      ["2026-10-02T12:00:00.000Z", 25]
+    );
   });
 
   it("returns early when the retention cleanup object store is unavailable", async (): Promise<void> => {

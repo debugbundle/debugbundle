@@ -1,4 +1,19 @@
-> Current analytics task (2026-10-02): follow [the focused visits/activation plan](spec/analytics-visit-flows-plan-20261002.md) and [scope reset](spec/analytics-scope-reset-20261002.md). The expanded `update/analytics` work is parked; its unfinished roadmap is not the active scope. See [STATUS.md](STATUS.md) for the handoff.
+> Active analytics work (2026-10-04): [public project flows](spec/analytics-public-flows-20261003.md) on `update/visit-flows`. The expanded `update/analytics` branch remains parked. See STATUS for current verification. No release is authorized.
+
+Public acquisition/activation flows are customer-project definitions with ordered origin-bound steps.
+`packages/storage/src/analytics-flow-store.ts` owns versioned definitions, hashed expiring contexts,
+single-use handoffs and aggregate increments; `analytics-flow-reports.ts` reads bounded daily counters.
+`analytics-flow-schema.ts` supplies the additive migration and separate empty-schema bootstrap SQL.
+API `routes/analytics-flows.ts`, CLI `analytics-flow-commands.ts`, ordinary MCP `analytics-flow-tools.ts`,
+and the project Analytics Flows page share this contract. Ordinary project access replaces the discarded
+operator-only candidate. No generic flow joins DebugBundle users, projects or incidents as business outcomes.
+
+Browser SDK `analytics-flows.ts` exports the public headless helper. Same-tab sessionStorage preserves
+context through a customer's dedicated auth origin and external OAuth return; integrations mark success
+explicitly. Site→blog uses the same mechanism. Existing debug capture remains independent. DebugBundle's
+own frontend SDK adoption/instrumentation belongs to the authorized release integration, using this same
+public API. No public consent UI or marketing copy is changed. The general retention worker retains bounded
+durable continuation; million-visit load testing is deferred by the owner.
 
 # SYSTEM OVERVIEW — DebugBundle
 
@@ -539,3 +554,7 @@ Lifecycle/target capture predicates run at ingestion; a project with any such pr
 `browser_recovery_events` indexes only resource and failed recovery references with project-scoped correlation hashes and seven-day expiry. Normalization commits this index with durable rebuild intents; late context-only requests or network breadcrumbs can enrich an existing bundle. Bundle readers bound and revalidate candidate evidence. Migration `202609220001_add_browser_recovery_context` adds this index and nullable alert coalescing keys before readiness permits new runtime code. Existing database rows and Bundle v1 consumers remain compatible.
 
 Custom alert webhook signing: `webhook_payload_version` separates compatible legacy JSON from opt-in group-reference bodies. Migration `202609250002_version_alert_webhook_payloads` runs before new API/worker code; storage creates or atomically provisions per-rule CSPRNG secrets and custom delivery fails closed without one. Provider-native Slack/Discord authentication remains provider-owned.
+
+### Hosted public flow consumers (2026-10-05)
+
+The site and app consume Browser SDK 3.1.0 through their `lib/dogfooding-flows.ts` modules. Optional origin-restricted project configuration enables `site-acquisition` (site visit, app arrival, confirmed sign-in) and `product-activation` (successful project creation, incident read, bundle retrieval). The existing programmatic analytics policy and stored opt-out apply. These consumers use public flow APIs; no private account joins are introduced. Hosted build settings and definition provisioning belong to the private cloud repository.

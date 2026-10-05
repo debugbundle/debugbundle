@@ -9,7 +9,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { App } from "./app.js";
-import { initializeWebDogfooding } from "./lib/dogfooding.js";
+import { initializeWebDogfooding, observeWebAnalyticsConsentWithdrawal } from "./lib/dogfooding.js";
 import "./styles/globals.css";
 
 const container = document.getElementById("root");
@@ -19,6 +19,7 @@ if (container === null) {
 }
 
 initializeWebDogfooding(import.meta.env);
+observeWebAnalyticsConsentWithdrawal();
 
 createRoot(container).render(
   <StrictMode>

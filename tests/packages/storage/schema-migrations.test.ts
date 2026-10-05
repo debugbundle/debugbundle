@@ -18,18 +18,41 @@ const ALL_REQUIRED_TABLES = Array.from(
 );
 
 describe("storage schema migrations", () => {
+  it("requires public flow tables and bounded hashed continuity before runtime use", () => {
+    const migration = STORAGE_SCHEMA_MIGRATIONS.find(
+      (entry) => entry.id === "202610030001_add_public_analytics_flows"
+    );
+    expect(migration).toBeDefined();
+    const sql = migration!.statements.join("\n");
+    expect(sql).toContain("context_hash text NOT NULL UNIQUE");
+    expect(sql).toContain("token_hash text NOT NULL UNIQUE");
+    expect(sql).toContain("ON DELETE CASCADE");
+    expect(sql).toContain("interval '24 hours'");
+    for (const table of ["definitions", "runs", "handoffs", "rollups"]) {
+      expect(REQUIRED_API_TABLES).toContain(`analytics_flow_${table}`);
+      expect(REQUIRED_WORKER_TABLES).toContain(`analytics_flow_${table}`);
+    }
+  });
   it("adds isolated agent credentials through an ordered, additive migration and requires the table at startup", () => {
-    const migration = STORAGE_SCHEMA_MIGRATIONS.find((entry) => entry.id === "202609200001_add_project_scoped_agent_tokens");
+    const migration = STORAGE_SCHEMA_MIGRATIONS.find(
+      (entry) => entry.id === "202609200001_add_project_scoped_agent_tokens"
+    );
     expect(migration).toBeDefined();
     expect(migration?.statements.join("\n")).toContain("CREATE TABLE IF NOT EXISTS agent_tokens");
     expect(migration?.statements.join("\n")).toContain("token_hash text NOT NULL UNIQUE");
     expect(migration?.statements.join("\n")).toContain("expires_at > created_at");
-    expect(migration?.statements.join("\n")).not.toMatch(/DROP TABLE|ALTER TABLE member_tokens|UPDATE member_tokens/);
+    expect(migration?.statements.join("\n")).not.toMatch(
+      /DROP TABLE|ALTER TABLE member_tokens|UPDATE member_tokens/
+    );
     expect(REQUIRED_API_TABLES).toContain("agent_tokens");
   });
   it("adds nullable resource route metadata without rewriting incident history", () => {
-    const migration = STORAGE_SCHEMA_MIGRATIONS.find(entry => entry.id === "202609160001_add_browser_resource_routes");
-    expect(migration?.statements.join("\n")).toContain("ADD COLUMN IF NOT EXISTS resource_route text");
+    const migration = STORAGE_SCHEMA_MIGRATIONS.find(
+      (entry) => entry.id === "202609160001_add_browser_resource_routes"
+    );
+    expect(migration?.statements.join("\n")).toContain(
+      "ADD COLUMN IF NOT EXISTS resource_route text"
+    );
     expect(migration?.statements.join("\n")).not.toMatch(/UPDATE incidents|DELETE|DROP /);
   });
   it("should replace the provisional saved-funnel default with tier capacity", (): void => {

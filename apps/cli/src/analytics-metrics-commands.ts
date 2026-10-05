@@ -547,7 +547,7 @@ export async function getAnalyticsOpportunityCommand(
   }
 }
 
-async function createAuthenticatedAnalyticsMetricsApi(
+export async function createAuthenticatedAnalyticsMetricsApi(
   input: { authFilePath?: string },
   dependencies?: {
     readAuthState?: (input: { authFilePath?: string }) => Promise<CliAuthState>;

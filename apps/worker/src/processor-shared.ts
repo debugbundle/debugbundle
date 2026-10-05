@@ -12,6 +12,7 @@ import type {
   BuildBundleJob,
   BuildAnalyticsBundleJob,
   CleanupRetentionJob,
+  RetentionCleanupResult,
   DeliverAlertEmailDigestJob,
   DeliverGitHubDispatchJob,
   EvaluateAnalyticsOpportunitiesJob,
@@ -36,7 +37,10 @@ import type {
   WebhookDeliveryStore,
   NormalizeEventsJob
 } from "../../../packages/storage/src/index.js";
-import { describeBrowserResourceInterruption, type EventEnvelope } from "../../../packages/shared-types/src/index.js";
+import {
+  describeBrowserResourceInterruption,
+  type EventEnvelope
+} from "../../../packages/shared-types/src/index.js";
 import { type ImprovementBundleWorkerDependencies } from "./improvement-bundles.js";
 import { type WorkerAccountAnalyticsDependencies } from "./account-analytics.js";
 import { type AnalyticsIncidentCorrelationRecorder } from "./analytics-incident-correlation.js";
@@ -408,12 +412,13 @@ export interface DeliverGitHubDispatchWorkerDependencies extends WorkerAccountAn
 }
 
 export interface RetentionCleanupRunner {
-  runCleanup(input: CleanupRetentionJob): Promise<void>;
+  runCleanup(input: CleanupRetentionJob): Promise<RetentionCleanupResult>;
 }
 
 export interface CleanupRetentionWorkerDependencies {
   queue: {
     dequeue(jobName: "cleanup-retention"): Promise<CleanupRetentionJob | null>;
+    enqueue(jobName: "cleanup-retention", payload: CleanupRetentionJob): Promise<void>;
   };
   retentionCleanupRunner: RetentionCleanupRunner;
 }

@@ -5,7 +5,12 @@ import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../../../apps/web/src/app.tsx";
-import { buildApiUrl, resetBrowserSessionClientState, resolveApiBaseUrl, resolveApiResourceUrl } from "../../../apps/web/src/lib/api.ts";
+import {
+  buildApiUrl,
+  resetBrowserSessionClientState,
+  resolveApiBaseUrl,
+  resolveApiResourceUrl
+} from "../../../apps/web/src/lib/api.ts";
 import { resolveDocumentationUrl } from "../../../apps/web/src/lib/external-links.ts";
 import {
   createBillingSummary,
@@ -18,6 +23,7 @@ import {
 afterEach(() => {
   cleanup();
   resetBrowserSessionClientState();
+  window.localStorage.clear();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -28,29 +34,40 @@ describe("web app - auth routes", () => {
     expect(resolveApiBaseUrl({})).toBe("");
     expect(buildApiUrl("/v1/auth/session", {})).toBe("/v1/auth/session");
 
-    expect(resolveApiBaseUrl({ VITE_API_URL: " https://api.debugbundle.com/ " })).toBe("https://api.debugbundle.com");
+    expect(resolveApiBaseUrl({ VITE_API_URL: " https://api.debugbundle.com/ " })).toBe(
+      "https://api.debugbundle.com"
+    );
     expect(buildApiUrl("/v1/auth/session", { VITE_API_URL: "https://api.debugbundle.com/" })).toBe(
       "https://api.debugbundle.com/v1/auth/session"
     );
-    expect(buildApiUrl("/v1/auth/github/start", { VITE_API_URL: "https://api.debugbundle.com" })).toBe(
-      "https://api.debugbundle.com/v1/auth/github/start"
-    );
-    expect(resolveApiResourceUrl("/v1/account/avatar", { VITE_API_URL: "https://api.debugbundle.com/" })).toBe(
-      "https://api.debugbundle.com/v1/account/avatar"
-    );
-    expect(resolveApiResourceUrl("https://cdn.example.test/avatar.png", { VITE_API_URL: "https://api.debugbundle.com/" })).toBe(
-      "https://cdn.example.test/avatar.png"
-    );
+    expect(
+      buildApiUrl("/v1/auth/github/start", { VITE_API_URL: "https://api.debugbundle.com" })
+    ).toBe("https://api.debugbundle.com/v1/auth/github/start");
+    expect(
+      resolveApiResourceUrl("/v1/account/avatar", { VITE_API_URL: "https://api.debugbundle.com/" })
+    ).toBe("https://api.debugbundle.com/v1/account/avatar");
+    expect(
+      resolveApiResourceUrl("https://cdn.example.test/avatar.png", {
+        VITE_API_URL: "https://api.debugbundle.com/"
+      })
+    ).toBe("https://cdn.example.test/avatar.png");
   });
 
   it("resolves documentation links by environment and supports explicit overrides", () => {
-    expect(resolveDocumentationUrl({ DEV: false, MODE: "production" }, new URL("https://app.debugbundle.com/dashboard"))).toBe(
-      "https://debugbundle.com/docs"
-    );
+    expect(
+      resolveDocumentationUrl(
+        { DEV: false, MODE: "production" },
+        new URL("https://app.debugbundle.com/dashboard")
+      )
+    ).toBe("https://debugbundle.com/docs");
 
     expect(
       resolveDocumentationUrl(
-        { DEV: false, MODE: "production", VITE_DOCUMENTATION_URL: "https://docs.example.test/custom" },
+        {
+          DEV: false,
+          MODE: "production",
+          VITE_DOCUMENTATION_URL: "https://docs.example.test/custom"
+        },
         new URL("https://app.debugbundle.com/dashboard")
       )
     ).toBe("https://docs.example.test/custom");
@@ -75,27 +92,33 @@ describe("web app - auth routes", () => {
     expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /continue with github/i })).toBeInTheDocument();
     expect(screen.getByText(/continue with email/i)).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: /allow this signup to be linked/i })).toBeNull();
   });
 
-  it.each(["/login", "/signup"])("places GitHub auth above email with an 'or' divider on %s", async (path) => {
-    const fetchMock = vi.fn((input: RequestInfo | URL) => {
-      if (requestUrl(input).endsWith("/v1/auth/session")) {
-        return jsonResponse(401, { error: "invalid_session" });
-      }
+  it.each(["/login", "/signup"])(
+    "places GitHub auth above email with an 'or' divider on %s",
+    async (path) => {
+      const fetchMock = vi.fn((input: RequestInfo | URL) => {
+        if (requestUrl(input).endsWith("/v1/auth/session")) {
+          return jsonResponse(401, { error: "invalid_session" });
+        }
 
-      return jsonResponse(200, { success: true });
-    });
+        return jsonResponse(200, { success: true });
+      });
 
-    vi.stubGlobal("fetch", fetchMock);
+      vi.stubGlobal("fetch", fetchMock);
 
-    render(<App initialEntries={[path]} />);
+      render(<App initialEntries={[path]} />);
 
-    const githubLink = await screen.findByRole("link", { name: /continue with github/i });
-    const emailInput = await screen.findByLabelText(/email address/i);
+      const githubLink = await screen.findByRole("link", { name: /continue with github/i });
+      const emailInput = await screen.findByLabelText(/email address/i);
 
-    expect(screen.getByText(/^or$/i)).toBeInTheDocument();
-    expect(githubLink.compareDocumentPosition(emailInput) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
-  });
+      expect(screen.getByText(/^or$/i)).toBeInTheDocument();
+      expect(
+        githubLink.compareDocumentPosition(emailInput) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).not.toBe(0);
+    }
+  );
 
   it("redirects to login with a toast when a protected request returns invalid_session", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
@@ -118,8 +141,12 @@ describe("web app - auth routes", () => {
 
     render(<App initialEntries={["/billing"]} />);
 
-    expect(await screen.findByRole("heading", { name: /continue to debugbundle/i })).toBeInTheDocument();
-    expect(await screen.findByText(/your session expired\. please sign in again\./i)).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /continue to debugbundle/i })
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/your session expired\. please sign in again\./i)
+    ).toBeInTheDocument();
   });
 
   it("redirects unknown signed-out routes back to login", async () => {
@@ -135,7 +162,9 @@ describe("web app - auth routes", () => {
 
     render(<App initialEntries={["/does-not-exist"]} />);
 
-    expect(await screen.findByRole("heading", { name: /continue to debugbundle/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /continue to debugbundle/i })
+    ).toBeInTheDocument();
   });
 
   it("redirects the retired organization route to projects", async () => {
@@ -164,7 +193,9 @@ describe("web app - auth routes", () => {
     render(<App initialEntries={["/organization"]} />);
 
     expect(await screen.findByRole("heading", { name: /projects/i, level: 1 })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: /organization/i, level: 1 })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: /organization/i, level: 1 })
+    ).not.toBeInTheDocument();
   });
 
   it("requests and verifies an email code from the login screen before landing on the dashboard", async () => {
@@ -180,7 +211,9 @@ describe("web app - auth routes", () => {
         expect(init?.method).toBe("POST");
         expect(init?.credentials).toBe("include");
         expect(init?.headers).toEqual({ "Content-Type": "application/json" });
-        expect(init?.body).toBe(JSON.stringify({ email: "owen@example.com", accepted_terms: true }));
+        expect(init?.body).toBe(
+          JSON.stringify({ email: "owen@example.com", accepted_terms: true })
+        );
         return jsonResponse(200, { success: true });
       }
 
@@ -243,8 +276,12 @@ describe("web app - auth routes", () => {
     await user.click(screen.getByRole("button", { name: /^send code$/i }));
 
     expect(emailInput).toHaveAttribute("aria-invalid", "true");
-    expect(screen.getByText(/enter your email address to receive a sign-in code/i)).toBeInTheDocument();
-    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/auth/request-code"))).toBe(false);
+    expect(
+      screen.getByText(/enter your email address to receive a sign-in code/i)
+    ).toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/auth/request-code"))
+    ).toBe(false);
   });
 
   it("validates the verification code before submitting", async () => {
@@ -257,7 +294,9 @@ describe("web app - auth routes", () => {
       }
 
       if (url.endsWith("/v1/auth/request-code")) {
-        expect(init?.body).toBe(JSON.stringify({ email: "owen@example.com", accepted_terms: true }));
+        expect(init?.body).toBe(
+          JSON.stringify({ email: "owen@example.com", accepted_terms: true })
+        );
         return jsonResponse(200, { success: true });
       }
 
@@ -276,7 +315,9 @@ describe("web app - auth routes", () => {
 
     expect(codeInput).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByText(/enter the six-digit code from your email/i)).toBeInTheDocument();
-    expect(fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/auth/verify-code"))).toBe(false);
+    expect(
+      fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/auth/verify-code"))
+    ).toBe(false);
   });
 
   it("shows documentation in the user menu and removes the duplicate settings entry", async () => {
@@ -325,7 +366,9 @@ describe("web app - auth routes", () => {
       }
 
       if (url.endsWith("/v1/auth/request-code")) {
-        expect(init?.body).toBe(JSON.stringify({ email: "owen@example.com", accepted_terms: true }));
+        expect(init?.body).toBe(
+          JSON.stringify({ email: "owen@example.com", accepted_terms: true })
+        );
         return jsonResponse(200, { success: true });
       }
 
@@ -351,8 +394,12 @@ describe("web app - auth routes", () => {
 
     render(<App initialEntries={["/signup"]} />);
 
-    expect((await screen.findByRole("link", { name: /terms of service/i })).getAttribute("href")).toBe("https://debugbundle.com/terms");
-    expect(screen.getByRole("link", { name: /privacy policy/i }).getAttribute("href")).toBe("https://debugbundle.com/privacy");
+    expect(
+      (await screen.findByRole("link", { name: /terms of service/i })).getAttribute("href")
+    ).toBe("https://debugbundle.com/terms");
+    expect(screen.getByRole("link", { name: /privacy policy/i }).getAttribute("href")).toBe(
+      "https://debugbundle.com/privacy"
+    );
 
     await user.type(screen.getByLabelText(/email address/i), "owen@example.com");
     await user.click(screen.getByRole("button", { name: /^send code$/i }));
@@ -375,7 +422,9 @@ describe("web app - auth routes", () => {
 
     render(<App initialEntries={["/auth/github/callback?error=oauth_exchange_failed"]} />);
 
-    expect(await screen.findByRole("heading", { name: /continue with github/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /continue with github/i })
+    ).toBeInTheDocument();
     expect(screen.getByText(/github sign-in could not be completed/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /continue with github/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /back to login/i })).toBeInTheDocument();
@@ -421,7 +470,9 @@ describe("web app - auth routes", () => {
     render(<App initialEntries={["/member-tokens"]} />);
 
     expect(await screen.findByRole("heading", { name: /member tokens/i })).toBeInTheDocument();
-    expect(screen.getByText(/complete email sign-in again to verify this address/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/complete email sign-in again to verify this address/i)
+    ).toBeInTheDocument();
     expect(await screen.findByText(/no member tokens yet/i)).toBeInTheDocument();
 
     const createButtons = screen.getAllByRole("button", { name: /create member token/i });
@@ -513,6 +564,12 @@ describe("web app - auth routes", () => {
     expect(screen.queryByRole("button", { name: /change password/i })).toBeNull();
     expect(screen.getByRole("heading", { name: /account data export/i })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /email access/i })).toBeNull();
+    const consent = screen.getByRole("checkbox", { name: /Share optional visit analytics/i });
+    const user = userEvent.setup();
+    await user.click(consent);
+    expect(window.localStorage.getItem("debugbundle.app.analytics_consent")).toBe("true");
+    await user.click(consent);
+    expect(window.localStorage.getItem("debugbundle.app.analytics_consent")).toBe("false");
   });
 
   it("supports resending codes and switching back to the email step", async () => {
@@ -525,7 +582,9 @@ describe("web app - auth routes", () => {
       }
 
       if (url.endsWith("/v1/auth/request-code")) {
-        expect(init?.body).toBe(JSON.stringify({ email: "owen@example.com", accepted_terms: true }));
+        expect(init?.body).toBe(
+          JSON.stringify({ email: "owen@example.com", accepted_terms: true })
+        );
         return jsonResponse(200, { success: true });
       }
 
@@ -545,7 +604,9 @@ describe("web app - auth routes", () => {
     await user.click(screen.getByRole("button", { name: /use a different email/i }));
 
     expect(screen.queryByLabelText(/six-digit code/i)).toBeNull();
-    expect(fetchMock.mock.calls.filter(([input]) => requestUrl(input).endsWith("/v1/auth/request-code"))).toHaveLength(2);
+    expect(
+      fetchMock.mock.calls.filter(([input]) => requestUrl(input).endsWith("/v1/auth/request-code"))
+    ).toHaveLength(2);
   });
 
   it("shows GitHub-only settings copy when email auth is unavailable", async () => {
@@ -679,10 +740,12 @@ describe("web app - auth routes", () => {
           "Content-Type": "application/json",
           "X-CSRF-Token": "csrf-token-123"
         });
-        expect(init.body).toBe(JSON.stringify({
-          confirmation_text: "Delete my account",
-          otp: "123456"
-        }));
+        expect(init.body).toBe(
+          JSON.stringify({
+            confirmation_text: "Delete my account",
+            otp: "123456"
+          })
+        );
 
         return jsonResponse(200, {
           account: {
@@ -703,12 +766,17 @@ describe("web app - auth routes", () => {
     await user.click(await screen.findByRole("button", { name: /delete account/i }));
 
     const dialog = await screen.findByRole("alertdialog");
-    await user.type(within(dialog).getByLabelText(/type the confirmation phrase/i), "Delete my account");
+    await user.type(
+      within(dialog).getByLabelText(/type the confirmation phrase/i),
+      "Delete my account"
+    );
     await user.click(within(dialog).getByRole("button", { name: /send email code/i }));
     await user.type(await within(dialog).findByLabelText(/email verification code/i), "123456");
     await user.click(within(dialog).getByRole("button", { name: /^delete account$/i }));
 
-    expect(await screen.findByRole("heading", { name: /continue to debugbundle/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /continue to debugbundle/i })
+    ).toBeInTheDocument();
   });
 
   it("imports a gravatar avatar from settings with an explicit user action", async () => {
@@ -798,6 +866,8 @@ describe("web app - auth routes", () => {
     await user.click(screen.getByRole("button", { name: /owen@example.com/i }));
     await user.click(await screen.findByRole("menuitem", { name: /log out/i }));
 
-    expect(await screen.findByRole("heading", { name: /continue to debugbundle/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /continue to debugbundle/i })
+    ).toBeInTheDocument();
   });
 });

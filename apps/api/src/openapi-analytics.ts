@@ -24,7 +24,13 @@ import {
   AnalyticsSavedFunnelKeySchema,
   AnalyticsSavedFunnelResponseSchema,
   AnalyticsSavedFunnelsResponseSchema,
-  AnalyticsSavedFunnelUpdateSchema
+  AnalyticsSavedFunnelUpdateSchema,
+  AnalyticsFlowDefinitionInputSchema,
+  AnalyticsFlowKeySchema,
+  AnalyticsFlowReportSchema,
+  AnalyticsFlowsResponseSchema,
+  AnalyticsFlowResponseSchema,
+  AnalyticsFlowCaptureSchemas
 } from "../../../packages/shared-types/src/index.js";
 
 type SecurityRequirement = Record<string, []>;
@@ -40,7 +46,7 @@ type ResponseSpec = {
 };
 
 type OperationSpec = {
-  method: "get" | "post" | "patch" | "delete";
+  method: "get" | "post" | "put" | "patch" | "delete";
   path: string;
   operationId: string;
   summary: string;
@@ -58,7 +64,6 @@ const AnalyticsSafeRouteSchema = z
   .min(1)
   .max(2048)
   .regex(/^[^?#]+$/);
-
 const AnalyticsSummaryQuerySchema = z
   .object({
     project_id: z.string().uuid(),
@@ -251,6 +256,7 @@ export function createAnalyticsMetricOpenApiOperations(options: {
   };
 
   return [
+    ...publicFlowOperations(options),
     {
       method: "get",
       path: "/v1/projects/{id}/analytics/saved-funnels",
@@ -568,5 +574,112 @@ export function createAnalyticsMetricOpenApiOperations(options: {
         ...responses
       }
     }
+  ];
+}
+
+function publicFlowOperations(options: {
+  anyMemberAuth: SecurityRequirement[];
+  apiError: SchemaComponent;
+}): OperationSpec[] {
+  const base = "/v1/projects/{id}/analytics/flows";
+  const project = z.object({ id: z.string().uuid() });
+  const item = project.extend({ key: AnalyticsFlowKeySchema });
+  const errors = {
+    "400": { description: "Invalid input.", schema: options.apiError },
+    "401": { description: "Invalid credentials.", schema: options.apiError },
+    "403": {
+      description: "Access, origin, analytics setting or consent denied.",
+      schema: options.apiError
+    },
+    "404": { description: "Project or flow unavailable.", schema: options.apiError },
+    "409": {
+      description: "Flow expired, out of order, replayed or at its definition limit.",
+      schema: options.apiError
+    },
+    "429": { description: "Rate or analytics allowance exceeded.", schema: options.apiError }
+  };
+  const common = { tags: ["Analytics"], security: options.anyMemberAuth };
+  return [
+    {
+      ...common,
+      method: "get",
+      path: base,
+      operationId: "listAnalyticsFlows",
+      summary: "List project acquisition and activation flows",
+      params: project,
+      responses: {
+        "200": {
+          description: "Flow definitions including archived versions.",
+          schema: component("AnalyticsFlowsResponse", AnalyticsFlowsResponseSchema)
+        },
+        ...errors
+      }
+    },
+    {
+      ...common,
+      method: "put",
+      path: `${base}/{key}`,
+      operationId: "saveAnalyticsFlow",
+      summary: "Create or replace a project flow (owner/admin)",
+      params: item,
+      requestBody: component("AnalyticsFlowDefinitionInput", AnalyticsFlowDefinitionInputSchema),
+      responses: {
+        "200": {
+          description: "Saved current definition.",
+          schema: component("AnalyticsFlowResponse", AnalyticsFlowResponseSchema)
+        },
+        ...errors
+      }
+    },
+    {
+      ...common,
+      method: "delete",
+      path: `${base}/{key}`,
+      operationId: "archiveAnalyticsFlow",
+      summary: "Archive a project flow (owner/admin)",
+      params: item,
+      responses: {
+        "200": {
+          description: "Archived.",
+          schema: component("AnalyticsFlowArchived", z.object({ archived: z.literal(true) }))
+        },
+        ...errors
+      }
+    },
+    {
+      ...common,
+      method: "get",
+      path: `${base}/{key}/report`,
+      operationId: "getAnalyticsFlowReport",
+      summary: "Read current-version aggregates for full UTC days",
+      params: item,
+      query: z.object({ window: z.enum(["7d", "30d", "90d"]).default("30d") }),
+      responses: {
+        "200": {
+          description: "Explicit observations, sources and incomplete coverage.",
+          schema: component("AnalyticsFlowReport", AnalyticsFlowReportSchema)
+        },
+        ...errors
+      }
+    },
+    ...Object.entries(AnalyticsFlowCaptureSchemas).map(
+      ([operation, schema]): OperationSpec => ({
+        method: "post",
+        path: `/v1/analytics/flows/{id}/{key}/${operation}`,
+        operationId: `captureAnalyticsFlow_${operation}`,
+        summary: `${operation}: explicit origin-bound flow observation`,
+        tags: ["Analytics"],
+        security: [{ projectBearerToken: [] }],
+        params: item,
+        requestBody: component(`AnalyticsFlowCapture_${operation}`, schema),
+        responses: {
+          "200": {
+            description:
+              "Accepted; start/arrive return expires_at, handoff returns origin and expires_at, step returns recorded, withdraw returns withdrawn."
+          },
+          ...errors
+        }
+      })
+    )
   ];
 }

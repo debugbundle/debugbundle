@@ -1,4 +1,5 @@
 import {
+  AnalyticsFlowDefinitionInputSchema,
   AnalyticsBundleAnalysisKindSchema,
   AnalyticsBundleSeveritySchema,
   AnalyticsOpportunityBundleStatusSchema,
@@ -39,6 +40,7 @@ import {
   listAnalyticsFunnelsWithAuthCommand as defaultListAnalyticsFunnelsCommand,
   listAnalyticsOpportunitiesWithAuthCommand as defaultListAnalyticsOpportunitiesCommand
 } from "./analytics-metrics-commands.js";
+import { analyticsFlowWithAuthCommand } from "./analytics-flow-commands.js";
 import {
   appendCommonAuthOptions,
   CliInputError,
@@ -322,6 +324,45 @@ export async function handleAnalyticsCommand(
   dependencies: ManagementCommandDependencies
 ): Promise<CliCommandResult> {
   const resource = requirePositional(parsedArgv, 1, "analytics resource");
+  if (resource === "flows") {
+    const action = requirePositional(parsedArgv, 2, "flows action");
+    if (!["list", "save", "archive", "report"].includes(action))
+      throw new CliInputError("Unknown analytics flows command.");
+    expectNoUnknownOptions(parsedArgv, [
+      "project",
+      "project-id",
+      "key",
+      "definition-json",
+      "window",
+      "auth-file",
+      "json"
+    ]);
+    ensureNoExtraPositionals(parsedArgv, 3);
+    const projectId = readProjectOption(parsedArgv);
+    if (!projectId) throw new CliInputError("Missing required option --project.");
+    const flowKey = readStringOption(parsedArgv, "key");
+    if ((action === "report" || action === "archive") && !flowKey)
+      throw new CliInputError("Missing required option --key.");
+    const window = readStringOption(parsedArgv, "window");
+    if (window !== undefined && window !== "7d" && window !== "30d" && window !== "90d")
+      throw new CliInputError("Invalid value for --window.");
+    const definition =
+      action === "save"
+        ? AnalyticsFlowDefinitionInputSchema.safeParse(
+            readJsonOption(parsedArgv, "definition-json")
+          )
+        : undefined;
+    if (definition && !definition.success) throw new CliInputError("Invalid flow definition.");
+    return await (dependencies.analyticsFlowCommand ?? analyticsFlowWithAuthCommand)(
+      appendCommonAuthOptions(parsedArgv, {
+        action: action as "list" | "save" | "archive" | "report",
+        projectId,
+        ...(flowKey === undefined ? {} : { flowKey }),
+        ...(window === undefined ? {} : { window }),
+        ...(definition?.success ? { definition: definition.data } : {})
+      })
+    );
+  }
   if (
     resource === "summary" ||
     resource === "routes" ||

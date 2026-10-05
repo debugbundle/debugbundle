@@ -4,7 +4,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "@debugbundle/mcp@1.12.1",
+        "@debugbundle/mcp@1.13.0",
         "--local-auth"
       ]
     }

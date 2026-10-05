@@ -226,6 +226,10 @@ gemini-extension-smoke:
 openclaw-plugin-check:
 	$(NODE_RUN) "corepack enable && corepack pnpm --dir apps/openclaw-plugin plugin:check"
 
+.PHONY: openclaw-plugin-build
+openclaw-plugin-build:
+	$(NODE_RUN) "corepack enable && corepack pnpm --dir apps/openclaw-plugin build && corepack pnpm --dir apps/openclaw-plugin plugin:build"
+
 # A disposable home keeps native Claude verification separate from personal auth.
 CLAUDE_SMOKE_VERSION ?= 2.1.277
 .PHONY: claude-plugin-smoke
@@ -406,12 +410,15 @@ openai-plugin-verify:
 .PHONY: ci
 ci: lint typecheck test build
 
-INTEGRATION_TEST_FILES ?= tests/integration/browser-resource-retention.integration.test.ts tests/integration/worker-analytics-bundle.integration.test.ts tests/integration/deployment-attribution.integration.test.ts tests/integration/improvement-occurrence-order.integration.test.ts tests/integration/alert-delivery-dedupe.integration.test.ts tests/integration/analytics-correlation.integration.test.ts tests/integration/analytics-incident-impact.integration.test.ts tests/integration/analytics-saved-funnels.integration.test.ts tests/integration/availability-checks.integration.test.ts tests/integration/ingestion-core.integration.test.ts tests/integration/incident-reliability.integration.test.ts tests/integration/worker-durability.integration.test.ts tests/integration/worker-job-migration.integration.test.ts tests/integration/worker-pipeline-recovery.integration.test.ts tests/integration/ingestion-bundle-triggers.integration.test.ts tests/integration/ingestion-replay-idempotency.integration.test.ts tests/integration/ingestion-lifecycle-webhooks.integration.test.ts tests/integration/billing-sync.integration.test.ts tests/integration/openai-coordination.integration.test.ts tests/integration/openai-oauth-grant-revocation.integration.test.ts tests/integration/openai-reviewer-fixtures.integration.test.ts tests/integration/project-deletion.integration.test.ts tests/integration/retention-cleanup.integration.test.ts tests/integration/retention-sampling.integration.test.ts tests/integration/storage-migrations.integration.test.ts
+INTEGRATION_TEST_FILES ?= tests/integration/analytics-public-flows.integration.test.ts tests/integration/browser-resource-retention.integration.test.ts tests/integration/worker-analytics-bundle.integration.test.ts tests/integration/deployment-attribution.integration.test.ts tests/integration/improvement-occurrence-order.integration.test.ts tests/integration/alert-delivery-dedupe.integration.test.ts tests/integration/analytics-correlation.integration.test.ts tests/integration/analytics-incident-impact.integration.test.ts tests/integration/analytics-saved-funnels.integration.test.ts tests/integration/availability-checks.integration.test.ts tests/integration/ingestion-core.integration.test.ts tests/integration/incident-reliability.integration.test.ts tests/integration/worker-durability.integration.test.ts tests/integration/worker-job-migration.integration.test.ts tests/integration/worker-pipeline-recovery.integration.test.ts tests/integration/ingestion-bundle-triggers.integration.test.ts tests/integration/ingestion-replay-idempotency.integration.test.ts tests/integration/ingestion-lifecycle-webhooks.integration.test.ts tests/integration/billing-sync.integration.test.ts tests/integration/openai-coordination.integration.test.ts tests/integration/openai-oauth-grant-revocation.integration.test.ts tests/integration/openai-reviewer-fixtures.integration.test.ts tests/integration/project-deletion.integration.test.ts tests/integration/retention-cleanup.integration.test.ts tests/integration/retention-sampling.integration.test.ts tests/integration/storage-migrations.integration.test.ts
 
 .PHONY: test-integration
 INTEGRATION_TEST_FILES += tests/integration/agent-token.integration.test.ts
 INTEGRATION_TEST_FILES += tests/integration/browser-resource-recovery.integration.test.ts
 INTEGRATION_TEST_FILES += tests/integration/alert-retry-ownership.integration.test.ts
+INTEGRATION_TEST_FILES += tests/integration/analytics-flow-runtime.integration.test.ts
+# Optional absolute module path inside /workspace for a separately built Browser SDK candidate.
+INTEGRATION_FLOW_SDK_MODULE ?=
 test-integration:
 	@set -e; \
 	trap 'POSTGRES_PORT=$(INTEGRATION_POSTGRES_PORT) REDIS_PORT=$(INTEGRATION_REDIS_PORT) LOCALSTACK_PORT=$(INTEGRATION_LOCALSTACK_PORT) API_PORT=$(INTEGRATION_API_PORT) WEB_PORT=$(INTEGRATION_WEB_PORT) APP_BASE_URL=$(INTEGRATION_APP_BASE_URL) VITE_API_URL=$(INTEGRATION_WEB_API_URL) CONTAINER_PREFIX=$(INTEGRATION_CONTAINER_PREFIX) DEBUGBUNDLE_PROBE_TRIGGER_SECRET=$(INTEGRATION_PROBE_TRIGGER_SECRET) ANALYTICS_HASH_SECRET=$(INTEGRATION_ANALYTICS_HASH_SECRET) $(INTEGRATION_COMPOSE) down -v' EXIT; \
@@ -421,6 +428,7 @@ test-integration:
 		-v "$(PWD):$(WORKDIR)" \
 		-w "$(WORKDIR)" \
 		-e RUN_INTEGRATION=1 \
+		-e INTEGRATION_FLOW_SDK_MODULE="$(INTEGRATION_FLOW_SDK_MODULE)" \
 		-e DB_HOST=postgres \
 		-e DB_PORT=5432 \
 		-e DB_USER=debugbundle \

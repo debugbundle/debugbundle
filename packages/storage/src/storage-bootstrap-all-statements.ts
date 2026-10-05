@@ -1,3 +1,4 @@
+import { ANALYTICS_FLOW_BOOTSTRAP_STATEMENTS } from "./analytics-flow-schema.js";
 import { BROWSER_RECOVERY_BOOTSTRAP_STATEMENTS } from "./browser-recovery-schema.js";
 import { AVAILABILITY_CHECK_BOOTSTRAP_STATEMENTS } from "./availability-check-bootstrap-statements.js";
 import { ANALYTICS_BOOTSTRAP_STATEMENTS } from "./analytics-bootstrap-statements.js";
@@ -11,5 +12,6 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
   ...OPENAI_OAUTH_BOOTSTRAP_STATEMENTS,
   ...AVAILABILITY_CHECK_BOOTSTRAP_STATEMENTS,
   ...ANALYTICS_BOOTSTRAP_STATEMENTS,
-  ...WORKER_JOB_BOOTSTRAP_STATEMENTS
+  ...WORKER_JOB_BOOTSTRAP_STATEMENTS,
+  ...ANALYTICS_FLOW_BOOTSTRAP_STATEMENTS
 ] as const;

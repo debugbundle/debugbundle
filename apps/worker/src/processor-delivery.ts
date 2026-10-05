@@ -259,7 +259,11 @@ export async function processNextCleanupRetentionJob(
     return { processed: false, reason: "no_jobs" };
   }
 
-  await dependencies.retentionCleanupRunner.runCleanup(job);
+  const result = await dependencies.retentionCleanupRunner.runCleanup(job);
+  if (result?.has_more) {
+    // The durable queue deduplicates this child by its parent job across retries.
+    await dependencies.queue.enqueue("cleanup-retention", job);
+  }
   return { processed: true };
 }
 

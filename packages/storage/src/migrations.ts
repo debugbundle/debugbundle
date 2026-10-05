@@ -78,7 +78,11 @@ export const REQUIRED_API_TABLES = [
   "analytics_opportunities",
   "analytics_bundle_generations",
   "analytics_incident_correlations",
-  "analytics_incident_session_links"
+  "analytics_incident_session_links",
+  "analytics_flow_definitions",
+  "analytics_flow_runs",
+  "analytics_flow_handoffs",
+  "analytics_flow_rollups"
 ] as const;
 
 export const REQUIRED_WORKER_TABLES = [
@@ -136,7 +140,11 @@ export const REQUIRED_WORKER_TABLES = [
   "analytics_opportunities",
   "analytics_bundle_generations",
   "analytics_incident_correlations",
-  "analytics_incident_session_links"
+  "analytics_incident_session_links",
+  "analytics_flow_definitions",
+  "analytics_flow_runs",
+  "analytics_flow_handoffs",
+  "analytics_flow_rollups"
 ] as const;
 
 const LEGACY_SCHEMA_TABLE = "schema_migrations";

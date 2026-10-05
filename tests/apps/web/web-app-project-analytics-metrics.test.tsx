@@ -345,6 +345,7 @@ describe("web app - project analytics metrics", () => {
     ).toEqual([
       "Overview",
       "Routes",
+      "Flows",
       "Funnels",
       "Audiences",
       "Journeys",

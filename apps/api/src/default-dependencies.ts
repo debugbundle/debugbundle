@@ -1,3 +1,4 @@
+import { createPostgresAnalyticsFlowStore } from "../../../packages/storage/src/analytics-flow-store.js";
 import {
   createAccountDeletionChallengeService,
   createGitHubCliAuthService,
@@ -259,6 +260,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
         };
 
   return {
+    analyticsFlows: createPostgresAnalyticsFlowStore(input.db),
     ingestionPersistence,
     ingestionMetadata,
     ...(accountAnalyticsStore === undefined ? {} : { accountAnalytics: accountAnalyticsStore }),
@@ -291,7 +293,10 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
     auditLogging: auditLogStore,
     memberAuth,
     agentTokens: createAgentTokenStore(input.db),
-    agentReads: createOpenAiHostedReadDependencies({ db: input.db, objectStoreReader: input.objectStore }),
+    agentReads: createOpenAiHostedReadDependencies({
+      db: input.db,
+      objectStoreReader: input.objectStore
+    }),
     agentDashboardBaseUrl: input.appBaseUrl ?? "https://app.debugbundle.com",
     webAuth,
     accountDeletionAuth,

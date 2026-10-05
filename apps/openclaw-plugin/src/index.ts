@@ -63,6 +63,8 @@ const MUTATION_MCP_TOOLS = new Set<DebugBundleMcpToolName>([
   "update_improvement_settings",
   "generate_analytics_bundle",
   "update_analytics_settings",
+  "save_analytics_flow",
+  "archive_analytics_flow",
   "create_saved_analytics_funnel",
   "update_saved_analytics_funnel",
   "archive_saved_analytics_funnel",
@@ -99,19 +101,22 @@ function toMcpFactoryInput(apiBaseUrl: string | undefined): { apiBaseUrl?: strin
   return apiBaseUrl === undefined ? {} : { apiBaseUrl };
 }
 
-export const DEBUGBUNDLE_OPENCLAW_TOOL_MAP: readonly DebugBundleOpenClawToolMapEntry[] = MCP_TOOL_CATALOG.map((tool) => ({
-  mcpToolName: tool.name,
-  openClawToolName: toOpenClawToolName(tool.name),
-  description: tool.description,
-  optional: MUTATION_MCP_TOOLS.has(tool.name),
-  parameters: toTypeBoxSchema(tool.inputSchema)
-}));
+export const DEBUGBUNDLE_OPENCLAW_TOOL_MAP: readonly DebugBundleOpenClawToolMapEntry[] =
+  MCP_TOOL_CATALOG.map((tool) => ({
+    mcpToolName: tool.name,
+    openClawToolName: toOpenClawToolName(tool.name),
+    description: tool.description,
+    optional: MUTATION_MCP_TOOLS.has(tool.name),
+    parameters: toTypeBoxSchema(tool.inputSchema)
+  }));
 
-export const DEBUGBUNDLE_OPENCLAW_TOOL_NAMES = DEBUGBUNDLE_OPENCLAW_TOOL_MAP.map((tool) => tool.openClawToolName);
-
-export const DEBUGBUNDLE_OPENCLAW_OPTIONAL_TOOL_NAMES = DEBUGBUNDLE_OPENCLAW_TOOL_MAP.filter((tool) => tool.optional).map(
+export const DEBUGBUNDLE_OPENCLAW_TOOL_NAMES = DEBUGBUNDLE_OPENCLAW_TOOL_MAP.map(
   (tool) => tool.openClawToolName
 );
+
+export const DEBUGBUNDLE_OPENCLAW_OPTIONAL_TOOL_NAMES = DEBUGBUNDLE_OPENCLAW_TOOL_MAP.filter(
+  (tool) => tool.optional
+).map((tool) => tool.openClawToolName);
 
 export async function executeDebugBundleOpenClawTool(
   mcpToolName: DebugBundleMcpToolName,
@@ -137,7 +142,8 @@ export default defineToolPlugin({
     {
       apiBaseUrl: Type.Optional(
         Type.String({
-          description: "Optional DebugBundle API base URL for self-hosted or non-production environments."
+          description:
+            "Optional DebugBundle API base URL for self-hosted or non-production environments."
         })
       )
     },

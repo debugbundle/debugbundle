@@ -42,7 +42,7 @@ Use `npx -y @debugbundle/mcp` in clients that require noninteractive package exe
 | Claude Desktop local MCP      | local MCP server config                           | uses local machine auth/config                    |
 | Claude Code plugin            | `/plugin marketplace add debugbundle/debugbundle` | installs bundled MCP config and DebugBundle skill |
 | Codex developer plugin | `codex plugin add debugbundle-codex@debugbundle` | repository marketplace; local MCP and workflow skill |
-| Codex direct MCP | `codex mcp add debugbundle -- npx -y @debugbundle/mcp@1.12.1 --local-auth` | app, CLI, and IDE on the same host |
+| Codex direct MCP | `codex mcp add debugbundle -- npx -y @debugbundle/mcp@1.13.0 --local-auth` | app, CLI, and IDE on the same host |
 | Cursor                        | MCP config with `npx @debugbundle/mcp`            | stdio transport                                   |
 | VS Code / GitHub MCP Registry | `com.debugbundle/mcp`                             | official registry metadata                        |
 | OpenClaw / ClawHub            | DebugBundle skill plus MCP config                 | use the published skill for workflow guidance     |
@@ -97,6 +97,12 @@ The plugin package lives at `apps/mcp/claude-code/debugbundle` and bundles a Cla
 | Project token              | SDK ingestion only                      | Do not use project tokens for MCP retrieval or management.        |
 
 ## What Agents Can Do
+
+- Read public project acquisition/activation definitions and aggregate reports with
+  `list_analytics_flows` and `get_analytics_flow_report`; owners/admins can manage them
+  with `save_analytics_flow` and `archive_analytics_flow`. These developer tools use
+  the same project authorization and flow services as API, CLI and web. The separate
+  hosted OpenAI catalog is unchanged.
 
 - List active incidents and fetch full incident context.
 - Fetch deterministic debug bundles and reproduction artifacts.

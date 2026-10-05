@@ -65,6 +65,19 @@ The CLI reads local project configuration from `.debugbundle/` and can use membe
 
 ## AnalyticsBundle
 
+Public project flows support customer-defined acquisition and activation steps across sites,
+auth pages and apps. Read definitions and aggregate reports with:
+
+```bash
+debugbundle analytics flows list --project <project-id> --json
+debugbundle analytics flows report --project <project-id> --key onboarding --window 30d --json
+```
+
+Owners/admins can use `analytics flows save --project <project-id> --definition-json '<JSON>'`
+and `analytics flows archive --project <project-id> --key onboarding`. See the
+[flow contract](https://debugbundle.com/docs/api/analytics/#public-acquisition-and-activation-flows)
+for definitions, capture, full UTC day report windows, and partial coverage.
+
 Analytics commands require connected member authentication and a project with AnalyticsBundle enabled. They query aggregate rollups or request an asynchronous analysis artifact; they do not read raw analytics events.
 
 ```sh

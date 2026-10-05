@@ -1,10 +1,7 @@
 import { API_BASE, buildBrowserSessionHeaders, readJson } from "./api-client.js";
 import { normalizeImprovementRecord, normalizeIncidentRecord } from "./api-record-normalizers.js";
-import type {
-  IncidentRecord,
-  IncidentStatusFilter,
-  ImprovementRecord
-} from "./api-types.js";
+import { observeWebActivationStep } from "./dogfooding-flows.js";
+import type { IncidentRecord, IncidentStatusFilter, ImprovementRecord } from "./api-types.js";
 
 export async function getIncident(incidentId: string): Promise<IncidentRecord> {
   const body = await readJson<{ incident: IncidentRecord }>(
@@ -12,7 +9,9 @@ export async function getIncident(incidentId: string): Promise<IncidentRecord> {
       credentials: "include"
     })
   );
-  return normalizeIncidentRecord(body.incident);
+  const incident = normalizeIncidentRecord(body.incident);
+  void observeWebActivationStep("incident_opened");
+  return incident;
 }
 
 export async function getImprovement(improvementId: string): Promise<ImprovementRecord> {
@@ -117,6 +116,7 @@ export async function getIncidentBundle(
   incidentId: string
 ): Promise<{ status: "ready"; bundle: BundleRecord } | { status: "pending" | "failed" }> {
   const body = await readArtifact(`/v1/incidents/${incidentId}/bundle`);
+  if (!isArtifactPendingOrFailedResponse(body)) void observeWebActivationStep("bundle_retrieved");
   return isArtifactPendingOrFailedResponse(body)
     ? { status: body.status }
     : { status: "ready", bundle: body as BundleRecord };
@@ -126,9 +126,7 @@ export async function getImprovementBundle(
   projectId: string,
   improvementId: string
 ): Promise<{ status: "ready"; bundle: BundleRecord } | ArtifactPendingOrFailedResponse> {
-  const body = await readArtifact(
-    `/v1/projects/${projectId}/improvements/${improvementId}/bundle`
-  );
+  const body = await readArtifact(`/v1/projects/${projectId}/improvements/${improvementId}/bundle`);
   return isArtifactPendingOrFailedResponse(body)
     ? body
     : { status: "ready", bundle: body as BundleRecord };

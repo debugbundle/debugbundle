@@ -325,7 +325,11 @@ vi.mock("../../packages/storage/src/migrations.js", () => ({
     "analytics_opportunities",
     "analytics_bundle_generations",
     "analytics_incident_correlations",
-    "analytics_incident_session_links"
+    "analytics_incident_session_links",
+    "analytics_flow_definitions",
+    "analytics_flow_runs",
+    "analytics_flow_handoffs",
+    "analytics_flow_rollups"
   ]
 }));
 
@@ -409,7 +413,11 @@ export const WORKER_TABLE_ROWS = [
   { table_name: "analytics_opportunities" },
   { table_name: "analytics_bundle_generations" },
   { table_name: "analytics_incident_correlations" },
-  { table_name: "analytics_incident_session_links" }
+  { table_name: "analytics_incident_session_links" },
+  { table_name: "analytics_flow_definitions" },
+  { table_name: "analytics_flow_runs" },
+  { table_name: "analytics_flow_handoffs" },
+  { table_name: "analytics_flow_rollups" }
 ];
 
 export function buildMigratedWorkerSchemaRows(sql: string): { rows: Record<string, unknown>[] } {

@@ -1,3 +1,4 @@
+import { registerAnalyticsFlowRoutes } from "./routes/analytics-flows.js";
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
 
 import { debugBundleRelayPlugin } from "@debugbundle/sdk-node/relay/fastify";
@@ -165,7 +166,12 @@ function getRequestPath(url: string): string {
 }
 
 function isSdkProjectTokenCorsRequest(request: { url: string }): boolean {
-  return SDK_PROJECT_TOKEN_CORS_PATHS.has(getRequestPath(request.url));
+  return (
+    SDK_PROJECT_TOKEN_CORS_PATHS.has(getRequestPath(request.url)) ||
+    /^\/v1\/analytics\/flows\/[^/]+\/[^/]+\/(start|step|handoff|arrive|withdraw)$/.test(
+      getRequestPath(request.url)
+    )
+  );
 }
 
 function isStateChangingMethod(method: string): boolean {
@@ -411,7 +417,11 @@ export function createApiServer(
   registerAdminAnalyticsRoutes(app, dependencies);
   registerAdminBillingRoutes(app, dependencies);
   registerAuthRoutes(app, dependencies);
-  registerAgentTokenRoutes(app, dependencies, dogfoodingEnv["AGENT_TOKEN_ISSUANCE_ENABLED"] === "true");
+  registerAgentTokenRoutes(
+    app,
+    dependencies,
+    dogfoodingEnv["AGENT_TOKEN_ISSUANCE_ENABLED"] === "true"
+  );
   registerAgentEvidenceRoutes(app, dependencies);
   registerBillingRoutes(app, dependencies);
   registerGitHubRoutes(app, dependencies);
@@ -428,6 +438,7 @@ export function createApiServer(
   registerAnalyticsRoutes(app, dependencies);
   registerAnalyticsSettingsRoutes(app, dependencies);
   registerAnalyticsSavedFunnelRoutes(app, dependencies);
+  registerAnalyticsFlowRoutes(app, dependencies);
   registerCapturePolicyRoutes(app, dependencies);
   registerCaptureRuleRoutes(app, dependencies);
   registerImprovementSettingsRoutes(app, dependencies);

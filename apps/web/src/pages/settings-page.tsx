@@ -17,6 +17,7 @@ import {
   AlertDialogTrigger
 } from "../components/ui/alert-dialog.js";
 import { Button } from "../components/ui/button.js";
+import { Checkbox } from "../components/ui/checkbox.js";
 import {
   Card,
   CardContent,
@@ -33,6 +34,10 @@ import {
   requestAccountDeletionOtp
 } from "../lib/api.js";
 import { showErrorToast, showSuccessToast } from "../lib/notify.js";
+import {
+  readWebDogfoodingAnalyticsConsent,
+  setWebDogfoodingAnalyticsConsent
+} from "../lib/dogfooding.js";
 import { useSession } from "../lib/session.js";
 
 const DELETE_ACCOUNT_CONFIRMATION_TEXT = "Delete my account";
@@ -49,6 +54,7 @@ export function SettingsPage(): JSX.Element {
   const [isImportingAvatar, setIsImportingAvatar] = useState(false);
   const [isRequestingDeleteOtp, setIsRequestingDeleteOtp] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [analyticsConsent, setAnalyticsConsent] = useState(readWebDogfoodingAnalyticsConsent);
 
   useEffect(() => {
     if (!isDeleteDialogOpen) {
@@ -146,6 +152,7 @@ export function SettingsPage(): JSX.Element {
         confirmation_text: deleteConfirmationText.trim(),
         otp: deleteOtp.trim()
       });
+      setWebDogfoodingAnalyticsConsent(false);
       setSession(null);
       setIsDeleteDialogOpen(false);
       showSuccessToast("Account deleted successfully.");
@@ -214,6 +221,31 @@ export function SettingsPage(): JSX.Element {
               <DetailBlock label="Workspace" value={session.organization_id} />
               <DetailBlock label="Role" value={session.role} />
               <DetailBlock label="Session" value={session.session_id} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Optional visit analytics</CardTitle>
+              <CardDescription>
+                Control optional browser analytics on this device.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Field orientation="horizontal" className="items-start gap-2">
+                <Checkbox
+                  id="account-analytics-consent"
+                  checked={analyticsConsent}
+                  onCheckedChange={(checked) => {
+                    const granted = checked === true;
+                    const effective = setWebDogfoodingAnalyticsConsent(granted);
+                    setAnalyticsConsent(effective);
+                  }}
+                />
+                <FieldLabel htmlFor="account-analytics-consent" className="font-normal leading-5">
+                  Share optional visit analytics. Turning this off clears queued analytics.
+                </FieldLabel>
+              </Field>
             </CardContent>
           </Card>
 

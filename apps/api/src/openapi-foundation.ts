@@ -7,6 +7,7 @@ import {
   BillingCheckoutConfirmBodySchema,
   BillingCapacityChangeBodySchema,
   GithubAuthCallbackQuerySchema,
+  GithubSignupStartQuerySchema,
   GithubDeviceClaimBodySchema,
   GithubDevicePollBodySchema,
   GithubDeviceStartBodySchema,
@@ -109,6 +110,7 @@ export function foundationOperations(): OperationSpec[] {
       operationId: "startGithubLogin",
       summary: "Start GitHub OAuth",
       tags: ["Auth"],
+      query: GithubSignupStartQuerySchema,
       responses: {
         "302": {
           description: "Redirects to GitHub authorization.",

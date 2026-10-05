@@ -1,4 +1,19 @@
-> Current analytics task (2026-10-02): follow [the focused visits/activation plan](spec/analytics-visit-flows-plan-20261002.md) and [scope reset](spec/analytics-scope-reset-20261002.md). The expanded `update/analytics` work is parked; its unfinished roadmap is not the active scope. See [STATUS.md](STATUS.md) for the handoff.
+> Active analytics work (2026-10-04): [public project flows](spec/analytics-public-flows-20261003.md) on `update/visit-flows`. The expanded `update/analytics` branch remains parked. See STATUS for current verification. No release is authorized.
+
+Public acquisition/activation flows are customer-project definitions with ordered origin-bound steps.
+`packages/storage/src/analytics-flow-store.ts` owns versioned definitions, hashed expiring contexts,
+single-use handoffs and aggregate increments; `analytics-flow-reports.ts` reads bounded daily counters.
+`analytics-flow-schema.ts` supplies the additive migration and separate empty-schema bootstrap SQL.
+API `routes/analytics-flows.ts`, CLI `analytics-flow-commands.ts`, ordinary MCP `analytics-flow-tools.ts`,
+and the project Analytics Flows page share this contract. Ordinary project access replaces the discarded
+operator-only candidate. No generic flow joins DebugBundle users, projects or incidents as business outcomes.
+
+Browser SDK `analytics-flows.ts` exports the public headless helper. Same-tab sessionStorage preserves
+context through a customer's dedicated auth origin and external OAuth return; integrations mark success
+explicitly. Site→blog uses the same mechanism. Existing debug capture remains independent. DebugBundle's
+own frontend SDK adoption/instrumentation belongs to the authorized release integration, using this same
+public API. No public consent UI or marketing copy is changed. The general retention worker retains bounded
+durable continuation; million-visit load testing is deferred by the owner.
 
 # ARCHITECTURE MAP — DebugBundle
 
@@ -310,6 +325,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
   - `routes/analytics-settings.ts` — project AnalyticsBundle settings read/update surface over shared analytics settings schemas, member preview, owner/admin mutation, all-tier analytics availability including the bounded Free preview, and fixed tier-bounded controlled custom dimensions
   - `routes/analytics-saved-funnels.ts` — all-tier project saved-funnel list/create/update/archive surface with member reads, owner/admin mutations, fixed tier-bounded active-definition limits, shared schemas, and configuration audit records
   - `routes/analytics.ts` — thin Analytics HTTP registration for aggregate metrics, opportunity/bundle inventory, generation, and artifact/status retrieval
+  - `routes/analytics-visit-flows.ts` — configured source/destination project-token handoff writes plus two operator-gated aggregate reads; current signup consent (signed for GitHub OAuth) gates account linking after response completion; withdrawal remains available with capture disabled; bundle outcomes link best-effort after core success
   - `routes/analytics-contracts.ts` — shared analytics HTTP request schemas, cursor parsing, and bounded time-window resolution
   - `routes/analytics-route-services.ts` — project/organization authorization helpers, linked-opportunity request derivation, focused-kind validation, deterministic generation response handling, and metric input normalization
   - `routes/project-members.ts` — project-scoped collaborator listing for any authorized member, cached member-avatar reads, pending-invite lifecycle, invite creation with transactional invite email delivery, role updates, member removal, and collaborator self-leave with removed-member automation cleanup
@@ -444,6 +460,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
   - `analytics-ingestion-jobs.ts` — narrow analytics aggregation job and persistence contracts kept outside oversized shared storage type files
   - `analytics-bundle-jobs.ts` — internal AnalyticsBundle build job contract used by the Redis queue lane for on-demand and scheduled generation work
   - `analytics-metrics-store.ts` / `analytics-incident-impact-metrics.ts` — Postgres aggregate AnalyticsBundle summary, route, journey-pattern, device, referrer, action, funnel, and incident-impact queries for API/CLI/MCP retrieval; incident impact reads only hashed incident/session links and aggregate ledgers, and reports unavailable conversion deltas explicitly
+  - `analytics-visit-flow-store.ts` / `visit-flow-schema.ts` — bounded site-to-app handoff and arrival storage, source attribution, committed-account link, first bundle receipt, and shared acquisition/activation reports; forward migration and readiness gate keep existing installations compatible
   - `analytics-journey-sample-store.ts` — retained redacted journey sample metadata reservation, internal project-scoped correlation subject persistence, artifact-complete marking, list/detail reads, and project-scoped cleanup helpers; public reads only expose rows after artifact persistence completes
   - `analytics-opportunity-evaluator.ts` — evaluator orchestration plus funnel-dropoff and journey-friction candidates
   - `analytics-opportunity-regression-evaluator.ts` — bounded route-exit, deploy-conversion, incident-impact, and stale-resolution evaluators
@@ -793,3 +810,7 @@ CLI runtime compatibility: `packages/node-http/src/index.ts` pairs the pinned Un
 Browser recovery and alert policy ownership: `shared-types/browser-recovery.ts` validates explicit sanitized failure candidates; `storage/browser-recovery-store.ts` indexes references and schedules durable enrichment with correlation locks, while `browser-recovery-schema.ts` supplies the forward migration and clean bootstrap. `retention-store.ts` removes expired index rows. `shared-types/alert-notification-policy.ts` owns channel noise configuration and stable per-rule policy; `alert-delivery-store.ts` serializes independent configured cooldown and burst checks before reading their snapshots. `apps/web/src/lib/alert-form.ts` holds the existing reusable alert form helpers, re-exported by the page to preserve import compatibility. Matcher summaries expose the new safety conditions through the existing shared text formatter.
 
 Custom alert webhook signing: `webhook_payload_version` separates compatible legacy JSON from opt-in group-reference bodies. Migration `202609250002_version_alert_webhook_payloads` runs before new API/worker code; storage creates or atomically provisions per-rule CSPRNG secrets and custom delivery fails closed without one. Provider-native Slack/Discord authentication remains provider-owned.
+
+### Hosted public flow consumers (2026-10-05)
+
+The site and app consume Browser SDK 3.1.0 through their `lib/dogfooding-flows.ts` modules. Optional origin-restricted project configuration enables `site-acquisition` (site visit, app arrival, confirmed sign-in) and `product-activation` (successful project creation, incident read, bundle retrieval). The existing programmatic analytics policy and stored opt-out apply. These consumers use public flow APIs; no private account joins are introduced. Hosted build settings and definition provisioning belong to the private cloud repository.

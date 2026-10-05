@@ -51,7 +51,7 @@ function fixture(
     "-m",
     "fixture"
   );
-  if (options.tag !== false) git(repo, "tag", "v1.0.0");
+  if (options.tag !== false) git(repo, "tag", "v1.0.1");
   return repo;
 }
 
@@ -83,7 +83,7 @@ describe("Gemini public extension verification", () => {
       expect(() => verify(create({ symlinkReadme: true }))).toThrow(
         /public_extension_file_not_regular:README.md/u
       );
-      expect(() => verify(create({ tag: false }))).toThrow(/public_extension_tag_missing:v1.0.0/u);
+      expect(() => verify(create({ tag: false }))).toThrow(/public_extension_tag_missing:v1.0.1/u);
     } finally {
       for (const repo of repositories) rmSync(repo, { recursive: true, force: true });
     }

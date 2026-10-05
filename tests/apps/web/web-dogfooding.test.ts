@@ -5,13 +5,84 @@ import { describe, expect, it, vi } from "vitest";
 import {
   initializeWebDogfooding,
   normalizeWebDogfoodingAnalyticsPath,
+  observeWebAnalyticsConsentWithdrawal,
+  readWebDogfoodingAnalyticsConsent,
   resolveWebDogfoodingConfig,
+  setWebDogfoodingAnalyticsConsent,
   trackWebDogfoodingPageView,
   type DogfoodingWindowTarget
 } from "../../../apps/web/src/lib/dogfooding.ts";
 
 describe("web dogfooding", () => {
   const relayEndpoint = "/debugbundle/browser";
+
+  it("automatically starts only when configured and preserves an explicit device opt-out", () => {
+    setWebDogfoodingAnalyticsConsent(true);
+    window.localStorage.clear();
+    const setConsent = vi.fn();
+    const sdk = { init: vi.fn(), analytics: { setConsent } };
+    const env = {
+      VITE_API_URL: "https://api.example.test",
+      VITE_DEBUGBUNDLE_DOGFOOD_PROJECT_TOKEN: "dbundle_proj_app",
+      VITE_DEBUGBUNDLE_DOGFOOD_ANALYTICS_ENABLED: "true",
+      VITE_DEBUGBUNDLE_DOGFOOD_ANALYTICS_AUTO_START: "true"
+    };
+    const target = { setTimeout: () => 1 };
+    try {
+      initializeWebDogfooding(
+        { ...env, VITE_DEBUGBUNDLE_DOGFOOD_ANALYTICS_AUTO_START: "false" },
+        target,
+        sdk
+      );
+      expect(readWebDogfoodingAnalyticsConsent()).toBe(false);
+      initializeWebDogfooding(env, target, sdk);
+      expect(setConsent).toHaveBeenLastCalledWith(true);
+      expect(readWebDogfoodingAnalyticsConsent()).toBe(true);
+      expect(window.localStorage.getItem("debugbundle.app.analytics_consent")).toBeNull();
+      setWebDogfoodingAnalyticsConsent(false);
+      expect(window.localStorage.getItem("debugbundle.app.analytics_consent")).toBe("false");
+      initializeWebDogfooding(env, target, sdk);
+      expect(setConsent).toHaveBeenLastCalledWith(false);
+      expect(readWebDogfoodingAnalyticsConsent()).toBe(false);
+    } finally {
+      setWebDogfoodingAnalyticsConsent(true);
+      window.localStorage.clear();
+      initializeWebDogfooding({});
+    }
+  });
+
+  it("honors withdrawal in another tab even when saving the device opt-out fails", () => {
+    expect(setWebDogfoodingAnalyticsConsent(true)).toBe(true);
+    const stop = observeWebAnalyticsConsentWithdrawal();
+    const blocked = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("storage_blocked");
+    });
+    try {
+      window.dispatchEvent(
+        new StorageEvent("storage", {
+          key: "debugbundle.app.analytics_consent",
+          newValue: null
+        })
+      );
+      expect(readWebDogfoodingAnalyticsConsent()).toBe(false);
+    } finally {
+      stop();
+      blocked.mockRestore();
+      window.localStorage.clear();
+    }
+  });
+
+  it("keeps consent off when the browser refuses preference storage", () => {
+    const blocked = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("storage_blocked");
+    });
+    try {
+      expect(setWebDogfoodingAnalyticsConsent(true)).toBe(false);
+      expect(readWebDogfoodingAnalyticsConsent()).toBe(false);
+    } finally {
+      blocked.mockRestore();
+    }
+  });
 
   it("stays disabled when dogfooding is neither explicitly enabled nor backed by a project token", () => {
     expect(
@@ -238,7 +309,7 @@ describe("web dogfooding", () => {
         analytics: {
           enabled: true,
           privacyMode: "standard",
-          consentRequired: false,
+          consentRequired: true,
           trackPageViews: false,
           trackRouteChanges: false,
           trackSessions: true,

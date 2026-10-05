@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.1.2] - 2026-10-05
+
+- Adopt MCP 1.13.0 with public project acquisition and activation flow definitions and aggregate reports.
+
 ## [1.1.1] - 2026-09-25
 
 - Pin the published MCP 1.12.1 release while preserving CLI-first guidance, local authentication, and existing plugin settings.

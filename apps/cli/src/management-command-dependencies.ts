@@ -42,6 +42,7 @@ import type {
   listAnalyticsFunnelsWithAuthCommand as defaultListAnalyticsFunnelsCommand,
   listAnalyticsOpportunitiesWithAuthCommand as defaultListAnalyticsOpportunitiesCommand
 } from "./analytics-metrics-commands.js";
+import type { analyticsFlowWithAuthCommand } from "./analytics-flow-commands.js";
 import type {
   createCaptureRuleWithAuthCommand as defaultCreateCaptureRuleCommand,
   deleteCaptureRuleWithAuthCommand as defaultDeleteCaptureRuleCommand,
@@ -186,6 +187,7 @@ export type ManagementCommandDependencies = {
   updateAnalyticsSavedFunnelCommand?: typeof defaultUpdateAnalyticsSavedFunnelCommand;
   archiveAnalyticsSavedFunnelCommand?: typeof defaultArchiveAnalyticsSavedFunnelCommand;
   getAnalyticsSummaryCommand?: typeof defaultGetAnalyticsSummaryCommand;
+  analyticsFlowCommand?: typeof analyticsFlowWithAuthCommand;
   getAnalyticsRoutesCommand?: typeof defaultGetAnalyticsRoutesCommand;
   getAnalyticsJourneysCommand?: typeof defaultGetAnalyticsJourneysCommand;
   getAnalyticsDevicesCommand?: typeof defaultGetAnalyticsDevicesCommand;

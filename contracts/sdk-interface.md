@@ -1278,3 +1278,14 @@ Future server SDKs must implement the same full relay handler contract before th
 All server SDKs must implement sections 1–8, section 11, section 12, and section 13 of this contract before release.
 
 Exception projection in the hardened native releases: Java3/Android3 and genuine reference errors in Swift3 may use bounded non-owning weak handles inspected only by the existing delivery worker. Queued telemetry remains privacy-protected; weak handles do not extend raw exception lifetime. At most one current raw exception graph is inspected by each worker, with no arbitrary graph byte-bound claim and no replacement workers if an accessor stalls. Collected/unavailable details use an explicit safe fallback. Swift custom value-error/formatter details that require arbitrary caller accessors use documented type/stack or placeholder fallback. Python2 uses built-in exception descriptors to preserve standard details without overridable metadata access.
+
+## Public Browser flow client
+
+The additive `createAnalyticsFlowClient` export provides headless `start`, `step`, `handoff`,
+`arrive`, `setConsent` and `withdraw` methods for project-defined acquisition/activation flows.
+See `contracts/public-interfaces.md` for the complete options, HTTP schema and expiry contract.
+This helper is explicit/direct, independent of ordinary debug capture and parent-client remote
+settings. Backend SDKs are unchanged; direct HTTP callers can submit the same explicit observations.
+Malformed JavaScript initialization returns an inactive client. Attribution is restricted to
+source/campaign data fields and checked by the existing telemetry privacy policy before capture.
+The unpublished local operator-only candidate is replaced directly, without compatibility shims.

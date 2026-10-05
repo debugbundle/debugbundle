@@ -6,6 +6,23 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-10-05
+
+### Added
+
+- Public project acquisition and activation flows with two to eight ordered steps, exact origins, expiring hashed contexts and single-use cross-origin handoffs. Customer sites, blogs, dedicated auth pages and apps share the same contract.
+- Aggregate step, drop-off, timing, source and previous-period reports with explicit unlinked coverage, available through the project Analytics Flows page, API, CLI 1.13.0, MCP 1.13.0 and OpenClaw 1.13.0.
+- Additive migration `202610030001_add_public_analytics_flows`, enforced before API/worker readiness, with bounded retention and project deletion cleanup.
+- Browser SDK 3.1.0 adoption and optional DebugBundle site/app consumers of the public flow API. Shared JS 2.2.0 exports the flow schemas; the redaction package is version-aligned without a behavior change.
+
+### Fixed
+
+- Preserve analytics withdrawal across queued delivery and concurrent account creation correctness.
+
+### Release notes
+
+- Existing APIs, saved funnels and installed debug capture remain compatible. Flow observations are explicitly instrumented and do not independently prove backend business outcomes. Backend SDK flow helpers are not added.
+
 ## [1.13.4] - 2026-09-26
 
 ### Reliability

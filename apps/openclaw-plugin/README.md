@@ -27,6 +27,10 @@ The plugin exposes the DebugBundle MCP tool catalog with a `debugbundle_` prefix
 - `debugbundle_get_bundle`
 - `debugbundle_get_reproduction`
 - `debugbundle_resolve_incident`
+- `debugbundle_list_analytics_flows`
+- `debugbundle_save_analytics_flow`
+- `debugbundle_archive_analytics_flow`
+- `debugbundle_get_analytics_flow_report`
 - `debugbundle_get_usage_summary`
 - `debugbundle_get_funnel_analysis`
 - `debugbundle_list_analytics_journey_samples`

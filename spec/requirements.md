@@ -738,6 +738,9 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **FR-ANL-29:** Analytics UI implementation must follow `/rules/design-discipline.md`: reuse existing app patterns and components, prefer tables for comparable records, avoid decorative dashboard card sprawl, include loading/empty/error/disabled/quota/partial-data states, and keep analytics opportunities and bundles visible in both sidebar-level Analytics and project-level Analytics surfaces.
 
+**FR-ANL-30:** Acquisition and activation flows are public project-scoped capabilities with customer-defined ordered steps and origins, ordinary project authorization, headless browser/HTTP capture, bounded cross-origin handoffs including dedicated auth pages, aggregate reports, API/CLI/MCP/web parity, and no dependency on DebugBundle business records. Follow `analytics-public-flows-20261003.md`.
+
+
 ---
 
 ### 1.12 Browser Relay

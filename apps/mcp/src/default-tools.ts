@@ -1,3 +1,5 @@
+import { createAnalyticsFlowApi } from "../../cli/src/analytics-flow-commands.js";
+import { createAnalyticsFlowMcpTools } from "./analytics-flow-tools.js";
 import { createAlertApi } from "../../../packages/alert-client/src/index.js";
 import { createBillingApi } from "../../../packages/billing-client/src/index.js";
 import { createGitHubManagementApi } from "../../../packages/github-client/src/index.js";
@@ -121,13 +123,33 @@ export async function createDefaultMcpTools(
       token
     });
     return {
-      agent_project_summary: (value) => client.read({ name: "project_summary", projectId: String(value["projectId"]) }),
-      agent_list_incidents: (value) => client.read({ name: "list_incidents", projectId: String(value["projectId"]),
-        ...(typeof value["limit"] === "number" ? { limit: value["limit"] } : {}),
-        ...(typeof value["cursor"] === "string" ? { cursor: value["cursor"] } : {}) }),
-      agent_get_incident: (value) => client.read({ name: "get_incident", projectId: String(value["projectId"]), incidentId: String(value["incidentId"]) }),
-      agent_get_incident_context: (value) => client.read({ name: "get_incident_context", projectId: String(value["projectId"]), incidentId: String(value["incidentId"]) }),
-      agent_get_bundle: (value) => client.read({ name: "get_bundle", projectId: String(value["projectId"]), incidentId: String(value["incidentId"]) })
+      agent_project_summary: (value) =>
+        client.read({ name: "project_summary", projectId: String(value["projectId"]) }),
+      agent_list_incidents: (value) =>
+        client.read({
+          name: "list_incidents",
+          projectId: String(value["projectId"]),
+          ...(typeof value["limit"] === "number" ? { limit: value["limit"] } : {}),
+          ...(typeof value["cursor"] === "string" ? { cursor: value["cursor"] } : {})
+        }),
+      agent_get_incident: (value) =>
+        client.read({
+          name: "get_incident",
+          projectId: String(value["projectId"]),
+          incidentId: String(value["incidentId"])
+        }),
+      agent_get_incident_context: (value) =>
+        client.read({
+          name: "get_incident_context",
+          projectId: String(value["projectId"]),
+          incidentId: String(value["incidentId"])
+        }),
+      agent_get_bundle: (value) =>
+        client.read({
+          name: "get_bundle",
+          projectId: String(value["projectId"]),
+          incidentId: String(value["incidentId"])
+        })
     };
   }
   const authState = await readLocalAuthState();
@@ -167,6 +189,7 @@ export async function createDefaultMcpTools(
         ...createAnalyticsJourneySampleApi(httpClient)
       }),
       ...createAnalyticsSettingsMcpTools(createAnalyticsSettingsApi(httpClient)),
+      ...createAnalyticsFlowMcpTools(createAnalyticsFlowApi(httpClient)),
       ...createAnalyticsSavedFunnelMcpTools(createAnalyticsSavedFunnelApi(httpClient)),
       ...createCaptureRuleMcpTools(createCaptureRuleApi(httpClient)),
       ...createCapturePolicyMcpTools(createCapturePolicyApi(httpClient)),

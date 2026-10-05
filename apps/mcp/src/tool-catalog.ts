@@ -1,3 +1,7 @@
+import {
+  ANALYTICS_FLOW_MCP_TOOL_NAMES,
+  ANALYTICS_FLOW_MCP_TOOL_CATALOG
+} from "./analytics-flow-tools.js";
 import { z } from "zod";
 
 import { ALERT_MCP_TOOL_NAMES } from "./alert-tools.js";
@@ -30,6 +34,7 @@ import { WEBHOOK_MCP_TOOL_NAMES } from "./webhook-tools.js";
 import { WEEKLY_REPORT_MCP_TOOL_NAMES } from "./weekly-report-tools.js";
 
 type McpToolName =
+  | (typeof ANALYTICS_FLOW_MCP_TOOL_NAMES)[number]
   | (typeof ALERT_MCP_TOOL_NAMES)[number]
   | (typeof ANALYZE_MCP_TOOL_NAMES)[number]
   | (typeof ANALYTICS_METRICS_MCP_TOOL_NAMES)[number]
@@ -54,6 +59,7 @@ type McpToolName =
   | (typeof WEEKLY_REPORT_MCP_TOOL_NAMES)[number];
 
 type McpToolGroup =
+  | "analytics_flows"
   | "alerts"
   | "analyze"
   | "analytics_metrics"
@@ -87,6 +93,7 @@ import { MCP_TOOL_CATALOG_FOUNDATION } from "./tool-catalog-foundation.js";
 import { MCP_TOOL_CATALOG_OPERATIONS } from "./tool-catalog-operations.js";
 
 export const MCP_TOOL_CATALOG = [
+  ...ANALYTICS_FLOW_MCP_TOOL_CATALOG,
   ...MCP_TOOL_CATALOG_FOUNDATION,
   ...MCP_TOOL_CATALOG_OPERATIONS,
   ...ANALYTICS_METRICS_MCP_TOOL_CATALOG,

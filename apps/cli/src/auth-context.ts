@@ -1,3 +1,4 @@
+import type { AnalyticsFlowHttpClient } from "./analytics-flow-commands.js";
 import { formatMutationOutcomeError } from "../../../packages/retrieval-client/src/mutation-outcome.js";
 import { nodeFetch } from "../../../packages/node-http/src/index.js";
 import {
@@ -70,7 +71,8 @@ async function parseResponseBody(response: { text(): Promise<string> }): Promise
 export function createCliHttpClient(
   input: { baseUrl: string },
   dependencies?: { fetchImpl?: typeof fetch }
-): RetrievalHttpClient &
+): AnalyticsFlowHttpClient &
+  RetrievalHttpClient &
   TokenManagementHttpClient &
   AlertHttpClient &
   WebhookHttpClient &
@@ -147,10 +149,14 @@ export async function runAuthenticatedCliCommand<TDependencies, TApi>(
     const { authState, api } = await options.createApi(input, options.dependencies);
     return await options.runCommand(authState, api);
   } catch (error) {
-    return mapCliAuthErrorToResult(error) ?? {
-      exitCode: 1,
-      output: formatMutationOutcomeError(error, input.json) ?? (error instanceof Error ? error.message : String(error))
-    };
+    return (
+      mapCliAuthErrorToResult(error) ?? {
+        exitCode: 1,
+        output:
+          formatMutationOutcomeError(error, input.json) ??
+          (error instanceof Error ? error.message : String(error))
+      }
+    );
   }
 }
 
@@ -170,14 +176,16 @@ export async function createAuthenticatedRetrievalApi(
   }
 
   const authState = await readAuthState(authStateInput);
-  const createHttpClient = dependencies?.createHttpClient ?? ((clientInput: { baseUrl: string }) => {
-    const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
-    if (dependencies?.fetchImpl !== undefined) {
-      httpClientDependencies.fetchImpl = dependencies.fetchImpl;
-    }
+  const createHttpClient =
+    dependencies?.createHttpClient ??
+    ((clientInput: { baseUrl: string }) => {
+      const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
+      if (dependencies?.fetchImpl !== undefined) {
+        httpClientDependencies.fetchImpl = dependencies.fetchImpl;
+      }
 
-    return createCliHttpClient(clientInput, httpClientDependencies);
-  });
+      return createCliHttpClient(clientInput, httpClientDependencies);
+    });
   const httpClient = createHttpClient({
     baseUrl: authState.base_url
   });
@@ -205,14 +213,16 @@ export async function createAuthenticatedTokenManagementApi(
   }
 
   const authState = await readAuthState(authStateInput);
-  const createHttpClient = dependencies?.createHttpClient ?? ((clientInput: { baseUrl: string }) => {
-    const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
-    if (dependencies?.fetchImpl !== undefined) {
-      httpClientDependencies.fetchImpl = dependencies.fetchImpl;
-    }
+  const createHttpClient =
+    dependencies?.createHttpClient ??
+    ((clientInput: { baseUrl: string }) => {
+      const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
+      if (dependencies?.fetchImpl !== undefined) {
+        httpClientDependencies.fetchImpl = dependencies.fetchImpl;
+      }
 
-    return createCliHttpClient(clientInput, httpClientDependencies);
-  });
+      return createCliHttpClient(clientInput, httpClientDependencies);
+    });
   const httpClient = createHttpClient({
     baseUrl: authState.base_url
   });
@@ -240,14 +250,16 @@ export async function createAuthenticatedAlertApi(
   }
 
   const authState = await readAuthState(authStateInput);
-  const createHttpClient = dependencies?.createHttpClient ?? ((clientInput: { baseUrl: string }) => {
-    const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
-    if (dependencies?.fetchImpl !== undefined) {
-      httpClientDependencies.fetchImpl = dependencies.fetchImpl;
-    }
+  const createHttpClient =
+    dependencies?.createHttpClient ??
+    ((clientInput: { baseUrl: string }) => {
+      const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
+      if (dependencies?.fetchImpl !== undefined) {
+        httpClientDependencies.fetchImpl = dependencies.fetchImpl;
+      }
 
-    return createCliHttpClient(clientInput, httpClientDependencies);
-  });
+      return createCliHttpClient(clientInput, httpClientDependencies);
+    });
   const httpClient = createHttpClient({
     baseUrl: authState.base_url
   });
@@ -275,14 +287,16 @@ export async function createAuthenticatedWebhookApi(
   }
 
   const authState = await readAuthState(authStateInput);
-  const createHttpClient = dependencies?.createHttpClient ?? ((clientInput: { baseUrl: string }) => {
-    const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
-    if (dependencies?.fetchImpl !== undefined) {
-      httpClientDependencies.fetchImpl = dependencies.fetchImpl;
-    }
+  const createHttpClient =
+    dependencies?.createHttpClient ??
+    ((clientInput: { baseUrl: string }) => {
+      const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
+      if (dependencies?.fetchImpl !== undefined) {
+        httpClientDependencies.fetchImpl = dependencies.fetchImpl;
+      }
 
-    return createCliHttpClient(clientInput, httpClientDependencies);
-  });
+      return createCliHttpClient(clientInput, httpClientDependencies);
+    });
   const httpClient = createHttpClient({
     baseUrl: authState.base_url
   });
@@ -310,14 +324,16 @@ export async function createAuthenticatedWeeklyReportApi(
   }
 
   const authState = await readAuthState(authStateInput);
-  const createHttpClient = dependencies?.createHttpClient ?? ((clientInput: { baseUrl: string }) => {
-    const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
-    if (dependencies?.fetchImpl !== undefined) {
-      httpClientDependencies.fetchImpl = dependencies.fetchImpl;
-    }
+  const createHttpClient =
+    dependencies?.createHttpClient ??
+    ((clientInput: { baseUrl: string }) => {
+      const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
+      if (dependencies?.fetchImpl !== undefined) {
+        httpClientDependencies.fetchImpl = dependencies.fetchImpl;
+      }
 
-    return createCliHttpClient(clientInput, httpClientDependencies);
-  });
+      return createCliHttpClient(clientInput, httpClientDependencies);
+    });
   const httpClient = createHttpClient({
     baseUrl: authState.base_url
   });
@@ -345,14 +361,16 @@ export async function createAuthenticatedSlackApi(
   }
 
   const authState = await readAuthState(authStateInput);
-  const createHttpClient = dependencies?.createHttpClient ?? ((clientInput: { baseUrl: string }) => {
-    const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
-    if (dependencies?.fetchImpl !== undefined) {
-      httpClientDependencies.fetchImpl = dependencies.fetchImpl;
-    }
+  const createHttpClient =
+    dependencies?.createHttpClient ??
+    ((clientInput: { baseUrl: string }) => {
+      const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
+      if (dependencies?.fetchImpl !== undefined) {
+        httpClientDependencies.fetchImpl = dependencies.fetchImpl;
+      }
 
-    return createCliHttpClient(clientInput, httpClientDependencies);
-  });
+      return createCliHttpClient(clientInput, httpClientDependencies);
+    });
   const httpClient = createHttpClient({
     baseUrl: authState.base_url
   });
@@ -380,14 +398,16 @@ export async function createAuthenticatedProjectManagementApi(
   }
 
   const authState = await readAuthState(authStateInput);
-  const createHttpClient = dependencies?.createHttpClient ?? ((clientInput: { baseUrl: string }) => {
-    const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
-    if (dependencies?.fetchImpl !== undefined) {
-      httpClientDependencies.fetchImpl = dependencies.fetchImpl;
-    }
+  const createHttpClient =
+    dependencies?.createHttpClient ??
+    ((clientInput: { baseUrl: string }) => {
+      const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
+      if (dependencies?.fetchImpl !== undefined) {
+        httpClientDependencies.fetchImpl = dependencies.fetchImpl;
+      }
 
-    return createCliHttpClient(clientInput, httpClientDependencies);
-  });
+      return createCliHttpClient(clientInput, httpClientDependencies);
+    });
   const httpClient = createHttpClient({
     baseUrl: authState.base_url
   });
@@ -415,14 +435,16 @@ export async function createAuthenticatedBillingApi(
   }
 
   const authState = await readAuthState(authStateInput);
-  const createHttpClient = dependencies?.createHttpClient ?? ((clientInput: { baseUrl: string }) => {
-    const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
-    if (dependencies?.fetchImpl !== undefined) {
-      httpClientDependencies.fetchImpl = dependencies.fetchImpl;
-    }
+  const createHttpClient =
+    dependencies?.createHttpClient ??
+    ((clientInput: { baseUrl: string }) => {
+      const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
+      if (dependencies?.fetchImpl !== undefined) {
+        httpClientDependencies.fetchImpl = dependencies.fetchImpl;
+      }
 
-    return createCliHttpClient(clientInput, httpClientDependencies);
-  });
+      return createCliHttpClient(clientInput, httpClientDependencies);
+    });
   const httpClient = createHttpClient({
     baseUrl: authState.base_url
   });
@@ -450,14 +472,16 @@ export async function createAuthenticatedGitHubManagementApi(
   }
 
   const authState = await readAuthState(authStateInput);
-  const createHttpClient = dependencies?.createHttpClient ?? ((clientInput: { baseUrl: string }) => {
-    const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
-    if (dependencies?.fetchImpl !== undefined) {
-      httpClientDependencies.fetchImpl = dependencies.fetchImpl;
-    }
+  const createHttpClient =
+    dependencies?.createHttpClient ??
+    ((clientInput: { baseUrl: string }) => {
+      const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
+      if (dependencies?.fetchImpl !== undefined) {
+        httpClientDependencies.fetchImpl = dependencies.fetchImpl;
+      }
 
-    return createCliHttpClient(clientInput, httpClientDependencies);
-  });
+      return createCliHttpClient(clientInput, httpClientDependencies);
+    });
   const httpClient = createHttpClient({
     baseUrl: authState.base_url
   });

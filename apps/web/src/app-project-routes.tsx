@@ -10,6 +10,7 @@ import { ProjectAnalyticsBundleDetailPage } from "./pages/project-analytics-bund
 import { ProjectAnalyticsBundlesPage } from "./pages/project-analytics-bundles-page.js";
 import { ProjectAnalyticsBundleCreatePage } from "./pages/project-analytics-bundle-create-page.js";
 import { ProjectAnalyticsFunnelsPage } from "./pages/project-analytics-funnels-page.js";
+import { ProjectAnalyticsFlowsPage } from "./pages/project-analytics-flows-page.js";
 import { ProjectAnalyticsJourneySamplePage } from "./pages/project-analytics-journey-sample-page.js";
 import { ProjectAnalyticsJourneysPage } from "./pages/project-analytics-journeys-page.js";
 import { ProjectAnalyticsLayout } from "./pages/project-analytics-layout.js";
@@ -50,6 +51,7 @@ export function createProjectRoutes(): JSX.Element {
       <Route path="analytics" element={<ProjectAnalyticsLayout />}>
         <Route index element={<ProjectAnalyticsPage />} />
         <Route path="routes" element={<ProjectAnalyticsRoutesPage />} />
+        <Route path="flows" element={<ProjectAnalyticsFlowsPage />} />
         <Route path="funnels" element={<ProjectAnalyticsFunnelsPage />} />
         <Route path="audiences" element={<ProjectAnalyticsAudiencesPage />} />
         <Route path="journeys" element={<ProjectAnalyticsJourneysPage />} />

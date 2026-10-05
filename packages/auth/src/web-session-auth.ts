@@ -63,7 +63,9 @@ export interface EmailAuthChallengeStore {
     expires_at: string;
     replaced_at: string;
   }): Promise<EmailAuthChallengeRecord>;
-  consumeEmailAuthChallenge(input: ConsumeEmailAuthChallengeInput): Promise<{ email: string; accepted_terms_at: string | null } | null>;
+  consumeEmailAuthChallenge(
+    input: ConsumeEmailAuthChallengeInput
+  ): Promise<{ email: string; accepted_terms_at: string | null } | null>;
 }
 
 export interface ProjectInviteAcceptanceStore {
@@ -75,11 +77,10 @@ export interface ProjectInviteAcceptanceStore {
   }): Promise<AcceptProjectInviteStoreResult>;
 }
 
-export type RequestEmailCodeResult =
-  | {
-      ok: true;
-      code_sent: boolean;
-    };
+export type RequestEmailCodeResult = {
+  ok: true;
+  code_sent: boolean;
+};
 
 export type VerifyEmailCodeResult =
   | {
@@ -100,7 +101,11 @@ export type AcceptInviteResult =
     }
   | {
       ok: false;
-      error: "invalid_session" | "invalid_token" | "invite_email_mismatch" | "shared_access_suspended";
+      error:
+        | "invalid_session"
+        | "invalid_token"
+        | "invite_email_mismatch"
+        | "shared_access_suspended";
     };
 
 export type BeginGitHubAuthResult =
@@ -143,17 +148,34 @@ export interface WebSessionAuthServiceOptions {
 }
 
 export interface WebSessionAuthService {
-  requestEmailCode(input: { email: string; accepted_terms_at: string; now?: Date }): Promise<RequestEmailCodeResult>;
-  verifyEmailCode(input: { email: string; code: string; now?: Date }): Promise<VerifyEmailCodeResult>;
-  beginGithubAuth(options?: { now?: Date; accepted_terms_at?: string }): Promise<BeginGitHubAuthResult>;
+  requestEmailCode(input: {
+    email: string;
+    accepted_terms_at: string;
+    now?: Date;
+  }): Promise<RequestEmailCodeResult>;
+  verifyEmailCode(input: {
+    email: string;
+    code: string;
+    now?: Date;
+  }): Promise<VerifyEmailCodeResult>;
+  beginGithubAuth(options?: {
+    now?: Date;
+    accepted_terms_at?: string;
+  }): Promise<BeginGitHubAuthResult>;
   completeGithubAuth(input: {
     code: string;
     state: string;
     stateCookieValue: string | null;
     now?: Date;
   }): Promise<CompleteGitHubAuthResult>;
-  acceptInviteForSession(sessionToken: string, input: { token: string; now?: Date }): Promise<AcceptInviteResult>;
-  resolveSessionByToken(sessionToken: string, options?: { now?: Date }): Promise<WebSessionRecord | null>;
+  acceptInviteForSession(
+    sessionToken: string,
+    input: { token: string; now?: Date }
+  ): Promise<AcceptInviteResult>;
+  resolveSessionByToken(
+    sessionToken: string,
+    options?: { now?: Date }
+  ): Promise<WebSessionRecord | null>;
   revokeSessionByToken(sessionToken: string, options?: { now?: Date }): Promise<boolean>;
 }
 
@@ -164,14 +186,18 @@ export function generateGithubOauthState(input: {
   accepted_terms_at?: string;
 }): { token: string; expires_at: string } {
   const now = input.now ?? new Date();
-  const expiresAt = new Date(now.getTime() + (input.lifetimeMs ?? DEFAULT_GITHUB_OAUTH_STATE_LIFETIME_MS)).toISOString();
+  const expiresAt = new Date(
+    now.getTime() + (input.lifetimeMs ?? DEFAULT_GITHUB_OAUTH_STATE_LIFETIME_MS)
+  ).toISOString();
   const payload = {
     nonce: randomBytes(16).toString("hex"),
     expires_at: expiresAt,
     ...(input.accepted_terms_at === undefined ? {} : { accepted_terms_at: input.accepted_terms_at })
   };
   const payloadSegment = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
-  const signatureSegment = createHmac("sha256", input.secret).update(payloadSegment, "utf8").digest("base64url");
+  const signatureSegment = createHmac("sha256", input.secret)
+    .update(payloadSegment, "utf8")
+    .digest("base64url");
 
   return {
     token: `${payloadSegment}.${signatureSegment}`,
@@ -185,7 +211,10 @@ interface GithubOauthStatePayload {
   accepted_terms_at?: string;
 }
 
-function parseGithubOauthStatePayload(token: string, secret: string): GithubOauthStatePayload | null {
+function parseGithubOauthStatePayload(
+  token: string,
+  secret: string
+): GithubOauthStatePayload | null {
   const separatorIndex = token.lastIndexOf(".");
   if (separatorIndex <= 0) {
     return null;
@@ -193,7 +222,9 @@ function parseGithubOauthStatePayload(token: string, secret: string): GithubOaut
 
   const payloadSegment = token.slice(0, separatorIndex);
   const signatureSegment = token.slice(separatorIndex + 1);
-  const expectedSignature = createHmac("sha256", secret).update(payloadSegment, "utf8").digest("base64url");
+  const expectedSignature = createHmac("sha256", secret)
+    .update(payloadSegment, "utf8")
+    .digest("base64url");
 
   if (!isTimingSafeEqualUtf8(expectedSignature, signatureSegment)) {
     return null;
@@ -214,7 +245,8 @@ function parseGithubOauthStatePayload(token: string, secret: string): GithubOaut
     }
     if (
       payload.accepted_terms_at !== undefined &&
-      (typeof payload.accepted_terms_at !== "string" || Number.isNaN(Date.parse(payload.accepted_terms_at)))
+      (typeof payload.accepted_terms_at !== "string" ||
+        Number.isNaN(Date.parse(payload.accepted_terms_at)))
     ) {
       return null;
     }
@@ -222,14 +254,19 @@ function parseGithubOauthStatePayload(token: string, secret: string): GithubOaut
     return {
       nonce: payload.nonce,
       expires_at: payload.expires_at,
-      ...(payload.accepted_terms_at === undefined ? {} : { accepted_terms_at: payload.accepted_terms_at })
+      ...(payload.accepted_terms_at === undefined
+        ? {}
+        : { accepted_terms_at: payload.accepted_terms_at })
     };
   } catch {
     return null;
   }
 }
 
-export function validateGithubOauthState(token: string, input: { now?: Date; secret: string }): boolean {
+export function validateGithubOauthState(
+  token: string,
+  input: { now?: Date; secret: string }
+): boolean {
   const payload = parseGithubOauthStatePayload(token, input.secret);
   if (payload === null) {
     return false;
@@ -253,7 +290,8 @@ export function createWebSessionAuthService(
   options: WebSessionAuthServiceOptions = {}
 ): WebSessionAuthService {
   const sessionLifetimeMs = options.sessionLifetimeMs ?? DEFAULT_SESSION_LIFETIME_MS;
-  const emailAuthCodeLifetimeMs = options.emailAuthCodeLifetimeMs ?? DEFAULT_EMAIL_AUTH_CODE_LIFETIME_MS;
+  const emailAuthCodeLifetimeMs =
+    options.emailAuthCodeLifetimeMs ?? DEFAULT_EMAIL_AUTH_CODE_LIFETIME_MS;
 
   return {
     async requestEmailCode(input): Promise<RequestEmailCodeResult> {
@@ -302,18 +340,14 @@ export function createWebSessionAuthService(
           };
         }
 
-        account = await store.createUserAccount({
+        const createdAccount = await store.createUserAccount({
           email: normalizedEmail,
           ...deriveOrganizationIdentity(normalizedEmail),
           accepted_terms_at: consumed.accepted_terms_at,
           created_at: now.toISOString()
         });
-
-        if (account === null) {
-          account = await store.findUserAccountByEmail(normalizedEmail);
-        }
-
-        createdUser = true;
+        createdUser = createdAccount !== null;
+        account = createdAccount ?? (await store.findUserAccountByEmail(normalizedEmail));
       }
 
       if (account === null) {
@@ -369,8 +403,12 @@ export function createWebSessionAuthService(
       const state = generateGithubOauthState({
         secret: githubOAuth.stateSecret,
         ...(optionsArg.now === undefined ? {} : { now: optionsArg.now }),
-        ...(githubOAuth.stateLifetimeMs === undefined ? {} : { lifetimeMs: githubOAuth.stateLifetimeMs }),
-        ...(optionsArg.accepted_terms_at === undefined ? {} : { accepted_terms_at: optionsArg.accepted_terms_at })
+        ...(githubOAuth.stateLifetimeMs === undefined
+          ? {}
+          : { lifetimeMs: githubOAuth.stateLifetimeMs }),
+        ...(optionsArg.accepted_terms_at === undefined
+          ? {}
+          : { accepted_terms_at: optionsArg.accepted_terms_at })
       });
       const authorizationUrl = new URL(githubOAuth.authorizeUrl ?? DEFAULT_GITHUB_AUTHORIZE_URL);
       authorizationUrl.searchParams.set("client_id", githubOAuth.clientId);
@@ -397,7 +435,8 @@ export function createWebSessionAuthService(
 
       const now = input.now ?? new Date();
       const stateMatches =
-        input.stateCookieValue !== null && isTimingSafeEqualUtf8(input.stateCookieValue, input.state);
+        input.stateCookieValue !== null &&
+        isTimingSafeEqualUtf8(input.stateCookieValue, input.state);
       if (
         !stateMatches ||
         !validateGithubOauthState(input.state, { now, secret: githubOAuth.stateSecret })
@@ -423,7 +462,10 @@ export function createWebSessionAuthService(
         return {
           ok: false,
           error: "oauth_exchange_failed",
-          redirect_url: buildGithubAppRedirectUrl(githubOAuth.appRedirectUrl, "oauth_exchange_failed")
+          redirect_url: buildGithubAppRedirectUrl(
+            githubOAuth.appRedirectUrl,
+            "oauth_exchange_failed"
+          )
         };
       }
 
@@ -431,7 +473,9 @@ export function createWebSessionAuthService(
         store,
         identity,
         verified_at: now.toISOString(),
-        ...(statePayload.accepted_terms_at === undefined ? {} : { accepted_terms_at: statePayload.accepted_terms_at })
+        ...(statePayload.accepted_terms_at === undefined
+          ? {}
+          : { accepted_terms_at: statePayload.accepted_terms_at })
       });
 
       const sessionToken = generateSessionToken();
@@ -517,7 +561,10 @@ export function createWebSessionAuthService(
       };
     },
 
-    async resolveSessionByToken(sessionToken: string, options = {}): Promise<WebSessionRecord | null> {
+    async resolveSessionByToken(
+      sessionToken: string,
+      options = {}
+    ): Promise<WebSessionRecord | null> {
       const session = await store.resolveSessionByTokenHash(hashToken(sessionToken));
       if (session === null) {
         return null;

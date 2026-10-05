@@ -1624,6 +1624,17 @@ Retention cleanup removes raw analytics objects according to `raw_retention_days
 
 Required table concepts for the AnalyticsBundle implementation:
 
+Public project flows use migration `202610030001_add_public_analytics_flows`:
+`analytics_flow_definitions` stores project-owned versioned definitions;
+`analytics_flow_runs` stores hashed expiring tab contexts, ordered progress and bounded categorical attribution;
+`analytics_flow_handoffs` stores hashed origin-bound single-use next-step tokens;
+`analytics_flow_rollups` stores daily cohort/step/source/campaign counters and elapsed-time totals.
+Runs expire in 10–1440 minutes, handoffs in at most ten minutes, and aggregates follow project retention.
+Deletion cascades from project to definitions, runs, handoffs and aggregates. No DebugBundle account,
+incident or bundle business records are used as customer conversions. Reports exclude older definition
+versions. Retention drains bounded batches through durable continuation jobs; no-progress object-store
+failures stop that chain until a scheduled retry. Expiry is not instantaneous physical deletion.
+
 | Table                              | Purpose                                                                                                                                                                                                                                                                   |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `project_analytics_settings`       | Project-scoped analytics enablement, privacy mode, consent requirement, sampling, retention, saved-funnel/custom-dimension limits, and capture toggles                                                                                                                    |

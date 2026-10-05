@@ -210,3 +210,11 @@ data is rejected, and the number of approved keys is capped by tier.
 The default analytics identity mode. It keeps analytics session-scoped and omits durable
 returning-visitor and user identity hashes; server settings may force this mode even when a
 client requests a less restrictive mode.
+
+### Public analytics flow
+
+A project-owned ordered definition of two to eight named steps and their exact allowed origins. Capture records bounded anonymous runs; reports expose aggregate reached, drop-off and explicitly unlinked observations.
+
+### Flow handoff
+
+A short-lived, single-use opaque capability that carries a flow run between configured origins. The destination exchanges it for its own context and removes it from the URL; it is not a customer identity or a project token.

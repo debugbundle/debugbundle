@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-05
+
+- Adopt MCP 1.13.0 with public project acquisition and activation flow definitions and aggregate reports.
+
 ## [1.0.0] - 2026-09-25
 
 ### Added

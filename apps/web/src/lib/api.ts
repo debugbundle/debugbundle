@@ -46,6 +46,7 @@ import {
   normalizeIncidentRecord,
   normalizeProjectRecord
 } from "./api-record-normalizers.js";
+import { observeWebActivationStep } from "./dogfooding-flows.js";
 
 export * from "./api-types.js";
 export {
@@ -385,7 +386,9 @@ export async function createProject(payload: {
     })
   );
 
-  return normalizeProjectRecord(body.project);
+  const project = normalizeProjectRecord(body.project);
+  void observeWebActivationStep("project_created");
+  return project;
 }
 
 export async function updateProject(

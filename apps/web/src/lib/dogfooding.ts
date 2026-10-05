@@ -3,8 +3,14 @@ import {
   type DebugBundleBrowserInitConfig,
   type DebugBundleBrowserSdk
 } from "@debugbundle/sdk-browser";
+import {
+  initializeWebFlows,
+  observeWebFlowAuthentication,
+  setWebFlowCaptureAllowed,
+  type WebFlowEnv
+} from "./dogfooding-flows.js";
 
-export interface WebDogfoodingEnv {
+export interface WebDogfoodingEnv extends WebFlowEnv {
   DEV?: boolean;
   MODE?: string;
   VITE_API_URL?: string;
@@ -16,6 +22,7 @@ export interface WebDogfoodingEnv {
   VITE_DEBUGBUNDLE_DOGFOOD_EXPOSE_TRIGGERS?: string;
   VITE_DEBUGBUNDLE_DOGFOOD_CAPTURE_CONSOLE?: string;
   VITE_DEBUGBUNDLE_DOGFOOD_ANALYTICS_ENABLED?: string;
+  VITE_DEBUGBUNDLE_DOGFOOD_ANALYTICS_AUTO_START?: string;
 }
 
 export interface WebDogfoodingConfig {
@@ -36,12 +43,56 @@ export interface DogfoodingWindowTarget {
 }
 
 type WebDogfoodingSdk = Pick<DebugBundleBrowserSdk, "init"> &
-  Partial<Pick<DebugBundleBrowserSdk, "captureException" | "flush">>;
+  Partial<Pick<DebugBundleBrowserSdk, "captureException" | "flush">> & {
+    analytics?: Pick<DebugBundleBrowserSdk["analytics"], "setConsent">;
+  };
 type WebDogfoodingAnalyticsSdk<Method extends keyof DebugBundleBrowserSdk["analytics"]> = {
   analytics: Pick<DebugBundleBrowserSdk["analytics"], Method>;
 };
 
 const browserDogfoodingSdk = createDebugBundleBrowserSdk();
+const analyticsConsentKey = "debugbundle.app.analytics_consent";
+let consentDeniedThisPage = false;
+let automaticAnalytics = false;
+
+export function readWebDogfoodingAnalyticsConsent(): boolean {
+  try {
+    const preference = window.localStorage.getItem(analyticsConsentKey);
+    return (
+      !consentDeniedThisPage &&
+      (preference === "true" || (preference === null && automaticAnalytics))
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function observeWebAnalyticsConsentWithdrawal(): () => void {
+  const onStorage = (event: StorageEvent): void => {
+    if ((event.key === analyticsConsentKey || event.key === null) && event.newValue !== "true") {
+      setWebDogfoodingAnalyticsConsent(false);
+    }
+  };
+  window.addEventListener("storage", onStorage);
+  return () => window.removeEventListener("storage", onStorage);
+}
+
+export function setWebDogfoodingAnalyticsConsent(granted: boolean): boolean {
+  let effective = false;
+  try {
+    if (granted) {
+      window.localStorage.setItem(analyticsConsentKey, "true");
+      effective = window.localStorage.getItem(analyticsConsentKey) === "true";
+    } else window.localStorage.setItem(analyticsConsentKey, "false");
+  } catch {
+    /* A blocked preference store cannot silently grant consent later. */
+  }
+  browserDogfoodingSdk.analytics.setConsent(effective);
+  setWebFlowCaptureAllowed(effective);
+  consentDeniedThisPage = !effective;
+  if (effective) trackWebDogfoodingPageView(window.location.pathname);
+  return effective;
+}
 const UUID_ROUTE_SEGMENT =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -179,6 +230,7 @@ export function setWebDogfoodingAnalyticsAuthState(
   sdk: WebDogfoodingAnalyticsSdk<"setContext"> = browserDogfoodingSdk
 ): void {
   sdk.analytics.setContext({ auth_state: authState });
+  void observeWebFlowAuthentication(authState === "authenticated");
 }
 
 export function resolveWebDogfoodingConfig(env: WebDogfoodingEnv): WebDogfoodingConfig | null {
@@ -228,6 +280,8 @@ export function initializeWebDogfooding(
   sdk: WebDogfoodingSdk = browserDogfoodingSdk,
   warn: (message: string) => void = console.warn
 ): WebDogfoodingConfig | null {
+  automaticAnalytics = false;
+  initializeWebFlows({}, false);
   try {
     const config = resolveWebDogfoodingConfig(env);
     if (config === null) {
@@ -240,6 +294,14 @@ export function initializeWebDogfooding(
         env.VITE_DEBUGBUNDLE_DOGFOOD_ANALYTICS_ENABLED,
         "VITE_DEBUGBUNDLE_DOGFOOD_ANALYTICS_ENABLED"
       ) ?? false;
+
+    automaticAnalytics =
+      analyticsEnabled &&
+      (parseBooleanFlag(
+        env.VITE_DEBUGBUNDLE_DOGFOOD_ANALYTICS_AUTO_START,
+        "VITE_DEBUGBUNDLE_DOGFOOD_ANALYTICS_AUTO_START"
+      ) ??
+        false);
 
     sdk.init({
       ...(config.projectToken === null || isRelayEndpoint(config.endpoint)
@@ -255,7 +317,7 @@ export function initializeWebDogfooding(
             analytics: {
               enabled: true,
               privacyMode: "standard",
-              consentRequired: false,
+              consentRequired: true,
               // App routes contain project and incident IDs, so the router bridge below
               // emits explicit safe templates instead of SDK-derived raw pathnames.
               trackPageViews: false,
@@ -270,6 +332,10 @@ export function initializeWebDogfooding(
         : {}),
       ...(tracePropagationTargets === undefined ? {} : { tracePropagationTargets })
     } satisfies DebugBundleBrowserInitConfig);
+
+    // The operator's startup policy does not overwrite an explicit device preference.
+    sdk.analytics?.setConsent(analyticsEnabled && readWebDogfoodingAnalyticsConsent());
+    initializeWebFlows(env, analyticsEnabled && readWebDogfoodingAnalyticsConsent());
 
     if (config.exposeTriggers) {
       target.__DEBUGBUNDLE_DOGFOOD__ = {
@@ -293,6 +359,7 @@ export function initializeWebDogfooding(
 
     return config;
   } catch (error) {
+    automaticAnalytics = false;
     const message = error instanceof Error ? error.message : "unknown_dogfooding_error";
     delete target.__DEBUGBUNDLE_DOGFOOD__;
     warn(`web_dogfooding_disabled: ${message}`);

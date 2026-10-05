@@ -99,9 +99,12 @@ async function pruneExpiredAnalyticsRollupTable(input: {
 export function createPostgresRetentionStore(db: Queryable): RetentionStore {
   return {
     async pruneExpiredBrowserRecoveryEvents(input) {
-      const result = await db.query(`DELETE FROM browser_recovery_events WHERE event_id IN (
+      const result = await db.query(
+        `DELETE FROM browser_recovery_events WHERE event_id IN (
         SELECT event_id FROM browser_recovery_events WHERE expires_at <= $1::timestamptz
-        ORDER BY expires_at, event_id LIMIT $2) RETURNING event_id`, [input.now, input.limit]);
+        ORDER BY expires_at, event_id LIMIT $2) RETURNING event_id`,
+        [input.now, input.limit]
+      );
       return result.rows.length;
     },
     async listExpiredSampledRawEvents(input): Promise<RetentionRawEventReference[]> {
@@ -321,6 +324,28 @@ export function createPostgresRetentionStore(db: Queryable): RetentionStore {
       deletedRows += deletedUsageClaims.rows.length;
       reachedBatchLimit = reachedBatchLimit || deletedUsageClaims.rows.length >= input.limit;
 
+      for (const table of ["analytics_flow_handoffs", "analytics_flow_runs"] as const) {
+        const result = await db.query(
+          `DELETE FROM ${table} WHERE id IN
+          (SELECT id FROM ${table} WHERE expires_at <= $1::timestamptz ORDER BY expires_at,id LIMIT $2)
+          RETURNING id`,
+          [input.now, input.limit]
+        );
+        deletedRows += result.rows.length;
+        reachedBatchLimit ||= result.rows.length >= input.limit;
+      }
+      const flowRollups = await db.query(
+        `DELETE FROM analytics_flow_rollups WHERE ctid IN (
+        SELECT candidate.ctid FROM analytics_flow_rollups candidate
+        JOIN analytics_flow_definitions flow ON flow.id=candidate.flow_id
+        LEFT JOIN project_analytics_settings settings ON settings.project_id=flow.project_id
+        WHERE candidate.cohort_date < $1::timestamptz - make_interval(months=>COALESCE(settings.aggregate_retention_months,12)::int)
+        ORDER BY candidate.cohort_date,candidate.flow_id LIMIT $2) RETURNING 1`,
+        [input.now, input.limit]
+      );
+      deletedRows += flowRollups.rows.length;
+      reachedBatchLimit ||= flowRollups.rows.length >= input.limit;
+
       return {
         deleted_rows: deletedRows,
         reached_batch_limit: reachedBatchLimit
@@ -470,25 +495,31 @@ export function createPostgresRetentionStore(db: Queryable): RetentionStore {
   };
 }
 
+export type RetentionCleanupResult = { has_more: true } | void;
+
 export function createRetentionCleanupService(input: {
   retentionStore: RetentionStore;
   objectStore: Pick<ObjectStoreClient, "deleteObject">;
   batchSize?: number;
   maxBatches?: number;
 }): {
-  runCleanup(job: CleanupRetentionJob): Promise<void>;
+  runCleanup(job: CleanupRetentionJob): Promise<RetentionCleanupResult>;
 } {
   const batchSize = input.batchSize ?? DEFAULT_RETENTION_CLEANUP_BATCH_SIZE;
   const maxBatches = input.maxBatches ?? DEFAULT_RETENTION_CLEANUP_MAX_BATCHES;
 
   return {
-    async runCleanup(job): Promise<void> {
+    async runCleanup(job): Promise<RetentionCleanupResult> {
       if (input.objectStore.deleteObject === undefined) {
         return;
       }
 
       for (let batchIndex = 0; batchIndex < maxBatches; batchIndex += 1) {
-        const prunedRecovery = await input.retentionStore.pruneExpiredBrowserRecoveryEvents?.({ now: job.scheduled_at, limit: batchSize }) ?? 0;
+        const prunedRecovery =
+          (await input.retentionStore.pruneExpiredBrowserRecoveryEvents?.({
+            now: job.scheduled_at,
+            limit: batchSize
+          })) ?? 0;
         const expiredReferences = await input.retentionStore.listExpiredSampledRawEvents({
           now: job.scheduled_at,
           limit: batchSize
@@ -641,13 +672,7 @@ export function createRetentionCleanupService(input: {
           prunedAnalyticsRollups.deleted_rows === 0 &&
           deletedAnalyticsBundleGenerations.length === 0 &&
           deletedIncidents.length === 0 &&
-          prunedRecovery < batchSize &&
-          expiredReferences.length < batchSize &&
-          expiredAnalyticsRawEvents.length < batchSize &&
-          expiredAnalyticsJourneySamples.length < batchSize &&
-          !prunedAnalyticsRollups.reached_batch_limit &&
-          expiredAnalyticsBundleGenerations.length < batchSize &&
-          expiredIncidents.length < batchSize
+          prunedRecovery === 0
         ) {
           return;
         }
@@ -664,6 +689,8 @@ export function createRetentionCleanupService(input: {
           return;
         }
       }
+      // Yield after bounded work; the worker schedules one durable continuation.
+      return { has_more: true };
     }
   };
 }

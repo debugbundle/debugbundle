@@ -17,7 +17,7 @@ They apply to **every future change** — not just the initial hardening pass.
 
 The API must use an explicit CORS origin allowlist derived from environment configuration (`APP_BASE_URL`). Open CORS (`*`) is never permitted. New API deployments must configure CORS before accepting cross-origin requests. Preflight requests from non-allowed origins must receive `403`.
 
-Exception: SDK project-token routes (`POST /v1/events`, `GET /v1/sdk/config`) may reflect a syntactically valid request `Origin` for browser direct/static ingestion because CORS preflight requests do not include bearer-token values. Those routes must not enable credentialed CORS for reflected origins, must still reject invalid project tokens, and must enforce any token-level `allowed_origins` check in the authenticated route handler. This is abuse reduction only, not a secret boundary.
+Exception: SDK project-token routes (`POST /v1/events`, `GET /v1/sdk/config`, and the five `POST /v1/analytics/flows/{id}/{key}/{start,step,handoff,arrive,withdraw}` capture operations) may reflect a syntactically valid request `Origin` for browser direct/static ingestion because CORS preflight requests do not include bearer-token values. Those routes must not enable credentialed CORS for reflected origins, must still reject invalid project tokens, and must enforce any token-level `allowed_origins` check in the authenticated route handler. Public flow capture additionally requires an exact origin from the project-owned flow definition and never returns management reports. This is abuse reduction only, not a secret boundary.
 
 ### SEC-02: Body Size Limits On All Routes
 

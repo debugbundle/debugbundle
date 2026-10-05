@@ -554,7 +554,177 @@ Current API implementation scope:
 
 ### 1.2b AnalyticsBundle And Product Analytics
 
-Analytics read/manage APIs require Browser Session or Member Token auth. Project tokens are write-only and may submit analytics events only through `/v1/events` ingestion.
+#### Public acquisition and activation flows
+
+Flows are a project feature for your own products. Use them for main site → blog,
+site → auth → app, onboarding, or another ordered acquisition/activation workflow.
+They do not depend on DebugBundle accounts, incidents, GitHub login, or operator settings.
+
+Create a named flow in **Project → Analytics → Flows**, or use the API/CLI/MCP.
+Each flow has 2–8 ordered steps, each with a key, name, and exact HTTPS origin
+(HTTP localhost is allowed). Several steps may use the same origin. All participating
+sites use the **same flow analytics project** and a public write-only project token
+whose origin allowlist includes those sites. They may use separate projects for debug
+capture. Configure separate products under their own project flows.
+
+| Method | Path | Permission |
+|---|---|---|
+| `GET` | `/v1/projects/{id}/analytics/flows` | Project reader |
+| `PUT` | `/v1/projects/{id}/analytics/flows/{key}` | Owner/admin; create or replace |
+| `DELETE` | `/v1/projects/{id}/analytics/flows/{key}` | Owner/admin; archive |
+| `GET` | `/v1/projects/{id}/analytics/flows/{key}/report?window=30d` | Project reader |
+| `POST` | `/v1/analytics/flows/{id}/{key}/{start,step,handoff,arrive,withdraw}` | Project token and allowed Origin |
+
+Example definition (`PUT` body; path key must match):
+
+```json
+{
+  "flow_key": "onboarding",
+  "display_name": "Site to signed-in app",
+  "kind": "acquisition",
+  "timeout_minutes": 60,
+  "steps": [
+    {"step_key":"visit","display_name":"Site visit","origin":"https://www.example.com"},
+    {"step_key":"auth","display_name":"Auth page","origin":"https://auth.example.com"},
+    {"step_key":"login","display_name":"Login completed","origin":"https://auth.example.com"},
+    {"step_key":"app","display_name":"App opened","origin":"https://app.example.com"}
+  ]
+}
+```
+
+Keys use lowercase letters, numbers, dots, underscores and hyphens, starting with a
+letter (maximum 64 characters). Names are at most 120 characters. Expiry is 10–1440
+minutes, default 60. Active definition limits follow the project's saved-funnel tier
+scale, with at most 100 retained definitions per project. Identical saves are idempotent;
+edits or reactivation start a new version. Reports use only the current version.
+
+### Browser SDK integration
+
+The public `createAnalyticsFlowClient` helper is available in Browser SDK 3.1.0 and later.
+Enable project analytics first. This separate helper uses direct API transport with a
+public project token; it does not inherit another SDK instance's consent or relay.
+
+```ts
+import { createAnalyticsFlowClient } from '@debugbundle/sdk-browser';
+
+const flow = createAnalyticsFlowClient({
+  endpoint: 'https://api.debugbundle.com',
+  projectId: '<flow-project-uuid>',
+  projectToken: 'dbundle_proj_...',
+  flowKey: 'onboarding',
+  enabled: true,
+  consentRequired: true
+});
+
+// Apply your integration's current capture policy programmatically.
+flow.setConsent(captureAllowed);
+```
+
+The helper supplies no checkbox, popup, or banner. `enabled` defaults to false and
+`consentRequired` defaults to true. If the integration sets `consentRequired: false`,
+it may start automatically; a server project setting that requires consent still
+rejects requests without `setConsent(true)`. Connect policy changes to this helper
+as well as your regular analytics client. `setConsent(false)` immediately stops queued
+work, aborts active requests, clears local continuity, and attempts server withdrawal.
+`await flow.withdraw()` performs the same cleanup. Previously accepted aggregate
+observations remain. Network failure can delay physical server cleanup until expiry.
+
+On the main site:
+
+```ts
+await flow.start('visit', { source: 'newsletter', campaign: 'launch' });
+const linkedUrl = await flow.handoff('auth', 'https://auth.example.com/login');
+// Navigate only when your application would normally navigate; retain a fallback.
+window.location.assign(linkedUrl ?? 'https://auth.example.com/login');
+```
+
+On the dedicated auth origin, initialize the same project/flow client and apply the
+current capture policy, then:
+
+```ts
+const linked = await flow.arrive();
+if (!linked) await flow.start('auth'); // explicitly unlinked, never a linked conversion
+
+// Your normal OAuth flow may now leave this origin and return to it.
+// Mark the next step only after your application confirms authentication succeeded.
+if (loginSucceeded) {
+  await flow.step('login');
+  const linkedUrl = await flow.handoff('app', 'https://app.example.com/welcome');
+  window.location.assign(linkedUrl ?? 'https://app.example.com/welcome');
+}
+```
+
+On the app origin, call `arrive()` after applying the current capture policy; use
+`start('app')` if you want to count a missing link as an unlinked app observation.
+For a main-site → blog flow, define only those two steps and use exactly the same
+`start` → `handoff` → `arrive` sequence. For same-origin custom steps, call `step(key)`
+after the relevant action succeeds. The API accepts explicit observations; it does
+not independently verify business outcomes or infer login success from redirects.
+
+Continuity uses expiring **sessionStorage**, scoped to the tab, project and flow.
+It is not a cross-site localStorage identity. Auth context can survive a same-tab
+external OAuth round trip back to the auth origin. The helper does not change OAuth
+`state` or send a handoff to the identity provider. Different tabs/devices are not
+stitched automatically. If an intermediary is uninstrumented, your integration must
+preserve the final destination's decorated URL inside its own validated return URL;
+do not forward analytics tokens as arbitrary provider parameters.
+
+The handoff uses a `dbflow` fragment parameter, removed from browser history by
+`arrive()` before transmission. Existing query parameters and other fragment segments
+are preserved. Hash routers must arrange for arrival processing before consuming this
+parameter. Tokens are random, hashed at rest, bound to the next configured origin and
+step, and redeemable once within ten minutes or the flow expiry. The receiver context
+rotates. Same-receiver retries are idempotent; another receiver cannot replay it.
+There is one outstanding handoff per next step; requesting another replaces it.
+Blocked tab storage fails closed. Delivery is best effort with a bounded timeout,
+32 pending operations, a 4 KiB response limit, and no persistent event queue. Helpers return `false`/`null`
+on failure and never make application navigation or authentication depend on success.
+Call `start()` again only after the current context expires or is withdrawn; an active
+context represents one run. Keep source/campaign labels categorical, at most 100
+characters from letters, numbers, `.`, `_`, `~`, `+`, `-`; never pass personal data.
+An omitted source is `unknown`; campaign defaults to an empty string. Unknown attribution fields and values rejected by the existing telemetry privacy policy (including DebugBundle credentials and recognized card numbers) are rejected before capture.
+
+### Direct capture API
+
+Send JSON, `Authorization: Bearer dbundle_proj_...`, and the configured `Origin`.
+Browser calls omit credentials. Context and token values are independently generated
+32-byte random values encoded as 43-character unpadded base64url strings.
+
+| Operation | JSON body (all also accept optional boolean `consent`) | Success body |
+|---|---|---|
+| `start` | `context`, `step_key`, optional `source`, `campaign` | `expires_at` |
+| `step` | `context`, `step_key` | `recorded: true` |
+| `handoff` | `context`, `step_key`, `token` | next `origin`, `expires_at` |
+| `arrive` | new receiver `context`, `token` | run `expires_at` |
+| `withdraw` | current `context` | `withdrawn: true` |
+
+Unknown fields are rejected. Project-token origin restrictions and the flow step origin
+both apply. Withdrawal remains available when analytics is disabled. Replays,
+out-of-order steps and expired contexts return `409`; wrong origins/settings/consent
+return `403`; invalid project credentials return `401`; malformed input returns `400`.
+Start claims one analytics session and event; each other capture operation except
+withdrawal claims an event. Stable retries reuse quota claims. Rate/allowance exhaustion
+returns `429`. Existing debug ingestion is independent.
+
+HTTP callers can use the same contract, including backend code that deliberately
+supplies the configured Origin and context. Backend SDKs do not yet include a flow
+helper. A browser observation must not be described as a server-verified conversion.
+
+### Reading reports
+
+`window=7d|30d|90d` (default `30d`) uses full UTC days and an equal previous period.
+Counts are grouped by the **start date** of the run. A later step completed after midnight
+still belongs to that starting cohort. Results include linked starts/completions,
+per-step reached/previous/drop-off/unlinked counts, average seconds from the previous
+step, and at most 50 source/campaign pairs with a truncation flag. A run starting at a
+later step is unlinked for its entire lifetime and excluded from linked conversions.
+Missing observation is unknown, not proof that an action did not occur. Today's starts
+appear after the UTC day closes; recent cohorts may still complete until expiry.
+
+Reports read aggregate counters, not raw events or individual journeys. Operational
+state expires within 24 hours; rollups follow project aggregate retention. Bounded worker
+cleanup continues while progress remains. Project deletion cascades. No global visitor
+identity, account identifiers, emails, raw URLs or form content is stored by this feature.
 
 Analytics shares browser SDK capture primitives with debug capture where that reduces duplication and improves correlation: normalized route keys, session ids, sanitized action/click descriptors, device/browser context, referrer/UTM parsing, and structured journey entries. The public interfaces remain separate. Debug events and debug bundles do not require analytics to be enabled, and analytics settings, consent, quotas, sampling, retention, or failures must not suppress existing incident/debug capture. When both lanes capture the same browser signal, API/CLI/MCP consumers see separate debug and analytics records linked by common correlation fields rather than a merged raw telemetry store.
 

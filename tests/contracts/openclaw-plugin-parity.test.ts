@@ -10,8 +10,12 @@ import { MCP_TOOL_CATALOG, MCP_TOOL_NAMES } from "../../apps/mcp/src/tool-catalo
 describe("openclaw plugin parity", () => {
   it("projects every MCP tool into one prefixed OpenClaw tool", () => {
     expect(DEBUGBUNDLE_OPENCLAW_TOOL_MAP).toHaveLength(MCP_TOOL_NAMES.length);
-    expect(DEBUGBUNDLE_OPENCLAW_TOOL_NAMES).toEqual(MCP_TOOL_NAMES.map((name) => `debugbundle_${name}`));
-    expect(new Set(DEBUGBUNDLE_OPENCLAW_TOOL_NAMES).size).toBe(DEBUGBUNDLE_OPENCLAW_TOOL_NAMES.length);
+    expect(DEBUGBUNDLE_OPENCLAW_TOOL_NAMES).toEqual(
+      MCP_TOOL_NAMES.map((name) => `debugbundle_${name}`)
+    );
+    expect(new Set(DEBUGBUNDLE_OPENCLAW_TOOL_NAMES).size).toBe(
+      DEBUGBUNDLE_OPENCLAW_TOOL_NAMES.length
+    );
 
     for (const mcpTool of MCP_TOOL_CATALOG) {
       expect(DEBUGBUNDLE_OPENCLAW_TOOL_MAP).toContainEqual(
@@ -47,6 +51,8 @@ describe("openclaw plugin parity", () => {
         "debugbundle_create_capture_rule",
         "debugbundle_generate_analytics_bundle",
         "debugbundle_update_analytics_settings",
+        "debugbundle_save_analytics_flow",
+        "debugbundle_archive_analytics_flow",
         "debugbundle_create_saved_analytics_funnel",
         "debugbundle_update_saved_analytics_funnel",
         "debugbundle_archive_saved_analytics_funnel",
@@ -61,7 +67,11 @@ describe("openclaw plugin parity", () => {
     expect(DEBUGBUNDLE_OPENCLAW_OPTIONAL_TOOL_NAMES).not.toContain("debugbundle_list_incidents");
     expect(DEBUGBUNDLE_OPENCLAW_OPTIONAL_TOOL_NAMES).not.toContain("debugbundle_get_bundle");
     expect(DEBUGBUNDLE_OPENCLAW_OPTIONAL_TOOL_NAMES).not.toContain("debugbundle_get_usage_summary");
-    expect(DEBUGBUNDLE_OPENCLAW_OPTIONAL_TOOL_NAMES).not.toContain("debugbundle_get_funnel_analysis");
-    expect(DEBUGBUNDLE_OPENCLAW_OPTIONAL_TOOL_NAMES).not.toContain("debugbundle_get_billing_summary");
+    expect(DEBUGBUNDLE_OPENCLAW_OPTIONAL_TOOL_NAMES).not.toContain(
+      "debugbundle_get_funnel_analysis"
+    );
+    expect(DEBUGBUNDLE_OPENCLAW_OPTIONAL_TOOL_NAMES).not.toContain(
+      "debugbundle_get_billing_summary"
+    );
   });
 });

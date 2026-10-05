@@ -93,7 +93,9 @@ describe("web app - auth trial flows", () => {
     await user.type(await screen.findByLabelText(/six-digit code/i), "123456");
     await user.click(screen.getByRole("button", { name: /^verify code$/i }));
 
-    expect(await screen.findByRole("button", { name: /convert to team paid/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: /convert to team paid/i })
+    ).toBeInTheDocument();
     expect(screen.getByText(/trial access stays active through .*2026/i)).toBeInTheDocument();
   });
 
