@@ -3,7 +3,7 @@
   "plugin_version": "1.0.1",
   "evidence_state": "local_connection_ready",
   "source": {
-    "commit": "bec2d260e8329b08ebbe62fdd67f02771c013fda",
+    "commit": "9969345c8b2f04c4dfcecda584907c2c150dc018",
     "tree_clean": true,
     "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
@@ -11,34 +11,36 @@
     "resource_origin": "https://mcp.debugbundle.com",
     "mcp_endpoint": "https://mcp.debugbundle.com/mcp",
     "oauth_issuer": "https://api.debugbundle.com",
-    "api_image_digest": "sha256:3f0d07996cc88e628f87aa882f31bae7a4597cc5e1b0f0616b6c79bf4f256025"
+    "api_image_digest": null
   },
   "registered_connection_id": "plugin_asdk_app_6a99ba6c1e7881919091a592738692c6",
   "package": {
     "archive_file": "debugbundle-openai-plugin-1.0.1.zip",
-    "archive_sha256": "c89d24c7f72fcfe25512054c5e35a473e2153b880867bb24da258e1559e722b7",
-    "archive_bytes": 62469,
+    "archive_sha256": "15a7e1fb43ce7393470cdf4a51db5fdedff7e1501b00fdfef21e4bb7a7c1a0ce",
+    "archive_bytes": 66525,
     "files": {
-      ".app.json": "137807180af48e9e6f6df967ebcb23925ed87fc051d219d153a1bc604c174f31",
-      ".codex-plugin/plugin.json": "fd355a806e971d45b8ee8576ff03a2c682d5a2f5cafe68bbcdcf7c1c9a09b286",
       "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
-      "README.md": "911e666560e068eea7838887a9bfe72e481698d17ef96ab30ae492c304330f84",
+      "README.md": "8109720b3224f9cce9f48889249166934162743ff008d4afba0f7088ac37d8d8",
       "assets/icon-512.png": "a05a29674a75a945b1a378c73c27322c9b1f14456329bec1fc1d986453696e30",
       "skills/debugbundle/SKILL.md": "c1b8405390bc0b7d16157eec05472f251e9ccc51288ebb8511c27a83d7b73b05",
       "skills/debugbundle/references/cli-handoff.md": "0327b8f03ff1d59b572fe732dfec3f6b962baec881b6a5b1c2fa848d525ca40c",
       "skills/debugbundle/references/privacy-and-safety.md": "436983b21e6570654ff18c148c1099b64f5e051353b02ac7b002b91430ce9682",
-      "skills/debugbundle/references/tools.md": "d294c7b6827baa6f8df4680434ea672f25c8a82c45e8f57ecc204fe2341fd240"
+      "skills/debugbundle/references/tools.md": "d294c7b6827baa6f8df4680434ea672f25c8a82c45e8f57ecc204fe2341fd240",
+      ".codex-plugin/plugin.json": "49321b97b99479c511889520aaa51a3295b79680d9a9199b63c68b3e89effde4",
+      ".mcp.json": "8d3895de740979818a317fd56f373d2eb98b1468576bff0d677a15d9c66b54ef"
     }
   },
   "submission": {
     "files": {
       "cli-handoff-cases.json": "af939c6aa2c3f2f263c985068702d06b68e7eaeaa422ac6e32688a828a29190b",
       "data-map.md": "90751261d20abbe9fcb80da3423e03927be5561f8a990bdb1734fab3c909162f",
-      "listing.md": "1517c2d65e1fb507e03c223f58c8a014ae8c696c69c2167de04d9f0a14136523",
+      "demo-recording-plan.md": "8ef2b36a33041fe2914c33b6e05d8c0a17cfd4ef1f5e973a3e7c9964cb4944c9",
+      "listing.md": "437e063a04df766d993f792a5a23f64ccbb766f9a7a32f4c82d228a403157f57",
       "policy-review.md": "283bd69177318e34d9cb46aa2f50f272e956865d462cb9bdf026c21d5cfc694c",
+      "portal-review.json": "b83d1753ba2a0b5c06740bd2e3384a41a79f284ad3705e58a91b24bb347b0e66",
       "post-launch-article-draft.md": "6ce0f34a4ce8261eb4a0f10e0f3c5fcc89de9677ffdcd988075ed296d97db7cd",
       "release-notes.md": "6b913b3e64487faf73d05801e8a3f818e03d2760eff2e730c9768b83d5cc39f9",
-      "review-checklist.md": "99c68cd3c2342c4defa4259915a57fbce341135fa5d58f6571efbc7c4619a712",
+      "review-checklist.md": "627aae42fcffc24864f17c23b844846e2a60b4f1d48d963d7f8f7ded8e011698",
       "starter-prompts.json": "35702070ebd292aee377b85a4d339f354c0b23080856211d45ec2c08c8c637f1",
       "test-cases.json": "3be1576775520e85babaff8cf23662a13a040c7ad21fd5fb18dfe5a477a1e764",
       "tool-scan.json": "ff38eb57f13fc704659de6e039c2cdcc1dddc2472a6341132cd0defbe4b8fc48"
@@ -76,8 +78,15 @@
     "reviewer_fixture_sha256": "7eeff32a1dd14b4cb0fe5126e04470e448cf3f73a54bfb4f7e9e8f64327c6758"
   },
   "manual_gates": [
+    "immutable_api_image_deployment_digest",
     "representative_capacity_load_evidence",
     "reviewer_synthetic_retained_corpus",
+    "current_reviewer_credential",
+    "reviewer_demo_recording_url",
+    "verified_publisher_identity",
+    "portal_cimd_connection",
+    "portal_domain_verification",
+    "portal_current_tool_scan",
     "owner_submission_approval",
     "openai_review_and_approval",
     "separate_owner_publication_approval",
