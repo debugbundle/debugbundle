@@ -17,14 +17,14 @@ importers:
         specifier: workspace:*
         version: link:packages/auth
       "@debugbundle/redaction":
-        specifier: 2.1.0
-        version: 2.1.0
+        specifier: 2.2.0
+        version: 2.2.0
       "@debugbundle/sdk-node":
         specifier: 3.1.0
         version: 3.1.0
       "@debugbundle/shared-types":
-        specifier: 2.1.0
-        version: 2.1.0
+        specifier: 2.2.0
+        version: 2.2.0
       "@modelcontextprotocol/sdk":
         specifier: ^1.29.0
         version: 1.29.0(zod@3.25.76)
@@ -901,6 +901,12 @@ packages:
         integrity: sha512-+IXVGehnYXwYE2niSRg0KVkPCmqm4FPhbHlz3XWCEIqrsPopSNcay14VMmdAPInsBy9FdVhP1J4CRWM8VCj8Cg==
       }
 
+  "@debugbundle/redaction@2.2.0":
+    resolution:
+      {
+        integrity: sha512-1Jl7hmgSjzCDwmj6oR54n+wC+shfwMzGQHsFF32rRXvThasixYp1INShqi/H98eO8tIZ+aklnDYmVfOaYy1T9A==
+      }
+
   "@debugbundle/sdk-browser@3.1.0":
     resolution:
       {
@@ -917,6 +923,12 @@ packages:
     resolution:
       {
         integrity: sha512-dB2XWLm+3VGd5dGQ4bM1PuUYkCB96iJlFrs+Mgio1MbVBu9GEQhk1h+HC4hVCyyiXvb9+NOClF8e648XPA1Cxg==
+      }
+
+  "@debugbundle/shared-types@2.2.0":
+    resolution:
+      {
+        integrity: sha512-HyXM2ga2Ado2hyaLtyAtbJ9zyUIG3yamEUjlV/S5kSZJu/BgFpEgziAGWOjGWSpG7rjKwJIF7X/8riKupRko4A==
       }
 
   "@dotenvx/dotenvx@1.60.0":
@@ -9330,6 +9342,8 @@ snapshots:
 
   "@debugbundle/redaction@2.1.0": {}
 
+  "@debugbundle/redaction@2.2.0": {}
+
   "@debugbundle/sdk-browser@3.1.0":
     dependencies:
       "@debugbundle/redaction": 2.1.0
@@ -9342,6 +9356,10 @@ snapshots:
       zod: 3.25.76
 
   "@debugbundle/shared-types@2.1.0":
+    dependencies:
+      zod: 3.25.76
+
+  "@debugbundle/shared-types@2.2.0":
     dependencies:
       zod: 3.25.76
 
