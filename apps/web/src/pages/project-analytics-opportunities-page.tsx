@@ -38,7 +38,11 @@ export function ProjectAnalyticsOpportunitiesPage(): JSX.Element {
         ...(query.environment === undefined ? {} : { environment: query.environment }),
         ...(cursor === null ? {} : { cursor })
       });
-      return { items: response.opportunities, nextCursor: response.next_cursor };
+      return {
+        items: response.opportunities,
+        nextCursor: response.next_cursor,
+        totalPages: response.total_pages
+      };
     },
     [projectId, queryKey, detectedWindow]
   );
@@ -94,6 +98,7 @@ export function ProjectAnalyticsOpportunitiesPage(): JSX.Element {
               />
               <CursorPaginationControls
                 page={pagination.page}
+                totalPages={pagination.totalPages}
                 hasNextPage={pagination.hasNextPage}
                 isLoading={pagination.isLoading}
                 onPreviousPage={pagination.goToPreviousPage}

@@ -22,7 +22,10 @@ function createTokenManagementDependency(): TokenManagementDependency {
 }
 
 function createServer(
-  overrides: { authRateLimiter?: Partial<AuthRateLimiterDependency> } = {}
+  overrides: {
+    authRateLimiter?: Partial<AuthRateLimiterDependency>;
+    countIncidentsForOrganization?: () => Promise<number>;
+  } = {}
 ): ReturnType<typeof createApiServer> {
   const projectId = "550e8400-e29b-41d4-a716-446655440000";
   const incidentRecord = {
@@ -100,6 +103,9 @@ function createServer(
     tokenManagement: createTokenManagementDependency(),
     incidentRetrieval: {
       listIncidentsForOrganization,
+      ...(overrides.countIncidentsForOrganization === undefined
+        ? {}
+        : { countIncidentsForOrganization: overrides.countIncidentsForOrganization }),
       getIncidentForOrganization,
       listServicesForOrganization,
       listIncidentLogsForOrganization

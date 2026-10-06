@@ -10,6 +10,7 @@ import { join } from "node:path";
 
 import {
   FINGERPRINT_VERSION,
+  deriveIncidentTitle,
   fingerprintVersion,
   classifyEvent,
   fingerprint,
@@ -624,7 +625,7 @@ export async function processCommand(
         mergedIncidentIds: new Set<string>([incidentId]),
         signalEventTypes: new Set<EventEnvelope["event_type"]>(),
         traceIds: new Set<string>(),
-        title: normalizedEvent.incident_title ?? normalizedEvent.normalized_message,
+        title: deriveIncidentTitle(normalizedEvent),
         kind: "immediate",
         severity: inferSeverity(event, capturePreset)
       };

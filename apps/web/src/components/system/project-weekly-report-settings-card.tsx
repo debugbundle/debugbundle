@@ -763,7 +763,7 @@ export function ProjectWeeklyReportSettingsCard({
                     </div>
                     {canEdit ? (
                       <div className="flex flex-wrap gap-2">
-                        <Button type="button" variant="outline" size="sm" onClick={() => openEditSlackDialog(channel)}>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => openEditSlackDialog(channel)}>
                           <PencilIcon data-icon="inline-start" />
                           Edit
                         </Button>

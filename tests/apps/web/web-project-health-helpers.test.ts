@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { AvailabilityCheckRecord } from "../../../apps/web/src/lib/api.js";
+import type {
+  AvailabilityCheckDailyRollupRecord,
+  AvailabilityCheckRecord
+} from "../../../apps/web/src/lib/api.js";
 import {
   availabilityResultVariant,
   availabilityStatusVariant,
@@ -20,6 +23,29 @@ import {
 } from "../../../apps/web/src/pages/project-health-page-utils.js";
 
 describe("web project health helpers", () => {
+  it("shows legacy long outages as down even without incident references", () => {
+    const rollup: AvailabilityCheckDailyRollupRecord = {
+      check_id: "check_1",
+      project_id: "project_1",
+      day: "2026-09-27",
+      state: "degraded",
+      total_checks: 1440,
+      successful_checks: 1355,
+      failed_checks: 85,
+      degraded_checks: 85,
+      avg_duration_ms: 123,
+      first_checked_at: "2026-09-27T00:00:00.000Z",
+      last_checked_at: "2026-09-27T23:59:00.000Z",
+      downtime_seconds: 5100,
+      incident_ids: []
+    };
+
+    expect(formatDailyStateLabel(rollup, 3)).toBe("Down");
+    expect(dailyStateClassName(rollup, 3)).toBe(
+      "bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive"
+    );
+  });
+
   it("maps status and result variants across all supported states", () => {
     expect(availabilityStatusVariant("passing")).toBe("success");
     expect(availabilityStatusVariant("paused")).toBe("warning");
@@ -98,6 +124,8 @@ describe("web project health helpers", () => {
     expect(formatDowntime(15)).toBe("15s");
     expect(formatDowntime(180)).toBe("3m");
     expect(formatDowntime(3_600)).toBe("1h");
+    expect(formatDowntime(5_100)).toBe("1h 25m");
+    expect(formatDowntime(89)).toBe("1m 29s");
 
     const invalidSessionError = new Error("invalid_session");
     expect(getAvailabilityErrorMessage(invalidSessionError)).toBe(

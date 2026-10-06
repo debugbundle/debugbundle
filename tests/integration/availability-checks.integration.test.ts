@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, expect, it } from "vitest";
 
 import { createPostgresAvailabilityCheckStore } from "../../packages/storage/src/availability-check-store.js";
+import type { AvailabilityCheckExecutionResult } from "../../packages/storage/src/availability-check-executor.js";
 import { bootstrapStorageSchema } from "../../packages/storage/src/migrations.js";
 import { migrateStorageSchema } from "../../packages/storage/src/schema-migrations.js";
 import {
@@ -218,6 +219,148 @@ runIntegration("availability checks integration", () => {
     expect(retainedRollups).toEqual([
       expect.objectContaining({ total_checks: 1, successful_checks: 1, failed_checks: 0 })
     ]);
+  });
+
+  it("retains threshold-backed outage history across midnight and recovery without duplicate incident references", async () => {
+    const organizationId = randomUUID();
+    const projectId = randomUUID();
+    const incidentId = randomUUID();
+    const { ownerUserId } = await seedOwnedProject({
+      pool,
+      organizationId,
+      projectId,
+      organizationName: "Outage history",
+      organizationSlug: `outage-${organizationId}`,
+      projectName: "Outage history",
+      projectSlug: `outage-${projectId}`,
+      organizationPlan: "team"
+    });
+    const store = createPostgresAvailabilityCheckStore(createQueryable(pool));
+    const check = await store.createCheckForProjectInOrganization({
+      organization_id: organizationId,
+      project_id: projectId,
+      created_by_user_id: ownerUserId,
+      name: "API health",
+      url: "https://app.example.com/health",
+      method: "GET",
+      expected_status_min: 200,
+      expected_status_max: 399,
+      timeout_ms: 5000,
+      interval_seconds: 60,
+      failure_threshold: 2,
+      recovery_threshold: 2,
+      enabled: true,
+      environment: "production",
+      service_name: "api",
+      now: "2026-06-15T23:58:00.000Z"
+    });
+    if (typeof check === "string") throw new Error(`availability_check_create_failed:${check}`);
+    const executionInput = (at: string, status: AvailabilityCheckExecutionResult["status"]) => ({
+      check_id: check.check_id,
+      scheduled_for: at,
+      claimed_at: at,
+      started_at: at,
+      completed_at: at,
+      result: {
+        status,
+        http_status: status === "success" ? 200 : null,
+        duration_ms: 100,
+        error_kind: status === "success" ? null : status,
+        error_message: status === "success" ? null : "Check could not complete",
+        checked_url_host: "app.example.com",
+        checked_url_path: "/health",
+        checked_url_query: {},
+        final_url: "https://app.example.com/health",
+        redirect_count: 0
+      }
+    });
+    const execute = async (at: string, status: AvailabilityCheckExecutionResult["status"]) => {
+      // Pin claim ownership and scheduling to the test's UTC clock without claiming other checks.
+      await pool.query(
+        "UPDATE availability_checks SET claimed_at = $2, next_check_at = $2 WHERE id = $1::uuid",
+        [check.check_id, at]
+      );
+      return store.recordCheckExecution(executionInput(at, status));
+    };
+    const readRollups = () =>
+      store.listDailyRollupsForCheckInOrganization({
+        organization_id: organizationId,
+        project_id: projectId,
+        check_id: check.check_id,
+        limit: 30
+      });
+
+    expect(await execute("2026-06-15T23:58:00.000Z", "timeout")).toMatchObject({
+      emit_failure_event: false
+    });
+    expect((await readRollups())?.[0]).toMatchObject({
+      state: "degraded",
+      failed_checks: 1,
+      incident_ids: []
+    });
+    expect(await execute("2026-06-15T23:59:00.000Z", "timeout")).toMatchObject({
+      emit_failure_event: true
+    });
+    expect((await readRollups())?.[0]).toMatchObject({ state: "down", failed_checks: 2 });
+    await pool.query(
+      `INSERT INTO incidents (id, project_id, environment, fingerprint, title, severity, first_seen_at, last_seen_at)
+       VALUES ($1::uuid, $2::uuid, 'production', $1::text, 'API unavailable', 'high', $3, $3)`,
+      [incidentId, projectId, "2026-06-15T23:59:00.000Z"]
+    );
+    await store.linkIncidentToCheck({
+      check_id: check.check_id,
+      incident_id: incidentId,
+      linked_at: "2026-06-15T23:59:00.000Z"
+    });
+    await store.appendIncidentToDailyRollup({
+      check_id: check.check_id,
+      project_id: projectId,
+      day: "2026-06-15",
+      incident_id: incidentId
+    });
+
+    expect(await execute("2026-06-16T00:00:00.000Z", "timeout")).toMatchObject({
+      emit_failure_event: false,
+      next_status: "failing"
+    });
+    expect((await readRollups())?.[0]).toMatchObject({
+      day: "2026-06-16",
+      state: "down",
+      incident_ids: [incidentId]
+    });
+    expect(
+      await store.recordCheckExecution(executionInput("2026-06-16T00:00:00.000Z", "timeout"))
+    ).toBeNull();
+    await execute("2026-06-16T00:01:00.000Z", "timeout");
+    expect(await execute("2026-06-16T00:02:00.000Z", "success")).toMatchObject({
+      next_status: "failing",
+      resolve_incident_id: null
+    });
+    expect(await execute("2026-06-16T00:03:00.000Z", "success")).toMatchObject({
+      next_status: "passing",
+      resolve_incident_id: incidentId
+    });
+    expect((await readRollups())?.[0]).toMatchObject({
+      state: "down",
+      total_checks: 4,
+      failed_checks: 2,
+      successful_checks: 2,
+      downtime_seconds: 120,
+      incident_ids: [incidentId]
+    });
+    await pool.query("UPDATE incidents SET status = 'resolved' WHERE id = $1::uuid", [incidentId]);
+    expect(await execute("2026-06-17T00:00:00.000Z", "internal_error")).toMatchObject({
+      next_status: "passing",
+      emit_failure_event: false
+    });
+    expect((await readRollups())?.map((row) => row.day)).toEqual(["2026-06-16", "2026-06-15"]);
+    await execute("2026-06-17T00:01:00.000Z", "success");
+    expect((await readRollups())?.[0]).toMatchObject({
+      state: "operational",
+      total_checks: 1,
+      failed_checks: 0,
+      incident_ids: []
+    });
   });
 
   it("enforces Free monitored-project capacity when creating and re-enabling checks", async () => {

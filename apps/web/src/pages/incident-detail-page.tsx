@@ -96,7 +96,12 @@ export function IncidentDetailPage(): JSX.Element {
         <>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 space-y-1">
-              <h2 className="break-words text-xl font-semibold">{incident.title}</h2>
+              <h2
+                className="line-clamp-2 [overflow-wrap:anywhere] text-xl font-semibold"
+                title={incident.title}
+              >
+                {incident.title}
+              </h2>
               <p className="text-sm text-muted-foreground">
                 {formatIncidentMatchedFields(incident.matched_fields)}
               </p>
@@ -427,7 +432,7 @@ const statusVariantMap: Record<IncidentRecord["status"], "destructive" | "warnin
 function MetricCard({ label, value }: { label: string; value: string }): JSX.Element {
   return (
     <Card>
-      <CardContent className="pt-6">
+      <CardContent>
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
         <p className="mt-1 text-lg font-semibold">{value}</p>
       </CardContent>

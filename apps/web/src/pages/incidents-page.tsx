@@ -35,7 +35,7 @@ export function IncidentsPage(): JSX.Element {
     direction: "desc"
   });
   const [bulkAction, setBulkAction] = useState<"resolved" | "unresolved" | null>(null);
-  const { items: incidents, isLoading, page, hasNextPage, goToNextPage, goToPreviousPage, refreshPage } = useCursorPagination(
+  const { items: incidents, isLoading, page, totalPages, hasNextPage, goToNextPage, goToPreviousPage, refreshPage } = useCursorPagination(
     async (cursor) => {
       const response = await listIncidents({
         limit: 20,
@@ -44,7 +44,8 @@ export function IncidentsPage(): JSX.Element {
       });
       return {
         items: response.incidents,
-        nextCursor: response.nextCursor
+        nextCursor: response.nextCursor,
+        totalPages: response.totalPages
       };
     },
     [statusFilter]
@@ -260,6 +261,7 @@ export function IncidentsPage(): JSX.Element {
 
                 <CursorPaginationControls
                   page={page}
+                  totalPages={totalPages}
                   hasNextPage={hasNextPage}
                   isLoading={isLoading}
                   onPreviousPage={goToPreviousPage}

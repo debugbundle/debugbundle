@@ -1,5 +1,9 @@
 import { createPostgresAnalyticsFlowStore } from "../../../packages/storage/src/analytics-flow-store.js";
 import {
+  countImprovementsForOrganization,
+  countIncidentsForOrganization
+} from "../../../packages/storage/src/incident-improvement-counts.js";
+import {
   createAccountDeletionChallengeService,
   createGitHubCliAuthService,
   createWebSessionAuthService,
@@ -732,6 +736,8 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
     improvementManagement: {
       listImprovementsForOrganization: (input) =>
         improvementOpportunityStore.listImprovementsForOrganization(input),
+      countImprovementsForOrganization: (request) =>
+        countImprovementsForOrganization(input.db, request),
       getImprovementForOrganization: (input) =>
         improvementOpportunityStore.getImprovementForOrganization(input),
       resolveImprovementForOrganization: (input) =>
@@ -743,6 +749,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
     },
     incidentRetrieval: {
       listIncidentsForOrganization: (input) => metadataStore.listIncidentsForOrganization(input),
+      countIncidentsForOrganization: (request) => countIncidentsForOrganization(input.db, request),
       getIncidentForOrganization: (input) => metadataStore.getIncidentForOrganization(input),
       resolveIncidentForOrganization: (input) =>
         incidentLifecycle.resolveIncidentForOrganization(input),

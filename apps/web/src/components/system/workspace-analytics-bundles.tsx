@@ -40,7 +40,11 @@ export function WorkspaceAnalyticsBundles({
   const pagination = useCursorPagination(
     async (cursor) => {
       const response = await listAnalyticsBundles(buildBundleQuery(filters, cursor));
-      return { items: response.bundles, nextCursor: response.next_cursor };
+      return {
+        items: response.bundles,
+        nextCursor: response.next_cursor,
+        totalPages: response.total_pages
+      };
     },
     [filters]
   );
@@ -129,6 +133,7 @@ export function WorkspaceAnalyticsBundles({
                 <AnalyticsBundlesTable bundles={bundles} />
                 <CursorPaginationControls
                   page={pagination.page}
+                  totalPages={pagination.totalPages}
                   hasNextPage={pagination.hasNextPage}
                   isLoading={pagination.isLoading}
                   onPreviousPage={pagination.goToPreviousPage}

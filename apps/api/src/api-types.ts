@@ -122,6 +122,9 @@ export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagement
       cursor?: { last_seen_at: string; incident_id: string };
       limit: number;
     }): Promise<IncidentRetrievalRecord[]>;
+    countIncidentsForOrganization?(
+      input: Parameters<ApiDependencies["incidentRetrieval"]["listIncidentsForOrganization"]>[0]
+    ): Promise<number>;
     getIncidentForOrganization(input: {
       organization_id: string;
       incident_id: string;

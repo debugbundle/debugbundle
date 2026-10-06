@@ -31,6 +31,7 @@ import {
   AlertDialogTitle
 } from "../ui/alert-dialog.js";
 import { Button } from "../ui/button.js";
+import { TableActionButton } from "./table-action-button.js";
 import { Dialog } from "../ui/dialog.js";
 import { Field, FieldGroup, FieldLabel } from "../ui/field.js";
 import { Input } from "../ui/input.js";
@@ -318,24 +319,18 @@ export function ProjectAnalyticsSavedFunnelsSection({
                 {canManage ? (
                   <TableCell>
                     <div className="flex justify-end gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
+                      <TableActionButton
+                        label="Edit"
+                        icon={PencilIcon}
                         aria-label={`Edit ${funnel.display_name}`}
                         onClick={() => openEditDialog(funnel)}
-                      >
-                        <PencilIcon />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
+                      />
+                      <TableActionButton
+                        label="Archive"
+                        icon={ArchiveIcon}
                         aria-label={`Archive ${funnel.display_name}`}
                         onClick={() => setPendingArchive(funnel)}
-                      >
-                        <ArchiveIcon />
-                      </Button>
+                      />
                     </div>
                   </TableCell>
                 ) : null}

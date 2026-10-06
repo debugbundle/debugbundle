@@ -131,6 +131,7 @@ export interface LegacyWeeklyReportEmailInput {
 export interface AlertEmailInput {
   conditionType: string;
   incidentId: string;
+  summary?: string | null;
   projectName?: string | null;
   occurredAt: string;
   serviceName: string;
@@ -146,6 +147,8 @@ export interface AlertDigestEmailEntryInput extends AlertEmailInput {
   summary: string | null;
   conditionTypes?: string[];
 }
+
+const MAX_SLACK_INCIDENT_TITLE_LENGTH = 180;
 
 function escapeSlackMrkdwn(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
@@ -490,20 +493,23 @@ export function renderAlertSlackMessage(input: AlertEmailInput): { text: string;
   const intro = formatAlertIntro(input.conditionType);
   const conditionLabel = formatAlertConditionLabel(input.conditionType);
   const severityLabel = titleCase(input.severity);
+  const titleCharacters = Array.from(input.summary?.replace(/\s+/g, " ").trim() ?? "");
+  const incidentTitle = titleCharacters.length > MAX_SLACK_INCIDENT_TITLE_LENGTH
+    ? `${titleCharacters.slice(0, MAX_SLACK_INCIDENT_TITLE_LENGTH - 1).join("").trimEnd()}…`
+    : titleCharacters.join("");
+  const escapedIncidentTitle = escapeSlackMrkdwn(incidentTitle);
+  const titleLine = incidentTitle.length === 0 ? "" : `*Incident:* ${escapedIncidentTitle}\n`;
   const linkParts = [
     ...(input.incidentUrl === undefined || input.incidentUrl === null
       ? []
       : [`<${input.incidentUrl}|Open incident>`]),
     ...(input.bundleUrl === undefined || input.bundleUrl === null
       ? []
-      : [`<${input.bundleUrl}|View bundle JSON>`]),
-    ...(input.groupUrl === undefined || input.groupUrl === null
-      ? []
-      : [`<${input.groupUrl}|Inspect alert group>`])
+      : [`<${input.bundleUrl}|View bundle JSON>`])
   ];
 
   const text = [
-    `[DebugBundle Alert] ${headline}`,
+    `[DebugBundle Alert] ${headline}${incidentTitle.length === 0 ? "" : `: ${escapedIncidentTitle}`}`,
     `Alert: ${conditionLabel}`,
     ...(input.projectName === undefined || input.projectName === null ? [] : [`Project: ${input.projectName}`]),
     `Service: ${input.serviceName}`,
@@ -512,55 +518,58 @@ export function renderAlertSlackMessage(input: AlertEmailInput): { text: string;
     `Incident ID: ${input.incidentId}`,
     `Detected at: ${input.occurredAt}`,
     ...(input.incidentUrl === undefined || input.incidentUrl === null ? [] : [`Open incident: ${input.incidentUrl}`]),
-    ...(input.bundleUrl === undefined || input.bundleUrl === null ? [] : [`View bundle: ${input.bundleUrl}`]),
-    ...(input.groupUrl === undefined || input.groupUrl === null ? [] : [`Inspect alert group: ${input.groupUrl}`])
+    ...(input.bundleUrl === undefined || input.bundleUrl === null ? [] : [`View bundle: ${input.bundleUrl}`])
   ].join("\n");
+
+  const detailFields = [
+    {
+      type: "mrkdwn",
+      text: `*Alert*\n${escapeSlackMrkdwn(conditionLabel)}`
+    },
+    ...(input.projectName === undefined || input.projectName === null
+      ? []
+      : [
+          {
+            type: "mrkdwn",
+            text: `*Project*\n${escapeSlackMrkdwn(input.projectName)}`
+          }
+        ]),
+    {
+      type: "mrkdwn",
+      text: `*Severity*\n${escapeSlackMrkdwn(severityLabel)}`
+    },
+    {
+      type: "mrkdwn",
+      text: `*Service*\n${escapeSlackMrkdwn(input.serviceName)}`
+    },
+    {
+      type: "mrkdwn",
+      text: `*Environment*\n${escapeSlackMrkdwn(input.environment)}`
+    },
+    {
+      type: "mrkdwn",
+      text: `*Incident ID*\n${escapeSlackMrkdwn(input.incidentId)}`
+    },
+    {
+      type: "mrkdwn",
+      text: `*Detected at*\n${escapeSlackMrkdwn(input.occurredAt)}`
+    }
+  ];
+  const detailBlocks: Array<Record<string, unknown>> = [];
+  // Separate sections give each two-column row Slack's native spacing.
+  for (let index = 0; index < detailFields.length; index += 2) {
+    detailBlocks.push({ type: "section", fields: detailFields.slice(index, index + 2) });
+  }
 
   const blocks: Array<Record<string, unknown>> = [
     {
       type: "section",
       text: {
         type: "mrkdwn",
-        text: `*:rotating_light: ${escapeSlackMrkdwn(headline)}*\n${escapeSlackMrkdwn(intro)}`
+        text: `*:rotating_light: ${escapeSlackMrkdwn(headline)}*\n${titleLine}${escapeSlackMrkdwn(intro)}`
       }
     },
-    {
-      type: "section",
-      fields: [
-        {
-          type: "mrkdwn",
-          text: `*Alert*\n${escapeSlackMrkdwn(conditionLabel)}`
-        },
-        ...(input.projectName === undefined || input.projectName === null
-          ? []
-          : [
-              {
-                type: "mrkdwn",
-                text: `*Project*\n${escapeSlackMrkdwn(input.projectName)}`
-              }
-            ]),
-        {
-          type: "mrkdwn",
-          text: `*Severity*\n${escapeSlackMrkdwn(severityLabel)}`
-        },
-        {
-          type: "mrkdwn",
-          text: `*Service*\n${escapeSlackMrkdwn(input.serviceName)}`
-        },
-        {
-          type: "mrkdwn",
-          text: `*Environment*\n${escapeSlackMrkdwn(input.environment)}`
-        },
-        {
-          type: "mrkdwn",
-          text: `*Incident ID*\n${escapeSlackMrkdwn(input.incidentId)}`
-        },
-        {
-          type: "mrkdwn",
-          text: `*Detected at*\n${escapeSlackMrkdwn(input.occurredAt)}`
-        }
-      ]
-    },
+    ...detailBlocks,
     ...(linkParts.length === 0
       ? []
       : [

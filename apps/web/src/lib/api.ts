@@ -22,9 +22,6 @@ import type {
   CreatedWebhookRecord,
   DeletedAccountRecord,
   DeletedProjectRecord,
-  IncidentRecord,
-  IncidentStatusFilter,
-  ImprovementRecord,
   MemberTokenRecord,
   ProbeActivationRecord,
   CreatedProbeActivation,
@@ -42,8 +39,6 @@ import type {
   WebhookRecord
 } from "./api-types.js";
 import {
-  normalizeImprovementRecord,
-  normalizeIncidentRecord,
   normalizeProjectRecord
 } from "./api-record-normalizers.js";
 import { observeWebActivationStep } from "./dogfooding-flows.js";
@@ -123,7 +118,9 @@ export {
   getIncident,
   getIncidentBundle,
   getIncidentReproduction,
+  listImprovements,
   listProjectImprovements,
+  listIncidents,
   listProjectIncidents,
   reopenImprovement,
   reopenIncident,
@@ -233,121 +230,6 @@ export async function listProjects(): Promise<ProjectRecord[]> {
   );
 
   return body.projects.map(normalizeProjectRecord);
-}
-
-export async function listIncidents(
-  inputOrLimit:
-    | number
-    | {
-        limit?: number;
-        cursor?: string;
-        projectId?: string;
-        environment?: string;
-        service?: string;
-        status?: IncidentStatusFilter;
-        severity?: IncidentRecord["severity"];
-        firstSeenAfter?: string;
-        attentionAfter?: string;
-      } = 20,
-  cursor?: string
-): Promise<{ incidents: IncidentRecord[]; nextCursor: string | null }> {
-  const input =
-    typeof inputOrLimit === "number"
-      ? {
-          limit: inputOrLimit,
-          ...(cursor === undefined ? {} : { cursor })
-        }
-      : inputOrLimit;
-
-  const searchParams = new URLSearchParams({
-    limit: String(input.limit ?? 20)
-  });
-
-  if (input.cursor !== undefined) {
-    searchParams.set("cursor", input.cursor);
-  }
-  if (input.projectId !== undefined) {
-    searchParams.set("project_id", input.projectId);
-  }
-  if (input.environment !== undefined) {
-    searchParams.set("environment", input.environment);
-  }
-  if (input.service !== undefined) {
-    searchParams.set("service", input.service);
-  }
-  if (input.status !== undefined) {
-    searchParams.set("status", input.status);
-  }
-  if (input.severity !== undefined) {
-    searchParams.set("severity", input.severity);
-  }
-  if (input.firstSeenAfter !== undefined) {
-    searchParams.set("first_seen_after", input.firstSeenAfter);
-  }
-  if (input.attentionAfter !== undefined) {
-    searchParams.set("attention_after", input.attentionAfter);
-  }
-
-  const body = await readJson<{ incidents: IncidentRecord[]; next_cursor: string | null }>(
-    await fetch(`${API_BASE}/v1/incidents?${searchParams.toString()}`, {
-      credentials: "include"
-    })
-  );
-
-  return {
-    incidents: body.incidents.map(normalizeIncidentRecord),
-    nextCursor: body.next_cursor
-  };
-}
-
-export async function listImprovements(
-  input: {
-    limit?: number;
-    cursor?: string;
-    projectId?: string;
-    environment?: string;
-    service?: string;
-    status?: ImprovementRecord["status"];
-    severity?: ImprovementRecord["severity"];
-    kind?: ImprovementRecord["kind"];
-  } = {}
-): Promise<{ improvements: ImprovementRecord[]; nextCursor: string | null }> {
-  const searchParams = new URLSearchParams({
-    limit: String(input.limit ?? 20)
-  });
-
-  if (input.cursor !== undefined) {
-    searchParams.set("cursor", input.cursor);
-  }
-  if (input.projectId !== undefined) {
-    searchParams.set("project_id", input.projectId);
-  }
-  if (input.environment !== undefined) {
-    searchParams.set("environment", input.environment);
-  }
-  if (input.service !== undefined) {
-    searchParams.set("service", input.service);
-  }
-  if (input.status !== undefined) {
-    searchParams.set("status", input.status);
-  }
-  if (input.severity !== undefined) {
-    searchParams.set("severity", input.severity);
-  }
-  if (input.kind !== undefined) {
-    searchParams.set("kind", input.kind);
-  }
-
-  const body = await readJson<{ improvements: ImprovementRecord[]; next_cursor: string | null }>(
-    await fetch(`${API_BASE}/v1/improvements?${searchParams.toString()}`, {
-      credentials: "include"
-    })
-  );
-
-  return {
-    improvements: body.improvements.map(normalizeImprovementRecord),
-    nextCursor: body.next_cursor
-  };
 }
 
 export async function listServices(projectId: string, limit = 100): Promise<ServiceRecord[]> {

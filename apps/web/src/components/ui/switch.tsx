@@ -17,7 +17,7 @@ function Switch({
         "peer inline-flex h-5 w-9 shrink-0 items-center rounded-full border border-transparent shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 data-[state=checked]:bg-primary",
         disabled
           ? "cursor-not-allowed opacity-100 data-[state=checked]:bg-primary/60 data-[state=unchecked]:bg-border"
-          : "data-[state=unchecked]:bg-border",
+          : "data-[state=unchecked]:bg-muted-foreground/80",
         className
       )}
       disabled={disabled}

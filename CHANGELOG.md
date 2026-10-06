@@ -6,6 +6,27 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.14.1] - 2026-10-07
+
+### Fixed
+
+- Bound incident titles to the exception summary across hosted and local processing, retain full incident evidence, and clamp long detail headings to two lines.
+- Include incident titles in Slack alerts, remove the alert-group footer link, and separate metadata pairs into readable rows.
+- Show measured 30-day uptime across health checks and projects, preserve confirmed daily outages through recovery, and mark legacy one-hour outages red with accurate downtime labels.
+- Show total pages consistently, refresh cursor chains safely, and preserve strict installed analytics readers through opt-in totals.
+- Align shared button icons and text, use accessible tooltip icon actions in tables, improve off-state switch contrast, reduce incident metric card spacing, and align analytics actions with headings.
+- Recover webhook pages from partial load failures with retry and cleanup protection.
+
+### Added
+
+- Browser-scoped clearing and review of failed GitHub delivery rows without deleting server history.
+- Opt-in, loopback-only populated development preview with synthetic management, billing, health and analytics data and actions. Production builds exclude fixtures and mock telemetry is disabled.
+
+### Distribution
+
+- Shared types and redaction 2.2.1, CLI/MCP/OpenClaw 1.13.1. Redaction is version-aligned without a behavior change; SDK versions and independently versioned developer plugin pins remain unchanged.
+- Existing public interfaces and persisted data remain compatible. No database migration is required; deploy API changes before updated web assets.
+
 ## [1.14.0] - 2026-10-05
 
 ### Added

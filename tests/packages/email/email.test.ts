@@ -29,6 +29,7 @@ import {
   formatProductFromEmail,
   renderAlertDigestEmail,
   renderAlertEmail,
+  renderAlertSlackMessage,
   renderAllowanceLimitReachedEmail,
   renderAllowanceWarning80Email,
   renderAccountDeletionOtpEmail,
@@ -178,6 +179,86 @@ describe("email package", () => {
     expect(rendered.html).toContain("&lt;123&gt;");
     expect(rendered.html).toContain("Open incident in DebugBundle");
     expect(rendered.html).toContain('src="https://app.debugbundle.com/email/debugbundle-mark.png"');
+  });
+
+  it("keeps Slack incident and bundle links without the alert-group inspection link", () => {
+    const input = {
+      conditionType: "new_incident",
+      incidentId: "inc_1",
+      summary: "Checkout failed",
+      occurredAt: "2026-05-13T08:33:56.774Z",
+      serviceName: "api",
+      environment: "production",
+      severity: "high" as const,
+      groupUrl: "https://api.debugbundle.com/v1/alert-groups/direct/group_1?project_id=project_1"
+    };
+    const incidentUrl = "https://app.debugbundle.com/incidents/inc_1";
+    const bundleUrl = "https://api.debugbundle.com/v1/incidents/inc_1/bundle";
+    const rendered = renderAlertSlackMessage({ ...input, incidentUrl, bundleUrl });
+
+    expect(rendered.text).toContain("Checkout failed");
+    expect(rendered.text).toContain(`Open incident: ${incidentUrl}`);
+    expect(rendered.text).toContain(`View bundle: ${bundleUrl}`);
+    expect(rendered.blocks.at(-1)?.["text"]).toMatchObject({
+      text: `<${incidentUrl}|Open incident> • <${bundleUrl}|View bundle JSON>`
+    });
+    expect(JSON.stringify(rendered)).not.toContain(input.groupUrl);
+    expect(JSON.stringify(rendered)).not.toContain("Inspect alert group");
+
+    const withoutIncidentLinks = renderAlertSlackMessage(input);
+    expect(withoutIncidentLinks.blocks).toHaveLength(4);
+    expect(JSON.stringify(withoutIncidentLinks)).not.toContain(input.groupUrl);
+  });
+
+  it.each(["Checkout <API>", undefined, null])("separates Slack metadata rows with optional project names (%s)", (projectName) => {
+    const rendered = renderAlertSlackMessage({
+      conditionType: "new_incident",
+      incidentId: "inc_<123>",
+      ...(projectName === undefined ? {} : { projectName }),
+      occurredAt: "2026-05-13T08:33:56.774Z",
+      serviceName: "checkout <api> & worker",
+      environment: "staging",
+      severity: "high"
+    });
+    const alert = "*Alert*\nNew incident";
+    const severity = "*Severity*\nHigh";
+    const service = "*Service*\ncheckout &lt;api&gt; &amp; worker";
+    const environment = "*Environment*\nstaging";
+    const incidentId = "*Incident ID*\ninc_&lt;123&gt;";
+    const detectedAt = "*Detected at*\n2026-05-13T08:33:56.774Z";
+    const expectedRows = projectName === undefined || projectName === null
+      ? [[alert, severity], [service, environment], [incidentId, detectedAt]]
+      : [[alert, "*Project*\nCheckout &lt;API&gt;"], [severity, service], [environment, incidentId], [detectedAt]];
+
+    expect(rendered.blocks.slice(1)).toEqual(expectedRows.map((row) => ({
+      type: "section",
+      fields: row.map((text) => ({ type: "mrkdwn", text }))
+    })));
+    expect(rendered.text).toContain("Service: checkout <api> & worker");
+    expect(rendered.text).toContain("Detected at: 2026-05-13T08:33:56.774Z");
+  });
+
+  it("bounds historical incident titles in Slack messages and keeps missing titles optional", () => {
+    const input = {
+      conditionType: "new_incident",
+      incidentId: "inc_1",
+      occurredAt: "2026-05-13T08:33:56.774Z",
+      serviceName: "api",
+      environment: "production",
+      severity: "high" as const
+    };
+    const longTitle = `Failure\n${"stack frame ".repeat(30)}`;
+    const rendered = renderAlertSlackMessage({ ...input, summary: longTitle });
+    const title = rendered.text.split("\n")[0]?.split(": ").slice(1).join(": ") ?? "";
+
+    expect(title).toMatch(/^Failure stack frame /);
+    expect(Array.from(title).length).toBeLessThanOrEqual(180);
+    expect(title).toMatch(/…$/);
+    expect(rendered.blocks[0]?.["text"]).toMatchObject({ text: expect.stringContaining(title) });
+
+    const missingTitle = renderAlertSlackMessage({ ...input, summary: " \n " });
+    expect(missingTitle.text.split("\n")[0]).toBe("[DebugBundle Alert] A new incident was detected");
+    expect(missingTitle.blocks[0]?.["text"]).not.toMatchObject({ text: expect.stringContaining("*Incident:*") });
   });
 
   it("renders alert digest emails with grouped incidents", () => {

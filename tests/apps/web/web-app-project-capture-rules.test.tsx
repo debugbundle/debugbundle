@@ -169,7 +169,11 @@ describe("web app — project capture rules", () => {
     expect(screen.getByText(/demote analytics resource errors/i)).toBeInTheDocument();
     expect(screen.getByText(/known third-party browser resource noise/i)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /^pause$/i }));
+    const pauseButton = screen.getByRole("button", { name: /^pause$/i });
+    expect(pauseButton.textContent).toBe("");
+    await user.hover(pauseButton);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Pause");
+    await user.click(pauseButton);
 
     await waitFor(() => {
       expect(
@@ -182,7 +186,11 @@ describe("web app — project capture rules", () => {
     });
 
     expect(await screen.findByText(/^disabled$/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^enable$/i })).toBeInTheDocument();
+    const enableButton = screen.getByRole("button", { name: /^enable$/i });
+    expect(enableButton.textContent).toBe("");
+    await user.unhover(enableButton);
+    await user.hover(enableButton);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Enable");
   });
 
   it("shows capture rules in preview-only mode for shared members", async () => {
@@ -445,7 +453,7 @@ describe("web app — project capture rules", () => {
 
     expect(await screen.findByText(/capture rule 07/i)).toBeInTheDocument();
     expect(screen.queryByText(/capture rule 01/i)).toBeNull();
-    expect(screen.getByText(/^page 2$/i)).toBeInTheDocument();
+    expect(screen.getByText(/^page 2 of 2$/i)).toBeInTheDocument();
   });
 
   it("lets managers create a manual capture rule from project settings", async () => {

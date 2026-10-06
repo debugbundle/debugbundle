@@ -65,6 +65,13 @@ Any dev-only or mock endpoint (e.g., mock OAuth login) must fail at server start
 
 Frontend-only review harnesses must be absent from production routing and require an explicit development opt-in. The OpenAI synthetic UI preview may run only when Vite reports development mode and `VITE_OPENAI_PLUGIN_PREVIEW=true`, or under the test runner; supplying that variable to a production build must not mount the route. Its fixtures stay in browser memory and must not call OAuth interaction, reviewer credential, grant, or connection-revocation APIs. A preview route cannot relax API feature flags, canonical-host enforcement, session checks, CSRF, or provider validation.
 
+The dashboard mock preview requires `DEBUGBUNDLE_DEV_MOCK=true`, Vite development
+serve mode and a loopback-bound web container. It must reject foreign Host/Origin
+headers, bound request bodies, intercept unsupported API routes without proxying,
+and disable frontend telemetry. Synthetic sessions and simulated mutations remain
+local memory; they cannot alter real auth, database, provider or worker behavior.
+Production builds and production preview mode must never register this middleware.
+
 ### SEC-11: Required Environment Variables Fail Fast
 
 Security-critical env vars (probe trigger secret, GitHub App credentials, etc.) must cause startup failure when missing or empty. No fallback values for secrets. Fail loud, fail early.

@@ -170,16 +170,16 @@ Every capability must be available through all applicable interfaces. Operations
 
 This additive credential is separate from member, project, probe, and hosted OAuth tokens. `dbundle_agent_` is hashed in `agent_tokens`, returned once with `Cache-Control: no-store`, bound to one project and `incident:read-minimized`, and expires after 30 days by default (at most 90). Old API versions reject its prefix. Issuer loss of project access, organization suspension, expiry, revocation, unknown scope, or unknown policy version denies reads. Creation is disabled by default and returns `503 agent_token_issuance_unavailable` until `AGENT_TOKEN_ISSUANCE_ENABLED=true` is set on every serving API replica **after** the forward migration and full replica rollout. List, revoke, and already-issued restricted reads do not use this creation gate. Rollback may make agent reads unavailable but cannot promote authority.
 
-| Operation | HTTP API | CLI | Ordinary management MCP / restricted `--agent-read` MCP |
-| --- | --- | --- | --- |
-| List scoped credentials | `GET /v1/projects/{id}/agent-tokens` | `token agent list <project-id>` | `list_agent_tokens` / unavailable |
-| Create scoped credential | `POST /v1/projects/{id}/agent-tokens` (`label`, optional `expires_at`) | `token agent create <project-id> --label <label> [--expires-at <ISO8601>]` | `create_agent_token` / unavailable |
-| Revoke scoped credential | `POST /v1/projects/{id}/agent-tokens/{tokenId}/revoke` | `token agent revoke <project-id> <token-id>` | `revoke_agent_token` / unavailable |
-| Project summary | `GET /v1/agent/projects/{id}` | `agent project_summary <project-id>` | `agent_project_summary` |
-| Incident list | `GET /v1/agent/projects/{id}/incidents` | `agent list_incidents <project-id>` | `agent_list_incidents` |
-| Incident detail | `GET /v1/agent/projects/{id}/incidents/{incidentId}` | `agent get_incident <project-id> <incident-id>` | `agent_get_incident` |
-| Existing context | `GET /v1/agent/projects/{id}/incidents/{incidentId}/context` | `agent get_incident_context <project-id> <incident-id>` | `agent_get_incident_context` |
-| Existing minimized bundle | `GET /v1/agent/projects/{id}/incidents/{incidentId}/bundle` | `agent get_bundle <project-id> <incident-id>` | `agent_get_bundle` |
+| Operation                 | HTTP API                                                               | CLI                                                                        | Ordinary management MCP / restricted `--agent-read` MCP |
+| ------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------- |
+| List scoped credentials   | `GET /v1/projects/{id}/agent-tokens`                                   | `token agent list <project-id>`                                            | `list_agent_tokens` / unavailable                       |
+| Create scoped credential  | `POST /v1/projects/{id}/agent-tokens` (`label`, optional `expires_at`) | `token agent create <project-id> --label <label> [--expires-at <ISO8601>]` | `create_agent_token` / unavailable                      |
+| Revoke scoped credential  | `POST /v1/projects/{id}/agent-tokens/{tokenId}/revoke`                 | `token agent revoke <project-id> <token-id>`                               | `revoke_agent_token` / unavailable                      |
+| Project summary           | `GET /v1/agent/projects/{id}`                                          | `agent project_summary <project-id>`                                       | `agent_project_summary`                                 |
+| Incident list             | `GET /v1/agent/projects/{id}/incidents`                                | `agent list_incidents <project-id>`                                        | `agent_list_incidents`                                  |
+| Incident detail           | `GET /v1/agent/projects/{id}/incidents/{incidentId}`                   | `agent get_incident <project-id> <incident-id>`                            | `agent_get_incident`                                    |
+| Existing context          | `GET /v1/agent/projects/{id}/incidents/{incidentId}/context`           | `agent get_incident_context <project-id> <incident-id>`                    | `agent_get_incident_context`                            |
+| Existing minimized bundle | `GET /v1/agent/projects/{id}/incidents/{incidentId}/bundle`            | `agent get_bundle <project-id> <incident-id>`                              | `agent_get_bundle`                                      |
 
 Management routes require an authorized member/session with effective project owner/admin role. Agent routes require an agent bearer token, matching path project, live issuer project access, and rate limiting; they never accept a saved member login as fallback. Successful restricted reads return `Cache-Control: no-store` and use strict incident/artifact allowlists with a 512 KiB projected output bound. Missing, failed, or oversized existing artifacts return a status, without enqueuing generation or returning a raw object URL. No agent route serves raw logs, request bodies, arbitrary artifacts, or mutations. The four incident shapes share the hosted OpenAI bounded projector but the hosted OAuth connection and its 23-tool contract remain separate.
 
@@ -485,9 +485,11 @@ Low-value external-probe `GET`/`404` routes such as common WordPress, OWA, RDWeb
 
 **Incident response fields include:** `id`, `project_id`, `project_name`, `service_id`, `service_name`, `environment`, `fingerprint`, `fingerprint_version`, `title`, `severity`, `status`, `first_seen_at`, `last_seen_at`, `occurrence_count`, `affected_users_estimate`, `spike_detected_at`, `resolved_at`, `regressed_at`, `matched_fields`, `incident_reason`
 
+New incident titles are display summaries bounded to 180 characters; stack frames remain in event and bundle evidence. Existing stored titles are returned unchanged for compatibility.
+
 Current API implementation scope (Phase 1 continuation):
 
-- `GET /v1/incidents` response body: `{ incidents: IncidentRetrievalRecord[], next_cursor: string | null }`
+- `GET /v1/incidents` response body: `{ incidents: IncidentRetrievalRecord[], next_cursor: string | null, total_pages?: number }`. The first page includes `total_pages` for the filtered result set; cursor pages may omit it.
 - `GET /v1/incidents/{id}` response body: `{ incident: IncidentRetrievalRecord }`
 - `GET /v1/incidents/{id}/context` response body: `IncidentContextRecord`
 - `POST /v1/incidents/{id}/resolve` response body: `{ incident: IncidentRetrievalRecord }`
@@ -544,7 +546,7 @@ Open request/log candidates below the configured generation threshold are intern
 
 Current API implementation scope:
 
-- `GET /v1/improvements` response body: `{ improvements: ImprovementRetrievalRecord[], next_cursor: string | null }`
+- `GET /v1/improvements` response body: `{ improvements: ImprovementRetrievalRecord[], next_cursor: string | null, total_pages?: number }`. The first page includes `total_pages` for the filtered result set; cursor pages may omit it.
 - `GET /v1/improvements/{id}` response body: `{ improvement: ImprovementRetrievalRecord }`
 - `POST /v1/improvements/{id}/resolve` response body: `{ improvement: ImprovementRetrievalRecord }`
 - `POST /v1/improvements/{id}/reopen` response body: `{ improvement: ImprovementRetrievalRecord }`
@@ -567,13 +569,13 @@ sites use the **same flow analytics project** and a public write-only project to
 whose origin allowlist includes those sites. They may use separate projects for debug
 capture. Configure separate products under their own project flows.
 
-| Method | Path | Permission |
-|---|---|---|
-| `GET` | `/v1/projects/{id}/analytics/flows` | Project reader |
-| `PUT` | `/v1/projects/{id}/analytics/flows/{key}` | Owner/admin; create or replace |
-| `DELETE` | `/v1/projects/{id}/analytics/flows/{key}` | Owner/admin; archive |
-| `GET` | `/v1/projects/{id}/analytics/flows/{key}/report?window=30d` | Project reader |
-| `POST` | `/v1/analytics/flows/{id}/{key}/{start,step,handoff,arrive,withdraw}` | Project token and allowed Origin |
+| Method   | Path                                                                  | Permission                       |
+| -------- | --------------------------------------------------------------------- | -------------------------------- |
+| `GET`    | `/v1/projects/{id}/analytics/flows`                                   | Project reader                   |
+| `PUT`    | `/v1/projects/{id}/analytics/flows/{key}`                             | Owner/admin; create or replace   |
+| `DELETE` | `/v1/projects/{id}/analytics/flows/{key}`                             | Owner/admin; archive             |
+| `GET`    | `/v1/projects/{id}/analytics/flows/{key}/report?window=30d`           | Project reader                   |
+| `POST`   | `/v1/analytics/flows/{id}/{key}/{start,step,handoff,arrive,withdraw}` | Project token and allowed Origin |
 
 Example definition (`PUT` body; path key must match):
 
@@ -605,13 +607,13 @@ Enable project analytics first. This separate helper uses direct API transport w
 public project token; it does not inherit another SDK instance's consent or relay.
 
 ```ts
-import { createAnalyticsFlowClient } from '@debugbundle/sdk-browser';
+import { createAnalyticsFlowClient } from "@debugbundle/sdk-browser";
 
 const flow = createAnalyticsFlowClient({
-  endpoint: 'https://api.debugbundle.com',
-  projectId: '<flow-project-uuid>',
-  projectToken: 'dbundle_proj_...',
-  flowKey: 'onboarding',
+  endpoint: "https://api.debugbundle.com",
+  projectId: "<flow-project-uuid>",
+  projectToken: "dbundle_proj_...",
+  flowKey: "onboarding",
   enabled: true,
   consentRequired: true
 });
@@ -632,10 +634,10 @@ observations remain. Network failure can delay physical server cleanup until exp
 On the main site:
 
 ```ts
-await flow.start('visit', { source: 'newsletter', campaign: 'launch' });
-const linkedUrl = await flow.handoff('auth', 'https://auth.example.com/login');
+await flow.start("visit", { source: "newsletter", campaign: "launch" });
+const linkedUrl = await flow.handoff("auth", "https://auth.example.com/login");
 // Navigate only when your application would normally navigate; retain a fallback.
-window.location.assign(linkedUrl ?? 'https://auth.example.com/login');
+window.location.assign(linkedUrl ?? "https://auth.example.com/login");
 ```
 
 On the dedicated auth origin, initialize the same project/flow client and apply the
@@ -643,14 +645,14 @@ current capture policy, then:
 
 ```ts
 const linked = await flow.arrive();
-if (!linked) await flow.start('auth'); // explicitly unlinked, never a linked conversion
+if (!linked) await flow.start("auth"); // explicitly unlinked, never a linked conversion
 
 // Your normal OAuth flow may now leave this origin and return to it.
 // Mark the next step only after your application confirms authentication succeeded.
 if (loginSucceeded) {
-  await flow.step('login');
-  const linkedUrl = await flow.handoff('app', 'https://app.example.com/welcome');
-  window.location.assign(linkedUrl ?? 'https://app.example.com/welcome');
+  await flow.step("login");
+  const linkedUrl = await flow.handoff("app", "https://app.example.com/welcome");
+  window.location.assign(linkedUrl ?? "https://app.example.com/welcome");
 }
 ```
 
@@ -690,13 +692,13 @@ Send JSON, `Authorization: Bearer dbundle_proj_...`, and the configured `Origin`
 Browser calls omit credentials. Context and token values are independently generated
 32-byte random values encoded as 43-character unpadded base64url strings.
 
-| Operation | JSON body (all also accept optional boolean `consent`) | Success body |
-|---|---|---|
-| `start` | `context`, `step_key`, optional `source`, `campaign` | `expires_at` |
-| `step` | `context`, `step_key` | `recorded: true` |
-| `handoff` | `context`, `step_key`, `token` | next `origin`, `expires_at` |
-| `arrive` | new receiver `context`, `token` | run `expires_at` |
-| `withdraw` | current `context` | `withdrawn: true` |
+| Operation  | JSON body (all also accept optional boolean `consent`) | Success body                |
+| ---------- | ------------------------------------------------------ | --------------------------- |
+| `start`    | `context`, `step_key`, optional `source`, `campaign`   | `expires_at`                |
+| `step`     | `context`, `step_key`                                  | `recorded: true`            |
+| `handoff`  | `context`, `step_key`, `token`                         | next `origin`, `expires_at` |
+| `arrive`   | new receiver `context`, `token`                        | run `expires_at`            |
+| `withdraw` | current `context`                                      | `withdrawn: true`           |
 
 Unknown fields are rejected. Project-token origin restrictions and the flow step origin
 both apply. Withdrawal remains available when analytics is disabled. Replays,
@@ -789,6 +791,8 @@ active-definition limit enforcement as the API.
 ```
 
 The implemented aggregate metrics read surface includes `GET /v1/analytics/summary`, `/routes`, `/journey-patterns`, `/devices`, `/referrers`, `/actions`, `/funnels`, `/funnels/{key}`, and `/incidents/{id}/impact` plus matching `debugbundle analytics summary|routes|journeys|devices|referrers|actions|funnels|funnel|incident-impact` commands and MCP `get_usage_summary`, `get_route_metrics`, `get_journey_patterns`, `get_device_breakdown`, `get_referrer_metrics`, `get_action_metrics`, `list_funnel_metrics`, `get_funnel_analysis`, and `get_incident_impact` tools. All metric adapters support the same bounded route/device/browser/OS/language/country/auth/referrer/UTM/custom-dimension filters. Incident impact verifies the requested incident belongs to the accessible project, reads only correlation links and aggregate ledgers, returns affected sessions/routes/funnels, top device/browser segments, linked session journey patterns, and the latest incident-impact AnalyticsBundle state. Its conversion delta is explicitly `unavailable` until a correlation-safe baseline exists; the API does not infer a number from unrelated aggregate rows. Journey-pattern rows remain aggregate transition metrics but may include up to three retained redacted `sample_ids` that match the transition tag and requested time window so agents can fetch representative journeys through the journey-sample detail route. Retained redacted journey samples are readable through `GET /v1/analytics/journey-samples` and `/journey-samples/{id}`, matching `debugbundle analytics journey-samples list|get` and MCP `list_analytics_journey_samples` / `get_analytics_journey_sample`; list responses expose metadata only and detail reads fetch the compressed redacted sample artifact from object storage without exposing its object key. Stored analytics opportunities are also readable through `GET /v1/analytics/opportunities` and `/opportunities/{id}`, matching `debugbundle analytics opportunities`, `debugbundle analytics opportunity get`, and MCP `list_analytics_opportunities` / `get_analytics_opportunity`. Deterministic evaluators cover funnel dropoff, route loops and fixed friction markers, route-exit regression, deploy conversion regression, and correlation-backed incident reach; recurring resolved signals reopen, snoozed signals remain snoozed, and stale open signals resolve after a complete evaluation window. AnalyticsBundle generation can be requested through `POST /v1/analytics/bundles`, `debugbundle analytics bundle create`, and MCP `generate_analytics_bundle`; successful requests reserve a deterministic generation record and enqueue `build-analytics-bundle`, returning pending state until the worker completes it. An optional `opportunity_id` derives the exact authorized opportunity scope/evidence and complete related incident/deploy sets; conflicting caller context is rejected. AnalyticsBundle generation records can be inventoried through `GET /v1/analytics/bundles`, `debugbundle analytics bundle list`, and MCP `list_analytics_bundles`, returning lightweight metadata including analysis kind, status, timestamps, failure reason, input fingerprint, and whether an artifact exists. Existing AnalyticsBundle generation records are readable through `GET /v1/analytics/bundles/{id}`, `debugbundle analytics bundle get`, and MCP `get_analytics_bundle`; completed generations return the validated `AnalyticsBundleV1` artifact, while pending/running and failed generations return explicit state payloads. These endpoints are project-authorized browser-session/member-token read surfaces; project tokens remain write-only for analytics ingestion.
+
+`GET /v1/analytics/opportunities` and `GET /v1/analytics/bundles` accept optional `include_total=true|false` (default false). Initial requests with `include_total=true` include `total_pages` for the filtered result set; cursor requests omit it and avoid recounting. Requests without this opt-in retain the original response keys for installed clients with strict response schemas. The dashboard requests totals on the first page; deploy the API before the web assets.
 
 Saved funnel definitions are project-scoped configuration, not one bundle per visit. Each definition contains a stable `funnel_key`, display name, and 2-20 ordered unique `{ step_key, display_name }` entries. Active definitions are limited independently from analytics event/session, retained-journey-sample, and AnalyticsBundle-generation allowances. The default active cap is derived from the current tier (1 Free, 10 Solo, 50 Team, 100 self-host), and creation enforces the lesser of any deliberately stored project override and the current tier cap under a project transaction lock. Paid included and purchased capacity units multiply the monthly analytics allowances but do not multiply saved funnels or custom-dimension slots. Archive is soft so historical aggregates remain interpretable; recreating an archived key reactivates it when capacity permits. Members may list definitions, while owner/admin role is required to create, update, or archive. Matching CLI commands are `debugbundle analytics saved-funnels list|create|update|archive`; matching MCP tools are `list_saved_analytics_funnels`, `create_saved_analytics_funnel`, `update_saved_analytics_funnel`, and `archive_saved_analytics_funnel`.
 
@@ -1537,20 +1541,24 @@ Checkout confirmation returns the standard billing summary response after the AP
 
 ### 1.4 Alerts
 
-| Method | Path              | Auth                            | Description       |
-| ------ | ----------------- | ------------------------------- | ----------------- |
-| POST   | `/v1/alerts`      | Browser Session or Member Token | Create alert rule |
-| GET    | `/v1/alerts`      | Browser Session or Member Token | List alert rules  |
-| PATCH  | `/v1/alerts/{id}` | Browser Session or Member Token | Update alert rule |
-| DELETE | `/v1/alerts/{id}` | Browser Session or Member Token | Delete alert rule |
-| GET    | `/v1/alert-groups` | Browser Session or Member Token | List direct alert deliveries and email digest groups |
-| GET    | `/v1/alert-groups/{kind}/{id}` | Browser Session or Member Token | Inspect a group's incident members |
+| Method | Path                           | Auth                            | Description                                          |
+| ------ | ------------------------------ | ------------------------------- | ---------------------------------------------------- |
+| POST   | `/v1/alerts`                   | Browser Session or Member Token | Create alert rule                                    |
+| GET    | `/v1/alerts`                   | Browser Session or Member Token | List alert rules                                     |
+| PATCH  | `/v1/alerts/{id}`              | Browser Session or Member Token | Update alert rule                                    |
+| DELETE | `/v1/alerts/{id}`              | Browser Session or Member Token | Delete alert rule                                    |
+| GET    | `/v1/alert-groups`             | Browser Session or Member Token | List direct alert deliveries and email digest groups |
+| GET    | `/v1/alert-groups/{kind}/{id}` | Browser Session or Member Token | Inspect a group's incident members                   |
 
 **Query params (list alerts):** `project_id` (required UUID), `limit` (optional, integer 1-100, default 20)
 
 **Alert group inspection:** Both routes require `project_id` (UUID) and accept `limit` (1–100, default 50) plus an opaque `cursor` returned as `next_cursor`. The detail path `kind` is `direct` or `email_digest`; `id` is a UUID from the list response. The list returns `{ groups, next_cursor }`; detail returns `{ group, members, next_cursor }`. Group fields are `group_id`, `kind`, `project_id`, nullable `alert_id` and `root_incident_id`, `channel`, `status`, `member_count`, `created_at`, and nullable `delivered_at`. Member fields are `incident_id`, `condition_type`, and `created_at`. The endpoints exclude recipient addresses, webhook URLs, stored payloads, raw log text, and provider errors. An unknown or cross-project group returns `404 group_not_found`; an invalid cursor returns `400 invalid_cursor`. Direct deliveries created before the membership migration show their root incident as a legacy single-member fallback. Member pages are ordered by creation time and UUID; each next cursor advances after the last returned row.
 
-When the API base URL is configured, direct Slack and Discord notifications link to the authenticated direct-group inspection route. Custom alert-webhook payloads opted into version 1 add `alert_group_id` and, when the API base URL is configured, `alert_group_url`; these fields are included in the exact signed body. Legacy custom alert-webhook payloads retain their prior field set for strict recipients, while receiving a signature header. Group inspection reflects later accepted members even though the first provider message was already sent.
+When the API base URL is configured, direct Discord notifications link to the authenticated direct-group inspection route. Custom alert-webhook payloads opted into version 1 add `alert_group_id` and, when the API base URL is configured, `alert_group_url`; these fields are included in the exact signed body. Legacy custom alert-webhook payloads retain their prior field set for strict recipients, while receiving a signature header. Group inspection reflects later accepted members even though the first provider message was already sent.
+
+Slack incident alerts show the incident title from the alert summary in the top-level notification text and the first visible message block. Titles are displayed on one line and capped at 180 characters for historical incidents; alerts without a summary retain the generic heading. Slack retains the incident and bundle links when their base URLs are configured, but does not include the alert-group inspection link in its notification text or visible blocks. Group inspection remains available through API, CLI, and MCP.
+
+Visible Slack metadata retains the field order Alert, optional Project, Severity, Service, Environment, Incident ID, and Detected at. Each consecutive pair uses a separate native section block with bold labels above values, allowing Slack's normal spacing between rows. A final unpaired field occupies its own section; unavailable project names are omitted before pairing. The top-level fallback text retains all metadata for notifications and accessibility.
 
 **Create alert request:**
 
@@ -2255,7 +2263,11 @@ Availability checks are hosted external HTTP checks executed by DebugBundle infr
 }
 ```
 
-Daily rollup `state` is intentionally less sensitive than raw execution status. A failed execution below the configured consecutive `failure_threshold` records failed checks, downtime estimate, and a `degraded` day, but it does not mark the full day `down`. A day is `down` only after the threshold-backed availability incident path opens or regresses an incident and appends that incident id to the rollup.
+Daily rollup `state` is intentionally less sensitive than raw execution status. A failed execution below the configured consecutive `failure_threshold` records failed checks, downtime estimate, and a `degraded` day. Reaching the threshold persists `down` immediately, including while asynchronous incident linkage is pending. Continued verified failures preserve `down` on each affected UTC day and append the linked open/regressed incident id without emitting another failure transition. Later successes preserve the day's worst confirmed state and deduplicated incident references; a later healthy day does not inherit a resolved incident. Rollup reads honor persisted `down` even when incident linkage is absent. These semantics use the existing fields and require no database migration; API, CLI, and MCP retain their existing response shapes.
+
+The workspace Health Status page labels its workspace, project, and check percentages `30-day uptime`: `100 * sum(successful_checks) / sum(total_checks)` over the displayed UTC-day window. Only verified endpoint outcomes count, unmonitored/unknown days do not fill the denominator, and no verified checks yields no measured percentage. Aggregates weight by check counts; this is the existing check-based estimate, not a wall-clock SLA calculation. Explicitly daily dashboard summaries continue to use the latest measured day. Current status badges remain independent of historical impact.
+
+Historical confirmed outage days remain red after recovery. To represent retained legacy continuation days without incident references, the web history surfaces also show outage impact for an individual check day with at least 3,600 seconds of recorded downtime and verified failures; this display fallback does not rewrite stored history or create incidents. Shorter unconfirmed interruptions remain amber. Project daily impact uses the worst individual check impact, not summed downtime. Durations retain hours/minutes/seconds; project tooltip durations sum check estimates and are labeled `total check downtime`, not elapsed project outage duration.
 
 Guardrails:
 
@@ -2814,6 +2826,8 @@ Rules may also subscribe to hosted improvement bundle creation:
 | POST   | `/v1/projects/{id}/github/deliveries/{id}/retry` | Browser Session or Member Token | Retry a failed delivery |
 
 **Deliveries query params:** `status` (optional: `pending`, `delivered`, `failed`, `retrying`, `skipped`), `limit` (optional, 1-100, default 20)
+
+The project GitHub page's **Clear failed** control saves the IDs of currently shown failed rows for that member and project in the current browser. **Show cleared** reveals them for inspection or retry. These controls do not modify delivery records or change API, CLI, or MCP history results; newly failed deliveries remain visible.
 
 **List deliveries response:**
 

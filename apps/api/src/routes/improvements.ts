@@ -118,7 +118,7 @@ export function registerImprovementRoutes(app: FastifyInstance, dependencies: Ap
       return reply.status(400).send({ error: "invalid_query" });
     }
 
-    const improvements = await dependencies.improvementManagement.listImprovementsForOrganization({
+    const improvementsRequest = {
       organization_id: member.organization_id,
       user_id: member.member_id,
       ...(parsedQuery.data.project_id === undefined ? {} : { project_id: parsedQuery.data.project_id }),
@@ -129,7 +129,11 @@ export function registerImprovementRoutes(app: FastifyInstance, dependencies: Ap
       ...(parsedQuery.data.kind === undefined ? {} : { kind: parsedQuery.data.kind }),
       ...(parsedCursor === null ? {} : { cursor: parsedCursor }),
       limit: parsedQuery.data.limit
-    });
+    };
+    const improvements = await dependencies.improvementManagement.listImprovementsForOrganization(improvementsRequest);
+    const totalCount = parsedCursor === null
+      ? await dependencies.improvementManagement.countImprovementsForOrganization?.(improvementsRequest)
+      : undefined;
 
     const nextCursorRecord = improvements.length >= parsedQuery.data.limit ? improvements.at(-1) : undefined;
     const nextCursor =
@@ -137,7 +141,8 @@ export function registerImprovementRoutes(app: FastifyInstance, dependencies: Ap
 
     return sendSafeImprovement(reply, {
       improvements,
-      next_cursor: nextCursor
+      next_cursor: nextCursor,
+      ...(totalCount === undefined ? {} : { total_pages: Math.max(1, Math.ceil(totalCount / parsedQuery.data.limit)) })
     });
   });
 

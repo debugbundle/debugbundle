@@ -118,7 +118,8 @@ export const LogSchema = z
 export const IncidentsResponseSchema = z
   .object({
     incidents: z.array(IncidentSchema),
-    next_cursor: z.string().nullable().optional()
+    next_cursor: z.string().nullable().optional(),
+    total_pages: z.number().int().positive().optional()
   });
 
 export const IncidentResponseSchema = z
@@ -244,7 +245,8 @@ export const ServicesResponseSchema = z
 export const ImprovementsResponseSchema = z
   .object({
     improvements: z.array(ImprovementSchema),
-    next_cursor: z.string().nullable().optional()
+    next_cursor: z.string().nullable().optional(),
+    total_pages: z.number().int().positive().optional()
   });
 
 export const LogsResponseSchema = z

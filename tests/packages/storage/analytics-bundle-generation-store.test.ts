@@ -30,6 +30,35 @@ const generationRow = {
 };
 
 describe("analytics bundle generation store", () => {
+  it("skips totals for legacy calls and cursor pages, and counts empty opted-in pages", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const store = createPostgresAnalyticsBundleGenerationStore({ query: query as Queryable["query"] });
+    for (const extra of [{}, { include_total: true, cursor: { created_at: "2026-07-08T10:00:00.000Z", generation_id: GENERATION_ID } }]) {
+      const result = await store.listAnalyticsBundleGenerationsForProject({ project_id: PROJECT_ID, limit: 10, ...extra });
+      expect(result).not.toHaveProperty("total_pages");
+      expect(query.mock.lastCall?.[0]).not.toContain("COUNT(*) OVER()");
+    }
+    const empty = await store.listAnalyticsBundleGenerationsForProject({ project_id: PROJECT_ID, limit: 10, include_total: true });
+    expect(empty.total_pages).toBe(1);
+    expect(query.mock.lastCall?.[0]).toContain("COUNT(*) OVER()");
+  });
+
+  it("reports exact total pages from the first-page generation count", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ ...generationRow, total_count: "21" }] });
+    const store = createPostgresAnalyticsBundleGenerationStore({
+      query: query as Queryable["query"]
+    });
+
+    const result = await store.listAnalyticsBundleGenerationsForProject({
+      project_id: PROJECT_ID,
+      limit: 10,
+      include_total: true
+    });
+
+    expect(result.total_pages).toBe(3);
+    expect(query.mock.calls[0]?.[0]).toContain("COUNT(*) OVER() AS total_count");
+  });
+
   it("builds deterministic input fingerprints independent of object key order", (): void => {
     const left = buildAnalyticsBundleInputFingerprint({
       opportunity_id: OPPORTUNITY_ID,

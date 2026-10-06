@@ -200,12 +200,13 @@ export function ProjectIncidentsPage(): JSX.Element {
     direction: "desc"
   });
   const [bulkAction, setBulkAction] = useState<"resolved" | "unresolved" | null>(null);
-  const { items: incidents, isLoading, page, hasNextPage, goToNextPage, goToPreviousPage, refreshPage } = useCursorPagination(
+  const { items: incidents, isLoading, page, totalPages, hasNextPage, goToNextPage, goToPreviousPage, refreshPage } = useCursorPagination(
     async (cursor) => {
       const response = await listProjectIncidents(projectId, 20, cursor ?? undefined, statusFilter === "all" ? undefined : statusFilter);
       return {
         items: response.incidents,
-        nextCursor: response.nextCursor
+        nextCursor: response.nextCursor,
+        totalPages: response.totalPages
       };
     },
     [projectId, statusFilter]
@@ -344,6 +345,7 @@ export function ProjectIncidentsPage(): JSX.Element {
                 />
                 <CursorPaginationControls
                   page={page}
+                  totalPages={totalPages}
                   hasNextPage={hasNextPage}
                   isLoading={isLoading}
                   onPreviousPage={goToPreviousPage}
@@ -391,12 +393,13 @@ export function ProjectBundlesPage(): JSX.Element {
     field: "last_seen_at",
     direction: "desc"
   });
-  const { items: incidents, isLoading, page, hasNextPage, goToNextPage, goToPreviousPage, refreshPage } = useCursorPagination(
+  const { items: incidents, isLoading, page, totalPages, hasNextPage, goToNextPage, goToPreviousPage, refreshPage } = useCursorPagination(
     async (cursor) => {
       const response = await listProjectIncidents(projectId, 20, cursor ?? undefined, statusFilter === "all" ? undefined : statusFilter);
       return {
         items: response.incidents,
-        nextCursor: response.nextCursor
+        nextCursor: response.nextCursor,
+        totalPages: response.totalPages
       };
     },
     [projectId, statusFilter]
@@ -509,6 +512,7 @@ export function ProjectBundlesPage(): JSX.Element {
               </Table>
               <CursorPaginationControls
                 page={page}
+                  totalPages={totalPages}
                 hasNextPage={hasNextPage}
                 isLoading={isLoading}
                 onPreviousPage={goToPreviousPage}

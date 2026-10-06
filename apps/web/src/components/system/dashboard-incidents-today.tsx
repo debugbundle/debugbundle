@@ -7,16 +7,21 @@ import type { IncidentRecord } from "../../lib/api.js";
 import { loadDashboardAttentionIncidentPage } from "../../lib/dashboard-incidents-today-data.js";
 import { getLocalDayWindow } from "../../lib/incidents-today.js";
 import { useCursorPagination } from "../../lib/use-cursor-pagination.js";
-import {
-  shouldIgnoreTableRowActivation
-} from "./selectable-table-actions.js";
+import { shouldIgnoreTableRowActivation } from "./selectable-table-actions.js";
 import { CursorPaginationControls } from "./cursor-pagination-controls.js";
 import { BoundedTableTitle } from "./bounded-table-title.js";
 import { TableRefreshButton } from "./table-refresh-button.js";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card.js";
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty.js";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle
+} from "../ui/empty.js";
 import { ProjectColorTagDot } from "./project-color-tag-dot.js";
 import { ResourceListState } from "./resource-list-state.js";
 import { Skeleton } from "../ui/skeleton.js";
@@ -25,7 +30,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 export function DashboardIncidentsToday(): JSX.Element {
   const navigate = useNavigate();
   const todayWindow = getLocalDayWindow();
-  const { items: incidents, isLoading, page, hasNextPage, goToNextPage, goToPreviousPage, refreshPage } = useCursorPagination(
+  const {
+    items: incidents,
+    isLoading,
+    page,
+    totalPages,
+    hasNextPage,
+    goToNextPage,
+    goToPreviousPage,
+    refreshPage
+  } = useCursorPagination(
     async (cursor) => await loadDashboardAttentionIncidentPage(todayWindow, cursor),
     [todayWindow.startsAtIso]
   );
@@ -36,7 +50,9 @@ export function DashboardIncidentsToday(): JSX.Element {
         <div className="flex w-full items-center justify-between gap-3 sm:w-auto">
           <div className="space-y-1.5">
             <CardTitle>Incidents today</CardTitle>
-            <CardDescription>Incidents opened or regressed today across this workspace.</CardDescription>
+            <CardDescription>
+              Incidents opened or regressed today across this workspace.
+            </CardDescription>
           </div>
           <TableRefreshButton
             isLoading={isLoading}
@@ -72,7 +88,9 @@ export function DashboardIncidentsToday(): JSX.Element {
                   <SirenIcon />
                 </EmptyMedia>
                 <EmptyTitle>No incidents today</EmptyTitle>
-                <EmptyDescription>Incidents opened or regressed today will appear here.</EmptyDescription>
+                <EmptyDescription>
+                  Incidents opened or regressed today will appear here.
+                </EmptyDescription>
               </EmptyHeader>
               <EmptyContent>
                 <Button asChild type="button" variant="outline">
@@ -116,6 +134,7 @@ export function DashboardIncidentsToday(): JSX.Element {
 
               <CursorPaginationControls
                 page={page}
+                totalPages={totalPages}
                 hasNextPage={hasNextPage}
                 isLoading={isLoading}
                 onPreviousPage={() => {
@@ -152,7 +171,11 @@ function DashboardIncidentRow(input: {
         </p>
       </TableCell>
       <TableCell className="text-sm text-muted-foreground whitespace-normal break-words align-middle">
-        <Link to={`/projects/${incident.project_id}`} className="inline-flex items-center gap-2 hover:underline" data-row-interactive="true">
+        <Link
+          to={`/projects/${incident.project_id}`}
+          className="inline-flex items-center gap-2 hover:underline"
+          data-row-interactive="true"
+        >
           <ProjectColorTagDot colorTag={incident.project_color_tag} />
           {incident.project_name}
         </Link>
@@ -169,7 +192,9 @@ function DashboardIncidentRow(input: {
       <TableCell>
         <Badge variant={statusVariantMap[incident.status]}>{incident.status}</Badge>
       </TableCell>
-      <TableCell className="whitespace-nowrap">{incident.occurrence_count.toLocaleString()}</TableCell>
+      <TableCell className="whitespace-nowrap">
+        {incident.occurrence_count.toLocaleString()}
+      </TableCell>
       <TableCell className="pr-3 text-right text-sm text-muted-foreground whitespace-nowrap">
         {new Date(incident.last_seen_at).toLocaleString(undefined, {
           dateStyle: "medium",
@@ -180,7 +205,10 @@ function DashboardIncidentRow(input: {
   );
 }
 
-const severityVariantMap: Record<IncidentRecord["severity"], "secondary" | "warning" | "destructive"> = {
+const severityVariantMap: Record<
+  IncidentRecord["severity"],
+  "secondary" | "warning" | "destructive"
+> = {
   low: "secondary",
   medium: "secondary",
   high: "warning",

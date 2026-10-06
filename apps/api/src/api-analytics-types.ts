@@ -140,6 +140,7 @@ export interface ApiAnalyticsDependencies {
           bundle_status?: AnalyticsOpportunityBundleStatus | undefined;
           from?: string | undefined;
           to?: string | undefined;
+          include_total?: boolean | undefined;
           cursor?: { last_detected_at: string; opportunity_id: string } | undefined;
           limit: number;
         }): Promise<AnalyticsOpportunitiesListResponse>;
@@ -153,6 +154,7 @@ export interface ApiAnalyticsDependencies {
           bundle_status?: AnalyticsOpportunityBundleStatus | undefined;
           from?: string | undefined;
           to?: string | undefined;
+          include_total?: boolean | undefined;
           cursor?: { last_detected_at: string; opportunity_id: string } | undefined;
           limit: number;
         }): Promise<AnalyticsOpportunitiesListResponse>;
@@ -186,9 +188,10 @@ export interface ApiAnalyticsDependencies {
           environment?: string | undefined;
           from?: string | undefined;
           to?: string | undefined;
+          include_total?: boolean | undefined;
           cursor?: { created_at: string; generation_id: string } | undefined;
           limit: number;
-        }): Promise<{ bundles: AnalyticsBundleGenerationRecord[]; next_cursor: string | null }>;
+        }): Promise<{ bundles: AnalyticsBundleGenerationRecord[]; next_cursor: string | null; total_pages?: number }>;
         listAnalyticsBundleGenerationsForOrganization(input: {
           organization_id: string;
           status?: AnalyticsBundleGenerationStatus | undefined;
@@ -197,11 +200,13 @@ export interface ApiAnalyticsDependencies {
           environment?: string | undefined;
           from?: string | undefined;
           to?: string | undefined;
+          include_total?: boolean | undefined;
           cursor?: { created_at: string; generation_id: string } | undefined;
           limit: number;
         }): Promise<{
           bundles: AnalyticsBundleGenerationInventoryRecord[];
           next_cursor: string | null;
+          total_pages?: number;
         }>;
         requestAnalyticsBundleGenerationForProject(input: {
           organization_id: string;

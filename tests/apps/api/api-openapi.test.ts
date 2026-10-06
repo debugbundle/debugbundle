@@ -119,6 +119,7 @@ describe("api openapi spec", () => {
       "bundle_status",
       "from",
       "to",
+      "include_total",
       "cursor",
       "limit"
     ]);
@@ -134,6 +135,7 @@ describe("api openapi spec", () => {
       "environment",
       "from",
       "to",
+      "include_total",
       "cursor",
       "limit"
     ]);

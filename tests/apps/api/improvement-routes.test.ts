@@ -99,6 +99,29 @@ function createImprovementRecord(overrides: Partial<Record<string, unknown>> = {
 }
 
 describe("improvement routes", () => {
+  it("includes the total page count on the first improvement page", async () => {
+    const countImprovementsForOrganization = vi.fn().mockResolvedValue(21);
+    const app = createDependencies({
+      improvementManagement: {
+        listImprovementsForOrganization: vi.fn().mockResolvedValue([createImprovementRecord()]),
+        countImprovementsForOrganization,
+        getImprovementForOrganization: vi.fn()
+      }
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/improvements?limit=10",
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().total_pages).toBe(3);
+    expect(countImprovementsForOrganization).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 10 })
+    );
+  });
+
   it("lists improvements for the authenticated organization", async () => {
     const app = createDependencies({
       improvementManagement: {

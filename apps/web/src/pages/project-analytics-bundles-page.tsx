@@ -38,7 +38,11 @@ export function ProjectAnalyticsBundlesPage(): JSX.Element {
         ...(query.environment === undefined ? {} : { environment: query.environment }),
         ...(cursor === null ? {} : { cursor })
       });
-      return { items: response.bundles, nextCursor: response.next_cursor };
+      return {
+        items: response.bundles,
+        nextCursor: response.next_cursor,
+        totalPages: response.total_pages
+      };
     },
     [projectId, queryKey, window]
   );
@@ -100,6 +104,7 @@ export function ProjectAnalyticsBundlesPage(): JSX.Element {
               />
               <CursorPaginationControls
                 page={pagination.page}
+                totalPages={pagination.totalPages}
                 hasNextPage={pagination.hasNextPage}
                 isLoading={pagination.isLoading}
                 onPreviousPage={pagination.goToPreviousPage}

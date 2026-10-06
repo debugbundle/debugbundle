@@ -1,6 +1,11 @@
 import { gzipSync } from "node:zlib";
 
-import { fingerprintVersion, inferMatchedFields, sanitizeEvent } from "../../event-normalizer/src/index.js";
+import {
+  deriveIncidentTitle,
+  fingerprintVersion,
+  inferMatchedFields,
+  sanitizeEvent
+} from "../../event-normalizer/src/index.js";
 import {
   normalizeResourceRoute,
   inferFrontendExceptionSeverity,
@@ -67,7 +72,7 @@ export function createIngestionMetadataService(
         fingerprint: input.fingerprint,
         fingerprint_version: fingerprintVersion(input.normalizedEvent),
         matched_fields: inferMatchedFields(input.normalizedEvent),
-        title: input.normalizedEvent.incident_title ?? input.normalizedEvent.normalized_message,
+        title: deriveIncidentTitle(input.normalizedEvent),
         severity,
         occurred_at: input.event.occurred_at,
         ...(input.event.event_type === "deploy_metadata"

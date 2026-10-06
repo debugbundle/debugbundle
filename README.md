@@ -346,6 +346,37 @@ make ci
 
 `make dev` requires `DEBUGBUNDLE_PROBE_TRIGGER_SECRET` and `ANALYTICS_HASH_SECRET` in `.env`. Start from `.env.example`, then keep local-only overrides in `.env.local` when needed.
 
+### Populated UI preview
+
+After `make install`, run `make dev-mock` and open <http://localhost:5291/dashboard>.
+It restarts only the web container and automatically signs the preview in as
+`demo@example.test`. Synthetic projects, incidents, improvements, 30-day health
+history, alert/capture rules, webhook endpoints and delivery history, project and
+member tokens, members/invitations, billing, provider connections, and GitHub
+deliveries are served locally, so the data works in your ordinary browser.
+SayCheese has analytics enabled with sample funnels, flows, journeys, opportunities
+and generated artifacts. TaskTime includes empty and analytics-disabled states.
+
+Project edits, incident/improvement actions, rule and health-check edits, webhook
+creation/tests, token creation/revocation, invitations/member edits, probe
+activation, weekly reports, repository selection, and analytics settings/flows/
+funnels/bundle generation are simulated in memory. Failed-delivery clearing uses
+the normal browser-only behavior. Billing checkout and portal links stay in the
+local preview; capacity changes only update mock state. Mock credentials are
+deliberately unusable with real installations. No real checks, notifications,
+GitHub dispatches, OAuth interactions, payments or database writes are made.
+Unknown API operations still return an explicit preview error without contacting
+the backend. External provider authorization and private operator tools require
+normal development. After a mock logout, use any valid email and code `123456` to
+return to the demo account; the same code is used for simulated account deletion.
+
+- Run `make dev-mock` again to reset the simulated server data. Browser preferences
+  and cleared-delivery IDs remain in local storage; use **Show cleared** to inspect them.
+- Run `make dev-mock-off` to return the frontend to your real local API.
+- The preview binds to loopback, blocks foreign origins and intercepts unknown API
+  paths rather than forwarding them. It requires development serve mode, is absent
+  from production builds and disables frontend telemetry even if local env enables it.
+
 ## Self-Hosting
 
 The supported self-host bootstrap lives in `deploy/selfhost/`.

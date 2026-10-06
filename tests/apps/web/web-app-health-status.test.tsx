@@ -15,16 +15,18 @@ afterEach(() => {
 });
 
 describe("web app — health status", () => {
-  it("shows project color tags in the health status list", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.setSystemTime(new Date("2026-06-17T12:00:00.000Z"));
+  it.each([false, true])(
+    "shows historical uptime, outage days, and current recovery (multiple checks: %s)",
+    async (multipleChecks) => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      vi.setSystemTime(new Date("2026-06-17T12:00:00.000Z"));
 
-    const project = createProject({
-      color_tag: "emerald",
-      organization_plan: "team"
-    });
+      const project = createProject({
+        color_tag: "emerald",
+        organization_plan: "team"
+      });
 
-    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
         const url = requestUrl(input);
 
         if (url.endsWith("/v1/auth/session")) {
@@ -70,7 +72,24 @@ describe("web app — health status", () => {
                 created_at: "2026-06-10T12:00:00.000Z",
                 updated_at: "2026-06-17T12:00:00.000Z"
               }
-            ],
+            ].flatMap((check) =>
+              multipleChecks
+                ? [
+                    check,
+                    {
+                      ...check,
+                      check_id: "chk_new",
+                      name: "New health",
+                      status: "unknown",
+                      consecutive_successes: 0,
+                      last_checked_at: null,
+                      last_result_status: null,
+                      last_result_http_status: null,
+                      last_result_duration_ms: null
+                    }
+                  ]
+                : [check]
+            ),
             limits: {
               max_checks_per_project: 10,
               max_monitored_projects_per_organization: 10,
@@ -79,6 +98,14 @@ describe("web app — health status", () => {
               recommended_failure_threshold: 2
             }
           });
+        }
+
+        if (
+          url.endsWith(
+            `/v1/projects/${project.project_id}/availability-checks/chk_new/daily-rollups?limit=30`
+          )
+        ) {
+          return jsonResponse(200, { rollups: [] });
         }
 
         if (
@@ -93,14 +120,14 @@ describe("web app — health status", () => {
                 project_id: project.project_id,
                 day: "2026-06-16",
                 state: "degraded",
-                total_checks: 10,
-                successful_checks: 9,
-                failed_checks: 1,
-                degraded_checks: 1,
+                total_checks: 100,
+                successful_checks: 15,
+                failed_checks: 85,
+                degraded_checks: 85,
                 avg_duration_ms: 120,
                 first_checked_at: "2026-06-16T00:00:00.000Z",
                 last_checked_at: "2026-06-16T12:00:00.000Z",
-                downtime_seconds: 60,
+                downtime_seconds: 5100,
                 incident_ids: []
               },
               {
@@ -108,8 +135,8 @@ describe("web app — health status", () => {
                 project_id: project.project_id,
                 day: "2026-06-17",
                 state: "operational",
-                total_checks: 10,
-                successful_checks: 10,
+                total_checks: 100,
+                successful_checks: 100,
                 failed_checks: 0,
                 degraded_checks: 0,
                 avg_duration_ms: 120,
@@ -123,27 +150,45 @@ describe("web app — health status", () => {
         }
 
         return jsonResponse(404, { error: "not_found" });
-    });
-    vi.stubGlobal("fetch", fetchMock);
+      });
+      vi.stubGlobal("fetch", fetchMock);
 
-    render(<App initialEntries={["/health-status"]} />);
+      render(<App initialEntries={["/health-status"]} />);
 
-    expect(
-      await screen.findByRole("heading", { name: /health status/i, level: 1 })
-    ).toBeInTheDocument();
-    expect(await screen.findByText(/main app/i)).toBeInTheDocument();
-    expect((await screen.findAllByText("100%")).length).toBeGreaterThan(0);
-    expect(document.querySelector('[data-project-color-tag="emerald"]')).not.toBeNull();
+      expect(
+        await screen.findByRole("heading", { name: /health status/i, level: 1 })
+      ).toBeInTheDocument();
+      expect(await screen.findByText(/main app/i)).toBeInTheDocument();
+      expect((await screen.findAllByText("57.50%")).length).toBe(multipleChecks ? 3 : 2);
+      expect(screen.getAllByText("30-day uptime")).toHaveLength(multipleChecks ? 4 : 2);
+      expect(screen.getAllByText("Operational")).toHaveLength(multipleChecks ? 2 : 1);
+      expect(
+        screen.getByLabelText(/down, 85 failed of 100 checks, 1h 25m total check downtime/)
+      ).toHaveClass("bg-destructive");
+      expect(document.querySelector('[data-project-color-tag="emerald"]')).not.toBeNull();
 
-    const refreshButton = within(screen.getByRole("banner")).getByRole("button", {
-      name: "Refresh"
-    });
-    const projectListRequests = () =>
-      fetchMock.mock.calls.filter(([input]) => requestUrl(input).endsWith("/v1/projects")).length;
-    const requestsBeforeRefresh = projectListRequests();
-    fireEvent.click(refreshButton);
-    await waitFor(() => expect(projectListRequests()).toBeGreaterThan(requestsBeforeRefresh));
-  });
+      if (multipleChecks) {
+        expect(screen.getByText("No data")).toBeInTheDocument();
+        expect(screen.getByLabelText(/down, 85 failed of 100 checks, 1h 25m downtime/)).toHaveClass(
+          "bg-destructive"
+        );
+        fireEvent.click(screen.getByRole("button", { name: `Collapse ${project.name} checks` }));
+        expect(screen.queryByText("New health")).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: `Expand ${project.name} checks` }));
+        expect(screen.getByText("New health")).toBeInTheDocument();
+        expect(screen.getAllByText("57.50%")).toHaveLength(3);
+      }
+
+      const refreshButton = within(screen.getByRole("banner")).getByRole("button", {
+        name: "Refresh"
+      });
+      const projectListRequests = () =>
+        fetchMock.mock.calls.filter(([input]) => requestUrl(input).endsWith("/v1/projects")).length;
+      const requestsBeforeRefresh = projectListRequests();
+      fireEvent.click(refreshButton);
+      await waitFor(() => expect(projectListRequests()).toBeGreaterThan(requestsBeforeRefresh));
+    }
+  );
 
   it("does not count resolved linked incidents as active", async () => {
     const project = createProject({

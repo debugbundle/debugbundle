@@ -23,6 +23,7 @@ import {
 } from "../components/ui/alert-dialog.js";
 import { Badge } from "../components/ui/badge.js";
 import { Button } from "../components/ui/button.js";
+import { TableActionButton } from "../components/system/table-action-button.js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card.js";
 import { Dialog, DialogTrigger } from "../components/ui/dialog.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "../components/ui/field.js";
@@ -654,16 +655,10 @@ export function ProjectAlertsPage(): JSX.Element {
                       <TableCell className="text-right">
                         {canManageAlertRule(alert, session?.user_id, effectiveRole) ? (
                           <div className="flex items-center justify-end gap-1">
-                            <Button type="button" variant="ghost" size="sm" onClick={() => openEditAlertDialog(alert)}>
-                              <PencilIcon data-icon="inline-start" />
-                              Edit
-                            </Button>
+                            <TableActionButton label="Edit" icon={PencilIcon} onClick={() => openEditAlertDialog(alert)} />
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button type="button" variant="ghost" size="sm">
-                                  <Trash2Icon data-icon="inline-start" />
-                                  Delete
-                                </Button>
+                                <TableActionButton label="Delete" icon={Trash2Icon} />
                               </AlertDialogTrigger>
                               <AlertDialogContent>
                                 <AlertDialogHeader>

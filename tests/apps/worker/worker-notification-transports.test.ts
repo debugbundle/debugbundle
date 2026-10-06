@@ -90,12 +90,13 @@ describe("worker notification transports", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("points direct provider alerts to their inspectable member group", async (): Promise<void> => {
+  it("omits group links from Slack while preserving Discord and webhook group references", async (): Promise<void> => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
     vi.stubGlobal("fetch", fetchMock);
     const transport = createAlertTransport({
       timeoutMs: 100,
       emailTransport: null,
+      appBaseUrl: "https://app.debugbundle.com",
       apiBaseUrl: "https://api.debugbundle.com"
     });
     const event = {
@@ -110,7 +111,12 @@ describe("worker notification transports", () => {
     await transport.deliver({ ...event, channel: "webhook", config: { target_url: "https://alerts.test/webhook" }, signing_secret: "secret", webhook_payload_version: 1 } as never);
     await transport.deliver({ ...event, channel: "webhook", config: { target_url: "https://alerts.test/legacy" }, signing_secret: "legacy-secret", webhook_payload_version: 0 } as never);
 
-    expect(JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string).text).toContain(groupUrl);
+    const slackBody = fetchMock.mock.calls[0]?.[1]?.body as string;
+    const slackMessage = JSON.parse(slackBody);
+    expect(slackBody).not.toContain(groupUrl);
+    expect(slackBody).not.toContain("Inspect alert group");
+    expect(slackMessage.text).toContain(`Open incident: https://app.debugbundle.com/incidents/${event.payload.incident_id}`);
+    expect(slackMessage.text).toContain(`View bundle: https://api.debugbundle.com/v1/incidents/${event.payload.incident_id}/bundle`);
     expect(JSON.parse(fetchMock.mock.calls[1]?.[1]?.body as string).content).toContain(groupUrl);
     const signedRequest = fetchMock.mock.calls[2]?.[1];
     expect(JSON.parse(signedRequest?.body as string)).toMatchObject({
@@ -121,6 +127,35 @@ describe("worker notification transports", () => {
       `sha256=${createHmac("sha256", "secret").update(signedRequest?.body as string).digest("hex")}`
     );
     expect(JSON.parse(fetchMock.mock.calls[3]?.[1]?.body as string)).not.toHaveProperty("alert_group_id");
+  });
+
+  it("includes Slack incident titles and separate metadata rows in the delivered payload", async (): Promise<void> => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createAlertTransport({ timeoutMs: 100, emailTransport: null }).deliver({
+      channel: "slack",
+      config: { webhook_url: "https://hooks.slack.test/alert" },
+      payload: {
+        condition_type: "new_incident",
+        incident_id: "inc_1",
+        project_name: "Checkout",
+        summary: "Checkout <API> failed & retried"
+      }
+    } as never);
+
+    const message = JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string) as {
+      text: string;
+      blocks: Array<{ text?: { text: string }; fields?: Array<{ type: string; text: string }> }>;
+    };
+    expect(message.text.split("\n")[0]).toContain("Checkout &lt;API&gt; failed &amp; retried");
+    expect(message.blocks[0]?.text?.text).toContain("Checkout &lt;API&gt; failed &amp; retried");
+    expect(message.blocks.slice(1).map((block) => block.fields?.map((field) => field.text.split("\n")[0]))).toEqual([
+      ["*Alert*", "*Project*"],
+      ["*Severity*", "*Service*"],
+      ["*Environment*", "*Incident ID*"],
+      ["*Detected at*"]
+    ]);
   });
 
   it("should surface alert transport configuration and delivery failures", async (): Promise<void> => {

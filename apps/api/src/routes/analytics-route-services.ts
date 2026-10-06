@@ -76,6 +76,7 @@ export async function listProjectAnalyticsOpportunities(
     bundle_status?: z.infer<typeof AnalyticsOpportunityBundleStatusSchema> | undefined;
     from?: string | undefined;
     to?: string | undefined;
+    include_total?: boolean | undefined;
     cursor?: { last_detected_at: string; opportunity_id: string } | undefined;
     limit: number;
   }
@@ -108,6 +109,7 @@ export async function listOrganizationAnalyticsOpportunities(
     bundle_status?: z.infer<typeof AnalyticsOpportunityBundleStatusSchema> | undefined;
     from?: string | undefined;
     to?: string | undefined;
+    include_total?: boolean | undefined;
     cursor?: { last_detected_at: string; opportunity_id: string } | undefined;
     limit: number;
   }
@@ -138,6 +140,7 @@ export async function listProjectAnalyticsBundles(
     environment?: string | undefined;
     from?: string | undefined;
     to?: string | undefined;
+    include_total?: boolean | undefined;
     cursor?: { created_at: string; generation_id: string } | undefined;
     limit: number;
   }
@@ -168,6 +171,7 @@ export async function listOrganizationAnalyticsBundles(
     environment?: string | undefined;
     from?: string | undefined;
     to?: string | undefined;
+    include_total?: boolean | undefined;
     cursor?: { created_at: string; generation_id: string } | undefined;
     limit: number;
   }

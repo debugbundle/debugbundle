@@ -10,6 +10,7 @@ import {
 } from "../lib/api.js";
 import {
   deriveHealthStatusImpact,
+  formatDowntime as formatStatusDowntime,
   formatHealthStatusLabel,
   type HealthStatusImpact
 } from "./health-status-page-utils.js";
@@ -187,6 +188,10 @@ export function dailyStateClassName(
 ): string | undefined {
   const impact = deriveHealthStatusImpact(rollup, failureThreshold);
 
+  if (impact === "outage") {
+    // Override the Badge's dark state colors for legacy outage rollups too.
+    return "bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive";
+  }
   if (impact === "elevated") {
     return "bg-warning text-warning-foreground";
   }
@@ -202,6 +207,9 @@ export function formatDailyStateLabel(
 ): string {
   const impact = deriveHealthStatusImpact(rollup, failureThreshold);
 
+  if (impact === "outage") {
+    return "Down";
+  }
   return impact === "minor" || impact === "elevated"
     ? formatDailyImpactLabel(impact)
     : formatHealthStatusLabel(rollup.state);
@@ -258,21 +266,7 @@ export function formatDay(value: string): string {
 }
 
 export function formatDowntime(seconds: number): string {
-  if (seconds <= 0) {
-    return "No recorded downtime";
-  }
-
-  if (seconds < 60) {
-    return `${seconds}s`;
-  }
-
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) {
-    return `${minutes}m`;
-  }
-
-  const hours = Math.round(minutes / 60);
-  return `${hours}h`;
+  return seconds <= 0 ? "No recorded downtime" : formatStatusDowntime(seconds);
 }
 
 export function getAvailabilityErrorMessage(error: unknown): string {

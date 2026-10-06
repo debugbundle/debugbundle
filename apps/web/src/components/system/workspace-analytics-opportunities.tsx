@@ -39,7 +39,11 @@ export function WorkspaceAnalyticsOpportunities({
   const pagination = useCursorPagination(
     async (cursor) => {
       const response = await listAnalyticsOpportunities(buildOpportunityQuery(filters, cursor));
-      return { items: response.opportunities, nextCursor: response.next_cursor };
+      return {
+        items: response.opportunities,
+        nextCursor: response.next_cursor,
+        totalPages: response.total_pages
+      };
     },
     [filters]
   );
@@ -129,6 +133,7 @@ export function WorkspaceAnalyticsOpportunities({
                 <AnalyticsOpportunitiesTable opportunities={opportunities} />
                 <CursorPaginationControls
                   page={pagination.page}
+                  totalPages={pagination.totalPages}
                   hasNextPage={pagination.hasNextPage}
                   isLoading={pagination.isLoading}
                   onPreviousPage={pagination.goToPreviousPage}

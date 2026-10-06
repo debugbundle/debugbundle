@@ -238,6 +238,9 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
     }
 
     const incidents = await dependencies.incidentRetrieval.listIncidentsForOrganization(incidentsRequest);
+    const totalCount = parsedCursor === null
+      ? await dependencies.incidentRetrieval.countIncidentsForOrganization?.(incidentsRequest)
+      : undefined;
 
     const nextCursorRecord = incidents.length >= parsedQuery.data.limit ? incidents.at(-1) : undefined;
     const nextCursor =
@@ -245,7 +248,8 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
 
     return sendSafeIncidentResponse(reply, {
       incidents,
-      next_cursor: nextCursor
+      next_cursor: nextCursor,
+      ...(totalCount === undefined ? {} : { total_pages: Math.max(1, Math.ceil(totalCount / parsedQuery.data.limit)) })
     });
   });
 

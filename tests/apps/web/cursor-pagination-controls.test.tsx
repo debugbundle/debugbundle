@@ -10,6 +10,7 @@ describe("CursorPaginationControls", () => {
     render(
       <CursorPaginationControls
         page={2}
+        totalPages={5}
         hasNextPage
         isLoading={false}
         onPreviousPage={vi.fn()}
@@ -17,19 +18,22 @@ describe("CursorPaginationControls", () => {
       />
     );
 
-    const pageLabel = screen.getByText("Page 2");
+    const pageLabel = screen.getByText("Page 2 of 5");
     const container = pageLabel.parentElement;
     const pagination = screen.getByRole("navigation", { name: "Pagination" });
 
     expect(container).not.toBeNull();
     expect(container).toHaveClass("flex-wrap", "items-center");
     expect(pagination).toHaveClass("ml-auto", "shrink-0", "justify-end");
+    expect(screen.getByRole("button", { name: "Go to previous page" })).toHaveAttribute("data-slot", "button");
+    expect(screen.getByRole("button", { name: "Go to next page" })).toHaveAttribute("data-slot", "button");
   });
 
   it("renders nothing when the first page has no next page", () => {
     const { container } = render(
       <CursorPaginationControls
         page={1}
+        totalPages={1}
         hasNextPage={false}
         isLoading={false}
         onPreviousPage={vi.fn()}

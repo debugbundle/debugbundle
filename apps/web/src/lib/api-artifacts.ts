@@ -157,21 +157,162 @@ function isArtifactPendingOrFailedResponse(
   return status === "pending" || status === "failed";
 }
 
+export async function listIncidents(
+  inputOrLimit:
+    | number
+    | {
+        limit?: number;
+        cursor?: string;
+        projectId?: string;
+        environment?: string;
+        service?: string;
+        status?: IncidentStatusFilter;
+        severity?: IncidentRecord["severity"];
+        firstSeenAfter?: string;
+        attentionAfter?: string;
+      } = 20,
+  cursor?: string
+): Promise<{
+  incidents: IncidentRecord[];
+  nextCursor: string | null;
+  totalPages?: number | undefined;
+}> {
+  const input =
+    typeof inputOrLimit === "number"
+      ? {
+          limit: inputOrLimit,
+          ...(cursor === undefined ? {} : { cursor })
+        }
+      : inputOrLimit;
+
+  const searchParams = new URLSearchParams({
+    limit: String(input.limit ?? 20)
+  });
+
+  if (input.cursor !== undefined) {
+    searchParams.set("cursor", input.cursor);
+  }
+  if (input.projectId !== undefined) {
+    searchParams.set("project_id", input.projectId);
+  }
+  if (input.environment !== undefined) {
+    searchParams.set("environment", input.environment);
+  }
+  if (input.service !== undefined) {
+    searchParams.set("service", input.service);
+  }
+  if (input.status !== undefined) {
+    searchParams.set("status", input.status);
+  }
+  if (input.severity !== undefined) {
+    searchParams.set("severity", input.severity);
+  }
+  if (input.firstSeenAfter !== undefined) {
+    searchParams.set("first_seen_after", input.firstSeenAfter);
+  }
+  if (input.attentionAfter !== undefined) {
+    searchParams.set("attention_after", input.attentionAfter);
+  }
+
+  const body = await readJson<{
+    incidents: IncidentRecord[];
+    next_cursor: string | null;
+    total_pages?: number;
+  }>(
+    await fetch(`${API_BASE}/v1/incidents?${searchParams.toString()}`, {
+      credentials: "include"
+    })
+  );
+
+  return {
+    incidents: body.incidents.map(normalizeIncidentRecord),
+    nextCursor: body.next_cursor,
+    ...(body.total_pages === undefined ? {} : { totalPages: body.total_pages })
+  };
+}
+
+export async function listImprovements(
+  input: {
+    limit?: number;
+    cursor?: string;
+    projectId?: string;
+    environment?: string;
+    service?: string;
+    status?: ImprovementRecord["status"];
+    severity?: ImprovementRecord["severity"];
+    kind?: ImprovementRecord["kind"];
+  } = {}
+): Promise<{
+  improvements: ImprovementRecord[];
+  nextCursor: string | null;
+  totalPages?: number | undefined;
+}> {
+  const searchParams = new URLSearchParams({
+    limit: String(input.limit ?? 20)
+  });
+
+  if (input.cursor !== undefined) {
+    searchParams.set("cursor", input.cursor);
+  }
+  if (input.projectId !== undefined) {
+    searchParams.set("project_id", input.projectId);
+  }
+  if (input.environment !== undefined) {
+    searchParams.set("environment", input.environment);
+  }
+  if (input.service !== undefined) {
+    searchParams.set("service", input.service);
+  }
+  if (input.status !== undefined) {
+    searchParams.set("status", input.status);
+  }
+  if (input.severity !== undefined) {
+    searchParams.set("severity", input.severity);
+  }
+  if (input.kind !== undefined) {
+    searchParams.set("kind", input.kind);
+  }
+
+  const body = await readJson<{
+    improvements: ImprovementRecord[];
+    next_cursor: string | null;
+    total_pages?: number;
+  }>(
+    await fetch(`${API_BASE}/v1/improvements?${searchParams.toString()}`, {
+      credentials: "include"
+    })
+  );
+
+  return {
+    improvements: body.improvements.map(normalizeImprovementRecord),
+    nextCursor: body.next_cursor,
+    ...(body.total_pages === undefined ? {} : { totalPages: body.total_pages })
+  };
+}
+
 export async function listProjectIncidents(
   projectId: string,
   limit = 50,
   cursor?: string,
   status?: IncidentStatusFilter
-): Promise<{ incidents: IncidentRecord[]; nextCursor: string | null }> {
+): Promise<{
+  incidents: IncidentRecord[];
+  nextCursor: string | null;
+  totalPages?: number | undefined;
+}> {
   const searchParams = new URLSearchParams({ project_id: projectId, limit: String(limit) });
   if (cursor !== undefined) searchParams.set("cursor", cursor);
   if (status !== undefined) searchParams.set("status", status);
-  const body = await readJson<{ incidents: IncidentRecord[]; next_cursor: string | null }>(
+  const body = await readJson<{
+    incidents: IncidentRecord[];
+    next_cursor: string | null;
+    total_pages?: number;
+  }>(
     await fetch(`${API_BASE}/v1/incidents?${searchParams.toString()}`, {
       credentials: "include"
     })
   );
-  return { incidents: body.incidents, nextCursor: body.next_cursor };
+  return { incidents: body.incidents, nextCursor: body.next_cursor, ...(body.total_pages === undefined ? {} : { totalPages: body.total_pages }) };
 }
 
 export async function listProjectImprovements(
@@ -179,17 +320,26 @@ export async function listProjectImprovements(
   limit = 50,
   cursor?: string,
   status?: ImprovementRecord["status"]
-): Promise<{ improvements: ImprovementRecord[]; nextCursor: string | null }> {
+): Promise<{
+  improvements: ImprovementRecord[];
+  nextCursor: string | null;
+  totalPages?: number | undefined;
+}> {
   const searchParams = new URLSearchParams({ project_id: projectId, limit: String(limit) });
   if (cursor !== undefined) searchParams.set("cursor", cursor);
   if (status !== undefined) searchParams.set("status", status);
-  const body = await readJson<{ improvements: ImprovementRecord[]; next_cursor: string | null }>(
+  const body = await readJson<{
+    improvements: ImprovementRecord[];
+    next_cursor: string | null;
+    total_pages?: number;
+  }>(
     await fetch(`${API_BASE}/v1/improvements?${searchParams.toString()}`, {
       credentials: "include"
     })
   );
   return {
     improvements: body.improvements.map(normalizeImprovementRecord),
-    nextCursor: body.next_cursor
+    nextCursor: body.next_cursor,
+    ...(body.total_pages === undefined ? {} : { totalPages: body.total_pages })
   };
 }

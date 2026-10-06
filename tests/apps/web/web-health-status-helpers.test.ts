@@ -4,6 +4,7 @@ import {
   buildHealthStatusDayRange,
   buildHealthStatusProjects,
   deriveHealthStatusImpact,
+  formatDowntime,
   formatHealthDayStatusLabel,
   formatStatusDayLabel,
   formatStatusUptime
@@ -241,7 +242,7 @@ describe("health status helpers", () => {
     expect(summaries[0]?.uptime_percentage).toBe(90);
   });
 
-  it("uses the latest retained day for health-status uptime percentages", () => {
+  it("uses all measured days in the displayed window for historical uptime", () => {
     const project = buildProject();
     const check = buildCheck();
     const summaries = buildHealthStatusProjects(
@@ -275,8 +276,48 @@ describe("health status helpers", () => {
       ["2026-06-14", "2026-06-15"]
     );
 
-    expect(summaries[0]?.uptime_percentage).toBe(100);
-    expect(summaries[0]?.checks[0]?.uptime_percentage).toBe(100);
+    expect(summaries[0]?.uptime_percentage).toBeCloseTo(99.96);
+    expect(summaries[0]?.checks[0]?.uptime_percentage).toBeCloseTo(99.96);
+    expect(summaries[0]?.current_state).toBe("operational");
+  });
+
+  it("weights verified check counts and excludes unknown days and out-of-window history", () => {
+    const summaries = buildHealthStatusProjects(
+      [
+        {
+          project: buildProject(),
+          checks: [
+            buildCheck(),
+            buildCheck({ check_id: "chk_2" }),
+            buildCheck({ check_id: "chk_3" })
+          ],
+          rollupsByCheckId: new Map([
+            [
+              "chk_1",
+              [
+                buildRollup({ day: "2026-06-13", total_checks: 10_000, successful_checks: 10_000 }),
+                buildRollup({
+                  day: "2026-06-14",
+                  total_checks: 100,
+                  successful_checks: 50,
+                  failed_checks: 50
+                })
+              ]
+            ],
+            ["chk_2", [buildRollup({ day: "2026-06-15", total_checks: 1, successful_checks: 1 })]]
+          ])
+        }
+      ],
+      ["2026-06-14", "2026-06-15", "2026-06-16"]
+    );
+
+    expect(summaries[0]?.uptime_percentage).toBeCloseTo((51 / 101) * 100);
+    expect(summaries[0]?.checks.map((summary) => summary.uptime_percentage)).toEqual([
+      50,
+      100,
+      null
+    ]);
+    expect(summaries[0]?.days[2]).toMatchObject({ state: "unknown", total_checks: 0 });
   });
 
   it("uses worst project state and counts active linked availability incidents", () => {
@@ -365,5 +406,67 @@ describe("health status helpers", () => {
     expect(formatHealthDayStatusLabel({ ...elevatedDay, impact: "elevated" })).toBe("Unstable");
     expect(deriveHealthStatusImpact(outageDay, 3)).toBe("outage");
     expect(formatHealthDayStatusLabel({ ...outageDay, impact: "outage" })).toBe("Down");
+  });
+
+  it.each([
+    [3599, "elevated"],
+    [3600, "outage"],
+    [5100, "outage"]
+  ] as const)(
+    "shows historical downtime of %s seconds with impact %s without an incident reference",
+    (downtime_seconds, expected) => {
+      const day = buildRollup({
+        state: "degraded",
+        total_checks: 1440,
+        successful_checks: 1380,
+        failed_checks: 60,
+        downtime_seconds,
+        incident_ids: []
+      });
+      expect(deriveHealthStatusImpact(day, 3)).toBe(expected);
+    }
+  );
+
+  it("does not combine different checks' brief interruptions into a one-hour outage", () => {
+    const checks = [buildCheck(), buildCheck({ check_id: "chk_2" })];
+    const [summary] = buildHealthStatusProjects(
+      [
+        {
+          project: buildProject(),
+          checks,
+          rollupsByCheckId: new Map(
+            checks.map((check) => [
+              check.check_id,
+              [
+                buildRollup({
+                  check_id: check.check_id,
+                  state: "degraded",
+                  total_checks: 60,
+                  successful_checks: 30,
+                  failed_checks: 30,
+                  downtime_seconds: 1800
+                })
+              ]
+            ])
+          )
+        }
+      ],
+      ["2026-06-15"]
+    );
+    expect(summary?.days[0]).toMatchObject({ impact: "elevated", downtime_seconds: 3600 });
+    expect(formatStatusDayLabel(summary!.days[0]!, "project")).toContain("1h total check downtime");
+  });
+
+  it.each([
+    [0, "no recorded"],
+    [59, "59s"],
+    [60, "1m"],
+    [89, "1m 29s"],
+    [3600, "1h"],
+    [5100, "1h 25m"],
+    [24840, "6h 54m"],
+    [3661, "1h 1m 1s"]
+  ])("formats %s seconds of downtime precisely", (seconds, expected) => {
+    expect(formatDowntime(seconds)).toBe(expected);
   });
 });

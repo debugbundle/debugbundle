@@ -442,7 +442,7 @@ export function createPostgresAvailabilityCheckStore(db: Queryable): Availabilit
             d.project_id::text AS project_id,
             d.day::text AS day,
             CASE
-              WHEN cardinality(COALESCE(d.incident_ids, ARRAY[]::uuid[])) > 0 THEN 'down'
+              WHEN d.state = 'down' OR cardinality(COALESCE(d.incident_ids, ARRAY[]::uuid[])) > 0 THEN 'down'
               WHEN d.state = 'paused' THEN 'paused'
               WHEN d.failed_checks > 0 OR d.degraded_checks > 0 OR d.state = 'degraded' THEN 'degraded'
               ELSE d.state
@@ -733,7 +733,15 @@ export function createPostgresAvailabilityCheckStore(db: Queryable): Availabilit
 
         if (!unverified) {
           const day = availabilityCheckDayBucket(input.completed_at);
-          const rollupState = deriveAvailabilityCheckDailyState(input.result);
+          const outcomeState = deriveAvailabilityCheckDailyState(input.result);
+          // Confirmed failures affect each UTC day, including continuations of an existing incident.
+          const rollupState = failed && nextStatus === "failing" ? "down" : outcomeState;
+          const continuingIncidentId =
+            failed &&
+            nextStatus === "failing" &&
+            (linkedIncidentStatus === "open" || linkedIncidentStatus === "regressed")
+              ? claimedCheck.linked_incident_id
+              : null;
           await tx.query(
             `
             INSERT INTO availability_check_daily_rollups (
@@ -768,14 +776,15 @@ export function createPostgresAvailabilityCheckStore(db: Queryable): Availabilit
               $10::timestamptz,
               $11::timestamptz,
               $12,
-              ARRAY[]::uuid[],
+              CASE WHEN $13::uuid IS NULL THEN ARRAY[]::uuid[] ELSE ARRAY[$13::uuid] END,
               now(),
               now()
             )
             ON CONFLICT (check_id, day)
             DO UPDATE SET
               state = CASE
-                WHEN cardinality(COALESCE(availability_check_daily_rollups.incident_ids, ARRAY[]::uuid[])) > 0 THEN 'down'
+                WHEN EXCLUDED.state = 'down' OR availability_check_daily_rollups.state = 'down'
+                  OR cardinality(COALESCE(availability_check_daily_rollups.incident_ids, ARRAY[]::uuid[])) > 0 THEN 'down'
                 WHEN EXCLUDED.state = 'degraded' OR availability_check_daily_rollups.failed_checks > 0 OR availability_check_daily_rollups.degraded_checks > 0 THEN 'degraded'
                 WHEN EXCLUDED.state = 'paused' OR availability_check_daily_rollups.state = 'paused' THEN 'paused'
                 ELSE 'operational'
@@ -793,6 +802,10 @@ export function createPostgresAvailabilityCheckStore(db: Queryable): Availabilit
               first_checked_at = LEAST(availability_check_daily_rollups.first_checked_at, EXCLUDED.first_checked_at),
               last_checked_at = GREATEST(availability_check_daily_rollups.last_checked_at, EXCLUDED.last_checked_at),
               downtime_seconds = availability_check_daily_rollups.downtime_seconds + EXCLUDED.downtime_seconds,
+              incident_ids = ARRAY(
+                SELECT DISTINCT incident_id
+                FROM unnest(COALESCE(availability_check_daily_rollups.incident_ids, ARRAY[]::uuid[]) || EXCLUDED.incident_ids) AS incident_id
+              ),
               updated_at = now()
           `,
             [
@@ -803,11 +816,12 @@ export function createPostgresAvailabilityCheckStore(db: Queryable): Availabilit
               rollupState,
               input.result.status === "success" ? 1 : 0,
               input.result.status === "success" ? 0 : 1,
-              rollupState === "degraded" ? 1 : 0,
+              outcomeState === "degraded" ? 1 : 0,
               input.result.duration_ms,
               input.started_at,
               input.completed_at,
-              input.result.status === "success" ? 0 : claimedCheck.interval_seconds
+              input.result.status === "success" ? 0 : claimedCheck.interval_seconds,
+              continuingIncidentId
             ]
           );
         }

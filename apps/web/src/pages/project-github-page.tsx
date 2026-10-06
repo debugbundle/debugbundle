@@ -1,4 +1,4 @@
-import { PencilIcon, PlusIcon } from "lucide-react";
+import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { CalloutCard } from "../components/system/callout-card.js";
@@ -60,6 +60,18 @@ interface GitHubSettingsState {
 type GitHubRuleEventType = "bundle.created" | "bundle.reopened" | "improvement_bundle.created";
 
 const DEFAULT_GITHUB_RULE_EVENT_TYPE: GitHubRuleEventType = "bundle.created";
+const MAX_CLEARED_DELIVERY_IDS = 100;
+
+function readClearedDeliveryIds(storageKey: string): string[] {
+  try {
+    const value: unknown = JSON.parse(window.localStorage.getItem(storageKey) ?? "[]");
+    return Array.isArray(value)
+      ? value.filter((id): id is string => typeof id === "string").slice(-MAX_CLEARED_DELIVERY_IDS)
+      : [];
+  } catch {
+    return [];
+  }
+}
 
 async function loadOptionalGitHubInstallUrl(projectId: string): Promise<{ installUrl: string | null; installUrlLoadFailed: boolean }> {
   try {
@@ -88,6 +100,8 @@ export function ProjectGitHubPage(): JSX.Element {
   const showGitHubSettingsLoading = useDelayedVisibility(githubSettings === null && githubErrorMessage === null);
   const [githubSettingsReloadKey, setGitHubSettingsReloadKey] = useState(0);
   const [retryingDeliveryId, setRetryingDeliveryId] = useState<string | null>(null);
+  const [clearedDeliveryState, setClearedDeliveryState] = useState<{ key: string | null; ids: string[] }>({ key: null, ids: [] });
+  const [showClearedDeliveries, setShowClearedDeliveries] = useState(false);
   const [selectedRepositoryFullName, setSelectedRepositoryFullName] = useState("");
   const [isConnectingRepository, setIsConnectingRepository] = useState(false);
   const [isRemovingRepository, setIsRemovingRepository] = useState(false);
@@ -107,6 +121,48 @@ export function ProjectGitHubPage(): JSX.Element {
   const canManageConnections = effectiveRole === "owner" || effectiveRole === "admin";
   const githubAutomationEnabled = project.organization_plan !== "free";
   const canManageGitHubAutomation = canManageConnections && githubAutomationEnabled;
+  const clearedDeliveryStorageKey = session?.user_id === undefined
+    ? null
+    : `debugbundle:github-cleared-deliveries:${session.user_id}:${project.project_id}`;
+  const clearedDeliveryIds = clearedDeliveryState.key === clearedDeliveryStorageKey ? clearedDeliveryState.ids : [];
+  const clearedDeliveryIdSet = new Set(clearedDeliveryIds);
+  const failedDeliveriesToClear = githubSettings?.deliveries.filter(
+    (delivery) => delivery.status === "failed" && !clearedDeliveryIdSet.has(delivery.delivery_id)
+  ) ?? [];
+  const clearedDeliveriesOnPage = githubSettings?.deliveries.filter(
+    (delivery) => delivery.status === "failed" && clearedDeliveryIdSet.has(delivery.delivery_id)
+  ) ?? [];
+  const visibleDeliveries = githubSettings?.deliveries.filter(
+    (delivery) => delivery.status !== "failed" || showClearedDeliveries || !clearedDeliveryIdSet.has(delivery.delivery_id)
+  ) ?? [];
+
+  useEffect(() => {
+    setShowClearedDeliveries(false);
+    setClearedDeliveryState({
+      key: clearedDeliveryStorageKey,
+      ids: clearedDeliveryStorageKey === null ? [] : readClearedDeliveryIds(clearedDeliveryStorageKey)
+    });
+  }, [clearedDeliveryStorageKey]);
+
+  function saveClearedDeliveryIds(nextIds: string[]): boolean {
+    if (clearedDeliveryStorageKey === null) return false;
+    try {
+      window.localStorage.setItem(clearedDeliveryStorageKey, JSON.stringify(nextIds));
+      setClearedDeliveryState({ key: clearedDeliveryStorageKey, ids: nextIds });
+      return true;
+    } catch {
+      showErrorToast("Could not save cleared deliveries in this browser.");
+      return false;
+    }
+  }
+
+  function handleClearFailedDeliveries(): void {
+    if (clearedDeliveryStorageKey === null || failedDeliveriesToClear.length === 0) return;
+    const currentIds = readClearedDeliveryIds(clearedDeliveryStorageKey);
+    const nextIds = [...new Set([...currentIds, ...failedDeliveriesToClear.map((delivery) => delivery.delivery_id)])]
+      .slice(-MAX_CLEARED_DELIVERY_IDS);
+    if (saveClearedDeliveryIds(nextIds)) setShowClearedDeliveries(false);
+  }
 
   useEffect(() => {
     if (!isCreateRuleOpen) {
@@ -213,6 +269,9 @@ export function ProjectGitHubPage(): JSX.Element {
           deliveries: current.deliveries.map((entry) => (entry.delivery_id === deliveryId ? delivery : entry))
         };
       });
+      if (clearedDeliveryStorageKey !== null) {
+        saveClearedDeliveryIds(readClearedDeliveryIds(clearedDeliveryStorageKey).filter((id) => id !== deliveryId));
+      }
       showSuccessToast("GitHub delivery retried successfully.");
     } catch {
       showErrorToast("Could not retry GitHub delivery.");
@@ -557,9 +616,9 @@ export function ProjectGitHubPage(): JSX.Element {
                   <div className="mt-3 space-y-3">
                     {githubSettings.rules.map((rule) => (
                       <div key={rule.rule_id} className="rounded-md border border-border/80 bg-background px-3 py-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="text-sm font-medium text-foreground">{rule.name}</p>
-                          <div className="flex items-center gap-2">
+                        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <p className="min-w-0 text-sm font-medium text-foreground [overflow-wrap:anywhere]">{rule.name}</p>
+                          <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
                             <Badge variant={rule.enabled ? "success" : "secondary"}>{rule.enabled ? "enabled" : "disabled"}</Badge>
                             {canManageGitHubAutomation && canManageGitHubRule(rule, session?.user_id, effectiveRole) ? (
                               <Button
@@ -582,6 +641,7 @@ export function ProjectGitHubPage(): JSX.Element {
                                 aria-label={`Delete rule ${rule.name}`}
                                 onClick={() => void handleDeleteRule(rule.rule_id)}
                               >
+                                <Trash2Icon data-icon="inline-start" />
                                 {activeRuleDeleteId === rule.rule_id ? "Deleting..." : "Delete rule"}
                               </Button>
                             ) : null}
@@ -595,14 +655,39 @@ export function ProjectGitHubPage(): JSX.Element {
               </div>
 
               <div className="rounded-lg border border-border/80 bg-background/60 p-4">
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-medium text-foreground">Recent deliveries</p>
                     <p className="mt-1 text-sm text-muted-foreground">Latest GitHub dispatch attempts for this project.</p>
                   </div>
+                  {githubSettings.deliveries.some((delivery) => delivery.status === "failed") ? (
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={clearedDeliveryStorageKey === null || failedDeliveriesToClear.length === 0}
+                        onClick={handleClearFailedDeliveries}
+                      >
+                        Clear failed
+                      </Button>
+                      {clearedDeliveriesOnPage.length > 0 ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowClearedDeliveries((current) => !current)}
+                        >
+                          {showClearedDeliveries ? "Hide cleared" : `Show cleared (${clearedDeliveriesOnPage.length})`}
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
                 {githubSettings.deliveries.length === 0 ? (
                   <p className="mt-3 text-sm text-muted-foreground">No GitHub delivery attempts yet.</p>
+                ) : visibleDeliveries.length === 0 ? (
+                  <p className="mt-3 text-sm text-muted-foreground">All recent failed deliveries are cleared from this view.</p>
                 ) : (
                   <div className="mt-3 overflow-x-auto">
                     <Table>
@@ -616,10 +701,10 @@ export function ProjectGitHubPage(): JSX.Element {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {githubSettings.deliveries.map((delivery) => (
+                        {visibleDeliveries.map((delivery) => (
                           <TableRow key={delivery.delivery_id}>
                             <TableCell className="font-medium">{delivery.rule_name}</TableCell>
-                            <TableCell className="max-w-80 whitespace-normal">
+                            <TableCell className="min-w-48 max-w-80 whitespace-normal">
                               <BoundedTableTitle title={delivery.target_title} />
                             </TableCell>
                             <TableCell>

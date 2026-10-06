@@ -4,6 +4,7 @@ export type { FingerprintVersion } from "./fingerprints.js";
 export { sanitizeEvent } from "./event-privacy.js";
 export { protectAnalyticsEvent } from "./analytics-privacy.js";
 export { parseStoredEvent } from "./stored-event.js";
+export { deriveIncidentTitle } from "./incident-title.js";
 
 import { redact, type JsonValue } from "../../redaction/src/index.js";
 import {

@@ -234,12 +234,13 @@ services:
       - node-corepack-cache:/root/.cache/node/corepack
     working_dir: /workspace/apps/web
     ports:
-      - "${WEB_PORT:-5291}:5291"
+      - "${WEB_BIND_HOST:-0.0.0.0}:${WEB_PORT:-5291}:5291"
     environment:
       <<: *node-pnpm-env
       VITE_DEV_API_PROXY_TARGET: http://api:3000
       VITE_API_URL: ${VITE_API_URL:-http://localhost:3003}
       VITE_OPENAI_PLUGIN_PREVIEW: ${VITE_OPENAI_PLUGIN_PREVIEW:-false}
+      DEBUGBUNDLE_DEV_MOCK: ${DEBUGBUNDLE_DEV_MOCK:-false}
       VITE_DEBUGBUNDLE_DOGFOOD_ENABLED: ${VITE_DEBUGBUNDLE_DOGFOOD_ENABLED:-}
       VITE_DEBUGBUNDLE_DOGFOOD_PROJECT_TOKEN: ${VITE_DEBUGBUNDLE_DOGFOOD_PROJECT_TOKEN:-}
       VITE_DEBUGBUNDLE_DOGFOOD_ENDPOINT: ${VITE_DEBUGBUNDLE_DOGFOOD_ENDPOINT:-}

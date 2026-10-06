@@ -6,6 +6,22 @@ import {
 } from "../../helpers/api-retrieval.js";
 
 describe("api-retrieval incidents", () => {
+  it("includes the total page count on the first incident page", async () => {
+    const countIncidentsForOrganization = vi.fn().mockResolvedValue(21);
+    const app = createServer({ countIncidentsForOrganization });
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/incidents?limit=10",
+      headers: { authorization: "Bearer dbundle_mem_test" }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().total_pages).toBe(3);
+    expect(countIncidentsForOrganization).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 10 })
+    );
+  });
+
   it("should reject incidents listing when member authorization header is missing", async (): Promise<void> => {
     const app = createServer();
 

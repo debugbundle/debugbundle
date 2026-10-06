@@ -146,7 +146,11 @@ Execution eligibility under FR-AVC-04 must exclude checks beyond the per-project
 
 Only verified endpoint outcomes contribute to customer daily rollups and uptime denominators. A day containing only monitor-internal errors has no measured uptime and must not be presented as customer downtime.
 
+Daily history must preserve a threshold-confirmed outage on every affected UTC day, including a continuing outage after midnight. Recording that continuation must not open another incident or emit another failure transition. Recovery must preserve the day's worst confirmed state and incident references without carrying those references into a later healthy day.
+
 **FR-AVC-06:** The authenticated web app must provide a workspace Health Status page that summarizes retained availability-check status across projects the signed-in member can access. The page must group checks by project, show one compact daily status block for each retained day, expose per-check detail through progressive disclosure, and reuse the existing project Health tab for check management.
+
+The workspace, project, and check history percentages must be labeled `30-day uptime` and use successful verified checks divided by all verified checks in the displayed 30-day window. Aggregate percentages must weight by check counts, exclude unknown/unmonitored periods, and never use only the latest day or an average of per-check percentages. Current status remains separate from historical impact; explicitly daily dashboard summaries remain daily. Confirmed outage days must be red after recovery. For legacy history missing incident references, a check day with at least one hour of recorded downtime must also show outage impact; shorter unconfirmed interruptions remain amber. Duration labels must retain hours, minutes, and seconds without rounding away downtime. Project tooltips must identify summed durations across checks as total check downtime rather than elapsed project outage duration.
 
 ### 1.2 Ingestion API
 
@@ -207,6 +211,8 @@ Only verified endpoint outcomes contribute to customer daily rollups and uptime 
 **FR-GRP-11:** Concrete opaque browser resource failures group across page routes by exact host/path/element type within the existing project/service/environment boundary. Human titles identify the provider or asset. Sanitized route counts survive raw sampling and remain bounded in bundle output. V3 is resource-only; historical groups, unrelated hashes and installed v1/v2 fingerprint rules remain compatible. Resource classification never proves the cause or automatically downgrades a dependency. See `spec/browser-resource-incidents.md`.
 
 **FR-GRP-12:** An opaque browser `resource_error` for a `link` target with `rel` equal to `preload`, `modulepreload`, or `prefetch` infers `low` severity only when the captured page was `hidden`, `prerender`, or `unloaded` and its ready state was `loading` or `interactive`. Missing lifecycle evidence, visible pages, completed pages, and non-speculative resources retain the normal opaque-resource severity. This evidence is consistent with an interrupted speculative load and must not be presented as proof of root cause.
+
+**FR-GRP-13:** Incident display titles must be concise and bounded. Recognizable Java and JavaScript stack frames embedded in an otherwise useful message must not be promoted into the title; a stack-only or machine-generated message uses a human event-type fallback. Explicit resource titles retain their meaning. Title selection must be shared by hosted and local processing, leave the normalized message and fingerprint unchanged, and preserve full diagnostic evidence in event and bundle context. Incident detail headings display at most two lines while retaining the complete stored title for assistive technology and hover access.
 
 ### 1.5 Bundle System
 
@@ -284,7 +290,7 @@ Project list/detail metrics must include `attention_incidents_today`, counting i
 
 ### 1.8 Alert System
 
-**FR-ALT-01:** Alert channels: email, Slack, Discord, webhook.
+**FR-ALT-01:** Alert channels: email, Slack, Discord, webhook. Slack incident alerts include the available incident title in both the message fallback text and visible message body. Slack includes incident and bundle links when their base URLs are configured and omits the alert-group inspection link from both representations. Visible metadata uses bold labels above values, with each pair of fields in a separate two-column section for native row spacing; an unavailable project name is omitted without leaving empty fields or sections.
 
 **FR-ALT-02:** Alert conditions: new incident, incident regressed, error spike (FR-GRP-03), severity threshold, regression after deploy (FR-GRP-04).
 
@@ -409,6 +415,12 @@ See `/spec/billing.md` and `/spec/system-emails.md` for the detailed source-of-t
 **FR-WEB-07:** Project navigation and detail surfaces must expose sharing state clearly for both sides of collaboration. Shared-with-you projects and owner-owned projects that have active collaborators must both render a shared indicator, backed by project payload metadata that distinguishes `private`, `shared_by_you`, and `shared_with_you`.
 
 **FR-WEB-08:** In project settings and collaboration surfaces, role-based visibility must match server authorization: plain members do not see the members-management tab, receive only the resolved capture-policy preview, and do not see destructive settings sections; owner/admin callers receive the corresponding management affordances allowed by their role.
+
+**FR-WEB-09:** Web list pagination displays the current page and exact filtered total page count. Text actions use the shared Button primitive with centered icons and labels; table Edit/Delete and capture-rule Pause/Enable actions use accessible icon buttons with tooltips. Paired Slack weekly report Edit/Delete actions use the same ghost variant. Enabled switches in their off state are distinguishable from disabled controls and contrast against surrounding surfaces in both themes. The analytics-disabled settings action sits at the right of its callout title row and wraps at narrow widths.
+
+**FR-WEB-10:** An explicitly opted-in local UI preview must populate the ordinary dashboard and related review surfaces with synthetic data. Simulated edits are held in memory, never forwarded to real services, and reset on preview restart. The preview is development-only, loopback-only, excluded from production builds, and disables frontend telemetry.
+
+The preview includes all primary dashboard and project pages, including webhooks/deliveries, tokens, members/invitations, billing/capacity, probes, weekly reports, and analytics flows/funnels/journeys/artifacts. Mock credentials cannot authenticate with a real installation; mock checkout and provider setup links stay local. Webhook read failures leave a retryable error state, retain independently available endpoint/history data, and ignore results from an unmounted or previous project view.
 
 ### 1.12 Auth & Identity
 
@@ -803,7 +815,7 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **FR-GHA-14:** When a user connects a repo for the first time, offer a default automation rule preset: `event_types: [bundle.created, bundle.reopened]`, `severity_min: high`, `incident_status: new_or_reopened`, `cooldown_seconds: 300`.
 
-**FR-GHA-15:** Provide delivery history UI in the web app's project GitHub tab, including rule name, target title, timestamp, status, attempt count, last error, and a "Retry" button for failed deliveries. The target title is an incident title for failure dispatches and an improvement title for hosted improvement dispatches.
+**FR-GHA-15:** Provide delivery history UI in the web app's project GitHub tab, including rule name, target title, timestamp, status, attempt count, last error, and a "Retry" button for failed deliveries. The target title is an incident title for failure dispatches and an improvement title for hosted improvement dispatches. Members may clear currently visible failed deliveries from their own browser view; this does not delete history or alter delivery status, and later failures remain visible.
 
 **FR-GHA-16:** If the GitHub installation becomes suspended or removed, show a "GitHub connection lost" banner in the project GitHub tab with a "Reconnect" action.
 

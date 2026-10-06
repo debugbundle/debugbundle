@@ -76,7 +76,7 @@ describe("ingestion metadata service", () => {
       },
       payload: {
         name: "TypeError",
-        message: "boom",
+        message: "TypeError: boom at handleCheckout (src/checkout.ts:10:2)",
         stack: "TypeError: boom",
         handled: false,
         request: {
@@ -103,6 +103,9 @@ describe("ingestion metadata service", () => {
     });
 
     expect(upsertIncident).toHaveBeenCalledOnce();
+    expect(upsertIncident).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "TypeError: boom" })
+    );
     expect(insertIncidentEvent).toHaveBeenCalledOnce();
     expect(recordMetricDeltas).toHaveBeenCalledWith(
       expect.objectContaining({

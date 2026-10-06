@@ -1,8 +1,16 @@
-import { FINGERPRINT_VERSION } from "../../../packages/event-normalizer/src/index.js";
+import {
+  FINGERPRINT_VERSION,
+  deriveIncidentTitle
+} from "../../../packages/event-normalizer/src/index.js";
+// Preserve the existing worker helper exports while sharing their implementation.
+export {
+  deriveIncidentTitle,
+  humanizeEventType,
+  isMachineGeneratedIncidentTitle
+} from "../../../packages/event-normalizer/src/incident-title.js";
 import type {
   AlertConditionType,
   BuildBundleJob,
-  GroupIncidentJob,
   RegressionDeployCorrelation
 } from "../../../packages/storage/src/index.js";
 import {
@@ -19,50 +27,6 @@ import {
   type WorkerProcessResult,
   getWorkerErrorMessage
 } from "./processor-shared.js";
-
-export function humanizeEventType(eventType: GroupIncidentJob["event_type"]): string {
-  return eventType
-    .split("_")
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-    .join(" ");
-}
-
-export function isMachineGeneratedIncidentTitle(
-  job: Pick<GroupIncidentJob, "event_type" | "normalized_message">
-): boolean {
-  const normalizedMessage = job.normalized_message.trim();
-  if (normalizedMessage.length === 0) {
-    return true;
-  }
-
-  if (normalizedMessage.startsWith("[") || normalizedMessage.startsWith("{")) {
-    return true;
-  }
-
-  return normalizedMessage === job.event_type;
-}
-
-export function deriveIncidentTitle(
-  job: Pick<GroupIncidentJob, "event_type" | "normalized_message" | "incident_title">
-): string {
-  if (job.incident_title !== undefined) return job.incident_title;
-  if (!isMachineGeneratedIncidentTitle(job)) {
-    return job.normalized_message;
-  }
-
-  switch (job.event_type) {
-    case "backend_exception":
-      return "Backend exception";
-    case "frontend_exception":
-      return "Frontend exception";
-    case "request_event":
-      return "Request failure";
-    case "log_event":
-      return "Application log error";
-    default:
-      return humanizeEventType(job.event_type);
-  }
-}
 
 export async function enqueueAlertEvaluation(
   queue: Pick<WorkerQueue, "enqueue"> | undefined,

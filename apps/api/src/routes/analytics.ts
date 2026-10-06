@@ -99,6 +99,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
         : { bundle_status: parsedQuery.data.bundle_status }),
       ...(parsedQuery.data.from === undefined ? {} : { from: parsedQuery.data.from }),
       ...(parsedQuery.data.to === undefined ? {} : { to: parsedQuery.data.to }),
+      ...(parsedQuery.data.include_total === "true" && parsedCursor === null ? { include_total: true } : {}),
       ...(parsedCursor === null ? {} : { cursor: parsedCursor }),
       limit: parsedQuery.data.limit
     };
@@ -116,7 +117,12 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
       return;
     }
 
-    return sendProjectedAnalyticsRead(reply, opportunities, AnalyticsOpportunitiesListResponseSchema);
+    // Older installed clients reject unknown response keys; totals are explicitly requested.
+    return sendProjectedAnalyticsRead(reply, {
+      opportunities: opportunities.opportunities,
+      next_cursor: opportunities.next_cursor,
+      ...(filters.include_total && opportunities.total_pages !== undefined ? { total_pages: opportunities.total_pages } : {})
+    }, AnalyticsOpportunitiesListResponseSchema);
   });
 
   app.get("/v1/analytics/opportunities/:id", async (request, reply) => {
@@ -315,6 +321,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
         : { environment: parsedQuery.data.environment }),
       ...(parsedQuery.data.from === undefined ? {} : { from: parsedQuery.data.from }),
       ...(parsedQuery.data.to === undefined ? {} : { to: parsedQuery.data.to }),
+      ...(parsedQuery.data.include_total === "true" && parsedCursor === null ? { include_total: true } : {}),
       ...(parsedCursor === null ? {} : { cursor: parsedCursor }),
       limit: parsedQuery.data.limit
     };
@@ -334,7 +341,8 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
 
     const projected = sanitizeTelemetry({
       bundles: generations.bundles.map(toAnalyticsBundleGenerationListRecord),
-      next_cursor: generations.next_cursor
+      next_cursor: generations.next_cursor,
+      ...(filters.include_total && generations.total_pages !== undefined ? { total_pages: generations.total_pages } : {})
     });
     if (!projected.ok) return reply.status(503).send({ error: "privacy_projection_unavailable" });
     const response = AnalyticsBundleGenerationsListResponseSchema.safeParse(projected.value);

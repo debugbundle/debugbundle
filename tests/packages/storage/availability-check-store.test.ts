@@ -840,6 +840,45 @@ describe("availability check store", () => {
     );
   });
 
+  it("records a continuing outage on a new UTC day without emitting another failure event", async () => {
+    const db = createSequentialDb([
+      {
+        rows: [
+          {
+            ...buildClaimedRow({
+              prior_status: "failing",
+              consecutive_failures: 10,
+              linked_incident_id: "inc_1"
+            }),
+            status: "failing",
+            linked_incident_status: "open"
+          }
+        ]
+      },
+      { rows: [] },
+      { rows: [] },
+      { rows: [] }
+    ]);
+    const store = createPostgresAvailabilityCheckStore(db as never);
+    const recorded = await store.recordCheckExecution({
+      check_id: "chk_1",
+      scheduled_for: "2026-06-16T00:00:00.000Z",
+      claimed_at: "2026-06-16T00:00:00.000Z",
+      started_at: "2026-06-16T00:00:00.000Z",
+      completed_at: "2026-06-16T00:00:00.180Z",
+      result: { ...successResult, status: "timeout", http_status: null, error_kind: "timeout" }
+    });
+    expect(recorded).toMatchObject({
+      next_status: "failing",
+      emit_failure_event: false,
+      resolve_incident_id: null
+    });
+    const rollupValues = db.query.mock.calls.at(-1)?.[1];
+    expect(rollupValues?.[3]).toBe("2026-06-16");
+    expect(rollupValues?.[4]).toBe("down");
+    expect(rollupValues?.[12]).toBe("inc_1");
+  });
+
   it.each(["passing", "failing"] as const)(
     "retains raw internal errors without changing %s customer health or uptime",
     async (priorStatus) => {

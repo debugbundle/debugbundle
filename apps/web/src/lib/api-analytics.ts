@@ -263,6 +263,7 @@ export async function listAnalyticsOpportunities(
   query: AnalyticsOpportunityInventoryQuery
 ): Promise<AnalyticsOpportunitiesListResponse> {
   const searchParams = buildAnalyticsInventorySearchParams(query);
+  if (query.cursor === undefined) searchParams.set("include_total", "true");
   if (query.severity !== undefined) searchParams.set("severity", query.severity);
   if (query.bundleStatus !== undefined) searchParams.set("bundle_status", query.bundleStatus);
   return readJson<AnalyticsOpportunitiesListResponse>(
@@ -276,6 +277,7 @@ export async function listAnalyticsBundles(
   query: AnalyticsBundleInventoryQuery
 ): Promise<AnalyticsBundleGenerationsListResponse> {
   const searchParams = buildAnalyticsInventorySearchParams(query);
+  if (query.cursor === undefined) searchParams.set("include_total", "true");
   return readJson<AnalyticsBundleGenerationsListResponse>(
     await fetch(`${API_BASE}/v1/analytics/bundles?${searchParams.toString()}`, {
       credentials: "include"

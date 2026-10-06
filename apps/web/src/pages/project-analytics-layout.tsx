@@ -172,14 +172,15 @@ export function ProjectAnalyticsLayout(): JSX.Element {
         title="Analytics capture is off"
         description="Enable project analytics before aggregate usage and journey signals can appear here. Debug incident capture remains independent."
         tone="neutral"
-      >
-        <Button asChild type="button" variant="outline" size="sm">
-          <Link to={`/projects/${projectId}/settings`}>
-            <Settings2Icon data-icon="inline-start" />
-            Open analytics settings
-          </Link>
-        </Button>
-      </CalloutCard>
+        titleAction={
+          <Button asChild type="button" variant="outline" size="sm">
+            <Link to={`/projects/${projectId}/settings`}>
+              <Settings2Icon data-icon="inline-start" />
+              Open analytics settings
+            </Link>
+          </Button>
+        }
+      />
     );
   }
 

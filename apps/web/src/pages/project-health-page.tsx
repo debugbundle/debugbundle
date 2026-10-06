@@ -28,6 +28,7 @@ import {
 } from "../components/ui/alert-dialog.js";
 import { Badge } from "../components/ui/badge.js";
 import { Button } from "../components/ui/button.js";
+import { TableActionButton } from "../components/system/table-action-button.js";
 import {
   Card,
   CardContent,
@@ -583,32 +584,24 @@ export function ProjectHealthPage(): JSX.Element {
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2">
                               {canManageChecks ? (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon-sm"
+                                <TableActionButton
+                                  label="Edit"
+                                  icon={PencilIcon}
                                   onClick={(event) => {
                                     event.stopPropagation();
                                     openEditDialog(check);
                                   }}
-                                >
-                                  <PencilIcon />
-                                  <span className="sr-only">Edit</span>
-                                </Button>
+                                />
                               ) : null}
                               {canManageChecks ? (
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon-sm"
+                                    <TableActionButton
+                                      label="Delete"
+                                      icon={Trash2Icon}
                                       onClick={(event) => event.stopPropagation()}
                                       disabled={deletingCheckId === check.check_id}
-                                    >
-                                      <Trash2Icon />
-                                      <span className="sr-only">Delete</span>
-                                    </Button>
+                                    />
                                   </AlertDialogTrigger>
                                   <AlertDialogContent>
                                     <AlertDialogHeader>

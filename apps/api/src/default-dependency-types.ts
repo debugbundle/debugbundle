@@ -173,7 +173,7 @@ export interface DefaultApiDependencies
     | "resolveImprovementForOrganization"
     | "reopenImprovementForOrganization"
     | "snoozeImprovementForOrganization"
-  >;
+  > & { countImprovementsForOrganization: NonNullable<NonNullable<ApiDependencies["improvementManagement"]>["countImprovementsForOrganization"]> };
   incidentRetrieval: Pick<
     MetadataStore,
     | "listIncidentsForOrganization"
@@ -186,7 +186,7 @@ export interface DefaultApiDependencies
     | "getBundleSourceForOrganization"
     | "listServicesForOrganization"
     | "listIncidentLogsForOrganization"
-  >;
+  > & { countIncidentsForOrganization: NonNullable<ApiDependencies["incidentRetrieval"]["countIncidentsForOrganization"]> };
   objectStoreReader: Pick<ObjectStoreReader, "getObject">;
   objectStoreWriter: Pick<ObjectStoreClient, "putObject">;
   bundleRegeneration: NonNullable<ApiDependencies["bundleRegeneration"]>;

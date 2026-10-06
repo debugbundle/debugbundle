@@ -411,6 +411,13 @@ export interface ApiManagementDependencies {
           cursor?: { last_detected_at: string; improvement_id: string };
           limit: number;
         }): Promise<ImprovementRetrievalRecord[]>;
+        countImprovementsForOrganization?(
+          input: Parameters<
+            NonNullable<
+              ApiManagementDependencies["improvementManagement"]
+            >["listImprovementsForOrganization"]
+          >[0]
+        ): Promise<number>;
         getImprovementForOrganization(input: {
           organization_id: string;
           improvement_id: string;

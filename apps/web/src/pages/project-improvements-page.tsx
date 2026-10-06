@@ -69,6 +69,7 @@ export function ProjectImprovementsPage(): JSX.Element {
     items: improvements,
     isLoading,
     page,
+    totalPages,
     hasNextPage,
     goToNextPage,
     goToPreviousPage,
@@ -78,7 +79,8 @@ export function ProjectImprovementsPage(): JSX.Element {
       if (!hostedImprovementsEnabled) {
         return {
           items: [],
-          nextCursor: null
+          nextCursor: null,
+          totalPages: 1
         };
       }
 
@@ -90,7 +92,8 @@ export function ProjectImprovementsPage(): JSX.Element {
       );
       return {
         items: response.improvements,
-        nextCursor: response.nextCursor
+        nextCursor: response.nextCursor,
+        totalPages: response.totalPages
       };
     },
     [projectId, statusFilter, hostedImprovementsEnabled]
@@ -323,6 +326,7 @@ export function ProjectImprovementsPage(): JSX.Element {
                   />
                   <CursorPaginationControls
                     page={page}
+                    totalPages={totalPages}
                     hasNextPage={hasNextPage}
                     isLoading={isLoading}
                     onPreviousPage={goToPreviousPage}

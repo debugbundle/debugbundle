@@ -90,6 +90,8 @@ help:
 	@echo "  make api-check       Run API runtime bootstrap tests"
 	@echo "  make backend-restart Recreate API + worker so they reload current env"
 	@echo "  make dev             Start everything (infra + API + worker + web) and open http://localhost:5291"
+	@echo "  make dev-mock        Show synthetic UI data at http://localhost:5291/dashboard"
+	@echo "  make dev-mock-off    Restore the web frontend to the real local API"
 	@echo "  make dev-openai-plugin-preview Start dev with the local synthetic OpenAI UI review route"
 	@echo "  make dev-public      Start the public-site dev server at http://localhost:5292"
 	@echo "  make dev-down        Stop the full local dev stack"
@@ -417,6 +419,7 @@ INTEGRATION_TEST_FILES += tests/integration/agent-token.integration.test.ts
 INTEGRATION_TEST_FILES += tests/integration/browser-resource-recovery.integration.test.ts
 INTEGRATION_TEST_FILES += tests/integration/alert-retry-ownership.integration.test.ts
 INTEGRATION_TEST_FILES += tests/integration/analytics-flow-runtime.integration.test.ts
+INTEGRATION_TEST_FILES += tests/integration/list-pagination-counts.integration.test.ts
 # Optional absolute module path inside /workspace for a separately built Browser SDK candidate.
 INTEGRATION_FLOW_SDK_MODULE ?=
 test-integration:
@@ -484,6 +487,15 @@ dev-public:
 .PHONY: dev-openai-plugin-preview
 dev-openai-plugin-preview:
 	$(MAKE) VITE_OPENAI_PLUGIN_PREVIEW=true dev
+
+# Recreate only the frontend. API, worker and database state stay independent.
+.PHONY: dev-mock dev-mock-off
+dev-mock:
+	DEBUGBUNDLE_DEV_MOCK=true WEB_BIND_HOST=127.0.0.1 WEB_PORT=5291 $(DOCKER_COMPOSE) --profile dev up -d --no-deps --force-recreate web
+	@echo "Mock preview: http://localhost:5291/dashboard (restart make dev-mock to reset simulated edits)"
+
+dev-mock-off:
+	DEBUGBUNDLE_DEV_MOCK=false $(DOCKER_COMPOSE) --profile dev up -d --no-deps --force-recreate web
 
 .PHONY: backend-restart
 backend-restart: ensure-probe-trigger-secret install

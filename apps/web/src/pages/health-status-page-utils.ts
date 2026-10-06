@@ -4,7 +4,7 @@ import type {
   ProjectRecord
 } from "../lib/api.js";
 import {
-  computeLatestAvailabilityUptimePercentage,
+  computeAvailabilityUptimePercentage,
   formatAvailabilityUptime
 } from "../lib/health-status-metrics.js";
 
@@ -116,7 +116,10 @@ export function formatHealthDayStatusLabel(day: HealthStatusDay): string {
   }
 }
 
-export function formatStatusDayLabel(day: HealthStatusDay): string {
+export function formatStatusDayLabel(
+  day: HealthStatusDay,
+  scope: "check" | "project" = "check"
+): string {
   const formattedDay = new Intl.DateTimeFormat(undefined, {
     month: "short",
     day: "numeric"
@@ -126,7 +129,8 @@ export function formatStatusDayLabel(day: HealthStatusDay): string {
     return `${formattedDay}: ${formatHealthStatusLabel(day.state).toLowerCase()}, no checks recorded`;
   }
 
-  return `${formattedDay}: ${formatHealthDayStatusLabel(day).toLowerCase()}, ${day.failed_checks} failed of ${day.total_checks} checks, ${formatDowntime(day.downtime_seconds)} downtime`;
+  const downtimeLabel = scope === "project" ? "total check downtime" : "downtime";
+  return `${formattedDay}: ${formatHealthDayStatusLabel(day).toLowerCase()}, ${day.failed_checks} failed of ${day.total_checks} checks, ${formatDowntime(day.downtime_seconds)} ${downtimeLabel}`;
 }
 
 export function formatDowntime(seconds: number): string {
@@ -137,13 +141,16 @@ export function formatDowntime(seconds: number): string {
     return `${seconds}s`;
   }
 
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) {
-    return `${minutes}m`;
-  }
-
-  const hours = Math.round(minutes / 60);
-  return `${hours}h`;
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = seconds % 60;
+  return [
+    hours > 0 ? `${hours}h` : null,
+    minutes > 0 ? `${minutes}m` : null,
+    remainingSeconds > 0 ? `${remainingSeconds}s` : null
+  ]
+    .filter((part) => part !== null)
+    .join(" ");
 }
 
 function buildCheckDays(
@@ -217,10 +224,18 @@ function deriveProjectCurrentState(
 }
 
 export function deriveHealthStatusImpact(
-  day: Pick<HealthStatusDay, "state" | "failed_checks" | "degraded_checks" | "incident_ids">,
+  day: Pick<
+    HealthStatusDay,
+    "state" | "failed_checks" | "degraded_checks" | "incident_ids" | "downtime_seconds"
+  >,
   failureThreshold: number
 ): HealthStatusImpact {
-  if (day.state === "down" || day.incident_ids.length > 0) {
+  // Older continuation days can lack an incident reference despite substantial downtime.
+  if (
+    day.state === "down" ||
+    day.incident_ids.length > 0 ||
+    (day.failed_checks > 0 && day.downtime_seconds >= 3600)
+  ) {
     return "outage";
   }
 
@@ -272,7 +287,7 @@ function countActiveAvailabilityIncidents(checks: HealthStatusCheckSummary[]): n
 }
 
 function computeUptimePercentage(days: HealthStatusDay[]): number | null {
-  return computeLatestAvailabilityUptimePercentage(days);
+  return computeAvailabilityUptimePercentage(days);
 }
 
 function emptyStatusDay(day: string): HealthStatusDay {

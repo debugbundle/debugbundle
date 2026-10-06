@@ -1,7 +1,14 @@
-import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "../ui/pagination.js";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious
+} from "../ui/pagination.js";
 
 export interface CursorPaginationControlsProps {
   page: number;
+  totalPages: number;
   hasNextPage: boolean;
   isLoading: boolean;
   onPreviousPage: () => void;
@@ -10,6 +17,7 @@ export interface CursorPaginationControlsProps {
 
 export function CursorPaginationControls({
   page,
+  totalPages,
   hasNextPage,
   isLoading,
   onPreviousPage,
@@ -21,14 +29,24 @@ export function CursorPaginationControls({
 
   return (
     <div className="flex flex-wrap items-center gap-3 border-t pt-4">
-      <p className="text-sm text-muted-foreground">Page {page}</p>
+      <p className="text-sm text-muted-foreground">
+        Page {page} of {totalPages}
+      </p>
       <Pagination className="mx-0 ml-auto w-auto shrink-0 justify-end">
         <PaginationContent>
           <PaginationItem>
-            <PaginationPrevious type="button" onClick={onPreviousPage} disabled={page === 1 || isLoading} />
+            <PaginationPrevious
+              type="button"
+              onClick={onPreviousPage}
+              disabled={page === 1 || isLoading}
+            />
           </PaginationItem>
           <PaginationItem>
-            <PaginationNext type="button" onClick={onNextPage} disabled={!hasNextPage || isLoading} />
+            <PaginationNext
+              type="button"
+              onClick={onNextPage}
+              disabled={!hasNextPage || isLoading}
+            />
           </PaginationItem>
         </PaginationContent>
       </Pagination>

@@ -38,6 +38,7 @@ export interface ReserveAnalyticsBundleGenerationInput {
 }
 
 export interface AnalyticsBundleGenerationListFilters {
+  include_total?: boolean | undefined;
   status?: AnalyticsBundleGenerationStatus | undefined;
   analysis_kind?: AnalyticsBundleAnalysisKind | undefined;
   service?: string | undefined;
@@ -56,14 +57,14 @@ export interface AnalyticsBundleGenerationStore {
       cursor?: { created_at: string; generation_id: string } | undefined;
       limit: number;
     }
-  ): Promise<{ bundles: AnalyticsBundleGenerationRecord[]; next_cursor: string | null }>;
+  ): Promise<{ bundles: AnalyticsBundleGenerationRecord[]; next_cursor: string | null; total_pages?: number }>;
   listAnalyticsBundleGenerationsForOrganization?(
     input: AnalyticsBundleGenerationListFilters & {
       organization_id: string;
       cursor?: { created_at: string; generation_id: string } | undefined;
       limit: number;
     }
-  ): Promise<{ bundles: AnalyticsBundleGenerationInventoryRecord[]; next_cursor: string | null }>;
+  ): Promise<{ bundles: AnalyticsBundleGenerationInventoryRecord[]; next_cursor: string | null; total_pages?: number }>;
   getAnalyticsBundleGenerationForProject(input: {
     project_id: string;
     generation_id: string;
@@ -90,6 +91,7 @@ export interface AnalyticsBundleGenerationStore {
 }
 
 type AnalyticsBundleGenerationRow = {
+  total_count?: unknown;
   generation_id: unknown;
   project_id: unknown;
   opportunity_id: unknown;
@@ -253,7 +255,7 @@ export function createPostgresAnalyticsBundleGenerationStore(
       params.push(limit + 1);
       const result = await db.query<AnalyticsBundleGenerationRow>(
         `
-          SELECT ${analyticsBundleGenerationSelectColumns()}
+          SELECT ${input.include_total === true && input.cursor === undefined ? "COUNT(*) OVER() AS total_count," : ""} ${analyticsBundleGenerationSelectColumns()}
           FROM analytics_bundle_generations
           WHERE ${where.join("\n            AND ")}
           ORDER BY created_at DESC, id DESC
@@ -272,7 +274,10 @@ export function createPostgresAnalyticsBundleGenerationStore(
 
       return {
         bundles: rows,
-        next_cursor
+        next_cursor,
+        ...(input.include_total === true && input.cursor === undefined && (result.rows.length === 0 || result.rows[0]?.total_count !== undefined)
+          ? { total_pages: Math.max(1, Math.ceil(Number(result.rows[0]?.total_count ?? 0) / limit)) }
+          : {})
       };
     },
 
@@ -287,6 +292,7 @@ export function createPostgresAnalyticsBundleGenerationStore(
       const result = await db.query<AnalyticsBundleGenerationInventoryRow>(
         `
           SELECT
+            ${input.include_total === true && input.cursor === undefined ? "COUNT(*) OVER() AS total_count," : ""}
             ${analyticsBundleGenerationSelectColumns("abg")},
             p.name AS project_name,
             p.color_tag AS project_color_tag
@@ -309,7 +315,10 @@ export function createPostgresAnalyticsBundleGenerationStore(
 
       return {
         bundles: rows,
-        next_cursor
+        next_cursor,
+        ...(input.include_total === true && input.cursor === undefined && (result.rows.length === 0 || result.rows[0]?.total_count !== undefined)
+          ? { total_pages: Math.max(1, Math.ceil(Number(result.rows[0]?.total_count ?? 0) / limit)) }
+          : {})
       };
     },
 

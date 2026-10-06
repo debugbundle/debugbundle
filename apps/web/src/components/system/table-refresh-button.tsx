@@ -70,7 +70,12 @@ export function TableRefreshButton({
       type="button"
       variant="outline"
       size="sm"
-      className={cn("gap-1.5", mobileIconOnly && "size-7 px-0 sm:w-auto sm:px-2.5", className)}
+      className={cn(
+        "gap-1.5",
+        mobileIconOnly &&
+          "size-7 px-0 sm:w-auto sm:px-2.5 [&_svg]:translate-y-0 sm:[&_svg]:-translate-y-px",
+        className
+      )}
       disabled={isLoading || isSpinning}
       aria-busy={isSpinning}
       aria-label={label}

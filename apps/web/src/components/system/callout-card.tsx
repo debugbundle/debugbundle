@@ -20,6 +20,7 @@ export interface CalloutCardProps extends HTMLAttributes<HTMLDivElement> {
   description: string;
   tone?: CalloutTone;
   titleAccessory?: ReactNode;
+  titleAction?: ReactNode;
 }
 
 export function CalloutCard({
@@ -29,6 +30,7 @@ export function CalloutCard({
   description,
   tone = "info",
   titleAccessory,
+  titleAction,
   children,
   ...props
 }: CalloutCardProps): JSX.Element {
@@ -50,9 +52,12 @@ export function CalloutCard({
         >
           {eyebrow}
         </Badge>
-        <div className="flex items-center gap-2">
-          <CardTitle>{title}</CardTitle>
-          {titleAccessory}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <CardTitle>{title}</CardTitle>
+            {titleAccessory}
+          </div>
+          {titleAction === undefined ? null : <div className="ml-auto">{titleAction}</div>}
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">

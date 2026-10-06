@@ -17,7 +17,10 @@ import {
   getIncidentReproduction,
   getSession,
   InvalidSessionError,
+  listAnalyticsBundles,
+  listAnalyticsOpportunities,
   listIncidents,
+  listImprovements,
   listProjectAvailabilityCheckDailyRollups,
   listProjectAvailabilityCheckResults,
   listProjectAvailabilityChecks,
@@ -39,6 +42,25 @@ afterEach(() => {
 });
 
 describe("web api client", () => {
+  it.each([listAnalyticsBundles, listAnalyticsOpportunities])("requests analytics totals only on the initial page", async (list) => {
+    const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ next_cursor: null, total_pages: 3 }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(list({ limit: 10 })).resolves.toMatchObject({ total_pages: 3 });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("include_total=true");
+    await list({ limit: 10, cursor: "next" });
+    expect(String(fetchMock.mock.calls[1]?.[0])).not.toContain("include_total");
+  });
+
+  it("passes list page totals through the public API exports", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ incidents: [], next_cursor: null, total_pages: 3 }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ improvements: [], next_cursor: null, total_pages: 4 }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(listIncidents({ limit: 10 })).resolves.toEqual({ incidents: [], nextCursor: null, totalPages: 3 });
+    await expect(listImprovements({ limit: 10 })).resolves.toEqual({ improvements: [], nextCursor: null, totalPages: 4 });
+  });
+
   it("calls project availability-check endpoints with browser-session credentials", async () => {
     const check = {
       check_id: "chk_1",

@@ -101,6 +101,9 @@ function buildAlertNotificationInput(
       event.payload["severity"] === "critical"
         ? event.payload["severity"]
         : "high",
+    ...(typeof event.payload["summary"] === "string"
+      ? { summary: event.payload["summary"] }
+      : {}),
     ...(input.appBaseUrl === undefined || input.appBaseUrl === null
       ? {}
       : { incidentUrl: `${input.appBaseUrl}/incidents/${incidentId}` }),

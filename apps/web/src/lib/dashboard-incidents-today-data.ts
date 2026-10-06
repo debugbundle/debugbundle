@@ -1,5 +1,9 @@
 import { listIncidents, type IncidentRecord } from "./api.js";
-import { getLocalDayWindow, isIncidentAttentionToday, type LocalDayWindow } from "./incidents-today.js";
+import {
+  getLocalDayWindow,
+  isIncidentAttentionToday,
+  type LocalDayWindow
+} from "./incidents-today.js";
 
 const DASHBOARD_INCIDENTS_TODAY_PAGE_SIZE = 10;
 const DASHBOARD_INCIDENTS_TODAY_SCAN_LIMIT = 100;
@@ -12,12 +16,26 @@ export type DashboardIncidentsTodayCursor = {
 export async function loadDashboardAttentionIncidentPage(
   todayWindow: LocalDayWindow,
   cursor: string | null
-): Promise<{ items: IncidentRecord[]; nextCursor: string | null }> {
+): Promise<{
+  items: IncidentRecord[];
+  nextCursor: string | null;
+  totalPages?: number | undefined;
+}> {
+  let scannedMatches = 0;
+  let remainingSourceCursor: string | null = null;
   const items: IncidentRecord[] = [];
   let currentCursor = decodeDashboardIncidentsTodayCursor(cursor);
 
   while (items.length < DASHBOARD_INCIDENTS_TODAY_PAGE_SIZE) {
-    const response = await listDashboardAttentionIncidentMatches(todayWindow, currentCursor.sourceCursor);
+    const response = await listDashboardAttentionIncidentMatches(
+      todayWindow,
+      currentCursor.sourceCursor
+    );
+    scannedMatches += response.matchedIncidents.length;
+    remainingSourceCursor =
+      response.reachedOlderIncidents || response.nextSourceCursor === currentCursor.sourceCursor
+        ? null
+        : response.nextSourceCursor;
     const availableIncidents = response.matchedIncidents.slice(currentCursor.matchOffset);
     const remainingPageSize = DASHBOARD_INCIDENTS_TODAY_PAGE_SIZE - items.length;
     const incidentsToTake = availableIncidents.slice(0, remainingPageSize);
@@ -26,13 +44,12 @@ export async function loadDashboardAttentionIncidentPage(
 
     const nextMatchOffset = currentCursor.matchOffset + incidentsToTake.length;
     if (nextMatchOffset < response.matchedIncidents.length) {
-      return {
-        items,
-        nextCursor: encodeDashboardIncidentsTodayCursor({
+      return finishPage(
+        encodeDashboardIncidentsTodayCursor({
           sourceCursor: currentCursor.sourceCursor,
           matchOffset: nextMatchOffset
         })
-      };
+      );
     }
 
     if (
@@ -40,10 +57,7 @@ export async function loadDashboardAttentionIncidentPage(
       response.nextSourceCursor === currentCursor.sourceCursor ||
       response.reachedOlderIncidents
     ) {
-      return {
-        items,
-        nextCursor: null
-      };
+      return finishPage(null);
     }
 
     currentCursor = {
@@ -52,15 +66,35 @@ export async function loadDashboardAttentionIncidentPage(
     };
   }
 
-  return {
-    items,
-    nextCursor: encodeDashboardIncidentsTodayCursor(currentCursor)
-  };
+  return finishPage(encodeDashboardIncidentsTodayCursor(currentCursor));
+
+  async function finishPage(nextCursor: string | null): Promise<{
+    items: IncidentRecord[];
+    nextCursor: string | null;
+    totalPages?: number;
+  }> {
+    if (cursor !== null) return { items, nextCursor };
+    // Continue counting after the source pages already read for this display page.
+    const remainingMatches =
+      remainingSourceCursor === null
+        ? 0
+        : await countDashboardAttentionIncidents(todayWindow, remainingSourceCursor);
+    return {
+      items,
+      nextCursor,
+      totalPages: Math.max(
+        1,
+        Math.ceil((scannedMatches + remainingMatches) / DASHBOARD_INCIDENTS_TODAY_PAGE_SIZE)
+      )
+    };
+  }
 }
 
-export async function countDashboardAttentionIncidents(todayWindow = getLocalDayWindow()): Promise<number> {
+export async function countDashboardAttentionIncidents(
+  todayWindow = getLocalDayWindow(),
+  sourceCursor: string | null = null
+): Promise<number> {
   let total = 0;
-  let sourceCursor: string | null = null;
 
   while (true) {
     const response = await listDashboardAttentionIncidentMatches(todayWindow, sourceCursor);
@@ -94,9 +128,12 @@ function decodeDashboardIncidentsTodayCursor(value: string | null): DashboardInc
     const parsed = JSON.parse(value) as Partial<DashboardIncidentsTodayCursor>;
     const sourceCursor = typeof parsed.sourceCursor === "string" ? parsed.sourceCursor : null;
     const parsedMatchOffset = parsed.matchOffset;
-    const matchOffset = Number.isInteger(parsedMatchOffset) && parsedMatchOffset !== undefined && parsedMatchOffset >= 0
-      ? parsedMatchOffset
-      : 0;
+    const matchOffset =
+      Number.isInteger(parsedMatchOffset) &&
+      parsedMatchOffset !== undefined &&
+      parsedMatchOffset >= 0
+        ? parsedMatchOffset
+        : 0;
 
     return {
       sourceCursor,
@@ -122,10 +159,13 @@ async function listDashboardAttentionIncidentMatches(
     limit: DASHBOARD_INCIDENTS_TODAY_SCAN_LIMIT,
     ...(sourceCursor === null ? {} : { cursor: sourceCursor })
   });
-  const matchedIncidents = response.incidents.filter((incident) => isIncidentAttentionToday(incident, todayWindow));
+  const matchedIncidents = response.incidents.filter((incident) =>
+    isIncidentAttentionToday(incident, todayWindow)
+  );
   const oldestScannedIncident = response.incidents.at(-1);
   const reachedOlderIncidents =
-    oldestScannedIncident !== undefined && isIncidentLastSeenBeforeWindow(oldestScannedIncident, todayWindow);
+    oldestScannedIncident !== undefined &&
+    isIncidentLastSeenBeforeWindow(oldestScannedIncident, todayWindow);
 
   return {
     matchedIncidents,
@@ -134,7 +174,10 @@ async function listDashboardAttentionIncidentMatches(
   };
 }
 
-function isIncidentLastSeenBeforeWindow(incident: IncidentRecord, todayWindow: LocalDayWindow): boolean {
+function isIncidentLastSeenBeforeWindow(
+  incident: IncidentRecord,
+  todayWindow: LocalDayWindow
+): boolean {
   const lastSeenAt = new Date(incident.last_seen_at).getTime();
   return Number.isFinite(lastSeenAt) && lastSeenAt < todayWindow.startsAtMs;
 }

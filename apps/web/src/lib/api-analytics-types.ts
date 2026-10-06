@@ -243,6 +243,7 @@ export interface AnalyticsOpportunityRecord {
 export interface AnalyticsOpportunitiesListResponse {
   opportunities: AnalyticsOpportunityRecord[];
   next_cursor: string | null;
+  total_pages?: number;
 }
 
 export interface AnalyticsOpportunityResponse {
@@ -287,6 +288,7 @@ export interface AnalyticsBundleGenerationRecord {
 export interface AnalyticsBundleGenerationsListResponse {
   bundles: AnalyticsBundleGenerationRecord[];
   next_cursor: string | null;
+  total_pages?: number;
 }
 
 export interface AnalyticsBundleInventoryQuery {

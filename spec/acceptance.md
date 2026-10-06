@@ -455,6 +455,9 @@ Native logger level/silent/processor filtering runs before SDK capture; enabled-
 - **Then** raw results and daily rollups older than 30 days are purged
 - **And** at least one retained daily state row remains available for each in-window day that had a verified endpoint outcome
 - **And** monitor-internal errors are excluded from customer uptime and downtime calculations while remaining in raw execution history
+- **And** reaching the consecutive failure threshold persists a `down` day even before asynchronous incident linkage completes
+- **And** a confirmed outage continuing across UTC midnight marks the next affected day `down` and retains its active incident reference without another failure transition
+- **And** recovery preserves that day's outage history, repeated recording does not duplicate counts or incident references, and a later healthy day has no stale outage reference
 
 ### AC-AVC-06: Workspace Health Status Page
 
@@ -464,6 +467,12 @@ Native logger level/silent/processor filtering runs before SDK capture; enabled-
 - **And** projects with multiple health checks can expand to show each check's retained status strip, current state, and uptime percentage
 - **And** projects without health checks do not appear in the status list
 - **And** the existing project Health tab remains the management surface for creating, editing, testing, and deleting checks
+- **And** workspace, project, and check percentages say `30-day uptime` and use successful verified checks divided by all verified checks across the displayed window, even when the latest day has recovered to 100%
+- **And** unknown days and history outside the displayed window do not affect uptime, aggregate percentages weight by check counts, and checks without verified results show no measured percentage
+- **And** recovered current status can be Operational while an affected historical day remains red in light and dark themes, including legacy check days with at least one hour of downtime and no incident reference
+- **And** shorter interruptions retain amber impact, and multiple short check interruptions are not promoted to an outage merely because their summed duration reaches one hour
+- **And** both Health Status and the project Health history show precise durations such as `1h 25m`, with project tooltips identifying summed durations as `total check downtime`
+- **And** explicitly daily dashboard health summaries continue to use the latest measured day
 
 ---
 
@@ -593,6 +602,19 @@ Native logger level/silent/processor filtering runs before SDK capture; enabled-
 
 - **Given** an event assigned to an incident
 - **Then** the grouping response includes `matched_fields` listing which fields contributed to the fingerprint match
+
+### AC-GRP-13: Bounded Incident Titles
+
+- **Given** an exception or error log with a concise message followed by Java or JavaScript stack frames
+- **When** hosted or local processing creates an incident
+- **Then** the title contains the useful message, excludes frames, and is at most 180 characters
+- **And** a stack-only message receives a human fallback title
+- **And** the complete normalized message still contributes to the same fingerprint and remains available as diagnostic evidence
+- **And** ordinary prose containing “at” remains intact
+- **And** named and anonymous frames, normalized source coordinates, and escaped stack separators produce the same concise summary
+- **And** explicit resource titles, existing worker helper imports, and previously queued jobs remain supported
+- **And** full error messages, stacks, and request routes remain in generated bundles
+- **And** existing long stored titles display in a two-line incident heading without losing the full text or hiding incident actions
 
 ---
 
@@ -1287,6 +1309,9 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **When** a new incident is created
 - **Then** the alert fires to the configured channel (email, Slack, Discord, or webhook)
 - **And** the alert payload includes incident title, severity, service, and a link to the bundle
+- **And** Slack shows the incident title in its notification text and visible message when a title is available
+- **And** Slack retains configured incident and bundle links and omits the alert-group inspection link from its notification text and visible message
+- **And** Slack metadata rows use separate sections with at most two fields per section, bold labels above values, and no empty fields or sections when the project name is unavailable
 
 ### AC-ALT-02: Alert on Spike
 
@@ -2334,6 +2359,36 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Then** the tab shows project-scoped summary, routes, funnels, devices, referrers, opportunities, and generated AnalyticsBundles as internal sub-tabs or same-page sections
 - **And** no additional top-level project tabs are created for routes, funnels, devices, referrers, opportunities, or bundles
 
+### AC-WEB-09: List Pagination and Action Alignment
+
+- **Given** a filtered incidents, improvements, analytics opportunities, AnalyticsBundle generations, or capture-rules list with multiple pages
+- **When** the member opens its first page or navigates by cursor
+- **Then** the pagination control reads `Page N of X` with the exact filtered page count from the initial list response
+- **And** previous and next remain bounded by available pages
+- **And** changing filters ignores pending responses for the previous filters, and refreshing updates totals and recovers from a removed page
+- **And** refreshing a later page resets to the refreshed first page if its continuation cursor changed, so cached pages cannot skip rows across the new boundary; a stable cursor preserves the current page
+- **And** analytics totals are opt-in so installed clients retain their existing strict response shape
+- **And** text actions use the shared Button primitive with their icons centered beside labels
+- **And** table Edit/Delete actions use shared icon buttons with accessible names and hover/keyboard tooltips; their handlers, disabled states and confirmation dialogs remain functional
+- **And** capture-rule Pause/Enable controls use pause/play icons with the same accessible labels, tooltips and disabled states
+- **And** GitHub rule cards retain text actions with both pencil and trash icons
+- **And** Slack weekly report Edit/Delete text actions share the ghost variant
+- **And** enabled off-state switches provide at least 3:1 track contrast against their surrounding surface in both themes, remain distinguishable from disabled controls, and preserve keyboard operation and accessible state
+- **And** the analytics-disabled settings action sits at the right of its callout title row and wraps accessibly on narrow screens
+
+### AC-WEB-10: Local Mock Preview
+
+- **Given** installed local dependencies and Docker
+- **When** the owner runs `make dev-mock` and opens `http://localhost:5291/dashboard`
+- **Then** the dashboard and review surfaces display synthetic data without browser test interception or real login
+- **And** webhook endpoints/history, project and member tokens, members/invitations, billing/capacity, probes, weekly reports and analytics flow/funnel/journey/artifact views are populated
+- **And** those management actions are simulated locally; token/webhook/probe credentials are fake and checkout/setup navigation never leaves the preview
+- **And** webhook endpoint/history failures stop loading, expose retry, preserve independent successful data, and cannot update an unmounted or previous project view
+- **And** incident, rule, health-check and settings edits and delivery retries affect only mock memory
+- **And** a restart resets mock data, and `make dev-mock-off` restores real API routing
+- **And** foreign hosts/origins and malformed or oversized JSON are rejected; unsupported API paths cannot reach a real backend
+- **And** builds and production preview mode never install the mock middleware or enable telemetry through mock mode
+
 ### AC-ANL-17: Analytics Settings
 
 - **Given** a project owner or admin opens project analytics settings
@@ -2579,6 +2634,8 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Then** each delivery shows rule name, target title, timestamp, status, attempt count, and last error
 - **And** failed deliveries show the HTTP status code from GitHub
 - **And** a "Retry" button is available on failed deliveries
+- **And** clearing failed rows hides only those deliveries in that member's browser, persists after reload, and leaves new failures visible
+- **And** cleared rows can be shown again for inspection or retry without changing stored delivery history
 
 ### AC-GHA-14: Free Tier Gating
 

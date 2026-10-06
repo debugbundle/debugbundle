@@ -17,6 +17,7 @@ export type AnalyticsOpportunitiesCursor = {
 };
 
 export interface AnalyticsOpportunityListFilters {
+  include_total?: boolean | undefined;
   status?: AnalyticsOpportunityStatus | undefined;
   kind?: AnalyticsBundleAnalysisKind | undefined;
   service?: string | undefined;
@@ -28,17 +29,21 @@ export interface AnalyticsOpportunityListFilters {
 }
 
 export interface AnalyticsOpportunityStore {
-  listAnalyticsOpportunitiesForProject(input: AnalyticsOpportunityListFilters & {
-    organization_id: string;
-    project_id: string;
-    cursor?: AnalyticsOpportunitiesCursor | undefined;
-    limit: number;
-  }): Promise<AnalyticsOpportunitiesListResponse>;
-  listAnalyticsOpportunitiesForOrganization(input: AnalyticsOpportunityListFilters & {
-    organization_id: string;
-    cursor?: AnalyticsOpportunitiesCursor | undefined;
-    limit: number;
-  }): Promise<AnalyticsOpportunitiesListResponse>;
+  listAnalyticsOpportunitiesForProject(
+    input: AnalyticsOpportunityListFilters & {
+      organization_id: string;
+      project_id: string;
+      cursor?: AnalyticsOpportunitiesCursor | undefined;
+      limit: number;
+    }
+  ): Promise<AnalyticsOpportunitiesListResponse>;
+  listAnalyticsOpportunitiesForOrganization(
+    input: AnalyticsOpportunityListFilters & {
+      organization_id: string;
+      cursor?: AnalyticsOpportunitiesCursor | undefined;
+      limit: number;
+    }
+  ): Promise<AnalyticsOpportunitiesListResponse>;
   getAnalyticsOpportunityForProject(input: {
     organization_id: string;
     project_id: string;
@@ -47,6 +52,7 @@ export interface AnalyticsOpportunityStore {
 }
 
 type AnalyticsOpportunityRow = {
+  total_count?: unknown;
   opportunity_id: unknown;
   project_id: unknown;
   project_name: unknown;
@@ -80,7 +86,7 @@ export function createPostgresAnalyticsOpportunityStore(db: Queryable): Analytic
       const where = buildAnalyticsOpportunityWhere(input);
       const result = await db.query<AnalyticsOpportunityRow>(
         `
-          ${buildAnalyticsOpportunitySelect()}
+          ${buildAnalyticsOpportunitySelect(input.include_total === true && input.cursor === undefined)}
           ${where.sql}
           ORDER BY ao.last_detected_at DESC, ao.id::text DESC
           LIMIT $${where.params.length + 1}
@@ -92,7 +98,13 @@ export function createPostgresAnalyticsOpportunityStore(db: Queryable): Analytic
 
       return AnalyticsOpportunitiesListResponseSchema.parse({
         opportunities,
-        next_cursor: nextRecord === undefined ? null : `${nextRecord.last_detected_at}|${nextRecord.opportunity_id}`
+        next_cursor:
+          nextRecord === undefined
+            ? null
+            : `${nextRecord.last_detected_at}|${nextRecord.opportunity_id}`,
+        ...(input.include_total === true && input.cursor === undefined && (result.rows.length === 0 || result.rows[0]?.total_count !== undefined)
+          ? { total_pages: Math.max(1, Math.ceil(Number(result.rows[0]?.total_count ?? 0) / limit)) }
+          : {})
       });
     },
 
@@ -101,7 +113,7 @@ export function createPostgresAnalyticsOpportunityStore(db: Queryable): Analytic
       const where = buildAnalyticsOpportunityWhere(input);
       const result = await db.query<AnalyticsOpportunityRow>(
         `
-          ${buildAnalyticsOpportunitySelect()}
+          ${buildAnalyticsOpportunitySelect(input.include_total === true && input.cursor === undefined)}
           ${where.sql}
           ORDER BY ao.last_detected_at DESC, ao.id::text DESC
           LIMIT $${where.params.length + 1}
@@ -113,7 +125,13 @@ export function createPostgresAnalyticsOpportunityStore(db: Queryable): Analytic
 
       return AnalyticsOpportunitiesListResponseSchema.parse({
         opportunities,
-        next_cursor: nextRecord === undefined ? null : `${nextRecord.last_detected_at}|${nextRecord.opportunity_id}`
+        next_cursor:
+          nextRecord === undefined
+            ? null
+            : `${nextRecord.last_detected_at}|${nextRecord.opportunity_id}`,
+        ...(input.include_total === true && input.cursor === undefined && (result.rows.length === 0 || result.rows[0]?.total_count !== undefined)
+          ? { total_pages: Math.max(1, Math.ceil(Number(result.rows[0]?.total_count ?? 0) / limit)) }
+          : {})
       });
     },
 
@@ -140,9 +158,10 @@ export function createPostgresAnalyticsOpportunityStore(db: Queryable): Analytic
   };
 }
 
-function buildAnalyticsOpportunitySelect(): string {
+function buildAnalyticsOpportunitySelect(includeTotal = false): string {
   return `
     SELECT
+      ${includeTotal ? "COUNT(*) OVER() AS total_count," : ""}
       ao.id::text AS opportunity_id,
       ao.project_id::text AS project_id,
       p.name AS project_name,
@@ -317,7 +336,10 @@ function mapAnalyticsOpportunityRow(row: AnalyticsOpportunityRow): AnalyticsOppo
     resolved_at: toNullableIsoString(row.resolved_at),
     snoozed_until: toNullableIsoString(row.snoozed_until),
     bundle_generation_id: toNullableString(row.bundle_generation_id),
-    bundle_status: toNonEmptyString(row.bundle_status, "not_requested") as AnalyticsOpportunityRecord["bundle_status"],
+    bundle_status: toNonEmptyString(
+      row.bundle_status,
+      "not_requested"
+    ) as AnalyticsOpportunityRecord["bundle_status"],
     bundle_created_at: toNullableIsoString(row.bundle_created_at),
     bundle_updated_at: toNullableIsoString(row.bundle_updated_at),
     bundle_failure_reason: toNullableString(row.bundle_failure_reason)
@@ -349,7 +371,9 @@ function toNumber(value: unknown): number {
 }
 
 function toStringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.length > 0) : [];
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.length > 0)
+    : [];
 }
 
 function toIsoString(value: unknown): string {

@@ -1,6 +1,9 @@
 import { formatCaptureRuleMatcher } from "../../lib/capture-rule-copy.js";
 import {
   LinkIcon,
+  PauseIcon,
+  PencilIcon,
+  PlayIcon,
   PlusIcon,
   RotateCcwIcon,
   ShieldAlertIcon,
@@ -31,6 +34,7 @@ import {
 } from "../ui/alert-dialog.js";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
+import { TableActionButton } from "./table-action-button.js";
 import { CollapsibleCard } from "../ui/collapsible-card.js";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "../ui/field.js";
@@ -409,34 +413,25 @@ export function ProjectCaptureRulesCard({
                     {showPreviewOnly ? null : (
                       <TableCell className="align-top text-right">
                         <div className="flex justify-end gap-2">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
+                          <TableActionButton
+                            label={rule.enabled ? "Pause" : "Enable"}
+                            icon={rule.enabled ? PauseIcon : PlayIcon}
                             disabled={isTogglingRuleId === rule.id}
                             onClick={() => void handleToggleEnabled(rule)}
-                          >
-                            {rule.enabled ? "Pause" : "Enable"}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
+                          />
+                          <TableActionButton
+                            label="Edit"
+                            icon={PencilIcon}
                             onClick={() => {
                               setEditingRule(rule);
                               setDraft(buildDraft(rule));
                             }}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
+                          />
+                          <TableActionButton
+                            label="Delete"
+                            icon={Trash2Icon}
                             onClick={() => setPendingDeleteRule(rule)}
-                          >
-                            Delete
-                          </Button>
+                          />
                         </div>
                       </TableCell>
                     )}
@@ -446,6 +441,7 @@ export function ProjectCaptureRulesCard({
             </Table>
             <CursorPaginationControls
               page={rulesPage}
+              totalPages={rulesPageCount}
               hasNextPage={rulesPage < rulesPageCount}
               isLoading={isLoading || isRefreshing}
               onPreviousPage={() => setRulesPage((current) => Math.max(1, current - 1))}
@@ -649,7 +645,6 @@ export function ProjectCaptureRulesCard({
     </>
   );
 }
-
 
 function getActionVariant(
   action: ProjectCaptureRule["action"]

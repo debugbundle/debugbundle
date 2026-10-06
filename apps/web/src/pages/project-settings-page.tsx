@@ -138,7 +138,7 @@ export function ProjectSettingsPage(): JSX.Element {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] xl:items-start">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] xl:items-start">
         <div className="space-y-4">
           <ProjectCapturePolicyCard projectId={project.project_id} organizationPlan={project.organization_plan} canEdit={canManageProject} />
           <ProjectCaptureRulesCard

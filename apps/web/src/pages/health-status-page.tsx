@@ -41,7 +41,7 @@ import {
   type HealthStatusProjectSummary,
   type ProjectHealthStatusInput
 } from "./health-status-page-utils.js";
-import { computeLatestAvailabilityUptimePercentage } from "../lib/health-status-metrics.js";
+import { computeAvailabilityUptimePercentage } from "../lib/health-status-metrics.js";
 
 const STATUS_HISTORY_DAYS = 30;
 
@@ -104,7 +104,7 @@ export function HealthStatusPage(): JSX.Element {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader description="Workspace health status across hosted availability checks. Each block summarizes one retained day of check history." />
+      <PageHeader description="Current health and uptime from recorded checks in the last 30 days. Each block represents a day; days without verified results are excluded from uptime." />
 
       {loadErrorMessage === null ? null : (
         <Notice tone="warning" title="Could not refresh health status">
@@ -115,7 +115,7 @@ export function HealthStatusPage(): JSX.Element {
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <StatusMetric label="Projects" value={String(summary.projectCount)} />
         <StatusMetric label="Checks" value={String(summary.checkCount)} />
-        <StatusMetric label="Uptime" value={formatStatusUptime(summary.uptimePercentage)} />
+        <StatusMetric label="30-day uptime" value={formatStatusUptime(summary.uptimePercentage)} />
       </div>
 
       <Card className="min-w-0">
@@ -223,17 +223,13 @@ function ProjectStatusRow({
           <StatusHistoryStrip
             days={project.days}
             label={`${project.project.name} health history`}
+            scope="project"
           />
         </div>
 
         <div className="flex items-center justify-between gap-3 lg:shrink-0 lg:justify-end">
           <StatusBadge state={project.current_state} />
-          <div className="min-w-24 text-right">
-            <p className="text-sm font-medium text-foreground">
-              {formatStatusUptime(project.uptime_percentage)}
-            </p>
-            <p className="text-xs text-muted-foreground">uptime</p>
-          </div>
+          <StatusUptime value={project.uptime_percentage} />
           <Button asChild type="button" variant="ghost" size="sm">
             <Link to={`/projects/${project.project.project_id}/health`}>Open</Link>
           </Button>
@@ -271,9 +267,7 @@ function CheckStatusRow({
       </div>
       <div className="flex items-center justify-between gap-3 lg:shrink-0 lg:justify-end">
         <StatusBadge state={mapCheckStatusToDayState(check.status)} />
-        <p className="min-w-24 text-right text-sm text-muted-foreground">
-          {formatStatusUptime(summary.uptime_percentage)}
-        </p>
+        <StatusUptime value={summary.uptime_percentage} />
       </div>
     </div>
   );
@@ -282,11 +276,13 @@ function CheckStatusRow({
 function StatusHistoryStrip({
   days,
   label,
-  compact = false
+  compact = false,
+  scope = "check"
 }: {
   days: HealthStatusDay[];
   label: string;
   compact?: boolean;
+  scope?: "check" | "project";
 }): JSX.Element {
   return (
     <div className="min-w-0 w-full" role="img" aria-label={label}>
@@ -296,7 +292,7 @@ function StatusHistoryStrip({
             <TooltipTrigger asChild>
               <button
                 type="button"
-                aria-label={formatStatusDayLabel(day)}
+                aria-label={formatStatusDayLabel(day, scope)}
                 className={cn(
                   "h-5 min-w-1 flex-1 rounded-[2px] border outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
                   compact ? "sm:h-4" : "sm:h-5",
@@ -305,7 +301,7 @@ function StatusHistoryStrip({
               />
             </TooltipTrigger>
             <TooltipContent side="top" sideOffset={6}>
-              {formatStatusDayLabel(day)}
+              {formatStatusDayLabel(day, scope)}
             </TooltipContent>
           </Tooltip>
         ))}
@@ -316,6 +312,15 @@ function StatusHistoryStrip({
 
 function StatusBadge({ state }: { state: HealthStatusDayState }): JSX.Element {
   return <Badge variant={statusBadgeVariant(state)}>{formatHealthStatusLabel(state)}</Badge>;
+}
+
+function StatusUptime({ value }: { value: number | null }): JSX.Element {
+  return (
+    <div className="min-w-24 text-right">
+      <p className="text-sm font-medium text-foreground">{formatStatusUptime(value)}</p>
+      <p className="text-xs text-muted-foreground">30-day uptime</p>
+    </div>
+  );
 }
 
 function StatusMetric({ label, value }: { label: string; value: string }): JSX.Element {
@@ -366,7 +371,7 @@ function buildWorkspaceSummary(projects: HealthStatusProjectSummary[]): {
   return {
     projectCount: projects.length,
     checkCount: projects.reduce((total, project) => total + project.checks.length, 0),
-    uptimePercentage: computeLatestAvailabilityUptimePercentage(allDays)
+    uptimePercentage: computeAvailabilityUptimePercentage(allDays)
   };
 }
 

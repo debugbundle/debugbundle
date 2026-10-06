@@ -88,6 +88,7 @@ export const AnalyticsOpportunitiesQuerySchema = z
     bundle_status: AnalyticsOpportunityBundleStatusSchema.optional(),
     from: z.string().datetime().optional(),
     to: z.string().datetime().optional(),
+    include_total: z.enum(["true", "false"]).optional(),
     cursor: z.string().trim().min(1).optional(),
     limit: z.coerce.number().int().min(1).max(100).optional().default(20)
   })
@@ -114,6 +115,7 @@ export const AnalyticsBundlesListQuerySchema = z
     environment: z.string().trim().min(1).max(120).optional(),
     from: z.string().datetime().optional(),
     to: z.string().datetime().optional(),
+    include_total: z.enum(["true", "false"]).optional(),
     cursor: z.string().trim().min(1).optional(),
     limit: z.coerce.number().int().min(1).max(100).optional().default(20)
   })

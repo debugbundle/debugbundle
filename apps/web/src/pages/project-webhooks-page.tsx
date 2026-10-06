@@ -13,13 +13,34 @@ import { ProjectResourceEmptyState } from "../components/system/project-resource
 import type { ProjectContext } from "../components/system/project-layout.js";
 import { Badge } from "../components/ui/badge.js";
 import { Button } from "../components/ui/button.js";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card.js";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "../components/ui/card.js";
 import { Dialog, DialogTrigger } from "../components/ui/dialog.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "../components/ui/field.js";
 import { Input } from "../components/ui/input.js";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
+import { Notice } from "../components/ui/notice.js";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "../components/ui/select.js";
 import { Skeleton } from "../components/ui/skeleton.js";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "../components/ui/table.js";
 import {
   createProjectWebhook,
   listProjectWebhookDeliveries,
@@ -40,7 +61,8 @@ const WEBHOOK_EVENT_GROUPS: Array<{
 }> = [
   {
     title: "Bundle lifecycle",
-    description: "Track incident bundle creation, refreshes, reopen events, and resolution changes.",
+    description:
+      "Track incident bundle creation, refreshes, reopen events, and resolution changes.",
     events: [
       { value: "bundle.created", label: "bundle.created" },
       { value: "bundle.updated", label: "bundle.updated" },
@@ -66,7 +88,10 @@ const WEBHOOK_EVENT_GROUPS: Array<{
   }
 ];
 
-const SEVERITY_FILTER_OPTIONS: Array<{ value: "" | "low" | "medium" | "high" | "critical"; label: string }> = [
+const SEVERITY_FILTER_OPTIONS: Array<{
+  value: "" | "low" | "medium" | "high" | "critical";
+  label: string;
+}> = [
   { value: "", label: "Any severity" },
   { value: "low", label: "Low" },
   { value: "medium", label: "Medium" },
@@ -86,7 +111,15 @@ type DeliveryState = Record<string, WebhookDeliveryRecord[]>;
 export function ProjectWebhooksPage(): JSX.Element {
   const { project, projectId } = useOutletContext<ProjectContext>();
   const [webhooks, setWebhooks] = useState<WebhookRecord[] | null>(null);
-  const showWebhooksLoading = useDelayedVisibility(webhooks === null);
+  const [webhooksError, setWebhooksError] = useState(false);
+  const [deliveriesError, setDeliveriesError] = useState(false);
+  const [deliveriesLoading, setDeliveriesLoading] = useState(false);
+  const [endpointRevision, setEndpointRevision] = useState(0);
+  const [deliveryRevision, setDeliveryRevision] = useState(0);
+  const showWebhooksLoading = useDelayedVisibility(webhooks === null && !webhooksError);
+  const showDeliveriesLoading = useDelayedVisibility(
+    (webhooks === null && !webhooksError) || deliveriesLoading
+  );
   const [deliveriesByWebhook, setDeliveriesByWebhook] = useState<DeliveryState>({});
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createdWebhook, setCreatedWebhook] = useState<CreatedWebhookRecord | null>(null);
@@ -95,14 +128,63 @@ export function ProjectWebhooksPage(): JSX.Element {
   const [environmentFilter, setEnvironmentFilter] = useState("");
   const [serviceFilter, setServiceFilter] = useState("");
   const [severityMin, setSeverityMin] = useState<"" | "low" | "medium" | "high" | "critical">("");
-  const [selectedBundleTypes, setSelectedBundleTypes] = useState<Array<"failure" | "improvement">>([]);
-  const [verificationScope, setVerificationScope] = useState<"all" | "verification_only" | "non_verification_only">("all");
+  const [selectedBundleTypes, setSelectedBundleTypes] = useState<Array<"failure" | "improvement">>(
+    []
+  );
+  const [verificationScope, setVerificationScope] = useState<
+    "all" | "verification_only" | "non_verification_only"
+  >("all");
   const [activeTestWebhookId, setActiveTestWebhookId] = useState<string | null>(null);
   const scopeOptions = useProjectScopeOptions(projectId, project.environment_default);
 
   useEffect(() => {
-    void loadWebhooks(projectId, setWebhooks, setDeliveriesByWebhook);
-  }, [projectId]);
+    let active = true;
+    setWebhooks(null);
+    setWebhooksError(false);
+    setDeliveriesByWebhook({});
+    void listProjectWebhooks(projectId).then(
+      (records) => {
+        if (active) {
+          setDeliveriesLoading(records.length > 0);
+          setWebhooks(records);
+        }
+      },
+      () => {
+        if (active) setWebhooksError(true);
+      }
+    );
+    return () => {
+      active = false;
+    };
+  }, [projectId, endpointRevision]);
+
+  useEffect(() => {
+    let active = true;
+    setDeliveriesError(false);
+    setDeliveriesLoading(webhooks !== null && webhooks.length > 0);
+    if (webhooks === null || webhooks.length === 0) return;
+    // A failed history read must not hide working endpoint configuration or other histories.
+    void Promise.allSettled(
+      webhooks.map(
+        async (webhook) =>
+          [
+            webhook.webhook_id,
+            await listProjectWebhookDeliveries(webhook.webhook_id, projectId)
+          ] as const
+      )
+    ).then((results) => {
+      if (!active) return;
+      const entries = results.flatMap((result) =>
+        result.status === "fulfilled" ? [result.value] : []
+      );
+      setDeliveriesByWebhook(Object.fromEntries(entries));
+      setDeliveriesError(results.some((result) => result.status === "rejected"));
+      setDeliveriesLoading(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [projectId, webhooks, deliveryRevision]);
 
   const resolvedProjectId = projectId;
 
@@ -115,7 +197,8 @@ export function ProjectWebhooksPage(): JSX.Element {
     )
     .sort((left, right) => {
       const leftTimestamp = left.delivery.last_attempted_at ?? left.delivery.next_attempt_at ?? "";
-      const rightTimestamp = right.delivery.last_attempted_at ?? right.delivery.next_attempt_at ?? "";
+      const rightTimestamp =
+        right.delivery.last_attempted_at ?? right.delivery.next_attempt_at ?? "";
 
       return rightTimestamp.localeCompare(leftTimestamp);
     });
@@ -181,13 +264,17 @@ export function ProjectWebhooksPage(): JSX.Element {
 
   function toggleEventSelection(eventType: WebhookEventType): void {
     setSelectedEvents((current) =>
-      current.includes(eventType) ? current.filter((value) => value !== eventType) : [...current, eventType]
+      current.includes(eventType)
+        ? current.filter((value) => value !== eventType)
+        : [...current, eventType]
     );
   }
 
   function toggleBundleTypeSelection(bundleType: "failure" | "improvement"): void {
     setSelectedBundleTypes((current) =>
-      current.includes(bundleType) ? current.filter((value) => value !== bundleType) : [...current, bundleType]
+      current.includes(bundleType)
+        ? current.filter((value) => value !== bundleType)
+        : [...current, bundleType]
     );
   }
 
@@ -202,152 +289,195 @@ export function ProjectWebhooksPage(): JSX.Element {
               Create webhook
             </Button>
           </DialogTrigger>
-            <DialogFormContent
-              title="Create webhook"
-              size="xl"
-              footer={
-                <Button type="submit" disabled={selectedEvents.length === 0 || endpointUrl.trim() === ""}>
-                  Create webhook
-                </Button>
-              }
-              onSubmit={(event) => void handleCreateWebhook(event)}
-            >
-                <FieldGroup>
+          <DialogFormContent
+            title="Create webhook"
+            size="xl"
+            footer={
+              <Button
+                type="submit"
+                disabled={selectedEvents.length === 0 || endpointUrl.trim() === ""}
+              >
+                Create webhook
+              </Button>
+            }
+            onSubmit={(event) => void handleCreateWebhook(event)}
+          >
+            <FieldGroup>
+              <Field>
+                <FieldLabel htmlFor="webhook-endpoint-url">Endpoint URL</FieldLabel>
+                <FieldDescription>
+                  DebugBundle signs every outgoing payload. Point this at the automation endpoint
+                  that should receive lifecycle events.
+                </FieldDescription>
+                <Input
+                  id="webhook-endpoint-url"
+                  type="url"
+                  value={endpointUrl}
+                  onChange={(event) => setEndpointUrl(event.currentTarget.value)}
+                />
+              </Field>
+              <Field>
+                <FieldLabel>Subscribed events</FieldLabel>
+                <FieldDescription>
+                  Choose the event families this endpoint should receive. Filters below narrow
+                  delivery further without changing the subscription list.
+                </FieldDescription>
+                <div className="space-y-4 pt-1">
+                  {WEBHOOK_EVENT_GROUPS.map((group) => (
+                    <fieldset key={group.title} className="space-y-2">
+                      <legend className="text-sm font-medium text-foreground">{group.title}</legend>
+                      <p className="text-sm text-muted-foreground">{group.description}</p>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {group.events.map((eventOption) => (
+                          <label
+                            key={eventOption.value}
+                            className="grid grid-cols-[auto_1fr] items-center gap-3 rounded-md border border-border bg-background/70 px-3 py-2 text-sm"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedEvents.includes(eventOption.value)}
+                              onChange={() => toggleEventSelection(eventOption.value)}
+                            />
+                            <span className="min-w-0 break-all font-mono text-[11px] uppercase leading-5 tracking-[0.12em] sm:text-xs">
+                              {eventOption.label}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  ))}
+                </div>
+              </Field>
+              <Field>
+                <FieldLabel>Optional filters</FieldLabel>
+                <FieldDescription>
+                  Leave filters empty to deliver every selected event. These match the environment
+                  and service metadata coming from the app that sends events into DebugBundle, not
+                  DebugBundle's own internal services.
+                </FieldDescription>
+                <div className="grid gap-4 pt-1 md:grid-cols-2">
                   <Field>
-                    <FieldLabel htmlFor="webhook-endpoint-url">Endpoint URL</FieldLabel>
-                    <FieldDescription>DebugBundle signs every outgoing payload. Point this at the automation endpoint that should receive lifecycle events.</FieldDescription>
-                    <Input
-                      id="webhook-endpoint-url"
-                      type="url"
-                      value={endpointUrl}
-                      onChange={(event) => setEndpointUrl(event.currentTarget.value)}
+                    <FieldLabel htmlFor="webhook-filter-environment">Environments</FieldLabel>
+                    <FieldDescription>
+                      Limit delivery to selected app environments. Leave empty to deliver every
+                      environment.
+                    </FieldDescription>
+                    <ProjectScopeMultiSelect
+                      id="webhook-filter-environment"
+                      label="Environments"
+                      value={splitScopeValues(environmentFilter)}
+                      options={scopeOptions.environments}
+                      onValueChange={(values) => setEnvironmentFilter(joinScopeValues(values))}
                     />
                   </Field>
                   <Field>
-                    <FieldLabel>Subscribed events</FieldLabel>
-                    <FieldDescription>Choose the event families this endpoint should receive. Filters below narrow delivery further without changing the subscription list.</FieldDescription>
-                    <div className="space-y-4 pt-1">
-                      {WEBHOOK_EVENT_GROUPS.map((group) => (
-                        <fieldset key={group.title} className="space-y-2">
-                          <legend className="text-sm font-medium text-foreground">{group.title}</legend>
-                          <p className="text-sm text-muted-foreground">{group.description}</p>
-                          <div className="grid gap-2 sm:grid-cols-2">
-                            {group.events.map((eventOption) => (
-                              <label
-                                key={eventOption.value}
-                                className="grid grid-cols-[auto_1fr] items-center gap-3 rounded-md border border-border bg-background/70 px-3 py-2 text-sm"
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={selectedEvents.includes(eventOption.value)}
-                                  onChange={() => toggleEventSelection(eventOption.value)}
-                                />
-                                <span className="min-w-0 break-all font-mono text-[11px] uppercase leading-5 tracking-[0.12em] sm:text-xs">
-                                  {eventOption.label}
-                                </span>
-                              </label>
-                            ))}
-                          </div>
-                        </fieldset>
+                    <FieldLabel htmlFor="webhook-filter-service">Services</FieldLabel>
+                    <FieldDescription>
+                      Limit delivery to selected app services. Leave empty to deliver every service.
+                    </FieldDescription>
+                    <ProjectScopeMultiSelect
+                      id="webhook-filter-service"
+                      label="Services"
+                      value={splitScopeValues(serviceFilter)}
+                      options={scopeOptions.services}
+                      onValueChange={(values) => setServiceFilter(joinScopeValues(values))}
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel
+                      id="webhook-filter-severity-label"
+                      htmlFor="webhook-filter-severity"
+                    >
+                      Minimum severity
+                    </FieldLabel>
+                    <Select
+                      value={severityMin === "" ? ANY_SEVERITY_SELECT_VALUE : severityMin}
+                      onValueChange={(value) =>
+                        setSeverityMin(
+                          (value === ANY_SEVERITY_SELECT_VALUE ? "" : value) as typeof severityMin
+                        )
+                      }
+                    >
+                      <SelectTrigger
+                        id="webhook-filter-severity"
+                        aria-labelledby="webhook-filter-severity-label webhook-filter-severity"
+                        className="w-full"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent position="popper">
+                        <SelectGroup>
+                          {SEVERITY_FILTER_OPTIONS.map((option) => (
+                            <SelectItem
+                              key={option.value || "any"}
+                              value={option.value === "" ? ANY_SEVERITY_SELECT_VALUE : option.value}
+                            >
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field>
+                    <FieldLabel
+                      id="webhook-filter-verification-label"
+                      htmlFor="webhook-filter-verification"
+                    >
+                      Verification scope
+                    </FieldLabel>
+                    <Select
+                      value={verificationScope}
+                      onValueChange={(value) =>
+                        setVerificationScope(value as typeof verificationScope)
+                      }
+                    >
+                      <SelectTrigger
+                        id="webhook-filter-verification"
+                        aria-labelledby="webhook-filter-verification-label webhook-filter-verification"
+                        className="w-full"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent position="popper">
+                        <SelectGroup>
+                          <SelectItem value="all">All matching events</SelectItem>
+                          <SelectItem value="verification_only">
+                            Verification events only
+                          </SelectItem>
+                          <SelectItem value="non_verification_only">
+                            Non-verification events only
+                          </SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field className="md:col-span-2">
+                    <FieldLabel>Bundle type</FieldLabel>
+                    <FieldDescription>
+                      Restrict delivery to failure bundles, improvement bundles, or both.
+                    </FieldDescription>
+                    <div className="grid gap-2 pt-1 sm:grid-cols-2">
+                      {BUNDLE_TYPE_FILTER_OPTIONS.map((bundleTypeOption) => (
+                        <label
+                          key={bundleTypeOption.value}
+                          className="flex items-center gap-3 rounded-md border border-border bg-background/70 px-3 py-2 text-sm"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedBundleTypes.includes(bundleTypeOption.value)}
+                            onChange={() => toggleBundleTypeSelection(bundleTypeOption.value)}
+                          />
+                          <span>{bundleTypeOption.label}</span>
+                        </label>
                       ))}
                     </div>
                   </Field>
-                  <Field>
-                    <FieldLabel>Optional filters</FieldLabel>
-                    <FieldDescription>Leave filters empty to deliver every selected event. These match the environment and service metadata coming from the app that sends events into DebugBundle, not DebugBundle's own internal services.</FieldDescription>
-                    <div className="grid gap-4 pt-1 md:grid-cols-2">
-                      <Field>
-                        <FieldLabel htmlFor="webhook-filter-environment">Environments</FieldLabel>
-                        <FieldDescription>Limit delivery to selected app environments. Leave empty to deliver every environment.</FieldDescription>
-                        <ProjectScopeMultiSelect
-                          id="webhook-filter-environment"
-                          label="Environments"
-                          value={splitScopeValues(environmentFilter)}
-                          options={scopeOptions.environments}
-                          onValueChange={(values) => setEnvironmentFilter(joinScopeValues(values))}
-                        />
-                      </Field>
-                      <Field>
-                        <FieldLabel htmlFor="webhook-filter-service">Services</FieldLabel>
-                        <FieldDescription>Limit delivery to selected app services. Leave empty to deliver every service.</FieldDescription>
-                        <ProjectScopeMultiSelect
-                          id="webhook-filter-service"
-                          label="Services"
-                          value={splitScopeValues(serviceFilter)}
-                          options={scopeOptions.services}
-                          onValueChange={(values) => setServiceFilter(joinScopeValues(values))}
-                        />
-                      </Field>
-                      <Field>
-                        <FieldLabel id="webhook-filter-severity-label" htmlFor="webhook-filter-severity">Minimum severity</FieldLabel>
-                        <Select
-                          value={severityMin === "" ? ANY_SEVERITY_SELECT_VALUE : severityMin}
-                          onValueChange={(value) => setSeverityMin((value === ANY_SEVERITY_SELECT_VALUE ? "" : value) as typeof severityMin)}
-                        >
-                          <SelectTrigger
-                            id="webhook-filter-severity"
-                            aria-labelledby="webhook-filter-severity-label webhook-filter-severity"
-                            className="w-full"
-                          >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent position="popper">
-                            <SelectGroup>
-                              {SEVERITY_FILTER_OPTIONS.map((option) => (
-                                <SelectItem key={option.value || "any"} value={option.value === "" ? ANY_SEVERITY_SELECT_VALUE : option.value}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                      </Field>
-                      <Field>
-                        <FieldLabel id="webhook-filter-verification-label" htmlFor="webhook-filter-verification">Verification scope</FieldLabel>
-                        <Select
-                          value={verificationScope}
-                          onValueChange={(value) => setVerificationScope(value as typeof verificationScope)}
-                        >
-                          <SelectTrigger
-                            id="webhook-filter-verification"
-                            aria-labelledby="webhook-filter-verification-label webhook-filter-verification"
-                            className="w-full"
-                          >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent position="popper">
-                            <SelectGroup>
-                              <SelectItem value="all">All matching events</SelectItem>
-                              <SelectItem value="verification_only">Verification events only</SelectItem>
-                              <SelectItem value="non_verification_only">Non-verification events only</SelectItem>
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                      </Field>
-                      <Field className="md:col-span-2">
-                        <FieldLabel>Bundle type</FieldLabel>
-                        <FieldDescription>Restrict delivery to failure bundles, improvement bundles, or both.</FieldDescription>
-                        <div className="grid gap-2 pt-1 sm:grid-cols-2">
-                          {BUNDLE_TYPE_FILTER_OPTIONS.map((bundleTypeOption) => (
-                            <label
-                              key={bundleTypeOption.value}
-                              className="flex items-center gap-3 rounded-md border border-border bg-background/70 px-3 py-2 text-sm"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={selectedBundleTypes.includes(bundleTypeOption.value)}
-                                onChange={() => toggleBundleTypeSelection(bundleTypeOption.value)}
-                              />
-                              <span>{bundleTypeOption.label}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </Field>
-                    </div>
-                  </Field>
-                </FieldGroup>
-            </DialogFormContent>
-          </Dialog>
+                </div>
+              </Field>
+            </FieldGroup>
+          </DialogFormContent>
+        </Dialog>
       </div>
 
       {createdWebhook?.signing_secret === undefined ? null : (
@@ -363,10 +493,25 @@ export function ProjectWebhooksPage(): JSX.Element {
         <Card>
           <CardHeader>
             <CardTitle>Webhook endpoints</CardTitle>
-            <CardDescription>Outbound endpoints and subscribed events for this project.</CardDescription>
+            <CardDescription>
+              Outbound endpoints and subscribed events for this project.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            {webhooks === null ? (
+            {webhooksError ? (
+              <Notice title="Could not load webhook endpoints" tone="destructive">
+                <p>Please try loading the endpoints again.</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => setEndpointRevision((value) => value + 1)}
+                >
+                  Retry webhook endpoints
+                </Button>
+              </Notice>
+            ) : webhooks === null ? (
               showWebhooksLoading ? (
                 <div className="space-y-3">
                   <Skeleton className="h-12 w-full" />
@@ -397,7 +542,9 @@ export function ProjectWebhooksPage(): JSX.Element {
                       <TableCell className="font-medium">{webhook.url}</TableCell>
                       <TableCell>{webhook.events.join(", ")}</TableCell>
                       <TableCell>
-                        <Badge variant={webhook.is_enabled ? "success" : "secondary"}>{webhook.is_enabled ? "enabled" : "disabled"}</Badge>
+                        <Badge variant={webhook.is_enabled ? "success" : "secondary"}>
+                          {webhook.is_enabled ? "enabled" : "disabled"}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         <Button
@@ -408,7 +555,9 @@ export function ProjectWebhooksPage(): JSX.Element {
                           onClick={() => void handleSendTest(webhook.webhook_id)}
                         >
                           <SendIcon data-icon="inline-start" />
-                          {activeTestWebhookId === webhook.webhook_id ? "Sending test..." : "Send test webhook"}
+                          {activeTestWebhookId === webhook.webhook_id
+                            ? "Sending test..."
+                            : "Send test webhook"}
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -425,19 +574,41 @@ export function ProjectWebhooksPage(): JSX.Element {
             <CardDescription>Recent delivery attempts for this project's webhooks.</CardDescription>
           </CardHeader>
           <CardContent>
-            {webhooks === null ? (
-              showWebhooksLoading ? (
+            {deliveriesError ? (
+              <Notice title="Could not load webhook deliveries" tone="destructive">
+                <p>
+                  Some delivery history is unavailable. Your webhook endpoints remain available.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => setDeliveryRevision((value) => value + 1)}
+                >
+                  Retry webhook deliveries
+                </Button>
+              </Notice>
+            ) : null}
+            {webhooksError ? (
+              <p className="text-sm text-muted-foreground">
+                Load webhook endpoints to view delivery history.
+              </p>
+            ) : webhooks === null || deliveriesLoading ? (
+              showDeliveriesLoading ? (
                 <div className="space-y-3">
                   <Skeleton className="h-12 w-full" />
                   <Skeleton className="h-12 w-full" />
                 </div>
               ) : null
             ) : recentDeliveries.length === 0 ? (
-              <ProjectResourceEmptyState
-                icon={SendIcon}
-                title="No delivery attempts yet"
-                description="Send a test webhook to create the first delivery record."
-              />
+              deliveriesError ? null : (
+                <ProjectResourceEmptyState
+                  icon={SendIcon}
+                  title="No delivery attempts yet"
+                  description="Send a test webhook to create the first delivery record."
+                />
+              )
             ) : (
               <Table>
                 <TableHeader>
@@ -454,7 +625,9 @@ export function ProjectWebhooksPage(): JSX.Element {
                       <TableCell className="font-medium">{webhook.url}</TableCell>
                       <TableCell>{delivery.event_type}</TableCell>
                       <TableCell>
-                        <Badge variant={getDeliveryBadgeVariant(delivery.status)}>{delivery.status}</Badge>
+                        <Badge variant={getDeliveryBadgeVariant(delivery.status)}>
+                          {delivery.status}
+                        </Badge>
                       </TableCell>
                       <TableCell>{delivery.attempt_count}</TableCell>
                     </TableRow>
@@ -469,7 +642,9 @@ export function ProjectWebhooksPage(): JSX.Element {
                 Synthetic verification tests
               </div>
               <p className="mt-2 leading-6">
-                The test action sends a signed <span className="font-mono">verification.passed</span> event through the real delivery pipeline so endpoint verification stays close to production behavior.
+                The test action sends a signed{" "}
+                <span className="font-mono">verification.passed</span> event through the real
+                delivery pipeline so endpoint verification stays close to production behavior.
               </p>
             </div>
           </CardContent>
@@ -477,29 +652,6 @@ export function ProjectWebhooksPage(): JSX.Element {
       </div>
     </div>
   );
-}
-
-async function loadWebhooks(
-  projectId: string,
-  setWebhooks: React.Dispatch<React.SetStateAction<WebhookRecord[] | null>>,
-  setDeliveriesByWebhook: React.Dispatch<React.SetStateAction<DeliveryState>>
-): Promise<void> {
-  const nextWebhooks = await listProjectWebhooks(projectId);
-  setWebhooks(nextWebhooks);
-
-  if (nextWebhooks.length === 0) {
-    setDeliveriesByWebhook({});
-    return;
-  }
-
-  const deliveryEntries = await Promise.all(
-    nextWebhooks.map(async (webhook) => {
-      const deliveries = await listProjectWebhookDeliveries(webhook.webhook_id, projectId);
-      return [webhook.webhook_id, deliveries] as const;
-    })
-  );
-
-  setDeliveriesByWebhook(Object.fromEntries(deliveryEntries));
 }
 
 function buildWebhookFilters(input: {

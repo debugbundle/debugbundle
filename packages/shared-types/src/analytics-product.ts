@@ -72,7 +72,8 @@ export type AnalyticsOpportunityRecord = z.infer<typeof AnalyticsOpportunityReco
 export const AnalyticsOpportunitiesListResponseSchema = z
   .object({
     opportunities: z.array(AnalyticsOpportunityRecordSchema).max(100),
-    next_cursor: z.string().trim().min(1).nullable()
+    next_cursor: z.string().trim().min(1).nullable(),
+    total_pages: z.number().int().positive().optional()
   })
   .strict();
 
@@ -110,7 +111,8 @@ export type AnalyticsBundleGenerationRecord = z.infer<typeof AnalyticsBundleGene
 export const AnalyticsBundleGenerationsListResponseSchema = z
   .object({
     bundles: z.array(AnalyticsBundleGenerationRecordSchema).max(100),
-    next_cursor: z.string().trim().min(1).nullable()
+    next_cursor: z.string().trim().min(1).nullable(),
+    total_pages: z.number().int().positive().optional()
   })
   .strict();
 export type AnalyticsBundleGenerationsListResponse = z.infer<
