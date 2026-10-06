@@ -51,6 +51,7 @@ help:
 	@echo "  make aws-smoke-check Run non-mutating AWS access checks for hosted services"
 	@echo "  make install         Install JS dependencies via Docker"
 	@echo "  make lint            Run eslint via Docker"
+	@echo "  make audit           Check dependency advisories at high severity via Docker"
 	@echo "  make typecheck       Run TypeScript checks via Docker"
 	@echo "  make web-check       Run focused web auth/account tests via Docker"
 	@echo "  make compose-check   Run local Docker Compose configuration checks"
@@ -172,6 +173,10 @@ install:
 .PHONY: lint
 lint:
 	$(NODE_RUN) "corepack enable && NODE_OPTIONS=--max-old-space-size=6144 corepack pnpm lint"
+
+.PHONY: audit
+audit:
+	$(NODE_RUN) "corepack enable && corepack pnpm audit --audit-level=high"
 
 .PHONY: typecheck
 typecheck:

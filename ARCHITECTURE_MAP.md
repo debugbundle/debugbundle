@@ -830,3 +830,8 @@ Custom alert webhook signing: `webhook_payload_version` separates compatible leg
 ### Hosted public flow consumers (2026-10-05)
 
 The site and app consume Browser SDK 3.1.0 through their `lib/dogfooding-flows.ts` modules. Optional origin-restricted project configuration enables `site-acquisition` (site visit, app arrival, confirmed sign-in) and `product-activation` (successful project creation, incident read, bundle retrieval). The existing programmatic analytics policy and stored opt-out apply. These consumers use public flow APIs; no private account joins are introduced. Hosted build settings and definition provisioning belong to the private cloud repository.
+
+Web shared styles use the vendored shadcn 4.1.2 Tailwind stylesheet (upstream MIT
+notice retained) through `globals.css`. The component generator is a separate
+development tool, not an app dependency; this removes its unused unpatched glob
+parser from the installed graph while preserving existing component styles.

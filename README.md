@@ -452,3 +452,17 @@ See [SECURITY.md](SECURITY.md) for scope and response expectations.
 ## License
 
 DebugBundle core, SDKs, and executable developer tools use [Apache-2.0](LICENSE). Service-required exceptions are limited to the WordPress plugin (GPL-2.0-or-later) and portable ClawHub/Smithery instruction skill (MIT-0). See the [licensing policy](spec/licensing.md).
+
+### Shared shadcn styles
+
+The web app vendors the unchanged shadcn 4.1.2 Tailwind stylesheet in
+`apps/web/src/styles/shadcn.css`, including its upstream MIT license. This preserves
+the current component animations and data variants without installing the component
+generator and its unused vulnerable glob-parser dependency in the app. Existing
+shadcn components and `components.json` remain the source of the UI. Run the
+component generator separately through its package runner when needed, and review
+any generated dependency/import changes against the dependency audit before adoption.
+
+`make audit` checks the installed dependency graph for high and critical advisories;
+core CI and core publication enforce the same threshold. Dependency refreshes use
+bounded vulnerable-version overrides and preserve independently published SDK pins.

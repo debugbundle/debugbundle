@@ -78,6 +78,9 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
 
+      - name: Audit dependencies
+        run: pnpm audit --audit-level=high
+
       - name: Run core release quality gates
         run: |
           pnpm lint

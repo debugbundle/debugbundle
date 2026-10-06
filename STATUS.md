@@ -11,7 +11,7 @@
 ## Release gates (in progress)
 
 - Candidate versions: core 1.14.1, shared-types/redaction 2.2.1, CLI/MCP/OpenClaw 1.13.1. Registry preflight confirms these npm versions are available. SDK source is unchanged; independent Codex, Claude Code, Gemini and OpenAI versions/pins remain unchanged after compatibility review.
-- Full integration suite: 140 passed in 31 files; one Browser SDK composition check requires the separate built-package integration target and is pending there. Full lint passes. Full unit coverage, clean committed source provenance, typecheck/build, installed consumer checks, GitHub CI, publication and live rollout remain open.
+- Initial clean patch gates pass: 3,915 unit tests in 461 files and changed coverage for all 59 source files, full lint/typecheck/candidate build, installed CLI Node 22/24/26 and upgrade checks, OpenClaw/package contracts, 140 integration tests plus both separate published Browser SDK composition tests. Site generated documentation is committed. GitHub site audit found new source-map-js/sharp advisories; the corresponding core audit exposed additional existing high/critical dependency ranges. Apply minimum patched versions, then rerun the affected full gates before publication. Site advances to 1.6.1; runtime source is still unchanged beyond the requested patch. Publication and live rollout remain open.
 - Previous main CI failures consisted of cancelled matrix jobs; completed core and installed-consumer jobs passed. The new release must finish every required matrix job successfully.
 
 ## Verification

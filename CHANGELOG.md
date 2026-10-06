@@ -22,6 +22,10 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 - Browser-scoped clearing and review of failed GitHub delivery rows without deleting server history.
 - Opt-in, loopback-only populated development preview with synthetic management, billing, health and analytics data and actions. Production builds exclude fixtures and mock telemetry is disabled.
 
+### Security
+
+- Refresh audited Fastify, Undici, MCP SDK, browser routing and transitive dependency ranges to patched versions. Public interfaces, authentication scopes and SDK package releases remain unchanged.
+
 ### Distribution
 
 - Shared types and redaction 2.2.1, CLI/MCP/OpenClaw 1.13.1. Redaction is version-aligned without a behavior change; SDK versions and independently versioned developer plugin pins remain unchanged.
