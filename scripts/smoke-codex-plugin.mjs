@@ -303,5 +303,7 @@ try {
 } finally {
   if (rpc) await rpc.close();
   api.close();
-  await rm(scratch, { recursive: true, force: true });
+  // Native plugin refresh can finish a Git write after its client exits.
+  // Retry only this disposable tree; persistent cleanup failures remain fatal.
+  await rm(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 }

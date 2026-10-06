@@ -218,3 +218,24 @@ A project-owned ordered definition of two to eight named steps and their exact a
 ### Flow handoff
 
 A short-lived, single-use opaque capability that carries a flow run between configured origins. The destination exchanges it for its own context and removes it from the URL; it is not a customer identity or a project token.
+
+## Dashboard patch terms
+
+### 30-day uptime
+
+The check-based percentage of successful verified endpoint checks over all verified
+checks in the displayed 30 UTC-day window. Unknown/unmonitored periods are excluded;
+project and workspace aggregates are weighted by check counts. Current status and
+explicit daily summaries are separate measurements.
+
+### Local mock preview
+
+The opt-in loopback-only development dashboard populated with synthetic records and
+in-memory simulated actions. It sends no provider deliveries or real billing changes,
+disables frontend telemetry, and resets simulated state when the web container restarts.
+
+### Cleared failed delivery
+
+A failed GitHub delivery whose ID is hidden for the current user and project in that
+browser. Server history is retained; Show cleared permits inspection and retry, and
+new failure IDs remain visible.

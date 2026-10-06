@@ -40,14 +40,14 @@ importers:
         specifier: workspace:*
         version: link:packages/auth
       "@debugbundle/redaction":
-        specifier: 2.2.0
-        version: 2.2.0
+        specifier: 2.2.1
+        version: 2.2.1
       "@debugbundle/sdk-node":
         specifier: 3.1.0
         version: 3.1.0
       "@debugbundle/shared-types":
-        specifier: 2.2.0
-        version: 2.2.0
+        specifier: 2.2.1
+        version: 2.2.1
       "@modelcontextprotocol/sdk":
         specifier: ^1.31.0
         version: 1.32.1(zod@3.25.76)
@@ -823,10 +823,10 @@ packages:
         integrity: sha512-+IXVGehnYXwYE2niSRg0KVkPCmqm4FPhbHlz3XWCEIqrsPopSNcay14VMmdAPInsBy9FdVhP1J4CRWM8VCj8Cg==
       }
 
-  "@debugbundle/redaction@2.2.0":
+  "@debugbundle/redaction@2.2.1":
     resolution:
       {
-        integrity: sha512-1Jl7hmgSjzCDwmj6oR54n+wC+shfwMzGQHsFF32rRXvThasixYp1INShqi/H98eO8tIZ+aklnDYmVfOaYy1T9A==
+        integrity: sha512-DjqdqjemaLfS/MPU4Zm5yhUf94ll+5MdyFdmWLkJvk0QLahxsSE2CKjxUwoeb+xSBQjqojhioAIKkjES+6x3iA==
       }
 
   "@debugbundle/sdk-browser@3.1.0":
@@ -847,10 +847,10 @@ packages:
         integrity: sha512-dB2XWLm+3VGd5dGQ4bM1PuUYkCB96iJlFrs+Mgio1MbVBu9GEQhk1h+HC4hVCyyiXvb9+NOClF8e648XPA1Cxg==
       }
 
-  "@debugbundle/shared-types@2.2.0":
+  "@debugbundle/shared-types@2.2.1":
     resolution:
       {
-        integrity: sha512-HyXM2ga2Ado2hyaLtyAtbJ9zyUIG3yamEUjlV/S5kSZJu/BgFpEgziAGWOjGWSpG7rjKwJIF7X/8riKupRko4A==
+        integrity: sha512-KMVHcCi85sDYv/0l/PDJgHHsnui0i0qmEh+vL9lqLKAwLeUjEXtAzCPeuQwmrA5fD7JOl+9FwHqDODc933ZPgw==
       }
 
   "@earendil-works/pi-tui@0.78.0":
@@ -8225,7 +8225,7 @@ snapshots:
 
   "@debugbundle/redaction@2.1.0": {}
 
-  "@debugbundle/redaction@2.2.0": {}
+  "@debugbundle/redaction@2.2.1": {}
 
   "@debugbundle/sdk-browser@3.1.0":
     dependencies:
@@ -8242,7 +8242,7 @@ snapshots:
     dependencies:
       zod: 3.25.76
 
-  "@debugbundle/shared-types@2.2.0":
+  "@debugbundle/shared-types@2.2.1":
     dependencies:
       zod: 3.25.76
 
