@@ -50,7 +50,7 @@ is required. Never update consumer pins to unpublished packages on public `main`
 
 ## Readiness evidence
 
-- Previous final local qualification: 4,066 unit tests in 497 files; all 73 changed
+- Fresh release qualification: 4,066 unit tests in 497 files; all 73 changed
   source coverage gates pass. Frozen legacy MCP fixtures are unchanged.
 - Fresh release integration: 141 tests in 31 files pass, including the published
   Browser SDK 3.1.0 HTTP/API/database composition path; no skipped cases.
@@ -62,3 +62,23 @@ is required. Never update consumer pins to unpublished packages on public `main`
 
 Final source SHAs, workflow outcomes, registry/install evidence and hosted results
 will be recorded after execution. A workflow trigger alone is not a successful release.
+
+## Package publication and final consumer preparation
+
+- Shared types/redaction 2.3.0 published and clean registry consumers passed:
+  [workflow 37655850138](https://github.com/debugbundle/debugbundle/actions/runs/37655850138), source `5de8338470a6b3cf650bdb191a16c8a6bd4d88d2`.
+- CLI 1.14.0 published; installed Node 22/24/26 lanes and registry smoke passed:
+  [workflow 37656792471](https://github.com/debugbundle/debugbundle/actions/runs/37656792471).
+- MCP 1.14.0 published; candidate/native Codex matrix, OpenClaw build and registry
+  stdio/native checks passed:
+  [workflow 37656797000](https://github.com/debugbundle/debugbundle/actions/runs/37656797000).
+  CLI/MCP publication source: `edd52cf4f63ce0c96f70702fb11326bc6dfd627f`.
+- Hosted shared-package pins adopt exactly 2.3.0 after registry verification. The
+  normalized lockfile changes only those two versions and their integrity hashes.
+- Codex 0.153.1, Claude Code 2.1.277 and Gemini CLI 0.61.0 native candidate checks pass
+  with 130 tools, local evidence, authentication boundaries and removal. Contract
+  checks pass (81 Gemini/routing/setup cases and 16 Codex/Claude/routing cases).
+- Full lint/typecheck/license checks, candidate/OpenClaw builds and all 73 changed
+  source coverage gates pass. The site audit reports no known vulnerabilities.
+- Cloud migration, activation, retention and site-boundary tests pass (35 cases).
+  No cloud deployment code or database schema change is required.

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-07
+
+- Adopt published MCP 1.14.0 with real-app verification, organization GitHub disconnect and all lifecycle webhook test events. Preserve local authentication, existing tools and CLI-first guidance.
+
 ## [1.0.1] - 2026-10-05
 
 - Adopt MCP 1.13.0 with public project acquisition and activation flow definitions and aggregate reports.
