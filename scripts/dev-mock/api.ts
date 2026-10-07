@@ -1,6 +1,10 @@
 import { z } from "zod";
 
 import { createDevMockFixtures, type MockRecord } from "./fixtures.js";
+import {
+  buildIncidentContextRecord,
+  type IncidentContextIncidentRecord
+} from "../../packages/storage/src/incident-context.js";
 import { base } from "./base.js";
 import syntheticBundle from "./bundle.json" with { type: "json" };
 import { createManagementMocks } from "./management.js";
@@ -239,6 +243,27 @@ export function createDevMockApi() {
         row["status"] = bulk[1] === "resolve" ? "resolved" : "open";
       });
       return reply({ incidents });
+    }
+    const contextMatch = /^\/v1\/incidents\/([^/]+)\/context$/.exec(route);
+    if (read && contextMatch) {
+      const incident = data.incidents.find(
+        (row) =>
+          row["incident_id"] === contextMatch[1] && (!projectId || row["project_id"] === projectId)
+      );
+      if (!incident) return missing();
+      return reply(
+        buildIncidentContextRecord({
+          incident: incident as IncidentContextIncidentRecord,
+          bundle: { status: "pending" },
+          reproduction: { status: "pending" },
+          logs: { logs: [], next_cursor: null }
+        })
+      );
+    }
+    if (read && path === "/v1/logs") {
+      if (!data.incidents.some((row) => row["incident_id"] === query.get("incident_id")))
+        return missing();
+      return reply({ logs: [], next_cursor: null });
     }
     const detail = /^\/v1\/(incidents|improvements)\/([^/]+)(?:\/(bundle|reproduction))?$/.exec(
       route

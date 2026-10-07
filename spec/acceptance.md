@@ -862,7 +862,7 @@ Each MCP tool must produce results that match its API/CLI equivalent:
 - Bundle parity (`debugbundle_get_bundle` = `GET /v1/incidents/{id}/bundle` = `debugbundle bundle <id> --json`)
 - Reproduction parity (`debugbundle_get_reproduction` = `GET /v1/incidents/{id}/reproduction` = `debugbundle reproduce <id> --json`)
 - Doctor parity (`debugbundle_doctor` = `debugbundle doctor --json`)
-- Verification parity (`debugbundle_verify_local` / `debugbundle_verify_cloud` = CLI verify equivalents)
+- Verification parity (`debugbundle_verify_local` / `debugbundle_verify_cloud` = CLI verify equivalents); additive `verify_app_event` matches `verify cloud --expect-app-event` through both ordinary and local-auth schemas, accepts nonblank service/traceId/requestId scope and rejects synthetic mode injection. The original verification contracts remain frozen.
 - Capture policy parity (`get_capture_policy` / `update_capture_policy` = `debugbundle capture-policy get/set --json`)
 - Probe parity (`activate_probe` / `list_active_probes` / `deactivate_probe` = `debugbundle probe activate/list/deactivate --json`)
 - Project parity (`list_projects` / `create_project` / `update_project` / `delete_project` = `debugbundle project list/create/update/delete --json`)
@@ -2760,3 +2760,12 @@ These are local correctness gates. Production activation, representative traffic
 ### AC-ANL-21: Public connected flows
 
 The seven acceptance cases in [public project flows](analytics-public-flows-20261003.md) are required. Verify independent projects, site/blog and site/auth/app continuity, ordered observations, permission and origin boundaries, expiry/replay/withdrawal, aggregate retention, compatibility and public interface parity. DebugBundle-only fixtures do not satisfy this criterion.
+
+### Interface parity remediation qualification
+
+Verify PAR-01 through PAR-14 against `interface-parity-matrix.md`: actual component
+requests and command/tool dispatch must match the existing API values, scope and
+outcome, including disabled/nullable/empty/false values. Cover creator/role/tier
+boundaries, one-time secrets, stale navigation responses, bounded pagination,
+invalid input before dispatch and legacy MCP metadata. Source/unit evidence does
+not assert browser, provider, release or installed-client acceptance.

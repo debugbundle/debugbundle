@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { WebhookApiError } from "../../../packages/webhook-client/src/index.js";
-import { WEBHOOK_MCP_TOOL_NAMES, createWebhookMcpTools } from "../../../apps/mcp/src/webhook-tools.js";
+import {
+  WEBHOOK_MCP_TOOL_NAMES,
+  createWebhookMcpTools
+} from "../../../apps/mcp/src/webhook-tools.js";
 
 describe("mcp webhook tools", () => {
   it("declares webhook tool parity", () => {
@@ -11,6 +14,7 @@ describe("mcp webhook tools", () => {
       "update_webhook",
       "delete_webhook",
       "test_webhook",
+      "test_webhook_event",
       "list_webhook_deliveries",
       "retry_webhook_delivery"
     ]);
@@ -19,13 +23,19 @@ describe("mcp webhook tools", () => {
   it("returns webhook and delivery payloads", async () => {
     const tools = createWebhookMcpTools({
       listWebhooks: vi.fn().mockResolvedValue([{ webhook_id: "wh_1" }]),
-      createWebhook: vi.fn().mockResolvedValue({ webhook_id: "wh_2", signing_secret: "dbundle_whsec_secret" }),
+      createWebhook: vi
+        .fn()
+        .mockResolvedValue({ webhook_id: "wh_2", signing_secret: "dbundle_whsec_secret" }),
       getWebhook: vi.fn(),
       updateWebhook: vi.fn().mockResolvedValue({ webhook_id: "wh_2", is_enabled: false }),
       deleteWebhook: vi.fn().mockResolvedValue({ webhook_id: "wh_2" }),
-      testWebhook: vi.fn().mockResolvedValue({ delivery_id: "del_test", event_type: "verification.failed" }),
+      testWebhook: vi
+        .fn()
+        .mockResolvedValue({ delivery_id: "del_test", event_type: "verification.failed" }),
       listWebhookDeliveries: vi.fn().mockResolvedValue([{ delivery_id: "del_1" }]),
-      retryWebhookDelivery: vi.fn().mockResolvedValue({ delivery_id: "del_1", event_type: "bundle.created" })
+      retryWebhookDelivery: vi
+        .fn()
+        .mockResolvedValue({ delivery_id: "del_1", event_type: "bundle.created" })
     });
 
     await expect(
@@ -132,7 +142,9 @@ describe("mcp webhook tools", () => {
       deleteWebhook: vi.fn().mockResolvedValue({ webhook_id: "wh_3" }),
       testWebhook: vi.fn().mockResolvedValue({ delivery_id: "del_3" }),
       listWebhookDeliveries: vi.fn().mockResolvedValue([]),
-      retryWebhookDelivery: vi.fn().mockResolvedValue({ delivery_id: "del_3", event_type: "verification.failed" })
+      retryWebhookDelivery: vi
+        .fn()
+        .mockResolvedValue({ delivery_id: "del_3", event_type: "verification.failed" })
     };
     const tools = createWebhookMcpTools(api);
 
@@ -195,10 +207,20 @@ describe("mcp webhook tools", () => {
     const tools = createWebhookMcpTools(api);
 
     await expect(
-      tools.list_webhook_deliveries({ bearerToken: "dbundle_mem_x", projectId: "proj_1", webhookId: "wh_4", limit: 7 })
+      tools.list_webhook_deliveries({
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        webhookId: "wh_4",
+        limit: 7
+      })
     ).resolves.toEqual({ deliveries: [{ delivery_id: "del_4" }] });
     await expect(
-      tools.test_webhook({ bearerToken: "dbundle_mem_x", projectId: "proj_1", webhookId: "wh_4", eventType: "not-valid" })
+      tools.test_webhook({
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        webhookId: "wh_4",
+        eventType: "not-valid"
+      })
     ).resolves.toEqual({ delivery: { delivery_id: "del_4" } });
 
     expect(api.listWebhookDeliveries).toHaveBeenCalledWith({

@@ -9,7 +9,14 @@ type CommandResult = {
   output: string;
 };
 
-export const SETUP_MCP_TOOL_NAMES = ["doctor", "validate", "verify_local", "verify_cloud", "smoke"] as const;
+export const SETUP_MCP_TOOL_NAMES = [
+  "doctor",
+  "validate",
+  "verify_local",
+  "verify_cloud",
+  "verify_app_event",
+  "smoke"
+] as const;
 
 function mapMcpError(): never {
   throw new Error("mcp_tool_error:unknown_error");
@@ -22,6 +29,24 @@ function parseJsonOutput(output: string): JsonLikeObject {
   }
 
   return parsed as JsonLikeObject;
+}
+
+function cloudVerificationOptions(
+  input: JsonLikeObject
+): Pick<
+  Parameters<typeof verifyCloudCommand>[0],
+  "projectId" | "service" | "environment" | "maxAgeMinutes" | "authFilePath"
+> & { json: true } {
+  return {
+    projectId: String(input["projectId"]),
+    ...(typeof input["service"] === "string" ? { service: input["service"] } : {}),
+    ...(typeof input["environment"] === "string" ? { environment: input["environment"] } : {}),
+    ...(typeof input["maxAgeMinutes"] === "number"
+      ? { maxAgeMinutes: input["maxAgeMinutes"] }
+      : {}),
+    ...(typeof input["authFilePath"] === "string" ? { authFilePath: input["authFilePath"] } : {}),
+    json: true as const
+  };
 }
 
 async function runJsonCommand(command: () => Promise<CommandResult>): Promise<JsonLikeObject> {
@@ -39,12 +64,17 @@ export function createSetupMcpTools(commands: {
   verifyLocalCommand: typeof verifyLocalCommand;
   verifyCloudCommand: typeof verifyCloudCommand;
   smokeCommand: typeof smokeCommand;
-}): Record<(typeof SETUP_MCP_TOOL_NAMES)[number], (input: Record<string, unknown>) => Promise<unknown>> {
+}): Record<
+  (typeof SETUP_MCP_TOOL_NAMES)[number],
+  (input: Record<string, unknown>) => Promise<unknown>
+> {
   return {
     async doctor(input) {
       return runJsonCommand(() =>
         commands.doctorCommand({
-          ...(typeof input["authFilePath"] === "string" ? { authFilePath: input["authFilePath"] } : {}),
+          ...(typeof input["authFilePath"] === "string"
+            ? { authFilePath: input["authFilePath"] }
+            : {}),
           ...(input["privacy"] === true ? { privacy: true } : {}),
           json: true
         })
@@ -71,14 +101,22 @@ export function createSetupMcpTools(commands: {
     async verify_cloud(input) {
       return runJsonCommand(() =>
         commands.verifyCloudCommand({
-          projectId: String(input["projectId"]),
-          ...(typeof input["service"] === "string" ? { service: input["service"] } : {}),
-          ...(typeof input["environment"] === "string" ? { environment: input["environment"] } : {}),
-          ...(typeof input["maxAgeMinutes"] === "number" ? { maxAgeMinutes: input["maxAgeMinutes"] } : {}),
+          ...cloudVerificationOptions(input),
           ...(input["trigger5xx"] === true ? { trigger5xx: true } : {}),
-          ...(typeof input["trigger4xxStatus"] === "number" ? { trigger4xxStatus: input["trigger4xxStatus"] } : {}),
-          ...(typeof input["authFilePath"] === "string" ? { authFilePath: input["authFilePath"] } : {}),
-          json: true
+          ...(typeof input["trigger4xxStatus"] === "number"
+            ? { trigger4xxStatus: input["trigger4xxStatus"] }
+            : {})
+        })
+      );
+    },
+
+    async verify_app_event(input) {
+      return runJsonCommand(() =>
+        commands.verifyCloudCommand({
+          ...cloudVerificationOptions(input),
+          expectAppEvent: true,
+          ...(typeof input["traceId"] === "string" ? { traceId: input["traceId"] } : {}),
+          ...(typeof input["requestId"] === "string" ? { requestId: input["requestId"] } : {})
         })
       );
     },
@@ -88,9 +126,15 @@ export function createSetupMcpTools(commands: {
         commands.smokeCommand({
           projectId: String(input["projectId"]),
           ...(typeof input["service"] === "string" ? { service: input["service"] } : {}),
-          ...(typeof input["environment"] === "string" ? { environment: input["environment"] } : {}),
-          ...(typeof input["maxAgeMinutes"] === "number" ? { maxAgeMinutes: input["maxAgeMinutes"] } : {}),
-          ...(typeof input["authFilePath"] === "string" ? { authFilePath: input["authFilePath"] } : {}),
+          ...(typeof input["environment"] === "string"
+            ? { environment: input["environment"] }
+            : {}),
+          ...(typeof input["maxAgeMinutes"] === "number"
+            ? { maxAgeMinutes: input["maxAgeMinutes"] }
+            : {}),
+          ...(typeof input["authFilePath"] === "string"
+            ? { authFilePath: input["authFilePath"] }
+            : {}),
           json: true
         })
       );

@@ -590,6 +590,7 @@ export interface AlertRecord {
   is_enabled: boolean;
   created_at: string;
   updated_at: string;
+  signing_secret?: string;
 }
 
 export type WeeklyReportChannel = "email" | "slack";

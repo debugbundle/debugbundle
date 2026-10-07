@@ -10,7 +10,7 @@ import {
   ShieldOffIcon,
   Trash2Icon
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
@@ -37,12 +37,8 @@ import { Button } from "../ui/button.js";
 import { TableActionButton } from "./table-action-button.js";
 import { CollapsibleCard } from "../ui/collapsible-card.js";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty.js";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "../ui/field.js";
-import { Input } from "../ui/input.js";
 import { Skeleton } from "../ui/skeleton.js";
-import { Switch } from "../ui/switch.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table.js";
-import { Textarea } from "../ui/textarea.js";
 import {
   buildProjectCaptureRuleCreate,
   CaptureRuleCreateForm,
@@ -63,29 +59,22 @@ interface ProjectCaptureRulesCardProps {
   canEdit: boolean;
 }
 
-interface RuleDraft {
-  name: string;
-  description: string;
-  enabled: boolean;
-  expires_at: string;
-}
-
-function buildDraft(rule: ProjectCaptureRule): RuleDraft {
+function buildDraft(rule: ProjectCaptureRule): CaptureRuleCreateDraft {
   return {
+    ...createDefaultCaptureRuleCreateDraft(),
     name: rule.name,
     description: rule.description ?? "",
     enabled: rule.enabled,
-    expires_at: toDateTimeLocalInputValue(rule.expires_at)
+    action: rule.action,
+    sampleRatePercent: rule.sample_rate === null ? "25" : String(rule.sample_rate * 100),
+    sampleEventClass: rule.sample_event_class ?? "preserve",
+    expiresAt: toDateTimeLocalInputValue(rule.expires_at),
+    advancedMatcherJson: JSON.stringify(rule.matcher, null, 2),
+    matcherJsonOnly: true
   };
 }
-
-function draftsEqual(left: RuleDraft, right: RuleDraft): boolean {
-  return (
-    left.name === right.name &&
-    left.description === right.description &&
-    left.enabled === right.enabled &&
-    left.expires_at === right.expires_at
-  );
+function draftsEqual(left: CaptureRuleCreateDraft, right: CaptureRuleCreateDraft): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 export function ProjectCaptureRulesCard({
@@ -98,7 +87,7 @@ export function ProjectCaptureRulesCard({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [editingRule, setEditingRule] = useState<ProjectCaptureRule | null>(null);
-  const [draft, setDraft] = useState<RuleDraft | null>(null);
+  const [draft, setDraft] = useState<CaptureRuleCreateDraft | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingDeleteRule, setPendingDeleteRule] = useState<ProjectCaptureRule | null>(null);
   const [isDeletingRuleId, setIsDeletingRuleId] = useState<string | null>(null);
@@ -112,7 +101,26 @@ export function ProjectCaptureRulesCard({
   const [rulesPage, setRulesPage] = useState(1);
   const scopeOptions = useProjectScopeOptions(projectId, environmentDefault);
 
+  const generation = useRef(0);
+  useEffect(() => {
+    generation.current += 1;
+    setRulesResponse(null);
+    setEditingRule(null);
+    setDraft(null);
+    setPendingDeleteRule(null);
+    setIsSaving(false);
+    setIsCreating(false);
+    setIsDeletingRuleId(null);
+    setIsTogglingRuleId(null);
+    setIsCreateOpen(false);
+    setCreateDraft(createDefaultCaptureRuleCreateDraft());
+    return () => {
+      generation.current += 1;
+    };
+  }, [projectId]);
+
   async function loadRules(showRefreshing = false): Promise<void> {
+    const requestGeneration = generation.current;
     if (showRefreshing) {
       setIsRefreshing(true);
     } else {
@@ -122,14 +130,18 @@ export function ProjectCaptureRulesCard({
 
     try {
       const response = await listProjectCaptureRules(projectId);
+      if (generation.current !== requestGeneration) return;
       setRulesResponse(response);
     } catch {
+      if (generation.current !== requestGeneration) return;
       setErrorMessage("Could not load capture rules.");
     } finally {
-      if (showRefreshing) {
-        setIsRefreshing(false);
-      } else {
-        setIsLoading(false);
+      if (generation.current === requestGeneration) {
+        if (showRefreshing) {
+          setIsRefreshing(false);
+        } else {
+          setIsLoading(false);
+        }
       }
     }
   }
@@ -156,6 +168,8 @@ export function ProjectCaptureRulesCard({
     editingRule !== null && editDraft !== null
       ? !draftsEqual(editDraft, buildDraft(editingRule))
       : false;
+  const editValidationError =
+    editDraft === null ? null : getCaptureRuleCreateDraftValidationError(editDraft);
   const createValidationError = getCaptureRuleCreateDraftValidationError(createDraft);
   const rulesPageCount = Math.max(1, Math.ceil(sortedRules.length / CAPTURE_RULES_PAGE_SIZE));
   const visibleRules = useMemo(() => {
@@ -168,6 +182,7 @@ export function ProjectCaptureRulesCard({
   }, [rulesPageCount]);
 
   async function handleCreateRule(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+    const requestGeneration = generation.current;
     event.preventDefault();
     if (createValidationError !== null) {
       setHasSubmittedCreate(true);
@@ -180,6 +195,7 @@ export function ProjectCaptureRulesCard({
         projectId,
         buildProjectCaptureRuleCreate(createDraft)
       );
+      if (generation.current !== requestGeneration) return;
       setRulesResponse((current) =>
         current === null
           ? current
@@ -194,13 +210,17 @@ export function ProjectCaptureRulesCard({
       setIsCreateOpen(false);
       showSuccessToast("Capture rule created successfully.");
     } catch {
+      if (generation.current !== requestGeneration) return;
       showErrorToast("Could not create capture rule.");
     } finally {
-      setIsCreating(false);
+      if (generation.current === requestGeneration) {
+        setIsCreating(false);
+      }
     }
   }
 
   async function handleToggleEnabled(rule: ProjectCaptureRule): Promise<void> {
+    const requestGeneration = generation.current;
     setIsTogglingRuleId(rule.id);
     setErrorMessage(null);
 
@@ -208,6 +228,7 @@ export function ProjectCaptureRulesCard({
       const updated = await updateProjectCaptureRule(projectId, rule.id, {
         enabled: !rule.enabled
       });
+      if (generation.current !== requestGeneration) return;
       setRulesResponse((current) =>
         current === null
           ? current
@@ -222,28 +243,57 @@ export function ProjectCaptureRulesCard({
         rule.enabled ? "Capture rule paused successfully." : "Capture rule enabled successfully."
       );
     } catch {
+      if (generation.current !== requestGeneration) return;
       showErrorToast("Could not update capture rule.");
     } finally {
-      setIsTogglingRuleId(null);
+      if (generation.current === requestGeneration) {
+        setIsTogglingRuleId(null);
+      }
     }
   }
 
   async function handleSaveRule(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+    const requestGeneration = generation.current;
     event.preventDefault();
-    if (editingRule === null || editDraft === null || !isEditDirty) {
+    if (
+      editingRule === null ||
+      editDraft === null ||
+      !isEditDirty ||
+      editValidationError !== null
+    ) {
       return;
     }
 
     setIsSaving(true);
 
     try {
+      const create = buildProjectCaptureRuleCreate(editDraft);
       const updated = await updateProjectCaptureRule(projectId, editingRule.id, {
-        name: editDraft.name.trim(),
-        description:
-          editDraft.description.trim().length === 0 ? null : editDraft.description.trim(),
-        enabled: editDraft.enabled,
-        expires_at: parseDateTimeLocalValue(editDraft.expires_at)
+        name: create.name,
+        description: create.description ?? null,
+        enabled: create.enabled ?? true,
+        action: create.action,
+        matcher: create.matcher,
+        ...(create.action === "sample"
+          ? {
+              sample_rate:
+                editDraft.sampleRatePercent === buildDraft(editingRule).sampleRatePercent &&
+                editingRule.action === "sample"
+                  ? editingRule.sample_rate
+                  : (create.sample_rate ?? null),
+              sample_event_class:
+                editDraft.sampleEventClass === buildDraft(editingRule).sampleEventClass &&
+                editingRule.action === "sample"
+                  ? editingRule.sample_event_class
+                  : (create.sample_event_class ?? null)
+            }
+          : {}),
+        // The datetime-local control displays minutes; untouched expiry must retain exact stored seconds.
+        ...(editDraft.expiresAt === buildDraft(editingRule).expiresAt
+          ? {}
+          : { expires_at: create.expires_at ?? null })
       });
+      if (generation.current !== requestGeneration) return;
       setRulesResponse((current) =>
         current === null
           ? current
@@ -258,13 +308,17 @@ export function ProjectCaptureRulesCard({
       setDraft(null);
       showSuccessToast("Capture rule updated successfully.");
     } catch {
+      if (generation.current !== requestGeneration) return;
       showErrorToast("Could not save capture rule changes.");
     } finally {
-      setIsSaving(false);
+      if (generation.current === requestGeneration) {
+        setIsSaving(false);
+      }
     }
   }
 
   async function handleDeleteRule(): Promise<void> {
+    const requestGeneration = generation.current;
     if (pendingDeleteRule === null) {
       return;
     }
@@ -272,6 +326,7 @@ export function ProjectCaptureRulesCard({
     setIsDeletingRuleId(pendingDeleteRule.id);
     try {
       await deleteProjectCaptureRule(projectId, pendingDeleteRule.id);
+      if (generation.current !== requestGeneration) return;
       setRulesResponse((current) =>
         current === null
           ? current
@@ -283,9 +338,12 @@ export function ProjectCaptureRulesCard({
       setPendingDeleteRule(null);
       showSuccessToast("Capture rule deleted successfully.");
     } catch {
+      if (generation.current !== requestGeneration) return;
       showErrorToast("Could not delete capture rule.");
     } finally {
-      setIsDeletingRuleId(null);
+      if (generation.current === requestGeneration) {
+        setIsDeletingRuleId(null);
+      }
     }
   }
 
@@ -463,7 +521,7 @@ export function ProjectCaptureRulesCard({
         {editingRule === null || editDraft === null ? null : (
           <DialogFormContent
             title="Edit capture rule"
-            description="Adjust the rule metadata, expiration, and whether it is actively applied."
+            description="Update the matcher, action, sampling, expiration, and enabled state."
             size="lg"
             onSubmit={(event) => void handleSaveRule(event)}
             footer={
@@ -480,84 +538,25 @@ export function ProjectCaptureRulesCard({
                 </Button>
                 <Button
                   type="submit"
-                  disabled={!isEditDirty || isSaving || editDraft.name.trim().length === 0}
+                  disabled={!isEditDirty || isSaving || editValidationError !== null}
                 >
                   {isSaving ? "Saving..." : "Save capture rule"}
                 </Button>
               </>
             }
           >
-            <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="project-capture-rule-name">Rule name</FieldLabel>
-                <Input
-                  id="project-capture-rule-name"
-                  value={editDraft.name}
-                  onChange={(event) => {
-                    const value = event.currentTarget.value;
-                    setDraft((current) => ({ ...(current ?? editDraft), name: value }));
-                  }}
-                  disabled={isSaving}
-                />
-              </Field>
-
-              <Field>
-                <FieldLabel htmlFor="project-capture-rule-description">Description</FieldLabel>
-                <Textarea
-                  id="project-capture-rule-description"
-                  value={editDraft.description}
-                  onChange={(event) => {
-                    const value = event.currentTarget.value;
-                    setDraft((current) => ({ ...(current ?? editDraft), description: value }));
-                  }}
-                  disabled={isSaving}
-                  rows={4}
-                />
-                <FieldDescription>
-                  Keep this short and factual so future reviewers know why the rule exists.
-                </FieldDescription>
-              </Field>
-
-              <Field orientation="horizontal" className="items-center justify-between gap-4">
-                <div className="flex flex-1 flex-col gap-1">
-                  <FieldLabel
-                    id="project-capture-rule-enabled-label"
-                    htmlFor="project-capture-rule-enabled"
-                  >
-                    Enabled
-                  </FieldLabel>
-                  <FieldDescription>
-                    Disable a rule temporarily without deleting its definition or match history.
-                  </FieldDescription>
-                </div>
-                <Switch
-                  id="project-capture-rule-enabled"
-                  aria-labelledby="project-capture-rule-enabled-label"
-                  checked={editDraft.enabled}
-                  disabled={isSaving}
-                  onCheckedChange={(checked) => {
-                    setDraft((current) => ({ ...(current ?? editDraft), enabled: checked }));
-                  }}
-                />
-              </Field>
-
-              <Field>
-                <FieldLabel htmlFor="project-capture-rule-expires-at">Expires at</FieldLabel>
-                <Input
-                  id="project-capture-rule-expires-at"
-                  type="datetime-local"
-                  value={editDraft.expires_at}
-                  onChange={(event) => {
-                    const value = event.currentTarget.value;
-                    setDraft((current) => ({ ...(current ?? editDraft), expires_at: value }));
-                  }}
-                  disabled={isSaving}
-                />
-                <FieldDescription>
-                  Leave blank to keep the rule active until it is disabled or deleted.
-                </FieldDescription>
-              </Field>
-            </FieldGroup>
+            <CaptureRuleCreateForm
+              draft={editDraft}
+              disabled={isSaving}
+              serviceOptions={scopeOptions.services}
+              environmentOptions={scopeOptions.environments}
+              onDraftChange={setDraft}
+            />
+            {editValidationError === null ? null : (
+              <p role="alert" className="text-sm text-destructive">
+                {editValidationError}
+              </p>
+            )}
           </DialogFormContent>
         )}
       </Dialog>
@@ -690,13 +689,4 @@ function toDateTimeLocalInputValue(value: string | null): string {
   const hours = String(date.getHours()).padStart(2, "0");
   const minutes = String(date.getMinutes()).padStart(2, "0");
   return `${year}-${month}-${day}T${hours}:${minutes}`;
-}
-
-function parseDateTimeLocalValue(value: string): string | null {
-  if (value.trim().length === 0) {
-    return null;
-  }
-
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.valueOf()) ? null : parsed.toISOString();
 }

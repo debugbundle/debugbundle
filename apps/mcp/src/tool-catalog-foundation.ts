@@ -1,6 +1,10 @@
 import { z } from "zod";
 
 const optionalBearerTokenSchema = z.string().optional();
+const appVerificationHintSchema = z
+  .string()
+  .min(1)
+  .refine((value) => value.trim().length > 0);
 const sourceSchema = z.enum(["local", "cloud"]).optional();
 const listIncidentsInputSchema = z.object({
   bearerToken: optionalBearerTokenSchema,
@@ -67,6 +71,32 @@ export const MCP_TOOL_CATALOG_FOUNDATION = [
       trigger4xxStatus: z.number().int().min(400).max(499).optional(),
       authFilePath: z.string().optional()
     })
+  },
+  {
+    name: "verify_app_event",
+    group: "setup",
+    description:
+      "Wait for a real SDK-driven hosted app incident and verify its bundle using service, traceId, or requestId. Read-only proof; does not create synthetic events. Requires local member authentication.",
+    inputSchema: z
+      .object({
+        projectId: z.string().min(1),
+        service: appVerificationHintSchema.optional(),
+        environment: z.string().optional(),
+        maxAgeMinutes: z.number().optional(),
+        traceId: appVerificationHintSchema.optional(),
+        requestId: appVerificationHintSchema.optional(),
+        authFilePath: z.string().optional()
+      })
+      .strict()
+      .refine(
+        (input) =>
+          input.service !== undefined ||
+          input.traceId !== undefined ||
+          input.requestId !== undefined,
+        {
+          message: "App-event proof requires service, traceId, or requestId."
+        }
+      )
   },
   {
     name: "smoke",
@@ -330,6 +360,13 @@ export const MCP_TOOL_CATALOG_FOUNDATION = [
     })
   },
   {
+    name: "disconnect_github_installation",
+    group: "github",
+    description:
+      "Disconnect the GitHub installation for the active organization and remove repository assignments across all its projects. Owner only. This does not uninstall the App from GitHub; install/reconnect requires the dashboard browser handoff.",
+    inputSchema: z.object({ bearerToken: z.string().min(1) }).strict()
+  },
+  {
     name: "list_project_tokens",
     group: "tokens",
     description: "List project tokens for a project.",
@@ -363,20 +400,31 @@ export const MCP_TOOL_CATALOG_FOUNDATION = [
   {
     name: "list_agent_tokens",
     group: "tokens",
-    description: "List project-scoped read-only agent credentials. Requires owner or project admin.",
+    description:
+      "List project-scoped read-only agent credentials. Requires owner or project admin.",
     inputSchema: z.object({ bearerToken: z.string(), projectId: z.string().uuid() })
   },
   {
     name: "create_agent_token",
     group: "tokens",
-    description: "Create a single-project minimized read credential, returned once. Requires owner or project admin.",
-    inputSchema: z.object({ bearerToken: z.string(), projectId: z.string().uuid(), label: z.string().min(1).max(120), expiresAt: z.string().datetime().optional() })
+    description:
+      "Create a single-project minimized read credential, returned once. Requires owner or project admin.",
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      projectId: z.string().uuid(),
+      label: z.string().min(1).max(120),
+      expiresAt: z.string().datetime().optional()
+    })
   },
   {
     name: "revoke_agent_token",
     group: "tokens",
     description: "Revoke a project-scoped agent credential. Requires owner or project admin.",
-    inputSchema: z.object({ bearerToken: z.string(), projectId: z.string().uuid(), tokenId: z.string().uuid() })
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      projectId: z.string().uuid(),
+      tokenId: z.string().uuid()
+    })
   },
   {
     name: "list_member_tokens",

@@ -1,3 +1,10 @@
+import { analyticsInventoryWindow } from "./analytics-filter-form.js";
+import {
+  AnalyticsActionMetricsResponseSchema,
+  AnalyticsJourneySamplesListResponseSchema,
+  type AnalyticsActionMetricsResponse,
+  type AnalyticsJourneySamplesListResponse
+} from "../../../../packages/shared-types/src/index.js";
 import { API_BASE, buildBrowserSessionHeaders, readJson } from "./api-client.js";
 import { ANALYTICS_BUNDLE_GENERATION_ID_HEADER } from "../../../../packages/shared-types/src/index.js";
 import type {
@@ -115,11 +122,14 @@ function buildProjectAnalyticsSearchParams(
   query: AnalyticsMetricsQuery
 ): URLSearchParams {
   const searchParams = new URLSearchParams({ project_id: projectId });
-  if (query.last !== undefined) searchParams.set("last", query.last);
-  if (query.granularity !== undefined) searchParams.set("granularity", query.granularity);
-  if (query.service !== undefined) searchParams.set("service", query.service);
-  if (query.environment !== undefined) searchParams.set("environment", query.environment);
-  if (query.limit !== undefined) searchParams.set("limit", String(query.limit));
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined) continue;
+    if (key === "custom_dimensions" && typeof value === "object") {
+      for (const [dimension, entry] of Object.entries(value))
+        searchParams.set(`custom_dimension.${dimension}`, entry);
+    } else if (typeof value === "string" || typeof value === "number")
+      searchParams.set(key, String(value));
+  }
   return searchParams;
 }
 
@@ -216,13 +226,21 @@ async function getProjectAnalyticsMetric<TResponse>(
 
 export async function listProjectAnalyticsOpportunities(
   projectId: string,
-  limit = 20
+  limit = 20,
+  query?: AnalyticsMetricsQuery
 ): Promise<AnalyticsOpportunitiesListResponse> {
   const searchParams = new URLSearchParams({
     project_id: projectId,
     status: "open",
     limit: String(limit)
   });
+  if (query !== undefined) {
+    const window = analyticsInventoryWindow(query);
+    searchParams.set("from", window.from);
+    searchParams.set("to", window.to);
+    if (query.service !== undefined) searchParams.set("service", query.service);
+    if (query.environment !== undefined) searchParams.set("environment", query.environment);
+  }
   return readJson<AnalyticsOpportunitiesListResponse>(
     await fetch(`${API_BASE}/v1/analytics/opportunities?${searchParams.toString()}`, {
       credentials: "include"
@@ -303,6 +321,7 @@ export async function createProjectAnalyticsBundle(
   input: ProjectAnalyticsBundleCreateInput
 ): Promise<ProjectAnalyticsBundleCreateResult> {
   const filters = {
+    ...input.filters,
     ...(input.service === undefined ? {} : { service: input.service }),
     ...(input.environment === undefined ? {} : { environment: input.environment })
   };
@@ -327,4 +346,34 @@ export async function createProjectAnalyticsBundle(
   const generationId = response.headers.get(ANALYTICS_BUNDLE_GENERATION_ID_HEADER);
   const bundle = await readJson<ProjectAnalyticsBundleResponse>(response);
   return { bundle, generationId };
+}
+
+export async function getProjectAnalyticsActions(
+  projectId: string,
+  query: AnalyticsMetricsQuery
+): Promise<AnalyticsActionMetricsResponse> {
+  return AnalyticsActionMetricsResponseSchema.parse(
+    await getProjectAnalyticsMetric(projectId, "/v1/analytics/actions", query)
+  );
+}
+export async function listProjectAnalyticsJourneySamples(
+  projectId: string,
+  options: {
+    service?: string;
+    environment?: string;
+    tag?: string;
+    limit?: number;
+    cursor?: string;
+  } = {}
+): Promise<AnalyticsJourneySamplesListResponse> {
+  const params = new URLSearchParams({ project_id: projectId, limit: String(options.limit ?? 20) });
+  for (const key of ["service", "environment", "tag", "cursor"] as const)
+    if (options[key] !== undefined) params.set(key, options[key]);
+  return AnalyticsJourneySamplesListResponseSchema.parse(
+    await readJson(
+      await fetch(`${API_BASE}/v1/analytics/journey-samples?${params.toString()}`, {
+        credentials: "include"
+      })
+    )
+  );
 }

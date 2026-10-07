@@ -58,7 +58,10 @@ async function chooseCustomScopeValue(
   value: string
 ): Promise<void> {
   await chooseSelectOption(user, label, new RegExp(`custom ${label.toLowerCase()}`, "i"));
-  await user.type(screen.getByRole("textbox", { name: new RegExp(`custom ${label.toLowerCase()}`, "i") }), value);
+  await user.type(
+    screen.getByRole("textbox", { name: new RegExp(`custom ${label.toLowerCase()}`, "i") }),
+    value
+  );
 }
 
 function installCreateFetch(
@@ -275,5 +278,53 @@ describe("web app - project AnalyticsBundle generation", () => {
 
     expect(await screen.findByText("Analytics bundle limit reached")).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Custom service" })).toHaveValue("storefront");
+  });
+  it("preserves exact UTC windows, opportunity context and additional specification filters", async () => {
+    const user = userEvent.setup();
+    const state = installCreateFetch();
+    render(<App initialEntries={[`/projects/${PROJECT_ID}/analytics/bundles/new`]} />);
+    await screen.findByRole("heading", { name: "Generate analytics bundle" });
+    await chooseSelectOption(user, "Time window", "Custom UTC timestamps");
+    fireEvent.change(screen.getByLabelText("From (UTC)"), {
+      target: { value: "2026-07-01T04:15:16.123Z" }
+    });
+    fireEvent.change(screen.getByLabelText("To (UTC)"), {
+      target: { value: "2026-07-03T12:13:14.456Z" }
+    });
+    fireEvent.change(screen.getByLabelText("Opportunity ID"), { target: { value: INCIDENT_ID } });
+    fireEvent.change(screen.getByLabelText("Additional filters (JSON)"), {
+      target: { value: '{"country":"SI","verification":false}' }
+    });
+    await user.click(screen.getByRole("button", { name: "Generate analytics bundle" }));
+    await waitFor(() => expect(state.createBodies()).toHaveLength(1));
+    expect(state.createBodies()[0]).toEqual({
+      project_id: PROJECT_ID,
+      analysis_kind: "usage_summary",
+      from: "2026-07-01T04:15:16.123Z",
+      to: "2026-07-03T12:13:14.456Z",
+      opportunity_id: INCIDENT_ID,
+      filters: { country: "SI", verification: false }
+    });
+  });
+  it("rejects invalid filter JSON and retains input before accepting a relative duration", async () => {
+    const user = userEvent.setup();
+    const state = installCreateFetch();
+    render(<App initialEntries={[`/projects/${PROJECT_ID}/analytics/bundles/new`]} />);
+    await screen.findByRole("heading", { name: "Generate analytics bundle" });
+    await chooseSelectOption(user, "Time window", "Relative duration");
+    fireEvent.change(screen.getByLabelText("Relative window"), { target: { value: "48h" } });
+    fireEvent.change(screen.getByLabelText("Additional filters (JSON)"), {
+      target: { value: "[]" }
+    });
+    await user.click(screen.getByRole("button", { name: "Generate analytics bundle" }));
+    expect(await screen.findByText("Enter a JSON object.")).toBeInTheDocument();
+    expect(state.createBodies()).toHaveLength(0);
+    expect(screen.getByLabelText("Additional filters (JSON)")).toHaveValue("[]");
+    fireEvent.change(screen.getByLabelText("Additional filters (JSON)"), {
+      target: { value: "{}" }
+    });
+    await user.click(screen.getByRole("button", { name: "Generate analytics bundle" }));
+    await waitFor(() => expect(state.createBodies()).toHaveLength(1));
+    expect(state.createBodies()[0]).toMatchObject({ last: "48h", filters: {} });
   });
 });

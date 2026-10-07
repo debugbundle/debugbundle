@@ -5,6 +5,7 @@ import { ImprovementDetailPage } from "./pages/improvement-detail-page.js";
 import { IncidentDetailPage } from "./pages/incident-detail-page.js";
 import { ProjectTokensPage } from "./pages/management-pages.js";
 import { ProjectAlertsPage } from "./pages/project-alerts-page.js";
+import { ProjectAnalyticsActionsPage } from "./pages/project-analytics-actions-page.js";
 import { ProjectAnalyticsAudiencesPage } from "./pages/project-analytics-audiences-page.js";
 import { ProjectAnalyticsBundleDetailPage } from "./pages/project-analytics-bundle-detail-page.js";
 import { ProjectAnalyticsBundlesPage } from "./pages/project-analytics-bundles-page.js";
@@ -50,6 +51,7 @@ export function createProjectRoutes(): JSX.Element {
       />
       <Route path="analytics" element={<ProjectAnalyticsLayout />}>
         <Route index element={<ProjectAnalyticsPage />} />
+        <Route path="actions" element={<ProjectAnalyticsActionsPage />} />
         <Route path="routes" element={<ProjectAnalyticsRoutesPage />} />
         <Route path="flows" element={<ProjectAnalyticsFlowsPage />} />
         <Route path="funnels" element={<ProjectAnalyticsFunnelsPage />} />

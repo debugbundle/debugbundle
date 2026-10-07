@@ -1,10 +1,14 @@
 import { ArrowLeftIcon, ClipboardCopyIcon, DownloadIcon, LoaderCircleIcon } from "lucide-react";
 import { BrowserResourceContextSchema } from "../../../../packages/shared-types/src/browser-resource-context.js";
 import { BrowserResourceDetails } from "../components/system/browser-resource-details.js";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import { CalloutCard } from "../components/system/callout-card.js";
 import { IncidentCaptureRuleSuggestionsDialog } from "../components/system/incident-capture-rule-suggestions-dialog.js";
+import {
+  IncidentContextTab,
+  IncidentLogsTab
+} from "../components/system/incident-evidence-tabs.js";
 import { IncidentAnalyticsImpact } from "../components/system/incident-analytics-impact.js";
 import { HighlightedCodeBlock } from "../components/system/highlighted-code-block.js";
 import { Badge } from "../components/ui/badge.js";
@@ -45,18 +49,26 @@ export function IncidentDetailPage(): JSX.Element {
   const backLabel = resolveIncidentBackLabel(location.pathname, projectId);
   const showIncidentLoading = useDelayedVisibility(incident === undefined);
 
+  const generation = useRef(0);
   useEffect(() => {
-    if (incidentId === undefined) return;
-
-    void (async () => {
-      try {
-        const result = await getIncident(incidentId);
-        setIncident(result);
-      } catch {
-        setError(true);
-        setIncident(null);
-      }
-    })();
+    const requestGeneration = ++generation.current;
+    setIncident(undefined);
+    setError(false);
+    setIsResolving(false);
+    if (incidentId !== undefined) {
+      void getIncident(incidentId)
+        .then((result) => {
+          if (generation.current === requestGeneration) setIncident(result);
+        })
+        .catch(() => {
+          if (generation.current !== requestGeneration) return;
+          setError(true);
+          setIncident(null);
+        });
+    }
+    return () => {
+      generation.current += 1;
+    };
   }, [incidentId]);
 
   if (incidentId === undefined) {
@@ -114,16 +126,19 @@ export function IncidentDetailPage(): JSX.Element {
                   size="sm"
                   disabled={isResolving}
                   onClick={() => {
+                    const requestGeneration = generation.current;
                     setIsResolving(true);
                     void (async () => {
                       try {
                         const resolved = await resolveIncident(incident.incident_id);
+                        if (generation.current !== requestGeneration) return;
                         setIncident(resolved);
                         showSuccessToast("Incident resolved successfully.");
                       } catch {
+                        if (generation.current !== requestGeneration) return;
                         showErrorToast("Could not resolve incident.");
                       } finally {
-                        setIsResolving(false);
+                        if (generation.current === requestGeneration) setIsResolving(false);
                       }
                     })();
                   }}
@@ -188,10 +203,14 @@ export function IncidentDetailPage(): JSX.Element {
           />
 
           <Tabs defaultValue="bundle">
-            <TabsList>
-              <TabsTrigger value="bundle">Debug Bundle</TabsTrigger>
-              <TabsTrigger value="reproduction">Reproduction</TabsTrigger>
-            </TabsList>
+            <div className="overflow-x-auto overscroll-x-contain pb-1">
+              <TabsList className="w-max min-w-full justify-start">
+                <TabsTrigger value="bundle">Debug Bundle</TabsTrigger>
+                <TabsTrigger value="reproduction">Reproduction</TabsTrigger>
+                <TabsTrigger value="context">Context</TabsTrigger>
+                <TabsTrigger value="logs">Logs</TabsTrigger>
+              </TabsList>
+            </div>
 
             <TabsContent value="bundle" className="mt-6">
               <BundleTab incidentId={incidentId} />
@@ -199,6 +218,12 @@ export function IncidentDetailPage(): JSX.Element {
 
             <TabsContent value="reproduction" className="mt-6">
               <ReproductionTab incidentId={incidentId} />
+            </TabsContent>
+            <TabsContent value="context" className="mt-6">
+              <IncidentContextTab key={incidentId} incidentId={incidentId} />
+            </TabsContent>
+            <TabsContent value="logs" className="mt-6">
+              <IncidentLogsTab key={incidentId} incidentId={incidentId} />
             </TabsContent>
           </Tabs>
 
@@ -277,7 +302,9 @@ function BundleTab({ incidentId }: { incidentId: string }): JSX.Element {
   const bundleJson = JSON.stringify(bundleState.bundle, null, 2);
   const context = bundleState.bundle["context"];
   const resource = BrowserResourceContextSchema.safeParse(
-    context !== null && typeof context === "object" ? (context as Record<string, unknown>)["resource_failure"] : undefined
+    context !== null && typeof context === "object"
+      ? (context as Record<string, unknown>)["resource_failure"]
+      : undefined
   );
 
   return (

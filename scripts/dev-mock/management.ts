@@ -39,6 +39,21 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
   const now = new Date().toISOString();
   let sequence = 100;
   let signedIn = true;
+  let installationConnected = true;
+  const agentTokens: MockRecord[] = [
+    {
+      token_id: "mock_agent_credential",
+      issuer_user_id: "usr_123",
+      organization_id: "org_123",
+      project_id: "proj_123",
+      label: "Preview agent",
+      scope: "incident:read-minimized",
+      policy_version: "telemetry-privacy-v1",
+      created_at: now,
+      expires_at: new Date(Date.now() + 30 * 86400000).toISOString(),
+      revoked_at: null
+    }
+  ];
   const repos = new Map<string, MockRecord>([["proj_123", data.repo]]);
   const members = new Map(
     data.projects.map((project) => [
@@ -234,6 +249,27 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
     const route = path.replace(/^\/v1\/projects\/[^/]+/, "/v1");
     const read = method === "GET";
     if (projectMatch && !project) return missing();
+    if (path === "/v1/github/installation") {
+      if (read) return reply({ installation: installationConnected ? data.installation : null });
+      if (method === "DELETE") {
+        installationConnected = false;
+        repos.clear();
+        return reply(null, 204);
+      }
+    }
+    const agentMatch = /^\/v1\/agent-tokens(?:\/([^/]+)\/revoke)?$/.exec(route);
+    if (project && agentMatch) {
+      if (read) return reply({ tokens: scoped(agentTokens, projectId) });
+      if (method === "POST" && !agentMatch[1])
+        return reply({ error: "agent_token_issuance_unavailable" }, 503);
+      const token = scoped(agentTokens, projectId).find((row) => row["token_id"] === agentMatch[1]);
+      if (method === "POST" && token) {
+        token["revoked_at"] = new Date().toISOString();
+        return reply({ token });
+      }
+      return missing();
+    }
+    if (read && path === "/v1/alert-groups") return reply({ groups: [], next_cursor: null });
     if (read && path === "/v1/auth/session")
       return reply({ session: signedIn ? data.session : null });
     if (method === "POST" && path === "/v1/auth/logout") {
@@ -476,9 +512,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
       if (method === "POST" && webhookRoute[2] === "test") {
         const input = z
           .object({
-            event_type: z
-              .enum(["verification.passed", "verification.failed"])
-              .default("verification.passed")
+            event_type: z.enum(webhookEvents.options).default("verification.passed")
           })
           .safeParse(payload ?? {});
         if (!input.success) return invalid();

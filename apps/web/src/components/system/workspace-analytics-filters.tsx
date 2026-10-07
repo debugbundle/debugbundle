@@ -31,6 +31,7 @@ export type WorkspaceAnalyticsFilterKey = keyof WorkspaceAnalyticsFilterValues;
 
 interface WorkspaceAnalyticsFiltersProps {
   mode: "opportunities" | "bundles";
+  fixedScope?: boolean;
   projects: ProjectRecord[];
   value: WorkspaceAnalyticsFilterValues;
   activeFilterCount: number;
@@ -85,6 +86,7 @@ const opportunityBundleStatusOptions = [
 
 export function WorkspaceAnalyticsFilters({
   mode,
+  fixedScope = false,
   projects,
   value,
   activeFilterCount,
@@ -120,38 +122,44 @@ export function WorkspaceAnalyticsFilters({
         onDismiss={onDismiss}
       >
         <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <FilterSelect
-            id={`workspace-analytics-${mode}-project`}
-            label="Project"
-            value={value.projectId}
-            options={[
-              ["all", "All projects"],
-              ...projects.map((project) => [project.project_id, project.name] as const)
-            ]}
-            onValueChange={(nextValue) => update("projectId", nextValue)}
-          />
-          <Field>
-            <FieldLabel htmlFor={`workspace-analytics-${mode}-service`}>Service</FieldLabel>
-            <ProjectScopeSelect
-              id={`workspace-analytics-${mode}-service`}
-              label="Service"
-              value={value.service}
-              options={scopeOptions.services}
-              allLabel="All services"
-              onValueChange={(nextValue) => update("service", nextValue)}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor={`workspace-analytics-${mode}-environment`}>Environment</FieldLabel>
-            <ProjectScopeSelect
-              id={`workspace-analytics-${mode}-environment`}
-              label="Environment"
-              value={value.environment}
-              options={scopeOptions.environments}
-              allLabel="All environments"
-              onValueChange={(nextValue) => update("environment", nextValue)}
-            />
-          </Field>
+          {fixedScope ? null : (
+            <>
+              <FilterSelect
+                id={`workspace-analytics-${mode}-project`}
+                label="Project"
+                value={value.projectId}
+                options={[
+                  ["all", "All projects"],
+                  ...projects.map((project) => [project.project_id, project.name] as const)
+                ]}
+                onValueChange={(nextValue) => update("projectId", nextValue)}
+              />
+              <Field>
+                <FieldLabel htmlFor={`workspace-analytics-${mode}-service`}>Service</FieldLabel>
+                <ProjectScopeSelect
+                  id={`workspace-analytics-${mode}-service`}
+                  label="Service"
+                  value={value.service}
+                  options={scopeOptions.services}
+                  allLabel="All services"
+                  onValueChange={(nextValue) => update("service", nextValue)}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor={`workspace-analytics-${mode}-environment`}>
+                  Environment
+                </FieldLabel>
+                <ProjectScopeSelect
+                  id={`workspace-analytics-${mode}-environment`}
+                  label="Environment"
+                  value={value.environment}
+                  options={scopeOptions.environments}
+                  allLabel="All environments"
+                  onValueChange={(nextValue) => update("environment", nextValue)}
+                />
+              </Field>
+            </>
+          )}
           <FilterSelect
             id={`workspace-analytics-${mode}-kind`}
             label="Analysis kind"
@@ -186,26 +194,30 @@ export function WorkspaceAnalyticsFilters({
               />
             </>
           ) : null}
-          <Field>
-            <FieldLabel htmlFor={`workspace-analytics-${mode}-from`}>From</FieldLabel>
-            <Input
-              id={`workspace-analytics-${mode}-from`}
-              type="date"
-              value={value.from}
-              max={value.to.length === 0 ? undefined : value.to}
-              onChange={(event) => update("from", event.target.value)}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor={`workspace-analytics-${mode}-to`}>To</FieldLabel>
-            <Input
-              id={`workspace-analytics-${mode}-to`}
-              type="date"
-              value={value.to}
-              min={value.from.length === 0 ? undefined : value.from}
-              onChange={(event) => update("to", event.target.value)}
-            />
-          </Field>
+          {fixedScope ? null : (
+            <>
+              <Field>
+                <FieldLabel htmlFor={`workspace-analytics-${mode}-from`}>From</FieldLabel>
+                <Input
+                  id={`workspace-analytics-${mode}-from`}
+                  type="date"
+                  value={value.from}
+                  max={value.to.length === 0 ? undefined : value.to}
+                  onChange={(event) => update("from", event.target.value)}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor={`workspace-analytics-${mode}-to`}>To</FieldLabel>
+                <Input
+                  id={`workspace-analytics-${mode}-to`}
+                  type="date"
+                  value={value.to}
+                  min={value.from.length === 0 ? undefined : value.from}
+                  onChange={(event) => update("to", event.target.value)}
+                />
+              </Field>
+            </>
+          )}
         </FieldGroup>
       </AnalyticsFilterPanel>
       {activeFilterCount === 0 ? null : (

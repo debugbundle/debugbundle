@@ -507,3 +507,5 @@ export {
 } from "./project-color-tags.js";
 
 export * from "./analytics-flows.js";
+
+export * from "./analytics-query.js";

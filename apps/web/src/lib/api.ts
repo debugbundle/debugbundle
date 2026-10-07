@@ -5,13 +5,9 @@ import {
   resetBrowserSessionClientState
 } from "./api-client.js";
 import type {
-  AlertChannel,
-  AlertConditionType,
-  AlertSeverityLifecycleScope,
   AdminAnalyticsAccessStatus,
   AdminMalformedRejectionBreakdown,
   AdminAnalyticsSummary,
-  AlertRecord,
   AvailabilityCheckDailyRollupRecord,
   AvailabilityCheckLimits,
   AvailabilityCheckRecord,
@@ -19,7 +15,6 @@ import type {
   AvailabilityCheckTestResult,
   CreatedMemberToken,
   CreatedProjectToken,
-  CreatedWebhookRecord,
   DeletedAccountRecord,
   DeletedProjectRecord,
   MemberTokenRecord,
@@ -33,14 +28,9 @@ import type {
   ProjectTokenRecord,
   SentSystemEmailPreviewRecord,
   ServiceRecord,
-  WeeklyReportChannelRecord,
-  WebhookDeliveryRecord,
-  WebhookEventType,
-  WebhookRecord
+  WeeklyReportChannelRecord
 } from "./api-types.js";
-import {
-  normalizeProjectRecord
-} from "./api-record-normalizers.js";
+import { normalizeProjectRecord } from "./api-record-normalizers.js";
 import { observeWebActivationStep } from "./dogfooding-flows.js";
 
 export * from "./api-types.js";
@@ -76,6 +66,7 @@ export {
 export {
   createProjectGitHubRule,
   deleteProjectGitHubRule,
+  disconnectGitHubInstallation,
   getGitHubInstallation,
   getGitHubInstallUrl,
   getProjectGitHubRepo,
@@ -366,21 +357,6 @@ export async function listProjectTokens(projectId: string): Promise<ProjectToken
   return body.tokens;
 }
 
-export async function listProjectAlerts(projectId: string, limit = 20): Promise<AlertRecord[]> {
-  const searchParams = new URLSearchParams({
-    project_id: projectId,
-    limit: String(limit)
-  });
-
-  const body = await readJson<{ alerts: AlertRecord[] }>(
-    await fetch(`${API_BASE}/v1/alerts?${searchParams.toString()}`, {
-      credentials: "include"
-    })
-  );
-
-  return body.alerts;
-}
-
 export async function listProjectWeeklyReportChannels(
   projectId: string,
   limit = 20
@@ -402,7 +378,7 @@ export async function listProjectWeeklyReportChannels(
 export async function createProjectWeeklyReportChannel(payload: {
   project_id: string;
   channel: "email" | "slack";
-  config: { to: string[] } | { slack_destination_id: string };
+  config: { to: string[] } | { slack_destination_id: string } | { webhook_url: string };
   schedule: WeeklyReportChannelRecord["schedule"];
   is_enabled?: boolean;
 }): Promise<WeeklyReportChannelRecord> {
@@ -427,7 +403,7 @@ export async function createProjectWeeklyReportChannel(payload: {
 export async function updateProjectWeeklyReportChannel(
   channelId: string,
   payload: {
-    config?: { to: string[] } | { slack_destination_id: string };
+    config?: { to: string[] } | { slack_destination_id: string } | { webhook_url: string };
     schedule?: WeeklyReportChannelRecord["schedule"];
     is_enabled?: boolean;
   }
@@ -455,147 +431,6 @@ export async function deleteProjectWeeklyReportChannel(channelId: string): Promi
     const body = (await response.json().catch(() => null)) as { error?: string } | null;
     throw new Error(body?.error ?? `request_failed_${response.status}`);
   }
-}
-
-export async function createProjectAlert(payload: {
-  project_id: string;
-  service_id?: string;
-  channel: AlertChannel;
-  condition_type: AlertConditionType;
-  severity_min?: "low" | "medium" | "high" | "critical";
-  severity_lifecycle_scope?: AlertSeverityLifecycleScope;
-  cooldown_seconds?: number;
-  config: Record<string, unknown>;
-  is_enabled?: boolean;
-}): Promise<AlertRecord> {
-  const body = await readJson<{ alert: AlertRecord }>(
-    await fetch(`${API_BASE}/v1/alerts`, {
-      method: "POST",
-      credentials: "include",
-      headers: buildBrowserSessionHeaders(true),
-      body: JSON.stringify({
-        project_id: payload.project_id,
-        service_id: payload.service_id,
-        channel: payload.channel,
-        condition_type: payload.condition_type,
-        severity_min: payload.severity_min,
-        severity_lifecycle_scope: payload.severity_lifecycle_scope,
-        cooldown_seconds: payload.cooldown_seconds ?? 0,
-        config: payload.config,
-        is_enabled: payload.is_enabled ?? true
-      })
-    })
-  );
-
-  return body.alert;
-}
-
-export async function updateProjectAlert(
-  alertId: string,
-  projectId: string,
-  payload: {
-    service_id?: string | null;
-    channel?: AlertChannel;
-    condition_type?: AlertConditionType;
-    severity_min?: "low" | "medium" | "high" | "critical" | null;
-    severity_lifecycle_scope?: AlertSeverityLifecycleScope | null;
-    cooldown_seconds?: number;
-    config?: Record<string, unknown> | null;
-    is_enabled?: boolean;
-  }
-): Promise<AlertRecord> {
-  const body = await readJson<{ alert: AlertRecord }>(
-    await fetch(`${API_BASE}/v1/alerts/${alertId}?project_id=${encodeURIComponent(projectId)}`, {
-      method: "PATCH",
-      credentials: "include",
-      headers: buildBrowserSessionHeaders(true),
-      body: JSON.stringify(payload)
-    })
-  );
-
-  return body.alert;
-}
-
-export async function listProjectWebhooks(projectId: string, limit = 20): Promise<WebhookRecord[]> {
-  const searchParams = new URLSearchParams({
-    project_id: projectId,
-    limit: String(limit)
-  });
-
-  const body = await readJson<{ webhooks: WebhookRecord[] }>(
-    await fetch(`${API_BASE}/v1/webhooks?${searchParams.toString()}`, {
-      credentials: "include"
-    })
-  );
-
-  return body.webhooks;
-}
-
-export async function createProjectWebhook(payload: {
-  project_id: string;
-  url: string;
-  events: WebhookEventType[];
-  filters?: WebhookRecord["filters"];
-  is_enabled?: boolean;
-}): Promise<CreatedWebhookRecord> {
-  const body = await readJson<{ webhook: CreatedWebhookRecord }>(
-    await fetch(`${API_BASE}/v1/webhooks`, {
-      method: "POST",
-      credentials: "include",
-      headers: buildBrowserSessionHeaders(true),
-      body: JSON.stringify({
-        project_id: payload.project_id,
-        url: payload.url,
-        events: payload.events,
-        filters: payload.filters ?? {},
-        is_enabled: payload.is_enabled ?? true
-      })
-    })
-  );
-
-  return body.webhook;
-}
-
-export async function listProjectWebhookDeliveries(
-  webhookId: string,
-  projectId: string,
-  limit = 5
-): Promise<WebhookDeliveryRecord[]> {
-  const searchParams = new URLSearchParams({
-    project_id: projectId,
-    limit: String(limit)
-  });
-
-  const body = await readJson<{ deliveries: WebhookDeliveryRecord[] }>(
-    await fetch(`${API_BASE}/v1/webhooks/${webhookId}/deliveries?${searchParams.toString()}`, {
-      credentials: "include"
-    })
-  );
-
-  return body.deliveries;
-}
-
-export async function testProjectWebhook(
-  webhookId: string,
-  projectId: string,
-  eventType: Extract<
-    WebhookEventType,
-    "verification.passed" | "verification.failed"
-  > = "verification.passed"
-): Promise<WebhookDeliveryRecord> {
-  const body = await readJson<{ delivery: WebhookDeliveryRecord }>(
-    await fetch(
-      `${API_BASE}/v1/webhooks/${webhookId}/test?project_id=${encodeURIComponent(projectId)}`,
-      {
-        method: "POST",
-        credentials: "include",
-        headers: buildBrowserSessionHeaders(true),
-        body: JSON.stringify({ event_type: eventType })
-      }
-    )
-  );
-
-  return body.delivery;
 }
 
 export async function createProjectToken(
@@ -851,18 +686,19 @@ export async function revokeMemberToken(tokenId: string): Promise<void> {
   );
 }
 
-export async function deleteAlert(alertId: string, projectId: string): Promise<void> {
-  const response = await fetch(
-    `${API_BASE}/v1/alerts/${alertId}?project_id=${encodeURIComponent(projectId)}`,
-    {
-      method: "DELETE",
-      credentials: "include",
-      headers: buildBrowserSessionHeaders()
-    }
-  );
+export {
+  listProjectAlerts,
+  createProjectAlert,
+  updateProjectAlert,
+  deleteAlert
+} from "./api-alerts.js";
 
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(body?.error ?? `request_failed_${response.status}`);
-  }
-}
+export {
+  listProjectWebhooks,
+  createProjectWebhook,
+  listProjectWebhookDeliveries,
+  testProjectWebhook,
+  updateProjectWebhook,
+  deleteProjectWebhook,
+  retryProjectWebhookDelivery
+} from "./api-webhooks.js";

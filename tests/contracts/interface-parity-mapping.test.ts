@@ -87,7 +87,7 @@ describe("retrieval parity mapping contract", () => {
       "| Verify local | — | `verify local` | `verify_local` | CLI/MCP-only (local env) |"
     );
     expect(contract).toContain(
-      "| Verify cloud | — | `verify cloud` | `verify_cloud` | Uses API internally; `--trigger-5xx`/`trigger5xx` proves hosted synthetic incident creation, `--trigger-4xx <status>`/`trigger4xxStatus` proves configured hosted 4xx promotion, and `--expect-app-event` proves real SDK-driven app capture |"
+      "| Verify cloud | — | `verify cloud` | `verify_cloud` | Uses API internally; `--trigger-5xx`/`trigger5xx` proves hosted synthetic incident creation, `--trigger-4xx <status>`/`trigger4xxStatus` proves configured hosted 4xx promotion |"
     );
     expect(contract).toContain("| Smoke test | — | `smoke` | `smoke` | CLI/MCP-only |");
     expect(contract).toContain(

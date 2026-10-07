@@ -162,7 +162,9 @@ function parseApiError(status: number, body: unknown): never {
   throw new GitHubManagementApiError(status, parsed.data.error);
 }
 
-async function expectInstallation(responsePromise: Promise<HttpResponse>): Promise<GitHubInstallation> {
+async function expectInstallation(
+  responsePromise: Promise<HttpResponse>
+): Promise<GitHubInstallation> {
   const response = await responsePromise;
   if (response.status < 200 || response.status >= 300) {
     parseApiError(response.status, response.body);
@@ -176,7 +178,9 @@ async function expectInstallation(responsePromise: Promise<HttpResponse>): Promi
   return parsed.data.installation;
 }
 
-async function expectRepositories(responsePromise: Promise<HttpResponse>): Promise<GitHubRepository[]> {
+async function expectRepositories(
+  responsePromise: Promise<HttpResponse>
+): Promise<GitHubRepository[]> {
   const response = await responsePromise;
   if (response.status < 200 || response.status >= 300) {
     parseApiError(response.status, response.body);
@@ -190,7 +194,9 @@ async function expectRepositories(responsePromise: Promise<HttpResponse>): Promi
   return parsed.data.repositories;
 }
 
-async function expectProjectRepo(responsePromise: Promise<HttpResponse>): Promise<ProjectGitHubRepo> {
+async function expectProjectRepo(
+  responsePromise: Promise<HttpResponse>
+): Promise<ProjectGitHubRepo> {
   const response = await responsePromise;
   if (response.status < 200 || response.status >= 300) {
     parseApiError(response.status, response.body);
@@ -204,7 +210,9 @@ async function expectProjectRepo(responsePromise: Promise<HttpResponse>): Promis
   return parsed.data.repo;
 }
 
-async function expectProjectRules(responsePromise: Promise<HttpResponse>): Promise<GitHubDispatchRule[]> {
+async function expectProjectRules(
+  responsePromise: Promise<HttpResponse>
+): Promise<GitHubDispatchRule[]> {
   const response = await responsePromise;
   if (response.status < 200 || response.status >= 300) {
     parseApiError(response.status, response.body);
@@ -218,7 +226,9 @@ async function expectProjectRules(responsePromise: Promise<HttpResponse>): Promi
   return parsed.data.rules;
 }
 
-async function expectProjectRule(responsePromise: Promise<HttpResponse>): Promise<GitHubDispatchRule> {
+async function expectProjectRule(
+  responsePromise: Promise<HttpResponse>
+): Promise<GitHubDispatchRule> {
   const response = await responsePromise;
   if (response.status < 200 || response.status >= 300) {
     parseApiError(response.status, response.body);
@@ -232,7 +242,9 @@ async function expectProjectRule(responsePromise: Promise<HttpResponse>): Promis
   return parsed.data.rule;
 }
 
-async function expectProjectDeliveries(responsePromise: Promise<HttpResponse>): Promise<GitHubDispatchDelivery[]> {
+async function expectProjectDeliveries(
+  responsePromise: Promise<HttpResponse>
+): Promise<GitHubDispatchDelivery[]> {
   const response = await responsePromise;
   if (response.status < 200 || response.status >= 300) {
     parseApiError(response.status, response.body);
@@ -246,7 +258,9 @@ async function expectProjectDeliveries(responsePromise: Promise<HttpResponse>): 
   return parsed.data.deliveries;
 }
 
-async function expectProjectDelivery(responsePromise: Promise<HttpResponse>): Promise<GitHubDispatchDelivery> {
+async function expectProjectDelivery(
+  responsePromise: Promise<HttpResponse>
+): Promise<GitHubDispatchDelivery> {
   const response = await responsePromise;
   if (response.status < 200 || response.status >= 300) {
     parseApiError(response.status, response.body);
@@ -273,6 +287,7 @@ async function expectNoContent(responsePromise: Promise<HttpResponse>): Promise<
 }
 
 export function createGitHubManagementApi(client: HttpClient): {
+  disconnectInstallation(input: { bearerToken: string }): Promise<void>;
   getInstallation(input: { bearerToken: string; projectId?: string }): Promise<GitHubInstallation>;
   listRepositories(input: { bearerToken: string; projectId?: string }): Promise<GitHubRepository[]>;
   getProjectRepo(input: { bearerToken: string; projectId: string }): Promise<ProjectGitHubRepo>;
@@ -282,8 +297,15 @@ export function createGitHubManagementApi(client: HttpClient): {
     status?: "pending" | "retrying" | "delivered" | "failed" | "skipped";
     limit?: number;
   }): Promise<GitHubDispatchDelivery[]>;
-  retryProjectDelivery(input: { bearerToken: string; projectId: string; deliveryId: string }): Promise<GitHubDispatchDelivery>;
-  listProjectRules(input: { bearerToken: string; projectId: string }): Promise<GitHubDispatchRule[]>;
+  retryProjectDelivery(input: {
+    bearerToken: string;
+    projectId: string;
+    deliveryId: string;
+  }): Promise<GitHubDispatchDelivery>;
+  listProjectRules(input: {
+    bearerToken: string;
+    projectId: string;
+  }): Promise<GitHubDispatchRule[]>;
   createProjectRule(input: {
     bearerToken: string;
     projectId: string;
@@ -311,13 +333,32 @@ export function createGitHubManagementApi(client: HttpClient): {
     cooldownSeconds?: number;
     enabled?: boolean;
   }): Promise<GitHubDispatchRule>;
-  deleteProjectRule(input: { bearerToken: string; projectId: string; ruleId: string }): Promise<void>;
-  setProjectRepo(input: { bearerToken: string; projectId: string; owner: string; repo: string }): Promise<ProjectGitHubRepo>;
+  deleteProjectRule(input: {
+    bearerToken: string;
+    projectId: string;
+    ruleId: string;
+  }): Promise<void>;
+  setProjectRepo(input: {
+    bearerToken: string;
+    projectId: string;
+    owner: string;
+    repo: string;
+  }): Promise<ProjectGitHubRepo>;
   removeProjectRepo(input: { bearerToken: string; projectId: string }): Promise<void>;
 } {
   return {
+    async disconnectInstallation(input) {
+      return expectNoContent(
+        client.request({
+          method: "DELETE",
+          path: "/v1/github/installation",
+          bearerToken: input.bearerToken
+        })
+      );
+    },
     async getInstallation(input) {
-      const query = input.projectId === undefined ? "" : `?project_id=${encodeURIComponent(input.projectId)}`;
+      const query =
+        input.projectId === undefined ? "" : `?project_id=${encodeURIComponent(input.projectId)}`;
       return expectInstallation(
         client.request({
           method: "GET",
@@ -328,7 +369,8 @@ export function createGitHubManagementApi(client: HttpClient): {
     },
 
     async listRepositories(input) {
-      const query = input.projectId === undefined ? "" : `?project_id=${encodeURIComponent(input.projectId)}`;
+      const query =
+        input.projectId === undefined ? "" : `?project_id=${encodeURIComponent(input.projectId)}`;
       return expectRepositories(
         client.request({
           method: "GET",
@@ -422,8 +464,12 @@ export function createGitHubManagementApi(client: HttpClient): {
             ...(input.services === undefined ? {} : { services: input.services }),
             ...(input.severityMin === undefined ? {} : { severity_min: input.severityMin }),
             ...(input.bundleType === undefined ? {} : { bundle_type: input.bundleType }),
-            ...(input.incidentStatus === undefined ? {} : { incident_status: input.incidentStatus }),
-            ...(input.cooldownSeconds === undefined ? {} : { cooldown_seconds: input.cooldownSeconds }),
+            ...(input.incidentStatus === undefined
+              ? {}
+              : { incident_status: input.incidentStatus }),
+            ...(input.cooldownSeconds === undefined
+              ? {}
+              : { cooldown_seconds: input.cooldownSeconds }),
             ...(input.enabled === undefined ? {} : { enabled: input.enabled })
           }
         })

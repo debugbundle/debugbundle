@@ -2,7 +2,7 @@
   "id": "debugbundle",
   "name": "DebugBundle",
   "description": "Use DebugBundle for runtime error reporting, incident response, live app monitoring, health checks, debug bundles, and product analytics.",
-  "version": "1.13.1",
+  "version": "1.14.0",
   "configSchema": {
     "type": "object",
     "properties": {
@@ -26,6 +26,7 @@
       "debugbundle_validate",
       "debugbundle_verify_local",
       "debugbundle_verify_cloud",
+      "debugbundle_verify_app_event",
       "debugbundle_smoke",
       "debugbundle_analyze",
       "debugbundle_list_incidents",
@@ -54,6 +55,7 @@
       "debugbundle_retry_github_delivery",
       "debugbundle_set_project_github_repo",
       "debugbundle_remove_project_github_repo",
+      "debugbundle_disconnect_github_installation",
       "debugbundle_list_project_tokens",
       "debugbundle_create_project_token",
       "debugbundle_revoke_project_token",
@@ -68,6 +70,7 @@
       "debugbundle_update_webhook",
       "debugbundle_delete_webhook",
       "debugbundle_test_webhook",
+      "debugbundle_test_webhook_event",
       "debugbundle_list_webhook_deliveries",
       "debugbundle_retry_webhook_delivery",
       "debugbundle_list_slack_destinations",
@@ -163,6 +166,9 @@
     "debugbundle_verify_cloud": {
       "optional": true
     },
+    "debugbundle_verify_app_event": {
+      "optional": true
+    },
     "debugbundle_smoke": {
       "optional": true
     },
@@ -208,6 +214,9 @@
     "debugbundle_remove_project_github_repo": {
       "optional": true
     },
+    "debugbundle_disconnect_github_installation": {
+      "optional": true
+    },
     "debugbundle_create_project_token": {
       "optional": true
     },
@@ -230,6 +239,9 @@
       "optional": true
     },
     "debugbundle_test_webhook": {
+      "optional": true
+    },
+    "debugbundle_test_webhook_event": {
       "optional": true
     },
     "debugbundle_retry_webhook_delivery": {

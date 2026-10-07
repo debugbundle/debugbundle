@@ -22,7 +22,12 @@ export const WebhookLinksSchema = z
 
 export const BundleLifecycleWebhookPayloadSchema = z
   .object({
-    event: z.enum(["bundle.created", "bundle.updated", "bundle.resolved", "improvement_bundle.created"]),
+    event: z.enum([
+      "bundle.created",
+      "bundle.updated",
+      "bundle.resolved",
+      "improvement_bundle.created"
+    ]),
     occurred_at: z.string().datetime(),
     project_id: z.string().min(1),
     bundle_id: z.string().min(1),
@@ -72,10 +77,17 @@ export const VerificationWebhookTestPayloadSchema = z
   })
   .strict();
 
+// The test service emits this envelope for every selectable event, independently of real lifecycle payloads.
+export const SyntheticWebhookTestPayloadSchema = VerificationWebhookTestPayloadSchema.extend({
+  event: WebhookEventTypeSchema,
+  event_type: WebhookEventTypeSchema
+});
+
 export const WebhookEventPayloadSchema = z.union([
   BundleLifecycleWebhookPayloadSchema,
   IncidentLifecycleWebhookPayloadSchema,
-  VerificationWebhookTestPayloadSchema
+  VerificationWebhookTestPayloadSchema,
+  SyntheticWebhookTestPayloadSchema
 ]);
 
 export const WebhookFiltersSchema = z
@@ -162,6 +174,7 @@ export const ApiErrorResponseSchema = z
   })
   .strict();
 
+export type WebhookEventType = z.infer<typeof WebhookEventTypeSchema>;
 export type WebhookRecord = z.infer<typeof WebhookSchema>;
 export type WebhookCreatedRecord = z.infer<typeof WebhookCreateSchema>;
 export type WebhookFilters = z.infer<typeof WebhookFiltersSchema>;
@@ -244,7 +257,9 @@ async function expectWebhook(responsePromise: Promise<HttpResponse>): Promise<We
   return parsed.data.webhook;
 }
 
-async function expectCreatedWebhook(responsePromise: Promise<HttpResponse>): Promise<WebhookCreatedRecord> {
+async function expectCreatedWebhook(
+  responsePromise: Promise<HttpResponse>
+): Promise<WebhookCreatedRecord> {
   const response = await responsePromise;
   if (response.status < 200 || response.status >= 300) {
     parseApiError(response.status, response.body);
@@ -258,7 +273,9 @@ async function expectCreatedWebhook(responsePromise: Promise<HttpResponse>): Pro
   return parsed.data.webhook;
 }
 
-async function expectWebhookDeliveries(responsePromise: Promise<HttpResponse>): Promise<WebhookDelivery[]> {
+async function expectWebhookDeliveries(
+  responsePromise: Promise<HttpResponse>
+): Promise<WebhookDelivery[]> {
   const response = await responsePromise;
   if (response.status < 200 || response.status >= 300) {
     parseApiError(response.status, response.body);
@@ -272,7 +289,9 @@ async function expectWebhookDeliveries(responsePromise: Promise<HttpResponse>): 
   return parsed.data.deliveries;
 }
 
-async function expectWebhookTestDelivery(responsePromise: Promise<HttpResponse>): Promise<WebhookDelivery> {
+async function expectWebhookTestDelivery(
+  responsePromise: Promise<HttpResponse>
+): Promise<WebhookDelivery> {
   const response = await responsePromise;
   if (response.status < 200 || response.status >= 300) {
     parseApiError(response.status, response.body);
@@ -286,7 +305,9 @@ async function expectWebhookTestDelivery(responsePromise: Promise<HttpResponse>)
   return parsed.data.delivery;
 }
 
-async function expectRetryDelivery(responsePromise: Promise<HttpResponse>): Promise<{ delivery_id: string; event_type: string }> {
+async function expectRetryDelivery(
+  responsePromise: Promise<HttpResponse>
+): Promise<{ delivery_id: string; event_type: string }> {
   const response = await responsePromise;
   if (response.status < 200 || response.status >= 300) {
     parseApiError(response.status, response.body);
@@ -301,7 +322,11 @@ async function expectRetryDelivery(responsePromise: Promise<HttpResponse>): Prom
 }
 
 export function createWebhookApi(client: HttpClient): {
-  listWebhooks(input: { bearerToken: string; projectId: string; limit?: number }): Promise<WebhookRecord[]>;
+  listWebhooks(input: {
+    bearerToken: string;
+    projectId: string;
+    limit?: number;
+  }): Promise<WebhookRecord[]>;
   createWebhook(input: {
     bearerToken: string;
     projectId: string;
@@ -310,7 +335,11 @@ export function createWebhookApi(client: HttpClient): {
     filters?: Record<string, unknown>;
     isEnabled?: boolean;
   }): Promise<WebhookCreatedRecord>;
-  getWebhook(input: { bearerToken: string; projectId: string; webhookId: string }): Promise<WebhookRecord>;
+  getWebhook(input: {
+    bearerToken: string;
+    projectId: string;
+    webhookId: string;
+  }): Promise<WebhookRecord>;
   updateWebhook(input: {
     bearerToken: string;
     projectId: string;
@@ -320,15 +349,29 @@ export function createWebhookApi(client: HttpClient): {
     filters?: Record<string, unknown>;
     isEnabled?: boolean;
   }): Promise<WebhookRecord>;
-  deleteWebhook(input: { bearerToken: string; projectId: string; webhookId: string }): Promise<{ webhook_id: string }>;
+  deleteWebhook(input: {
+    bearerToken: string;
+    projectId: string;
+    webhookId: string;
+  }): Promise<{ webhook_id: string }>;
   testWebhook(input: {
     bearerToken: string;
     projectId: string;
     webhookId: string;
-    eventType?: "verification.passed" | "verification.failed";
+    eventType?: WebhookEventType;
   }): Promise<WebhookDelivery>;
-  listWebhookDeliveries(input: { bearerToken: string; projectId: string; webhookId: string; limit?: number }): Promise<WebhookDelivery[]>;
-  retryWebhookDelivery(input: { bearerToken: string; projectId: string; webhookId: string; deliveryId: string }): Promise<{ delivery_id: string; event_type: string }>;
+  listWebhookDeliveries(input: {
+    bearerToken: string;
+    projectId: string;
+    webhookId: string;
+    limit?: number;
+  }): Promise<WebhookDelivery[]>;
+  retryWebhookDelivery(input: {
+    bearerToken: string;
+    projectId: string;
+    webhookId: string;
+    deliveryId: string;
+  }): Promise<{ delivery_id: string; event_type: string }>;
 } {
   return {
     async listWebhooks(input) {
@@ -430,7 +473,7 @@ export function createWebhookApi(client: HttpClient): {
 
     async testWebhook(input) {
       const body: {
-        event_type?: "verification.passed" | "verification.failed";
+        event_type?: WebhookEventType;
       } = {};
 
       if (input.eventType !== undefined) {

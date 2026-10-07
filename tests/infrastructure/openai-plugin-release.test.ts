@@ -7,13 +7,25 @@ import { describe, expect, it } from "vitest";
 
 const repoRoot = process.cwd();
 
-function runJson(args: string[]): unknown {
+function runJson(args: string[], cwd = repoRoot): unknown {
   return JSON.parse(
     execFileSync(process.execPath, ["scripts/release-openai-plugin.mjs", ...args, "--json"], {
-      cwd: repoRoot,
+      cwd,
       encoding: "utf8"
     })
   ) as unknown;
+}
+
+function withCommittedSource<T>(run: (sourceRoot: string) => T): T {
+  const sourceRoot = mkdtempSync(join(tmpdir(), "debugbundle-openai-committed-"));
+  try {
+    // Published provenance is checked against committed files, independently of local edits.
+    execFileSync("git", ["clone", "--quiet", "--shared", "--no-checkout", repoRoot, sourceRoot]);
+    execFileSync("git", ["checkout", "--quiet", "--detach", "HEAD"], { cwd: sourceRoot });
+    return run(sourceRoot);
+  } finally {
+    rmSync(sourceRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+  }
 }
 
 describe("OpenAI plugin release automation", () => {
@@ -243,7 +255,7 @@ describe("OpenAI plugin release automation", () => {
   });
 
   it("verifies the committed source manifest and exact package hashes without live access", () => {
-    const result = runJson(["verify"]) as {
+    const result = withCommittedSource((sourceRoot) => runJson(["verify"], sourceRoot)) as {
       ok: boolean;
       failures: string[];
       manifest: {
@@ -319,6 +331,21 @@ describe("OpenAI plugin release automation", () => {
     expect(result.manifest.manual_gates).not.toContain(
       "owner_approval_and_implementation_of_consent_ui_design"
     );
+  });
+
+  it("rejects release provenance after a tracked source edit", () => {
+    withCommittedSource((sourceRoot) => {
+      writeFileSync(join(sourceRoot, "STATUS.md"), "unreleased local candidate\n");
+      const completed = spawnSync(
+        process.execPath,
+        ["scripts/release-openai-plugin.mjs", "verify", "--json"],
+        { cwd: sourceRoot, encoding: "utf8" }
+      );
+      expect(completed.status).toBe(1);
+      const result = JSON.parse(completed.stdout) as { ok: boolean; failures: string[] };
+      expect(result.ok).toBe(false);
+      expect(result.failures).toContain("release_manifest_drift");
+    });
   });
 
   it("produces byte-identical ZIP bytes for the same ordered or unordered inputs", () => {

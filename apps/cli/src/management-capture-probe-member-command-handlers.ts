@@ -2,7 +2,11 @@ import {
   ImmediateClientErrorPathRulesSchema,
   RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES
 } from "../../../packages/shared-types/src/index.js";
-import type { CapturePolicyUpdate, CaptureRuleCreate, CaptureRuleUpdate } from "../../../packages/shared-types/src/index.js";
+import type {
+  CapturePolicyUpdate,
+  CaptureRuleCreate,
+  CaptureRuleUpdate
+} from "../../../packages/shared-types/src/index.js";
 import {
   getCapturePolicyWithAuthCommand as defaultGetCapturePolicyCommand,
   setCapturePolicyWithAuthCommand as defaultSetCapturePolicyCommand
@@ -26,7 +30,10 @@ import {
   requirePositional,
   type ParsedArgv
 } from "./argv-helpers.js";
-import type { ManagementCommandDependencies, CliCommandResult } from "./management-command-dependencies.js";
+import type {
+  ManagementCommandDependencies,
+  CliCommandResult
+} from "./management-command-dependencies.js";
 import {
   activateProbeWithAuthCommand as defaultActivateProbeCommand,
   deactivateProbeWithAuthCommand as defaultDeactivateProbeCommand,
@@ -38,7 +45,10 @@ export async function handleCapturePolicyCommand(
   dependencies: ManagementCommandDependencies
 ): Promise<CliCommandResult> {
   function parseClientErrorStatusesOption(value: string): number[] {
-    const parts = value.split(",").map((part) => part.trim()).filter((part) => part.length > 0);
+    const parts = value
+      .split(",")
+      .map((part) => part.trim())
+      .filter((part) => part.length > 0);
     if (parts.length === 0) {
       throw new CliInputError("Invalid value for --client-error-statuses.");
     }
@@ -65,7 +75,9 @@ export async function handleCapturePolicyCommand(
     return normalized;
   }
 
-  function parseClientErrorPathRuleOption(value: string): NonNullable<CapturePolicyUpdate["immediate_client_error_path_rules"]>[number] {
+  function parseClientErrorPathRuleOption(
+    value: string
+  ): NonNullable<CapturePolicyUpdate["immediate_client_error_path_rules"]>[number] {
     const separatorIndex = value.indexOf("=");
     if (separatorIndex <= 0 || separatorIndex === value.length - 1) {
       throw new CliInputError("Invalid value for --client-error-path-rule.");
@@ -78,14 +90,16 @@ export async function handleCapturePolicyCommand(
 
     const ruleValue = value.slice(separatorIndex + 1);
     const methodSeparatorIndex = ruleValue.lastIndexOf("@");
-    const pathPattern = methodSeparatorIndex === -1 ? ruleValue : ruleValue.slice(0, methodSeparatorIndex);
-    const methods = methodSeparatorIndex === -1
-      ? []
-      : ruleValue
-          .slice(methodSeparatorIndex + 1)
-          .split(",")
-          .map((method) => method.trim().toUpperCase())
-          .filter((method) => method.length > 0);
+    const pathPattern =
+      methodSeparatorIndex === -1 ? ruleValue : ruleValue.slice(0, methodSeparatorIndex);
+    const methods =
+      methodSeparatorIndex === -1
+        ? []
+        : ruleValue
+            .slice(methodSeparatorIndex + 1)
+            .split(",")
+            .map((method) => method.trim().toUpperCase())
+            .filter((method) => method.length > 0);
     const parsed = ImmediateClientErrorPathRulesSchema.safeParse([
       {
         status_code: status,
@@ -159,20 +173,26 @@ export async function handleCapturePolicyCommand(
         throw new CliInputError("Invalid value for --override.");
       }
 
-      (update as Record<string, string | null | undefined>)[key] = rawValue === "null" ? null : rawValue;
+      (update as Record<string, string | null | undefined>)[key] =
+        rawValue === "null" ? null : rawValue;
     }
 
     const clientErrorIncidents = readStringOption(parsedArgv, "client-error-incidents");
     const clientErrorStatuses = readStringOption(parsedArgv, "client-error-statuses");
-    const clientErrorPathRuleOptions = readStringListOption(parsedArgv, "client-error-path-rule") ?? [];
+    const clientErrorPathRuleOptions =
+      readStringListOption(parsedArgv, "client-error-path-rule") ?? [];
     const clientErrorPathRulesJson = readJsonOption(parsedArgv, "client-error-path-rules-json");
 
     if (clientErrorStatuses !== undefined && clientErrorIncidents !== "custom") {
-      throw new CliInputError("Use --client-error-statuses only with --client-error-incidents custom.");
+      throw new CliInputError(
+        "Use --client-error-statuses only with --client-error-incidents custom."
+      );
     }
 
     if (clientErrorPathRuleOptions.length > 0 && clientErrorPathRulesJson !== undefined) {
-      throw new CliInputError("Use either --client-error-path-rule or --client-error-path-rules-json, not both.");
+      throw new CliInputError(
+        "Use either --client-error-path-rule or --client-error-path-rules-json, not both."
+      );
     }
 
     if (clientErrorIncidents !== undefined) {
@@ -190,7 +210,8 @@ export async function handleCapturePolicyCommand(
           if (clientErrorStatuses === undefined) {
             throw new CliInputError("Missing required option --client-error-statuses.");
           }
-          update.immediate_client_error_statuses = parseClientErrorStatusesOption(clientErrorStatuses);
+          update.immediate_client_error_statuses =
+            parseClientErrorStatusesOption(clientErrorStatuses);
           break;
         default:
           throw new CliInputError("Invalid value for --client-error-incidents.");
@@ -387,7 +408,7 @@ export async function handleCaptureRuleCommand(
     }
     const expiresAt = readStringOption(parsedArgv, "expires-at");
     if (expiresAt !== undefined) {
-      update["expires_at"] = expiresAt;
+      update["expires_at"] = expiresAt === "null" ? null : expiresAt;
     }
 
     if (Object.keys(update).length === 0) {
@@ -423,11 +444,22 @@ export async function handleCaptureRuleCommand(
   throw new CliInputError("Unknown capture-rule command.");
 }
 
-export async function handleProbeCommand(parsedArgv: ParsedArgv, dependencies: ManagementCommandDependencies): Promise<CliCommandResult> {
+export async function handleProbeCommand(
+  parsedArgv: ParsedArgv,
+  dependencies: ManagementCommandDependencies
+): Promise<CliCommandResult> {
   const action = requirePositional(parsedArgv, 1, "action");
 
   if (action === "activate") {
-    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "label-pattern", "service", "environment", "ttl-seconds", "trigger-ttl-seconds"]);
+    expectNoUnknownOptions(parsedArgv, [
+      "auth-file",
+      "json",
+      "label-pattern",
+      "service",
+      "environment",
+      "ttl-seconds",
+      "trigger-ttl-seconds"
+    ]);
     ensureNoExtraPositionals(parsedArgv, 3);
 
     const projectId = requirePositional(parsedArgv, 2, "project-id");
@@ -495,8 +527,13 @@ export async function handleProbeCommand(parsedArgv: ParsedArgv, dependencies: M
   throw new CliInputError("Unknown probe command.");
 }
 
-export function handleMemberCommand(parsedArgv: ParsedArgv, dependencies: ManagementCommandDependencies): Promise<CliCommandResult> {
+export function handleMemberCommand(
+  parsedArgv: ParsedArgv,
+  dependencies: ManagementCommandDependencies
+): Promise<CliCommandResult> {
   void parsedArgv;
   void dependencies;
-  throw new CliInputError("Use `debugbundle project members ... --project-id <id>` for project collaboration commands.");
+  throw new CliInputError(
+    "Use `debugbundle project members ... --project-id <id>` for project collaboration commands."
+  );
 }

@@ -12,11 +12,63 @@ import {
   removeProjectGitHubRepoCommand,
   retryProjectGitHubDeliveryCommand,
   setProjectGitHubRepoCommand,
-  updateProjectGitHubRuleCommand
+  updateProjectGitHubRuleCommand,
+  updateProjectGitHubRuleWithAuthCommand
 } from "../../../apps/cli/src/github-commands.js";
 import { GitHubManagementApiError } from "../../../packages/github-client/src/index.js";
 
 describe("cli github commands", () => {
+  it.each([undefined, 3600])(
+    "updates a rule using stored member auth with cooldown %s",
+    async (cooldownSeconds) => {
+      const rule = {
+        rule_id: "rule",
+        project_id: "proj",
+        created_by_user_id: "member",
+        name: "Scoped rule",
+        enabled: false,
+        event_types: ["bundle.resolved"],
+        environments: [],
+        services: [],
+        severity_min: null,
+        bundle_type: null,
+        incident_status: "new_or_reopened",
+        cooldown_seconds: cooldownSeconds ?? 300,
+        created_at: "2026-10-07T00:00:00Z",
+        updated_at: "2026-10-07T00:00:00Z"
+      };
+      const fetchImpl = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(new Response(JSON.stringify({ rule }), { status: 200 }));
+      const result = await updateProjectGitHubRuleWithAuthCommand(
+        {
+          projectId: "proj",
+          ruleId: "rule",
+          enabled: false,
+          ...(cooldownSeconds === undefined ? {} : { cooldownSeconds }),
+          json: true
+        },
+        {
+          readAuthState: vi
+            .fn()
+            .mockResolvedValue({ bearer_token: "stored_member", base_url: "https://example.test" }),
+          fetchImpl
+        }
+      );
+      expect(result.exitCode).toBe(0);
+      expect(fetchImpl).toHaveBeenCalledWith(
+        "https://example.test/v1/projects/proj/github/rules/rule",
+        expect.objectContaining({
+          method: "PATCH",
+          headers: expect.objectContaining({ authorization: "Bearer stored_member" }),
+          body: JSON.stringify({
+            ...(cooldownSeconds === undefined ? {} : { cooldown_seconds: cooldownSeconds }),
+            enabled: false
+          })
+        })
+      );
+    }
+  );
   it("renders github status in human and json modes", async () => {
     const installation = {
       id: "ghi_1",
@@ -58,8 +110,14 @@ describe("cli github commands", () => {
     expect(humanResult.output).toContain("GitHub installation: debugbundle");
     expect(humanResult.output).toContain("Assigned repo: debugbundle/app");
     expect(JSON.parse(jsonResult.output)).toEqual({ installation });
-    expect(getInstallation).toHaveBeenCalledWith({ bearerToken: "dbundle_mem_x", projectId: "proj_1" });
-    expect(getProjectRepo).toHaveBeenCalledWith({ bearerToken: "dbundle_mem_x", projectId: "proj_1" });
+    expect(getInstallation).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_x",
+      projectId: "proj_1"
+    });
+    expect(getProjectRepo).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_x",
+      projectId: "proj_1"
+    });
   });
 
   it("renders repository list, repo set, and repo remove output", async () => {
@@ -103,7 +161,10 @@ describe("cli github commands", () => {
 
     expect(listResult.exitCode).toBe(0);
     expect(listResult.output).toContain("debugbundle/app (main)");
-    expect(listRepositories).toHaveBeenCalledWith({ bearerToken: "dbundle_mem_x", projectId: "proj_1" });
+    expect(listRepositories).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_x",
+      projectId: "proj_1"
+    });
     expect(setResult.output).toContain("Project repo set: Assigned repo: debugbundle/app");
     expect(JSON.parse(removeResult.output)).toEqual({ removed: true, project_id: "proj_1" });
   });
@@ -112,13 +173,17 @@ describe("cli github commands", () => {
     const authFailure = await getGitHubStatusWithAuthCommand(
       {},
       {
-        readAuthState: vi.fn().mockRejectedValue(new CliAuthStateError("auth_state_missing", "Not logged in."))
+        readAuthState: vi
+          .fn()
+          .mockRejectedValue(new CliAuthStateError("auth_state_missing", "Not logged in."))
       }
     );
     const apiFailure = await listGitHubRepositoriesCommand(
       { bearerToken: "dbundle_mem_x" },
       {
-        listRepositories: vi.fn().mockRejectedValue(new GitHubManagementApiError(404, "installation_not_found"))
+        listRepositories: vi
+          .fn()
+          .mockRejectedValue(new GitHubManagementApiError(404, "installation_not_found"))
       }
     );
     const invalidRef = await setProjectGitHubRepoCommand(
@@ -232,8 +297,12 @@ describe("cli github commands", () => {
       }
     );
 
-    expect(listResult.output).toContain("High severity incidents | enabled | bundle.created,bundle.reopened | high | 300s");
-    expect(createResult.output).toContain("GitHub rule created: 11111111-1111-4111-8111-111111111111");
+    expect(listResult.output).toContain(
+      "High severity incidents | enabled | bundle.created,bundle.reopened | high | 300s"
+    );
+    expect(createResult.output).toContain(
+      "GitHub rule created: 11111111-1111-4111-8111-111111111111"
+    );
     expect(JSON.parse(updateResult.output).rule.name).toBe("Critical incidents only");
     expect(JSON.parse(deleteResult.output)).toEqual({
       deleted: true,
@@ -293,7 +362,9 @@ describe("cli github commands", () => {
       }
     );
 
-    expect(listResult.output).toContain("High severity incidents | failed | TypeError in checkout | attempts: 2");
+    expect(listResult.output).toContain(
+      "High severity incidents | failed | TypeError in checkout | attempts: 2"
+    );
     expect(JSON.parse(retryResult.output)).toEqual({
       delivery: expect.objectContaining({
         delivery_id: "del_1",

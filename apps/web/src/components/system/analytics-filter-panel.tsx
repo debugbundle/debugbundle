@@ -35,6 +35,7 @@ export function AnalyticsFilterPanel({
   title,
   description,
   activeFilterCount,
+  canApply = true,
   scrollable = false,
   desktopSize = "default",
   onApply,
@@ -46,6 +47,7 @@ export function AnalyticsFilterPanel({
   title: string;
   description: string;
   activeFilterCount: number;
+  canApply?: boolean;
   scrollable?: boolean;
   desktopSize?: "default" | "wide";
   onApply: () => void;
@@ -99,7 +101,9 @@ export function AnalyticsFilterPanel({
             <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">{children}</div>
             <Separator />
             <SheetFooter>
-              <Button type="submit">Apply filters</Button>
+              <Button type="submit" disabled={!canApply}>
+                Apply filters
+              </Button>
               <Button type="button" variant="outline" onClick={resetFilters}>
                 Reset filters
               </Button>
@@ -134,7 +138,9 @@ export function AnalyticsFilterPanel({
             <Button type="button" variant="outline" onClick={resetFilters}>
               Reset
             </Button>
-            <Button type="submit">Apply filters</Button>
+            <Button type="submit" disabled={!canApply}>
+              Apply filters
+            </Button>
           </div>
         </form>
       </PopoverContent>

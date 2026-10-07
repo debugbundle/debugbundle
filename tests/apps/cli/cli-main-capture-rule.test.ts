@@ -3,6 +3,33 @@ import { describe, expect, it, vi } from "vitest";
 import { runCli } from "../../../apps/cli/src/main.js";
 
 describe("cli main capture-rule routing", () => {
+  it.each([
+    { value: "null", expected: null },
+    { value: "2026-11-07T12:00:00.000Z", expected: "2026-11-07T12:00:00.000Z" }
+  ])("updates or explicitly clears capture-rule expiry: $value", async ({ value, expected }) => {
+    const updateCaptureRuleCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "updated" });
+    const result = await runCli(
+      [
+        "capture-rule",
+        "update",
+        "00000000-0000-4000-8000-000000000101",
+        "--project-id",
+        "proj_123",
+        "--expires-at",
+        value,
+        "--json"
+      ],
+      { updateCaptureRuleCommand }
+    );
+    expect(result.exitCode).toBe(0);
+    expect(updateCaptureRuleCommand).toHaveBeenCalledWith({
+      projectId: "proj_123",
+      ruleId: "00000000-0000-4000-8000-000000000101",
+      update: { expires_at: expected },
+      json: true
+    });
+  });
+
   it("routes capture-rule list/create/update/delete arguments into command handlers", async () => {
     const listCaptureRulesCommand = vi.fn().mockResolvedValue({
       exitCode: 0,
@@ -29,87 +56,96 @@ describe("cli main capture-rule routing", () => {
       output: "capture-rule-delete"
     });
 
-    await runCli([
-      "capture-rule",
-      "list",
-      "--project-id",
-      "proj_123",
-      "--auth-file",
-      "/tmp/auth.json",
-      "--json"
-    ], {
-      listCaptureRulesCommand
-    });
+    await runCli(
+      [
+        "capture-rule",
+        "list",
+        "--project-id",
+        "proj_123",
+        "--auth-file",
+        "/tmp/auth.json",
+        "--json"
+      ],
+      {
+        listCaptureRulesCommand
+      }
+    );
 
-    await runCli([
-      "capture-rule",
-      "suggest",
-      "inc_123",
-      "--auth-file",
-      "/tmp/auth.json"
-    ], {
+    await runCli(["capture-rule", "suggest", "inc_123", "--auth-file", "/tmp/auth.json"], {
       suggestCaptureRulesFromIncidentCommand
     });
 
-    await runCli([
-      "capture-rule",
-      "create-from-suggestion",
-      "inc_123",
-      "--suggestion-id",
-      "primary_resource_host_demote",
-      "--name",
-      "Demote analytics noise",
-      "--enabled",
-      "false"
-    ], {
-      createCaptureRuleFromIncidentSuggestionCommand
-    });
+    await runCli(
+      [
+        "capture-rule",
+        "create-from-suggestion",
+        "inc_123",
+        "--suggestion-id",
+        "primary_resource_host_demote",
+        "--name",
+        "Demote analytics noise",
+        "--enabled",
+        "false"
+      ],
+      {
+        createCaptureRuleFromIncidentSuggestionCommand
+      }
+    );
 
-    await runCli([
-      "capture-rule",
-      "create",
-      "--project-id",
-      "proj_123",
-      "--name",
-      "Demote analytics noise",
-      "--action",
-      "demote",
-      "--matcher-json",
-      '{"event_types":["frontend_exception"],"browser_event_kind":"resource_error","resource_url":{"host":"analytics.example.com"}}',
-      "--description",
-      "Known third-party noise",
-      "--enabled",
-      "false"
-    ], {
-      createCaptureRuleCommand
-    });
+    await runCli(
+      [
+        "capture-rule",
+        "create",
+        "--project-id",
+        "proj_123",
+        "--name",
+        "Demote analytics noise",
+        "--action",
+        "demote",
+        "--matcher-json",
+        '{"event_types":["frontend_exception"],"browser_event_kind":"resource_error","resource_url":{"host":"analytics.example.com"}}',
+        "--description",
+        "Known third-party noise",
+        "--enabled",
+        "false"
+      ],
+      {
+        createCaptureRuleCommand
+      }
+    );
 
-    await runCli([
-      "capture-rule",
-      "update",
-      "00000000-0000-4000-8000-000000000101",
-      "--project-id",
-      "proj_123",
-      "--action",
-      "sample",
-      "--sample-rate",
-      "0.25",
-      "--sample-event-class",
-      "context",
-      "--json"
-    ], {
-      updateCaptureRuleCommand
-    });
+    await runCli(
+      [
+        "capture-rule",
+        "update",
+        "00000000-0000-4000-8000-000000000101",
+        "--project-id",
+        "proj_123",
+        "--action",
+        "sample",
+        "--sample-rate",
+        "0.25",
+        "--sample-event-class",
+        "context",
+        "--json"
+      ],
+      {
+        updateCaptureRuleCommand
+      }
+    );
 
-    const deleteResult = await runCli([
-      "capture-rule",
-      "delete",
-      "00000000-0000-4000-8000-000000000101",
-      "--project-id",
-      "proj_123"
-    ], {
-      deleteCaptureRuleCommand
-    });
+    const deleteResult = await runCli(
+      [
+        "capture-rule",
+        "delete",
+        "00000000-0000-4000-8000-000000000101",
+        "--project-id",
+        "proj_123"
+      ],
+      {
+        deleteCaptureRuleCommand
+      }
+    );
 
     expect(listCaptureRulesCommand).toHaveBeenCalledWith({
       projectId: "proj_123",

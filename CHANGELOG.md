@@ -6,6 +6,30 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-10-07
+
+### Added
+
+- Complete CLI webhook test-event selection and add MCP/OpenClaw `test_webhook_event` for all existing event types, retaining the legacy verification-only MCP tool.
+- Add ordinary/local-auth MCP `verify_app_event` and its OpenClaw projection for real SDK-driven hosted proof, preserving the frozen `verify_cloud` contract and restricted catalogs.
+- Add owner-only organization GitHub disconnect to CLI, ordinary/local-auth MCP, OpenClaw and the dashboard, preserving browser installation state validation.
+- Add existing API-backed dashboard analytics actions/sample inventory and complete filters, incident context/logs, scoped agent credential lifecycle, webhook management, weekly channel options and custom improvement snooze.
+- Add CLI webhook update `--filters-json` for explicit filter replacement and clearing; reject ambiguous combinations with individual filter flags.
+
+### Fixed
+
+- Accept the existing synthetic lifecycle test envelopes in the shared webhook payload parser while retaining the legacy verification schema and emitted payloads.
+- Preserve GitHub rule event arrays, enabled state and legacy scopes in the dashboard; allow member creators to manage their rules and retain cleanup after downgrade.
+- Support exact alert cooldowns, severity clearing and Discord; expose delivery options, one-time signing keys and grouped delivery inspection using existing dashboard patterns.
+- Reuse capture-rule creation controls for full editing and preserve untouched expiry precision.
+- Allow CLI capture-rule updates to clear an existing expiry with `--expires-at null` while preserving omission and timestamp behavior.
+
+### Distribution
+
+- Shared types and redaction 2.3.0, CLI/MCP/OpenClaw 1.14.0. Redaction follows the paired shared-package release without changing sanitization behavior; SDK packages remain 3.1.0.
+- Developer plugin pins adopt the verified MCP release through independently versioned updates. The ordinary catalog has 130 tools; hosted OAuth retains 23 read-only tools and the project-agent profile retains five.
+- Existing interfaces and persisted data remain compatible. No database migration is required.
+
 ## [1.14.1] - 2026-10-07
 
 ### Fixed
@@ -104,7 +128,6 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 - Direct alert, signed lifecycle-webhook, weekly Slack report, connected-Slack test, and availability-check sends now validate the address used by the socket and reject private/reserved destinations and unsafe ports. Alert create/update also rejects unsafe literal targets; webhooks do not follow redirects, while availability checks revalidate each redirect. Previously configured blocked targets remain stored but delivery fails until the owner changes the URL to a direct public endpoint.
 - Updated API, CLI, and MCP clients can opt into signed custom alert-webhook creation with `signing: "hmac_sha256_v1"`. The exact JSON body receives a per-rule HMAC-SHA256 signature, with its secret shown only on creation or explicit rotation. Every custom webhook is signed, including legacy rules upgraded atomically before delivery. Legacy clients keep their strict response/body shape until opted in or rotated; an explicit payload-version column and forward migration preserve that boundary without exposing keys in readable config.
-
 
 ## [1.12.0] - 2026-09-23
 

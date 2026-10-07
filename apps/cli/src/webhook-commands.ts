@@ -1,9 +1,11 @@
 import { WebhookApiError } from "../../../packages/webhook-client/src/index.js";
-import type { WebhookDelivery, WebhookRecord, WebhookCreatedRecord } from "../../../packages/webhook-client/src/index.js";
-import {
-  createAuthenticatedWebhookApi,
-  runAuthenticatedCliCommand
-} from "./auth-context.js";
+import type {
+  WebhookEventType,
+  WebhookDelivery,
+  WebhookRecord,
+  WebhookCreatedRecord
+} from "../../../packages/webhook-client/src/index.js";
+import { createAuthenticatedWebhookApi, runAuthenticatedCliCommand } from "./auth-context.js";
 import type { CliCommandResult } from "./token-commands.js";
 
 function mapErrorToExitCode(error: unknown): number {
@@ -45,7 +47,10 @@ function formatWebhookDeliveriesTable(deliveries: WebhookDelivery[]): string {
   }
 
   return deliveries
-    .map((delivery) => `${delivery.delivery_id} | ${delivery.status} | ${delivery.event_type} | attempts=${delivery.attempt_count}`)
+    .map(
+      (delivery) =>
+        `${delivery.delivery_id} | ${delivery.status} | ${delivery.event_type} | attempts=${delivery.attempt_count}`
+    )
     .join("\n");
 }
 
@@ -57,7 +62,11 @@ export async function listWebhooksCommand(
     json?: boolean;
   },
   api: {
-    listWebhooks(input: { bearerToken: string; projectId: string; limit?: number }): Promise<WebhookRecord[]>;
+    listWebhooks(input: {
+      bearerToken: string;
+      projectId: string;
+      limit?: number;
+    }): Promise<WebhookRecord[]>;
   }
 ): Promise<CliCommandResult> {
   try {
@@ -76,7 +85,10 @@ export async function listWebhooksCommand(
       output: input.json ? JSON.stringify({ webhooks }) : formatWebhookTable(webhooks)
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -88,7 +100,12 @@ export async function listWebhooksWithAuthCommand(
     createApi: createAuthenticatedWebhookApi,
     dependencies,
     runCommand: (authState, api) => {
-      const commandInput: { bearerToken: string; projectId: string; limit?: number; json?: boolean } = {
+      const commandInput: {
+        bearerToken: string;
+        projectId: string;
+        limit?: number;
+        json?: boolean;
+      } = {
         bearerToken: authState.bearer_token,
         projectId: input.projectId
       };
@@ -160,7 +177,10 @@ export async function createWebhookCommand(
       output: `Webhook created: ${webhook.webhook_id}\nSigning secret: ${webhook.signing_secret}`
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -269,7 +289,10 @@ export async function updateWebhookCommand(
       output: input.json ? JSON.stringify({ webhook }) : `Webhook updated: ${webhook.webhook_id}`
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -336,7 +359,11 @@ export async function deleteWebhookCommand(
     json?: boolean;
   },
   api: {
-    deleteWebhook(input: { bearerToken: string; projectId: string; webhookId: string }): Promise<{ webhook_id: string }>;
+    deleteWebhook(input: {
+      bearerToken: string;
+      projectId: string;
+      webhookId: string;
+    }): Promise<{ webhook_id: string }>;
   }
 ): Promise<CliCommandResult> {
   try {
@@ -350,7 +377,10 @@ export async function deleteWebhookCommand(
       output: input.json ? JSON.stringify({ webhook }) : `Webhook deleted: ${webhook.webhook_id}`
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -362,7 +392,12 @@ export async function deleteWebhookWithAuthCommand(
     createApi: createAuthenticatedWebhookApi,
     dependencies,
     runCommand: (authState, api) => {
-      const commandInput: { bearerToken: string; projectId: string; webhookId: string; json?: boolean } = {
+      const commandInput: {
+        bearerToken: string;
+        projectId: string;
+        webhookId: string;
+        json?: boolean;
+      } = {
         bearerToken: authState.bearer_token,
         projectId: input.projectId,
         webhookId: input.webhookId
@@ -384,7 +419,7 @@ export async function testWebhookCommand(
     bearerToken: string;
     projectId: string;
     webhookId: string;
-    eventType?: "verification.passed" | "verification.failed";
+    eventType?: WebhookEventType;
     json?: boolean;
   },
   api: {
@@ -392,7 +427,7 @@ export async function testWebhookCommand(
       bearerToken: string;
       projectId: string;
       webhookId: string;
-      eventType?: "verification.passed" | "verification.failed";
+      eventType?: WebhookEventType;
     }): Promise<WebhookDelivery>;
   }
 ): Promise<CliCommandResult> {
@@ -401,7 +436,7 @@ export async function testWebhookCommand(
       bearerToken: string;
       projectId: string;
       webhookId: string;
-      eventType?: "verification.passed" | "verification.failed";
+      eventType?: WebhookEventType;
     } = {
       bearerToken: input.bearerToken,
       projectId: input.projectId,
@@ -420,7 +455,10 @@ export async function testWebhookCommand(
         : `Webhook test queued: ${delivery.delivery_id} | ${delivery.event_type} | attempts=${delivery.attempt_count}`
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -429,7 +467,7 @@ export async function testWebhookWithAuthCommand(
     authFilePath?: string;
     projectId: string;
     webhookId: string;
-    eventType?: "verification.passed" | "verification.failed";
+    eventType?: WebhookEventType;
     json?: boolean;
   },
   dependencies?: Parameters<typeof createAuthenticatedWebhookApi>[1]
@@ -442,7 +480,7 @@ export async function testWebhookWithAuthCommand(
         bearerToken: string;
         projectId: string;
         webhookId: string;
-        eventType?: "verification.passed" | "verification.failed";
+        eventType?: WebhookEventType;
         json?: boolean;
       } = {
         bearerToken: authState.bearer_token,
@@ -473,11 +511,21 @@ export async function listWebhookDeliveriesCommand(
     json?: boolean;
   },
   api: {
-    listWebhookDeliveries(input: { bearerToken: string; projectId: string; webhookId: string; limit?: number }): Promise<WebhookDelivery[]>;
+    listWebhookDeliveries(input: {
+      bearerToken: string;
+      projectId: string;
+      webhookId: string;
+      limit?: number;
+    }): Promise<WebhookDelivery[]>;
   }
 ): Promise<CliCommandResult> {
   try {
-    const requestInput: { bearerToken: string; projectId: string; webhookId: string; limit?: number } = {
+    const requestInput: {
+      bearerToken: string;
+      projectId: string;
+      webhookId: string;
+      limit?: number;
+    } = {
       bearerToken: input.bearerToken,
       projectId: input.projectId,
       webhookId: input.webhookId
@@ -493,19 +541,34 @@ export async function listWebhookDeliveriesCommand(
       output: input.json ? JSON.stringify({ deliveries }) : formatWebhookDeliveriesTable(deliveries)
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
 export async function listWebhookDeliveriesWithAuthCommand(
-  input: { authFilePath?: string; projectId: string; webhookId: string; limit?: number; json?: boolean },
+  input: {
+    authFilePath?: string;
+    projectId: string;
+    webhookId: string;
+    limit?: number;
+    json?: boolean;
+  },
   dependencies?: Parameters<typeof createAuthenticatedWebhookApi>[1]
 ): Promise<CliCommandResult> {
   return runAuthenticatedCliCommand(input, {
     createApi: createAuthenticatedWebhookApi,
     dependencies,
     runCommand: (authState, api) => {
-      const commandInput: { bearerToken: string; projectId: string; webhookId: string; limit?: number; json?: boolean } = {
+      const commandInput: {
+        bearerToken: string;
+        projectId: string;
+        webhookId: string;
+        limit?: number;
+        json?: boolean;
+      } = {
         bearerToken: authState.bearer_token,
         projectId: input.projectId,
         webhookId: input.webhookId
@@ -534,7 +597,12 @@ export async function retryWebhookDeliveryCommand(
     json?: boolean;
   },
   api: {
-    retryWebhookDelivery(input: { bearerToken: string; projectId: string; webhookId: string; deliveryId: string }): Promise<{ delivery_id: string; event_type: string }>;
+    retryWebhookDelivery(input: {
+      bearerToken: string;
+      projectId: string;
+      webhookId: string;
+      deliveryId: string;
+    }): Promise<{ delivery_id: string; event_type: string }>;
   }
 ): Promise<CliCommandResult> {
   try {
@@ -546,22 +614,39 @@ export async function retryWebhookDeliveryCommand(
     });
     return {
       exitCode: 0,
-      output: input.json ? JSON.stringify(result) : `Delivery retried: ${result.delivery_id} | ${result.event_type}`
+      output: input.json
+        ? JSON.stringify(result)
+        : `Delivery retried: ${result.delivery_id} | ${result.event_type}`
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
 export async function retryWebhookDeliveryWithAuthCommand(
-  input: { authFilePath?: string; projectId: string; webhookId: string; deliveryId: string; json?: boolean },
+  input: {
+    authFilePath?: string;
+    projectId: string;
+    webhookId: string;
+    deliveryId: string;
+    json?: boolean;
+  },
   dependencies?: Parameters<typeof createAuthenticatedWebhookApi>[1]
 ): Promise<CliCommandResult> {
   return runAuthenticatedCliCommand(input, {
     createApi: createAuthenticatedWebhookApi,
     dependencies,
     runCommand: (authState, api) => {
-      const commandInput: { bearerToken: string; projectId: string; webhookId: string; deliveryId: string; json?: boolean } = {
+      const commandInput: {
+        bearerToken: string;
+        projectId: string;
+        webhookId: string;
+        deliveryId: string;
+        json?: boolean;
+      } = {
         bearerToken: authState.bearer_token,
         projectId: input.projectId,
         webhookId: input.webhookId,

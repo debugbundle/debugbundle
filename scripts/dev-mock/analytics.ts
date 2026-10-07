@@ -4,6 +4,7 @@ import {
   AnalyticsSavedFunnelCreateSchema,
   AnalyticsSavedFunnelUpdateSchema,
   AnalyticsBundleAnalysisKindSchema,
+  parseAnalyticsRelativeDurationMs,
   ANALYTICS_BUNDLE_GENERATION_ID_HEADER
 } from "../../packages/shared-types/src/index.js";
 import type {
@@ -91,9 +92,14 @@ export function createAnalyticsMocks(data: ReturnType<typeof createDevMockFixtur
           ? 90
           : 30;
     return {
-      from: query.get("from") ?? new Date(Date.now() - days * 86400000).toISOString(),
+      from:
+        query.get("from") ??
+        new Date(
+          Date.now() -
+            (parseAnalyticsRelativeDurationMs(query.get("last") ?? "") ?? days * 86400000)
+        ).toISOString(),
       to: query.get("to") ?? now,
-      granularity: "day" as const
+      granularity: query.get("granularity") === "hour" ? ("hour" as const) : ("day" as const)
     };
   }
   function artifact(record: MockRecord, query: URLSearchParams): AnalyticsBundleV1 {
@@ -308,31 +314,72 @@ export function createAnalyticsMocks(data: ReturnType<typeof createDevMockFixtur
               ]
             : []
       });
+    const sampleId = mockProjectUuid(910);
+    const sample = {
+      sample_id: sampleId,
+      project_id: projectUuid("proj_123"),
+      service: "saycheese-frontend",
+      environment: "production",
+      session_id_hash: `sha256:${"b".repeat(64)}`,
+      visitor_id_hash: null,
+      analysis_tags: ["checkout_friction"],
+      first_seen_at: now,
+      last_seen_at: now,
+      dimensions_summary: { device_type: "mobile", browser_family: "Safari", language: "en" },
+      has_artifact: true,
+      expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+      created_at: now
+    };
+    if (read && route === "/v1/analytics/actions")
+      return reply({
+        window: { ...metricsWindow, project_id: projectUuid(projectId ?? "proj_123") },
+        actions:
+          projectId === "proj_123"
+            ? [
+                {
+                  action_key: "checkout",
+                  kind: "conversion",
+                  event_count: 220,
+                  unique_sessions: 200
+                }
+              ]
+            : []
+      });
+    if (read && route === "/v1/analytics/journey-samples") {
+      const limit = z.coerce
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .safeParse(query.get("limit") ?? 20);
+      if (!limit.success) return invalid();
+      const matches =
+        projectId === "proj_123" &&
+        !query.has("cursor") &&
+        (!query.has("tag") || query.get("tag") === "checkout_friction") &&
+        (!query.has("service") || query.get("service") === sample.service) &&
+        (!query.has("environment") || query.get("environment") === sample.environment);
+      return reply({ samples: matches ? [sample] : [], next_cursor: null });
+    }
     const journeyMatch = /^\/v1\/analytics\/journey-samples\/([^/]+)$/.exec(path);
     if (read && journeyMatch) {
-      if (projectId !== "proj_123" || journeyMatch[1] !== "journey_demo") return missing();
+      if (projectId !== "proj_123" || !["journey_demo", sampleId].includes(journeyMatch[1]!))
+        return missing();
       return reply({
-        sample: {
-          sample_id: "journey_demo",
-          project_id: projectId,
-          service: "saycheese-frontend",
-          environment: "production",
-          session_id_hash: `sha256:${"b".repeat(64)}`,
+        sample,
+        journey: {
+          schema_version: "analytics_journey_sample.v1",
+          sample_id: sampleId,
+          project_id: sample.project_id,
+          service: sample.service,
+          environment: sample.environment,
+          session_id_hash: sample.session_id_hash,
           visitor_id_hash: null,
-          analysis_tags: ["checkout_friction"],
           first_seen_at: now,
           last_seen_at: now,
-          dimensions_summary: { device_type: "mobile", browser_family: "Safari", language: "en" },
-          has_artifact: true,
-          expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
-          created_at: now
-        },
-        journey: {
-          timeline: ["/events", "/checkout", "/shipping"].map((route_key, i) => ({
-            occurred_at: new Date(Date.now() - (2 - i) * 60000).toISOString(),
-            kind: "page_view",
-            route: { normalized_path: route_key }
-          }))
+          analysis_tags: sample.analysis_tags,
+          dimensions_summary: {},
+          events: []
         }
       });
     }

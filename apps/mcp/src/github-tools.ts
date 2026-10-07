@@ -10,7 +10,8 @@ export const GITHUB_MCP_TOOL_NAMES = [
   "list_github_deliveries",
   "retry_github_delivery",
   "set_project_github_repo",
-  "remove_project_github_repo"
+  "remove_project_github_repo",
+  "disconnect_github_installation"
 ] as const;
 
 function mapMcpError(error: unknown): never {
@@ -22,6 +23,7 @@ function mapMcpError(error: unknown): never {
 }
 
 export function createGitHubMcpTools(api: {
+  disconnectInstallation?(input: { bearerToken: string }): Promise<void>;
   getInstallation(input: { bearerToken: string; projectId?: string }): Promise<unknown>;
   listRepositories(input: { bearerToken: string; projectId?: string }): Promise<unknown[]>;
   getProjectRepo?(input: { bearerToken: string; projectId: string }): Promise<unknown>;
@@ -31,7 +33,11 @@ export function createGitHubMcpTools(api: {
     status?: "pending" | "retrying" | "delivered" | "failed" | "skipped";
     limit?: number;
   }): Promise<unknown[]>;
-  retryProjectDelivery?(input: { bearerToken: string; projectId: string; deliveryId: string }): Promise<unknown>;
+  retryProjectDelivery?(input: {
+    bearerToken: string;
+    projectId: string;
+    deliveryId: string;
+  }): Promise<unknown>;
   listProjectRules?(input: { bearerToken: string; projectId: string }): Promise<unknown[]>;
   createProjectRule?(input: {
     bearerToken: string;
@@ -60,11 +66,31 @@ export function createGitHubMcpTools(api: {
     cooldownSeconds?: number;
     enabled?: boolean;
   }): Promise<unknown>;
-  deleteProjectRule?(input: { bearerToken: string; projectId: string; ruleId: string }): Promise<void>;
-  setProjectRepo(input: { bearerToken: string; projectId: string; owner: string; repo: string }): Promise<unknown>;
+  deleteProjectRule?(input: {
+    bearerToken: string;
+    projectId: string;
+    ruleId: string;
+  }): Promise<void>;
+  setProjectRepo(input: {
+    bearerToken: string;
+    projectId: string;
+    owner: string;
+    repo: string;
+  }): Promise<unknown>;
   removeProjectRepo(input: { bearerToken: string; projectId: string }): Promise<void>;
-}): Record<(typeof GITHUB_MCP_TOOL_NAMES)[number], (input: Record<string, unknown>) => Promise<unknown>> {
+}): Record<
+  (typeof GITHUB_MCP_TOOL_NAMES)[number],
+  (input: Record<string, unknown>) => Promise<unknown>
+> {
   return {
+    async disconnect_github_installation(input) {
+      try {
+        await api.disconnectInstallation!({ bearerToken: String(input["bearerToken"]) });
+        return { disconnected: true };
+      } catch (error) {
+        mapMcpError(error);
+      }
+    },
     async get_github_status(input) {
       try {
         const bearerToken = String(input["bearerToken"]);
@@ -117,12 +143,21 @@ export function createGitHubMcpTools(api: {
             bearerToken: String(input["bearerToken"]),
             projectId: String(input["projectId"]),
             name: String(input["name"]),
-            eventTypes: Array.isArray(input["eventTypes"]) ? input["eventTypes"].map((value) => String(value)) : [],
-            environments: Array.isArray(input["environments"]) ? input["environments"].map((value) => String(value)) : [],
-            services: Array.isArray(input["services"]) ? input["services"].map((value) => String(value)) : [],
+            eventTypes: Array.isArray(input["eventTypes"])
+              ? input["eventTypes"].map((value) => String(value))
+              : [],
+            environments: Array.isArray(input["environments"])
+              ? input["environments"].map((value) => String(value))
+              : [],
+            services: Array.isArray(input["services"])
+              ? input["services"].map((value) => String(value))
+              : [],
             severityMin: String(input["severityMin"]) as "low" | "medium" | "high" | "critical",
             bundleType: String(input["bundleType"]) as "failure" | "improvement",
-            incidentStatus: String(input["incidentStatus"]) as "new_only" | "reopened_only" | "new_or_reopened",
+            incidentStatus: String(input["incidentStatus"]) as
+              | "new_only"
+              | "reopened_only"
+              | "new_or_reopened",
             cooldownSeconds: Number(input["cooldownSeconds"]),
             ...(typeof input["enabled"] === "boolean" ? { enabled: input["enabled"] } : {})
           })
@@ -140,9 +175,15 @@ export function createGitHubMcpTools(api: {
             projectId: String(input["projectId"]),
             ruleId: String(input["ruleId"]),
             ...(typeof input["name"] === "string" ? { name: input["name"] } : {}),
-            ...(Array.isArray(input["eventTypes"]) ? { eventTypes: input["eventTypes"].map((value) => String(value)) } : {}),
-            ...(Array.isArray(input["environments"]) ? { environments: input["environments"].map((value) => String(value)) } : {}),
-            ...(Array.isArray(input["services"]) ? { services: input["services"].map((value) => String(value)) } : {}),
+            ...(Array.isArray(input["eventTypes"])
+              ? { eventTypes: input["eventTypes"].map((value) => String(value)) }
+              : {}),
+            ...(Array.isArray(input["environments"])
+              ? { environments: input["environments"].map((value) => String(value)) }
+              : {}),
+            ...(Array.isArray(input["services"])
+              ? { services: input["services"].map((value) => String(value)) }
+              : {}),
             ...(typeof input["severityMin"] === "string"
               ? { severityMin: input["severityMin"] as "low" | "medium" | "high" | "critical" }
               : {}),
@@ -150,9 +191,16 @@ export function createGitHubMcpTools(api: {
               ? { bundleType: input["bundleType"] as "failure" | "improvement" }
               : {}),
             ...(typeof input["incidentStatus"] === "string"
-              ? { incidentStatus: input["incidentStatus"] as "new_only" | "reopened_only" | "new_or_reopened" }
+              ? {
+                  incidentStatus: input["incidentStatus"] as
+                    | "new_only"
+                    | "reopened_only"
+                    | "new_or_reopened"
+                }
               : {}),
-            ...(typeof input["cooldownSeconds"] === "number" ? { cooldownSeconds: input["cooldownSeconds"] } : {}),
+            ...(typeof input["cooldownSeconds"] === "number"
+              ? { cooldownSeconds: input["cooldownSeconds"] }
+              : {}),
             ...(typeof input["enabled"] === "boolean" ? { enabled: input["enabled"] } : {})
           })
         };
@@ -186,7 +234,14 @@ export function createGitHubMcpTools(api: {
             bearerToken: String(input["bearerToken"]),
             projectId: String(input["projectId"]),
             ...(typeof input["status"] === "string"
-              ? { status: input["status"] as "pending" | "retrying" | "delivered" | "failed" | "skipped" }
+              ? {
+                  status: input["status"] as
+                    | "pending"
+                    | "retrying"
+                    | "delivered"
+                    | "failed"
+                    | "skipped"
+                }
               : {}),
             ...(typeof input["limit"] === "number" ? { limit: input["limit"] } : {})
           })

@@ -1,4 +1,8 @@
-import { WebhookApiError } from "../../../packages/webhook-client/src/index.js";
+import {
+  WebhookApiError,
+  WebhookEventTypeSchema,
+  type WebhookEventType
+} from "../../../packages/webhook-client/src/index.js";
 
 export const WEBHOOK_MCP_TOOL_NAMES = [
   "list_webhooks",
@@ -6,6 +10,7 @@ export const WEBHOOK_MCP_TOOL_NAMES = [
   "update_webhook",
   "delete_webhook",
   "test_webhook",
+  "test_webhook_event",
   "list_webhook_deliveries",
   "retry_webhook_delivery"
 ] as const;
@@ -19,7 +24,11 @@ function mapMcpError(error: unknown): never {
 }
 
 export function createWebhookMcpTools(api: {
-  listWebhooks(input: { bearerToken: string; projectId: string; limit?: number }): Promise<unknown[]>;
+  listWebhooks(input: {
+    bearerToken: string;
+    projectId: string;
+    limit?: number;
+  }): Promise<unknown[]>;
   createWebhook(input: {
     bearerToken: string;
     projectId: string;
@@ -28,7 +37,11 @@ export function createWebhookMcpTools(api: {
     filters?: Record<string, unknown>;
     isEnabled?: boolean;
   }): Promise<unknown>;
-  getWebhook(input: { bearerToken: string; projectId: string; webhookId: string }): Promise<unknown>;
+  getWebhook(input: {
+    bearerToken: string;
+    projectId: string;
+    webhookId: string;
+  }): Promise<unknown>;
   updateWebhook(input: {
     bearerToken: string;
     projectId: string;
@@ -38,16 +51,33 @@ export function createWebhookMcpTools(api: {
     filters?: Record<string, unknown>;
     isEnabled?: boolean;
   }): Promise<unknown>;
-  deleteWebhook(input: { bearerToken: string; projectId: string; webhookId: string }): Promise<unknown>;
+  deleteWebhook(input: {
+    bearerToken: string;
+    projectId: string;
+    webhookId: string;
+  }): Promise<unknown>;
   testWebhook(input: {
     bearerToken: string;
     projectId: string;
     webhookId: string;
-    eventType?: "verification.passed" | "verification.failed";
+    eventType?: WebhookEventType;
   }): Promise<unknown>;
-  listWebhookDeliveries(input: { bearerToken: string; projectId: string; webhookId: string; limit?: number }): Promise<unknown[]>;
-  retryWebhookDelivery(input: { bearerToken: string; projectId: string; webhookId: string; deliveryId: string }): Promise<unknown>;
-}): Record<(typeof WEBHOOK_MCP_TOOL_NAMES)[number], (input: Record<string, unknown>) => Promise<unknown>> {
+  listWebhookDeliveries(input: {
+    bearerToken: string;
+    projectId: string;
+    webhookId: string;
+    limit?: number;
+  }): Promise<unknown[]>;
+  retryWebhookDelivery(input: {
+    bearerToken: string;
+    projectId: string;
+    webhookId: string;
+    deliveryId: string;
+  }): Promise<unknown>;
+}): Record<
+  (typeof WEBHOOK_MCP_TOOL_NAMES)[number],
+  (input: Record<string, unknown>) => Promise<unknown>
+> {
   return {
     async list_webhooks(input) {
       try {
@@ -80,7 +110,9 @@ export function createWebhookMcpTools(api: {
           bearerToken: String(input["bearerToken"]),
           projectId: String(input["projectId"]),
           url: String(input["url"]),
-          events: Array.isArray(input["events"]) ? input["events"].map((value) => String(value)) : []
+          events: Array.isArray(input["events"])
+            ? input["events"].map((value) => String(value))
+            : []
         };
         if (typeof input["filters"] === "object" && input["filters"] !== null) {
           requestInput.filters = input["filters"] as Record<string, unknown>;
@@ -147,6 +179,21 @@ export function createWebhookMcpTools(api: {
       }
     },
 
+    async test_webhook_event(input) {
+      try {
+        return {
+          delivery: await api.testWebhook({
+            bearerToken: String(input["bearerToken"]),
+            projectId: String(input["projectId"]),
+            webhookId: String(input["webhookId"]),
+            eventType: WebhookEventTypeSchema.parse(input["eventType"])
+          })
+        };
+      } catch (error) {
+        mapMcpError(error);
+      }
+    },
+
     async test_webhook(input) {
       try {
         const requestInput: {
@@ -159,7 +206,10 @@ export function createWebhookMcpTools(api: {
           projectId: String(input["projectId"]),
           webhookId: String(input["webhookId"])
         };
-        if (input["eventType"] === "verification.passed" || input["eventType"] === "verification.failed") {
+        if (
+          input["eventType"] === "verification.passed" ||
+          input["eventType"] === "verification.failed"
+        ) {
           requestInput.eventType = input["eventType"];
         }
 
@@ -173,7 +223,12 @@ export function createWebhookMcpTools(api: {
 
     async list_webhook_deliveries(input) {
       try {
-        const requestInput: { bearerToken: string; projectId: string; webhookId: string; limit?: number } = {
+        const requestInput: {
+          bearerToken: string;
+          projectId: string;
+          webhookId: string;
+          limit?: number;
+        } = {
           bearerToken: String(input["bearerToken"]),
           projectId: String(input["projectId"]),
           webhookId: String(input["webhookId"])

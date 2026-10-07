@@ -1,3 +1,7 @@
+import { z } from "zod";
+import { analyticsBundleSpecificationFilters } from "../lib/analytics-filter-form.js";
+import { parseAnalyticsRelativeDurationMs } from "../../../../packages/shared-types/src/analytics-query.js";
+import { Textarea } from "../components/ui/textarea.js";
 import { ArrowLeftIcon, LoaderCircleIcon, RefreshCwIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useOutletContext } from "react-router-dom";
@@ -39,11 +43,23 @@ import {
 } from "../lib/api.js";
 import type { ProjectAnalyticsContext } from "./project-analytics-layout.js";
 
-type TimeWindow = "7d" | "30d" | "90d" | "custom";
-type FormField = "from" | "to" | "funnel" | "route" | "incident" | "deploy";
+type TimeWindow = "7d" | "30d" | "90d" | "custom" | "exact" | "relative";
+type FormField =
+  | "from"
+  | "to"
+  | "funnel"
+  | "route"
+  | "incident"
+  | "deploy"
+  | "filters"
+  | "opportunity"
+  | "relative";
 
 interface FormDraft {
   analysisKind: AnalyticsBundleAnalysisKind;
+  filters: string;
+  opportunityId: string;
+  relative: string;
   timeWindow: TimeWindow;
   from: string;
   to: string;
@@ -70,7 +86,9 @@ const timeWindowOptions: Array<{ value: TimeWindow; label: string }> = [
   { value: "7d", label: "Last 7 days" },
   { value: "30d", label: "Last 30 days" },
   { value: "90d", label: "Last 90 days" },
-  { value: "custom", label: "Custom range" }
+  { value: "custom", label: "Custom range" },
+  { value: "exact", label: "Custom UTC timestamps" },
+  { value: "relative", label: "Relative duration" }
 ];
 
 const routeContextKinds = new Set<AnalyticsBundleAnalysisKind>([
@@ -84,9 +102,20 @@ export function ProjectAnalyticsBundleCreatePage(): JSX.Element {
   const navigate = useNavigate();
   const [draft, setDraft] = useState<FormDraft>(() => ({
     analysisKind: "usage_summary",
-    timeWindow: query.last ?? "30d",
-    from: "",
-    to: "",
+    timeWindow:
+      query.from !== undefined
+        ? "exact"
+        : query.last === undefined || ["7d", "30d", "90d"].includes(query.last)
+          ? ((query.last ?? "30d") as TimeWindow)
+          : "relative",
+    from: query.from ?? "",
+    to: query.to ?? "",
+    relative: query.last ?? "30d",
+    filters:
+      Object.keys(analyticsBundleSpecificationFilters(query)).length === 0
+        ? ""
+        : JSON.stringify(analyticsBundleSpecificationFilters(query), null, 2),
+    opportunityId: "",
     funnel: "",
     route: "",
     incidentId: "",
@@ -98,6 +127,13 @@ export function ProjectAnalyticsBundleCreatePage(): JSX.Element {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submittingRef = useRef(false);
+  const generation = useRef(0);
+  useEffect(() => {
+    generation.current += 1;
+    return () => {
+      generation.current += 1;
+    };
+  }, [projectId]);
   const [incidents, setIncidents] = useState<IncidentRecord[] | null>(null);
   const [incidentsError, setIncidentsError] = useState(false);
   const [incidentsAttempt, setIncidentsAttempt] = useState(0);
@@ -142,10 +178,12 @@ export function ProjectAnalyticsBundleCreatePage(): JSX.Element {
     setSubmitError(null);
     if (Object.keys(nextErrors).length > 0) return;
 
+    const requestGeneration = generation.current;
     submittingRef.current = true;
     setIsSubmitting(true);
     try {
       const result = await createProjectAnalyticsBundle(projectId, buildCreateInput(draft));
+      if (generation.current !== requestGeneration) return;
       const pendingId =
         "status" in result.bundle && result.bundle.status === "pending"
           ? result.bundle.bundle_generation_id
@@ -161,10 +199,13 @@ export function ProjectAnalyticsBundleCreatePage(): JSX.Element {
       }
       void navigate(`/projects/${projectId}/analytics/bundles`);
     } catch (error) {
+      if (generation.current !== requestGeneration) return;
       setSubmitError(formatCreateError(error));
     } finally {
-      submittingRef.current = false;
-      setIsSubmitting(false);
+      if (generation.current === requestGeneration) {
+        submittingRef.current = false;
+        setIsSubmitting(false);
+      }
     }
   }
 
@@ -251,6 +292,45 @@ export function ProjectAnalyticsBundleCreatePage(): JSX.Element {
                 </SelectContent>
               </Select>
             </Field>
+            {draft.timeWindow === "relative" ? (
+              <Field data-invalid={errors.relative !== undefined || undefined}>
+                <FieldLabel htmlFor="analytics-bundle-relative">Relative window</FieldLabel>
+                <Input
+                  id="analytics-bundle-relative"
+                  value={draft.relative}
+                  onChange={(event) => update("relative", event.currentTarget.value)}
+                />
+                {errors.relative === undefined ? (
+                  <FieldDescription>
+                    Use hours, days or weeks, such as 24h or 2w, up to 370 days.
+                  </FieldDescription>
+                ) : (
+                  <FieldError>{errors.relative}</FieldError>
+                )}
+              </Field>
+            ) : null}
+            {draft.timeWindow === "exact" ? (
+              <>
+                {(["from", "to"] as const).map((key) => (
+                  <Field key={key} data-invalid={errors[key] !== undefined || undefined}>
+                    <FieldLabel htmlFor={`analytics-bundle-exact-${key}`}>
+                      {key === "from" ? "From (UTC)" : "To (UTC)"}
+                    </FieldLabel>
+                    <Input
+                      id={`analytics-bundle-exact-${key}`}
+                      value={draft[key]}
+                      placeholder="2026-10-01T00:00:00Z"
+                      onChange={(event) => update(key, event.currentTarget.value)}
+                    />
+                    {errors[key] === undefined ? (
+                      <FieldDescription>ISO 8601 UTC timestamp.</FieldDescription>
+                    ) : (
+                      <FieldError>{errors[key]}</FieldError>
+                    )}
+                  </Field>
+                ))}
+              </>
+            ) : null}
             {draft.timeWindow === "custom" ? (
               <>
                 <DateField
@@ -408,6 +488,43 @@ export function ProjectAnalyticsBundleCreatePage(): JSX.Element {
           </FieldGroup>
         </FieldSet>
 
+        <FieldSet>
+          <FieldLegend>Additional analysis context</FieldLegend>
+          <FieldGroup>
+            <Field data-invalid={errors.opportunity !== undefined || undefined}>
+              <FieldLabel htmlFor="analytics-bundle-opportunity">Opportunity ID</FieldLabel>
+              <Input
+                id="analytics-bundle-opportunity"
+                value={draft.opportunityId}
+                onChange={(event) => update("opportunityId", event.currentTarget.value)}
+              />
+              <FieldDescription>
+                Optional. The server derives the authorized opportunity's scope and evidence, and
+                rejects conflicting analysis context.
+              </FieldDescription>
+              {errors.opportunity === undefined ? null : (
+                <FieldError>{errors.opportunity}</FieldError>
+              )}
+            </Field>
+            <Field data-invalid={errors.filters !== undefined || undefined}>
+              <FieldLabel htmlFor="analytics-bundle-filters">Additional filters (JSON)</FieldLabel>
+              <Textarea
+                id="analytics-bundle-filters"
+                value={draft.filters}
+                onChange={(event) => update("filters", event.currentTarget.value)}
+                placeholder="{}"
+                aria-invalid={errors.filters !== undefined || undefined}
+              />
+              <FieldDescription>
+                Optional analysis-specification fields. Use the Scope controls for service and
+                environment. Other keys are retained in the specification; they do not add aggregate
+                dimension filtering.
+              </FieldDescription>
+              {errors.filters === undefined ? null : <FieldError>{errors.filters}</FieldError>}
+            </Field>
+          </FieldGroup>
+        </FieldSet>
+
         <div className="flex flex-wrap items-center gap-2 border-t pt-5">
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? (
@@ -460,6 +577,35 @@ function DateField({
 
 function validateDraft(draft: FormDraft): Partial<Record<FormField, string>> {
   const errors: Partial<Record<FormField, string>> = {};
+  if (draft.filters.trim()) {
+    try {
+      const parsed = z.record(z.string(), z.unknown()).safeParse(JSON.parse(draft.filters));
+      if (!parsed.success) errors.filters = "Enter a JSON object.";
+      else if ("service" in parsed.data || "environment" in parsed.data)
+        errors.filters = "Use the Scope controls for service and environment.";
+    } catch {
+      errors.filters = "Enter valid JSON.";
+    }
+  }
+  if (
+    draft.opportunityId.trim() &&
+    !z.string().uuid().safeParse(draft.opportunityId.trim()).success
+  )
+    errors.opportunity = "Enter a valid opportunity UUID.";
+  if (
+    draft.timeWindow === "relative" &&
+    parseAnalyticsRelativeDurationMs(draft.relative.trim()) === null
+  )
+    errors.relative = "Enter a valid relative window, up to 370 days.";
+  if (draft.timeWindow === "exact") {
+    if (!z.string().datetime().safeParse(draft.from.trim()).success)
+      errors.from = "Enter a valid UTC start timestamp.";
+    if (!z.string().datetime().safeParse(draft.to.trim()).success)
+      errors.to = "Enter a valid UTC end timestamp.";
+    if (Date.parse(draft.from) > Date.parse(draft.to))
+      errors.from = "The start must be before the end.";
+  }
+
   if (draft.timeWindow === "custom") {
     if (draft.from.length === 0) errors.from = "Choose a start date.";
     if (draft.to.length === 0) errors.to = "Choose an end date.";
@@ -493,9 +639,15 @@ function buildCreateInput(draft: FormDraft): Parameters<typeof createProjectAnal
   const deployId = draft.deployId.trim();
   return {
     analysisKind: draft.analysisKind,
+    ...(draft.opportunityId.trim() ? { opportunityId: draft.opportunityId.trim() } : {}),
+    ...(draft.filters.trim()
+      ? { filters: JSON.parse(draft.filters) as Record<string, unknown> }
+      : {}),
     ...(draft.timeWindow === "custom"
       ? { from: toAnalyticsDateStart(draft.from)!, to: toAnalyticsDateEnd(draft.to)! }
-      : { last: draft.timeWindow }),
+      : draft.timeWindow === "exact"
+        ? { from: draft.from.trim(), to: draft.to.trim() }
+        : { last: draft.timeWindow === "relative" ? draft.relative.trim() : draft.timeWindow }),
     ...(funnel.length === 0 ? {} : { funnel }),
     ...(route.length === 0 ? {} : { route }),
     ...(draft.incidentId.length === 0 ? {} : { incidentId: draft.incidentId }),

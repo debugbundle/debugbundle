@@ -1,8 +1,14 @@
 import { LightbulbIcon } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 
 import { AnalyticsOpportunitiesTable } from "../components/system/analytics-opportunities-table.js";
+import {
+  WorkspaceAnalyticsFilters,
+  createWorkspaceAnalyticsFilters
+} from "../components/system/workspace-analytics-filters.js";
+import { BoundedListLimit } from "../components/system/bounded-list-limit.js";
+import type { AnalyticsOpportunityInventoryQuery } from "../lib/api.js";
 import { AnalyticsSectionHeader } from "../components/system/analytics-section-header.js";
 import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
 import { ResourceListState } from "../components/system/resource-list-state.js";
@@ -20,18 +26,41 @@ import { listAnalyticsOpportunities } from "../lib/api.js";
 import { useCursorPagination } from "../lib/use-cursor-pagination.js";
 import type { ProjectAnalyticsContext } from "./project-analytics-layout.js";
 
-const WINDOW_DAYS = { "7d": 7, "30d": 30, "90d": 90 } as const;
+import { analyticsInventoryWindow } from "../lib/analytics-filter-form.js";
 
 export function ProjectAnalyticsOpportunitiesPage(): JSX.Element {
   const { projectId, query } = useOutletContext<ProjectAnalyticsContext>();
+  const [draftFilters, setDraftFilters] = useState(() => ({
+    ...createWorkspaceAnalyticsFilters("opportunities"),
+    status: "all"
+  }));
+  const [filters, setFilters] = useState(draftFilters);
+  const [limit, setLimit] = useState(20);
   const queryKey = JSON.stringify(query);
-  const detectedWindow = useMemo(() => buildDetectedWindow(query.last ?? "30d"), [queryKey]);
+  const detectedWindow = useMemo(() => analyticsInventoryWindow(query), [queryKey]);
   const pagination = useCursorPagination(
     async (cursor) => {
       const response = await listAnalyticsOpportunities({
         projectId,
-        status: "all",
-        limit: 20,
+        status: filters.status as NonNullable<AnalyticsOpportunityInventoryQuery["status"]>,
+        limit,
+        ...(filters.severity === "all"
+          ? {}
+          : {
+              severity: filters.severity as NonNullable<
+                AnalyticsOpportunityInventoryQuery["severity"]
+              >
+            }),
+        ...(filters.bundleStatus === "all"
+          ? {}
+          : {
+              bundleStatus: filters.bundleStatus as NonNullable<
+                AnalyticsOpportunityInventoryQuery["bundleStatus"]
+              >
+            }),
+        ...(filters.kind === "all"
+          ? {}
+          : { kind: filters.kind as NonNullable<AnalyticsOpportunityInventoryQuery["kind"]> }),
         from: detectedWindow.from,
         to: detectedWindow.to,
         ...(query.service === undefined ? {} : { service: query.service }),
@@ -44,7 +73,7 @@ export function ProjectAnalyticsOpportunitiesPage(): JSX.Element {
         totalPages: response.total_pages
       };
     },
-    [projectId, queryKey, detectedWindow]
+    [projectId, queryKey, detectedWindow, filters, limit]
   );
 
   return (
@@ -56,6 +85,33 @@ export function ProjectAnalyticsOpportunitiesPage(): JSX.Element {
         onRefresh={pagination.refreshPage}
       />
 
+      <WorkspaceAnalyticsFilters
+        mode="opportunities"
+        fixedScope
+        projects={[]}
+        value={draftFilters}
+        activeFilterCount={
+          [filters.status, filters.kind, filters.severity, filters.bundleStatus].filter(
+            (value) => value !== "all"
+          ).length
+        }
+        onChange={setDraftFilters}
+        onApply={() => setFilters(draftFilters)}
+        onReset={() => {
+          const defaults = { ...createWorkspaceAnalyticsFilters("opportunities"), status: "all" };
+          setFilters(defaults);
+          setDraftFilters(defaults);
+        }}
+        onDismiss={() => setDraftFilters(filters)}
+      />
+      <BoundedListLimit
+        id="analytics-opportunities-limit"
+        label="Inventory page limit"
+        paginated
+        value={limit}
+        onChange={setLimit}
+        disabled={pagination.isLoading}
+      />
       {pagination.hasError ? (
         <Notice title="Could not load project analytics opportunities" tone="destructive">
           <div className="flex flex-col items-start gap-2">
@@ -110,12 +166,6 @@ export function ProjectAnalyticsOpportunitiesPage(): JSX.Element {
       )}
     </div>
   );
-}
-
-function buildDetectedWindow(last: keyof typeof WINDOW_DAYS): { from: string; to: string } {
-  const to = new Date();
-  const from = new Date(to.getTime() - WINDOW_DAYS[last] * 24 * 60 * 60 * 1000);
-  return { from: from.toISOString(), to: to.toISOString() };
 }
 
 function InventorySkeleton(): JSX.Element {

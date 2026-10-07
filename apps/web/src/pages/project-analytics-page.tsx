@@ -66,7 +66,7 @@ export function ProjectAnalyticsPage(): JSX.Element {
     void Promise.allSettled([
       getProjectAnalyticsSummary(projectId, query),
       getProjectAnalyticsRoutes(projectId, query),
-      listProjectAnalyticsOpportunities(projectId, 5)
+      listProjectAnalyticsOpportunities(projectId, 5, query)
     ])
       .then(([summaryResult, routesResult, opportunitiesResult]) => {
         if (!active) return;

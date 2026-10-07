@@ -15,13 +15,18 @@ describe("mcp github tools", () => {
       "list_github_deliveries",
       "retry_github_delivery",
       "set_project_github_repo",
-      "remove_project_github_repo"
+      "remove_project_github_repo",
+      "disconnect_github_installation"
     ]);
   });
 
   it("returns github payloads for slice-one operations", async () => {
-    const getInstallation = vi.fn().mockResolvedValue({ account_login: "debugbundle", status: "active" });
-    const listRepositories = vi.fn().mockResolvedValue([{ full_name: "debugbundle/app", default_branch: "main" }]);
+    const getInstallation = vi
+      .fn()
+      .mockResolvedValue({ account_login: "debugbundle", status: "active" });
+    const listRepositories = vi
+      .fn()
+      .mockResolvedValue([{ full_name: "debugbundle/app", default_branch: "main" }]);
     const tools = createGitHubMcpTools({
       getInstallation,
       listRepositories,
@@ -36,14 +41,20 @@ describe("mcp github tools", () => {
       installation: { account_login: "debugbundle", status: "active" },
       repo: { repo_owner: "debugbundle", repo_name: "app" }
     });
-    expect(getInstallation).toHaveBeenCalledWith({ bearerToken: "dbundle_mem_x", projectId: "proj_1" });
+    expect(getInstallation).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_x",
+      projectId: "proj_1"
+    });
 
     await expect(
       tools.list_github_repositories({ bearerToken: "dbundle_mem_x", projectId: "proj_1" })
     ).resolves.toEqual({
       repositories: [{ full_name: "debugbundle/app", default_branch: "main" }]
     });
-    expect(listRepositories).toHaveBeenCalledWith({ bearerToken: "dbundle_mem_x", projectId: "proj_1" });
+    expect(listRepositories).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_x",
+      projectId: "proj_1"
+    });
 
     await expect(
       tools.set_project_github_repo({
@@ -63,10 +74,16 @@ describe("mcp github tools", () => {
 
   it("maps api and unknown errors", async () => {
     const tools = createGitHubMcpTools({
-      getInstallation: vi.fn().mockRejectedValue(new GitHubManagementApiError(404, "installation_not_found")),
+      getInstallation: vi
+        .fn()
+        .mockRejectedValue(new GitHubManagementApiError(404, "installation_not_found")),
       listRepositories: vi.fn().mockRejectedValue(new Error("network")),
-      setProjectRepo: vi.fn().mockRejectedValue(new GitHubManagementApiError(404, "repo_not_found")),
-      removeProjectRepo: vi.fn().mockRejectedValue(new GitHubManagementApiError(404, "repo_not_found"))
+      setProjectRepo: vi
+        .fn()
+        .mockRejectedValue(new GitHubManagementApiError(404, "repo_not_found")),
+      removeProjectRepo: vi
+        .fn()
+        .mockRejectedValue(new GitHubManagementApiError(404, "repo_not_found"))
     });
 
     await expect(tools.get_github_status({ bearerToken: "dbundle_mem_x" })).rejects.toThrow(
@@ -76,7 +93,12 @@ describe("mcp github tools", () => {
       "mcp_tool_error:unknown_error"
     );
     await expect(
-      tools.set_project_github_repo({ bearerToken: "dbundle_mem_x", projectId: "proj_1", owner: "debugbundle", repo: "app" })
+      tools.set_project_github_repo({
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        owner: "debugbundle",
+        repo: "app"
+      })
     ).rejects.toThrow("mcp_tool_error:repo_not_found");
     await expect(
       tools.remove_project_github_repo({ bearerToken: "dbundle_mem_x", projectId: "proj_1" })
@@ -88,8 +110,12 @@ describe("mcp github tools", () => {
       getInstallation: vi.fn().mockResolvedValue({}),
       listRepositories: vi.fn().mockResolvedValue([]),
       getProjectRepo: vi.fn(),
-      listProjectRules: vi.fn().mockResolvedValue([{ rule_id: "rule_1", name: "High severity incidents" }]),
-      createProjectRule: vi.fn().mockResolvedValue({ rule_id: "rule_1", name: "High severity incidents" }),
+      listProjectRules: vi
+        .fn()
+        .mockResolvedValue([{ rule_id: "rule_1", name: "High severity incidents" }]),
+      createProjectRule: vi
+        .fn()
+        .mockResolvedValue({ rule_id: "rule_1", name: "High severity incidents" }),
       updateProjectRule: vi.fn().mockResolvedValue({ rule_id: "rule_1", enabled: false }),
       deleteProjectRule: vi.fn().mockResolvedValue(undefined),
       setProjectRepo: vi.fn().mockResolvedValue({}),
@@ -126,7 +152,11 @@ describe("mcp github tools", () => {
     ).resolves.toEqual({ rule: { rule_id: "rule_1", enabled: false } });
 
     await expect(
-      tools.delete_github_dispatch_rule({ bearerToken: "dbundle_mem_x", projectId: "proj_1", ruleId: "rule_1" })
+      tools.delete_github_dispatch_rule({
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        ruleId: "rule_1"
+      })
     ).resolves.toEqual({ deleted: true, project_id: "proj_1", rule_id: "rule_1" });
   });
 
@@ -136,16 +166,27 @@ describe("mcp github tools", () => {
       listRepositories: vi.fn().mockResolvedValue([]),
       setProjectRepo: vi.fn().mockResolvedValue({}),
       removeProjectRepo: vi.fn().mockResolvedValue(undefined),
-      listProjectDeliveries: vi.fn().mockResolvedValue([{ delivery_id: "del_1", status: "failed" }]),
+      listProjectDeliveries: vi
+        .fn()
+        .mockResolvedValue([{ delivery_id: "del_1", status: "failed" }]),
       retryProjectDelivery: vi.fn().mockResolvedValue({ delivery_id: "del_1", status: "retrying" })
     });
 
     await expect(
-      tools.list_github_deliveries({ bearerToken: "dbundle_mem_x", projectId: "proj_1", status: "failed", limit: 5 })
+      tools.list_github_deliveries({
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        status: "failed",
+        limit: 5
+      })
     ).resolves.toEqual({ deliveries: [{ delivery_id: "del_1", status: "failed" }] });
 
     await expect(
-      tools.retry_github_delivery({ bearerToken: "dbundle_mem_x", projectId: "proj_1", deliveryId: "del_1" })
+      tools.retry_github_delivery({
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        deliveryId: "del_1"
+      })
     ).resolves.toEqual({ delivery: { delivery_id: "del_1", status: "retrying" } });
   });
 });

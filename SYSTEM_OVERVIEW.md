@@ -17,6 +17,13 @@ durable continuation; million-visit load testing is deferred by the owner.
 
 # SYSTEM OVERVIEW — DebugBundle
 
+Local interface-parity remediation is tracked in `spec/interface-parity-remediation.md`
+and `spec/interface-parity-matrix.md`. The candidate exposes audited dashboard rule,
+webhook, analytics, agent-credential and incident-evidence operations through existing
+services, with bounded lists, one-time reveals and scoped late-response guards. GitHub
+disconnect is additive CLI/MCP organization-owner cleanup; install remains a browser
+handoff. Ordinary MCP has 130 tools; hosted 23-tool and restricted five-tool profiles
+retain their authority. No database schema or deployment/configuration changes.
 Local UI review: `make dev-mock` recreates only the web container and serves synthetic
 dashboard data at `http://localhost:5291/dashboard`. Opt-in Vite middleware owns
 in-memory simulation; the real API, worker and database remain independent.

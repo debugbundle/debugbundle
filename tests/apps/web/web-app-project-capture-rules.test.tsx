@@ -643,9 +643,9 @@ describe("web app — project capture rules", () => {
         name: "Sample invalid rate",
         action: "sample",
         resourceHost: "analytics.example.com",
-        sampleRatePercent: "0"
+        sampleRatePercent: "-1"
       })
-    ).toBe("Sample rate must be greater than 0 and at most 100.");
+    ).toBe("Sample rate must be between 0 and 100.");
 
     expect(
       getCaptureRuleCreateDraftValidationError({

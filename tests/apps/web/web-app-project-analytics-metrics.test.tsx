@@ -344,6 +344,7 @@ describe("web app - project analytics metrics", () => {
         .map((tab) => tab.textContent)
     ).toEqual([
       "Overview",
+      "Actions",
       "Routes",
       "Flows",
       "Funnels",

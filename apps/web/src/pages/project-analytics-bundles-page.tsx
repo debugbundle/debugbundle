@@ -1,8 +1,14 @@
 import { PackageIcon, PlusIcon } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 
 import { AnalyticsBundlesTable } from "../components/system/analytics-bundles-table.js";
+import {
+  WorkspaceAnalyticsFilters,
+  createWorkspaceAnalyticsFilters
+} from "../components/system/workspace-analytics-filters.js";
+import { BoundedListLimit } from "../components/system/bounded-list-limit.js";
+import type { AnalyticsBundleInventoryQuery } from "../lib/api.js";
 import { AnalyticsSectionHeader } from "../components/system/analytics-section-header.js";
 import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
 import { ResourceListState } from "../components/system/resource-list-state.js";
@@ -20,18 +26,27 @@ import { listAnalyticsBundles } from "../lib/api.js";
 import { useCursorPagination } from "../lib/use-cursor-pagination.js";
 import type { ProjectAnalyticsContext } from "./project-analytics-layout.js";
 
-const WINDOW_DAYS = { "7d": 7, "30d": 30, "90d": 90 } as const;
+import { analyticsInventoryWindow } from "../lib/analytics-filter-form.js";
 
 export function ProjectAnalyticsBundlesPage(): JSX.Element {
   const { projectId, query } = useOutletContext<ProjectAnalyticsContext>();
+  const [draftFilters, setDraftFilters] = useState(() => ({
+    ...createWorkspaceAnalyticsFilters("bundles"),
+    status: "all"
+  }));
+  const [filters, setFilters] = useState(draftFilters);
+  const [limit, setLimit] = useState(20);
   const queryKey = JSON.stringify(query);
-  const window = useMemo(() => buildWindow(query.last ?? "30d"), [queryKey]);
+  const window = useMemo(() => analyticsInventoryWindow(query), [queryKey]);
   const pagination = useCursorPagination(
     async (cursor) => {
       const response = await listAnalyticsBundles({
         projectId,
-        status: "all",
-        limit: 20,
+        status: filters.status as NonNullable<AnalyticsBundleInventoryQuery["status"]>,
+        limit,
+        ...(filters.kind === "all"
+          ? {}
+          : { kind: filters.kind as NonNullable<AnalyticsBundleInventoryQuery["kind"]> }),
         from: window.from,
         to: window.to,
         ...(query.service === undefined ? {} : { service: query.service }),
@@ -44,7 +59,7 @@ export function ProjectAnalyticsBundlesPage(): JSX.Element {
         totalPages: response.total_pages
       };
     },
-    [projectId, queryKey, window]
+    [projectId, queryKey, window, filters, limit]
   );
 
   return (
@@ -62,6 +77,29 @@ export function ProjectAnalyticsBundlesPage(): JSX.Element {
             </Link>
           </Button>
         }
+      />
+      <WorkspaceAnalyticsFilters
+        mode="bundles"
+        fixedScope
+        projects={[]}
+        value={draftFilters}
+        activeFilterCount={[filters.status, filters.kind].filter((value) => value !== "all").length}
+        onChange={setDraftFilters}
+        onApply={() => setFilters(draftFilters)}
+        onReset={() => {
+          const defaults = { ...createWorkspaceAnalyticsFilters("bundles"), status: "all" };
+          setFilters(defaults);
+          setDraftFilters(defaults);
+        }}
+        onDismiss={() => setDraftFilters(filters)}
+      />
+      <BoundedListLimit
+        id="analytics-bundles-limit"
+        label="Inventory page limit"
+        paginated
+        value={limit}
+        onChange={setLimit}
+        disabled={pagination.isLoading}
       />
       {pagination.hasError ? (
         <Notice title="Could not load project analytics bundles" tone="destructive">
@@ -116,12 +154,6 @@ export function ProjectAnalyticsBundlesPage(): JSX.Element {
       )}
     </div>
   );
-}
-
-function buildWindow(last: keyof typeof WINDOW_DAYS): { from: string; to: string } {
-  const to = new Date();
-  const from = new Date(to.getTime() - WINDOW_DAYS[last] * 24 * 60 * 60 * 1000);
-  return { from: from.toISOString(), to: to.toISOString() };
 }
 
 function InventorySkeleton(): JSX.Element {

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { WebhookEventTypeSchema } from "../../../packages/webhook-client/src/index.js";
 
 import { ProjectColorTagSchema } from "../../../packages/shared-types/src/index.js";
 
@@ -68,6 +69,20 @@ export const MCP_TOOL_CATALOG_OPERATIONS = [
       webhookId: z.string(),
       eventType: verificationEventTypeSchema.optional()
     })
+  },
+  {
+    name: "test_webhook_event",
+    group: "webhooks",
+    description:
+      "Queue a signed synthetic webhook test for any supported lifecycle event. Requires endpoint creator or owner/admin authority; does not create a real incident or bundle. The legacy test_webhook verification contract is retained.",
+    inputSchema: z
+      .object({
+        bearerToken: z.string(),
+        projectId: z.string().min(1),
+        webhookId: z.string().min(1),
+        eventType: WebhookEventTypeSchema
+      })
+      .strict()
   },
   {
     name: "list_webhook_deliveries",
@@ -189,20 +204,27 @@ export const MCP_TOOL_CATALOG_OPERATIONS = [
   {
     name: "list_alert_groups",
     group: "alerts",
-    description: "List project-scoped alert delivery and email digest groups with bounded incident counts and no payloads or destination secrets.",
+    description:
+      "List project-scoped alert delivery and email digest groups with bounded incident counts and no payloads or destination secrets.",
     inputSchema: z.object({
-      bearerToken: z.string(), projectId: z.string().uuid(),
-      limit: z.number().int().min(1).max(100).optional(), cursor: z.string().max(256).optional()
+      bearerToken: z.string(),
+      projectId: z.string().uuid(),
+      limit: z.number().int().min(1).max(100).optional(),
+      cursor: z.string().max(256).optional()
     })
   },
   {
     name: "get_alert_group",
     group: "alerts",
-    description: "Inspect one project-scoped alert group and a paginated page of member incident IDs without raw logs or destination secrets.",
+    description:
+      "Inspect one project-scoped alert group and a paginated page of member incident IDs without raw logs or destination secrets.",
     inputSchema: z.object({
-      bearerToken: z.string(), projectId: z.string().uuid(),
-      kind: z.enum(["direct", "email_digest"]), groupId: z.string().uuid(),
-      limit: z.number().int().min(1).max(100).optional(), cursor: z.string().max(256).optional()
+      bearerToken: z.string(),
+      projectId: z.string().uuid(),
+      kind: z.enum(["direct", "email_digest"]),
+      groupId: z.string().uuid(),
+      limit: z.number().int().min(1).max(100).optional(),
+      cursor: z.string().max(256).optional()
     })
   },
   {

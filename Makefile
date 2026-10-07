@@ -53,7 +53,7 @@ help:
 	@echo "  make lint            Run eslint via Docker"
 	@echo "  make audit           Check dependency advisories at high severity via Docker"
 	@echo "  make typecheck       Run TypeScript checks via Docker"
-	@echo "  make web-check       Run focused web auth/account tests via Docker"
+	@echo "  make web-check       Run web app routing and management tests via Docker"
 	@echo "  make compose-check   Run local Docker Compose configuration checks"
 	@echo "  make load-check      Run noisy-ingestion load checks via Docker"
 	@echo "  make incident-recovery-check  Exercise real HTTP/storage bursts and crashes in isolated Docker"
@@ -184,7 +184,7 @@ typecheck:
 
 .PHONY: web-check
 web-check:
-	$(NODE_RUN) "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm vitest run tests/apps/web/web-app-auth.test.tsx tests/apps/web/web-app-billing-refresh.test.tsx tests/apps/web/web-app-management.test.tsx tests/apps/web/web-app-incidents.test.tsx tests/apps/web/web-app-openai-oauth.test.tsx tests/apps/web/web-openai-plugin-preview.test.tsx tests/apps/web/web-dogfooding.test.ts && corepack pnpm typecheck"
+	$(NODE_RUN) "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm vitest run tests/apps/web/web-app-*.test.tsx tests/apps/web/web-openai-plugin-preview.test.tsx tests/apps/web/web-dogfooding.test.ts && corepack pnpm typecheck"
 
 .PHONY: compose-check
 compose-check:
@@ -305,6 +305,11 @@ coverage-focused:
 .PHONY: format-focused
 format-focused:
 	$(NODE_RUN) "corepack enable && corepack pnpm exec prettier --write $(FORMAT_FILES)"
+
+# Inspect official component documentation without changing app dependencies or files.
+.PHONY: ui-component-docs
+ui-component-docs:
+	docker run --rm -v "$(PWD)/apps/web:$(WORKDIR):ro" -w "$(WORKDIR)" $(NODE_IMAGE) sh -lc "corepack enable && corepack pnpm dlx shadcn@latest docs $(UI_COMPONENTS)"
 
 .PHONY: lint-focused
 lint-focused:

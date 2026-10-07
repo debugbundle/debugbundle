@@ -350,7 +350,7 @@ Incident/improvement lifecycle writes with an unreadable success response, a tra
 
 **FR-MCP-02:** MCP must be a thin adapter over the same domain services used by CLI/API.
 
-**FR-MCP-03:** MCP responses must be deterministic, compact, machine-readable, redaction-aware, and consistent with CLI/API results. `verify_cloud` must accept `trigger5xx` and `trigger4xxStatus` so agents can run the same active hosted 5xx proof path as `debugbundle verify cloud --trigger-5xx` and the same configured-client-error proof path as `debugbundle verify cloud --trigger-4xx <status>`.
+**FR-MCP-03:** MCP responses must be deterministic, compact, machine-readable, redaction-aware, and consistent with CLI/API results. `verify_cloud` must accept `trigger5xx` and `trigger4xxStatus` so agents can run the same active hosted 5xx proof path as `debugbundle verify cloud --trigger-5xx` and the same configured-client-error proof path as `debugbundle verify cloud --trigger-4xx <status>`. Additive ordinary stdio tool `verify_app_event` provides real SDK-driven app proof, forwarding `service`, `traceId`, and `requestId` to the same CLI verifier with `expectAppEvent: true`. App-event proof requires a nonblank service or correlation hint and never sends synthetic events. Preserve the frozen `verify_cloud` schema/description, hosted read-only catalog and restricted-agent authority.
 
 **FR-MCP-04:** The official OpenAI Plugin v1 product is an independently versioned `1.0.0` distribution that combines one tailored DebugBundle skill with an OAuth-protected remote MCP server. It has no custom MCP UI and exposes only the twenty-three read-only tools frozen in `contracts/public-interfaces.md` and `tests/fixtures/openai-plugin-v1/tool-contracts.json`.
 
@@ -976,3 +976,12 @@ FR-SDK-03 / FR-REL-02 / FR-BND-01 require native prototype-backed browser error 
 FR-GRP-09 / FR-EVT-08d require fingerprint v2 calendar normalization to remain confined to known WildFly timer diagnostics and require server-derived v1 aliases for installed exact-fingerprint rules. Aliases are internal evaluation context, never trusted ingestion fields. Existing incident fingerprints and versions are retained.
 
 FR-BND-01 / FR-RET-11 require ISO UTC bundle timestamps, occurrence-ordered improvement detection/evidence, and deployment attribution scoped to project, service, environment and triggering occurrence. Unknown workload deployment evidence must remain null. OpenAI browser evidence is an optional bounded projection of already-redacted frontend context; the public tool inventory and BundleV1 schema remain compatible.
+
+### Audited interface parity remediation
+
+The implementation of INV-5, FR-WEB-09, FR-MCP-02/03 and the mapped GitHub, alert,
+webhook, analytics and capture requirements is tracked by PAR-01 through PAR-14 in
+`interface-parity-remediation.md`. `interface-parity-matrix.md` specifies operation,
+option, role and intentional browser/local/credential-authority differences. GitHub
+installation disconnect is active-organization owner-only across its adapters;
+browser installation state validation and existing tier/quota gates remain intact.

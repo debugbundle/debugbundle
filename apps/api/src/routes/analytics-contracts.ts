@@ -4,47 +4,26 @@ import {
   AnalyticsBundleAnalysisKindSchema,
   AnalyticsBundleGenerationStatusSchema,
   AnalyticsBundleSeveritySchema,
-  AnalyticsMetricsGranularitySchema,
   AnalyticsOpportunityBundleStatusSchema,
   AnalyticsOpportunityStatusSchema
 } from "../../../../packages/shared-types/src/index.js";
+import {
+  AnalyticsMetricsQuerySchema as AnalyticsSummaryQuerySchema,
+  resolveAnalyticsTimeRange
+} from "../../../../packages/shared-types/src/analytics-query.js";
+export { AnalyticsSummaryQuerySchema, resolveAnalyticsTimeRange };
 import type { ApiDependencies } from "../api-types.js";
 
 const DEFAULT_LAST_MS = 7 * 24 * 60 * 60 * 1000;
-const MAX_LAST_MS = 370 * 24 * 60 * 60 * 1000;
 
-export type AnalyticsOpportunitiesDependency = NonNullable<ApiDependencies["analyticsOpportunities"]>;
+export type AnalyticsOpportunitiesDependency = NonNullable<
+  ApiDependencies["analyticsOpportunities"]
+>;
 export type AnalyticsBundlesDependency = NonNullable<ApiDependencies["analyticsBundles"]>;
 
-export const AnalyticsSummaryQuerySchema = z
-  .object({
-    project_id: z.string().uuid(),
-    from: z.string().datetime().optional(),
-    to: z.string().datetime().optional(),
-    last: z.string().trim().min(2).max(16).optional(),
-    granularity: AnalyticsMetricsGranularitySchema.optional().default("day"),
-    service: z.string().trim().min(1).max(120).optional(),
-    environment: z.string().trim().min(1).max(120).optional(),
-    route: z.string().trim().min(1).max(2048).refine((value) => !value.includes("?") && !value.includes("#")).optional(),
-    device_type: z.string().trim().min(1).max(40).optional(),
-    browser: z.string().trim().min(1).max(80).optional(),
-    os: z.string().trim().min(1).max(80).optional(),
-    language: z.string().trim().min(1).max(40).optional(),
-    country: z.string().trim().min(1).max(8).optional(),
-    auth_state: z.enum(["anonymous", "authenticated", "unknown"]).optional(),
-    referrer: z.string().trim().min(1).max(255).optional(),
-    utm_source: z.string().trim().min(1).max(128).optional(),
-    utm_medium: z.string().trim().min(1).max(128).optional(),
-    utm_campaign: z.string().trim().min(1).max(128).optional(),
-    custom_dimensions: z.record(
-      z.string().regex(/^[A-Za-z][A-Za-z0-9_.-]{0,63}$/),
-      z.string().max(128)
-    ).refine((value) => Object.keys(value).length <= 8).optional(),
-    limit: z.coerce.number().int().min(1).max(100).optional().default(10)
-  })
-  .strict();
-
-export function parseAnalyticsSummaryQuery(raw: unknown): ReturnType<typeof AnalyticsSummaryQuerySchema.safeParse> {
+export function parseAnalyticsSummaryQuery(
+  raw: unknown
+): ReturnType<typeof AnalyticsSummaryQuerySchema.safeParse> {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
     return AnalyticsSummaryQuerySchema.safeParse(raw);
   }
@@ -57,7 +36,10 @@ export function parseAnalyticsSummaryQuery(raw: unknown): ReturnType<typeof Anal
       continue;
     }
     const dimensionKey = key.slice("custom_dimension.".length);
-    if (typeof value !== "string" || Object.prototype.hasOwnProperty.call(customDimensions, dimensionKey)) {
+    if (
+      typeof value !== "string" ||
+      Object.prototype.hasOwnProperty.call(customDimensions, dimensionKey)
+    ) {
       normalized[key] = value;
       continue;
     }
@@ -69,18 +51,25 @@ export function parseAnalyticsSummaryQuery(raw: unknown): ReturnType<typeof Anal
   return AnalyticsSummaryQuerySchema.safeParse(normalized);
 }
 
-export const AnalyticsFunnelParamsSchema = z.object({
-  key: z.string().trim().min(1).max(120)
-}).strict();
+export const AnalyticsFunnelParamsSchema = z
+  .object({
+    key: z.string().trim().min(1).max(120)
+  })
+  .strict();
 
-export const AnalyticsIncidentImpactParamsSchema = z.object({
-  id: z.string().uuid()
-}).strict();
+export const AnalyticsIncidentImpactParamsSchema = z
+  .object({
+    id: z.string().uuid()
+  })
+  .strict();
 
 export const AnalyticsOpportunitiesQuerySchema = z
   .object({
     project_id: z.string().uuid().optional(),
-    status: z.union([AnalyticsOpportunityStatusSchema, z.literal("all")]).optional().default("open"),
+    status: z
+      .union([AnalyticsOpportunityStatusSchema, z.literal("all")])
+      .optional()
+      .default("open"),
     kind: AnalyticsBundleAnalysisKindSchema.optional(),
     service: z.string().trim().min(1).max(120).optional(),
     environment: z.string().trim().min(1).max(120).optional(),
@@ -93,23 +82,36 @@ export const AnalyticsOpportunitiesQuerySchema = z
     limit: z.coerce.number().int().min(1).max(100).optional().default(20)
   })
   .strict()
-  .refine((value) => value.from === undefined || value.to === undefined || Date.parse(value.from) <= Date.parse(value.to), {
-    message: "from must be before or equal to to",
-    path: ["from"]
-  });
+  .refine(
+    (value) =>
+      value.from === undefined ||
+      value.to === undefined ||
+      Date.parse(value.from) <= Date.parse(value.to),
+    {
+      message: "from must be before or equal to to",
+      path: ["from"]
+    }
+  );
 
-export const AnalyticsOpportunityParamsSchema = z.object({
-  id: z.string().uuid()
-}).strict();
+export const AnalyticsOpportunityParamsSchema = z
+  .object({
+    id: z.string().uuid()
+  })
+  .strict();
 
-export const AnalyticsBundleParamsSchema = z.object({
-  id: z.string().uuid()
-}).strict();
+export const AnalyticsBundleParamsSchema = z
+  .object({
+    id: z.string().uuid()
+  })
+  .strict();
 
 export const AnalyticsBundlesListQuerySchema = z
   .object({
     project_id: z.string().uuid().optional(),
-    status: z.union([AnalyticsBundleGenerationStatusSchema, z.literal("all")]).optional().default("all"),
+    status: z
+      .union([AnalyticsBundleGenerationStatusSchema, z.literal("all")])
+      .optional()
+      .default("all"),
     kind: AnalyticsBundleAnalysisKindSchema.optional(),
     service: z.string().trim().min(1).max(120).optional(),
     environment: z.string().trim().min(1).max(120).optional(),
@@ -120,10 +122,16 @@ export const AnalyticsBundlesListQuerySchema = z
     limit: z.coerce.number().int().min(1).max(100).optional().default(20)
   })
   .strict()
-  .refine((value) => value.from === undefined || value.to === undefined || Date.parse(value.from) <= Date.parse(value.to), {
-    message: "from must be before or equal to to",
-    path: ["from"]
-  });
+  .refine(
+    (value) =>
+      value.from === undefined ||
+      value.to === undefined ||
+      Date.parse(value.from) <= Date.parse(value.to),
+    {
+      message: "from must be before or equal to to",
+      path: ["from"]
+    }
+  );
 
 export const AnalyticsBundleQuerySchema = z
   .object({
@@ -162,47 +170,16 @@ export type AuthorizedAnalyticsQuery = AnalyticsQuery & {
 };
 export type AnalyticsBundleCreateBody = z.infer<typeof AnalyticsBundleCreateBodySchema>;
 export type AnalyticsBundleGeneration = NonNullable<
-  Awaited<ReturnType<NonNullable<ApiDependencies["analyticsBundles"]>["getAnalyticsBundleGenerationForProject"]>>
+  Awaited<
+    ReturnType<
+      NonNullable<ApiDependencies["analyticsBundles"]>["getAnalyticsBundleGenerationForProject"]
+    >
+  >
 >;
 export type AnalyticsBundleGenerationListRecord = AnalyticsBundleGeneration & {
   project_name?: string | undefined;
   project_color_tag?: string | null | undefined;
 };
-
-export function resolveAnalyticsTimeRange(input: {
-  from?: string | undefined;
-  to?: string | undefined;
-  last?: string | undefined;
-}): { from: string; to: string } | null {
-  if (input.last !== undefined && input.from !== undefined) {
-    return null;
-  }
-
-  const to = input.to ?? new Date().toISOString();
-  const toMs = Date.parse(to);
-  if (Number.isNaN(toMs)) {
-    return null;
-  }
-
-  let from = input.from;
-  if (from === undefined) {
-    const lastMs = input.last === undefined ? DEFAULT_LAST_MS : parseLastDurationMs(input.last);
-    if (lastMs === null) {
-      return null;
-    }
-    from = new Date(toMs - lastMs).toISOString();
-  }
-
-  const fromMs = Date.parse(from);
-  if (Number.isNaN(fromMs) || fromMs > toMs) {
-    return null;
-  }
-
-  return {
-    from: new Date(fromMs).toISOString(),
-    to: new Date(toMs).toISOString()
-  };
-}
 
 export function resolveIncidentImpactTimeRange(
   input: {
@@ -239,24 +216,6 @@ export function parseAnalyticsBundleGenerationsCursor(
   rawCursor: string | undefined
 ): { created_at: string; generation_id: string } | null {
   return parseCursor(rawCursor, "created_at", "generation_id");
-}
-
-function parseLastDurationMs(value: string): number | null {
-  const match = /^([1-9][0-9]{0,4})([hdw])$/.exec(value.trim());
-  if (match === null) {
-    return null;
-  }
-
-  const amount = Number(match[1]);
-  const unit = match[2];
-  const multiplier = unit === "h"
-    ? 60 * 60 * 1000
-    : unit === "d"
-      ? 24 * 60 * 60 * 1000
-      : 7 * 24 * 60 * 60 * 1000;
-  const durationMs = amount * multiplier;
-
-  return durationMs <= MAX_LAST_MS ? durationMs : null;
 }
 
 function parseCursor<TimestampKey extends string, IdKey extends string>(

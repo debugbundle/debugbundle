@@ -112,7 +112,8 @@ Every capability must be available through all applicable interfaces. Operations
 | Doctor                                       | —                                                                   | `doctor`                                  | `doctor`                                                                                                             | CLI/MCP-only (local env)                                                                                                                                                                                                                     |
 | Validate                                     | —                                                                   | `validate [--fix]`                        | `validate`                                                                                                           | CLI/MCP-only (local env)                                                                                                                                                                                                                     |
 | Verify local                                 | —                                                                   | `verify local`                            | `verify_local`                                                                                                       | CLI/MCP-only (local env)                                                                                                                                                                                                                     |
-| Verify cloud                                 | —                                                                   | `verify cloud`                            | `verify_cloud`                                                                                                       | Uses API internally; `--trigger-5xx`/`trigger5xx` proves hosted synthetic incident creation, `--trigger-4xx <status>`/`trigger4xxStatus` proves configured hosted 4xx promotion, and `--expect-app-event` proves real SDK-driven app capture |
+| Verify cloud                                 | —                                                                   | `verify cloud`                            | `verify_cloud`                                                                                                       | Uses API internally; `--trigger-5xx`/`trigger5xx` proves hosted synthetic incident creation, `--trigger-4xx <status>`/`trigger4xxStatus` proves configured hosted 4xx promotion |
+| Verify real app event | — | `verify cloud --expect-app-event` | `verify_app_event` | Ordinary/local-auth MCP and OpenClaw; existing CLI verifier, project scope plus nonblank service/trace/request hint, no synthetic events |
 | Smoke test                                   | —                                                                   | `smoke`                                   | `smoke`                                                                                                              | CLI/MCP-only                                                                                                                                                                                                                                 |
 | Login                                        | —                                                                   | `login`                                   | —                                                                                                                    | CLI-only (stores member-token auth state locally; supports member-token, GitHub device, and `gh` bootstrap modes)                                                                                                                            |
 | Setup project                                | —                                                                   | `setup`                                   | —                                                                                                                    | CLI-only (local scaffold generation, mixed-runtime discovery, relay scaffolding, and runtime-specific relay guidance)                                                                                                                        |
@@ -146,7 +147,7 @@ Every capability must be available through all applicable interfaces. Operations
 | SDK config                                   | `GET /v1/sdk/config`                                                | —                                         | —                                                                                                                    | SDK-only (project token, includes resolved capture policy; callers may opt into bounded restrictive analytics capture settings with `X-DebugBundle-Analytics-Config: 1`)                                                                     |
 | Get GitHub App install URL                   | `GET /v1/github/app/install-url`                                    | —                                         | —                                                                                                                    | Browser Session or Member Token, owner/admin only on eligible Solo+ project; web convenience route for the install/reconnect CTA, optionally signed with a return path                                                                       |
 | Get GitHub installation                      | `GET /v1/github/installation`                                       | `github status`                           | `get_github_status`                                                                                                  | Browser Session or Member Token; read remains available when preserved GitHub setup is paused on Free                                                                                                                                        |
-| Disconnect GitHub installation               | `DELETE /v1/github/installation`                                    | —                                         | —                                                                                                                    | Web/API cleanup action; owner/admin only and allowed after downgrade                                                                                                                                                                         |
+| Disconnect GitHub installation | `DELETE /v1/github/installation` | `github disconnect` | `disconnect_github_installation` | Browser Session or Member Token; active organization owner only, all-project repository cleanup, allowed after downgrade |
 | List GitHub repositories                     | `GET /v1/github/repositories`                                       | `github repos`                            | `list_github_repositories`                                                                                           | Browser Session or Member Token, owner/admin only on eligible Solo+ project                                                                                                                                                                  |
 | Get project GitHub repo                      | `GET /v1/projects/{id}/github/repo`                                 | `github status`                           | `get_github_status`                                                                                                  | Included in status response; read remains available when preserved GitHub setup is paused on Free                                                                                                                                            |
 | Set project GitHub repo                      | `PUT /v1/projects/{id}/github/repo`                                 | `github repo set`                         | `set_project_github_repo`                                                                                            | Browser Session or Member Token, owner/admin only, Solo+ only                                                                                                                                                                                |
@@ -1047,7 +1048,7 @@ Journey sample responses must not expose the internal object-storage key. Expire
 
 `last` may be supplied instead of `from` for relative windows such as `"7d"`; `to` may still be supplied with `last` to anchor the window.
 Focused generation requirements are: `funnel_dropoff` requires `funnel`, `route_health` requires `route`, `incident_impact` requires an accessible project `incident_id`, `deploy_comparison` requires `deploy_id`, and `conversion_path` requires `funnel` or `route`. When `opportunity_id` is supplied, it must belong to the target project and match `analysis_kind`; the API derives the opportunity's exact analysis window, service/environment, focus, aggregate evidence, and complete related incident/deploy sets, rejecting conflicting explicit values. When standalone `incident_id` or `deploy_id` is supplied, the generation stores those values as linked evidence while preserving the scalar request fields for compatibility. An identical completed or in-flight request reuses its deterministic generation; an identical failed request resets that generation to pending for retry without a duplicate durable quota claim.
-The web generation surface may submit only the bounded `service` and `environment` keys inside `filters`; it does not expose arbitrary JSON or custom-filter entry. Bundle workers apply these nested scope values while continuing to accept legacy top-level `service` and `environment` analysis specifications. When `route` is supplied, route metrics and journey-pattern evidence are restricted to that normalized route context.
+The web generation surface supports the existing service/environment scope controls and an optional JSON object of additional specification filters. Scope keys remain controlled by the service/environment fields. Bundle workers apply these nested scope values while continuing to accept legacy top-level `service` and `environment` analysis specifications; other filter keys are retained as specification metadata and do not add worker dimension filtering. When `route` is supplied, route metrics and journey-pattern evidence are restricted to that normalized route context.
 
 **Analytics inventory list scope:** `GET /v1/analytics/opportunities` and `GET /v1/analytics/bundles` retain their existing project-scoped behavior when `project_id=<uuid>` is supplied. An authorized browser session or member token may omit `project_id` only for these list endpoints to return records across projects in the caller's organization. Cross-project pagination remains ordered by the record timestamp and unique record ID, and bundle rows include `project_name` and `project_color_tag` metadata. Detail, metric, journey-sample, settings, and generation endpoints remain project-scoped.
 
@@ -3078,14 +3079,20 @@ Current alert CLI behavior is a thin adapter over the alert HTTP client in `pack
 ```
 debugbundle webhook list --project-id <id> [--limit <n>] [--auth-file <path>] [--json]
 debugbundle webhook create --project-id <id> --url <url> --event <event[,event]> [--environment <env[,env]>] [--service <svc[,svc]>] [--severity-min <level>] [--bundle-type <type[,type]>] [--verification <true|false>] [--is-enabled <true|false>] [--auth-file <path>] [--json]
-debugbundle webhook update <id> --project-id <id> [--url <url>] [--event <event[,event]>] [--environment <env[,env]>] [--service <svc[,svc]>] [--severity-min <level>] [--bundle-type <type[,type]>] [--verification <true|false>] [--is-enabled <true|false>] [--auth-file <path>] [--json]
+debugbundle webhook update <id> --project-id <id> [--url <url>] [--event <event[,event]>] [--filters-json <json>] [--environment <env[,env]>] [--service <svc[,svc]>] [--severity-min <level>] [--bundle-type <type[,type]>] [--verification <true|false>] [--is-enabled <true|false>] [--auth-file <path>] [--json]
 debugbundle webhook delete <id> --project-id <id> [--auth-file <path>] [--json]
-debugbundle webhook test <id> --project-id <id> [--event <verification.passed|verification.failed>] [--auth-file <path>] [--json]
+debugbundle webhook test <id> --project-id <id> [--event <bundle.created|bundle.updated|bundle.reopened|bundle.resolved|verification.passed|verification.failed|improvement_bundle.created|incident.spike_detected>] [--auth-file <path>] [--json]
 debugbundle webhook deliveries <id> --project-id <id> [--limit <n>] [--auth-file <path>] [--json]
 debugbundle webhook retry <id> <delivery-id> --project-id <id> [--auth-file <path>] [--json]
 ```
 
 Current webhook CLI behavior is a thin adapter over the webhook HTTP client in `packages/webhook-client`, reusing stored member auth after `debugbundle login` and forwarding JSON output without duplicating transport logic. Multi-value flags (`--event`, `--environment`, `--service`, `--bundle-type`) accept comma-separated values.
+
+`webhook update --filters-json '{}'` explicitly clears all filters. A nonempty
+JSON object replaces the filter object. It is validated with the shared webhook
+filter schema and cannot be combined with individual filter flags. Omitting all
+filter options preserves existing filters. Individual filter flags retain their
+existing replacement semantics and may be used together.
 
 ### 2.7 Slack Commands
 
@@ -3170,11 +3177,15 @@ debugbundle capture-rule list --project-id <id> [--auth-file <path>] [--json]
 debugbundle capture-rule suggest <incident-id> [--auth-file <path>] [--json]
 debugbundle capture-rule create-from-suggestion <incident-id> --suggestion-id <id> [--name <name>] [--description <text>] [--enabled <true|false>] [--expires-at <ISO8601>] [--auth-file <path>] [--json]
 debugbundle capture-rule create --project-id <id> --name <name> --action <demote|sample|drop> --matcher-json <json> [--description <text>] [--enabled <true|false>] [--sample-rate <0-1>] [--sample-event-class <preserve|context>] [--expires-at <ISO8601>] [--auth-file <path>] [--json]
-debugbundle capture-rule update <rule-id> --project-id <id> [--name <name>] [--description <text>] [--enabled <true|false>] [--action <demote|sample|drop>] [--matcher-json <json>] [--sample-rate <0-1>] [--sample-event-class <preserve|context>] [--expires-at <ISO8601>] [--auth-file <path>] [--json]
+debugbundle capture-rule update <rule-id> --project-id <id> [--name <name>] [--description <text>] [--enabled <true|false>] [--action <demote|sample|drop>] [--matcher-json <json>] [--sample-rate <0-1>] [--sample-event-class <preserve|context>] [--expires-at <ISO8601|null>] [--auth-file <path>] [--json]
 debugbundle capture-rule delete <rule-id> --project-id <id> [--auth-file <path>] [--json]
 ```
 
 `capture-rule suggest` exposes the deterministic incident suggestion surface without mutating project state. `capture-rule create-from-suggestion` applies one of those suggestions with optional local overrides like `name`, `description`, or `expires-at`. Direct `create/update/delete` remain the explicit project-management surface and require owner/admin authorization.
+
+`capture-rule update --expires-at null` clears an existing expiry by sending JSON
+`null`; an ISO8601 value replaces it and omission preserves it. Creation continues
+to use an optional ISO8601 expiry and defaults to no expiry.
 
 ### 2.13 Improvement Settings Commands
 
@@ -3243,6 +3254,7 @@ debugbundle project members leave --project-id <id> [--auth-file <path>] [--json
 ### 2.16 GitHub Commands
 
 ```
+debugbundle github disconnect [--auth-file <path>] [--json]
 debugbundle github status [--project-id <id>] [--auth-file <path>] [--json]
 debugbundle github repos [--project-id <id>] [--auth-file <path>] [--json]
 debugbundle github repo set <owner/repo> --project-id <id> [--auth-file <path>] [--json]
@@ -3254,6 +3266,8 @@ debugbundle github rules delete <rule-id> --project-id <id> [--auth-file <path>]
 debugbundle github deliveries [--project-id <id>] [--status <status>] [--limit <n>] [--auth-file <path>] [--json]
 debugbundle github deliveries retry <delivery-id> [--project-id <id>] [--auth-file <path>] [--json]
 ```
+
+`github disconnect` removes the installation connection for the caller's active organization and cascades its project repository assignments. It requires the organization owner, remains available after downgrade, accepts no project override, and does not uninstall the App on GitHub. Ordinary/local-auth MCP and OpenClaw expose the same operation as `disconnect_github_installation`. Installation and reconnect remain dashboard browser handoffs: the callback requires the signed state cookie issued in that browser; automation must not return a bare installation URL or weaken that check.
 
 `github status` shows the organization's GitHub App installation status and any assigned repo for the current project. `github repos` lists repositories available to the installation for owner/admin callers. `github repo set` assigns a primary repo to the project for owner/admin callers. `github rules create` is available to any authorized collaborator on an eligible shared project, while rule update/delete and delivery retry obey creator ownership for plain members. `github deliveries` lists recent delivery history for a project, and `github deliveries retry` retries a failed delivery within that project scope when the caller owns the underlying rule or has admin rights. Multi-value flags (`--event`, `--environment`, `--service`) accept comma-separated values. Eligibility is determined from the target project's owner plan, not the acting collaborator's personal plan.
 
@@ -3354,6 +3368,7 @@ debugbundle_doctor            → same result as `debugbundle doctor --json`
 debugbundle_validate          → same result as `debugbundle validate --json`
 debugbundle_verify_local      → same result as `debugbundle verify local --json`
 debugbundle_verify_cloud      → same result as `debugbundle verify cloud --json`
+debugbundle_verify_app_event  → same result as `debugbundle verify cloud --expect-app-event --json`; accepts service, traceId, requestId hints
 debugbundle_smoke             → same result as `debugbundle smoke --json`
 ```
 
@@ -3870,3 +3885,62 @@ The static public site at `debugbundle.com` publishes the following machine-read
 ### Generation Pipeline
 
 Artifacts are generated by `apps/public-site/scripts/generate-public-artifacts.ts` during the `build` step (`pnpm run generate:artifacts && next build`). The pipeline also generates the search index (`/search-index.json`) and reference data consumed by `/docs/v1/reference/*` pages.
+
+## Dashboard parity controls
+
+The local candidate uses the existing dashboard tokens and primitives. Full audited
+operation/option/role mappings and executable evidence are in
+`spec/interface-parity-remediation.md` and `spec/interface-parity-matrix.md`.
+
+- Alerts and lifecycle webhooks share their create/edit fields and preserve disabled
+  state, all supported events, exact cooldown seconds and optional config. Alerts
+  expose service scope, digest window, project cooldown scope and signing creation/
+  rotation. Returned secrets use one-time reveal states, never general list records.
+  Group and member inspection supports cursors and a 1–100 page limit.
+- Webhooks expose edit, enable/disable, confirmed delete, all test events, and retry
+  of failed/disabled deliveries. Retry requires an enabled endpoint. Endpoint and
+  delivery inventories accept limits 1–100 and remain capped lists without cursors.
+- Agent credentials appear in project Tokens for owner/admin management. Creation
+  remains server-gated off by default; unavailable creation is explicit. Optional
+  expiry is a future UTC timestamp no later than 90 days; omission retains the
+  server's 30-day default. List/revoke never return a browser reveal secret.
+- Incident detail includes Context and Logs. Logs contain event metadata, with a
+  level filter, 1–100 page limit and opaque cursors; raw sensitive messages are not
+  introduced. Context preserves explicit pending/failed/partial artifact states.
+- Weekly reports expose email delete, enabled/schedule/timezone and Slack destination
+  or direct webhook configuration. Email channels remain unique per project. Slack
+  schedule create/edit remains Team-gated, with preserved read/delete after downgrade.
+  Lists accept 1–100 records without claiming cursor support or exact totals.
+- Improvement detail keeps its seven-day shortcut and adds a future UTC snooze time.
+- Analytics exposes Actions and retained journey-sample inventory within existing
+  navigation. Metrics share custom UTC/relative windows, hourly/daily granularity,
+  supported dimensions and up to eight custom dimensions. Overview opportunities
+  use the same time/service/environment scope. Opportunity and bundle inventories
+  add their existing kind/status/severity/bundle-state options and page limits.
+  Inventory endpoints do not apply metric dimension filters. Journey sample inventory
+  supports service/environment/tag/limit/cursor, independently of aggregate windows.
+  Saved flow reports retain their API's 7d/30d/90d window contract. Bundle generation
+  preserves exact UTC timestamps, relative durations, opportunity context and JSON
+  specification filters; worker application of scope is described above.
+
+Project changes and unmounts cancel stale reads and discard late mutation results
+in changed management flows. Server authorization, paid-tier/quota checks, CSRF,
+restricted five-tool agent MCP and 23-tool hosted read-only MCP remain authoritative.
+The ordinary/local-auth catalog has 130 tools; legacy tool schemas and descriptions
+remain frozen. This is an unpublished source candidate, not a live acceptance claim.
+
+### Complete webhook test event adapters
+
+CLI `webhook test --event` accepts all eight values of the existing webhook event
+enum. Omitting the option retains `verification.passed`. Ordinary/local-auth MCP and
+OpenClaw expose the additive `test_webhook_event` tool with required `projectId`,
+`webhookId` and `eventType`; the frozen `test_webhook` schema remains unchanged. Both
+use the existing scoped API test route and signed synthetic envelope. A synthetic
+test does not create real incidents or bundles or reproduce a real lifecycle payload.
+Hosted OAuth and restricted agent-read catalogs remain unchanged.
+
+`SyntheticWebhookTestPayloadSchema` extends the retained verification test schema
+with the complete event enum. `WebhookEventPayloadSchema` accepts real lifecycle
+payloads and synthetic test envelopes for every supported event. Synthetic envelopes
+contain `test: true` and `data.message`; they do not represent real lifecycle artifacts.
+The legacy verification schema, API-emitted format and signing behavior are retained.

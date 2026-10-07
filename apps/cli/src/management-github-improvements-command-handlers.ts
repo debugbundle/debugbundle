@@ -1,6 +1,7 @@
 import {
   createProjectGitHubRuleWithAuthCommand as defaultCreateProjectGitHubRuleCommand,
   deleteProjectGitHubRuleWithAuthCommand as defaultDeleteProjectGitHubRuleCommand,
+  disconnectGitHubInstallationWithAuthCommand as defaultDisconnectGitHubInstallationCommand,
   getGitHubStatusWithAuthCommand as defaultGetGitHubStatusCommand,
   listGitHubRepositoriesWithAuthCommand as defaultListGitHubRepositoriesCommand,
   listProjectGitHubDeliveriesWithAuthCommand as defaultListProjectGitHubDeliveriesCommand,
@@ -35,20 +36,41 @@ import {
   requirePositional,
   type ParsedArgv
 } from "./argv-helpers.js";
-import type { ManagementCommandDependencies, CliCommandResult } from "./management-command-dependencies.js";
+import type {
+  ManagementCommandDependencies,
+  CliCommandResult
+} from "./management-command-dependencies.js";
 
-export async function handleGithubCommand(parsedArgv: ParsedArgv, dependencies: ManagementCommandDependencies): Promise<CliCommandResult> {
+export async function handleGithubCommand(
+  parsedArgv: ParsedArgv,
+  dependencies: ManagementCommandDependencies
+): Promise<CliCommandResult> {
   const action = requirePositional(parsedArgv, 1, "action");
+
+  if (action === "disconnect") {
+    expectNoUnknownOptions(parsedArgv, ["auth-file", "json"]);
+    ensureNoExtraPositionals(parsedArgv, 2);
+    const input = appendCommonAuthOptions(
+      parsedArgv,
+      {} as { authFilePath?: string; json?: boolean }
+    );
+    return await (
+      dependencies.disconnectGitHubInstallationCommand ?? defaultDisconnectGitHubInstallationCommand
+    )(input);
+  }
 
   if (action === "status") {
     expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id"]);
     ensureNoExtraPositionals(parsedArgv, 2);
 
-    const input = appendCommonAuthOptions(parsedArgv, {} as {
-      authFilePath?: string;
-      json?: boolean;
-      projectId?: string;
-    });
+    const input = appendCommonAuthOptions(
+      parsedArgv,
+      {} as {
+        authFilePath?: string;
+        json?: boolean;
+        projectId?: string;
+      }
+    );
     const projectId = readStringOption(parsedArgv, "project-id");
     if (projectId !== undefined) {
       input.projectId = projectId;
@@ -61,17 +83,22 @@ export async function handleGithubCommand(parsedArgv: ParsedArgv, dependencies: 
     expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id"]);
     ensureNoExtraPositionals(parsedArgv, 2);
 
-    const input = appendCommonAuthOptions(parsedArgv, {} as {
-      authFilePath?: string;
-      json?: boolean;
-      projectId?: string;
-    });
+    const input = appendCommonAuthOptions(
+      parsedArgv,
+      {} as {
+        authFilePath?: string;
+        json?: boolean;
+        projectId?: string;
+      }
+    );
     const projectId = readStringOption(parsedArgv, "project-id");
     if (projectId !== undefined) {
       input.projectId = projectId;
     }
 
-    return await (dependencies.listGitHubRepositoriesCommand ?? defaultListGitHubRepositoriesCommand)(input);
+    return await (
+      dependencies.listGitHubRepositoriesCommand ?? defaultListGitHubRepositoriesCommand
+    )(input);
   }
 
   if (action !== "repo") {
@@ -90,17 +117,24 @@ export async function handleGithubCommand(parsedArgv: ParsedArgv, dependencies: 
         const limit = readLimitOption(parsedArgv);
         const input = appendCommonAuthOptions(parsedArgv, {
           projectId,
-          ...(status === undefined ? {} : { status: status as "pending" | "retrying" | "delivered" | "failed" | "skipped" }),
+          ...(status === undefined
+            ? {}
+            : { status: status as "pending" | "retrying" | "delivered" | "failed" | "skipped" }),
           ...(limit === undefined ? {} : { limit })
         });
 
-        return await (dependencies.listProjectGitHubDeliveriesCommand ?? defaultListProjectGitHubDeliveriesCommand)(input);
+        return await (
+          dependencies.listProjectGitHubDeliveriesCommand ??
+          defaultListProjectGitHubDeliveriesCommand
+        )(input);
       }
 
       if (deliveriesAction === "retry") {
         ensureNoExtraPositionals(parsedArgv, 4);
 
-        return await (dependencies.retryProjectGitHubDeliveryCommand ?? defaultRetryProjectGitHubDeliveryCommand)(
+        return await (
+          dependencies.retryProjectGitHubDeliveryCommand ?? defaultRetryProjectGitHubDeliveryCommand
+        )(
           appendCommonAuthOptions(parsedArgv, {
             projectId,
             deliveryId: requirePositional(parsedArgv, 3, "delivery-id")
@@ -138,9 +172,9 @@ export async function handleGithubCommand(parsedArgv: ParsedArgv, dependencies: 
     const rulesAction = parsedArgv.positionals[2];
     if (rulesAction === undefined) {
       ensureNoExtraPositionals(parsedArgv, 2);
-      return await (dependencies.listProjectGitHubRulesCommand ?? defaultListProjectGitHubRulesCommand)(
-        appendCommonAuthOptions(parsedArgv, { projectId })
-      );
+      return await (
+        dependencies.listProjectGitHubRulesCommand ?? defaultListProjectGitHubRulesCommand
+      )(appendCommonAuthOptions(parsedArgv, { projectId }));
     }
 
     if (rulesAction === "create") {
@@ -155,7 +189,12 @@ export async function handleGithubCommand(parsedArgv: ParsedArgv, dependencies: 
       const cooldownSeconds = readIntegerOption(parsedArgv, "cooldown") ?? 300;
       const enabled = readBooleanStringOption(parsedArgv, "enabled");
 
-      if (name === undefined || eventTypes === undefined || severityMin === undefined || bundleType === undefined) {
+      if (
+        name === undefined ||
+        eventTypes === undefined ||
+        severityMin === undefined ||
+        bundleType === undefined
+      ) {
         throw new CliInputError("Missing required GitHub rule options.");
       }
 
@@ -187,9 +226,9 @@ export async function handleGithubCommand(parsedArgv: ParsedArgv, dependencies: 
         commandInput.enabled = enabled;
       }
 
-      return await (dependencies.createProjectGitHubRuleCommand ?? defaultCreateProjectGitHubRuleCommand)(
-        commandInput
-      );
+      return await (
+        dependencies.createProjectGitHubRuleCommand ?? defaultCreateProjectGitHubRuleCommand
+      )(commandInput);
     }
 
     if (rulesAction === "update") {
@@ -228,7 +267,8 @@ export async function handleGithubCommand(parsedArgv: ParsedArgv, dependencies: 
       if (eventTypes !== undefined) input.eventTypes = eventTypes;
       if (environments !== undefined) input.environments = environments;
       if (services !== undefined) input.services = services;
-      if (severityMin !== undefined) input.severityMin = severityMin as "low" | "medium" | "high" | "critical";
+      if (severityMin !== undefined)
+        input.severityMin = severityMin as "low" | "medium" | "high" | "critical";
       if (bundleType !== undefined) input.bundleType = bundleType as "failure" | "improvement";
       if (incidentStatus !== undefined) {
         input.incidentStatus = incidentStatus as "new_only" | "reopened_only" | "new_or_reopened";
@@ -236,12 +276,16 @@ export async function handleGithubCommand(parsedArgv: ParsedArgv, dependencies: 
       if (cooldownSeconds !== undefined) input.cooldownSeconds = cooldownSeconds;
       if (enabled !== undefined) input.enabled = enabled;
 
-      return await (dependencies.updateProjectGitHubRuleCommand ?? defaultUpdateProjectGitHubRuleCommand)(input);
+      return await (
+        dependencies.updateProjectGitHubRuleCommand ?? defaultUpdateProjectGitHubRuleCommand
+      )(input);
     }
 
     if (rulesAction === "delete") {
       ensureNoExtraPositionals(parsedArgv, 4);
-      return await (dependencies.deleteProjectGitHubRuleCommand ?? defaultDeleteProjectGitHubRuleCommand)(
+      return await (
+        dependencies.deleteProjectGitHubRuleCommand ?? defaultDeleteProjectGitHubRuleCommand
+      )(
         appendCommonAuthOptions(parsedArgv, {
           projectId,
           ruleId: requirePositional(parsedArgv, 3, "rule-id")
@@ -280,9 +324,9 @@ export async function handleGithubCommand(parsedArgv: ParsedArgv, dependencies: 
       throw new CliInputError("Missing required option --project-id.");
     }
 
-    return await (dependencies.removeProjectGitHubRepoCommand ?? defaultRemoveProjectGitHubRepoCommand)(
-      appendCommonAuthOptions(parsedArgv, { projectId })
-    );
+    return await (
+      dependencies.removeProjectGitHubRepoCommand ?? defaultRemoveProjectGitHubRepoCommand
+    )(appendCommonAuthOptions(parsedArgv, { projectId }));
   }
 
   throw new CliInputError("Unknown github repo command.");
@@ -294,21 +338,35 @@ export async function handleImprovementsCommand(
 ): Promise<CliCommandResult> {
   const action = requirePositional(parsedArgv, 1, "action");
   if (action === "list") {
-    expectNoUnknownOptions(parsedArgv, ["project-id", "environment", "service", "status", "severity", "kind", "cursor", "limit", "auth-file", "json"]);
+    expectNoUnknownOptions(parsedArgv, [
+      "project-id",
+      "environment",
+      "service",
+      "status",
+      "severity",
+      "kind",
+      "cursor",
+      "limit",
+      "auth-file",
+      "json"
+    ]);
     ensureNoExtraPositionals(parsedArgv, 2);
 
-    const input = appendCommonAuthOptions(parsedArgv, {} as {
-      authFilePath?: string;
-      json?: boolean;
-      projectId?: string;
-      environment?: string;
-      service?: string;
-      status?: string;
-      severity?: string;
-      kind?: string;
-      cursor?: string;
-      limit?: number;
-    });
+    const input = appendCommonAuthOptions(
+      parsedArgv,
+      {} as {
+        authFilePath?: string;
+        json?: boolean;
+        projectId?: string;
+        environment?: string;
+        service?: string;
+        status?: string;
+        severity?: string;
+        kind?: string;
+        cursor?: string;
+        limit?: number;
+      }
+    );
     const projectId = readStringOption(parsedArgv, "project-id");
     if (projectId !== undefined) input.projectId = projectId;
     const environment = readStringOption(parsedArgv, "environment");
@@ -404,7 +462,9 @@ export async function handleImprovementsCommand(
       throw new CliInputError("Missing required option --project.");
     }
 
-    return await (dependencies.getImprovementSettingsCommand ?? defaultGetImprovementSettingsCommand)(
+    return await (
+      dependencies.getImprovementSettingsCommand ?? defaultGetImprovementSettingsCommand
+    )(
       appendCommonAuthOptions(parsedArgv, {
         projectId
       })
@@ -430,7 +490,11 @@ export async function handleImprovementsCommand(
 
     const sensitivity = readStringOption(parsedArgv, "sensitivity");
     if (sensitivity !== undefined) {
-      if (sensitivity !== "high_confidence" && sensitivity !== "balanced" && sensitivity !== "verbose") {
+      if (
+        sensitivity !== "high_confidence" &&
+        sensitivity !== "balanced" &&
+        sensitivity !== "verbose"
+      ) {
         throw new CliInputError("Invalid value for --sensitivity.");
       }
       update.improvement_bundle_sensitivity = sensitivity;
@@ -440,7 +504,9 @@ export async function handleImprovementsCommand(
       throw new CliInputError("At least one improvement settings field must be provided.");
     }
 
-    return await (dependencies.setImprovementSettingsCommand ?? defaultSetImprovementSettingsCommand)(
+    return await (
+      dependencies.setImprovementSettingsCommand ?? defaultSetImprovementSettingsCommand
+    )(
       appendCommonAuthOptions(parsedArgv, {
         projectId,
         update

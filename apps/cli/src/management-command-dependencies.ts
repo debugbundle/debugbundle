@@ -59,6 +59,7 @@ import type {
 import type {
   createProjectGitHubRuleWithAuthCommand as defaultCreateProjectGitHubRuleCommand,
   deleteProjectGitHubRuleWithAuthCommand as defaultDeleteProjectGitHubRuleCommand,
+  disconnectGitHubInstallationWithAuthCommand as defaultDisconnectGitHubInstallationCommand,
   getGitHubStatusWithAuthCommand as defaultGetGitHubStatusCommand,
   listGitHubRepositoriesWithAuthCommand as defaultListGitHubRepositoriesCommand,
   listProjectGitHubDeliveriesWithAuthCommand as defaultListProjectGitHubDeliveriesCommand,
@@ -233,6 +234,7 @@ export type ManagementCommandDependencies = {
   updateMemberRoleCommand?: typeof defaultUpdateMemberRoleCommand;
   removeMemberCommand?: typeof defaultRemoveMemberCommand;
   leaveProjectCommand?: typeof defaultLeaveProjectCommand;
+  disconnectGitHubInstallationCommand?: typeof defaultDisconnectGitHubInstallationCommand;
   getGitHubStatusCommand?: typeof defaultGetGitHubStatusCommand;
   listGitHubRepositoriesCommand?: typeof defaultListGitHubRepositoriesCommand;
   listProjectGitHubRulesCommand?: typeof defaultListProjectGitHubRulesCommand;

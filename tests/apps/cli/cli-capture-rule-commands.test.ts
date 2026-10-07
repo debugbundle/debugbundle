@@ -43,6 +43,34 @@ const rule = {
 };
 
 describe("cli capture-rule commands", () => {
+  it("validates and forwards an explicit expiry clear while rejecting an invalid date before API dispatch", async () => {
+    const updateCaptureRule = vi.fn().mockResolvedValue({ rule });
+    const input = {
+      bearerToken: "dbundle_mem_owner",
+      projectId: "proj_1",
+      ruleId: rule.id,
+      json: true
+    };
+    const cleared = await updateCaptureRuleCommand(
+      { ...input, update: { expires_at: null } },
+      { updateCaptureRule }
+    );
+    expect(cleared.exitCode).toBe(0);
+    expect(updateCaptureRule).toHaveBeenCalledWith({
+      bearerToken: input.bearerToken,
+      projectId: input.projectId,
+      ruleId: input.ruleId,
+      update: { expires_at: null }
+    });
+    updateCaptureRule.mockClear();
+    const invalid = await updateCaptureRuleCommand(
+      { ...input, update: { expires_at: "invalid" } },
+      { updateCaptureRule }
+    );
+    expect(invalid.exitCode).not.toBe(0);
+    expect(updateCaptureRule).not.toHaveBeenCalled();
+  });
+
   it("renders capture rules in human mode", async () => {
     const result = await listCaptureRulesCommand(
       {
@@ -255,12 +283,18 @@ describe("cli capture-rule commands", () => {
         projectId: "proj_1"
       },
       {
-        readAuthState: vi.fn().mockRejectedValue(new CliAuthStateError("auth_state_missing", "Not logged in."))
+        readAuthState: vi
+          .fn()
+          .mockRejectedValue(new CliAuthStateError("auth_state_missing", "Not logged in."))
       }
     );
     const unauthorized = await listCaptureRulesCommand(
       { bearerToken: "dbundle_mem_x", projectId: "proj_1" },
-      { listCaptureRules: vi.fn().mockRejectedValue(new CaptureRuleApiError(401, "invalid_member_token")) }
+      {
+        listCaptureRules: vi
+          .fn()
+          .mockRejectedValue(new CaptureRuleApiError(401, "invalid_member_token"))
+      }
     );
     const forbidden = await deleteCaptureRuleCommand(
       { bearerToken: "dbundle_mem_x", projectId: "proj_1", ruleId: rule.id },

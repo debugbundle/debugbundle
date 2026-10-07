@@ -1,8 +1,4 @@
-import {
-  API_BASE,
-  buildBrowserSessionHeaders,
-  readJson
-} from "./api-client.js";
+import { API_BASE, buildBrowserSessionHeaders, readJson } from "./api-client.js";
 import type {
   GitHubDispatchDeliveryRecord,
   GitHubDispatchRuleRecord,
@@ -35,10 +31,7 @@ export async function getGitHubInstallation(
   return body.installation;
 }
 
-export async function getGitHubInstallUrl(
-  returnTo?: string,
-  projectId?: string
-): Promise<string> {
+export async function getGitHubInstallUrl(returnTo?: string, projectId?: string): Promise<string> {
   const searchParams = new URLSearchParams();
   if (returnTo !== undefined) {
     searchParams.set("return_to", returnTo);
@@ -159,10 +152,7 @@ export async function updateProjectGitHubRule(
   return body.rule;
 }
 
-export async function deleteProjectGitHubRule(
-  projectId: string,
-  ruleId: string
-): Promise<void> {
+export async function deleteProjectGitHubRule(projectId: string, ruleId: string): Promise<void> {
   const response = await fetch(`${API_BASE}/v1/projects/${projectId}/github/rules/${ruleId}`, {
     method: "DELETE",
     credentials: "include",
@@ -236,4 +226,13 @@ export async function removeProjectGitHubRepo(projectId: string): Promise<void> 
   if (!response.ok) {
     await readJson(response);
   }
+}
+
+export async function disconnectGitHubInstallation(): Promise<void> {
+  const response = await fetch(`${API_BASE}/v1/github/installation`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: buildBrowserSessionHeaders()
+  });
+  if (!response.ok) await readJson(response);
 }

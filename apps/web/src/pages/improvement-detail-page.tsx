@@ -1,12 +1,19 @@
 import { ArrowLeftIcon, ClipboardCopyIcon, DownloadIcon, LoaderCircleIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 
 import { CalloutCard } from "../components/system/callout-card.js";
+import { ImprovementSnoozeDialog } from "../components/system/improvement-snooze-dialog.js";
 import { HighlightedCodeBlock } from "../components/system/highlighted-code-block.js";
 import { Badge } from "../components/ui/badge.js";
 import { Button } from "../components/ui/button.js";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card.js";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "../components/ui/card.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import {
   getImprovement,
@@ -31,23 +38,31 @@ export function ImprovementDetailPage(): JSX.Element {
   const [error, setError] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
   const showLoading = useDelayedVisibility(improvement === undefined);
-  const backDestination = projectId === undefined ? "/improvements" : `/projects/${projectId}/improvements`;
-  const backLabel = projectId === undefined ? "Back to improvements" : "Back to project improvements";
+  const backDestination =
+    projectId === undefined ? "/improvements" : `/projects/${projectId}/improvements`;
+  const backLabel =
+    projectId === undefined ? "Back to improvements" : "Back to project improvements";
 
+  const generation = useRef(0);
   useEffect(() => {
-    if (improvementId === undefined) {
-      return;
+    const requestGeneration = ++generation.current;
+    setImprovement(undefined);
+    setError(false);
+    setIsMutating(false);
+    if (improvementId !== undefined) {
+      void getImprovement(improvementId)
+        .then((result) => {
+          if (generation.current === requestGeneration) setImprovement(result);
+        })
+        .catch(() => {
+          if (generation.current !== requestGeneration) return;
+          setError(true);
+          setImprovement(null);
+        });
     }
-
-    void (async () => {
-      try {
-        const result = await getImprovement(improvementId);
-        setImprovement(result);
-      } catch {
-        setError(true);
-        setImprovement(null);
-      }
-    })();
+    return () => {
+      generation.current += 1;
+    };
   }, [improvementId]);
 
   if (improvementId === undefined) {
@@ -102,16 +117,19 @@ export function ImprovementDetailPage(): JSX.Element {
                   size="sm"
                   disabled={isMutating}
                   onClick={() => {
+                    const requestGeneration = generation.current;
                     setIsMutating(true);
                     void (async () => {
                       try {
                         const reopened = await reopenImprovement(improvement.improvement_id);
+                        if (generation.current !== requestGeneration) return;
                         setImprovement(reopened);
                         showSuccessToast("Improvement reopened successfully.");
                       } catch (error) {
+                        if (generation.current !== requestGeneration) return;
                         showErrorToast(getImprovementMutationErrorMessage("reopen", error));
                       } finally {
-                        setIsMutating(false);
+                        if (generation.current === requestGeneration) setIsMutating(false);
                       }
                     })();
                   }}
@@ -126,39 +144,58 @@ export function ImprovementDetailPage(): JSX.Element {
                     size="sm"
                     disabled={isMutating}
                     onClick={() => {
+                      const requestGeneration = generation.current;
                       setIsMutating(true);
                       void (async () => {
                         try {
-                          const snoozedUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-                          const snoozed = await snoozeImprovement(improvement.improvement_id, snoozedUntil);
+                          const snoozedUntil = new Date(
+                            Date.now() + 7 * 24 * 60 * 60 * 1000
+                          ).toISOString();
+                          const snoozed = await snoozeImprovement(
+                            improvement.improvement_id,
+                            snoozedUntil
+                          );
+                          if (generation.current !== requestGeneration) return;
                           setImprovement(snoozed);
                           showSuccessToast("Improvement snoozed for 7 days.");
                         } catch (error) {
+                          if (generation.current !== requestGeneration) return;
                           showErrorToast(getImprovementMutationErrorMessage("snooze", error));
                         } finally {
-                          setIsMutating(false);
+                          if (generation.current === requestGeneration) setIsMutating(false);
                         }
                       })();
                     }}
                   >
                     {isMutating ? "Snoozing..." : "Snooze 7 days"}
                   </Button>
+                  <ImprovementSnoozeDialog
+                    key={improvementId}
+                    improvementId={improvement.improvement_id}
+                    disabled={isMutating}
+                    onPendingChange={setIsMutating}
+                    onSnoozed={setImprovement}
+                    errorMessage={(error) => getImprovementMutationErrorMessage("snooze", error)}
+                  />
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     disabled={isMutating}
                     onClick={() => {
+                      const requestGeneration = generation.current;
                       setIsMutating(true);
                       void (async () => {
                         try {
                           const resolved = await resolveImprovement(improvement.improvement_id);
+                          if (generation.current !== requestGeneration) return;
                           setImprovement(resolved);
                           showSuccessToast("Improvement resolved successfully.");
                         } catch (error) {
+                          if (generation.current !== requestGeneration) return;
                           showErrorToast(getImprovementMutationErrorMessage("resolve", error));
                         } finally {
-                          setIsMutating(false);
+                          if (generation.current === requestGeneration) setIsMutating(false);
                         }
                       })();
                     }}
@@ -167,7 +204,9 @@ export function ImprovementDetailPage(): JSX.Element {
                   </Button>
                 </>
               )}
-              <Badge variant={severityVariantMap[improvement.severity]}>{improvement.severity}</Badge>
+              <Badge variant={severityVariantMap[improvement.severity]}>
+                {improvement.severity}
+              </Badge>
               <Badge variant={statusVariantMap[improvement.status]}>{improvement.status}</Badge>
             </div>
           </div>
@@ -180,20 +219,32 @@ export function ImprovementDetailPage(): JSX.Element {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <DetailRow label="Project" value={improvement.project_name} linkTo={`/projects/${improvement.project_id}`} />
+            <DetailRow
+              label="Project"
+              value={improvement.project_name}
+              linkTo={`/projects/${improvement.project_id}`}
+            />
             <DetailRow label="Service" value={improvement.service_name} />
             <DetailRow label="Kind" value={formatImprovementKind(improvement.kind)} />
             <DetailRow label="Fingerprint" value={improvement.fingerprint} truncateValue />
             <DetailRow label="First detected" value={formatDate(improvement.first_detected_at)} />
-            {improvement.resolved_at !== null ? <DetailRow label="Resolved" value={formatDate(improvement.resolved_at)} /> : null}
-            {improvement.snoozed_until !== null ? <DetailRow label="Snoozed until" value={formatDate(improvement.snoozed_until)} /> : null}
-            {improvement.bundle_updated_at !== null ? <DetailRow label="Bundle updated" value={formatDate(improvement.bundle_updated_at)} /> : null}
+            {improvement.resolved_at !== null ? (
+              <DetailRow label="Resolved" value={formatDate(improvement.resolved_at)} />
+            ) : null}
+            {improvement.snoozed_until !== null ? (
+              <DetailRow label="Snoozed until" value={formatDate(improvement.snoozed_until)} />
+            ) : null}
+            {improvement.bundle_updated_at !== null ? (
+              <DetailRow label="Bundle updated" value={formatDate(improvement.bundle_updated_at)} />
+            ) : null}
           </div>
 
           <Card>
             <CardHeader>
               <CardTitle>Evidence</CardTitle>
-              <CardDescription>Deterministic evidence captured for this improvement opportunity.</CardDescription>
+              <CardDescription>
+                Deterministic evidence captured for this improvement opportunity.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <HighlightedCodeBlock code={JSON.stringify(improvement.evidence, null, 2)} />
@@ -248,7 +299,9 @@ function ImprovementBundleCard(input: {
           </div>
         </CardContent>
       </Card>
-    ) : <></>;
+    ) : (
+      <></>
+    );
   }
 
   if (bundleState.status === "pending") {
@@ -258,7 +311,12 @@ function ImprovementBundleCard(input: {
         title="Bundle is being generated"
         description="The hosted improvement bundle is still being written for this opportunity."
         tone="neutral"
-        titleAccessory={<LoaderCircleIcon className="size-4 animate-spin text-muted-foreground" aria-hidden="true" />}
+        titleAccessory={
+          <LoaderCircleIcon
+            className="size-4 animate-spin text-muted-foreground"
+            aria-hidden="true"
+          />
+        }
       />
     );
   }
@@ -279,7 +337,9 @@ function ImprovementBundleCard(input: {
           <div className="flex flex-wrap gap-2">
             {incidentIds.map((incidentId) => (
               <Button key={incidentId} asChild type="button" variant="outline" size="sm">
-                <Link to={`/projects/${input.projectId}/incidents/${incidentId}`}>Open incident {incidentId}</Link>
+                <Link to={`/projects/${input.projectId}/incidents/${incidentId}`}>
+                  Open incident {incidentId}
+                </Link>
               </Button>
             ))}
           </div>
@@ -348,11 +408,21 @@ function ImprovementBundleCard(input: {
           <CardDescription>Full improvement bundle artifact for this opportunity.</CardDescription>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => { void copyToClipboard(bundleJson); }}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              void copyToClipboard(bundleJson);
+            }}
+          >
             <ClipboardCopyIcon className="size-4" />
             Copy
           </Button>
-          <Button variant="outline" size="sm" onClick={() => downloadJson(bundleJson, `improvement-${input.improvementId}.json`)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => downloadJson(bundleJson, `improvement-${input.improvementId}.json`)}
+          >
             <DownloadIcon className="size-4" />
             Download
           </Button>
@@ -393,19 +463,26 @@ function DetailRow({
   linkTo?: string;
   truncateValue?: boolean;
 }): JSX.Element {
-  const content = linkTo === undefined ? (
-    <span className={cn("text-sm text-foreground", truncateValue ? "truncate" : "break-words")} title={truncateValue ? value : undefined}>
-      {value}
-    </span>
-  ) : (
-    <Link
-      to={linkTo}
-      className={cn("text-sm text-foreground hover:underline", truncateValue ? "truncate" : "break-words")}
-      title={truncateValue ? value : undefined}
-    >
-      {value}
-    </Link>
-  );
+  const content =
+    linkTo === undefined ? (
+      <span
+        className={cn("text-sm text-foreground", truncateValue ? "truncate" : "break-words")}
+        title={truncateValue ? value : undefined}
+      >
+        {value}
+      </span>
+    ) : (
+      <Link
+        to={linkTo}
+        className={cn(
+          "text-sm text-foreground hover:underline",
+          truncateValue ? "truncate" : "break-words"
+        )}
+        title={truncateValue ? value : undefined}
+      >
+        {value}
+      </Link>
+    );
 
   return (
     <Card>
@@ -417,7 +494,9 @@ function DetailRow({
   );
 }
 
-function startArtifactPolling<TArtifactState extends { status: "ready" | "pending" | "failed" }>(input: {
+function startArtifactPolling<
+  TArtifactState extends { status: "ready" | "pending" | "failed" }
+>(input: {
   load: () => Promise<TArtifactState>;
   setState: (state: TArtifactState | { status: "error" }) => void;
 }): () => void {
@@ -431,7 +510,9 @@ function startArtifactPolling<TArtifactState extends { status: "ready" | "pendin
 
       input.setState(result);
       if (result.status === "pending") {
-        timeout = setTimeout(() => { void loadArtifact(); }, ARTIFACT_POLL_INTERVAL_MS);
+        timeout = setTimeout(() => {
+          void loadArtifact();
+        }, ARTIFACT_POLL_INTERVAL_MS);
       }
     } catch {
       if (!cancelled) {

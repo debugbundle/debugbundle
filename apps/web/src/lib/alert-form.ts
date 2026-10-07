@@ -1,3 +1,5 @@
+import { preserveAlertNoiseSettings } from "../../../../packages/shared-types/src/alert-notification-policy.js";
+import { durationToSeconds, type DurationDraft } from "./duration-form.js";
 import type {
   AlertChannel,
   AlertConditionType,
@@ -22,12 +24,14 @@ export const ALERT_CHANNEL_LABELS: Record<AlertChannel, string> = {
 export const TEAM_ALERT_CHANNEL_OPTIONS: AlertChannelOption[] = [
   { value: "email", label: ALERT_CHANNEL_LABELS["email"] },
   { value: "slack", label: ALERT_CHANNEL_LABELS["slack"] },
+  { value: "discord", label: ALERT_CHANNEL_LABELS["discord"] },
   { value: "webhook", label: ALERT_CHANNEL_LABELS["webhook"] }
 ];
 
 export const STANDARD_ALERT_CHANNEL_OPTIONS: AlertChannelOption[] = [
   { value: "email", label: ALERT_CHANNEL_LABELS["email"] },
   { value: "slack", label: `${ALERT_CHANNEL_LABELS["slack"]} (Team tier only)`, disabled: true },
+  { value: "discord", label: ALERT_CHANNEL_LABELS["discord"] },
   { value: "webhook", label: ALERT_CHANNEL_LABELS["webhook"] }
 ];
 
@@ -279,4 +283,110 @@ export function validateAlertCooldownDays(value: string): string | undefined {
   }
 
   return undefined;
+}
+
+export function buildAlertRulePayload({
+  channel,
+  conditionType,
+  severityLifecycleScope,
+  severityMin,
+  cooldown,
+  emailRecipient,
+  destinationUrl,
+  selectedSlackDestinationId,
+  serviceId,
+  enabled,
+  digestWindow,
+  cooldownScope,
+  slackDirect,
+  editing,
+  previousConfig
+}: {
+  channel: AlertChannel;
+  conditionType: AlertConditionType;
+  severityLifecycleScope: AlertSeverityLifecycleScope;
+  severityMin: "" | "low" | "medium" | "high" | "critical";
+  cooldown: DurationDraft;
+  emailRecipient: string;
+  destinationUrl: string;
+  selectedSlackDestinationId: string;
+  serviceId: string;
+  enabled: boolean;
+  digestWindow: string;
+  cooldownScope: string;
+  slackDirect: boolean;
+  editing: boolean;
+  previousConfig: Record<string, unknown> | undefined;
+}): {
+  channel: AlertChannel;
+  condition_type: AlertConditionType;
+  severity_lifecycle_scope?: AlertSeverityLifecycleScope;
+  severity_min?: "low" | "medium" | "high" | "critical" | null;
+  cooldown_seconds: number;
+  config: Record<string, unknown>;
+  service_id?: string | null;
+  is_enabled: boolean;
+} {
+  const cooldownSeconds = durationToSeconds(cooldown, 604800);
+  if (cooldownSeconds === null) {
+    throw new Error("Enter a cooldown between 0 and 604800 seconds, in whole seconds.");
+  }
+
+  const config =
+    channel === "slack" && slackDirect
+      ? destinationUrl.trim() === ""
+        ? null
+        : { webhook_url: destinationUrl.trim() }
+      : buildAlertConfig({
+          channel,
+          emailRecipient: emailRecipient.trim(),
+          destinationUrl: destinationUrl.trim(),
+          slackDestinationId: selectedSlackDestinationId
+        });
+
+  if (channel === "email" && digestWindow !== "") {
+    if (!/^\d+$/.test(digestWindow) || Number(digestWindow) < 1 || Number(digestWindow) > 300) {
+      throw new Error("Enter an email digest window from 1 to 300 seconds.");
+    }
+    if (config !== null) config["aggregation_window_seconds"] = Number(digestWindow);
+  } else if (channel !== "email" && cooldownScope !== "" && config !== null)
+    config["cooldown_scope"] = cooldownScope;
+  if (config === null) {
+    throw new Error(
+      channel === "email"
+        ? "Enter a valid recipient email address."
+        : channel === "slack"
+          ? "Connect Slack and choose a channel for this alert."
+          : "Add a destination URL for this alert channel."
+    );
+  }
+
+  const draft: {
+    channel: AlertChannel;
+    condition_type: AlertConditionType;
+    severity_lifecycle_scope?: AlertSeverityLifecycleScope;
+    severity_min?: "low" | "medium" | "high" | "critical" | null;
+    cooldown_seconds: number;
+    config: Record<string, unknown>;
+    service_id?: string | null;
+    is_enabled: boolean;
+  } = {
+    channel,
+    is_enabled: enabled,
+    ...(serviceId === "" ? (!editing ? {} : { service_id: null }) : { service_id: serviceId }),
+    condition_type: conditionType,
+    cooldown_seconds: cooldownSeconds,
+    config: preserveAlertNoiseSettings(channel, previousConfig, config)
+  };
+
+  if (channel === "email" && digestWindow === "") delete draft.config["aggregation_window_seconds"];
+  if (channel !== "email" && cooldownScope === "") delete draft.config["cooldown_scope"];
+  if (severityMin !== "") draft.severity_min = severityMin;
+  else if (editing) draft.severity_min = null;
+
+  if (conditionType === "severity_threshold") {
+    draft.severity_lifecycle_scope = severityLifecycleScope;
+  }
+
+  return draft;
 }

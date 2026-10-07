@@ -41,13 +41,12 @@ export interface ProjectAnalyticsSettingsResponse {
 
 export type ProjectAnalyticsSettingsUpdate = Partial<ProjectAnalyticsSettings>;
 
-export interface AnalyticsMetricsQuery {
-  last?: "7d" | "30d" | "90d";
-  granularity?: "hour" | "day";
-  service?: string;
-  environment?: string;
-  limit?: number;
-}
+export type AnalyticsMetricsQuery = Partial<
+  Omit<
+    import("../../../../packages/shared-types/src/analytics-query.js").AnalyticsMetricsQuery,
+    "project_id"
+  >
+>;
 
 export interface AnalyticsMetricsSegment {
   value: string;
@@ -309,9 +308,10 @@ export type ProjectAnalyticsBundleResponse =
   | { status: "failed"; reason: string };
 
 export interface ProjectAnalyticsBundleCreateInput {
+  filters?: Record<string, unknown>;
   analysisKind: AnalyticsBundleAnalysisKind;
   opportunityId?: string;
-  last?: "7d" | "30d" | "90d";
+  last?: string;
   from?: string;
   to?: string;
   funnel?: string;

@@ -395,6 +395,19 @@ The public documentation/marketing/blog site lives in the standalone public repo
 
 ### `apps/cli`
 
+- **Parity remediation ownership:** `webhook-command-handler.ts` owns lifecycle
+  webhook argv handling and validated JSON filter replacement, with a compatible
+  re-export from `management-webhook-alert-slack-weekly-command-handlers.ts`.
+  The shared `packages/webhook-client` filter schema validates explicit JSON;
+  existing HTTP/domain services own authorization and updates. Capture-rule argv
+  update maps the explicit `--expires-at null` sentinel to JSON null. Ordinary MCP
+  `setup-tools.ts` adds `verify_app_event` over the existing CLI verifier while
+  retaining frozen `verify_cloud` metadata;
+  no hosted or restricted-agent catalog changes. See the local remediation register
+  in `spec/interface-parity-remediation.md` and `spec/interface-parity-matrix.md`.
+  Additive GitHub disconnect adapters in `github-client`, CLI and MCP call the existing
+  organization-owner DELETE route; the OpenClaw projection remains catalog-derived.
+
 - **Owns:** CLI command parsing, terminal I/O, interactive flows, local processing pipeline
 - **Commands:** See `/contracts/public-interfaces.md` and `/spec/local-first-onboarding.md` §11
 - **Imports:** `shared-types`, `auth`, `event-normalizer`, `bundle-engine`, `repro-engine` (for local processing), `github-client` (for GitHub automation management)
@@ -835,3 +848,41 @@ Web shared styles use the vendored shadcn 4.1.2 Tailwind stylesheet (upstream MI
 notice retained) through `globals.css`. The component generator is a separate
 development tool, not an app dependency; this removes its unused unpatched glob
 parser from the installed graph while preserving existing component styles.
+
+### Local interface parity candidate
+
+- `apps/web/src/components/system/github-rule-fields.tsx` and `lib/github-rule-form.ts`
+  own reusable GitHub form presentation and API serialization.
+- Shared duration and lifecycle-event fields compose existing UI primitives.
+- Alert form/delivery fields reuse create/edit presentation; `lib/api-alerts.ts`
+  preserves existing imports through the API barrel. `alert-groups-card.tsx` uses
+  shared response schemas and bounded scoped group/member inspection.
+- Capture-rule creation form also renders full JSON matcher editing without changing
+  rule identity; metadata and sampling go through the existing update API.
+- Dashboard management test scenarios live in functional files with common helpers
+  under `tests/apps/web/helpers/`. Other audited adapters remain in progress.
+
+### Interface parity candidate boundaries
+
+- `packages/shared-types/src/analytics-query.ts` owns the existing metric query schema
+  and time resolver. API `analytics-contracts.ts` re-exports the same schema under its
+  established name; dashboard filter validation uses it without moving domain reads.
+- `apps/web/src/lib/api-alerts.ts`, `api-alert-groups.ts`, `api-webhooks.ts`,
+  `api-agent-tokens.ts` and `api-incident-evidence.ts` are thin browser adapters over
+  existing services. Analytics actions/samples reuse shared response schemas.
+- Dashboard system components share duration/lifecycle/rule fields, bounded limits,
+  resource confirmations, weekly-report schedule fields and one-time reveal primitives.
+  Incident evidence tabs and agent credential management own scoped read/mutation state;
+  project and detail navigation discards late results in changed paths.
+- Analytics layout owns common metric filters; inventory filters reuse the workspace
+  component with fixed project scope. Journey samples use the existing detail route;
+  saved flow windows and worker specification-metadata limits remain explicit.
+- `scripts/dev-mock` models newly exposed routes locally, including default-disabled
+  agent issuance. It remains an opt-in synthetic simulator with no provider proxy.
+- Functional dashboard management tests share `tests/apps/web/helpers` after splitting
+  the oversized suite. Behavioral mappings accompany the documentation table.
+
+Webhook test event adapters reuse the existing webhook-client enum and API/domain
+test service. `test_webhook_event` is additive in ordinary MCP/OpenClaw; frozen
+`test_webhook` metadata and restricted profiles remain unchanged. Behavioral tests
+live in `tests/contracts/webhook-test-event-parity.test.ts`.

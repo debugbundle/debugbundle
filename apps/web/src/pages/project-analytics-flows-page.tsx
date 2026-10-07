@@ -42,7 +42,8 @@ function message(error: unknown): string {
 }
 export function ProjectAnalyticsFlowsPage(): JSX.Element {
   const { projectId, query, canManageFlows } = useOutletContext<ProjectAnalyticsContext>();
-  const window = query.last ?? "30d";
+  const window =
+    query.last === "7d" || query.last === "30d" || query.last === "90d" ? query.last : "30d";
   const [flows, setFlows] = useState<AnalyticsFlowDefinition[]>([]);
   const [selected, setSelected] = useState("");
   const [report, setReport] = useState<AnalyticsFlowReport | null>(null);

@@ -1,3 +1,37 @@
+# Current interface parity remediation — 2026-10-07
+
+The owner authorized final production-readiness review and the release train on
+2026-10-07. `spec/interface-parity-release-20261007.md` records the sequence, versions
+and evidence. The dashboard proposal remains approved; reuse existing patterns and
+tokens. The earlier local-only boundary is superseded for this candidate. Browser
+investigation, unrelated credential/configuration changes and OpenAI submission are
+outside this release scope.
+
+All fourteen findings are implemented locally, including lossless rule editing,
+webhook and weekly-channel management, analytics controls and inventory, scoped agent
+credentials, incident context/logs, bounded options, and GitHub disconnect adapters.
+The operation/option/role matrix records intentional interface differences. Focused
+regressions, lint/typecheck, dashboard/shared/CLI/MCP builds, public documentation,
+OpenClaw projection and installed CLI/upgrade checks pass. Final full qualification
+passed 4,066 unit tests in 497 files and the changed-source coverage gate for all 73
+changed source files. Integration passed all 140 applicable cases in 31 files, with
+one optional Browser SDK case skipped because its built SDK module was not supplied.
+The final re-audit also patched
+CLI/MCP webhook test-event selection and synthetic lifecycle payload parsing, retaining
+legacy descriptors and payloads; ordinary MCP has 130 tools, hosted 23 and agent five.
+These final unit, integration, typecheck/build, documentation and installed CLI checks
+include that client-only parser fix. The register is complete for local qualification;
+browser, provider and production behavior have not been verified for this candidate.
+Preserve all local edits in core and the `site/` companion. No schema change was made.
+
+Published OpenAI provenance remains unchanged. Its verification test now reads an
+isolated committed-source checkout rather than expecting an edited candidate to match
+historical release evidence; a separate regression verifies that source edits are
+rejected. Direct release verification on this uncommitted candidate remains fail-closed
+until separately authorized release preparation.
+
+---
+
 # Current patch review — 2026-10-07
 
 ## Scope and decisions

@@ -1,8 +1,28 @@
-import { preserveAlertNoiseSettings } from "../../../../packages/shared-types/src/alert-notification-policy.js";
-import { TEAM_ALERT_CHANNEL_OPTIONS, STANDARD_ALERT_CHANNEL_OPTIONS, ALERT_CONDITION_OPTIONS, SEVERITY_OPTIONS, ALERT_SEVERITY_LIFECYCLE_SCOPE_OPTIONS, ALERT_SEVERITY_ANY_VALUE, ALERT_SEVERITY_LIFECYCLE_DEFAULT, ALERT_COOLDOWN_DEFAULT_DAYS, ALERT_COOLDOWN_MAX_DAYS, SECONDS_PER_DAY, formatAlertChannelWithDestination, canManageAlertRule, formatAlertCondition, formatSeverityLifecycleScopeForAlert, formatSeverity, formatAlertCooldown, buildAlertConfig, describeAlertChannel, getDefaultCooldownDays, describeAlertCooldown, getDestinationLabel, getDestinationDescription, validateAlertCooldownDays } from "../lib/alert-form.js";
+import { BoundedListLimit } from "../components/system/bounded-list-limit.js";
+import {
+  TEAM_ALERT_CHANNEL_OPTIONS,
+  STANDARD_ALERT_CHANNEL_OPTIONS,
+  ALERT_SEVERITY_LIFECYCLE_DEFAULT,
+  SECONDS_PER_DAY,
+  formatAlertChannelWithDestination,
+  canManageAlertRule,
+  formatAlertCondition,
+  formatSeverityLifecycleScopeForAlert,
+  formatSeverity,
+  formatAlertCooldown,
+  buildAlertRulePayload,
+  getDefaultCooldownDays,
+  getDestinationLabel,
+  getDestinationDescription
+} from "../lib/alert-form.js";
 export * from "../lib/alert-form.js";
+import { AlertGroupsCard } from "../components/system/alert-groups-card.js";
+import { AlertDeliveryFields } from "../components/system/alert-delivery-fields.js";
+import { AlertRuleFields } from "../components/system/alert-rule-fields.js";
+import { durationFromSeconds } from "../lib/duration-form.js";
+import { PlaintextTokenReveal } from "../components/system/plaintext-token-reveal.js";
 import { BellRingIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useOutletContext, useSearchParams } from "react-router-dom";
 import { getTierCapabilities } from "../../../../packages/shared-types/src/index.js";
 import { DialogFormContent } from "../components/system/dialog-form-content.js";
@@ -24,13 +44,26 @@ import {
 import { Badge } from "../components/ui/badge.js";
 import { Button } from "../components/ui/button.js";
 import { TableActionButton } from "../components/system/table-action-button.js";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card.js";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "../components/ui/card.js";
 import { Dialog, DialogTrigger } from "../components/ui/dialog.js";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "../components/ui/field.js";
+import { Field, FieldDescription, FieldLabel } from "../components/ui/field.js";
 import { Input } from "../components/ui/input.js";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
+
 import { Skeleton } from "../components/ui/skeleton.js";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "../components/ui/table.js";
 import {
   createProjectAlert,
   deleteAlert,
@@ -63,7 +96,11 @@ export function ProjectAlertsPage(): JSX.Element {
   const { session } = useSession();
   const [searchParams, setSearchParams] = useSearchParams();
   const [alerts, setAlerts] = useState<AlertRecord[] | null>(null);
-  const showAlertsLoading = useDelayedVisibility(alerts === null);
+  const [alertsError, setAlertsError] = useState(false);
+  const [alertLimit, setAlertLimit] = useState(20);
+  const [alertsRevision, setAlertsRevision] = useState(0);
+  const projectGeneration = useRef(0);
+  const showAlertsLoading = useDelayedVisibility(alerts === null && !alertsError);
   const [slackDestinations, setSlackDestinations] = useState<SlackDestinationRecord[]>([]);
   const [slackDestinationsLoaded, setSlackDestinationsLoaded] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -71,41 +108,85 @@ export function ProjectAlertsPage(): JSX.Element {
   const [slackTestDestinationId, setSlackTestDestinationId] = useState<string | null>(null);
   const [slackDeleteDestinationId, setSlackDeleteDestinationId] = useState<string | null>(null);
   const [editingAlertId, setEditingAlertId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [serviceId, setServiceId] = useState("");
+  const [enabled, setEnabled] = useState(true);
+  const [digestWindow, setDigestWindow] = useState("");
+  const [cooldownScope, setCooldownScope] = useState("");
+  const [signingRequested, setSigningRequested] = useState(false);
+  const [signingSecret, setSigningSecret] = useState<string | null>(null);
+  const [slackDirect, setSlackDirect] = useState(false);
   const [channel, setChannel] = useState<AlertChannel>("email");
   const [conditionType, setConditionType] = useState<AlertConditionType>("new_incident");
-  const [severityLifecycleScope, setSeverityLifecycleScope] = useState<AlertSeverityLifecycleScope>(ALERT_SEVERITY_LIFECYCLE_DEFAULT);
+  const [severityLifecycleScope, setSeverityLifecycleScope] = useState<AlertSeverityLifecycleScope>(
+    ALERT_SEVERITY_LIFECYCLE_DEFAULT
+  );
   const [severityMin, setSeverityMin] = useState<"" | "low" | "medium" | "high" | "critical">("");
-  const [cooldownDays, setCooldownDays] = useState(ALERT_COOLDOWN_DEFAULT_DAYS);
+  const [cooldown, setCooldown] = useState(() => durationFromSeconds(SECONDS_PER_DAY));
   const [isCooldownPristine, setIsCooldownPristine] = useState(true);
   const [emailRecipient, setEmailRecipient] = useState("");
   const [destinationUrl, setDestinationUrl] = useState("");
   const [selectedSlackDestinationId, setSelectedSlackDestinationId] = useState("");
-  const [preferredSlackDestinationId, setPreferredSlackDestinationId] = useState<string | null>(null);
+  const [preferredSlackDestinationId, setPreferredSlackDestinationId] = useState<string | null>(
+    null
+  );
   const slackEnabled = getTierCapabilities(project.organization_plan).slack_integration;
   const effectiveRole = getProjectEffectiveRole(project);
   const canManageIntegrations = effectiveRole === "owner" || effectiveRole === "admin";
   const channelOptions = slackEnabled ? TEAM_ALERT_CHANNEL_OPTIONS : STANDARD_ALERT_CHANNEL_OPTIONS;
   useEffect(() => {
-    void (async () => {
-      const nextAlerts = await listProjectAlerts(projectId);
-      setAlerts(nextAlerts);
-    })();
+    let active = true;
+    setAlerts(null);
+    setAlertsError(false);
+    void listProjectAlerts(projectId, alertLimit).then(
+      (records) => {
+        if (active) setAlerts(records);
+      },
+      () => {
+        if (active) setAlertsError(true);
+      }
+    );
+    return () => {
+      active = false;
+    };
+  }, [projectId, alertsRevision, alertLimit]);
+  useEffect(() => {
+    projectGeneration.current += 1;
+    setIsCreateOpen(false);
+    setEditingAlertId(null);
+    setSigningSecret(null);
+    setSlackDestinations([]);
+    setSlackDestinationsLoaded(false);
+    setIsConnectingSlack(false);
+    setSlackTestDestinationId(null);
+    setSlackDeleteDestinationId(null);
+    setIsSaving(false);
+    return () => {
+      projectGeneration.current += 1;
+    };
   }, [projectId]);
 
   const resolvedProjectId = projectId;
 
-  async function refreshSlackDestinations(nextPreferredDestinationId: string | null = preferredSlackDestinationId): Promise<void> {
+  async function refreshSlackDestinations(
+    nextPreferredDestinationId: string | null = preferredSlackDestinationId
+  ): Promise<void> {
+    const generation = projectGeneration.current;
     try {
       const destinations = await listProjectSlackDestinations(projectId);
+      if (generation !== projectGeneration.current) return;
       setSlackDestinations(destinations);
-      const resolvedDestinationId = resolveSlackDestinationSelection(destinations, nextPreferredDestinationId);
+      const resolvedDestinationId = resolveSlackDestinationSelection(
+        destinations,
+        nextPreferredDestinationId
+      );
       if (resolvedDestinationId !== null) {
         setSelectedSlackDestinationId(resolvedDestinationId);
       }
     } catch {
-      setSlackDestinations([]);
+      if (generation === projectGeneration.current) setSlackDestinations([]);
     } finally {
-      setSlackDestinationsLoaded(true);
+      if (generation === projectGeneration.current) setSlackDestinationsLoaded(true);
     }
   }
 
@@ -114,23 +195,32 @@ export function ProjectAlertsPage(): JSX.Element {
   }, [projectId, slackEnabled]);
 
   useEffect(() => {
+    if (editingAlertId !== null) return;
     if (channelOptions.some((option) => option.value === channel && option.disabled !== true)) {
       return;
     }
 
     setChannel(channelOptions.find((option) => option.disabled !== true)?.value ?? "email");
-  }, [channel, channelOptions]);
+  }, [channel, channelOptions, editingAlertId]);
 
   function resetAlertForm(nextChannel: AlertChannel = "email"): void {
     setChannel(nextChannel);
+    setServiceId("");
+    setEnabled(true);
+    setDigestWindow("");
+    setCooldownScope("");
+    setSigningRequested(false);
+    setSlackDirect(false);
     setConditionType("new_incident");
     setSeverityLifecycleScope(ALERT_SEVERITY_LIFECYCLE_DEFAULT);
     setSeverityMin("");
-    setCooldownDays(getDefaultCooldownDays(nextChannel));
+    setCooldown(durationFromSeconds(Number(getDefaultCooldownDays(nextChannel)) * SECONDS_PER_DAY));
     setIsCooldownPristine(true);
     setEmailRecipient(session?.email ?? "");
     setDestinationUrl("");
-    setSelectedSlackDestinationId(resolveSlackDestinationSelection(slackDestinations, preferredSlackDestinationId) ?? "");
+    setSelectedSlackDestinationId(
+      resolveSlackDestinationSelection(slackDestinations, preferredSlackDestinationId) ?? ""
+    );
   }
 
   function handleCreateOpenChange(nextOpen: boolean): void {
@@ -150,18 +240,27 @@ export function ProjectAlertsPage(): JSX.Element {
       return;
     }
 
-    const resolvedDestinationId = resolveSlackDestinationSelection(slackDestinations, preferredSlackDestinationId);
+    const resolvedDestinationId = resolveSlackDestinationSelection(
+      slackDestinations,
+      preferredSlackDestinationId
+    );
     if (resolvedDestinationId !== null) {
       setSelectedSlackDestinationId(resolvedDestinationId);
     }
-  }, [channel, preferredSlackDestinationId, selectedSlackDestinationId, slackDestinations, slackEnabled]);
+  }, [
+    channel,
+    preferredSlackDestinationId,
+    selectedSlackDestinationId,
+    slackDestinations,
+    slackEnabled
+  ]);
 
   useEffect(() => {
     if (!isCooldownPristine) {
       return;
     }
 
-    setCooldownDays(getDefaultCooldownDays(channel));
+    setCooldown(durationFromSeconds(Number(getDefaultCooldownDays(channel)) * SECONDS_PER_DAY));
   }, [channel, isCooldownPristine]);
 
   useEffect(() => {
@@ -195,53 +294,77 @@ export function ProjectAlertsPage(): JSX.Element {
   }, [searchParams, setSearchParams]);
 
   async function handleConnectSlack(): Promise<void> {
+    const generation = projectGeneration.current;
     try {
       setIsConnectingSlack(true);
       const installUrl = await getSlackInstallUrl(projectId, `/projects/${projectId}/alerts`);
+      if (generation !== projectGeneration.current) return;
       window.location.assign(installUrl);
     } catch {
+      if (generation !== projectGeneration.current) return;
       setIsConnectingSlack(false);
       showErrorToast("Could not start the Slack connect flow.");
     }
   }
 
   async function handleTestSlackDestination(destinationId: string): Promise<void> {
+    const generation = projectGeneration.current;
     try {
       setSlackTestDestinationId(destinationId);
       await testProjectSlackDestination(projectId, destinationId);
+      if (generation !== projectGeneration.current) return;
       showSuccessToast("Slack test message sent successfully.");
     } catch (error) {
+      if (generation !== projectGeneration.current) return;
       showErrorToast(getSlackDestinationErrorMessage(error, "test"));
     } finally {
-      setSlackTestDestinationId(null);
+      if (generation === projectGeneration.current) setSlackTestDestinationId(null);
     }
   }
 
   async function handleDeleteSlackDestination(destinationId: string): Promise<void> {
+    const generation = projectGeneration.current;
     try {
       setSlackDeleteDestinationId(destinationId);
       await deleteProjectSlackDestination(projectId, destinationId);
+      if (generation !== projectGeneration.current) return;
       const remainingDestinations = slackDestinations.filter(
         (destination) => destination.slack_destination_id !== destinationId
       );
       setSlackDestinations(remainingDestinations);
-      const nextSelectedDestinationId = resolveSlackDestinationSelection(remainingDestinations, null) ?? "";
+      const nextSelectedDestinationId =
+        resolveSlackDestinationSelection(remainingDestinations, null) ?? "";
       setSelectedSlackDestinationId(nextSelectedDestinationId);
-      setPreferredSlackDestinationId(nextSelectedDestinationId.length > 0 ? nextSelectedDestinationId : null);
+      setPreferredSlackDestinationId(
+        nextSelectedDestinationId.length > 0 ? nextSelectedDestinationId : null
+      );
       showSuccessToast("Slack channel disconnected successfully.");
     } catch (error) {
+      if (generation !== projectGeneration.current) return;
       showErrorToast(getSlackDestinationErrorMessage(error, "delete"));
     } finally {
-      setSlackDeleteDestinationId(null);
+      if (generation === projectGeneration.current) setSlackDeleteDestinationId(null);
     }
   }
 
   function populateAlertForm(alert: AlertRecord): void {
     setChannel(alert.channel);
+    setServiceId(alert.service_id ?? "");
+    setEnabled(alert.is_enabled);
+    setDigestWindow(
+      typeof alert.config["aggregation_window_seconds"] === "number"
+        ? String(alert.config["aggregation_window_seconds"])
+        : ""
+    );
+    setCooldownScope(
+      typeof alert.config["cooldown_scope"] === "string" ? alert.config["cooldown_scope"] : ""
+    );
+    setSigningRequested(false);
+    setSlackDirect(alert.channel === "slack" && typeof alert.config["webhook_url"] === "string");
     setConditionType(alert.condition_type);
     setSeverityLifecycleScope(alert.severity_lifecycle_scope ?? ALERT_SEVERITY_LIFECYCLE_DEFAULT);
     setSeverityMin(alert.severity_min ?? "");
-    setCooldownDays(String(alert.cooldown_seconds / SECONDS_PER_DAY));
+    setCooldown(durationFromSeconds(alert.cooldown_seconds));
     setIsCooldownPristine(false);
 
     if (alert.channel === "email") {
@@ -255,8 +378,12 @@ export function ProjectAlertsPage(): JSX.Element {
     if (alert.channel === "slack") {
       const slackDestinationId = alert.config["slack_destination_id"];
       setEmailRecipient("");
-      setDestinationUrl("");
-      setSelectedSlackDestinationId(typeof slackDestinationId === "string" ? slackDestinationId : "");
+      setDestinationUrl(
+        typeof alert.config["webhook_url"] === "string" ? alert.config["webhook_url"] : ""
+      );
+      setSelectedSlackDestinationId(
+        typeof slackDestinationId === "string" ? slackDestinationId : ""
+      );
       return;
     }
 
@@ -273,102 +400,72 @@ export function ProjectAlertsPage(): JSX.Element {
     setIsCreateOpen(true);
   }
 
-  function buildAlertDraft():
-    | {
-        channel: AlertChannel;
-        condition_type: AlertConditionType;
-        severity_lifecycle_scope?: AlertSeverityLifecycleScope;
-        severity_min?: "low" | "medium" | "high" | "critical";
-        cooldown_seconds: number;
-        config: Record<string, unknown>;
-      }
-    | null {
-    const cooldownValidationError = validateAlertCooldownDays(cooldownDays);
-    if (cooldownValidationError !== undefined) {
-      showErrorToast(cooldownValidationError);
+  function buildAlertDraft(): ReturnType<typeof buildAlertRulePayload> | null {
+    try {
+      return buildAlertRulePayload({
+        channel,
+        conditionType,
+        severityLifecycleScope,
+        severityMin,
+        cooldown,
+        emailRecipient,
+        destinationUrl,
+        selectedSlackDestinationId,
+        serviceId,
+        enabled,
+        digestWindow,
+        cooldownScope,
+        slackDirect,
+        editing: editingAlertId !== null,
+        previousConfig: alerts?.find(
+          (alert) => alert.alert_id === editingAlertId && alert.channel === channel
+        )?.config
+      });
+    } catch (error) {
+      showErrorToast(error instanceof Error ? error.message : "Could not validate alert rule.");
       return null;
     }
-
-    const cooldownSeconds = Number.parseInt(cooldownDays, 10) * SECONDS_PER_DAY;
-    const config = buildAlertConfig({
-      channel,
-      emailRecipient: emailRecipient.trim(),
-      destinationUrl: destinationUrl.trim(),
-      slackDestinationId: selectedSlackDestinationId
-    });
-
-    if (config === null) {
-      showErrorToast(
-        channel === "email"
-          ? "Enter a valid recipient email address."
-          : channel === "slack"
-            ? "Connect Slack and choose a channel for this alert."
-            : "Add a destination URL for this alert channel."
-      );
-      return null;
-    }
-
-    const draft: {
-      channel: AlertChannel;
-      condition_type: AlertConditionType;
-      severity_lifecycle_scope?: AlertSeverityLifecycleScope;
-      severity_min?: "low" | "medium" | "high" | "critical";
-      cooldown_seconds: number;
-      config: Record<string, unknown>;
-    } = {
-      channel,
-      condition_type: conditionType,
-      cooldown_seconds: cooldownSeconds,
-      config: preserveAlertNoiseSettings(channel, alerts?.find(alert => alert.alert_id === editingAlertId && alert.channel === channel)?.config, config)
-    };
-
-    if (severityMin !== "") {
-      draft.severity_min = severityMin;
-    }
-
-    if (conditionType === "severity_threshold") {
-      draft.severity_lifecycle_scope = severityLifecycleScope;
-    }
-
-    return draft;
   }
 
   async function handleCreateAlert(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
+    if (isSaving) return;
     const draft = buildAlertDraft();
     if (draft === null) {
       return;
     }
 
-    const createPayload: {
-      project_id: string;
-      channel: AlertChannel;
-      condition_type: AlertConditionType;
-      severity_lifecycle_scope?: AlertSeverityLifecycleScope;
-      severity_min?: "low" | "medium" | "high" | "critical";
-      cooldown_seconds: number;
-      config: Record<string, unknown>;
-      is_enabled: boolean;
-    } = {
+    const { severity_min, service_id, ...createDraft } = draft;
+    const createPayload: Parameters<typeof createProjectAlert>[0] = {
       project_id: resolvedProjectId,
-      ...draft,
-      is_enabled: true
+      ...createDraft,
+      ...(severity_min == null ? {} : { severity_min }),
+      ...(service_id == null ? {} : { service_id }),
+      is_enabled: enabled,
+      ...(channel === "webhook" && signingRequested ? { signing: "hmac_sha256_v1" as const } : {})
     };
 
+    const generation = projectGeneration.current;
     try {
-      const created = await createProjectAlert(createPayload);
+      setIsSaving(true);
+      const { signing_secret, ...created } = await createProjectAlert(createPayload);
+      if (generation !== projectGeneration.current) return;
+      setSigningSecret(signing_secret ?? null);
 
       setAlerts((current) => [...(current ?? []), created]);
       resetAlertForm();
       setIsCreateOpen(false);
       showSuccessToast("Alert rule created successfully.");
     } catch {
-      showErrorToast("Could not create alert rule.");
+      if (generation === projectGeneration.current) showErrorToast("Could not create alert rule.");
+    } finally {
+      if (generation === projectGeneration.current) setIsSaving(false);
     }
   }
 
   async function handleUpdateAlert(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
+    if (isSaving) return;
 
     if (editingAlertId === null) {
       return;
@@ -379,14 +476,31 @@ export function ProjectAlertsPage(): JSX.Element {
       return;
     }
 
+    const generation = projectGeneration.current;
     try {
-      const updated = await updateProjectAlert(editingAlertId, resolvedProjectId, draft);
-      setAlerts((current) => (current ?? []).map((alert) => (alert.alert_id === updated.alert_id ? updated : alert)));
+      setIsSaving(true);
+      const { signing_secret, ...updated } = await updateProjectAlert(
+        editingAlertId,
+        resolvedProjectId,
+        {
+          ...draft,
+          ...(channel === "webhook" && signingRequested
+            ? { rotate_signing_secret: true as const }
+            : {})
+        }
+      );
+      if (generation !== projectGeneration.current) return;
+      setSigningSecret(signing_secret ?? null);
+      setAlerts((current) =>
+        (current ?? []).map((alert) => (alert.alert_id === updated.alert_id ? updated : alert))
+      );
       setIsCreateOpen(false);
       setEditingAlertId(null);
       showSuccessToast("Alert rule updated successfully.");
     } catch {
-      showErrorToast("Could not update alert rule.");
+      if (generation === projectGeneration.current) showErrorToast("Could not update alert rule.");
+    } finally {
+      if (generation === projectGeneration.current) setIsSaving(false);
     }
   }
 
@@ -400,176 +514,60 @@ export function ProjectAlertsPage(): JSX.Element {
     }
   }
 
-  const alertFormFields = (
-    <FieldGroup>
+  const destinationFields =
+    channel === "email" ? (
       <Field>
-        <FieldLabel id="project-alert-channel-label" htmlFor="project-alert-channel">Channel</FieldLabel>
-        <Select
-          value={channel}
-          onValueChange={(value) => setChannel(value as AlertChannel)}
-        >
-          <SelectTrigger id="project-alert-channel" aria-labelledby="project-alert-channel-label project-alert-channel" className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent position="popper">
-            <SelectGroup>
-              {channelOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value} disabled={option.disabled === true}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-        <FieldDescription>{describeAlertChannel(channel)}</FieldDescription>
-      </Field>
-      {channel === "email" ? (
-        <Field>
-          <FieldLabel htmlFor="project-alert-email-recipient">Recipient email</FieldLabel>
-          <FieldDescription>Send this alert to a single email address. Create additional alert rules if multiple people should receive it.</FieldDescription>
-          <Input
-            id="project-alert-email-recipient"
-            type="email"
-            inputMode="email"
-            autoComplete="email"
-            placeholder={session?.email ?? "oncall@example.com"}
-            value={emailRecipient}
-            onChange={(event) => setEmailRecipient(event.currentTarget.value)}
-            required
-          />
-        </Field>
-      ) : channel === "slack" ? (
-        <ConnectedSlackDestinationField
-          label={getDestinationLabel(channel)}
-          description={getDestinationDescription(channel)}
-          slackDestinations={slackDestinations}
-          slackDestinationsLoaded={slackDestinationsLoaded}
-          selectedSlackDestinationId={selectedSlackDestinationId}
-          canManageIntegrations={canManageIntegrations}
-          isConnectingSlack={isConnectingSlack}
-          slackTestDestinationId={slackTestDestinationId}
-          slackDeleteDestinationId={slackDeleteDestinationId}
-          onSelectedSlackDestinationIdChange={setSelectedSlackDestinationId}
-          onConnectSlack={() => void handleConnectSlack()}
-          onTestSlackDestination={(destinationId) => void handleTestSlackDestination(destinationId)}
-          onDeleteSlackDestination={(destinationId) => void handleDeleteSlackDestination(destinationId)}
-          emptyManageText="Connect Slack once, choose a channel in Slack, and it will become available for alert rules here."
-          emptyReadOnlyText="A project admin needs to connect Slack before this project can send Slack alerts."
-        />
-      ) : (
-        <Field>
-          <FieldLabel htmlFor="project-alert-destination">{getDestinationLabel(channel)}</FieldLabel>
-          <FieldDescription>{getDestinationDescription(channel)}</FieldDescription>
-          <Input
-            id="project-alert-destination"
-            type="url"
-            inputMode="url"
-            placeholder="https://example.com/..."
-            value={destinationUrl}
-            onChange={(event) => setDestinationUrl(event.currentTarget.value)}
-            required
-          />
-        </Field>
-      )}
-      <Field>
-        <FieldLabel id="project-alert-condition-label" htmlFor="project-alert-condition">Condition</FieldLabel>
-        <Select
-          value={conditionType}
-          onValueChange={(value) => setConditionType(value as AlertConditionType)}
-        >
-          <SelectTrigger
-            id="project-alert-condition"
-            aria-labelledby="project-alert-condition-label project-alert-condition"
-            className="w-full"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent position="popper">
-            <SelectGroup>
-              {ALERT_CONDITION_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-      </Field>
-      {conditionType === "severity_threshold" ? (
-        <Field>
-          <FieldLabel id="project-alert-severity-lifecycle-label" htmlFor="project-alert-severity-lifecycle">
-            Notify on
-          </FieldLabel>
-          <Select
-            value={severityLifecycleScope}
-            onValueChange={(value) => setSeverityLifecycleScope(value as AlertSeverityLifecycleScope)}
-          >
-            <SelectTrigger
-              id="project-alert-severity-lifecycle"
-              aria-labelledby="project-alert-severity-lifecycle-label project-alert-severity-lifecycle"
-              className="w-full"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent position="popper">
-              <SelectGroup>
-                {ALERT_SEVERITY_LIFECYCLE_SCOPE_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </Field>
-      ) : null}
-      <Field>
-        <FieldLabel id="project-alert-severity-label" htmlFor="project-alert-severity">Minimum severity</FieldLabel>
-        <FieldDescription>Leave unset to deliver for all severities matching the selected condition.</FieldDescription>
-        <Select
-          value={severityMin === "" ? ALERT_SEVERITY_ANY_VALUE : severityMin}
-          onValueChange={(value) => setSeverityMin((value === ALERT_SEVERITY_ANY_VALUE ? "" : value) as typeof severityMin)}
-        >
-          <SelectTrigger
-            id="project-alert-severity"
-            aria-labelledby="project-alert-severity-label project-alert-severity"
-            className="w-full"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent position="popper">
-            <SelectGroup>
-              {SEVERITY_OPTIONS.map((option) => (
-                <SelectItem key={option.value || "any"} value={option.value === "" ? ALERT_SEVERITY_ANY_VALUE : option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-      </Field>
-      <Field>
-        <FieldLabel htmlFor="project-alert-cooldown-days">Cooldown (days)</FieldLabel>
+        <FieldLabel htmlFor="project-alert-email-recipient">Recipient email</FieldLabel>
         <FieldDescription>
-          {describeAlertCooldown(channel)}
+          Send this alert to a single email address. Create additional alert rules if multiple
+          people should receive it.
         </FieldDescription>
         <Input
-          id="project-alert-cooldown-days"
-          type="number"
-          inputMode="numeric"
-          min="0"
-          max={String(ALERT_COOLDOWN_MAX_DAYS)}
-          step="1"
-          value={cooldownDays}
-          onChange={(event) => {
-            setCooldownDays(event.currentTarget.value);
-            setIsCooldownPristine(false);
-          }}
+          id="project-alert-email-recipient"
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          placeholder={session?.email ?? "oncall@example.com"}
+          value={emailRecipient}
+          onChange={(event) => setEmailRecipient(event.currentTarget.value)}
           required
         />
       </Field>
-    </FieldGroup>
-  );
+    ) : channel === "slack" && !slackDirect ? (
+      <ConnectedSlackDestinationField
+        label={getDestinationLabel(channel)}
+        description={getDestinationDescription(channel)}
+        slackDestinations={slackDestinations}
+        slackDestinationsLoaded={slackDestinationsLoaded}
+        selectedSlackDestinationId={selectedSlackDestinationId}
+        canManageIntegrations={canManageIntegrations}
+        isConnectingSlack={isConnectingSlack}
+        slackTestDestinationId={slackTestDestinationId}
+        slackDeleteDestinationId={slackDeleteDestinationId}
+        onSelectedSlackDestinationIdChange={setSelectedSlackDestinationId}
+        onConnectSlack={() => void handleConnectSlack()}
+        onTestSlackDestination={(destinationId) => void handleTestSlackDestination(destinationId)}
+        onDeleteSlackDestination={(destinationId) =>
+          void handleDeleteSlackDestination(destinationId)
+        }
+        emptyManageText="Connect Slack once, choose a channel in Slack, and it will become available for alert rules here."
+        emptyReadOnlyText="A project admin needs to connect Slack before this project can send Slack alerts."
+      />
+    ) : (
+      <Field>
+        <FieldLabel htmlFor="project-alert-destination">{getDestinationLabel(channel)}</FieldLabel>
+        <FieldDescription>{getDestinationDescription(channel)}</FieldDescription>
+        <Input
+          id="project-alert-destination"
+          type="url"
+          inputMode="url"
+          placeholder="https://example.com/..."
+          value={destinationUrl}
+          onChange={(event) => setDestinationUrl(event.currentTarget.value)}
+          required
+        />
+      </Field>
+    );
 
   return (
     <div className="space-y-4">
@@ -589,29 +587,108 @@ export function ProjectAlertsPage(): JSX.Element {
                 ? "Add a project-scoped delivery rule for incident lifecycle changes."
                 : "Update this project-scoped delivery rule for incident lifecycle changes."
             }
+            size="lg"
             footer={
               <Button
                 type="submit"
-                disabled={channel === "slack" && (!slackEnabled || selectedSlackDestinationId.length === 0)}
+                disabled={
+                  isSaving ||
+                  (channel === "slack" &&
+                    !slackDirect &&
+                    (!slackEnabled || selectedSlackDestinationId.length === 0))
+                }
               >
-                {editingAlertId === null ? "Create alert rule" : "Save changes"}
+                {isSaving
+                  ? "Saving..."
+                  : editingAlertId === null
+                    ? "Create alert rule"
+                    : "Save changes"}
               </Button>
             }
-            onSubmit={(event) => void (editingAlertId === null ? handleCreateAlert(event) : handleUpdateAlert(event))}
+            onSubmit={(event) =>
+              void (editingAlertId === null ? handleCreateAlert(event) : handleUpdateAlert(event))
+            }
           >
-            {alertFormFields}
+            <AlertRuleFields
+              channel={channel}
+              setChannel={setChannel}
+              channelOptions={channelOptions}
+              conditionType={conditionType}
+              setConditionType={setConditionType}
+              severityLifecycleScope={severityLifecycleScope}
+              setSeverityLifecycleScope={setSeverityLifecycleScope}
+              severityMin={severityMin}
+              setSeverityMin={setSeverityMin}
+              cooldown={cooldown}
+              onCooldownChange={(value) => {
+                setCooldown(value);
+                setIsCooldownPristine(false);
+              }}
+              destinationFields={destinationFields}
+              advancedFields={
+                <AlertDeliveryFields
+                  projectId={projectId}
+                  serviceId={serviceId}
+                  setServiceId={setServiceId}
+                  enabled={enabled}
+                  setEnabled={setEnabled}
+                  digestWindow={digestWindow}
+                  setDigestWindow={setDigestWindow}
+                  cooldownScope={cooldownScope}
+                  setCooldownScope={setCooldownScope}
+                  signingRequested={signingRequested}
+                  setSigningRequested={setSigningRequested}
+                  editingAlertId={editingAlertId}
+                  channel={channel}
+                />
+              }
+            />
           </DialogFormContent>
         </Dialog>
       </div>
 
+      {signingSecret === null ? null : (
+        <div className="flex flex-col gap-3">
+          <PlaintextTokenReveal
+            value={signingSecret}
+            title="New alert signing secret"
+            regionLabel="New alert signing secret"
+            description="This verification key is shown once. Copy it into your receiver now."
+          />
+          <Button type="button" variant="outline" onClick={() => setSigningSecret(null)}>
+            Dismiss secret
+          </Button>
+        </div>
+      )}
       <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <Card>
           <CardHeader>
             <CardTitle>Alert rules</CardTitle>
-            <CardDescription>Rules for sending incident events to external channels.</CardDescription>
+            <CardDescription>
+              Rules for sending incident events to external channels.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            {alerts === null ? (
+            <BoundedListLimit
+              id="alert-rule-limit"
+              label="Alert rule limit"
+              value={alertLimit}
+              onChange={setAlertLimit}
+            />
+            {alertsError ? (
+              <div className="flex flex-col gap-3">
+                <p role="alert" className="text-sm text-destructive">
+                  Could not load alert rules.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setAlertsRevision((current) => current + 1)}
+                >
+                  Retry alert rules
+                </Button>
+              </div>
+            ) : alerts === null ? (
               showAlertsLoading ? (
                 <div className="space-y-3">
                   <Skeleton className="h-12 w-full" />
@@ -647,15 +724,23 @@ export function ProjectAlertsPage(): JSX.Element {
                       </TableCell>
                       <TableCell>{formatAlertCondition(alert.condition_type)}</TableCell>
                       <TableCell>{formatSeverityLifecycleScopeForAlert(alert)}</TableCell>
-                      <TableCell>{alert.severity_min === null ? "Any" : formatSeverity(alert.severity_min)}</TableCell>
+                      <TableCell>
+                        {alert.severity_min === null ? "Any" : formatSeverity(alert.severity_min)}
+                      </TableCell>
                       <TableCell>{formatAlertCooldown(alert.cooldown_seconds)}</TableCell>
                       <TableCell>
-                        <Badge variant={alert.is_enabled ? "success" : "secondary"}>{alert.is_enabled ? "enabled" : "disabled"}</Badge>
+                        <Badge variant={alert.is_enabled ? "success" : "secondary"}>
+                          {alert.is_enabled ? "enabled" : "disabled"}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         {canManageAlertRule(alert, session?.user_id, effectiveRole) ? (
                           <div className="flex items-center justify-end gap-1">
-                            <TableActionButton label="Edit" icon={PencilIcon} onClick={() => openEditAlertDialog(alert)} />
+                            <TableActionButton
+                              label="Edit"
+                              icon={PencilIcon}
+                              onClick={() => openEditAlertDialog(alert)}
+                            />
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <TableActionButton label="Delete" icon={Trash2Icon} />
@@ -664,12 +749,17 @@ export function ProjectAlertsPage(): JSX.Element {
                                 <AlertDialogHeader>
                                   <AlertDialogTitle>Delete alert rule</AlertDialogTitle>
                                   <AlertDialogDescription>
-                                    This will permanently remove this alert rule. Incident lifecycle events will no longer be delivered through this channel.
+                                    This will permanently remove this alert rule. Incident lifecycle
+                                    events will no longer be delivered through this channel.
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => void handleDeleteAlert(alert.alert_id)}>Delete alert</AlertDialogAction>
+                                  <AlertDialogAction
+                                    onClick={() => void handleDeleteAlert(alert.alert_id)}
+                                  >
+                                    Delete alert
+                                  </AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
                             </AlertDialog>
@@ -690,7 +780,9 @@ export function ProjectAlertsPage(): JSX.Element {
           <Card>
             <CardHeader>
               <CardTitle>Alert rule guidance</CardTitle>
-              <CardDescription>Use a small set of clear rules with specific conditions and destinations.</CardDescription>
+              <CardDescription>
+                Use a small set of clear rules with specific conditions and destinations.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="rounded-lg border border-border/80 bg-background/60 p-4 text-sm text-muted-foreground">
@@ -699,7 +791,8 @@ export function ProjectAlertsPage(): JSX.Element {
                   Getting started
                 </div>
                 <p className="mt-2 leading-6">
-                  Start with the key incident events and add more rules only when they map to a clear response path.
+                  Start with the key incident events and add more rules only when they map to a
+                  clear response path.
                 </p>
               </div>
             </CardContent>
@@ -740,6 +833,7 @@ export function ProjectAlertsPage(): JSX.Element {
           ) : null}
         </div>
       </div>
+      <AlertGroupsCard key={projectId} projectId={projectId} />
     </div>
   );
 }

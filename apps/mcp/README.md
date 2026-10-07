@@ -112,6 +112,14 @@ The plugin package lives at `apps/mcp/claude-code/debugbundle` and bundles a Cla
 - List saved analytics funnels and, with owner/admin access, create, update, or archive reusable funnel definitions through `list_saved_analytics_funnels`, `create_saved_analytics_funnel`, `update_saved_analytics_funnel`, and `archive_saved_analytics_funnel`.
 - Inspect hosted health checks, probes, alerts, webhooks, projects, members, billing, capture policy, and GitHub automation state.
 - Run local and hosted verification through tools such as `verify_local`, `verify_cloud`, `doctor`, `smoke`, and `analyze`.
+
+`verify_app_event` provides real SDK-driven app proof, matching the CLI's
+`verify cloud --expect-app-event`. Pass `projectId` and at least one of `service`,
+`traceId`, or `requestId`; `environment`, `maxAgeMinutes`, and `authFilePath` are
+optional. It reads existing incidents/bundles and never sends synthetic events.
+The existing `verify_cloud` schema and description remain unchanged. The new tool
+is available through ordinary and local-auth stdio MCP and its OpenClaw projection;
+hosted read-only and restricted agent catalogs remain unchanged.
 - Resolve or reopen incidents after verification.
 
 For analytics questions, use direct aggregate tools first and generate an AnalyticsBundle only when a bounded analysis needs a durable artifact. The product does not create one bundle per visit.
@@ -147,3 +155,14 @@ For analytics questions, use direct aggregate tools first and generate an Analyt
 ## License
 
 Apache-2.0.
+
+`disconnect_github_installation` calls the existing organization-wide disconnect
+route. It requires the active organization's owner and removes repository assignments
+for all its projects, including cleanup after downgrade. It does not uninstall the
+App on GitHub. Install/reconnect uses the dashboard browser flow to retain the signed
+state cookie. This additive tool brings the ordinary/local-auth catalog to 130 tools;
+the hosted 23-tool and restricted five-tool profiles remain unchanged.
+
+`test_webhook_event` accepts all eight supported webhook events through the existing
+scoped test service. The legacy `test_webhook` schema remains verification-only.
+Both queue a signed synthetic envelope without creating real incidents or bundles.

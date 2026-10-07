@@ -1,3 +1,4 @@
+import { CaptureRuleMatcherSchema } from "../../../../../packages/shared-types/src/capture-rule-schemas.js";
 import {
   type CaptureRuleAction,
   type CaptureRuleBrowserEventKind,
@@ -9,7 +10,14 @@ import {
 } from "../../lib/capture-rules-api.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "../ui/field.js";
 import { Input } from "../ui/input.js";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../ui/select.js";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "../ui/select.js";
 import { Switch } from "../ui/switch.js";
 import { Textarea } from "../ui/textarea.js";
 import {
@@ -86,6 +94,7 @@ export interface CaptureRuleCreateDraft {
   sampleEventClass: "preserve" | "context";
   expiresAt: string;
   advancedMatcherJson: string;
+  matcherJsonOnly?: boolean;
 }
 
 interface CaptureRuleCreateFormProps {
@@ -127,15 +136,31 @@ export function createDefaultCaptureRuleCreateDraft(): CaptureRuleCreateDraft {
   };
 }
 
-export function getCaptureRuleCreateDraftValidationError(draft: CaptureRuleCreateDraft): string | null {
+export function getCaptureRuleCreateDraftValidationError(
+  draft: CaptureRuleCreateDraft
+): string | null {
   if (draft.name.trim().length === 0) {
     return "Rule name is required.";
   }
 
   if (draft.action === "sample") {
     const sampleRate = Number(draft.sampleRatePercent);
-    if (!Number.isFinite(sampleRate) || sampleRate <= 0 || sampleRate > 100) {
-      return "Sample rate must be greater than 0 and at most 100.";
+    if (
+      draft.sampleRatePercent.trim() === "" ||
+      !Number.isFinite(sampleRate) ||
+      sampleRate < 0 ||
+      sampleRate > 100
+    ) {
+      return "Sample rate must be between 0 and 100.";
+    }
+  }
+
+  if (draft.matcherJsonOnly) {
+    try {
+      const parsed = CaptureRuleMatcherSchema.safeParse(JSON.parse(draft.advancedMatcherJson));
+      return parsed.success ? null : "Matcher JSON must satisfy the capture rule matcher schema.";
+    } catch {
+      return "Matcher JSON must be valid JSON.";
     }
   }
 
@@ -161,14 +186,20 @@ export function getCaptureRuleCreateDraftValidationError(draft: CaptureRuleCreat
     return "Add at least one matcher field beyond event type.";
   }
 
-  if (matcher.browser_event_kind === "resource_error" && matcher.resource_url === undefined && matcher.fingerprint === undefined) {
+  if (
+    matcher.browser_event_kind === "resource_error" &&
+    matcher.resource_url === undefined &&
+    matcher.fingerprint === undefined
+  ) {
     return "Resource-error rules need a resource URL matcher or exact fingerprint.";
   }
 
   return null;
 }
 
-export function buildProjectCaptureRuleCreate(draft: CaptureRuleCreateDraft): ProjectCaptureRuleCreate {
+export function buildProjectCaptureRuleCreate(
+  draft: CaptureRuleCreateDraft
+): ProjectCaptureRuleCreate {
   const expiresAt = parseDateTimeLocalValue(draft.expiresAt);
   return {
     name: draft.name.trim(),
@@ -192,7 +223,10 @@ export function CaptureRuleCreateForm({
   environmentOptions = [],
   onDraftChange
 }: CaptureRuleCreateFormProps): JSX.Element {
-  function update<Key extends keyof CaptureRuleCreateDraft>(key: Key, value: CaptureRuleCreateDraft[Key]): void {
+  function update<Key extends keyof CaptureRuleCreateDraft>(
+    key: Key,
+    value: CaptureRuleCreateDraft[Key]
+  ): void {
     onDraftChange({ ...draft, [key]: value });
   }
 
@@ -211,7 +245,11 @@ export function CaptureRuleCreateForm({
 
         <Field>
           <FieldLabel htmlFor="capture-rule-create-action">Action</FieldLabel>
-          <Select value={draft.action} onValueChange={(value) => update("action", value as CaptureRuleAction)} disabled={disabled}>
+          <Select
+            value={draft.action}
+            onValueChange={(value) => update("action", value as CaptureRuleAction)}
+            disabled={disabled}
+          >
             <SelectTrigger id="capture-rule-create-action" className="w-full">
               <SelectValue />
             </SelectTrigger>
@@ -240,233 +278,330 @@ export function CaptureRuleCreateForm({
         <FieldDescription>Use this to record why this rule is safe to apply.</FieldDescription>
       </Field>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Field>
-          <FieldLabel htmlFor="capture-rule-create-event-type">Event type</FieldLabel>
-          <Select value={draft.eventType} onValueChange={(value) => update("eventType", value as CaptureRuleEventType)} disabled={disabled}>
-            <SelectTrigger id="capture-rule-create-event-type" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {eventTypeOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </Field>
+      {draft.matcherJsonOnly ? null : (
+        <>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor="capture-rule-create-event-type">Event type</FieldLabel>
+              <Select
+                value={draft.eventType}
+                onValueChange={(value) => update("eventType", value as CaptureRuleEventType)}
+                disabled={disabled}
+              >
+                <SelectTrigger id="capture-rule-create-event-type" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {eventTypeOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
 
-        <Field>
-          <FieldLabel htmlFor="capture-rule-create-runtime">Runtime</FieldLabel>
-          <Select
-            value={draft.runtime === "" ? NO_VALUE : draft.runtime}
-            onValueChange={(value) => update("runtime", value === NO_VALUE ? "" : (value as CaptureRuleRuntime))}
-            disabled={disabled}
-          >
-            <SelectTrigger id="capture-rule-create-runtime" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value={NO_VALUE}>Any runtime</SelectItem>
-                {runtimeOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </Field>
-      </div>
+            <Field>
+              <FieldLabel htmlFor="capture-rule-create-runtime">Runtime</FieldLabel>
+              <Select
+                value={draft.runtime === "" ? NO_VALUE : draft.runtime}
+                onValueChange={(value) =>
+                  update("runtime", value === NO_VALUE ? "" : (value as CaptureRuleRuntime))
+                }
+                disabled={disabled}
+              >
+                <SelectTrigger id="capture-rule-create-runtime" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value={NO_VALUE}>Any runtime</SelectItem>
+                    {runtimeOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Field>
-          <FieldLabel htmlFor="capture-rule-create-services">Services</FieldLabel>
-          <ProjectScopeMultiSelect
-            id="capture-rule-create-services"
-            label="Services"
-            value={splitScopeValues(draft.serviceNames)}
-            options={serviceOptions}
-            onValueChange={(values) => update("serviceNames", joinScopeValues(values))}
-            disabled={disabled}
-          />
-        </Field>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor="capture-rule-create-services">Services</FieldLabel>
+              <ProjectScopeMultiSelect
+                id="capture-rule-create-services"
+                label="Services"
+                value={splitScopeValues(draft.serviceNames)}
+                options={serviceOptions}
+                onValueChange={(values) => update("serviceNames", joinScopeValues(values))}
+                disabled={disabled}
+              />
+            </Field>
 
-        <Field>
-          <FieldLabel htmlFor="capture-rule-create-environments">Environments</FieldLabel>
-          <ProjectScopeMultiSelect
-            id="capture-rule-create-environments"
-            label="Environments"
-            value={splitScopeValues(draft.environments)}
-            options={environmentOptions}
-            onValueChange={(values) => update("environments", joinScopeValues(values))}
-            disabled={disabled}
-          />
-        </Field>
-      </div>
+            <Field>
+              <FieldLabel htmlFor="capture-rule-create-environments">Environments</FieldLabel>
+              <ProjectScopeMultiSelect
+                id="capture-rule-create-environments"
+                label="Environments"
+                value={splitScopeValues(draft.environments)}
+                options={environmentOptions}
+                onValueChange={(values) => update("environments", joinScopeValues(values))}
+                disabled={disabled}
+              />
+            </Field>
+          </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Field>
-          <FieldLabel htmlFor="capture-rule-create-browser-kind">Browser event kind</FieldLabel>
-          <Select
-            value={draft.browserEventKind === "" ? NO_VALUE : draft.browserEventKind}
-            onValueChange={(value) =>
-              update("browserEventKind", value === NO_VALUE ? "" : (value as CaptureRuleBrowserEventKind))
-            }
-            disabled={disabled}
-          >
-            <SelectTrigger id="capture-rule-create-browser-kind" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value={NO_VALUE}>Any browser event</SelectItem>
-                {browserEventKindOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </Field>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor="capture-rule-create-browser-kind">Browser event kind</FieldLabel>
+              <Select
+                value={draft.browserEventKind === "" ? NO_VALUE : draft.browserEventKind}
+                onValueChange={(value) =>
+                  update(
+                    "browserEventKind",
+                    value === NO_VALUE ? "" : (value as CaptureRuleBrowserEventKind)
+                  )
+                }
+                disabled={disabled}
+              >
+                <SelectTrigger id="capture-rule-create-browser-kind" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value={NO_VALUE}>Any browser event</SelectItem>
+                    {browserEventKindOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
 
-        <Field>
-          <FieldLabel htmlFor="capture-rule-create-client-kind">Client kind</FieldLabel>
-          <Select
-            value={draft.clientKind === "" ? NO_VALUE : draft.clientKind}
-            onValueChange={(value) => update("clientKind", value === NO_VALUE ? "" : (value as CaptureRuleClientKind))}
-            disabled={disabled}
-          >
-            <SelectTrigger id="capture-rule-create-client-kind" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value={NO_VALUE}>Any client</SelectItem>
-                {clientKindOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </Field>
-      </div>
+            <Field>
+              <FieldLabel htmlFor="capture-rule-create-client-kind">Client kind</FieldLabel>
+              <Select
+                value={draft.clientKind === "" ? NO_VALUE : draft.clientKind}
+                onValueChange={(value) =>
+                  update("clientKind", value === NO_VALUE ? "" : (value as CaptureRuleClientKind))
+                }
+                disabled={disabled}
+              >
+                <SelectTrigger id="capture-rule-create-client-kind" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value={NO_VALUE}>Any client</SelectItem>
+                    {clientKindOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Field>
-          <FieldLabel htmlFor="capture-rule-create-first-party">Request scope</FieldLabel>
-          <Select
-            value={draft.firstParty === "" ? NO_VALUE : draft.firstParty}
-            onValueChange={(value) => update("firstParty", value === NO_VALUE ? "" : (value as "true" | "false"))}
-            disabled={disabled}
-          >
-            <SelectTrigger id="capture-rule-create-first-party" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value={NO_VALUE}>Any request scope</SelectItem>
-                <SelectItem value="true">First-party only</SelectItem>
-                <SelectItem value="false">Third-party allowed</SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </Field>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor="capture-rule-create-first-party">Request scope</FieldLabel>
+              <Select
+                value={draft.firstParty === "" ? NO_VALUE : draft.firstParty}
+                onValueChange={(value) =>
+                  update("firstParty", value === NO_VALUE ? "" : (value as "true" | "false"))
+                }
+                disabled={disabled}
+              >
+                <SelectTrigger id="capture-rule-create-first-party" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value={NO_VALUE}>Any request scope</SelectItem>
+                    <SelectItem value="true">First-party only</SelectItem>
+                    <SelectItem value="false">Third-party allowed</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
 
-        <Field>
-          <FieldLabel htmlFor="capture-rule-create-bot-family">Bot family</FieldLabel>
-          <Input
-            id="capture-rule-create-bot-family"
-            value={draft.botFamily}
-            onChange={(event) => update("botFamily", event.currentTarget.value)}
-            disabled={disabled}
-            placeholder="Googlebot"
-          />
-        </Field>
-      </div>
+            <Field>
+              <FieldLabel htmlFor="capture-rule-create-bot-family">Bot family</FieldLabel>
+              <Input
+                id="capture-rule-create-bot-family"
+                value={draft.botFamily}
+                onChange={(event) => update("botFamily", event.currentTarget.value)}
+                disabled={disabled}
+                placeholder="Googlebot"
+              />
+            </Field>
+          </div>
 
-      <Field orientation="horizontal" className="items-center justify-between gap-4">
-        <div className="flex flex-1 flex-col gap-1">
-          <FieldLabel id="capture-rule-create-opaque-label" htmlFor="capture-rule-create-opaque">Opaque browser event</FieldLabel>
-          <FieldDescription>Use this for browser-native errors without useful application stack evidence.</FieldDescription>
-        </div>
-        <Switch
-          id="capture-rule-create-opaque"
-          aria-labelledby="capture-rule-create-opaque-label"
-          checked={draft.browserEventOpaque}
-          disabled={disabled}
-          onCheckedChange={(checked) => update("browserEventOpaque", checked)}
-        />
-      </Field>
+          <Field orientation="horizontal" className="items-center justify-between gap-4">
+            <div className="flex flex-1 flex-col gap-1">
+              <FieldLabel
+                id="capture-rule-create-opaque-label"
+                htmlFor="capture-rule-create-opaque"
+              >
+                Opaque browser event
+              </FieldLabel>
+              <FieldDescription>
+                Use this for browser-native errors without useful application stack evidence.
+              </FieldDescription>
+            </div>
+            <Switch
+              id="capture-rule-create-opaque"
+              aria-labelledby="capture-rule-create-opaque-label"
+              checked={draft.browserEventOpaque}
+              disabled={disabled}
+              onCheckedChange={(checked) => update("browserEventOpaque", checked)}
+            />
+          </Field>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Field>
-          <FieldLabel htmlFor="capture-rule-create-error-name">Error name</FieldLabel>
-          <Input id="capture-rule-create-error-name" value={draft.errorName} onChange={(event) => update("errorName", event.currentTarget.value)} disabled={disabled} />
-        </Field>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Field>
+              <FieldLabel htmlFor="capture-rule-create-error-name">Error name</FieldLabel>
+              <Input
+                id="capture-rule-create-error-name"
+                value={draft.errorName}
+                onChange={(event) => update("errorName", event.currentTarget.value)}
+                disabled={disabled}
+              />
+            </Field>
 
-        <Field>
-          <FieldLabel htmlFor="capture-rule-create-message-equals">Message equals</FieldLabel>
-          <Input id="capture-rule-create-message-equals" value={draft.messageEquals} onChange={(event) => update("messageEquals", event.currentTarget.value)} disabled={disabled} />
-        </Field>
+            <Field>
+              <FieldLabel htmlFor="capture-rule-create-message-equals">Message equals</FieldLabel>
+              <Input
+                id="capture-rule-create-message-equals"
+                value={draft.messageEquals}
+                onChange={(event) => update("messageEquals", event.currentTarget.value)}
+                disabled={disabled}
+              />
+            </Field>
 
-        <Field>
-          <FieldLabel htmlFor="capture-rule-create-message-contains">Message contains</FieldLabel>
-          <Input id="capture-rule-create-message-contains" value={draft.messageContains} onChange={(event) => update("messageContains", event.currentTarget.value)} disabled={disabled} />
-        </Field>
-      </div>
+            <Field>
+              <FieldLabel htmlFor="capture-rule-create-message-contains">
+                Message contains
+              </FieldLabel>
+              <Input
+                id="capture-rule-create-message-contains"
+                value={draft.messageContains}
+                onChange={(event) => update("messageContains", event.currentTarget.value)}
+                disabled={disabled}
+              />
+            </Field>
+          </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Field>
-          <FieldLabel htmlFor="capture-rule-create-resource-host">Resource host</FieldLabel>
-          <Input id="capture-rule-create-resource-host" value={draft.resourceHost} onChange={(event) => update("resourceHost", event.currentTarget.value)} disabled={disabled} placeholder="analytics.example.com" />
-        </Field>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Field>
+              <FieldLabel htmlFor="capture-rule-create-resource-host">Resource host</FieldLabel>
+              <Input
+                id="capture-rule-create-resource-host"
+                value={draft.resourceHost}
+                onChange={(event) => update("resourceHost", event.currentTarget.value)}
+                disabled={disabled}
+                placeholder="analytics.example.com"
+              />
+            </Field>
 
-        <Field>
-          <FieldLabel htmlFor="capture-rule-create-resource-path">Resource path equals</FieldLabel>
-          <Input id="capture-rule-create-resource-path" value={draft.resourcePathEquals} onChange={(event) => update("resourcePathEquals", event.currentTarget.value)} disabled={disabled} placeholder="/tag.js" />
-        </Field>
+            <Field>
+              <FieldLabel htmlFor="capture-rule-create-resource-path">
+                Resource path equals
+              </FieldLabel>
+              <Input
+                id="capture-rule-create-resource-path"
+                value={draft.resourcePathEquals}
+                onChange={(event) => update("resourcePathEquals", event.currentTarget.value)}
+                disabled={disabled}
+                placeholder="/tag.js"
+              />
+            </Field>
 
-        <Field>
-          <FieldLabel htmlFor="capture-rule-create-request-path">Request path equals</FieldLabel>
-          <Input id="capture-rule-create-request-path" value={draft.requestPathEquals} onChange={(event) => update("requestPathEquals", event.currentTarget.value)} disabled={disabled} placeholder="/api/bootstrap" />
-        </Field>
-      </div>
+            <Field>
+              <FieldLabel htmlFor="capture-rule-create-request-path">
+                Request path equals
+              </FieldLabel>
+              <Input
+                id="capture-rule-create-request-path"
+                value={draft.requestPathEquals}
+                onChange={(event) => update("requestPathEquals", event.currentTarget.value)}
+                disabled={disabled}
+                placeholder="/api/bootstrap"
+              />
+            </Field>
+          </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Field>
-          <FieldLabel htmlFor="capture-rule-create-status-codes">Status codes</FieldLabel>
-          <Input id="capture-rule-create-status-codes" value={draft.statusCodes} onChange={(event) => update("statusCodes", event.currentTarget.value)} disabled={disabled} placeholder="404, 429" />
-        </Field>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Field>
+              <FieldLabel htmlFor="capture-rule-create-status-codes">Status codes</FieldLabel>
+              <Input
+                id="capture-rule-create-status-codes"
+                value={draft.statusCodes}
+                onChange={(event) => update("statusCodes", event.currentTarget.value)}
+                disabled={disabled}
+                placeholder="404, 429"
+              />
+            </Field>
 
-        <Field>
-          <FieldLabel htmlFor="capture-rule-create-fingerprint-version">Fingerprint version</FieldLabel>
-          <Input id="capture-rule-create-fingerprint-version" value={draft.fingerprintVersion} onChange={(event) => update("fingerprintVersion", event.currentTarget.value)} disabled={disabled} placeholder="v1" />
-        </Field>
+            <Field>
+              <FieldLabel htmlFor="capture-rule-create-fingerprint-version">
+                Fingerprint version
+              </FieldLabel>
+              <Input
+                id="capture-rule-create-fingerprint-version"
+                value={draft.fingerprintVersion}
+                onChange={(event) => update("fingerprintVersion", event.currentTarget.value)}
+                disabled={disabled}
+                placeholder="v1"
+              />
+            </Field>
 
-        <Field>
-          <FieldLabel htmlFor="capture-rule-create-fingerprint-value">Fingerprint value</FieldLabel>
-          <Input id="capture-rule-create-fingerprint-value" value={draft.fingerprintValue} onChange={(event) => update("fingerprintValue", event.currentTarget.value)} disabled={disabled} />
-        </Field>
-      </div>
+            <Field>
+              <FieldLabel htmlFor="capture-rule-create-fingerprint-value">
+                Fingerprint value
+              </FieldLabel>
+              <Input
+                id="capture-rule-create-fingerprint-value"
+                value={draft.fingerprintValue}
+                onChange={(event) => update("fingerprintValue", event.currentTarget.value)}
+                disabled={disabled}
+              />
+            </Field>
+          </div>
+        </>
+      )}
 
       {draft.action === "sample" ? (
         <div className="grid gap-4 md:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="capture-rule-create-sample-rate">Sample rate percent</FieldLabel>
-            <Input id="capture-rule-create-sample-rate" type="number" min="1" max="100" value={draft.sampleRatePercent} onChange={(event) => update("sampleRatePercent", event.currentTarget.value)} disabled={disabled} />
+            <Input
+              id="capture-rule-create-sample-rate"
+              type="number"
+              min="0"
+              max="100"
+              step="any"
+              value={draft.sampleRatePercent}
+              onChange={(event) => update("sampleRatePercent", event.currentTarget.value)}
+              disabled={disabled}
+            />
           </Field>
 
           <Field>
             <FieldLabel htmlFor="capture-rule-create-sample-class">Sampled-in class</FieldLabel>
-            <Select value={draft.sampleEventClass} onValueChange={(value) => update("sampleEventClass", value as "preserve" | "context")} disabled={disabled}>
+            <Select
+              value={draft.sampleEventClass}
+              onValueChange={(value) => update("sampleEventClass", value as "preserve" | "context")}
+              disabled={disabled}
+            >
               <SelectTrigger id="capture-rule-create-sample-class" className="w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -484,8 +619,13 @@ export function CaptureRuleCreateForm({
       <div className="grid gap-4 md:grid-cols-2">
         <Field orientation="horizontal" className="items-center justify-between gap-4">
           <div className="flex flex-1 flex-col gap-1">
-            <FieldLabel id="capture-rule-create-enabled-label" htmlFor="capture-rule-create-enabled">Enabled</FieldLabel>
-            <FieldDescription>Create disabled when you want to stage the rule for later review.</FieldDescription>
+            <FieldLabel
+              id="capture-rule-create-enabled-label"
+              htmlFor="capture-rule-create-enabled"
+            >
+              Enabled
+            </FieldLabel>
+            <FieldDescription>Disable a rule to stage it for later review.</FieldDescription>
           </div>
           <Switch
             id="capture-rule-create-enabled"
@@ -498,12 +638,20 @@ export function CaptureRuleCreateForm({
 
         <Field>
           <FieldLabel htmlFor="capture-rule-create-expires-at">Expires at</FieldLabel>
-          <Input id="capture-rule-create-expires-at" type="datetime-local" value={draft.expiresAt} onChange={(event) => update("expiresAt", event.currentTarget.value)} disabled={disabled} />
+          <Input
+            id="capture-rule-create-expires-at"
+            type="datetime-local"
+            value={draft.expiresAt}
+            onChange={(event) => update("expiresAt", event.currentTarget.value)}
+            disabled={disabled}
+          />
         </Field>
       </div>
 
       <Field>
-        <FieldLabel htmlFor="capture-rule-create-advanced-json">Additional matcher JSON</FieldLabel>
+        <FieldLabel htmlFor="capture-rule-create-advanced-json">
+          {draft.matcherJsonOnly ? "Matcher JSON" : "Additional matcher JSON"}
+        </FieldLabel>
         <Textarea
           id="capture-rule-create-advanced-json"
           value={draft.advancedMatcherJson}
@@ -512,13 +660,18 @@ export function CaptureRuleCreateForm({
           rows={4}
           placeholder='{"status_ranges":[{"start":500,"end":599}]}'
         />
-        <FieldDescription>Optional. Merge extra matcher fields that are not covered by the guided controls.</FieldDescription>
+        <FieldDescription>
+          {draft.matcherJsonOnly
+            ? "Edit the complete matcher. Existing event arrays and lifecycle predicates are preserved until you change them."
+            : "Optional. Merge extra matcher fields that are not covered by the guided controls."}
+        </FieldDescription>
       </Field>
     </FieldGroup>
   );
 }
 
 function buildCaptureRuleMatcher(draft: CaptureRuleCreateDraft): CaptureRuleMatcher {
+  if (draft.matcherJsonOnly) return JSON.parse(draft.advancedMatcherJson) as CaptureRuleMatcher;
   const matcher: CaptureRuleMatcher = {
     event_types: [draft.eventType]
   };
@@ -531,7 +684,8 @@ function buildCaptureRuleMatcher(draft: CaptureRuleCreateDraft): CaptureRuleMatc
   if (draft.runtime !== "") matcher.runtime = [draft.runtime];
   if (draft.firstParty !== "") matcher.first_party = draft.firstParty === "true";
   if (draft.errorName.trim().length > 0) matcher.error_name = draft.errorName.trim();
-  if (draft.messageContains.trim().length > 0) matcher.message_contains = draft.messageContains.trim();
+  if (draft.messageContains.trim().length > 0)
+    matcher.message_contains = draft.messageContains.trim();
   if (draft.messageEquals.trim().length > 0) matcher.message_equals = draft.messageEquals.trim();
   if (draft.browserEventKind !== "") matcher.browser_event_kind = draft.browserEventKind;
   if (draft.browserEventOpaque) matcher.browser_event_opaque = true;
@@ -560,7 +714,10 @@ function buildCaptureRuleMatcher(draft: CaptureRuleCreateDraft): CaptureRuleMatc
   };
 }
 
-function buildUrlMatcher(host: string, pathEquals: string): NonNullable<CaptureRuleMatcher["resource_url"]> | null {
+function buildUrlMatcher(
+  host: string,
+  pathEquals: string
+): NonNullable<CaptureRuleMatcher["resource_url"]> | null {
   const matcher: NonNullable<CaptureRuleMatcher["resource_url"]> = {};
   if (host.trim().length > 0) matcher.host = host.trim().toLowerCase();
   if (pathEquals.trim().length > 0) matcher.path_equals = normalizePath(pathEquals.trim());
@@ -568,7 +725,14 @@ function buildUrlMatcher(host: string, pathEquals: string): NonNullable<CaptureR
 }
 
 function parseStringList(value: string): string[] {
-  return Array.from(new Set(value.split(",").map((entry) => entry.trim()).filter((entry) => entry.length > 0)));
+  return Array.from(
+    new Set(
+      value
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0)
+    )
+  );
 }
 
 function parseNumberList(value: string): number[] {

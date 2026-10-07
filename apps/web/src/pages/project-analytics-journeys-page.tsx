@@ -2,6 +2,7 @@ import { RouteIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 
+import { AnalyticsJourneySamplesCard } from "../components/system/analytics-journey-samples-card.js";
 import { AnalyticsSectionHeader } from "../components/system/analytics-section-header.js";
 import { Button } from "../components/ui/button.js";
 import {
@@ -152,6 +153,12 @@ export function ProjectAnalyticsJourneysPage(): JSX.Element {
           </TableBody>
         </Table>
       ) : null}
+      <AnalyticsJourneySamplesCard
+        key={`${projectId}:${query.service ?? ""}:${query.environment ?? ""}`}
+        projectId={projectId}
+        service={query.service}
+        environment={query.environment}
+      />
     </div>
   );
 }

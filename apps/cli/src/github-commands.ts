@@ -1,6 +1,9 @@
 import { GitHubManagementApiError } from "../../../packages/github-client/src/index.js";
 
-import { createAuthenticatedGitHubManagementApi, runAuthenticatedCliCommand } from "./auth-context.js";
+import {
+  createAuthenticatedGitHubManagementApi,
+  runAuthenticatedCliCommand
+} from "./auth-context.js";
 import type { CliCommandResult } from "./token-commands.js";
 
 interface InstallationLike {
@@ -106,8 +109,8 @@ function formatGitHubRuleTable(rules: GitHubDispatchRuleLike[]): string {
   return rules
     .map(
       (rule) =>
-        `${rule.name} | ${rule.enabled ? "enabled" : "disabled"} | ${rule.event_types.join(",")}`
-        + ` | ${rule.severity_min ?? "none"} | ${rule.cooldown_seconds}s`
+        `${rule.name} | ${rule.enabled ? "enabled" : "disabled"} | ${rule.event_types.join(",")}` +
+        ` | ${rule.severity_min ?? "none"} | ${rule.cooldown_seconds}s`
     )
     .join("\n");
 }
@@ -155,10 +158,16 @@ export async function getGitHubStatusCommand(
 
     return {
       exitCode: 0,
-      output: repo === null ? formatInstallation(installation) : `${formatInstallation(installation)}\n${formatProjectRepo(repo)}`
+      output:
+        repo === null
+          ? formatInstallation(installation)
+          : `${formatInstallation(installation)}\n${formatProjectRepo(repo)}`
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -183,10 +192,15 @@ export async function listGitHubRepositoriesCommand(
         ? JSON.stringify({ repositories })
         : repositories.length === 0
           ? "No GitHub repositories found."
-          : repositories.map((repository) => `${repository.full_name} (${repository.default_branch})`).join("\n")
+          : repositories
+              .map((repository) => `${repository.full_name} (${repository.default_branch})`)
+              .join("\n")
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -198,12 +212,23 @@ export async function setProjectGitHubRepoCommand(
     json?: boolean;
   },
   api: {
-    setProjectRepo(input: { bearerToken: string; projectId: string; owner: string; repo: string }): Promise<ProjectRepoLike>;
+    setProjectRepo(input: {
+      bearerToken: string;
+      projectId: string;
+      owner: string;
+      repo: string;
+    }): Promise<ProjectRepoLike>;
   }
 ): Promise<CliCommandResult> {
   try {
     const [owner, repo] = input.repoRef.split("/");
-    if (owner === undefined || owner.length === 0 || repo === undefined || repo.length === 0 || input.repoRef.includes("//")) {
+    if (
+      owner === undefined ||
+      owner.length === 0 ||
+      repo === undefined ||
+      repo.length === 0 ||
+      input.repoRef.includes("//")
+    ) {
       return {
         exitCode: 4,
         output: "Repository must be provided as owner/repo."
@@ -219,10 +244,15 @@ export async function setProjectGitHubRepoCommand(
 
     return {
       exitCode: 0,
-      output: input.json ? JSON.stringify({ repo: assignedRepo }) : `Project repo set: ${formatProjectRepo(assignedRepo)}`
+      output: input.json
+        ? JSON.stringify({ repo: assignedRepo })
+        : `Project repo set: ${formatProjectRepo(assignedRepo)}`
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -240,10 +270,15 @@ export async function removeProjectGitHubRepoCommand(
     await api.removeProjectRepo({ bearerToken: input.bearerToken, projectId: input.projectId });
     return {
       exitCode: 0,
-      output: input.json ? JSON.stringify({ removed: true, project_id: input.projectId }) : `Project repo removed: ${input.projectId}`
+      output: input.json
+        ? JSON.stringify({ removed: true, project_id: input.projectId })
+        : `Project repo removed: ${input.projectId}`
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -254,7 +289,10 @@ export async function listProjectGitHubRulesCommand(
     json?: boolean;
   },
   api: {
-    listProjectRules(input: { bearerToken: string; projectId: string }): Promise<GitHubDispatchRuleLike[]>;
+    listProjectRules(input: {
+      bearerToken: string;
+      projectId: string;
+    }): Promise<GitHubDispatchRuleLike[]>;
   }
 ): Promise<CliCommandResult> {
   try {
@@ -268,7 +306,10 @@ export async function listProjectGitHubRulesCommand(
       output: input.json ? JSON.stringify({ rules }) : formatGitHubRuleTable(rules)
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -302,7 +343,10 @@ export async function listProjectGitHubDeliveriesCommand(
       output: input.json ? JSON.stringify({ deliveries }) : formatGitHubDeliveryTable(deliveries)
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -314,7 +358,11 @@ export async function retryProjectGitHubDeliveryCommand(
     json?: boolean;
   },
   api: {
-    retryProjectDelivery(input: { bearerToken: string; projectId: string; deliveryId: string }): Promise<GitHubDispatchDeliveryLike>;
+    retryProjectDelivery(input: {
+      bearerToken: string;
+      projectId: string;
+      deliveryId: string;
+    }): Promise<GitHubDispatchDeliveryLike>;
   }
 ): Promise<CliCommandResult> {
   try {
@@ -326,10 +374,15 @@ export async function retryProjectGitHubDeliveryCommand(
 
     return {
       exitCode: 0,
-      output: input.json ? JSON.stringify({ delivery }) : `GitHub delivery retried: ${delivery.delivery_id} | ${delivery.status}`
+      output: input.json
+        ? JSON.stringify({ delivery })
+        : `GitHub delivery retried: ${delivery.delivery_id} | ${delivery.status}`
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -384,7 +437,10 @@ export async function createProjectGitHubRuleCommand(
       output: input.json ? JSON.stringify({ rule }) : `GitHub rule created: ${rule.rule_id}`
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -442,7 +498,10 @@ export async function updateProjectGitHubRuleCommand(
       output: input.json ? JSON.stringify({ rule }) : `GitHub rule updated: ${rule.rule_id}`
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -454,7 +513,11 @@ export async function deleteProjectGitHubRuleCommand(
     json?: boolean;
   },
   api: {
-    deleteProjectRule(input: { bearerToken: string; projectId: string; ruleId: string }): Promise<void>;
+    deleteProjectRule(input: {
+      bearerToken: string;
+      projectId: string;
+      ruleId: string;
+    }): Promise<void>;
   }
 ): Promise<CliCommandResult> {
   try {
@@ -470,7 +533,10 @@ export async function deleteProjectGitHubRuleCommand(
         : `GitHub rule deleted: ${input.ruleId}`
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -648,7 +714,9 @@ export async function updateProjectGitHubRuleWithAuthCommand(
           ...(input.severityMin === undefined ? {} : { severityMin: input.severityMin }),
           ...(input.bundleType === undefined ? {} : { bundleType: input.bundleType }),
           ...(input.incidentStatus === undefined ? {} : { incidentStatus: input.incidentStatus }),
-          ...(input.cooldownSeconds === undefined ? {} : { cooldownSeconds: input.cooldownSeconds }),
+          ...(input.cooldownSeconds === undefined
+            ? {}
+            : { cooldownSeconds: input.cooldownSeconds }),
           ...(input.enabled === undefined ? {} : { enabled: input.enabled }),
           ...(input.json === undefined ? {} : { json: input.json })
         },
@@ -717,6 +785,44 @@ export async function retryProjectGitHubDeliveryWithAuthCommand(
           bearerToken: authState.bearer_token,
           projectId: input.projectId,
           deliveryId: input.deliveryId,
+          ...(input.json === undefined ? {} : { json: input.json })
+        },
+        api
+      )
+  });
+}
+
+export async function disconnectGitHubInstallationCommand(
+  input: { bearerToken: string; json?: boolean },
+  api: { disconnectInstallation(input: { bearerToken: string }): Promise<void> }
+): Promise<CliCommandResult> {
+  try {
+    await api.disconnectInstallation({ bearerToken: input.bearerToken });
+    return {
+      exitCode: 0,
+      output: input.json
+        ? JSON.stringify({ disconnected: true })
+        : "GitHub installation disconnected for the active organization and all its projects."
+    };
+  } catch (error) {
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
+export async function disconnectGitHubInstallationWithAuthCommand(
+  input: { authFilePath?: string; json?: boolean },
+  dependencies?: Parameters<typeof createAuthenticatedGitHubManagementApi>[1]
+): Promise<CliCommandResult> {
+  return runAuthenticatedCliCommand(input, {
+    createApi: createAuthenticatedGitHubManagementApi,
+    dependencies,
+    runCommand: (authState, api) =>
+      disconnectGitHubInstallationCommand(
+        {
+          bearerToken: authState.bearer_token,
           ...(input.json === undefined ? {} : { json: input.json })
         },
         api
