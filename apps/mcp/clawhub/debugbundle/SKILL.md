@@ -23,11 +23,11 @@ metadata:
         description: Optional DebugBundle API base URL for self-hosted or non-production environments.
     install:
       - kind: node
-        package: "@debugbundle/mcp@1.13.1"
+        package: "@debugbundle/mcp@1.14.0"
         bins:
           - debugbundle-mcp
       - kind: node
-        package: "@debugbundle/cli@1.13.1"
+        package: "@debugbundle/cli@1.14.0"
         bins:
           - debugbundle
     skillKey: debugbundle
