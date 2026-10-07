@@ -1,4 +1,4 @@
-> Current patch release (2026-10-07): core 1.14.1, shared 2.2.1, CLI/MCP/OpenClaw 1.13.1 and site 1.6.1 are published; the hosted app/site rollout passes. See [release evidence](spec/dashboard-patch-release-20261007.md) for exact sources, green engineering/runtime gates and external discovery limits. The public analytics flows shipped in 1.14.0; the expanded analytics candidate remains parked.
+> Current interface parity release (2026-10-07): core 1.15.0, shared 2.3.0, CLI/MCP/OpenClaw 1.14.0 and site 1.6.2 are published and deployed. All fourteen audited gaps are patched, with existing dashboard patterns and the owner's Managing Noise edits retained. See [release evidence](spec/interface-parity-release-20261007.md) for exact sources, passing engineering/live runtime gates and external discovery limits. Public analytics flows shipped in 1.14.0; the expanded analytics candidate remains parked.
 
 Public acquisition/activation flows are customer-project definitions with ordered origin-bound steps.
 `packages/storage/src/analytics-flow-store.ts` owns versioned definitions, hashed expiring contexts,
@@ -17,13 +17,13 @@ durable continuation; million-visit load testing is deferred by the owner.
 
 # SYSTEM OVERVIEW — DebugBundle
 
-Local interface-parity remediation is tracked in `spec/interface-parity-remediation.md`
-and `spec/interface-parity-matrix.md`. The candidate exposes audited dashboard rule,
+Released interface-parity remediation is tracked in `spec/interface-parity-remediation.md`
+and `spec/interface-parity-matrix.md`. The product exposes audited dashboard rule,
 webhook, analytics, agent-credential and incident-evidence operations through existing
 services, with bounded lists, one-time reveals and scoped late-response guards. GitHub
 disconnect is additive CLI/MCP organization-owner cleanup; install remains a browser
 handoff. Ordinary MCP has 130 tools; hosted 23-tool and restricted five-tool profiles
-retain their authority. No database schema or deployment/configuration changes.
+retain their authority. No database schema or runtime configuration changes.
 Local UI review: `make dev-mock` recreates only the web container and serves synthetic
 dashboard data at `http://localhost:5291/dashboard`. Opt-in Vite middleware owns
 in-memory simulation; the real API, worker and database remain independent.

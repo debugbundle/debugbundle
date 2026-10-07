@@ -1,6 +1,6 @@
 # Interface parity remediation
 
-Status: complete for local implementation and qualification on 2026-10-07; owner approved the dashboard proposal and reiterated existing design patterns.
+Status: implemented, qualified and released in core 1.15.0 on 2026-10-07; production readback passes. The owner approved the dashboard proposal and reiterated existing design patterns.
 Baseline: core checkout `f4ea8dc748f447e7a5e7252ec3e3a261cf975006`, audited 2026-10-07.
 Scope: fix all identified parity defects with backward-compatible adapters, shared
 domain behavior and regression coverage. Local qualification is complete. The owner

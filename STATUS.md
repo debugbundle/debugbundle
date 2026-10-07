@@ -1,27 +1,36 @@
-# Current interface parity remediation — 2026-10-07
+# Current interface parity release — 2026-10-07
 
-The owner authorized final production-readiness review and the release train on
-2026-10-07. `spec/interface-parity-release-20261007.md` records the sequence, versions
-and evidence. The dashboard proposal remains approved; reuse existing patterns and
-tokens. The earlier local-only boundary is superseded for this candidate. Browser
-investigation, unrelated credential/configuration changes and OpenAI submission are
-outside this release scope.
+All fourteen audited findings are patched and released. Core 1.15.0, shared
+2.3.0, CLI/MCP/OpenClaw 1.14.0 and site 1.6.2 are published. Codex 1.2.0, Claude Code
+1.14.0 and Gemini 1.1.0 adopt the verified MCP release and pass native public installs.
+Existing dashboard patterns remain intact. The owner's Managing Noise edits are
+included and verified live. No database schema or runtime feature-gate change was made.
 
-All fourteen findings are implemented and re-audited. Fresh qualification passed
-4,066 unit tests in 497 files, all 73 changed-source coverage gates, 141 integration
-tests in 31 files with the published Browser SDK and zero skips, full lint/typecheck,
-license/artifact checks, candidate builds, installed consumers, and 35 cloud rollout
-safeguard tests. No database schema change is required. Ordinary MCP has 130 tools;
-hosted OAuth remains 23 and restricted agent five.
+Production runs core `9b993a08ed7634716e212772e51a34d0bb9c8327` and site
+`3e8336c31abd04aadfacd48e8da4e6405a7147cd`. Exact-source CI, canonical releases and
+hosted workflow `37666936585` pass. API/worker run version 1.15.0 with immutable digest
+`sha256:b352d7980759b77362d4fe112932e9f00d34869afaeb978487028f59c0b58207`, healthy,
+zero restarts, active worker processing and unchanged feature flags. Public readiness,
+app/site identity, OAuth issuer, MCP challenge and scoped old/new CLI readbacks pass.
+The endpoint monitor is passing; the unrelated existing OAuth incident is unchanged.
+Retention preserves active plus one verified stable release, with 45 GiB free.
 
-Shared types/redaction 2.3.0, CLI 1.14.0 and MCP 1.14.0 are published with green OIDC
-release workflows and clean registry-install checks. Hosted consumer pins now adopt
-the published shared pair. Codex 1.2.0, Claude Code 1.14.0 and Gemini 1.1.0 candidates
-pin MCP 1.14.0 and pass source/native-client checks. Core 1.15.0, site 1.6.2, public
-developer distribution, MCP ecosystem follow-through and hosted exact-source rollout
-are next; follow the release record for immutable evidence. Production has not yet
-been updated for this candidate. OpenAI version/catalog/portal state remain unchanged;
-only local source/image provenance is refreshed during the authorized release.
+Qualification covers 4,066 unit tests: 4,052 pass in exact-source public CI and the
+14 private-site cases pass locally. All 73 changed-source coverage gates, 141
+integration tests with no skips,
+lint/typecheck/build/audits, installed consumers and 35 cloud safeguard tests pass. Final
+CI caught and corrected a stale Gemini version-tag fixture without weakening the
+production verifier; the focused release target now includes it. A subsequent 1,522
+infrastructure/contract/package tests and full exact-source CI pass.
+
+All five MCP ecosystem uploads and artifact checks pass. ClawHub/OpenClaw final
+moderation is clean. External discovery remains partial: two ClawHub queries miss the
+required top-ten ranking; Glama API access and PulseMCP/LobeHub verification remain
+limited. See [release evidence](spec/interface-parity-release-20261007.md) and the
+[distribution ledger](spec/agent-distribution-ledger.md). Browser/provider mutation
+checks are outside this candidate's verified scope. OpenAI version, frozen catalog
+and portal state remain unchanged; only source/image provenance is refreshed.
+Documentation follow-ups do not change the deployed source SHAs.
 
 ---
 
