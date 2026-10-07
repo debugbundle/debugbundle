@@ -19,19 +19,19 @@ assets. No database schema change or new migration is part of this patch.
 
 ## Engineering and publication gates
 
-| Gate | Verified result |
-| --- | --- |
-| Local full unit/coverage | 3,915 tests, 461 files; all 59 changed-source coverage gates pass; merged line coverage 86.09% |
-| [Exact-source main CI](https://github.com/debugbundle/debugbundle/actions/runs/37549220063) | Lint, types, audit, build and all native Gemini jobs pass; 3,901 unit tests pass, 14 private-site checks skip because the private checkout is absent |
-| Private-site checks | All 14 skipped public-CI cases pass locally; site CI/release also pass |
-| Integration | 141 tests in 31 files, including the published Browser SDK composition path; no skipped cases |
-| [Installed CLI matrix](https://github.com/debugbundle/debugbundle/actions/runs/37549220125) | Node 22, 24, 26.0, 26.2 and latest 26, including upgrade checks, pass |
-| [Shared package release](https://github.com/debugbundle/debugbundle/actions/runs/37547448294) | Published 2.2.1 packages and clean registry installs pass |
-| [CLI release](https://github.com/debugbundle/debugbundle/actions/runs/37547784806) | Publish and installed-package verification pass |
-| [MCP release](https://github.com/debugbundle/debugbundle/actions/runs/37547784908) | Publish, stdio and native Node 22/24/26 checks pass; 127-tool discovery and authentication boundaries pass |
-| [Core publication](https://github.com/debugbundle/debugbundle/actions/runs/37550500759) | All release gates pass; canonical tag resolves to the qualified source |
-| Browser review | 72 ordinary-HTTP desktop/phone views; no failed API responses, exceptions, stuck loading or page overflow; management actions and icon/contrast checks pass |
-| Mock isolation | Production build excludes synthetic fixture markers; mock actions remain in memory without provider requests or billing writes |
+| Gate                                                                                          | Verified result                                                                                                                                             |
+| --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local full unit/coverage                                                                      | 3,915 tests, 461 files; all 59 changed-source coverage gates pass; merged line coverage 86.09%                                                              |
+| [Exact-source main CI](https://github.com/debugbundle/debugbundle/actions/runs/37549220063)   | Lint, types, audit, build and all native Gemini jobs pass; 3,901 unit tests pass, 14 private-site checks skip because the private checkout is absent        |
+| Private-site checks                                                                           | All 14 skipped public-CI cases pass locally; site CI/release also pass                                                                                      |
+| Integration                                                                                   | 141 tests in 31 files, including the published Browser SDK composition path; no skipped cases                                                               |
+| [Installed CLI matrix](https://github.com/debugbundle/debugbundle/actions/runs/37549220125)   | Node 22, 24, 26.0, 26.2 and latest 26, including upgrade checks, pass                                                                                       |
+| [Shared package release](https://github.com/debugbundle/debugbundle/actions/runs/37547448294) | Published 2.2.1 packages and clean registry installs pass                                                                                                   |
+| [CLI release](https://github.com/debugbundle/debugbundle/actions/runs/37547784806)            | Publish and installed-package verification pass                                                                                                             |
+| [MCP release](https://github.com/debugbundle/debugbundle/actions/runs/37547784908)            | Publish, stdio and native Node 22/24/26 checks pass; 127-tool discovery and authentication boundaries pass                                                  |
+| [Core publication](https://github.com/debugbundle/debugbundle/actions/runs/37550500759)       | All release gates pass; canonical tag resolves to the qualified source                                                                                      |
+| Browser review                                                                                | 72 ordinary-HTTP desktop/phone views; no failed API responses, exceptions, stuck loading or page overflow; management actions and icon/contrast checks pass |
+| Mock isolation                                                                                | Production build excludes synthetic fixture markers; mock actions remain in memory without provider requests or billing writes                              |
 
 One native MCP attempt completed functional checks but failed at disposable Git
 cleanup with `ENOTEMPTY`. Its retry passed. Bounded cleanup retries are committed
