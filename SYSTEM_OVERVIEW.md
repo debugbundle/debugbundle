@@ -1,4 +1,4 @@
-> Current patch release (2026-10-07): core 1.14.1 and affected shared/CLI/MCP packages are authorized for publication and hosted rollout. See STATUS for the current gates and exact release evidence. The public analytics flows shipped in 1.14.0; the expanded analytics candidate remains parked.
+> Current patch release (2026-10-07): core 1.14.1, shared 2.2.1, CLI/MCP/OpenClaw 1.13.1 and site 1.6.1 are published; the hosted app/site rollout passes. See [release evidence](spec/dashboard-patch-release-20261007.md) for exact sources, green engineering/runtime gates and external discovery limits. The public analytics flows shipped in 1.14.0; the expanded analytics candidate remains parked.
 
 Public acquisition/activation flows are customer-project definitions with ordered origin-bound steps.
 `packages/storage/src/analytics-flow-store.ts` owns versioned definitions, hashed expiring contexts,
