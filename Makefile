@@ -216,7 +216,7 @@ codex-plugin-check:
 
 .PHONY: gemini-extension-check gemini-extension-package gemini-extension-smoke gemini-extension-verify-public
 gemini-extension-check:
-	$(NODE_RUN) "corepack enable && corepack pnpm vitest run tests/contracts/gemini-developer-extension.test.ts tests/infrastructure/gemini-extension-package.test.ts tests/contracts/agent-interface-routing.test.ts tests/packages/agent-setup tests/apps/cli/cli-agent-setup.test.ts"
+	$(NODE_RUN) "apk add --no-cache git >/dev/null && corepack enable && corepack pnpm vitest run tests/contracts/gemini-developer-extension.test.ts tests/infrastructure/gemini-extension-package.test.ts tests/infrastructure/gemini-extension-publication.test.ts tests/contracts/agent-interface-routing.test.ts tests/packages/agent-setup tests/apps/cli/cli-agent-setup.test.ts"
 
 gemini-extension-package:
 	$(NODE_RUN) "node scripts/package-gemini-extension.mjs"

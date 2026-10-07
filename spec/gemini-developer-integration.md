@@ -6,8 +6,8 @@ Current package versions, MCP pins, public channels, and release evidence for al
 
 ## Package and runtime boundaries
 
-- Source: `plugins/debugbundle-gemini/`; independent extension version `1.0.0`.
-- Native entry point: root `gemini-extension.json`, with one `debugbundle` stdio server running `npx -y @debugbundle/mcp@1.12.1 --local-auth` in `${workspacePath}`.
+- Source: `plugins/debugbundle-gemini/`; independent extension version recorded in its manifest and the distribution ledger.
+- Native entry point: root `gemini-extension.json`, with one `debugbundle` stdio server running `npx -y @debugbundle/mcp@1.14.0 --local-auth` in `${workspacePath}`.
 - Workflow: `skills/debugbundle/SKILL.md`, containing the shared CLI-first guidance. Gemini's generated project skill takes precedence over the extension skill.
 - Installation configures the connection and portable skill. Application setup, SDK capture, login, and authorized writes remain separate actions.
 - Local reads require no member login. Hosted reads use saved CLI authentication on the same machine/account, or explicit protected environment forwarding for a direct MCP connection. Credentials never enter per-call schemas.
@@ -28,9 +28,9 @@ make lint typecheck
 make -C site test typecheck build
 ```
 
-The package target emits `.tmp/gemini-extension/debugbundle-gemini-1.0.0.zip` and its SHA-256. The archive contains only the root manifest, skill, README, changelog, and Apache-2.0 license. Tests check reproducibility, exact extracted content, rejection of unsupported capabilities/credentials and invalid versions, and refusal to follow source symlinks.
+The package target emits `.tmp/gemini-extension/debugbundle-gemini-<version>.zip` and its SHA-256. The archive contains only the root manifest, skill, README, changelog, and Apache-2.0 license. The check target also verifies exact public files and the manifest-matching version tag, rejecting absent or incorrect tags. Tests check reproducibility, exact extracted content, rejection of unsupported capabilities/credentials and invalid versions, and refusal to follow source symlinks.
 
-The native smoke pins Gemini CLI `0.61.0`, DebugBundle CLI `1.12.0`, and MCP `1.12.1`. CI and local qualification cover Node 22, 24, and 26 on Linux in Docker; the Make target defaults to Node 24 and accepts `GEMINI_SMOKE_NODE_IMAGE=node:22-bookworm` or `node:26-bookworm` for the other runtimes. It installs dependencies into an isolated application, then uses offline npm and a loopback-only proxy configuration for client checks. It verifies the extracted archive, native install/list/update/uninstall, real local incident/bundle/reproduction reads, real CLI setup, project-skill precedence and activation, saved-auth retrieval against a synthetic loopback server, per-call credential rejection, missing-auth failure before HTTP, direct MCP environment forwarding, access-denial propagation without retry, and preservation of user settings and project guidance on removal.
+The native smoke pins Gemini CLI `0.61.0`, DebugBundle CLI `1.12.0`, and the exact MCP version from the extension manifest. CI and local qualification cover Node 22, 24, and 26 on Linux in Docker; the Make target defaults to Node 24 and accepts `GEMINI_SMOKE_NODE_IMAGE=node:22-bookworm` or `node:26-bookworm` for the other runtimes. It installs dependencies into an isolated application, then uses offline npm and a loopback-only proxy configuration for client checks. It verifies the extracted archive, native install/list/update/uninstall, real local incident/bundle/reproduction reads, real CLI setup, project-skill precedence and activation, saved-auth retrieval against a synthetic loopback server, per-call credential rejection, missing-auth failure before HTTP, direct MCP environment forwarding, access-denial propagation without retry, and preservation of user settings and project guidance on removal.
 
 Recorded responses drive Gemini's real tool scheduler and MCP transport without a model API request. This proves integration plumbing; it does not prove a live model's investigation quality or permission decisions. No host credentials or customer incident data are used. Native macOS/Windows execution and other Gemini versions require their own client acceptance before being described as tested.
 

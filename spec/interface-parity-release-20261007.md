@@ -82,3 +82,14 @@ will be recorded after execution. A workflow trigger alone is not a successful r
   source coverage gates pass. The site audit reports no known vulnerabilities.
 - Cloud migration, activation, retention and site-boundary tests pass (35 cases).
   No cloud deployment code or database schema change is required.
+
+## Final CI fixture correction
+
+Exact-source CI `37660164081` caught a Gemini publication fixture that still created
+`v1.0.1` after the package moved to 1.1.0. The production verifier correctly rejected
+it; the live public repository/tag and native install had already passed. The fixture
+now derives its expected tag from the copied package manifest and retains missing-tag
+rejection, with an additional wrong-version assertion. The focused Gemini check now
+includes this publication test and installs its Git prerequisite, so version bumps
+exercise the complete package/publication contract before promotion. This changes no
+shipped application/package behavior or production verification requirement.

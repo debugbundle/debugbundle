@@ -1,5 +1,13 @@
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -8,6 +16,8 @@ import { describe, expect, it } from "vitest";
 const root = process.cwd();
 const source = join(root, "plugins/debugbundle-gemini");
 const verifier = join(root, "scripts/verify-gemini-publication.mjs");
+const manifest = JSON.parse(readFileSync(join(source, "gemini-extension.json"), "utf8"));
+const versionTag = `v${manifest.version}`;
 const files = [
   "gemini-extension.json",
   "skills/debugbundle/SKILL.md",
@@ -24,7 +34,7 @@ function fixture(
     changeReadme?: boolean;
     extraFile?: boolean;
     symlinkReadme?: boolean;
-    tag?: boolean;
+    tag?: string | false;
   } = {}
 ): string {
   const repo = mkdtempSync(join(tmpdir(), "debugbundle-gemini-publication-"));
@@ -51,7 +61,7 @@ function fixture(
     "-m",
     "fixture"
   );
-  if (options.tag !== false) git(repo, "tag", "v1.0.1");
+  if (options.tag !== false) git(repo, "tag", options.tag ?? versionTag);
   return repo;
 }
 
@@ -83,7 +93,12 @@ describe("Gemini public extension verification", () => {
       expect(() => verify(create({ symlinkReadme: true }))).toThrow(
         /public_extension_file_not_regular:README.md/u
       );
-      expect(() => verify(create({ tag: false }))).toThrow(/public_extension_tag_missing:v1.0.1/u);
+      expect(() => verify(create({ tag: false }))).toThrow(
+        `public_extension_tag_missing:${versionTag}`
+      );
+      expect(() => verify(create({ tag: "v0.0.0" }))).toThrow(
+        `public_extension_tag_missing:${versionTag}`
+      );
     } finally {
       for (const repo of repositories) rmSync(repo, { recursive: true, force: true });
     }
