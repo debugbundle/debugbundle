@@ -1,6 +1,8 @@
 # Public status pages
 
-Owner-approved on 2026-10-08. Implemented and locally qualified; unreleased.
+Owner-approved on 2026-10-08. Implementation and local acceptance are complete;
+the owner authorized the release train on 2026-10-10. Publication and deployment
+evidence is maintained in [the release record](public-status-release-20261010.md).
 
 FR-AVC-07 extends FR-AVC-03/05/06 with one opt-in public page anchored to a project. The owner can choose a custom page title, explicitly include other projects owned by the same account, and explicitly select existing checks. Project and selected check names are retained. Newly created projects/checks remain private. There is no template system, subscription feature, or separate history page.
 
@@ -98,4 +100,4 @@ For real-stack acceptance use the normal Docker development stack with `make dev
 5. Change the device light/dark setting while an anonymous status page is open; confirm the page follows it even with a conflicting saved dashboard preference. Verify the small clickable footer logo above the underlined Powered by DebugBundle link, with increased spacing and that dashboard theme selection still works on return. Sweep across adjacent project/check days in both directions on the authenticated Health Status view, public page and saved preview; every hovered day should update its tooltip immediately.
 6. Check narrow-screen layout and keyboard controls during owner review. Open a dropdown with Enter, type in search, use arrows to enter the choices, Space/Enter to toggle, and Escape to close. Close the selector and preview independently; settings must remain open and focus return to each trigger. Close settings and confirm focus returns to the toolbar button. Reopen settings to confirm the saved configuration loads. Automated source/component tests do not claim browser or device verification.
 
-Release remains pending owner local acceptance and explicit commit/publish/deploy authorization. The eventual release must carry the paired core, website documentation and private cloud configuration, apply the forward migration before dependent runtime, and verify anonymous/public and authenticated/private behavior after rollout. Optional dedicated DNS/TLS/SPA hosting remains separate from the default app-host path.
+The owner accepted the local implementation and authorized commit, publication and deployment on 2026-10-10. The release carries the paired core, website documentation and private cloud configuration, applies the forward migration before dependent runtime, and verifies anonymous/public and authenticated/private behavior after rollout. See the release record for current progress and live evidence. Optional dedicated DNS/TLS/SPA hosting remains separate from the default app-host path.

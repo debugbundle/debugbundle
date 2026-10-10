@@ -4,8 +4,12 @@ The owner accepted the local UI and authorized commits, pushes, package publicat
 and the hosted release train. Fresh qualification passes 4,164 unit tests, 48
 changed-source coverage gates, 148 integration cases, ten self-host checks and the
 deployed-predecessor migration/rollback rehearsal. Lint, typecheck, builds, audits,
-site and cloud checks pass. Package publication is next. Cloud preparation is
-committed/pushed at `1ae2628`. See `spec/public-status-release-20261010.md` for the version plan,
+site and cloud checks pass. Shared 2.4.0 and CLI/MCP 1.15.0 are published and their
+downloaded artifacts verified. Developer package contracts and native 134-tool
+checks pass; public promotion and hosted rollout are next. The native published
+MCP smoke now verifies the release version instead of an older marketplace pin.
+Cloud preparation is committed/pushed at `1ae2628`.
+See `spec/public-status-release-20261010.md` for the version plan,
 dependency order, production migration and verification record. The earlier
 local-only boundaries below are historical; no production success is claimed yet.
 

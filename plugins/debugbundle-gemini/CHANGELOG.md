@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-10
+
+- Adopt published MCP 1.15.0 with owner-authorized public status settings, project/check choices, saved preview and publication controls. Preserve existing authentication, tool contracts and CLI-first guidance.
+
 ## [1.1.0] - 2026-10-07
 
 - Adopt published MCP 1.14.0 with real-app verification, organization GitHub disconnect and all lifecycle webhook test events. Preserve local authentication, existing tools and CLI-first guidance.

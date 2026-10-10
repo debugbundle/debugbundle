@@ -1,6 +1,6 @@
 {
   "name": "debugbundle-codex",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Runtime error reporting, incident response, health checks, debug bundles, and product analytics for Codex.",
   "author": {
     "name": "DebugBundle",
@@ -28,10 +28,7 @@
     "longDescription": "Connect Codex to the existing DebugBundle local MCP server and a debugging workflow skill. Inspect local or hosted evidence, investigate code, and use authorized management tools. Hosted access uses your existing DebugBundle CLI login. This developer plugin includes write tools and is separate from the read-only OpenAI connection.",
     "developerName": "DebugBundle",
     "category": "Developer Tools",
-    "capabilities": [
-      "Read",
-      "Write"
-    ],
+    "capabilities": ["Read", "Write"],
     "websiteURL": "https://debugbundle.com/docs/mcp/codex/",
     "privacyPolicyURL": "https://debugbundle.com/privacy/",
     "termsOfServiceURL": "https://debugbundle.com/terms/",

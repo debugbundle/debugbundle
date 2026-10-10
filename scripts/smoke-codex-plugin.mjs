@@ -23,24 +23,28 @@ const source = join(dirname(fileURLToPath(import.meta.url)), "..");
 const scratch = await mkdtemp(join(tmpdir(), "debugbundle-codex-"));
 const codexVersion = process.env.CODEX_SMOKE_VERSION ?? "0.153.1";
 const useGitHub = process.env.MCP_SMOKE_GITHUB === "1";
+const candidate = process.env.MCP_SMOKE_CANDIDATE === "1";
+const published = process.env.MCP_SMOKE_PUBLISHED === "1";
+assert.ok(!(candidate && published), "Choose a candidate tarball or published release");
 assert.ok(
-  !useGitHub || process.env.MCP_SMOKE_CANDIDATE !== "1",
-  "GitHub smoke requires the published MCP artifact"
+  !useGitHub || (!candidate && !published),
+  "GitHub smoke must use the public marketplace pin"
 );
 const plugin = JSON.parse(
   await readFile(join(source, "plugins/debugbundle-codex/.mcp.json"), "utf8")
 );
-const candidate = process.env.MCP_SMOKE_CANDIDATE === "1";
-const candidateVersion = candidate
-  ? JSON.parse(await readFile(join(source, "apps/mcp/package.json"), "utf8")).version
-  : null;
-const mcpSpec = candidate
-  ? `@debugbundle/mcp@${candidateVersion}`
-  : plugin.mcpServers.debugbundle.args[1];
-const mcpTarball =
-  candidate
-    ? join(source, ".tmp/codex-plugin", `debugbundle-mcp-${candidateVersion}.tgz`)
+// Release smoke must test this release even before the marketplace pin advances.
+const releaseVersion =
+  candidate || published
+    ? JSON.parse(await readFile(join(source, "apps/mcp/package.json"), "utf8")).version
     : null;
+const mcpSpec =
+  candidate || published
+    ? `@debugbundle/mcp@${releaseVersion}`
+    : plugin.mcpServers.debugbundle.args[1];
+const mcpTarball = candidate
+  ? join(source, ".tmp/codex-plugin", `debugbundle-mcp-${releaseVersion}.tgz`)
+  : null;
 const marketplace = join(scratch, "marketplace");
 const project = join(scratch, "application");
 const codexHome = join(scratch, "codex-state");
@@ -131,7 +135,7 @@ try {
     join(marketplace, "plugins/debugbundle-codex"),
     { recursive: true }
   );
-  if (candidate) {
+  if (candidate || published) {
     const candidatePlugin = structuredClone(plugin);
     candidatePlugin.mcpServers.debugbundle.args[1] = mcpSpec;
     await writeFile(

@@ -91,3 +91,30 @@ schema exports. Shared-types archive SHA-256 is
 `e2949d8e78f86741a7d68332c8de351e89a27be6947eacbd8d7538bd8e3089a8`;
 redaction is `3771a153a12e22bcfdc1a06d51aaf8e9c87e9a5d74948718b12987d46e63cf07`.
 Hosted consumer pins move to 2.4.0 only after this readback.
+
+## CLI, MCP and native release verification
+
+CLI/MCP 1.15.0 are published from `5d91a0ee5cac156c07c5c866eb3f1b60e66cba8e`.
+[CLI workflow 38049752312](https://github.com/debugbundle/debugbundle/actions/runs/38049752312)
+and [MCP workflow 38049753938](https://github.com/debugbundle/debugbundle/actions/runs/38049753938)
+pass package/runtime matrices and registry-installed checks. Independent downloads
+verify exact names, versions, registry integrity, Apache licenses and public-status
+commands/tools. CLI archive SHA-256 is
+`34dd9ceed1473f304b7466bd30355f3c41eb4e355bb65a5422de26f69b892780`;
+MCP is `bfe92f23cf665a31d84f724db262e22179d0a3a9e976586fc91f90aeacd4849c`.
+
+Release review reproduced a native-smoke selection gap: the published Codex test
+installed the older marketplace pin (1.14.0 / 130 tools) before developer package
+promotion. The published-release target now selects the exact MCP package version
+and rewrites only its disposable marketplace. Public GitHub verification retains
+the actual published marketplace pin. The corrected smoke passes MCP 1.15.0 / 134
+tools, plugin/direct discovery, local evidence, authentication boundaries, reinstall
+and removal while the source marketplace still pins 1.14.0. This changes release
+verification only; the published MCP artifact and hosted OpenAI contract are unchanged.
+
+Developer candidates Codex 1.3.0, Claude Code 1.15.0 and Gemini 1.2.0 now pin the
+verified MCP 1.15.0. Gemini packaging/routing/setup contracts pass all 82 cases;
+Codex/Claude/routing contracts pass all 16 cases. Native Codex 0.153.1, Claude Code
+2.1.277 and Gemini CLI 0.61.0 pass isolated installation, 134-tool discovery, local
+evidence/authentication boundaries, update/reinstall and removal as applicable.
+Public marketplace/source verification follows promotion to public main.

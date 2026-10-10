@@ -26,6 +26,12 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 - Preserve installed databases during local/self-host startup: automatic bootstrap skips populated schemas before forward migration, and local startup no longer resets volumes after schema errors.
 - Keep self-host analytics smoke events inside its current-day reporting window instead of emitting an expired fixed fixture date.
 
+### Distribution
+
+- Shared types and redaction 2.4.0, CLI/MCP/OpenClaw 1.15.0. Redaction follows the paired shared-package release without a sanitization change; SDK packages remain 3.1.0.
+- Codex 1.3.0, Claude Code 1.15.0 and Gemini 1.2.0 adopt the published MCP tools through independently versioned updates. The ordinary catalog has 134 tools; hosted OAuth retains 23 read-only tools and the project-agent profile retains five.
+- Existing installations and public interfaces remain compatible. The additive public-status migration precedes new API/worker activation; public pages remain disabled until explicitly published by their owner.
+
 ## [1.15.0] - 2026-10-07
 
 ### Added

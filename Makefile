@@ -259,7 +259,7 @@ codex-plugin-smoke: codex-plugin-pack
 
 .PHONY: codex-plugin-smoke-published
 codex-plugin-smoke-published:
-	docker run --rm -v "$(PWD):/source:ro" -e CODEX_SMOKE_VERSION="$(CODEX_SMOKE_VERSION)" $(CODEX_SMOKE_NODE_IMAGE) node /source/scripts/smoke-codex-plugin.mjs
+	docker run --rm -v "$(PWD):/source:ro" -e CODEX_SMOKE_VERSION="$(CODEX_SMOKE_VERSION)" -e MCP_SMOKE_PUBLISHED=1 $(CODEX_SMOKE_NODE_IMAGE) node /source/scripts/smoke-codex-plugin.mjs
 
 .PHONY: codex-plugin-smoke-github
 codex-plugin-smoke-github:
