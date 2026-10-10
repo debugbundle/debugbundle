@@ -1,20 +1,25 @@
-# Public status modal follow-up — 2026-10-10 (release candidate 1.16.1)
+# Public status controls release — 2026-10-10
 
-FR-AVC-07 / AC-AVC-07: the enable switch now saves immediately. First enable
-creates the page with the validated title/check selections; later toggles use
-saved settings and preserve other edits for Save status settings. The read-only
-copy input appears while enabling and becomes copyable when the URL exists.
-Failures restore the saved switch without losing drafts. The action is Preview
-status page, and opening it focuses the heading without activating a day tooltip.
-Keyboard day details and focus return remain.
+Core 1.16.1 and site 1.6.4 are published and live. The owner-approved enable
+switch saves visibility immediately, first enable publishes validated setup,
+other edits remain explicit saves, and the copy input appears while publishing.
+Preview status page focuses its heading without opening a day tooltip.
 
-Pre-ship review covers first-enable validation, saved/draft separation, existing
-empty configurations, pending/error/retry states, late toggle/save responses,
-preview focus, clipboard fallback and collaborator restrictions. No API, schema,
-auth or monitoring change. All 78 focused/adjacent tests in 11 files pass, both changed-source coverage gates
-pass, and focused lint, repository typecheck and candidate builds pass. Evidence:
-`.tmp/public-status-autosave-{red,green,coverage,lint,typecheck,build}.log`.
-Docs/rules are reconciled. Owner accepted the changes and authorized commit, push and release. Launch qualification and production verification are in progress; see `spec/public-status-followup-release-20261010.md`.
+All 4,178 local tests in 511 files / 93 shards pass, including private-site
+cases; both changed-source coverage gates, 78 targeted regressions, repository
+lint/typecheck/builds/audit, 41 site tests/build/typecheck and exact-source CI
+pass. Canonical core release 38074697868 and hosted run 38075660361 succeeded.
+API/worker revision/version/digest, healthy startup, active processing and the
+unchanged 58-migration ledger are independently verified. Fifteen live HTTP
+checks and thirteen served UI markers pass; existing publication settings are
+unchanged, scheduled health passes after promotion, and scoped incident delta
+is zero. Exactly the active release plus verified 1.16.0 rollback images remain;
+retention dry-run has no candidates and disk has 45 GiB free.
+
+Docs/rules/glossary reconciliation and release evidence are complete. No API,
+schema, runtime configuration or independent CLI/MCP/shared/SDK/plugin changes.
+See `spec/public-status-followup-release-20261010.md` for exact identities and
+verification limits. Earlier local-only notes below are historical.
 
 # Public status release — 2026-10-10
 
