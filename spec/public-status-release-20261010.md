@@ -79,3 +79,15 @@ Docker's automatic address pool was exhausted by unrelated local projects.
 Verification used unused explicit subnets and distinct disposable names, retaining
 all existing networks and data. Self-host checks reused installed dependencies;
 the service, bootstrap and migration commands were unchanged.
+
+## Published dependency roots
+
+Shared types and redaction 2.4.0 are published from
+`494b783a32bd7abb9f237c7bcd2c5f45cd56c4f9` through
+[workflow 38049423839](https://github.com/debugbundle/debugbundle/actions/runs/38049423839).
+Candidate and clean registry-consumer checks pass. Independent downloads match
+the registry integrity hashes, package identities, Apache licenses and new status
+schema exports. Shared-types archive SHA-256 is
+`e2949d8e78f86741a7d68332c8de351e89a27be6947eacbd8d7538bd8e3089a8`;
+redaction is `3771a153a12e22bcfdc1a06d51aaf8e9c87e9a5d74948718b12987d46e63cf07`.
+Hosted consumer pins move to 2.4.0 only after this readback.

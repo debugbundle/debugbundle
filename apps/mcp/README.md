@@ -50,7 +50,7 @@ Use `npx -y @debugbundle/mcp` in clients that require noninteractive package exe
 | Self-hosted DebugBundle       | `DEBUGBUNDLE_API_URL` plus member auth                                     | points the server at your API base URL               |
 
 This package is the supported public local stdio path. The separate OpenAI Plugin
-`1.0.0` uses an OAuth-protected read-only remote endpoint at
+uses an OAuth-protected read-only remote endpoint at
 `https://mcp.debugbundle.com/mcp`. Its review/publication process is independent and
 does not alter this package's catalog or authentication.
 
