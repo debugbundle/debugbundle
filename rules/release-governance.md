@@ -210,6 +210,12 @@ ancestor and that no path except `apps/mcp/openai/release-manifest.json` changed
 current commit. Any other committed or working-tree change invalidates the candidate until it is
 prepared again.
 
+Refresh and verify this source record after the final implementation commits and before
+core CI/release promotion, even when the OpenAI plugin itself is unchanged. A test
+against the previous committed checkout does not qualify new uncommitted inputs.
+After a hosted rollout, refresh the record again with the independently verified
+API image digest; complete other evidence edits before the final manifest-only commit.
+
 Validation fails before any external action for placeholders, missing assets, path escapes, unknown manifest fields, stale connection metadata, hash/version/origin drift, or any mismatch with `tests/fixtures/openai-plugin-v1/`. No reviewer credential, domain-challenge token, OAuth key, client assertion, or other secret may enter the package, release manifest, source control, CI artifact, or log.
 
 #### Candidate And Production Gates

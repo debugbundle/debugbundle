@@ -1,17 +1,20 @@
-# Public status release in progress — 2026-10-10
+# Public status release — 2026-10-10
 
-The owner accepted the local UI and authorized commits, pushes, package publication
-and the hosted release train. Fresh qualification passes 4,164 unit tests, 48
-changed-source coverage gates, 148 integration cases, ten self-host checks and the
-deployed-predecessor migration/rollback rehearsal. Lint, typecheck, builds, audits,
-site and cloud checks pass. Shared 2.4.0 and CLI/MCP 1.15.0 are published and their
-downloaded artifacts verified. Developer package contracts and native 134-tool
-checks pass; public promotion and hosted rollout are next. The native published
-MCP smoke now verifies the release version instead of an older marketplace pin.
-Cloud preparation is committed/pushed at `1ae2628`.
-See `spec/public-status-release-20261010.md` for the version plan,
-dependency order, production migration and verification record. The earlier
-local-only boundaries below are historical; no production success is claimed yet.
+Core 1.16.0 API/worker and dashboard are live, with the additive public-status
+migration and exact runtime source/digest independently verified. API/worker are
+healthy with zero restarts, the worker is active, and the previous stable release
+and both images are retained. Public/private HTTP boundaries, owner settings,
+served UI assets and website references pass. Hosted workflow 38052622593,
+CloudFront invalidations and external endpoint verification completed successfully; see the release record for exact evidence.
+
+Shared 2.4.0, CLI/MCP/OpenClaw 1.15.0, site 1.6.3, Codex 1.3.0, Claude Code 1.15.0
+and Gemini 1.2.0 are published with exact artifact/native-install verification.
+Core CI passes 4,150 public tests; all 4,164 local tests, 48 changed-source coverage
+gates, 148 integration cases, ten self-host checks and old/new migration/rollback
+compatibility pass. External directory/ranking limits remain documented.
+The provenance-only correction and its verified CI rerun are recorded in
+`spec/public-status-release-20261010.md`. Historical local-only statements below
+predate the owner's acceptance and current release authorization.
 
 # Public status pages — 2026-10-10
 

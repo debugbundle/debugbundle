@@ -1,6 +1,6 @@
 # Public status release — 2026-10-10
 
-Status: authorized release preparation in progress.
+Status: released and independently verified in production on 2026-10-10.
 
 The owner approved the final UI and explicitly authorized production readiness,
 commits, pushes, package publication and the hosted release train on 2026-10-10.
@@ -10,7 +10,7 @@ implementation and earlier qualification are recorded in `public-status-pages.md
 
 ## Versions and sequence
 
-| Surface                  | Candidate | Reason                                                                   |
+| Surface                  | Version   | Reason                                                                   |
 | ------------------------ | --------- | ------------------------------------------------------------------------ |
 | Core                     | 1.16.0    | Additive public status capability and forward migration                  |
 | Shared types / redaction | 2.4.0     | Public status schemas and shared health helpers; paired release workflow |
@@ -38,15 +38,15 @@ implementation and earlier qualification are recorded in `public-status-pages.md
 SDK versions and hosted OpenAI/restricted tool catalogs remain independent. No
 OpenAI portal submission or publication is part of this train.
 
-## Evidence
+## Preparation baseline
 
 - Core, site and cloud main match their remote baselines before preparation.
-- Registry readback confirms shared 2.3.0 and CLI/MCP 1.14.0 are current; planned
-  versions are unpublished. All existing pending edits belong to the reviewed
+- Pre-release registry readback confirmed shared 2.3.0 and CLI/MCP 1.14.0 were current;
+  planned versions were unpublished. All existing pending edits belonged to the reviewed
   public-status implementation and its local refinements.
 - Earlier full qualification and current frontend regressions are recorded in the
   implementation spec. Fresh release gates and immutable publication/deployment
-  identities will be recorded here as they complete.
+  identities are recorded below.
 
 ## Fresh release qualification
 
@@ -112,9 +112,95 @@ tools, plugin/direct discovery, local evidence, authentication boundaries, reins
 and removal while the source marketplace still pins 1.14.0. This changes release
 verification only; the published MCP artifact and hosted OpenAI contract are unchanged.
 
-Developer candidates Codex 1.3.0, Claude Code 1.15.0 and Gemini 1.2.0 now pin the
+Published developer packages Codex 1.3.0, Claude Code 1.15.0 and Gemini 1.2.0 now pin the
 verified MCP 1.15.0. Gemini packaging/routing/setup contracts pass all 82 cases;
 Codex/Claude/routing contracts pass all 16 cases. Native Codex 0.153.1, Claude Code
 2.1.277 and Gemini CLI 0.61.0 pass isolated installation, 134-tool discovery, local
 evidence/authentication boundaries, update/reinstall and removal as applicable.
-Public marketplace/source verification follows promotion to public main.
+Public marketplace/source installation, updates and removal pass against the promoted main branches; the Gemini release ZIP also matches the validated source byte for byte.
+
+## Published ecosystem and discovery limits
+
+Official MCP Registry `com.debugbundle/mcp` 1.15.0, Smithery MCP and Smithery skill
+publication and public lookup pass. OpenClaw 1.15.0 is publicly available as latest,
+with a clean aggregate scan, zero VirusTotal malicious/suspicious detections and
+clean LLM review. Its downloaded archive exactly matches all six reviewed source
+files, SHA-256 `19435befbab9e0636912097a8177a65b172499e5610f9bc505463eb2e8917064`.
+ClawHub records the source commit; it does not report cryptographic provenance.
+
+The portable ClawHub skill is unchanged and remains 1.14.0; exact-version, license
+and clean moderation checks pass without republishing identical content. Two of
+seven bounded search-rank checks pass. MCP.so lookup passes; Glama's public query
+returns 401, and PulseMCP/LobeHub require manual visibility verification. These
+external discovery limits are retained rather than treating accepted publication
+as proof of search ranking or republishing unchanged artifacts.
+
+## Pre-deployment provenance correction
+
+Canonical core 1.16.0 is published from `62b9950be74b39f184a3c0ce54d2f170de709790`
+through [release workflow 38050610425](https://github.com/debugbundle/debugbundle/actions/runs/38050610425).
+Site 1.6.3 is published from `84fa7bc1247ad605dc22796a8dc8e659ff80ad52` through
+[workflow 38050687474](https://github.com/debugbundle/site/actions/runs/38050687474);
+site CI 38050658715 passes.
+
+Core CI 38050456704 stopped at the committed OpenAI source-manifest check because
+its recorded source commit preceded the release changes. Deployment was held.
+The repository-owned preparation/verification targets reproduced the drift and
+refreshed only `source.commit`, preserving the plugin version, exact package hashes,
+23-tool contract and currently deployed image digest. Follow-up
+`f658a487f58807c1eaab2bdcd6cd2dfcb45cd338` contains only that evidence correction;
+all 13 committed-source release checks pass. [CI 38051304207](https://github.com/debugbundle/debugbundle/actions/runs/38051304207)
+passes all 4,150 public tests in 93 coverage shards, lint, typecheck and build. Its
+14 intentional private-site skips passed in the 4,164-test local gate. CLI runtime
+compatibility and the Gemini Node 22/24/26 matrix also pass before deployment. The canonical tag remains unchanged, and runtime application
+source is identical to it.
+
+## Production deployment and independent readback
+
+[Hosted workflow 38052622593](https://github.com/debugbundle/debugbundle-cloud/actions/runs/38052622593)
+uses trusted cloud `1ae26283d0fc38f895885737ed9dd5d3a30356a3`, product
+`f658a487f58807c1eaab2bdcd6cd2dfcb45cd338` and site
+`84fa7bc1247ad605dc22796a8dc8e659ff80ad52`. Core 1.16.0 API and worker both run
+immutable digest `sha256:99961a4d911d79ac053f02642c7207d5acdba253c8e0db5eb36c9bada58103b2`
+in release `20261010124130-3097d00cdb0a`. Independent SSH readback matches the
+revision, version and digest, with healthy containers, zero restarts/OOM kills,
+`postgres-v1` and worker processing enabled.
+
+Automatic database backups are enabled and the preflight restore point is
+2026-10-10 12:11:18 UTC. The additive migration applied at 12:42:17.284 UTC;
+the ledger has 58 entries, exact checksum
+`178d76996c160d95b47aa9c852e1b6f3c57703435e54b174605a28972ccab1da`, and all three
+public-status tables. The rollout applies migrations before candidate activation.
+API configuration uses `https://app.debugbundle.com/status` and trusted private
+proxy handling; existing OAuth/MCP gates remain enabled.
+
+Live read-only verification passes:
+
+- API/MCP readiness, original OAuth issuer and unauthenticated MCP challenge;
+- dashboard build ID matching the deployed product commit and `/status/:publicId`
+  SPA routing;
+- anonymous unavailable-page 404 with the exact generic body and `no-store`;
+- unauthenticated settings/options/preview rejection, and authenticated owner
+  settings/options returning 200 with `no-store`;
+- public documentation and generated core 1.16.0 references including all four
+  status tools;
+- served JS/CSS and source-matching logo, including status-page, system-theme,
+  spaced logo/attribution and shared tooltip markers.
+
+The scope's existing public page remains disabled. No customer status selection
+or publication was changed for verification. Positive publication, multi-project
+selection, safe aggregates and unpublishing are covered by the real integration
+gate; HTTP/asset verification does not claim browser/device interaction testing.
+
+Retention readback proves exactly the active release plus previous stable
+`20261007183207-3acae674a892`, retaining both API/worker immutable references and
+images for each. The previous digest remains
+`sha256:b352d7980759b77362d4fe112932e9f00d34869afaeb978487028f59c0b58207`;
+disk has 45 GiB free. The first scoped post-promotion health check passes with zero
+consecutive failures. The pre-existing active incident has no new occurrence.
+
+The hosted workflow completed successfully, including migration-before-activation,
+SPA/site publication, CloudFront invalidation completion and external endpoint
+verification. The OpenAI plugin keeps version 1.0.1 and its frozen 23-tool contract;
+only its local source/runtime provenance is refreshed after final evidence commits.
+No portal submission, directory publication or reviewer-state change is included.

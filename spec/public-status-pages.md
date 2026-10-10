@@ -1,8 +1,8 @@
 # Public status pages
 
 Owner-approved on 2026-10-08. Implementation and local acceptance are complete;
-the owner authorized the release train on 2026-10-10. Publication and deployment
-evidence is maintained in [the release record](public-status-release-20261010.md).
+the owner authorized the release train on 2026-10-10. Core 1.16.0 is live.
+Publication and deployment evidence is maintained in [the release record](public-status-release-20261010.md).
 
 FR-AVC-07 extends FR-AVC-03/05/06 with one opt-in public page anchored to a project. The owner can choose a custom page title, explicitly include other projects owned by the same account, and explicitly select existing checks. Project and selected check names are retained. Newly created projects/checks remain private. There is no template system, subscription feature, or separate history page.
 
