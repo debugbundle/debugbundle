@@ -6,6 +6,15 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.16.1] - 2026-10-10
+
+### Fixed
+
+- Save public status visibility immediately when enabling or disabling. First enable validates and publishes the initial settings; subsequent toggles preserve unsaved title/project/check edits for the explicit save action. Pending saves show the share-link input, prevent competing changes and restore saved visibility after failures.
+- Rename the saved-preview action to Preview status page and focus its heading on opening, keeping daily details available through deliberate keyboard focus without automatically opening the first tooltip.
+
+Independent CLI, MCP, shared, SDK and plugin versions remain unchanged. No database migration or public interface change.
+
 ## [1.16.0] - 2026-10-10
 
 ### Added

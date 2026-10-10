@@ -183,13 +183,46 @@ it("explains why publication requires selected checks", async () => {
   );
   fireEvent.click(await screen.findByRole("switch", { name: "Enable public page" }));
   expect(
-    screen.getByText("Select at least one health check before publishing.")
+    screen.getByText("Select at least one health check before enabling the public page.")
   ).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Save status settings" })).toBeDisabled();
+  expect(screen.getByRole("switch", { name: "Enable public page" })).toHaveAttribute(
+    "aria-checked",
+    "false"
+  );
+  expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === "PUT")).toBe(false);
   await selectChoice("Website checks", "Public service");
-  expect(screen.queryByText("Select at least one health check before publishing.")).toBeNull();
   expect(screen.getByRole("button", { name: "Save status settings" })).toBeEnabled();
 });
+it.each(["missing title", "unloaded checks"])(
+  "does not create a page with %s on first enable",
+  async (invalid) => {
+    renderManagedPanel(
+      {
+        ...statusSettings,
+        enabled: false,
+        title: statusSettings.title
+      },
+      invalid === "unloaded checks"
+        ? {
+            projects: [{ ...options.projects[0]!, checks: [], next_check_cursor: statusCheckId }],
+            next_cursor: null
+          }
+        : options
+    );
+    const toggle = await screen.findByRole("switch", { name: "Enable public page" });
+    if (invalid === "missing title")
+      fireEvent.change(screen.getByLabelText("Page status title"), { target: { value: "" } });
+    fireEvent.click(toggle);
+    expect(
+      screen.getByText(
+        "Enter a page title and review all selected projects and checks before enabling."
+      )
+    ).toBeInTheDocument();
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === "PUT")).toBe(false);
+  }
+);
+
 it.each(["project", "publication"] as const)(
   "enforces the %s check limit while keeping selected checks removable",
   async (scope) => {
@@ -372,13 +405,12 @@ it("loads, publishes and previews through the actual local mock API", async () =
   });
   await selectChoice("SayCheese checks", "Web health");
   fireEvent.click(screen.getByLabelText("Enable public page"));
-  fireEvent.click(screen.getByRole("button", { name: "Save status settings" }));
   await waitFor(() =>
     expect(screen.getByRole("link", { name: "Open status page" }).getAttribute("href")).toMatch(
       /^http:\/\/localhost:5291\/status\/[a-f0-9]{24}$/
     )
   );
-  fireEvent.click(screen.getByRole("button", { name: "Preview saved page" }));
+  fireEvent.click(screen.getByRole("button", { name: "Preview status page" }));
   await screen.findByRole("dialog", { name: "Demo service status" });
   expect(screen.queryByText("Status settings unavailable")).toBeNull();
 });
@@ -511,7 +543,6 @@ it("publishes explicit multi-project selections, copies the URL, previews and un
   await selectChoice("Other projects", "API");
   await selectChoice("API checks", "API check");
   fireEvent.click(screen.getByLabelText("Enable public page"));
-  fireEvent.click(screen.getByRole("button", { name: "Save status settings" }));
   await waitFor(() =>
     expect(saved).toHaveBeenCalledWith({
       title: "Customer status",
@@ -524,12 +555,12 @@ it("publishes explicit multi-project selections, copies the URL, previews and un
   );
   fireEvent.click(await screen.findByRole("button", { name: "Copy link" }));
   expect(writeText).toHaveBeenCalledWith(`https://status.example.com/${statusPublicId}`);
-  fireEvent.click(screen.getByRole("button", { name: "Preview saved page" }));
+  fireEvent.click(screen.getByRole("button", { name: "Preview status page" }));
   await screen.findByRole("dialog", { name: "Product status" });
   fireEvent.click(screen.getByRole("button", { name: "Close" }));
   await waitFor(() => expect(screen.queryByRole("dialog", { name: "Product status" })).toBeNull());
   await waitFor(() =>
-    expect(screen.getByRole("button", { name: "Preview saved page" })).toHaveFocus()
+    expect(screen.getByRole("button", { name: "Preview status page" })).toHaveFocus()
   );
   await waitFor(() =>
     expect(
@@ -537,7 +568,6 @@ it("publishes explicit multi-project selections, copies the URL, previews and un
     ).toBe(false)
   );
   fireEvent.click(screen.getByLabelText("Enable public page"));
-  fireEvent.click(screen.getByRole("button", { name: "Save status settings" }));
   await waitFor(() => expect(saved.mock.lastCall?.[0].enabled).toBe(false));
   await waitFor(() => expect(screen.queryByRole("button", { name: "Copy link" })).toBeNull());
 });
@@ -595,7 +625,7 @@ it("loads all selected projects/checks for review and preserves saved publicatio
   expect(screen.getByRole("link", { name: "Open status page" }).getAttribute("href")).toBe(
     management.public_url
   );
-  fireEvent.click(screen.getByRole("button", { name: "Preview saved page" }));
+  fireEvent.click(screen.getByRole("button", { name: "Preview status page" }));
   await screen.findByText("The saved status page could not be previewed.");
 });
 it("keeps drafts and unloaded selections through failed pagination and permits retry", async () => {

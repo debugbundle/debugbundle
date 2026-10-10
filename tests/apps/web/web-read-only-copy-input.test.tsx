@@ -40,6 +40,28 @@ it("copies the read-only value using the labelled inline icon without submitting
   expect(button).toHaveFocus();
 });
 
+it("shows a pending value without copying an empty string, then enables copying when ready", async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  const props = {
+    id: "link",
+    label: "Share link",
+    placeholder: "Creating your public link…"
+  };
+  const view = render(<ReadOnlyCopyInput {...props} value="" />);
+  const input = screen.getByRole("textbox", { name: "Share link" });
+  expect(input).toHaveAttribute("readonly");
+  expect(input).toHaveAttribute("placeholder", props.placeholder);
+  expect(screen.getByRole("button", { name: "Copy" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+  expect(writeText).not.toHaveBeenCalled();
+  view.rerender(<ReadOnlyCopyInput {...props} value={value} />);
+  expect(input).toHaveValue(value);
+  expect(screen.getByRole("button", { name: "Copy" })).toBeEnabled();
+  fireEvent.click(screen.getByRole("button", { name: "Copy" }));
+  await waitFor(() => expect(writeText).toHaveBeenCalledWith(value));
+});
+
 it.each(["missing", "rejected", "throws"])(
   "selects the value for manual copying when the clipboard is %s",
   async (mode) => {

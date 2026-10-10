@@ -1,3 +1,21 @@
+# Public status modal follow-up — 2026-10-10 (release candidate 1.16.1)
+
+FR-AVC-07 / AC-AVC-07: the enable switch now saves immediately. First enable
+creates the page with the validated title/check selections; later toggles use
+saved settings and preserve other edits for Save status settings. The read-only
+copy input appears while enabling and becomes copyable when the URL exists.
+Failures restore the saved switch without losing drafts. The action is Preview
+status page, and opening it focuses the heading without activating a day tooltip.
+Keyboard day details and focus return remain.
+
+Pre-ship review covers first-enable validation, saved/draft separation, existing
+empty configurations, pending/error/retry states, late toggle/save responses,
+preview focus, clipboard fallback and collaborator restrictions. No API, schema,
+auth or monitoring change. All 78 focused/adjacent tests in 11 files pass, both changed-source coverage gates
+pass, and focused lint, repository typecheck and candidate builds pass. Evidence:
+`.tmp/public-status-autosave-{red,green,coverage,lint,typecheck,build}.log`.
+Docs/rules are reconciled. Owner accepted the changes and authorized commit, push and release. Launch qualification and production verification are in progress; see `spec/public-status-followup-release-20261010.md`.
+
 # Public status release — 2026-10-10
 
 Core 1.16.0 API/worker and dashboard are live, with the additive public-status

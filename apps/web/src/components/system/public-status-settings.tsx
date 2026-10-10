@@ -26,6 +26,7 @@ import {
 } from "../ui/dialog.js";
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldGroup,
   FieldLabel,
@@ -64,11 +65,14 @@ function PublicStatusSettingsContent({ project, checks }: PublicStatusSettingsPr
   const [stored, setStored] = useState<PublicStatusManagement | null>(null);
   const [draft, setDraft] = useState<PublicStatusSettings | null>(null);
   const [options, setOptions] = useState<PublicStatusOptions>({ projects: [], next_cursor: null });
-  const [operation, setOperation] = useState<"save" | "preview" | "options" | null>(null);
+  const [operation, setOperation] = useState<"save" | "toggle" | "preview" | "options" | null>(
+    null
+  );
   const busy = operation !== null;
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<PublicStatusPage | null>(null);
   const previewTrigger = useRef<HTMLButtonElement>(null);
+  const previewTitle = useRef<HTMLHeadingElement>(null);
   const alive = useRef(true);
   // Health polling changes result fields frequently; only membership/name edits need new choices.
   const anchorCheckRevision = JSON.stringify(checks?.map(({ check_id, name }) => [check_id, name]));
@@ -155,6 +159,46 @@ function PublicStatusSettingsContent({ project, checks }: PublicStatusSettingsPr
         setError(
           "Could not save status settings. Check the title, project ownership, and selected checks."
         );
+    } finally {
+      if (alive.current) setOperation(null);
+    }
+  }
+  async function setEnabled(enabled: boolean): Promise<void> {
+    if (!draft || busy || stored?.access_mode !== "manage") return;
+    const creating = !stored.public_id;
+    const settings = creating ? draft : stored.settings;
+    if (enabled && !settings.projects.some((p) => p.check_ids.length > 0)) {
+      setError(
+        creating
+          ? "Select at least one health check before enabling the public page."
+          : "Save at least one selected health check before enabling the public page."
+      );
+      return;
+    }
+    if (creating && (unreviewed || !draft.title.trim())) {
+      setError("Enter a page title and review all selected projects and checks before enabling.");
+      return;
+    }
+    setOperation("toggle");
+    setError(null);
+    setDraft({ ...draft, enabled });
+    try {
+      // First enable creates the page. Later visibility changes leave form edits unsaved.
+      const result = await savePublicStatusSettings(project.project_id, {
+        ...settings,
+        enabled
+      });
+      if (!alive.current) return;
+      setStored(result);
+      setDraft((value) =>
+        creating ? result.settings : value ? { ...value, enabled: result.settings.enabled } : value
+      );
+      showSuccessToast(enabled ? "Public status page enabled." : "Public status page disabled.");
+    } catch {
+      if (alive.current) {
+        setDraft((value) => (value ? { ...value, enabled: stored.settings.enabled } : value));
+        setError("Could not update public page visibility. Try again.");
+      }
     } finally {
       if (alive.current) setOperation(null);
     }
@@ -295,7 +339,7 @@ function PublicStatusSettingsContent({ project, checks }: PublicStatusSettingsPr
                 disabled={busy || !stored?.public_id}
                 onClick={() => void showPreview()}
               >
-                {operation === "preview" ? "Loading preview…" : "Preview saved page"}
+                {operation === "preview" ? "Loading preview…" : "Preview status page"}
               </Button>
               <Button
                 type="submit"
@@ -432,13 +476,23 @@ function PublicStatusSettingsContent({ project, checks }: PublicStatusSettingsPr
                 </FieldDescription>
               ) : null}
             </FieldSet>
-            <Field orientation="horizontal" className="justify-between">
-              <FieldLabel htmlFor="public-status-enabled">Enable public page</FieldLabel>
+            <Field orientation="horizontal" className="justify-between" data-disabled={busy}>
+              <FieldContent>
+                <FieldLabel htmlFor="public-status-enabled">Enable public page</FieldLabel>
+                <FieldDescription id="public-status-enabled-description" role="status">
+                  {operation === "toggle"
+                    ? "Saving visibility…"
+                    : stored?.public_id
+                      ? "Saves immediately. Other changes need Save status settings."
+                      : "Enabling creates and publishes this page with the settings above."}
+                </FieldDescription>
+              </FieldContent>
               <Switch
                 id="public-status-enabled"
+                aria-describedby="public-status-enabled-description"
                 checked={draft.enabled}
                 disabled={busy}
-                onCheckedChange={(value) => setDraft({ ...draft, enabled: value })}
+                onCheckedChange={(value) => void setEnabled(value)}
               />
             </Field>
             {draft.enabled && !draft.projects.some((p) => p.check_ids.length > 0) ? (
@@ -457,23 +511,26 @@ function PublicStatusSettingsContent({ project, checks }: PublicStatusSettingsPr
               : "The project owner has not published a status page."}
           </p>
         ) : null}
-        {stored?.settings.enabled && stored.public_url ? (
+        {stored?.settings.enabled || (manage && draft?.enabled) ? (
           <div className="flex flex-col gap-2">
             <ReadOnlyCopyInput
               id="public-status-link"
               label="Public status link"
-              value={stored.public_url}
+              value={stored?.public_url ?? ""}
+              placeholder="Creating your public link…"
               copyLabel="Copy link"
               successMessage="Status link copied."
               errorMessage="Could not copy the link. Select and copy the URL in the input."
             />
-            <div className="flex flex-wrap gap-2">
-              <Button asChild variant="outline">
-                <a href={stored.public_url} target="_blank" rel="noopener noreferrer">
-                  Open status page
-                </a>
-              </Button>
-            </div>
+            {stored?.settings.enabled && stored.public_url ? (
+              <div className="flex flex-wrap gap-2">
+                <Button asChild variant="outline">
+                  <a href={stored.public_url} target="_blank" rel="noopener noreferrer">
+                    Open status page
+                  </a>
+                </Button>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </DialogFormContent>
@@ -486,13 +543,18 @@ function PublicStatusSettingsContent({ project, checks }: PublicStatusSettingsPr
         <DialogContent
           size="xl"
           className="flex max-h-[calc(100dvh-2rem)] flex-col"
+          onOpenAutoFocus={(event) => {
+            // Introduce the preview without opening the first day's focus-triggered tooltip.
+            event.preventDefault();
+            previewTitle.current?.focus();
+          }}
           onCloseAutoFocus={(event) => {
             event.preventDefault();
             previewTrigger.current?.focus();
           }}
         >
           <DialogHeader className="shrink-0 pr-8">
-            <DialogTitle className="break-words">
+            <DialogTitle ref={previewTitle} tabIndex={-1} className="break-words">
               {preview?.title ?? "Status page preview"}
             </DialogTitle>
             <DialogDescription>

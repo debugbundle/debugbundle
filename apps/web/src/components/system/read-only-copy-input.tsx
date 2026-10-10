@@ -13,6 +13,7 @@ export interface ReadOnlyCopyInputProps {
   id: string;
   label: string;
   value: string;
+  placeholder?: string;
   copyLabel?: string;
   successMessage?: string;
   errorMessage?: string;
@@ -22,6 +23,7 @@ export function ReadOnlyCopyInput({
   id,
   label,
   value,
+  placeholder,
   copyLabel = "Copy",
   successMessage = "Copied to clipboard.",
   errorMessage = "Could not copy. Select and copy the value in the input."
@@ -46,6 +48,7 @@ export function ReadOnlyCopyInput({
           id={id}
           ref={input}
           value={value}
+          placeholder={placeholder}
           readOnly
           onFocus={(event) => event.currentTarget.select()}
         />
@@ -54,6 +57,7 @@ export function ReadOnlyCopyInput({
             size="icon-xs"
             aria-label={copyLabel}
             title={copyLabel}
+            disabled={!value}
             onClick={() => void copy()}
           >
             <CopyIcon />

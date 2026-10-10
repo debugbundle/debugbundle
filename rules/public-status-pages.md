@@ -2,6 +2,8 @@
 
 Applies to FR-AVC-07 / AC-AVC-07 in addition to SEC-01 through SEC-26.
 
+The enable switch saves immediately. For a new page, first enable validates and saves the current title and explicit check selections to create and publish it. For an existing page, save visibility using its saved configuration and preserve unsaved form edits; title/project/check changes require Save status settings. Explain these semantics beside the switch. Disable competing controls while saving, restore the saved switch state on failure, preserve drafts and ignore late responses after closing. An existing configuration with no saved checks must save selected checks before enabling. Reveal the read-only link field while enabling, with copying disabled until a URL exists; only offer Open status page after publication succeeds. Retain a live link until disabling succeeds. Label the preview action Preview status page; initially focus its heading rather than a history block so no tooltip opens automatically. Preserve deliberate keyboard access to day details and focus return.
+
 Publication is a separate owner-controlled read projection. Do not weaken existing authenticated availability routes or reuse SDK write tokens as public read credentials. One anchor project owns its publication metadata and random 96-bit URL identifier. A URL is public, not a secret or authorization token.
 
 Persist explicit project/check selections atomically. Revalidate the anchor, every included project's current organization/owner, undeleted check membership and existing plan execution eligibility on every public read. Soft deletion, hard deletion, unpublishing and reassignment fail closed. New checks are never automatically included. Invalid selections cannot partially replace the published page.
