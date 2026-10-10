@@ -8,6 +8,7 @@ import "./lib/theme-init.js";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
+import { isPublicStatusLocation } from "./lib/public-status-routing.js";
 import { App } from "./app.js";
 import { initializeWebDogfooding, observeWebAnalyticsConsentWithdrawal } from "./lib/dogfooding.js";
 import "./styles/globals.css";
@@ -18,8 +19,10 @@ if (container === null) {
   throw new Error("debugbundle_web_root_not_found");
 }
 
-initializeWebDogfooding(import.meta.env);
-observeWebAnalyticsConsentWithdrawal();
+if (!isPublicStatusLocation(import.meta.env.VITE_PUBLIC_STATUS_PAGE_BASE_URL, window.location)) {
+  initializeWebDogfooding(import.meta.env);
+  observeWebAnalyticsConsentWithdrawal();
+}
 
 createRoot(container).render(
   <StrictMode>

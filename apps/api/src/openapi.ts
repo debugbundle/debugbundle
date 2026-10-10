@@ -1,3 +1,4 @@
+import { publicStatusOperations } from "./openapi-public-status.js";
 import { agentOperations } from "./openapi-agent.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { SESSION_COOKIE_NAME, type JsonSchemaDocument, type SchemaSpec } from "./openapi-model.js";
@@ -71,7 +72,8 @@ export function buildPublicOpenApiSpec(): Record<string, unknown> {
     ...projectsOperations(),
     ...configurationOperations(),
     ...notificationsOperations(),
-    ...captureOperations()
+    ...captureOperations(),
+    ...publicStatusOperations()
   ];
   const paths: Record<string, Record<string, unknown>> = {};
 

@@ -29,8 +29,6 @@ S3_BUCKET ?= debugbundle-raw-events
 WORKER_POLL_INTERVAL_MS ?= 1000
 WORKER_RUN_ONCE ?= 0
 PUBLIC_SITE_PORT ?= 5292
-LEGACY_STORAGE_BOOTSTRAP_ERROR := storage_bootstrap_legacy_schema_detected
-PARTIAL_STORAGE_BOOTSTRAP_ERROR := storage_bootstrap_partial_schema_detected
 
 # Run Node/pnpm commands in a disposable Docker container to keep host clean.
 NODE_RUN = docker run --rm -t \
@@ -144,9 +142,10 @@ db-bootstrap: infra-up
 		-e DB_USER=debugbundle \
 		-e DB_PASSWORD=debugbundle \
 		-e DB_NAME=debugbundle \
-			$(NODE_IMAGE) sh -lc "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm db:bootstrap"
+			$(NODE_IMAGE) sh -lc "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm db:bootstrap $(STORAGE_BOOTSTRAP_FLAGS)"
 
 .PHONY: db-migrate
+db-migrate: STORAGE_BOOTSTRAP_FLAGS := --if-empty
 db-migrate: db-bootstrap
 	docker run --rm -t \
 		--network "$(COMPOSE_NETWORK)" \
@@ -311,6 +310,11 @@ format-focused:
 ui-component-docs:
 	docker run --rm -v "$(PWD)/apps/web:$(WORKDIR):ro" -w "$(WORKDIR)" $(NODE_IMAGE) sh -lc "corepack enable && corepack pnpm dlx shadcn@latest docs $(UI_COMPONENTS)"
 
+# Add shared shadcn primitives through the app's registry/config inside Docker.
+.PHONY: ui-component-add
+ui-component-add:
+	docker run --rm -e CI=1 -v "$(PWD):$(WORKDIR)" -w "$(WORKDIR)/apps/web" $(NODE_IMAGE) sh -lc "corepack enable && corepack pnpm dlx shadcn@latest add $(UI_COMPONENTS) $(UI_COMPONENT_FLAGS)"
+
 .PHONY: lint-focused
 lint-focused:
 	$(NODE_RUN) "corepack enable && corepack pnpm exec eslint $(LINT_FILES)"
@@ -430,6 +434,7 @@ INTEGRATION_TEST_FILES += tests/integration/browser-resource-recovery.integratio
 INTEGRATION_TEST_FILES += tests/integration/alert-retry-ownership.integration.test.ts
 INTEGRATION_TEST_FILES += tests/integration/analytics-flow-runtime.integration.test.ts
 INTEGRATION_TEST_FILES += tests/integration/list-pagination-counts.integration.test.ts
+INTEGRATION_TEST_FILES += tests/integration/public-status-pages.integration.test.ts
 # Optional absolute module path inside /workspace for a separately built Browser SDK candidate.
 INTEGRATION_FLOW_SDK_MODULE ?=
 test-integration:
@@ -475,16 +480,7 @@ api-check:
 
 .PHONY: dev
 dev: ensure-probe-trigger-secret install
-	@set -e; \
-	if $(DOCKER_COMPOSE) --profile dev up; then \
-		exit 0; \
-	fi; \
-	if $(DOCKER_COMPOSE) logs db-bootstrap 2>/dev/null | grep -Eq "$(LEGACY_STORAGE_BOOTSTRAP_ERROR)|$(PARTIAL_STORAGE_BOOTSTRAP_ERROR)"; then \
-		echo "Incompatible local database schema detected; resetting local dev state and retrying."; \
-		$(DOCKER_COMPOSE) --profile dev down -v; \
-		exec $(DOCKER_COMPOSE) --profile dev up; \
-	fi; \
-	exit 1
+	$(DOCKER_COMPOSE) --profile dev up
 
 .PHONY: dev-public
 dev-public:

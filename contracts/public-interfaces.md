@@ -2290,6 +2290,39 @@ Execution eligibility applies the per-project saved-check cap before ranking ena
 
 When consecutive failures reach `failure_threshold`, DebugBundle opens or regresses the linked availability incident for that check using the normal incident lifecycle. When consecutive successes reach `recovery_threshold`, DebugBundle auto-resolves the linked availability incident.
 
+### 1.8a Public Status Pages
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| GET | `/v1/public/status/{publicId}` | Anonymous | Strict safe projection of a published page; 120 reads/IP/minute, no-store. |
+| GET | `/v1/projects/{id}/status-page` | Browser Session or Member Token | Owners receive saved settings; collaborators receive only the published title/link. |
+| PUT | `/v1/projects/{id}/status-page` | Project owner | Atomically replace settings, publish or unpublish. Normal session CSRF applies. |
+| GET | `/v1/projects/{id}/status-page/options` | Project owner | Bounded same-owner/account projects and checks. |
+| GET | `/v1/projects/{id}/status-page/preview` | Project owner | Preview saved public projection even while disabled; no check execution. |
+
+Settings are strict `{title, enabled, projects:[{project_id, check_ids:[]}]}`. Title is trimmed, 1–120 characters. Anchor project is first. Selections are unique and bounded to 50 projects, 50 checks/project, 500 total; enabling requires at least one selected check. Every selection must still belong to the same owner and organization. Invalid/cross-project selections return 400 without changing the prior page. Only the owner may configure or preview; admin/member attempts return 403. All tiers may publish existing checks without altering execution entitlements.
+
+Management response is `{settings, public_id, public_url, access_mode:"manage"|"preview"}`. A new project defaults disabled with anchor/empty checks and null ID/URL. First save allocates a random 96-bit public identifier; saves/unpublishing retain it. Disabled pages are unavailable anonymously; owners retain the URL for future reuse. Collaborators receive anchor/empty selections and only an enabled page's title/link. No other-project configuration or unpublished preview is exposed.
+
+Options return `{projects:[{project_id,name,checks:[{check_id,name}],next_check_cursor}],next_cursor}`. Each list page contains at most 50 projects and the first 50 checks/project, sorted by UUID. Continue projects with `?cursor=<next_cursor>`. Continue checks separately with `?check_project_id=<project-id>&check_cursor=<next_check_cursor>`; a check project without cursor reads its first page. A check cursor requires its project, and project/check cursors cannot be combined. All option reads revalidate ownership; nonexistent/foreign check projects return 400.
+
+Anonymous/preview DTOs contain only sanitized title/names, anonymous positional display keys, current state, nullable 30-day uptime/latest verified timestamp and exactly 30 UTC daily availability aggregates. Days contain day/state/impact, total/success/failed/degraded counts and downtime seconds. They never contain project/check/incident IDs, URLs, environment/service labels, plan/account information, raw results, diagnostics, logs, bundles or credentials. Uptime is `100*sum(successful_checks)/sum(total_checks)` for verified outcomes; no measurement is null. History reuses Health Status impact, including retained legacy outage fallback. Freshness uses the latest verified rollup result; after three effective intervals current status is unknown. Aggregate status prioritizes failing, unknown, paused, then operational. Historical outages remain visible after current recovery. Deleted/reassigned selections disappear immediately; a deleted/reassigned anchor or disabled/missing ID returns generic 404. Empty publications left after deletion show no published checks.
+
+Public reads never probe or mutate customer state. Public output/limiter failure returns bounded 503; 429 includes Retry-After seconds. Management bad input is 400, authentication 401, owner authorization/CSRF 403, unavailable settings 500. Responses are no-store. A dedicated status origin receives anonymous GET CORS only, never credentialed management CORS.
+
+CLI parity (member auth file):
+
+```text
+debugbundle health status get --project-id <id> [--json]
+debugbundle health status save --project-id <id> --settings-json '<settings>' [--json]
+debugbundle health status options --project-id <id> [--cursor <project-id> | --check-project-id <project-id> [--check-cursor <check-id>]] [--json]
+debugbundle health status preview --project-id <id> [--json]
+```
+
+All commands accept `--auth-file`. Ordinary/local-auth MCP parity: `get_public_status_page`, `save_public_status_page`, `list_public_status_page_options`, `preview_public_status_page`. Ordinary inputs use `bearerToken` and `projectId`; save adds `settings`, options adds the same snake-case pagination fields. Local-auth removes the bearer input. OpenClaw prefixes these names with `debugbundle_`; save is an optional mutation. Hosted OAuth and restricted-agent catalogs do not gain these tools.
+
+Default share URL is `${APP_BASE_URL}/status/<public-id>`. Optional `PUBLIC_STATUS_PAGE_BASE_URL` and matching build-time `VITE_PUBLIC_STATUS_PAGE_BASE_URL` set a configured path or dedicated root origin. Operators must serve the same SPA with fallback there and provision DNS/TLS separately. Root status-host routes bypass private session/telemetry providers, including missing paths. See [deployment and publication design](../spec/public-status-pages.md).
+
 ### 1.9 Capture Policy
 
 Per-project capture policy controls what event classes the SDK captures and the ingestion API accepts.

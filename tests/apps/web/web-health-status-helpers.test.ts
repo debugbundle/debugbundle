@@ -377,6 +377,22 @@ describe("health status helpers", () => {
     expect(summaries[0]?.active_incident_count).toBe(0);
   });
 
+  it("labels UTC history days consistently for visitors west of UTC", () => {
+    const previousTimezone = process.env["TZ"];
+    process.env["TZ"] = "America/Los_Angeles";
+    try {
+      expect(
+        formatStatusDayLabel({
+          ...buildRollup({ day: "2026-06-15", state: "operational" }),
+          impact: "none"
+        })
+      ).toMatch(/^Jun 15:/);
+    } finally {
+      if (previousTimezone === undefined) delete process.env["TZ"];
+      else process.env["TZ"] = previousTimezone;
+    }
+  });
+
   it("formats uptime and accessible day labels", () => {
     expect(formatStatusUptime(null)).toBe("No data");
     expect(formatStatusUptime(100)).toBe("100%");

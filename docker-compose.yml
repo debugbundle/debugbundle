@@ -80,7 +80,7 @@ services:
       DB_USER: debugbundle
       DB_PASSWORD: debugbundle
       DB_NAME: debugbundle
-    command: sh -lc "corepack enable && corepack pnpm db:bootstrap"
+    command: sh -lc "corepack enable && corepack pnpm db:bootstrap --if-empty"
     profiles:
       - dev
 
@@ -136,6 +136,8 @@ services:
       API_PORT: "3000"
       AGENT_TOKEN_ISSUANCE_ENABLED: ${AGENT_TOKEN_ISSUANCE_ENABLED:-false}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:5291}
+      PUBLIC_STATUS_PAGE_BASE_URL: ${PUBLIC_STATUS_PAGE_BASE_URL:-}
+      PUBLIC_STATUS_TRUST_PROXY: ${PUBLIC_STATUS_TRUST_PROXY:-false}
       SES_REGION: ${SES_REGION:-us-east-1}
       SES_FROM_EMAIL: ${SES_FROM_EMAIL:-}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
@@ -238,6 +240,7 @@ services:
     environment:
       <<: *node-pnpm-env
       VITE_DEV_API_PROXY_TARGET: http://api:3000
+      VITE_PUBLIC_STATUS_PAGE_BASE_URL: ${VITE_PUBLIC_STATUS_PAGE_BASE_URL:-}
       VITE_API_URL: ${VITE_API_URL:-http://localhost:3003}
       VITE_OPENAI_PLUGIN_PREVIEW: ${VITE_OPENAI_PLUGIN_PREVIEW:-false}
       DEBUGBUNDLE_DEV_MOCK: ${DEBUGBUNDLE_DEV_MOCK:-false}

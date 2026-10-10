@@ -56,7 +56,7 @@ Local convenience must not introduce a different auth model than hosted deployme
 The compose file now brings up the full authenticated product surface:
 
 - `workspace-init` installs the monorepo workspace once inside the repo checkout
-- `db-bootstrap` creates a clean empty schema, `db-migrate` applies ordered forward migrations, and `api` starts only after both complete
+- `db-bootstrap --if-empty` initializes only a clean empty schema and skips installed schemas without seeding their ledger; `db-migrate` applies ordered forward migrations, and `api` starts only after both services complete
 - `worker` starts only after the API is healthy, so it sees a migrated database
 - `localstack` bootstraps the raw-event bucket automatically via `localstack-init/01-create-bucket.sh`
 - `web` serves the built SPA on the configured host port
@@ -180,7 +180,7 @@ git pull
 docker compose up -d --force-recreate workspace-init db-bootstrap db-migrate api worker web
 ```
 
-No manual schema command is required on clean startup. The one-shot `db-bootstrap` service bootstraps an empty database before the API starts, and the one-shot `db-migrate` service applies ordered forward migrations before runtime services consume the schema. This is required for additive runtime-dependent changes such as the no-card trial lifecycle worker and AnalyticsBundle incident-correlation storage; API and worker readiness fail closed until their required migrations are recorded. Destructive schema cleanup should be shipped in a later deploy after additive migrations and compatible application code are already live.
+No manual schema command is required on clean startup. The one-shot `db-bootstrap` service runs `db:bootstrap --if-empty`: it initializes an empty public schema and leaves every populated schema and its migration ledger unchanged. The one-shot `db-migrate` service then applies ordered forward migrations before runtime services consume the schema. Direct `db:bootstrap` remains strict and rejects an incomplete schema; it is never an upgrade command. API and worker readiness fail closed until their required migrations are recorded. Startup errors preserve existing volumes; investigate the failed service before retrying. Destructive schema cleanup should be shipped in a later deploy after additive migrations and compatible application code are already live.
 
 ## GitHub App Setup (Optional)
 
@@ -262,3 +262,15 @@ Keep a compatible `postgres-v1` worker after upgrade, including during an API ro
 ### Browser recovery and alert noise controls (core 1.12.0)
 
 Apply `db-migrate` before the new API and worker start. Migration `202609220001_add_browser_recovery_context` adds an expiring correlation-reference index and nullable alert coalescing keys. It is additive and compatible with the previous runtime; do not drop these additions on rollback. Runtime readiness rejects a missing migration. The existing Compose migration dependency handles clean installs and upgrades; `db-bootstrap` is not an upgrade command.
+
+## Public status page upgrade and hosting
+
+Apply `corepack pnpm db:migrate` to the existing database before starting code that uses public status pages. Migration `202610080001_add_public_status_pages` only adds publication tables/indexes; it publishes nothing and preserves all existing checks and results. Never run bootstrap as an upgrade. Compose's migration service precedes API/worker startup and readiness requires the checksummed ledger plus the new API tables. Rollback to old application code can retain these additive tables safely.
+
+No new environment configuration is required: share URLs default to `APP_BASE_URL/status/<public-id>`. The existing SPA serves public routes without authentication; all other routes retain normal access.
+
+For a dedicated root host, set API `PUBLIC_STATUS_PAGE_BASE_URL=https://status.example.com` and rebuild the SPA with `VITE_PUBLIC_STATUS_PAGE_BASE_URL=https://status.example.com`. Serve the same frontend assets and SPA fallback on that host, and provision its DNS/TLS before publishing those URLs. The API grants this origin only anonymous public GET CORS. Do not add it to credentialed application origins or proxy private authenticated routes there. Paths other than a public identifier show unavailable without fetching a session. Public responses must retain `Cache-Control: no-store`; do not add CDN caching that delays unpublishing. Public rate limiting uses the existing Redis limiter independently of member management buckets.
+
+Owners manage title, explicitly included projects/checks and publication state through the Health tab or `debugbundle health status get|save|options|preview`. Public URLs are deliberately public locators, not credentials. Warn owners to review project/check names before publishing. No subscriptions, separate history page or anonymous check execution is included.
+
+Public throttling defaults to the socket peer IP. Set `PUBLIC_STATUS_TRUST_PROXY=true` only when the API cannot be reached directly and a trusted proxy appends the real client IP to X-Forwarded-For. This avoids sharing one throttle across all visitors behind the proxy; only the last valid hop is used, and other authentication flows are unchanged. Keep the default false on direct/public API bindings.

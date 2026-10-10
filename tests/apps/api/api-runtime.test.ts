@@ -45,6 +45,7 @@ describe("api runtime", () => {
     });
 
     expect(env.API_PORT).toBe(3000);
+    expect(env.PUBLIC_STATUS_TRUST_PROXY).toBe("false");
     expect(env.DB_SSL_MODE).toBe("disable");
     expect(env.DB_HOST).toBe("localhost");
     expect(env.DB_POOL_MAX).toBe(10);
@@ -59,6 +60,16 @@ describe("api runtime", () => {
     });
 
     expect(env.DB_SSL_MODE).toBe("require");
+  });
+
+  it("fails startup on ambiguous public proxy trust configuration", () => {
+    expect(() =>
+      parseApiRuntimeEnv({
+        DEBUGBUNDLE_PROBE_TRIGGER_SECRET: "probe",
+        ANALYTICS_HASH_SECRET: "analytics",
+        PUBLIC_STATUS_TRUST_PROXY: "yes"
+      })
+    ).toThrow("PUBLIC_STATUS_TRUST_PROXY");
   });
 
   it("should require the probe trigger secret env var", (): void => {
@@ -86,6 +97,23 @@ describe("api runtime", () => {
 
   it("should pass schema guard when required tables exist", async (): Promise<void> => {
     await expect(assertDatabaseSchema(buildMigratedApiSchemaDb())).resolves.toBeUndefined();
+  });
+
+  it("rejects a current ledger when publication tables are missing", async () => {
+    const migrated = buildMigratedApiSchemaDb();
+    const db: Queryable = {
+      query: async <Row extends Record<string, unknown>>(sql: string, params?: unknown[]) => {
+        const result = await migrated.query<Row>(sql, params ?? []);
+        return sql.includes("information_schema.tables")
+          ? {
+              rows: result.rows.filter(
+                (row) => !String(row["table_name"]).startsWith("public_status_")
+              )
+            }
+          : result;
+      }
+    };
+    await expect(assertDatabaseSchema(db)).rejects.toThrow("public_status_pages");
   });
 
   it("should fail schema guard with explicit missing table names", async (): Promise<void> => {

@@ -1,3 +1,4 @@
+import { registerPublicStatusRoutes } from "./routes/public-status.js";
 import { registerAnalyticsFlowRoutes } from "./routes/analytics-flows.js";
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
 
@@ -236,7 +237,11 @@ function registerApiCsrfProtection(app: FastifyInstance): void {
   });
 }
 
-function registerApiCors(app: FastifyInstance, allowedOrigins: string[]): void {
+function registerApiCors(
+  app: FastifyInstance,
+  allowedOrigins: string[],
+  statusOrigin: string | null
+): void {
   app.addHook("onRequest", async (request, reply) => {
     const requestOrigin =
       typeof request.headers.origin === "string" ? request.headers.origin : undefined;
@@ -246,6 +251,24 @@ function registerApiCors(app: FastifyInstance, allowedOrigins: string[]): void {
     }
 
     reply.header("Vary", appendVaryHeader(reply.getHeader("Vary"), "Origin"));
+
+    // A status-only origin gains anonymous read access, never credentialed management CORS.
+    if (
+      requestOrigin === statusOrigin &&
+      getRequestPath(request.url).startsWith("/v1/public/status/") &&
+      (request.method === "GET" ||
+        (request.method === "OPTIONS" &&
+          request.headers["access-control-request-method"] === "GET"))
+    ) {
+      reply.header("Access-Control-Allow-Origin", requestOrigin);
+      reply.header("Access-Control-Expose-Headers", "Retry-After");
+      if (isCorsPreflightRequest(request)) {
+        reply.header("Access-Control-Allow-Methods", "GET, OPTIONS");
+        reply.header("Access-Control-Allow-Headers", "Cache-Control, Pragma");
+        return reply.status(204).send();
+      }
+      return;
+    }
 
     if (!allowedOrigins.includes(requestOrigin)) {
       if (isSdkProjectTokenCorsRequest(request) && normalizeOrigin(requestOrigin) !== null) {
@@ -379,7 +402,13 @@ export function createApiServer(
   };
   const requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_API_REQUEST_TIMEOUT_MS;
 
-  registerApiCors(app, allowedOrigins);
+  registerApiCors(
+    app,
+    allowedOrigins,
+    normalizeOrigin(
+      dependencies.publicStatusBaseUrl ?? dogfoodingEnv["PUBLIC_STATUS_PAGE_BASE_URL"]
+    )
+  );
   registerApiSearchCrawlerControls(app);
   registerApiContentLengthLimit(app, SMALL_REQUEST_BODY_LIMIT_BYTES);
   registerApiRequestTimeout(app, requestTimeoutMs);
@@ -429,6 +458,7 @@ export function createApiServer(
   registerProjectMemberRoutes(app, dependencies);
   registerProjectRoutes(app, dependencies);
   registerAvailabilityCheckRoutes(app, dependencies);
+  registerPublicStatusRoutes(app, dependencies);
   registerProbeRoutes(app, dependencies);
   registerSystemEmailReviewRoutes(app, dependencies, dogfoodingEnv);
   registerSlackRoutes(app, dependencies);

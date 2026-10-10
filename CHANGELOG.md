@@ -6,6 +6,26 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-10-10
+
+### Added
+
+- Opt-in public multi-project status pages with custom title, explicit project/check selection, copyable stable link, owner preview and unpublish controls in Project Health.
+- Reuse accessible Health Status rows and 30-day uptime/history for a credential-free, sanitized public projection, with freshness and paused coverage shown explicitly and a Powered by DebugBundle link.
+- Add publication settings/options/preview API, `health status` CLI commands and four ordinary/local-auth MCP tools; OpenClaw keeps publishing optional. Hosted read-only and restricted catalogs remain unchanged.
+- Add forward migration `202610080001_add_public_status_pages` and readiness requirements. Run `db:migrate` before activating new runtime code; bootstrap is not an upgrade path.
+
+### Fixed
+
+- Make public status pages follow device light/dark settings at startup and while open without changing dashboard preferences; add the existing small clickable footer logo above the underlined Powered by DebugBundle attribution with increased spacing. Fix adjacent daily tooltip movement in all shared health views while retaining keyboard access and ordinary tooltip behavior.
+- Open public status settings from a Health toolbar button beside Create health check in the shared form modal. Add a read-only share URL with an inline copy icon, searchable project/check multi-selects, compact selection summaries, the enable switch and a scrollable saved-preview dialog. Preserve explicit selections, pagination and keyboard focus.
+- Simulate public status settings, preview, publishing and unpublishing in the local dashboard mock; use valid project/check UUIDs so strict forms work without weakening production validation.
+- Keep shared Health Status history labels on their recorded UTC day for visitors in every timezone.
+- Refresh publication choices after health-check edits and revalidate public pages when returning to a background tab.
+- Lock selected projects in a consistent order to prevent concurrent reciprocal status-page saves from deadlocking.
+- Preserve installed databases during local/self-host startup: automatic bootstrap skips populated schemas before forward migration, and local startup no longer resets volumes after schema errors.
+- Keep self-host analytics smoke events inside its current-day reporting window instead of emitting an expired fixed fixture date.
+
 ## [1.15.0] - 2026-10-07
 
 ### Added

@@ -188,6 +188,7 @@ export type ManagementCommandDependencies = {
   updateAnalyticsSavedFunnelCommand?: typeof defaultUpdateAnalyticsSavedFunnelCommand;
   archiveAnalyticsSavedFunnelCommand?: typeof defaultArchiveAnalyticsSavedFunnelCommand;
   getAnalyticsSummaryCommand?: typeof defaultGetAnalyticsSummaryCommand;
+  publicStatusCommand?: typeof import("./public-status-commands.js").publicStatusWithAuthCommand;
   analyticsFlowCommand?: typeof analyticsFlowWithAuthCommand;
   getAnalyticsRoutesCommand?: typeof defaultGetAnalyticsRoutesCommand;
   getAnalyticsJourneysCommand?: typeof defaultGetAnalyticsJourneysCommand;

@@ -2,15 +2,41 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   bootstrapStorageSchema,
+  bootstrapStorageSchemaIfEmpty,
   REQUIRED_API_TABLES,
   REQUIRED_WORKER_TABLES,
   STORAGE_BOOTSTRAP_SQL
 } from "../../../packages/storage/src/migrations.js";
 import { STORAGE_SCHEMA_MIGRATIONS } from "../../../packages/storage/src/schema-migrations.js";
 
-const ALL_REQUIRED_TABLES = Array.from(new Set([...REQUIRED_API_TABLES, ...REQUIRED_WORKER_TABLES]));
+const ALL_REQUIRED_TABLES = Array.from(
+  new Set([...REQUIRED_API_TABLES, ...REQUIRED_WORKER_TABLES])
+);
 
 describe("storage bootstrap schema", () => {
+  it("skips every populated schema without changing tables or migration history", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [{ populated: true }] });
+    expect(await bootstrapStorageSchemaIfEmpty({ query })).toEqual({ status: "skipped_existing" });
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(query.mock.calls[0]?.[0]).toContain("pg_catalog.pg_class");
+  });
+  it("bootstraps only a confirmed empty schema in automatic startup", async () => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ populated: false }] })
+      .mockResolvedValue({ rows: [] });
+    expect(await bootstrapStorageSchemaIfEmpty({ query })).toEqual({ status: "bootstrapped" });
+    expect(query).toHaveBeenCalledWith("COMMIT", []);
+  });
+  it("fails closed when the emptiness query cannot confirm the schema state", async () => {
+    for (const response of [{ rows: [] }, { rows: [{ populated: null }] }]) {
+      const query = vi.fn().mockResolvedValue(response);
+      await expect(bootstrapStorageSchemaIfEmpty({ query })).rejects.toThrow(
+        "storage_schema_state_unknown"
+      );
+      expect(query).toHaveBeenCalledTimes(1);
+    }
+  });
   it("should bootstrap an empty schema inside a transaction", async (): Promise<void> => {
     const query = vi
       .fn()
@@ -26,11 +52,9 @@ describe("storage bootstrap schema", () => {
   });
 
   it("should no-op when the clean schema is already bootstrapped", async (): Promise<void> => {
-    const query = vi
-      .fn()
-      .mockResolvedValueOnce({
-        rows: ALL_REQUIRED_TABLES.map((table_name) => ({ table_name }))
-      });
+    const query = vi.fn().mockResolvedValueOnce({
+      rows: ALL_REQUIRED_TABLES.map((table_name) => ({ table_name }))
+    });
 
     const result = await bootstrapStorageSchema({ query });
 
@@ -39,11 +63,9 @@ describe("storage bootstrap schema", () => {
   });
 
   it("should leave schema evolution to db migrations when all required tables already exist", async (): Promise<void> => {
-    const query = vi
-      .fn()
-      .mockResolvedValueOnce({
-        rows: ALL_REQUIRED_TABLES.map((table_name) => ({ table_name }))
-      });
+    const query = vi.fn().mockResolvedValueOnce({
+      rows: ALL_REQUIRED_TABLES.map((table_name) => ({ table_name }))
+    });
 
     const result = await bootstrapStorageSchema({ query });
 
@@ -54,13 +76,19 @@ describe("storage bootstrap schema", () => {
   it("should fail when a legacy schema history table is present", async (): Promise<void> => {
     const query = vi.fn().mockResolvedValueOnce({ rows: [{ table_name: "schema_migrations" }] });
 
-    await expect(bootstrapStorageSchema({ query })).rejects.toThrow("storage_bootstrap_legacy_schema_detected");
+    await expect(bootstrapStorageSchema({ query })).rejects.toThrow(
+      "storage_bootstrap_legacy_schema_detected"
+    );
   });
 
   it("should fail when only part of the required schema exists", async (): Promise<void> => {
-    const query = vi.fn().mockResolvedValueOnce({ rows: [{ table_name: "users" }, { table_name: "organizations" }] });
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ table_name: "users" }, { table_name: "organizations" }] });
 
-    await expect(bootstrapStorageSchema({ query })).rejects.toThrow("storage_bootstrap_partial_schema_detected");
+    await expect(bootstrapStorageSchema({ query })).rejects.toThrow(
+      "storage_bootstrap_partial_schema_detected"
+    );
   });
 
   it("should rollback and surface bootstrap failures", async (): Promise<void> => {
@@ -71,7 +99,9 @@ describe("storage bootstrap schema", () => {
       .mockRejectedValueOnce(new Error("db exploded"))
       .mockResolvedValueOnce({ rows: [] });
 
-    await expect(bootstrapStorageSchema({ query })).rejects.toThrow("storage_bootstrap_failed: db exploded");
+    await expect(bootstrapStorageSchema({ query })).rejects.toThrow(
+      "storage_bootstrap_failed: db exploded"
+    );
     expect(query).toHaveBeenCalledWith("ROLLBACK", []);
     expect(query).not.toHaveBeenCalledWith("COMMIT", []);
   });
@@ -175,8 +205,8 @@ describe("storage bootstrap schema", () => {
   });
 
   it("should include the analytics transition unique-subject migration", (): void => {
-    const migration = STORAGE_SCHEMA_MIGRATIONS.find((entry) =>
-      entry.id === "202607080001_add_analytics_transition_unique_subjects"
+    const migration = STORAGE_SCHEMA_MIGRATIONS.find(
+      (entry) => entry.id === "202607080001_add_analytics_transition_unique_subjects"
     );
 
     expect(migration).toBeDefined();
@@ -184,8 +214,8 @@ describe("storage bootstrap schema", () => {
   });
 
   it("should include the analytics incident correlation migration", (): void => {
-    const migration = STORAGE_SCHEMA_MIGRATIONS.find((entry) =>
-      entry.id === "202607100001_add_analytics_incident_correlation"
+    const migration = STORAGE_SCHEMA_MIGRATIONS.find(
+      (entry) => entry.id === "202607100001_add_analytics_incident_correlation"
     );
 
     expect(migration).toBeDefined();
@@ -204,34 +234,88 @@ describe("storage bootstrap schema", () => {
   });
 
   it("should include critical foreign keys with the expected deletion behavior", (): void => {
-    expect(STORAGE_BOOTSTRAP_SQL.includes("organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("organization_id uuid REFERENCES organizations(id) ON DELETE SET NULL")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("digest_id uuid NOT NULL REFERENCES alert_email_digests(id) ON DELETE CASCADE")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("webhook_id uuid REFERENCES agent_webhooks(id) ON DELETE CASCADE")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("installation_id uuid NOT NULL REFERENCES github_installations(id) ON DELETE CASCADE")).toBe(true);
+    expect(
+      STORAGE_BOOTSTRAP_SQL.includes(
+        "organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE"
+      )
+    ).toBe(true);
+    expect(
+      STORAGE_BOOTSTRAP_SQL.includes(
+        "organization_id uuid REFERENCES organizations(id) ON DELETE SET NULL"
+      )
+    ).toBe(true);
+    expect(
+      STORAGE_BOOTSTRAP_SQL.includes(
+        "project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE"
+      )
+    ).toBe(true);
+    expect(
+      STORAGE_BOOTSTRAP_SQL.includes(
+        "digest_id uuid NOT NULL REFERENCES alert_email_digests(id) ON DELETE CASCADE"
+      )
+    ).toBe(true);
+    expect(
+      STORAGE_BOOTSTRAP_SQL.includes(
+        "webhook_id uuid REFERENCES agent_webhooks(id) ON DELETE CASCADE"
+      )
+    ).toBe(true);
+    expect(
+      STORAGE_BOOTSTRAP_SQL.includes(
+        "installation_id uuid NOT NULL REFERENCES github_installations(id) ON DELETE CASCADE"
+      )
+    ).toBe(true);
   });
 
   it("should include critical uniqueness constraints for ownership and delivery paths", (): void => {
-    expect(STORAGE_BOOTSTRAP_SQL.includes("UNIQUE (project_id, environment, service_id, fingerprint)")).toBe(true);
+    expect(
+      STORAGE_BOOTSTRAP_SQL.includes("UNIQUE (project_id, environment, service_id, fingerprint)")
+    ).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("UNIQUE (organization_id, user_id)")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("email text NOT NULL UNIQUE")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("project_id uuid NOT NULL UNIQUE REFERENCES projects(id) ON DELETE CASCADE")).toBe(true);
+    expect(
+      STORAGE_BOOTSTRAP_SQL.includes(
+        "project_id uuid NOT NULL UNIQUE REFERENCES projects(id) ON DELETE CASCADE"
+      )
+    ).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("rule_name text NOT NULL")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("rule_id uuid NOT NULL REFERENCES github_dispatch_rules(id) ON DELETE CASCADE")).toBe(false);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE INDEX plan_cleanup_tasks_pending_idx")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE UNIQUE INDEX github_dispatch_deliveries_rule_dedupe_key_idx")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE UNIQUE INDEX alert_email_digests_project_recipient_pending_idx")).toBe(true);
+    expect(
+      STORAGE_BOOTSTRAP_SQL.includes(
+        "rule_id uuid NOT NULL REFERENCES github_dispatch_rules(id) ON DELETE CASCADE"
+      )
+    ).toBe(false);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE INDEX plan_cleanup_tasks_pending_idx")).toBe(
+      true
+    );
+    expect(
+      STORAGE_BOOTSTRAP_SQL.includes(
+        "CREATE UNIQUE INDEX github_dispatch_deliveries_rule_dedupe_key_idx"
+      )
+    ).toBe(true);
+    expect(
+      STORAGE_BOOTSTRAP_SQL.includes(
+        "CREATE UNIQUE INDEX alert_email_digests_project_recipient_pending_idx"
+      )
+    ).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE project_usage_counters")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE account_analytics_accounts")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE account_metric_periods")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE account_metric_events")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE account_payment_retention_records")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE account_payment_provider_events")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE account_payment_retention_records")).toBe(
+      true
+    );
+    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE account_payment_provider_events")).toBe(
+      true
+    );
     expect(STORAGE_BOOTSTRAP_SQL.includes("'transition_session'")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("analytics_journey_samples integer NOT NULL DEFAULT 0")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("has_artifact boolean NOT NULL DEFAULT false")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("UNIQUE (organization_id, slack_team_id, slack_channel_id)")).toBe(true);
+    expect(
+      STORAGE_BOOTSTRAP_SQL.includes("analytics_journey_samples integer NOT NULL DEFAULT 0")
+    ).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("has_artifact boolean NOT NULL DEFAULT false")).toBe(
+      true
+    );
+    expect(
+      STORAGE_BOOTSTRAP_SQL.includes("UNIQUE (organization_id, slack_team_id, slack_channel_id)")
+    ).toBe(true);
   });
 
   it("should encode improvement constraints directly in the bootstrap schema", (): void => {
@@ -248,31 +332,57 @@ describe("storage bootstrap schema", () => {
   });
 
   it("should include hot-path indexes for retrieval and claim queries", (): void => {
-    expect(STORAGE_BOOTSTRAP_SQL.includes("incident_events_incident_occurred_event_idx")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("incident_events_incident_occurred_event_idx")).toBe(
+      true
+    );
     expect(STORAGE_BOOTSTRAP_SQL.includes("webhook_deliveries_status_next_attempt_idx")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("github_dispatch_deliveries_status_next_attempt_idx")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("alert_email_digests_status_next_attempt_idx")).toBe(true);
+    expect(
+      STORAGE_BOOTSTRAP_SQL.includes("github_dispatch_deliveries_status_next_attempt_idx")
+    ).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("alert_email_digests_status_next_attempt_idx")).toBe(
+      true
+    );
     expect(STORAGE_BOOTSTRAP_SQL.includes("sessions_token_hash_idx")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("alert_deliveries_project_status_idx")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("organizations_stripe_customer_id_key")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("slack_destinations_org_active_idx")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("github_marketplace_accounts_installation_idx")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("account_metric_periods_grain_period_metric_idx")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("account_payment_provider_events_provider_event_key")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("github_marketplace_accounts_installation_idx")).toBe(
+      true
+    );
+    expect(STORAGE_BOOTSTRAP_SQL.includes("account_metric_periods_grain_period_metric_idx")).toBe(
+      true
+    );
+    expect(
+      STORAGE_BOOTSTRAP_SQL.includes("account_payment_provider_events_provider_event_key")
+    ).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE availability_checks")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE availability_check_results")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE availability_check_daily_rollups")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE availability_check_daily_rollups")).toBe(
+      true
+    );
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE project_analytics_settings")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE analytics_ingestion_ledger")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE analytics_bundle_generations")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE analytics_incident_correlations")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE analytics_incident_session_links")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE analytics_incident_correlations")).toBe(
+      true
+    );
+    expect(STORAGE_BOOTSTRAP_SQL.includes("CREATE TABLE analytics_incident_session_links")).toBe(
+      true
+    );
     expect(STORAGE_BOOTSTRAP_SQL.includes("severity_lifecycle_scope text")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("alert_rules_severity_lifecycle_scope_check")).toBe(true);
     expect(STORAGE_BOOTSTRAP_SQL.includes("availability_checks_due_idx")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("availability_check_results_check_started_idx")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("analytics_session_rollups_project_bucket_idx")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("analytics_opportunities_project_status_detected_idx")).toBe(true);
-    expect(STORAGE_BOOTSTRAP_SQL.includes("analytics_bundle_generations_status_created_idx")).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("availability_check_results_check_started_idx")).toBe(
+      true
+    );
+    expect(STORAGE_BOOTSTRAP_SQL.includes("analytics_session_rollups_project_bucket_idx")).toBe(
+      true
+    );
+    expect(
+      STORAGE_BOOTSTRAP_SQL.includes("analytics_opportunities_project_status_detected_idx")
+    ).toBe(true);
+    expect(STORAGE_BOOTSTRAP_SQL.includes("analytics_bundle_generations_status_created_idx")).toBe(
+      true
+    );
   });
 });

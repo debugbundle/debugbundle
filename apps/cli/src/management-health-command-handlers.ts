@@ -1,3 +1,4 @@
+import { handleStatusCommand } from "./management-status-command-handler.js";
 import {
   createHealthCheckWithAuthCommand as defaultCreateHealthCheckCommand,
   deleteHealthCheckWithAuthCommand as defaultDeleteHealthCheckCommand,
@@ -66,6 +67,7 @@ export async function handleHealthCommand(
   dependencies: ManagementCommandDependencies
 ): Promise<CliCommandResult> {
   const resource = requirePositional(parsedArgv, 1, "resource");
+  if (resource === "status") return handleStatusCommand(parsedArgv, dependencies);
   if (resource !== "checks") {
     throw new CliInputError("Unknown health command.");
   }

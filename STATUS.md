@@ -1,3 +1,129 @@
+# Public status release in progress — 2026-10-10
+
+The owner accepted the local UI and authorized commits, pushes, package publication
+and the hosted release train. Fresh qualification passes 4,164 unit tests, 48
+changed-source coverage gates, 148 integration cases, ten self-host checks and the
+deployed-predecessor migration/rollback rehearsal. Lint, typecheck, builds, audits,
+site and cloud checks pass. Package publication is next. Cloud preparation is
+committed/pushed at `1ae2628`. See `spec/public-status-release-20261010.md` for the version plan,
+dependency order, production migration and verification record. The earlier
+local-only boundaries below are historical; no production success is claimed yet.
+
+# Public status pages — 2026-10-10
+
+Local candidate implemented and production-readiness audit complete. Owner local
+acceptance and explicit release approval remain pending; no commit, publish or
+deployment authorized.
+FR-AVC-07 / AC-AVC-07 implements opt-in project-anchored multi-project publication,
+custom title, explicit check selection, shared Health Status rows/history, owner
+preview, copy/open and unpublish. API/CLI/ordinary MCP/OpenClaw stay aligned;
+frozen hosted/restricted profiles remain unchanged. Public projection sanitizes
+names and excludes private IDs/diagnostics; live ownership/deletion/eligibility
+checks and verified-result freshness fail closed.
+
+The earlier full feature audit passed all 4,118 unit tests (505 files / 92 shards)
+and all 43 changed-source coverage candidates. All 148 isolated integration
+cases pass without skips, including seven publication cases and real
+member-auth/Postgres/Redis HTTP composition. All ten self-host Compose smoke
+checks pass, covering fresh bootstrap/migration/readiness, ingestion, incidents,
+debug bundles, analytics aggregates, journeys and analytics bundles. Lint,
+typecheck, candidate builds, 41 site tests/build/typecheck, 21 hosted safeguards
+and OpenClaw validation pass.
+
+The follow-up audit fixed stale publication choices after check edits, stale
+public results after returning to a background tab, reciprocal save deadlocks,
+and installed-schema startup ordering. Automatic bootstrap now skips populated
+schemas without seeding their ledger; forward migrations handle upgrades, and
+startup failures never automatically reset local volumes. A stale smoke-test
+timestamp was also corrected without changing analytics processing. Existing
+monitoring, incident and uptime calculations remain intact.
+
+Pre-ship review is complete. Optional hosted configuration is wired in the
+private cloud repo; default app URLs need no DNS change. Deployment must apply
+the forward migration before dependent runtime activation. No browser or
+production verification occurred. See `spec/public-status-pages.md` for the
+contract, fresh qualification evidence and owner local test checklist. Use the
+real local API for persistence/auth/migration acceptance. The follow-up mock
+publication slice now supports the same UI flow with synthetic history, explicit
+selections, valid UUIDs and local share links. All 67 checks in ten adjacent
+mock/web/Compose test files pass, along with typecheck, focused lint and candidate
+builds. The new simulator passes normal coverage thresholds (98.82% lines,
+98.19% branches, 100% functions). A build with the mock flag enabled excludes
+mock markers. Live local HTTP confirms settings/options, multi-project save,
+safe anonymous output, owner preview and unpublish. `make dev-mock` is running
+for owner review; publications reset on restart. These checks supplement the
+earlier full qualification above; no new browser or production claim is made.
+
+The owner superseded the sidebar placement with the modal design on 2026-10-09.
+A Public status page button immediately left of Create health check opens the
+shared form modal, with a scrollable body and fixed save/preview footer. The
+published URL uses a labelled read-only input and an inline copy icon on the
+right; clipboard failures select the input for manual copying. Searchable
+project/check selectors, pagination, explicit selections, limits and the enable
+switch are retained. Settings load on opening, closing discards unsaved drafts,
+and reopening reads saved settings. Selectors and saved preview dismiss without
+closing settings; focus returns to their buttons and then the toolbar. Responses
+from closed instances cannot update or reopen the next modal.
+
+The prior sidebar qualification passed 716 frontend/mock/Compose tests in 108
+files; that evidence remains historical. Fresh modal qualification passes all
+133 checks in 19 focused/adjacent Health, public-page, mock, Compose and docs
+files (29 focused plus 104 adjacent), along with focused lint, repository
+typecheck, candidate builds and the website's 41 tests/build/typecheck. The
+selector, copy input and new input-group primitive have 100% coverage across
+all metrics; settings pass normal per-file thresholds (98.4% lines, 96.77%
+functions, 87.58% branches, 96.75% statements). Tests reproduce missing modal
+placement first and cover pointer/keyboard opening, search focus inside dialogs,
+nested dismissal/focus return, read-only copy/manual fallback, close/reopen and
+late load/save/preview responses, plus existing publication and Health flows.
+Evidence: `.tmp/public-status-modal-{red,coverage-final,regression,lint-final,typecheck-final,build-final,site}.log`
+and `.tmp/public-status-modal-served.json`.
+
+The final pre-ship review covers changed components, error/loading/disabled and
+limit states, trust boundaries, async cleanup, publication compatibility and
+documentation. No API, authorization, monitoring, package dependency or schema
+change is part of this modal slice. HTTP confirms the current mock serves all
+six checked routes/modules at port 5291. Mock publications were not reset.
+Refresh the Health tab for owner review. Browser/device acceptance and explicit
+commit/publication/deployment authorization remain pending.
+
+The owner-directed theme, branding and tooltip refinement is locally qualified
+on 2026-10-10. Anonymous pages follow the device light/dark setting before mount
+and while open, independently of the saved dashboard preference. Private routes
+retain their preference and controls. The underlined Powered by DebugBundle attribution stays on one line, with the
+existing small brand mark above it in a separate accessible link with increased spacing. Shared daily status tooltips
+move to each adjacent project/check block on the first pointer movement in both
+directions across Health Status, public pages and saved previews. Keyboard focus,
+descriptions and Escape dismissal remain intact; ordinary tooltips are unchanged.
+
+Fresh qualification passes all 740 tests in 112 frontend/mock/Compose files,
+followed by all 46 focused checks in seven files, including two additional browser
+portability cases. Normal per-file coverage thresholds pass for all four targeted
+source modules: shared history 100% lines / 93.61% branches, theme initialization
+100% across all metrics, theme provider 96.77% lines / 91.93% branches, and public
+page 100% lines / 82.14% branches. Repository typecheck, lint, candidate builds and
+the website's 41 tests/build/typecheck pass. The close-during-save regression now
+waits for loaded selections and defers only the save request, preserving its
+original assertions. Pre-ship review covers provider routing, theme listeners,
+anonymous storage independence, footer accessibility, shared tooltip scope and
+contract/documentation alignment. This slice adds no API, schema, monitoring,
+authorization or dependency change. Local HTTP confirms six current modules and
+assets; mock publications remain intact. Evidence:
+`.tmp/public-status-theme-tooltip-{red,regression,coverage-final,lint-final,typecheck-final,build,site}.log`
+and `.tmp/public-status-theme-tooltip-served.json`. Refresh the local page before
+owner review; no browser/device verification, commit, publication or deployment
+occurred.
+
+Owner clarification (2026-10-10) restores the complete underlined Powered by
+DebugBundle attribution and a separate clickable logo. The subsequent owner
+revision places the logo above the attribution with increased spacing. Both links have
+accessible names and visible keyboard focus. All 17 public-page/theme tests,
+normal page coverage gates, focused lint and repository typecheck pass against
+the corrected footer. Evidence: `.tmp/public-status-footer-above-{red,green,lint,typecheck}.log`.
+This supersedes only the footer arrangement; changes remain local/unreleased.
+
+---
+
 # Current interface parity release — 2026-10-07
 
 All fourteen audited findings are patched and released. Core 1.15.0, shared

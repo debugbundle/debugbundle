@@ -19,7 +19,7 @@ const reply = (body: unknown, status = 200): MockResponse => ({ status, body });
 const missing = (): MockResponse => reply({ error: "mock_record_not_found" }, 404);
 const invalid = (): MockResponse => reply({ error: "invalid_mock_payload" }, 400);
 
-/** Legacy demo links use friendly IDs; strictly validated artifact fields use synthetic UUIDs. */
+/** Synthetic artifact identifiers remain distinct from fixture-owned project identifiers. */
 export function mockProjectUuid(index: number): string {
   return `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`;
 }
@@ -27,15 +27,14 @@ export function mockProjectUuid(index: number): string {
 export function createAnalyticsMocks(data: ReturnType<typeof createDevMockFixtures>) {
   const now = new Date().toISOString();
   let sequence = 100;
-  const projectUuid = (id: string): string =>
-    mockProjectUuid(data.projects.findIndex((project) => project["project_id"] === id));
+  const projectUuid = (id: string): string => id;
   const definitions = new Map<string, AnalyticsFlowDefinition[]>([
     [
-      "proj_123",
+      "00000000-0000-4000-8000-000000000001",
       [
         {
           id: mockProjectUuid(100),
-          project_id: projectUuid("proj_123"),
+          project_id: projectUuid("00000000-0000-4000-8000-000000000001"),
           flow_key: "checkout",
           display_name: "Checkout journey",
           kind: "activation",
@@ -65,10 +64,10 @@ export function createAnalyticsMocks(data: ReturnType<typeof createDevMockFixtur
   ]);
   const saved = new Map<string, AnalyticsSavedFunnel[]>([
     [
-      "proj_123",
+      "00000000-0000-4000-8000-000000000001",
       [
         {
-          project_id: projectUuid("proj_123"),
+          project_id: projectUuid("00000000-0000-4000-8000-000000000001"),
           funnel_key: "checkout",
           display_name: "Checkout completion",
           created_at: now,
@@ -301,7 +300,7 @@ export function createAnalyticsMocks(data: ReturnType<typeof createDevMockFixtur
       return reply({
         window: metricsWindow,
         patterns:
-          projectId === "proj_123"
+          projectId === "00000000-0000-4000-8000-000000000001"
             ? [
                 {
                   from_route_key: "/events",
@@ -317,7 +316,7 @@ export function createAnalyticsMocks(data: ReturnType<typeof createDevMockFixtur
     const sampleId = mockProjectUuid(910);
     const sample = {
       sample_id: sampleId,
-      project_id: projectUuid("proj_123"),
+      project_id: projectUuid("00000000-0000-4000-8000-000000000001"),
       service: "saycheese-frontend",
       environment: "production",
       session_id_hash: `sha256:${"b".repeat(64)}`,
@@ -332,9 +331,12 @@ export function createAnalyticsMocks(data: ReturnType<typeof createDevMockFixtur
     };
     if (read && route === "/v1/analytics/actions")
       return reply({
-        window: { ...metricsWindow, project_id: projectUuid(projectId ?? "proj_123") },
+        window: {
+          ...metricsWindow,
+          project_id: projectUuid(projectId ?? "00000000-0000-4000-8000-000000000001")
+        },
         actions:
-          projectId === "proj_123"
+          projectId === "00000000-0000-4000-8000-000000000001"
             ? [
                 {
                   action_key: "checkout",
@@ -354,7 +356,7 @@ export function createAnalyticsMocks(data: ReturnType<typeof createDevMockFixtur
         .safeParse(query.get("limit") ?? 20);
       if (!limit.success) return invalid();
       const matches =
-        projectId === "proj_123" &&
+        projectId === "00000000-0000-4000-8000-000000000001" &&
         !query.has("cursor") &&
         (!query.has("tag") || query.get("tag") === "checkout_friction") &&
         (!query.has("service") || query.get("service") === sample.service) &&
@@ -363,7 +365,10 @@ export function createAnalyticsMocks(data: ReturnType<typeof createDevMockFixtur
     }
     const journeyMatch = /^\/v1\/analytics\/journey-samples\/([^/]+)$/.exec(path);
     if (read && journeyMatch) {
-      if (projectId !== "proj_123" || !["journey_demo", sampleId].includes(journeyMatch[1]!))
+      if (
+        projectId !== "00000000-0000-4000-8000-000000000001" ||
+        !["journey_demo", sampleId].includes(journeyMatch[1]!)
+      )
         return missing();
       return reply({
         sample,

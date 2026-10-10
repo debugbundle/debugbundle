@@ -19,15 +19,20 @@ export function createDevMockFixtures() {
     owner_email: "demo@example.test",
     metrics: {
       ...base.projects.metrics,
-      open_incidents: id === "proj_123" ? 22 : 0,
-      attention_incidents_today: id === "proj_123" ? 22 : 0,
-      opened_incidents_today: id === "proj_123" ? 23 : 0
+      open_incidents: id === "00000000-0000-4000-8000-000000000001" ? 22 : 0,
+      attention_incidents_today: id === "00000000-0000-4000-8000-000000000001" ? 22 : 0,
+      opened_incidents_today: id === "00000000-0000-4000-8000-000000000001" ? 23 : 0
     }
   });
   const projects = [
-    project("proj_123", "SayCheese", "saycheese", "lime"),
-    project("proj_new", "TaskTime App", "tasktime", "blue"),
-    project("proj_down", "Healthbrain Patients", "healthbrain-patients", "emerald")
+    project("00000000-0000-4000-8000-000000000001", "SayCheese", "saycheese", "lime"),
+    project("00000000-0000-4000-8000-000000000002", "TaskTime App", "tasktime", "blue"),
+    project(
+      "00000000-0000-4000-8000-000000000003",
+      "Healthbrain Patients",
+      "healthbrain-patients",
+      "emerald"
+    )
   ];
   const check = (
     id: string,
@@ -44,40 +49,65 @@ export function createDevMockFixtures() {
     ...overrides
   });
   const checks = [
-    check("chk_events", "proj_123", "Events page health"),
-    check("chk_web", "proj_123", "Web health"),
-    check("chk_api", "proj_123", "API health"),
-    check("chk_new", "proj_new", "New health", {
-      status: "unknown",
-      last_checked_at: null,
-      last_result_status: null,
-      last_result_http_status: null,
-      last_result_duration_ms: null
-    }),
-    check("chk_down", "proj_down", "patients-api", {
-      service_name: "patients-api",
-      status: "failing",
-      consecutive_failures: 6,
-      consecutive_successes: 0,
-      last_result_status: "failure",
-      last_result_http_status: 503,
-      linked_incident_id: "inc_down",
-      linked_incident_status: "open"
-    })
+    check(
+      "10000000-0000-4000-8000-000000000001",
+      "00000000-0000-4000-8000-000000000001",
+      "Events page health"
+    ),
+    check(
+      "10000000-0000-4000-8000-000000000002",
+      "00000000-0000-4000-8000-000000000001",
+      "Web health"
+    ),
+    check(
+      "10000000-0000-4000-8000-000000000003",
+      "00000000-0000-4000-8000-000000000001",
+      "API health"
+    ),
+    check(
+      "10000000-0000-4000-8000-000000000004",
+      "00000000-0000-4000-8000-000000000002",
+      "New health",
+      {
+        status: "unknown",
+        last_checked_at: null,
+        last_result_status: null,
+        last_result_http_status: null,
+        last_result_duration_ms: null
+      }
+    ),
+    check(
+      "10000000-0000-4000-8000-000000000005",
+      "00000000-0000-4000-8000-000000000003",
+      "patients-api",
+      {
+        service_name: "patients-api",
+        status: "failing",
+        consecutive_failures: 6,
+        consecutive_successes: 0,
+        last_result_status: "failure",
+        last_result_http_status: 503,
+        linked_incident_id: "inc_down",
+        linked_incident_status: "open"
+      }
+    )
   ];
   const rollups = checks
     .flatMap((item) =>
       Array.from({ length: 30 }, (_, i): MockRecord[] => {
-        if (item["check_id"] === "chk_new" || (item["check_id"] === "chk_events" && i < 29))
+        if (
+          item["check_id"] === "10000000-0000-4000-8000-000000000004" ||
+          (item["check_id"] === "10000000-0000-4000-8000-000000000001" && i < 29)
+        )
           return [];
         const day = new Date();
         day.setUTCDate(day.getUTCDate() - (29 - i));
         const failed =
-          item["check_id"] === "chk_api" && i === 28
+          item["check_id"] === "10000000-0000-4000-8000-000000000003" && i === 28
             ? 85
-            : item["check_id"] === "chk_down" && i === 29
+            : item["check_id"] === "10000000-0000-4000-8000-000000000005" && i === 29
               ? 6
-              : item["check_id"] === "chk_web" && i === 8
+              : item["check_id"] === "10000000-0000-4000-8000-000000000002" && i === 8
                 ? 2
                 : 0;
         return [
@@ -126,7 +156,7 @@ export function createDevMockFixtures() {
   incidents.push({
     ...incidents[2],
     incident_id: "inc_down",
-    project_id: "proj_down",
+    project_id: "00000000-0000-4000-8000-000000000003",
     project_name: "Healthbrain Patients",
     project_color_tag: "emerald",
     service_name: "patients-api",
@@ -209,7 +239,7 @@ export function createDevMockFixtures() {
           ...structuredClone(base.analyticsSettings),
           settings: {
             ...structuredClone(base.analyticsSettings.settings),
-            enabled: p["project_id"] === "proj_123"
+            enabled: p["project_id"] === "00000000-0000-4000-8000-000000000001"
           }
         }
       ])

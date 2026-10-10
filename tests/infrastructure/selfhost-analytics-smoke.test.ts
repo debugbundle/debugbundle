@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { runSelfhostAnalyticsSmoke } from "../../scripts/selfhost-smoke-analytics.js";
 import { AnalyticsEventEnvelopeSchema } from "../../packages/shared-types/src/index.js";
@@ -15,7 +15,12 @@ function jsonResponse(status: number, body: unknown, headers: HeadersInit = {}):
 }
 
 describe("self-host analytics smoke runner", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
   it("proves realistic browser traffic reaches rollups, samples, and AnalyticsBundle generation", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-09T12:00:00.000Z"));
     const fetchImpl = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(
@@ -132,6 +137,8 @@ describe("self-host analytics smoke runner", () => {
     expect(directBody.events).toHaveLength(20);
     expect(relayUpstreamBody.events).toHaveLength(9);
     const events = [...directBody.events, ...relayUpstreamBody.events];
+    // The runner queries last=1d, so synthetic capture must stay inside that live window.
+    expect(events.every((event) => event["occurred_at"] === new Date().toISOString())).toBe(true);
     expect(
       new Set(events.map((event) => (event["correlation"] as { session_id: string }).session_id))
         .size

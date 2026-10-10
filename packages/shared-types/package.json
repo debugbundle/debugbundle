@@ -1,6 +1,6 @@
 {
   "name": "@debugbundle/shared-types",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "private": true,
   "type": "module",
   "license": "Apache-2.0",

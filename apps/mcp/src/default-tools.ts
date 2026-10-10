@@ -1,3 +1,5 @@
+import { createPublicStatusApi } from "../../cli/src/public-status-commands.js";
+import { createPublicStatusMcpTools } from "./public-status-tools.js";
 import { createAnalyticsFlowApi } from "../../cli/src/analytics-flow-commands.js";
 import { createAnalyticsFlowMcpTools } from "./analytics-flow-tools.js";
 import { createAlertApi } from "../../../packages/alert-client/src/index.js";
@@ -189,6 +191,7 @@ export async function createDefaultMcpTools(
         ...createAnalyticsJourneySampleApi(httpClient)
       }),
       ...createAnalyticsSettingsMcpTools(createAnalyticsSettingsApi(httpClient)),
+      ...createPublicStatusMcpTools(createPublicStatusApi(httpClient)),
       ...createAnalyticsFlowMcpTools(createAnalyticsFlowApi(httpClient)),
       ...createAnalyticsSavedFunnelMcpTools(createAnalyticsSavedFunnelApi(httpClient)),
       ...createCaptureRuleMcpTools(createCaptureRuleApi(httpClient)),

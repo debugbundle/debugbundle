@@ -1,3 +1,4 @@
+import { PUBLIC_STATUS_SCHEMA_MIGRATIONS } from "./public-status-schema.js";
 import { ANALYTICS_FLOW_SCHEMA_MIGRATIONS } from "./analytics-flow-schema.js";
 import { BROWSER_RECOVERY_MIGRATIONS } from "./browser-recovery-schema.js";
 import { type Queryable } from "./migrations.js";
@@ -34,7 +35,8 @@ export const STORAGE_SCHEMA_MIGRATIONS: readonly StorageSchemaMigration[] = [
   ...ANALYTICS_STORAGE_SCHEMA_MIGRATIONS,
   ...OPENAI_OAUTH_STORAGE_SCHEMA_MIGRATIONS,
   ...WORKER_JOB_SCHEMA_MIGRATIONS,
-  ...ANALYTICS_FLOW_SCHEMA_MIGRATIONS
+  ...ANALYTICS_FLOW_SCHEMA_MIGRATIONS,
+  ...PUBLIC_STATUS_SCHEMA_MIGRATIONS
 ].sort((left, right) => left.id.localeCompare(right.id));
 
 function validateStorageSchemaMigrations(migrations: readonly StorageSchemaMigration[]): void {

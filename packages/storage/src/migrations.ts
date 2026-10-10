@@ -82,7 +82,10 @@ export const REQUIRED_API_TABLES = [
   "analytics_flow_definitions",
   "analytics_flow_runs",
   "analytics_flow_handoffs",
-  "analytics_flow_rollups"
+  "analytics_flow_rollups",
+  "public_status_pages",
+  "public_status_page_projects",
+  "public_status_page_checks"
 ] as const;
 
 export const REQUIRED_WORKER_TABLES = [
@@ -199,6 +202,23 @@ async function listKnownStorageTables(db: Queryable): Promise<Set<string>> {
   );
 
   return new Set(rows.rows.map((row) => row.table_name));
+}
+
+/** Startup orchestration only: installed schemas must proceed to forward migrations unchanged. */
+export async function bootstrapStorageSchemaIfEmpty(
+  db: Queryable
+): Promise<{ status: "bootstrapped" | "already_bootstrapped" | "skipped_existing" }> {
+  const result = await db.query<{ populated: boolean }>(
+    `SELECT EXISTS (
+      SELECT 1 FROM pg_catalog.pg_class
+      WHERE relnamespace = 'public'::regnamespace AND relkind IN ('r','p','v','m','f','S')
+    ) AS populated`,
+    []
+  );
+  const populated = result.rows[0]?.populated;
+  if (typeof populated !== "boolean") throw new Error("storage_schema_state_unknown");
+  if (populated) return { status: "skipped_existing" };
+  return bootstrapStorageSchema(db);
 }
 
 export async function bootstrapStorageSchema(

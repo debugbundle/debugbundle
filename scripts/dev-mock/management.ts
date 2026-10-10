@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
 import type { createDevMockFixtures, MockRecord } from "./fixtures.js";
 import type { MockResponse } from "./api.js";
 import { base } from "./base.js";
@@ -45,7 +46,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
       token_id: "mock_agent_credential",
       issuer_user_id: "usr_123",
       organization_id: "org_123",
-      project_id: "proj_123",
+      project_id: "00000000-0000-4000-8000-000000000001",
       label: "Preview agent",
       scope: "incident:read-minimized",
       policy_version: "telemetry-privacy-v1",
@@ -54,7 +55,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
       revoked_at: null
     }
   ];
-  const repos = new Map<string, MockRecord>([["proj_123", data.repo]]);
+  const repos = new Map<string, MockRecord>([["00000000-0000-4000-8000-000000000001", data.repo]]);
   const members = new Map(
     data.projects.map((project) => [
       String(project["project_id"]),
@@ -67,7 +68,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
           avatar_url: null,
           created_at: now
         },
-        ...(project["project_id"] === "proj_123"
+        ...(project["project_id"] === "00000000-0000-4000-8000-000000000001"
           ? [
               {
                 user_id: "usr_collaborator",
@@ -92,7 +93,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
   const invites: MockRecord[] = [
     {
       invite_id: "invite_demo",
-      project_id: "proj_123",
+      project_id: "00000000-0000-4000-8000-000000000001",
       email: "pending@example.test",
       role: "member",
       invited_by_user_id: "usr_123",
@@ -132,7 +133,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
   const probes: MockRecord[] = [
     {
       activation_id: "probe_demo",
-      project_id: "proj_123",
+      project_id: "00000000-0000-4000-8000-000000000001",
       label_pattern: "checkout.*",
       service: "saycheese-frontend",
       environment: "production",
@@ -144,7 +145,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
   const webhooks: MockRecord[] = [
     {
       webhook_id: "wh_demo",
-      project_id: "proj_123",
+      project_id: "00000000-0000-4000-8000-000000000001",
       created_by_user_id: "usr_123",
       url: "https://hooks.example.test/debugbundle",
       events: ["bundle.created", "verification.passed"],
@@ -184,7 +185,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
   const channels: MockRecord[] = [
     {
       channel_id: "weekly_demo",
-      project_id: "proj_123",
+      project_id: "00000000-0000-4000-8000-000000000001",
       channel: "email",
       config: { to: ["demo@example.test"] },
       schedule: { day_of_week: "monday", hour_of_day: 9, timezone: "UTC" },
@@ -194,7 +195,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
     },
     {
       channel_id: "weekly_slack_demo",
-      project_id: "proj_123",
+      project_id: "00000000-0000-4000-8000-000000000001",
       channel: "slack",
       config: { slack_destination_id: "slack_demo" },
       schedule: { day_of_week: "monday", hour_of_day: 9, timezone: "UTC" },
@@ -206,7 +207,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
   const destinations: MockRecord[] = [
     {
       slack_destination_id: "slack_demo",
-      project_id: "proj_123",
+      project_id: "00000000-0000-4000-8000-000000000001",
       organization_id: "org_123",
       slack_team_id: "mock_team",
       slack_team_name: "Demo workspace",
@@ -319,7 +320,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
       const record = {
         ...structuredClone(base.projects),
         ...input.data,
-        project_id: `mock_project_${sequence++}`,
+        project_id: randomUUID(),
         sharing_state: "private",
         created_at: now,
         updated_at: now
@@ -572,7 +573,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
     }
     if (path === "/v1/slack/app/install-url" && read)
       return reply({
-        install_url: `/projects/${encodeURIComponent(projectId ?? "proj_123")}/alerts`
+        install_url: `/projects/${encodeURIComponent(projectId ?? "00000000-0000-4000-8000-000000000001")}/alerts`
       });
     if (project && route === "/v1/slack/destinations" && read)
       return reply({ destinations: scoped(destinations, projectId) });
@@ -633,5 +634,5 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
     }
     return undefined;
   }
-  return { handle };
+  return { handle, isSignedIn: () => signedIn };
 }

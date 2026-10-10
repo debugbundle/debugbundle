@@ -45,6 +45,9 @@ import type { ApiManagementDependencies } from "./api-management-types.js";
 import type { OpenAiHostedReadDependencies } from "./openai-mcp-operations.js";
 
 export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagementDependencies {
+  publicStatusPages?: import("../../../packages/storage/src/public-status-store.js").PublicStatusPageStore;
+  publicStatusBaseUrl?: string;
+  publicStatusTrustProxy?: boolean;
   alertGroupInspection?: AlertGroupInspectionStore;
   ingestionPersistence: Pick<IngestionPersistenceService, "persistAndEnqueue"> &
     Partial<AnalyticsIngestionPersistenceService>;

@@ -4,17 +4,21 @@ import { createDevMockApi } from "../../scripts/dev-mock/api.js";
 describe("local preview management data", () => {
   it("simulates probe, weekly-report, repository and project actions without losing their scoped state", () => {
     const api = createDevMockApi();
-    const activation = api.handle("POST", "/v1/projects/proj_123/probes/activate", {
-      label_pattern: "checkout.*",
-      service: "*",
-      environment: "*",
-      ttl_seconds: 60,
-      trigger_ttl_seconds: 300
-    });
+    const activation = api.handle(
+      "POST",
+      "/v1/projects/00000000-0000-4000-8000-000000000001/probes/activate",
+      {
+        label_pattern: "checkout.*",
+        service: "*",
+        environment: "*",
+        ttl_seconds: 60,
+        trigger_ttl_seconds: 300
+      }
+    );
     expect(activation.status).toBe(200);
     const record = (activation.body as { activation: { activation_id: string } }).activation;
     expect(
-      api.handle("POST", "/v1/projects/proj_123/probes/deactivate", {
+      api.handle("POST", "/v1/projects/00000000-0000-4000-8000-000000000001/probes/deactivate", {
         activation_id: record.activation_id
       }).status
     ).toBe(200);
@@ -22,21 +26,35 @@ describe("local preview management data", () => {
       api.handle("PATCH", "/v1/weekly-report-channels/weekly_demo", { is_enabled: false }).body
     ).toHaveProperty("channel.is_enabled", false);
     expect(
-      api.handle("POST", "/v1/projects/proj_123/slack/destinations/slack_demo/test").body
+      api.handle(
+        "POST",
+        "/v1/projects/00000000-0000-4000-8000-000000000001/slack/destinations/slack_demo/test"
+      ).body
     ).toHaveProperty("synthetic", true);
-    expect(api.handle("DELETE", "/v1/projects/proj_123/github/repo").status).toBe(200);
-    expect(api.handle("GET", "/v1/projects/proj_123/github/repo").body).toMatchObject({
+    expect(
+      api.handle("DELETE", "/v1/projects/00000000-0000-4000-8000-000000000001/github/repo").status
+    ).toBe(200);
+    expect(
+      api.handle("GET", "/v1/projects/00000000-0000-4000-8000-000000000001/github/repo").body
+    ).toMatchObject({
       repo: null
     });
     expect(
-      api.handle("PUT", "/v1/projects/proj_123/github/repo", { owner: "demo", repo: "web" }).body
+      api.handle("PUT", "/v1/projects/00000000-0000-4000-8000-000000000001/github/repo", {
+        owner: "demo",
+        repo: "web"
+      }).body
     ).toHaveProperty("repo.repo_name", "web");
     expect(
       api.handle("POST", "/v1/improvements/imp_0/snooze", {
         snoozed_until: new Date(Date.now() + 86400000).toISOString()
       }).body
     ).toHaveProperty("improvement.status", "snoozed");
-    for (const id of ["proj_123", "proj_new", "proj_down"])
+    for (const id of [
+      "00000000-0000-4000-8000-000000000001",
+      "00000000-0000-4000-8000-000000000002",
+      "00000000-0000-4000-8000-000000000003"
+    ])
       expect(api.handle("DELETE", `/v1/projects/${id}`).status).toBe(200);
     expect(
       api.handle("POST", "/v1/projects", {
@@ -47,16 +65,16 @@ describe("local preview management data", () => {
     ).toHaveProperty("project.organization_id", "org_123");
   });
   it.each([
-    ["/v1/webhooks?project_id=proj_123&limit=20", "webhooks"],
-    ["/v1/projects/proj_123/probes", "activations"],
-    ["/v1/projects/proj_123/tokens", "tokens"],
-    ["/v1/projects/proj_123/members", "members"],
-    ["/v1/projects/proj_123/invites", "invites"],
+    ["/v1/webhooks?project_id=00000000-0000-4000-8000-000000000001&limit=20", "webhooks"],
+    ["/v1/projects/00000000-0000-4000-8000-000000000001/probes", "activations"],
+    ["/v1/projects/00000000-0000-4000-8000-000000000001/tokens", "tokens"],
+    ["/v1/projects/00000000-0000-4000-8000-000000000001/members", "members"],
+    ["/v1/projects/00000000-0000-4000-8000-000000000001/invites", "invites"],
     ["/v1/member/tokens", "tokens"],
     ["/v1/billing", "billing"],
     ["/v1/openai/connections", "connections"],
-    ["/v1/projects/proj_123/slack/destinations", "destinations"],
-    ["/v1/weekly-report-channels?project_id=proj_123", "channels"]
+    ["/v1/projects/00000000-0000-4000-8000-000000000001/slack/destinations", "destinations"],
+    ["/v1/weekly-report-channels?project_id=00000000-0000-4000-8000-000000000001", "channels"]
   ])("populates %s with synthetic data", (path, key) => {
     const result = createDevMockApi().handle("GET", path);
     expect(result.status).toBe(200);
@@ -67,7 +85,7 @@ describe("local preview management data", () => {
   it("simulates webhook creation and test deliveries, scopes history and reveals secrets only once", () => {
     const api = createDevMockApi();
     const created = api.handle("POST", "/v1/webhooks", {
-      project_id: "proj_123",
+      project_id: "00000000-0000-4000-8000-000000000001",
       url: "https://hooks.example.test/demo",
       events: ["bundle.created"]
     });
@@ -76,25 +94,30 @@ describe("local preview management data", () => {
       .webhook;
     expect(webhook.signing_secret).toContain("mock");
     const path = `/v1/webhooks/${webhook.webhook_id}`;
-    expect(api.handle("GET", `${path}?project_id=proj_123`).body).not.toHaveProperty(
-      "webhook.signing_secret"
-    );
     expect(
-      api.handle("POST", `${path}/test?project_id=proj_123`, { event_type: "verification.passed" })
-        .body
+      api.handle("GET", `${path}?project_id=00000000-0000-4000-8000-000000000001`).body
+    ).not.toHaveProperty("webhook.signing_secret");
+    expect(
+      api.handle("POST", `${path}/test?project_id=00000000-0000-4000-8000-000000000001`, {
+        event_type: "verification.passed"
+      }).body
     ).toHaveProperty("delivery.status", "delivered");
-    expect(api.handle("GET", `${path}/deliveries?project_id=proj_123`).body).toHaveProperty(
-      "deliveries.0.event_type",
-      "verification.passed"
-    );
-    expect(api.handle("GET", `${path}/deliveries?project_id=proj_new`).status).toBe(404);
     expect(
-      api.handle("POST", "/v1/webhooks", { project_id: "proj_123", url: "invalid", events: [] })
-        .status
+      api.handle("GET", `${path}/deliveries?project_id=00000000-0000-4000-8000-000000000001`).body
+    ).toHaveProperty("deliveries.0.event_type", "verification.passed");
+    expect(
+      api.handle("GET", `${path}/deliveries?project_id=00000000-0000-4000-8000-000000000002`).status
+    ).toBe(404);
+    expect(
+      api.handle("POST", "/v1/webhooks", {
+        project_id: "00000000-0000-4000-8000-000000000001",
+        url: "invalid",
+        events: []
+      }).status
     ).toBe(400);
   });
 
-  it.each(["/v1/projects/proj_123/tokens", "/v1/member/tokens"])(
+  it.each(["/v1/projects/00000000-0000-4000-8000-000000000001/tokens", "/v1/member/tokens"])(
     "creates and revokes fake tokens at %s without retaining plaintext",
     (path) => {
       const api = createDevMockApi();
@@ -126,19 +149,34 @@ describe("local preview management data", () => {
 
   it("simulates invites and member edits independently for each project", () => {
     const api = createDevMockApi();
-    const invited = api.handle("POST", "/v1/projects/proj_123/invite", {
+    const invited = api.handle("POST", "/v1/projects/00000000-0000-4000-8000-000000000001/invite", {
       email: "new@example.test",
       role: "admin"
     });
     expect(invited.status).toBe(200);
     const inviteId = (invited.body as { invite: { invite_id: string } }).invite.invite_id;
-    expect(api.handle("GET", "/v1/projects/proj_new/invites").body).toMatchObject({ invites: [] });
-    expect(api.handle("DELETE", `/v1/projects/proj_new/invites/${inviteId}`).status).toBe(404);
-    expect(api.handle("DELETE", `/v1/projects/proj_123/invites/${inviteId}`).status).toBe(200);
     expect(
-      api.handle("PATCH", "/v1/projects/proj_123/members/usr_collaborator", { role: "admin" }).body
+      api.handle("GET", "/v1/projects/00000000-0000-4000-8000-000000000002/invites").body
+    ).toMatchObject({ invites: [] });
+    expect(
+      api.handle("DELETE", `/v1/projects/00000000-0000-4000-8000-000000000002/invites/${inviteId}`)
+        .status
+    ).toBe(404);
+    expect(
+      api.handle("DELETE", `/v1/projects/00000000-0000-4000-8000-000000000001/invites/${inviteId}`)
+        .status
+    ).toBe(200);
+    expect(
+      api.handle(
+        "PATCH",
+        "/v1/projects/00000000-0000-4000-8000-000000000001/members/usr_collaborator",
+        { role: "admin" }
+      ).body
     ).toHaveProperty("member.role", "admin");
-    expect(api.handle("DELETE", "/v1/projects/proj_123/members/usr_123").status).toBe(400);
+    expect(
+      api.handle("DELETE", "/v1/projects/00000000-0000-4000-8000-000000000001/members/usr_123")
+        .status
+    ).toBe(400);
   });
 
   it("keeps billing checkout URLs local and capacity changes consistent with the selected plan", () => {

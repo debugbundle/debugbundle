@@ -1,4 +1,5 @@
-import { ChevronDownIcon, ChevronRightIcon, HeartPulseIcon } from "lucide-react";
+import { HealthStatusProjectRow } from "../components/system/health-status-view.js";
+import { ChevronRightIcon, HeartPulseIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -7,7 +8,6 @@ import { useHeaderActions } from "../components/system/header-actions-context.js
 import { ProjectNameWithAccessIndicator } from "../components/system/project-name-with-access-indicator.js";
 import { ResourceListState } from "../components/system/resource-list-state.js";
 import { TableRefreshButton } from "../components/system/table-refresh-button.js";
-import { Badge } from "../components/ui/badge.js";
 import { Button } from "../components/ui/button.js";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
 import {
@@ -20,7 +20,6 @@ import {
 } from "../components/ui/empty.js";
 import { Notice } from "../components/ui/notice.js";
 import { Skeleton } from "../components/ui/skeleton.js";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../components/ui/tooltip.js";
 import {
   isInvalidSessionError,
   listProjectAvailabilityCheckDailyRollups,
@@ -29,14 +28,10 @@ import {
   type AvailabilityCheckRecord
 } from "../lib/api.js";
 import { isSharedProjectAccessSuspended } from "../lib/project-access.js";
-import { cn } from "../lib/utils.js";
 import {
   buildHealthStatusDayRange,
   buildHealthStatusProjects,
-  formatHealthStatusLabel,
-  formatStatusDayLabel,
   formatStatusUptime,
-  type HealthStatusDay,
   type HealthStatusDayState,
   type HealthStatusProjectSummary,
   type ProjectHealthStatusInput
@@ -190,136 +185,41 @@ function ProjectStatusRow({
   expanded: boolean;
   onToggle: () => void;
 }): JSX.Element {
-  const canExpand = project.checks.length > 1;
-
+  const view = {
+    key: project.project.project_id,
+    name: project.project.name,
+    current_state: project.current_state,
+    uptime_percentage: project.uptime_percentage,
+    last_verified_at: null,
+    days: project.days,
+    checks: project.checks.map((c) => ({
+      key: c.check.check_id,
+      name: c.check.name,
+      current_state: mapCheckStatusToDayState(c.check.status),
+      uptime_percentage: c.uptime_percentage,
+      last_verified_at: null,
+      days: c.days
+    }))
+  };
   return (
-    <div className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-5">
-        <div className="flex min-w-0 items-center gap-2 lg:max-w-sm lg:shrink-0">
-          {canExpand ? (
-            <Button
-              type="button"
-              size="icon-sm"
-              variant="ghost"
-              aria-label={`${expanded ? "Collapse" : "Expand"} ${project.project.name} checks`}
-              aria-expanded={expanded}
-              onClick={onToggle}
-            >
-              {expanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
-            </Button>
-          ) : null}
-          <div className="min-w-0">
-            <ProjectNameWithAccessIndicator project={project.project} showColorTag />
-            <p className="text-xs text-muted-foreground">
-              {project.checks.length} health check{project.checks.length === 1 ? "" : "s"}
-              {project.active_incident_count > 0
-                ? ` / ${project.active_incident_count} active incident${project.active_incident_count === 1 ? "" : "s"}`
-                : ""}
-            </p>
-          </div>
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <StatusHistoryStrip
-            days={project.days}
-            label={`${project.project.name} health history`}
-            scope="project"
-          />
-        </div>
-
-        <div className="flex items-center justify-between gap-3 lg:shrink-0 lg:justify-end">
-          <StatusBadge state={project.current_state} />
-          <StatusUptime value={project.uptime_percentage} />
-          <Button asChild type="button" variant="ghost" size="sm">
-            <Link to={`/projects/${project.project.project_id}/health`}>Open</Link>
-          </Button>
-        </div>
-      </div>
-
-      {canExpand && expanded ? (
-        <div className="ml-0 flex flex-col gap-2 rounded-lg border border-border/80 bg-muted/20 p-3 sm:ml-9">
-          {project.checks.map((checkSummary) => (
-            <CheckStatusRow key={checkSummary.check.check_id} summary={checkSummary} />
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function CheckStatusRow({
-  summary
-}: {
-  summary: HealthStatusProjectSummary["checks"][number];
-}): JSX.Element {
-  const check = summary.check;
-
-  return (
-    <div className="flex flex-col gap-3 rounded-md px-1 py-2 lg:flex-row lg:items-center lg:gap-5">
-      <div className="min-w-0 lg:max-w-xs lg:shrink-0">
-        <p className="truncate text-sm font-medium text-foreground">{check.name}</p>
-        <p className="truncate text-xs text-muted-foreground">
-          {[check.service_name, check.environment].filter(Boolean).join(" / ")}
-        </p>
-      </div>
-      <div className="min-w-0 flex-1">
-        <StatusHistoryStrip days={summary.days} label={`${check.name} health history`} compact />
-      </div>
-      <div className="flex items-center justify-between gap-3 lg:shrink-0 lg:justify-end">
-        <StatusBadge state={mapCheckStatusToDayState(check.status)} />
-        <StatusUptime value={summary.uptime_percentage} />
-      </div>
-    </div>
-  );
-}
-
-function StatusHistoryStrip({
-  days,
-  label,
-  compact = false,
-  scope = "check"
-}: {
-  days: HealthStatusDay[];
-  label: string;
-  compact?: boolean;
-  scope?: "check" | "project";
-}): JSX.Element {
-  return (
-    <div className="min-w-0 w-full" role="img" aria-label={label}>
-      <div className="flex min-w-0 w-full gap-0.5">
-        {days.map((day) => (
-          <Tooltip key={day.day}>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                aria-label={formatStatusDayLabel(day, scope)}
-                className={cn(
-                  "h-5 min-w-1 flex-1 rounded-[2px] border outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
-                  compact ? "sm:h-4" : "sm:h-5",
-                  statusDayClassName(day)
-                )}
-              />
-            </TooltipTrigger>
-            <TooltipContent side="top" sideOffset={6}>
-              {formatStatusDayLabel(day, scope)}
-            </TooltipContent>
-          </Tooltip>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function StatusBadge({ state }: { state: HealthStatusDayState }): JSX.Element {
-  return <Badge variant={statusBadgeVariant(state)}>{formatHealthStatusLabel(state)}</Badge>;
-}
-
-function StatusUptime({ value }: { value: number | null }): JSX.Element {
-  return (
-    <div className="min-w-24 text-right">
-      <p className="text-sm font-medium text-foreground">{formatStatusUptime(value)}</p>
-      <p className="text-xs text-muted-foreground">30-day uptime</p>
-    </div>
+    <HealthStatusProjectRow
+      project={view}
+      expanded={expanded}
+      onToggle={onToggle}
+      name={<ProjectNameWithAccessIndicator project={project.project} showColorTag />}
+      subtitle={`${project.checks.length} health check${project.checks.length === 1 ? "" : "s"}${project.active_incident_count > 0 ? ` / ${project.active_incident_count} active incident${project.active_incident_count === 1 ? "" : "s"}` : ""}`}
+      action={
+        <Button asChild type="button" variant="ghost" size="sm">
+          <Link to={`/projects/${project.project.project_id}/health`}>Open</Link>
+        </Button>
+      }
+      checkDescriptions={Object.fromEntries(
+        project.checks.map((c) => [
+          c.check.check_id,
+          [c.check.service_name, c.check.environment].filter(Boolean).join(" / ")
+        ])
+      )}
+    />
   );
 }
 
@@ -401,41 +301,4 @@ function mapCheckStatusToDayState(status: AvailabilityCheckRecord["status"]): He
     return "down";
   }
   return status;
-}
-
-function statusBadgeVariant(
-  state: HealthStatusDayState
-): "outline" | "secondary" | "success" | "warning" | "destructive" {
-  if (state === "operational") {
-    return "success";
-  }
-  if (state === "degraded") {
-    return "warning";
-  }
-  if (state === "down") {
-    return "destructive";
-  }
-  if (state === "paused") {
-    return "secondary";
-  }
-  return "outline";
-}
-
-function statusDayClassName(day: HealthStatusDay): string {
-  if (day.impact === "outage") {
-    return "border-destructive/80 bg-destructive";
-  }
-  if (day.impact === "elevated") {
-    return "border-warning bg-warning";
-  }
-  if (day.impact === "minor") {
-    return "border-warning/60 bg-warning/55";
-  }
-  if (day.state === "operational") {
-    return "border-success/80 bg-success";
-  }
-  if (day.state === "paused") {
-    return "border-border bg-muted";
-  }
-  return "border-border/60 bg-muted/40";
 }

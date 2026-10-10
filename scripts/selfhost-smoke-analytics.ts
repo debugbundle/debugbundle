@@ -181,7 +181,7 @@ function createBrowserAnalyticsFixtureEvents(input: {
     schema_version: ANALYTICS_EVENT_SCHEMA_VERSION,
     event_id: `00000000-0000-4000-8000-${String(input.fixtureIndex * 100 + eventIndex + 1).padStart(12, "0")}`,
     event_type: "analytics_event",
-    occurred_at: "2026-07-16T00:00:00.000Z",
+    occurred_at: new Date().toISOString(),
     sdk_name: "@debugbundle/sdk-browser",
     sdk_version: "1.5.0",
     service: { name: input.serviceName, runtime: "browser", framework: null, environment: "production" },

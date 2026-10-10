@@ -2,7 +2,10 @@ import { Pool } from "pg";
 import { pathToFileURL } from "url";
 import { z } from "zod";
 
-import { bootstrapStorageSchema } from "../packages/storage/src/migrations.js";
+import {
+  bootstrapStorageSchema,
+  bootstrapStorageSchemaIfEmpty
+} from "../packages/storage/src/migrations.js";
 import { seedStorageMigrationLedgerForCurrentSchema } from "../packages/storage/src/schema-migrations.js";
 import { buildPostgresSslConfig } from "../packages/storage/src/postgres-ssl.js";
 
@@ -16,7 +19,8 @@ const StorageBootstrapEnvSchema = z.object({
 });
 
 export async function runStorageBootstrapScript(
-  envInput: Record<string, string | undefined> = process.env
+  envInput: Record<string, string | undefined> = process.env,
+  options: { ifEmpty?: boolean } = {}
 ): Promise<void> {
   const env = StorageBootstrapEnvSchema.parse(envInput);
   const ssl = buildPostgresSslConfig(env.DB_SSL_MODE);
@@ -33,11 +37,19 @@ export async function runStorageBootstrapScript(
   const client = await pool.connect();
 
   try {
-    const result = await bootstrapStorageSchema({
-      query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) => client.query<Row>(sql, params)
-    });
+    const result = await (options.ifEmpty ? bootstrapStorageSchemaIfEmpty : bootstrapStorageSchema)(
+      {
+        query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) =>
+          client.query<Row>(sql, params)
+      }
+    );
+    if (result.status === "skipped_existing") {
+      console.log("db_bootstrap_skipped: existing_schema; run db:migrate before runtime startup");
+      return;
+    }
     const ledgerStatus = await seedStorageMigrationLedgerForCurrentSchema({
-      query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) => client.query<Row>(sql, params)
+      query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) =>
+        client.query<Row>(sql, params)
     });
 
     console.log(`db_bootstrap_ok: ${result.status}; migration_ledger=${ledgerStatus}`);
@@ -56,8 +68,10 @@ export function isDirectExecution(argvPath: string | undefined = process.argv[1]
 }
 
 if (isDirectExecution()) {
-  runStorageBootstrapScript().catch((error: unknown) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  });
+  runStorageBootstrapScript(process.env, { ifEmpty: process.argv.includes("--if-empty") }).catch(
+    (error: unknown) => {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    }
+  );
 }

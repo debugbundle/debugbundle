@@ -2,7 +2,7 @@
   "id": "debugbundle",
   "name": "DebugBundle",
   "description": "Use DebugBundle for runtime error reporting, incident response, live app monitoring, health checks, debug bundles, and product analytics.",
-  "version": "1.14.0",
+  "version": "1.15.0",
   "configSchema": {
     "type": "object",
     "properties": {
@@ -18,6 +18,10 @@
   },
   "contracts": {
     "tools": [
+      "debugbundle_get_public_status_page",
+      "debugbundle_save_public_status_page",
+      "debugbundle_list_public_status_page_options",
+      "debugbundle_preview_public_status_page",
       "debugbundle_list_analytics_flows",
       "debugbundle_save_analytics_flow",
       "debugbundle_archive_analytics_flow",
@@ -151,6 +155,9 @@
     ]
   },
   "toolMetadata": {
+    "debugbundle_save_public_status_page": {
+      "optional": true
+    },
     "debugbundle_save_analytics_flow": {
       "optional": true
     },

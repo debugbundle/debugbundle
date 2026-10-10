@@ -1,3 +1,4 @@
+import { PublicStatusSettingsDialog } from "../components/system/public-status-settings.js";
 import {
   ActivityIcon,
   PencilIcon,
@@ -424,8 +425,8 @@ export function ProjectHealthPage(): JSX.Element {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div />
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <PublicStatusSettingsDialog key={projectId} project={project} checks={checks} />
         {canManageChecks ? (
           <Dialog open={isFormOpen} onOpenChange={closeDialog}>
             <DialogTrigger asChild>
@@ -476,8 +477,8 @@ export function ProjectHealthPage(): JSX.Element {
         ) : null}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <Card>
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle>Health checks</CardTitle>
           </CardHeader>
@@ -635,7 +636,7 @@ export function ProjectHealthPage(): JSX.Element {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle>Selected check</CardTitle>
             <CardDescription>

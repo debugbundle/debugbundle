@@ -52,6 +52,8 @@ export interface CreateApiDependenciesInput {
   githubAppClient?: GitHubAppClient;
   stripeConfig?: StripeConfig;
   appBaseUrl?: string;
+  publicStatusBaseUrl?: string;
+  publicStatusTrustProxy?: boolean;
   lifecycleWebhookFallbackTargetUrl?: string;
   lifecycleWebhookFallbackSigningSecret?: string;
 }
@@ -59,45 +61,44 @@ export interface CreateApiDependenciesInput {
 type MetadataStore = ReturnType<typeof createPostgresMetadataStore>;
 type WebhookStore = ReturnType<typeof createPostgresWebhookDeliveryStore>;
 
-export interface DefaultApiDependencies
-  extends Omit<
-    ApiDependencies,
-    | "accountManagement"
-    | "accountDeletionAuth"
-    | "alertManagement"
-    | "analyticsSettingsManagement"
-    | "analyticsBundles"
-    | "analyticsJourneySamples"
-    | "analyticsMetrics"
-    | "analyticsUsage"
-    | "availabilityCheckManagement"
-    | "auditLogging"
-    | "billingEmails"
-    | "billingManagement"
-    | "bundleRegeneration"
-    | "capturePolicyManagement"
-    | "captureRuleManagement"
-    | "githubCliAuth"
-    | "improvementManagement"
-    | "improvementSettingsManagement"
-    | "incidentRetrieval"
-    | "ingestionMetadata"
-    | "ingestionPersistence"
-    | "memberAuth"
-    | "objectStoreReader"
-    | "objectStoreWriter"
-    | "operationalEmailDelivery"
-    | "probeManagement"
-    | "projectCollaboration"
-    | "projectManagement"
-    | "slackManagement"
-    | "tokenManagement"
-    | "webAuth"
-    | "webhookDelivery"
-    | "webhookManagement"
-    | "webhookTesting"
-    | "weeklyReportManagement"
-  > {
+export interface DefaultApiDependencies extends Omit<
+  ApiDependencies,
+  | "accountManagement"
+  | "accountDeletionAuth"
+  | "alertManagement"
+  | "analyticsSettingsManagement"
+  | "analyticsBundles"
+  | "analyticsJourneySamples"
+  | "analyticsMetrics"
+  | "analyticsUsage"
+  | "availabilityCheckManagement"
+  | "auditLogging"
+  | "billingEmails"
+  | "billingManagement"
+  | "bundleRegeneration"
+  | "capturePolicyManagement"
+  | "captureRuleManagement"
+  | "githubCliAuth"
+  | "improvementManagement"
+  | "improvementSettingsManagement"
+  | "incidentRetrieval"
+  | "ingestionMetadata"
+  | "ingestionPersistence"
+  | "memberAuth"
+  | "objectStoreReader"
+  | "objectStoreWriter"
+  | "operationalEmailDelivery"
+  | "probeManagement"
+  | "projectCollaboration"
+  | "projectManagement"
+  | "slackManagement"
+  | "tokenManagement"
+  | "webAuth"
+  | "webhookDelivery"
+  | "webhookManagement"
+  | "webhookTesting"
+  | "weeklyReportManagement"
+> {
   ingestionPersistence: ReturnType<typeof createIngestionPersistenceService>;
   ingestionMetadata: ReturnType<typeof createIngestionMetadataService>;
   auditLogging: ReturnType<typeof createPostgresAuditLogStore>;
@@ -116,7 +117,10 @@ export interface DefaultApiDependencies
     GitHubCliAuthService,
     "beginDeviceAuth" | "pollDeviceAuth" | "claimDeviceAuth" | "exchangeGitHubAccessToken"
   >;
-  accountDeletionAuth?: Pick<AccountDeletionChallengeService, "requestDeletionOtp" | "verifyDeletionOtp">;
+  accountDeletionAuth?: Pick<
+    AccountDeletionChallengeService,
+    "requestDeletionOtp" | "verifyDeletionOtp"
+  >;
   billingEmails?: BillingEmailService;
   tokenManagement: Pick<
     MetadataStore,
@@ -173,7 +177,11 @@ export interface DefaultApiDependencies
     | "resolveImprovementForOrganization"
     | "reopenImprovementForOrganization"
     | "snoozeImprovementForOrganization"
-  > & { countImprovementsForOrganization: NonNullable<NonNullable<ApiDependencies["improvementManagement"]>["countImprovementsForOrganization"]> };
+  > & {
+    countImprovementsForOrganization: NonNullable<
+      NonNullable<ApiDependencies["improvementManagement"]>["countImprovementsForOrganization"]
+    >;
+  };
   incidentRetrieval: Pick<
     MetadataStore,
     | "listIncidentsForOrganization"
@@ -186,13 +194,20 @@ export interface DefaultApiDependencies
     | "getBundleSourceForOrganization"
     | "listServicesForOrganization"
     | "listIncidentLogsForOrganization"
-  > & { countIncidentsForOrganization: NonNullable<ApiDependencies["incidentRetrieval"]["countIncidentsForOrganization"]> };
+  > & {
+    countIncidentsForOrganization: NonNullable<
+      ApiDependencies["incidentRetrieval"]["countIncidentsForOrganization"]
+    >;
+  };
   objectStoreReader: Pick<ObjectStoreReader, "getObject">;
   objectStoreWriter: Pick<ObjectStoreClient, "putObject">;
   bundleRegeneration: NonNullable<ApiDependencies["bundleRegeneration"]>;
   alertManagement: Pick<
     MetadataStore,
-    "listAlertsForOrganization" | "createAlertForOrganization" | "updateAlertForOrganization" | "deleteAlertForOrganization"
+    | "listAlertsForOrganization"
+    | "createAlertForOrganization"
+    | "updateAlertForOrganization"
+    | "deleteAlertForOrganization"
   >;
   alertGroupInspection: NonNullable<ApiDependencies["alertGroupInspection"]>;
   availabilityCheckManagement: ReturnType<typeof createPostgresAvailabilityCheckStore> & {

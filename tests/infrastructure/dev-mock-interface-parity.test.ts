@@ -16,48 +16,70 @@ describe("opt-in parity preview fixtures", () => {
     const api = createDevMockApi();
     expect(
       AnalyticsActionMetricsResponseSchema.parse(
-        api.handle("GET", "/v1/projects/proj_123/analytics/actions?granularity=hour&last=24h").body
+        api.handle(
+          "GET",
+          "/v1/projects/00000000-0000-4000-8000-000000000001/analytics/actions?granularity=hour&last=24h"
+        ).body
       ).window.granularity
     ).toBe("hour");
     const samples = AnalyticsJourneySamplesListResponseSchema.parse(
-      api.handle("GET", "/v1/analytics/journey-samples?project_id=proj_123&limit=20").body
+      api.handle(
+        "GET",
+        "/v1/analytics/journey-samples?project_id=00000000-0000-4000-8000-000000000001&limit=20"
+      ).body
     ).samples;
     expect(samples).toHaveLength(1);
     AnalyticsJourneySampleResponseSchema.parse(
       api.handle(
         "GET",
-        `/v1/analytics/journey-samples/${samples[0]!.sample_id}?project_id=proj_123`
+        `/v1/analytics/journey-samples/${samples[0]!.sample_id}?project_id=00000000-0000-4000-8000-000000000001`
       ).body
     );
     expect(
-      api.handle("GET", "/v1/analytics/journey-samples?project_id=proj_new").body
+      api.handle(
+        "GET",
+        "/v1/analytics/journey-samples?project_id=00000000-0000-4000-8000-000000000002"
+      ).body
     ).toMatchObject({ samples: [] });
   });
   it("provides bounded incident evidence and keeps issuance disabled", () => {
     const api = createDevMockApi();
     IncidentContextSchema.parse(api.handle("GET", "/v1/incidents/inc_long/context").body);
     LogsResponseSchema.parse(api.handle("GET", "/v1/logs?incident_id=inc_long&limit=20").body);
-    const body = api.handle("GET", "/v1/projects/proj_123/agent-tokens").body as {
+    const body = api.handle("GET", "/v1/projects/00000000-0000-4000-8000-000000000001/agent-tokens")
+      .body as {
       tokens: unknown[];
     };
     const token = AgentTokenSchema.parse(body.tokens[0]);
     expect(token.plaintext).toBeUndefined();
     expect(
-      api.handle("POST", "/v1/projects/proj_123/agent-tokens", { label: "Preview" }).status
+      api.handle("POST", "/v1/projects/00000000-0000-4000-8000-000000000001/agent-tokens", {
+        label: "Preview"
+      }).status
     ).toBe(503);
     expect(
-      api.handle("POST", `/v1/projects/proj_123/agent-tokens/${token.token_id}/revoke`, {}).body
+      api.handle(
+        "POST",
+        `/v1/projects/00000000-0000-4000-8000-000000000001/agent-tokens/${token.token_id}/revoke`,
+        {}
+      ).body
     ).toHaveProperty("token.revoked_at");
     AlertGroupListResponseSchema.parse(
-      api.handle("GET", "/v1/alert-groups?project_id=proj_123&limit=20").body
+      api.handle("GET", "/v1/alert-groups?project_id=00000000-0000-4000-8000-000000000001&limit=20")
+        .body
     );
   });
   it("disconnects synthetic installation and repository state without provider access", () => {
     const api = createDevMockApi();
     expect(api.handle("DELETE", "/v1/github/installation").status).toBe(204);
-    expect(api.handle("GET", "/v1/github/installation?project_id=proj_123").body).toEqual({
+    expect(
+      api.handle("GET", "/v1/github/installation?project_id=00000000-0000-4000-8000-000000000001")
+        .body
+    ).toEqual({
       installation: null
     });
-    expect(api.handle("GET", "/v1/projects/proj_123/github/repo").body).toEqual({ repo: null });
+    expect(
+      api.handle("GET", "/v1/projects/00000000-0000-4000-8000-000000000001/github/repo").body
+    ).toEqual({ repo: null });
   });
 });

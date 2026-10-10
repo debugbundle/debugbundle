@@ -68,7 +68,12 @@ export function createDevMockMiddleware() {
     });
     async function respond(req: IncomingMessage, res: ServerResponse): Promise<void> {
       const payload = await readBody(req);
-      const result = api.handle(req.method ?? "GET", req.url ?? "/", payload);
+      const result = api.handle(
+        req.method ?? "GET",
+        req.url ?? "/",
+        payload,
+        `http://${req.headers.host}`
+      );
       for (const [key, value] of Object.entries(result.headers ?? {})) res.setHeader(key, value);
       if (!res.destroyed) send(result.status, result.body);
     }

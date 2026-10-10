@@ -1,3 +1,11 @@
+Public status candidate (2026-10-08, local/unreleased): FR-AVC-07 adds opt-in project-anchored publication metadata and a safe aggregate projection. `public-status-store.ts` owns atomic same-owner/account selections and live ownership/eligibility checks; `public-status-projection.ts` owns sanitization and conservative freshness. Shared `availability-health.ts`/`availability-metrics.ts` preserve existing history behavior; `health-status-view.tsx` renders authenticated and public rows. `/status/:publicId` bypasses private providers, while Project Health manages title/selections/copy/preview. Five API operations, `health status` CLI and four ordinary MCP tools share the contract. Ordinary candidate catalog has 134 tools; frozen hosted/restricted profiles stay 23/five. Migration `202610080001_add_public_status_pages` is additive and must precede runtime activation. See `spec/public-status-pages.md` and `rules/public-status-pages.md`.
+
+Public status UI refinement (2026-10-09, owner-directed): Project Health opens publication settings with a toolbar button immediately left of Create health check, using the shared `dialog-form-content.tsx` modal with a scrollable body and fixed actions. Shared `components/system/multi-select.tsx` composes Radix/shadcn menus, search, controlled selections and pagination. `public-status-settings.tsx` loads on opening, owns publication draft/limits and a nested saved-preview dialog, discards unsaved edits on close and ignores late responses. Shared `read-only-copy-input.tsx` composes `ui/input-group.tsx` for labelled read-only URLs, a right-side copy icon and manual-copy fallback. Domain services and public interfaces are unchanged.
+
+Public status theme/tooltip refinement (2026-10-10, owner-directed): `theme-init.ts` uses the existing public-route predicate to apply device color scheme before mount. `PublicStatusPage` owns a system-forced `ThemeProvider`; private routes keep their stored theme provider in `PrivateAppRoot`. Public themes never read/write dashboard preferences, listen to device changes and clean up on unmount. The footer reuses `BrandMark`. Shared `StatusHistoryStrip` disables hover corridors for plain-text daily details across authenticated Health Status, public pages and saved previews, preserving keyboard behavior and other tooltips. Domain/auth/schema behavior is unchanged.
+
+Automatic local/self-host initialization uses `bootstrapStorageSchemaIfEmpty` through `db:bootstrap --if-empty`; populated schemas and ledgers remain untouched until `db:migrate` runs. API/worker dependencies retain migration-before-runtime ordering. Local `make dev` fails without resetting volumes. See NFR-SCHEMA-05 and `deploy/selfhost/README.md`.
+
 > Current interface parity release (2026-10-07): core 1.15.0, shared 2.3.0, CLI/MCP/OpenClaw 1.14.0 and site 1.6.2 are published and deployed. All fourteen audited gaps are patched, with existing dashboard patterns and the owner's Managing Noise edits retained. See [release evidence](spec/interface-parity-release-20261007.md) for exact sources, passing engineering/live runtime gates and external discovery limits. Public analytics flows shipped in 1.14.0; the expanded analytics candidate remains parked.
 
 Public acquisition/activation flows are customer-project definitions with ordered origin-bound steps.
@@ -29,6 +37,9 @@ dashboard data at `http://localhost:5291/dashboard`. Opt-in Vite middleware owns
 in-memory simulation; the real API, worker and database remain independent.
 The preview populates the primary dashboard/project pages, including token/member,
 webhook/probe, billing/capacity and analytics flow/funnel/journey/artifact views.
+Public status settings/options/preview and publication are also simulated in
+memory with valid project/check UUIDs and loopback-only share links. The mock
+uses the production aggregate projection; reads never execute health checks.
 `make dev-mock-off` restores normal API routing. Mock mode is loopback-only,
 development-only, absent from production builds and disables frontend telemetry.
 See README's populated UI preview and FR-WEB-10 / AC-WEB-10.

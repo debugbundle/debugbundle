@@ -19,7 +19,7 @@ export const base = {
     csrf_token: "csrf-token-123"
   },
   projects: {
-    project_id: "proj_123",
+    project_id: "00000000-0000-4000-8000-000000000001",
     organization_id: "org_123",
     owner_user_id: "usr_123",
     owner_email: "owner@example.com",
@@ -46,8 +46,8 @@ export const base = {
     updated_at: "2026-03-17T00:00:00.000Z"
   },
   checks: {
-    check_id: "chk_events",
-    project_id: "proj_123",
+    check_id: "10000000-0000-4000-8000-000000000001",
+    project_id: "00000000-0000-4000-8000-000000000001",
     name: "Events page health",
     url: "https://health.example.test/ready",
     method: "GET",
@@ -79,7 +79,7 @@ export const base = {
   },
   incidents: {
     incident_id: "inc_long",
-    project_id: "proj_123",
+    project_id: "00000000-0000-4000-8000-000000000001",
     project_name: "SayCheese",
     project_color_tag: "lime",
     service_id: "svc_123",
@@ -101,7 +101,7 @@ export const base = {
   },
   improvements: {
     improvement_id: "imp_0",
-    project_id: "proj_123",
+    project_id: "00000000-0000-4000-8000-000000000001",
     project_name: "SayCheese",
     project_color_tag: "lime",
     project_slug: "saycheese",
@@ -134,7 +134,7 @@ export const base = {
   },
   captureRules: {
     id: "rule_0",
-    project_id: "proj_123",
+    project_id: "00000000-0000-4000-8000-000000000001",
     name: "Demote analytics resource errors 1",
     description: "Known third-party browser resource noise.",
     enabled: true,
@@ -159,7 +159,7 @@ export const base = {
   },
   githubRules: {
     rule_id: "ghr_123",
-    project_id: "proj_123",
+    project_id: "00000000-0000-4000-8000-000000000001",
     created_by_user_id: "usr_123",
     name: "Default triage rule",
     enabled: true,
@@ -210,7 +210,7 @@ export const base = {
   },
   opportunities: {
     opportunity_id: "opp_0",
-    project_id: "proj_123",
+    project_id: "00000000-0000-4000-8000-000000000001",
     project_name: "SayCheese",
     project_color_tag: "lime",
     service: "web",
@@ -236,7 +236,7 @@ export const base = {
   },
   bundles: {
     generation_id: "gen_0",
-    project_id: "proj_123",
+    project_id: "00000000-0000-4000-8000-000000000001",
     project_name: "SayCheese",
     project_color_tag: "lime",
     opportunity_id: "opp_0",
@@ -261,7 +261,7 @@ export const base = {
   },
   alerts: {
     alert_id: "alert_0",
-    project_id: "proj_123",
+    project_id: "00000000-0000-4000-8000-000000000001",
     created_by_user_id: "usr_123",
     service_id: null,
     channel: "email",
@@ -287,7 +287,7 @@ export const base = {
   },
   repo: {
     id: "pgr_123",
-    project_id: "proj_123",
+    project_id: "00000000-0000-4000-8000-000000000001",
     installation_id: "ghi_123",
     repo_owner: "debugbundle",
     repo_name: "app",

@@ -36,20 +36,23 @@ Use `npx -y @debugbundle/mcp` in clients that require noninteractive package exe
 
 ## Install Matrix
 
-| Environment                   | Recommended path                                  | Notes                                             |
-| ----------------------------- | ------------------------------------------------- | ------------------------------------------------- |
-| Generic local MCP client      | `npx @debugbundle/mcp`                            | stdio transport                                   |
-| Claude Desktop local MCP      | local MCP server config                           | uses local machine auth/config                    |
-| Claude Code plugin            | `/plugin marketplace add debugbundle/debugbundle` | installs bundled MCP config and DebugBundle skill |
-| Codex developer plugin | `codex plugin add debugbundle-codex@debugbundle` | repository marketplace; local MCP and workflow skill |
-| Codex direct MCP | `codex mcp add debugbundle -- npx -y @debugbundle/mcp@1.14.0 --local-auth` | app, CLI, and IDE on the same host |
-| Cursor                        | MCP config with `npx @debugbundle/mcp`            | stdio transport                                   |
-| VS Code / GitHub MCP Registry | `com.debugbundle/mcp`                             | official registry metadata                        |
-| OpenClaw / ClawHub            | DebugBundle skill plus MCP config                 | use the published skill for workflow guidance     |
-| CI/headless agents            | `DEBUGBUNDLE_MEMBER_TOKEN`                        | never use a project token                         |
-| Self-hosted DebugBundle       | `DEBUGBUNDLE_API_URL` plus member auth            | points the server at your API base URL            |
+| Environment                   | Recommended path                                                           | Notes                                                |
+| ----------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Generic local MCP client      | `npx @debugbundle/mcp`                                                     | stdio transport                                      |
+| Claude Desktop local MCP      | local MCP server config                                                    | uses local machine auth/config                       |
+| Claude Code plugin            | `/plugin marketplace add debugbundle/debugbundle`                          | installs bundled MCP config and DebugBundle skill    |
+| Codex developer plugin        | `codex plugin add debugbundle-codex@debugbundle`                           | repository marketplace; local MCP and workflow skill |
+| Codex direct MCP              | `codex mcp add debugbundle -- npx -y @debugbundle/mcp@1.15.0 --local-auth` | app, CLI, and IDE on the same host                   |
+| Cursor                        | MCP config with `npx @debugbundle/mcp`                                     | stdio transport                                      |
+| VS Code / GitHub MCP Registry | `com.debugbundle/mcp`                                                      | official registry metadata                           |
+| OpenClaw / ClawHub            | DebugBundle skill plus MCP config                                          | use the published skill for workflow guidance        |
+| CI/headless agents            | `DEBUGBUNDLE_MEMBER_TOKEN`                                                 | never use a project token                            |
+| Self-hosted DebugBundle       | `DEBUGBUNDLE_API_URL` plus member auth                                     | points the server at your API base URL               |
 
-This package is the supported public local stdio path. A separate OpenAI Plugin `1.0.0` source candidate targets an OAuth-protected read-only remote endpoint at `https://mcp.debugbundle.com/mcp`; it is not deployed, submitted, published, or publicly installable yet and does not alter this package's catalog or authentication.
+This package is the supported public local stdio path. The separate OpenAI Plugin
+`1.0.0` uses an OAuth-protected read-only remote endpoint at
+`https://mcp.debugbundle.com/mcp`. Its review/publication process is independent and
+does not alter this package's catalog or authentication.
 
 ## Local authentication profile
 
@@ -120,6 +123,7 @@ optional. It reads existing incidents/bundles and never sends synthetic events.
 The existing `verify_cloud` schema and description remain unchanged. The new tool
 is available through ordinary and local-auth stdio MCP and its OpenClaw projection;
 hosted read-only and restricted agent catalogs remain unchanged.
+
 - Resolve or reopen incidents after verification.
 
 For analytics questions, use direct aggregate tools first and generate an AnalyticsBundle only when a bounded analysis needs a durable artifact. The product does not create one bundle per visit.
@@ -160,9 +164,21 @@ Apache-2.0.
 route. It requires the active organization's owner and removes repository assignments
 for all its projects, including cleanup after downgrade. It does not uninstall the
 App on GitHub. Install/reconnect uses the dashboard browser flow to retain the signed
-state cookie. This additive tool brings the ordinary/local-auth catalog to 130 tools;
+state cookie. The ordinary/local-auth catalog now contains 134 tools;
 the hosted 23-tool and restricted five-tool profiles remain unchanged.
 
 `test_webhook_event` accepts all eight supported webhook events through the existing
 scoped test service. The legacy `test_webhook` schema remains verification-only.
 Both queue a signed synthetic envelope without creating real incidents or bundles.
+
+## Public status pages
+
+`get_public_status_page`, `list_public_status_page_options`,
+`save_public_status_page` and `preview_public_status_page` manage owner-controlled
+publication through the same API as Project Health. Read the options, select checks
+explicitly and save `{title, enabled, projects:[{project_id, check_ids}]}`. A save with
+`enabled: false` unpublishes without changing the URL. Publish only on the owner's
+instruction: selected project/check names and aggregate availability become public;
+URLs and diagnostics stay private. New checks remain private. The hosted read-only
+and restricted-agent profiles do not expose publication tools. See the
+[status-page guide](https://debugbundle.com/docs/availability-checks/).

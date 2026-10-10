@@ -194,6 +194,16 @@ describe("web app — project health page", () => {
     render(<App initialEntries={["/projects/proj_123/health"]} />);
 
     expect(await screen.findByRole("heading", { name: "Health checks" })).toBeInTheDocument();
+    const publicStatusButton = screen.getByRole("button", { name: "Public status page" });
+    expect(publicStatusButton.nextElementSibling).toBe(
+      screen.getByRole("button", { name: "Create health check" })
+    );
+    expect(screen.queryByRole("heading", { name: "Public status page" })).toBeNull();
+    await user.click(publicStatusButton);
+    await screen.findByRole("dialog", { name: "Public status page" });
+    await screen.findByText("Public status settings could not be loaded.");
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(publicStatusButton).toHaveFocus());
     expect(await screen.findByText("Primary app")).toBeInTheDocument();
     expect(screen.getAllByText("Passing").length).toBeGreaterThan(0);
     expect(screen.getByText(/GET https:\/\/app\.example\.com\/health/)).toBeInTheDocument();

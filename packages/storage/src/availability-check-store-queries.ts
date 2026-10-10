@@ -62,9 +62,16 @@ function buildEligibilityCtes(organizationPredicate: string): string {
   `;
 }
 
-export const LIST_AVAILABILITY_CHECKS_QUERY = `
+// Predicates are internal SQL fragments; external values remain bound parameters.
+export function buildAvailabilityChecksListQuery(
+  organizationPredicate: string,
+  checkPredicate: string,
+  limitSql = "$3",
+  cursorSql = "$4"
+): string {
+  return `
   WITH
-  ${buildEligibilityCtes("AND p.organization_id = $2::uuid")},
+  ${buildEligibilityCtes(`AND ${organizationPredicate}`)},
   ranked AS (
     SELECT
       c.id::text AS check_id,
@@ -111,8 +118,8 @@ export const LIST_AVAILABILITY_CHECKS_QUERY = `
     LEFT JOIN monitored_project_ranks monitored_ranks
       ON monitored_ranks.organization_id = p.organization_id
       AND monitored_ranks.project_id = c.project_id
-    WHERE c.project_id = $1::uuid
-      AND p.organization_id = $2::uuid
+    WHERE ${checkPredicate}
+      AND ${organizationPredicate}
       AND c.deleted_at IS NULL
   )
   SELECT
@@ -123,10 +130,15 @@ export const LIST_AVAILABILITY_CHECKS_QUERY = `
     NOT ranked.enabled OR ranked.organization_check_rank <= ranked.plan_organization_check_limit
       AS within_organization_active_limit
   FROM ranked
-  WHERE ($4::text IS NULL OR ranked.check_id = $4)
+  WHERE (${cursorSql}::text IS NULL OR ranked.check_id = ${cursorSql})
   ORDER BY ranked.created_at DESC
-  LIMIT $3
+  LIMIT ${limitSql}
 `;
+}
+export const LIST_AVAILABILITY_CHECKS_QUERY = buildAvailabilityChecksListQuery(
+  "p.organization_id = $2::uuid",
+  "c.project_id = $1::uuid"
+);
 
 export const CLAIM_DUE_AVAILABILITY_CHECKS_QUERY = `
   WITH due_organizations AS (

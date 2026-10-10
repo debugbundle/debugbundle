@@ -37,6 +37,15 @@ The plugin exposes the DebugBundle MCP tool catalog with a `debugbundle_` prefix
 - `debugbundle_generate_analytics_bundle`
 - `debugbundle_activate_probe`
 - `debugbundle_list_health_checks`
+- `debugbundle_get_public_status_page`
+- `debugbundle_list_public_status_page_options`
+- `debugbundle_save_public_status_page`
+- `debugbundle_preview_public_status_page`
+
+Public status publication requires the project owner's member authentication and
+explicit check selection. The save tool is an optional mutation: publish or
+unpublish only on the owner's instruction. Selected names and aggregate health
+become public; endpoint URLs and diagnostics remain private.
 
 For product-usage questions, start with aggregate reads such as `debugbundle_get_usage_summary`, then narrow to routes, actions, funnels, or bounded journey samples. Generate an analytics bundle only when a specific analysis question needs a durable artifact; DebugBundle does not create one per visit.
 

@@ -31,12 +31,20 @@ describe("opt-in local dashboard mocks", () => {
     const projects = api.handle("GET", "/v1/projects");
     expect(projects.status).toBe(200);
     expect(projects.body).toHaveProperty("projects.0.name", "SayCheese");
-    const page = api.handle("GET", "/v1/incidents?project_id=proj_123&status=open&limit=10");
+    const page = api.handle(
+      "GET",
+      "/v1/incidents?project_id=00000000-0000-4000-8000-000000000001&status=open&limit=10"
+    );
     expect(page.body).toMatchObject({ total_count: 22, total_pages: 3, next_cursor: "10" });
     expect(
-      api.handle("GET", "/v1/incidents?status=active&project_id=proj_123&limit=20").body
+      api.handle(
+        "GET",
+        "/v1/incidents?status=active&project_id=00000000-0000-4000-8000-000000000001&limit=20"
+      ).body
     ).toMatchObject({ total_count: 22, total_pages: 2 });
-    expect(api.handle("GET", "/v1/incidents?project_id=proj_new").body).toMatchObject({
+    expect(
+      api.handle("GET", "/v1/incidents?project_id=00000000-0000-4000-8000-000000000002").body
+    ).toMatchObject({
       incidents: [],
       total_count: 0
     });
@@ -51,21 +59,26 @@ describe("opt-in local dashboard mocks", () => {
       "resolved"
     );
     expect(api.handle("PATCH", "/v1/alerts/alert_0", { is_enabled: false }).status).toBe(200);
-    expect(api.handle("GET", "/v1/alerts?project_id=proj_123").body).toHaveProperty(
-      "alerts.0.is_enabled",
-      false
-    );
     expect(
-      api.handle("POST", "/v1/projects/proj_123/github/deliveries/gdd_0/retry").body
+      api.handle("GET", "/v1/alerts?project_id=00000000-0000-4000-8000-000000000001").body
+    ).toHaveProperty("alerts.0.is_enabled", false);
+    expect(
+      api.handle(
+        "POST",
+        "/v1/projects/00000000-0000-4000-8000-000000000001/github/deliveries/gdd_0/retry"
+      ).body
     ).toHaveProperty("delivery.status", "retrying");
     expect(
-      api.handle("PATCH", "/v1/projects/proj_123/availability-checks/chk_web", { enabled: false })
-        .status
+      api.handle(
+        "PATCH",
+        "/v1/projects/00000000-0000-4000-8000-000000000001/availability-checks/10000000-0000-4000-8000-000000000002",
+        { enabled: false }
+      ).status
     ).toBe(200);
-    expect(api.handle("GET", "/v1/projects/proj_123/availability-checks").body).toHaveProperty(
-      "checks.1.enabled",
-      false
-    );
+    expect(
+      api.handle("GET", "/v1/projects/00000000-0000-4000-8000-000000000001/availability-checks")
+        .body
+    ).toHaveProperty("checks.1.enabled", false);
     expect(createDevMockApi().handle("GET", "/v1/alerts").body).toHaveProperty(
       "alerts.0.is_enabled",
       true
@@ -77,9 +90,12 @@ describe("opt-in local dashboard mocks", () => {
     expect(api.handle("GET", "/v1/unknown").status).toBe(501);
     expect(api.handle("POST", "/v1/alerts", "invalid").status).toBe(400);
     expect(api.handle("PATCH", "/v1/alerts/missing", { is_enabled: false }).status).toBe(404);
-    expect(api.handle("POST", "/v1/projects/proj_123/github/deliveries/missing/retry").status).toBe(
-      404
-    );
+    expect(
+      api.handle(
+        "POST",
+        "/v1/projects/00000000-0000-4000-8000-000000000001/github/deliveries/missing/retry"
+      ).status
+    ).toBe(404);
   });
 
   it("handles local HTTP reads and edits, rejects foreign origins and never forwards mock routes", async () => {
@@ -142,7 +158,7 @@ describe("opt-in local dashboard mocks", () => {
     for (const id of ["alert_0", "alert_1", "alert_2"]) api.handle("DELETE", `/v1/alerts/${id}`);
     expect(
       api.handle("POST", "/v1/alerts", {
-        project_id: "proj_123",
+        project_id: "00000000-0000-4000-8000-000000000001",
         config: { to: "demo@example.test" }
       }).body
     ).toHaveProperty("alert.channel", "email");
@@ -151,15 +167,23 @@ describe("opt-in local dashboard mocks", () => {
   it("serves schema-valid synthetic incident artifacts", () => {
     const api = createDevMockApi();
     const bundle = BundleV1Schema.parse(api.handle("GET", "/v1/incidents/inc_normal/bundle").body);
-    expect(bundle.project.id).toBe("proj_123");
+    expect(bundle.project.id).toBe("00000000-0000-4000-8000-000000000001");
     expect(bundle.verification.synthetic).toBe(true);
     expect(api.handle("GET", "/v1/incidents/inc_normal/reproduction").body).toMatchObject({
       possible: false
     });
     const improvement = BundleV1Schema.parse(
-      api.handle("GET", "/v1/projects/proj_123/improvements/imp_0/bundle").body
+      api.handle(
+        "GET",
+        "/v1/projects/00000000-0000-4000-8000-000000000001/improvements/imp_0/bundle"
+      ).body
     );
     expect(improvement.bundle_type).toBe("improvement");
-    expect(api.handle("GET", "/v1/projects/proj_new/improvements/imp_0/bundle").status).toBe(404);
+    expect(
+      api.handle(
+        "GET",
+        "/v1/projects/00000000-0000-4000-8000-000000000002/improvements/imp_0/bundle"
+      ).status
+    ).toBe(404);
   });
 });

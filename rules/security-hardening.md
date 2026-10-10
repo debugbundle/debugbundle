@@ -156,6 +156,7 @@ The following categories of actions must produce `audit_logs` entries:
 - Session creation and revocation
 - Config changes (capture policy, webhooks, alerts)
 - Hosted availability-check creation, update, deletion, and target tests
+- Public status publication/unpublication and configuration attempts (success and failure)
 
 New security-relevant routes or actions must add audit logging in the same change. Audit logging is fail-open (failures log warnings but do not block the request).
 
@@ -224,3 +225,5 @@ When adding a new API route, SDK feature, or storage surface, review this list a
 ### Runtime logger payload boundary
 
 The shared API/worker runtime logger projects request/response objects to method/status metadata, removes exception message/stack/cause and payload fields, and applies the mandatory bounded sanitizer to records and child bindings. Message arguments must be fixed event identifiers; interpolation arguments and free-form message text are withheld. Keep diagnostic detail in protected incident evidence, not infrastructure logs. Proxy access and error log sinks require separate effective-configuration and synthetic failure checks.
+
+Public status pages must also enforce [the public publication trust rules](public-status-pages.md); anonymous projections are not an exception to sanitization or owner-only configuration.

@@ -478,6 +478,20 @@ Native logger level/silent/processor filtering runs before SDK capture; enabled-
 
 ## 3. Bundle Generation Acceptance
 
+### AC-AVC-07: Public Multi-Project Status Page
+
+- Publishing requires an authenticated project owner, valid session CSRF or member token, and explicit same-owner/same-organization project/check selections. Admin/member mutations and cross-project check IDs fail before writes. Invalid saves leave the prior publication intact.
+- A new project has no public ID or enabled publication. A saved page has a random stable URL; unpublishing returns the same URL to its owner but makes anonymous reads 404. Owner-only preview works for saved disabled pages. New checks stay private; deletion or reassignment removes affected data immediately. Deleted/reassigned anchors make the page unavailable.
+- Anonymous output contains only the sanitized custom title, retained names, anonymous display keys, current state, measured uptime, latest verified timestamps and 30 UTC daily aggregates. Strict response schemas reject accidental diagnostics or IDs. Public visits use no session, credentials or check/incident/alert mutation. Unknown/paused/stale states and unmeasured history never imply green availability; outage history survives recovery and uptime uses total verified checks.
+- Existing authenticated health rows/check management and monitor entitlement/incident/alert behavior remain compatible. Owner Health controls include other projects, select checks, save, copy/open and preview; collaborators only see the published link. Public pages reuse accessible responsive rows and omit subscriptions, management links and separate history.
+- A Public status page toolbar button immediately left of Create health check opens publication settings in the generic form modal, with a scrollable body and fixed action footer. Settings load only when opened; closing discards unsaved edits, reopening reads saved settings, and late responses cannot reopen a closed modal. The published link is a labelled read-only input with a copy icon on the right and manual-copy fallback on clipboard failure. Searchable multi-select menus retain hidden/unloaded selections, keep the anchor fixed, show selection summaries, and expose both pagination dimensions inside the menus. The enable control uses the shared switch. Saved preview uses a scrollable dialog; dismissing it or a selector leaves settings open. Search/navigation/toggle/dismissal work by keyboard and closing overlays restores trigger focus.
+- Public pages use the device color scheme before React mounts and track preference changes, including when a conflicting dashboard preference is saved. Dashboard theme selection remains intact when returning to private routes. Public rendering works with dashboard storage blocked and has a light fallback when device media queries are unavailable. The underlined Powered by DebugBundle attribution remains on one line, with the existing small brand mark above it in a separately labelled, keyboard-accessible DebugBundle link and increased spacing between them. Project/check daily tooltips move to every adjacent day in either direction on the first pointer movement in authenticated Health Status, anonymous pages and saved previews; keyboard focus, accessible descriptions and Escape dismissal remain intact. Other tooltips retain hoverable content.
+- API, CLI and ordinary/local-auth MCP cover settings, save/unpublish, options and preview; OpenClaw publication remains an optional mutation. Hosted 23-tool and restricted five-tool profiles retain their authority.
+- Project and per-project check options both paginate at 50 without silently losing choices. Publication is bounded to 50 projects, 50 selected checks per project and 500 total. Public reads rate-limit per IP and fail closed with no-store responses. A dedicated root status origin gets anonymous GET CORS only and never loads the private session provider.
+- A populated predecessor upgrades through `202610080001_add_public_status_pages`, preserving installed rows. Missing migration/checksum corruption fails readiness; bootstrap rejects schema upgrade; repeated migration is idempotent. Existing Compose and hosted rollout run migrations before starting dependent runtime code.
+- Automatic Compose initialization uses `db:bootstrap --if-empty`: empty databases initialize normally; installed databases skip bootstrap and ledger seeding before forward migration. Local startup never resets volumes on failure (NFR-SCHEMA-05).
+- Concurrent saves of pages that include each other's anchor projects complete without a lock-order deadlock. Health-check creation/rename/deletion refreshes publication choices without discarding the title draft or selecting new checks. Returning to a backgrounded public page revalidates before redisplaying status.
+
 ### AC-BND-01: Deterministic Bundle
 
 - **Given** the same set of normalized events for an incident
@@ -2385,6 +2399,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** those management actions are simulated locally; token/webhook/probe credentials are fake and checkout/setup navigation never leaves the preview
 - **And** webhook endpoint/history failures stop loading, expose retry, preserve independent successful data, and cannot update an unmounted or previous project view
 - **And** incident, rule, health-check and settings edits and delivery retries affect only mock memory
+- **And** public status settings, both option pagination dimensions, saved preview, publish/unpublish and anonymous share pages work through the normal strict forms with valid project/check UUIDs; loopback links retain their ID across saves, restart clears publications, new checks stay private, and public output reuses the safe production projection
 - **And** a restart resets mock data, and `make dev-mock-off` restores real API routing
 - **And** foreign hosts/origins and malformed or oversized JSON are rejected; unsupported API paths cannot reach a real backend
 - **And** builds and production preview mode never install the mock middleware or enable telemetry through mock mode
@@ -2735,7 +2750,6 @@ These are local correctness gates. Production activation, representative traffic
 - Calendar/day/month/timezone changes in the same WildFly timer diagnostic produce one v2 fingerprint; different components, error codes, causes and environments remain distinct. Existing v1 exact-match capture rules still match their server-derived legacy fingerprint.
 - Deployment attribution excludes other projects, services, environments and future releases; older raw metadata cannot override newer scoped history. Missing customer evidence yields null, never the worker platform release.
 
-
 ### AC-GRP-RESOURCE: Browser resource identity and scoped noise control
 
 - The SayCheese-shaped synthetic corpus produces six resource groups from fifteen occurrences across thirteen legacy route-specific groups. An independent application exception stays separate, including when a resource and backend exception share a trace ID in local processing.
@@ -2755,7 +2769,6 @@ These are local correctness gates. Production activation, representative traffic
 - Email with a nonzero cooldown retains both distinct resource incidents in one digest and suppresses a replay. Configurable windows and project rule cooldowns validate through API and are passed unchanged by CLI/MCP; dashboard destination edits retain those settings.
 - With a narrow hosted lifecycle rule and a broader local drop, SDK configuration withholds both rules and ingestion retains authoritative precedence.
 - Forward migration from the predecessor schema preserves project data, repeated migration is a no-op, and missing migration readiness fails closed. Expired correlation metadata is pruned in bounded batches; no raw session values are persisted there.
-
 
 ### AC-ANL-21: Public connected flows
 

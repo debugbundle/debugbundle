@@ -73,6 +73,7 @@ const MUTATION_MCP_TOOLS = new Set<DebugBundleMcpToolName>([
   "archive_saved_analytics_funnel",
   "activate_probe",
   "deactivate_probe",
+  "save_public_status_page",
   "create_health_check",
   "update_health_check",
   "delete_health_check",

@@ -1,3 +1,5 @@
+import { parsePublicStatusBaseUrl } from "../../../packages/shared-types/src/public-status.js";
+import { createPublicStatusPageStore } from "../../../packages/storage/src/public-status-store.js";
 import { createPostgresAnalyticsFlowStore } from "../../../packages/storage/src/analytics-flow-store.js";
 import {
   countImprovementsForOrganization,
@@ -264,6 +266,12 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
         };
 
   return {
+    publicStatusPages: createPublicStatusPageStore(input.db),
+    publicStatusTrustProxy: input.publicStatusTrustProxy ?? false,
+    publicStatusBaseUrl: parsePublicStatusBaseUrl(
+      input.publicStatusBaseUrl?.trim() ||
+        `${(input.appBaseUrl ?? "https://app.debugbundle.com").replace(/\/+$/, "")}/status`
+    ).toString(),
     analyticsFlows: createPostgresAnalyticsFlowStore(input.db),
     ingestionPersistence,
     ingestionMetadata,

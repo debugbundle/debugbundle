@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useLayoutEffect,
@@ -30,7 +31,9 @@ function getBrowserDocument(): Document | null {
   return typeof document === "undefined" ? null : document;
 }
 
-export function getStoredTheme(windowLike: Pick<Window, "localStorage"> | null = getBrowserWindow()): ThemeMode {
+export function getStoredTheme(
+  windowLike: Pick<Window, "localStorage"> | null = getBrowserWindow()
+): ThemeMode {
   if (windowLike === null) {
     return "system";
   }
@@ -43,8 +46,12 @@ export function resolveTheme(
   theme: ThemeMode,
   matchMedia?: (query: string) => MediaQueryList
 ): ResolvedTheme {
+  const browserWindow = getBrowserWindow();
   const resolvedMatchMedia =
-    matchMedia ?? (getBrowserWindow() === null ? undefined : (query: string): MediaQueryList => window.matchMedia(query));
+    matchMedia ??
+    (browserWindow === null || typeof browserWindow.matchMedia !== "function"
+      ? undefined
+      : (query: string): MediaQueryList => browserWindow.matchMedia(query));
 
   if (theme === "light" || theme === "dark") {
     return theme;
@@ -71,22 +78,33 @@ export function applyResolvedTheme(
 
 export function initializeThemeDocument(
   windowLike: Pick<Window, "localStorage" | "matchMedia"> | null = getBrowserWindow(),
-  documentLike: Pick<Document, "documentElement"> | null = getBrowserDocument()
+  documentLike: Pick<Document, "documentElement"> | null = getBrowserDocument(),
+  forcedTheme?: ThemeMode
 ): { theme: ThemeMode; resolvedTheme: ResolvedTheme } {
-  const theme = getStoredTheme(windowLike);
-  const resolvedTheme =
-    resolveTheme(
-      theme,
-      windowLike === null ? undefined : (query: string): MediaQueryList => windowLike.matchMedia(query)
-    );
+  const theme = forcedTheme ?? getStoredTheme(windowLike);
+  const resolvedTheme = resolveTheme(
+    theme,
+    windowLike === null || typeof windowLike.matchMedia !== "function"
+      ? undefined
+      : (query: string): MediaQueryList => windowLike.matchMedia(query)
+  );
   applyResolvedTheme(resolvedTheme, documentLike);
 
   return { theme, resolvedTheme };
 }
 
-export function ThemeProvider({ children }: { children: ReactNode }): JSX.Element {
-  const [theme, setThemeState] = useState<ThemeMode>(() => getStoredTheme());
-  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveTheme(getStoredTheme()));
+export function ThemeProvider({
+  children,
+  forcedTheme
+}: {
+  children: ReactNode;
+  forcedTheme?: ThemeMode;
+}): JSX.Element {
+  // Public pages follow the device without reading or overwriting dashboard preferences.
+  const [preference, setThemeState] = useState<ThemeMode>(() => forcedTheme ?? getStoredTheme());
+  const theme = forcedTheme ?? preference;
+  const [systemTheme, setSystemTheme] = useState<ResolvedTheme>(() => resolveTheme("system"));
+  const resolvedTheme = theme === "system" ? systemTheme : theme;
 
   useLayoutEffect(() => {
     applyResolvedTheme(resolvedTheme);
@@ -94,12 +112,17 @@ export function ThemeProvider({ children }: { children: ReactNode }): JSX.Elemen
 
   useEffect(() => {
     const browserWindow = getBrowserWindow();
-    if (browserWindow === null || typeof browserWindow.matchMedia !== "function") {
+    if (
+      theme !== "system" ||
+      browserWindow === null ||
+      typeof browserWindow.matchMedia !== "function"
+    ) {
       return;
     }
 
     const mediaQuery = browserWindow.matchMedia(SYSTEM_THEME_MEDIA_QUERY);
-    const listener = (): void => setResolvedTheme(resolveTheme(theme));
+    const listener = (): void => setSystemTheme(resolveTheme("system"));
+    listener();
 
     if (typeof mediaQuery.addEventListener === "function") {
       mediaQuery.addEventListener("change", listener);
@@ -116,15 +139,19 @@ export function ThemeProvider({ children }: { children: ReactNode }): JSX.Elemen
     };
   }, [theme]);
 
-  function setTheme(nextTheme: ThemeMode): void {
-    setThemeState(nextTheme);
-    setResolvedTheme(resolveTheme(nextTheme));
+  const setTheme = useCallback(
+    (nextTheme: ThemeMode): void => {
+      if (forcedTheme !== undefined) return;
+      setThemeState(nextTheme);
+      setSystemTheme(resolveTheme("system"));
 
-    const browserWindow = getBrowserWindow();
-    if (browserWindow !== null) {
-      browserWindow.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
-    }
-  }
+      const browserWindow = getBrowserWindow();
+      if (browserWindow !== null) {
+        browserWindow.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+      }
+    },
+    [forcedTheme]
+  );
 
   const value = useMemo(
     () => ({
@@ -132,7 +159,7 @@ export function ThemeProvider({ children }: { children: ReactNode }): JSX.Elemen
       resolvedTheme,
       setTheme
     }),
-    [theme, resolvedTheme]
+    [theme, resolvedTheme, setTheme]
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

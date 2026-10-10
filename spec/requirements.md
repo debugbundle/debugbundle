@@ -150,7 +150,11 @@ Daily history must preserve a threshold-confirmed outage on every affected UTC d
 
 **FR-AVC-06:** The authenticated web app must provide a workspace Health Status page that summarizes retained availability-check status across projects the signed-in member can access. The page must group checks by project, show one compact daily status block for each retained day, expose per-check detail through progressive disclosure, and reuse the existing project Health tab for check management.
 
+Daily status tooltips must move to every immediately adjacent block in either direction without requiring a second hover. Retain keyboard focus descriptions and dismissal across authenticated health, public pages and saved previews.
+
 The workspace, project, and check history percentages must be labeled `30-day uptime` and use successful verified checks divided by all verified checks in the displayed 30-day window. Aggregate percentages must weight by check counts, exclude unknown/unmonitored periods, and never use only the latest day or an average of per-check percentages. Current status remains separate from historical impact; explicitly daily dashboard summaries remain daily. Confirmed outage days must be red after recovery. For legacy history missing incident references, a check day with at least one hour of recorded downtime must also show outage impact; shorter unconfirmed interruptions remain amber. Duration labels must retain hours, minutes, and seconds without rounding away downtime. Project tooltips must identify summed durations across checks as total check downtime rather than elapsed project outage duration.
+
+**FR-AVC-07:** Each project may anchor one opt-in public status page. Only its owner may publish or unpublish, change its title, or explicitly include checks from projects with the same current owner and organization. New projects/checks are private. Reuse Health Status rows and their check-weighted 30-day UTC history; retain project/check names and customize the page title. Public output must be a strict sanitized aggregate allowlist with no internal IDs, endpoints, labels, plans, diagnostics, incidents, account data, logs, bundles, or credentials. Public reads cannot execute checks or change customer state. Unknown, stale and paused coverage cannot be presented as operational. Share links remain stable across saves/unpublishing; deleted/reassigned data is revalidated on reads. Provide owner preview and copy/open in Project Health plus API/CLI/ordinary MCP parity. Public pages follow the device light/dark preference from startup and react to changes without reading or modifying the dashboard theme preference. Their linked Powered by DebugBundle footer reuses the small existing brand mark above the underlined attribution with comfortable spacing. V1 has no templates, subscriptions or separate history page. See [the publication contract](public-status-pages.md) and [trust rules](../rules/public-status-pages.md).
 
 ### 1.2 Ingestion API
 
@@ -420,7 +424,7 @@ See `/spec/billing.md` and `/spec/system-emails.md` for the detailed source-of-t
 
 **FR-WEB-10:** An explicitly opted-in local UI preview must populate the ordinary dashboard and related review surfaces with synthetic data. Simulated edits are held in memory, never forwarded to real services, and reset on preview restart. The preview is development-only, loopback-only, excluded from production builds, and disables frontend telemetry.
 
-The preview includes all primary dashboard and project pages, including webhooks/deliveries, tokens, members/invitations, billing/capacity, probes, weekly reports, and analytics flows/funnels/journeys/artifacts. Mock credentials cannot authenticate with a real installation; mock checkout and provider setup links stay local. Webhook read failures leave a retryable error state, retain independently available endpoint/history data, and ignore results from an unmounted or previous project view.
+The preview includes all primary dashboard and project pages, including webhooks/deliveries, tokens, members/invitations, billing/capacity, probes, weekly reports, analytics flows/funnels/journeys/artifacts, and public status settings/options/preview/publication. Public status links stay on the current loopback preview origin; selections are explicit and new checks stay private. Project/check fixtures and newly created records use valid UUIDs, preserving strict production form schemas. Mock credentials cannot authenticate with a real installation; mock checkout and provider setup links stay local. Webhook read failures leave a retryable error state, retain independently available endpoint/history data, and ignore results from an unmounted or previous project view.
 
 ### 1.12 Auth & Identity
 
@@ -752,7 +756,6 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **FR-ANL-30:** Acquisition and activation flows are public project-scoped capabilities with customer-defined ordered steps and origins, ordinary project authorization, headless browser/HTTP capture, bounded cross-origin handoffs including dedicated auth pages, aggregate reports, API/CLI/MCP/web parity, and no dependency on DebugBundle business records. Follow `analytics-public-flows-20261003.md`.
 
-
 ---
 
 ### 1.12 Browser Relay
@@ -947,6 +950,8 @@ Self-hosted deployments have no enforced rate limits (configurable via environme
 **NFR-SCHEMA-03:** Field meanings must not change silently.
 
 **NFR-SCHEMA-04:** Removed fields require schema version bump.
+
+**NFR-SCHEMA-05:** Runtime startup must distinguish empty-schema initialization from installed-schema upgrades. Automatic bootstrap skips populated schemas without recording migrations; ordered checksummed forward migrations run before dependent API/worker activation. Startup or migration failure must preserve database volumes and fail closed, never trigger an automatic data reset.
 
 ### 2.9 Hosted MCP Reliability And Privacy
 

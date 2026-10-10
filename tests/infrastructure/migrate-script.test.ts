@@ -7,6 +7,7 @@ const {
   connectMock,
   releaseMock,
   bootstrapStorageSchemaMock,
+  bootstrapStorageSchemaIfEmptyMock,
   seedStorageMigrationLedgerForCurrentSchemaMock,
   poolConstructorMock
 } = vi.hoisted(() => ({
@@ -15,6 +16,7 @@ const {
   releaseMock: vi.fn(),
   connectMock: vi.fn(),
   bootstrapStorageSchemaMock: vi.fn(),
+  bootstrapStorageSchemaIfEmptyMock: vi.fn(),
   seedStorageMigrationLedgerForCurrentSchemaMock: vi.fn(),
   poolConstructorMock: vi.fn()
 }));
@@ -30,7 +32,8 @@ vi.mock("pg", () => ({
 }));
 
 vi.mock("../../packages/storage/src/migrations.js", () => ({
-  bootstrapStorageSchema: bootstrapStorageSchemaMock
+  bootstrapStorageSchema: bootstrapStorageSchemaMock,
+  bootstrapStorageSchemaIfEmpty: bootstrapStorageSchemaIfEmptyMock
 }));
 
 vi.mock("../../packages/storage/src/schema-migrations.js", () => ({
@@ -50,6 +53,7 @@ describe("storage bootstrap script", () => {
       release: releaseMock
     });
     bootstrapStorageSchemaMock.mockReset();
+    bootstrapStorageSchemaIfEmptyMock.mockReset();
     seedStorageMigrationLedgerForCurrentSchemaMock.mockReset();
     poolConstructorMock.mockReset();
     delete process.env["DB_HOST"];
@@ -60,6 +64,22 @@ describe("storage bootstrap script", () => {
     delete process.env["DB_SSL_MODE"];
   });
 
+  it("skips installed schemas without seeding unapplied migrations in automatic startup", async () => {
+    bootstrapStorageSchemaIfEmptyMock.mockResolvedValue({ status: "skipped_existing" });
+    await runStorageBootstrapScript({}, { ifEmpty: true });
+    expect(bootstrapStorageSchemaIfEmptyMock).toHaveBeenCalledOnce();
+    expect(bootstrapStorageSchemaMock).not.toHaveBeenCalled();
+    expect(seedStorageMigrationLedgerForCurrentSchemaMock).not.toHaveBeenCalled();
+    expect(releaseMock).toHaveBeenCalledOnce();
+    expect(endMock).toHaveBeenCalledOnce();
+  });
+  it("records the current ledger after automatically creating an empty schema", async () => {
+    bootstrapStorageSchemaIfEmptyMock.mockResolvedValue({ status: "bootstrapped" });
+    seedStorageMigrationLedgerForCurrentSchemaMock.mockResolvedValue("seeded_current_schema");
+    await runStorageBootstrapScript({}, { ifEmpty: true });
+    expect(seedStorageMigrationLedgerForCurrentSchemaMock).toHaveBeenCalledOnce();
+  });
+
   it("should log when bootstrap creates the schema", async (): Promise<void> => {
     bootstrapStorageSchemaMock.mockResolvedValueOnce({ status: "bootstrapped" });
     seedStorageMigrationLedgerForCurrentSchemaMock.mockResolvedValueOnce("seeded_current_schema");
@@ -67,7 +87,9 @@ describe("storage bootstrap script", () => {
 
     await runStorageBootstrapScript({});
 
-    expect(logSpy).toHaveBeenCalledWith("db_bootstrap_ok: bootstrapped; migration_ledger=seeded_current_schema");
+    expect(logSpy).toHaveBeenCalledWith(
+      "db_bootstrap_ok: bootstrapped; migration_ledger=seeded_current_schema"
+    );
     expect(bootstrapStorageSchemaMock).toHaveBeenCalledOnce();
     expect(seedStorageMigrationLedgerForCurrentSchemaMock).toHaveBeenCalledOnce();
     expect(releaseMock).toHaveBeenCalledOnce();
@@ -83,7 +105,9 @@ describe("storage bootstrap script", () => {
 
     await runStorageBootstrapScript({});
 
-    expect(logSpy).toHaveBeenCalledWith("db_bootstrap_ok: already_bootstrapped; migration_ledger=already_present");
+    expect(logSpy).toHaveBeenCalledWith(
+      "db_bootstrap_ok: already_bootstrapped; migration_ledger=already_present"
+    );
     expect(releaseMock).toHaveBeenCalledOnce();
     expect(endMock).toHaveBeenCalledOnce();
     logSpy.mockRestore();
@@ -123,10 +147,12 @@ describe("storage bootstrap script", () => {
 
   it("should call pool query through bootstrap query adapter", async (): Promise<void> => {
     queryMock.mockResolvedValueOnce({ rows: [] });
-    bootstrapStorageSchemaMock.mockImplementationOnce(async (db: { query: (sql: string, params: unknown[]) => Promise<unknown> }) => {
-      await db.query("SELECT 1", ["x"]);
-      return { status: "already_bootstrapped" };
-    });
+    bootstrapStorageSchemaMock.mockImplementationOnce(
+      async (db: { query: (sql: string, params: unknown[]) => Promise<unknown> }) => {
+        await db.query("SELECT 1", ["x"]);
+        return { status: "already_bootstrapped" };
+      }
+    );
     seedStorageMigrationLedgerForCurrentSchemaMock.mockResolvedValueOnce("already_present");
 
     await runStorageBootstrapScript({});

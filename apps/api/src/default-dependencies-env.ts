@@ -169,6 +169,10 @@ export function createApiDependenciesFromEnv(
       ? {}
       : { analyticsHashSecret: env["ANALYTICS_HASH_SECRET"] }),
     appBaseUrl,
+    ...(env["PUBLIC_STATUS_PAGE_BASE_URL"] === undefined
+      ? {}
+      : { publicStatusBaseUrl: env["PUBLIC_STATUS_PAGE_BASE_URL"] }),
+    publicStatusTrustProxy: env["PUBLIC_STATUS_TRUST_PROXY"] === "true",
     ...(adminAnalyticsAccessEmails === undefined ? {} : { adminAnalyticsAccessEmails }),
     ...(authEmailSender === undefined ? {} : { authEmails: authEmailSender }),
     ...(billingEmails === undefined ? {} : { billingEmails }),

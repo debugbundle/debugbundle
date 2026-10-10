@@ -276,6 +276,7 @@ Handles production deployment, container publishing to private registries, and i
 - Schema changes must follow expand/contract rollout discipline: additive migration first, compatible code next, optional backfill after that, destructive cleanup only in a later release.
 - Any release that changes schema-dependent runtime behavior must include migration-path tests plus deploy/readiness validation that fails closed when required migrations are missing or invalid.
 - Agent-authored release reviews must explicitly check for unsafe destructive-in-place changes, bootstrap-as-migration regressions, and deploy ordering mistakes.
+- Automatic initialization may call `db:bootstrap --if-empty`, which skips every populated public schema without seeding the migration ledger. Installed schemas then run `db:migrate`. Never recover from startup/migration failure by automatically deleting database volumes.
 
 ---
 

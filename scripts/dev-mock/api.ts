@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
 
 import { createDevMockFixtures, type MockRecord } from "./fixtures.js";
 import {
@@ -10,6 +11,7 @@ import syntheticBundle from "./bundle.json" with { type: "json" };
 import { createManagementMocks } from "./management.js";
 import { createAnalyticsMocks } from "./analytics.js";
 import { createBillingMocks } from "./billing.js";
+import { createPublicStatusMocks } from "./public-status.js";
 
 export interface MockResponse {
   status: number;
@@ -30,6 +32,7 @@ export function createDevMockApi() {
   const management = createManagementMocks(data);
   const analytics = createAnalyticsMocks(data);
   const billing = createBillingMocks(data);
+  const publicStatus = createPublicStatusMocks(data, management.isSignedIn);
   const capturePolicies = new Map(
     data.projects.map((project) => [
       String(project["project_id"]),
@@ -136,14 +139,19 @@ export function createDevMockApi() {
     Object.assign(existing, changes, { updated_at: new Date().toISOString() });
     if (!id) {
       Object.assign(existing, {
-        [idKey]: `demo_${key}_${sequence++}`,
-        project_id: projectId ?? parsed.data["project_id"] ?? "proj_123"
+        [idKey]: key === "check" ? randomUUID() : `demo_${key}_${sequence++}`,
+        project_id: projectId ?? parsed.data["project_id"] ?? "00000000-0000-4000-8000-000000000001"
       });
       rows.push(existing);
     }
     return reply({ [key]: existing });
   }
-  function handle(method: string, resource: string, payload?: unknown): MockResponse {
+  function handle(
+    method: string,
+    resource: string,
+    payload?: unknown,
+    origin = "http://localhost:5291"
+  ): MockResponse {
     const url = new URL(resource, "http://localhost");
     const path = url.pathname,
       query = url.searchParams;
@@ -151,6 +159,8 @@ export function createDevMockApi() {
     const projectId = projectMatch?.[1] ?? query.get("project_id");
     const route = path.replace(/^\/v1\/projects\/[^/]+/, "/v1");
     const read = method === "GET";
+    const published = publicStatus.handle(method, path, query, payload, origin);
+    if (published) return published;
     const managed = management.handle(method, path, query, payload);
     if (managed) return managed;
     const analyzed = analytics.handle(method, path, query, payload);
@@ -184,7 +194,7 @@ export function createDevMockApi() {
         services: [
           {
             service_id: "svc_123",
-            project_id: projectId ?? "proj_123",
+            project_id: projectId ?? "00000000-0000-4000-8000-000000000001",
             name: "saycheese-frontend",
             runtime: "browser",
             framework: null,
@@ -399,22 +409,28 @@ export function createDevMockApi() {
     if (method === "POST" && retry) {
       const rows: MockRecord[] = data.deliveries;
       const delivery =
-        projectId === "proj_123" ? rows.find((row) => row["delivery_id"] === retry[1]) : undefined;
+        projectId === "00000000-0000-4000-8000-000000000001"
+          ? rows.find((row) => row["delivery_id"] === retry[1])
+          : undefined;
       if (!delivery) return missing();
       delivery["status"] = "retrying";
       delivery["last_error"] = null;
       return reply({ delivery });
     }
     if (read && route === "/v1/github/deliveries")
-      return reply({ deliveries: projectId === "proj_123" ? data.deliveries : [] });
+      return reply({
+        deliveries: projectId === "00000000-0000-4000-8000-000000000001" ? data.deliveries : []
+      });
     if (read && path === "/v1/github/installation")
       return reply({ installation: data.installation });
     if (read && path === "/v1/github/repositories")
       return reply({ repositories: data.repositories });
     if (read && path === "/v1/github/app/install-url")
-      return reply({ install_url: "/projects/proj_123/github" });
+      return reply({ install_url: "/projects/00000000-0000-4000-8000-000000000001/github" });
     if (route === "/v1/analytics-settings") {
-      const settings = data.analyticsSettings.get(projectId ?? "proj_123");
+      const settings = data.analyticsSettings.get(
+        projectId ?? "00000000-0000-4000-8000-000000000001"
+      );
       if (!settings) return missing();
       if (method === "PATCH") {
         const parsed = objectSchema.safeParse(payload);
@@ -425,7 +441,7 @@ export function createDevMockApi() {
     }
     if (route === "/v1/capture-policy" || route === "/v1/improvement-settings") {
       const records = route.endsWith("capture-policy") ? capturePolicies : improvementSettings;
-      const id = projectId ?? "proj_123";
+      const id = projectId ?? "00000000-0000-4000-8000-000000000001";
       if (!data.projects.some((project) => project["project_id"] === id)) return missing();
       const record =
         records.get(id) ??
@@ -443,7 +459,7 @@ export function createDevMockApi() {
         : reply({ access_mode: "manage", cloud_automation_available: true, settings: record });
     }
     const window = {
-      project_id: projectId ?? "proj_123",
+      project_id: projectId ?? "00000000-0000-4000-8000-000000000001",
       from: new Date(Date.now() - 30 * 86400000).toISOString(),
       to: new Date().toISOString(),
       granularity: "day",

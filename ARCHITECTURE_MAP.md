@@ -1,3 +1,11 @@
+Public status candidate (2026-10-08, local/unreleased): FR-AVC-07 adds opt-in project-anchored publication metadata and a safe aggregate projection. `public-status-store.ts` owns atomic same-owner/account selections and live ownership/eligibility checks; `public-status-projection.ts` owns sanitization and conservative freshness. Shared `availability-health.ts`/`availability-metrics.ts` preserve existing history behavior; `health-status-view.tsx` renders authenticated and public rows. `/status/:publicId` bypasses private providers, while Project Health manages title/selections/copy/preview. Five API operations, `health status` CLI and four ordinary MCP tools share the contract. Ordinary candidate catalog has 134 tools; frozen hosted/restricted profiles stay 23/five. Migration `202610080001_add_public_status_pages` is additive and must precede runtime activation. See `spec/public-status-pages.md` and `rules/public-status-pages.md`.
+
+Public status UI refinement (2026-10-09, owner-directed): Project Health opens publication settings with a toolbar button immediately left of Create health check, using the shared `dialog-form-content.tsx` modal with a scrollable body and fixed actions. Shared `components/system/multi-select.tsx` composes Radix/shadcn menus, search, controlled selections and pagination. `public-status-settings.tsx` loads on opening, owns publication draft/limits and a nested saved-preview dialog, discards unsaved edits on close and ignores late responses. Shared `read-only-copy-input.tsx` composes `ui/input-group.tsx` for labelled read-only URLs, a right-side copy icon and manual-copy fallback. Domain services and public interfaces are unchanged.
+
+Public status theme/tooltip refinement (2026-10-10, owner-directed): `theme-init.ts` uses the existing public-route predicate to apply device color scheme before mount. `PublicStatusPage` owns a system-forced `ThemeProvider`; private routes keep their stored theme provider in `PrivateAppRoot`. Public themes never read/write dashboard preferences, listen to device changes and clean up on unmount. The footer reuses `BrandMark`. Shared `StatusHistoryStrip` disables hover corridors for plain-text daily details across authenticated Health Status, public pages and saved previews, preserving keyboard behavior and other tooltips. Domain/auth/schema behavior is unchanged.
+
+Automatic local/self-host initialization uses `bootstrapStorageSchemaIfEmpty` through `db:bootstrap --if-empty`; populated schemas and ledgers remain untouched until `db:migrate` runs. API/worker dependencies retain migration-before-runtime ordering. Local `make dev` fails without resetting volumes. See NFR-SCHEMA-05 and `deploy/selfhost/README.md`.
+
 > Current interface parity release (2026-10-07): core 1.15.0, shared 2.3.0, CLI/MCP/OpenClaw 1.14.0 and site 1.6.2 are published and deployed. All fourteen audited gaps are patched, with existing dashboard patterns and the owner's Managing Noise edits retained. See [release evidence](spec/interface-parity-release-20261007.md) for exact sources, passing engineering/live runtime gates and external discovery limits. Public analytics flows shipped in 1.14.0; the expanded analytics candidate remains parked.
 
 Public acquisition/activation flows are customer-project definitions with ordered origin-bound steps.
@@ -20,8 +28,11 @@ durable continuation; million-visit load testing is deferred by the owner.
 Local UI fixtures live in `scripts/dev-mock/`: synthetic base records, rolling dates,
 filtered pagination and in-memory mutation simulation. `management.ts`, `billing.ts`
 and `analytics.ts` cover dashboard management/provider fixtures, local billing
-simulation and analytics definitions/reports/artifacts respectively. Mock credentials
-are invalid and provider/checkout navigation stays local. `apps/web/dev-mock-plugin.ts`
+simulation and analytics definitions/reports/artifacts respectively.
+`public-status.ts` owns ephemeral publication metadata and paginated
+choices, delegating safe output to the production `public-status-projection.ts`.
+Fixture and newly created project/check IDs are UUIDs for strict form parity.
+Mock credentials are invalid and provider/checkout navigation stays local. `apps/web/dev-mock-plugin.ts`
 is the opt-in development middleware adapter; `vite.config.ts` excludes it from builds
 and disables real API routing/telemetry in mock mode. `make dev-mock` recreates only
 the loopback-bound web container. No runtime API, storage or worker domain path changes.

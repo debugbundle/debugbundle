@@ -1,3 +1,5 @@
+import { resolvePublicStatusRoute } from "./lib/public-status-routing.js";
+import { PublicStatusPage } from "./pages/public-status-page.js";
 import { LoaderCircleIcon } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -164,11 +166,16 @@ function omitAuthFieldError(
 }
 
 export function App({ initialEntries }: AppProps): JSX.Element {
+  const publicRoute = resolvePublicStatusRoute(
+    import.meta.env.VITE_PUBLIC_STATUS_PAGE_BASE_URL,
+    window.location.origin
+  );
   const router =
     initialEntries === undefined ? (
       <BrowserRouter>
         <Routes>
-          <Route element={<RootGate />}>
+          <Route path={publicRoute.path} element={<PublicStatusPage />} />
+          <Route element={<PrivateAppRoot />}>
             <Route index element={<RootRedirect />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
@@ -203,7 +210,8 @@ export function App({ initialEntries }: AppProps): JSX.Element {
     ) : (
       <MemoryRouter initialEntries={initialEntries}>
         <Routes>
-          <Route element={<RootGate />}>
+          <Route path={publicRoute.path} element={<PublicStatusPage />} />
+          <Route element={<PrivateAppRoot />}>
             <Route index element={<RootRedirect />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
@@ -237,15 +245,24 @@ export function App({ initialEntries }: AppProps): JSX.Element {
       </MemoryRouter>
     );
 
+  return <TooltipProvider>{router}</TooltipProvider>;
+}
+
+function PrivateAppRoot(): JSX.Element {
+  if (
+    resolvePublicStatusRoute(
+      import.meta.env.VITE_PUBLIC_STATUS_PAGE_BASE_URL,
+      window.location.origin
+    ).dedicated
+  )
+    return <PublicStatusPage />;
   return (
     <ThemeProvider>
-      <TooltipProvider>
-        <SessionProvider>
-          {router}
-          <AppUpdateNotifier />
-          <AppToaster />
-        </SessionProvider>
-      </TooltipProvider>
+      <SessionProvider>
+        <RootGate />
+        <AppUpdateNotifier />
+        <AppToaster />
+      </SessionProvider>
     </ThemeProvider>
   );
 }

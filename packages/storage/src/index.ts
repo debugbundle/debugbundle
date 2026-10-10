@@ -262,3 +262,9 @@ export {
   AnalyticsFlowError,
   type AnalyticsFlowStore
 } from "./analytics-flow-store.js";
+
+export {
+  createPublicStatusPageStore,
+  PublicStatusError,
+  type PublicStatusPageStore
+} from "./public-status-store.js";

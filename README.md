@@ -23,6 +23,14 @@ Key properties:
 - **Safe SDKs:** SDK failures are swallowed internally, sensitive fields are redacted before transport, and duplicate storms are suppressed locally.
 - **Self-hostable core:** Compose-based stack for the web app, API, worker, Postgres, Redis, and S3-compatible object storage.
 
+## Public status pages
+
+Project owners can publish a status page from **Project → Health → Public status page**. The button sits immediately left of **Create health check** and opens the shared settings modal. Choose a title and checks using searchable multi-select dropdowns; optionally add projects you own in the same account through **Other projects**. Turn on **Enable public page** and save, then copy the stable link from its read-only input using the copy icon on the right. Paste it into your website. New checks remain private; turning off the switch and saving removes public access immediately. **Preview saved page** opens the saved public view in a dialog. Closing settings discards unsaved edits; reopening loads the saved configuration.
+
+Public pages follow the device light/dark setting, including changes while open, independently of your dashboard theme preference. They reuse Health Status rows and 30-day availability history with a small clickable logo above the underlined Powered by DebugBundle attribution. Daily tooltips update on every adjacent block across the shared health views. Project/check names are public; endpoint URLs, errors, service/environment labels, incidents and account data remain private. API/CLI/MCP provide the same management operations. See [the status-page contract](spec/public-status-pages.md) and [self-host deployment](deploy/selfhost/README.md).
+
+For local end-to-end verification, use the normal Docker stack (`make dev`), which initializes empty databases and migrates installed ones without resetting data. `make dev-mock` also simulates status settings, selection, preview, publish/unpublish and local anonymous pages for UI review. Restore real API routing with `make dev-mock-off` to verify persistence, authorization and migrations against the real stack. Follow the [local verification checklist](spec/public-status-pages.md#owner-local-verification).
+
 ## AnalyticsBundle
 
 AnalyticsBundle extends debugging from incident evidence to product-usage evidence without turning DebugBundle into a long-term raw-event store. It is opt-in browser analytics for the questions a human or agent needs to improve a product: visits and active users, routes and funnels, device/browser/OS/language segments, feature use, friction markers, incident impact, and bounded structured journey replay.
@@ -360,7 +368,12 @@ and generated artifacts. TaskTime includes empty and analytics-disabled states.
 Project edits, incident/improvement actions, rule and health-check edits, webhook
 creation/tests, token creation/revocation, invitations/member edits, probe
 activation, weekly reports, repository selection, and analytics settings/flows/
-funnels/bundle generation are simulated in memory. Failed-delivery clearing uses
+funnels/bundle generation and public status publication are simulated in memory.
+Public status pages start private; select checks and publish in Project Health to
+open a loopback share link. Mock project/check IDs use UUIDs so the normal strict
+forms work, including newly created records. Publication choices paginate, new
+checks remain private, and restarting resets publications along with other edits.
+Failed-delivery clearing uses
 the normal browser-only behavior. Billing checkout and portal links stay in the
 local preview; capacity changes only update mock state. Mock credentials are
 deliberately unusable with real installations. No real checks, notifications,
@@ -459,7 +472,7 @@ The web app vendors the unchanged shadcn 4.1.2 Tailwind stylesheet in
 `apps/web/src/styles/shadcn.css`, including its upstream MIT license. This preserves
 the current component animations and data variants without installing the component
 generator and its unused vulnerable glob-parser dependency in the app. Existing
-shadcn components and `components.json` remain the source of the UI. Run the
+shadcn components and `components.json` remain the source of the UI. Inspect component docs with `make ui-component-docs UI_COMPONENTS='dialog input-group'` and preview registry changes with `make ui-component-add UI_COMPONENTS=input-group UI_COMPONENT_FLAGS='--dry-run'`. Review existing component differences before applying changes; preserve local primitives and shared utilities. Run the
 component generator separately through its package runner when needed, and review
 any generated dependency/import changes against the dependency audit before adoption.
 

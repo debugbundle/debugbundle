@@ -239,3 +239,5 @@ disables frontend telemetry, and resets simulated state when the web container r
 A failed GitHub delivery whose ID is hidden for the current user and project in that
 browser. Server history is retained; Show cleared permits inspection and retry, and
 new failure IDs remain visible.
+
+**Public status page:** An opt-in, owner-controlled availability projection anchored to one project, with explicit same-owner/account project and check selections. It publishes names and bounded availability aggregates, never check diagnostics.

@@ -63,6 +63,24 @@ Portable plugin skills complement the project's profile and workflows. Setup doe
 
 The CLI reads local project configuration from `.debugbundle/` and can use member-token authentication for connected cloud operations. Use `debugbundle connect` to configure cloud access, or pass `--auth-file` to commands that support explicit auth state.
 
+## Public status pages
+
+Owners can publish selected health checks from their own projects through a stable public link:
+
+```sh
+debugbundle health status get --project-id <id> --json
+debugbundle health status options --project-id <id> --json
+debugbundle health status save --project-id <id> --settings-json '<settings>' --json
+debugbundle health status preview --project-id <id> --json
+```
+
+Settings contain `title`, `enabled` and explicit `projects` entries with `project_id`
+and `check_ids`. Save with `enabled: false` to unpublish while retaining the URL.
+Only selected names and aggregate availability are public; endpoint URLs and
+diagnostics stay private. New checks remain private. Use member authentication
+and publish only on the owner's instruction. See the
+[status-page guide](https://debugbundle.com/docs/availability-checks/).
+
 ## AnalyticsBundle
 
 Public project flows support customer-defined acquisition and activation steps across sites,
