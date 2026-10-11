@@ -992,3 +992,7 @@ webhook, analytics and capture requirements is tracked by PAR-01 through PAR-14 
 option, role and intentional browser/local/credential-authority differences. GitHub
 installation disconnect is active-organization owner-only across its adapters;
 browser installation state validation and existing tier/quota gates remain intact.
+
+## Hosted client compatibility foundations
+
+**FR-MCP-18:** Vendor-independent hosted-client verification/admission mechanics may be shared behind existing OpenAI compatibility exports while Muse remains unconfigured and unreachable. Preserve exact OpenAI issuer/audience/client, token and grant callback shape, errors, keys/storage, metadata, catalog and installed SDK contracts. An explicitly server-owned verification profile binds full resource URI, issuer, exact client, allowed product scopes and lifetime; it cannot authorize OAuth registration or activate routes. Configuration mutation must not broaden verification. See `spec/hosted-client-foundations.md`. Verified Muse client/redirect/authentication/discovery contracts remain prerequisites for provider/storage/routing implementation.

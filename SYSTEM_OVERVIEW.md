@@ -600,3 +600,7 @@ Web shared styles use the vendored shadcn 4.1.2 Tailwind stylesheet (upstream MI
 notice retained) through `globals.css`. The component generator is a separate
 development tool, not an app dependency; this removes its unused unpatched glob
 parser from the installed graph while preserving existing component styles.
+
+## Hosted client compatibility preparation
+
+The Muse implementation feature workspace contains vendor-independent hosted-client verification/admission foundations behind the existing OpenAI compatibility exports. No Muse OAuth provider, endpoint or production configuration is activated; real client/authentication details remain external dependencies. SDKs and legacy OpenAI storage/callbacks/catalog stay unchanged. See `spec/hosted-client-foundations.md` for the preservation and qualification contract.

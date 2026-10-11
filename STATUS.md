@@ -1,3 +1,37 @@
+# Muse connector deferred — 2026-10-11
+
+Owner-requested handoff: save the qualified candidate on `feature/muse-connector`
+and return the original core/cloud/site checkouts to `main`. The isolated
+`.local-repos/muse-connector-workspace/core` workspace and local evidence are
+preserved. Only core has source changes; cloud/site and all SDKs are unchanged.
+No merge, deployment, terms acceptance, submission or publication is part of this
+handoff. The full phase and all 13 slice completion gates remain open.
+
+The signed-in consumer Muse session reaches a country/region waitlist, preventing
+real custom-connector testing with that account. Publisher intake was accessible,
+but exact client/callback/token-authentication/resource/discovery and private-test
+contracts remain unverified. Publisher region/business eligibility is unknown;
+no EU publisher ban or rejected submission was established. Muse Code is separate.
+
+The authorized vendor-independent foundations are locally qualified: shared
+profile-bound token verification, read scopes and bounded admission behind the
+existing OpenAI exports; an actual old/new provider credential harness; and an
+explicit correction for the existing every-use refresh-rotation defect. Old
+credential formats remain compatible. The archived source’s rotation policy
+prevents treating it as a security-qualified actual hosted rollback baseline.
+
+Full suite: 4,216 tests / 512 files / 94 shards. Final auth/MCP run: 148 tests /
+16 files, including three additional tests after the full run. All eight changed
+source coverage checks, lint, typecheck, build and actual credential corpus pass.
+SDK, schema, catalog, metadata, OpenAI connection interfaces and production are
+unchanged. Muse production OAuth/storage/routes/UI/operations remain unimplemented.
+
+Resume from [the tracked handoff](spec/muse-connector-handoff.md) after an authorized
+consumer/private-testing path and exact vendor contracts are available. The local
+proposal owns detailed slice progress; local qualification and vendor evidence
+remain separate. Recheck current terms/eligibility, finish Slices 1–3 gates, then
+continue Slices 4–13. Preserve OpenAI’s separate portal escalation.
+
 # Public status controls release — 2026-10-10
 
 Core 1.16.1 and site 1.6.4 are published and live. The owner-approved enable

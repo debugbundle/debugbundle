@@ -121,3 +121,7 @@ Before public launch:
 - Rate limits, audit logs, readiness checks, and operational logs are present.
 - Public docs and listings do not claim hosted Remote MCP availability before launch.
 - The official OpenAI evidence state reports production deployment, live-client validation, portal review, publication, and directory discovery independently. A deployed Developer Mode candidate must never be described as approved, published, or directory-discoverable before those later gates are proven.
+
+## Vendor-independent continuation — 2026-10-10
+
+The owner approved [hosted-client compatibility foundations](hosted-client-foundations.md) while real Muse access is region-gated. This permits compatible internal verification/admission extraction and old-source credential characterization with Muse off; it does not authorize an arbitrary client, a guessed Muse OAuth profile, new storage or enabled Muse routes. The official OpenAI contract and separate portal escalation remain frozen.

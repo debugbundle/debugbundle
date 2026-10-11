@@ -6,6 +6,15 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### Fixed
+
+- Explicitly rotate hosted OpenAI refresh tokens on every exchange, as required by the existing credential contract. Retain the existing issuer, client, keys, token format and storage so previously issued credentials remain readable. Reuse revokes the backing grant. Archived source remains format-compatible but its default rotation policy is not a security-qualified rollback target.
+
+### Engineering
+
+- Extract profile-bound hosted access-token verification and bounded admission mechanics behind the existing OpenAI exports. Muse remains unconfigured and unavailable; SDK packages, ingestion, catalogs and existing connection interfaces are unchanged.
+- Add a Docker-only archived-source/candidate OAuth compatibility harness using synthetic credentials and disposable Postgres/Redis.
+
 ## [1.16.1] - 2026-10-10
 
 ### Fixed

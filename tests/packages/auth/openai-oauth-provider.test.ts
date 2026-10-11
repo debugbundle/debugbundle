@@ -77,13 +77,11 @@ describe("OpenAI OAuth/OIDC provider profile", () => {
     });
     expect(configuration.features.registration).toEqual({ enabled: false });
     expect(configuration.features.devInteractions).toEqual({ enabled: false });
+    expect(configuration.rotateRefreshToken).toBe(true);
     expect(configuration.formats).toEqual({ AccessToken: "jwt" });
     expect(configuration.scopes).toEqual(OPENAI_OIDC_SCOPES);
     expect(
-      configuration.features.resourceIndicators.getResourceServerInfo(
-        {},
-        OPENAI_MCP_RESOURCE
-      )
+      configuration.features.resourceIndicators.getResourceServerInfo({}, OPENAI_MCP_RESOURCE)
     ).toMatchObject({ scope: OPENAI_HOSTED_MCP_SCOPES.join(" ") });
     expect(configuration.routes.authorization).toBe("/oauth/authorize");
     const policy = configuration.interactions.policy;
@@ -94,9 +92,7 @@ describe("OpenAI OAuth/OIDC provider profile", () => {
     for (const reason of ["op_scopes_missing", "op_claims_missing", "rs_scopes_missing"]) {
       const check = policy[0]?.checks.find((candidate) => candidate.reason === reason);
       expect(check).toBeDefined();
-      await expect(
-        Promise.resolve().then(() => check?.check({ oidc: {} }))
-      ).resolves.toBe(true);
+      await expect(Promise.resolve().then(() => check?.check({ oidc: {} }))).resolves.toBe(true);
       await expect(
         Promise.resolve().then(() =>
           check?.check({
@@ -307,4 +303,83 @@ describe("OpenAI OAuth/OIDC provider profile", () => {
 
     expect(provider.callback()).toEqual(expect.any(Function));
   });
+
+  it("keeps token claims minimal and refuses resources outside the approved audience", async () => {
+    const findVerifiedAccount = vi.fn(async (accountId: string) =>
+      accountId === "verified-user"
+        ? { userId: accountId, email: "synthetic@example.test", emailVerified: true }
+        : undefined
+    );
+    const resolveGrantClaims = vi.fn(
+      async () =>
+        undefined as { grantId: string; organizationId: string; email?: string } | undefined
+    );
+    const configuration = buildOpenAiOidcConfiguration({
+      adapter: vi.fn(),
+      cimdCache: { getOpenAiCimdResponse: vi.fn(), setOpenAiCimdResponse: vi.fn() },
+      jwks: { keys: [] },
+      cookieKeys: ["synthetic-cookie-key"],
+      findVerifiedAccount,
+      claimClientAssertionJti: vi.fn(async () => true),
+      resolveGrantClaims
+    });
+    const resource = configuration.features.resourceIndicators;
+    await expect(
+      configuration.features.clientIdMetadataDocument.allowFetch({}, OPENAI_CIMD_CLIENT_ID)
+    ).resolves.toBe(true);
+    await expect(
+      configuration.features.clientIdMetadataDocument.allowFetch(
+        {},
+        "https://attacker.example/client.json"
+      )
+    ).resolves.toBe(false);
+    expect(configuration.interactions.url({}, { uid: "interaction/with?delimiters" })).toBe(
+      "/oauth/interaction/interaction%2Fwith%3Fdelimiters"
+    );
+    await expect(configuration.findAccount({}, "missing-user")).resolves.toBeUndefined();
+    const verifiedAccount = await configuration.findAccount({}, "verified-user");
+    await expect(verifiedAccount?.claims()).resolves.toEqual({
+      sub: "verified-user",
+      email: "synthetic@example.test",
+      email_verified: true
+    });
+    expect(resource.defaultResource()).toBe(OPENAI_MCP_RESOURCE);
+    expect(resource.useGrantedResource()).toBe(true);
+    expect(() =>
+      resource.getResourceServerInfo({}, "https://mcp.debugbundle.com/muse/mcp")
+    ).toThrow("invalid_target");
+    expect(configuration.issueRefreshToken()).toBe(true);
+    await expect(configuration.extraTokenClaims({}, {})).resolves.toEqual({
+      nbf: expect.any(Number)
+    });
+    expect(resolveGrantClaims).not.toHaveBeenCalled();
+    await expect(
+      configuration.extraTokenClaims({}, { grantId: "missing-provider-grant" })
+    ).resolves.toEqual({ nbf: expect.any(Number) });
+    resolveGrantClaims.mockResolvedValue({
+      grantId: "normalized-grant",
+      organizationId: "organization",
+      email: "synthetic@example.test"
+    });
+    await expect(
+      configuration.extraTokenClaims({}, { grantId: "valid-provider-grant" })
+    ).resolves.toEqual({
+      grant_id: "normalized-grant",
+      organization_id: "organization",
+      nbf: expect.any(Number)
+    });
+  });
+
+  it.each(["", "invalid-email"])(
+    "rejects an unusable verified identity email: %j",
+    async (email) => {
+      await expect(
+        resolveOpenAiAccount("synthetic-user", async () => ({
+          userId: "synthetic-user",
+          email,
+          emailVerified: true
+        }))
+      ).resolves.toBeUndefined();
+    }
+  );
 });

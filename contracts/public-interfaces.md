@@ -3977,3 +3977,7 @@ with the complete event enum. `WebhookEventPayloadSchema` accepts real lifecycle
 payloads and synthetic test envelopes for every supported event. Synthetic envelopes
 contain `test: true` and `data.message`; they do not represent real lifecycle artifacts.
 The legacy verification schema, API-emitted format and signing behavior are retained.
+
+## Hosted client compatibility foundation contract
+
+Internal package mechanics may be shared under [FR-MCP-18](../spec/hosted-client-foundations.md). Existing OpenAI factory exports and their grant callback/error/AuthInfo shape remain compatible. Each constructed verifier is bound to one server-owned issuer, full resource URI, exact client, product scope set and token lifetime; it never selects a profile from caller input. No Muse route, registration method, callback or public production endpoint is established by synthetic profile tests. OpenAI discovery, CIMD/private-key authentication, legacy encrypted records and independent release contract remain unchanged.

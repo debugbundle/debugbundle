@@ -96,6 +96,7 @@ export interface OpenAiOidcConfiguration {
   findAccount: (_ctx: unknown, accountId: string) => ReturnType<typeof resolveOpenAiAccount>;
   conformIdTokenClaims: false;
   issueRefreshToken: () => true;
+  rotateRefreshToken: true;
   extraTokenClaims: (
     _ctx: unknown,
     token: { grantId?: string }
@@ -295,6 +296,9 @@ export function buildOpenAiOidcConfiguration(
       resolveOpenAiAccount(accountId, dependencies.findVerifiedAccount),
     conformIdTokenClaims: false,
     issueRefreshToken: () => true,
+    // Confidential clients otherwise inherit rotation only after 70% of TTL.
+    // Every exchange must consume its token so replay revokes the backing grant.
+    rotateRefreshToken: true,
     extraTokenClaims: async (_ctx: unknown, token: { grantId?: string }) => {
       const notBefore = Math.floor(Date.now() / 1_000);
       if (!token.grantId) {

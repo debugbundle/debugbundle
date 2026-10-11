@@ -2783,3 +2783,11 @@ outcome, including disabled/nullable/empty/false values. Cover creator/role/tier
 boundaries, one-time secrets, stale navigation responses, bounded pagination,
 invalid input before dispatch and legacy MCP metadata. Source/unit evidence does
 not assert browser, provider, release or installed-client acceptance.
+
+### AC-MCP-20: Hosted Client Compatibility Foundations
+
+- Existing OpenAI factories preserve metadata, AuthInfo/grant-callback/error shape and the frozen 23-tool catalog. Old-source-issued credentials remain readable by candidate code and candidate credentials remain readable by old source; record corpus limitations separately from real client/deployment proof.
+- Explicit synthetic profiles reject tokens across issuer, exact client and full path-bearing resource in both directions even with shared signing keys; unsupported/duplicate scopes, malformed lifetime/type, inactive grants and storage failure fail closed. Caller mutation cannot broaden configured profiles.
+- Shared admission preserves bounded/cancellable waiting and idempotent cleanup. Extraction does not create a second runtime gate, Redis capacity budget or new service.
+- SDK ingestion/public schemas and member/project authentication regressions pass. Muse routes/provider/configuration are not activated or inferred from tests.
+- Code exchange, refresh/reuse, migration, reviewer, load, deployment, real Muse and external marketplace evidence remain explicitly separate qualification gates.

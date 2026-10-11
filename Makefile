@@ -85,6 +85,7 @@ help:
 	@echo "  make openai-plugin-verify    Verify source manifest and candidate hashes"
 	@echo "  make test-integration Run Compose-backed ingestion integration tests"
 	@echo "  make test-mixed-version-api PREVIOUS_API_REVISION=<deployed core SHA>  Verify old/new API on an isolated forward-migrated DB"
+	@echo "  make test-hosted-oauth-compatibility PREVIOUS_API_REVISION=<baseline SHA>  Verify synthetic old/new OAuth credentials"
 	@echo "  make worker-jobs     Inspect scoped durable worker job metadata (read-only by default)"
 	@echo "  make api-check       Run API runtime bootstrap tests"
 	@echo "  make backend-restart Recreate API + worker so they reload current env"
@@ -296,6 +297,11 @@ browser-evidence-check:
 
 test-focused:
 	$(NODE_RUN) "apk add --no-cache git >/dev/null && corepack enable && corepack pnpm vitest run $(TEST_FILES)"
+
+# Archived baseline/candidate factories, synthetic credentials, disposable DB/Redis.
+.PHONY: test-hosted-oauth-compatibility
+test-hosted-oauth-compatibility:
+	PREVIOUS_API_REVISION="$(PREVIOUS_API_REVISION)" bash scripts/verify-hosted-oauth-compatibility.sh
 
 .PHONY: coverage-focused
 coverage-focused:

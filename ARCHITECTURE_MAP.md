@@ -899,3 +899,7 @@ Webhook test event adapters reuse the existing webhook-client enum and API/domai
 test service. `test_webhook_event` is additive in ordinary MCP/OpenClaw; frozen
 `test_webhook` metadata and restricted profiles remain unchanged. Behavioral tests
 live in `tests/contracts/webhook-test-event-parity.test.ts`.
+
+## Hosted client compatibility preparation
+
+`packages/auth/src/hosted-access-token-verifier.ts` owns explicitly profile-bound access-token verification; `openai-access-token-verifier.ts` preserves the OpenAI factory and legacy callback/error/result shape. `packages/mcp-core/src/hosted-admission.ts` owns the existing bounded local queue, with `openai-admission.ts` retaining its export. These internal mechanics add no runtime instance or Muse route. See `spec/hosted-client-foundations.md`.
