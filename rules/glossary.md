@@ -17,6 +17,14 @@ back to that source rather than becoming independently maintained skills.
 
 The repository-distributed `debugbundle-codex` package combines the local stdio MCP server and a workflow skill for Codex. It supports existing local evidence and authorized member operations. It is separate from the hosted read-only OpenAI plugin and its directory approval.
 
+### Optional OpenClaw Tool
+
+A tool disabled by default until an operator explicitly allows it. DebugBundle also requires native per-call approval for optional tools, with denial on timeout. Allowlisting makes the capability available; it does not grant persistent approval to execute it. New capabilities default to optional until reviewed.
+
+### ClawHub Security Acceptance
+
+Completed clean overall, final-review and antivirus outcomes for the exact expected skill and plugin versions, plus unblocked skill moderation. Publication receipts, artifact integrity and search visibility are separate evidence. Scanner warnings adjudicated benign by the platform remain recorded.
+
 ### Local Authentication Profile
 
 The opt-in MCP `--local-auth` mode obtains member credentials from the server environment or saved CLI login instead of tool arguments. It preserves the remaining tool validation and domain behavior; the default stdio contract remains unchanged.
