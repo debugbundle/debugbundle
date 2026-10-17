@@ -26,4 +26,6 @@ Core baseline `e7400c49` and site baseline `2f61696` matched origin/main before 
 
 ## Publication and rollout evidence
 
-Pending.
+- Shared types/redaction 2.5.0 published from `a04f54e0` by [run 39031356123](https://github.com/debugbundle/debugbundle/actions/runs/39031356123). Both registry tarballs passed identity, integrity, license and compatibility checks; the shared artifact includes the provider catalog and service-scoped fallback. Consumer adoption passed 113 tests in six files and changes only the two intended dependency resolutions.
+- Production baseline: API/worker 1.16.1 healthy, worker processing enabled, 58 migrations applied, 12,034 completed jobs and no other job states. Four existing scoped operational incidents were recorded before rollout for comparison.
+- Remaining publications and production rollout are pending.
