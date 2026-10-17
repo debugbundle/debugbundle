@@ -2,7 +2,7 @@
 
 This is the maintained inventory for first-party developer agent packages that bundle the local DebugBundle MCP server and a workflow skill. It complements the [MCP ecosystem release manifest](../apps/mcp/ecosystem-release-manifest.json), which tracks the npm server, MCP Registry, Smithery, ClawHub, OpenClaw, and downstream discovery. That pipeline does not publish Codex, Claude Code, or Gemini CLI packages. The hosted, read-only [OpenAI plugin](../apps/mcp/openai/release-manifest.json) has its own release gate.
 
-## Developer package release candidates (2026-10-17)
+## Published developer packages (2026-10-17)
 
 | Host        | Package version | MCP pin  | Maintained source                                                           | Public channel                                                                                                  | Release and update route                                                                                                                                                                                                            |
 | ----------- | --------------- | -------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -10,9 +10,20 @@ This is the maintained inventory for first-party developer agent packages that b
 | Claude Code | `1.16.0`        | `1.16.0` | [`apps/mcp/claude-code/debugbundle/`](../apps/mcp/claude-code/debugbundle/) | core Git marketplace in [`debugbundle/debugbundle`](https://github.com/debugbundle/debugbundle)                 | Publish the reviewed plugin and [catalog](../.claude-plugin/marketplace.json) on core `main`; verify a public marketplace install and update.                                                                                       |
 | Gemini CLI  | `1.2.1`         | `1.16.0` | [`plugins/debugbundle-gemini/`](../plugins/debugbundle-gemini/)             | standalone Git repository [`debugbundle/debugbundle-gemini`](https://github.com/debugbundle/debugbundle-gemini) | Copy the validated package to public `main`, tag the version, publish a GitHub Release with the validated ZIP, run `make gemini-extension-verify-public`, verify a fresh Git install/update, and check gallery indexing separately. |
 
-The Codex and Claude Code marketplaces are directories inside the public core repository. Gemini CLI installs from its separate root-manifest Git repository. These are three independent package versions and release actions; none is an npm package publish. All three target the published `@debugbundle/mcp@1.16.0`. MCP 1.16.0 registry artifacts are independently verified. Native package and public installation checks for this train are in progress; track evidence in [the resource controls release](browser-resource-release-20261017.md). The generated project skill from `debugbundle setup` is another installation path, not a fourth package release.
+The Codex and Claude Code marketplaces are directories inside the public core repository. Gemini CLI installs from its separate root-manifest Git repository. These are three independent package versions and release actions; none is an npm package publish. All three target the published `@debugbundle/mcp@1.16.0`. MCP 1.16.0 registry artifacts are independently verified. Native package and public installation checks pass for this train; track evidence in [the resource controls release](browser-resource-release-20261017.md). The generated project skill from `debugbundle setup` is another installation path, not a fourth package release.
 
 ## Release evidence and discovery
+
+The 2026-10-17 resource-controls release verifies public Codex/Claude source
+`47ae20ec64e0847d372ff3d0fcc419d5303aac43` and Gemini standalone source
+`ef26fcbd79916d06973461c820fc7a3a4ae0f7e8`, tag `v1.2.1`, and its
+[published release](https://github.com/debugbundle/debugbundle-gemini/releases/tag/v1.2.1).
+Codex 0.153.1, Claude Code 2.1.277 and Gemini CLI 0.61.0 pass public install,
+134-tool discovery, local evidence, credential boundaries, updates and removal.
+The downloaded Gemini ZIP matches SHA-256
+`338f917f7ef39e39e6c2a792859102a4a11330ef75dd0033d90bf3cd17c7eea4`.
+Full CI passes native Gemini on Node 22/24/26. Public installation is verified;
+external gallery indexing remains separate. See the [release evidence](browser-resource-release-20261017.md).
 
 The 2026-10-10 public status release verifies Codex 0.153.1 and Claude Code 2.1.277
 against public core marketplace source `62b9950be74b39f184a3c0ce54d2f170de709790`.

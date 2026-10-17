@@ -15,12 +15,19 @@ lint/typecheck, guidance consistency, shared/CLI/MCP/web candidate builds,
 clean CLI installs on Node 22/24/26, the published-1.10.0 upgrade fixture, and
 41 site tests/typecheck/production build pass. No browser inspection was requested.
 
-The owner authorized the release train on 2026-10-17. Shared packages 2.5.0
-are published and independently verified; CLI/MCP 1.16.0 publication and native
-registry checks are in progress. Production remains at the verified 1.16.1
-baseline until dependent publication, exact-source CI and rollout gates pass.
-No customer policy mutation is part of this release. Track live evidence in
-`spec/browser-resource-release-20261017.md`.
+Core 1.17.0 and site 1.6.6 are published and live at the exact CI-qualified
+release commits. Shared 2.5.0, CLI/MCP/OpenClaw 1.16.0, Codex 1.3.1, Claude Code
+1.16.0 and Gemini 1.2.1 are published; native public installs pass. Hosted rollout
+39033810796 succeeds. Independent readback confirms healthy API/worker 1.17.0,
+active processing, 58 migrations, served dashboard/docs, unchanged incident
+baseline and retained previous stable release/images. Customer rules remain unchanged.
+
+MCP Registry, Smithery MCP/skill, ClawHub skill and OpenClaw publication are
+publicly verified, including exact skill/package contents. All 80 public
+API/MCP readiness samples pass through the post-release observation window.
+ClawHub capability search remains partial (5/7), and some external directory
+checks are restricted/unverified. These are explicit remaining discovery limits,
+not a failed production rollout. See `spec/browser-resource-release-20261017.md`.
 
 # Public status controls release — 2026-10-10
 
