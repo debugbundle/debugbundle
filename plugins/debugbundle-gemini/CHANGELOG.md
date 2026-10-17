@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-10-17
+
+- Adopt verified MCP 1.16.0 and expanded browser resource noise guidance. Preserve existing tool contracts, authentication, capture defaults and reviewed rule scope.
+
 ## [1.2.0] - 2026-10-10
 
 - Adopt published MCP 1.15.0 with owner-authorized public status settings, project/check choices, saved preview and publication controls. Preserve existing authentication, tool contracts and CLI-first guidance.

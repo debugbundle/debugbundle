@@ -15,10 +15,12 @@ lint/typecheck, guidance consistency, shared/CLI/MCP/web candidate builds,
 clean CLI installs on Node 22/24/26, the published-1.10.0 upgrade fixture, and
 41 site tests/typecheck/production build pass. No browser inspection was requested.
 
-No commit, push, publication, deployment or customer policy mutation occurred.
-Next: prepare independent release versions and run the recorded package/channel
-and hosted rollout sequence with exact release authorization. Keep live rollout
-proof separate from local qualification. See `spec/browser-resource-incidents.md`.
+The owner authorized the release train on 2026-10-17. Shared packages 2.5.0
+are published and independently verified; CLI/MCP 1.16.0 publication and native
+registry checks are in progress. Production remains at the verified 1.16.1
+baseline until dependent publication, exact-source CI and rollout gates pass.
+No customer policy mutation is part of this release. Track live evidence in
+`spec/browser-resource-release-20261017.md`.
 
 # Public status controls release — 2026-10-10
 
