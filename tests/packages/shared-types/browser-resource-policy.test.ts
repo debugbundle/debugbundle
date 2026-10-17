@@ -8,6 +8,7 @@ import {
 import { browserResourceEvent } from "../../helpers/browser-resource-fixtures.js";
 import { describeBrowserResource } from "../../../packages/shared-types/src/browser-resource.js";
 import { buildBrowserResourceSuggestions } from "../../../packages/shared-types/src/browser-resource-suggestions.js";
+import { buildEventFingerprintContext } from "../../../packages/event-normalizer/src/index.js";
 
 function suggestions(url: string, page?: string | null, relatedUrl?: string) {
   const event = browserResourceEvent({ url, page });
@@ -90,7 +91,13 @@ describe("resource noise policy", () => {
       { host: "www.googletagmanager.com", path_equals: "/gtm.js" },
       { host: "www.googletagmanager.com", path_equals: "/gtm.js" }
     ]);
-    expect(suggestions(signIn, undefined, tracker)).toEqual([]);
+    const signInControls = suggestions(signIn, undefined, tracker);
+    expect(signInControls).toHaveLength(2);
+    expect(signInControls[0]?.rule.matcher.resource_url).toEqual({
+      host: "accounts.google.com",
+      path_equals: "/gsi/client"
+    });
+    expect(signInControls[0]?.reason).toContain("authentication");
   });
   it("keeps other resources, application errors, services and environments outside a suggested rule", () => {
     const suggestion = suggestions("https://www.googletagmanager.com/gtm.js")[0]!;
@@ -115,6 +122,7 @@ describe("resource noise policy", () => {
       browserResourceEvent({ url: "https://www.googletagmanager.com/gtag/js" }),
       browserResourceEvent({ url: "https://accounts.google.com/gsi/client" }),
       browserResourceEvent({ url: "/assets/main.js" }),
+      browserResourceEvent({ tag: "img" }),
       { ...event, service: { ...event.service, name: "admin" } },
       { ...event, service: { ...event.service, environment: "staging" } },
       {
@@ -143,6 +151,7 @@ describe("resource noise policy", () => {
       event_types: ["frontend_exception"],
       browser_event_kind: "resource_error",
       browser_event_opaque: true,
+      browser_target_tag_name: "script",
       services: ["web"],
       environments: ["production"],
       resource_url: { host: "www.googletagmanager.com", path_equals: "/gtm.js" }
@@ -156,9 +165,131 @@ describe("resource noise policy", () => {
     "https://app.example.com/assets/main.js",
     "https://cdn.example.com/unknown.js",
     "https://www.googletagmanager.com.evil.example/gtm.js"
-  ])("does not recommend suppressing a functional or unknown resource: %s", (url) => {
-    expect(suggestions(url)).toEqual([]);
+  ])(
+    "offers explicit controls without declaring a functional or unknown resource harmless: %s",
+    (url) => {
+      const result = suggestions(url);
+      expect(result.map((item) => item.suggestion_id)).toEqual([
+        "resource_context",
+        "resource_drop"
+      ]);
+      expect(result.every((item) => item.requires_confirmation)).toBe(true);
+      expect(result[0]?.rule.matcher).toMatchObject({
+        services: ["web"],
+        environments: ["production"],
+        browser_target_tag_name: "script",
+        resource_url: { host: new URL(url).hostname, path_equals: new URL(url).pathname }
+      });
+      expect(result[0]?.reason).not.toMatch(/harmless|safe to ignore/i);
+    }
+  );
+
+  it.each([
+    { url: null },
+    { tag: null },
+    { url: "/assets/main.js", page: null },
+    { url: `https://cdn.example.com/${"a".repeat(1025)}` }
+  ])("uses the exact fingerprint when resource identity is incomplete: %j", (input) => {
+    const result = buildBrowserResourceSuggestions({
+      browserEvent: browserResourceEvent(input).payload.browser_event,
+      service: "web",
+      environment: "production",
+      incident: {
+        incident_id: "incident",
+        project_id: "project",
+        fingerprint: "hash",
+        fingerprint_version: "v3",
+        title: "Resource failed",
+        occurrence_count: 1,
+        matched_fields: []
+      }
+    });
+    expect(result.map((item) => item.suggestion_id)).toEqual([
+      "exact_fingerprint_demote",
+      "exact_fingerprint_drop"
+    ]);
+    expect(result.every((item) => item.requires_confirmation)).toBe(true);
+    expect(result[0]?.rule.matcher).toMatchObject({
+      event_types: ["frontend_exception"],
+      fingerprint: { version: "v3", value: "hash" }
+    });
+    expect(result[0]?.rule.matcher.resource_url).toBeUndefined();
   });
+
+  it.each(["service", "environment"] as const)(
+    "does not broaden a rule when %s is missing",
+    (missing) => {
+      const result = buildBrowserResourceSuggestions({
+        browserEvent: browserResourceEvent().payload.browser_event,
+        service: missing === "service" ? undefined : "web",
+        environment: missing === "environment" ? undefined : "production",
+        incident: {
+          incident_id: "incident",
+          project_id: "project",
+          fingerprint: "hash",
+          fingerprint_version: "v2",
+          title: "Resource failed",
+          occurrence_count: 1,
+          matched_fields: []
+        }
+      });
+      expect(result[0]?.rule.matcher.fingerprint).toEqual({ version: "v2", value: "hash" });
+      expect(result[0]?.rule.matcher.resource_url).toBeUndefined();
+      expect(result[0]?.rule.matcher.services).toEqual(missing === "service" ? undefined : ["web"]);
+      expect(result[0]?.rule.matcher.environments).toEqual(
+        missing === "environment" ? undefined : ["production"]
+      );
+    }
+  );
+
+  it.each(["demote", "drop"] as const)(
+    "keeps fingerprint fallback %s within the observed service and environment",
+    (action) => {
+      const event = browserResourceEvent({ url: null });
+      const identity = buildEventFingerprintContext(event).fingerprint;
+      const selected = buildBrowserResourceSuggestions({
+        browserEvent: event.payload.browser_event,
+        service: event.service.name,
+        environment: event.service.environment,
+        incident: {
+          incident_id: "incident",
+          project_id: "project",
+          fingerprint: identity.value,
+          fingerprint_version: identity.version,
+          title: "Resource failed",
+          occurrence_count: 1,
+          matched_fields: []
+        }
+      }).find((suggestion) => suggestion.recommended_action === action)!;
+      const rule = CaptureRuleSchema.parse({
+        ...selected.rule,
+        id: "00000000-0000-4000-8000-000000000101",
+        project_id: "project",
+        hit_count: 0,
+        last_matched_at: null,
+        created_at: "2026-10-17T00:00:00.000Z",
+        updated_at: "2026-10-17T00:00:00.000Z"
+      });
+      const evaluate = (candidate: typeof event) =>
+        evaluateCaptureRules(
+          [rule],
+          buildCaptureRuleEvaluationContext({
+            project_id: "project",
+            event: candidate,
+            ...buildEventFingerprintContext(candidate)
+          }),
+          "2026-10-17T00:00:00.000Z"
+        );
+      const otherService = { ...event, service: { ...event.service, name: "admin" } };
+      // Fingerprints group by error and environment; service is a separate incident key.
+      expect(buildEventFingerprintContext(otherService).fingerprint).toEqual(identity);
+      expect(evaluate(event)?.outcome).toBe(action);
+      expect(evaluate(otherService)).toBeNull();
+      expect(
+        evaluate({ ...event, service: { ...event.service, environment: "staging" } })
+      ).toBeNull();
+    }
+  );
 
   it("compares absolute resource URLs with the captured page origin", () => {
     const event = browserResourceEvent({ url: "https://app.example.com/assets/main.js" });
@@ -171,7 +302,39 @@ describe("resource noise policy", () => {
     expect(withoutOrigin.first_party).toBeUndefined();
   });
 
-  it("suggests only lifecycle-scoped demotion for hidden first-party preloads", () => {
+  it.each([false, undefined])(
+    "preserves observed opacity instead of assuming opaque=true (%s)",
+    (opaque) => {
+      const event = browserResourceEvent().payload.browser_event;
+      const result = buildBrowserResourceSuggestions({
+        browserEvent: { ...event, opaque },
+        service: "web",
+        environment: "production",
+        incident: {
+          incident_id: "incident",
+          project_id: "project",
+          fingerprint: "hash",
+          fingerprint_version: "v3",
+          title: "Resource failed",
+          occurrence_count: 1,
+          matched_fields: []
+        }
+      });
+      if (opaque === false) {
+        expect(result[0]?.rule.matcher.browser_event_opaque).toBe(false);
+        expect(result[0]?.suggestion_id).toBe("resource_context");
+      } else {
+        expect(result[0]?.rule.matcher).toEqual({
+          event_types: ["frontend_exception"],
+          services: ["web"],
+          environments: ["production"],
+          fingerprint: { version: "v3", value: "hash" }
+        });
+      }
+    }
+  );
+
+  it("preserves lifecycle-scoped demotion alongside explicit exact-resource controls", () => {
     const event = browserResourceEvent({
       url: "https://app.example.com/assets/app-8f3a.js?signature=secret",
       page: "https://app.example.com/gallery",
@@ -205,7 +368,11 @@ describe("resource noise policy", () => {
       }
     });
 
-    expect(result).toHaveLength(1);
+    expect(result.map((item) => item.suggestion_id)).toEqual([
+      "hidden_preload_demote",
+      "resource_context",
+      "resource_drop"
+    ]);
     expect(result[0]).toMatchObject({
       suggestion_id: "hidden_preload_demote",
       recommended_action: "demote",
@@ -244,22 +411,29 @@ describe("resource noise policy", () => {
         visibilityState: "hidden",
         attributes: { rel: "preload", as: "script" }
       });
-      expect(
-        buildBrowserResourceSuggestions({
-          browserEvent: event.payload.browser_event,
-          service: "web",
-          environment: "production",
-          incident: {
-            incident_id: "incident",
-            project_id: "project",
-            fingerprint: "hash",
-            fingerprint_version: "v2",
-            title: "Resource failed",
-            occurrence_count: 1,
-            matched_fields: []
-          }
-        })
-      ).toEqual([]);
+      const result = buildBrowserResourceSuggestions({
+        browserEvent: event.payload.browser_event,
+        service: "web",
+        environment: "production",
+        incident: {
+          incident_id: "incident",
+          project_id: "project",
+          fingerprint: "hash",
+          fingerprint_version: "v2",
+          title: "Resource failed",
+          occurrence_count: 1,
+          matched_fields: []
+        }
+      });
+      expect(result.map((item) => item.suggestion_id)).toEqual([
+        "resource_context",
+        "resource_drop"
+      ]);
+      expect(result.every((item) => item.requires_confirmation)).toBe(true);
+      expect(result[0]?.rule.matcher.resource_url).toEqual({
+        host: new URL(url).hostname,
+        path_equals: new URL(url).pathname
+      });
     }
   );
 });

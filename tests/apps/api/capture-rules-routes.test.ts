@@ -129,7 +129,9 @@ function createIncidentFixture(): Awaited<
   };
 }
 
-function createBrowserNoiseBundleBuffer(): Buffer {
+function createBrowserNoiseBundleBuffer(
+  sourceUrl: string | null = "https://www.googletagmanager.com/gtm.js?token=secret#frag"
+): Buffer {
   const bundle = createBundleWithRequestContext();
   bundle.service.name = "web";
   bundle.project.environment = "production";
@@ -170,7 +172,7 @@ function createBrowserNoiseBundleBuffer(): Buffer {
           page: { url: "https://app.example.com/checkout" },
           target: {
             tag_name: "script",
-            source_url: "https://www.googletagmanager.com/gtm.js?token=secret#frag"
+            ...(sourceUrl === null ? {} : { source_url: sourceUrl })
           }
         }
       }
@@ -282,45 +284,54 @@ describe("capture rule routes", () => {
     expect(response.json()).toEqual({ rule });
   });
 
-  it("returns deterministic incident-based suggestions when the incident bundle is ready", async () => {
-    const objectStoreReader = {
-      getObject: vi.fn().mockResolvedValue(createBrowserNoiseBundleBuffer())
-    };
-    const app = createDependencies({
-      incidentRetrieval: {
-        listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
-        getIncidentForOrganization: vi.fn().mockResolvedValue(createIncidentFixture()),
-        listIncidentLogsForOrganization: vi.fn().mockResolvedValue([]),
-        getBundleFailureReasonForOrganization: vi.fn().mockResolvedValue(null)
-      },
-      objectStoreReader
-    });
+  it.each([
+    "https://www.googletagmanager.com/gtm.js",
+    "https://www.googletagmanager.com/gtag/js",
+    "https://cdn.example.com/optional.js",
+    null
+  ])(
+    "returns deterministic resource controls for %s without changing the API shape",
+    async (url) => {
+      const objectStoreReader = {
+        getObject: vi.fn().mockResolvedValue(createBrowserNoiseBundleBuffer(url))
+      };
+      const app = createDependencies({
+        incidentRetrieval: {
+          listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
+          getIncidentForOrganization: vi.fn().mockResolvedValue(createIncidentFixture()),
+          listIncidentLogsForOrganization: vi.fn().mockResolvedValue([]),
+          getBundleFailureReasonForOrganization: vi.fn().mockResolvedValue(null)
+        },
+        objectStoreReader
+      });
 
-    const response = await app.inject({
-      method: "POST",
-      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/capture-rule-suggestion",
-      headers: { authorization: "Bearer dbundle_mem_test_token" }
-    });
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/capture-rule-suggestion",
+        headers: { authorization: "Bearer dbundle_mem_test_token" }
+      });
 
-    expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({
-      bundle_status: "ready",
-      suggestions: [
-        expect.objectContaining({
-          suggestion_id: "resource_context",
-          recommended_action: "demote"
-        }),
-        expect.objectContaining({
-          suggestion_id: "resource_drop",
-          recommended_action: "drop"
-        })
-      ]
-    });
-  });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        bundle_status: "ready",
+        suggestions: [
+          expect.objectContaining({
+            suggestion_id: url === null ? "exact_fingerprint_demote" : "resource_context",
+            recommended_action: "demote"
+          }),
+          expect.objectContaining({
+            suggestion_id: url === null ? "exact_fingerprint_drop" : "resource_drop",
+            recommended_action: "drop"
+          })
+        ]
+      });
+    }
+  );
 
-  it("marks incident suggestions that already have matching capture rules", async () => {
+  it.each([true, false])("reports legacy matching rules with enabled=%s", async (enabled) => {
     const existingRule = {
       ...rule,
+      enabled,
       created_from_incident_id: null
     };
     const objectStoreReader = {
@@ -353,8 +364,10 @@ describe("capture rule routes", () => {
     expect(response.json().suggestions[0]).toMatchObject({
       suggestion_id: "resource_context",
       created_rule_id: rule.id,
-      created_rule_enabled: true
+      created_rule_enabled: enabled
     });
+    expect(response.json().suggestions[0].rule.matcher).toEqual(existingRule.matcher);
+    expect(response.json().suggestions[0].rule.matcher.browser_target_tag_name).toBeUndefined();
   });
 
   it("returns pending suggestions and requests bundle regeneration when the bundle is missing", async () => {
@@ -443,57 +456,62 @@ describe("capture rule routes", () => {
             event_types: ["frontend_exception"],
             browser_event_kind: "resource_error",
             browser_event_opaque: true,
-    services: ["web"],
-    environments: ["production"],
-    resource_url: { host: "www.googletagmanager.com", path_equals: "/gtm.js" }
+            browser_target_tag_name: "script",
+            services: ["web"],
+            environments: ["production"],
+            resource_url: { host: "www.googletagmanager.com", path_equals: "/gtm.js" }
           }
         })
       })
     );
   });
 
-  it("returns an existing matching rule instead of duplicating a selected suggestion", async () => {
-    const existingRule = {
-      ...rule,
-      created_from_incident_id: null
-    };
-    const createCaptureRuleForProject = vi.fn();
-    const objectStoreReader = {
-      getObject: vi.fn().mockResolvedValue(createBrowserNoiseBundleBuffer())
-    };
-    const app = createDependencies({
-      auditLogging: {
-        createAuditLog: vi.fn().mockResolvedValue(undefined)
-      },
-      incidentRetrieval: {
-        listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
-        getIncidentForOrganization: vi.fn().mockResolvedValue(createIncidentFixture()),
-        listIncidentLogsForOrganization: vi.fn().mockResolvedValue([]),
-        getBundleFailureReasonForOrganization: vi.fn().mockResolvedValue(null)
-      },
-      captureRuleManagement: {
-        listCaptureRulesForProject: vi.fn().mockResolvedValue([existingRule]),
-        listActiveCaptureRulesForProject: vi.fn(),
-        createCaptureRuleForProject,
-        updateCaptureRuleForProject: vi.fn(),
-        deleteCaptureRuleForProject: vi.fn()
-      },
-      objectStoreReader
-    });
+  it.each([true, false])(
+    "returns an existing legacy rule without duplicating or enabling it (enabled=%s)",
+    async (enabled) => {
+      const existingRule = {
+        ...rule,
+        enabled,
+        created_from_incident_id: null
+      };
+      const createCaptureRuleForProject = vi.fn();
+      const objectStoreReader = {
+        getObject: vi.fn().mockResolvedValue(createBrowserNoiseBundleBuffer())
+      };
+      const app = createDependencies({
+        auditLogging: {
+          createAuditLog: vi.fn().mockResolvedValue(undefined)
+        },
+        incidentRetrieval: {
+          listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
+          getIncidentForOrganization: vi.fn().mockResolvedValue(createIncidentFixture()),
+          listIncidentLogsForOrganization: vi.fn().mockResolvedValue([]),
+          getBundleFailureReasonForOrganization: vi.fn().mockResolvedValue(null)
+        },
+        captureRuleManagement: {
+          listCaptureRulesForProject: vi.fn().mockResolvedValue([existingRule]),
+          listActiveCaptureRulesForProject: vi.fn(),
+          createCaptureRuleForProject,
+          updateCaptureRuleForProject: vi.fn(),
+          deleteCaptureRuleForProject: vi.fn()
+        },
+        objectStoreReader
+      });
 
-    const response = await app.inject({
-      method: "POST",
-      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/capture-rules",
-      headers: { authorization: "Bearer dbundle_mem_test_token" },
-      payload: {
-        suggestion_id: "resource_context"
-      }
-    });
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/capture-rules",
+        headers: { authorization: "Bearer dbundle_mem_test_token" },
+        payload: {
+          suggestion_id: "resource_context"
+        }
+      });
 
-    expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ rule: existingRule });
-    expect(createCaptureRuleForProject).not.toHaveBeenCalled();
-  });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ rule: existingRule });
+      expect(createCaptureRuleForProject).not.toHaveBeenCalled();
+    }
+  );
 
   it("updates capture rules for owners and admins", async () => {
     const updatedRule = {

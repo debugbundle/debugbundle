@@ -1,3 +1,5 @@
+import { identifyBrowserResourceProvider } from "./browser-resource-providers.js";
+
 /** Resource identity is evidence; dependency importance and failure cause are separate decisions. */
 export interface BrowserResource {
   host: string | null;
@@ -109,21 +111,10 @@ export function describeBrowserResource(value: unknown): BrowserResource | null 
     location.first_party === true ? "application_asset" : "unknown";
   let provider: string | null = null;
   if (type === "script") {
-    if (location.host === "www.googletagmanager.com" && location.path === "/gtm.js") {
-      provider = "Google Tag Manager";
-      role = "tag_manager";
-    } else if (
-      location.host === "connect.facebook.net" &&
-      /^\/[a-z]{2}_[A-Z]{2}\/fbevents\.js$/.test(location.path)
-    ) {
-      provider = "Meta Pixel";
-      role = "advertising";
-    } else if (location.host === "www.clarity.ms" && /^\/tag\/[A-Za-z0-9]+$/.test(location.path)) {
-      provider = "Microsoft Clarity";
-      role = "analytics";
-    } else if (location.host === "accounts.google.com" && location.path === "/gsi/client") {
-      provider = "Google sign-in";
-      role = "authentication";
+    const recognized = identifyBrowserResourceProvider(location.host, location.path);
+    if (recognized !== null) {
+      provider = recognized.name;
+      role = recognized.role;
     }
   }
   const file = location.path.split("/").filter(Boolean).at(-1) ?? location.path;
@@ -161,13 +152,15 @@ export function describeBrowserResourceInterruption(
   const visibility = page?.["visibility_state"];
   const readyState = page?.["ready_state"];
   const tag = typeof target?.["tag_name"] === "string" ? target["tag_name"].toLowerCase() : null;
-  const rel = typeof attributes?.["rel"] === "string" ? attributes["rel"].trim().toLowerCase() : null;
+  const rel =
+    typeof attributes?.["rel"] === "string" ? attributes["rel"].trim().toLowerCase() : null;
   if (
     (visibility !== "hidden" && visibility !== "prerender" && visibility !== "unloaded") ||
     (readyState !== "loading" && readyState !== "interactive") ||
     tag !== "link" ||
     (rel !== "preload" && rel !== "modulepreload" && rel !== "prefetch")
-  ) return null;
+  )
+    return null;
   return {
     visibility_state: visibility,
     ready_state: readyState,

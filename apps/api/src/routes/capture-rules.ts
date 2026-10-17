@@ -4,6 +4,7 @@ import type { FastifyInstance } from "fastify";
 
 import {
   buildCaptureRuleSuggestions,
+  findExistingCaptureRuleForSuggestion,
   BundleV1Schema,
   CaptureRuleCreateSchema,
   CaptureRuleSuggestionsResponseSchema,
@@ -16,7 +17,7 @@ import {
   type CaptureRuleSuggestionsResponse,
   type CaptureRulesResponse,
   type CaptureRule,
-  type BundleV1,
+  type BundleV1
 } from "../../../../packages/shared-types/src/index.js";
 import { buildBundleObjectKey } from "../../../../packages/storage/src/index.js";
 import { readSanitizedArtifact } from "../../../../packages/storage/src/artifact-privacy.js";
@@ -28,7 +29,11 @@ import {
   requireRateLimitedMemberAuth,
   requireRateLimitedProjectAccess
 } from "../api-helpers.js";
-import { IncidentParamsSchema, ProjectCaptureRuleParamsSchema, ProjectParamsSchema } from "../schemas.js";
+import {
+  IncidentParamsSchema,
+  ProjectCaptureRuleParamsSchema,
+  ProjectParamsSchema
+} from "../schemas.js";
 
 function buildCaptureRulesResponse(input: {
   accessMode: CaptureRulesResponse["access_mode"];
@@ -36,7 +41,7 @@ function buildCaptureRulesResponse(input: {
 }): CaptureRulesResponse {
   return CaptureRulesResponseSchema.parse({
     access_mode: input.accessMode,
-    rules: input.rules,
+    rules: input.rules
   });
 }
 
@@ -48,34 +53,6 @@ function buildCaptureRuleSuggestionsResponse(
   input: CaptureRuleSuggestionsResponse
 ): CaptureRuleSuggestionsResponse {
   return CaptureRuleSuggestionsResponseSchema.parse(input);
-}
-
-function stableStringify(value: unknown): string {
-  if (Array.isArray(value)) {
-    return `[${value.map(stableStringify).sort().join(",")}]`;
-  }
-
-  if (value !== null && typeof value === "object") {
-    return `{${Object.entries(value as Record<string, unknown>)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, entry]) => `${JSON.stringify(key)}:${stableStringify(entry)}`)
-      .join(",")}}`;
-  }
-
-  return JSON.stringify(value);
-}
-
-function captureRuleMatchesSuggestion(rule: CaptureRule, suggestionRule: CaptureRuleCreate): boolean {
-  return (
-    rule.action === suggestionRule.action &&
-    rule.sample_rate === suggestionRule.sample_rate &&
-    rule.sample_event_class === suggestionRule.sample_event_class &&
-    stableStringify(rule.matcher) === stableStringify(suggestionRule.matcher)
-  );
-}
-
-function findExistingRuleForSuggestion(rules: CaptureRule[], suggestionRule: CaptureRuleCreate): CaptureRule | null {
-  return rules.find((rule) => captureRuleMatchesSuggestion(rule, suggestionRule)) ?? null;
 }
 
 async function listExistingCaptureRulesForSuggestions(input: {
@@ -100,9 +77,15 @@ function annotateCaptureRuleSuggestions(input: {
   existingRules: CaptureRule[];
 }): CaptureRuleSuggestionsResponse["suggestions"] {
   return input.suggestions.map((suggestion) => {
-    const existingRule = findExistingRuleForSuggestion(input.existingRules, suggestion.rule);
+    const existingRule = findExistingCaptureRuleForSuggestion(input.existingRules, suggestion.rule);
     return {
       ...suggestion,
+      // A legacy rule can cover more element types than the new proposal. Show
+      // its saved scope so the existing-rule state never understates its reach.
+      rule:
+        existingRule === null
+          ? suggestion.rule
+          : { ...suggestion.rule, matcher: existingRule.matcher },
       created_rule_id: existingRule?.id ?? null,
       created_rule_enabled: existingRule?.enabled ?? null
     };
@@ -138,10 +121,11 @@ async function readBundleForCaptureRuleSuggestions(input: {
     };
   } catch (error) {
     if (isObjectNotFoundError(error)) {
-      const failureReason = await input.dependencies.incidentRetrieval.getBundleFailureReasonForOrganization?.({
-        organization_id: input.organizationId,
-        incident_id: input.incidentId
-      });
+      const failureReason =
+        await input.dependencies.incidentRetrieval.getBundleFailureReasonForOrganization?.({
+          organization_id: input.organizationId,
+          incident_id: input.incidentId
+        });
 
       if (failureReason === "monthly_quota_exceeded") {
         return {
@@ -177,7 +161,10 @@ async function readBundleForCaptureRuleSuggestions(input: {
   }
 }
 
-export function registerCaptureRuleRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
+export function registerCaptureRuleRoutes(
+  app: FastifyInstance,
+  dependencies: ApiDependencies
+): void {
   app.get("/v1/projects/:id/capture-rules", async (request, reply) => {
     const parsedParams = ProjectParamsSchema.safeParse(request.params);
     if (!parsedParams.success) {
@@ -186,33 +173,35 @@ export function registerCaptureRuleRoutes(app: FastifyInstance, dependencies: Ap
 
     const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
       bucket: "management-read",
-      projectId: parsedParams.data.id,
+      projectId: parsedParams.data.id
     });
     if (auth === null) {
       return;
     }
 
     const accessMode: CaptureRulesResponse["access_mode"] =
-      auth.access.effective_role === "owner" || auth.access.effective_role === "admin" ? "manage" : "preview";
+      auth.access.effective_role === "owner" || auth.access.effective_role === "admin"
+        ? "manage"
+        : "preview";
 
     if (dependencies.captureRuleManagement === undefined) {
       return reply.status(200).send(
         buildCaptureRulesResponse({
           accessMode,
-          rules: [],
+          rules: []
         })
       );
     }
 
     const rules = await dependencies.captureRuleManagement.listCaptureRulesForProject({
       organization_id: auth.access.organization_id,
-      project_id: parsedParams.data.id,
+      project_id: parsedParams.data.id
     });
 
     return reply.status(200).send(
       buildCaptureRulesResponse({
         accessMode,
-        rules,
+        rules
       })
     );
   });
@@ -225,7 +214,7 @@ export function registerCaptureRuleRoutes(app: FastifyInstance, dependencies: Ap
 
     const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
       bucket: "management-write",
-      projectId: parsedParams.data.id,
+      projectId: parsedParams.data.id
     });
     if (auth === null) {
       return;
@@ -247,7 +236,7 @@ export function registerCaptureRuleRoutes(app: FastifyInstance, dependencies: Ap
       organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id,
       id: randomUUID(),
-      create: parsedBody.data,
+      create: parsedBody.data
     });
 
     if (rule === null) {
@@ -263,8 +252,8 @@ export function registerCaptureRuleRoutes(app: FastifyInstance, dependencies: Ap
         metadata: {
           reason: "project_not_found",
           action: parsedBody.data.action,
-          name: parsedBody.data.name,
-        },
+          name: parsedBody.data.name
+        }
       });
 
       return reply.status(404).send({ error: "project_not_found" });
@@ -282,15 +271,20 @@ export function registerCaptureRuleRoutes(app: FastifyInstance, dependencies: Ap
       metadata: {
         project_id: parsedParams.data.id,
         action: rule.action,
-        name: rule.name,
-      },
+        name: rule.name
+      }
     });
 
     return reply.status(201).send(buildCaptureRuleResponse(rule));
   });
 
   app.post("/v1/incidents/:id/capture-rule-suggestion", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "retrieval-read");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "retrieval-read"
+    );
     if (member === null) {
       return;
     }
@@ -309,11 +303,16 @@ export function registerCaptureRuleRoutes(app: FastifyInstance, dependencies: Ap
     }
 
     const access = await dependencies.projectManagement?.resolveProjectAccessForUser?.({
-      user_id: member.member_id, project_id: incident.project_id
+      user_id: member.member_id,
+      project_id: incident.project_id
     });
-    const accessMode = access != null && !isSharedProjectAccessSuspended(access) &&
-      (access.effective_role === "owner" || access.effective_role === "admin") && dependencies.captureRuleManagement !== undefined
-      ? "manage" : "preview";
+    const accessMode =
+      access != null &&
+      !isSharedProjectAccessSuspended(access) &&
+      (access.effective_role === "owner" || access.effective_role === "admin") &&
+      dependencies.captureRuleManagement !== undefined
+        ? "manage"
+        : "preview";
 
     const bundle = await readBundleForCaptureRuleSuggestions({
       dependencies,
@@ -363,7 +362,7 @@ export function registerCaptureRuleRoutes(app: FastifyInstance, dependencies: Ap
 
     return reply.status(200).send(
       buildCaptureRuleSuggestionsResponse({
-          access_mode: accessMode,
+        access_mode: accessMode,
         suggestions: annotateCaptureRuleSuggestions({
           suggestions,
           existingRules
@@ -374,7 +373,12 @@ export function registerCaptureRuleRoutes(app: FastifyInstance, dependencies: Ap
   });
 
   app.post("/v1/incidents/:id/capture-rules", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-write");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "management-write"
+    );
     if (member === null) {
       return;
     }
@@ -448,9 +452,13 @@ export function registerCaptureRuleRoutes(app: FastifyInstance, dependencies: Ap
     const create: CaptureRuleCreate = {
       ...suggestion.rule,
       ...(parsedBody.data.name === undefined ? {} : { name: parsedBody.data.name }),
-      ...(parsedBody.data.description === undefined ? {} : { description: parsedBody.data.description }),
+      ...(parsedBody.data.description === undefined
+        ? {}
+        : { description: parsedBody.data.description }),
       ...(parsedBody.data.enabled === undefined ? {} : { enabled: parsedBody.data.enabled }),
-      ...(parsedBody.data.expires_at === undefined ? {} : { expires_at: parsedBody.data.expires_at })
+      ...(parsedBody.data.expires_at === undefined
+        ? {}
+        : { expires_at: parsedBody.data.expires_at })
     };
 
     const existingRules = await listExistingCaptureRulesForSuggestions({
@@ -458,7 +466,7 @@ export function registerCaptureRuleRoutes(app: FastifyInstance, dependencies: Ap
       organizationId: member.organization_id,
       projectId: incident.project_id
     });
-    const existingRule = findExistingRuleForSuggestion(existingRules, create);
+    const existingRule = findExistingCaptureRuleForSuggestion(existingRules, create);
     if (existingRule !== null) {
       return reply.status(200).send(buildCaptureRuleResponse(existingRule));
     }
@@ -503,7 +511,7 @@ export function registerCaptureRuleRoutes(app: FastifyInstance, dependencies: Ap
 
     const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
       bucket: "management-write",
-      projectId: parsedParams.data.id,
+      projectId: parsedParams.data.id
     });
     if (auth === null) {
       return;
@@ -525,7 +533,7 @@ export function registerCaptureRuleRoutes(app: FastifyInstance, dependencies: Ap
       organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id,
       rule_id: parsedParams.data.ruleId,
-      update: parsedBody.data,
+      update: parsedBody.data
     });
 
     if (rule === null) {
@@ -540,8 +548,8 @@ export function registerCaptureRuleRoutes(app: FastifyInstance, dependencies: Ap
         ip_address: request.ip,
         metadata: {
           reason: "capture_rule_not_found",
-          update_keys: Object.keys(parsedBody.data),
-        },
+          update_keys: Object.keys(parsedBody.data)
+        }
       });
 
       return reply.status(404).send({ error: "capture_rule_not_found" });
@@ -559,8 +567,8 @@ export function registerCaptureRuleRoutes(app: FastifyInstance, dependencies: Ap
       metadata: {
         update_keys: Object.keys(parsedBody.data),
         project_id: parsedParams.data.id,
-        action: rule.action,
-      },
+        action: rule.action
+      }
     });
 
     return reply.status(200).send(buildCaptureRuleResponse(rule));
@@ -574,7 +582,7 @@ export function registerCaptureRuleRoutes(app: FastifyInstance, dependencies: Ap
 
     const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
       bucket: "management-write",
-      projectId: parsedParams.data.id,
+      projectId: parsedParams.data.id
     });
     if (auth === null) {
       return;
@@ -590,7 +598,7 @@ export function registerCaptureRuleRoutes(app: FastifyInstance, dependencies: Ap
     const deleted = await dependencies.captureRuleManagement.deleteCaptureRuleForProject({
       organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id,
-      rule_id: parsedParams.data.ruleId,
+      rule_id: parsedParams.data.ruleId
     });
 
     await recordAuditLog(dependencies.auditLogging, {
@@ -604,8 +612,8 @@ export function registerCaptureRuleRoutes(app: FastifyInstance, dependencies: Ap
       ip_address: request.ip,
       metadata: {
         project_id: parsedParams.data.id,
-        reason: deleted ? null : "capture_rule_not_found",
-      },
+        reason: deleted ? null : "capture_rule_not_found"
+      }
     });
 
     if (!deleted) {

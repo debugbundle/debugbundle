@@ -194,7 +194,7 @@ describe("web app — incident table interactions", () => {
 
     expect(await screen.findByText(/demote resource errors from analytics\.example\.com/i)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /create rule/i }));
+    await user.click(screen.getByRole("button", { name: /keep as context/i }));
 
     await waitFor(() => {
       expect(

@@ -1,3 +1,25 @@
+# Browser resource noise controls audit — 2026-10-17
+
+The provider/control expansion is implemented and local release qualification is
+complete. The audit fixed cross-service fingerprint fallback scope and stale
+saved-rule scope after a create response. Existing saved/paused rules remain
+unchanged; capture stays enabled by default. No new API/CLI/MCP/SDK option or
+database migration is required.
+
+The clean final full suite passes 4,257 tests in 512 files (154 conditional/
+integration skips), with 187 focused regressions and all ten changed-source
+coverage gates passing. All 15 selected real-service integration tests pass,
+including cross-service isolation, history preservation and pause/restore;
+disposable services/volumes were independently confirmed removed. Repository
+lint/typecheck, guidance consistency, shared/CLI/MCP/web candidate builds,
+clean CLI installs on Node 22/24/26, the published-1.10.0 upgrade fixture, and
+41 site tests/typecheck/production build pass. No browser inspection was requested.
+
+No commit, push, publication, deployment or customer policy mutation occurred.
+Next: prepare independent release versions and run the recorded package/channel
+and hosted rollout sequence with exact release authorization. Keep live rollout
+proof separate from local qualification. See `spec/browser-resource-incidents.md`.
+
 # Public status controls release — 2026-10-10
 
 Core 1.16.1 and site 1.6.4 are published and live. The owner-approved enable

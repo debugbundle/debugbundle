@@ -9,62 +9,74 @@ import {
 } from "../../../apps/mcp/src/capture-rule-tools.ts";
 
 describe("mcp capture-rule tools", () => {
-  it.each(["resource_context", "resource_drop"])(
-    "preserves the server-reviewed scope and opaque ID for %s",
-    async (suggestionId) => {
-      const event = browserResourceEvent();
-      const suggestions = buildBrowserResourceSuggestions({
-        browserEvent: event.payload.browser_event,
-        service: event.service.name,
-        environment: event.service.environment,
-        incident: {
-          incident_id: "inc_1",
-          project_id: "proj_1",
-          fingerprint: "hash",
-          fingerprint_version: "v3",
-          title: "Google Tag Manager script failed to load",
-          occurrence_count: 4,
-          matched_fields: []
-        }
-      });
-      const response = { access_mode: "manage", bundle_status: "ready", suggestions };
-      const apply = vi.fn().mockResolvedValue({ rule: { id: "rule_1" } });
-      const tools = createCaptureRuleMcpTools({
-        listCaptureRules: vi.fn(),
-        createCaptureRule: vi.fn(),
-        updateCaptureRule: vi.fn(),
-        deleteCaptureRule: vi.fn(),
-        suggestCaptureRulesFromIncident: vi.fn().mockResolvedValue(response),
-        createCaptureRuleFromIncidentSuggestion: apply
-      });
+  it.each([
+    ["https://www.googletagmanager.com/gtm.js", "resource_context"],
+    ["https://www.googletagmanager.com/gtm.js", "resource_drop"],
+    ["https://www.googletagmanager.com/gtag/js", "resource_context"],
+    ["https://cdn.example.com/unknown.js", "resource_drop"],
+    [null, "exact_fingerprint_demote"],
+    [null, "exact_fingerprint_drop"]
+  ] as const)("preserves the server-reviewed scope for %s / %s", async (url, suggestionId) => {
+    const event = browserResourceEvent({ url });
+    const suggestions = buildBrowserResourceSuggestions({
+      browserEvent: event.payload.browser_event,
+      service: event.service.name,
+      environment: event.service.environment,
+      incident: {
+        incident_id: "inc_1",
+        project_id: "proj_1",
+        fingerprint: "hash",
+        fingerprint_version: "v3",
+        title: "Google Tag Manager script failed to load",
+        occurrence_count: 4,
+        matched_fields: []
+      }
+    });
+    const response = { access_mode: "manage", bundle_status: "ready", suggestions };
+    const apply = vi.fn().mockResolvedValue({ rule: { id: "rule_1" } });
+    const tools = createCaptureRuleMcpTools({
+      listCaptureRules: vi.fn(),
+      createCaptureRule: vi.fn(),
+      updateCaptureRule: vi.fn(),
+      deleteCaptureRule: vi.fn(),
+      suggestCaptureRulesFromIncident: vi.fn().mockResolvedValue(response),
+      createCaptureRuleFromIncidentSuggestion: apply
+    });
 
-      const result = await tools.suggest_capture_rules_from_incident({
-        bearerToken: "dbundle_mem_x",
-        incidentId: "inc_1"
-      });
-      expect(result).toEqual(response);
-      expect(apply).not.toHaveBeenCalled();
-      const selected = suggestions.find((suggestion) => suggestion.suggestion_id === suggestionId);
-      expect(selected?.requires_confirmation).toBe(true);
-      expect(selected?.rule.matcher).toMatchObject({
-        services: [event.service.name],
-        environments: [event.service.environment],
-        browser_event_kind: "resource_error",
-        browser_event_opaque: true,
-        resource_url: { host: "www.googletagmanager.com", path_equals: "/gtm.js" }
-      });
-      await tools.create_capture_rule_from_incident_suggestion({
-        bearerToken: "dbundle_mem_x",
-        incidentId: "inc_1",
-        create: { suggestion_id: selected!.suggestion_id }
-      });
-      expect(apply).toHaveBeenCalledWith({
-        bearerToken: "dbundle_mem_x",
-        incidentId: "inc_1",
-        create: { suggestion_id: suggestionId }
-      });
-    }
-  );
+    const result = await tools.suggest_capture_rules_from_incident({
+      bearerToken: "dbundle_mem_x",
+      incidentId: "inc_1"
+    });
+    expect(result).toEqual(response);
+    expect(apply).not.toHaveBeenCalled();
+    const selected = suggestions.find((suggestion) => suggestion.suggestion_id === suggestionId);
+    expect(selected?.requires_confirmation).toBe(true);
+    expect(selected?.rule.matcher).toMatchObject(
+      url === null
+        ? {
+            event_types: ["frontend_exception"],
+            fingerprint: { version: "v3", value: "hash" }
+          }
+        : {
+            services: [event.service.name],
+            environments: [event.service.environment],
+            browser_event_kind: "resource_error",
+            browser_event_opaque: true,
+            browser_target_tag_name: "script",
+            resource_url: { host: new URL(url).hostname, path_equals: new URL(url).pathname }
+          }
+    );
+    await tools.create_capture_rule_from_incident_suggestion({
+      bearerToken: "dbundle_mem_x",
+      incidentId: "inc_1",
+      create: { suggestion_id: selected!.suggestion_id }
+    });
+    expect(apply).toHaveBeenCalledWith({
+      bearerToken: "dbundle_mem_x",
+      incidentId: "inc_1",
+      create: { suggestion_id: suggestionId }
+    });
+  });
 
   it("declares capture-rule tool parity", () => {
     expect(CAPTURE_RULE_MCP_TOOL_NAMES).toEqual([
@@ -83,7 +95,9 @@ describe("mcp capture-rule tools", () => {
       createCaptureRule: vi.fn().mockResolvedValue({ rule: { id: "rule_1" } }),
       updateCaptureRule: vi.fn().mockResolvedValue({ rule: { id: "rule_1", enabled: false } }),
       deleteCaptureRule: vi.fn().mockResolvedValue({ success: true }),
-      suggestCaptureRulesFromIncident: vi.fn().mockResolvedValue({ bundle_status: "ready", suggestions: [] }),
+      suggestCaptureRulesFromIncident: vi
+        .fn()
+        .mockResolvedValue({ bundle_status: "ready", suggestions: [] }),
       createCaptureRuleFromIncidentSuggestion: vi.fn().mockResolvedValue({ rule: { id: "rule_2" } })
     };
     const tools = createCaptureRuleMcpTools(api);
@@ -138,7 +152,9 @@ describe("mcp capture-rule tools", () => {
 
   it("maps capture-rule api and unknown errors to mcp tool errors", async () => {
     const tools = createCaptureRuleMcpTools({
-      listCaptureRules: vi.fn().mockRejectedValue(new CaptureRuleApiError(401, "invalid_member_token")),
+      listCaptureRules: vi
+        .fn()
+        .mockRejectedValue(new CaptureRuleApiError(401, "invalid_member_token")),
       createCaptureRule: vi.fn().mockRejectedValue(new Error("boom")),
       updateCaptureRule: vi.fn().mockResolvedValue({}),
       deleteCaptureRule: vi.fn().mockResolvedValue({}),

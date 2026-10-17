@@ -1,6 +1,6 @@
 # Browser resource incidents
 
-Status: implemented, published and verified in production on 2026-09-16 (core 1.10.0).
+Original release: published and verified in production on 2026-09-16 (core 1.10.0). The provider/control expansion below is local implementation work, not a published release.
 
 ## Objective and compatibility
 
@@ -8,7 +8,66 @@ Turn repeated browser resource failures into clearly named, resource-grouped inc
 
 The approved UI uses the existing incident list/detail, Badge, Button, DialogFormContent, Alert and project capture-rule controls. Reuse semantic tokens, responsive layout and accessible dialog behavior. Rename the incident action to “Reduce noise”; explain context retention versus discarded future events, preview the complete matcher and retain loading/error/member-only/existing-rule states. Destructive rules require an explicit review of their exact scope.
 
-## Execution checklist
+## Resource controls and provider expansion (2026-10-16)
+
+FR-EVT-07c and AC-GRP-RESOURCE extend the existing workflow without new endpoints, CLI flags, MCP tools, SDK options, schema versions or database migrations. Capture remains enabled by default. Provider identity only improves labels and review context; it never applies policy. Existing fingerprints, stored rules and historical artifacts are unchanged.
+
+Every primary resource incident with available bundle evidence offers confirmation-required **Keep as context** and **Stop capturing** controls. Complete evidence matches the exact host/path/element type, service, environment and observed opacity plus `frontend_exception` / `resource_error`. Missing URL, origin for a relative URL, type, service, environment or opacity falls back to the incident's versioned exact fingerprint, retaining every available service/environment predicate. Fingerprints do not contain service identity; they must not replace an available service restriction. Never infer missing scope or widen it to a host. Resource evidence attached to an unrelated primary exception does not turn that exception into a resource suggestion.
+
+Keep `resource_context`, `resource_drop`, `exact_fingerprint_demote`, `exact_fingerprint_drop` and `hidden_preload_demote` IDs stable. Existing matching rules, including paused rules, earlier resource suggestions without an element-type predicate, and historical fingerprint-only rules, are surfaced and returned without rewriting or enabling them. Only those known legacy omissions are accepted; all remaining predicates and action settings must agree. Exact scoped matches take precedence over the legacy match. Existing-rule suggestions display the saved matcher, including absent type or service/environment predicates, on both initial reads and create responses, so they never understate the rule's actual scope. Hosted ingestion remains authoritative; the existing SDK-config guard withholds the complete rule set when target/lifecycle predicates require server enforcement.
+
+The approved dialog reuses the existing Card, Badge, Button, Checkbox and DialogFormContent primitives and semantic tokens. Show resource/fingerprint scope first, wrap long paths, label actions plainly, require explicit review and retain loading, pending, retry, preview, existing and paused-rule states. Late fetch/save results must not update a different incident after navigation. Sampling and manual rule editing stay in project settings. Context retains evidence without new incidents, alerts or automation and may remain billable on paid plans; drop discards future matches only. Neither deletes history.
+
+### Curated provider signatures
+
+Recognize only exact documented hosts and anchored script paths, never broad domain suffixes. Queries, fragments and URL credentials do not participate in identity or rules. Google tag can serve Analytics or Ads, so its label does not assume a single destination. Proxied/self-hosted or unrecognized variants retain generic explicit controls. The 18 analytics/advertising/tag families below are a bounded starter catalog, not a claim to recognize every product or installation. Google sign-in remains separately recognized as authentication.
+
+| Provider family | Script signature and source |
+| --- | --- |
+| Google tag / Google Analytics | `www.googletagmanager.com/gtag/js`; legacy `www.google-analytics.com` or `ssl.google-analytics.com` `/analytics.js` or `/ga.js`. [Google tag](https://developers.google.com/tag-platform/gtagjs) |
+| Google Tag Manager | `www.googletagmanager.com/gtm.js`; retain existing recognition. |
+| Microsoft Clarity | `www.clarity.ms/tag/{id}`; retain existing recognition. |
+| Hotjar | `static.hotjar.com/c/hotjar-{numeric-id}.js`. [Official loader](https://github.com/hotjar/hotjar-js/blob/main/src/utils.ts) |
+| Cloudflare Web Analytics | `static.cloudflareinsights.com/beacon.min.js`. [Collection documentation](https://developers.cloudflare.com/web-analytics/data-metrics/data-origin-and-collection/) |
+| Yandex Metrica | `mc.yandex.ru` or `mc.yandex.com` `/metrika/tag.js`. [Initialization](https://yandex.ru/support/metrica/ru/code/counter-initialize), [alternative domain](https://yandex.ru/support/metrica/en/general/alternative-domain) |
+| WordPress.com / Jetpack Stats | `stats.wp.com/e-{six-digit-week}.js`. [Official implementation](https://github.com/Automattic/jetpack-stats) |
+| Meta Pixel | `connect.facebook.net/{locale}/fbevents.js`; retain existing recognition. |
+| Microsoft Advertising UET | `bat.bing.com/bat.js`. [UET documentation](https://help.ads.microsoft.com/apex/index/3/en/56688) |
+| LinkedIn Insight | `snap.licdn.com/li.lms-analytics/insight.min.js`. [Official installation guide](https://business.linkedin.com/content/dam/me/business/en-us/marketing-solutions/a/targeting/matched-audiences/pdfs/GSG-WebsiteRetargeting.pdf) |
+| TikTok Pixel | `analytics.tiktok.com/i18n/pixel/events.js`. [Developer documentation](https://ads.tiktok.com/gateway/docs/index?doc_id=1701890973258754) |
+| Pinterest Tag | `s.pinimg.com/ct/core.js`. [Base code](https://help.pinterest.com/it/business/article/install-the-base-code) |
+| X Pixel | `static.ads-twitter.com` or `platform.twitter.com` `/uwt.js` or `/oct.js`. [Conversion tracking](https://business.x.com/en/help/campaign-measurement-and-analytics/conversion-tracking-for-websites) |
+| Segment | `cdn.segment.com/analytics.js/v1/{write-key}/analytics.min.js`. [Official loading example](https://segment.com/blog/twilio-segment-edge-sdk/) |
+| Mixpanel | `cdn.mxpnl.com/libs/mixpanel-2-latest.min.js` or `/libs/mixpanel-js/dist/mixpanel.module.js`. [Official SDK](https://github.com/mixpanel/mixpanel-js) |
+| Amplitude | `cdn.amplitude.com/libs/analytics-browser-{version}-min.js[.gz]` or `/script/{key}.js`. [Browser script](https://amplitude.com/docs/session-replay/self-host-browser-script), [unified SDK](https://amplitude.com/docs/sdks/analytics/browser/browser-unified-sdk) |
+| PostHog | `us-assets.i.posthog.com`, `eu-assets.i.posthog.com` or `app.posthog.com` `/static/array.js`. [Installation](https://posthog.com/docs/getting-started/install) |
+| Plausible | `plausible.io/js/pa-{id}.js` or legacy `/js/script[.extensions].js`. [Current script](https://plausible.io/docs/proxy/guides/apache), [legacy migration](https://plausible.io/docs/script-update-guide) |
+
+Regression coverage includes spoofed hosts, unrelated paths, wrong element types, old suggestion IDs, typed/untyped and paused-rule detection, missing-evidence fallback, related-versus-primary exceptions, exact matcher boundaries, mixed SDK versions and UI navigation during save. Integration coverage uses real disposable Postgres, Redis and object storage to verify default incident capture, context/drop enforcement for recognized, unknown and incomplete resources, retained history, no new alerts/lifecycle dispatch, and capture restoration when the rule is paused. Release and live customer-rule changes require separate authorization.
+
+### Local verification
+
+The 2026-10-17 pre-release audit found and corrected two edge cases before release:
+
+- A fingerprint is shared across services even though service is a separate incident key. New incomplete-evidence controls now retain every available service/environment predicate. Historical fingerprint-only rules are still recognized and returned with their actual saved scope, without rewriting or enabling them. Real-fingerprint unit tests reproduce the old cross-service match; ingestion tests confirm another service still creates its own incident under both demote and drop policies.
+- A rule created by another request between suggestion read and save can be returned as an existing legacy rule. The dialog now refreshes its displayed matcher from the save response, including paused state, instead of continuing to display the narrower proposal. A UI regression reproduces and guards that case.
+
+- Clean final full unit/regression run on 2026-10-17: 4,257 tests passed in 512 files, including both audit fixes. The run skipped 154 integration/conditional tests in 33 files; real-service integration evidence is listed separately below.
+- Final changed-source validation: 187 tests in 18 files pass, and coverage passes for all ten changed source files. Two wider files meet the gate through complete coverage of changed executable lines. This run includes both audit corrections.
+- All 15 selected integration tests pass across resource capture, recovery, route retention and ingestion, including capture preservation in another service with the same fingerprint. New fixtures remove their follow-up work; recovery fixtures start with idle legacy ingress so unrelated earlier test jobs cannot masquerade as recovery work. Disposable containers and volumes were removed.
+- Repository lint, typecheck and agent-guidance consistency checks pass. Shared/CLI/MCP/web candidate builds pass. Clean packaged CLI smoke tests pass on Node 22.23.3, 24.14.0, 26.0.0, 26.2.0 and 26.12.0, including HTTP/1 and HTTP/2, compressed responses and failure handling. Upgrading a disposable project from published CLI 1.10.0 preserves its profile, connection, user instructions and ownership metadata. The public site passes 41 tests, typecheck and static build. Browser inspection was not requested or performed.
+- Pre-ship review checked exact matcher boundaries, saved/paused legacy state, primary-versus-related evidence, incomplete evidence, mixed SDK precedence, stale UI responses, input sanitization, authorization and test-fixture cleanup. No schema migration, live policy mutation, commit, publication or deployment is part of this local validation.
+
+### Release sequence
+
+After approval of the release actions, prepare independent versions and dated release metadata for the changed distributions. No SDK release, customer configuration change or new database migration is needed.
+
+1. Build/pack and publish the shared JS pair, then the CLI and MCP candidates. Verify clean registry installs. The CLI carries the updated generated guidance and local resource recognition; existing CLI/API/MCP commands remain compatible.
+2. Complete the MCP ecosystem pipeline and update the changed Codex/Gemini/Claude Code/ClawHub guidance distributions with their own version and pin rules. Keep the frozen hosted OpenAI catalog unchanged.
+3. Publish the core release and deploy pinned core/site commits through the private cloud repository's standard rollout. Retain the verified previous API/worker images, keep readiness and migration-ledger checks, and deploy the dashboard and public documentation.
+4. Independently verify deployed versions, healthy API/worker processing, served dashboard/docs assets, and read-only suggestion behavior. Any live rule test must use an owned disposable project; do not rewrite customer policies. Record artifact/registry and live rollout evidence separately from local qualification.
+
+## Original release checklist (historical)
 
 - [x] Add failing resource identity, title, diagnosis, origin and scoped-suggestion regressions.
 - [x] Implement one deterministic shared resource interpreter using sanitized existing browser evidence. Recognize exact GTM, Meta Pixel, Clarity and Google Identity resources; use type/filename/host for unknown targets. Origin relationship and dependency role remain separate; missing origin is unknown. Preserve the original error message.
@@ -30,7 +89,7 @@ Synthetic acceptance corpus: four GTM route variants, five Meta Pixel route vari
 
 Page-load lifecycle evidence distinguishes a narrow interrupted-preload pattern from ordinary asset failures. A resource event qualifies only when it is opaque, targets a `link` whose normalized `rel` is `preload`, `modulepreload`, or `prefetch`, the page visibility is `hidden`, `prerender`, or `unloaded`, and the page ready state is `loading` or `interactive`.
 
-That combination infers low severity. First-party JavaScript/CSS asset paths may produce a medium-confidence, confirmation-required demotion suggestion; authentication and other non-asset endpoints do not. The suggested matcher includes service/environment scope, `first_party: true`, host plus parent asset path (or the exact path when no safe parent exists), visibility, ready state, tag name, and `rel`. Visible or completed-page failures do not match. The evidence is described as consistent with a browser-aborted speculative load, never proof.
+That combination infers low severity. First-party JavaScript/CSS asset paths may produce a medium-confidence, confirmation-required hidden-preload demotion suggestion; authentication and other non-asset endpoints do not receive this special suggestion. The suggested matcher includes service/environment scope, `first_party: true`, host plus parent asset path (or the exact path when no safe parent exists), visibility, ready state, tag name, and `rel`. Visible or completed-page failures do not match. The evidence is described as consistent with a browser-aborted speculative load, never proof. The exact-resource controls above remain available separately.
 
 These DOM lifecycle predicates are enforced at hosted ingestion. When any active rule requires them, SDK config withholds the entire rule set so older clients cannot ignore predicates or run a broader drop ahead of a narrower hosted exception. Ingestion evaluates the full set with normal specificity and precedence.
 

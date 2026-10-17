@@ -479,6 +479,7 @@ export {
   type CaptureRuleSuggestionBundle,
   buildCaptureRuleSuggestions
 } from "./capture-rule-suggestions.js";
+export { findExistingCaptureRuleForSuggestion } from "./capture-rule-suggestion-matching.js";
 
 export {
   ImprovementBundleSensitivityValues,

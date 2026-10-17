@@ -1004,7 +1004,7 @@ All SDKs must implement sections 1-8, section 11, and section 12 of this contrac
 
 ## 12. Capture Policy And Capture Rule Integration
 
-SDKs must respect the server-side capture policy and project capture rules delivered via `GET /v1/sdk/config`. The capture policy controls broad event capture behavior. Capture rules apply manual project decisions to known noisy patterns.
+SDKs must respect the server-side capture policy and project capture rules delivered via `GET /v1/sdk/config`. The capture policy controls broad event capture behavior. Capture rules apply manual project decisions to known noisy patterns. Browser resource suggestions use existing predicates and versioned fingerprints, independent of provider recognition; no new SDK option or payload field is required. Exact element-type rules retain the existing server-only delivery guard: the full rule set stays at ingestion so older SDKs cannot ignore a predicate or change rule precedence. Existing stored rules are not rewritten.
 
 ### Policy Delivery
 

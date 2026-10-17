@@ -327,7 +327,8 @@ export function buildCaptureRuleSuggestions(input: {
 
   if (
     evidence.eventType === "frontend_exception" &&
-    evidence.browserEventKind === "resource_error"
+    (evidence.browserEventKind === "resource_error" ||
+      input.bundle.context.resource_failure != null)
   ) {
     return buildBrowserResourceSuggestions({
       browserEvent: readFrontendException(input.bundle)?.["browser_event"],

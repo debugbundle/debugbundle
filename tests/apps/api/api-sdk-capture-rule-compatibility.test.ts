@@ -2,7 +2,10 @@ import { mockedObject } from "../../helpers/vitest.js";
 import { expect, it, vi } from "vitest";
 import { createApiServer } from "../../../apps/api/src/server.js";
 import { createBaseDependencies } from "../../helpers/api-capture-rule-ingestion.js";
-it("keeps lifecycle-aware capture rules server-side for mixed SDK compatibility", async () => {
+it.each([
+  { browser_page_visibility_state: "hidden" as const },
+  { browser_target_tag_name: "script" }
+])("keeps browser predicates server-side for mixed SDK compatibility: %j", async (predicate) => {
   const baseRule = {
     id: "00000000-0000-4000-8000-000000000101",
     project_id: "proj_123",
@@ -35,12 +38,14 @@ it("keeps lifecycle-aware capture rules server-side for mixed SDK compatibility"
     action: "demote" as const,
     matcher: {
       ...sdkSafeRule.matcher,
-      browser_page_visibility_state: "hidden" as const
+      ...predicate
     }
   };
   const app = createApiServer(
     createBaseDependencies({
-      captureRuleManagement: mockedObject<NonNullable<Parameters<typeof createApiServer>[0]["captureRuleManagement"]>>({
+      captureRuleManagement: mockedObject<
+        NonNullable<Parameters<typeof createApiServer>[0]["captureRuleManagement"]>
+      >({
         listActiveCaptureRulesForProject: vi.fn().mockResolvedValue([sdkSafeRule, serverOnlyRule])
       })
     })

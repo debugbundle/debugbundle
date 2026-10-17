@@ -1,7 +1,7 @@
 import { createPostgresRetentionStore } from "../../packages/storage/src/retention-store.js";
 import { randomUUID } from "node:crypto";
 import { gzipSync, gunzipSync } from "node:zlib";
-import { afterAll, beforeAll, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
 import { createEventEnvelope, type EventEnvelope } from "../../packages/shared-types/src/index.js";
 import {
   buildRawEventObjectKey,
@@ -34,6 +34,12 @@ runIntegration("browser recovery correlation through durable processing", () => 
   const redis = createRedisQueueClient({ redisUrl });
   beforeAll(async () => {
     await bootstrapStorageAndCreateBucket(pool, s3);
+  });
+  beforeEach(async () => {
+    // Other serial ingestion fixtures leave legacy queue jobs. This test measures
+    // whether its own recovery evidence schedules a build, so begin with idle ingress.
+    for (const name of ["normalize-events", "group-incident", "build-bundle"] as const)
+      await redis.clearJobQueue(name);
   });
   afterAll(async () => {
     await redis.close();

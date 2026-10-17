@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { CliAuthStateError } from "../../../apps/cli/src/auth-state.js";
+import { buildBrowserResourceSuggestions } from "../../../packages/shared-types/src/browser-resource-suggestions.js";
+import { browserResourceEvent } from "../../helpers/browser-resource-fixtures.js";
 import {
   CaptureRuleApiError,
   createCaptureRuleApi,
@@ -43,6 +45,55 @@ const rule = {
 };
 
 describe("cli capture-rule commands", () => {
+  it.each(["https://www.googletagmanager.com/gtag/js", "https://cdn.example.com/unknown.js", null])(
+    "preserves reviewed resource controls and returned IDs for %s through existing JSON commands",
+    async (url) => {
+      const suggestions = buildBrowserResourceSuggestions({
+        browserEvent: browserResourceEvent({ url }).payload.browser_event,
+        service: "web",
+        environment: "production",
+        incident: {
+          incident_id: "incident",
+          project_id: "project",
+          fingerprint: "hash",
+          fingerprint_version: "v3",
+          title: "Resource failed",
+          occurrence_count: 1,
+          matched_fields: []
+        }
+      });
+      const response = { access_mode: "manage", bundle_status: "ready", suggestions };
+      const apply = vi.fn().mockResolvedValue({ rule });
+      const read = await suggestCaptureRulesFromIncidentCommand(
+        { bearerToken: "dbundle_mem_x", incidentId: "incident", json: true },
+        {
+          suggestCaptureRulesFromIncident: vi.fn().mockResolvedValue(response)
+        }
+      );
+      expect(read.exitCode).toBe(0);
+      expect(JSON.parse(read.output)).toEqual(response);
+      expect(apply).not.toHaveBeenCalled();
+      const suggestion_id = suggestions[0]!.suggestion_id;
+      const created = await createCaptureRuleFromIncidentSuggestionCommand(
+        {
+          bearerToken: "dbundle_mem_x",
+          incidentId: "incident",
+          create: { suggestion_id },
+          json: true
+        },
+        {
+          createCaptureRuleFromIncidentSuggestion: apply
+        }
+      );
+      expect(created.exitCode).toBe(0);
+      expect(apply).toHaveBeenCalledWith({
+        bearerToken: "dbundle_mem_x",
+        incidentId: "incident",
+        create: { suggestion_id }
+      });
+    }
+  );
+
   it("validates and forwards an explicit expiry clear while rejecting an invalid date before API dispatch", async () => {
     const updateCaptureRule = vi.fn().mockResolvedValue({ rule });
     const input = {

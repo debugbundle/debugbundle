@@ -3,6 +3,13 @@ import type { CaptureRuleMatcher } from "./capture-rules-api.js";
 export function formatCaptureRuleMatcher(matcher: CaptureRuleMatcher): string {
   const parts: string[] = [];
 
+  if (matcher.resource_url !== undefined) {
+    parts.push(`resource: ${formatUrlMatcher(matcher.resource_url)}`);
+  }
+  if (matcher.fingerprint !== undefined) {
+    parts.push(`fingerprint: ${matcher.fingerprint.version}:${matcher.fingerprint.value}`);
+  }
+
   if (matcher.event_types?.length) {
     parts.push(`events: ${matcher.event_types.join(", ")}`);
   }
@@ -12,11 +19,18 @@ export function formatCaptureRuleMatcher(matcher: CaptureRuleMatcher): string {
   if (matcher.browser_event_opaque !== undefined) {
     parts.push(matcher.browser_event_opaque ? "opaque browser event" : "non-opaque browser event");
   }
-  if (matcher.browser_page_visibility_state !== undefined) parts.push(`page visibility: ${matcher.browser_page_visibility_state}`);
-  if (matcher.browser_page_ready_state !== undefined) parts.push(`document state: ${matcher.browser_page_ready_state}`);
-  if (matcher.browser_target_tag_name !== undefined) parts.push(`target: ${matcher.browser_target_tag_name}`);
+  if (matcher.browser_page_visibility_state !== undefined)
+    parts.push(`page visibility: ${matcher.browser_page_visibility_state}`);
+  if (matcher.browser_page_ready_state !== undefined)
+    parts.push(`document state: ${matcher.browser_page_ready_state}`);
+  if (matcher.browser_target_tag_name !== undefined)
+    parts.push(`target: ${matcher.browser_target_tag_name}`);
   if (matcher.browser_target_attributes !== undefined) {
-    parts.push(`target attributes: ${Object.entries(matcher.browser_target_attributes).map(([key, value]) => `${key}=${String(value)}`).join(", ")}`);
+    parts.push(
+      `target attributes: ${Object.entries(matcher.browser_target_attributes)
+        .map(([key, value]) => `${key}=${String(value)}`)
+        .join(", ")}`
+    );
   }
   if (matcher.runtime?.length) {
     parts.push(`runtime: ${matcher.runtime.join(", ")}`);
@@ -42,9 +56,6 @@ export function formatCaptureRuleMatcher(matcher: CaptureRuleMatcher): string {
   if (matcher.message_contains !== undefined) {
     parts.push(`message contains: ${matcher.message_contains}`);
   }
-  if (matcher.resource_url !== undefined) {
-    parts.push(`resource: ${formatUrlMatcher(matcher.resource_url)}`);
-  }
   if (matcher.request_url !== undefined) {
     parts.push(`request: ${formatUrlMatcher(matcher.request_url)}`);
   }
@@ -58,9 +69,6 @@ export function formatCaptureRuleMatcher(matcher: CaptureRuleMatcher): string {
   }
   if (matcher.first_party !== undefined) {
     parts.push(matcher.first_party ? "first-party only" : "third-party only");
-  }
-  if (matcher.fingerprint !== undefined) {
-    parts.push(`fingerprint: ${matcher.fingerprint.version}:${matcher.fingerprint.value}`);
   }
 
   return parts.length === 0 ? "Custom matcher" : parts.join(" • ");

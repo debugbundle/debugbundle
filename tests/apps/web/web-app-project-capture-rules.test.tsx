@@ -360,7 +360,7 @@ describe("web app — project capture rules", () => {
     await openCaptureRulesSettings();
 
     const matcherSummary = await screen.findByText(
-      `events: frontend_exception • fingerprint: v1:${fingerprint}`
+      `fingerprint: v1:${fingerprint} • events: frontend_exception`
     );
 
     expect(matcherSummary).toHaveClass("whitespace-normal");

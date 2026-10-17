@@ -3,7 +3,38 @@ import { describe, expect, it } from "vitest";
 import { buildCaptureRuleSuggestions } from "../../../packages/shared-types/src/capture-rule-suggestions.ts";
 
 describe("capture rule suggestions", () => {
-  it("does not suggest suppressing an unrecognized third-party resource", () => {
+  it("uses the incident fingerprint when only retained resource context remains", () => {
+    const suggestions = buildCaptureRuleSuggestions({
+      incident: {
+        incident_id: "inc",
+        project_id: "proj",
+        fingerprint: "resource-fingerprint",
+        fingerprint_version: "v3",
+        title: "Resource failed",
+        occurrence_count: 1,
+        matched_fields: []
+      },
+      bundle: {
+        signal: {
+          signal_type: "frontend_exception",
+          source_event_types: ["frontend_exception"],
+          fingerprint: "resource-fingerprint"
+        },
+        context: {
+          resource_failure: { host: "cdn.example.com", path: "/optional.js", type: "script" }
+        }
+      }
+    });
+    expect(suggestions.map((item) => item.suggestion_id)).toEqual([
+      "exact_fingerprint_demote",
+      "exact_fingerprint_drop"
+    ]);
+    expect(suggestions[0]?.rule.matcher).toEqual({
+      event_types: ["frontend_exception"],
+      fingerprint: { version: "v3", value: "resource-fingerprint" }
+    });
+  });
+  it("offers reviewed fingerprint controls for an unrecognized resource with incomplete evidence", () => {
     const suggestions = buildCaptureRuleSuggestions({
       incident: {
         incident_id: "inc_123",
@@ -44,7 +75,16 @@ describe("capture rule suggestions", () => {
       }
     });
 
-    expect(suggestions).toEqual([]);
+    expect(suggestions.map((item) => item.suggestion_id)).toEqual([
+      "exact_fingerprint_demote",
+      "exact_fingerprint_drop"
+    ]);
+    expect(suggestions.every((item) => item.requires_confirmation)).toBe(true);
+    expect(suggestions[0]?.rule.matcher).toEqual({
+      event_types: ["frontend_exception"],
+      fingerprint: { version: "v1", value: "fp_browser_noise" }
+    });
+    expect(JSON.stringify(suggestions)).not.toContain("secret");
   });
 
   it("does not suggest sampling application asset failures", () => {
@@ -88,7 +128,11 @@ describe("capture rule suggestions", () => {
       }
     });
 
-    expect(suggestions).toEqual([]);
+    expect(suggestions.every((item) => item.rule.action !== "sample")).toBe(true);
+    expect(suggestions.map((item) => item.suggestion_id)).toEqual([
+      "exact_fingerprint_demote",
+      "exact_fingerprint_drop"
+    ]);
   });
 
   it("suggests request-event sampling for repeated narrow route failures", () => {

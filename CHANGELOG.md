@@ -6,6 +6,19 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.17.0] - 2026-10-17
+
+### Improved
+
+- Expand browser resource recognition to 18 common analytics, advertising and tag-provider families, including Google tag / Analytics, Hotjar, Cloudflare Web Analytics, Segment, Mixpanel, Amplitude, PostHog and Plausible. Recognition improves labels without changing default capture, severity or fingerprints.
+- Offer explicit Keep as context and Stop capturing controls for unknown providers and application resources too. New rules match exact host/path/type/service/environment/opacity, with a fingerprint fallback that retains available service/environment restrictions when evidence is incomplete. Require scope review and preserve existing hidden-preload controls.
+- Clarify Reduce noise actions, scope and paused-rule states, and prevent late saves from updating a different incident after navigation. Detect existing legacy resource rules without duplicating, changing or re-enabling them.
+- Update public documentation and generated/distributed agent guidance. Existing API routes, CLI commands and MCP tools remain compatible; no SDK options, database migration or automatic customer-rule changes are introduced.
+
+### Distribution
+
+- Shared types/redaction 2.5.0 and CLI/MCP/OpenClaw 1.16.0 carry the resource recognition and guidance updates. Developer plugin pins are promoted after registry verification. No SDK release is required.
+
 ## [1.16.1] - 2026-10-10
 
 ### Fixed
