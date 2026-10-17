@@ -235,7 +235,7 @@ openclaw-plugin-check:
 
 .PHONY: openclaw-release-check
 openclaw-release-check: openclaw-plugin-check
-	$(MAKE) test-focused TEST_FILES='tests/apps/openclaw-plugin tests/contracts/openclaw-plugin-parity.test.ts tests/apps/mcp/mcp-clawhub-skill.test.ts tests/apps/mcp/mcp-legacy-contract.test.ts tests/apps/mcp/mcp-ecosystem-release.test.ts tests/apps/mcp/mcp-ecosystem-security.test.ts tests/apps/mcp/mcp-ecosystem-publication.test.ts --maxWorkers=2'
+	$(MAKE) test-focused TEST_FILES='tests/apps/openclaw-plugin tests/contracts/openclaw-plugin-parity.test.ts tests/apps/mcp/mcp-clawhub-skill.test.ts tests/apps/mcp/mcp-legacy-contract.test.ts tests/apps/mcp/mcp-ecosystem-release.test.ts tests/apps/mcp/mcp-ecosystem-security.test.ts tests/apps/mcp/mcp-ecosystem-publication.test.ts tests/contracts/codex-developer-plugin.test.ts --maxWorkers=2'
 
 .PHONY: openclaw-plugin-build
 openclaw-plugin-build:

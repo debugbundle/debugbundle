@@ -114,7 +114,8 @@ describe("Codex developer plugin distribution", () => {
     expect(
       workflow.match(/npm install --global corepack@0\.34\.6\n\s+corepack enable/gu)
     ).toHaveLength(2);
-    expect(workflow).toContain("run: make openclaw-plugin-check");
+    expect(workflow).toContain("run: make openclaw-release-check");
+    expect(read("Makefile")).toContain("openclaw-release-check: openclaw-plugin-check");
     expect(workflow).toContain(
       "run: make codex-plugin-smoke CODEX_SMOKE_NODE_IMAGE=node:${{ matrix.node-version }}-bookworm"
     );
