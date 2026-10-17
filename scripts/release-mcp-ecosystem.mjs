@@ -680,6 +680,8 @@ async function publish(context, options) {
         if (key === "clawhub") assertCleanGitPath(target.skillPath);
         if (key === "clawhubPlugin") {
           assertCleanGitPath(target.packagePath);
+          runCommand("npx", ["-y", `${target.cliPackage}@${target.cliVersion}`, "package", "validate",
+            join(repoRoot, target.packagePath), "--out", join(context.stageRoot, "openclaw-inspector")], { cwd: repoRoot });
           runCommand("npx", ["-y", `${target.cliPackage}@${target.cliVersion}`, "package", "publish",
             join(repoRoot, target.packagePath), "--dry-run"], { cwd: repoRoot });
         }

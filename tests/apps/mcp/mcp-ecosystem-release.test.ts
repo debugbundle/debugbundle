@@ -106,6 +106,8 @@ describe("mcp ecosystem release pipeline", () => {
     expect(script).toContain("verification_failed:");
     expect(script).toContain('runCommand("make", ["openclaw-release-check"]');
     expect(script).toContain("await publishTargets(context, options,");
+    expect(script).toContain('"package", "validate"');
+    expect(script).toContain('join(context.stageRoot, "openclaw-inspector")');
     expect(readFileSync(join(repoRoot, ".github/workflows/release-mcp-package.yml"), "utf8"))
       .toContain("run: make openclaw-release-check");
     const makefile = readFileSync(join(repoRoot, "Makefile"), "utf8");
