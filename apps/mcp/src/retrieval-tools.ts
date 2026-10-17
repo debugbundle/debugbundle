@@ -1,7 +1,7 @@
 import { MutationOutcomeUnconfirmedError } from "../../../packages/retrieval-client/src/mutation-outcome.js";
 import { RetrievalApiError } from "../../../packages/retrieval-client/src/index.js";
 import { sanitizeTelemetry } from "../../../packages/redaction/src/index.js";
-import { buildIncidentContextRecord } from "../../../packages/storage/src/index.js";
+import { buildIncidentContextRecord } from "../../../packages/storage/src/incident-context.js";
 import {
   cacheCloudBundleArtifact,
   cacheCloudReproductionArtifact,

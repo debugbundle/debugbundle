@@ -1,11 +1,11 @@
+import type { IncidentReason } from "../../../packages/storage/src/incident-reason.js";
 import { RetrievalApiError, formatMutationOutcomeError } from "../../../packages/retrieval-client/src/index.js";
 import { sanitizeTelemetry } from "../../../packages/redaction/src/index.js";
 import {
   buildIncidentContextRecord,
   type IncidentContextArtifactRecord,
-  type IncidentContextRecord,
-  type IncidentReason
-} from "../../../packages/storage/src/index.js";
+  type IncidentContextRecord
+} from "../../../packages/storage/src/incident-context.js";
 import {
   createAuthenticatedRetrievalApi,
   mapCliAuthErrorToResult,

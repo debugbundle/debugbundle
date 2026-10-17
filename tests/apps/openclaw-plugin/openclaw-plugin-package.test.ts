@@ -67,8 +67,8 @@ describe("openclaw plugin package", () => {
     expect(packageJson.openclaw).toMatchObject({
       extensions: ["./dist/index.js"],
       compat: {
-        pluginApi: ">=2026.5.17",
-        minGatewayVersion: "2026.5.17"
+        pluginApi: ">=2026.6.9",
+        minGatewayVersion: "2026.6.9"
       },
       build: {
         openclawVersion: "2026.6.9",

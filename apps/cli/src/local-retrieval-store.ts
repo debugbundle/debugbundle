@@ -7,7 +7,7 @@ import {
   deriveIncidentReasonFromSignal,
   deriveIncidentReasonFromSourceEventTypes,
   type IncidentReason
-} from "../../../packages/storage/src/index.js";
+} from "../../../packages/storage/src/incident-reason.js";
 import { isRecord, resolveWorkspacePath } from "./cli-fs-helpers.js";
 
 type FileReader = (path: string, encoding: BufferEncoding) => Promise<string>;

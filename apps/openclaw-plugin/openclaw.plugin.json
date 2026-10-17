@@ -2,7 +2,7 @@
   "id": "debugbundle",
   "name": "DebugBundle",
   "description": "Use DebugBundle for runtime error reporting, incident response, live app monitoring, health checks, debug bundles, and product analytics.",
-  "version": "1.16.0",
+  "version": "1.16.1",
   "configSchema": {
     "type": "object",
     "properties": {
@@ -228,6 +228,12 @@
       "optional": true
     },
     "debugbundle_revoke_project_token": {
+      "optional": true
+    },
+    "debugbundle_create_agent_token": {
+      "optional": true
+    },
+    "debugbundle_revoke_agent_token": {
       "optional": true
     },
     "debugbundle_create_member_token": {

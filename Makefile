@@ -77,6 +77,7 @@ help:
 	@echo "  make gemini-extension-verify-public Check public Gemini files and version tag against core"
 	@echo "  make codex-plugin-smoke     Verify a fresh Codex client against synthetic data"
 	@echo "  make openclaw-plugin-check  Build and validate the OpenClaw companion package"
+	@echo "  make openclaw-release-check  Validate both OpenClaw distributions before publication"
 	@echo "  make openai-plugin-validate  Validate the source-ready OpenAI plugin package"
 	@echo "  make openai-plugin-check     Run package, skill, and release contract tests"
 	@echo "  make openai-plugin-inspector-check Validate the exact data-free catalog with MCP Inspector"
@@ -231,6 +232,10 @@ gemini-extension-smoke:
 .PHONY: openclaw-plugin-check
 openclaw-plugin-check:
 	$(NODE_RUN) "corepack enable && corepack pnpm --dir apps/openclaw-plugin plugin:check"
+
+.PHONY: openclaw-release-check
+openclaw-release-check: openclaw-plugin-check
+	$(MAKE) test-focused TEST_FILES='tests/apps/openclaw-plugin tests/contracts/openclaw-plugin-parity.test.ts tests/apps/mcp/mcp-clawhub-skill.test.ts tests/apps/mcp/mcp-legacy-contract.test.ts tests/apps/mcp/mcp-ecosystem-release.test.ts tests/apps/mcp/mcp-ecosystem-security.test.ts tests/apps/mcp/mcp-ecosystem-publication.test.ts --maxWorkers=2'
 
 .PHONY: openclaw-plugin-build
 openclaw-plugin-build:

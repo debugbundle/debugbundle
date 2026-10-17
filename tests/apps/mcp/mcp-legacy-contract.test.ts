@@ -18,8 +18,16 @@ describe("legacy MCP and OpenClaw contract", () => {
     const expected = JSON.parse(await readFile(legacyContractPath, "utf8")) as {
       initialization: { result: { serverInfo: { version: string } } };
       tools: { result: { tools: Array<{ name: string }> } };
-      openClaw: { names: string[]; tools: Array<{ openClawToolName: string }> };
+      openClaw: { names: string[]; tools: Array<{ openClawToolName: string; optional: boolean }> };
     };
+    // AC-OPENCLAW-02 security correction: retain the historical fixture and
+    // permit only these two default-exposure changes, not schema/catalog drift.
+    for (const tool of expected.openClaw.tools) {
+      if (["debugbundle_create_agent_token", "debugbundle_revoke_agent_token"].includes(tool.openClawToolName)) {
+        expect(tool.optional).toBe(false);
+        tool.optional = true;
+      }
+    }
     const successfulServer = createMcpServer({
       tools: {
         doctor: vi.fn().mockResolvedValue({ status: "healthy" })

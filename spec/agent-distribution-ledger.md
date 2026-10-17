@@ -62,6 +62,8 @@ MCP 1.13.1 changes bundled retrieval and local incident processing without chang
 
 ## When a package changes
 
+MCP 1.16.1 compatibility review (2026-10-17): Codex 1.3.1, Claude Code 1.16.0 and Gemini 1.2.1 retain their verified MCP 1.16.0 pins. This correction enforces OpenClaw host approval and optional-tool policy and removes unused bundled imports without changing MCP names, schemas or authentication. The portable ClawHub skill and OpenClaw companion follow the 1.16.1 patch. The hosted OpenAI plugin and runtime remain independent and are not republished or deployed.
+
 1. Review an MCP npm release against each pinned version. A new `@debugbundle/mcp` version does not silently change any of these packages. If a package should adopt it, publish and smoke-test that exact npm version first.
 2. For a changed package manifest, MCP pin, bundled skill, or behavior, bump that package's own version, update its changelog, keep shared skill guidance in sync, and run its contract and native-client smoke checks. Update this ledger's version and pin from the candidate source in the same change. A documentation-only edit outside a package does not require republishing the package.
 3. Publish Codex and Claude Code changes through their reviewed core marketplace source. For Gemini, publish the validated five-file package to the standalone repository's default branch, create a matching version tag, publish a GitHub Release on that tag with the deterministic ZIP, and run `make gemini-extension-verify-public`. A tag alone does not create a GitHub Release. The core source remains authoritative; do not edit the public copy independently.

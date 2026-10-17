@@ -3731,7 +3731,7 @@ The OpenClaw plugin is a host-native projection of the MCP tool catalog. It expo
 
 OpenClaw auth follows the MCP auth order: explicit per-tool `bearerToken`, `DEBUGBUNDLE_MEMBER_TOKEN`, then CLI auth state from `~/.debugbundle/auth.json`. `DEBUGBUNDLE_API_URL` or plugin config `apiBaseUrl` may point at self-hosted or non-production APIs. Project tokens remain write-only ingestion credentials and are not valid for OpenClaw management tools.
 
-Mutation tools must be marked optional in `openclaw.plugin.json` so operators explicitly allow them before model exposure. Production-impacting mutations must also use OpenClaw per-call approval hooks before public publish.
+Mutation tools, including agent-token creation/revocation, must be marked optional in `openclaw.plugin.json` and runtime registration so operators explicitly allow them before model exposure. New capabilities default to optional until reviewed for default exposure. Optional tools also use OpenClaw's `before_tool_call` approval hook with allow-once/deny decisions and deny-on-timeout semantics. An unavailable approval route blocks the call; approval text excludes credentials and raw input. Existing tool names, schemas, delegation and CLI/API/MCP behavior remain unchanged. See the plugin README for operator opt-in and approval routing.
 
 ---
 

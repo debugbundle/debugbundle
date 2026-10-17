@@ -155,10 +155,22 @@ export async function verifyClawHubDiscovery(target, dependencies = {}) {
   return { status: "partial", discoveryChecks };
 }
 
+export function verificationTargetEntries(context) {
+  const targets = new Map(context.targetEntries);
+  // A partial publish must still verify both public ClawHub distributions.
+  if (targets.has("clawhub") || targets.has("clawhubPlugin")) {
+    for (const key of ["clawhub", "clawhubPlugin"]) {
+      if (!targets.has(key))
+        targets.set(key, context.manifest?.publishTargets?.[key] ?? { type: "push" });
+    }
+  }
+  return [...targets];
+}
+
 export function collectVerificationFailures(context, report) {
   const failures = [];
 
-  for (const [targetKey, target] of context.targetEntries) {
+  for (const [targetKey, target] of verificationTargetEntries(context)) {
     if (target.type !== "push") {
       continue;
     }
@@ -167,6 +179,14 @@ export function collectVerificationFailures(context, report) {
     if (status !== "found") {
       failures.push(`${targetKey}:${status ?? "missing"}`);
       continue;
+    }
+
+    if (targetKey === "clawhub" || targetKey === "clawhubPlugin") {
+      const expectedVersion = targetKey === "clawhub" ? context.clawhubVersion : context.version;
+      const security = report.verify[targetKey].security;
+      if (security?.passed !== true || security.version !== expectedVersion) {
+        failures.push(`${targetKey}:security_not_passed`);
+      }
     }
 
     if (
@@ -196,20 +216,85 @@ export function smitheryStdioDirectoryUrl(namespace) {
 
 export function verifyClawHubPluginRecord(payload, target, expectedVersion) {
   const packageRecord = payload.package;
-  const latestVersion = payload.latestVersion?.version ?? payload.version?.version ?? packageRecord?.latestVersion ?? null;
+  const latestVersion =
+    payload.latestVersion?.version ??
+    payload.version?.version ??
+    packageRecord?.latestVersion ??
+    null;
+  const release = payload.version;
+  const security = {
+    version: release?.version ?? null,
+    passed:
+      release?.version === expectedVersion &&
+      packageRecord?.scanStatus === "clean" &&
+      release?.verification?.scanStatus === "clean" &&
+      release?.llmAnalysis?.status === "clean" &&
+      ["benign", "clean"].includes(release?.llmAnalysis?.verdict) &&
+      release?.vtAnalysis?.status === "clean",
+    scanStatus: release?.verification?.scanStatus ?? null,
+    review: release?.llmAnalysis ?? null,
+    antivirus: release?.vtAnalysis ?? null,
+    staticScan: release?.staticScan ?? null,
+    skillSpector: release?.skillSpectorAnalysis ?? null
+  };
   return {
-    status: packageRecord === undefined ? "missing" : latestVersion === expectedVersion ? "found" : "partial",
+    status:
+      packageRecord == null
+        ? "missing"
+        : latestVersion === expectedVersion && security.passed
+          ? "found"
+          : "partial",
     packageName: target.packageName,
     pluginId: target.pluginId,
     latestVersion,
-    files: Array.isArray(payload.version?.files) ? payload.version.files.map((file) => file.path) : null
+    security,
+    files: Array.isArray(payload.version?.files)
+      ? payload.version.files.map((file) => file.path)
+      : null
   };
 }
 
 export function verifyClawHubPlugin(target, expectedVersion, runCommand, parseJson) {
   const result = runCommand("npx", [
-    "-y", `${target.cliPackage}@${target.cliVersion}`,
-    "package", "inspect", target.packageName, "--files", "--json"
+    "-y",
+    `${target.cliPackage}@${target.cliVersion}`,
+    "package",
+    "inspect",
+    target.packageName,
+    "--version",
+    expectedVersion,
+    "--files",
+    "--json"
   ]);
   return verifyClawHubPluginRecord(parseJson(result.stdout), target, expectedVersion);
+}
+
+export function verifyClawHubSkillRecord(payload, expectedVersion) {
+  const release = payload.version;
+  const moderation = payload.moderation;
+  const review = release?.security;
+  const security = {
+    version: release?.version ?? null,
+    passed:
+      release?.version === expectedVersion &&
+      review?.hasScanResult === true &&
+      review?.status === "clean" &&
+      review?.scanners?.vt?.status === "clean" &&
+      review?.scanners?.llm?.status === "clean" &&
+      ["benign", "clean"].includes(review?.scanners?.llm?.verdict) &&
+      moderation?.verdict === "clean" &&
+      moderation?.isSuspicious === false &&
+      moderation?.isMalwareBlocked === false,
+    review: review ?? null,
+    moderation: moderation ?? null
+  };
+  return {
+    status:
+      payload.skill == null
+        ? "missing"
+        : payload.latestVersion?.version === expectedVersion && security.passed
+          ? "found"
+          : "partial",
+    security
+  };
 }

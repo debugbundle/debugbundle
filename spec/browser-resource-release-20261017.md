@@ -2,6 +2,8 @@
 
 Status: core 1.17.0 and site 1.6.6 are released and independently verified in production. All first-party package publications are publicly verified; search ranking and some third-party discovery checks remain qualified below.
 
+Security follow-up: the owner surfaced the OpenClaw 1.16.0 Review result after publication. The earlier checks verified version/content integrity but did not gate security acceptance. The release remains operationally deployed, but OpenClaw security acceptance is incomplete. See [corrective candidate and evidence](openclaw-security-remediation-20261017.md); both skill and plugin must pass before ecosystem acceptance can be closed.
+
 The owner authorized commits, pushes, production deployment and listing publication on 2026-10-17 after the implementation audit. Scope is FR-EVT-07c / AC-GRP-RESOURCE, the 18-family provider catalog, explicit resource controls, compatibility fixes, generated/distributed guidance and public docs. No new SDK option, database migration, customer-policy mutation or hosted OpenAI catalog/submission change is required.
 
 ## Released versions

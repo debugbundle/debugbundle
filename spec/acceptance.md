@@ -1094,6 +1094,9 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **When** the OpenClaw plugin manifest is generated
 - **Then** the tool is marked optional so operators must explicitly allow it before the model can see it
 - **And** production-impacting mutation tools must add OpenClaw per-call approval gates before public publish
+- **And** agent-token creation and revocation are optional in both runtime registration and generated metadata
+- **And** new, unclassified capabilities default to optional; existing default reads retain their exposure
+- **And** optional calls require native allow-once approval, fail closed on denial/timeout/unavailable approval, and never include credentials or raw input in approval text
 
 ### AC-OPENCLAW-03: Package Validation
 
@@ -1103,6 +1106,18 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** `openclaw.plugin.json` declares `contracts.tools`, `configSchema`, activation, and OpenClaw compatibility metadata
 - **And** package and manifest descriptions use the same truthful capability-first positioning as the shared DebugBundle skill
 - **And** ClawHub package validation and dry-run publish pass before the package is published
+- **And** the assembled plugin excludes unused hosted/server modules and runtime dynamic-code compilation
+
+### AC-OPENCLAW-04: Skill And Plugin Security Acceptance
+
+- Before any OpenClaw-related publication, the pipeline must pass `make openclaw-release-check` (native build, manifest/artifact guard, portable skill, permission, parity, legacy and release-gate tests). A failed preflight must prevent every publisher from running. CI must run the same gate before publishing the companion MCP npm package. Persist accepted publication receipts independently so a later failure does not lose evidence.
+
+- **Given** a full ecosystem release or a partial ClawHub skill/plugin publication
+- **When** post-publication verification runs
+- **Then** both exact expected versions have completed clean ClawHub overall security and final reviewer/antivirus results, with unblocked skill moderation
+- **And** missing, pending, suspicious/Review, blocked, stale, failed, or unavailable results fail the release command; an old publication-only report cannot pass
+- **And** scanner details, including findings adjudicated benign by ClawHub, remain in the report; there is no local bypass or conversion of warnings into passes
+- **And** a partial publication verifies its unchanged companion without republishing it
 
 ---
 

@@ -6,6 +6,14 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## CLI / MCP / OpenClaw [1.16.1] - 2026-10-17
+
+### Security
+
+- Correct OpenClaw agent-token creation/revocation to require explicit optional-tool opt-in. New capabilities default to optional until reviewed, and optional calls require native allow-once approval with denial on timeout. Align the declared OpenClaw minimum with the already-supported 2026.6.9 host baseline; upgrade older hosts before installing this security correction. API, CLI, MCP tool schemas and authentication remain unchanged.
+- Remove unused server/compiler imports from the OpenClaw artifact and reject their reintroduction during packaging. Retain credential authentication and telemetry redaction.
+- Require completed, exact-version clean ClawHub security outcomes for both the skill and plugin before release acceptance, including partial publications. Preserve all scanner findings and fail closed on Review, pending, missing or blocked results.
+
 ## [1.17.0] - 2026-10-17
 
 ### Improved

@@ -1,3 +1,5 @@
+OpenClaw security acceptance follow-up (2026-10-17): the published 1.16.0 plugin has a ClawHub Review outcome; its security acceptance is incomplete despite successful publication/content verification. The skill has a clean overall outcome, with adjudicated scanner warnings retained. The local corrective candidate passes 250 tests, full lint, typecheck and native package/artifact validation. The strict two-distribution gate rejects the currently flagged plugin. The owner has authorized corrective CLI/MCP/OpenClaw 1.16.1 publication; the release is in progress, with mandatory pre-publication checks and post-publication security acceptance. See `spec/openclaw-security-remediation-20261017.md`.
+
 # Browser resource noise controls audit — 2026-10-17
 
 The provider/control expansion is implemented and local release qualification is

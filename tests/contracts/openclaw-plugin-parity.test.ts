@@ -5,9 +5,16 @@ import {
   DEBUGBUNDLE_OPENCLAW_TOOL_MAP,
   DEBUGBUNDLE_OPENCLAW_TOOL_NAMES
 } from "../../apps/openclaw-plugin/src/index.js";
+import { isOptionalOpenClawTool } from "../../apps/openclaw-plugin/src/tool-policy.js";
 import { MCP_TOOL_CATALOG, MCP_TOOL_NAMES } from "../../apps/mcp/src/tool-catalog.js";
 
 describe("openclaw plugin parity", () => {
+  it("requires explicit opt-in for capabilities that have not been reviewed for default exposure", () => {
+    expect(isOptionalOpenClawTool("new_unreviewed_capability")).toBe(true);
+    expect(isOptionalOpenClawTool("create_agent_token")).toBe(true);
+    expect(isOptionalOpenClawTool("revoke_agent_token")).toBe(true);
+    expect(isOptionalOpenClawTool("list_agent_tokens")).toBe(false);
+  });
   it("projects every MCP tool into one prefixed OpenClaw tool", () => {
     expect(DEBUGBUNDLE_OPENCLAW_TOOL_MAP).toHaveLength(MCP_TOOL_NAMES.length);
     expect(DEBUGBUNDLE_OPENCLAW_TOOL_NAMES).toEqual(
@@ -47,6 +54,8 @@ describe("openclaw plugin parity", () => {
         "debugbundle_delete_project",
         "debugbundle_create_project_token",
         "debugbundle_revoke_project_token",
+        "debugbundle_create_agent_token",
+        "debugbundle_revoke_agent_token",
         "debugbundle_update_capture_policy",
         "debugbundle_create_capture_rule",
         "debugbundle_generate_analytics_bundle",

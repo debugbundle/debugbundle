@@ -28,7 +28,8 @@ describe("mcp ecosystem release pipeline", () => {
     };
     const script = readFileSync(scriptPath, "utf8");
     const verificationHelper = readFileSync(verificationHelperPath, "utf8");
-    const releaseSources = `${script}\n${verificationHelper}`;
+    const targetVerification = readFileSync(join(repoRoot, "scripts", "mcp-ecosystem-target-verification.mjs"), "utf8");
+    const releaseSources = `${script}\n${verificationHelper}\n${targetVerification}`;
 
     expect(manifest.package).toEqual({
       name: "@debugbundle/mcp",
@@ -85,24 +86,33 @@ describe("mcp ecosystem release pipeline", () => {
     expect(releaseSources).toContain('https://api.smithery.ai/skills?namespace=');
     expect(releaseSources).toContain('https://glama.ai/api/mcp/v1/servers?query=');
     expect(releaseSources).toContain("matchesGlamaServer");
-    expect(script).toContain("pulseMcp");
-    expect(script).toContain("mcpSo");
+    expect(releaseSources).toContain("pulseMcp");
+    expect(releaseSources).toContain("mcpSo");
     expect(releaseSources).toContain("fetchText");
-    expect(script).toContain('resources: "skills"');
-    expect(script).toContain("registryIndexed");
-    expect(script).toContain("expectedCatalog");
-    expect(script).toContain('"inspect"');
-    expect(script).toContain("verifyClawHubDiscovery");
+    expect(releaseSources).toContain('resources: "skills"');
+    expect(releaseSources).toContain("registryIndexed");
+    expect(releaseSources).toContain("expectedCatalog");
+    expect(releaseSources).toContain('"inspect"');
+    expect(releaseSources).toContain("verifyClawHubDiscovery");
     expect(releaseSources).toContain("https://clawhub.ai/api/v1/search?q=");
-    expect(script).toContain("discoveryChecks");
+    expect(releaseSources).toContain("discoveryChecks");
     expect(releaseSources).toContain("maxRank");
-    expect(script).toContain("/skills/");
+    expect(releaseSources).toContain("/skills/");
     expect(script).toContain("parseJsonFromCommandOutput");
     expect(releaseSources).toContain('"package",');
     expect(script).toContain('"plugin:validate"');
     expect(script).toContain('`${target.cliPackage}@${target.cliVersion}`');
-    expect(script).toContain("manual_check_required");
+    expect(releaseSources).toContain("manual_check_required");
     expect(script).toContain("verification_failed:");
+    expect(script).toContain('runCommand("make", ["openclaw-release-check"]');
+    expect(script).toContain("await publishTargets(context, options,");
+    expect(readFileSync(join(repoRoot, ".github/workflows/release-mcp-package.yml"), "utf8"))
+      .toContain("run: make openclaw-release-check");
+    const makefile = readFileSync(join(repoRoot, "Makefile"), "utf8");
+    expect(makefile).toContain("openclaw-release-check: openclaw-plugin-check");
+    for (const regression of ["mcp-clawhub-skill", "mcp-legacy-contract", "mcp-ecosystem-security", "mcp-ecosystem-publication"]) {
+      expect(makefile).toContain(`tests/apps/mcp/${regression}.test.ts`);
+    }
   });
 
   it("checks the stdio directory and rejects stale OpenClaw releases", async () => {
@@ -117,7 +127,11 @@ describe("mcp ecosystem release pipeline", () => {
     expect(url.searchParams.get("namespace")).toBe("debugbundle");
     expect(url.searchParams.get("remote")).toBe("false");
     const target = { packageName: "@debugbundle/openclaw-plugin", pluginId: "debugbundle" };
-    const payload = { package: { name: target.packageName }, version: { version: "1.7.1", files: [] } };
+    const payload = {
+      package: { name: target.packageName, scanStatus: "clean" },
+      version: { version: "1.7.1", files: [], verification: { scanStatus: "clean" },
+        llmAnalysis: { status: "clean", verdict: "benign" }, vtAnalysis: { status: "clean" } }
+    };
     expect(verifyClawHubPluginRecord(payload, target, "1.8.0").status).toBe("partial");
     payload.version.version = "1.8.0";
     expect(verifyClawHubPluginRecord(payload, target, "1.8.0").status).toBe("found");

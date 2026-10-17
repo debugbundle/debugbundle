@@ -1,6 +1,7 @@
 import { nodeFetch } from "../../node-http/src/index.js";
 import { sanitizeTelemetry } from "../../redaction/src/index.js";
-import { projectOpenAiToolOutput, type OpenAiToolName } from "../../mcp-core/src/index.js";
+// The client needs the pure output contract, not the hosted MCP server/compiler.
+import { projectOpenAiToolOutput, type OpenAiToolName } from "../../mcp-core/src/openai-contract.js";
 import { z } from "zod";
 
 export const AGENT_READ_NAMES = [

@@ -9,7 +9,7 @@ import { createEventEnvelope } from "../../../packages/shared-types/src/index.js
 import {
   deriveIncidentReasonFromSignal,
   type IncidentReason
-} from "../../../packages/storage/src/index.js";
+} from "../../../packages/storage/src/incident-reason.js";
 import { createRetrievalApi } from "../../../packages/retrieval-client/src/index.js";
 import { createTokenManagementApi } from "../../../packages/token-management/src/index.js";
 
