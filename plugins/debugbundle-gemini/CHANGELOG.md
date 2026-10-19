@@ -1,5 +1,9 @@
 # DebugBundle for Gemini CLI changelog
 
+## [1.3.0] - 2026-10-19
+
+- Adopt verified MCP 1.17.0 with account and project notification preferences, channel pauses and daily email digest schedules. Preserve local authentication and existing tool contracts.
+
 ## [Unreleased]
 
 ## [1.2.1] - 2026-10-17

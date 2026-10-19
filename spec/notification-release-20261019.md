@@ -53,3 +53,18 @@ The verified production baseline is core 1.17.0, API/worker digest
 healthy with zero restarts/OOMs and worker processing enabled. The active release
 is `20261017125033-c494777251f4`; free disk is 45 GiB. The existing endpoint check
 is passing with zero consecutive failures.
+
+CLI/MCP 1.17.0 published from `20bafbe8` with successful registry-install and
+native-client checks in workflows
+[39244696765](https://github.com/debugbundle/debugbundle/actions/runs/39244696765)
+and [39244702838](https://github.com/debugbundle/debugbundle/actions/runs/39244702838).
+Independent npm integrity and archive checks pass. SHA-256: CLI
+`e297f960d20ac5d5365fc7594ab088a767555c99813475fe20967c77ff408f9b`;
+MCP `0aa9084a0b2863a5c17c9b5de2a96b9b2564525a4fb30878ca0764e1429e9eae`.
+
+Developer candidates adopt that verified MCP: Codex 1.4.0, Claude Code 1.17.0,
+Gemini 1.3.0. Contract checks and native Codex/Claude/Gemini checks pass with
+138-tool discovery, local evidence, authentication boundaries, update/reinstall
+and removal. Gemini deterministic archive SHA-256:
+`c629a96cf4a928408d47a391672f432f43ae3c31c9a416c02dd62de92c38f635`.
+Public installation verification remains pending until source promotion.

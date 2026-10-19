@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.17.0] - 2026-10-19
+
+- Adopt verified MCP 1.17.0 with account and project notification preferences, channel pauses and daily email digest schedules. Preserve local authentication and existing tool contracts.
+
 ## [1.16.0] - 2026-10-17
 
 - Adopt verified MCP 1.16.0 and expanded browser resource noise guidance. Preserve existing tool contracts, authentication, capture defaults and reviewed rule scope.
