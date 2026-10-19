@@ -37,3 +37,19 @@ the unchanged 67-file changed-code coverage gate, 174 integration tests (one con
 SDK fixture skipped), lint, typecheck, candidate builds, native OpenClaw validation
 and 41 site tests/build/typecheck. Release-specific CI, published artifact checks,
 marketplace acceptance and production evidence will be recorded below.
+
+## Publication evidence
+
+Shared types/redaction 2.6.0 published from `17ab514a` through
+[workflow 39244204107](https://github.com/debugbundle/debugbundle/actions/runs/39244204107),
+including staged-artifact and registry-installed smoke checks. Independent tarball
+verification confirms package identities, SHA-512 integrity, README/LICENSE and the
+new shared notification modules. SHA-256: shared types
+`e8337e29db5d6da61852f676c3bfdd2258641bf909dc284d5c12867d87c8f169`;
+redaction `050f18182e5238c0779257f92eab7186437aa9ab518b1a446b670ca9a0836f46`.
+
+The verified production baseline is core 1.17.0, API/worker digest
+`sha256:7f44f85f40d11085e7d0c58e7fdf0b2ffb305bd989f16854ce574cb951690464`,
+healthy with zero restarts/OOMs and worker processing enabled. The active release
+is `20261017125033-c494777251f4`; free disk is 45 GiB. The existing endpoint check
+is passing with zero consecutive failures.
