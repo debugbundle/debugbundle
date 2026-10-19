@@ -1,4 +1,30 @@
-# Notification release review — 2026-10-19 (locally qualified; awaiting release approval)
+# Notification preferences released — 2026-10-19
+
+Core 1.18.0 and site 1.6.7 are published and live. Shared packages 2.6.0,
+CLI/MCP/OpenClaw/portable skill 1.17.0 and Codex/Claude/Gemini
+1.4.0/1.17.0/1.3.0 are published with verified artifacts and native public installs.
+Final CI passes 4,332 tests (14 conditional skips), all 67 changed-source coverage
+gates, lint/typecheck/build and the Node 22/24/26 native matrix. The stale hosted
+OpenAI source-provenance check is corrected without changing its package or catalog.
+
+Hosted workflow 39249938711 succeeds for core `a4e0ffca` and site `cb9679ac`.
+Migration 59 precedes activation; all four notification tables exist. API/worker
+are healthy on 1.18.0 with zero restarts, the worker is active, and public readiness,
+live API/CLI reads and the dashboard build marker pass. No new connected-project
+incidents are observed; endpoint health passes. The verified 1.17.0 rollback
+release/images remain intact, with 45 GiB disk free.
+
+Both exact-version ClawHub security gates and downloaded artifact/source parity
+pass. Full ecosystem verification remains qualified: Smithery rejects MCP server
+updates with HTTP 403, ClawHub search is 5/7, and some external directories remain
+unverified. The Smithery skill update passes. No customer notification preferences
+or monitoring were changed, and no live-provider email was sent.
+
+See `spec/notification-release-20261019.md` for exact versions, sources, workflow
+links and remaining external follow-through. Historical local-only statements below
+predate the owner's release approval and are superseded by this record.
+
+# Pre-release notification review — 2026-10-19 (historical local checkpoint)
 
 The final review fixed daily-email boundary races affecting both delayed new
 incidents and schedule changes. They can no longer attach to an email already

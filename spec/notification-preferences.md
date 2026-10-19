@@ -1,7 +1,8 @@
 # Notification preferences and daily incident digests
 
-Status: final source review and automated qualification complete (2026-10-19). No commit,
-publication or deployment authorized or performed.
+Status: released in core 1.18.0 on 2026-10-19 after owner approval. Production
+verification and external distribution limits are recorded in
+[the release evidence](notification-release-20261019.md).
 
 ## Product contract
 

@@ -10,9 +10,17 @@ This is the maintained inventory for first-party developer agent packages that b
 | Claude Code | `1.17.0`        | `1.17.0` | [`apps/mcp/claude-code/debugbundle/`](../apps/mcp/claude-code/debugbundle/) | core Git marketplace in [`debugbundle/debugbundle`](https://github.com/debugbundle/debugbundle)                 | Publish the reviewed plugin and [catalog](../.claude-plugin/marketplace.json) on core `main`; verify a public marketplace install and update.                                                                                       |
 | Gemini CLI  | `1.3.0`         | `1.17.0` | [`plugins/debugbundle-gemini/`](../plugins/debugbundle-gemini/)             | standalone Git repository [`debugbundle/debugbundle-gemini`](https://github.com/debugbundle/debugbundle-gemini) | Copy the validated package to public `main`, tag the version, publish a GitHub Release with the validated ZIP, run `make gemini-extension-verify-public`, verify a fresh Git install/update, and check gallery indexing separately. |
 
-The Codex and Claude Code marketplaces are directories inside the public core repository. Gemini CLI installs from its separate root-manifest Git repository. These are three independent package versions and release actions; none is an npm package publish. All three target the published `@debugbundle/mcp@1.17.0`. MCP 1.17.0 registry artifacts are independently verified. Native package and public installation checks for this candidate train are tracked in [the notification release](notification-release-20261019.md); publication is not complete until those gates pass. The generated project skill from `debugbundle setup` is another installation path, not a fourth package release.
+The Codex and Claude Code marketplaces are directories inside the public core repository. Gemini CLI installs from its separate root-manifest Git repository. These are three independent package versions and release actions; none is an npm package publish. All three target the published `@debugbundle/mcp@1.17.0`. MCP 1.17.0 registry artifacts are independently verified. Native package and public installation checks pass for this train; evidence is recorded in [the notification release](notification-release-20261019.md). The generated project skill from `debugbundle setup` is another installation path, not a fourth package release.
 
 ## Release evidence and discovery
+
+The 2026-10-19 notification release verifies core marketplace source
+`a4e0ffcab75346818bbab06b0386cb9bffc48a56` and Gemini standalone source
+`51b1c33643d47e4db742778796bb42f50830d742`, tag `v1.3.0`, and its published ZIP.
+Native Codex/Claude/Gemini install, 138-tool discovery, local evidence, credential
+boundaries, updates/reinstallation and removal pass. The downloaded Gemini ZIP
+matches `c629a96cf4a928408d47a391672f432f43ae3c31c9a416c02dd62de92c38f635`.
+External gallery indexing remains separate; see the [release evidence](notification-release-20261019.md).
 
 The 2026-10-17 resource-controls release verifies public Codex/Claude source
 `47ae20ec64e0847d372ff3d0fcc419d5303aac43` and Gemini standalone source

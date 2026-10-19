@@ -1,7 +1,9 @@
 # Notification preferences release — 2026-10-19
 
-Status: release preparation. The owner authorized commit, publication and production
-deployment after the final local review. No production completion is claimed yet.
+Status: core 1.18.0 and site 1.6.7 are published and deployed. The owner authorized
+the release after local review. Production migration, readiness, API/CLI reads,
+served build identity and rollback retention pass. The MCP ecosystem remains
+qualified by the external publication/discovery limits recorded below.
 
 Scope: FR-ALT-08 / FR-EMAIL-08 and the approved settings, submit-feedback and email-preview
 refinements. Detailed implementation and local evidence are in
@@ -9,12 +11,13 @@ refinements. Detailed implementation and local evidence are in
 
 ## Versions and order
 
-| Surface | Candidate |
+| Surface | Published |
 | --- | --- |
 | Core | 1.18.0 |
 | Shared types / redaction | 2.6.0 |
 | CLI / MCP / OpenClaw / portable skill | 1.17.0 |
 | Website | 1.6.7 |
+| Codex / Claude Code / Gemini | 1.4.0 / 1.17.0 / 1.3.0 |
 
 Publish shared packages first, adopt their verified registry versions, then publish
 CLI/MCP and run the mandatory MCP ecosystem pipeline. Developer plugin pins change
@@ -67,4 +70,86 @@ Gemini 1.3.0. Contract checks and native Codex/Claude/Gemini checks pass with
 138-tool discovery, local evidence, authentication boundaries, update/reinstall
 and removal. Gemini deterministic archive SHA-256:
 `c629a96cf4a928408d47a391672f432f43ae3c31c9a416c02dd62de92c38f635`.
-Public installation verification remains pending until source promotion.
+Public Codex/Claude installs from core `a4e0ffca` pass; Gemini public Git install,
+update/removal, tag/source parity and downloaded ZIP integrity pass against
+`51b1c33643d47e4db742778796bb42f50830d742`.
+
+## Final qualification and production
+
+[Final candidate CI 39246712952](https://github.com/debugbundle/debugbundle/actions/runs/39246712952)
+passes lint, typecheck, 4,332 tests in 96 shards (14 conditional skips), build and
+native Gemini on Node 22/24/26. The unchanged coverage gate passes all 67 changed
+source files, including 15 assessed by changed-line coverage. CLI runtime
+compatibility workflow 39246712950 also passes. An earlier CI attempt caught stale
+OpenAI source provenance; the manifest-only correction and all 13 provenance tests
+pass without changing the independently versioned plugin archive or frozen catalog.
+
+[PR 9](https://github.com/debugbundle/debugbundle/pull/9) is merged at
+`a4e0ffcab75346818bbab06b0386cb9bffc48a56`. The canonical
+[core 1.18.0 release](https://github.com/debugbundle/debugbundle/releases/tag/v1.18.0)
+and [site 1.6.7 release](https://github.com/debugbundle/site/releases/tag/v1.6.7)
+pass workflows 39249346003 and 39249872065. Site CI 39245956246 passes after core
+contract promotion; the earlier expected 134-versus-138-tool mismatch is resolved.
+
+[Hosted deployment 39249938711](https://github.com/debugbundle/debugbundle-cloud/actions/runs/39249938711)
+succeeds from trusted cloud source `b2508b1671c16a0d0ade55e682c082c48cbb827a`,
+core source `a4e0ffcab75346818bbab06b0386cb9bffc48a56` and site source
+`cb9679ac1a68b4067c19740d82acaff30e0f6aaf`, preserving the existing MCP gate.
+
+- API and worker independently report core 1.18.0, image digest
+  `sha256:dfd67096ee1a5140d967be9e142709cb99781615cdbd7a3d465768a3f10043df`,
+  healthy containers, zero restarts/OOMs, and worker processing enabled.
+- Read-only database verification confirms 59 migrations, latest
+  `202610180001_add_notification_preferences`, and all four notification tables.
+  All 11,882 observed worker jobs are completed. Migration runs before activation.
+- Authenticated account/project personal/shared preference GETs return HTTP 200
+  with no-store; the published CLI 1.17.0 reads all four scopes successfully.
+  Existing effective delivery defaults remain immediate; no customer settings changed.
+- Public API/MCP readiness is healthy throughout the sampled rollout window.
+  The live dashboard `version.json` identifies the exact deployed core SHA.
+  Public OpenAPI includes both notification preference scopes. CDN invalidations
+  and the workflow's external endpoint/site checks pass.
+- The connected production project's bounded incident read has no new incidents
+  or changed last-seen times; its four pre-existing active incidents remain.
+  Its endpoint health check is passing with zero consecutive failures.
+- Active runtime `20261019121425-d1c61b93cbff` retains verified previous stable
+  `20261017125033-c494777251f4` and both previous images at
+  `sha256:7f44f85f40d11085e7d0c58e7fdf0b2ffb305bd989f16854ce574cb951690464`.
+  Retention dry run has zero deletion candidates; disk has 45 GiB free.
+
+No browser inspection or live-provider email send was performed. Local integration
+coverage verifies delivery policy, scheduling, retries and suppression; production
+verification is read-only. SDKs and the independent OpenAI portal publication stay unchanged.
+
+## Registry security, artifact integrity and external limits
+
+Official MCP Registry 1.17.0 and the Smithery skill update are accepted and independently
+found. Both ClawHub 1.17.0 distributions are published: skill receipt
+`k97fnx26pk591srv3gcycdk1ks8gknmh`, plugin receipt `rd7cacz6mzfr9y0shjbnry734h8gjrmn`.
+The unchanged verifier confirms both exact-version security gates pass: clean
+overall outcome, benign final review, clean antivirus, and unblocked skill moderation.
+Plugin antivirus reports zero malicious and suspicious detections across 61 engines.
+Static heuristics concerning Undici's test flag, the redaction regex and intentional
+CLI auth reads remain recorded and are adjudicated benign by the final review;
+low-severity skill boilerplate/access-control findings are also retained. No scan
+was bypassed or suppressed.
+
+The downloaded plugin archive passes registry integrity checks and all six files
+match the reviewed artifact. SHA-256:
+`525b10b0ee3ea7b64482df474157db6900d66ea7a0b8774e7e40c81a30bddc11`.
+Both downloaded skill files match source and registry hashes; SKILL.md SHA-256:
+`e066f8bf3df614386c69492ffb29bfef433b74c1f45c09433f2dc5ea77e5460c`.
+
+The full ecosystem verifier deliberately remains non-green:
+
+- Smithery MCP server publication returns HTTP 403, `Updating servers has been removed`.
+  Its existing listing is not proof of a 1.17.0 update; provider intervention remains required.
+- ClawHub search satisfies 5/7 configured rank checks: the aggregate query is absent
+  and incident response is rank 17 against the top-ten target.
+- Glama returns HTTP 401; PulseMCP and LobeHub require manual discovery verification.
+  MCP.so is found. These do not alter the verified npm/plugin installation paths.
+
+Detailed scanner/artifact evidence is retained locally in
+`spec/local/notification-release-20261019.json`; workflow links above provide durable
+qualification/deployment records. Source/doc reconciliation does not change the
+exact deployed SHA or require another runtime release.
