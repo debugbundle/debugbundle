@@ -1,3 +1,4 @@
+import { alertNotificationHistorySql } from "./alert-notification-history.js";
 import { randomBytes, randomUUID } from "node:crypto";
 
 import { getTierCapabilities } from "../../shared-types/src/index.js";
@@ -242,24 +243,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
             OR NOT EXISTS (
               SELECT 1
               FROM (
-                SELECT COALESCE(delivered_at, created_at) AS notified_at
-                FROM alert_deliveries
-                WHERE alert_id = $2::uuid
-                  AND notification_key = $7
-                  AND status IN ('pending', 'delivered')
-                UNION ALL
-                SELECT
-                  CASE
-                    WHEN digests.status = 'delivered'
-                      THEN COALESCE(digests.delivered_at, items.created_at)
-                    ELSE items.created_at
-                  END AS notified_at
-                FROM alert_email_digest_items items
-                INNER JOIN alert_email_digests digests
-                  ON digests.id = items.digest_id
-                WHERE items.alert_id = $2::uuid
-                  AND items.notification_key = $7
-                  AND digests.status IN ('pending', 'delivered')
+                ${alertNotificationHistorySql("$2", "$7")}
               ) recent_notifications
               WHERE recent_notifications.notified_at >= now() - make_interval(secs => $10)
             )
@@ -497,24 +481,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
               OR NOT EXISTS (
                 SELECT 1
                 FROM (
-                  SELECT COALESCE(delivered_at, created_at) AS notified_at
-                  FROM alert_deliveries
-                  WHERE alert_id = $5::uuid
-                    AND notification_key = $9
-                    AND status IN ('pending', 'delivered')
-                  UNION ALL
-                  SELECT
-                    CASE
-                      WHEN digests.status = 'delivered'
-                        THEN COALESCE(digests.delivered_at, items.created_at)
-                      ELSE items.created_at
-                    END AS notified_at
-                  FROM alert_email_digest_items items
-                  INNER JOIN alert_email_digests digests
-                    ON digests.id = items.digest_id
-                  WHERE items.alert_id = $5::uuid
-                    AND items.notification_key = $9
-                    AND digests.status IN ('pending', 'delivered')
+                  ${alertNotificationHistorySql("$5", "$9")}
                 ) recent_notifications
                 WHERE recent_notifications.notified_at >= now() - make_interval(secs => $11)
               )

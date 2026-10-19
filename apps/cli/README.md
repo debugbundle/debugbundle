@@ -2,6 +2,10 @@
 
 Command-line interface for DebugBundle.
 
+Notification preferences support account and project scopes, personal email or shared
+destinations, per-channel pause/resume, and daily email with local time and timezone.
+Use `debugbundle --help` and the [notification CLI guide](https://debugbundle.com/docs/cli/alerts/).
+
 ## Installation
 
 ```sh

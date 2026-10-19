@@ -770,6 +770,16 @@ export function renderAlertDigestEmail(input: {
   return { subject, text, html };
 }
 
+/** Keep daily delivery and the local review catalog on the same email rendering path. */
+export function renderDailyIncidentDigestEmail(
+  input: Parameters<typeof renderAlertDigestEmail>[0] & { totalIncidentCount: number }
+): ReturnType<typeof renderAlertDigestEmail> {
+  return {
+    ...renderAlertDigestEmail(input),
+    subject: `[DebugBundle Daily] ${input.totalIncidentCount} new unresolved incident${input.totalIncidentCount === 1 ? "" : "s"}`
+  };
+}
+
 export function createSesEmailTransport(input: {
   region: string;
   fromEmail: string;

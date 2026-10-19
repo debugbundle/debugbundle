@@ -39,7 +39,8 @@ describe("web app - project settings layout", () => {
       "Capture rules",
       "Improvement bundles",
       "Product analytics",
-      "Weekly reports"
+      "Weekly reports",
+      "Notifications"
     ];
     const triggers = await Promise.all(
       sectionNames.map((name) => screen.findByRole("button", { name }))

@@ -49,6 +49,20 @@ import {
 } from "../../../packages/email/src/system-email-review.js";
 
 describe("email package", () => {
+  it("previews the daily incident email with two projects and production delivery copy", () => {
+    const entry = getSystemEmailReviewEntry("daily-incident-digest");
+    expect(entry?.implementationStatus).toBe("implemented");
+    const preview = entry?.preview;
+    expect(preview?.subject).toBe("[DebugBundle Daily] 2 new unresolved incidents");
+    for (const project of ["Checkout API", "Customer Portal"]) {
+      expect(preview?.text).toContain(project);
+      expect(preview?.html).toContain(project);
+    }
+    expect(preview?.html).toContain("/incidents/inc_checkout_daily");
+    expect(preview?.html).toContain("/incidents/inc_portal_daily");
+    expect(preview?.text).toContain("Alerts: Incident regressed");
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.useRealTimers();

@@ -1,3 +1,5 @@
+import { PendingButton } from "../components/system/pending-button.js";
+import { usePendingAction } from "../lib/use-pending-action.js";
 import { MailCheckIcon, PlusIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
@@ -20,14 +22,40 @@ import {
   AlertDialogTrigger
 } from "../components/ui/alert-dialog.js";
 import { Button } from "../components/ui/button.js";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card.js";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "../components/ui/card.js";
 import { Dialog, DialogTrigger } from "../components/ui/dialog.js";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../components/ui/empty.js";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle
+} from "../components/ui/empty.js";
 import { Field, FieldGroup, FieldLabel } from "../components/ui/field.js";
 import { Input } from "../components/ui/input.js";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "../components/ui/select.js";
 import { Skeleton } from "../components/ui/skeleton.js";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "../components/ui/table.js";
 import { showErrorToast, showSuccessToast } from "../lib/notify.js";
 import { getProjectEffectiveRole } from "../lib/project-access.js";
 import {
@@ -46,6 +74,7 @@ import { useSession } from "../lib/session.js";
 export function ProjectMembersPage(): JSX.Element {
   const { project, projectId } = useOutletContext<ProjectContext>();
   const { session, setSession } = useSession();
+  const { pending: isInviting, run: runInvite } = usePendingAction();
   const navigate = useNavigate();
   const [members, setMembers] = useState<ProjectMemberRecord[] | null>(null);
   const [invites, setInvites] = useState<ProjectInviteRecord[] | null>(null);
@@ -88,27 +117,34 @@ export function ProjectMembersPage(): JSX.Element {
   async function handleInvite(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
 
-    try {
-      const created = await inviteProjectMember(projectId, { email: inviteEmail, role: inviteRole });
-      setInvites((current) => [...(current ?? []), created]);
-      setInviteEmail("");
-      setInviteRole("member");
-      setIsInviteOpen(false);
-      showSuccessToast("Invite sent successfully.");
-    } catch (error) {
-      if (error instanceof Error && error.message === "upgrade_required") {
-        showErrorToast("Upgrade to Team to invite collaborators.");
-        return;
-      }
+    await runInvite(async () => {
+      try {
+        const created = await inviteProjectMember(projectId, {
+          email: inviteEmail,
+          role: inviteRole
+        });
+        setInvites((current) => [...(current ?? []), created]);
+        setInviteEmail("");
+        setInviteRole("member");
+        setIsInviteOpen(false);
+        showSuccessToast("Invite sent successfully.");
+      } catch (error) {
+        if (error instanceof Error && error.message === "upgrade_required") {
+          showErrorToast("Upgrade to Team to invite collaborators.");
+          return;
+        }
 
-      showErrorToast("Could not send invite.");
-    }
+        showErrorToast("Could not send invite.");
+      }
+    });
   }
 
   async function handleRoleChange(userId: string, role: "admin" | "member"): Promise<void> {
     try {
       const updated = await updateProjectMemberRole(projectId, userId, role);
-      setMembers((current) => (current ?? []).map((member) => (member.user_id === userId ? updated : member)));
+      setMembers((current) =>
+        (current ?? []).map((member) => (member.user_id === userId ? updated : member))
+      );
       showSuccessToast("Access updated successfully.");
     } catch (error) {
       if (error instanceof Error && error.message === "owner_role_change_not_allowed") {
@@ -166,7 +202,12 @@ export function ProjectMembersPage(): JSX.Element {
         description="Manage who can access this project and review pending invites."
         actions={
           canInvite ? (
-            <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
+            <Dialog
+              open={isInviteOpen}
+              onOpenChange={(next) => {
+                if (!isInviting) setIsInviteOpen(next);
+              }}
+            >
               <DialogTrigger asChild>
                 <Button type="button">
                   <PlusIcon data-icon="inline-start" />
@@ -175,14 +216,20 @@ export function ProjectMembersPage(): JSX.Element {
               </DialogTrigger>
               <DialogFormContent
                 title="Invite collaborator"
+                busy={isInviting}
                 description="Invite someone to this project."
-                footer={<Button type="submit">Send invite</Button>}
+                footer={
+                  <PendingButton type="submit" pending={isInviting} pendingLabel="Sending…">
+                    Send invite
+                  </PendingButton>
+                }
                 onSubmit={(event) => void handleInvite(event)}
               >
                 <FieldGroup>
                   <Field>
                     <FieldLabel htmlFor="project-invite-email">Email address</FieldLabel>
                     <Input
+                      disabled={isInviting}
                       id="project-invite-email"
                       type="email"
                       value={inviteEmail}
@@ -190,12 +237,19 @@ export function ProjectMembersPage(): JSX.Element {
                     />
                   </Field>
                   <Field>
-                    <FieldLabel id="project-invite-role-label" htmlFor="project-invite-role">Role</FieldLabel>
+                    <FieldLabel id="project-invite-role-label" htmlFor="project-invite-role">
+                      Role
+                    </FieldLabel>
                     <Select
+                      disabled={isInviting}
                       value={inviteRole}
                       onValueChange={(value) => setInviteRole(value as "admin" | "member")}
                     >
-                      <SelectTrigger id="project-invite-role" aria-labelledby="project-invite-role-label project-invite-role" className="w-full">
+                      <SelectTrigger
+                        id="project-invite-role"
+                        aria-labelledby="project-invite-role-label project-invite-role"
+                        className="w-full"
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent position="popper">
@@ -233,7 +287,9 @@ export function ProjectMembersPage(): JSX.Element {
         <Card>
           <CardHeader>
             <CardTitle>People with access</CardTitle>
-            <CardDescription>Project owners and collaborators who can open this project.</CardDescription>
+            <CardDescription>
+              Project owners and collaborators who can open this project.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {members === null ? (
@@ -265,7 +321,11 @@ export function ProjectMembersPage(): JSX.Element {
                       <TableRow key={member.user_id}>
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-3">
-                            <UserAvatar email={member.email} avatarUrl={member.avatar_url} size="sm" />
+                            <UserAvatar
+                              email={member.email}
+                              avatarUrl={member.avatar_url}
+                              size="sm"
+                            />
                             <span>{member.email}</span>
                           </div>
                         </TableCell>
@@ -273,9 +333,15 @@ export function ProjectMembersPage(): JSX.Element {
                           {canEditRole ? (
                             <Select
                               value={member.role}
-                              onValueChange={(value) => void handleRoleChange(member.user_id, value as "admin" | "member")}
+                              onValueChange={(value) =>
+                                void handleRoleChange(member.user_id, value as "admin" | "member")
+                              }
                             >
-                              <SelectTrigger aria-label={`role for ${member.email}`} className="min-w-28" size="sm">
+                              <SelectTrigger
+                                aria-label={`role for ${member.email}`}
+                                className="min-w-28"
+                                size="sm"
+                              >
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent position="popper">
@@ -307,7 +373,9 @@ export function ProjectMembersPage(): JSX.Element {
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => void handleRemoveMember(member.user_id)}>
+                                  <AlertDialogAction
+                                    onClick={() => void handleRemoveMember(member.user_id)}
+                                  >
                                     Remove access
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
@@ -336,7 +404,12 @@ export function ProjectMembersPage(): JSX.Element {
                               </AlertDialogContent>
                             </AlertDialog>
                           ) : (
-                            <span className="text-muted-foreground" aria-label="No action available">—</span>
+                            <span
+                              className="text-muted-foreground"
+                              aria-label="No action available"
+                            >
+                              —
+                            </span>
                           )}
                         </TableCell>
                       </TableRow>
@@ -367,7 +440,9 @@ export function ProjectMembersPage(): JSX.Element {
                       <MailCheckIcon />
                     </EmptyMedia>
                     <EmptyTitle>No pending invites right now</EmptyTitle>
-                    <EmptyDescription>Outstanding invitations will appear here until they are accepted or cancelled.</EmptyDescription>
+                    <EmptyDescription>
+                      Outstanding invitations will appear here until they are accepted or cancelled.
+                    </EmptyDescription>
                   </EmptyHeader>
                 </Empty>
               ) : (
@@ -402,7 +477,9 @@ export function ProjectMembersPage(): JSX.Element {
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Keep invite</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => void handleCancelInvite(invite.invite_id)}>
+                                <AlertDialogAction
+                                  onClick={() => void handleCancelInvite(invite.invite_id)}
+                                >
                                   Cancel invite
                                 </AlertDialogAction>
                               </AlertDialogFooter>

@@ -1,3 +1,5 @@
+import { PendingButton } from "../components/system/pending-button.js";
+import { NotificationSettings } from "../components/system/notification-settings.js";
 import { DownloadIcon, ShieldAlertIcon, Trash2Icon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
@@ -210,7 +212,7 @@ export function SettingsPage(): JSX.Element {
     <div className="space-y-8">
       <PageHeader description="Review your active sign-in methods, account verification state, and account lifecycle controls." />
       <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="space-y-4">
+        <div className="flex min-w-0 flex-col gap-4">
           <Card>
             <CardHeader>
               <CardTitle>Profile</CardTitle>
@@ -224,12 +226,12 @@ export function SettingsPage(): JSX.Element {
             </CardContent>
           </Card>
 
+          <NotificationSettings key={session.session_id} />
+
           <Card>
             <CardHeader>
               <CardTitle>Optional visit analytics</CardTitle>
-              <CardDescription>
-                Control optional browser analytics on this device.
-              </CardDescription>
+              <CardDescription>Control optional browser analytics on this device.</CardDescription>
             </CardHeader>
             <CardContent>
               <Field orientation="horizontal" className="items-start gap-2">
@@ -271,75 +273,20 @@ export function SettingsPage(): JSX.Element {
                   </p>
                 </div>
               </div>
-              <Button
+              <PendingButton
+                pending={isImportingAvatar}
                 type="button"
                 variant="outline"
                 onClick={() => void handleImportGravatarAvatar()}
                 disabled={isImportingAvatar}
               >
                 {isImportingAvatar ? "Importing..." : "Import from Gravatar"}
-              </Button>
+              </PendingButton>
             </CardContent>
           </Card>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Verification status</CardTitle>
-                <CardDescription>Email verification gates first token issuance.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {session.email_verified_at === null ? (
-                  <CalloutCard
-                    eyebrow="Pending"
-                    title="Verification required"
-                    description="Verify your email before creating your first member token."
-                    tone="warning"
-                  />
-                ) : (
-                  <CalloutCard
-                    eyebrow="Ready"
-                    title="Verified"
-                    description="This account can issue member tokens for CLI and MCP access."
-                    tone="neutral"
-                  />
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Sign-in methods</CardTitle>
-                <CardDescription>
-                  Browser sign-in options currently attached to this member identity.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm">
-                <DetailBlock
-                  label="Email code"
-                  value={hasEmailCredential ? "Enabled" : "Unavailable"}
-                />
-                <DetailBlock
-                  label="GitHub OAuth"
-                  value={hasGithubCredential ? "Enabled" : "Not connected"}
-                />
-                {hasEmailCredential ? (
-                  <p className="text-muted-foreground">
-                    Email sign-in uses a one-time code and completes account verification as part of
-                    the same flow.
-                  </p>
-                ) : (
-                  <p className="text-muted-foreground">
-                    This account currently relies on GitHub only. Request an email code from the
-                    login screen if email access should be enabled.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="flex min-w-0 flex-col gap-4">
           <Card>
             <CardHeader>
               <CardTitle>Account data export</CardTitle>
@@ -361,15 +308,70 @@ export function SettingsPage(): JSX.Element {
                   Only owners can export or delete this account.
                 </p>
               ) : null}
-              <Button
+              <PendingButton
+                icon={<DownloadIcon data-icon="inline-start" />}
+                pending={isExporting}
                 type="button"
                 variant="outline"
                 onClick={() => void handleExportAccountData()}
                 disabled={!canManageOrganizationAccount || isExporting}
               >
-                <DownloadIcon data-icon="inline-start" />
                 {isExporting ? "Preparing export..." : "Download export"}
-              </Button>
+              </PendingButton>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Verification status</CardTitle>
+              <CardDescription>Email verification gates first token issuance.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {session.email_verified_at === null ? (
+                <CalloutCard
+                  eyebrow="Pending"
+                  title="Verification required"
+                  description="Verify your email before creating your first member token."
+                  tone="warning"
+                />
+              ) : (
+                <CalloutCard
+                  eyebrow="Ready"
+                  title="Verified"
+                  description="This account can issue member tokens for CLI and MCP access."
+                  tone="neutral"
+                />
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Sign-in methods</CardTitle>
+              <CardDescription>
+                Browser sign-in options currently attached to this member identity.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <DetailBlock
+                label="Email code"
+                value={hasEmailCredential ? "Enabled" : "Unavailable"}
+              />
+              <DetailBlock
+                label="GitHub OAuth"
+                value={hasGithubCredential ? "Enabled" : "Not connected"}
+              />
+              {hasEmailCredential ? (
+                <p className="text-muted-foreground">
+                  Email sign-in uses a one-time code and completes account verification as part of
+                  the same flow.
+                </p>
+              ) : (
+                <p className="text-muted-foreground">
+                  This account currently relies on GitHub only. Request an email code from the login
+                  screen if email access should be enabled.
+                </p>
+              )}
             </CardContent>
           </Card>
 

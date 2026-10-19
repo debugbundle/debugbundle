@@ -36,6 +36,7 @@ export function createPostgresWeeklyReportDeliveryStore(db: Queryable): WeeklyRe
               last_error = NULL,
               updated_at = now()
             WHERE weekly_report_deliveries.status = 'failed'
+              AND weekly_report_deliveries.last_error IS DISTINCT FROM 'notification_suppressed'
             RETURNING id AS delivery_id, true AS claimed
           )
           SELECT delivery_id, claimed

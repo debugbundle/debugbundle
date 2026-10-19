@@ -1,3 +1,4 @@
+import { handleNotificationCommand, notificationWithAuthCommand } from "./notification-commands.js";
 import { parseAgents } from "../../../packages/agent-setup/src/index.js";
 import { analyzeCommand as defaultAnalyzeCommand } from "./analyze-command.js";
 import { agentReadCommand as defaultAgentReadCommand } from "./agent-read-command.js";
@@ -34,6 +35,7 @@ import { CapturePresetSchema } from "../../../packages/shared-types/src/index.js
 import packageJson from "../package.json" with { type: "json" };
 
 export type CliDependencies = ManagementCommandDependencies & CaptureRuleCommandDependencies & {
+  notificationCommand?: typeof notificationWithAuthCommand;
   agentReadCommand?: typeof defaultAgentReadCommand;
   analyzeCommand?: typeof defaultAnalyzeCommand;
   cleanCommand?: typeof defaultCleanCommand;
@@ -646,6 +648,10 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
 
     if (command === "github") {
       return await handleGithubCommand(parsedArgv, dependencies);
+    }
+
+    if (command === "notifications") {
+      return await handleNotificationCommand(parsedArgv, dependencies.notificationCommand);
     }
 
     if (command === "alert") {

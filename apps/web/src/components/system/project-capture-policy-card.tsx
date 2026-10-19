@@ -1,3 +1,4 @@
+import { PendingButton } from "./pending-button.js";
 import { RotateCcwIcon, ShieldCheckIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -349,9 +350,9 @@ export function ProjectCapturePolicyCard({ projectId, organizationPlan, canEdit 
                 <RotateCcwIcon data-icon="inline-start" />
                 Reset changes
               </Button>
-              <Button type="submit" disabled={isSaveDisabled}>
+              <PendingButton pending={isSaving} type="submit" disabled={isSaveDisabled}>
                 {isSaving ? "Saving..." : "Save capture policy"}
-              </Button>
+              </PendingButton>
             </div>
           ) : null}
         </form>

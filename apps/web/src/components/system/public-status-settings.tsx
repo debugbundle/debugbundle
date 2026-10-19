@@ -1,3 +1,4 @@
+import { PendingButton } from "./pending-button.js";
 import { useEffect, useRef, useState } from "react";
 import type { AvailabilityCheckRecord, ProjectRecord } from "../../lib/api.js";
 import {
@@ -341,7 +342,7 @@ function PublicStatusSettingsContent({ project, checks }: PublicStatusSettingsPr
               >
                 {operation === "preview" ? "Loading preview…" : "Preview status page"}
               </Button>
-              <Button
+              <PendingButton pending={operation === "save"}
                 type="submit"
                 disabled={
                   busy ||
@@ -351,7 +352,7 @@ function PublicStatusSettingsContent({ project, checks }: PublicStatusSettingsPr
                 }
               >
                 {operation === "save" ? "Saving…" : "Save status settings"}
-              </Button>
+              </PendingButton>
             </>
           ) : null
         }

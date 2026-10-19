@@ -12,6 +12,7 @@ import { createManagementMocks } from "./management.js";
 import { createAnalyticsMocks } from "./analytics.js";
 import { createBillingMocks } from "./billing.js";
 import { createPublicStatusMocks } from "./public-status.js";
+import { createNotificationMocks } from "./notifications.js";
 
 export interface MockResponse {
   status: number;
@@ -33,6 +34,7 @@ export function createDevMockApi() {
   const analytics = createAnalyticsMocks(data);
   const billing = createBillingMocks(data);
   const publicStatus = createPublicStatusMocks(data, management.isSignedIn);
+  const notifications = createNotificationMocks(data, management.isSignedIn);
   const capturePolicies = new Map(
     data.projects.map((project) => [
       String(project["project_id"]),
@@ -161,6 +163,8 @@ export function createDevMockApi() {
     const read = method === "GET";
     const published = publicStatus.handle(method, path, query, payload, origin);
     if (published) return published;
+    const notification = notifications.handle(method, path, query, payload);
+    if (notification) return notification;
     const managed = management.handle(method, path, query, payload);
     if (managed) return managed;
     const analyzed = analytics.handle(method, path, query, payload);

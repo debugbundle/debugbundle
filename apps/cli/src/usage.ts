@@ -1,5 +1,9 @@
 export const CLI_USAGE_LINES = [
   "Usage:",
+  "  debugbundle notifications get [--audience personal|shared] [--project-id <id>] [--auth-file <path>] [--json]",
+  "  debugbundle notifications set [--email immediate|daily|off|inherit] [--slack immediate|off|inherit] [--discord immediate|off|inherit] [--webhook immediate|off|inherit] [--time HH:mm --timezone IANA | --inherit-schedule true] [--audience personal|shared] [--project-id <id>] [--auth-file <path>] [--json]",
+  "  debugbundle notifications pause --for <24h|7d|forever> [--channels all|email,slack,discord,webhook] [--allow-health-checks true|false] [--audience personal|shared] [--project-id <id>] [--auth-file <path>] [--json] (or --until <ISO8601>)",
+  "  debugbundle notifications resume [--channels all|email,slack,discord,webhook] [--audience personal|shared] [--project-id <id>] [--auth-file <path>] [--json]",
   "  debugbundle --version",
   "  debugbundle -v",
   "  debugbundle -h",

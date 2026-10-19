@@ -1,3 +1,5 @@
+import { PendingButton } from "../components/system/pending-button.js";
+import { usePendingAction } from "../lib/use-pending-action.js";
 import { PlusIcon, RadarIcon } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
@@ -51,6 +53,7 @@ const DEFAULT_TRIGGER_TTL_SECONDS = "86400";
 
 export function ProjectProbesPage(): JSX.Element {
   const { project } = useOutletContext<ProjectContext>();
+  const { pending: isActivating, run: runActivate } = usePendingAction();
   const [activations, setActivations] = useState<ProbeActivationRecord[] | null>(null);
   const showActivationsLoading = useDelayedVisibility(activations === null);
   const [isActivateOpen, setIsActivateOpen] = useState(false);
@@ -87,22 +90,24 @@ export function ProjectProbesPage(): JSX.Element {
       return;
     }
 
-    try {
-      const created = await createProjectProbeActivation(project.project_id, {
-        label_pattern: labelPattern.trim(),
-        service: service.trim(),
-        environment: environment.trim(),
-        ttl_seconds: Number.parseInt(ttlSeconds, 10),
-        trigger_ttl_seconds: Number.parseInt(triggerTtlSeconds, 10)
-      });
+    await runActivate(async () => {
+      try {
+        const created = await createProjectProbeActivation(project.project_id, {
+          label_pattern: labelPattern.trim(),
+          service: service.trim(),
+          environment: environment.trim(),
+          ttl_seconds: Number.parseInt(ttlSeconds, 10),
+          trigger_ttl_seconds: Number.parseInt(triggerTtlSeconds, 10)
+        });
 
-      setCreatedActivation(created);
-      setActivations((current) => [created.activation, ...(current ?? [])]);
-      resetActivationForm();
-      showSuccessToast("Probe activated successfully.");
-    } catch (error) {
-      showErrorToast(getActivationErrorMessage(error));
-    }
+        setCreatedActivation(created);
+        setActivations((current) => [created.activation, ...(current ?? [])]);
+        resetActivationForm();
+        showSuccessToast("Probe activated successfully.");
+      } catch (error) {
+        showErrorToast(getActivationErrorMessage(error));
+      }
+    });
   }
 
   async function handleDeactivateProbe(activationId: string): Promise<void> {
@@ -135,7 +140,12 @@ export function ProjectProbesPage(): JSX.Element {
       <div className="flex items-center justify-between">
         <div />
         {remoteProbesEnabled ? (
-          <Dialog open={isActivateOpen} onOpenChange={setIsActivateOpen}>
+          <Dialog
+            open={isActivateOpen}
+            onOpenChange={(next) => {
+              if (!isActivating) setIsActivateOpen(next);
+            }}
+          >
             <DialogTrigger asChild>
               <Button type="button">
                 <PlusIcon data-icon="inline-start" />
@@ -144,11 +154,17 @@ export function ProjectProbesPage(): JSX.Element {
             </DialogTrigger>
             <DialogFormContent
               title="Activate remote probe"
+              busy={isActivating}
               description="Activate matching SDK probe labels for independent shipping. Always-on probe buffers continue working separately."
               footer={
-                <Button type="submit" disabled={!canSubmitActivation}>
+                <PendingButton
+                  type="submit"
+                  pending={isActivating}
+                  pendingLabel="Activating…"
+                  disabled={!canSubmitActivation}
+                >
                   Activate probe
-                </Button>
+                </PendingButton>
               }
               onSubmit={(formEvent) => void handleActivateProbe(formEvent)}
             >
@@ -161,6 +177,7 @@ export function ProjectProbesPage(): JSX.Element {
                     <span className="font-mono">*</span> for every probe label.
                   </FieldDescription>
                   <Input
+                    disabled={isActivating}
                     id="probe-label-pattern"
                     value={labelPattern}
                     onChange={(event) => setLabelPattern(event.currentTarget.value)}
@@ -175,6 +192,7 @@ export function ProjectProbesPage(): JSX.Element {
                     </FieldDescription>
                     <ProjectScopeSelect
                       id="probe-service"
+                      disabled={isActivating}
                       label="Service"
                       value={service}
                       options={scopeOptions.services}
@@ -189,6 +207,7 @@ export function ProjectProbesPage(): JSX.Element {
                     <FieldDescription>Use * to match every environment.</FieldDescription>
                     <ProjectScopeSelect
                       id="probe-environment"
+                      disabled={isActivating}
                       label="Environment"
                       value={environment}
                       options={scopeOptions.environments}
@@ -209,6 +228,7 @@ export function ProjectProbesPage(): JSX.Element {
                       Range: 60 to 3600.
                     </FieldDescription>
                     <Input
+                      disabled={isActivating}
                       id="probe-ttl-seconds"
                       type="number"
                       min={60}
@@ -226,6 +246,7 @@ export function ProjectProbesPage(): JSX.Element {
                       URL. Range: 60 to 86400.
                     </FieldDescription>
                     <Input
+                      disabled={isActivating}
                       id="probe-trigger-ttl-seconds"
                       type="number"
                       min={60}

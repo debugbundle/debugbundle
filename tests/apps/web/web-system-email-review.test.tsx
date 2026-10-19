@@ -71,6 +71,14 @@ describe("web app — system email review", () => {
     await user.click(screen.getByRole("tab", { name: /mobile view/i }));
 
     expect(screen.getByTitle(/html mobile preview/i)).toBeInTheDocument();
+
+    const dailyRow = screen.getByText("Daily incident digest (two projects)").closest("tr");
+    expect(dailyRow).not.toBeNull();
+    await user.click(within(dailyRow as HTMLTableRowElement).getByRole("button", { name: /^view$/i }));
+    expect(screen.getByText("[DebugBundle Daily] 2 new unresolved incidents")).toBeInTheDocument();
+    const dailyPreview = screen.getByTitle(/html mobile preview/i);
+    expect(dailyPreview).toHaveAttribute("srcdoc", expect.stringContaining("Checkout API"));
+    expect(dailyPreview).toHaveAttribute("srcdoc", expect.stringContaining("Customer Portal"));
   });
 
   it("shows an owner-only gate for member sessions", async () => {

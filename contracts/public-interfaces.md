@@ -263,7 +263,7 @@ When GitHub sign-in returns a profile image URL, the API may fetch and cache tha
 
 The CLI bootstrap flow is additive and issues the same member-token credential used by normal CLI/MCP auth. `POST /v1/auth/github/device/start` plus `poll`/`claim` implement the official GitHub device flow. `POST /v1/auth/github/token/exchange` accepts an already-authenticated GitHub access token such as the output of `gh auth token`.
 
-`GET /v1/account/export` returns a JSON attachment with top-level `export_version: 1` plus the retained organization-account record set, including organization and project members, projects, tokens, capture policies, probes, hosted improvement opportunities, reusable Slack destinations, alerts, weekly reports, webhooks, GitHub automation, incidents, audit logs, billing-processing rows, retryable plan-cleanup rows, operational email rows, and retained raw-event, bundle, improvement-bundle, and reproduction artifacts when present in object storage. Stored debugging artifacts are bounded and projected through the current telemetry privacy policy before inclusion, including artifacts captured before an SDK upgrade; missing or unprojectable objects receive a fixed artifact error. Account-administration records remain owner-only export data and may contain personal or operational details, so this browser-session export is not part of the restricted agent read surface.
+`GET /v1/account/export` returns a JSON attachment with top-level `export_version: 1` plus the retained organization-account record set, including organization and project members, projects, tokens, capture policies, probes, hosted improvement opportunities, reusable Slack destinations, alerts, weekly reports, webhooks, GitHub automation, incidents, audit logs, billing-processing rows, retryable plan-cleanup rows, operational email rows, notification preferences and scoped daily-delivery metadata, and retained raw-event, bundle, improvement-bundle, and reproduction artifacts when present in object storage. Stored debugging artifacts are bounded and projected through the current telemetry privacy policy before inclusion, including artifacts captured before an SDK upgrade; missing or unprojectable objects receive a fixed artifact error. Account-administration records remain owner-only export data and may contain personal or operational details, so this browser-session export is not part of the restricted agent read surface.
 
 `GET /v1/account/avatar` returns the signed-in user's cached avatar bytes with a first-party URL shape of `/v1/account/avatar`. `POST /v1/account/avatar/import-gravatar` performs a server-side fetch against Gravatar only after explicit user action, stores the resulting avatar in object storage, and returns:
 
@@ -1539,6 +1539,23 @@ Checkout confirmation returns the standard billing summary response after the AP
   ]
 }
 ```
+
+### Notification preferences
+
+| Scope | Read | Update | Pause / Resume |
+| --- | --- | --- | --- |
+| Account | `GET /v1/account/notification-preferences` | `PATCH /v1/account/notification-preferences` | `POST /v1/account/notification-preferences/{pause,resume}` |
+| Project | `GET /v1/projects/{id}/notification-preferences` | `PATCH /v1/projects/{id}/notification-preferences` | `POST /v1/projects/{id}/notification-preferences/{pause,resume}` |
+
+All operations accept `?audience=personal|shared` (default personal). They require browser session or member authentication, management rate limits and session CSRF for mutations. Personal scope addresses the authenticated user, never an arbitrary recipient. Shared account writes require the account owner; shared project writes require project owner/admin. Project reads require access. Responses contain `audience`, `project_id`, `can_manage`, `settings`, inherited `account`, and per-channel `effective` mode/reason/pause end/schedule. Personal project responses also include non-secret `shared` constraints so displayed effective policy matches delivery.
+
+PATCH accepts partial `channels` (`email`: immediate/daily/off; slack/discord/webhook: immediate/off; projects also allow inherit) and optional `daily: {time: "09:00", timezone: "Europe/Ljubljana"}`. Project `daily: null` inherits the account schedule; account null resets the UTC default. Personal scope permits only email. Pause accepts `{channels: ["email", "slack"], until: "2026-12-01T09:00:00.000Z", allow_health_checks: false}`; null `until` means until resumed, and finite times must be future. Resume accepts `{channels: ["email"]}`. Account pauses always win. Off/pause apply to optional weekly reports; mandatory system mail and lifecycle automation are excluded. Defaults preserve existing immediate delivery.
+
+CLI: `debugbundle notifications get|set|pause|resume`, common flags `--audience personal|shared`, `--project-id <uuid>`, `--auth-file <path>`, `--json`. Set accepts `--email immediate|daily|off|inherit`, corresponding immediate/off/inherit channel flags, `--time HH:mm --timezone IANA`, or project `--inherit-schedule true`. Pause accepts `--channels all|email,slack,discord,webhook` plus `--for 24h|7d|forever` or `--until <UTC ISO8601>`, and optional `--allow-health-checks true|false`. Resume accepts `--channels`.
+
+Ordinary MCP: `get_notification_preferences`, `update_notification_preferences`, `pause_notifications`, `resume_notifications`. Common input: `bearerToken`, optional `audience` and `projectId`; mutation payloads are respectively `update`, `pause`, `resume` with the same API schemas. Local-auth mode supplies the token through its existing mechanism. Hosted OpenAI and restricted-agent tool profiles do not gain these management operations. OpenClaw keeps new capabilities optional with its existing approval behavior.
+
+See `spec/notification-preferences.md` for inheritance, daily scheduling, suppression and delivery guarantees.
 
 ### 1.4 Alerts
 

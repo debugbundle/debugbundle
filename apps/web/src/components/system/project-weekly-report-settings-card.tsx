@@ -1,3 +1,4 @@
+import { PendingButton } from "./pending-button.js";
 import { BellRingIcon, CalendarClockIcon, MailIcon, PlusIcon, RotateCcwIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -527,9 +528,9 @@ export function ProjectWeeklyReportSettingsCard({
                 <RotateCcwIcon data-icon="inline-start" />
                 Reset
               </Button>
-              <Button type="submit" disabled={isEmailSaveDisabled}>
+              <PendingButton pending={isSavingEmail} type="submit" disabled={isEmailSaveDisabled}>
                 {isSavingEmail ? "Saving..." : "Save email weekly report"}
-              </Button>
+              </PendingButton>
             </div>
           </div>
         </form>
@@ -639,7 +640,7 @@ export function ProjectWeeklyReportSettingsCard({
             }
             description="Choose a connected Slack channel and schedule for this weekly project summary."
             footer={
-              <Button
+              <PendingButton pending={isSavingSlack}
                 type="submit"
                 disabled={
                   isSavingSlack ||
@@ -654,7 +655,7 @@ export function ProjectWeeklyReportSettingsCard({
                   : slackDraft.channel_id === null
                     ? "Create Slack weekly report"
                     : "Save Slack weekly report"}
-              </Button>
+              </PendingButton>
             }
             onSubmit={(event) => void handleSaveSlackChannel(event)}
           >

@@ -45,6 +45,10 @@ import type { ApiManagementDependencies } from "./api-management-types.js";
 import type { OpenAiHostedReadDependencies } from "./openai-mcp-operations.js";
 
 export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagementDependencies {
+  notificationPreferences?: Pick<
+    import("../../../packages/storage/src/notification-preferences-store.js").NotificationPreferencesStore,
+    "get" | "update"
+  >;
   publicStatusPages?: import("../../../packages/storage/src/public-status-store.js").PublicStatusPageStore;
   publicStatusBaseUrl?: string;
   publicStatusTrustProxy?: boolean;

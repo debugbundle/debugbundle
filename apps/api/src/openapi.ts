@@ -1,3 +1,4 @@
+import { notificationPreferencesOperations } from "./openapi-notification-preferences.js";
 import { publicStatusOperations } from "./openapi-public-status.js";
 import { agentOperations } from "./openapi-agent.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
@@ -73,7 +74,8 @@ export function buildPublicOpenApiSpec(): Record<string, unknown> {
     ...configurationOperations(),
     ...notificationsOperations(),
     ...captureOperations(),
-    ...publicStatusOperations()
+    ...publicStatusOperations(),
+    ...notificationPreferencesOperations()
   ];
   const paths: Record<string, Record<string, unknown>> = {};
 

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { filterNotificationDigest } from "../../../packages/storage/src/notification-legacy-delivery.js";
 import { resolveAlertNoisePolicy } from "../../../packages/shared-types/src/alert-notification-policy.js";
 import type { AlertConditionType } from "../../../packages/storage/src/index.js";
 import {
@@ -16,18 +17,27 @@ import {
 export const ALERT_EMAIL_DIGEST_WINDOW_SECONDS = 10;
 
 const SAFE_DELIVERY_ERRORS = new Set([
-  "alert_payload_unsafe", "alert_timeout", "alert_transport_error",
-  "alert_email_not_configured", "alert_email_recipients_missing", "alert_email_error",
-  "alert_slack_destination_store_missing", "alert_slack_encryption_key_missing",
-  "alert_slack_destination_not_found", "alert_slack_webhook_secret_invalid",
-  "alert_slack_webhook_url_missing", "alert_discord_webhook_url_missing",
-  "alert_target_url_missing", "alert_target_blocked", "alert_redirect_blocked"
+  "alert_payload_unsafe",
+  "alert_timeout",
+  "alert_transport_error",
+  "alert_email_not_configured",
+  "alert_email_recipients_missing",
+  "alert_email_error",
+  "alert_slack_destination_store_missing",
+  "alert_slack_encryption_key_missing",
+  "alert_slack_destination_not_found",
+  "alert_slack_webhook_secret_invalid",
+  "alert_slack_webhook_url_missing",
+  "alert_discord_webhook_url_missing",
+  "alert_target_url_missing",
+  "alert_target_blocked",
+  "alert_redirect_blocked"
 ]);
 
 function safeDeliveryFailure(error: unknown): AlertDeliveryError {
-  return error instanceof AlertDeliveryError && (
-    SAFE_DELIVERY_ERRORS.has(error.message) || /^alert_http_error_[1-5][0-9]{2}$/.test(error.message)
-  )
+  return error instanceof AlertDeliveryError &&
+    (SAFE_DELIVERY_ERRORS.has(error.message) ||
+      /^alert_http_error_[1-5][0-9]{2}$/.test(error.message))
     ? error
     : new AlertDeliveryError("alert_delivery_transport_failed");
 }
@@ -83,15 +93,92 @@ export async function processNextEvaluateAlertsJob(
 
   let providerFailure: AlertDeliveryError | null = null;
   for (const alert of alerts) {
+    const recipient =
+      typeof alert.config["to"] === "string" ? alert.config["to"].trim().toLowerCase() : undefined;
     // A critical transition must not disappear behind a lower-severity burst send.
-    const coalescingKey = job.coalescing_key === undefined
-      ? undefined
-      : createHash("sha256").update(`${job.coalescing_key}:${job.severity}`).digest("hex");
-    const noisePolicy = resolveAlertNoisePolicy({ channel: alert.channel, config: alert.config,
-      projectId: job.project_id, incidentId: job.incident_id, environment: job.environment,
-      severity: job.severity, notificationKey, cooldownSeconds: alert.cooldown_seconds,
+    const coalescingKey =
+      job.coalescing_key === undefined
+        ? undefined
+        : createHash("sha256").update(`${job.coalescing_key}:${job.severity}`).digest("hex");
+    const noisePolicy = resolveAlertNoisePolicy({
+      channel: alert.channel,
+      config: alert.config,
+      projectId: job.project_id,
+      incidentId: job.incident_id,
+      environment: job.environment,
+      severity: job.severity,
+      notificationKey,
+      cooldownSeconds: alert.cooldown_seconds,
       ...(coalescingKey === undefined ? {} : { coalescingKey }),
-      ...(job.coalescing_window_seconds === undefined ? {} : { coalescingWindowSeconds: job.coalescing_window_seconds }) });
+      ...(job.coalescing_window_seconds === undefined
+        ? {}
+        : { coalescingWindowSeconds: job.coalescing_window_seconds })
+    });
+    const policy = await dependencies.notificationPreferences?.decide({
+      project_id: job.project_id,
+      channel: alert.channel,
+      ...(recipient === undefined ? {} : { recipient }),
+      incident_id: job.incident_id,
+      occurred_at: job.occurred_at
+    });
+    if (policy?.mode === "off") continue;
+    if (alert.channel === "email" && recipient !== undefined && policy?.mode === "daily") {
+      if (dependencies.notificationDaily === undefined)
+        throw new Error("notification_daily_store_unavailable");
+      if (
+        job.condition_type === "new_incident" ||
+        job.condition_type === "incident_regressed" ||
+        job.lifecycle_event === "new_incident" ||
+        job.lifecycle_event === "incident_regressed"
+      ) {
+        const queued = await dependencies.notificationDaily.enqueue({
+          alert_id: alert.alert_id,
+          incident_id: job.incident_id,
+          project_id: job.project_id,
+          recipient,
+          occurred_at: job.occurred_at,
+          schedule: policy.daily,
+          notification_key: noisePolicy.notification_key,
+          cooldown_seconds: noisePolicy.cooldown_seconds,
+          allow_new_delivery: remainingAlertDeliveries === null || remainingAlertDeliveries > 0
+        });
+        if (queued.created_delivery && remainingAlertDeliveries !== null) {
+          const previousUsed = alertAllowanceUsed ?? 0;
+          remainingAlertDeliveries -= 1;
+          alertAllowanceUsed = previousUsed + 1;
+          if (
+            dependencies.operationalEmailDeliveryStore !== undefined &&
+            alertAllowanceLimit !== null
+          ) {
+            await queueAllowanceThresholdNotifications({
+              store: dependencies.operationalEmailDeliveryStore,
+              project_id: job.project_id,
+              meter: "monthly_alert_deliveries",
+              previous_used: previousUsed,
+              next_used: alertAllowanceUsed,
+              limit: alertAllowanceLimit,
+              usage_window_starts_at: alertUsageWindowStartsAt,
+              usage_window_ends_at: alertUsageWindowEndsAt
+            });
+          }
+        } else if (
+          queued.allowance_exhausted === true &&
+          dependencies.operationalEmailDeliveryStore !== undefined &&
+          alertAllowanceLimit !== null
+        ) {
+          await queueAllowanceLimitReachedNotification({
+            store: dependencies.operationalEmailDeliveryStore,
+            project_id: job.project_id,
+            meter: "monthly_alert_deliveries",
+            used: alertAllowanceUsed ?? alertAllowanceLimit,
+            limit: alertAllowanceLimit,
+            usage_window_starts_at: alertUsageWindowStartsAt,
+            usage_window_ends_at: alertUsageWindowEndsAt
+          });
+        }
+      }
+      continue;
+    }
     const payload: Record<string, unknown> = {
       alert_id: alert.alert_id,
       condition_type: job.condition_type,
@@ -183,13 +270,19 @@ export async function processNextEvaluateAlertsJob(
       allow_new_delivery: remainingAlertDeliveries === null || remainingAlertDeliveries > 0,
       cooldown_seconds: noisePolicy.cooldown_seconds,
       channel: alert.channel,
-      ...(coalescingKey === undefined ? {} : { coalescing_key: coalescingKey, coalescing_window_seconds: job.coalescing_window_seconds ?? 10 }),
+      ...(coalescingKey === undefined
+        ? {}
+        : {
+            coalescing_key: coalescingKey,
+            coalescing_window_seconds: job.coalescing_window_seconds ?? 10
+          }),
       payload
     });
 
     if (intent.delivery_id === null) {
       if (
-        remainingAlertDeliveries !== null && remainingAlertDeliveries <= 0 &&
+        remainingAlertDeliveries !== null &&
+        remainingAlertDeliveries <= 0 &&
         dependencies.operationalEmailDeliveryStore !== undefined &&
         alertAllowanceLimit !== null
       ) {
@@ -206,15 +299,16 @@ export async function processNextEvaluateAlertsJob(
       continue;
     }
 
-    if (intent.created) await recordProjectMetricDeltas(dependencies, {
-      projectId: job.project_id,
-      occurredAt: job.occurred_at,
-      source: "alert_delivery_created",
-      dedupeKey: `alert_delivery_created:${intent.delivery_id}`,
-      deltas: {
-        alert_deliveries_created: 1
-      }
-    });
+    if (intent.created)
+      await recordProjectMetricDeltas(dependencies, {
+        projectId: job.project_id,
+        occurredAt: job.occurred_at,
+        source: "alert_delivery_created",
+        dedupeKey: `alert_delivery_created:${intent.delivery_id}`,
+        deltas: {
+          alert_deliveries_created: 1
+        }
+      });
 
     if (intent.created && remainingAlertDeliveries !== null) {
       const previousUsed = alertAllowanceUsed ?? 0;
@@ -238,17 +332,32 @@ export async function processNextEvaluateAlertsJob(
     }
 
     const delivery = {
-        delivery_id: intent.delivery_id,
-        alert_id: alert.alert_id,
-        project_id: job.project_id,
-        incident_id: job.incident_id,
-        channel: alert.channel,
-        config: alert.config,
-        signing_secret: alert.signing_secret ?? null,
-        webhook_payload_version: alert.webhook_payload_version ?? 0,
-        payload
-      };
+      delivery_id: intent.delivery_id,
+      alert_id: alert.alert_id,
+      project_id: job.project_id,
+      incident_id: job.incident_id,
+      channel: alert.channel,
+      config: alert.config,
+      signing_secret: alert.signing_secret ?? null,
+      webhook_payload_version: alert.webhook_payload_version ?? 0,
+      payload
+    };
     try {
+      const currentPolicy = await dependencies.notificationPreferences?.decide({
+        project_id: job.project_id,
+        channel: alert.channel,
+        ...(recipient === undefined ? {} : { recipient }),
+        incident_id: job.incident_id,
+        occurred_at: job.occurred_at
+      });
+      if (currentPolicy?.mode === "off") {
+        await dependencies.alertStore.markAlertDeliveryResult({
+          delivery_id: intent.delivery_id,
+          delivered: false,
+          error_message: "notification_suppressed"
+        });
+        continue;
+      }
       await dependencies.alertTransport.deliver(delivery);
     } catch (error) {
       const failure = safeDeliveryFailure(error);
@@ -301,8 +410,24 @@ export async function processNextDeliverAlertEmailDigestJob(
   }
 
   const digest = await dependencies.alertStore.getAlertEmailDigest(job.digest_id);
-  if (digest === null || (digest.digest.status !== "pending" && digest.digest.status !== "failed")) {
+  if (
+    digest === null ||
+    (digest.digest.status !== "pending" && digest.digest.status !== "failed")
+  ) {
     return { processed: true };
+  }
+
+  if (dependencies.notificationPreferences !== undefined) {
+    if (dependencies.notificationDaily === undefined)
+      throw new Error("notification_daily_store_unavailable");
+    const eligible = await filterNotificationDigest({
+      digestId: digest.digest.digest_id,
+      recipient: digest.digest.recipient,
+      preferences: dependencies.notificationPreferences,
+      daily: dependencies.notificationDaily
+    });
+    digest.total_incident_count = eligible.total;
+    digest.items = eligible.items;
   }
 
   if (digest.items.length === 0) {

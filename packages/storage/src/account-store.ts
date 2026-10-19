@@ -1,3 +1,4 @@
+import { exportNotificationAccountData, deleteNotificationAccountData } from "./notification-account-data.js";
 import type { AccountAnalyticsStore } from "./account-analytics-store.js";
 import { runInTransaction } from "./transaction.js";
 import type {
@@ -528,6 +529,7 @@ export function createPostgresAccountStore(
       );
 
       return {
+        ...await exportNotificationAccountData(db, { ...input, projectIds }),
         export_version: 1,
         exported_at: input.exported_at,
         user,
@@ -778,6 +780,8 @@ export function createPostgresAccountStore(
           `,
             [input.user_id],
           );
+
+          await deleteNotificationAccountData(queryable, input.user_id);
 
           await queryable.query(
           `

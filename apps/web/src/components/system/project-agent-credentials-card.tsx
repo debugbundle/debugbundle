@@ -1,3 +1,4 @@
+import { PendingButton } from "./pending-button.js";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import {
@@ -220,12 +221,12 @@ export function ProjectAgentCredentialsCard({ projectId }: { projectId: string }
             description="Creation is available only when enabled by this server. Credentials expire after 30 days by default and at most 90 days."
             onSubmit={(event) => void create(event)}
             footer={
-              <Button
+              <PendingButton pending={pending}
                 type="submit"
                 disabled={pending || invalidExpiry || label.trim().length === 0}
               >
                 {pending ? "Creating..." : "Create agent credential"}
-              </Button>
+              </PendingButton>
             }
           >
             <FieldGroup>

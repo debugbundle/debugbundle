@@ -283,6 +283,13 @@ Every relevant UI should account for:
 
 If the agent proposes UI without states, the proposal is incomplete.
 
+For asynchronous submit actions, reuse `components/system/pending-button.tsx` with
+the action's actual request state. It composes the existing Button and loading icon,
+disables the running action, exposes `aria-busy`, and respects reduced motion.
+Validation, permissions and another action's request must not imply a spinner.
+Use `usePendingAction` when a create form has no existing in-flight guard; keep
+existing mutation owners and their error/draft behavior when adding feedback.
+
 ## Accessibility requirements
 
 Accessibility is not optional.

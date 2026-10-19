@@ -1,3 +1,4 @@
+import { registerNotificationPreferencesRoutes } from "./routes/notification-preferences.js";
 import { registerPublicStatusRoutes } from "./routes/public-status.js";
 import { registerAnalyticsFlowRoutes } from "./routes/analytics-flows.js";
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
@@ -443,6 +444,7 @@ export function createApiServer(
       : undefined;
 
   registerAccountRoutes(app, dependencies);
+  registerNotificationPreferencesRoutes(app, dependencies);
   registerAdminAnalyticsRoutes(app, dependencies);
   registerAdminBillingRoutes(app, dependencies);
   registerAuthRoutes(app, dependencies);

@@ -1,3 +1,5 @@
+import { PendingButton } from "./pending-button.js";
+import { usePendingAction } from "../../lib/use-pending-action.js";
 import type * as React from "react";
 import { PlusIcon } from "lucide-react";
 import { useState } from "react";
@@ -6,12 +8,22 @@ import { useNavigate } from "react-router-dom";
 import type { ProjectRecord } from "../../lib/api.js";
 import { createProject } from "../../lib/api.js";
 import { showErrorToast } from "../../lib/notify.js";
-import { CUSTOM_PROJECT_ENVIRONMENT_VALUE, PROJECT_ENVIRONMENT_OPTIONS, slugifyProjectName } from "../../lib/project-form.js";
-import { Button } from "../ui/button.js";
+import {
+  CUSTOM_PROJECT_ENVIRONMENT_VALUE,
+  PROJECT_ENVIRONMENT_OPTIONS,
+  slugifyProjectName
+} from "../../lib/project-form.js";
 import { Dialog, DialogTrigger } from "../ui/dialog.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "../ui/field.js";
 import { Input } from "../ui/input.js";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../ui/select.js";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "../ui/select.js";
 import { ProjectColorTagPicker } from "./project-color-tag-picker.js";
 import { DialogFormContent } from "./dialog-form-content.js";
 
@@ -29,6 +41,7 @@ export function CreateProjectDialog({
   trigger
 }: CreateProjectDialogProps): JSX.Element {
   const navigate = useNavigate();
+  const { pending: isCreating, run: runCreate } = usePendingAction();
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -38,7 +51,9 @@ export function CreateProjectDialog({
   const [colorTag, setColorTag] = useState<ProjectRecord["color_tag"]>(null);
 
   const resolvedOpen = open ?? uncontrolledOpen;
-  const selectedProjectEnvironment = PROJECT_ENVIRONMENT_OPTIONS.some((option) => option.value === environmentDefault)
+  const selectedProjectEnvironment = PROJECT_ENVIRONMENT_OPTIONS.some(
+    (option) => option.value === environmentDefault
+  )
     ? environmentDefault
     : CUSTOM_PROJECT_ENVIRONMENT_VALUE;
 
@@ -62,20 +77,22 @@ export function CreateProjectDialog({
   async function handleCreateProject(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
 
-    try {
-      const created = await createProject({
-        name,
-        slug,
-        environment_default: environmentDefault,
-        color_tag: colorTag
-      });
-      await onCreated?.(created);
-      resetForm();
-      handleDialogOpenChange(false);
-      void navigate(`/projects/${created.project_id}`);
-    } catch {
-      showErrorToast("Could not create project.");
-    }
+    await runCreate(async () => {
+      try {
+        const created = await createProject({
+          name,
+          slug,
+          environment_default: environmentDefault,
+          color_tag: colorTag
+        });
+        await onCreated?.(created);
+        resetForm();
+        handleDialogOpenChange(false);
+        void navigate(`/projects/${created.project_id}`);
+      } catch {
+        showErrorToast("Could not create project.");
+      }
+    });
   }
 
   function handleProjectNameChange(value: string): void {
@@ -108,28 +125,44 @@ export function CreateProjectDialog({
   }
 
   return (
-    <Dialog open={resolvedOpen} onOpenChange={handleDialogOpenChange}>
+    <Dialog
+      open={resolvedOpen}
+      onOpenChange={(next) => {
+        if (!isCreating) handleDialogOpenChange(next);
+      }}
+    >
       {trigger === undefined ? null : <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogFormContent
         title="Create project"
+        busy={isCreating}
         description="Add a new project in this workspace."
         size="lg"
         footer={
-          <Button type="submit">
-            <PlusIcon data-icon="inline-start" />
+          <PendingButton
+            type="submit"
+            pending={isCreating}
+            pendingLabel="Creating…"
+            icon={<PlusIcon data-icon="inline-start" />}
+          >
             Create project
-          </Button>
+          </PendingButton>
         }
         onSubmit={(event) => void handleCreateProject(event)}
       >
         <FieldGroup>
           <Field>
             <FieldLabel htmlFor="project-name">Project name</FieldLabel>
-            <Input id="project-name" value={name} onChange={(event) => handleProjectNameChange(event.currentTarget.value)} />
+            <Input
+              disabled={isCreating}
+              id="project-name"
+              value={name}
+              onChange={(event) => handleProjectNameChange(event.currentTarget.value)}
+            />
           </Field>
           <Field>
             <FieldLabel htmlFor="project-slug">Project slug</FieldLabel>
             <Input
+              disabled={isCreating}
               id="project-slug"
               value={slug}
               onChange={(event) => handleProjectSlugChange(event.currentTarget.value)}
@@ -140,14 +173,23 @@ export function CreateProjectDialog({
           </Field>
           <Field>
             <FieldLabel>Color tag</FieldLabel>
-            <ProjectColorTagPicker value={colorTag} onChange={setColorTag} />
+            <ProjectColorTagPicker disabled={isCreating} value={colorTag} onChange={setColorTag} />
           </Field>
           <Field>
-            <FieldLabel id="project-environment-default-label" htmlFor="project-environment-default">
+            <FieldLabel
+              id="project-environment-default-label"
+              htmlFor="project-environment-default"
+            >
               Default environment
             </FieldLabel>
-            <FieldDescription>Used as the initial environment in setup snippets and project defaults.</FieldDescription>
-            <Select value={selectedProjectEnvironment} onValueChange={handleProjectEnvironmentChange}>
+            <FieldDescription>
+              Used as the initial environment in setup snippets and project defaults.
+            </FieldDescription>
+            <Select
+              disabled={isCreating}
+              value={selectedProjectEnvironment}
+              onValueChange={handleProjectEnvironmentChange}
+            >
               <SelectTrigger
                 id="project-environment-default"
                 aria-labelledby="project-environment-default-label project-environment-default"
@@ -167,10 +209,13 @@ export function CreateProjectDialog({
             </Select>
             {selectedProjectEnvironment !== CUSTOM_PROJECT_ENVIRONMENT_VALUE ? null : (
               <Input
+                disabled={isCreating}
                 id="project-environment-default-custom"
                 aria-label="Custom environment"
                 value={customEnvironmentDefault}
-                onChange={(event) => handleCustomProjectEnvironmentChange(event.currentTarget.value)}
+                onChange={(event) =>
+                  handleCustomProjectEnvironmentChange(event.currentTarget.value)
+                }
                 placeholder="preview"
                 required
               />

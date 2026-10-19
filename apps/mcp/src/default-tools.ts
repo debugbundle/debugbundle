@@ -1,3 +1,5 @@
+import { createNotificationApi } from "../../../packages/alert-client/src/notification-preferences.js";
+import { createNotificationMcpTools } from "./notification-tools.js";
 import { createPublicStatusApi } from "../../cli/src/public-status-commands.js";
 import { createPublicStatusMcpTools } from "./public-status-tools.js";
 import { createAnalyticsFlowApi } from "../../cli/src/analytics-flow-commands.js";
@@ -192,6 +194,7 @@ export async function createDefaultMcpTools(
       }),
       ...createAnalyticsSettingsMcpTools(createAnalyticsSettingsApi(httpClient)),
       ...createPublicStatusMcpTools(createPublicStatusApi(httpClient)),
+      ...createNotificationMcpTools(createNotificationApi(httpClient)),
       ...createAnalyticsFlowMcpTools(createAnalyticsFlowApi(httpClient)),
       ...createAnalyticsSavedFunnelMcpTools(createAnalyticsSavedFunnelApi(httpClient)),
       ...createCaptureRuleMcpTools(createCaptureRuleApi(httpClient)),

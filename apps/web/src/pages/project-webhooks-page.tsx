@@ -1,3 +1,4 @@
+import { PendingButton } from "../components/system/pending-button.js";
 import { BoundedListLimit } from "../components/system/bounded-list-limit.js";
 import { useSession } from "../lib/session.js";
 import { getProjectEffectiveRole } from "../lib/project-access.js";
@@ -377,7 +378,7 @@ export function ProjectWebhooksPage(): JSX.Element {
             title={editingWebhook === null ? "Create webhook" : "Edit webhook"}
             size="xl"
             footer={
-              <Button
+              <PendingButton pending={isSaving}
                 type="submit"
                 disabled={isSaving || selectedEvents.length === 0 || endpointUrl.trim() === ""}
               >
@@ -386,7 +387,7 @@ export function ProjectWebhooksPage(): JSX.Element {
                   : editingWebhook === null
                     ? "Create webhook"
                     : "Save webhook"}
-              </Button>
+              </PendingButton>
             }
             onSubmit={(event) => void handleCreateWebhook(event)}
           >

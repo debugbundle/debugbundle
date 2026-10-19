@@ -1408,6 +1408,29 @@ If CLI says something is healthy and MCP says something different, that is a pro
 
 ## 14. Email Acceptance
 
+### AC-ALT-10: Notification Preferences Across Interfaces
+
+- Account/project controls offer inherited or explicit channel modes and 24-hour, seven-day, custom, or indefinite pauses; resume preserves modes and never replays suppressed history.
+- Personal email cannot mutate shared channels. Shared account changes require owner authority; shared project changes require owner/admin. Account pauses win over project overrides, including future projects.
+- API (session CSRF/member authentication), CLI, ordinary MCP and dashboard use the same policies; hosted/restricted catalogs stay read-only and unchanged.
+- Immediate delivery is rechecked before transport; optional weekly report groups never mix projects with different effective recipients.
+
+### AC-EMAIL-05: Daily Incident Email
+
+- Daily schedule controls match the weekly report layout: schedule and hour share a responsive row, timezone spans the width below, and the device-timezone shortcut remains compact. Hourly choices and Custom time preserve saved minute-level values and project inheritance.
+- The local system-email catalog includes a daily digest example with two named projects and valid incident links, rendered through the same daily email helper as delivery. Dashboard, API, CLI and ordinary MCP support the saved local time and IANA timezone; project schedules can inherit or override the account schedule.
+
+- Daily email and live Slack coexist. Availability incidents stay immediate unless explicitly off/paused; pause health exceptions are honoured.
+- Local-time scheduling covers DST gaps/repeated hours. Only new/reopened, currently unresolved incidents matching enabled destinations appear. Counts include all eligible incidents; previews are bounded to 25 and grouped by project.
+- Concurrent enqueue/claims, retries and restarts do not duplicate logical batches; missed windows coalesce. Resolved/deleted incidents, disabled destinations and removed member access are filtered. Empty digests are suppressed.
+- Settings changes apply to pending batches. Daily schedule changes move pending items to the new schedule. Explicit off/pause discards suppressed history; provider ambiguity remains at-least-once once handed off.
+- Daily batching counts against existing alert allowances once per project/batch, not per item or retry; transferring an already-accounted short digest does not charge it again.
+- Earlier schedule changes wake pending mail before the old deadline; delayed workers retain the change-time anchor. Switching to immediate flushes eligible pending incidents without sending unrelated future windows early. Stale claims cannot reschedule or create destination accounting records.
+- Late admission and schedule changes never append incidents to a digest already sending or completed; those incidents remain queued for the next daily window. Future policy-only claims still accept new incidents for their scheduled window.
+- Daily allowance exhaustion retains mandatory limit notices. Incident/queue cleanup, rescheduling and coalescing never reset admitted usage or create another charge; minimal project-scoped allowance records survive queue retention.
+- Rule cooldowns apply atomically across daily/immediate transitions using the existing notification key; distinct severity keys remain eligible and legacy transfers are not suppressed a second time.
+- Forward migration, ledger/checksum and readiness checks are required before runtime activation; empty bootstrap is not an upgrade path. Account export/deletion and bounded retention cover new records.
+
 ### AC-EMAIL-01: Email Code Delivery
 
 - **Given** a user requests a browser sign-in code
@@ -2419,6 +2442,14 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** a restart resets mock data, and `make dev-mock-off` restores real API routing
 - **And** foreign hosts/origins and malformed or oversized JSON are rejected; unsupported API paths cannot reach a real backend
 - **And** builds and production preview mode never install the mock middleware or enable telemetry through mock mode
+
+### AC-WEB-11: Pending Submissions and Project Notification Disclosure
+
+- Delaying project creation shows a spinner and an accessible busy button immediately. Duplicate clicks or repeated form submissions send only one request until it settles.
+- Creation failure restores submission, preserves entered values, and permits retry. Successful creation retains the existing navigation and completion callbacks.
+- Token creation, invitations and probe activation use the same pending guard. Existing settings/rule forms keep their own request state, validation and permission gates while displaying the shared spinner.
+- Only the submitted notification action is busy: Save, Pause and Resume remain distinct. Disabled validation, quota or permission states do not show a spinner.
+- Project Notifications appears in the existing collapsible settings sequence, closed initially and accessible by keyboard. Opening it exposes the unchanged editor. Account Notifications stays expanded.
 
 ### AC-ANL-17: Analytics Settings
 

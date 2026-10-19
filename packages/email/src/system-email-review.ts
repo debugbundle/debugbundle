@@ -1,5 +1,6 @@
 import {
   renderAlertDigestEmail,
+  renderDailyIncidentDigestEmail,
   renderAlertEmail,
   renderCapacityQuantityChangeEmail,
   renderEmailAuthCodeEmail,
@@ -480,6 +481,47 @@ export const SYSTEM_EMAIL_REVIEW_ENTRIES: readonly SystemEmailReviewEntry[] = [
         incidentUrl: SAMPLE_INCIDENT_URL,
         bundleUrl: SAMPLE_BUNDLE_URL,
         brandMarkUrl: SAMPLE_EMAIL_BRAND_MARK_URL
+      });
+    }
+  },
+  {
+    id: "daily-incident-digest",
+    title: "Daily incident digest (two projects)",
+    category: "alerts",
+    recipient: "Configured recipient with daily email enabled",
+    trigger: "Saved daily local time and time zone, when new unresolved incidents are available",
+    requiredInV1: false,
+    implementationStatus: "implemented",
+    notes: "Example: 09:00 Europe/Ljubljana, with one unresolved incident from each of two projects. Set Email delivery to Daily digest in account or project Notifications to configure the schedule. Health-check outage emails bypass daily batching.",
+    get preview() {
+      return renderDailyIncidentDigestEmail({
+        brandMarkUrl: SAMPLE_EMAIL_BRAND_MARK_URL,
+        totalIncidentCount: 2,
+        allIncidentsUrl: "https://app.debugbundle.local/incidents",
+        alerts: [
+          {
+            projectName: "Checkout API",
+            conditionType: "new_incident",
+            incidentId: "inc_checkout_daily",
+            occurredAt: "2026-10-18T14:12:00.000Z",
+            serviceName: "checkout-api",
+            environment: "production",
+            severity: "high",
+            incidentUrl: "https://app.debugbundle.local/incidents/inc_checkout_daily",
+            summary: "Payment capture failed after the checkout request timed out."
+          },
+          {
+            projectName: "Customer Portal",
+            conditionType: "incident_regressed",
+            incidentId: "inc_portal_daily",
+            occurredAt: "2026-10-19T05:40:00.000Z",
+            serviceName: "customer-web",
+            environment: "production",
+            severity: "medium",
+            incidentUrl: "https://app.debugbundle.local/incidents/inc_portal_daily",
+            summary: "Account settings fail to load after sign-in."
+          }
+        ]
       });
     }
   },

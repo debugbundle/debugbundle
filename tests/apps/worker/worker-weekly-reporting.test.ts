@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { processNextGenerateWeeklyReportJob } from "../../../apps/worker/src/processor.js";
+import {
+  processNextGenerateWeeklyReportJob,
+  type WeeklyReportTransport
+} from "../../../apps/worker/src/processor.js";
 import { scheduleWeeklyReports } from "../../../apps/worker/src/runtime.js";
 
 type WeeklyReportJob = {
@@ -582,4 +585,76 @@ describe("worker weekly reporting", () => {
     expect(enqueue).not.toHaveBeenCalled();
     vi.useRealTimers();
   });
+});
+
+it("isolates weekly report projects after per-recipient pauses are applied", async () => {
+  const deliver = vi.fn<WeeklyReportTransport["deliver"]>();
+  await processNextGenerateWeeklyReportJob({
+    queue: {
+      dequeue: vi
+        .fn()
+        .mockResolvedValue({
+          delivery_id: "d1",
+          delivery_ids: ["d1", "d2"],
+          weekly_report_channel_id: "c1",
+          weekly_report_channel_ids: ["c1", "c2"],
+          project_id: "p1",
+          project_ids: ["p1", "p2"],
+          window_start: "2026-10-01T00:00:00Z",
+          window_end: "2026-10-08T00:00:00Z"
+        })
+    },
+    weeklyReportingStore: {
+      getWeeklyProjectReport: vi.fn(async ({ project_id }) => ({
+        project_id,
+        project_name: project_id,
+        window_start: "2026-10-01T00:00:00Z",
+        window_end: "2026-10-08T00:00:00Z",
+        bundle_counts: { failure: 1, improvement: 0 },
+        new_incidents: 1,
+        resolved_incidents: 0,
+        opened_incidents_resolved: 0,
+        regressions: 0,
+        top_spiking_incidents: []
+      }))
+    },
+    weeklyReportChannelStore: {
+      getWeeklyReportChannelById: vi.fn(async ({ channel_id }) => ({
+        channel_id,
+        project_id: channel_id === "c1" ? "p1" : "p2",
+        channel: "email" as const,
+        config: { to: ["alice@example.com", "bob@example.com"] },
+        schedule: { day_of_week: "monday" as const, hour_of_day: 9, timezone: "UTC" },
+        is_enabled: true,
+        created_at: "2026-10-01T00:00:00Z",
+        updated_at: "2026-10-01T00:00:00Z"
+      }))
+    },
+    weeklyReportDeliveryStore: {
+      claimWeeklyReportDelivery: vi.fn(),
+      markWeeklyReportDeliveryResult: vi.fn()
+    },
+    notificationPreferences: {
+      decide: vi.fn(async ({ project_id, recipient }) => ({
+        mode:
+          project_id === "p2" && recipient === "alice@example.com"
+            ? ("off" as const)
+            : ("immediate" as const),
+        reason: "account_default" as const,
+        paused_until: null,
+        daily: { time: "09:00", timezone: "UTC" }
+      }))
+    },
+    weeklyReportTransport: { deliver }
+  });
+  expect(deliver).toHaveBeenCalledTimes(2);
+  expect(
+    deliver.mock.calls.map(([delivery]) => ({
+      recipients: delivery.channel.config["to"],
+      projects: delivery.deliveries?.map((item) => item.report.project_id)
+    }))
+  ).toEqual([
+    { recipients: ["alice@example.com", "bob@example.com"], projects: ["p1"] },
+    { recipients: ["bob@example.com"], projects: ["p2"] }
+  ]);
 });

@@ -1,3 +1,4 @@
+import { PendingButton } from "./pending-button.js";
 import { GaugeIcon, RotateCcwIcon, SparklesIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -278,9 +279,9 @@ export function ProjectImprovementSettingsCard({
                 <RotateCcwIcon data-icon="inline-start" />
                 Reset
               </Button>
-              <Button type="submit" disabled={isSaveDisabled}>
+              <PendingButton pendingLabel="Saving…" pending={isSaving} type="submit" disabled={isSaveDisabled}>
                 Save improvement settings
-              </Button>
+              </PendingButton>
             </div>
           ) : null}
 

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, afterEach, expect, it, vi } from "vitest";
 import { App } from "../../../apps/web/src/app.tsx";
@@ -20,6 +20,50 @@ afterEach(() => {
 });
 
 describe("project creation", () => {
+  it("shows progress, prevents duplicate submits, and preserves input for retry after a slow failure", async () => {
+    let finish!: (response: Response) => void;
+    const createRequest = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          finish = resolve;
+        })
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = requestUrl(input);
+        if (url.endsWith("/v1/auth/session"))
+          return jsonResponse(200, { session: createSession() });
+        if (url.endsWith("/v1/projects")) {
+          return init?.method === "POST"
+            ? createRequest()
+            : jsonResponse(200, { projects: [createProject()] });
+        }
+        return jsonResponse(404, { error: "not_found" });
+      })
+    );
+    render(<App initialEntries={["/projects"]} />);
+    fireEvent.click(await screen.findByRole("button", { name: /create project/i }));
+    const name = await screen.findByLabelText(/project name/i);
+    fireEvent.change(name, { target: { value: "Slow project" } });
+    const form = screen.getByRole("button", { name: /^create project$/i }).closest("form")!;
+    fireEvent.submit(form);
+    await waitFor(() => expect(createRequest).toHaveBeenCalledTimes(1));
+    const pending = screen.getByRole("button", { name: /creating/i });
+    expect(pending).toBeDisabled();
+    expect(pending).toHaveAttribute("aria-busy", "true");
+    expect(pending.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+    fireEvent.submit(form);
+    expect(createRequest).toHaveBeenCalledTimes(1);
+    await act(async () => finish(jsonResponse(500, { error: "project_create_failed" })));
+    expect(await screen.findByText(/could not create project/i)).toBeInTheDocument();
+    expect(name).toHaveValue("Slow project");
+    expect(screen.getByRole("button", { name: /^create project$/i })).toBeEnabled();
+    fireEvent.submit(form);
+    await waitFor(() => expect(createRequest).toHaveBeenCalledTimes(2));
+    await act(async () => finish(jsonResponse(500, { error: "project_create_failed" })));
+  });
+
   it("creates a project and opens its overview directly", async () => {
     const user = userEvent.setup();
     const existingProject = createProject({
@@ -194,6 +238,20 @@ describe("project creation", () => {
     await user.type(screen.getByLabelText(/custom environment/i), "preview");
     await user.click(screen.getByRole("button", { name: /^create project$/i }));
 
+    await waitFor(() => {
+      const post = fetchMock.mock.calls.find(
+        ([input, init]) => requestUrl(input).endsWith("/v1/projects") && init?.method === "POST"
+      );
+      expect(post?.[1]?.body).toBe(
+        JSON.stringify({
+          name: "Ops Platform",
+          slug: "ops-control-plane",
+          environment_default: "preview",
+          color_tag: null,
+          weekly_report_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+        })
+      );
+    });
     expect(await screen.findByText(/project details/i)).toBeInTheDocument();
     expect(screen.getByText(/^ops-control-plane$/i)).toBeInTheDocument();
     expect(screen.getByText(/^preview$/i)).toBeInTheDocument();

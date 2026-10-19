@@ -1,3 +1,4 @@
+import { PendingButton } from "./pending-button.js";
 import { RotateCcwIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -494,12 +495,12 @@ export function ProjectAnalyticsSettingsCard(
               <RotateCcwIcon data-icon="inline-start" />
               Reset
             </Button>
-            <Button
+            <PendingButton pendingLabel="Saving…" pending={isSaving}
               type="submit"
               disabled={isLoading || isSaving || !isDirty || customDimensionsInvalid}
             >
               Save analytics settings
-            </Button>
+            </PendingButton>
           </div>
         </form>
       ) : hasLoadedSettings && settingsDraft.analytics_available ? (

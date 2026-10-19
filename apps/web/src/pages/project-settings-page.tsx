@@ -1,3 +1,5 @@
+import { PendingButton } from "../components/system/pending-button.js";
+import { NotificationSettings } from "../components/system/notification-settings.js";
 import { PencilIcon, Settings2Icon, Trash2Icon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
@@ -161,6 +163,7 @@ export function ProjectSettingsPage(): JSX.Element {
             organizationPlan={project.organization_plan}
             canEdit={canManageProject}
           />
+          <NotificationSettings key={project.project_id} projectId={project.project_id} />
         </div>
 
         <div className="space-y-4">
@@ -257,9 +260,9 @@ export function ProjectSettingsPage(): JSX.Element {
           description="Update the name, slug, and editable environment default used in setup snippets and project metadata."
           size="lg"
           footer={
-            <Button type="submit" disabled={isSaving || !canManageProject}>
+            <PendingButton type="submit" pending={isSaving} disabled={isSaving || !canManageProject}>
               {isSaving ? "Saving..." : "Save changes"}
-            </Button>
+            </PendingButton>
           }
           onSubmit={(event) => void handleSaveChanges(event)}
         >

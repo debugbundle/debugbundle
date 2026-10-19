@@ -313,11 +313,7 @@ export function createPostgresBillingStore(
 
     for (const row of result.rows) {
       const trialPlan = normalizeTrialPlan(row.trial_plan);
-      if (
-        trialPlan === null ||
-        row.trial_started_at === null ||
-        row.trial_ends_at === null
-      ) {
+      if (trialPlan === null || row.trial_started_at === null || row.trial_ends_at === null) {
         continue;
       }
 
@@ -458,6 +454,7 @@ export function createPostgresBillingStore(
       monthlyRemoteActivations,
       alertDeliveriesTablePresent,
       alertEmailDigestsTablePresent,
+      dailyNotificationsTablePresent,
       webhookDeliveriesTablePresent,
       usageCountersTablePresent
     ] = await Promise.all([
@@ -520,12 +517,13 @@ export function createPostgresBillingStore(
       ),
       tableExists(db, "alert_deliveries"),
       tableExists(db, "alert_email_digests"),
+      tableExists(db, "notification_daily_allowance_usage"),
       tableExists(db, "webhook_deliveries"),
       tableExists(db, "org_usage_counters")
     ]);
 
     const monthlyAlertDeliveries =
-      alertDeliveriesTablePresent || alertEmailDigestsTablePresent
+      alertDeliveriesTablePresent || alertEmailDigestsTablePresent || dailyNotificationsTablePresent
         ? await readCount(
             db,
             `
@@ -543,6 +541,9 @@ export function createPostgresBillingStore(
                         SELECT dig.project_id, dig.created_at
                         FROM alert_email_digests dig
                       `
+                    : null,
+                  dailyNotificationsTablePresent
+                    ? `SELECT project_id, created_at FROM notification_daily_allowance_usage WHERE billable`
                     : null
                 ]
                   .filter((part): part is string => part !== null)
@@ -644,7 +645,9 @@ export function createPostgresBillingStore(
     getBillingSummaryForOrganization,
     recordTrialLifecycleEvent,
 
-    async claimTrialStartedNotificationCandidates(input): Promise<TrialLifecycleNotificationCandidate[]> {
+    async claimTrialStartedNotificationCandidates(
+      input
+    ): Promise<TrialLifecycleNotificationCandidate[]> {
       return claimTrialLifecycleCandidates({
         sql: `
           SELECT
@@ -690,7 +693,8 @@ export function createPostgresBillingStore(
           LIMIT $4
         `,
         params: [input.now, input.reminder_days, lowerBound, input.limit],
-        event_type: input.reminder_days === 7 ? "trial_ending_soon_7d_email" : "trial_ending_soon_1d_email",
+        event_type:
+          input.reminder_days === 7 ? "trial_ending_soon_7d_email" : "trial_ending_soon_1d_email",
         dedupe_key: (candidate) => `${candidate.trial_ends_at}:${input.reminder_days}`
       });
     },
@@ -849,7 +853,9 @@ export function createPostgresBillingStore(
           return false;
         }
 
-        const cleanupSummary = await createOrganizationPlanCleanupService(tx).cleanupOrganizationForPlan({
+        const cleanupSummary = await createOrganizationPlanCleanupService(
+          tx
+        ).cleanupOrganizationForPlan({
           organization_id: input.organization_id,
           plan: "free",
           now: input.now

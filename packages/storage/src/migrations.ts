@@ -8,6 +8,10 @@ export interface Queryable {
 }
 
 export const REQUIRED_API_TABLES = [
+  "notification_preferences",
+  "notification_daily_batches",
+  "notification_daily_items",
+  "notification_daily_allowance_usage",
   "users",
   "sessions",
   "email_auth_challenges",
@@ -89,6 +93,10 @@ export const REQUIRED_API_TABLES = [
 ] as const;
 
 export const REQUIRED_WORKER_TABLES = [
+  "notification_preferences",
+  "notification_daily_batches",
+  "notification_daily_items",
+  "notification_daily_allowance_usage",
   "worker_jobs",
   "processed_events",
   "organizations",

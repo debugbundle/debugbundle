@@ -1,7 +1,7 @@
 # System Emails
 
 Version: v1
-Last updated: 2026-09-10
+Last updated: 2026-10-18
 
 ---
 
@@ -60,7 +60,7 @@ Mandatory v1 emails:
 - allowance warning at 80%
 - allowance limit reached at 100%
 - retention rotation notice when oldest retained data is removed
-- weekly report delivery
+- weekly report delivery (required capability; optional delivery controlled by notification preferences)
 
 ### 3.4 Alert Delivery Emails
 
@@ -70,6 +70,7 @@ User-configured alert notifications (not system-triggered):
 These are driven by user-created alert rules, not system lifecycle events.
 The alert delivery system already supports email as a channel type and now batches alert emails into 10-second per-project/per-recipient digests to reduce burst noise.
 Email alert rules require one explicit recipient address per rule in v1.
+Account/project preferences can pause/off selected delivery channels or replace short email batching with a daily local-time incident digest while Slack remains live. Daily email includes new/reopened unresolved incidents and skips empty periods. Health-check outages bypass daily batching, but explicit off/pause applies unless the pause allows health alerts. Optional weekly reports respect pause/off; mandatory sign-in, invite, security, billing and operational owner emails remain enabled. See `spec/notification-preferences.md`.
 They are listed here for completeness but follow a different trigger model.
 
 See `apps/worker/src/runtime.ts` alert delivery for implementation.
@@ -293,6 +294,7 @@ At minimum, test coverage must verify that the system triggers the correct email
 ### 8.1 Local Review Tooling
 
 - The dev-only review surface at `app.debugbundle.com/__dev/system-emails` must render from the same sample email catalog used by any local preview-send flow.
+- The catalog includes `daily-incident-digest` ("Daily incident digest (two projects)") with Checkout API and Customer Portal. It uses the same renderer and daily subject as worker delivery, with HTML/mobile/plain-text review. In Notifications, selecting Daily digest reveals the local HH:mm and IANA time zone; project settings can inherit the account schedule or override it. API, CLI and ordinary MCP expose the same schedule.
 - The dev-only preview-send route `POST /v1/internal/system-email-previews/send` is owner-only and exists strictly for local/test review workflows.
 - Preview-send must deliver the selected sample email to the signed-in owner session email plus any mirrored internal review recipients configured for the local review workflow, and must fail clearly when transactional email transport is not configured.
 

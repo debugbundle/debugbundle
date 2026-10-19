@@ -1,3 +1,4 @@
+import { PendingButton } from "../components/system/pending-button.js";
 import { BoundedListLimit } from "../components/system/bounded-list-limit.js";
 import {
   TEAM_ALERT_CHANNEL_OPTIONS,
@@ -589,7 +590,7 @@ export function ProjectAlertsPage(): JSX.Element {
             }
             size="lg"
             footer={
-              <Button
+              <PendingButton pending={isSaving}
                 type="submit"
                 disabled={
                   isSaving ||
@@ -603,7 +604,7 @@ export function ProjectAlertsPage(): JSX.Element {
                   : editingAlertId === null
                     ? "Create alert rule"
                     : "Save changes"}
-              </Button>
+              </PendingButton>
             }
             onSubmit={(event) =>
               void (editingAlertId === null ? handleCreateAlert(event) : handleUpdateAlert(event))

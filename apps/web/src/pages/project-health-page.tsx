@@ -1,3 +1,4 @@
+import { PendingButton } from "../components/system/pending-button.js";
 import { PublicStatusSettingsDialog } from "../components/system/public-status-settings.js";
 import {
   ActivityIcon,
@@ -452,7 +453,7 @@ export function ProjectHealthPage(): JSX.Element {
                       <ActivityIcon data-icon="inline-start" />
                       {isTesting ? "Testing..." : "Test endpoint"}
                     </Button>
-                    <Button type="submit" disabled={isSubmitting}>
+                    <PendingButton pending={isSubmitting} type="submit" disabled={isSubmitting}>
                       {isSubmitting
                         ? formMode === "create"
                           ? "Creating..."
@@ -460,7 +461,7 @@ export function ProjectHealthPage(): JSX.Element {
                         : formMode === "create"
                           ? "Create check"
                           : "Save changes"}
-                    </Button>
+                    </PendingButton>
                   </div>
                 </div>
               }

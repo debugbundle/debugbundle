@@ -249,3 +249,12 @@ browser. Server history is retained; Show cleared permits inspection and retry, 
 new failure IDs remain visible.
 
 **Public status page:** An opt-in, owner-controlled availability projection anchored to one project, with explicit same-owner/account project and check selections. It publishes names and bounded availability aggregates, never check diagnostics.
+
+
+## Notification delivery terms
+
+- **Personal notification preferences:** A user's delivery choices for their own email, independently of the alert rule creator.
+- **Shared notification preferences:** Account/project delivery choices affecting configured team destinations; changes require owner or project admin authority.
+- **Notification pause:** A temporary or indefinite delivery override that preserves saved channel modes and incident monitoring. Resuming never replays suppressed history.
+- **Daily incident digest:** A local-time email of newly opened/reopened, still-unresolved matched incidents. It is separate from short burst batching and weekly reports; health outages bypass daily mode.
+- **Daily allowance admission:** One project/window's accepted daily delivery, recorded without recipients or telemetry. Its usage survives retries, rescheduling and queue/incident cleanup; moving already-admitted items does not consume another allowance.

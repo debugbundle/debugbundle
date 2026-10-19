@@ -4,6 +4,12 @@ MCP server for runtime error reporting, crash reporting, incident response, endp
 
 ## Install
 
+Ordinary authenticated MCP includes account/project notification preferences,
+channel-specific pause/resume, and daily email scheduling with local time and IANA
+timezone. These tools use the same permissions and policies as the API and CLI;
+the hosted read-only and restricted catalogs remain unchanged. See the
+[tool reference](https://debugbundle.com/docs/mcp/tools/).
+
 Run the stdio server directly with npm:
 
 ```bash

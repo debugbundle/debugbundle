@@ -15,9 +15,13 @@ describe("OpenClaw mutation approval registration", () => {
     const on = vi.fn();
     const registerTool = vi.fn();
     plugin.register({ on, registerTool, pluginConfig: {} } as never);
-    expect(getToolPluginMetadata(plugin)?.tools).toHaveLength(134);
+    expect(getToolPluginMetadata(plugin)?.tools).toHaveLength(138);
     expect(on).toHaveBeenCalledWith("before_tool_call", expect.any(Function));
     const hook = on.mock.calls[0]?.[1] as (event: unknown) => unknown;
+    expect(DEBUGBUNDLE_OPENCLAW_OPTIONAL_TOOL_NAMES).toEqual(expect.arrayContaining([
+      "debugbundle_get_notification_preferences", "debugbundle_update_notification_preferences",
+      "debugbundle_pause_notifications", "debugbundle_resume_notifications"
+    ]));
     for (const toolName of DEBUGBUNDLE_OPENCLAW_OPTIONAL_TOOL_NAMES) {
       const decision = hook({
         toolName,
@@ -35,7 +39,7 @@ describe("OpenClaw mutation approval registration", () => {
     }
     expect(hook({ toolName: "debugbundle_list_incidents", params: {} })).toBeUndefined();
     expect(hook({ toolName: "other_plugin_delete", params: {} })).toBeUndefined();
-    expect(registerTool).toHaveBeenCalledTimes(134);
+    expect(registerTool).toHaveBeenCalledTimes(138);
   });
 
   it("fails before registering tools when the host cannot install the safety hook", () => {

@@ -441,6 +441,7 @@ INTEGRATION_TEST_FILES += tests/integration/analytics-flow-runtime.integration.t
 INTEGRATION_TEST_FILES += tests/integration/list-pagination-counts.integration.test.ts
 INTEGRATION_TEST_FILES += tests/integration/public-status-pages.integration.test.ts
 INTEGRATION_TEST_FILES += tests/integration/browser-resource-capture.integration.test.ts
+INTEGRATION_TEST_FILES += tests/integration/notification-preferences.integration.test.ts
 # Optional absolute module path inside /workspace for a separately built Browser SDK candidate.
 INTEGRATION_FLOW_SDK_MODULE ?=
 test-integration:

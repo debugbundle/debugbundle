@@ -1,3 +1,5 @@
+import { PendingButton } from "../components/system/pending-button.js";
+import { usePendingAction } from "../lib/use-pending-action.js";
 import { FolderIcon, KeyRoundIcon, PlusIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
@@ -254,25 +256,28 @@ export function ProjectTokensPage(): JSX.Element {
   }, [projectId]);
 
   const resolvedProjectId = projectId;
+  const { pending: isCreating, run: runCreate } = usePendingAction();
 
   async function handleCreateToken(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
 
-    try {
-      const allowedOrigins = parseAllowedOriginsInput(allowedOriginsInput);
-      const created = await createProjectToken(resolvedProjectId, {
-        label,
-        ...(allowedOrigins.length === 0 ? {} : { allowed_origins: allowedOrigins })
-      });
-      setCreatedToken(created);
-      setTokens((current) => [...(current ?? []), { ...created, plaintext: undefined }]);
-      setLabel("");
-      setAllowedOriginsInput("");
-      setIsCreateOpen(false);
-      showSuccessToast("Project token created successfully.");
-    } catch {
-      showErrorToast("Could not create project token.");
-    }
+    await runCreate(async () => {
+      try {
+        const allowedOrigins = parseAllowedOriginsInput(allowedOriginsInput);
+        const created = await createProjectToken(resolvedProjectId, {
+          label,
+          ...(allowedOrigins.length === 0 ? {} : { allowed_origins: allowedOrigins })
+        });
+        setCreatedToken(created);
+        setTokens((current) => [...(current ?? []), { ...created, plaintext: undefined }]);
+        setLabel("");
+        setAllowedOriginsInput("");
+        setIsCreateOpen(false);
+        showSuccessToast("Project token created successfully.");
+      } catch {
+        showErrorToast("Could not create project token.");
+      }
+    });
   }
 
   async function handleRevokeToken(tokenId: string): Promise<void> {
@@ -290,7 +295,12 @@ export function ProjectTokensPage(): JSX.Element {
       <div className="flex items-center justify-between">
         <div />
         {canManageProjectTokens ? (
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <Dialog
+            open={isCreateOpen}
+            onOpenChange={(next) => {
+              if (!isCreating) setIsCreateOpen(next);
+            }}
+          >
             <DialogTrigger asChild>
               <Button type="button">
                 <PlusIcon data-icon="inline-start" />
@@ -299,14 +309,20 @@ export function ProjectTokensPage(): JSX.Element {
             </DialogTrigger>
             <DialogFormContent
               title="Create token"
+              busy={isCreating}
               description="Create a project token for SDK ingestion."
-              footer={<Button type="submit">Create token</Button>}
+              footer={
+                <PendingButton type="submit" pending={isCreating} pendingLabel="Creating…">
+                  Create token
+                </PendingButton>
+              }
               onSubmit={(event) => void handleCreateToken(event)}
             >
               <FieldGroup>
                 <Field>
                   <FieldLabel htmlFor="project-token-label">Token label</FieldLabel>
                   <Input
+                    disabled={isCreating}
                     id="project-token-label"
                     value={label}
                     onChange={(event) => setLabel(event.currentTarget.value)}
@@ -320,6 +336,7 @@ export function ProjectTokensPage(): JSX.Element {
                     Leave empty for server-side SDKs and relay tokens.
                   </FieldDescription>
                   <Textarea
+                    disabled={isCreating}
                     id="project-token-allowed-origins"
                     value={allowedOriginsInput}
                     onChange={(event) => setAllowedOriginsInput(event.currentTarget.value)}

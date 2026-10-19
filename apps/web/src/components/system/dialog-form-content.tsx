@@ -3,13 +3,21 @@ import { XIcon } from "lucide-react";
 
 import { cn } from "../../lib/utils.js";
 import { Button } from "../ui/button.js";
-import { DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog.js";
+import {
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "../ui/dialog.js";
 
 export interface DialogFormContentProps extends React.ComponentProps<"form"> {
   title: string;
   description?: string;
   footer: React.ReactNode;
   size?: "sm" | "md" | "lg" | "xl";
+  busy?: boolean;
 }
 
 export function DialogFormContent({
@@ -17,6 +25,7 @@ export function DialogFormContent({
   description,
   footer,
   size = "md",
+  busy = false,
   className,
   children,
   ...props
@@ -32,7 +41,7 @@ export function DialogFormContent({
         <div className="flex items-start justify-between gap-4">
           <DialogTitle>{title}</DialogTitle>
           <DialogClose asChild>
-            <Button variant="ghost" className="-mr-2 -mt-2 shrink-0" size="icon-sm">
+            <Button variant="ghost" className="-mr-2 -mt-2 shrink-0" size="icon-sm" disabled={busy}>
               <XIcon />
               <span className="sr-only">Close</span>
             </Button>
@@ -44,7 +53,9 @@ export function DialogFormContent({
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pt-6 pb-6">
           <div className="flex flex-col gap-6">{children}</div>
         </div>
-        <DialogFooter className="mt-0 shrink-0 items-center !mx-0 !mb-0 px-6 py-4">{footer}</DialogFooter>
+        <DialogFooter className="mt-0 shrink-0 items-center !mx-0 !mb-0 px-6 py-4">
+          {footer}
+        </DialogFooter>
       </form>
     </DialogContent>
   );

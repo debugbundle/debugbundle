@@ -1,3 +1,4 @@
+import { PendingButton } from "./pending-button.js";
 import { formatCaptureRuleMatcher } from "../../lib/capture-rule-copy.js";
 import {
   LinkIcon,
@@ -536,12 +537,12 @@ export function ProjectCaptureRulesCard({
                 >
                   Reset
                 </Button>
-                <Button
+                <PendingButton pending={isSaving}
                   type="submit"
                   disabled={!isEditDirty || isSaving || editValidationError !== null}
                 >
                   {isSaving ? "Saving..." : "Save capture rule"}
-                </Button>
+                </PendingButton>
               </>
             }
           >
@@ -589,9 +590,9 @@ export function ProjectCaptureRulesCard({
               >
                 Reset
               </Button>
-              <Button type="submit" disabled={isCreating}>
+              <PendingButton pending={isCreating} type="submit" disabled={isCreating}>
                 {isCreating ? "Creating..." : "Create rule"}
-              </Button>
+              </PendingButton>
             </>
           }
         >

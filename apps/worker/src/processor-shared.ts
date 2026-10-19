@@ -479,6 +479,14 @@ export class AlertDeliveryError extends Error {
 }
 
 export interface EvaluateAlertsWorkerDependencies extends WorkerAccountAnalyticsDependencies {
+  notificationPreferences?: Pick<
+    import("../../../packages/storage/src/notification-preferences-store.js").NotificationPreferencesStore,
+    "decide"
+  >;
+  notificationDaily?: Pick<
+    import("../../../packages/storage/src/notification-daily-store.js").NotificationDailyStore,
+    "enqueue"
+  >;
   queue: WorkerQueue;
   alertStore: AlertDeliveryStore;
   alertTransport: AlertDeliveryTransport;
@@ -490,12 +498,24 @@ export interface EvaluateAlertsWorkerDependencies extends WorkerAccountAnalytics
 }
 
 export interface DeliverAlertEmailDigestWorkerDependencies extends WorkerAccountAnalyticsDependencies {
+  notificationPreferences?: Pick<
+    import("../../../packages/storage/src/notification-preferences-store.js").NotificationPreferencesStore,
+    "decide"
+  >;
+  notificationDaily?: Pick<
+    import("../../../packages/storage/src/notification-daily-store.js").NotificationDailyStore,
+    "enqueue" | "listLegacyDigestItems"
+  >;
   queue: WorkerQueue;
   alertStore: Pick<AlertDeliveryStore, "getAlertEmailDigest" | "markAlertEmailDigestResult">;
   alertEmailDigestTransport: AlertEmailDigestTransport;
 }
 
 export interface GenerateWeeklyReportWorkerDependencies extends WorkerAccountAnalyticsDependencies {
+  notificationPreferences?: Pick<
+    import("../../../packages/storage/src/notification-preferences-store.js").NotificationPreferencesStore,
+    "decide"
+  >;
   queue: {
     dequeue(jobName: "generate-weekly-report"): Promise<GenerateWeeklyReportJob | null>;
   };

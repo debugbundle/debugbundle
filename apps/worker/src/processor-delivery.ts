@@ -1,3 +1,4 @@
+import { groupWeeklyNotificationDeliveries } from "../../../packages/shared-types/src/weekly-notification-groups.js";
 import type {
   AccountMetricKey,
   WeeklyReportChannelRecord,
@@ -183,68 +184,114 @@ export async function processNextGenerateWeeklyReportJob(
       continue;
     }
 
+    let deliveryChannel = channel;
+    if (dependencies.notificationPreferences !== undefined) {
+      if (channel.channel === "email") {
+        const configured = channel.config["to"];
+        const recipients = Array.isArray(configured)
+          ? configured.filter((value): value is string => typeof value === "string")
+          : typeof configured === "string"
+            ? [configured]
+            : [];
+        const allowed: string[] = [];
+        for (const recipient of recipients) {
+          const policy = await dependencies.notificationPreferences.decide({
+            project_id: projectId,
+            channel: "email",
+            recipient,
+            occurred_at: job.window_end
+          });
+          if (policy.mode !== "off") allowed.push(recipient);
+        }
+        if (allowed.length === 0) {
+          await dependencies.weeklyReportDeliveryStore.markWeeklyReportDeliveryResult({
+            delivery_id: deliveryId,
+            delivered: false,
+            error_message: "notification_suppressed"
+          });
+          continue;
+        }
+        deliveryChannel = { ...channel, config: { ...channel.config, to: allowed } };
+      } else {
+        const policy = await dependencies.notificationPreferences.decide({
+          project_id: projectId,
+          channel: "slack",
+          occurred_at: job.window_end
+        });
+        if (policy.mode === "off") {
+          await dependencies.weeklyReportDeliveryStore.markWeeklyReportDeliveryResult({
+            delivery_id: deliveryId,
+            delivered: false,
+            error_message: "notification_suppressed"
+          });
+          continue;
+        }
+      }
+    }
     deliveries.push({
       delivery_id: deliveryId,
-      channel,
+      channel: deliveryChannel,
       report
     });
   }
 
-  const primaryDelivery = deliveries[0];
-  if (primaryDelivery === undefined) {
-    return { processed: true };
-  }
-
-  try {
-    await dependencies.weeklyReportTransport.deliver({
-      delivery_id: primaryDelivery.delivery_id,
-      channel: primaryDelivery.channel,
-      report: primaryDelivery.report,
-      deliveries
-    });
-
-    for (const delivery of deliveries) {
-      await dependencies.weeklyReportDeliveryStore.markWeeklyReportDeliveryResult({
-        delivery_id: delivery.delivery_id,
-        delivered: true,
-        error_message: null
-      });
-      await recordProjectMetricDeltas(dependencies, {
-        projectId: delivery.report.project_id,
-        occurredAt: job.window_end,
-        source: "weekly_report_result",
-        dedupeKey: `weekly_report_result:${delivery.delivery_id}:delivered`,
-        deltas: {
-          weekly_reports_sent: 1
-        }
-      });
+  for (const group of groupWeeklyNotificationDeliveries(deliveries)) {
+    const primaryDelivery = group[0];
+    if (primaryDelivery === undefined) {
+      continue;
     }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    dependencies.logger?.warn(
-      {
-        channel_id: primaryDelivery.channel.channel_id,
+
+    try {
+      await dependencies.weeklyReportTransport.deliver({
         delivery_id: primaryDelivery.delivery_id,
-        error_message: message,
-        project_id: job.project_id
-      },
-      "worker_weekly_report_delivery_failed"
-    );
-    for (const delivery of deliveries) {
-      await dependencies.weeklyReportDeliveryStore.markWeeklyReportDeliveryResult({
-        delivery_id: delivery.delivery_id,
-        delivered: false,
-        error_message: message
+        channel: primaryDelivery.channel,
+        report: primaryDelivery.report,
+        deliveries: group
       });
-      await recordProjectMetricDeltas(dependencies, {
-        projectId: delivery.report.project_id,
-        occurredAt: job.window_end,
-        source: "weekly_report_result",
-        dedupeKey: `weekly_report_result:${delivery.delivery_id}:failed`,
-        deltas: {
-          weekly_reports_failed: 1
-        }
-      });
+
+      for (const delivery of group) {
+        await dependencies.weeklyReportDeliveryStore.markWeeklyReportDeliveryResult({
+          delivery_id: delivery.delivery_id,
+          delivered: true,
+          error_message: null
+        });
+        await recordProjectMetricDeltas(dependencies, {
+          projectId: delivery.report.project_id,
+          occurredAt: job.window_end,
+          source: "weekly_report_result",
+          dedupeKey: `weekly_report_result:${delivery.delivery_id}:delivered`,
+          deltas: {
+            weekly_reports_sent: 1
+          }
+        });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      dependencies.logger?.warn(
+        {
+          channel_id: primaryDelivery.channel.channel_id,
+          delivery_id: primaryDelivery.delivery_id,
+          error_message: message,
+          project_id: job.project_id
+        },
+        "worker_weekly_report_delivery_failed"
+      );
+      for (const delivery of group) {
+        await dependencies.weeklyReportDeliveryStore.markWeeklyReportDeliveryResult({
+          delivery_id: delivery.delivery_id,
+          delivered: false,
+          error_message: message
+        });
+        await recordProjectMetricDeltas(dependencies, {
+          projectId: delivery.report.project_id,
+          occurredAt: job.window_end,
+          source: "weekly_report_result",
+          dedupeKey: `weekly_report_result:${delivery.delivery_id}:failed`,
+          deltas: {
+            weekly_reports_failed: 1
+          }
+        });
+      }
     }
   }
 

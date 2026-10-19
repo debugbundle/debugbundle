@@ -1,3 +1,4 @@
+import { PendingButton } from "./pending-button.js";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { snoozeImprovement, type ImprovementRecord } from "../../lib/api.js";
@@ -76,9 +77,9 @@ export function ImprovementSnoozeDialog({
         description="Choose when this improvement should become active again."
         onSubmit={(event) => void save(event)}
         footer={
-          <Button type="submit" disabled={!valid || pending || disabled}>
+          <PendingButton pending={pending} type="submit" disabled={!valid || pending || disabled}>
             {pending ? "Snoozing..." : "Snooze improvement"}
-          </Button>
+          </PendingButton>
         }
       >
         <Field data-invalid={!valid || undefined}>

@@ -274,3 +274,23 @@ For a dedicated root host, set API `PUBLIC_STATUS_PAGE_BASE_URL=https://status.e
 Owners manage title, explicitly included projects/checks and publication state through the Health tab or `debugbundle health status get|save|options|preview`. Public URLs are deliberately public locators, not credentials. Warn owners to review project/check names before publishing. No subscriptions, separate history page or anonymous check execution is included.
 
 Public throttling defaults to the socket peer IP. Set `PUBLIC_STATUS_TRUST_PROXY=true` only when the API cannot be reached directly and a trusted proxy appends the real client IP to X-Forwarded-For. This avoids sharing one throttle across all visitors behind the proxy; only the last valid hop is used, and other authentication flows are unchanged. Keep the default false on direct/public API bindings.
+
+## Updating notification preferences and daily email
+
+Run `corepack pnpm db:migrate` before activating the API and worker containing
+notification preferences. Migration `202610180001_add_notification_preferences`
+adds four tables and their indexes: preferences, daily batches, incident references
+and minimal allowance usage. API/worker readiness requires the migration's checksum
+and required tables. Existing projects and alert defaults are preserved; there is
+no backfill or destructive schema step. Bootstrap remains for empty schemas only.
+
+The daily-email lane runs inside the worker and uses the existing configured email
+transport; no external scheduler is required. Queue metadata expires after 30 days,
+while project-scoped allowance identities survive cleanup so usage cannot reset.
+Deleting the project/account removes those usage records. Check readiness and a
+controlled email delivery after activation, including the saved local time zone.
+
+Rollback may retain the additive tables, but older application code will resume its
+previous alert behavior and will not enforce these new preferences. Keep this in
+mind when validating a rollback; saved preferences become effective again only
+when a compatible API/worker is active.

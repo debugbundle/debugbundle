@@ -1,3 +1,5 @@
+import { PendingButton } from "../components/system/pending-button.js";
+import { usePendingAction } from "../lib/use-pending-action.js";
 import { KeySquareIcon, PlusIcon } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
@@ -21,11 +23,25 @@ import {
 import { Button } from "../components/ui/button.js";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
 import { Dialog, DialogTrigger } from "../components/ui/dialog.js";
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../components/ui/empty.js";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle
+} from "../components/ui/empty.js";
 import { Field, FieldDescription, FieldLabel } from "../components/ui/field.js";
 import { Input } from "../components/ui/input.js";
 import { Skeleton } from "../components/ui/skeleton.js";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "../components/ui/table.js";
 import {
   createMemberToken,
   listMemberTokens,
@@ -38,6 +54,7 @@ import { useSession } from "../lib/session.js";
 
 export function MemberTokensPage(): JSX.Element {
   const { session } = useSession();
+  const { pending: isCreating, run: runCreate } = usePendingAction();
   const [tokens, setTokens] = useState<MemberTokenRecord[] | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [label, setLabel] = useState("");
@@ -64,19 +81,21 @@ export function MemberTokensPage(): JSX.Element {
   async function handleCreate(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
 
-    try {
-      const created = await createMemberToken({ label });
-      setCreatedToken(created);
-      setTokens((current) => {
-        const next = current ?? [];
-        return [...next, { ...created, plaintext: undefined }];
-      });
-      setLabel("");
-      setIsCreateOpen(false);
-      showSuccessToast("Member token created successfully.");
-    } catch {
-      showErrorToast("Could not create member token.");
-    }
+    await runCreate(async () => {
+      try {
+        const created = await createMemberToken({ label });
+        setCreatedToken(created);
+        setTokens((current) => {
+          const next = current ?? [];
+          return [...next, { ...created, plaintext: undefined }];
+        });
+        setLabel("");
+        setIsCreateOpen(false);
+        showSuccessToast("Member token created successfully.");
+      } catch {
+        showErrorToast("Could not create member token.");
+      }
+    });
   }
 
   async function handleRevoke(tokenId: string): Promise<void> {
@@ -94,7 +113,12 @@ export function MemberTokensPage(): JSX.Element {
       <PageHeader
         description="Issue member-scoped credentials for CLI and MCP access. Plaintext token material is shown once and should move straight into a secret manager."
         actions={
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <Dialog
+            open={isCreateOpen}
+            onOpenChange={(next) => {
+              if (!isCreating) setIsCreateOpen(next);
+            }}
+          >
             <DialogTrigger asChild>
               <Button type="button" disabled={!canCreate}>
                 <PlusIcon data-icon="inline-start" />
@@ -103,13 +127,19 @@ export function MemberTokensPage(): JSX.Element {
             </DialogTrigger>
             <DialogFormContent
               title="Create token"
+              busy={isCreating}
               description="Create a member token for CLI or MCP automation."
-              footer={<Button type="submit">Create token</Button>}
+              footer={
+                <PendingButton type="submit" pending={isCreating} pendingLabel="Creating…">
+                  Create token
+                </PendingButton>
+              }
               onSubmit={(event) => void handleCreate(event)}
             >
               <Field>
                 <FieldLabel htmlFor="member-token-label">Token label</FieldLabel>
                 <Input
+                  disabled={isCreating}
                   id="member-token-label"
                   value={label}
                   onChange={(event) => setLabel(event.currentTarget.value)}
@@ -132,7 +162,9 @@ export function MemberTokensPage(): JSX.Element {
         />
       ) : null}
 
-      {createdToken?.plaintext === undefined ? null : <PlaintextTokenReveal value={createdToken.plaintext} />}
+      {createdToken?.plaintext === undefined ? null : (
+        <PlaintextTokenReveal value={createdToken.plaintext} />
+      )}
 
       <Card>
         <CardHeader>
@@ -155,7 +187,8 @@ export function MemberTokensPage(): JSX.Element {
                   </EmptyMedia>
                   <EmptyTitle>No member tokens yet</EmptyTitle>
                   <EmptyDescription>
-                    Issue a member token when you need CLI or MCP access outside the signed-in browser workspace.
+                    Issue a member token when you need CLI or MCP access outside the signed-in
+                    browser workspace.
                   </EmptyDescription>
                 </EmptyHeader>
                 <EmptyContent>
@@ -182,7 +215,9 @@ export function MemberTokensPage(): JSX.Element {
                     <TableRow key={token.token_id}>
                       <TableCell className="font-medium">{token.label}</TableCell>
                       <TableCell>{formatDate(token.created_at)}</TableCell>
-                      <TableCell>{token.last_used_at === null ? "Never" : formatDate(token.last_used_at)}</TableCell>
+                      <TableCell>
+                        {token.last_used_at === null ? "Never" : formatDate(token.last_used_at)}
+                      </TableCell>
                       <TableCell className="text-right">
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
@@ -194,7 +229,8 @@ export function MemberTokensPage(): JSX.Element {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Revoke member token</AlertDialogTitle>
                               <AlertDialogDescription>
-                                This will immediately invalidate the token for CLI and MCP authentication.
+                                This will immediately invalidate the token for CLI and MCP
+                                authentication.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>

@@ -1,3 +1,4 @@
+import { PendingButton } from "./pending-button.js";
 import { useId, useState } from "react";
 import {
   AnalyticsFlowDefinitionInputSchema,
@@ -208,9 +209,9 @@ export function AnalyticsFlowForm({
           </Notice>
         )}
         <div className="flex gap-2">
-          <Button type="submit" disabled={busy}>
+          <PendingButton pending={busy} type="submit" disabled={busy}>
             {busy ? "Saving…" : "Save flow"}
-          </Button>
+          </PendingButton>
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>

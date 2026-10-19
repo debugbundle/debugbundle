@@ -1,3 +1,114 @@
+# Notification release review — 2026-10-19 (locally qualified; awaiting release approval)
+
+The final review fixed daily-email boundary races affecting both delayed new
+incidents and schedule changes. They can no longer attach to an email already
+sending or completed; late items remain queued for the next daily window, while
+future policy-only claims still accept items. The two-project preview now renders
+the correct regression label. Added unit tests close the normal CI coverage gap
+for database transaction, claim, allowance and preference-update orchestration.
+
+All 4,323 full-run unit tests pass across 528 files/96 shards, followed by 26 passing
+storage checks (23 added cases). The unchanged coverage gate passes all 67 changed
+source files after merging current storage coverage with the full run. Daily store,
+claims and usage have 100% statement/line/function coverage. Final integration:
+174 passed, one conditional SDK-fixture skip, across 34 files including 21 notification
+database cases. Disposable containers/volumes are gone. Repository lint plus final
+changed-file lint, final typecheck, candidate builds, native OpenClaw validation and
+site 41 tests/build/typecheck pass. Local API readiness and served schedule controls
+are verified. No browser inspection or live-provider delivery was performed.
+
+Pre-ship review reconciles requirements, contracts, docs and module maps; authorization,
+recipient privacy, retries, cooldowns, allowance accounting, cleanup and the additive
+migration remain covered. Hosted/self-host release paths apply migrations before
+runtime activation. No known local release blockers remain. No commit, publication
+or deployment was authorized; production readiness and controlled delivery checks
+remain part of the subsequent approved release. Details: `spec/notification-preferences.md`.
+
+# Daily schedule layout — 2026-10-19
+
+Account and project daily notification controls now reuse the weekly report hour
+choices and responsive schedule/hour row, followed by a full-width timezone field
+and compact device-timezone shortcut. The shared daily schedule component retains
+project inheritance, disabled states, failure drafts and arbitrary minute values
+through Custom time. Ten notification UI tests and four weekly/layout regressions
+pass; changed-file lint, repository typecheck and candidate builds pass. The local
+app serves the component. Pre-ship review and documentation reconciliation confirm
+no saved-data, scheduler or API/CLI/MCP contract change. No deployment.
+
+# Daily digest preview and schedule parity — 2026-10-19
+
+The local system-email review catalog now includes "Daily incident digest (two
+projects)": Checkout API and Customer Portal. Preview and worker delivery share
+`renderDailyIncidentDigestEmail`, preserving existing delivered HTML/text and daily
+subjects. No email was sent during verification. Existing account/project local
+time and IANA timezone controls are confirmed in the dashboard, API, CLI and
+ordinary MCP, including inherited project schedules and invalid-input rejection.
+All 62 focused email, worker, scheduling and interface checks pass in nine files;
+the final three review-page checks also pass after adding two-project selection
+assertions. Changed-file lint, repository typecheck and candidate builds pass.
+The local review route serves the new catalog. Pre-ship review preserves redaction,
+escaping, dev-only owner access and existing delivery behavior; no schema or public
+interface change is required. Specs and module maps are reconciled. No deployment.
+
+# Submit feedback and project notification disclosure — 2026-10-19
+
+Owner-requested UI refinement uses a shared PendingButton across 23 form/action
+consumers. New create-project/token/invite/probe guards prevent overlapping submits
+and release after errors; existing forms retain their request state and permissions.
+Notification Save/Pause/Resume show separate progress. Project Notifications uses
+the existing collapsed-by-default card; account Notifications stays expanded.
+The owner-edited health-check email copy is preserved. Local API readiness and
+served source are verified. All 139 affected-form tests pass across 25 files,
+including delayed creation, duplicate-submit prevention, failed-draft retry,
+successful navigation, permission states and collapsed project settings.
+Changed-file lint, repository typecheck and shared/CLI/MCP/web candidate builds
+pass. Pre-ship review confirms existing validation, callbacks and request ownership
+are preserved; no public interface or schema changes are introduced by this UI
+refinement. Documentation and the component map are reconciled. Browser visual
+acceptance remains with the owner. No commit, publication or deployment is authorized.
+
+# Notification preferences and daily email — 2026-10-19 (reviewed and locally qualified)
+
+Implementation and approved reusable UI are in place: account/project preferences,
+personal/shared scopes, per-channel pauses and daily local-time email, health priority,
+API/CLI/ordinary MCP/OpenClaw parity, forward migration and daily worker lane.
+No commit, publication or deployment is authorized. Product/implementation contract:
+`spec/notification-preferences.md`.
+
+Owner-requested final review fixed earlier schedule changes waiting for the old
+deadline, daily-to-immediate queue loss, missing allowance-limit notices, usage
+reset by incident/queue cleanup, and stale-worker reschedule writes. Canonical
+preference locks, scoped wake-ups and an independent allowance ledger preserve
+concurrency/accounting. The local UI preview now supports the notification editor.
+Daily/live email now share atomic rule cooldown history across mode transitions.
+
+Full regression passes 4,314 tests in 527 files (169 conditional skips). After the
+last cooldown fix, 1,029 storage/worker/startup/preview regressions pass in 117 files,
+and 113 feature/integration checks pass in 16 files, including 16 notification
+PostgreSQL cases and existing migration/alert-deduplication suites. All 22 new source
+modules meet 80% on all four coverage measures; aggregate statements are 98.28%
+and branches 92.08%. Repository lint/typecheck and final changed-file lint pass.
+Core builds and companion site 41 tests/build/typecheck pass, including the final
+artifact refresh. Native OpenClaw source/catalog is unchanged by this follow-up and
+retains its successful native validation.
+
+Pre-ship review covers recipient privacy, authorization/CSRF, concurrency and retry
+fencing, pause/off cutoffs, DST, bounded cleanup, export/deletion and billing (including
+no second charge for converted short digests). Forward migration/readiness and both
+hosted migration-before-activation paths are verified locally. Contracts, glossary,
+overview/map and paired handwritten/generated site references are reconciled.
+Final review results are recorded in `spec/notification-preferences.md`. No known
+source or automated-test blockers remain for owner testing. No browser/provider/
+production acceptance is claimed; commit/publication/deployment remain separate
+owner actions. The forward migration must precede activation of the new runtime.
+
+Owner layout feedback (2026-10-19): notification controls share one consistently
+padded card body, with an inline save action and a separator before pause controls.
+The intermediate shaded footer is removed. Verification status and Sign-in methods
+now follow Account data export in the desktop sidebar. All 38 focused settings
+tests, changed-file lint, typecheck and candidate builds pass; the running local
+app serves the update for owner visual acceptance.
+
 OpenClaw security remediation released (2026-10-17): CLI/MCP/OpenClaw and portable skill 1.16.1 are published. Both exact-version ClawHub security gates pass, and downloaded content matches the reviewed source. Full CI passes 4,254 tests across 514 files, lint/typecheck/build, native clients and changed-code coverage. Mandatory pre-publication checks and strict post-publication security acceptance are enforced. Official MCP Registry and Smithery skill updates pass; Smithery MCP publishing is blocked by a provider HTTP 403 and ClawHub search remains 5/7. The full ecosystem verifier stays non-green for those external limits. Hosted runtime is unchanged. See `spec/openclaw-security-remediation-20261017.md`.
 
 # Browser resource noise controls audit — 2026-10-17

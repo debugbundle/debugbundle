@@ -1,3 +1,4 @@
+import { PendingButton } from "../components/system/pending-button.js";
 import { useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { CalloutCard } from "../components/system/callout-card.js";
@@ -813,9 +814,9 @@ export function ProjectGitHubPage(): JSX.Element {
           }
           size="lg"
           footer={
-            <Button type="submit" disabled={isSavingRule}>
+            <PendingButton pending={isSavingRule} type="submit" disabled={isSavingRule}>
               {isSavingRule ? "Saving..." : editingRuleId === null ? "Create rule" : "Save rule"}
-            </Button>
+            </PendingButton>
           }
           onSubmit={(event) => void handleCreateRule(event)}
         >

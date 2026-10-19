@@ -1,6 +1,10 @@
 import { createWorkerActivationState } from "./worker-activation.js";
 import { createDurableWorkerQueue } from "./durable-queue.js";
 import { createDurableIncidentProcessing } from "./durable-incident-processing.js";
+import { createNotificationPreferencesStore } from "../../../packages/storage/src/notification-preferences-store.js";
+import { createNotificationDailyStore } from "../../../packages/storage/src/notification-daily-store.js";
+import { deliverNextDailyNotification } from "../../../packages/storage/src/notification-delivery-service.js";
+import { createDailyNotificationTransport } from "./notification-daily-transport.js";
 import {
   createWorkerJobStore,
   WORKER_JOB_PROTOCOL
@@ -291,6 +295,8 @@ export async function runWorkerFromEnv(
   });
   const retentionStore = createPostgresRetentionStore(queryable);
   const weeklyReportChannelStore = createPostgresWeeklyReportChannelStore(queryable);
+  const notificationPreferences = createNotificationPreferencesStore(queryable);
+  const notificationDaily = createNotificationDailyStore(queryable);
   const weeklyReportDeliveryStore = createPostgresWeeklyReportDeliveryStore(queryable);
   const frequencyCounter = createRedisIncidentFrequencyCounter({
     redisUrl: env.REDIS_URL,
@@ -384,6 +390,11 @@ export async function runWorkerFromEnv(
   });
   const appBaseUrl = normalizeWorkerBaseUrl(envInput["APP_BASE_URL"]);
   const emailAssetBaseUrl = resolveWorkerEmailAssetBaseUrl(envInput);
+  const dailyNotificationTransport = createDailyNotificationTransport({
+    emailTransport,
+    appBaseUrl,
+    emailAssetBaseUrl
+  });
   const retentionCleanupRunner = createRetentionCleanupService({
     retentionStore,
     objectStore
@@ -504,6 +515,8 @@ export async function runWorkerFromEnv(
         queue,
         alertStore: alertDeliveryStore,
         alertTransport,
+        notificationPreferences,
+        notificationDaily,
         billingStore,
         operationalEmailDeliveryStore,
         accountAnalyticsStore,
@@ -568,6 +581,8 @@ export async function runWorkerFromEnv(
         queue,
         alertStore: alertDeliveryStore,
         alertEmailDigestTransport,
+        notificationPreferences,
+        notificationDaily,
         accountAnalyticsStore,
         resolveOrganizationIdForProject
       })
@@ -638,6 +653,7 @@ export async function runWorkerFromEnv(
         weeklyReportChannelStore,
         weeklyReportDeliveryStore,
         weeklyReportTransport,
+        notificationPreferences,
         accountAnalyticsStore,
         resolveOrganizationIdForProject
       })
@@ -646,7 +662,12 @@ export async function runWorkerFromEnv(
     await runDeliveryProcessStep("cleanup-retention", async () =>
       processNextCleanupRetentionJob({
         queue,
-        retentionCleanupRunner
+        retentionCleanupRunner: {
+          runCleanup: async (job) => {
+            await notificationDaily.cleanup();
+            return retentionCleanupRunner.runCleanup(job);
+          }
+        }
       })
     );
 
@@ -682,6 +703,15 @@ export async function runWorkerFromEnv(
     });
   }
 
+  // A large daily digest must not occupy the live-alert delivery lane.
+  const processDailyPass = async (): Promise<{ processed: boolean }> => ({
+    processed: await deliverNextDailyNotification({
+      store: notificationDaily,
+      preferences: notificationPreferences,
+      deliver: dailyNotificationTransport
+    })
+  });
+  let dailyLoopPromise: Promise<void> | null = null;
   let availabilityLoopPromise: Promise<void> | null = null;
   let deliveryLoopPromise: Promise<void> | null = null;
   try {
@@ -697,6 +727,15 @@ export async function runWorkerFromEnv(
         intervalMs: env.AVAILABILITY_CHECK_LOOP_INTERVAL_MS,
         processBatch: processAvailabilityBatch
       });
+      if (emailTransport !== null) {
+        dailyLoopPromise = runWorkerLane({
+          logger,
+          name: "daily-email-lane",
+          shutdown: shutdownState,
+          idleIntervalMs: env.WORKER_POLL_INTERVAL_MS,
+          processPass: processDailyPass
+        });
+      }
       deliveryLoopPromise = runWorkerLane({
         logger,
         name: "delivery-lane",
@@ -830,6 +869,8 @@ export async function runWorkerFromEnv(
 
       if (env.WORKER_RUN_ONCE === "1") {
         await processDeliveryPass();
+        if (emailTransport !== null)
+          await runWorkerProcessStep(logger, "deliver-daily-notification", processDailyPass);
         break;
       }
 
@@ -845,6 +886,7 @@ export async function runWorkerFromEnv(
       await availabilityLoopPromise;
     }
     if (deliveryLoopPromise !== null) await deliveryLoopPromise;
+    if (dailyLoopPromise !== null) await dailyLoopPromise;
     await deliveryQueue.close();
     if (healthServer !== null) {
       healthServer.close();

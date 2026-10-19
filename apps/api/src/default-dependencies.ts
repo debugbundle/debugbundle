@@ -1,3 +1,4 @@
+import { createNotificationPreferencesStore } from "../../../packages/storage/src/notification-preferences-store.js";
 import { parsePublicStatusBaseUrl } from "../../../packages/shared-types/src/public-status.js";
 import { createPublicStatusPageStore } from "../../../packages/storage/src/public-status-store.js";
 import { createPostgresAnalyticsFlowStore } from "../../../packages/storage/src/analytics-flow-store.js";
@@ -266,6 +267,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
         };
 
   return {
+    notificationPreferences: createNotificationPreferencesStore(input.db),
     publicStatusPages: createPublicStatusPageStore(input.db),
     publicStatusTrustProxy: input.publicStatusTrustProxy ?? false,
     publicStatusBaseUrl: parsePublicStatusBaseUrl(

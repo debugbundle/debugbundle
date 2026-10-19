@@ -6,6 +6,25 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.18.0] - 2026-10-19
+
+### Added
+
+- Account and project notification preferences with personal email and privileged shared-channel scopes, inherited delivery modes, channel-specific pauses and resume. Support 24 hours, seven days, custom deadlines or an indefinite pause across existing and future projects.
+- Daily incident emails at a configurable local time and IANA timezone, grouped by project and limited to newly opened or regressed incidents that remain unresolved. Health-check outage alerts retain immediate priority in daily mode; explicit off/pause controls and health-check pause exceptions remain available.
+- Matching API, CLI and ordinary MCP controls, with OpenClaw permissions preserved. Hosted read-only and restricted catalogs remain unchanged.
+- Additive migration `202610180001_add_notification_preferences` with durable daily queues, recipient filtering, retention-independent allowance accounting, and readiness checks. Apply `db:migrate` before activating the new API and worker; never bootstrap an installed database.
+
+### Improved
+
+- Align daily scheduling with weekly-report controls; use collapsed project notification settings and consistent account card spacing. Add a two-project daily-email preview to the local system-email catalog.
+- Show progress on shared submit controls and prevent overlapping creation requests while preserving drafts and retry behavior.
+- Preserve cooldowns across daily/live transitions, fence retries and schedule changes, and defer late incidents beyond emails already sending or completed without losing their queue references.
+
+### Distribution
+
+- Shared types/redaction 2.6.0 and CLI/MCP/OpenClaw 1.17.0 carry the new notification contracts and controls. Developer-plugin pins follow verified MCP publication. No SDK or hosted OpenAI plugin release is required.
+
 ## CLI / MCP / OpenClaw [1.16.1] - 2026-10-17
 
 ### Security

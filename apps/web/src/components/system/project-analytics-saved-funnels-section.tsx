@@ -1,3 +1,4 @@
+import { PendingButton } from "./pending-button.js";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
@@ -357,13 +358,13 @@ export function ProjectAnalyticsSavedFunnelsSection({
                 <Button type="button" variant="outline" onClick={closeDialog} disabled={isSaving}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isSaving}>
+                <PendingButton pending={isSaving} type="submit" disabled={isSaving}>
                   {isSaving
                     ? "Saving..."
                     : dialogMode === "create"
                       ? "Create funnel"
                       : "Save changes"}
-                </Button>
+                </PendingButton>
               </>
             }
           >

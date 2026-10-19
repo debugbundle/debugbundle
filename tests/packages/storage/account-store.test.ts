@@ -146,6 +146,11 @@ describe("postgres account store", () => {
         return rowsResult([{ data: { audit_log_id: "audit_123", organization_id: "org_123" } }]);
       }
 
+      if (sqlText.includes("FROM notification_preferences")) return rowsResult([{ user_id: "usr_123", preferences: {} }]);
+      if (sqlText.includes("FROM notification_daily_batches")) return rowsResult([{ id: "daily_123", recipient: "owen@example.com" }]);
+      if (sqlText.includes("FROM notification_daily_items")) return rowsResult([{ batch_id: "daily_123", project_id: "proj_123" }]);
+      if (sqlText.includes("FROM notification_daily_allowance_usage")) return rowsResult([{ batch_id: "daily_123", project_id: "proj_123", billable: true }]);
+
       throw new Error(`Unhandled SQL in exportAccountForOrganization: ${sqlText}`);
     });
 
@@ -159,6 +164,10 @@ describe("postgres account store", () => {
 
     expect(result).toEqual(
       expect.objectContaining({
+        notification_preferences: [{ user_id: "usr_123", preferences: {} }],
+        notification_daily_batches: [{ id: "daily_123", recipient: "owen@example.com" }],
+        notification_daily_items: [{ batch_id: "daily_123", project_id: "proj_123" }],
+        notification_daily_allowance_usage: [{ batch_id: "daily_123", project_id: "proj_123", billable: true }],
         export_version: 1,
         exported_at: "2026-04-06T00:00:00.000Z",
         user: expect.objectContaining({ user_id: "usr_123" }),
@@ -343,6 +352,7 @@ describe("postgres account store", () => {
       if (sqlText.includes("DELETE FROM audit_logs") && sqlText.includes("WHERE actor_user_id = $1")) {
         return rowsResult([]);
       }
+      if (sqlText.includes("DELETE FROM notification_daily_batches")) return rowsResult([]);
       if (sqlText.includes("DELETE FROM users")) {
         return rowsResult([]);
       }
@@ -439,6 +449,7 @@ describe("postgres account store", () => {
       if (sqlText.includes("DELETE FROM audit_logs") && sqlText.includes("WHERE actor_user_id = $1")) {
         return rowsResult([]);
       }
+      if (sqlText.includes("DELETE FROM notification_daily_batches")) return rowsResult([]);
       if (sqlText.includes("DELETE FROM users")) {
         return rowsResult([]);
       }
@@ -461,6 +472,7 @@ describe("postgres account store", () => {
       user_deleted: true,
       deleted_member_token_count: 1
     });
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("DELETE FROM notification_daily_batches"), ["usr_123"]);
     expect(query).toHaveBeenCalledWith("COMMIT", []);
   });
 });
