@@ -6,6 +6,15 @@ This file is the mandatory execution contract for AI agents working on DebugBund
 
 ## 0) Critical Rules
 
+### Product Scope and Separate Consent
+
+- This workspace's authorized product is **DebugBundle only**, including its own SDKs, plugins and distribution repositories when they are within the requested change.
+- Approval to fix, publish or deploy DebugBundle never authorizes changing another product, even when the same owner controls it or its telemetry exposed the bug. General approval such as "proceed with the releases" stays within DebugBundle.
+- Do not update dependencies, edit files, commit, push, publish, deploy, change infrastructure/access rules, mutate data, or run production canaries in consumer products such as SayCheese, Afipal, Sava, Healthbrain, TaskTime or LOADVOID without separate explicit consent naming that product and action.
+- Publishing the DebugBundle WordPress plugin is a DebugBundle distribution action; installing or updating it on an existing WordPress site requires separate explicit consent for that site.
+- When a consumer needs adoption, report the available DebugBundle version and leave the consumer unchanged until consent is given. Shared ownership, available credentials, access to a repository and a release-verification procedure do not confer authorization.
+- An unauthorized change is not permission to perform a rollback or any further consumer mutation. Disclose the action and obtain explicit instructions before further changes.
+
 ### Development Phase Status: PRODUCTION
 
 **This project is live and has installed projects. Therefore:**

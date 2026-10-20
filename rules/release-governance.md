@@ -1,7 +1,29 @@
 # Release & Open-Source Governance — DebugBundle
 
 Version: v1
-Last updated: 2026-09-10
+Last updated: 2026-10-20
+
+---
+
+## Product Scope and Separate Consent
+
+Release authority is product-specific. Work in this repository is limited to
+DebugBundle and the DebugBundle-owned SDK/plugin distributions included in the
+requested release. General approval to proceed with releases does not authorize
+changes to another product owned by the same person.
+
+Consumer telemetry, repository access, shared ownership, credentials, internal
+dogfooding and release runbooks are evidence or tools, never consent to update a
+consumer. Dependency changes, commits/pushes, publication/deployment, production
+canaries, database mutations and infrastructure/access changes in another product
+require separate explicit consent naming the product and action. In particular,
+publishing DebugBundle's WordPress plugin does not authorize installing or
+updating it on any existing WordPress site.
+
+Report consumer adoption requirements without executing them. Disclose any
+unauthorized consumer action; do not compound it with an unapproved rollback or
+additional changes. These boundaries apply before every cross-repository or
+production mutation and take precedence over release-train follow-through.
 
 ---
 

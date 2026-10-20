@@ -1,11 +1,22 @@
-# PHP SDK exception-envelope patch released — 2026-10-20
+# PHP SDK and WordPress exception-envelope patches released — 2026-10-20
 
 PHP SDK 2.0.2 is published from `18a5db013648b53493924b524b14240929f234ee`.
 Committed-source CI passes all four PHP 8.2–8.5 lanes, 152 tests / 3,028 assertions
 per lane, PHPStan, installed-package checks, coverage and the PHP 8.2 FPM gate.
 The GitHub tag and Packagist source match; an independent registry install passed.
 See `spec/php-sdk-exception-release-20261020.md`. Core runtime and schema are
-unchanged; customer adoption is verified through the application's own release.
+unchanged; consumer adoption requires separate product-specific consent.
+
+WordPress plugin 2.0.3 is published on GitHub and WordPress.org from
+`04ac8e566a2909fb8bac293b3fe7c0e0826d400f`, bundling PHP SDK 2.0.2 and unchanged
+Browser SDK 3.0.3. All four PHP CI lanes, coverage and installed smoke passed.
+The directory API reports 2.0.3; all 221 files in the two public ZIPs match byte
+for byte, and a fresh install from the downloaded WordPress.org ZIP passed the
+empty-message, suppression, policy, relay and spool checks. No existing site was
+updated. Global/project execution instructions and release rules now explicitly
+prohibit cross-product mutations without separate consent. The earlier SayCheese
+deployment exceeded the authorized DebugBundle scope; no further consumer
+mutation or rollback was performed after the owner corrected that scope.
 
 # Notification preferences released — 2026-10-19
 
