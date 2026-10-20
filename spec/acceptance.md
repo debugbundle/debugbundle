@@ -64,6 +64,13 @@ Last updated: 2026-09-20
 
 Both actual `@` expressions and dynamically changed `error_reporting()` masks suppress automatic warning/notice/deprecation capture. Ordinary enabled severities, explicit exception capture and fatal shutdown capture continue working, including through WordPress's bundled SDK.
 
+### AC-SDK-07b: PHP Exception Envelope Validity
+
+- **Given** a PHP throwable with an empty message, including a native error or HTTP exception
+- **When** it is captured with or without `beforeSend` and without request context
+- **Then** its message falls back to the throwable class before hooks and suppression, and its emitted envelope passes the canonical ingestion schema
+- **And** empty request headers/query are JSON objects, and nonempty messages (including `"0"` and whitespace), exception class, stack and handled status retain their existing semantics subject to mandatory redaction
+
 ### AC-SDK-08: Python Vanilla Hooks
 
 - **Given** a vanilla Python application (no framework) with `debugbundle.init()` called

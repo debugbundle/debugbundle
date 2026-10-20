@@ -1,3 +1,12 @@
+# PHP SDK exception-envelope patch released — 2026-10-20
+
+PHP SDK 2.0.2 is published from `18a5db013648b53493924b524b14240929f234ee`.
+Committed-source CI passes all four PHP 8.2–8.5 lanes, 152 tests / 3,028 assertions
+per lane, PHPStan, installed-package checks, coverage and the PHP 8.2 FPM gate.
+The GitHub tag and Packagist source match; an independent registry install passed.
+See `spec/php-sdk-exception-release-20261020.md`. Core runtime and schema are
+unchanged; customer adoption is verified through the application's own release.
+
 # Notification preferences released — 2026-10-19
 
 Core 1.18.0 and site 1.6.7 are published and live. Shared packages 2.6.0,

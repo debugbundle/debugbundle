@@ -21,6 +21,8 @@ Last updated: 2026-09-20
 
 **FR-SDK-03:** Backend SDK must capture: unhandled exceptions, explicitly captured exceptions, request metadata (method, path, route template, headers sanitized, body sanitized/truncated), response status/duration, correlation/trace/request IDs, structured logs, service identity, deploy/version metadata.
 
+PHP exception capture must satisfy the canonical envelope even when the throwable has no message or request context is absent: use the throwable class for an empty message before hooks/suppression and encode empty request maps as JSON objects. Preserve nonempty messages and stack evidence through mandatory redaction.
+
 **FR-SDK-04:** Browser SDK must capture: route changes, clicks, sanitized form submissions, console logs, network request summaries, frontend exceptions, lightweight DOM context near the error. Non-exception captures (route changes, clicks, console logs, network summaries) are breadcrumbs — by default they are held in a local ring buffer and only shipped alongside a `frontend_exception` (see FR-SDK-24).
 
 **FR-SDK-05:** SDKs must emit eight normalized event types: `backend_exception`, `request_event`, `log_event`, `frontend_breadcrumb`, `frontend_exception`, `deploy_metadata`, `error_suppressed` (aggregate), `probe_event` (diagnostic). The first six are signal events; `error_suppressed` is an operational aggregate emitted by duplicate suppression (see FR-SDK-09); `probe_event` is a diagnostic event emitted by activated probes (see FR-PRB-01).
