@@ -390,7 +390,7 @@ The public documentation/marketing/blog site lives in the standalone public repo
   - `openapi.ts` — API-owned OpenAPI 3.1 generator built from request schemas plus shared client response schemas for public artifact publication
   - `stripe-config.ts` — Stripe client factory, price-to-plan mapping, billing state derivation, entitlement eligibility checks
   - `billing-slot-management.ts` — Stripe subscription state loading, projected billing summary computation, subscription-item quantity building for immediate allowance-capacity increases, and subscription-schedule phase building for deferred allowance-capacity reductions
-  - `billing-links.ts` — env-based static billing URL fallback when Stripe API is not configured
+  - `billing-links.ts` — non-production static billing URL fallback; production requires the authenticated dynamic Stripe path
   - `default-dependencies.ts` — dependency composition including account export artifact hydration for retained raw events, failure bundles, improvement bundles, and reproductions; admin-only aggregate analytics gating through `ADMIN_ANALYTICS_ACCESS_EMAILS`; project AnalyticsBundle settings management; internal analytics usage metering for event/session and bundle-generation quotas; project-object cleanup on account deletion; dynamic Stripe checkout session; customer portal creation; projected billing summaries; and Stripe-backed allowance-capacity mutations
   - shared client packages under `packages/*-client` — thin typed HTTP adapters reused by CLI and MCP parity flows; billing allowance-capacity management uses `packages/billing-client`
   - `runtime.ts` — server bootstrap, graceful shutdown, and conditional Stripe webhook wiring (creates separate connection pool for billing sync)
