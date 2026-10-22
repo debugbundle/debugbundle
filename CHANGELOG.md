@@ -12,6 +12,10 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 - Accept bounded billing lifecycle email deliveries through the existing worker transport and retry path. This compatibility release preserves the existing billing API producer and schema so a subsequent billing rollout can safely transition worker generations.
 
+### Security
+
+- Update vulnerable transitive MCP SDK dependencies to 1.32.1 and Vite tooling to 8.1.6. Preserve unrelated locked dependency versions.
+
 ## [1.18.0] - 2026-10-19
 
 ### Added
