@@ -60,7 +60,9 @@ describe("api-default-dependency-mocks billing-confirmation", () => {
           enqueue: vi.fn()
         },
         db: {
-          query: vi.fn().mockResolvedValue({ rows: [{ stripe_customer_id: "cus_123" }] })
+          query: vi
+            .fn()
+            .mockResolvedValue({ rows: [{ revision: "123", stripe_customer_id: "cus_123" }] })
         },
         stripeConfig: {
           client: {
@@ -102,12 +104,18 @@ describe("api-default-dependency-mocks billing-confirmation", () => {
     };
 
     const sessionMissingDeps = makeDeps({
-      retrieveSession: vi.fn().mockRejectedValue(new Error("missing_session"))
+      retrieveSession: vi
+        .fn()
+        .mockRejectedValue(
+          Object.assign(new Error("missing_session"), { code: "resource_missing" })
+        )
     });
     const wrongOrgDeps = makeDeps({
       retrieveSession: vi.fn().mockResolvedValue({
         id: "cs_wrong_org",
         status: "complete",
+        mode: "subscription",
+        payment_status: "paid",
         client_reference_id: "org_other",
         customer: "cus_123",
         subscription: "sub_123"
@@ -126,6 +134,8 @@ describe("api-default-dependency-mocks billing-confirmation", () => {
       retrieveSession: vi.fn().mockResolvedValue({
         id: "cs_missing_customer",
         status: "complete",
+        mode: "subscription",
+        payment_status: "paid",
         client_reference_id: "org_123",
         customer: null,
         subscription: {
@@ -140,6 +150,8 @@ describe("api-default-dependency-mocks billing-confirmation", () => {
       retrieveSession: vi.fn().mockResolvedValue({
         id: "cs_sub_failure",
         status: "complete",
+        mode: "subscription",
+        payment_status: "paid",
         client_reference_id: "org_123",
         customer: "cus_123",
         subscription: "sub_123"
@@ -193,6 +205,7 @@ describe("api-default-dependency-mocks billing-confirmation", () => {
     const subscription = {
       id: "sub_123",
       status: "active",
+      customer: "cus_123",
       items: {
         data: [
           {
@@ -265,6 +278,7 @@ describe("api-default-dependency-mocks billing-confirmation", () => {
       query: vi.fn().mockResolvedValue({
         rows: [
           {
+            revision: "123",
             plan: "solo",
             stripe_customer_id: "cus_123",
             stripe_subscription_id: "sub_123"
@@ -301,6 +315,8 @@ describe("api-default-dependency-mocks billing-confirmation", () => {
               retrieve: vi.fn().mockResolvedValue({
                 id: "cs_123",
                 status: "complete",
+                mode: "subscription",
+                payment_status: "paid",
                 client_reference_id: "org_123",
                 customer: "cus_123",
                 subscription
@@ -347,6 +363,7 @@ describe("api-default-dependency-mocks billing-confirmation", () => {
     const subscription = {
       id: "sub_123",
       status: "active",
+      customer: "cus_123",
       items: {
         data: [
           {
@@ -419,6 +436,7 @@ describe("api-default-dependency-mocks billing-confirmation", () => {
       query: vi.fn().mockResolvedValue({
         rows: [
           {
+            revision: "123",
             plan: "solo",
             stripe_customer_id: "cus_123",
             stripe_subscription_id: "sub_123"
@@ -455,6 +473,8 @@ describe("api-default-dependency-mocks billing-confirmation", () => {
               retrieve: vi.fn().mockResolvedValue({
                 id: "cs_124",
                 status: "complete",
+                mode: "subscription",
+                payment_status: "paid",
                 client_reference_id: "org_123",
                 customer: "cus_123",
                 subscription

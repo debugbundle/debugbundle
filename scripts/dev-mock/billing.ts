@@ -1,5 +1,10 @@
+import type {
+  BillingPlanChangeQuote,
+  BillingPlanChangeState
+} from "../../packages/billing-client/src/plan-change.js";
 import { z } from "zod";
 import { getTierCapabilities } from "../../packages/shared-types/src/index.js";
+import { getFirstPurchaseEligibility } from "../../packages/shared-types/src/first-purchase-eligibility.js";
 import type { BillingSummaryRecord } from "../../apps/web/src/lib/api-types.js";
 import type { createDevMockFixtures } from "./fixtures.js";
 import type { MockResponse } from "./api.js";
@@ -13,6 +18,9 @@ export function createBillingMocks(data: ReturnType<typeof createDevMockFixtures
   const now = new Date().toISOString();
   let sequence = 100;
   const checkouts = new Map<string, "solo" | "team">();
+  let upgradeQuote: { token: string; expires: number; additional: number } | null = null;
+  let planQuote: BillingPlanChangeQuote | null = null;
+  let pendingPlan: BillingPlanChangeState["pending_change"] = null;
   let plan: "free" | "solo" | "team" = "team";
   let additionalCapacity = 1;
   let pendingReduction: BillingSummaryRecord["capacity_units"]["pending_reduction"] = null;
@@ -74,10 +82,108 @@ export function createBillingMocks(data: ReturnType<typeof createDevMockFixtures
   function handle(method: string, path: string, payload: unknown): MockResponse | undefined {
     const read = method === "GET";
     if (path === "/v1/billing" && read) return reply({ billing: billing() });
+    if (path === "/v1/billing/plan-change" && read) return reply({ pending_change: pendingPlan });
+    if (path === "/v1/billing/plan-change/preview" && method === "POST") {
+      if (plan !== "team" || trial.active || pendingReduction || pendingPlan)
+        return reply({ error: "plan_change_not_allowed" }, 409);
+      planQuote = {
+        confirmation_token: `mock_plan_${sequence++}`,
+        expires_at: new Date(Date.now() + 600_000).toISOString(),
+        effective_at: billing().usage_window.ends_at,
+        target_plan: "solo",
+        amount_due: 0,
+        currency: "usd",
+        monthly_total: 499 + additionalCapacity * 99,
+        tax: 0,
+        additional_capacity_units: additionalCapacity
+      };
+      return reply({ quote: planQuote });
+    }
+    if (path === "/v1/billing/plan-change" && method === "POST") {
+      const input = z.object({ confirmation_token: z.string() }).strict().safeParse(payload);
+      if (!input.success) return invalid();
+      if (pendingPlan) return reply({ pending_change: pendingPlan });
+      if (
+        !planQuote ||
+        planQuote.confirmation_token !== input.data.confirmation_token ||
+        Date.parse(planQuote.expires_at) <= Date.now() ||
+        planQuote.additional_capacity_units !== additionalCapacity ||
+        plan !== "team" ||
+        pendingReduction
+      )
+        return reply({ error: "plan_change_confirmation_required" }, 409);
+      pendingPlan = {
+        schedule_id: `mock_schedule_${sequence++}`,
+        target_plan: "solo",
+        effective_at: planQuote.effective_at,
+        additional_capacity_units: additionalCapacity
+      };
+      return reply({ pending_change: pendingPlan });
+    }
+    if (path === "/v1/billing/plan-change" && method === "DELETE") {
+      const input = z.object({ schedule_id: z.string() }).strict().safeParse(payload);
+      if (!input.success) return invalid();
+      if (!pendingPlan || pendingPlan.schedule_id !== input.data.schedule_id)
+        return reply({ error: "plan_change_not_found" }, 409);
+      pendingPlan = null;
+      planQuote = null;
+      return reply({ pending_change: null });
+    }
+    if (pendingPlan && path.startsWith("/v1/billing/capacity/"))
+      return reply({ error: "billing_change_in_progress" }, 409);
+    if (path === "/v1/billing/upgrade/preview" && method === "POST") {
+      if (plan !== "solo" || trial.active || pendingReduction)
+        return reply({ error: "checkout_not_allowed" }, 409);
+      upgradeQuote = {
+        token: `mock_quote_${sequence++}`,
+        expires: Date.now() + 600_000,
+        additional: additionalCapacity
+      };
+      // Synthetic amounts exercise the dialog; they are never Stripe quotes.
+      return reply({
+        quote: {
+          confirmation_token: upgradeQuote.token,
+          expires_at: new Date(upgradeQuote.expires).toISOString(),
+          currency: "usd",
+          amount_due: 500,
+          tax: 0,
+          monthly_total: 1900 + additionalCapacity * 199,
+          additional_capacity_units: additionalCapacity
+        }
+      });
+    }
     if (method === "POST" && ["/v1/billing/checkout", "/v1/billing/trial/start"].includes(path)) {
-      const input = z.object({ target_plan: z.enum(["solo", "team"]) }).safeParse(payload);
+      const input = z
+        .object({
+          target_plan: z.enum(["solo", "team"]),
+          confirmation_token: z.string().optional()
+        })
+        .safeParse(payload);
       if (!input.success) return invalid();
       if (path.endsWith("/checkout")) {
+        if (
+          trial.active &&
+          !getFirstPurchaseEligibility(
+            {
+              trial_started_at: trial.started_at,
+              previously_paid: false
+            },
+            Date.now()
+          ).allowed
+        )
+          return reply({ error: "paid_purchase_locked" }, 409);
+        if (plan === "solo" && !trial.active && input.data.target_plan === "team") {
+          if (
+            !upgradeQuote ||
+            input.data.confirmation_token !== upgradeQuote.token ||
+            Date.now() >= upgradeQuote.expires ||
+            additionalCapacity !== upgradeQuote.additional
+          )
+            return reply({ error: "upgrade_confirmation_required" }, 409);
+          setPlan("team");
+          upgradeQuote = null;
+          return reply({ url: "/billing?checkout=success" });
+        }
         const id = `mock_checkout_${sequence++}`;
         checkouts.set(id, input.data.target_plan);
         return reply({ url: `/billing?checkout=success&session_id=${id}` });

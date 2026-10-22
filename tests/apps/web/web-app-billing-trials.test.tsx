@@ -172,13 +172,15 @@ describe("web app - billing trial flows", () => {
 
     render(<App initialEntries={["/billing?trial=team"]} />);
 
-    expect(await screen.findByText(/this account has already used its free trial/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/this account has already used its free trial/i)
+    ).toBeInTheDocument();
     expect(screen.getByText(/already used the team trial/i)).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /upgrade to team/i }).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: /start team trial/i })).toBeNull();
   });
 
-  it("shows paid conversion when trial is unavailable without recorded trial plan", async () => {
+  it("guides an account without usable trial history to contact before purchasing", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
 
@@ -215,9 +217,20 @@ describe("web app - billing trial flows", () => {
 
     render(<App initialEntries={["/billing?trial=solo"]} />);
 
-    expect(await screen.findByText(/this account has already used its free trial/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/this account has already used its free trial/i)
+    ).toBeInTheDocument();
     expect(screen.getByText(/a new solo trial cannot be started here/i)).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /upgrade to solo/i }).length).toBeGreaterThan(0);
+    expect(
+      screen
+        .getAllByRole("button", { name: /upgrade to solo/i })
+        .every((button) => button.hasAttribute("disabled"))
+    ).toBe(true);
+    expect(screen.getByRole("link", { name: "Contact us" })).toHaveAttribute(
+      "href",
+      "https://debugbundle.com/contact/"
+    );
   });
 
   it("shows specific trial-start errors from the billing page", async () => {

@@ -1,12 +1,21 @@
+import { BillingPlanChangeControl } from "./billing-plan-change-control.js";
+import { BillingUpgradeDialog } from "./billing-upgrade-dialog.js";
 import { CreditCardIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { CalloutCard } from "../components/system/callout-card.js";
+import { BillingPurchaseNotice } from "../components/system/billing-purchase-notice.js";
 import { PageHeader } from "../components/system/page-header.js";
 import { PlanBadge } from "../components/system/plan-badge.js";
 import { UsageMeter } from "../components/system/usage-meter.js";
 import { Button } from "../components/ui/button.js";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card.js";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "../components/ui/card.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import {
   confirmBillingCheckout,
@@ -21,7 +30,11 @@ import { showErrorToast, showSuccessToast } from "../lib/notify.js";
 import { useSession } from "../lib/session.js";
 import { useDelayedVisibility } from "../lib/use-delayed-visibility.js";
 import { RawIngestedEventsBreakdownDialog } from "./billing-usage-breakdown-dialog.js";
-import { CapacityDialog, CheckoutReturnDialog, type CheckoutReturnDialogState } from "./billing-page-dialogs.js";
+import {
+  CapacityDialog,
+  CheckoutReturnDialog,
+  type CheckoutReturnDialogState
+} from "./billing-page-dialogs.js";
 import {
   billingReflectsCheckout,
   clearPendingBillingCheckout,
@@ -32,6 +45,8 @@ import {
   formatPlanName,
   formatTrialDaysRemaining,
   getBillingWindowRefreshDelay,
+  getBillingFirstPurchaseEligibility,
+  formatPurchaseUnlockDate,
   readPendingBillingCheckout,
   resolveRequestedTrialPlan,
   writePendingBillingCheckout
@@ -49,9 +64,11 @@ export function BillingPage(): JSX.Element {
   const [activeCheckoutPlan, setActiveCheckoutPlan] = useState<"solo" | "team" | null>(null);
   const [activeTrialStartPlan, setActiveTrialStartPlan] = useState<"solo" | "team" | null>(null);
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
+  const [isUpgradeDialogOpen, setIsUpgradeDialogOpen] = useState(false);
   const [isCapacityDialogOpen, setIsCapacityDialogOpen] = useState(false);
   const [isRawIngestBreakdownOpen, setIsRawIngestBreakdownOpen] = useState(false);
-  const [checkoutReturnDialog, setCheckoutReturnDialog] = useState<CheckoutReturnDialogState | null>(null);
+  const [checkoutReturnDialog, setCheckoutReturnDialog] =
+    useState<CheckoutReturnDialogState | null>(null);
   // Older billing reads must not overwrite a later checkout, trial, or capacity response.
   const billingStateRevisionRef = useRef(0);
   const commitBilling = useCallback((nextBilling: BillingSummaryRecord): void => {
@@ -62,6 +79,9 @@ export function BillingPage(): JSX.Element {
   const checkoutStatus = searchParams.get("checkout");
   const checkoutSessionId = searchParams.get("session_id");
   const requestedTrialPlan = resolveRequestedTrialPlan(searchParams.get("trial"));
+  const purchaseEligibility = billing === null ? null : getBillingFirstPurchaseEligibility(billing);
+  const purchaseUnlocksAt =
+    purchaseEligibility?.allowed === false ? purchaseEligibility.unlocks_at : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -69,12 +89,15 @@ export function BillingPage(): JSX.Element {
 
     const clearCheckoutReturn = (): void => {
       clearPendingBillingCheckout();
-      setSearchParams((currentParams) => {
-        const nextParams = new URLSearchParams(currentParams);
-        nextParams.delete("checkout");
-        nextParams.delete("session_id");
-        return nextParams;
-      }, { replace: true });
+      setSearchParams(
+        (currentParams) => {
+          const nextParams = new URLSearchParams(currentParams);
+          nextParams.delete("checkout");
+          nextParams.delete("session_id");
+          return nextParams;
+        },
+        { replace: true }
+      );
     };
 
     const loadBillingSummary = async (): Promise<BillingSummaryRecord | null> => {
@@ -121,7 +144,10 @@ export function BillingPage(): JSX.Element {
       void refreshSession().catch(() => undefined);
     };
 
-    const pollForCheckoutUpdate = async (baseline: BillingSummaryRecord, attemptsRemaining: number): Promise<void> => {
+    const pollForCheckoutUpdate = async (
+      baseline: BillingSummaryRecord,
+      attemptsRemaining: number
+    ): Promise<void> => {
       const nextBilling = await loadBillingSummary();
       if (cancelled || nextBilling === null) {
         clearCheckoutReturn();
@@ -219,10 +245,14 @@ export function BillingPage(): JSX.Element {
         return;
       }
 
-      const delay = getBillingWindowRefreshDelay(usageWindowEndsAt);
-      if (delay === null) {
+      const delays = [usageWindowEndsAt, purchaseUnlocksAt]
+        .filter((value): value is string => value !== null)
+        .map((value) => getBillingWindowRefreshDelay(value))
+        .filter((value): value is number => value !== null);
+      if (delays.length === 0) {
         return;
       }
+      const delay = Math.min(...delays);
 
       timeoutId = window.setTimeout(() => {
         void refreshBillingSummary();
@@ -285,9 +315,18 @@ export function BillingPage(): JSX.Element {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", handleFocus);
     };
-  }, [billing?.usage_window.ends_at, commitBilling]);
+  }, [billing?.usage_window.ends_at, purchaseUnlocksAt, commitBilling]);
 
   async function handleCheckout(targetPlan: "solo" | "team"): Promise<void> {
+    if (
+      billing?.plan === "solo" &&
+      billing.stripe_customer_id &&
+      !billing.trial.active &&
+      targetPlan === "team"
+    ) {
+      setIsUpgradeDialogOpen(true);
+      return;
+    }
     setActiveCheckoutPlan(targetPlan);
 
     if (billing !== null) {
@@ -300,9 +339,17 @@ export function BillingPage(): JSX.Element {
     try {
       const url = await startBillingCheckout(targetPlan);
       window.location.assign(url);
-    } catch {
+    } catch (error) {
       clearPendingBillingCheckout();
-      showErrorToast("Billing checkout is unavailable right now.");
+      showErrorToast(
+        error instanceof Error && error.message === "email_verification_required"
+          ? "Verify your email in account settings before starting checkout."
+          : error instanceof Error && error.message === "paid_purchase_locked"
+            ? "Paid subscriptions unlock after seven days of your trial. Contact us if you need to subscribe sooner."
+            : error instanceof Error && error.message === "checkout_in_progress"
+              ? "An earlier checkout is still pending. Select the same plan to resume it, or wait for its one-hour expiry. If you already paid, refresh billing."
+              : "Billing checkout is unavailable right now."
+      );
     } finally {
       setActiveCheckoutPlan(null);
     }
@@ -328,11 +375,14 @@ export function BillingPage(): JSX.Element {
       const nextBilling = await startBillingTrial(targetPlan);
       commitBilling(nextBilling);
       showSuccessToast(`${formatPlanName(targetPlan)} trial started successfully.`);
-      setSearchParams((currentParams) => {
-        const nextParams = new URLSearchParams(currentParams);
-        nextParams.set("trial", targetPlan);
-        return nextParams;
-      }, { replace: true });
+      setSearchParams(
+        (currentParams) => {
+          const nextParams = new URLSearchParams(currentParams);
+          nextParams.set("trial", targetPlan);
+          return nextParams;
+        },
+        { replace: true }
+      );
     } catch (error) {
       if (error instanceof Error && error.message === "trial_unavailable") {
         showErrorToast("This account can no longer start a free trial.");
@@ -347,6 +397,7 @@ export function BillingPage(): JSX.Element {
   }
 
   const canChangeBilling = billing !== null;
+  const isPurchaseLocked = purchaseEligibility?.allowed === false;
   const isTrialActive = billing?.trial.active === true;
   const activeTrialPlan = billing?.trial.plan;
   const trialDaysRemaining = formatTrialDaysRemaining(billing?.trial.days_remaining ?? null);
@@ -360,67 +411,97 @@ export function BillingPage(): JSX.Element {
   const canManageStripeBilling = canChangeBilling && !isBillingManagedInternally;
   const canManageCapacity = billing !== null && billing.plan !== "free" && !isTrialActive;
   const pendingReduction = billing?.capacity_units.pending_reduction ?? null;
-  const primaryTrialCheckoutPlan = activeTrialPlan === "team" ? "team" : billing?.plan === "team" ? "team" : "solo";
-  const trialCallout = billing === null ? null : isTrialActive ? (
-    <CalloutCard
-      eyebrow="Trial active"
-      title={`${trialDaysRemaining ?? "Active"} in your ${formatPlanName(activeTrialPlan ?? billing.plan)} trial`}
-      description={`Trial access stays active through ${formatDate(billing.trial.ends_at ?? billing.usage_window.ends_at)}. No credit card is required until you convert, and extra capacity remains locked during the trial.`}
-      tone="neutral"
-    >
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" disabled={activeCheckoutPlan !== null} onClick={() => void handleCheckout(primaryTrialCheckoutPlan)}>
-          <CreditCardIcon data-icon="inline-start" />
-          {activeCheckoutPlan === primaryTrialCheckoutPlan
-            ? "Opening checkout..."
-            : `Convert to ${formatPlanName(primaryTrialCheckoutPlan)} paid`}
-        </Button>
-        {activeTrialPlan === "solo" ? (
-          <Button type="button" variant="outline" disabled={activeCheckoutPlan !== null} onClick={() => void handleCheckout("team")}>
-            {activeCheckoutPlan === "team" ? "Opening checkout..." : "Upgrade to Team"}
+  const primaryTrialCheckoutPlan =
+    activeTrialPlan === "team" ? "team" : billing?.plan === "team" ? "team" : "solo";
+  const trialCallout =
+    billing === null ? null : isTrialActive ? (
+      <CalloutCard
+        eyebrow="Trial active"
+        title={`${trialDaysRemaining ?? "Active"} in your ${formatPlanName(activeTrialPlan ?? billing.plan)} trial`}
+        description={`Trial access stays active through ${formatDate(billing.trial.ends_at ?? billing.usage_window.ends_at)}. No credit card is required until you convert, and extra capacity remains locked during the trial.`}
+        tone="neutral"
+      >
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            disabled={isPurchaseLocked || activeCheckoutPlan !== null}
+            onClick={() => void handleCheckout(primaryTrialCheckoutPlan)}
+          >
+            <CreditCardIcon data-icon="inline-start" />
+            {activeCheckoutPlan === primaryTrialCheckoutPlan
+              ? "Opening checkout..."
+              : `Convert to ${formatPlanName(primaryTrialCheckoutPlan)} paid`}
           </Button>
-        ) : null}
-      </div>
-    </CalloutCard>
-  ) : billing.plan === "free" && billing.trial.available ? (
-    <CalloutCard
-      eyebrow="30-day no-card trial"
-      title={
-        requestedTrialPlan === null
-          ? "Start a paid-plan trial before you subscribe"
-          : `${formatPlanName(preferredTrialPlan)} trial ready to start`
-      }
-      description="Trials include the full paid allowance for the selected plan. No credit card is required, and extra capacity stays unavailable until you convert to paid."
-      tone="neutral"
-    >
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" disabled={activeTrialStartPlan !== null} onClick={() => void handleStartTrial(preferredTrialPlan)}>
-          {activeTrialStartPlan === preferredTrialPlan ? "Starting trial..." : `Start ${formatPlanName(preferredTrialPlan)} trial`}
-        </Button>
-        <Button type="button" variant="outline" disabled={activeTrialStartPlan !== null} onClick={() => void handleStartTrial(alternateTrialPlan)}>
-          {activeTrialStartPlan === alternateTrialPlan ? "Starting trial..." : `Start ${formatPlanName(alternateTrialPlan)} trial`}
-        </Button>
-      </div>
-    </CalloutCard>
-  ) : billing.plan === "free" && requestedTrialPlan !== null ? (
-    <CalloutCard
-      eyebrow="Trial unavailable"
-      title="This account has already used its free trial"
-      description={
-        billing.trial.plan === null
-          ? `A new ${formatPlanName(requestedTrialPlan)} trial cannot be started here. Paid checkout is still available.`
-          : `This account already used the ${formatPlanName(billing.trial.plan)} trial. Paid checkout is still available${billing.trial.expired_at === null ? "." : ` after it ended on ${formatDate(billing.trial.expired_at)}.`}`
-      }
-      tone="neutral"
-    >
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" disabled={activeCheckoutPlan !== null} onClick={() => void handleCheckout(requestedTrialPlan)}>
-          <CreditCardIcon data-icon="inline-start" />
-          {activeCheckoutPlan === requestedTrialPlan ? "Opening checkout..." : `Upgrade to ${formatPlanName(requestedTrialPlan)}`}
-        </Button>
-      </div>
-    </CalloutCard>
-  ) : null;
+          {activeTrialPlan === "solo" ? (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isPurchaseLocked || activeCheckoutPlan !== null}
+              onClick={() => void handleCheckout("team")}
+            >
+              {activeCheckoutPlan === "team" ? "Opening checkout..." : "Upgrade to Team"}
+            </Button>
+          ) : null}
+        </div>
+      </CalloutCard>
+    ) : billing.plan === "free" && billing.trial.available ? (
+      <CalloutCard
+        eyebrow="30-day no-card trial"
+        title={
+          requestedTrialPlan === null
+            ? "Start a paid-plan trial before you subscribe"
+            : `${formatPlanName(preferredTrialPlan)} trial ready to start`
+        }
+        description="Trials include the full paid allowance for the selected plan. No credit card is required, and extra capacity stays unavailable until you convert to paid."
+        tone="neutral"
+      >
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            disabled={activeTrialStartPlan !== null}
+            onClick={() => void handleStartTrial(preferredTrialPlan)}
+          >
+            {activeTrialStartPlan === preferredTrialPlan
+              ? "Starting trial..."
+              : `Start ${formatPlanName(preferredTrialPlan)} trial`}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={activeTrialStartPlan !== null}
+            onClick={() => void handleStartTrial(alternateTrialPlan)}
+          >
+            {activeTrialStartPlan === alternateTrialPlan
+              ? "Starting trial..."
+              : `Start ${formatPlanName(alternateTrialPlan)} trial`}
+          </Button>
+        </div>
+      </CalloutCard>
+    ) : billing.plan === "free" && requestedTrialPlan !== null ? (
+      <CalloutCard
+        eyebrow="Trial unavailable"
+        title="This account has already used its free trial"
+        description={
+          billing.trial.plan === null
+            ? `A new ${formatPlanName(requestedTrialPlan)} trial cannot be started here.${isPurchaseLocked ? " Contact us for help subscribing." : " Paid checkout is still available."}`
+            : `This account already used the ${formatPlanName(billing.trial.plan)} trial.${isPurchaseLocked ? " Contact us for help subscribing." : ` Paid checkout is still available${billing.trial.expired_at === null ? "." : ` after it ended on ${formatDate(billing.trial.expired_at)}.`}`}`
+        }
+        tone="neutral"
+      >
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            disabled={isPurchaseLocked || activeCheckoutPlan !== null}
+            onClick={() => void handleCheckout(requestedTrialPlan)}
+          >
+            <CreditCardIcon data-icon="inline-start" />
+            {activeCheckoutPlan === requestedTrialPlan
+              ? "Opening checkout..."
+              : `Upgrade to ${formatPlanName(requestedTrialPlan)}`}
+          </Button>
+        </div>
+      </CalloutCard>
+    ) : null;
 
   return (
     <div className="space-y-8">
@@ -452,12 +533,23 @@ export function BillingPage(): JSX.Element {
       ) : (
         <>
           {trialCallout}
+          {isPurchaseLocked ? (
+            <BillingPurchaseNotice
+              unlockDate={
+                purchaseEligibility?.unlocks_at
+                  ? formatPurchaseUnlockDate(purchaseEligibility.unlocks_at)
+                  : null
+              }
+            />
+          ) : null}
 
           <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
             <Card>
               <CardHeader>
                 <CardTitle>Current plan</CardTitle>
-                <CardDescription>Current plan and allowance capacity for this account.</CardDescription>
+                <CardDescription>
+                  Current plan and allowance capacity for this account.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-4">
@@ -466,7 +558,11 @@ export function BillingPage(): JSX.Element {
                     <div className="flex items-center gap-3">
                       <PlanBadge plan={billing.plan} />
                       <span className="text-sm text-muted-foreground">
-                        {[trialDaysRemaining, formatActiveProjectCount(billing.active_projects), formatAllowanceUnitCount(billing.capacity_units.total)]
+                        {[
+                          trialDaysRemaining,
+                          formatActiveProjectCount(billing.active_projects),
+                          formatAllowanceUnitCount(billing.capacity_units.total)
+                        ]
                           .filter((value) => value !== null)
                           .join(" • ")}
                       </span>
@@ -475,22 +571,37 @@ export function BillingPage(): JSX.Element {
                   <div className="flex flex-wrap gap-3">
                     {billing.plan === "free" ? (
                       <>
-                        <Button type="button" disabled={!canChangeBilling || activeCheckoutPlan !== null} onClick={() => void handleCheckout("solo")}>
+                        <Button
+                          type="button"
+                          disabled={
+                            !canChangeBilling || isPurchaseLocked || activeCheckoutPlan !== null
+                          }
+                          onClick={() => void handleCheckout("solo")}
+                        >
                           <CreditCardIcon data-icon="inline-start" />
-                          {activeCheckoutPlan === "solo" ? "Opening checkout..." : "Upgrade to Solo"}
+                          {activeCheckoutPlan === "solo"
+                            ? "Opening checkout..."
+                            : "Upgrade to Solo"}
                         </Button>
                         <Button
                           type="button"
                           variant="outline"
-                          disabled={!canChangeBilling || activeCheckoutPlan !== null}
+                          disabled={
+                            !canChangeBilling || isPurchaseLocked || activeCheckoutPlan !== null
+                          }
                           onClick={() => void handleCheckout("team")}
                         >
                           Upgrade to Team
                         </Button>
                       </>
-                    ) : isTrialActive ? null : isBillingManagedInternally ? null : billing.plan === "solo" ? (
+                    ) : isTrialActive ? null : isBillingManagedInternally ? null : billing.plan ===
+                      "solo" ? (
                       <>
-                        <Button type="button" disabled={!canManageStripeBilling || isOpeningPortal} onClick={() => void handlePortal()}>
+                        <Button
+                          type="button"
+                          disabled={!canManageStripeBilling || isOpeningPortal}
+                          onClick={() => void handlePortal()}
+                        >
                           <CreditCardIcon data-icon="inline-start" />
                           {isOpeningPortal ? "Opening portal..." : "Manage subscription"}
                         </Button>
@@ -504,13 +615,25 @@ export function BillingPage(): JSX.Element {
                         </Button>
                       </>
                     ) : (
-                      <Button type="button" disabled={!canManageStripeBilling || isOpeningPortal} onClick={() => void handlePortal()}>
+                      <Button
+                        type="button"
+                        disabled={!canManageStripeBilling || isOpeningPortal}
+                        onClick={() => void handlePortal()}
+                      >
                         <CreditCardIcon data-icon="inline-start" />
                         {isOpeningPortal ? "Opening portal..." : "Manage subscription"}
                       </Button>
                     )}
                   </div>
                 </div>
+
+                {billing.plan === "team" &&
+                canManageStripeBilling &&
+                billing.stripe_customer_id &&
+                billing.billing_state === "active" &&
+                !billing.trial.active ? (
+                  <BillingPlanChangeControl />
+                ) : null}
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <CalloutCard
@@ -596,7 +719,8 @@ export function BillingPage(): JSX.Element {
                   <div>
                     <p className="text-muted-foreground">Scheduled allowance</p>
                     <p className="font-medium">
-                      {pendingReduction.total} total units on {formatDate(pendingReduction.effective_at)}
+                      {pendingReduction.total} total units on{" "}
+                      {formatDate(pendingReduction.effective_at)}
                     </p>
                   </div>
                 )}
@@ -652,6 +776,14 @@ export function BillingPage(): JSX.Element {
             </CardContent>
           </Card>
 
+          <BillingUpgradeDialog
+            open={isUpgradeDialogOpen}
+            onOpenChange={setIsUpgradeDialogOpen}
+            onNavigate={(url) => {
+              writePendingBillingCheckout({ previousPlan: billing.plan, targetPlan: "team" });
+              window.location.assign(url);
+            }}
+          />
           <RawIngestedEventsBreakdownDialog
             billing={billing}
             open={isRawIngestBreakdownOpen}

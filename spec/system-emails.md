@@ -124,6 +124,7 @@ Recommended v1 or shortly after:
 - Recipient: organization owner billing contact
 - Required in v1: yes
 - Notes: must explain current risk to paid entitlements and next billing attempt if known
+- Pending-upgrade exception: an unapplied upgrade whose current paid base subscription remains active does not start base-plan dunning or downgrade mail. The same hosted upgrade invoice handles payment recovery. An upgrade invoice is not a renewal; current-state plan-change confirmation covers either webhook delivery order.
 
 ### 4.7 Payment Failure Reminder
 
@@ -305,3 +306,7 @@ At minimum, test coverage must verify that the system triggers the correct email
 - Billing lifecycle source-of-truth: `/spec/billing.md`
 - Tier allowance notification requirements: `/spec/product.md` section 13
 - Existing auth flows: `/spec/auth-architecture.md`
+
+Billing webhook notifications are queued atomically with state and event receipt in operational_email_deliveries (billing_lifecycle). Rendered content is validated before queueing; the existing worker retries transport failures. Transition comparisons use the persisted pre-change snapshot. Queue deduplication prevents repeated webhook processing from enqueueing duplicates; external email delivery remains at-least-once.
+
+Billing outbox rollout requires the notification-compatible worker before the API producer. An application rollback must retain a compatible worker until pending billing messages are delivered or explicitly reconciled; existing retry limits and at-least-once transport semantics still apply.

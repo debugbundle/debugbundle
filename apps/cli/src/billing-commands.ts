@@ -1,11 +1,23 @@
-import { BillingApiError } from "../../../packages/billing-client/src/index.js";
+import {
+  BillingApiError,
+  type CapacityPaymentRequired
+} from "../../../packages/billing-client/src/index.js";
 
 import { createAuthenticatedBillingApi, runAuthenticatedCliCommand } from "./auth-context.js";
 import type { CliCommandResult } from "./token-commands.js";
 
 interface BillingSummaryLike {
   plan: "free" | "solo" | "team";
-  billing_state: "active" | "past_due" | "canceled" | "unpaid" | "incomplete" | "admin_override" | "trialing" | "trial_expired" | null;
+  billing_state:
+    | "active"
+    | "past_due"
+    | "canceled"
+    | "unpaid"
+    | "incomplete"
+    | "admin_override"
+    | "trialing"
+    | "trial_expired"
+    | null;
   active_projects: number;
   capacity_units: {
     total: number;
@@ -165,7 +177,10 @@ export async function startBillingTrialCommand(
     json?: boolean;
   },
   api: {
-    startTrial(input: { bearerToken: string; targetPlan: "solo" | "team" }): Promise<BillingSummaryLike>;
+    startTrial(input: {
+      bearerToken: string;
+      targetPlan: "solo" | "team";
+    }): Promise<BillingSummaryLike>;
   }
 ): Promise<CliCommandResult> {
   try {
@@ -176,7 +191,9 @@ export async function startBillingTrialCommand(
 
     return {
       exitCode: 0,
-      output: input.json ? JSON.stringify({ billing }) : `Trial started.\n${formatBillingSummary(billing)}`
+      output: input.json
+        ? JSON.stringify({ billing })
+        : `Trial started.\n${formatBillingSummary(billing)}`
     };
   } catch (error) {
     return { exitCode: mapErrorToExitCode(error), output: formatBillingError(error) };
@@ -190,7 +207,10 @@ export async function increaseBillingCapacityCommand(
     json?: boolean;
   },
   api: {
-    increaseCapacity(input: { bearerToken: string; targetAdditionalCapacityUnits: number }): Promise<BillingSummaryLike>;
+    increaseCapacity(input: {
+      bearerToken: string;
+      targetAdditionalCapacityUnits: number;
+    }): Promise<BillingSummaryLike | CapacityPaymentRequired>;
   }
 ): Promise<CliCommandResult> {
   try {
@@ -199,9 +219,18 @@ export async function increaseBillingCapacityCommand(
       targetAdditionalCapacityUnits: input.targetAdditionalCapacityUnits
     });
 
+    if ("payment_required" in billing)
+      return {
+        exitCode: 5,
+        output: input.json
+          ? JSON.stringify(billing)
+          : `Payment is required before capacity increases. Complete it on Stripe: ${billing.payment_required.url}`
+      };
     return {
       exitCode: 0,
-      output: input.json ? JSON.stringify({ billing }) : `Allowance capacity increased.\n${formatBillingSummary(billing)}`
+      output: input.json
+        ? JSON.stringify({ billing })
+        : `Allowance capacity increased.\n${formatBillingSummary(billing)}`
     };
   } catch (error) {
     return { exitCode: mapErrorToExitCode(error), output: formatBillingError(error) };
@@ -215,7 +244,10 @@ export async function scheduleBillingCapacityReductionCommand(
     json?: boolean;
   },
   api: {
-    scheduleCapacityReduction(input: { bearerToken: string; targetAdditionalCapacityUnits: number }): Promise<BillingSummaryLike>;
+    scheduleCapacityReduction(input: {
+      bearerToken: string;
+      targetAdditionalCapacityUnits: number;
+    }): Promise<BillingSummaryLike>;
   }
 ): Promise<CliCommandResult> {
   try {
@@ -226,7 +258,9 @@ export async function scheduleBillingCapacityReductionCommand(
 
     return {
       exitCode: 0,
-      output: input.json ? JSON.stringify({ billing }) : `Capacity reduction scheduled.\n${formatBillingSummary(billing)}`
+      output: input.json
+        ? JSON.stringify({ billing })
+        : `Capacity reduction scheduled.\n${formatBillingSummary(billing)}`
     };
   } catch (error) {
     return { exitCode: mapErrorToExitCode(error), output: formatBillingError(error) };
@@ -246,7 +280,9 @@ export async function cancelBillingCapacityReductionCommand(
     const billing = await api.cancelCapacityReduction({ bearerToken: input.bearerToken });
     return {
       exitCode: 0,
-      output: input.json ? JSON.stringify({ billing }) : `Capacity reduction cancelled.\n${formatBillingSummary(billing)}`
+      output: input.json
+        ? JSON.stringify({ billing })
+        : `Capacity reduction cancelled.\n${formatBillingSummary(billing)}`
     };
   } catch (error) {
     return { exitCode: mapErrorToExitCode(error), output: formatBillingError(error) };
@@ -260,9 +296,16 @@ export async function getBillingSummaryWithAuthCommand(
   return runAuthenticatedCliCommand(input, {
     createApi: createAuthenticatedBillingApi,
     dependencies,
-    runCommand: (authState, api) => getBillingSummaryCommand({ bearerToken: authState.bearer_token, ...(input.json === undefined ? {} : { json: input.json }) }, {
-      getBillingSummary: (requestInput) => api.getBillingSummary(requestInput)
-    })
+    runCommand: (authState, api) =>
+      getBillingSummaryCommand(
+        {
+          bearerToken: authState.bearer_token,
+          ...(input.json === undefined ? {} : { json: input.json })
+        },
+        {
+          getBillingSummary: (requestInput) => api.getBillingSummary(requestInput)
+        }
+      )
   });
 }
 

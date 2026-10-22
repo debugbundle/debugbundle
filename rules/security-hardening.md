@@ -35,6 +35,12 @@ The API must enforce a server-wide request timeout (currently 30s). Routes that 
 
 All authentication-adjacent endpoints (login, signup, password reset, verification resend, and any future auth endpoints) must enforce per-IP rate limiting. Current limit: 10 requests/minute per IP. Rate-limited responses must include a `Retry-After` header.
 
+### SEC-04a: Trusted Client IPs and Checkout Admission
+
+Forwarded client IPs are disabled by default. `API_TRUSTED_PROXY_IPS` may name at most 16 explicit immediate-peer IPs; wildcards, booleans, CIDR-wide trust and arbitrary further hops are rejected. Before enabling it, verify the API listener is private to the managed proxy and the proxy overwrites untrusted forwarding headers. Direct client forwarding must never bypass shared IP admission. Hosted Checkout additionally uses organization and client-IP limits, a durable attempt and provider idempotency; IP equality alone never proves shared identity or fraud.
+
+Prepared subscription upgrades and capacity mutations share a durable organization reservation and immutable provider commands. Stop ambiguous replays before provider idempotency retention expires; never rotate potentially charged work on age alone. Paid upgrades must preserve purchased capacity and gate new entitlements on applied Stripe state. A failed pending upgrade must not trigger base-plan dunning. Cached canceled state alone cannot authorize another subscription: verify the exact provider subscription is terminal and fence cancellation against replacement subscriptions and newer checkout reservations.
+
 ### SEC-05: CSRF Protection On Session Mutations
 
 All POST/PUT/PATCH/DELETE routes authenticated via session cookie must validate the `X-CSRF-Token` header using timing-safe comparison. Exempt only session-creating routes (login, signup) and bearer-token-only routes. New mutation routes using session auth inherit this requirement automatically.
@@ -227,3 +233,5 @@ When adding a new API route, SDK feature, or storage surface, review this list a
 The shared API/worker runtime logger projects request/response objects to method/status metadata, removes exception message/stack/cause and payload fields, and applies the mandatory bounded sanitizer to records and child bindings. Message arguments must be fixed event identifiers; interpolation arguments and free-form message text are withheld. Keep diagnostic detail in protected incident evidence, not infrastructure logs. Proxy access and error log sinks require separate effective-configuration and synthetic failure checks.
 
 Public status pages must also enforce [the public publication trust rules](public-status-pages.md); anonymous projections are not an exception to sanitization or owner-only configuration.
+
+Billing first-purchase admission (local candidate): never trust a browser clock, disabled button, customer ID or failed subscription as purchase eligibility. Recheck the immutable trial start and processed paid-invoice history inside the organisation-locked reservation before returning/replaying Checkout. Return `paid_purchase_locked` without deleting ambiguous work. Payment/webhook reconciliation must continue to honour existing provider-confirmed payments. The gate cannot revoke previously issued hosted URLs.

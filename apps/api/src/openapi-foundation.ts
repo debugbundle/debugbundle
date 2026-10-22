@@ -1,3 +1,4 @@
+import { billingPlanChangeOperations } from "./openapi-billing-plan-change.js";
 import {
   z,
   AccountDeleteBodySchema,
@@ -41,6 +42,7 @@ import {
 
 export function foundationOperations(): OperationSpec[] {
   return [
+    ...billingPlanChangeOperations(),
     {
       method: "get",
       path: "/health",
@@ -373,6 +375,45 @@ export function foundationOperations(): OperationSpec[] {
 
     {
       method: "post",
+      path: "/v1/billing/upgrade/preview",
+      operationId: "previewBillingUpgrade",
+      summary: "Preview a same-subscription Solo to Team upgrade",
+      tags: ["Billing"],
+      security: browserSessionAuth,
+      requestBody: component("BillingUpgradePreviewBody", z.object({}).strict()),
+      responses: {
+        "200": {
+          description:
+            "A ten-minute confirmation quote, or the existing unpaid invoice to resume. This preview makes no payment mutation.",
+          schema: component(
+            "BillingUpgradePreviewResponse",
+            z.union([
+              z.object({
+                quote: z.object({
+                  confirmation_token: z.string(),
+                  expires_at: z.string().datetime(),
+                  currency: z.string(),
+                  amount_due: z.number().int(),
+                  tax: z.number().int(),
+                  monthly_total: z.number().int(),
+                  additional_capacity_units: z.number().int()
+                })
+              }),
+              z.object({ payment_url: z.string().url() })
+            ])
+          )
+        },
+        "400": { description: "Invalid payload.", schema: apiError },
+        "401": { description: "Invalid browser session.", schema: apiError },
+        "403": { description: "Verified owner session and CSRF token required.", schema: apiError },
+        "409": { description: "Unsafe plan change or an unresolved operation.", schema: apiError },
+        "429": { description: "Rate limit reached.", schema: apiError },
+        "503": { description: "Billing service unavailable.", schema: apiError }
+      }
+    },
+
+    {
+      method: "post",
       path: "/v1/billing/checkout",
       operationId: "createBillingCheckout",
       summary: "Create a Stripe checkout link",
@@ -380,13 +421,29 @@ export function foundationOperations(): OperationSpec[] {
       security: browserSessionAuth,
       requestBody: component("BillingCheckoutBody", BillingCheckoutBodySchema),
       responses: {
-        "200": { description: "Hosted checkout URL.", schema: billingLinkResponse },
+        "200": {
+          description:
+            "Hosted Checkout URL for a new subscription, the same paid-upgrade invoice URL for authentication/payment recovery, or the billing return URL after that upgrade is applied.",
+          schema: billingLinkResponse
+        },
         "400": { description: "Invalid request body.", schema: apiError },
         "401": { description: "Browser session is missing or invalid.", schema: apiError },
         "403": { description: "Owner access or a verified email is required.", schema: apiError },
         "404": { description: "Billing was not found or is unavailable.", schema: apiError },
-        "409": { description: "Requested plan change is invalid.", schema: apiError },
-        "503": { description: "Billing is not configured.", schema: apiError }
+        "409": {
+          description:
+            "Invalid or unsafe plan change, first paid purchase locked until seven full trial days (paid_purchase_locked), or a durable checkout/subscription operation is still in progress.",
+          schema: apiError
+        },
+        "429": {
+          description: "Checkout admission limit reached; Retry-After is returned.",
+          schema: apiError
+        },
+        "503": {
+          description:
+            "Billing is not configured or provider/persistence work failed; uncertain reservations remain retained.",
+          schema: apiError
+        }
       }
     },
 
@@ -435,12 +492,28 @@ export function foundationOperations(): OperationSpec[] {
       security: anyMemberAuth,
       requestBody: component("BillingCapacityBody", BillingCapacityChangeBodySchema),
       responses: {
-        "200": { description: "Updated billing summary.", schema: billingSummaryResponse },
+        "200": {
+          description:
+            "Confirmed applied capacity, or an existing Stripe invoice requiring payment/authentication. Capacity remains unchanged until payment applies.",
+          schema: {
+            oneOf: [
+              billingSummaryResponse,
+              component(
+                "BillingCapacityPaymentRequired",
+                z.object({ payment_required: z.object({ url: z.string().url() }) })
+              )
+            ]
+          }
+        },
         "400": { description: "Invalid request body.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
         "403": { description: "Owner access or a verified email is required.", schema: apiError },
         "404": { description: "Billing was not found or is unavailable.", schema: apiError },
-        "409": { description: "Requested capacity change is invalid.", schema: apiError },
+        "409": {
+          description:
+            "Requested capacity change is invalid or another durable subscription operation is pending (billing_change_in_progress).",
+          schema: apiError
+        },
         "503": { description: "Billing is not configured.", schema: apiError }
       }
     },
@@ -459,7 +532,11 @@ export function foundationOperations(): OperationSpec[] {
         "401": { description: "Authentication is invalid.", schema: apiError },
         "403": { description: "Owner access or a verified email is required.", schema: apiError },
         "404": { description: "Billing was not found or is unavailable.", schema: apiError },
-        "409": { description: "Requested capacity reduction is invalid.", schema: apiError },
+        "409": {
+          description:
+            "Requested capacity reduction is invalid or another durable subscription operation is pending (billing_change_in_progress).",
+          schema: apiError
+        },
         "503": { description: "Billing is not configured.", schema: apiError }
       }
     },
@@ -476,7 +553,11 @@ export function foundationOperations(): OperationSpec[] {
         "401": { description: "Authentication is invalid.", schema: apiError },
         "403": { description: "Owner access or a verified email is required.", schema: apiError },
         "404": { description: "Billing was not found or is unavailable.", schema: apiError },
-        "409": { description: "No scheduled reduction exists.", schema: apiError },
+        "409": {
+          description:
+            "No scheduled reduction exists or another durable subscription operation is pending (billing_change_in_progress).",
+          schema: apiError
+        },
         "503": { description: "Billing is not configured.", schema: apiError }
       }
     }

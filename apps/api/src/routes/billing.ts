@@ -1,85 +1,18 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { requireOwnerBillingPrincipal } from "./billing-principal.js";
+import { registerBillingPlanChangeRoutes } from "./billing-plan-change.js";
+import { registerBillingUpgradeRoutes } from "./billing-upgrade.js";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import type { ApiDependencies } from "../api-types.js";
 import { recordAuditLog, resolveAuditActorType } from "../audit-logging.js";
 import { ensureBillingAdminDefaultPlan, isBillingAdminOperator } from "../billing-admin-helpers.js";
-import { enforceRequestRateLimit, requireOwnerMemberAuth, resolveBrowserSession } from "../api-helpers.js";
+import { enforceRequestRateLimit, resolveBrowserSession } from "../api-helpers.js";
 import {
   BillingCheckoutBodySchema,
   BillingCheckoutConfirmBodySchema,
   BillingCapacityChangeBodySchema,
   BillingTrialStartBodySchema
 } from "../schemas.js";
-
-async function requireOwnerBillingPrincipal(
-  request: FastifyRequest,
-  reply: FastifyReply,
-  dependencies: ApiDependencies,
-  bucket: "management-read" | "management-write"
-): Promise<
-  | {
-      organization_id: string;
-      subject: string;
-      user_id: string;
-      email: string | undefined;
-    }
-  | null
-> {
-  if (request.headers.authorization === undefined) {
-    const session = await resolveBrowserSession(request.headers.cookie, dependencies);
-    if (session === null) {
-      await reply.status(401).send({ error: "invalid_session" });
-      return null;
-    }
-
-    if (session.role !== "owner") {
-      await reply.status(403).send({ error: "forbidden" });
-      return null;
-    }
-
-    if (
-      !(await enforceRequestRateLimit(request, reply, dependencies, {
-        bucket,
-        subject: `member:${session.user_id}`
-      }))
-    ) {
-      return null;
-    }
-
-    return {
-      organization_id: session.organization_id,
-      subject: `member:${session.user_id}`,
-      user_id: session.user_id,
-      email: session.email
-    };
-  }
-
-  const member = await requireOwnerMemberAuth(request.headers, dependencies);
-  if (member === null) {
-    await reply.status(401).send({ error: "invalid_member_token" });
-    return null;
-  }
-  if (member === "forbidden") {
-    await reply.status(403).send({ error: "forbidden" });
-    return null;
-  }
-
-  if (
-    !(await enforceRequestRateLimit(request, reply, dependencies, {
-      bucket,
-      subject: `member:${member.member_id}`
-    }))
-  ) {
-    return null;
-  }
-
-  return {
-    organization_id: member.organization_id,
-    subject: `member:${member.member_id}`,
-    user_id: member.member_id,
-    email: member.email
-  };
-}
 
 function canUpgrade(currentPlan: "free" | "solo" | "team", targetPlan: "solo" | "team"): boolean {
   if (currentPlan === "free") {
@@ -165,9 +98,16 @@ async function recordBillingAdminOverrideAudit(
 }
 
 export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
+  registerBillingUpgradeRoutes(app, dependencies);
+  registerBillingPlanChangeRoutes(app, dependencies);
   app.get("/v1/billing", async (request, reply) => {
     reply.header("Cache-Control", "no-store");
-    const principal = await requireOwnerBillingPrincipal(request, reply, dependencies, "management-read");
+    const principal = await requireOwnerBillingPrincipal(
+      request,
+      reply,
+      dependencies,
+      "management-read"
+    );
     if (principal === null) {
       return;
     }
@@ -207,7 +147,12 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
   });
 
   app.post("/v1/billing/trial/start", async (request, reply) => {
-    const principal = await requireOwnerBillingPrincipal(request, reply, dependencies, "management-write");
+    const principal = await requireOwnerBillingPrincipal(
+      request,
+      reply,
+      dependencies,
+      "management-write"
+    );
     if (principal === null) {
       return;
     }
@@ -272,6 +217,8 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
     if (session.role !== "owner") {
       return reply.status(403).send({ error: "forbidden" });
     }
+    if (!session.email_verified_at)
+      return reply.status(403).send({ error: "email_verification_required" });
     if (
       !(await enforceRequestRateLimit(request, reply, dependencies, {
         bucket: "management-write",
@@ -287,6 +234,30 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
     const parsedBody = BillingCheckoutBodySchema.safeParse(request.body);
     if (!parsedBody.success) {
       return reply.status(400).send({ error: "invalid_payload" });
+    }
+
+    if (
+      !(await enforceRequestRateLimit(request, reply, dependencies, {
+        bucket: "billing-checkout-account",
+        subject: `organization:${session.organization_id}`
+      })) ||
+      !(await enforceRequestRateLimit(request, reply, dependencies, {
+        bucket: "billing-checkout-ip",
+        subject: `ip:${request.ip}`
+      }))
+    ) {
+      await recordAuditLog(dependencies.auditLogging, {
+        organization_id: session.organization_id,
+        actor_user_id: session.user_id,
+        actor_type: "browser_session",
+        action: "billing.checkout",
+        target_type: "billing_checkout",
+        target_id: session.organization_id,
+        status: "failure",
+        ip_address: request.ip,
+        metadata: { reason: "rate_limited", target_plan: parsedBody.data.target_plan }
+      });
+      return;
     }
 
     const billing = await dependencies.billingManagement.getBillingSummaryForOrganization({
@@ -335,8 +306,27 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
       organization_id: session.organization_id,
       billing_email: session.email,
       current_plan: billing.plan,
-      target_plan: parsedBody.data.target_plan
+      target_plan: parsedBody.data.target_plan,
+      ...(parsedBody.data.confirmation_token
+        ? { confirmation_token: parsedBody.data.confirmation_token }
+        : {})
     });
+    if (typeof checkout === "string") {
+      await recordAuditLog(dependencies.auditLogging, {
+        organization_id: session.organization_id,
+        actor_user_id: session.user_id,
+        actor_type: "browser_session",
+        action: "billing.checkout",
+        target_type: "billing_checkout",
+        target_id: session.organization_id,
+        status: "failure",
+        ip_address: request.ip,
+        metadata: { reason: checkout, target_plan: parsedBody.data.target_plan }
+      });
+      return reply
+        .status(checkout === "billing_service_error" ? 503 : 409)
+        .send({ error: checkout });
+    }
     if (checkout === null) {
       await recordAuditLog(dependencies.auditLogging, {
         organization_id: session.organization_id,
@@ -407,11 +397,12 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
     });
 
     if (typeof result === "string") {
-      const statusCode = result === "billing_not_configured" || result === "billing_service_error"
-        ? 503
-        : result === "billing_not_found" || result === "checkout_session_not_found"
-          ? 404
-          : 409;
+      const statusCode =
+        result === "billing_not_configured" || result === "billing_service_error"
+          ? 503
+          : result === "billing_not_found" || result === "checkout_session_not_found"
+            ? 404
+            : 409;
 
       await recordAuditLog(dependencies.auditLogging, {
         organization_id: session.organization_id,
@@ -444,7 +435,7 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
       }
     });
 
-    return reply.status(200).send({ billing: result });
+    return reply.status(200).send("payment_required" in result ? result : { billing: result });
   });
 
   app.post("/v1/billing/portal", async (request, reply) => {
@@ -566,7 +557,12 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
   });
 
   app.post("/v1/billing/capacity/increase", async (request, reply) => {
-    const principal = await requireOwnerBillingPrincipal(request, reply, dependencies, "management-write");
+    const principal = await requireOwnerBillingPrincipal(
+      request,
+      reply,
+      dependencies,
+      "management-write"
+    );
     if (principal === null) {
       return;
     }
@@ -617,15 +613,14 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
       billing !== null &&
       billing.plan !== "free" &&
       !hasActiveTrial(billing) &&
-      (
-        billing.billing_state === "admin_override" ||
+      (billing.billing_state === "admin_override" ||
         billing.billing_state === null ||
-        billing.billing_state === undefined
-      ) &&
+        billing.billing_state === undefined) &&
       billing.stripe_customer_id === null;
 
     const result = isInternalOperatorBilling
-      ? parsedBody.data.target_additional_capacity_units <= billing.capacity_units.additional_purchased
+      ? parsedBody.data.target_additional_capacity_units <=
+        billing.capacity_units.additional_purchased
         ? "invalid_target_quantity"
         : await dependencies.billingAdmin!.overrideOrganizationBilling({
             organization_id: principal.organization_id,
@@ -653,20 +648,21 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
 
     if (typeof result === "string") {
       const statusCode =
-        result === "billing_not_configured"
-          ? 503
-          : result === "billing_not_found"
-            ? 404
-            : 409;
+        result === "billing_not_configured" ? 503 : result === "billing_not_found" ? 404 : 409;
 
       return reply.status(statusCode).send({ error: result });
     }
 
-    return reply.status(200).send({ billing: result });
+    return reply.status(200).send("payment_required" in result ? result : { billing: result });
   });
 
   app.post("/v1/billing/capacity/scheduled-reduction", async (request, reply) => {
-    const principal = await requireOwnerBillingPrincipal(request, reply, dependencies, "management-write");
+    const principal = await requireOwnerBillingPrincipal(
+      request,
+      reply,
+      dependencies,
+      "management-write"
+    );
     if (principal === null) {
       return;
     }
@@ -717,16 +713,15 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
       billing !== null &&
       billing.plan !== "free" &&
       !hasActiveTrial(billing) &&
-      (
-        billing.billing_state === "admin_override" ||
+      (billing.billing_state === "admin_override" ||
         billing.billing_state === null ||
-        billing.billing_state === undefined
-      ) &&
+        billing.billing_state === undefined) &&
       billing.stripe_customer_id === null;
 
     const result = isInternalOperatorBilling
       ? parsedBody.data.target_additional_capacity_units < 0 ||
-        parsedBody.data.target_additional_capacity_units >= billing.capacity_units.additional_purchased
+        parsedBody.data.target_additional_capacity_units >=
+          billing.capacity_units.additional_purchased
         ? "invalid_target_quantity"
         : await dependencies.billingAdmin!.overrideOrganizationBilling({
             organization_id: principal.organization_id,
@@ -754,20 +749,21 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
 
     if (typeof result === "string") {
       const statusCode =
-        result === "billing_not_configured"
-          ? 503
-          : result === "billing_not_found"
-            ? 404
-            : 409;
+        result === "billing_not_configured" ? 503 : result === "billing_not_found" ? 404 : 409;
 
       return reply.status(statusCode).send({ error: result });
     }
 
-    return reply.status(200).send({ billing: result });
+    return reply.status(200).send("payment_required" in result ? result : { billing: result });
   });
 
   app.delete("/v1/billing/capacity/scheduled-reduction", async (request, reply) => {
-    const principal = await requireOwnerBillingPrincipal(request, reply, dependencies, "management-write");
+    const principal = await requireOwnerBillingPrincipal(
+      request,
+      reply,
+      dependencies,
+      "management-write"
+    );
     if (principal === null) {
       return;
     }
@@ -790,15 +786,11 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
 
     if (typeof result === "string") {
       const statusCode =
-        result === "billing_not_configured"
-          ? 503
-          : result === "billing_not_found"
-            ? 404
-            : 409;
+        result === "billing_not_configured" ? 503 : result === "billing_not_found" ? 404 : 409;
 
       return reply.status(statusCode).send({ error: result });
     }
 
-    return reply.status(200).send({ billing: result });
+    return reply.status(200).send("payment_required" in result ? result : { billing: result });
   });
 }

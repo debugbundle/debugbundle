@@ -38,6 +38,11 @@ function buildMigratedApiSchemaDb(): Queryable {
 }
 
 describe("api runtime", () => {
+  it("rejects broad client-IP proxy trust before creating runtime dependencies", () => {
+    expect(() => parseApiRuntimeEnv({ API_TRUSTED_PROXY_IPS: "true" })).toThrow(
+      "API_TRUSTED_PROXY_IPS"
+    );
+  });
   it("should parse environment with defaults", (): void => {
     const env = parseApiRuntimeEnv({
       DEBUGBUNDLE_PROBE_TRIGGER_SECRET: "test-probe-secret",

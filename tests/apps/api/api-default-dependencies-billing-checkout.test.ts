@@ -169,11 +169,28 @@ describe("api-default-dependency-mocks billing-checkout", () => {
   });
 
   it("should prefill checkout email for first-time Stripe customers", async (): Promise<void> => {
-    const checkoutCreate = vi
-      .fn()
-      .mockResolvedValue({ url: "https://checkout.stripe.test/session_123" });
+    const checkoutCreate = vi.fn().mockResolvedValue({
+      id: "cs_test_123",
+      status: "open",
+      client_reference_id: "org_123",
+      url: "https://checkout.stripe.test/session_123"
+    });
     const db = {
-      query: vi.fn().mockResolvedValue({ rows: [{ stripe_customer_id: null }] })
+      query: vi.fn().mockImplementation((sql: string) => {
+        if (sql.includes("FROM organizations"))
+          return {
+            rows: [
+              {
+                stripe_customer_id: null,
+                stripe_subscription_id: null,
+                suspended_at: null,
+                trial_started_at: "2026-06-01T00:00:00.000Z"
+              }
+            ]
+          };
+        if (sql.includes("UPDATE billing_checkout_attempts")) return { rows: [{ id: "attempt" }] };
+        return { rows: [] };
+      })
     };
     const deps = createApiDependencies({
       objectStore: {
@@ -232,20 +249,38 @@ describe("api-default-dependency-mocks billing-checkout", () => {
           metadata: { organization_id: "org_123" }
         },
         success_url: expect.stringContaining("session_id={CHECKOUT_SESSION_ID}")
-      })
+      }),
+      expect.objectContaining({ idempotencyKey: expect.stringMatching(/^billing-checkout:/) })
     );
     expect(db.query).toHaveBeenCalledWith(
-      "SELECT stripe_customer_id FROM organizations WHERE id = $1 LIMIT 1",
+      expect.stringContaining("FROM organizations WHERE id = $1 FOR UPDATE"),
       ["org_123"]
     );
   });
 
   it("should update saved Stripe customer billing details during checkout", async (): Promise<void> => {
-    const checkoutCreate = vi
-      .fn()
-      .mockResolvedValue({ url: "https://checkout.stripe.test/session_456" });
+    const checkoutCreate = vi.fn().mockResolvedValue({
+      id: "cs_test_456",
+      status: "open",
+      client_reference_id: "org_123",
+      url: "https://checkout.stripe.test/session_456"
+    });
     const db = {
-      query: vi.fn().mockResolvedValue({ rows: [{ stripe_customer_id: "cus_existing" }] })
+      query: vi.fn().mockImplementation((sql: string) => {
+        if (sql.includes("FROM organizations"))
+          return {
+            rows: [
+              {
+                stripe_customer_id: "cus_existing",
+                stripe_subscription_id: null,
+                trial_started_at: "2026-06-01T00:00:00.000Z",
+                suspended_at: null
+              }
+            ]
+          };
+        if (sql.includes("UPDATE billing_checkout_attempts")) return { rows: [{ id: "attempt" }] };
+        return { rows: [] };
+      })
     };
     const deps = createApiDependencies({
       objectStore: {
@@ -300,15 +335,42 @@ describe("api-default-dependency-mocks billing-checkout", () => {
         automatic_tax: { enabled: true },
         billing_address_collection: "auto",
         tax_id_collection: { enabled: true }
-      })
+      }),
+      expect.objectContaining({ idempotencyKey: expect.stringMatching(/^billing-checkout:/) })
     );
     expect(checkoutCreate.mock.calls[0]?.[0]).not.toHaveProperty("customer_email");
   });
 
   it("should increase allowance capacity immediately through the Stripe subscription", async (): Promise<void> => {
-    const subscriptionUpdate = vi.fn().mockResolvedValue({ id: "sub_123" });
+    const subscriptionUpdate = vi.fn().mockImplementation(async () => {
+      const updated = {
+        id: "sub_123",
+        customer: "cus_123",
+        status: "active",
+        schedule: null,
+        latest_invoice: {
+          id: "in_capacity",
+          status: "paid",
+          customer: "cus_123",
+          billing_reason: "subscription_update",
+          parent: { subscription_details: { subscription: "sub_123" } }
+        },
+        items: {
+          data: [
+            { id: "si_plan", price: { id: "price_solo" }, quantity: 1 },
+            { id: "si_capacity", price: { id: "price_solo_capacity" }, quantity: 2 }
+          ]
+        }
+      };
+      subscriptionRetrieve.mockResolvedValue(updated);
+      return updated;
+    });
     const subscriptionRetrieve = vi.fn().mockResolvedValue({
       id: "sub_123",
+      customer: "cus_123",
+      status: "active",
+      collection_method: "charge_automatically",
+      latest_invoice: { id: "in_original", status: "paid" },
       schedule: null,
       items: {
         data: [
@@ -424,9 +486,14 @@ describe("api-default-dependency-mocks billing-checkout", () => {
       expect.objectContaining({
         proration_behavior: "always_invoice",
         items: [
-          { id: "si_plan", quantity: 1 },
+          { id: "si_plan", price: "price_solo", quantity: 1 },
           { price: "price_solo_capacity", quantity: 2 }
         ]
+      }),
+      expect.objectContaining({
+        idempotencyKey: expect.stringMatching(/^billing-subscription:.*:update$/),
+        timeout: 8000,
+        maxNetworkRetries: 0
       })
     );
     expect(nextBilling).toEqual(

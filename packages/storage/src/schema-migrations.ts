@@ -1,4 +1,8 @@
+import { BILLING_PLAN_CHANGE_MIGRATION } from "./billing-plan-change-schema.js";
 import { NOTIFICATION_SCHEMA_MIGRATIONS } from "./notification-schema.js";
+import { BILLING_CHECKOUT_MIGRATION } from "./billing-checkout-schema.js";
+import { BILLING_SUBSCRIPTION_OPERATION_MIGRATION } from "./billing-subscription-operation-schema.js";
+import { BILLING_NOTIFICATION_MIGRATION } from "./billing-notification-schema.js";
 import { PUBLIC_STATUS_SCHEMA_MIGRATIONS } from "./public-status-schema.js";
 import { ANALYTICS_FLOW_SCHEMA_MIGRATIONS } from "./analytics-flow-schema.js";
 import { BROWSER_RECOVERY_MIGRATIONS } from "./browser-recovery-schema.js";
@@ -38,7 +42,11 @@ export const STORAGE_SCHEMA_MIGRATIONS: readonly StorageSchemaMigration[] = [
   ...WORKER_JOB_SCHEMA_MIGRATIONS,
   ...ANALYTICS_FLOW_SCHEMA_MIGRATIONS,
   ...PUBLIC_STATUS_SCHEMA_MIGRATIONS,
-  ...NOTIFICATION_SCHEMA_MIGRATIONS
+  ...NOTIFICATION_SCHEMA_MIGRATIONS,
+  BILLING_CHECKOUT_MIGRATION,
+  BILLING_SUBSCRIPTION_OPERATION_MIGRATION,
+  BILLING_NOTIFICATION_MIGRATION,
+  BILLING_PLAN_CHANGE_MIGRATION
 ].sort((left, right) => left.id.localeCompare(right.id));
 
 function validateStorageSchemaMigrations(migrations: readonly StorageSchemaMigration[]): void {

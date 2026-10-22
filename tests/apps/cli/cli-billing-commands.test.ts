@@ -266,7 +266,9 @@ describe("cli billing commands", () => {
     const authFailure = await getBillingSummaryWithAuthCommand(
       {},
       {
-        readAuthState: vi.fn().mockRejectedValue(new CliAuthStateError("auth_state_missing", "Not logged in."))
+        readAuthState: vi
+          .fn()
+          .mockRejectedValue(new CliAuthStateError("auth_state_missing", "Not logged in."))
       }
     );
     const conflictFailure = await increaseBillingCapacityCommand(
@@ -275,7 +277,9 @@ describe("cli billing commands", () => {
         targetAdditionalCapacityUnits: 4
       },
       {
-        increaseCapacity: vi.fn().mockRejectedValue(new BillingApiError(409, "pending_capacity_reduction_exists"))
+        increaseCapacity: vi
+          .fn()
+          .mockRejectedValue(new BillingApiError(409, "pending_capacity_reduction_exists"))
       }
     );
 
@@ -303,7 +307,9 @@ describe("cli billing commands", () => {
         targetAdditionalCapacityUnits: 4
       },
       {
-        increaseCapacity: vi.fn().mockRejectedValue(new BillingApiError(409, "trial_conversion_required"))
+        increaseCapacity: vi
+          .fn()
+          .mockRejectedValue(new BillingApiError(409, "trial_conversion_required"))
       }
     );
 
@@ -406,4 +412,26 @@ describe("cli billing commands", () => {
       expect(result.exitCode).toBe(testCase.exitCode);
     }
   });
+});
+
+it("reports required payment without claiming capacity increased", async () => {
+  const payment = { payment_required: { url: "https://invoice.stripe.com/i/test_capacity" } };
+  const api = { increaseCapacity: vi.fn(async () => payment) };
+  const result = await increaseBillingCapacityCommand(
+    { bearerToken: "synthetic", targetAdditionalCapacityUnits: 3 },
+    api
+  );
+  expect(result.exitCode).toBe(5);
+  expect(result.output).toContain(payment.payment_required.url);
+  expect(result.output).not.toContain("capacity increased");
+  expect(
+    JSON.parse(
+      (
+        await increaseBillingCapacityCommand(
+          { bearerToken: "synthetic", targetAdditionalCapacityUnits: 3, json: true },
+          api
+        )
+      ).output
+    )
+  ).toEqual(payment);
 });

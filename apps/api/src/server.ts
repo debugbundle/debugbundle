@@ -13,6 +13,7 @@ import type { RuntimeLogger } from "../../../packages/runtime-logger/src/index.j
 import { ANALYTICS_BUNDLE_GENERATION_ID_HEADER } from "../../../packages/shared-types/src/index.js";
 
 import type { ApiDependencies } from "./api-types.js";
+import { createTrustedProxyPolicy } from "./client-ip.js";
 import { resolveBrowserSession } from "./api-helpers.js";
 import { registerOpenAiMcpHttpRoutes, type OpenAiMcpHttpOptions } from "./openai-mcp-http.js";
 import { registerOpenAiOAuthHttpRoutes, type OpenAiOAuthHttpOptions } from "./openai-oauth-http.js";
@@ -66,6 +67,7 @@ import { registerOpenAiConnectionRoutes } from "./routes/openai-connections.js";
 export type { ApiDependencies } from "./api-types.js";
 
 export interface ApiServerOptions {
+  trustedProxyIps?: string;
   dogfoodingEnv?: Record<string, string | undefined>;
   dogfoodingSdk?: ApiDogfoodingSdk;
   logger?: FastifyBaseLogger | RuntimeLogger;
@@ -387,13 +389,16 @@ export function createApiServer(
   dependencies: ApiDependencies,
   options: ApiServerOptions = {}
 ): FastifyInstance {
+  const dogfoodingEnv = options.dogfoodingEnv ?? process.env;
   const app: FastifyInstance = Fastify({
     ...(options.logger === undefined
       ? { logger: false }
       : { loggerInstance: options.logger as FastifyBaseLogger }),
-    bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES
+    bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES,
+    trustProxy: createTrustedProxyPolicy(
+      options.trustedProxyIps ?? dogfoodingEnv["API_TRUSTED_PROXY_IPS"]
+    )
   });
-  const dogfoodingEnv = options.dogfoodingEnv ?? process.env;
   const dogfoodingConfig = resolveApiDogfoodingConfig(dogfoodingEnv);
   const allowedOrigins = resolveAllowedCorsOrigins(dogfoodingEnv);
   const context = {

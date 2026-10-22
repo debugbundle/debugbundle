@@ -1,7 +1,83 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createDevMockApi } from "../../scripts/dev-mock/api.js";
 
 describe("local preview management data", () => {
+  it("keeps the first-purchase trial wait in the local simulation", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date("2026-10-22T15:00:00Z"));
+      const api = createDevMockApi();
+      expect(api.handle("POST", "/v1/billing/trial/start", { target_plan: "solo" }).status).toBe(
+        200
+      );
+      expect(api.handle("POST", "/v1/billing/checkout", { target_plan: "solo" })).toMatchObject({
+        status: 409,
+        body: { error: "paid_purchase_locked" }
+      });
+      vi.setSystemTime(new Date("2026-10-29T15:00:00Z"));
+      expect(api.handle("POST", "/v1/billing/checkout", { target_plan: "solo" }).status).toBe(200);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("simulates scheduling and cancelling a plan change without changing the current plan", () => {
+    const api = createDevMockApi();
+    const quote = (
+      api.handle("POST", "/v1/billing/plan-change/preview", {}).body as {
+        quote: { confirmation_token: string };
+      }
+    ).quote;
+    expect(quote).toBeDefined();
+    const scheduled = api.handle("POST", "/v1/billing/plan-change", {
+      confirmation_token: quote.confirmation_token
+    });
+    expect(scheduled).toMatchObject({
+      status: 200,
+      body: { pending_change: { target_plan: "solo", additional_capacity_units: 1 } }
+    });
+    expect(api.handle("GET", "/v1/billing").body).toMatchObject({ billing: { plan: "team" } });
+    const scheduleId = (scheduled.body as { pending_change: { schedule_id: string } })
+      .pending_change.schedule_id;
+    expect(api.handle("DELETE", "/v1/billing/plan-change", { schedule_id: "wrong" }).status).toBe(
+      409
+    );
+    expect(
+      api.handle("DELETE", "/v1/billing/plan-change", { schedule_id: scheduleId }).body
+    ).toEqual({ pending_change: null });
+  });
+  it("previews and confirms a paid upgrade locally with the retained capacity", () => {
+    const api = createDevMockApi();
+    const checkout = api.handle("POST", "/v1/billing/checkout", { target_plan: "solo" });
+    const url = new URL((checkout.body as { url: string }).url, "http://localhost:5291");
+    api.handle("POST", "/v1/billing/checkout/confirm", {
+      session_id: url.searchParams.get("session_id")
+    });
+    const preview = api.handle("POST", "/v1/billing/upgrade/preview", {});
+    expect(preview.status).toBe(200);
+    expect(preview.body).toMatchObject({
+      quote: {
+        currency: "usd",
+        additional_capacity_units: 1,
+        amount_due: expect.any(Number),
+        monthly_total: expect.any(Number),
+        tax: 0
+      }
+    });
+    expect(api.handle("POST", "/v1/billing/checkout", { target_plan: "team" }).status).toBe(409);
+    const token = (preview.body as { quote: { confirmation_token: string } }).quote
+      .confirmation_token;
+    const result = api.handle("POST", "/v1/billing/checkout", {
+      target_plan: "team",
+      confirmation_token: token
+    });
+    expect(result).toMatchObject({ status: 200, body: { url: "/billing?checkout=success" } });
+    expect(api.handle("GET", "/v1/billing").body).toMatchObject({
+      billing: {
+        plan: "team",
+        capacity_units: { additional_purchased: 1 }
+      }
+    });
+  });
   it("simulates probe, weekly-report, repository and project actions without losing their scoped state", () => {
     const api = createDevMockApi();
     const activation = api.handle(

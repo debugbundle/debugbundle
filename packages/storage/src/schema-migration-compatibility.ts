@@ -1,6 +1,8 @@
 import { REQUIRED_API_TABLES, REQUIRED_WORKER_TABLES, type Queryable } from "./migrations.js";
 
 const CURRENT_SCHEMA_SENTINEL_COLUMNS = [
+  { table_name: "billing_subscription_operations", column_name: "parameters" },
+  { table_name: "billing_checkout_attempts", column_name: "parameters" },
   { table_name: "alert_deliveries", column_name: "coalescing_key" },
   { table_name: "alert_deliveries", column_name: "evaluation_job_id" },
   { table_name: "alert_rules", column_name: "webhook_payload_version" },
@@ -100,7 +102,18 @@ export async function isCurrentStorageSchemaBaseline(db: Queryable): Promise<boo
     return false;
   }
 
-  return true;
+  const constraint = await db.query<{ definition: string }>(
+    "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid='operational_email_deliveries'::regclass AND conname='operational_email_deliveries_kind_check'",
+    []
+  );
+  if (constraint.rows[0]?.definition.includes("billing_lifecycle") !== true) return false;
+  const operations = await db.query<{ definition: string }>(
+    "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid='billing_subscription_operations'::regclass AND conname='billing_subscription_operations_kind_check'",
+    []
+  );
+  return ["plan_schedule", "plan_cancel"].every((kind) =>
+    operations.rows[0]?.definition.includes(kind)
+  );
 }
 
 export async function ensureLegacyGitHubDispatchFingerprintCompatibility(

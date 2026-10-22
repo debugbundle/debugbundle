@@ -40,7 +40,19 @@ describe("billing checkout", () => {
 
       if (url.endsWith("/v1/billing") && init?.method === undefined) {
         return jsonResponse(200, {
-          billing: createBillingSummary()
+          billing: createBillingSummary({
+            trial: {
+              available: false,
+              active: false,
+              plan: "solo",
+              started_at: "2026-01-01T00:00:00.000Z",
+              ends_at: "2026-01-31T00:00:00.000Z",
+              used_at: "2026-01-01T00:00:00.000Z",
+              converted_at: null,
+              expired_at: "2026-01-31T00:00:00.000Z",
+              days_remaining: null
+            }
+          })
         });
       }
 
@@ -300,7 +312,7 @@ describe("billing checkout", () => {
     expect(await screen.findByRole("heading", { name: /billing/i, level: 1 })).toBeInTheDocument();
     expect(await screen.findByRole("dialog", { name: /checkout canceled/i })).toBeInTheDocument();
     expect(
-      screen.getByText(/no payment was completed and your plan has not changed/i)
+      screen.getByText(/checkout was closed\. your current plan is shown below/i)
     ).toBeInTheDocument();
   });
 });

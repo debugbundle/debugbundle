@@ -143,6 +143,7 @@
       "debugbundle_test_health_check",
       "debugbundle_list_health_check_results",
       "debugbundle_list_health_check_daily_rollups",
+      "debugbundle_billing_plan_change",
       "debugbundle_get_billing_summary",
       "debugbundle_start_trial",
       "debugbundle_increase_capacity",
@@ -358,6 +359,9 @@
       "optional": true
     },
     "debugbundle_delete_health_check": {
+      "optional": true
+    },
+    "debugbundle_billing_plan_change": {
       "optional": true
     },
     "debugbundle_start_trial": {

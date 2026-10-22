@@ -149,7 +149,12 @@ describe("api-default-dependency-mocks billing-state", () => {
         monthly_webhook_deliveries: { used: 6, limit: 750 }
       }
     };
-    const checkoutCreate = vi.fn().mockResolvedValue({ url: null });
+    const checkoutCreate = vi.fn().mockResolvedValue({
+      id: "cs_existing",
+      client_reference_id: "org_123",
+      status: "open",
+      url: null
+    });
     const portalCreate = vi.fn().mockRejectedValue(new Error("stripe unavailable"));
     const subscriptionRetrieve = vi.fn().mockRejectedValue(new Error("stripe unavailable"));
     const billingStore = {
@@ -160,19 +165,28 @@ describe("api-default-dependency-mocks billing-state", () => {
     createPostgresBillingStoreMock.mockReturnValueOnce(billingStore);
 
     const db = {
-      query: vi
-        .fn()
-        .mockResolvedValueOnce({ rows: [{ stripe_customer_id: "cus_123" }] })
-        .mockResolvedValueOnce({ rows: [{ stripe_customer_id: "cus_123" }] })
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              plan: "solo",
-              stripe_customer_id: "cus_123",
-              stripe_subscription_id: "sub_123"
-            }
-          ]
-        })
+      query: vi.fn().mockImplementation((sql: string) => {
+        if (sql.includes("FOR UPDATE"))
+          return {
+            rows: [
+              {
+                stripe_customer_id: "cus_123",
+                stripe_subscription_id: null,
+                suspended_at: null,
+                trial_started_at: "2026-01-01T00:00:00.000Z",
+                billing_state: "canceled"
+              }
+            ]
+          };
+        if (sql.includes("UPDATE billing_checkout_attempts")) return { rows: [{ id: "attempt" }] };
+        if (sql.includes("FROM organizations"))
+          return {
+            rows: [
+              { plan: "solo", stripe_customer_id: "cus_123", stripe_subscription_id: "sub_123" }
+            ]
+          };
+        return { rows: [] };
+      })
     };
 
     const deps = createApiDependencies({
@@ -229,7 +243,7 @@ describe("api-default-dependency-mocks billing-state", () => {
         current_plan: "free",
         target_plan: "solo"
       })
-    ).resolves.toBeNull();
+    ).resolves.toBe("billing_service_error");
     await expect(
       deps.billingManagement.createPortalLink({
         organization_id: "org_123",
@@ -246,7 +260,7 @@ describe("api-default-dependency-mocks billing-state", () => {
     expect(subscriptionRetrieve).toHaveBeenCalledWith(
       "sub_123",
       {
-        expand: ["schedule", "items.data.price"]
+        expand: ["schedule", "items.data.price", "latest_invoice"]
       },
       {
         timeout: 2500,
@@ -258,7 +272,8 @@ describe("api-default-dependency-mocks billing-state", () => {
       expect.objectContaining({
         customer: "cus_123",
         line_items: [{ price: "price_solo", quantity: 1 }]
-      })
+      }),
+      expect.objectContaining({ idempotencyKey: expect.stringMatching(/^billing-checkout:/) })
     );
     expect(portalCreate).toHaveBeenCalledWith({
       customer: "cus_123",

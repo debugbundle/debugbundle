@@ -923,6 +923,14 @@ An SDK may also emit a bounded aggregate for local queue pressure. It retains th
 | created_at         | timestamptz | NOT NULL DEFAULT now()  |
 | updated_at         | timestamptz | NOT NULL DEFAULT now()  |
 
+### 5.2a billing_checkout_attempts (local candidate)
+
+One internal row per organization: `organization_id` (primary key, organization foreign key with cascade deletion), unique UUID `id`, `target_plan` (`solo`/`team`), fixed `parameters` JSON object, unique nullable `stripe_session_id`, and `created_at`. Migration `202610220001_add_billing_checkout_attempts` precedes runtime. Parameters contain existing billing routing/email when needed, never card data or credentials. Ambiguous attempts are retained, never rotated on age; exact provider-confirmed expiry or completed-terminal-subscription reconciliation fences retirement by attempt/session identity.
+
+### 5.2b billing_subscription_operations (local candidate)
+
+One internal row per organization: `organization_id` (primary key, organization foreign key with cascade deletion), unique UUID `id`, `subscription_id`, `customer_id`, `kind` (`upgrade`, `capacity_increase`, `capacity_schedule`, `capacity_cancel`, `plan_schedule`, `plan_cancel`), `intent` JSON object, nullable immutable `parameters` JSON object, nullable `resource_id` (invoice/schedule reference), `created_at`, and nullable `completed_at`. Migration `202610220002_add_billing_subscription_operations` follows the checkout migration and is required at readiness. Organization locking serializes claims; parameter/resource/completion writes fence by attempt ID. Prepared uncertain work remains reserved. Completed work can yield to the next explicit operation. `completed_at` also retires unprepared or provider-voided operations without erasing their revision. Plan-change quotes bind to that revision, checked atomically at claim; identical pending retries retain their identity. No card data or credentials are stored, and no age-based cleanup can discard uncertain charges. The later additive migration `202610220004_add_billing_plan_change_operations` expands accepted kinds while preserving existing reservations and earlier checksums. Prepared plan changes also retain their original signed quote for reload recovery, with no signing secret stored. All migrations precede activation; bootstrap remains empty-schema-only.
+
 ### 5.3 organization_members
 
 | Column          | Type                       | Constraints                 |
@@ -1996,3 +2004,7 @@ Pending schedule changes use their wake-up timestamp as the next local-time calc
 Daily items also retain the existing privacy-safe `notification_key`, indexed with rule and creation time. Daily, immediate and short-digest admission share the rule/key advisory lock and pending/delivered cooldown history through `alert-notification-history.ts`. Switching delivery modes does not bypass a configured cooldown. Already-admitted short-digest transfers retain their key and bypass a second cooldown check.
 
 The API and worker require this migration in readiness checks. Existing deployments must run `db:migrate` before switching to new API/worker images. Bootstrap definitions only support empty schemas; no destructive upgrade or backfill is required. Older binaries ignore the additive tables. Hosted source/image rollout already executes the migration before runtime activation; self-host updates must preserve that ordering.
+
+Billing lifecycle notifications use the existing operational_email_deliveries outbox with kind billing_lifecycle and validated subject/text/html payload. Forward migration 202610220003 expands the kind constraint; API/worker readiness requires its ledger/checksum. Notification inserts share the webhook state/event transaction. Checkout reconciliation uses the PostgreSQL row revision for compare-and-swap; no business identifier is derived from that revision.
+
+First-purchase wait (local candidate): no new billing-summary fields or database shape are introduced. Existing `trial_started_at` is the immutable elapsed-time anchor. The locked Checkout claim checks an organisation-scoped processed `invoice.paid` receipt for previous paid history, rather than treating a customer ID, incomplete subscription or conversion timestamp alone as proof. Retain these billing receipts for resubscription; blocked Checkout reservations are not deleted or age-rotated. The four existing forward billing migrations and readiness gates remain required.

@@ -302,6 +302,30 @@ browser-evidence-check:
 test-focused:
 	$(NODE_RUN) "apk add --no-cache git >/dev/null && corepack enable && corepack pnpm vitest run $(TEST_FILES)"
 
+.PHONY: test-billing-checkout-integration
+test-billing-checkout-integration:
+	sh scripts/test-billing-checkout-integration.sh
+
+# Use the already installed, lockfile-pinned tools without fetching Corepack.
+.PHONY: billing-safety-check billing-safety-format billing-safety-test
+billing-safety-test:
+	test -n "$(TEST_FILES)"
+	$(NODE_RUN) "node_modules/.bin/vitest run $(TEST_FILES)"
+
+# Full-suite infrastructure fixtures create disposable Git repositories. Keep
+# that tool inside this temporary container and reuse the installed JS packages.
+.PHONY: billing-safety-unit-test
+billing-safety-unit-test:
+	$(NODE_RUN) "apk add --no-cache git >/dev/null && node_modules/.bin/vitest run --maxWorkers=4 --reporter=dot"
+
+billing-safety-check:
+	test -n "$(LINT_FILES)" && test -n "$(TEST_FILES)"
+	$(NODE_RUN) "node_modules/.bin/tsc --noEmit -p tsconfig.json && node_modules/.bin/eslint $(LINT_FILES) && node_modules/.bin/prettier --check $(LINT_FILES) && node_modules/.bin/vitest run $(TEST_FILES)"
+
+billing-safety-format:
+	test -n "$(FORMAT_FILES)"
+	$(NODE_RUN) "node_modules/.bin/prettier --write $(FORMAT_FILES)"
+
 .PHONY: coverage-focused
 coverage-focused:
 	$(NODE_RUN) "apk add --no-cache git >/dev/null && corepack enable && VITEST_COVERAGE_SHARD=1 corepack pnpm vitest run --coverage $(TEST_FILES) && node scripts/check-changed-file-coverage.mjs"
@@ -596,3 +620,31 @@ license-site-check:
 .PHONY: mcp-ecosystem-check
 mcp-ecosystem-check:
 	$(NODE_RUN) 'corepack pnpm vitest run tests/apps/mcp/mcp-ecosystem-release.test.ts'
+
+.PHONY: billing-ui-docs
+billing-ui-docs:
+	$(NODE_RUN) "corepack enable && cd apps/web && corepack pnpm dlx shadcn@latest docs dialog button"
+
+.PHONY: billing-safety-web-build
+billing-safety-web-build:
+	$(NODE_RUN) "cd apps/web && node_modules/.bin/vite build --outDir /tmp/debugbundle-billing-web-build"
+
+# Explicit opt-in runner: credentials must be test-only and the expected account
+# is read back before creating exclusively disposable DebugBundle fixtures.
+.PHONY: billing-stripe-test
+billing-stripe-test:
+	test -f .local-notes/stripe-test.env
+	docker run --rm --env-file .local-notes/stripe-test.env -e RUN_STRIPE_TEST=1 -v "$(CURDIR):/workspace" -w /workspace node:24-alpine node_modules/.bin/tsx scripts/billing-stripe-test.ts
+
+# Same test-only guards and cleanup as the provider matrix, with a bounded wait
+# for the hosted challenge. No API payment fallback is used in this mode.
+.PHONY: billing-stripe-hosted-test
+billing-stripe-hosted-test:
+	test -f .local-notes/stripe-test.env
+	docker run --rm --env-file .local-notes/stripe-test.env -e RUN_STRIPE_TEST=1 -e STRIPE_TEST_HOSTED=1 -v "$(CURDIR):/workspace" -w /workspace node:24-alpine node_modules/.bin/tsx scripts/billing-stripe-test.ts
+
+# Explicit test-mode browser journey through the dashboard, API and disposable
+# PostgreSQL, with signed CLI webhook forwarding and scoped fixture cleanup.
+.PHONY: billing-stripe-browser-test
+billing-stripe-browser-test:
+	sh scripts/test-billing-stripe-browser.sh

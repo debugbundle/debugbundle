@@ -1,4 +1,31 @@
 import type { BillingSummaryRecord } from "../lib/api.js";
+import { getFirstPurchaseEligibility } from "../../../../packages/shared-types/src/first-purchase-eligibility.js";
+
+export function getBillingFirstPurchaseEligibility(
+  billing: BillingSummaryRecord,
+  now = Date.now()
+): ReturnType<typeof getFirstPurchaseEligibility> {
+  // Presentation only: the locked server claim requires a processed paid-invoice
+  // receipt. A customer ID alone must never unlock a new account's purchase.
+  return getFirstPurchaseEligibility(
+    {
+      trial_started_at: billing.trial.started_at,
+      previously_paid:
+        billing.trial.converted_at !== null ||
+        (billing.stripe_customer_id !== null &&
+          !billing.trial.active &&
+          (billing.billing_state === "canceled" || billing.plan !== "free"))
+    },
+    now
+  );
+}
+
+export function formatPurchaseUnlockDate(value: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "long",
+    timeStyle: "long"
+  }).format(new Date(value));
+}
 
 export interface PendingBillingCheckout {
   previousPlan: BillingSummaryRecord["plan"];
@@ -33,7 +60,9 @@ export function readPendingBillingCheckout(): PendingBillingCheckout | null {
   try {
     const parsedValue = JSON.parse(rawValue) as Partial<PendingBillingCheckout>;
     if (
-      (parsedValue.previousPlan === "free" || parsedValue.previousPlan === "solo" || parsedValue.previousPlan === "team") &&
+      (parsedValue.previousPlan === "free" ||
+        parsedValue.previousPlan === "solo" ||
+        parsedValue.previousPlan === "team") &&
       (parsedValue.targetPlan === "solo" || parsedValue.targetPlan === "team")
     ) {
       return {
@@ -69,6 +98,8 @@ export function billingReflectsCheckout(
   pendingCheckout: PendingBillingCheckout | null,
   baseline: BillingSummaryRecord | null
 ): boolean {
+  if (billing.trial.active || billing.billing_state === "incomplete" || billing.plan === "free")
+    return false;
   if (pendingCheckout !== null) {
     if (billing.plan !== pendingCheckout.targetPlan) {
       return false;
@@ -89,7 +120,9 @@ export function billingReflectsCheckout(
     return false;
   }
 
-  return billing.plan !== baseline.plan || billing.stripe_customer_id !== baseline.stripe_customer_id;
+  return (
+    billing.plan !== baseline.plan || billing.stripe_customer_id !== baseline.stripe_customer_id
+  );
 }
 
 export function formatPlanName(plan: BillingSummaryRecord["plan"]): string {
@@ -145,7 +178,9 @@ function formatTimeInTimeZone(
 }
 
 function isUtcTimeZone(timeZone: string): boolean {
-  return timeZone === "UTC" || timeZone === "Etc/UTC" || timeZone === "Etc/GMT" || timeZone === "GMT";
+  return (
+    timeZone === "UTC" || timeZone === "Etc/UTC" || timeZone === "Etc/GMT" || timeZone === "GMT"
+  );
 }
 
 export function formatBillingWindowDescription(

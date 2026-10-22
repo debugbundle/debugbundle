@@ -117,6 +117,10 @@ describe("api-default-dependency-mocks billing-slots", () => {
     };
     const subscriptionWithExtraSlots = {
       id: "sub_123",
+      customer: "cus_123",
+      status: "active",
+      collection_method: "charge_automatically",
+      latest_invoice: { id: "in_original", status: "paid" },
       schedule: null,
       items: {
         data: [

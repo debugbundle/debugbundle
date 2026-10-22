@@ -823,7 +823,8 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
           'trial_started',
           'trial_ending_soon',
           'trial_expired',
-          'trial_converted'
+          'trial_converted',
+          'billing_lifecycle'
         )),
       dedupe_key text NOT NULL,
       payload jsonb NOT NULL DEFAULT '{}'::jsonb,

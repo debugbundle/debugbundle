@@ -181,6 +181,18 @@ export const MCP_TOOL_CATALOG = [
   ...PROBE_MCP_TOOL_CATALOG,
   ...HEALTH_CHECK_MCP_TOOL_CATALOG,
   {
+    name: "billing_plan_change",
+    group: "billing",
+    description:
+      "Preview or schedule Team to Solo at renewal on the same subscription, retaining extra capacity. Show the quote and Team feature loss and obtain explicit user confirmation before schedule; send that exact confirmationToken. Cancel releases only the exact scheduleId returned by status.",
+    inputSchema: z.object({
+      bearerToken: z.string(),
+      action: z.enum(["status", "preview", "schedule", "cancel"]),
+      confirmationToken: z.string().max(8192).optional(),
+      scheduleId: z.string().max(255).optional()
+    })
+  },
+  {
     name: "get_billing_summary",
     group: "billing",
     description: "Get the billing summary for the organization.",

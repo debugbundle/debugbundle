@@ -200,7 +200,11 @@ The full auth model is defined in `/spec/auth-architecture.md`.
 
 Member-authorized routes accept either a valid browser session or a valid member token. After principal resolution, both paths must enforce the same authorization rules and execute the same domain behavior.
 
-Stripe checkout and customer-portal billing routes remain browser-session-only interactive surfaces. Billing summary, no-card trial start, and allowance-capacity management routes now accept owner-scoped member tokens so CLI and MCP can reuse the same domain behavior.
+Stripe checkout and customer-portal billing routes remain browser-session-only interactive surfaces. Upgrade preview accepts `{}` and returns `{ quote: { confirmation_token, expires_at, currency, amount_due, tax, monthly_total, additional_capacity_units } }` (monetary amounts are Stripe minor units), or `{ payment_url }` for an existing unpaid upgrade. It makes no payment mutation. Confirm through `/v1/billing/checkout` with `target_plan: "team"` and `confirmation_token`. Missing/expired/changed quotes return `409 upgrade_confirmation_required`; an already prepared request resumes the same confirmed attempt. Checkout and preview require a verified email. Tokens bind the owner organization and exact subscription/items; responses must not be cached.
+
+Capacity-increase success remains `{ billing }` when Stripe confirms payment and applied items. `200 { payment_required: { url } }` means an existing hosted Stripe invoice needs payment/authentication; current entitlements stay unchanged. The web app offers the saved invoice in a separate tab, closes the dialog and refreshes billing on return/focus; CLI returns exit 5 and the URL (JSON retains the payment_required object), and MCP returns the same object. Do not describe that result as a completed capacity increase.
+
+Billing summary, no-card trial start, and allowance-capacity management routes now accept owner-scoped member tokens so CLI and MCP can reuse the same domain behavior.
 
 ### 1.0a Browser Auth
 
@@ -1321,7 +1325,8 @@ Project `metrics.attention_incidents_today` counts incidents first opened today 
 | ------ | ------------------------------------------ | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | GET    | `/v1/billing`                              | Browser Session or Member Token (owner only) | Return billing summary, plan state, and allowance usage for the current organization                                         |
 | POST   | `/v1/billing/trial/start`                  | Browser Session or Member Token (owner only) | Start an eligible 30-day no-card Solo or Team trial for the current organization                                             |
-| POST   | `/v1/billing/checkout`                     | Browser Session (owner only)                 | Create a Stripe-hosted checkout session URL for an allowed upgrade target                                                    |
+| POST | `/v1/billing/upgrade/preview` | Verified Browser Session (owner only) | Return a signed upgrade quote or existing hosted payment recovery URL |
+| POST   | `/v1/billing/checkout`                     | Browser Session (owner only)                 | Create a hosted purchase URL or same-subscription paid-upgrade invoice URL                                                    |
 | POST   | `/v1/billing/checkout/confirm`             | Browser Session (owner only)                 | Verify a returned Stripe Checkout Session and sync the organization billing snapshot from Stripe                             |
 | POST   | `/v1/billing/portal`                       | Browser Session (owner only)                 | Create a Stripe-hosted customer-portal session URL for an active paid plan                                                   |
 | POST   | `/v1/billing/capacity/increase`            | Browser Session or Member Token (owner only) | Immediately increase additional allowance-capacity units via Stripe subscription update with proration                       |
@@ -1333,6 +1338,8 @@ Billing summary, no-card trial start, and allowance-capacity management routes a
 `GET /v1/billing` returns `Cache-Control: no-store`. The web Billing page displays the exact `usage_window.ends_at` boundary in the browser's local timezone together with UTC, refreshes just after that boundary, and refreshes again when the page becomes visible or focused. A late background billing response must not replace a newer checkout, trial, or capacity result.
 
 For paid internally managed accounts (`stripe_customer_id = null`), the same capacity routes remain available. In that mode, increases and reductions both apply immediately to the stored purchased-capacity quantity and `pending_reduction` remains `null`.
+
+Checkout safety candidate (local, not released): successful `200 {url}` is unchanged. Free/trial purchases reuse an organization-reserved open Checkout; paid Solo-to-Team changes update the same subscription, preserve purchased extra capacity and return the same hosted proration invoice for payment/authentication or the existing billing-success route after application. `409 checkout_in_progress` retains conflicting/completed/uncertain work; `409 checkout_not_allowed` rejects unsafe subscription/account states. Provider/persistence failures return `503 billing_service_error`. Dedicated admission limits return `429 rate_limited` with `Retry-After`. Capacity routes retain their API/CLI/MCP surface and add `409 billing_change_in_progress` while a shared durable subscription operation is pending. Fixed request/step keys survive retries; ambiguous subscription operations stop replay before provider key expiry, without age-based replacement. Resubscription requires provider-confirmed expiry or the exact completed session's terminal subscription; delayed cancellation cannot erase a newer reservation. Browser-session/owner/CSRF boundaries remain enforced. See `spec/billing.md` sections 4.2a/4.2b.
 
 **Billing summary response shape:**
 
@@ -3994,3 +4001,21 @@ with the complete event enum. `WebhookEventPayloadSchema` accepts real lifecycle
 payloads and synthetic test envelopes for every supported event. Synthetic envelopes
 contain `test: true` and `data.message`; they do not represent real lifecycle artifacts.
 The legacy verification schema, API-emitted format and signing behavior are retained.
+
+In production (`NODE_ENV=production`), legacy static billing links no longer act as a fallback for incomplete dynamic Stripe configuration. The existing unavailable-billing response is returned. Local/manual link scaffolding remains compatible. Team-to-Solo uses the approved same-subscription scheduled-change interface described below.
+
+
+### Billing plan-change interface (FR-BIL-09)
+
+| Method | Path | Owner operation |
+|---|---|---|
+| GET | `/v1/billing/plan-change` | Read owned pending schedule or null |
+| POST | `/v1/billing/plan-change/preview` | `{}`; read a signed quote, no payment/schedule mutation |
+| POST | `/v1/billing/plan-change` | `{confirmation_token}`; schedule Team to Solo at renewal |
+| DELETE | `/v1/billing/plan-change` | `{schedule_id}`; release the exact owned pending schedule |
+
+Browser sessions require verified owner access and CSRF for writes; owner member tokens are supported. Organization identity comes from authentication. All responses are no-store. Quote fields: `confirmation_token`, `expires_at`, `effective_at`, `target_plan:"solo"`, `currency`, `amount_due:0`, `tax`, `monthly_total`, `additional_capacity_units`; optional `resume_required:true` identifies a previously confirmed uncertain operation, retaining its original token/parameters. Taxes/discounts at renewal can change the final invoice. State responses contain `pending_change:null` or `{schedule_id,target_plan:"solo",effective_at,additional_capacity_units}`. These fields do not extend the existing strict billing-summary response.
+
+Malformed input returns 400; unauthenticated 401; role/verification/CSRF failure 403; unsafe state, stale quote or conflicts 409; limits 429; unavailable billing/provider 503. A timeout does not imply failure at Stripe: retry the same confirmed operation. CLI: `billing plan-change status|preview|schedule --confirmation-token <token>|cancel --schedule-id <id>` with common auth/json options. CLI conflicts exit 5. Ordinary MCP `billing_plan_change` accepts `action`, `bearerToken`, and action-specific `confirmationToken` or `scheduleId`; preview and explicit confirmation precede schedule. All adapters call the shared billing domain.
+
+Temporary first-purchase policy (local candidate): `POST /v1/billing/checkout` additionally returns `409 {"error":"paid_purchase_locked"}` before returning/replaying a first-purchase request until seven complete 24-hour days after the immutable trial start. Missing or invalid starts fail closed. A processed organisation-scoped `invoice.paid` receipt preserves previously paid resubscriptions; existing provider-terminal verification still applies. Paid plan management and completed-payment confirmation are unchanged. Existing billing summary, CLI/MCP retrieval and successful `{url}` payloads are unchanged; automation may read existing trial timestamps, while Checkout remains owner/browser-only. No additional purchase route or support override is introduced. Existing issued Stripe URLs are not revoked. See FR-BIL-10 and AC-BILL-09.

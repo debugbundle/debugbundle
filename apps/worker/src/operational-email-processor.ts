@@ -17,10 +17,11 @@ import {
   getAllowanceMeterLabel,
   type AccountMetricKey
 } from "../../../packages/storage/src/index.js";
-import type {
-  PostgresOperationalEmailDeliveryStore
-} from "../../../packages/storage/src/operational-email-delivery-store.js";
-import { recordProjectMetricDeltas, type WorkerAccountAnalyticsDependencies } from "./account-analytics.js";
+import type { PostgresOperationalEmailDeliveryStore } from "../../../packages/storage/src/operational-email-delivery-store.js";
+import {
+  recordProjectMetricDeltas,
+  type WorkerAccountAnalyticsDependencies
+} from "./account-analytics.js";
 
 export interface DeliverOperationalEmailWorkerDependencies extends WorkerAccountAnalyticsDependencies {
   logger?: Pick<RuntimeLogger, "warn">;
@@ -93,7 +94,8 @@ function isAllowanceMeter(value: string): value is Parameters<typeof getAllowanc
 export async function processNextDeliverOperationalEmailJob(
   dependencies: DeliverOperationalEmailWorkerDependencies
 ): Promise<WorkerProcessResult> {
-  const claimed = await dependencies.operationalEmailDeliveryStore.claimDueOperationalEmailDeliveries(1);
+  const claimed =
+    await dependencies.operationalEmailDeliveryStore.claimDueOperationalEmailDeliveries(1);
   const next = claimed[0];
   if (next === undefined) {
     return { processed: false, reason: "no_jobs" };
@@ -106,10 +108,11 @@ export async function processNextDeliverOperationalEmailJob(
     return { processed: true };
   }
 
-  const recipientContext = await dependencies.operationalEmailDeliveryStore.resolveOperationalEmailRecipientContext({
-    organization_id: delivery.organization_id,
-    project_id: delivery.project_id
-  });
+  const recipientContext =
+    await dependencies.operationalEmailDeliveryStore.resolveOperationalEmailRecipientContext({
+      organization_id: delivery.organization_id,
+      project_id: delivery.project_id
+    });
   if (recipientContext === null) {
     await dependencies.operationalEmailDeliveryStore.markOperationalEmailDeliveryAttempt({
       delivery_id: delivery.delivery_id,

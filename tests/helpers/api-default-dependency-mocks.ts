@@ -1,5 +1,14 @@
 import { beforeEach, vi } from "vitest";
 
+vi.mock("../../packages/storage/src/billing-subscription-operation-store.js", async () => {
+  const { createMemoryBillingSubscriptionOperationStore } =
+    await import("./billing-subscription-operations.js");
+  return {
+    createPostgresBillingSubscriptionOperationStore: () =>
+      createMemoryBillingSubscriptionOperationStore()
+  };
+});
+
 const {
   poolQueryMock,
   poolConfigSpy,

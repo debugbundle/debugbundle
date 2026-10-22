@@ -1338,6 +1338,43 @@ If CLI says something is healthy and MCP says something different, that is a pro
 
 ---
 
+### AC-BILL-05: Durable Checkout Admission
+
+- Concurrent processes and retries reserve one attempt per organization and use identical Stripe parameters and idempotency key; separate organizations remain independent.
+- An open session is reused. A completed or ambiguous attempt cannot silently become a second purchase. Only a provider-confirmed expired session or a completed session tied to its exact provider-confirmed terminal subscription permits replacement.
+- New sessions expire in one hour and request 3DS where supported. Admission rejects suspended/linked active-subscription accounts; ended subscriptions retain a tested resubscription path.
+- Organization and trusted-client-IP limits reject before provider work, return Retry-After and record an audit failure. Existing owner, CSRF, trial and bearer-token boundaries remain enforced.
+- The additive migration preserves predecessor data, repeats safely, and is required at readiness before dependent code activates. No bootstrap upgrade or production canary is implied by local tests.
+
+### AC-BILL-09: First-Purchase Trial Wait
+
+Mapped requirements: FR-BIL-10, FR-BIL-07 and FR-BIL-03.
+
+- Direct Free-to-paid requests and trial conversion before seven full 24-hour days return `409 paid_purchase_locked` before any Stripe request, including both plan choices and retries with an existing reservation.
+- The exact seven-day boundary is eligible; timezone and daylight-saving changes do not change the elapsed duration. Missing, malformed and future starts fail closed.
+- Previously paid resubscriptions use an organisation-scoped processed `invoice.paid` receipt. A customer, an unpaid terminal subscription or a receipt belonging to another organisation cannot bypass the wait. Existing terminal-subscription verification still applies.
+- A blocked attempt is neither retired nor replaced, regardless of age or plan choice. Already captured payments and webhook/return reconciliation remain valid.
+- Existing paid upgrades, downgrades, capacity and renewal paths remain available. The no-card trial remains 30 days. The existing billing UI shows the unlock date/time and Contact us link, disables unavailable first-purchase actions, preserves Start trial and refreshes at unlock or return/focus.
+- Existing billing-summary and successful Checkout payloads remain unchanged. The contact link is a request for support, not an automatic early-purchase override.
+- The gate does not revoke previously issued hosted URLs, establish customer legitimacy or guarantee prevention of aged-account abuse. Live mitigation and release remain separately authorised.
+
+### AC-BILL-06: Authoritative Subscription Period
+
+- Initial invoice envelopes with equal start/end cannot clear a valid current subscription-item period, regardless of invoice/checkout event order.
+- Current subscription-item periods win over older invoice/proration periods. Legacy top-level subscription and invoice fallbacks remain supported; invalid timestamps never throw or invent a window.
+- Non-entitled plans still clear their billing periods under the existing entitlement policy.
+
+### AC-BILL-07: Same-Subscription Paid Upgrade
+
+- Paid Solo-to-Team requests update existing base and extra-capacity item IDs, preserve the purchased quantity and use fixed immediate prorations with `pending_if_incomplete`; no new recurring Checkout is created.
+- Declines/authentication requirements retain Solo and its purchased capacity. Explicit retries reuse one hosted invoice or replay identical stored parameters/key after an uncertain response. Paid-but-not-yet-applied updates remain pending.
+- Upgrade and capacity payment links open the saved invoice in a separate tab with an accessible new-tab label and close the dialog. Billing stays open and refreshes on return/focus. A pending invoice never displays a completed purchase or enables conflicting capacity changes; an already-paid upgrade retains the existing success-return flow.
+- Capacity mutations and upgrades cannot overlap across API processes. Multi-step schedule creation/update uses separate stable keys and resumes the same saved schedule. Prepared operations survive process/provider/DB failures; stale writers cannot complete or replace another attempt.
+- Ambiguous operations older than the bounded 23-hour replay window remain reserved for reconciliation. A provider-voided upgrade invoice with no pending update permits a new explicit attempt; age alone never does.
+- Scheduled reductions/cancellation, non-active subscriptions, unpaid prior invoices, unknown/partial items and mismatched ownership fail closed before a fresh upgrade mutation.
+- Both invoice/subscription webhook orders retain current Team/capacity and send one plan-change confirmation. Failed pending upgrades do not start paid Solo dunning. Old-subscription cancellation cannot revoke a replacement or erase a newer checkout.
+- Both additive migrations are required at readiness, preserve predecessor data and repeat safely. Local provider fakes and PostgreSQL tests do not prove hosted Stripe/SCA or deployment success.
+
 ## 13. Alert Acceptance
 
 ### AC-ALT-01: Alert on New Incident
@@ -2837,3 +2874,22 @@ outcome, including disabled/nullable/empty/false values. Cover creator/role/tier
 boundaries, one-time secrets, stale navigation responses, bounded pagination,
 invalid input before dispatch and legacy MCP metadata. Source/unit evidence does
 not assert browser, provider, release or installed-client acceptance.
+
+Billing audit additions: prove quote cancellation makes zero payment calls, stale/tampered quotes fail closed, hosted authentication preserves existing capacity, API/CLI/MCP report payment_required without success, terminal summaries remove paid capacity, discounts/tax survive reductions, unrelated schedules remain untouched, verified-owner/CSRF boundaries hold, concurrent webhooks enqueue one transition notification, notification failure rolls back event/state, and stale Checkout returns cannot overwrite newer billing state. Exercise ordered forward migration 202610220003 and missing-ledger readiness in disposable PostgreSQL.
+
+Billing audit edge cases: ambiguous unsaved Checkout requests stop provider replay before the 24-hour idempotency retention boundary without releasing their reservation. Production cannot use static payment-link fallback. Capacity reduction rejects missing authoritative periods and unrelated future price, discount, tax or metadata changes. Local mock preview supports the approved quote/confirmation path without contacting Stripe.
+
+
+### AC-BILL-08: Scheduled Team-to-Solo Change
+
+Mapped requirements: FR-BIL-09, FR-BIL-08, NFR security/reliability and INV-5.
+
+- Preview creates no schedule or payment. Confirm shows renewal date, zero due now, estimated tax/total, retained purchased units and Team collaboration/Slack loss; Cancel performs no mutation.
+- Both prices change on the existing subscription at renewal, preserving quantities 0 through 99. Team and its included capacity stay active before the phase transition; Solo and its included capacity apply afterwards.
+- Owner/browser verification, CSRF, member-token scope, strict payloads and rate limits hold. CLI/MCP require the same quote token or exact cancellation schedule ID.
+- Lost create/update/release responses recover stable IDs and commands. A reload can recover the confirmed quote. A reservation older than the replay window is retained; known applied/released state may be reconciled without replay.
+- Discounts, tax and purchased quantity survive both phases. Foreign/custom future schedules, cancellations, unpaid invoices, pending updates, unknown/mixed/partial items and inconsistent periods fail closed.
+- A renewal invoice arriving before a subscription event still emits the plan transition once. Stale Team events cannot restore Team after the current subscription is Solo.
+- The already applied final phase does not strand later upgrades/capacity changes: release only an owned schedule with no remaining future phase, inside the next durable mutation.
+- Forward migration 202610220004 expands the operation kind constraint without altering existing reservation rows or preceding checksums. Readiness fails until recorded; bootstrap creates the final empty schema without ALTER-based evolution.
+- Provider validation uses an explicit Docker target, a test-only credential and expected-account/balance verification, labelled newly created fixtures and scoped cleanup. Hosted browser challenge completion and the application return journey remain separate evidence.

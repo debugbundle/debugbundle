@@ -6,6 +6,32 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.19.0] - 2026-10-22
+
+### Added
+
+- Confirmed paid Solo-to-Team upgrades on the existing subscription, with prorated invoice previews, retained purchased capacity and hosted payment/authentication recovery.
+- Team-to-Solo changes scheduled for renewal, with confirmation of retained capacity, feature changes and the effective date. API and source CLI/MCP adapters share the billing service.
+- A temporary seven-day wait from the start of the existing 30-day no-card trial before a first paid purchase. Direct Free-to-paid requests follow the same server-side rule. The billing page shows the unlock time and a contact link for earlier-purchase requests; existing paid management remains available.
+
+### Fixed
+
+- Reserve Checkout and subscription mutations durably, reuse open sessions and provider idempotency keys, and fence stale writers. Preserve uncertain payments instead of replacing attempts based on age.
+- Resolve authoritative subscription periods from current Stripe item periods and supported invoice fallbacks in either webhook order.
+- Keep previous entitlements while upgrade or capacity payment is pending, and commit billing notifications atomically with webhook state.
+- Preserve cancellation and resubscription without allowing a second recurring Checkout for a linked non-terminal subscription.
+
+### Security
+
+- Require a verified owner email before Checkout and upgrade previews. Add organisation and client-IP admission limits, with forwarding headers trusted only from explicitly configured immediate proxies.
+- Limit newly issued Checkout sessions to one hour and request supported 3D Secure authentication. These controls do not revoke historical URLs or guarantee issuer authentication.
+
+### Upgrade
+
+- Apply the four additive `202610220001` through `202610220004` billing migrations before dependent runtime activation; readiness fails closed when required migrations are missing.
+- Deploy a billing-notification-compatible worker before enabling the new API producer and retain a compatible worker for rollback. Existing billing snapshots and provider settings are not automatically repaired or changed.
+- Independently published CLI, MCP, OpenClaw, shared JS and SDK package versions are unchanged by the hosted release; source adapters require their own package release to reach registry installations.
+
 ## [1.18.1] - 2026-10-22
 
 ### Fixed

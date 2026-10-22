@@ -258,3 +258,10 @@ new failure IDs remain visible.
 - **Notification pause:** A temporary or indefinite delivery override that preserves saved channel modes and incident monitoring. Resuming never replays suppressed history.
 - **Daily incident digest:** A local-time email of newly opened/reopened, still-unresolved matched incidents. It is separate from short burst batching and weekly reports; health outages bypass daily mode.
 - **Daily allowance admission:** One project/window's accepted daily delivery, recorded without recipients or telemetry. Its usage survives retries, rescheduling and queue/incident cleanup; moving already-admitted items does not consume another allowance.
+
+## Billing operation terms
+
+- **Checkout reservation:** One organisation's durable first-purchase attempt, binding its provider idempotency key and exact request. An old or uncertain attempt remains reserved until authoritative provider state permits completion or replacement.
+- **Subscription operation:** A durable, fenced owner request to change the existing subscription's plan or capacity. Prepared commands and provider keys survive retries; elapsed time alone never authorises another charge.
+- **Pending payment:** An invoice still awaiting payment or authentication. Upgrade/capacity entitlements remain at their previous values until the provider applies the paid change.
+- **First-purchase unlock:** Seven complete 24-hour days from the authoritative no-card trial start. Processed organisation-scoped paid-invoice history exempts previously paid accounts; account age is not evidence of legitimacy.

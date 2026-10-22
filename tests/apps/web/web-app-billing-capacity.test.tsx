@@ -305,3 +305,42 @@ describe("billing capacity", () => {
     ).toBeInTheDocument();
   });
 });
+
+it("continues a capacity authentication request on the saved Stripe invoice without showing success", async () => {
+  const user = userEvent.setup();
+  const assign = vi.fn();
+  Object.defineProperty(window, "location", { configurable: true, value: { assign } });
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((input: RequestInfo | URL) => {
+      const url = requestUrl(input);
+      if (url.endsWith("/v1/auth/session")) return jsonResponse(200, { session: createSession() });
+      if (url.endsWith("/v1/billing"))
+        return jsonResponse(200, {
+          billing: createBillingSummary({
+            plan: "solo",
+            stripe_customer_id: "cus_test",
+            billing_state: "active"
+          })
+        });
+      if (url.endsWith("/v1/billing/capacity/increase"))
+        return jsonResponse(200, {
+          payment_required: { url: "https://invoice.stripe.com/i/capacity" }
+        });
+      return jsonResponse(404, { error: "not_found" });
+    })
+  );
+  render(<App initialEntries={["/billing"]} />);
+  await user.click(await screen.findByRole("button", { name: /manage capacity/i }));
+  await user.click(await screen.findByRole("button", { name: /increase capacity now/i }));
+  const link = await screen.findByRole("link", { name: /continue payment on stripe/i });
+  expect(link).toHaveAttribute("href", "https://invoice.stripe.com/i/capacity");
+  expect(link).toHaveAttribute("target", "_blank");
+  expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  expect(screen.getByRole("button", { name: /increase capacity now/i })).toBeDisabled();
+  expect(assign).not.toHaveBeenCalled();
+  expect(screen.queryByText("Allowance capacity increased successfully.")).not.toBeInTheDocument();
+  await user.click(link);
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(assign).not.toHaveBeenCalled();
+});

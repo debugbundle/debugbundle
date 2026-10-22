@@ -1,26 +1,16 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as routerDom from "../../../node_modules/.pnpm/node_modules/react-router-dom/dist/index.js";
 import { MemoryRouter } from "../../../node_modules/.pnpm/node_modules/react-router-dom/dist/index.js";
 
 import {
-  CapacityDialog,
-  CheckoutReturnDialog,
-  billingReflectsCheckout,
-  clearPendingBillingCheckout,
-  formatActiveProjectCount,
-  formatAllowanceUnitCount,
-  formatBillingWindowDescription,
-  formatDate,
-  formatPlanName,
-  getBillingWindowRefreshDelay,
-  readPendingBillingCheckout,
-  writePendingBillingCheckout
-} from "../../../apps/web/src/pages/billing-page.tsx";
-import { ProjectTokensPage, ProjectsPage, sortProjects } from "../../../apps/web/src/pages/management-pages.tsx";
+  ProjectTokensPage,
+  ProjectsPage,
+  sortProjects
+} from "../../../apps/web/src/pages/management-pages.tsx";
 import { RecentProjectsTable } from "../../../apps/web/src/components/system/recent-projects-table.tsx";
 import {
   HeaderActionsProvider,
@@ -51,7 +41,6 @@ import {
 } from "../../../apps/web/src/pages/project-alerts-page.tsx";
 import { getSlackDestinationErrorMessage } from "../../../apps/web/src/lib/slack-destinations.ts";
 import * as api from "../../../apps/web/src/lib/api.ts";
-import * as notify from "../../../apps/web/src/lib/notify.tsx";
 import * as projectSharingApi from "../../../apps/web/src/lib/project-sharing-api.ts";
 import * as sessionModule from "../../../apps/web/src/lib/session.tsx";
 import { createBillingSummary, createProject, jsonResponse } from "./web-test-helpers.js";
@@ -61,7 +50,10 @@ function renderProjectTokensPage(): ReturnType<typeof render> {
   return render(
     <MemoryRouter initialEntries={["/"]}>
       <routerDom.Routes>
-        <routerDom.Route path="/" element={<routerDom.Outlet context={{ projectId: "proj_123" }} />}>
+        <routerDom.Route
+          path="/"
+          element={<routerDom.Outlet context={{ projectId: "proj_123" }} />}
+        >
           <routerDom.Route index element={<ProjectTokensPage />} />
         </routerDom.Route>
       </routerDom.Routes>
@@ -80,7 +72,11 @@ function renderProjectMembersPage(project = createProject()): ReturnType<typeof 
       <routerDom.Routes>
         <routerDom.Route
           path="/"
-          element={<routerDom.Outlet context={{ projectId: project.project_id, project, onProjectUpdated: vi.fn() }} />}
+          element={
+            <routerDom.Outlet
+              context={{ projectId: project.project_id, project, onProjectUpdated: vi.fn() }}
+            />
+          }
         >
           <routerDom.Route index element={<ProjectMembersPage />} />
         </routerDom.Route>
@@ -90,7 +86,10 @@ function renderProjectMembersPage(project = createProject()): ReturnType<typeof 
 }
 
 beforeEach(() => {
-  vi.stubGlobal("fetch", vi.fn(() => jsonResponse(404, { error: "not_found" })));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(() => jsonResponse(404, { error: "not_found" }))
+  );
 });
 
 afterEach(() => {
@@ -101,148 +100,6 @@ afterEach(() => {
 });
 
 describe("web page helper coverage", () => {
-  it("reads, writes, and clears pending billing checkout state", () => {
-    expect(readPendingBillingCheckout()).toBeNull();
-
-    window.sessionStorage.setItem("debugbundle.billing.checkout", "not-json");
-    expect(readPendingBillingCheckout()).toBeNull();
-
-    window.sessionStorage.setItem(
-      "debugbundle.billing.checkout",
-      JSON.stringify({ previousPlan: "starter", targetPlan: "team" })
-    );
-    expect(readPendingBillingCheckout()).toBeNull();
-
-    writePendingBillingCheckout({ previousPlan: "free", targetPlan: "solo" });
-    expect(readPendingBillingCheckout()).toEqual({ previousPlan: "free", targetPlan: "solo" });
-
-    clearPendingBillingCheckout();
-    expect(readPendingBillingCheckout()).toBeNull();
-  });
-
-  it("returns safely when billing checkout storage is unavailable", () => {
-    vi.stubGlobal("window", undefined);
-
-    expect(readPendingBillingCheckout()).toBeNull();
-    expect(() => writePendingBillingCheckout({ previousPlan: "solo", targetPlan: "team" })).not.toThrow();
-    expect(() => clearPendingBillingCheckout()).not.toThrow();
-  });
-
-  it("detects when billing state reflects a checkout and formats billing labels", () => {
-    const baseline = createBillingSummary({ plan: "free", stripe_customer_id: null });
-    const updated = createBillingSummary({ plan: "solo", stripe_customer_id: "cus_123" });
-    const trialBaseline = createBillingSummary({
-      plan: "team",
-      billing_state: "trialing",
-      stripe_customer_id: null,
-      trial: {
-        available: false,
-        active: true,
-        plan: "team",
-        started_at: "2026-06-04T00:00:00.000Z",
-        ends_at: "2026-07-04T00:00:00.000Z",
-        used_at: "2026-06-04T00:00:00.000Z",
-        converted_at: null,
-        expired_at: null,
-        days_remaining: 30
-      }
-    });
-    const convertedTrial = createBillingSummary({
-      plan: "team",
-      billing_state: "active",
-      stripe_customer_id: "cus_123",
-      trial: {
-        available: false,
-        active: false,
-        plan: "team",
-        started_at: "2026-06-04T00:00:00.000Z",
-        ends_at: "2026-07-04T00:00:00.000Z",
-        used_at: "2026-06-04T00:00:00.000Z",
-        converted_at: "2026-06-10T00:00:00.000Z",
-        expired_at: null,
-        days_remaining: null
-      }
-    });
-
-    expect(
-      billingReflectsCheckout(updated, { previousPlan: "free", targetPlan: "solo" }, baseline)
-    ).toBe(true);
-    expect(
-      billingReflectsCheckout(convertedTrial, { previousPlan: "team", targetPlan: "team" }, trialBaseline)
-    ).toBe(true);
-    expect(billingReflectsCheckout(baseline, null, null)).toBe(false);
-    expect(billingReflectsCheckout(updated, null, baseline)).toBe(true);
-    expect(billingReflectsCheckout(baseline, null, createBillingSummary({ plan: "free", stripe_customer_id: null }))).toBe(false);
-
-    expect(formatPlanName("free")).toBe("Free");
-    expect(formatPlanName("solo")).toBe("Solo");
-    expect(formatPlanName("team")).toBe("Team");
-    expect(formatActiveProjectCount(1)).toBe("1 active project");
-    expect(formatActiveProjectCount(3)).toBe("3 active projects");
-    expect(formatAllowanceUnitCount(1)).toBe("1 allowance unit");
-    expect(formatAllowanceUnitCount(4)).toBe("4 allowance units");
-    expect(formatDate("2026-04-23T11:56:12.000Z")).toMatch(/2026/);
-    expect(
-      formatBillingWindowDescription(
-        {
-          starts_at: "2026-07-01T00:00:00.000Z",
-          ends_at: "2026-08-01T00:00:00.000Z"
-        },
-        { locale: "en-GB", timeZone: "Europe/Ljubljana" }
-      )
-    ).toBe(
-      "Current window: 1 Jul 2026 to 1 Aug 2026. Resets 1 Aug 2026 at 02:00 CEST (00:00 UTC)."
-    );
-    expect(
-      formatBillingWindowDescription(
-        {
-          starts_at: "2026-07-01T00:00:00.000Z",
-          ends_at: "2026-08-01T00:00:00.000Z"
-        },
-        { locale: "en-GB", timeZone: "UTC" }
-      )
-    ).toBe("Current window: 1 Jul 2026 to 1 Aug 2026. Resets 1 Aug 2026 at 00:00 UTC.");
-    expect(
-      formatBillingWindowDescription(
-        {
-          starts_at: "2026-07-01T00:00:00.000Z",
-          ends_at: "2026-08-01T00:00:00.000Z"
-        },
-        { locale: "en-GB", timeZone: "America/Los_Angeles" }
-      )
-    ).toMatch(
-      /^Current window: 30 Jun 2026 to 31 Jul 2026\. Resets 31 Jul 2026 at 17:00 (?:PDT|GMT-7) \(1 Aug 2026 at 00:00 UTC\)\.$/
-    );
-  });
-
-  it("bounds billing refresh timers and retries safely after a passed boundary", () => {
-    const now = Date.parse("2026-07-01T00:00:00.000Z");
-
-    expect(getBillingWindowRefreshDelay("2026-07-01T00:01:00.000Z", now)).toBe(61_000);
-    expect(getBillingWindowRefreshDelay("2026-08-01T00:00:00.000Z", now)).toBe(86_400_000);
-    expect(getBillingWindowRefreshDelay("2026-06-30T23:59:00.000Z", now)).toBe(30_000);
-    expect(getBillingWindowRefreshDelay("not-a-date", now)).toBeNull();
-  });
-
-  it("renders checkout return dialog states", () => {
-    const { rerender } = render(<CheckoutReturnDialog state={{ status: "syncing" }} onOpenChange={() => {}} />);
-
-    expect(screen.getByText(/confirming your subscription/i)).toBeInTheDocument();
-    expect(screen.getByText(/this usually finishes in a few seconds/i)).toBeInTheDocument();
-
-    rerender(<CheckoutReturnDialog state={{ status: "success" }} onOpenChange={() => {}} />);
-    expect(screen.getByText(/free is active/i)).toBeInTheDocument();
-
-    rerender(<CheckoutReturnDialog state={{ status: "delayed" }} onOpenChange={() => {}} />);
-    expect(screen.getByText(/payment received/i)).toBeInTheDocument();
-
-    rerender(<CheckoutReturnDialog state={{ status: "canceled" }} onOpenChange={() => {}} />);
-    expect(screen.getByText(/checkout canceled/i)).toBeInTheDocument();
-
-    rerender(<CheckoutReturnDialog state={{ status: "error" }} onOpenChange={() => {}} />);
-    expect(screen.getByText(/could not confirm billing yet/i)).toBeInTheDocument();
-  });
-
   it("sorts projects across each supported field", () => {
     const projects = [
       createProject({
@@ -272,29 +129,36 @@ describe("web page helper coverage", () => {
     ];
 
     expect(sortProjects(null, { field: "name", direction: "asc" })).toEqual([]);
-    expect(sortProjects(projects, { field: "name", direction: "asc" }).map((project) => project.project_id)).toEqual([
-      "proj_alpha",
-      "proj_zeta"
-    ]);
-    expect(sortProjects(projects, { field: "slug", direction: "desc" }).map((project) => project.project_id)).toEqual([
-      "proj_zeta",
-      "proj_alpha"
-    ]);
-    expect(sortProjects(projects, { field: "environment_default", direction: "asc" }).map((project) => project.project_id)).toEqual([
-      "proj_zeta",
-      "proj_alpha"
-    ]);
-    expect(sortProjects(projects, { field: "monthly_bundle_requests", direction: "asc" }).map((project) => project.project_id)).toEqual([
-      "proj_alpha",
-      "proj_zeta"
-    ]);
     expect(
-      sortProjects(projects, { field: "monthly_raw_ingested_events", direction: "asc" }).map((project) => project.project_id)
+      sortProjects(projects, { field: "name", direction: "asc" }).map(
+        (project) => project.project_id
+      )
+    ).toEqual(["proj_alpha", "proj_zeta"]);
+    expect(
+      sortProjects(projects, { field: "slug", direction: "desc" }).map(
+        (project) => project.project_id
+      )
     ).toEqual(["proj_zeta", "proj_alpha"]);
-    expect(sortProjects(projects, { field: "unknown" as never, direction: "asc" }).map((project) => project.project_id)).toEqual([
-      "proj_zeta",
-      "proj_alpha"
-    ]);
+    expect(
+      sortProjects(projects, { field: "environment_default", direction: "asc" }).map(
+        (project) => project.project_id
+      )
+    ).toEqual(["proj_zeta", "proj_alpha"]);
+    expect(
+      sortProjects(projects, { field: "monthly_bundle_requests", direction: "asc" }).map(
+        (project) => project.project_id
+      )
+    ).toEqual(["proj_alpha", "proj_zeta"]);
+    expect(
+      sortProjects(projects, { field: "monthly_raw_ingested_events", direction: "asc" }).map(
+        (project) => project.project_id
+      )
+    ).toEqual(["proj_zeta", "proj_alpha"]);
+    expect(
+      sortProjects(projects, { field: "unknown" as never, direction: "asc" }).map(
+        (project) => project.project_id
+      )
+    ).toEqual(["proj_zeta", "proj_alpha"]);
   });
 
   it("shows dashboard projects in the same name order as the Projects page", async () => {
@@ -395,8 +259,12 @@ describe("web page helper coverage", () => {
       refreshSession: vi.fn(async () => createSession()),
       setSession: vi.fn()
     });
-    vi.spyOn(projectSharingApi, "listProjectMembers").mockRejectedValue(new Error("invalid_session"));
-    vi.spyOn(projectSharingApi, "listProjectInvites").mockRejectedValue(new Error("invalid_session"));
+    vi.spyOn(projectSharingApi, "listProjectMembers").mockRejectedValue(
+      new Error("invalid_session")
+    );
+    vi.spyOn(projectSharingApi, "listProjectInvites").mockRejectedValue(
+      new Error("invalid_session")
+    );
     vi.spyOn(projectSharingApi, "inviteProjectMember").mockResolvedValue(
       createProjectInvite({ invite_id: "pinv_bootstrap", email: "bootstrap@example.com" })
     );
@@ -432,12 +300,20 @@ describe("web page helper coverage", () => {
     expect(formatActiveProjects(2)).toBe("2 active projects");
 
     expect(formatProjectSharingSummary(null)).toBe("Loading sharing summary...");
-    expect(formatProjectSharingSummary([])).toBe("Create a project to start sending events and sharing access.");
-    expect(formatProjectSharingSummary([createProject()])).toBe("1 active project. Sharing is managed from each project's Members tab.");
+    expect(formatProjectSharingSummary([])).toBe(
+      "Create a project to start sending events and sharing access."
+    );
+    expect(formatProjectSharingSummary([createProject()])).toBe(
+      "1 active project. Sharing is managed from each project's Members tab."
+    );
     expect(
       formatProjectSharingSummary([
         createProject(),
-        createProject({ project_id: "proj_456", relationship: "shared", sharing_state: "shared_by_you" })
+        createProject({
+          project_id: "proj_456",
+          relationship: "shared",
+          sharing_state: "shared_by_you"
+        })
       ])
     ).toBe("2 active projects. 1 project is shared.");
 
@@ -470,7 +346,13 @@ describe("web page helper coverage", () => {
     });
     vi.spyOn(api, "listProjects").mockResolvedValue([
       createProject(),
-      createProject({ project_id: "proj_456", name: "Worker", slug: "worker", relationship: "shared", sharing_state: "shared_by_you" })
+      createProject({
+        project_id: "proj_456",
+        name: "Worker",
+        slug: "worker",
+        relationship: "shared",
+        sharing_state: "shared_by_you"
+      })
     ]);
     vi.spyOn(api, "getBillingSummary").mockResolvedValue(
       createBillingSummary({
@@ -493,7 +375,9 @@ describe("web page helper coverage", () => {
 
     expect(await screen.findByText(/^2 active projects$/i)).toBeInTheDocument();
     expect(screen.getByText(/2 active projects\. 1 project is shared\./i)).toBeInTheDocument();
-    expect(screen.getByText(/team plan with 2 active projects and 17 allowance units/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/team plan with 2 active projects and 17 allowance units/i)
+    ).toBeInTheDocument();
   });
 
   it("handles null, forbidden, and invalid-session organization overview states", async () => {
@@ -534,202 +418,6 @@ describe("web page helper coverage", () => {
 
     expect(await screen.findByText(/manage sharing from each project/i)).toBeInTheDocument();
     expect(screen.getByText(/loading billing summary/i)).toBeInTheDocument();
-  });
-
-  it("surfaces billing capacity dialog error and cancel paths", async () => {
-    const user = userEvent.setup();
-    const billing = createBillingSummary({
-      plan: "solo",
-      stripe_customer_id: "cus_123",
-      active_projects: 3,
-      capacity_units: {
-        total: 5,
-        included: 3,
-        additional_purchased: 2,
-        pending_reduction: null
-      }
-    });
-    const onBillingChange = vi.fn();
-    const showErrorToast = vi.spyOn(notify, "showErrorToast").mockImplementation(() => undefined);
-    const showSuccessToast = vi.spyOn(notify, "showSuccessToast").mockImplementation(() => undefined);
-
-    vi.spyOn(api, "increaseBillingCapacity")
-      .mockRejectedValueOnce(new Error("pending_capacity_reduction_exists"))
-      .mockRejectedValueOnce(new Error("invalid_target_quantity"));
-    vi.spyOn(api, "scheduleBillingCapacityReduction").mockRejectedValue(new Error("invalid_target_quantity"));
-    vi.spyOn(api, "cancelBillingCapacityReduction").mockResolvedValue(
-      createBillingSummary({
-        plan: "solo",
-        stripe_customer_id: "cus_123",
-        active_projects: 3,
-        capacity_units: {
-          total: 5,
-          included: 3,
-          additional_purchased: 2,
-          pending_reduction: null
-        }
-      })
-    );
-
-    const { rerender } = render(
-      <CapacityDialog
-        billing={billing}
-        canChangeBilling={true}
-        managementMode="stripe"
-        open={true}
-        onOpenChange={() => {}}
-        onBillingChange={onBillingChange}
-      />
-    );
-
-    expect(screen.getByRole("dialog", { name: /manage allowance capacity/i })).toHaveClass(
-      "max-h-[calc(100dvh-2rem)]",
-      "overflow-y-auto",
-      "overscroll-contain"
-    );
-
-    await user.click(screen.getByRole("button", { name: /increase capacity now/i }));
-    await waitFor(() => {
-      expect(showErrorToast).toHaveBeenCalledWith("Cancel the scheduled reduction before adding more capacity units.");
-    });
-
-    await user.click(screen.getByRole("button", { name: /increase capacity now/i }));
-    await waitFor(() => {
-      expect(showErrorToast).toHaveBeenCalledWith("Choose a unit count above your current purchased quantity.");
-    });
-
-    await user.click(screen.getByRole("button", { name: /schedule reduction/i }));
-    await waitFor(() => {
-      expect(showErrorToast).toHaveBeenCalledWith("Choose a unit count below your current purchased quantity.");
-    });
-
-    rerender(
-      <CapacityDialog
-        billing={createBillingSummary({
-          plan: "solo",
-          stripe_customer_id: "cus_123",
-          active_projects: 3,
-          capacity_units: {
-            total: 5,
-            included: 3,
-            additional_purchased: 2,
-            pending_reduction: {
-              additional_purchased: 0,
-              total: 3,
-              effective_at: "2026-04-23T11:56:12.000Z"
-            }
-          }
-        })}
-        canChangeBilling={true}
-        managementMode="stripe"
-        open={true}
-        onOpenChange={() => {}}
-        onBillingChange={onBillingChange}
-      />
-    );
-
-    await user.click(screen.getByRole("button", { name: /keep current units/i }));
-    await waitFor(() => {
-      expect(onBillingChange).toHaveBeenCalled();
-      expect(showSuccessToast).toHaveBeenCalledWith("Scheduled capacity reduction cancelled successfully.");
-    });
-  });
-
-  it("applies successful billing capacity increases", async () => {
-    const user = userEvent.setup();
-    const nextBilling = createBillingSummary({
-      plan: "solo",
-      stripe_customer_id: "cus_123",
-      active_projects: 3,
-      capacity_units: {
-        total: 6,
-        included: 3,
-        additional_purchased: 3,
-        pending_reduction: null
-      }
-    });
-    const onBillingChange = vi.fn();
-    const showSuccessToast = vi.spyOn(notify, "showSuccessToast").mockImplementation(() => undefined);
-
-    vi.spyOn(api, "increaseBillingCapacity").mockResolvedValue(nextBilling);
-
-    render(
-      <CapacityDialog
-        billing={createBillingSummary({
-          plan: "solo",
-          stripe_customer_id: "cus_123",
-          active_projects: 3,
-          capacity_units: {
-            total: 5,
-            included: 3,
-            additional_purchased: 2,
-            pending_reduction: null
-          }
-        })}
-        canChangeBilling={true}
-        managementMode="stripe"
-        open={true}
-        onOpenChange={() => {}}
-        onBillingChange={onBillingChange}
-      />
-    );
-
-    await user.click(screen.getByRole("button", { name: /increase capacity now/i }));
-
-    await waitFor(() => {
-      expect(onBillingChange).toHaveBeenCalledWith(nextBilling);
-      expect(showSuccessToast).toHaveBeenCalledWith("Allowance capacity increased successfully.");
-    });
-  });
-
-  it("applies immediate internal capacity reductions", async () => {
-    const user = userEvent.setup();
-    const nextBilling = createBillingSummary({
-      plan: "team",
-      stripe_customer_id: null,
-      active_projects: 3,
-      capacity_units: {
-        total: 16,
-        included: 15,
-        additional_purchased: 1,
-        pending_reduction: null
-      }
-    });
-    const onBillingChange = vi.fn();
-    const showSuccessToast = vi.spyOn(notify, "showSuccessToast").mockImplementation(() => undefined);
-
-    vi.spyOn(api, "scheduleBillingCapacityReduction").mockResolvedValue(nextBilling);
-
-    render(
-      <CapacityDialog
-        billing={createBillingSummary({
-          plan: "team",
-          stripe_customer_id: null,
-          active_projects: 3,
-          capacity_units: {
-            total: 17,
-            included: 15,
-            additional_purchased: 2,
-            pending_reduction: null
-          }
-        })}
-        canChangeBilling={true}
-        managementMode="internal"
-        open={true}
-        onOpenChange={() => {}}
-        onBillingChange={onBillingChange}
-      />
-    );
-
-    expect(screen.getByText(/internal admin-managed accounts update purchased allowance units immediately/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /reduce capacity now/i })).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: /reduce capacity now/i }));
-
-    await waitFor(() => {
-      expect(onBillingChange).toHaveBeenCalledWith(nextBilling);
-      expect(showSuccessToast).toHaveBeenCalledWith("Allowance capacity reduced successfully.");
-    });
   });
 
   it("formats alert channel metadata and builds alert config variants", () => {
@@ -853,17 +541,31 @@ describe("web page helper coverage", () => {
     expect(formatAlertCooldown(86_400)).toBe("1 day");
     expect(formatAlertCooldown(172_800)).toBe("2 days");
     expect(formatAlertCooldown(900)).toBe("15 minutes");
-    expect(getSlackDestinationErrorMessage(new Error("slack_destination_in_use"), "delete")).toMatch(/weekly reports/i);
-    expect(getSlackDestinationErrorMessage(new Error("slack_rate_limited"), "test")).toMatch(/slow down/i);
+    expect(
+      getSlackDestinationErrorMessage(new Error("slack_destination_in_use"), "delete")
+    ).toMatch(/weekly reports/i);
+    expect(getSlackDestinationErrorMessage(new Error("slack_rate_limited"), "test")).toMatch(
+      /slow down/i
+    );
     expect(getSlackDestinationErrorMessage(new Error("forbidden"), "delete")).toMatch(/owners/i);
     expect(getSlackDestinationErrorMessage("unknown", "test")).toMatch(/could not send/i);
 
-    expect(validateAlertRecipientEmail("")).toBe("Enter the email address that should receive this alert.");
-    expect(validateAlertRecipientEmail("broken")).toBe("Enter a valid email address for this alert.");
+    expect(validateAlertRecipientEmail("")).toBe(
+      "Enter the email address that should receive this alert."
+    );
+    expect(validateAlertRecipientEmail("broken")).toBe(
+      "Enter a valid email address for this alert."
+    );
     expect(validateAlertRecipientEmail("alerts@example.com")).toBeUndefined();
-    expect(validateAlertCooldownDays("")).toBe("Cooldown days must be a whole number between 0 and 7.");
-    expect(validateAlertCooldownDays("1.5")).toBe("Cooldown days must be a whole number between 0 and 7.");
-    expect(validateAlertCooldownDays("8")).toBe("Cooldown days must be a whole number between 0 and 7.");
+    expect(validateAlertCooldownDays("")).toBe(
+      "Cooldown days must be a whole number between 0 and 7."
+    );
+    expect(validateAlertCooldownDays("1.5")).toBe(
+      "Cooldown days must be a whole number between 0 and 7."
+    );
+    expect(validateAlertCooldownDays("8")).toBe(
+      "Cooldown days must be a whole number between 0 and 7."
+    );
     expect(validateAlertCooldownDays("0")).toBeUndefined();
     expect(validateAlertCooldownDays("7")).toBeUndefined();
 
@@ -878,9 +580,21 @@ describe("web page helper coverage", () => {
       to: "alerts@example.com"
     });
     expect(
-      buildAlertConfig({ channel: "email", emailRecipient: "broken", destinationUrl: "", slackDestinationId: "" })
+      buildAlertConfig({
+        channel: "email",
+        emailRecipient: "broken",
+        destinationUrl: "",
+        slackDestinationId: ""
+      })
     ).toBeNull();
-    expect(buildAlertConfig({ channel: "webhook", emailRecipient: "", destinationUrl: "", slackDestinationId: "" })).toBeNull();
+    expect(
+      buildAlertConfig({
+        channel: "webhook",
+        emailRecipient: "",
+        destinationUrl: "",
+        slackDestinationId: ""
+      })
+    ).toBeNull();
     expect(
       buildAlertConfig({
         channel: "webhook",

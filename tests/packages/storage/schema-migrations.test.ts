@@ -325,6 +325,8 @@ describe("storage schema migrations", () => {
 
   it("should seed the migration ledger instead of replaying history for a current bootstrap schema", async (): Promise<void> => {
     const currentSchemaColumns = [
+      { table_name: "billing_subscription_operations", column_name: "parameters" },
+      { table_name: "billing_checkout_attempts", column_name: "parameters" },
       { table_name: "incident_events", column_name: "resource_route" },
       { table_name: "alert_deliveries", column_name: "coalescing_key" },
       { table_name: "alert_deliveries", column_name: "evaluation_job_id" },
@@ -374,6 +376,10 @@ describe("storage schema migrations", () => {
       })
       .mockResolvedValueOnce({
         rows: currentSchemaColumns
+      })
+      .mockResolvedValueOnce({ rows: [{ definition: "CHECK includes billing_lifecycle" }] })
+      .mockResolvedValueOnce({
+        rows: [{ definition: "CHECK includes plan_schedule and plan_cancel" }]
       })
       .mockResolvedValue({ rows: [] });
 

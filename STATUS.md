@@ -1,3 +1,15 @@
+# Billing security release preparation — 2026-10-22
+
+Core 1.19.0 implements same-subscription Solo-to-Team upgrades with confirmed proration, retained capacity and payment recovery, plus Team-to-Solo scheduling at renewal. Durable Checkout/subscription reservations and webhook transactions preserve uncertain operations and queue billing notifications atomically. First paid purchase requires seven elapsed trial days; the existing billing page shows the unlock time and contact link. Existing paid management remains available. The frozen read-only OpenAI catalog is unchanged; source CLI/MCP additions require separately published packages.
+
+Fresh release checks pass **4,609 unit tests** (200 conditional skips), **25 disposable PostgreSQL cases**, full typecheck, changed-source ESLint/Prettier, dashboard build and **41 site tests**. New exact compatibility-worker source passes typecheck and 45 focused tests; committed provenance/governance passes 18 tests. The approved dependency updates move vulnerable transitive MCP SDK dependencies to 1.32.1 and Vite to 8.1.6. The high-severity audit gate passes; 37 low/moderate findings remain. The existing large-bundle warning remains.
+
+Earlier authorised test-mode provider/browser checks cover paid/declined/authentication recovery, proration/tax/discounts, retained capacity, scheduled downgrade renewal/re-upgrade, direct Checkout return, hosted 3DS retry on the same invoice, same-subscription upgrade and real signed test webhook delivery. The later seven-day policy has unit/UI/PostgreSQL coverage; the revised hosted-browser harness has not been rerun. No outbound customer email was sent.
+
+**Deployment sequence:** first deploy core 1.18.1's compatible worker while retaining the previous API producer, independently verify enabled processing, then deploy 1.19.0 with all four forward migrations before dependent activation. Retain the bridge as the verified previous stable release. Owner-approved proxy trust is limited to the verified immediate peer. Hosted image installation now requires the reviewed frozen lockfile; the cloud configuration passes 25 Docker-backed deployment tests.
+
+The owner authorised this hosted release. Compatibility source and cloud configuration are committed/pushed; source CI and hosted promotion are separate checkpoints and production has not yet been promoted. Local/provider results do not establish hosted success or customer legitimacy. Legacy URLs, malformed historic billing periods, CAPTCHA/monitoring and provider risk-policy changes remain unresolved. Refunds, holds, cancellations and messages remain separately authorised actions. No consumer product is changed. Exact operational receipts stay in the ignored private handoff.
+
 # PHP SDK and WordPress exception-envelope patches released — 2026-10-20
 
 PHP SDK 2.0.2 is published from `18a5db013648b53493924b524b14240929f234ee`.
@@ -468,3 +480,5 @@ Documentation follow-ups do not change the deployed source SHAs.
 All 17 repositories are on `main`. Local `update/visit-flows` branches and the three published remote feature branches were deleted only after ancestry verification. Documentation/provenance commits after release do not change the deployed source SHA.
 
 Registry, Smithery and ClawHub/OpenClaw publication are verified. Two ClawHub searches remain below their ranking target; Glama verification returned 401, while PulseMCP/LobeHub need manual verification. These directory limitations do not block the verified runtime or public Git/npm installation paths. No OpenAI portal submission occurred. Reviewer access expires on 2026-11-07; any further extension or review-lifecycle change requires the appropriate owner approval.
+
+Local billing purchase-wait candidate: FR-BIL-10 / AC-BILL-09 now enforce seven complete trial days before a first paid Checkout, with the approved reusable unlock/contact notice and unchanged paid management. Validation: 4,609 unit tests, 25 disposable PostgreSQL tests, typecheck, focused lint/format and Docker dashboard build pass; new policy/notice coverage is 100%. Not deployed. Existing hosted URLs, compatible-worker rollout, migration execution and operational account/payment decisions remain separate gates.

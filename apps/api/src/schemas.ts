@@ -1,4 +1,9 @@
-import { AlertEmailConfigSchema, AlertSlackConfigSchema, AlertDiscordConfigSchema, AlertWebhookConfigSchema } from "../../../packages/shared-types/src/alert-notification-policy.js";
+import {
+  AlertEmailConfigSchema,
+  AlertSlackConfigSchema,
+  AlertDiscordConfigSchema,
+  AlertWebhookConfigSchema
+} from "../../../packages/shared-types/src/alert-notification-policy.js";
 import { GITHUB_OAUTH_ISSUER } from "../../../packages/auth/src/index.js";
 import {
   MAX_BILLING_ADDITIONAL_CAPACITY_UNITS,
@@ -776,6 +781,7 @@ export const ProjectsQuerySchema = TokenListQuerySchema;
 
 export const BillingCheckoutBodySchema = z
   .object({
+    confirmation_token: z.string().min(1).max(8192).optional(),
     target_plan: RequestedTrialPlanSchema
   })
   .strict();

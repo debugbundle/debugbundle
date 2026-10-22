@@ -8,6 +8,8 @@ export interface Queryable {
 }
 
 export const REQUIRED_API_TABLES = [
+  "billing_subscription_operations",
+  "billing_checkout_attempts",
   "notification_preferences",
   "notification_daily_batches",
   "notification_daily_items",

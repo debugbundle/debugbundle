@@ -1,3 +1,8 @@
+import {
+  createPlanChangeClient,
+  type PlanChangeRequest,
+  type PlanChangeResponse
+} from "./plan-change-client.js";
 import { z } from "zod";
 
 export const BillingUsageMetricSchema = z
@@ -8,7 +13,16 @@ export const BillingUsageMetricSchema = z
   .strict();
 
 export const BillingStateSchema = z
-  .enum(["active", "past_due", "canceled", "unpaid", "incomplete", "admin_override", "trialing", "trial_expired"])
+  .enum([
+    "active",
+    "past_due",
+    "canceled",
+    "unpaid",
+    "incomplete",
+    "admin_override",
+    "trialing",
+    "trial_expired"
+  ])
   .nullable();
 
 export const BillingTrialPlanSchema = z.enum(["solo", "team"]);
@@ -115,7 +129,9 @@ function parseApiError(status: number, body: unknown): never {
   throw new BillingApiError(status, parsed.data.error);
 }
 
-async function expectBilling(responsePromise: Promise<HttpResponse>): Promise<z.infer<typeof BillingSummarySchema>> {
+async function expectBilling(
+  responsePromise: Promise<HttpResponse>
+): Promise<z.infer<typeof BillingSummarySchema>> {
   const response = await responsePromise;
   if (response.status < 200 || response.status >= 300) {
     parseApiError(response.status, response.body);
@@ -129,14 +145,56 @@ async function expectBilling(responsePromise: Promise<HttpResponse>): Promise<z.
   return parsed.data.billing;
 }
 
+export const CapacityPaymentRequiredSchema = z.object({
+  payment_required: z.object({
+    url: z
+      .string()
+      .url()
+      .refine((value) => {
+        const url = new URL(value);
+        return (
+          url.protocol === "https:" &&
+          url.hostname === "invoice.stripe.com" &&
+          !url.username &&
+          !url.password &&
+          !url.port
+        );
+      })
+  })
+});
+export type CapacityPaymentRequired = z.infer<typeof CapacityPaymentRequiredSchema>;
+
+async function expectCapacity(
+  responsePromise: Promise<HttpResponse>
+): Promise<z.infer<typeof BillingSummarySchema> | CapacityPaymentRequired> {
+  const response = await responsePromise;
+  if (response.status < 200 || response.status >= 300)
+    parseApiError(response.status, response.body);
+  const payment = CapacityPaymentRequiredSchema.safeParse(response.body);
+  return payment.success ? payment.data : expectBilling(Promise.resolve(response));
+}
+
 export function createBillingApi(client: HttpClient): {
+  planChange(input: PlanChangeRequest): Promise<PlanChangeResponse>;
   getBillingSummary(input: { bearerToken: string }): Promise<z.infer<typeof BillingSummarySchema>>;
-  startTrial(input: { bearerToken: string; targetPlan: z.infer<typeof BillingTrialPlanSchema> }): Promise<z.infer<typeof BillingSummarySchema>>;
-  increaseCapacity(input: { bearerToken: string; targetAdditionalCapacityUnits: number }): Promise<z.infer<typeof BillingSummarySchema>>;
-  scheduleCapacityReduction(input: { bearerToken: string; targetAdditionalCapacityUnits: number }): Promise<z.infer<typeof BillingSummarySchema>>;
-  cancelCapacityReduction(input: { bearerToken: string }): Promise<z.infer<typeof BillingSummarySchema>>;
+  startTrial(input: {
+    bearerToken: string;
+    targetPlan: z.infer<typeof BillingTrialPlanSchema>;
+  }): Promise<z.infer<typeof BillingSummarySchema>>;
+  increaseCapacity(input: {
+    bearerToken: string;
+    targetAdditionalCapacityUnits: number;
+  }): Promise<z.infer<typeof BillingSummarySchema> | CapacityPaymentRequired>;
+  scheduleCapacityReduction(input: {
+    bearerToken: string;
+    targetAdditionalCapacityUnits: number;
+  }): Promise<z.infer<typeof BillingSummarySchema>>;
+  cancelCapacityReduction(input: {
+    bearerToken: string;
+  }): Promise<z.infer<typeof BillingSummarySchema>>;
 } {
   return {
+    planChange: createPlanChangeClient(client, parseApiError),
     async getBillingSummary(input) {
       return expectBilling(
         client.request({
@@ -161,7 +219,7 @@ export function createBillingApi(client: HttpClient): {
     },
 
     async increaseCapacity(input) {
-      return expectBilling(
+      return expectCapacity(
         client.request({
           method: "POST",
           path: "/v1/billing/capacity/increase",

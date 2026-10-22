@@ -22,6 +22,8 @@ import {
   parseOpenAiPluginRuntimeConfig
 } from "./openai-plugin-runtime.js";
 import { createApiServer, type ApiServerOptions } from "./server.js";
+import { createTrustedProxyPolicy } from "./client-ip.js";
+import { createBillingWebhookTransaction } from "../../../packages/billing/src/stripe-webhook-transaction.js";
 import { createStripeConfig } from "./stripe-config.js";
 
 const ApiRuntimeEnvSchema = z.object({
@@ -86,6 +88,8 @@ export function createDrainingReadinessState(
 }
 
 export function parseApiRuntimeEnv(env: Record<string, string | undefined>): ApiRuntimeEnv {
+  // Validate before opening pools; never interpret a broad trust flag as an IP.
+  createTrustedProxyPolicy(env["API_TRUSTED_PROXY_IPS"]);
   const result = ApiRuntimeEnvSchema.safeParse({
     API_HOST: env["API_HOST"],
     API_PORT: env["API_PORT"],
@@ -316,7 +320,9 @@ export async function startApiServerFromEnv(
     AWS_SECRET_ACCESS_KEY: env.AWS_SECRET_ACCESS_KEY
   });
 
-  const serverOptions: ApiServerOptions = {};
+  const serverOptions: ApiServerOptions = {
+    trustedProxyIps: envInput["API_TRUSTED_PROXY_IPS"] ?? ""
+  };
   const webhookPools: Pool[] = [];
   const stripeConfig = createStripeConfig(envInput);
   if (stripeConfig) {
@@ -326,6 +332,7 @@ export async function startApiServerFromEnv(
     serverOptions.stripeWebhook = {
       stripeConfig,
       billingSyncStore,
+      eventTransaction: createBillingWebhookTransaction(createPoolQueryable(syncPool)),
       ...(dependencies.auditLogging === undefined
         ? {}
         : { auditLogging: dependencies.auditLogging }),

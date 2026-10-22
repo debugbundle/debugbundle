@@ -1,3 +1,4 @@
+import { handleBillingPlanChange } from "./billing-plan-change-command.js";
 import {
   cancelBillingCapacityReductionWithAuthCommand as defaultCancelBillingCapacityReductionCommand,
   getBillingSummaryWithAuthCommand as defaultGetBillingSummaryCommand,
@@ -20,7 +21,10 @@ import {
   listProjectsWithAuthCommand as defaultListProjectsCommand,
   updateProjectWithAuthCommand as defaultUpdateProjectCommand
 } from "./project-commands.js";
-import { PROJECT_COLOR_TAG_VALUES, type ProjectColorTag } from "../../../packages/shared-types/src/index.js";
+import {
+  PROJECT_COLOR_TAG_VALUES,
+  type ProjectColorTag
+} from "../../../packages/shared-types/src/index.js";
 import {
   appendCommonAuthOptions,
   CliInputError,
@@ -34,7 +38,10 @@ import {
   requirePositional,
   type ParsedArgv
 } from "./argv-helpers.js";
-import type { ManagementCommandDependencies, CliCommandResult } from "./management-command-dependencies.js";
+import type {
+  ManagementCommandDependencies,
+  CliCommandResult
+} from "./management-command-dependencies.js";
 import {
   agentTokenWithAuthCommand,
   createMemberTokenWithAuthCommand as defaultCreateMemberTokenCommand,
@@ -58,14 +65,21 @@ function readProjectColorTagOption(parsedArgv: ParsedArgv): ProjectColorTag | un
   throw new CliInputError("Invalid value for --color-tag.");
 }
 
-export async function handleBillingCommand(parsedArgv: ParsedArgv, dependencies: ManagementCommandDependencies): Promise<CliCommandResult> {
+export async function handleBillingCommand(
+  parsedArgv: ParsedArgv,
+  dependencies: ManagementCommandDependencies
+): Promise<CliCommandResult> {
   const action = requirePositional(parsedArgv, 1, "action");
+
+  if (action === "plan-change") return handleBillingPlanChange(parsedArgv);
 
   if (action === "get") {
     expectNoUnknownOptions(parsedArgv, ["auth-file", "json"]);
     ensureNoExtraPositionals(parsedArgv, 2);
 
-    return await (dependencies.getBillingSummaryCommand ?? defaultGetBillingSummaryCommand)(appendCommonAuthOptions(parsedArgv, {}));
+    return await (dependencies.getBillingSummaryCommand ?? defaultGetBillingSummaryCommand)(
+      appendCommonAuthOptions(parsedArgv, {})
+    );
   }
 
   if (action === "trial") {
@@ -99,43 +113,54 @@ export async function handleBillingCommand(parsedArgv: ParsedArgv, dependencies:
     expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "target-additional-capacity-units"]);
     ensureNoExtraPositionals(parsedArgv, 3);
 
-    const targetAdditionalCapacityUnits = readIntegerOption(parsedArgv, "target-additional-capacity-units");
+    const targetAdditionalCapacityUnits = readIntegerOption(
+      parsedArgv,
+      "target-additional-capacity-units"
+    );
     if (targetAdditionalCapacityUnits === undefined) {
       throw new CliInputError("Missing required option --target-additional-capacity-units.");
     }
 
-    return await (dependencies.increaseBillingCapacityCommand ?? defaultIncreaseBillingCapacityCommand)(
-      appendCommonAuthOptions(parsedArgv, { targetAdditionalCapacityUnits })
-    );
+    return await (
+      dependencies.increaseBillingCapacityCommand ?? defaultIncreaseBillingCapacityCommand
+    )(appendCommonAuthOptions(parsedArgv, { targetAdditionalCapacityUnits }));
   }
 
   if (capacityAction === "schedule-reduction") {
     expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "target-additional-capacity-units"]);
     ensureNoExtraPositionals(parsedArgv, 3);
 
-    const targetAdditionalCapacityUnits = readIntegerOption(parsedArgv, "target-additional-capacity-units");
+    const targetAdditionalCapacityUnits = readIntegerOption(
+      parsedArgv,
+      "target-additional-capacity-units"
+    );
     if (targetAdditionalCapacityUnits === undefined) {
       throw new CliInputError("Missing required option --target-additional-capacity-units.");
     }
 
-    return await (dependencies.scheduleBillingCapacityReductionCommand ?? defaultScheduleBillingCapacityReductionCommand)(
-      appendCommonAuthOptions(parsedArgv, { targetAdditionalCapacityUnits })
-    );
+    return await (
+      dependencies.scheduleBillingCapacityReductionCommand ??
+      defaultScheduleBillingCapacityReductionCommand
+    )(appendCommonAuthOptions(parsedArgv, { targetAdditionalCapacityUnits }));
   }
 
   if (capacityAction === "cancel-reduction") {
     expectNoUnknownOptions(parsedArgv, ["auth-file", "json"]);
     ensureNoExtraPositionals(parsedArgv, 3);
 
-    return await (dependencies.cancelBillingCapacityReductionCommand ?? defaultCancelBillingCapacityReductionCommand)(
-      appendCommonAuthOptions(parsedArgv, {})
-    );
+    return await (
+      dependencies.cancelBillingCapacityReductionCommand ??
+      defaultCancelBillingCapacityReductionCommand
+    )(appendCommonAuthOptions(parsedArgv, {}));
   }
 
   throw new CliInputError("Unknown billing capacity command.");
 }
 
-export async function handleProjectCommand(parsedArgv: ParsedArgv, dependencies: ManagementCommandDependencies): Promise<CliCommandResult> {
+export async function handleProjectCommand(
+  parsedArgv: ParsedArgv,
+  dependencies: ManagementCommandDependencies
+): Promise<CliCommandResult> {
   const action = requirePositional(parsedArgv, 1, "action");
 
   if (action === "members") {
@@ -232,11 +257,14 @@ export async function handleProjectCommand(parsedArgv: ParsedArgv, dependencies:
     expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "limit"]);
     ensureNoExtraPositionals(parsedArgv, 2);
 
-    const input = appendCommonAuthOptions(parsedArgv, {} as {
-      limit?: number;
-      authFilePath?: string;
-      json?: boolean;
-    });
+    const input = appendCommonAuthOptions(
+      parsedArgv,
+      {} as {
+        limit?: number;
+        authFilePath?: string;
+        json?: boolean;
+      }
+    );
     const limit = readLimitOption(parsedArgv);
     if (limit !== undefined) {
       input.limit = limit;
@@ -246,7 +274,14 @@ export async function handleProjectCommand(parsedArgv: ParsedArgv, dependencies:
   }
 
   if (action === "create") {
-    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "name", "slug", "environment-default", "color-tag"]);
+    expectNoUnknownOptions(parsedArgv, [
+      "auth-file",
+      "json",
+      "name",
+      "slug",
+      "environment-default",
+      "color-tag"
+    ]);
     ensureNoExtraPositionals(parsedArgv, 2);
 
     const name = readStringOption(parsedArgv, "name");
@@ -279,7 +314,15 @@ export async function handleProjectCommand(parsedArgv: ParsedArgv, dependencies:
   }
 
   if (action === "update") {
-    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "name", "slug", "environment-default", "color-tag", "clear-color-tag"]);
+    expectNoUnknownOptions(parsedArgv, [
+      "auth-file",
+      "json",
+      "name",
+      "slug",
+      "environment-default",
+      "color-tag",
+      "clear-color-tag"
+    ]);
     ensureNoExtraPositionals(parsedArgv, 3);
 
     const input = appendCommonAuthOptions(parsedArgv, {
@@ -317,7 +360,12 @@ export async function handleProjectCommand(parsedArgv: ParsedArgv, dependencies:
       }
     }
 
-    if (input.name === undefined && input.slug === undefined && input.environmentDefault === undefined && input.colorTag === undefined) {
+    if (
+      input.name === undefined &&
+      input.slug === undefined &&
+      input.environmentDefault === undefined &&
+      input.colorTag === undefined
+    ) {
       throw new CliInputError("At least one project field must be provided.");
     }
 
@@ -338,7 +386,10 @@ export async function handleProjectCommand(parsedArgv: ParsedArgv, dependencies:
   throw new CliInputError("Unknown project command.");
 }
 
-export async function handleTokenCommand(parsedArgv: ParsedArgv, dependencies: ManagementCommandDependencies): Promise<CliCommandResult> {
+export async function handleTokenCommand(
+  parsedArgv: ParsedArgv,
+  dependencies: ManagementCommandDependencies
+): Promise<CliCommandResult> {
   const scope = requirePositional(parsedArgv, 1, "scope");
   const action = requirePositional(parsedArgv, 2, "action");
 
@@ -346,9 +397,12 @@ export async function handleTokenCommand(parsedArgv: ParsedArgv, dependencies: M
     if (action === "list") {
       expectNoUnknownOptions(parsedArgv, ["auth-file", "json"]);
       ensureNoExtraPositionals(parsedArgv, 4);
-      return agentTokenWithAuthCommand(appendCommonAuthOptions(parsedArgv, {
-        action, projectId: requirePositional(parsedArgv, 3, "project-id")
-      }));
+      return agentTokenWithAuthCommand(
+        appendCommonAuthOptions(parsedArgv, {
+          action,
+          projectId: requirePositional(parsedArgv, 3, "project-id")
+        })
+      );
     }
     if (action === "create") {
       expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "label", "expires-at"]);
@@ -356,18 +410,25 @@ export async function handleTokenCommand(parsedArgv: ParsedArgv, dependencies: M
       const label = readStringOption(parsedArgv, "label");
       if (label === undefined) throw new CliInputError("Missing required option --label.");
       const expiresAt = readStringOption(parsedArgv, "expires-at");
-      return agentTokenWithAuthCommand(appendCommonAuthOptions(parsedArgv, {
-        action, projectId: requirePositional(parsedArgv, 3, "project-id"), label,
-        ...(expiresAt === undefined ? {} : { expiresAt })
-      }));
+      return agentTokenWithAuthCommand(
+        appendCommonAuthOptions(parsedArgv, {
+          action,
+          projectId: requirePositional(parsedArgv, 3, "project-id"),
+          label,
+          ...(expiresAt === undefined ? {} : { expiresAt })
+        })
+      );
     }
     if (action === "revoke") {
       expectNoUnknownOptions(parsedArgv, ["auth-file", "json"]);
       ensureNoExtraPositionals(parsedArgv, 5);
-      return agentTokenWithAuthCommand(appendCommonAuthOptions(parsedArgv, {
-        action, projectId: requirePositional(parsedArgv, 3, "project-id"),
-        tokenId: requirePositional(parsedArgv, 4, "token-id")
-      }));
+      return agentTokenWithAuthCommand(
+        appendCommonAuthOptions(parsedArgv, {
+          action,
+          projectId: requirePositional(parsedArgv, 3, "project-id"),
+          tokenId: requirePositional(parsedArgv, 4, "token-id")
+        })
+      );
     }
   }
 
@@ -389,7 +450,9 @@ export async function handleTokenCommand(parsedArgv: ParsedArgv, dependencies: M
         input.limit = limit;
       }
 
-      return await (dependencies.listProjectTokensCommand ?? defaultListProjectTokensCommand)(input);
+      return await (dependencies.listProjectTokensCommand ?? defaultListProjectTokensCommand)(
+        input
+      );
     }
 
     if (action === "create") {
@@ -429,11 +492,14 @@ export async function handleTokenCommand(parsedArgv: ParsedArgv, dependencies: M
       expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "limit"]);
       ensureNoExtraPositionals(parsedArgv, 3);
 
-      const input = appendCommonAuthOptions(parsedArgv, {} as {
-        limit?: number;
-        authFilePath?: string;
-        json?: boolean;
-      });
+      const input = appendCommonAuthOptions(
+        parsedArgv,
+        {} as {
+          limit?: number;
+          authFilePath?: string;
+          json?: boolean;
+        }
+      );
       const limit = readLimitOption(parsedArgv);
       if (limit !== undefined) {
         input.limit = limit;

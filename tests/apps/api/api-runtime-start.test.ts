@@ -95,6 +95,8 @@ function buildMigratedRuntimeSchemaRows(sql: string): { rows: Record<string, unk
   if (sql.includes("information_schema.tables")) {
     return {
       rows: [
+        { table_name: "billing_checkout_attempts" },
+        { table_name: "billing_subscription_operations" },
         { table_name: "users" },
         { table_name: "password_credentials" },
         { table_name: "oauth_identities" },

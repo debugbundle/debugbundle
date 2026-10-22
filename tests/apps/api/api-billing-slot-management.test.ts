@@ -46,6 +46,8 @@ function buildSummary(additionalPurchased: number): BillingSummaryRecord {
 function buildSubscriptionItem(priceId: string, quantity: number): Stripe.SubscriptionItem {
   return {
     id: `si_${priceId}`,
+    current_period_start: Date.parse("2026-03-23T11:56:12.000Z") / 1000,
+    current_period_end: Date.parse("2026-04-23T11:56:12.000Z") / 1000,
     price: {
       id: priceId,
       recurring: {

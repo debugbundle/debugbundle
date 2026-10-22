@@ -1,10 +1,25 @@
 import { CheckCircle2Icon, InfoIcon, LoaderCircleIcon, XCircleIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { MAX_BILLING_ADDITIONAL_CAPACITY_UNITS } from "../../../../packages/shared-types/src/index.js";
+import { BillingPaymentContinuation } from "../components/system/billing-payment-continuation.js";
 import { CalloutCard } from "../components/system/callout-card.js";
 import { Button } from "../components/ui/button.js";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card.js";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog.js";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "../components/ui/card.js";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from "../components/ui/dialog.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "../components/ui/field.js";
 import { Input } from "../components/ui/input.js";
 import {
@@ -29,19 +44,38 @@ interface CapacityDialogProps {
 
 export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
   const [increaseTarget, setIncreaseTarget] = useState(
-    String(Math.min(props.billing.capacity_units.additional_purchased + 1, MAX_BILLING_ADDITIONAL_CAPACITY_UNITS))
+    String(
+      Math.min(
+        props.billing.capacity_units.additional_purchased + 1,
+        MAX_BILLING_ADDITIONAL_CAPACITY_UNITS
+      )
+    )
   );
-  const [reductionTarget, setReductionTarget] = useState(String(Math.max(props.billing.capacity_units.additional_purchased - 1, 0)));
+  const [reductionTarget, setReductionTarget] = useState(
+    String(Math.max(props.billing.capacity_units.additional_purchased - 1, 0))
+  );
   const [activeAction, setActiveAction] = useState<"increase" | "reduce" | "cancel" | null>(null);
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!props.open) {
+      setPaymentUrl(null);
       return;
     }
 
-    setIncreaseTarget(String(Math.min(props.billing.capacity_units.additional_purchased + 1, MAX_BILLING_ADDITIONAL_CAPACITY_UNITS)));
+    setIncreaseTarget(
+      String(
+        Math.min(
+          props.billing.capacity_units.additional_purchased + 1,
+          MAX_BILLING_ADDITIONAL_CAPACITY_UNITS
+        )
+      )
+    );
     setReductionTarget(
-      String(props.billing.capacity_units.pending_reduction?.additional_purchased ?? Math.max(props.billing.capacity_units.additional_purchased - 1, 0))
+      String(
+        props.billing.capacity_units.pending_reduction?.additional_purchased ??
+          Math.max(props.billing.capacity_units.additional_purchased - 1, 0)
+      )
     );
   }, [props.billing, props.open]);
 
@@ -60,6 +94,10 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
 
     try {
       const nextBilling = await increaseBillingCapacity(parsedIncreaseTarget);
+      if ("payment_required" in nextBilling) {
+        setPaymentUrl(nextBilling.payment_required.url);
+        return;
+      }
       props.onBillingChange(nextBilling);
       showSuccessToast("Allowance capacity increased successfully.");
     } catch (error) {
@@ -85,7 +123,11 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
     try {
       const nextBilling = await scheduleBillingCapacityReduction(parsedReductionTarget);
       props.onBillingChange(nextBilling);
-      showSuccessToast(isInternalManagement ? "Allowance capacity reduced successfully." : "Capacity reduction scheduled successfully.");
+      showSuccessToast(
+        isInternalManagement
+          ? "Allowance capacity reduced successfully."
+          : "Capacity reduction scheduled successfully."
+      );
     } catch (error) {
       if (error instanceof Error && error.message === "invalid_target_quantity") {
         showErrorToast("Choose a unit count below your current purchased quantity.");
@@ -140,15 +182,21 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
           </Card>
           <Card>
             <CardContent className="space-y-1 p-4">
-              <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Purchased now</p>
+              <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                Purchased now
+              </p>
               <p className="text-xl font-semibold">{currentAdditionalCapacityUnits}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="space-y-1 p-4">
-              <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Allowance units</p>
+              <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                Allowance units
+              </p>
               <p className="text-xl font-semibold">{props.billing.capacity_units.total}</p>
-              <p className="text-xs text-muted-foreground">{formatActiveProjectCount(props.billing.active_projects)}</p>
+              <p className="text-xs text-muted-foreground">
+                {formatActiveProjectCount(props.billing.active_projects)}
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -161,6 +209,19 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
             tone="neutral"
           />
         )}
+
+        {paymentUrl ? (
+          <>
+            <p>
+              Your capacity payment is waiting. Your current allowance stays active until payment
+              completes.
+            </p>
+            <BillingPaymentContinuation
+              url={paymentUrl}
+              onContinue={() => props.onOpenChange(false)}
+            />
+          </>
+        ) : null}
 
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
@@ -183,10 +244,12 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
                     max={MAX_BILLING_ADDITIONAL_CAPACITY_UNITS}
                     step={1}
                     value={increaseTarget}
+                    disabled={paymentUrl !== null}
                     onChange={(event) => setIncreaseTarget(event.currentTarget.value)}
                   />
                   <FieldDescription>
-                    Enter the total purchased extra units you want active right away, up to {MAX_BILLING_ADDITIONAL_CAPACITY_UNITS}.
+                    Enter the total purchased extra units you want active right away, up to{" "}
+                    {MAX_BILLING_ADDITIONAL_CAPACITY_UNITS}.
                   </FieldDescription>
                 </Field>
               </FieldGroup>
@@ -197,6 +260,7 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
                   !props.canChangeBilling ||
                   pendingReduction !== null ||
                   activeAction !== null ||
+                  paymentUrl !== null ||
                   Number.isNaN(parsedIncreaseTarget) ||
                   parsedIncreaseTarget > MAX_BILLING_ADDITIONAL_CAPACITY_UNITS ||
                   parsedIncreaseTarget <= currentAdditionalCapacityUnits
@@ -215,7 +279,9 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
 
           <Card>
             <CardHeader>
-              <CardTitle>{isInternalManagement ? "Reduce capacity now" : "Reduce on renewal"}</CardTitle>
+              <CardTitle>
+                {isInternalManagement ? "Reduce capacity now" : "Reduce on renewal"}
+              </CardTitle>
               <CardDescription>
                 {isInternalManagement
                   ? "Lower the purchased extra-unit count immediately for this internally managed account."
@@ -226,7 +292,9 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
               <FieldGroup>
                 <Field>
                   <FieldLabel htmlFor="billing-slot-reduction">
-                    {isInternalManagement ? "Purchased extra units after update" : "Purchased extra units after renewal"}
+                    {isInternalManagement
+                      ? "Purchased extra units after update"
+                      : "Purchased extra units after renewal"}
                   </FieldLabel>
                   <Input
                     id="billing-slot-reduction"
@@ -236,7 +304,7 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
                     step={1}
                     value={reductionTarget}
                     onChange={(event) => setReductionTarget(event.currentTarget.value)}
-                    disabled={currentAdditionalCapacityUnits === 0}
+                    disabled={currentAdditionalCapacityUnits === 0 || paymentUrl !== null}
                   />
                   <FieldDescription>
                     {isInternalManagement
@@ -253,6 +321,7 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
                     !props.canChangeBilling ||
                     currentAdditionalCapacityUnits === 0 ||
                     activeAction !== null ||
+                    paymentUrl !== null ||
                     Number.isNaN(parsedReductionTarget) ||
                     parsedReductionTarget < 0 ||
                     parsedReductionTarget >= currentAdditionalCapacityUnits
@@ -270,7 +339,12 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
                         : "Update scheduled reduction"}
                 </Button>
                 {isInternalManagement || pendingReduction === null ? null : (
-                  <Button type="button" variant="outline" disabled={activeAction !== null} onClick={() => void handleCancelReduction()}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={activeAction !== null || paymentUrl !== null}
+                    onClick={() => void handleCancelReduction()}
+                  >
                     {activeAction === "cancel" ? "Cancelling..." : "Keep current units"}
                   </Button>
                 )}
@@ -308,36 +382,41 @@ export function CheckoutReturnDialog(props: {
         return {
           icon: <LoaderCircleIcon className={`${iconClassName} animate-spin`} aria-hidden="true" />,
           title: "Confirming your subscription",
-          description: "Stripe accepted the payment. DebugBundle is verifying the Checkout Session and updating your account.",
+          description: "DebugBundle is checking your payment and current subscription with Stripe.",
           primary: "This usually finishes in a few seconds."
         };
       case "success":
         return {
           icon: <CheckCircle2Icon className={iconClassName} aria-hidden="true" />,
           title: `${formatPlanName(state.plan ?? "free")} is active`,
-          description: "Your billing state is updated and the new tier is available across this account.",
+          description:
+            "Your billing state is updated and the new tier is available across this account.",
           primary: "You can keep working with the updated allowances now."
         };
       case "delayed":
         return {
           icon: <InfoIcon className={iconClassName} aria-hidden="true" />,
-          title: "Payment received",
-          description: "Stripe accepted the payment, but the subscription update has not reached DebugBundle yet.",
-          primary: "Keep this page open and refresh billing in a moment. If the tier still does not change, the Stripe webhook needs attention."
+          title: "Still confirming your subscription",
+          description:
+            "We have not confirmed the subscription update yet. Your current plan is shown below.",
+          primary:
+            "Refresh billing in a moment. You can also manage your subscription to check payment status."
         };
       case "canceled":
         return {
           icon: <XCircleIcon className={iconClassName} aria-hidden="true" />,
           title: "Checkout canceled",
-          description: "No payment was completed and your plan has not changed.",
+          description: "Checkout was closed. Your current plan is shown below.",
           primary: "You can start checkout again whenever you are ready."
         };
       case "error":
         return {
           icon: <InfoIcon className={iconClassName} aria-hidden="true" />,
           title: "Could not confirm billing yet",
-          description: "Stripe redirected back successfully, but DebugBundle could not verify the Checkout Session right now.",
-          primary: "Your payment may still be valid. Refresh billing shortly, or check the Stripe webhook configuration."
+          description:
+            "Stripe redirected back successfully, but DebugBundle could not verify the Checkout Session right now.",
+          primary:
+            "Your payment may still be valid. Refresh billing shortly, or check the Stripe webhook configuration."
         };
     }
   })();

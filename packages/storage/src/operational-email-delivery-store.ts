@@ -20,22 +20,25 @@ export type PostgresOperationalEmailDeliveryKind =
   | "trial_converted"
   | "billing_lifecycle";
 
-export interface PostgresOperationalEmailDeliveryRecord
-  extends Omit<OperationalEmailDeliveryRecord, "project_id" | "kind"> {
+export interface PostgresOperationalEmailDeliveryRecord extends Omit<
+  OperationalEmailDeliveryRecord,
+  "project_id" | "kind"
+> {
   project_id: string | null;
   kind: PostgresOperationalEmailDeliveryKind;
 }
 
-export interface PostgresOperationalEmailRecipientContext
-  extends Omit<OperationalEmailRecipientContext, "project_name"> {
+export interface PostgresOperationalEmailRecipientContext extends Omit<
+  OperationalEmailRecipientContext,
+  "project_name"
+> {
   project_name: string | null;
 }
 
-export interface PostgresOperationalEmailDeliveryStore
-  extends Omit<
-    OperationalEmailDeliveryStore,
-    "getOperationalEmailDelivery" | "resolveOperationalEmailRecipientContext"
-  > {
+export interface PostgresOperationalEmailDeliveryStore extends Omit<
+  OperationalEmailDeliveryStore,
+  "getOperationalEmailDelivery" | "resolveOperationalEmailRecipientContext"
+> {
   queueOrganizationOperationalEmailDelivery(input: {
     organization_id: string;
     kind: PostgresOperationalEmailDeliveryKind;
@@ -169,7 +172,9 @@ export function createPostgresOperationalEmailDeliveryStore(
   db: Queryable
 ): PostgresOperationalEmailDeliveryStore {
   return {
-    async queueProjectOperationalEmailDelivery(input): Promise<{ delivery_id: string | null; created: boolean }> {
+    async queueProjectOperationalEmailDelivery(
+      input
+    ): Promise<{ delivery_id: string | null; created: boolean }> {
       const result = await db.query<{ delivery_id: string | null; created: boolean }>(
         `
           WITH scoped_project AS (
@@ -236,14 +241,22 @@ export function createPostgresOperationalEmailDeliveryStore(
             AND NOT EXISTS (SELECT 1 FROM queued)
           LIMIT 1
         `,
-        [randomUUID(), input.project_id, input.kind, input.dedupe_key, JSON.stringify(input.payload)]
+        [
+          randomUUID(),
+          input.project_id,
+          input.kind,
+          input.dedupe_key,
+          JSON.stringify(input.payload)
+        ]
       );
 
       const row = result.rows[0];
       return row ?? { delivery_id: null, created: false };
     },
 
-    async queueOrganizationOperationalEmailDelivery(input): Promise<{ delivery_id: string | null; created: boolean }> {
+    async queueOrganizationOperationalEmailDelivery(
+      input
+    ): Promise<{ delivery_id: string | null; created: boolean }> {
       return queueOperationalEmailDelivery({
         db,
         organization_id: input.organization_id,
@@ -254,7 +267,9 @@ export function createPostgresOperationalEmailDeliveryStore(
       });
     },
 
-    async claimDueOperationalEmailDeliveries(limit): Promise<Array<{ delivery_id: string; attempt: number }>> {
+    async claimDueOperationalEmailDeliveries(
+      limit
+    ): Promise<Array<{ delivery_id: string; attempt: number }>> {
       const result = await db.query<{ delivery_id: string; attempt: number }>(
         `
           WITH due AS (
@@ -282,7 +297,9 @@ export function createPostgresOperationalEmailDeliveryStore(
       return result.rows;
     },
 
-    async getOperationalEmailDelivery(input): Promise<PostgresOperationalEmailDeliveryRecord | null> {
+    async getOperationalEmailDelivery(
+      input
+    ): Promise<PostgresOperationalEmailDeliveryRecord | null> {
       const result = await db.query<{
         delivery_id: string;
         organization_id: string;
@@ -327,7 +344,9 @@ export function createPostgresOperationalEmailDeliveryStore(
     async resolveOperationalEmailRecipientContext(
       input
     ): Promise<PostgresOperationalEmailRecipientContext | null> {
-      const result = await db.query<PostgresOperationalEmailRecipientContext & Record<string, unknown>>(
+      const result = await db.query<
+        PostgresOperationalEmailRecipientContext & Record<string, unknown>
+      >(
         `
           SELECT
             o.name AS organization_name,

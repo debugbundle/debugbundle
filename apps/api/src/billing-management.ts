@@ -1,4 +1,25 @@
-import type Stripe from "stripe";
+import { createStripePlanChangeService } from "../../../packages/billing/src/stripe-plan-change.js";
+import type { BillingPlanChangeManagement } from "../../../packages/billing-client/src/plan-change.js";
+import { confirmStripeCheckout } from "../../../packages/billing/src/stripe-checkout-confirmation.js";
+import type { CapacityPaymentRequired } from "../../../packages/billing/src/stripe-capacity-payment.js";
+import {
+  previewStripeSubscriptionUpgrade,
+  type UpgradePreviewResult
+} from "../../../packages/billing/src/stripe-upgrade-preview.js";
+import { createPostgresBillingSubscriptionOperationStore } from "../../../packages/storage/src/billing-subscription-operation-store.js";
+import { reconcileStripeSubscriptionOperation } from "../../../packages/billing/src/stripe-operation-reconciliation.js";
+import { createStripeSubscriptionUpgradeLink } from "../../../packages/billing/src/stripe-subscription-upgrade.js";
+import {
+  runStripeCapacityOperation,
+  type CapacityOperationError
+} from "../../../packages/billing/src/stripe-capacity-operations.js";
+import { createPostgresBillingCheckoutStore } from "../../../packages/storage/src/billing-checkout-store.js";
+import { createStripeCheckoutLink, type CheckoutLinkResult } from "./stripe-checkout.js";
+export {
+  readUnixTimestampField,
+  readSubscriptionInvoiceLinePeriod,
+  resolveStripeSubscriptionBillingPeriod
+} from "./stripe-billing-period.js";
 
 import { MAX_BILLING_ADDITIONAL_CAPACITY_UNITS } from "../../../packages/shared-types/src/index.js";
 import type {
@@ -17,18 +38,11 @@ import {
 } from "../../../packages/storage/src/index.js";
 
 import {
-  buildSchedulePhasesForReduction,
-  buildSubscriptionItemsForQuantity,
   loadStripeBillingSubscriptionState,
   projectBillingSummary
 } from "./billing-slot-management.js";
 import type { BillingLinkProvider } from "./billing-links.js";
-import {
-  deriveBillingState,
-  derivePlanFromSubscriptionItems,
-  isEntitlementEligible,
-  type StripeConfig
-} from "./stripe-config.js";
+import { deriveBillingState, type StripeConfig } from "./stripe-config.js";
 
 const BILLING_SUMMARY_STRIPE_PROJECTION_TIMEOUT_MS = 2_500;
 const NO_CARD_TRIAL_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -41,81 +55,11 @@ export function normalizeBillingPlan(plan: string | null | undefined): "free" | 
   return "free";
 }
 
-export function readUnixTimestampField(source: unknown, key: string): number | null {
-  if (typeof source !== "object" || source === null) {
-    return null;
-  }
-
-  const value = (source as Record<string, unknown>)[key];
-  return typeof value === "number" ? value : null;
-}
-
-export function readSubscriptionInvoiceLinePeriod(source: unknown): { start: number | null; end: number | null } {
-  if (typeof source !== "object" || source === null) {
-    return { start: null, end: null };
-  }
-
-  const lines = (source as Record<string, unknown>)["lines"];
-  if (typeof lines !== "object" || lines === null) {
-    return { start: null, end: null };
-  }
-
-  const data = (lines as Record<string, unknown>)["data"];
-  if (!Array.isArray(data)) {
-    return { start: null, end: null };
-  }
-
-  for (const line of data) {
-    if (typeof line !== "object" || line === null) {
-      continue;
-    }
-
-    const period = (line as Record<string, unknown>)["period"];
-    if (typeof period !== "object" || period === null) {
-      continue;
-    }
-
-    const start = readUnixTimestampField(period, "start");
-    const end = readUnixTimestampField(period, "end");
-    if (start !== null || end !== null) {
-      return { start, end };
-    }
-  }
-
-  return { start: null, end: null };
-}
-
-export function resolveStripeSubscriptionBillingPeriod(subscription: Stripe.Subscription): {
-  starts_at: string | null;
-  ends_at: string | null;
-} {
-  const invoicePeriod = readSubscriptionInvoiceLinePeriod(subscription.latest_invoice);
-  const startSeconds =
-    invoicePeriod.start ??
-    readUnixTimestampField(subscription.latest_invoice, "period_start") ??
-    readUnixTimestampField(subscription, "current_period_start");
-  const endSeconds =
-    invoicePeriod.end ??
-    readUnixTimestampField(subscription.latest_invoice, "period_end") ??
-    readUnixTimestampField(subscription, "current_period_end");
-
-  if (startSeconds !== null && endSeconds !== null && endSeconds <= startSeconds) {
-    return {
-      starts_at: null,
-      ends_at: null
-    };
-  }
-
-  return {
-    starts_at: startSeconds === null ? null : new Date(startSeconds * 1000).toISOString(),
-    ends_at: endSeconds === null ? null : new Date(endSeconds * 1000).toISOString()
-  };
-}
-
 interface OrganizationBillingState {
   plan: "free" | "solo" | "team";
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
+  billing_state: string | null;
 }
 
 interface CreateBillingManagementInput {
@@ -149,10 +93,7 @@ async function recordBillingMetricDeltas(
     dedupe_key: string;
     deltas: Partial<
       Record<
-        | "plan_upgraded"
-        | "plan_downgraded"
-        | "capacity_units_purchased"
-        | "capacity_units_reduced",
+        "plan_upgraded" | "plan_downgraded" | "capacity_units_purchased" | "capacity_units_reduced",
         number
       >
     >;
@@ -173,11 +114,13 @@ async function getOrganizationBillingState(
     plan: string;
     stripe_customer_id: string | null;
     stripe_subscription_id: string | null;
+    billing_state: string | null;
   }>(
     `
       SELECT
         COALESCE(plan, 'free') AS plan,
         stripe_customer_id,
+        billing_state,
         to_jsonb(organizations) ->> 'stripe_subscription_id' AS stripe_subscription_id
       FROM organizations
       WHERE id = $1
@@ -194,7 +137,8 @@ async function getOrganizationBillingState(
   return {
     plan: normalizeBillingPlan(row.plan),
     stripe_customer_id: row.stripe_customer_id ?? null,
-    stripe_subscription_id: row.stripe_subscription_id ?? null
+    stripe_subscription_id: row.stripe_subscription_id ?? null,
+    billing_state: row.billing_state ?? null
   };
 }
 
@@ -223,12 +167,18 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
       target_plan: "solo" | "team";
       now: string;
     }): Promise<BillingSummaryRecord | "billing_not_found" | "trial_unavailable">;
+    getPlanChange?: BillingPlanChangeManagement["getPlanChange"];
+    previewPlanChange?: BillingPlanChangeManagement["previewPlanChange"];
+    schedulePlanChange?: BillingPlanChangeManagement["schedulePlanChange"];
+    cancelPlanChange?: BillingPlanChangeManagement["cancelPlanChange"];
+    previewUpgrade?(input: { organization_id: string }): Promise<UpgradePreviewResult>;
     createCheckoutLink(input: {
       organization_id: string;
       billing_email: string;
       current_plan: "free" | "solo" | "team";
       target_plan: "solo" | "team";
-    }): Promise<{ url: string } | null>;
+      confirmation_token?: string;
+    }): Promise<CheckoutLinkResult>;
     confirmCheckoutSession(input: {
       organization_id: string;
       session_id: string;
@@ -249,35 +199,16 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
       organization_id: string;
       target_additional_capacity_units: number;
       now: string;
-    }): Promise<
-      | BillingSummaryRecord
-      | "billing_not_configured"
-      | "billing_not_found"
-      | "no_active_subscription"
-      | "invalid_target_quantity"
-      | "pending_capacity_reduction_exists"
-    >;
+    }): Promise<BillingSummaryRecord | CapacityPaymentRequired | CapacityOperationError>;
     scheduleCapacityReduction(input: {
       organization_id: string;
       target_additional_capacity_units: number;
       now: string;
-    }): Promise<
-      | BillingSummaryRecord
-      | "billing_not_configured"
-      | "billing_not_found"
-      | "no_active_subscription"
-      | "invalid_target_quantity"
-    >;
+    }): Promise<BillingSummaryRecord | CapacityPaymentRequired | CapacityOperationError>;
     cancelCapacityReduction(input: {
       organization_id: string;
       now: string;
-    }): Promise<
-      | BillingSummaryRecord
-      | "billing_not_configured"
-      | "billing_not_found"
-      | "no_active_subscription"
-      | "capacity_reduction_not_found"
-    >;
+    }): Promise<BillingSummaryRecord | CapacityPaymentRequired | CapacityOperationError>;
   };
   getProjectedBillingSummary(input: {
     organization_id: string;
@@ -291,6 +222,22 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
   }): Promise<BillingSummaryRecord | "billing_not_found">;
 } {
   const appBaseUrl = input.appBaseUrl ?? "http://localhost:3000";
+  const subscriptionOperationStore = createPostgresBillingSubscriptionOperationStore(input.db);
+
+  async function planChangeService(
+    organizationId: string
+  ): Promise<ReturnType<typeof createStripePlanChangeService> | null> {
+    if (!input.stripeConfig) return null;
+    const organization = await getOrganizationBillingState(input.db, organizationId);
+    if (!organization?.stripe_subscription_id || !organization.stripe_customer_id) return null;
+    return createStripePlanChangeService({
+      provider: input.stripeConfig,
+      store: subscriptionOperationStore,
+      organizationId,
+      subscriptionId: organization.stripe_subscription_id,
+      customerId: organization.stripe_customer_id
+    });
+  }
 
   async function getProjectedBillingSummary(inputValue: {
     organization_id: string;
@@ -305,7 +252,10 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
       input.db,
       inputValue.organization_id
     );
-    if (organizationBillingState === null || organizationBillingState.stripe_subscription_id === null) {
+    if (
+      organizationBillingState === null ||
+      organizationBillingState.stripe_subscription_id === null
+    ) {
       return summary;
     }
 
@@ -318,8 +268,15 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
         timeoutMs: BILLING_SUMMARY_STRIPE_PROJECTION_TIMEOUT_MS
       });
 
+      await reconcileStripeSubscriptionOperation({
+        store: subscriptionOperationStore,
+        client: input.stripeConfig.client,
+        organizationId: inputValue.organization_id,
+        subscription: stripeState.subscription
+      });
+
       return projectBillingSummary({
-        summary,
+        summary: { ...summary, billing_state: deriveBillingState(stripeState.subscription.status) },
         plan: stripeState.plan,
         additionalPurchased: stripeState.additionalPurchased,
         pendingReduction: stripeState.pendingReduction
@@ -370,7 +327,8 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
       stripeConfig: input.stripeConfig,
       subscriptionId: organizationBillingState.stripe_subscription_id,
       fallbackPlan: organizationBillingState.plan,
-      fallbackEffectiveAt: summary.usage_window.ends_at
+      fallbackEffectiveAt: summary.usage_window.ends_at,
+      timeoutMs: 8000
     });
 
     return {
@@ -394,10 +352,7 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
     const additionalCapacityUnits =
       inputValue.plan === "free"
         ? 0
-        : Math.min(
-            inputValue.additional_capacity_units,
-            MAX_BILLING_ADDITIONAL_CAPACITY_UNITS
-          );
+        : Math.min(inputValue.additional_capacity_units, MAX_BILLING_ADDITIONAL_CAPACITY_UNITS);
     const updated = await runInTransaction(input.db, async (tx) => {
       const previousResult = await tx.query<{ plan: string; additional_capacity_units: number }>(
         `
@@ -412,7 +367,8 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
       );
       const previousPlan = normalizePlanForDowngradeAudit(previousResult.rows[0]?.plan);
       const targetPlan = normalizePlanForDowngradeAudit(inputValue.plan);
-      const previousAdditionalCapacityUnits = previousResult.rows[0]?.additional_capacity_units ?? 0;
+      const previousAdditionalCapacityUnits =
+        previousResult.rows[0]?.additional_capacity_units ?? 0;
 
       const result = await tx.query<{ id: string }>(
         `
@@ -444,7 +400,9 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
         return false;
       }
 
-      const cleanupSummary = await createOrganizationPlanCleanupService(tx).cleanupOrganizationForPlan({
+      const cleanupSummary = await createOrganizationPlanCleanupService(
+        tx
+      ).cleanupOrganizationForPlan({
         organization_id: inputValue.organization_id,
         plan: targetPlan,
         now: inputValue.now
@@ -471,7 +429,9 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
           ...(planRank(inputValue.plan) > planRank(previousPlan) ? { plan_upgraded: 1 } : {}),
           ...(planRank(inputValue.plan) < planRank(previousPlan) ? { plan_downgraded: 1 } : {}),
           ...(additionalCapacityUnits > previousAdditionalCapacityUnits
-            ? { capacity_units_purchased: additionalCapacityUnits - previousAdditionalCapacityUnits }
+            ? {
+                capacity_units_purchased: additionalCapacityUnits - previousAdditionalCapacityUnits
+              }
             : {}),
           ...(additionalCapacityUnits < previousAdditionalCapacityUnits
             ? { capacity_units_reduced: previousAdditionalCapacityUnits - additionalCapacityUnits }
@@ -487,11 +447,11 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
     }
 
     return (
-      await input.billingStore.getBillingSummaryForOrganization({
+      (await input.billingStore.getBillingSummaryForOrganization({
         organization_id: inputValue.organization_id,
         now: inputValue.now
-      })
-    ) ?? "billing_not_found";
+      })) ?? "billing_not_found"
+    );
   }
 
   return {
@@ -512,47 +472,78 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
             new Date(trialInput.now).getTime() + NO_CARD_TRIAL_DURATION_MS
           ).toISOString()
         }),
+      getPlanChange: async ({ organization_id }) =>
+        (await planChangeService(organization_id))?.getStatus() ?? "no_active_subscription",
+      previewPlanChange: async ({ organization_id }) =>
+        (await planChangeService(organization_id))?.preview() ?? "no_active_subscription",
+      schedulePlanChange: async ({ organization_id, confirmation_token }) =>
+        (await planChangeService(organization_id))?.schedule(confirmation_token) ??
+        "no_active_subscription",
+      cancelPlanChange: async ({ organization_id, schedule_id }) =>
+        (await planChangeService(organization_id))?.cancel(schedule_id) ?? "no_active_subscription",
+      previewUpgrade: async ({ organization_id }) => {
+        if (!input.stripeConfig) return "billing_service_error";
+        const organization = await getOrganizationBillingState(input.db, organization_id);
+        if (!organization?.stripe_subscription_id || !organization.stripe_customer_id)
+          return "checkout_not_allowed";
+        return previewStripeSubscriptionUpgrade({
+          provider: input.stripeConfig,
+          store: subscriptionOperationStore,
+          organizationId: organization_id,
+          subscriptionId: organization.stripe_subscription_id,
+          customerId: organization.stripe_customer_id
+        });
+      },
       createCheckoutLink: async (checkoutInput) => {
         if (input.stripeConfig !== undefined) {
-          const stripe = input.stripeConfig;
-          const priceId =
-            checkoutInput.target_plan === "solo" ? stripe.soloPriceId : stripe.teamPriceId;
-          const orgResult = await input.db.query<{ stripe_customer_id: string | null }>(
-            `SELECT stripe_customer_id FROM organizations WHERE id = $1 LIMIT 1`,
-            [checkoutInput.organization_id]
-          );
-          const existingCustomerId = orgResult.rows[0]?.stripe_customer_id ?? null;
-
-          const sessionParams: NonNullable<
-            Parameters<typeof stripe.client.checkout.sessions.create>[0]
-          > = {
-            mode: "subscription",
-            client_reference_id: checkoutInput.organization_id,
-            metadata: { organization_id: checkoutInput.organization_id },
-            line_items: [{ price: priceId, quantity: 1 }],
-            success_url: `${appBaseUrl}/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${appBaseUrl}/billing?checkout=canceled`,
-            automatic_tax: { enabled: true },
-            billing_address_collection: "auto",
-            tax_id_collection: { enabled: true },
-            allow_promotion_codes: true,
-            subscription_data: {
-              metadata: { organization_id: checkoutInput.organization_id }
-            }
-          };
-
-          if (existingCustomerId !== null) {
-            sessionParams.customer = existingCustomerId;
-            sessionParams.customer_update = { address: "auto", name: "auto" };
-          } else {
-            sessionParams.customer_email = checkoutInput.billing_email;
-          }
-
           try {
-            const session = await stripe.client.checkout.sessions.create(sessionParams);
-            return session.url ? { url: session.url } : null;
+            const organization = await getOrganizationBillingState(
+              input.db,
+              checkoutInput.organization_id
+            );
+            if (
+              organization?.stripe_subscription_id &&
+              checkoutInput.current_plan === "solo" &&
+              checkoutInput.target_plan === "team" &&
+              organization.billing_state !== "canceled"
+            ) {
+              return createStripeSubscriptionUpgradeLink({
+                provider: input.stripeConfig,
+                store: subscriptionOperationStore,
+                organizationId: checkoutInput.organization_id,
+                appBaseUrl,
+                ...(checkoutInput.confirmation_token
+                  ? { confirmationToken: checkoutInput.confirmation_token }
+                  : {})
+              });
+            }
+            let endedSubscriptionId: string | undefined;
+            if (organization?.stripe_subscription_id && organization.billing_state === "canceled") {
+              const subscription = await input.stripeConfig.client.subscriptions.retrieve(
+                organization.stripe_subscription_id,
+                {},
+                { timeout: 8000, maxNetworkRetries: 0 }
+              );
+              if (
+                subscription.status !== "canceled" &&
+                subscription.status !== "incomplete_expired"
+              )
+                return "checkout_not_allowed";
+              endedSubscriptionId = subscription.id;
+            }
+            return createStripeCheckoutLink({
+              stripe: input.stripeConfig,
+              store: createPostgresBillingCheckoutStore(input.db),
+              appBaseUrl,
+              input: {
+                ...checkoutInput,
+                ...(endedSubscriptionId === undefined
+                  ? {}
+                  : { confirmed_ended_subscription_id: endedSubscriptionId })
+              }
+            });
           } catch {
-            return null;
+            return "billing_service_error";
           }
         }
 
@@ -566,105 +557,22 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
           return "billing_not_configured";
         }
 
-        let session: Stripe.Checkout.Session;
-        try {
-          session = await input.stripeConfig.client.checkout.sessions.retrieve(
-            confirmInput.session_id,
-            {
-              expand: ["subscription", "subscription.items.data", "subscription.latest_invoice"]
-            }
-          );
-        } catch {
-          return "checkout_session_not_found";
-        }
-
-        const sessionOrganizationId =
-          session.client_reference_id ?? session.metadata?.["organization_id"] ?? null;
-        if (sessionOrganizationId !== confirmInput.organization_id) {
-          return "checkout_session_not_found";
-        }
-
-        if (session.status !== "complete") {
-          return "checkout_not_complete";
-        }
-
-        const subscriptionId =
-          typeof session.subscription === "string"
-            ? session.subscription
-            : session.subscription?.id;
-        if (subscriptionId === undefined) {
-          return "checkout_not_complete";
-        }
-
-        let subscription: Stripe.Subscription;
-        try {
-          if (typeof session.subscription === "string") {
-            subscription = await input.stripeConfig.client.subscriptions.retrieve(
-              subscriptionId,
-              {
-                expand: ["items.data", "latest_invoice"]
-              }
-            );
-          } else if (session.subscription !== null) {
-            subscription = session.subscription;
-          } else {
-            return "checkout_not_complete";
-          }
-        } catch {
-          return "billing_service_error";
-        }
-
-        const customerId =
-          typeof session.customer === "string" ? session.customer : session.customer?.id;
-        if (customerId === undefined) {
-          return "checkout_not_complete";
-        }
-
-        const { plan, extraCapacityQuantity } = derivePlanFromSubscriptionItems(
-          subscription.items.data,
-          input.stripeConfig.priceMap
-        );
-        const billingState = deriveBillingState(subscription.status);
-        const effectivePlan = isEntitlementEligible(billingState, "plan") ? plan : "free";
-        const effectiveExtraCapacity = isEntitlementEligible(
-          billingState,
-          "extra_capacity"
-        )
-          ? extraCapacityQuantity
-          : 0;
-        const period =
-          effectivePlan === "free"
-            ? { starts_at: null, ends_at: null }
-            : resolveStripeSubscriptionBillingPeriod(subscription);
-
-        try {
-          await input.billingSyncStore.linkStripeCustomer(
-            confirmInput.organization_id,
-            customerId,
-            subscription.id
-          );
-          await input.billingSyncStore.updateEntitlements({
-            organization_id: confirmInput.organization_id,
-            plan: effectivePlan,
-            additional_capacity_units: effectiveExtraCapacity,
-            billing_state: billingState,
-            stripe_customer_id: customerId,
-            stripe_subscription_id: subscription.id,
-            billing_period_starts_at: period.starts_at,
-            billing_period_ends_at: period.ends_at,
-            last_billing_sync_at: confirmInput.now,
-            last_billing_event_id: `checkout_session:${session.id}`
-          });
-        } catch {
-          return "billing_service_error";
-        }
+        const confirmation = await confirmStripeCheckout({
+          db: input.db,
+          store: input.billingSyncStore,
+          provider: input.stripeConfig,
+          organizationId: confirmInput.organization_id,
+          sessionId: confirmInput.session_id,
+          now: confirmInput.now
+        });
+        if (confirmation !== "confirmed") return confirmation;
 
         return (
-          await getProjectedBillingSummary({
+          (await getProjectedBillingSummary({
             organization_id: confirmInput.organization_id,
             now: confirmInput.now
-          })
-        ) ?? "billing_not_found";
+          })) ?? "billing_not_found"
+        );
       },
       createPortalLink: async (portalInput) => {
         if (input.stripeConfig !== undefined) {
@@ -691,144 +599,38 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
         const url = input.billingLinks.createPortalUrl();
         return url === null ? null : { url };
       },
-      increaseCapacity: async (capacityInput) => {
-        let context: Awaited<ReturnType<typeof loadCapacityManagementContext>>;
-
-        try {
-          context = await loadCapacityManagementContext(capacityInput);
-        } catch {
-          return "billing_not_configured";
-        }
-
-        if (typeof context === "string") {
-          return context;
-        }
-
-        if (capacityInput.target_additional_capacity_units <= context.stripeState.additionalPurchased) {
-          return "invalid_target_quantity";
-        }
-
-        if (context.stripeState.pendingReduction !== null) {
-          return "pending_capacity_reduction_exists";
-        }
-
-        try {
-          await input.stripeConfig!.client.subscriptions.update(
-            context.stripeState.subscription.id,
-            {
-              items: buildSubscriptionItemsForQuantity({
-                subscription: context.stripeState.subscription,
-                stripeConfig: input.stripeConfig!,
-                targetAdditionalPurchased: capacityInput.target_additional_capacity_units,
-                plan: context.stripeState.plan
-              }),
-              proration_behavior: "always_invoice"
-            }
-          );
-        } catch {
-          return "billing_not_configured";
-        }
-
-        return projectBillingSummary({
-          summary: context.summary,
-          plan: context.stripeState.plan,
-          additionalPurchased: capacityInput.target_additional_capacity_units,
-          pendingReduction: null
-        });
-      },
-      scheduleCapacityReduction: async (capacityInput) => {
-        let context: Awaited<ReturnType<typeof loadCapacityManagementContext>>;
-
-        try {
-          context = await loadCapacityManagementContext(capacityInput);
-        } catch {
-          return "billing_not_configured";
-        }
-
-        if (typeof context === "string") {
-          return context;
-        }
-
-        if (
-          capacityInput.target_additional_capacity_units < 0 ||
-          capacityInput.target_additional_capacity_units >=
-            context.stripeState.additionalPurchased
-        ) {
-          return "invalid_target_quantity";
-        }
-
-        const pendingReduction = {
-          additional_purchased: capacityInput.target_additional_capacity_units,
-          total:
-            context.summary.capacity_units.included +
-            capacityInput.target_additional_capacity_units,
-          effective_at: context.summary.usage_window.ends_at
-        };
-
-        try {
-          const scheduleId =
-            context.stripeState.schedule?.id ??
-            (
-              await input.stripeConfig!.client.subscriptionSchedules.create({
-                from_subscription: context.stripeState.subscription.id
-              })
-            ).id;
-
-          await input.stripeConfig!.client.subscriptionSchedules.update(scheduleId, {
-            end_behavior: "release",
-            proration_behavior: "none",
-            phases: buildSchedulePhasesForReduction({
-              subscription: context.stripeState.subscription,
-              schedule: context.stripeState.schedule,
-              stripeConfig: input.stripeConfig!,
-              summary: context.summary,
-              targetAdditionalPurchased: capacityInput.target_additional_capacity_units,
-              plan: context.stripeState.plan
+      increaseCapacity: async (capacityInput) =>
+        input.stripeConfig === undefined
+          ? "billing_not_configured"
+          : runStripeCapacityOperation({
+              store: subscriptionOperationStore,
+              provider: input.stripeConfig,
+              organizationId: capacityInput.organization_id,
+              kind: "capacity_increase",
+              target: capacityInput.target_additional_capacity_units,
+              loadContext: () => loadCapacityManagementContext(capacityInput)
+            }),
+      scheduleCapacityReduction: async (capacityInput) =>
+        input.stripeConfig === undefined
+          ? "billing_not_configured"
+          : runStripeCapacityOperation({
+              store: subscriptionOperationStore,
+              provider: input.stripeConfig,
+              organizationId: capacityInput.organization_id,
+              kind: "capacity_schedule",
+              target: capacityInput.target_additional_capacity_units,
+              loadContext: () => loadCapacityManagementContext(capacityInput)
+            }),
+      cancelCapacityReduction: async (capacityInput) =>
+        input.stripeConfig === undefined
+          ? "billing_not_configured"
+          : runStripeCapacityOperation({
+              store: subscriptionOperationStore,
+              provider: input.stripeConfig,
+              organizationId: capacityInput.organization_id,
+              kind: "capacity_cancel",
+              loadContext: () => loadCapacityManagementContext(capacityInput)
             })
-          });
-        } catch {
-          return "billing_not_configured";
-        }
-
-        return projectBillingSummary({
-          summary: context.summary,
-          plan: context.stripeState.plan,
-          additionalPurchased: context.stripeState.additionalPurchased,
-          pendingReduction
-        });
-      },
-      cancelCapacityReduction: async (capacityInput) => {
-        let context: Awaited<ReturnType<typeof loadCapacityManagementContext>>;
-
-        try {
-          context = await loadCapacityManagementContext(capacityInput);
-        } catch {
-          return "billing_not_configured";
-        }
-
-        if (typeof context === "string") {
-          return context;
-        }
-
-        if (context.stripeState.schedule === null || context.stripeState.pendingReduction === null) {
-          return "capacity_reduction_not_found";
-        }
-
-        try {
-          await input.stripeConfig!.client.subscriptionSchedules.release(
-            context.stripeState.schedule.id
-          );
-        } catch {
-          return "billing_not_configured";
-        }
-
-        return projectBillingSummary({
-          summary: context.summary,
-          plan: context.stripeState.plan,
-          additionalPurchased: context.stripeState.additionalPurchased,
-          pendingReduction: null
-        });
-      }
     },
     getProjectedBillingSummary,
     overrideOrganizationBilling

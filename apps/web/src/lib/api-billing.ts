@@ -40,23 +40,25 @@ export async function startBillingTrial(
 }
 
 export async function startBillingCheckout(
-  targetPlan: "solo" | "team"
+  targetPlan: "solo" | "team",
+  confirmationToken?: string
 ): Promise<string> {
   const body = await readJson<{ url: string }>(
     await fetch(`${API_BASE}/v1/billing/checkout`, {
       method: "POST",
       credentials: "include",
       headers: buildBrowserSessionHeaders(true),
-      body: JSON.stringify({ target_plan: targetPlan })
+      body: JSON.stringify({
+        target_plan: targetPlan,
+        ...(confirmationToken ? { confirmation_token: confirmationToken } : {})
+      })
     })
   );
 
   return body.url;
 }
 
-export async function confirmBillingCheckout(
-  sessionId: string
-): Promise<BillingSummaryRecord> {
+export async function confirmBillingCheckout(sessionId: string): Promise<BillingSummaryRecord> {
   const body = await readJson<BillingSummaryResponse>(
     await fetch(`${API_BASE}/v1/billing/checkout/confirm`, {
       method: "POST",
@@ -83,8 +85,8 @@ export async function openBillingPortal(): Promise<string> {
 
 export async function increaseBillingCapacity(
   targetAdditionalCapacityUnits: number
-): Promise<BillingSummaryRecord> {
-  const body = await readJson<BillingSummaryResponse>(
+): Promise<BillingSummaryRecord | { payment_required: { url: string } }> {
+  const body = await readJson<BillingSummaryResponse | { payment_required: { url: string } }>(
     await fetch(`${API_BASE}/v1/billing/capacity/increase`, {
       method: "POST",
       credentials: "include",
@@ -95,7 +97,7 @@ export async function increaseBillingCapacity(
     })
   );
 
-  return normalizeBillingSummary(body.billing);
+  return "payment_required" in body ? body : normalizeBillingSummary(body.billing);
 }
 
 export async function scheduleBillingCapacityReduction(
@@ -125,4 +127,21 @@ export async function cancelBillingCapacityReduction(): Promise<BillingSummaryRe
   );
 
   return normalizeBillingSummary(body.billing);
+}
+
+export type { BillingUpgradeQuote } from "../../../../packages/billing/src/stripe-upgrade-quote.js";
+export async function previewBillingUpgrade(): Promise<
+  | {
+      quote: import("../../../../packages/billing/src/stripe-upgrade-quote.js").BillingUpgradeQuote;
+    }
+  | { payment_url: string }
+> {
+  return readJson(
+    await fetch(`${API_BASE}/v1/billing/upgrade/preview`, {
+      method: "POST",
+      credentials: "include",
+      headers: buildBrowserSessionHeaders(true),
+      body: "{}"
+    })
+  );
 }

@@ -12,6 +12,8 @@ import type { Queryable } from "./types.js";
 
 export interface BillingEntitlementUpdate {
   organization_id: string;
+  expected_revision?: string;
+  replace_from_subscription_id?: string;
   plan: TierName;
   additional_capacity_units: number;
   billing_state: string;
@@ -30,14 +32,18 @@ export interface BillingSyncStore {
     eventType: string,
     organizationId: string | null
   ): Promise<void>;
-  updateEntitlements(update: BillingEntitlementUpdate): Promise<void>;
+  updateEntitlements(update: BillingEntitlementUpdate): Promise<boolean | void>;
   resolveOrganizationByStripeCustomerId(customerId: string): Promise<string | null>;
   linkStripeCustomer(
     organizationId: string,
     customerId: string,
     subscriptionId: string
   ): Promise<void>;
-  revokeEntitlements(organizationId: string, eventId: string): Promise<void>;
+  revokeEntitlements(
+    organizationId: string,
+    eventId: string,
+    subscriptionId?: string
+  ): Promise<boolean | void>;
   updateBillingState(organizationId: string, billingState: string, eventId: string): Promise<void>;
 }
 
@@ -113,16 +119,20 @@ export function createPostgresBillingSyncStore(
       );
     },
 
-    async updateEntitlements(update: BillingEntitlementUpdate): Promise<void> {
-      await runInTransaction(db, async (tx) => {
+    async updateEntitlements(update: BillingEntitlementUpdate): Promise<boolean> {
+      return runInTransaction(db, async (tx) => {
         const previousResult = await tx.query<{
+          revision: string;
           plan: string;
           additional_capacity_units: number;
           trial_used_at: string | null;
           trial_converted_at: string | null;
+          stripe_subscription_id: string | null;
         }>(
           `
             SELECT
+              xmin::text AS revision,
+              stripe_subscription_id,
               COALESCE(plan, 'free') AS plan,
               COALESCE(additional_capacity_units, 0)::int AS additional_capacity_units,
               (to_jsonb(organizations) ->> 'trial_used_at') AS trial_used_at,
@@ -133,9 +143,22 @@ export function createPostgresBillingSyncStore(
           `,
           [update.organization_id]
         );
+        const linkedSubscription = previousResult.rows[0]?.stripe_subscription_id;
+        if (
+          update.expected_revision !== undefined &&
+          previousResult.rows[0]?.revision !== update.expected_revision
+        )
+          return false;
+        if (
+          linkedSubscription &&
+          linkedSubscription !== update.stripe_subscription_id &&
+          !(update.expected_revision && update.replace_from_subscription_id === linkedSubscription)
+        )
+          return false;
         const previousPlan = normalizePlanForDowngradeAudit(previousResult.rows[0]?.plan);
         const targetPlan = normalizePlanForDowngradeAudit(update.plan);
-        const previousAdditionalCapacityUnits = previousResult.rows[0]?.additional_capacity_units ?? 0;
+        const previousAdditionalCapacityUnits =
+          previousResult.rows[0]?.additional_capacity_units ?? 0;
         const previousTrialUsedAt = previousResult.rows[0]?.trial_used_at ?? null;
         const previousTrialConvertedAt = previousResult.rows[0]?.trial_converted_at ?? null;
 
@@ -173,7 +196,9 @@ export function createPostgresBillingSyncStore(
           ]
         );
 
-        const cleanupSummary = await createOrganizationPlanCleanupService(tx).cleanupOrganizationForPlan({
+        const cleanupSummary = await createOrganizationPlanCleanupService(
+          tx
+        ).cleanupOrganizationForPlan({
           organization_id: update.organization_id,
           plan: targetPlan,
           now: update.last_billing_sync_at
@@ -229,6 +254,7 @@ export function createPostgresBillingSyncStore(
           dedupe_key: `billing_entitlements_updated:${update.last_billing_event_id}`,
           deltas
         });
+        return true;
       });
     },
 
@@ -249,17 +275,26 @@ export function createPostgresBillingSyncStore(
         `
           UPDATE organizations
           SET stripe_customer_id = $2, stripe_subscription_id = $3
-          WHERE id = $1
+          WHERE id = $1 AND (stripe_subscription_id IS NULL OR stripe_subscription_id = $3 OR billing_state = 'canceled')
         `,
         [organizationId, customerId, subscriptionId]
       );
     },
 
-    async revokeEntitlements(organizationId: string, eventId: string): Promise<void> {
-      await runInTransaction(db, async (tx) => {
-        const previousResult = await tx.query<{ plan: string; additional_capacity_units: number }>(
+    async revokeEntitlements(
+      organizationId: string,
+      eventId: string,
+      subscriptionId?: string
+    ): Promise<boolean> {
+      return runInTransaction(db, async (tx) => {
+        const previousResult = await tx.query<{
+          plan: string;
+          additional_capacity_units: number;
+          stripe_subscription_id: string | null;
+        }>(
           `
             SELECT
+              stripe_subscription_id,
               COALESCE(plan, 'free') AS plan,
               COALESCE(additional_capacity_units, 0)::int AS additional_capacity_units
             FROM organizations
@@ -268,8 +303,14 @@ export function createPostgresBillingSyncStore(
           `,
           [organizationId]
         );
+        if (
+          subscriptionId !== undefined &&
+          previousResult.rows[0]?.stripe_subscription_id !== subscriptionId
+        )
+          return false;
         const previousPlan = normalizePlanForDowngradeAudit(previousResult.rows[0]?.plan);
-        const previousAdditionalCapacityUnits = previousResult.rows[0]?.additional_capacity_units ?? 0;
+        const previousAdditionalCapacityUnits =
+          previousResult.rows[0]?.additional_capacity_units ?? 0;
 
         await tx.query(
           `
@@ -287,7 +328,15 @@ export function createPostgresBillingSyncStore(
           [organizationId, eventId]
         );
 
-        const cleanupSummary = await createOrganizationPlanCleanupService(tx).cleanupOrganizationForPlan({
+        // Checkout reservations can belong to a later, still-ambiguous purchase.
+        // Only checkout reconciliation may retire its exact terminal session.
+        await tx.query("DELETE FROM billing_subscription_operations WHERE organization_id=$1", [
+          organizationId
+        ]);
+
+        const cleanupSummary = await createOrganizationPlanCleanupService(
+          tx
+        ).cleanupOrganizationForPlan({
           organization_id: organizationId,
           plan: "free"
         });
@@ -316,6 +365,7 @@ export function createPostgresBillingSyncStore(
               : {})
           }
         });
+        return true;
       });
     },
 

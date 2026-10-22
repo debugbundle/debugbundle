@@ -1,20 +1,32 @@
+import { assertSupportedSubscriptionItems } from "../../../../packages/billing/src/stripe-subscription.js";
+import {
+  readBillingSnapshot,
+  sendBillingEmail,
+  sendEntitlementDowngradeConfirmation,
+  resolveBillingEmailBrandMarkUrl,
+  fallbackManagementUrl,
+  sendBillingChangeConfirmations,
+  type BillingSummaryReader,
+  type BillingEmailService,
+  type RecomputedEntitlements
+} from "../../../../packages/billing/src/stripe-webhook-emails.js";
+import { resolveStripeSubscriptionBillingPeriod } from "../stripe-billing-period.js";
+import type { BillingWebhookTransaction } from "../../../../packages/billing/src/stripe-webhook-transaction.js";
+import { reconcileStripeSubscriptionOperation } from "../../../../packages/billing/src/stripe-operation-reconciliation.js";
+import type { BillingSubscriptionOperationStore } from "../../../../packages/storage/src/billing-subscription-operation-store.js";
+import { BILLING_PROVIDER_REQUEST_OPTIONS } from "../../../../packages/billing/src/stripe-subscription-upgrade.js";
 import type { FastifyInstance } from "fastify";
 import Stripe from "stripe";
 
 import type { RuntimeLogger } from "../../../../packages/runtime-logger/src/index.js";
-import { getTierCapabilities, type TierName } from "../../../../packages/shared-types/src/index.js";
+import { getTierCapabilities } from "../../../../packages/shared-types/src/index.js";
 import type { AuditLogStore, BillingSyncStore } from "../../../../packages/storage/src/index.js";
 import {
-  buildEmailBrandMarkUrl,
-  renderCapacityQuantityChangeEmail,
-  renderEntitlementDowngradeConfirmationEmail,
   renderEntitlementDowngradeWarningEmail,
   renderPaymentFailureEmail,
   renderPaymentFailureReminderEmail,
-  renderPlanChangeConfirmationEmail,
   renderPurchaseConfirmationEmail,
-  renderRenewalSuccessEmail,
-  type BillingEmailRendered
+  renderRenewalSuccessEmail
 } from "../../../../packages/email/src/index.js";
 import {
   derivePlanFromSubscriptionItems,
@@ -24,115 +36,27 @@ import {
 } from "../stripe-config.js";
 import { recordAuditLog } from "../audit-logging.js";
 
-interface BillingSummarySnapshot {
-  plan: TierName;
-  additionalCapacityUnits: number;
-  totalCapacityUnits: number;
-}
-
-interface BillingSummaryReader {
-  getBillingSummaryForOrganization(input: {
-    organization_id: string;
-    now: string;
-  }): Promise<{
-    plan: TierName;
-    active_projects: number;
-    capacity_units: {
-      total: number;
-      additional_purchased: number;
-    };
-  } | null>;
-}
-
-interface BillingEmailService {
-  managementUrl?: string;
-  getBillingContactForOrganization(input: { organization_id: string }): Promise<{
-    organizationName: string;
-    recipientEmail: string;
-  } | null>;
-  send(input: {
-    to: string[];
-    subject: string;
-    text: string;
-    html: string;
-  }): Promise<void>;
-}
-
-interface RecomputedEntitlements {
-  effectivePlan: TierName;
-  extraCapacityQuantity: number;
-  billingPeriodStartsAt: string | null;
-  billingPeriodEndsAt: string | null;
-  totalCapacityUnits: number;
-}
-
-function readUnixTimestampField(source: unknown, key: string): number | null {
-  if (typeof source !== "object" || source === null) {
-    return null;
-  }
-
-  const value = (source as Record<string, unknown>)[key];
-  return typeof value === "number" ? value : null;
-}
-
-function readSubscriptionInvoiceLinePeriod(source: unknown): { start: number | null; end: number | null } {
-  if (typeof source !== "object" || source === null) {
-    return { start: null, end: null };
-  }
-
-  const invoice = source as Record<string, unknown>;
-  const lines = invoice["lines"];
-  if (typeof lines !== "object" || lines === null) {
-    return { start: null, end: null };
-  }
-
-  const data = (lines as Record<string, unknown>)["data"];
-  if (!Array.isArray(data)) {
-    return { start: null, end: null };
-  }
-
-  for (const line of data) {
-    if (typeof line !== "object" || line === null) {
-      continue;
-    }
-
-    const period = (line as Record<string, unknown>)["period"];
-    if (typeof period !== "object" || period === null) {
-      continue;
-    }
-
-    const start = readUnixTimestampField(period, "start");
-    const end = readUnixTimestampField(period, "end");
-    if (start !== null || end !== null) {
-      return { start, end };
-    }
-  }
-
-  return { start: null, end: null };
-}
-
 export interface StripeWebhookDependencies {
   stripeConfig: StripeConfig;
   billingSyncStore: BillingSyncStore;
+  eventTransaction?: BillingWebhookTransaction;
+  subscriptionOperationStore?: BillingSubscriptionOperationStore;
   billingSummaryReader?: BillingSummaryReader;
   billingEmails?: BillingEmailService;
   auditLogging?: Pick<AuditLogStore, "createAuditLog">;
   logger?: Pick<RuntimeLogger, "warn" | "error">;
 }
 
-const MAX_BILLING_EMAIL_SEND_ATTEMPTS = 3;
-
-export function registerStripeWebhookRoute(app: FastifyInstance, dependencies: StripeWebhookDependencies): void {
+export function registerStripeWebhookRoute(
+  app: FastifyInstance,
+  dependencies: StripeWebhookDependencies
+): void {
   const { stripeConfig } = dependencies;
 
   app.register((scope) => {
-    scope.addContentTypeParser(
-      "application/json",
-      { parseAs: "buffer" },
-      (_req, body, done) => {
-        done(null, body);
-      }
-    );
+    scope.addContentTypeParser("application/json", { parseAs: "buffer" }, (_req, body, done) => {
+      done(null, body);
+    });
 
     scope.post("/v1/billing/stripe-webhook", async (request, reply) => {
       const logger = request.log.child({ route: request.routeOptions.url });
@@ -148,21 +72,29 @@ export function registerStripeWebhookRoute(app: FastifyInstance, dependencies: S
 
       let event: Stripe.Event;
       try {
-        event = stripeConfig.client.webhooks.constructEvent(rawBody, signature, stripeConfig.webhookSecret);
+        event = stripeConfig.client.webhooks.constructEvent(
+          rawBody,
+          signature,
+          stripeConfig.webhookSecret
+        );
       } catch {
-        await recordAuditLog(dependencies.auditLogging, {
-          organization_id: null,
-          actor_user_id: null,
-          actor_type: "system",
-          action: "billing.webhook.process",
-          target_type: "stripe_event",
-          target_id: null,
-          status: "failure",
-          ip_address: request.ip,
-          metadata: {
-            reason: "invalid_signature"
-          }
-        }, logger);
+        await recordAuditLog(
+          dependencies.auditLogging,
+          {
+            organization_id: null,
+            actor_user_id: null,
+            actor_type: "system",
+            action: "billing.webhook.process",
+            target_type: "stripe_event",
+            target_id: null,
+            status: "failure",
+            ip_address: request.ip,
+            metadata: {
+              reason: "invalid_signature"
+            }
+          },
+          logger
+        );
 
         return reply.status(400).send({ error: "invalid_signature" });
       }
@@ -174,58 +106,127 @@ export function registerStripeWebhookRoute(app: FastifyInstance, dependencies: S
 
       const alreadyProcessed = await dependencies.billingSyncStore.isEventProcessed(event.id);
       if (alreadyProcessed) {
-        await recordAuditLog(dependencies.auditLogging, {
-          organization_id: null,
-          actor_user_id: null,
-          actor_type: "system",
-          action: "billing.webhook.process",
-          target_type: "stripe_event",
-          target_id: event.id,
-          status: "success",
-          ip_address: request.ip,
-          metadata: {
-            duplicate: true,
-            event_type: event.type
-          }
-        }, scopedDependencies.logger);
+        await recordAuditLog(
+          dependencies.auditLogging,
+          {
+            organization_id: null,
+            actor_user_id: null,
+            actor_type: "system",
+            action: "billing.webhook.process",
+            target_type: "stripe_event",
+            target_id: event.id,
+            status: "success",
+            ip_address: request.ip,
+            metadata: {
+              duplicate: true,
+              event_type: event.type
+            }
+          },
+          scopedDependencies.logger
+        );
 
         return reply.status(200).send({ received: true, duplicate: true });
       }
 
       try {
-        const organizationId = await processStripeEvent(event, scopedDependencies);
+        let organizationId: string | null;
+        if (dependencies.eventTransaction) {
+          const object = event.data.object as {
+            customer?: string | { id: string };
+            client_reference_id?: string;
+            metadata?: Record<string, string>;
+          };
+          const customerId =
+            typeof object.customer === "string" ? object.customer : object.customer?.id;
+          const organizationKey =
+            object.client_reference_id ??
+            object.metadata?.["organization_id"] ??
+            (customerId
+              ? await dependencies.billingSyncStore.resolveOrganizationByStripeCustomerId(
+                  customerId
+                )
+              : null) ??
+            customerId ??
+            event.id;
+          const outcome = await dependencies.eventTransaction(
+            organizationKey,
+            event.id,
+            async (context) => {
+              let emailOrganizationId: string | undefined;
+              const service = dependencies.billingEmails;
+              return processStripeEvent(event, {
+                ...scopedDependencies,
+                ...context,
+                ...(service
+                  ? {
+                      billingEmails: {
+                        ...service,
+                        async getBillingContactForOrganization(input) {
+                          emailOrganizationId = input.organization_id;
+                          return service.getBillingContactForOrganization(input);
+                        },
+                        async send(message) {
+                          if (!emailOrganizationId)
+                            throw new Error("billing_email_organization_missing");
+                          await context.queueEmail(emailOrganizationId, {
+                            subject: message.subject,
+                            text: message.text,
+                            html: message.html
+                          });
+                        }
+                      }
+                    }
+                  : {})
+              });
+            }
+          );
+          if (outcome === "duplicate")
+            return reply.status(200).send({ received: true, duplicate: true });
+          organizationId = outcome;
+        } else organizationId = await processStripeEvent(event, scopedDependencies);
 
-        await recordAuditLog(dependencies.auditLogging, {
-          organization_id: organizationId,
-          actor_user_id: null,
-          actor_type: "system",
-          action: "billing.webhook.process",
-          target_type: "stripe_event",
-          target_id: event.id,
-          status: "success",
-          ip_address: request.ip,
-          metadata: {
-            duplicate: false,
-            event_type: event.type
-          }
-        }, scopedDependencies.logger);
+        await recordAuditLog(
+          dependencies.auditLogging,
+          {
+            organization_id: organizationId,
+            actor_user_id: null,
+            actor_type: "system",
+            action: "billing.webhook.process",
+            target_type: "stripe_event",
+            target_id: event.id,
+            status: "success",
+            ip_address: request.ip,
+            metadata: {
+              duplicate: false,
+              event_type: event.type
+            }
+          },
+          scopedDependencies.logger
+        );
       } catch (error) {
         const message = error instanceof Error ? error.message : "unknown_error";
-        await recordAuditLog(dependencies.auditLogging, {
-          organization_id: null,
-          actor_user_id: null,
-          actor_type: "system",
-          action: "billing.webhook.process",
-          target_type: "stripe_event",
-          target_id: event.id,
-          status: "failure",
-          ip_address: request.ip,
-          metadata: {
-            event_type: event.type,
-            reason: message
-          }
-        }, scopedDependencies.logger);
-        scopedDependencies.logger?.error({ error_message: message }, "stripe_webhook_processing_error");
+        await recordAuditLog(
+          dependencies.auditLogging,
+          {
+            organization_id: null,
+            actor_user_id: null,
+            actor_type: "system",
+            action: "billing.webhook.process",
+            target_type: "stripe_event",
+            target_id: event.id,
+            status: "failure",
+            ip_address: request.ip,
+            metadata: {
+              event_type: event.type,
+              reason: message
+            }
+          },
+          scopedDependencies.logger
+        );
+        scopedDependencies.logger?.error(
+          { error_message: message },
+          "stripe_webhook_processing_error"
+        );
         return reply.status(500).send({ error: "processing_failed" });
       }
 
@@ -234,7 +235,10 @@ export function registerStripeWebhookRoute(app: FastifyInstance, dependencies: S
   });
 }
 
-async function processStripeEvent(event: Stripe.Event, dependencies: StripeWebhookDependencies): Promise<string | null> {
+async function processStripeEvent(
+  event: Stripe.Event,
+  dependencies: StripeWebhookDependencies
+): Promise<string | null> {
   switch (event.type) {
     case "checkout.session.completed":
       return handleCheckoutSessionCompleted(event, dependencies);
@@ -258,7 +262,8 @@ async function handleCheckoutSessionCompleted(
   dependencies: StripeWebhookDependencies
 ): Promise<string | null> {
   const session = event.data.object as Stripe.Checkout.Session;
-  const organizationId = session.client_reference_id ?? (session.metadata?.["organization_id"] ?? null);
+  const organizationId =
+    session.client_reference_id ?? session.metadata?.["organization_id"] ?? null;
 
   if (organizationId === null) {
     dependencies.logger?.warn({ reason: "organization_missing" }, "stripe_webhook_no_organization");
@@ -267,7 +272,8 @@ async function handleCheckoutSessionCompleted(
   }
 
   const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id;
-  const subscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
+  const subscriptionId =
+    typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
   if (customerId === undefined || subscriptionId === undefined) {
     dependencies.logger?.warn(
       {
@@ -281,23 +287,51 @@ async function handleCheckoutSessionCompleted(
     return organizationId;
   }
 
-  await dependencies.billingSyncStore.linkStripeCustomer(organizationId, customerId, subscriptionId);
+  const subscription = await dependencies.stripeConfig.client.subscriptions.retrieve(
+    subscriptionId,
+    {
+      expand: ["items.data", "latest_invoice"]
+    },
+    BILLING_PROVIDER_REQUEST_OPTIONS
+  );
+  const liveCustomer =
+    typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id;
+  if (
+    liveCustomer !== customerId ||
+    (subscription.metadata?.["organization_id"] &&
+      subscription.metadata["organization_id"] !== organizationId)
+  )
+    throw new Error("billing_subscription_ownership_mismatch");
+  if (["canceled", "incomplete_expired", "paused", "unpaid"].includes(subscription.status)) {
+    await dependencies.billingSyncStore.markEventProcessed(event.id, event.type, organizationId);
+    return organizationId;
+  }
+  await dependencies.billingSyncStore.linkStripeCustomer(
+    organizationId,
+    customerId,
+    subscriptionId
+  );
+  const entitlements = await recomputeEntitlements(
+    subscription,
+    organizationId,
+    event.id,
+    dependencies
+  );
 
-  const subscription = await dependencies.stripeConfig.client.subscriptions.retrieve(subscriptionId, {
-    expand: ["items.data", "latest_invoice"]
-  });
-  const entitlements = await recomputeEntitlements(subscription, organizationId, event.id, dependencies);
-
-  if (entitlements.effectivePlan !== "free") {
-    await sendBillingEmail(dependencies.billingEmails, organizationId, (contact) =>
-      renderPurchaseConfirmationEmail({
-        organizationName: contact.organizationName,
-        plan: entitlements.effectivePlan,
-        extraCapacity: entitlements.extraCapacityQuantity,
-        portalUrl: dependencies.billingEmails?.managementUrl ?? fallbackManagementUrl(),
-        brandMarkUrl: resolveBillingEmailBrandMarkUrl()
-      })
-    , dependencies.logger);
+  if (entitlements.applied && entitlements.effectivePlan !== "free") {
+    await sendBillingEmail(
+      dependencies.billingEmails,
+      organizationId,
+      (contact) =>
+        renderPurchaseConfirmationEmail({
+          organizationName: contact.organizationName,
+          plan: entitlements.effectivePlan,
+          extraCapacity: entitlements.extraCapacityQuantity,
+          portalUrl: dependencies.billingEmails?.managementUrl ?? fallbackManagementUrl(),
+          brandMarkUrl: resolveBillingEmailBrandMarkUrl()
+        }),
+      dependencies.logger
+    );
   }
 
   await dependencies.billingSyncStore.markEventProcessed(event.id, event.type, organizationId);
@@ -308,13 +342,26 @@ async function handleSubscriptionChange(
   event: Stripe.Event,
   dependencies: StripeWebhookDependencies
 ): Promise<string | null> {
-  const subscription = event.data.object as Stripe.Subscription;
-  const organizationId = await resolveOrganizationFromSubscription(subscription, dependencies.billingSyncStore);
+  const eventSubscription = event.data.object as Stripe.Subscription;
+  // Event delivery order is not subscription state order. Retrieve the current
+  // items, including pending upgrades, before deriving any paid entitlement.
+  const subscription = await dependencies.stripeConfig.client.subscriptions.retrieve(
+    eventSubscription.id,
+    { expand: ["items.data", "latest_invoice"] },
+    BILLING_PROVIDER_REQUEST_OPTIONS
+  );
+  const organizationId = await resolveOrganizationFromSubscription(
+    subscription,
+    dependencies.billingSyncStore
+  );
 
   if (organizationId === null) {
     dependencies.logger?.warn(
       {
-        customer_id: typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id ?? null,
+        customer_id:
+          typeof subscription.customer === "string"
+            ? subscription.customer
+            : (subscription.customer?.id ?? null),
         reason: "organization_missing"
       },
       "stripe_webhook_no_organization"
@@ -324,37 +371,21 @@ async function handleSubscriptionChange(
   }
 
   const previous = await readBillingSnapshot(dependencies.billingSummaryReader, organizationId);
-  const entitlements = await recomputeEntitlements(subscription, organizationId, event.id, dependencies);
+  const entitlements = await recomputeEntitlements(
+    subscription,
+    organizationId,
+    event.id,
+    dependencies
+  );
 
-  if (event.type === "customer.subscription.updated" && previous !== null) {
-    if (previous.plan !== "free" && entitlements.effectivePlan === "free") {
-      await sendEntitlementDowngradeConfirmation(dependencies.billingEmails, organizationId, previous);
-    } else {
-      if (previous.plan !== entitlements.effectivePlan) {
-        await sendBillingEmail(dependencies.billingEmails, organizationId, (contact) =>
-          renderPlanChangeConfirmationEmail({
-            organizationName: contact.organizationName,
-            previousPlan: previous.plan,
-            newPlan: entitlements.effectivePlan,
-            extraCapacity: entitlements.extraCapacityQuantity,
-            brandMarkUrl: resolveBillingEmailBrandMarkUrl()
-          })
-        , dependencies.logger);
-      }
-
-      if (previous.additionalCapacityUnits !== entitlements.extraCapacityQuantity) {
-        await sendBillingEmail(dependencies.billingEmails, organizationId, (contact) =>
-          renderCapacityQuantityChangeEmail({
-            organizationName: contact.organizationName,
-            plan: entitlements.effectivePlan,
-            previousCapacity: previous.additionalCapacityUnits,
-            newCapacity: entitlements.extraCapacityQuantity,
-            totalCapacityUnits: entitlements.totalCapacityUnits,
-            brandMarkUrl: resolveBillingEmailBrandMarkUrl()
-          })
-        , dependencies.logger);
-      }
-    }
+  if (event.type === "customer.subscription.updated") {
+    await sendBillingChangeConfirmations(
+      dependencies.billingEmails,
+      organizationId,
+      previous,
+      entitlements,
+      dependencies.logger
+    );
   }
 
   await dependencies.billingSyncStore.markEventProcessed(event.id, event.type, organizationId);
@@ -366,7 +397,10 @@ async function handleSubscriptionDeleted(
   dependencies: StripeWebhookDependencies
 ): Promise<string | null> {
   const subscription = event.data.object as Stripe.Subscription;
-  const organizationId = await resolveOrganizationFromSubscription(subscription, dependencies.billingSyncStore);
+  const organizationId = await resolveOrganizationFromSubscription(
+    subscription,
+    dependencies.billingSyncStore
+  );
 
   if (organizationId === null) {
     dependencies.logger?.warn({ reason: "organization_missing" }, "stripe_webhook_no_organization");
@@ -375,10 +409,19 @@ async function handleSubscriptionDeleted(
   }
 
   const previous = await readBillingSnapshot(dependencies.billingSummaryReader, organizationId);
-  await dependencies.billingSyncStore.revokeEntitlements(organizationId, event.id);
+  const revoked = await dependencies.billingSyncStore.revokeEntitlements(
+    organizationId,
+    event.id,
+    subscription.id
+  );
 
-  if (previous !== null && previous.plan !== "free") {
-    await sendEntitlementDowngradeConfirmation(dependencies.billingEmails, organizationId, previous, dependencies.logger);
+  if (revoked !== false && previous !== null && previous.plan !== "free") {
+    await sendEntitlementDowngradeConfirmation(
+      dependencies.billingEmails,
+      organizationId,
+      previous,
+      dependencies.logger
+    );
   }
 
   await dependencies.billingSyncStore.markEventProcessed(event.id, event.type, organizationId);
@@ -397,41 +440,71 @@ async function handleInvoicePaid(
     return null;
   }
 
-  const organizationId = await dependencies.billingSyncStore.resolveOrganizationByStripeCustomerId(customerId);
+  const organizationId =
+    await dependencies.billingSyncStore.resolveOrganizationByStripeCustomerId(customerId);
   if (organizationId === null) {
-    dependencies.logger?.warn({ customer_id: customerId, reason: "organization_missing" }, "stripe_webhook_no_organization");
+    dependencies.logger?.warn(
+      { customer_id: customerId, reason: "organization_missing" },
+      "stripe_webhook_no_organization"
+    );
     await dependencies.billingSyncStore.markEventProcessed(event.id, event.type, null);
     return null;
   }
 
+  const previous = await readBillingSnapshot(dependencies.billingSummaryReader, organizationId);
   const parentSubscription = invoice.parent?.subscription_details?.subscription;
-  const subscriptionId = typeof parentSubscription === "string" ? parentSubscription : parentSubscription?.id;
+  const subscriptionId =
+    typeof parentSubscription === "string" ? parentSubscription : parentSubscription?.id;
   let entitlements: RecomputedEntitlements | null = null;
 
   if (subscriptionId !== undefined) {
-    const subscription = await dependencies.stripeConfig.client.subscriptions.retrieve(subscriptionId, {
-      expand: ["items.data", "latest_invoice"]
-    });
+    const subscription = await dependencies.stripeConfig.client.subscriptions.retrieve(
+      subscriptionId,
+      {
+        expand: ["items.data", "latest_invoice"]
+      },
+      BILLING_PROVIDER_REQUEST_OPTIONS
+    );
     entitlements = await recomputeEntitlements(
       subscription,
       organizationId,
       event.id,
-      dependencies,
-      new Date(invoice.period_end * 1000).toISOString()
+      dependencies
     );
   }
 
   const billingReason = typeof invoice.billing_reason === "string" ? invoice.billing_reason : null;
-  if (entitlements !== null && billingReason !== "subscription_create" && entitlements.effectivePlan !== "free") {
-    await sendBillingEmail(dependencies.billingEmails, organizationId, (contact) =>
-      renderRenewalSuccessEmail({
-        organizationName: contact.organizationName,
-        plan: entitlements.effectivePlan,
-        extraCapacity: entitlements.extraCapacityQuantity,
-        nextRenewalDate: entitlements.billingPeriodEndsAt ?? new Date().toISOString(),
-        brandMarkUrl: resolveBillingEmailBrandMarkUrl()
-      })
-    , dependencies.logger);
+  // A scheduled downgrade arrives on a renewal invoice. Either event order
+  // must emit the transition before its persisted previous plan is replaced.
+  if (billingReason !== "subscription_create" && entitlements !== null) {
+    await sendBillingChangeConfirmations(
+      dependencies.billingEmails,
+      organizationId,
+      previous,
+      entitlements,
+      dependencies.logger
+    );
+  }
+  if (
+    entitlements !== null &&
+    entitlements.applied &&
+    billingReason !== "subscription_create" &&
+    billingReason !== "subscription_update" &&
+    entitlements.effectivePlan !== "free"
+  ) {
+    await sendBillingEmail(
+      dependencies.billingEmails,
+      organizationId,
+      (contact) =>
+        renderRenewalSuccessEmail({
+          organizationName: contact.organizationName,
+          plan: entitlements.effectivePlan,
+          extraCapacity: entitlements.extraCapacityQuantity,
+          nextRenewalDate: entitlements.billingPeriodEndsAt ?? new Date().toISOString(),
+          brandMarkUrl: resolveBillingEmailBrandMarkUrl()
+        }),
+      dependencies.logger
+    );
   }
 
   await dependencies.billingSyncStore.markEventProcessed(event.id, event.type, organizationId);
@@ -450,42 +523,80 @@ async function handleInvoicePaymentFailed(
     return null;
   }
 
-  const organizationId = await dependencies.billingSyncStore.resolveOrganizationByStripeCustomerId(customerId);
+  const organizationId =
+    await dependencies.billingSyncStore.resolveOrganizationByStripeCustomerId(customerId);
   if (organizationId === null) {
-    dependencies.logger?.warn({ customer_id: customerId, reason: "organization_missing" }, "stripe_webhook_no_organization");
+    dependencies.logger?.warn(
+      { customer_id: customerId, reason: "organization_missing" },
+      "stripe_webhook_no_organization"
+    );
     await dependencies.billingSyncStore.markEventProcessed(event.id, event.type, null);
     return null;
   }
 
   const previous = await readBillingSnapshot(dependencies.billingSummaryReader, organizationId);
-  await dependencies.billingSyncStore.updateBillingState(organizationId, "past_due", event.id);
+  const parentSubscription = invoice.parent?.subscription_details?.subscription;
+  const subscriptionId =
+    typeof parentSubscription === "string" ? parentSubscription : parentSubscription?.id;
+  if (subscriptionId !== undefined) {
+    const subscription = await dependencies.stripeConfig.client.subscriptions.retrieve(
+      subscriptionId,
+      { expand: ["items.data", "latest_invoice"] },
+      BILLING_PROVIDER_REQUEST_OPTIONS
+    );
+    const current = await recomputeEntitlements(
+      subscription,
+      organizationId,
+      event.id,
+      dependencies
+    );
+    if (!current.applied || subscription.status !== "past_due") {
+      // A declined/authentication-pending upgrade leaves the paid base plan
+      // active. It must not start base-subscription dunning or downgrade mail.
+      await dependencies.billingSyncStore.markEventProcessed(event.id, event.type, organizationId);
+      return organizationId;
+    }
+  } else {
+    // A one-off invoice is not evidence that the recurring subscription failed.
+    await dependencies.billingSyncStore.markEventProcessed(event.id, event.type, organizationId);
+    return organizationId;
+  }
 
   if (previous !== null && previous.plan !== "free") {
     const attemptCount = typeof invoice.attempt_count === "number" ? invoice.attempt_count : 1;
-    const nextAttemptAt = typeof invoice.next_payment_attempt === "number"
-      ? new Date(invoice.next_payment_attempt * 1000).toISOString()
-      : null;
+    const nextAttemptAt =
+      typeof invoice.next_payment_attempt === "number"
+        ? new Date(invoice.next_payment_attempt * 1000).toISOString()
+        : null;
     const effectiveDate = resolveDowngradeEffectiveDate(invoice, nextAttemptAt);
 
     if (attemptCount <= 1) {
-      await sendBillingEmail(dependencies.billingEmails, organizationId, (contact) =>
-        renderPaymentFailureEmail({
-          organizationName: contact.organizationName,
-          plan: previous.plan,
-          portalUrl: dependencies.billingEmails?.managementUrl ?? fallbackManagementUrl(),
-          brandMarkUrl: resolveBillingEmailBrandMarkUrl()
-        })
-      , dependencies.logger);
+      await sendBillingEmail(
+        dependencies.billingEmails,
+        organizationId,
+        (contact) =>
+          renderPaymentFailureEmail({
+            organizationName: contact.organizationName,
+            plan: previous.plan,
+            portalUrl: dependencies.billingEmails?.managementUrl ?? fallbackManagementUrl(),
+            brandMarkUrl: resolveBillingEmailBrandMarkUrl()
+          }),
+        dependencies.logger
+      );
     } else if (nextAttemptAt !== null) {
-      await sendBillingEmail(dependencies.billingEmails, organizationId, (contact) =>
-        renderPaymentFailureReminderEmail({
-          organizationName: contact.organizationName,
-          plan: previous.plan,
-          portalUrl: dependencies.billingEmails?.managementUrl ?? fallbackManagementUrl(),
-          daysUntilDowngrade: daysUntilIsoTimestamp(effectiveDate),
-          brandMarkUrl: resolveBillingEmailBrandMarkUrl()
-        })
-      , dependencies.logger);
+      await sendBillingEmail(
+        dependencies.billingEmails,
+        organizationId,
+        (contact) =>
+          renderPaymentFailureReminderEmail({
+            organizationName: contact.organizationName,
+            plan: previous.plan,
+            portalUrl: dependencies.billingEmails?.managementUrl ?? fallbackManagementUrl(),
+            daysUntilDowngrade: daysUntilIsoTimestamp(effectiveDate),
+            brandMarkUrl: resolveBillingEmailBrandMarkUrl()
+          }),
+        dependencies.logger
+      );
     }
 
     if (nextAttemptAt === null || attemptCount >= 3) {
@@ -510,48 +621,26 @@ async function recomputeEntitlements(
   subscription: Stripe.Subscription,
   organizationId: string,
   eventId: string,
-  dependencies: StripeWebhookDependencies,
-  billingPeriodEndsAt?: string | null
+  dependencies: StripeWebhookDependencies
 ): Promise<RecomputedEntitlements> {
+  if (isEntitlementEligible(deriveBillingState(subscription.status)))
+    assertSupportedSubscriptionItems(subscription, dependencies.stripeConfig.priceMap);
   const { plan, extraCapacityQuantity } = derivePlanFromSubscriptionItems(
     subscription.items.data,
     dependencies.stripeConfig.priceMap
   );
   const billingState = deriveBillingState(subscription.status);
   const effectivePlan = isEntitlementEligible(billingState, "plan") ? plan : "free";
-  const effectiveExtraCapacity = isEntitlementEligible(billingState, "extra_capacity") ? extraCapacityQuantity : 0;
-  const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id ?? "";
-  const currentPeriodStart = readUnixTimestampField(subscription, "current_period_start");
-  const currentPeriodEnd = readUnixTimestampField(subscription, "current_period_end");
-  const latestInvoice = typeof subscription.latest_invoice !== "string" && subscription.latest_invoice !== null
-    ? subscription.latest_invoice
-    : null;
-  const latestInvoiceLinePeriod = readSubscriptionInvoiceLinePeriod(latestInvoice);
-  const latestInvoicePeriodStart = readUnixTimestampField(latestInvoice, "period_start");
-  const latestInvoicePeriodEnd = readUnixTimestampField(latestInvoice, "period_end");
-
-  let periodStartsAt = typeof currentPeriodStart === "number"
-    ? new Date(currentPeriodStart * 1000).toISOString()
-    : null;
-
-  let periodEndsAt = billingPeriodEndsAt ?? null;
-  if (periodEndsAt === null || periodEndsAt === undefined) {
-    if (typeof currentPeriodEnd === "number") {
-      periodEndsAt = new Date(currentPeriodEnd * 1000).toISOString();
-    } else if (latestInvoiceLinePeriod.end !== null) {
-      periodEndsAt = new Date(latestInvoiceLinePeriod.end * 1000).toISOString();
-    } else if (latestInvoicePeriodEnd !== null) {
-      periodEndsAt = new Date(latestInvoicePeriodEnd * 1000).toISOString();
-    }
-  }
-
-  if (periodStartsAt === null) {
-    if (latestInvoiceLinePeriod.start !== null) {
-      periodStartsAt = new Date(latestInvoiceLinePeriod.start * 1000).toISOString();
-    } else if (latestInvoicePeriodStart !== null) {
-      periodStartsAt = new Date(latestInvoicePeriodStart * 1000).toISOString();
-    }
-  }
+  const effectiveExtraCapacity = isEntitlementEligible(billingState, "extra_capacity")
+    ? extraCapacityQuantity
+    : 0;
+  const customerId =
+    typeof subscription.customer === "string"
+      ? subscription.customer
+      : (subscription.customer?.id ?? "");
+  const period = resolveStripeSubscriptionBillingPeriod(subscription);
+  let periodStartsAt = period.starts_at;
+  let periodEndsAt = period.ends_at;
 
   if (effectivePlan === "free") {
     periodStartsAt = null;
@@ -561,7 +650,7 @@ async function recomputeEntitlements(
     periodEndsAt = null;
   }
 
-  await dependencies.billingSyncStore.updateEntitlements({
+  const applied = await dependencies.billingSyncStore.updateEntitlements({
     organization_id: organizationId,
     plan: effectivePlan,
     additional_capacity_units: effectiveExtraCapacity,
@@ -574,12 +663,23 @@ async function recomputeEntitlements(
     last_billing_event_id: eventId
   });
 
+  if (applied !== false && dependencies.subscriptionOperationStore) {
+    await reconcileStripeSubscriptionOperation({
+      store: dependencies.subscriptionOperationStore,
+      client: dependencies.stripeConfig.client,
+      organizationId,
+      subscription
+    });
+  }
+
   return {
+    applied: applied !== false,
     effectivePlan,
     extraCapacityQuantity: effectiveExtraCapacity,
     billingPeriodStartsAt: periodStartsAt,
     billingPeriodEndsAt: periodEndsAt,
-    totalCapacityUnits: getTierCapabilities(effectivePlan).included_capacity_units + effectiveExtraCapacity
+    totalCapacityUnits:
+      getTierCapabilities(effectivePlan).included_capacity_units + effectiveExtraCapacity
   };
 }
 
@@ -592,7 +692,8 @@ async function resolveOrganizationFromSubscription(
     return fromMetadata;
   }
 
-  const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id;
+  const customerId =
+    typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id;
   if (customerId === undefined) {
     return null;
   }
@@ -600,111 +701,10 @@ async function resolveOrganizationFromSubscription(
   return billingSyncStore.resolveOrganizationByStripeCustomerId(customerId);
 }
 
-async function readBillingSnapshot(
-  billingSummaryReader: BillingSummaryReader | undefined,
-  organizationId: string
-): Promise<BillingSummarySnapshot | null> {
-  if (billingSummaryReader === undefined) {
-    return null;
-  }
-
-  const summary = await billingSummaryReader.getBillingSummaryForOrganization({
-    organization_id: organizationId,
-    now: new Date().toISOString()
-  });
-  if (summary === null) {
-    return null;
-  }
-
-  return {
-    plan: summary.plan,
-    additionalCapacityUnits: summary.capacity_units.additional_purchased,
-    totalCapacityUnits: summary.capacity_units.total
-  };
-}
-
-async function sendBillingEmail(
-  service: BillingEmailService | undefined,
-  organizationId: string,
-  render: (contact: { organizationName: string; recipientEmail: string }) => BillingEmailRendered,
-  logger?: Pick<RuntimeLogger, "warn" | "error">
-): Promise<void> {
-  if (service === undefined) {
-    return;
-  }
-
-  const contact = await service.getBillingContactForOrganization({ organization_id: organizationId });
-  if (contact === null) {
-    logger?.warn({ organization_id: organizationId }, "stripe_billing_email_no_contact");
-    return;
-  }
-
-  const rendered = render(contact);
-  const message = {
-    to: [contact.recipientEmail],
-    subject: rendered.subject,
-    text: rendered.text,
-    html: rendered.html
-  };
-
-  let lastError: unknown;
-  for (let attempt = 1; attempt <= MAX_BILLING_EMAIL_SEND_ATTEMPTS; attempt += 1) {
-    try {
-      await service.send(message);
-      return;
-    } catch (error) {
-      lastError = error;
-      const errorMessage = error instanceof Error ? error.message : "unknown_error";
-
-      if (attempt < MAX_BILLING_EMAIL_SEND_ATTEMPTS) {
-        logger?.warn(
-          {
-            attempt,
-            error_message: errorMessage,
-            max_attempts: MAX_BILLING_EMAIL_SEND_ATTEMPTS,
-            organization_id: organizationId,
-            recipient_email: contact.recipientEmail,
-            subject: rendered.subject
-          },
-          "stripe_billing_email_retry"
-        );
-        continue;
-      }
-
-      logger?.error(
-        {
-          attempts: MAX_BILLING_EMAIL_SEND_ATTEMPTS,
-          error_message: errorMessage,
-          organization_id: organizationId,
-          recipient_email: contact.recipientEmail,
-          subject: rendered.subject
-        },
-        "stripe_billing_email_delivery_failed"
-      );
-    }
-  }
-
-  throw lastError instanceof Error ? lastError : new Error("billing_email_send_failed");
-}
-
-async function sendEntitlementDowngradeConfirmation(
-  service: BillingEmailService | undefined,
-  organizationId: string,
-  previous: BillingSummarySnapshot,
-  logger?: Pick<RuntimeLogger, "warn" | "error">
-): Promise<void> {
-  await sendBillingEmail(service, organizationId, (contact) =>
-    renderEntitlementDowngradeConfirmationEmail({
-      organizationName: contact.organizationName,
-      previousPlan: previous.plan,
-      previousCapacityUnits: previous.totalCapacityUnits,
-      newCapacityUnits: getTierCapabilities("free").included_capacity_units,
-      brandMarkUrl: resolveBillingEmailBrandMarkUrl()
-    })
-  , logger);
-}
-
-function resolveDowngradeEffectiveDate(invoice: Stripe.Invoice, nextAttemptAt: string | null): string {
+function resolveDowngradeEffectiveDate(
+  invoice: Stripe.Invoice,
+  nextAttemptAt: string | null
+): string {
   if (nextAttemptAt !== null) {
     return nextAttemptAt;
   }
@@ -719,18 +719,4 @@ function resolveDowngradeEffectiveDate(invoice: Stripe.Invoice, nextAttemptAt: s
 function daysUntilIsoTimestamp(value: string): number {
   const diffMs = new Date(value).getTime() - Date.now();
   return Math.max(1, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
-}
-
-function resolveBillingEmailBrandMarkUrl(): string | undefined {
-  const baseUrl =
-    process.env["EMAIL_ASSET_BASE_URL"]
-    ?? process.env["PUBLIC_SITE_URL"]
-    ?? process.env["APP_BASE_URL"]
-    ?? "http://localhost:3000";
-
-  return buildEmailBrandMarkUrl(baseUrl);
-}
-
-function fallbackManagementUrl(): string {
-  return `${(process.env["APP_BASE_URL"] ?? "http://localhost:3000").replace(/\/+$/, "")}/billing`;
 }

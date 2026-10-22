@@ -1,7 +1,7 @@
 # Billing
 
 Version: v1
-Last updated: 2026-09-10
+Last updated: 2026-10-22 (local safety candidate)
 
 ---
 
@@ -71,7 +71,7 @@ The API must be configured with:
 
 Hosted production deploys must source these values from `debugbundle-cloud` GitHub Actions secrets and merge them into the runtime env during deploy rather than relying on one manually maintained host-only `.env`.
 
-Legacy static URL variables (`STRIPE_SOLO_CHECKOUT_URL`, `STRIPE_TEAM_CHECKOUT_URL`, `STRIPE_CUSTOMER_PORTAL_URL`) remain local/manual fallback scaffolding only and must not be the hosted production path.
+Legacy static URL variables (`STRIPE_SOLO_CHECKOUT_URL`, `STRIPE_TEAM_CHECKOUT_URL`, `STRIPE_CUSTOMER_PORTAL_URL`) remain local/manual fallback scaffolding only. With `NODE_ENV=production`, the fallback returns no link: incomplete dynamic configuration must not bypass ownership checks or durable reservations.
 
 ### 2.4 Price-to-Plan Mapping
 
@@ -158,7 +158,7 @@ Eligibility and lifecycle rules:
 
 ## 4. Checkout Flow
 
-Before Stripe checkout begins, eligible Free organizations may start a 30-day no-card Solo or Team trial from pricing, billing, API, CLI, or MCP. Checkout remains available during an active trial so the organization can convert to paid before expiry.
+Before Stripe checkout begins, eligible Free organizations may start a 30-day no-card Solo or Team trial from pricing, billing, API, CLI, or MCP. The temporary first-purchase restriction unlocks Checkout after seven full 24-hour days from the trial start, so conversion remains possible before trial expiry. Direct Free-to-paid cannot bypass this wait. Previously paid organisations retain their resubscription path.
 
 ### 4.1 Production Checkout State
 
@@ -194,7 +194,59 @@ The checkout route must create a Stripe Checkout Session dynamically using the S
 Checkout validation must also enforce trial conversion rules:
 - Active Solo trial: allow paid Solo or Team checkout.
 - Active Team trial: allow paid Team checkout only.
-- Active no-card trials are not required to expire first.
+- Active no-card trials are not required to expire first, but the first paid purchase must wait seven full days from the immutable trial start.
+
+### First-purchase restriction (local candidate)
+
+The organisation-locked Checkout claim checks the shared elapsed-time policy before creating, returning or replaying any Checkout request. Missing, malformed or future trial starts fail closed with `409 paid_purchase_locked`. The server uses its own clock; browser time cannot grant eligibility. A processed, organisation-scoped `invoice.paid` receipt exempts previously paid accounts. Customer IDs, incomplete/terminal subscriptions and trial conversion timestamps alone are insufficient proof. The existing provider-terminal check is still required before resubscription.
+
+The billing page reuses CalloutCard and Button, shows the exact local unlock date/time, keeps Start trial available and disables unavailable first-purchase buttons. “Need to subscribe sooner? Contact us” links to `https://debugbundle.com/contact/`. Summary fields provide presentation hints for historical paid accounts; the locked server claim remains authoritative and reports an explicit refusal when history needs review. The page refreshes at the unlock boundary and on visibility/focus. No billing-summary fields, new automation tools, dependencies, styles or automatic support overrides are added.
+
+Paid plan management and provider-confirmed payment/webhook reconciliation continue normally. Blocked attempts stay reserved, including uncertain or completed attempts; the policy never rotates them on age. Existing hosted Stripe URLs remain usable until Stripe expires them and cannot be revoked by this creation gate. Any account hold, refund, subscription cancellation, legacy-session reconciliation or release requires its own authorised operational action. Account age can be waited out and does not establish trust.
+
+### 4.2a Checkout safety candidate (not deployed)
+
+`billing_checkout_attempts` holds one organization-scoped attempt, fixed Stripe request parameters and its eventual session ID. A short organization row lock serializes reservations; no provider call holds that transaction. Persist the reservation before any Stripe call. Retrying must reuse the request and `billing-checkout:<attempt-id>` key. Return the same open session; completed/uncertain attempts remain reserved. Only a Stripe-confirmed expired session, or a completed session whose exact linked subscription is confirmed `canceled`/`incomplete_expired`, can be retired with an attempt/session compare-and-set. The cached internal `canceled` state alone is insufficient: paused subscriptions must not start another purchase. A different plan while the reservation is open returns `409 checkout_in_progress`; a saved session can still be checked for expiry and then replaced with the requested plan. An unsaved different-plan attempt remains reserved. A pending reservation that cannot be reconciled needs operator review, not a new charge attempt.
+
+New sessions set `expires_at` to reservation time plus one hour and request `payment_method_options.card.request_three_d_secure = any`. This asks the issuer for supported authentication; it does not guarantee a challenge, liability shift or rejection of unsupported cards. Hosted Checkout/Radar protections remain necessary. No CVC/AVS rules, live catalog, customer, subscription or refund settings are changed by this patch.
+
+The route additionally limits organization requests to five/minute and client-IP requests to ten/minute through the existing shared limiter. A reservation survives process/Redis restarts. Suspensions are rechecked inside the reservation transaction. Linked non-terminal subscriptions cannot create another recurring Checkout. Paid Solo-to-Team requests use the same-subscription path below. Cancellation events retain checkout reservations: only explicit session reconciliation may retire the exact completed purchase, so a delayed cancellation cannot erase a later uncertain attempt. Active paid access and portal management remain available.
+
+`503 billing_service_error` reports provider/persistence failure; `503 billing_not_configured` remains the absent-provider fallback. Audit entries retain the reason without provider credentials or card details.
+
+Migration `202610220001_add_billing_checkout_attempts` is additive, checksummed and required before runtime activation. Stored parameters contain the existing billing email/provider routing, not card data or credentials; records stay internal, bounded to one per organization, and cascade with account deletion. Future rollout must reconcile legacy open sessions before enabling this flow; the patch cannot revoke URLs issued by an older version.
+
+### 4.2b Same-subscription Solo-to-Team upgrade candidate
+
+The existing owner/session/CSRF-protected `POST /v1/billing/checkout` retains `200 {url}`. For a paid Solo subscription targeting Team, it reserves one `billing_subscription_operations` record and updates the existing subscription. It changes the existing base item to the Team Price and the existing extra-capacity item to the Team capacity Price, preserving the exact purchased quantity (including 99 units). It never creates another recurring Checkout or subscription.
+
+`packages/billing/src/stripe-subscription-upgrade.ts` persists the exact item IDs, Prices, quantities and `proration_date` before dispatch. The update uses `payment_behavior=pending_if_incomplete`, `proration_behavior=always_invoice`, an eight-second request timeout, no automatic network retries and `billing-subscription:<attempt-id>:update` idempotency. Stripe invoices the unused-period credits and new-period charges together. Existing Solo entitlement policy remains unchanged; Team is derived only from applied current Stripe items.
+
+An open update invoice returns its validated Stripe-hosted invoice URL. Required authentication or a declined card is recovered on that same invoice; app retries do not create a replacement invoice. A paid invoice awaiting application stays reserved. Once Stripe reports applied Team items, the link returns to the existing billing-success polling route without inventing a Checkout Session ID. For upgrade and capacity payments, the existing dialog offers “Continue payment on Stripe” as an explicit link that opens a separate tab and closes the dialog. The original billing page remains open, refreshes on return/focus and grants no capacity or plan success before the authoritative paid state. Pending capacity disables conflicting changes; reopening resumes the same provider operation. A paid upgrade still uses the existing billing-success route. Hosted return/authentication behaviour remains an independent verification gate.
+
+Stripe's `subscription_update_confirm` portal flow supports only one item and cannot update a subscription with extra capacity. This candidate uses the subscription pending-update API instead. It requires an active, automatically charged subscription with a paid prior invoice and complete known item shapes. Scheduled reductions, scheduled cancellation, another pending update, paused/past-due/trialing subscriptions and mismatched ownership fail closed before a fresh update. Cancel an existing scheduled reduction through its existing explicit route before requesting the upgrade; the candidate does not silently discard it.
+
+The same durable operation slot coordinates capacity increases, scheduled reductions and cancellation of reductions. Capacity increases retain existing entitlements until payment applies; reductions remain effective at renewal. Exact provider commands and stable step keys are persisted. Schedule creation and update have separate keys, and a saved schedule ID is reused after failure. Conflicting operations return `409 billing_change_in_progress` (upgrade uses the existing `checkout_in_progress`). An unprepared validation failure can release its slot; a prepared uncertain operation cannot. A completed record can be replaced by the next explicit operation.
+
+Stripe may prune idempotency keys after 24 hours. Ambiguous subscription mutations stop replay at 23 hours (with at most one minute of DB/API clock tolerance), remain reserved and require reconciliation. Age never rotates an attempt. Only an exact provider-voided upgrade or capacity invoice with no pending update permits retirement and a later explicit fresh attempt. Known invoice IDs remain readable for reconciliation after the replay deadline.
+
+Subscription-change webhooks retrieve the current subscription instead of deriving entitlements from a delayed event payload. Storage fences old subscription IDs; cancellation mail is suppressed when the old subscription no longer matches. A failed pending-upgrade invoice must not mark paid Solo past due or emit base-plan downgrade/dunning emails. Both paid-invoice and subscription-update ordering paths compare the previous snapshot and send the applicable plan-change confirmation; update invoices do not masquerade as renewals.
+
+Additive migration `202610220002_add_billing_subscription_operations` follows the checkout reservation migration and must run before dependent runtime activation. The record contains internal subscription/customer references and fixed provider commands, no card data or credentials. It is bounded to one per organization and cascades on account deletion. Bootstrap remains empty-schema-only; no existing production snapshots are repaired automatically.
+
+Provider contracts: [pending subscription updates](https://docs.stripe.com/billing/subscriptions/pending-updates), [subscription update/proration](https://docs.stripe.com/api/subscriptions/update), [portal flow item limitations](https://docs.stripe.com/customer-management/portal-deep-links), and [idempotency retention](https://docs.stripe.com/api/idempotent_requests). Local tests use provider fakes and disposable PostgreSQL; no live subscription was changed to verify this candidate.
+
+### Confirmation and recovery invariants
+
+Paid Solo-to-Team uses the existing accessible billing dialog before attempting payment. `POST /v1/billing/upgrade/preview` reads Stripe invoice previews and returns due-now amount, tax, recurring monthly total and retained extra units with a signed ten-minute token. The token is bound to the organization, subscription, current items/period and fixed proration date. Confirmation rechecks eligibility and the same preview amounts; a changed or expired quote requires another review. The quote uses a domain-separated HMAC with the existing webhook signing secret, never sent to the browser. A prepared ambiguous request keeps its original parameters even after the quote expires; retry only reconciles/replays that already confirmed operation. Preview may instead return the already saved open invoice for payment recovery.
+
+Capacity purchases also use `pending_if_incomplete` with `always_invoice`. Active paid automatic subscriptions are required; the existing paid capacity remains until the invoice is paid and the requested items are applied. An open invoice returns `payment_required: { url }`, which web, CLI and MCP expose without reporting success. Reading billing or receiving a webhook reconciles completed paid operations so later capacity changes are not permanently blocked. Exact void invoices may be retired; time alone never clears an ambiguous payment.
+
+Reduction phases preserve existing subscription/item discounts and tax settings. Only the known two-phase capacity reduction can be updated or released; unrelated subscription schedules fail closed. Current Clover item periods (or a validated current provider schedule) determine the effective date; cached application periods alone cannot authorize a future charge change. Future item prices, discounts, taxes and metadata must not be silently overwritten, and schedules with unsupported custom settings remain blocked. Unknown, duplicated, mixed-plan or truncated paid item lists fail closed without inventing a downgrade. Terminal subscriptions never project paid capacity.
+
+Checkout creation and upgrade preview require a verified owner browser session (FR-AUTH-04), CSRF and rate limits. Checkout return always retrieves the current subscription, validates customer/organization/mode/payment state and atomically updates using the database row revision. A newer webhook wins over a stale return. The return UI reports verification pending until state is confirmed; query-string flags are not payment proof. Changing plans while an earlier Checkout is open remains blocked until provider-confirmed expiry; the user can resume the original plan. An ambiguous unsaved attempt stays reserved. Its original one-hour expiry bounds replay to less than 23 hours from creation; beyond that, only reconciliation is allowed, never an age-based replacement.
+
+Webhook handling serializes each account, locks its row before provider retrieval, and reads persisted pre-change entitlements for transition notifications. Billing state, processed event and notification outbox entry commit together. Migration `202610220003_add_billing_lifecycle_notifications` expands the existing operational-email kind constraint before API/worker activation. Workers deliver and retry through the existing operational-email queue. Deployment must activate the compatible worker and retire older workers before activating the API producer; older workers cannot process the new kind. On rollback, keep a compatible worker until queued billing notifications are delivered or explicitly reconciled; do not roll the kind constraint back or delete pending notifications. A failed standalone invoice cannot change subscription dunning state. This prevents lost mail from an inline send failure; transport delivery remains at-least-once, not a promise of globally exactly-once email.
 
 ### 4.3 Checkout Route Changes
 
@@ -224,7 +276,7 @@ The Stripe Customer Portal must be configured to allow:
 - Payment method updates
 - Invoice history viewing
 
-Plan changes between Solo and Team should be handled through the web app checkout flow, not through the portal, to maintain explicit upgrade path control.
+Paid Solo-to-Team changes enter through the existing checkout route but update the same subscription using the pending-invoice path in section 4.2b. The general portal retains cancellation, payment-method and invoice management; it is not used to bypass the explicit upgrade path. The approved Team-to-Solo flow uses the existing Dialog/Button primitives to preview and confirm a same-subscription schedule at renewal. It retains purchased extra units, shows included capacity changing from 15 to 3 and explains that collaboration/Slack pause with saved setup retained. Cancellation and capacity reduction remain separate operations.
 
 ### 4.6 In-App Capacity Management
 
@@ -523,11 +575,11 @@ At minimum, billing webhook processing must trigger:
 - No-card trial converted
 - Purchase confirmation (on `checkout.session.completed`)
 - Renewal success (on `invoice.paid` for recurring invoices)
-- Payment failure (on `invoice.payment_failed`)
+- Payment failure (on `invoice.payment_failed` when the current subscription is past due; an unapplied pending upgrade leaves the paid base plan unchanged and uses its hosted invoice recovery)
 - Payment failure reminder (on repeated `invoice.payment_failed` within dunning window)
 - Entitlement downgrade warning (when `past_due` and approaching final retry)
 - Entitlement downgrade confirmation (on subscription deletion or transition to `canceled`/`unpaid`)
-- Plan change confirmation (on plan price change in `customer.subscription.updated`)
+- Plan change confirmation (on current applied plan change in `customer.subscription.updated` or its `invoice.paid`, independent of delivery order)
 - Capacity quantity change confirmation (on extra-capacity quantity change in `customer.subscription.updated`)
 
 ---
@@ -679,6 +731,71 @@ Billing webhook processing triggers the correct lifecycle emails for:
 - Tier pricing and allowance numbers: `/spec/product.md` section 13
 - System email inventory: `/spec/system-emails.md`
 - Product overview and pricing philosophy: `/spec/product.md` §13
-- Requirements: `/spec/requirements.md` FR-BIL-01 through FR-BIL-06
+- Requirements: `/spec/requirements.md` FR-BIL-01 through FR-BIL-08
 - Auth and session model: `/spec/auth-architecture.md`
 - Domain invariants for billing enforcement: `/rules/domain-invariants.md`
+
+### Current-period selection correction (local candidate)
+
+Webhook and checkout-return synchronization share `stripe-billing-period.ts`. Read current subscription-item periods first (Clover), then legacy top-level subscription fields, then valid non-proration invoice lines and invoice envelope fields. Do not override the result with an `invoice.paid` envelope: an initial invoice can have equal top-level start/end. Retrieve the current subscription and preserve the same real month in either webhook order. This corrects future snapshots; existing malformed periods need an explicit, scoped reconciliation after a verified release, with no payment replay.
+
+
+---
+
+## Local checkout and period hardening — 22 October 2026
+
+This is a local, uncommitted candidate originating from hosted source `a4e0ffcab75346818bbab06b0386cb9bffc48a56` and transferred onto current main `fc5f3b1dab0f3cea4cd1efd80cbca1cc1160755d` with newer documentation preserved. It is not a release receipt. The owner explicitly requires local work and separate consent before publication or deployment. Do not run production billing canaries or act on customer accounts from this document.
+
+## Scope and behaviour
+
+- A short PostgreSQL transaction reserves one checkout attempt per organisation before Stripe is called. Repeated/concurrent requests reuse the open session or the same persisted parameters and Stripe idempotency key. Completed/uncertain attempts cannot silently become another charge. Only a provider-confirmed expired session or a completed session tied to its exact provider-confirmed terminal subscription permits replacement.
+- New sessions expire in one hour and request supported 3DS authentication. Provider calls have an eight-second timeout with no automatic network retries; a subsequent explicit request safely replays the reserved attempt. The existing member limit is supplemented by five organisation requests/minute and ten trusted-client-IP requests/minute.
+- Webhook/checkout-return synchronisation shares current-period selection: Clover subscription items, legacy subscription fields, then valid non-proration invoice fallbacks. A zero-length initial invoice envelope cannot erase the actual month. Existing entitlement policy is preserved.
+- Forwarded IPs stay disabled by default. Explicit immediate-peer IPs are accepted; broad trust/CIDRs and further hops are rejected. Runtime validates settings before opening dependencies. Existing CORS, session/CSRF, owner and OAuth/MCP host isolation remain in place.
+- Migrations `202610220001_add_billing_checkout_attempts`, `202610220002_add_billing_subscription_operations`, `202610220003_add_billing_lifecycle_notifications` and `202610220004_add_billing_plan_change_operations` are additive and must precede dependent runtime activation. Cancellation retains checkout reservations; explicit provider-confirmed terminal-session reconciliation preserves resubscription without erasing newer ambiguous attempts. One internal record per organisation contains provider routing/existing billing email, no card data or credentials; account deletion cascades it.
+
+## Material limits before any release
+
+The replacement Solo-to-Team path is implemented locally using the existing subscription and a payment-pending proration invoice, preserving extra-capacity quantity and serializing capacity mutations. The former second-subscription path remains blocked. Local concurrency, failure and webhook-ordering regressions are distinct from hosted authentication and invoice-return evidence. The authorised test-mode browser journeys are recorded below; production deployment and customer acceptance remain separate gates. Scheduled capacity reductions must be explicitly cancelled before upgrading.
+
+A different target while an attempt is open returns `409 checkout_in_progress`; it can finish or expire before another target starts. If a pending provider response cannot be reconciled, retain the reservation for operator review. Never rotate an ambiguous attempt merely because it is old.
+
+The patch does not expire legacy Stripe URLs or alter Radar, CVC/AVS rules, subscriptions, payments or existing stored billing snapshots. Requesting 3DS does not guarantee a challenge or protect unsupported cards. A separately reviewed CVC-failure rule and legacy-session reconciliation remain operational work. No new paid product or account-wide address/country block is proposed.
+
+Provider references: [Stripe 3DS behaviour](https://docs.stripe.com/payments/3d-secure/authentication-flow), [card-testing controls](https://docs.stripe.com/disputes/prevention/card-testing), and [Fastify proxy trust](https://fastify.dev/docs/latest/Reference/Server/). These support the integration choices and limitations; they do not prove a live outcome.
+
+## Local verification
+
+Use `make test-billing-checkout-integration` for a disposable PostgreSQL instance, without host ports or persistent volumes. It verifies concurrent requests through independent stores and the real API billing dependency, organisation separation, mutation/checkout fencing, terminal-session resubscription, delayed cancellation, both additive/repeated migrations, fail-closed readiness and a pre-ledger upgrade preserving a paid snapshot. Other existing development stacks are untouched.
+
+Focused API tests cover uncertain responses with identical idempotency, both initial-webhook orders, supported 3DS parameters, owner/session controls, dedicated rate rejection/audit, untrusted forwarding, runtime startup and existing OAuth/MCP isolation. Typecheck and focused lint are required. Local tests do not establish a hosted Stripe/3DS/customer journey or live rollout success.
+
+## Rollout prerequisites
+
+First review the exact local paid-plan candidate and independently verify the hosted authentication/invoice-return journey in an authorised test environment. Reconcile legacy open checkouts through a separately authorised Stripe interface. Review the exact source diff and all four migrations, preserve a verified backup and previous immutable runtime, then apply the migrations before dependent activation. Activate the notification-compatible worker and retire incompatible workers before enabling the new API producer; preserve compatible processing during rollback. Configure only independently verified immediate proxy addresses after checking the listener and header-overwrite boundary. Independently read back deployed provenance, readiness, billing periods and provider delivery; reconcile the known malformed snapshot without replaying a payment. Leave the additive table in place if rolling application code back. No part of this paragraph is permission to execute it.
+
+
+### Scheduled paid plan changes (FR-BIL-09)
+
+`GET /v1/billing/plan-change` returns `{pending_change:null|{schedule_id,target_plan,effective_at,additional_capacity_units}}`. `POST /v1/billing/plan-change/preview` with `{}` returns a signed ten-minute quote containing zero due now, estimated recurring total/tax/currency, effective date and retained units. `POST /v1/billing/plan-change` requires `{confirmation_token}`. `DELETE /v1/billing/plan-change` requires the exact `{schedule_id}`. All require an owner; browser access requires verified email and writes require CSRF. Existing management rate limits apply. These separate responses preserve older strict billing-summary clients.
+
+The plan schedule uses `from_subscription`, stable create/update keys, `end_behavior=release`, no immediate proration and two monthly phases. Current Team prices remain until the authoritative common item-period end. The next phase uses Solo plan/add-on prices and the same purchased quantity, item discounts/tax rates and subscription discounts/tax settings. Current subscriptions must be active, paid, automatic collection, complete/known monthly items and free of conflicting schedules, cancellation or pending payment. No entitlements change on schedule creation. Stripe's current subscription, read through the existing fenced webhook/return paths, remains authoritative.
+
+The shared durable reservation stores plan scheduling/cancellation as `plan_schedule`/`plan_cancel` after additive forward migration 202610220004. Confirmation is bound to current item/period/settings and rechecks the quote before preparing. Prepared requests retain the original quote and commands. Preview can return `resume_required:true` with that exact confirmed quote after a reload; its expiry does not authorise a new operation. Stop unknown replay at 23 hours. Exact applied/released provider state can complete an old reservation without replay. Never delete a reservation merely because it is old.
+
+New downgrade confirmations are bound to the current durable operation revision. The store compares that revision under the organization lock, so a delayed confirm cannot recreate a change after another tab cancelled it. Unprepared and provider-voided operations retain a completed revision when retired; they do not erase confirmation history. Identical prepared retries still recover their original operation and quote.
+
+Cancelling releases only the supplied owned pending schedule after full phase validation; it does not cancel the subscription or remove Team access. Other capacity/plan mutations reject future schedules. After the final managed phase has already applied, the next owner-requested upgrade, downgrade or capacity change may release that exact owned schedule, with a stable key recorded in its operation, before applying its new change. No future phase can be discarded by this path. Renewal and subscription events use the persisted previous plan so both orders send the plan transition confirmation.
+
+Use `debugbundle billing plan-change status|preview`, `schedule --confirmation-token <token>` or `cancel --schedule-id <id>`. The source `billing_plan_change` MCP tool provides the same actions (the independently published 1.17.0 CLI/MCP packages require a later release for these additions); agents must present the price/date/capacity/feature impact and obtain explicit confirmation before scheduling. The synthetic developer API supports this flow without contacting Stripe.
+
+`make billing-stripe-test` is an explicit provider-validation target. It requires an ignored `.local-notes/stripe-test.env` with `STRIPE_TEST_KEY` and `STRIPE_TEST_ACCOUNT`; never put keys in command arguments, tracked files or logs. The runner refuses live credentials, verifies account and test balance before writes, creates only labelled disposable objects and records a private receipt before scoped cleanup. It does not change account/Portal/Radar settings or use existing customers. Provider API results, disposable PostgreSQL integration and hosted browser acceptance are distinct gates. No local result authorises release.
+
+`make billing-stripe-hosted-test` waits for a browser-completed 3DS payment of the original upgrade invoice; it does not pay through the API as a substitute. `make billing-stripe-browser-test` exercises the actual dashboard and billing API against disposable PostgreSQL, with test-only CLI webhook forwarding. It uses an isolated localhost hostname/session, loopback ports 5297/3297 and the existing pinned frontend dependencies. A synthetic account starts free, verifies that first purchase is blocked, then receives an eight-day-old no-card trial in its disposable database before Checkout; the runner follows that organization's exact durable Checkout reservation to discover and clean up the customer it actually created. It verifies paid Checkout return, same-subscription upgrade payment, dashboard focus refresh, signed webhook receipts and valid persisted periods. Unrelated services fail closed and no outbound email worker runs. The runner never uses an existing database, customer, saved payment method or live credential. Private receipts retain fixture identities and cleanup results. Provider-hosted proof does not prove production deployment or customer legitimacy.
+
+
+### Local validation checkpoint — 22 October 2026
+
+The release full unit suite passes 4,609 tests (200 conditional skips), plus 25 disposable PostgreSQL integration cases. Typecheck, changed-source lint/format, coverage gates and dashboard build pass. Test-mode provider checks cover paid/declined/authentication recovery, taxes/discounts/proration, retained capacity, scheduled downgrade renewal, subsequent upgrade and capacity changes. Edge completed a failed then successful 3DS attempt on the same invoice. The actual local dashboard/API/database completed direct paid Checkout with 3DS, return confirmation, a same-subscription upgrade through the separate invoice tab, automatic focus refresh and real signed test webhook delivery. No production or customer-legitimacy conclusion follows.
+
+The existing private image rollout migrates before candidate startup, but promotes API traffic before activating the candidate worker. A first release that produces `billing_lifecycle` messages requires either a prior compatible-worker bridge release or reviewed worker-first orchestration with compatible-worker rollback. Do not execute the unchanged one-step rollout for this candidate. The chosen release sequence deploys the core 1.18.1 compatibility worker before the core 1.19.0 API producer and retains the bridge for rollback. Hosted image installation uses the frozen reviewed lockfile; explicit immediate-proxy trust is configured only after separate boundary approval. Actual deployment evidence belongs in STATUS.md and the release checkpoint.

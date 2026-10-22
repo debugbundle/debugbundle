@@ -1,21 +1,36 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 
-import { SESSION_COOKIE_NAME, readCookieValue, requireMemberToken } from "../../../packages/auth/src/index.js";
+import {
+  SESSION_COOKIE_NAME,
+  readCookieValue,
+  requireMemberToken
+} from "../../../packages/auth/src/index.js";
 import { sanitizeEvent } from "../../../packages/event-normalizer/src/index.js";
 import { isSelfHostMode } from "../../../packages/shared-types/src/index.js";
 import type { EventEnvelope } from "../../../packages/shared-types/src/index.js";
-import type { ProjectAccessRecord, ResolveMemberResult } from "../../../packages/storage/src/index.js";
+import type {
+  ProjectAccessRecord,
+  ResolveMemberResult
+} from "../../../packages/storage/src/index.js";
 import { z } from "zod";
 import type { ApiDependencies } from "./api-types.js";
 import { ImprovementsCursorSchema, IncidentsCursorSchema, LogsCursorSchema } from "./schemas.js";
 
-export type RequestRateLimitBucket = "retrieval-read" | "retrieval-write" | "management-read" | "management-write";
+export type RequestRateLimitBucket =
+  | "retrieval-read"
+  | "retrieval-write"
+  | "management-read"
+  | "management-write"
+  | "billing-checkout-account"
+  | "billing-checkout-ip";
 
 const REQUEST_RATE_LIMIT_PER_MINUTE: Record<RequestRateLimitBucket, number> = {
   "retrieval-read": 300,
   "retrieval-write": 30,
   "management-read": 200,
-  "management-write": 30
+  "management-write": 30,
+  "billing-checkout-account": 5,
+  "billing-checkout-ip": 10
 };
 
 function toRetryAfterSeconds(retryAfterMs: number): string {
@@ -49,7 +64,9 @@ export function serializeCursorTimestamp(rawValue: string): string {
   return normalized ?? rawValue;
 }
 
-export function parseLogsCursor(rawCursor: string | undefined): { occurred_at: string; event_id: string } | null {
+export function parseLogsCursor(
+  rawCursor: string | undefined
+): { occurred_at: string; event_id: string } | null {
   if (rawCursor === undefined) {
     return null;
   }
@@ -66,7 +83,10 @@ export function parseLogsCursor(rawCursor: string | undefined): { occurred_at: s
     return null;
   }
 
-  const parsed = LogsCursorSchema.safeParse({ occurred_at: normalizedOccurredAt, event_id: eventId });
+  const parsed = LogsCursorSchema.safeParse({
+    occurred_at: normalizedOccurredAt,
+    event_id: eventId
+  });
   if (!parsed.success) {
     return null;
   }
@@ -74,7 +94,9 @@ export function parseLogsCursor(rawCursor: string | undefined): { occurred_at: s
   return parsed.data;
 }
 
-export function parseIncidentsCursor(rawCursor: string | undefined): { last_seen_at: string; incident_id: string } | null {
+export function parseIncidentsCursor(
+  rawCursor: string | undefined
+): { last_seen_at: string; incident_id: string } | null {
   if (rawCursor === undefined) {
     return null;
   }
@@ -91,7 +113,10 @@ export function parseIncidentsCursor(rawCursor: string | undefined): { last_seen
     return null;
   }
 
-  const parsed = IncidentsCursorSchema.safeParse({ last_seen_at: normalizedLastSeenAt, incident_id: incidentId });
+  const parsed = IncidentsCursorSchema.safeParse({
+    last_seen_at: normalizedLastSeenAt,
+    incident_id: incidentId
+  });
   if (!parsed.success) {
     return null;
   }
@@ -99,7 +124,9 @@ export function parseIncidentsCursor(rawCursor: string | undefined): { last_seen
   return parsed.data;
 }
 
-export function parseImprovementsCursor(rawCursor: string | undefined): { last_detected_at: string; improvement_id: string } | null {
+export function parseImprovementsCursor(
+  rawCursor: string | undefined
+): { last_detected_at: string; improvement_id: string } | null {
   if (rawCursor === undefined) {
     return null;
   }
@@ -116,7 +143,10 @@ export function parseImprovementsCursor(rawCursor: string | undefined): { last_d
     return null;
   }
 
-  const parsed = ImprovementsCursorSchema.safeParse({ last_detected_at: normalizedLastDetectedAt, improvement_id: improvementId });
+  const parsed = ImprovementsCursorSchema.safeParse({
+    last_detected_at: normalizedLastDetectedAt,
+    improvement_id: improvementId
+  });
   if (!parsed.success) {
     return null;
   }
@@ -179,9 +209,12 @@ export async function enforceRequestRateLimit(
     return true;
   }
 
-  await reply.header("Retry-After", toRetryAfterSeconds(rateLimit.retry_after_ms)).status(429).send({
-    error: "rate_limited"
-  });
+  await reply
+    .header("Retry-After", toRetryAfterSeconds(rateLimit.retry_after_ms))
+    .status(429)
+    .send({
+      error: "rate_limited"
+    });
   return false;
 }
 
@@ -232,7 +265,10 @@ export async function requireRateLimitedOwnerMemberAuth(
 export async function requireRateLimitedProjectAccess(
   request: FastifyRequest,
   reply: FastifyReply,
-  dependencies: Pick<ApiDependencies, "memberAuth" | "webAuth" | "authRateLimiter" | "projectManagement">,
+  dependencies: Pick<
+    ApiDependencies,
+    "memberAuth" | "webAuth" | "authRateLimiter" | "projectManagement"
+  >,
   input: {
     bucket: RequestRateLimitBucket;
     projectId: string;
@@ -273,16 +309,13 @@ export function isSharedProjectAccessSuspended(
 export async function resolveBrowserSession(
   cookieHeader: string | undefined,
   dependencies: Pick<ApiDependencies, "webAuth">
-): Promise<
-  | {
-      user_id: string;
-      email: string;
-      organization_id: string;
-      email_verified_at: string | null;
-      role: "owner" | "member";
-    }
-  | null
-> {
+): Promise<{
+  user_id: string;
+  email: string;
+  organization_id: string;
+  email_verified_at: string | null;
+  role: "owner" | "member";
+} | null> {
   if (dependencies.webAuth === undefined) {
     return null;
   }

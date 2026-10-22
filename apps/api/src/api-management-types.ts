@@ -1,3 +1,8 @@
+import type { BillingPlanChangeManagement } from "../../../packages/billing-client/src/plan-change.js";
+import type { CapacityPaymentRequired } from "../../../packages/billing/src/stripe-capacity-payment.js";
+import type { UpgradePreviewResult } from "../../../packages/billing/src/stripe-upgrade-preview.js";
+import type { CapacityOperationError } from "../../../packages/billing/src/stripe-capacity-operations.js";
+import type { CheckoutLinkResult } from "./stripe-checkout.js";
 import type {
   ImprovementSettings,
   ImprovementSettingsUpdate,
@@ -176,12 +181,18 @@ export interface ApiManagementDependencies {
           target_plan: "solo" | "team";
           now: string;
         }): Promise<BillingSummaryRecord | "billing_not_found" | "trial_unavailable">;
+        getPlanChange?: BillingPlanChangeManagement["getPlanChange"];
+        previewPlanChange?: BillingPlanChangeManagement["previewPlanChange"];
+        schedulePlanChange?: BillingPlanChangeManagement["schedulePlanChange"];
+        cancelPlanChange?: BillingPlanChangeManagement["cancelPlanChange"];
+        previewUpgrade?(input: { organization_id: string }): Promise<UpgradePreviewResult>;
         createCheckoutLink(input: {
           organization_id: string;
           billing_email: string;
           current_plan: "free" | "solo" | "team";
           target_plan: "solo" | "team";
-        }): Promise<{ url: string } | null>;
+          confirmation_token?: string;
+        }): Promise<CheckoutLinkResult>;
         confirmCheckoutSession?(input: {
           organization_id: string;
           session_id: string;
@@ -202,35 +213,16 @@ export interface ApiManagementDependencies {
           organization_id: string;
           target_additional_capacity_units: number;
           now: string;
-        }): Promise<
-          | BillingSummaryRecord
-          | "billing_not_configured"
-          | "billing_not_found"
-          | "no_active_subscription"
-          | "invalid_target_quantity"
-          | "pending_capacity_reduction_exists"
-        >;
+        }): Promise<BillingSummaryRecord | CapacityPaymentRequired | CapacityOperationError>;
         scheduleCapacityReduction?(input: {
           organization_id: string;
           target_additional_capacity_units: number;
           now: string;
-        }): Promise<
-          | BillingSummaryRecord
-          | "billing_not_configured"
-          | "billing_not_found"
-          | "no_active_subscription"
-          | "invalid_target_quantity"
-        >;
+        }): Promise<BillingSummaryRecord | CapacityPaymentRequired | CapacityOperationError>;
         cancelCapacityReduction?(input: {
           organization_id: string;
           now: string;
-        }): Promise<
-          | BillingSummaryRecord
-          | "billing_not_configured"
-          | "billing_not_found"
-          | "no_active_subscription"
-          | "capacity_reduction_not_found"
-        >;
+        }): Promise<BillingSummaryRecord | CapacityPaymentRequired | CapacityOperationError>;
       }
     | undefined;
   availabilityCheckManagement?:
