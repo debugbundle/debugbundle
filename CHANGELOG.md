@@ -6,6 +6,12 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.18.1] - 2026-10-22
+
+### Fixed
+
+- Accept bounded billing lifecycle email deliveries through the existing worker transport and retry path. This compatibility release preserves the existing billing API producer and schema so a subsequent billing rollout can safely transition worker generations.
+
 ## [1.18.0] - 2026-10-19
 
 ### Added

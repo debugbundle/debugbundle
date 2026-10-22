@@ -17,7 +17,8 @@ export type PostgresOperationalEmailDeliveryKind =
   | "trial_started"
   | "trial_ending_soon"
   | "trial_expired"
-  | "trial_converted";
+  | "trial_converted"
+  | "billing_lifecycle";
 
 export interface PostgresOperationalEmailDeliveryRecord
   extends Omit<OperationalEmailDeliveryRecord, "project_id" | "kind"> {

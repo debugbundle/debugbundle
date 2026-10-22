@@ -10,6 +10,7 @@ import {
   renderWebhookAutoDisabledEmail,
   type EmailTransport
 } from "../../../packages/email/src/index.js";
+import { BillingLifecycleEmailPayloadSchema } from "../../../packages/billing/src/billing-email-payload.js";
 import type { RuntimeLogger } from "../../../packages/runtime-logger/src/index.js";
 import {
   getAllowanceLimitBehavior,
@@ -270,6 +271,10 @@ export async function processNextDeliverOperationalEmailJob(
           billingUrl,
           ...(brandMarkUrl === undefined ? {} : { brandMarkUrl })
         });
+        break;
+      }
+      case "billing_lifecycle": {
+        rendered = BillingLifecycleEmailPayloadSchema.parse(delivery.payload);
         break;
       }
       case "trial_converted": {
