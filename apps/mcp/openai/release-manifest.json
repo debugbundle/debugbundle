@@ -3,7 +3,7 @@
   "plugin_version": "1.0.2",
   "evidence_state": "local_connection_ready",
   "source": {
-    "commit": "64e44f3b0b2b4cca366d4be36daffbcd90e58e2c",
+    "commit": "cbac080233e839fa4c11e11c50df44e12b128acf",
     "tree_clean": true,
     "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
@@ -11,7 +11,7 @@
     "resource_origin": "https://mcp.debugbundle.com",
     "mcp_endpoint": "https://mcp.debugbundle.com/mcp",
     "oauth_issuer": "https://api.debugbundle.com",
-    "api_image_digest": "sha256:3801ac0694a04c0510faf158c25ee83185aa36ad20465149ed59f493f11ef83b"
+    "api_image_digest": "sha256:977b9a0d804318662d808cf68c5c39946794b2e14723136c0676c6b3aeaa9309"
   },
   "registered_connection_id": "plugin_asdk_app_6a99ba6c1e7881919091a592738692c6",
   "package": {
@@ -41,7 +41,7 @@
       "post-launch-article-draft.md": "6ce0f34a4ce8261eb4a0f10e0f3c5fcc89de9677ffdcd988075ed296d97db7cd",
       "registration-diagnostics.md": "33c395f732d4cdaf1b082c5131cd09ed1fd626c3e926cf68c62afe158cc8d531",
       "release-notes.md": "0c9e4014497417008a0bda652f4f883f724e8b2002d3f525858585ac06c52cfa",
-      "review-checklist.md": "c0f1d4f6ef0e334df0159759afd73df91c1a092f830129a8a1924b3700972d05",
+      "review-checklist.md": "eba6ef8ee5167edf6f44409aba7c136e11805278d665209ac296bfea3bd6c49a",
       "starter-prompts.json": "b5d6dba8150a473e1658f3815e93b8cb2ca7b54108d80ed1b9a3b15ca135e01c",
       "test-cases.json": "91e7f69c79658848f4ad3fa3b5cff869263e8ea83af2b249b8e93a08fddc523c",
       "tool-scan.json": "ff38eb57f13fc704659de6e039c2cdcc1dddc2472a6341132cd0defbe4b8fc48"
