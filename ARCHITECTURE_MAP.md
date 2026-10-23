@@ -41,6 +41,8 @@ durable continuation; million-visit load testing is deferred by the owner.
 
 # ARCHITECTURE MAP — DebugBundle
 
+Maintenance release (2026-10-23, core 1.19.1/site 1.6.8): `apps/api/src/client-ip.ts` rejects missing/non-string peers in the exact immediate-hop proxy callback; `apps/web/src/pages/billing-page.tsx` composes the existing purchase notice only while shared eligibility produces a future unlock time. In the site companion, `src/components/product-cta.tsx` owns reusable CTA copy/actions and theme-aware presentation, mounted once after article content by `app/(blog)/blog/[...slug]/page.tsx`. No new schema, domain service or public interface is introduced. See `spec/maintenance-release-20261023.md` for deployment identities and evidence.
+
 Local UI fixtures live in `scripts/dev-mock/`: synthetic base records, rolling dates,
 filtered pagination and in-memory mutation simulation. `management.ts`, `billing.ts`
 and `analytics.ts` cover dashboard management/provider fixtures, local billing

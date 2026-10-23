@@ -41,6 +41,8 @@ durable continuation; million-visit load testing is deferred by the owner.
 
 # SYSTEM OVERVIEW — DebugBundle
 
+Current maintenance release (2026-10-23): core 1.19.1 and site 1.6.8 are published and live. Missing socket-peer addresses fail closed without crashing; the existing billing notice appears only during a started trial's purchase wait. The shared site `ProductCta` is mounted once by the blog layout. Reviewer expiry was extended with the existing credential at the owner's request. Production health, source/image identity, retained rollback and zero active incidents are independently verified; OpenAI 1.0.2 portal publication remains separate. See `spec/maintenance-release-20261023.md`. Earlier dated release entries are historical.
+
 Released interface-parity remediation is tracked in `spec/interface-parity-remediation.md`
 and `spec/interface-parity-matrix.md`. The product exposes audited dashboard rule,
 webhook, analytics, agent-credential and incident-evidence operations through existing

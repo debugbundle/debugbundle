@@ -196,7 +196,7 @@ Checkout validation must also enforce trial conversion rules:
 - Active Team trial: allow paid Team checkout only.
 - Active no-card trials are not required to expire first, but the first paid purchase must wait seven full days from the immutable trial start.
 
-### First-purchase restriction (local candidate)
+### First-purchase restriction
 
 The organisation-locked Checkout claim checks the shared elapsed-time policy before creating, returning or replaying any Checkout request. Missing, malformed or future trial starts fail closed with `409 paid_purchase_locked`. The server uses its own clock; browser time cannot grant eligibility. A processed, organisation-scoped `invoice.paid` receipt exempts previously paid accounts. Customer IDs, incomplete/terminal subscriptions and trial conversion timestamps alone are insufficient proof. The existing provider-terminal check is still required before resubscription.
 
@@ -204,7 +204,7 @@ The billing page reuses CalloutCard and Button and shows the exact local unlock 
 
 Paid plan management and provider-confirmed payment/webhook reconciliation continue normally. Blocked attempts stay reserved, including uncertain or completed attempts; the policy never rotates them on age. Existing hosted Stripe URLs remain usable until Stripe expires them and cannot be revoked by this creation gate. Any account hold, refund, subscription cancellation, legacy-session reconciliation or release requires its own authorised operational action. Account age can be waited out and does not establish trust.
 
-### 4.2a Checkout safety candidate (not deployed)
+### 4.2a Checkout safety
 
 `billing_checkout_attempts` holds one organization-scoped attempt, fixed Stripe request parameters and its eventual session ID. A short organization row lock serializes reservations; no provider call holds that transaction. Persist the reservation before any Stripe call. Retrying must reuse the request and `billing-checkout:<attempt-id>` key. Return the same open session; completed/uncertain attempts remain reserved. Only a Stripe-confirmed expired session, or a completed session whose exact linked subscription is confirmed `canceled`/`incomplete_expired`, can be retired with an attempt/session compare-and-set. The cached internal `canceled` state alone is insufficient: paused subscriptions must not start another purchase. A different plan while the reservation is open returns `409 checkout_in_progress`; a saved session can still be checked for expiry and then replaced with the requested plan. An unsaved different-plan attempt remains reserved. A pending reservation that cannot be reconciled needs operator review, not a new charge attempt.
 
@@ -735,16 +735,18 @@ Billing webhook processing triggers the correct lifecycle emails for:
 - Auth and session model: `/spec/auth-architecture.md`
 - Domain invariants for billing enforcement: `/rules/domain-invariants.md`
 
-### Current-period selection correction (local candidate)
+### Current-period selection correction
 
 Webhook and checkout-return synchronization share `stripe-billing-period.ts`. Read current subscription-item periods first (Clover), then legacy top-level subscription fields, then valid non-proration invoice lines and invoice envelope fields. Do not override the result with an `invoice.paid` envelope: an initial invoice can have equal top-level start/end. Retrieve the current subscription and preserve the same real month in either webhook order. This corrects future snapshots; existing malformed periods need an explicit, scoped reconciliation after a verified release, with no payment replay.
 
 
 ---
 
-## Local checkout and period hardening — 22 October 2026
+## Local checkout and period hardening — 22 October 2026 (historical checkpoint)
 
-This is a local, uncommitted candidate originating from hosted source `a4e0ffcab75346818bbab06b0386cb9bffc48a56` and transferred onto current main `fc5f3b1dab0f3cea4cd1efd80cbca1cc1160755d` with newer documentation preserved. It is not a release receipt. The owner explicitly requires local work and separate consent before publication or deployment. Do not run production billing canaries or act on customer accounts from this document.
+The checkout/period policy below subsequently shipped in core 1.19.0. Core 1.19.1 corrects missing-peer handling and trial-only notice visibility; its production receipt is `spec/maintenance-release-20261023.md`. This paragraph preserves the earlier preparation state and does not describe the current deployment.
+
+At this checkpoint, this was a local, uncommitted candidate originating from hosted source `a4e0ffcab75346818bbab06b0386cb9bffc48a56` and transferred onto current main `fc5f3b1dab0f3cea4cd1efd80cbca1cc1160755d` with newer documentation preserved. It is not a release receipt. The owner explicitly requires local work and separate consent before publication or deployment. Do not run production billing canaries or act on customer accounts from this document.
 
 ## Scope and behaviour
 

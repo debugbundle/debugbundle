@@ -1,4 +1,14 @@
-# Approved release in progress — 2026-10-23
+# Production release complete — 2026-10-23
+
+Core **1.19.1** and site **1.6.8** are published and deployed from `86c134f1885e8baade8b9ac5c0f1479f13f1304a` and `2cc93191da67c0f52f0d28e7972b6ab2a4e896ee`. Exact-source core, CLI compatibility, site, canonical-release and hosted-rollout workflows pass. Independent runtime readback confirms both containers match the source/version and immutable image digest, are healthy with zero restarts, and have active worker processing. The migration gate reports zero new migrations and 63 already applied. The previous stable runtime and both images are retained and validated. See `spec/maintenance-release-20261023.md` for source identities, checks and limits.
+
+All 28 live blog posts have the one shared centred CTA, docs before the primary homepage action, the important themed foreground and no eyebrow. Live SPA bytes identify the approved core source; billing notice visibility has regression coverage. The site release also pins Next.js 16.4.1 after its independent CI audit found security advisories; the patched site audit, 41 tests, build and typecheck pass. Core's existing six low and 31 moderate audit findings remain below the high-severity release gate.
+
+The owner chose to preserve the current reviewer login and extend its expiry to **2026-11-23T07:53:34.795Z**. Only the expiry changed; persisted configuration and an outside-network POST-body login/synthetic-boundary smoke pass. The callback was not followed and no fresh token exchange or full reviewer-case execution is claimed. Both remaining incidents were resolved at **20:42:30 UTC** after deployment/renewal proof; independent project-wide active readback is empty. The saved readiness monitor passes HTTP 200 with zero failures. Existing three narrow noise rules remain; broad suppression was declined because it would hide future genuine failures.
+
+OpenAI 1.0.2 candidate source and deterministic packaging are included; the frozen 23-tool contract is unchanged. Portal submission/publication remain pending the accessible video, full reviewer-case evidence, imported annotation review, override-disabled reload and owner approval. No consumer product was changed. Documentation/provenance follow-up commits do not change the deployed source identities above. Earlier local/in-progress entries below are historical checkpoints.
+
+# Approved release in progress — 2026-10-23 (historical checkpoint)
 
 The owner explicitly authorised committing and pushing the complete reviewed DebugBundle batch and deploying production. Core 1.19.1 and site 1.6.8 include the final CTA contrast, alignment, action-order and eyebrow refinements, plus the OpenAI 1.0.2 candidate source and packaging. The reviewed file hashes match, all three repositories are current on `main`, and preflight production API/worker are healthy with zero restarts on the verified 1.19.0 source. Release commits, exact-commit CI, hosted rollout and independent production readback are in progress. OpenAI portal submission/publication and the pending reviewer credential-renewal choice retain their separate gates.
 
