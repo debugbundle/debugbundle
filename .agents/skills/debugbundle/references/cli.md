@@ -2,7 +2,7 @@
 
 ## Setup
 
-- `debugbundle setup [--non-interactive] [--json]`
+- `debugbundle setup [--agent <codex|claude-code|gemini-cli|muse-code|none>]... [--non-interactive] [--json]`
 - `debugbundle doctor [--check-relay] [--json]`
 - `debugbundle validate [--fix] [--json]`
 - `debugbundle ingest <file> --format <format> [--json]`
@@ -45,6 +45,7 @@ Use probes for targeted evidence gathering when bundle context is insufficient. 
 ## Notifications
 
 - `debugbundle alert list --project-id <id> [--limit <n>] [--auth-file <path>] [--json]`
+- `debugbundle alert groups --project-id <id> [--limit <n>] [--cursor <cursor>] [--auth-file <path>] [--json]` lists safe alert delivery and email digest groups; `debugbundle alert group <direct|email_digest> <group-id> --project-id <id> [--cursor <cursor>] --json` pages their incident IDs.
 - `debugbundle alert create --project-id <id> --channel <channel> --condition <condition> [--service-id <id>] [--severity-min <level>] [--cooldown <seconds>] --config-json <json> [--is-enabled <true|false>] [--auth-file <path>] [--json]`
 - `debugbundle alert update <alert-id> --project-id <id> [--service-id <id|null>] [--channel <channel>] [--condition <condition>] [--severity-min <level|null>] [--cooldown <seconds>] [--config-json <json|null>] [--is-enabled <true|false>] [--auth-file <path>] [--json]`
 - `debugbundle alert delete <alert-id> --project-id <id> [--auth-file <path>] [--json]`
@@ -127,23 +128,17 @@ Use availability-check commands for hosted endpoint reachability. Prefer `test` 
 
 ## Incident Hygiene
 
-Resolve incidents after a fix is verified or after an intentional smoke, dogfood, or verification incident has served its purpose.
+With explicit user authorization, resolve incidents after a fix is verified or after an intentional smoke, dogfood, or verification incident has served its purpose. A title or passing test alone is not authorization.
 Leave incidents open when the failure is still live or the fix is not yet confirmed.
 
 ### Smoke-Test Cleanup Recipe
 
-Review open incidents and resolve the intentionally generated ones:
+For explicitly authorized cloud cleanup, list the intended project, verify exact record membership and current state, resolve only the selected IDs, then read back those same records:
 
 ```bash
-debugbundle incidents --status active --json
-debugbundle resolve <incident-id> [incident-id ...]
-debugbundle incidents --status active --json
+debugbundle incidents --source cloud --project-id <project-id> --status all --limit 25 --json
+debugbundle resolve <incident-id> [incident-id ...] --source cloud --json
+debugbundle incidents --source cloud --project-id <project-id> --status all --limit 25 --json
 ```
 
-If you want a title-based batch cleanup and have `jq` available:
-
-```bash
-debugbundle incidents --status active --json \
-  | jq -r '.incidents[] | select(.title | test("smoke test|dogfood|verification|synthetic"; "i")) | .incident_id' \
-  | xargs debugbundle resolve
-```
+Follow bounded pagination until the selected records are found; inspect those IDs to verify uncertain outcomes before retrying. For local cleanup, explicitly use `--source local` without a cloud project flag. Never pipe title matches directly into lifecycle mutations.

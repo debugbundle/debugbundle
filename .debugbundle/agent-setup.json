@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "selected_agents": [],
+  "selection_declared": false,
+  "canonical": {
+    "references/cli.md": "7d005af6f938c709dfbfc4049ab7816ca55c4305108ab82381b439b33144e495",
+    "references/mcp.md": "3dbaaa133720131207c24997a70db494c2482bee952a105facbeb49c17759a51",
+    "references/bundle-schema.md": "5153042a4dbfbaf433de1c55b75448c7adaef74f4c380e9ecd29ca79c3dcbeb3",
+    "references/profile-enrichment.md": "424a207cf49561457bdad67c5b7bdeb343b0daa74e286f0e41e8440bc008a72b",
+    "assets/schemas/improvement-analysis.json": "7eccd1cbf8044ebfa38dc9d941ad6fb612082f54fc3a67efec00324eb0d02b83",
+    "assets/schemas/performance-analysis.json": "1c24f8ad8915d379a2c6e63537babf09bc1eccf76e7b52b60d455d8bc9d2f8ee",
+    "evals/evals.json": "c524e0806635a5b89310a67dfd307350d4ded2a1beda3ebc60d6a6f36254d3c9",
+    "SKILL.md": "b60c3cd92b2e71e4f73db6026106109da79b346b1316b7d1bd64bfeba4e5a790"
+  },
+  "instructions": {}
+}

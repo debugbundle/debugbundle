@@ -6,6 +6,15 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.19.1] - 2026-10-23
+
+### Fixed
+
+- The billing paid-unlock notice appears only after a trial has started and while the first-payment waiting period remains locked.
+- API proxy trust rejects missing or non-string socket peer addresses without throwing, preserving the exact immediate-peer allowlist and preventing disconnected requests from causing a secondary HTTP 500.
+- OpenAI plugin candidate 1.0.2 explicitly selects CIMD OAuth registration in the portal ZIP, retaining the existing `private_key_jwt` provider policy, scopes, skill and twenty-three read-only tools. The owner observed successful portal authorization and a clean tool scan; reviewer execution, submission and publication remain separate gates.
+- Added a local OpenAI registration diagnostic archive to test a distinct plugin identity without changing the canonical release or hosted authentication; an unqualified portable-format experiment is rejected.
+
 ## [1.19.0] - 2026-10-22
 
 ### Added

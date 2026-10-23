@@ -39,6 +39,8 @@ All authentication-adjacent endpoints (login, signup, password reset, verificati
 
 Forwarded client IPs are disabled by default. `API_TRUSTED_PROXY_IPS` may name at most 16 explicit immediate-peer IPs; wildcards, booleans, CIDR-wide trust and arbitrary further hops are rejected. Before enabling it, verify the API listener is private to the managed proxy and the proxy overwrites untrusted forwarding headers. Direct client forwarding must never bypass shared IP admission. Hosted Checkout additionally uses organization and client-IP limits, a durable attempt and provider idempotency; IP equality alone never proves shared identity or fraud.
 
+An unavailable or non-string socket peer address must return an untrusted decision without throwing. A disconnected request must not recover its identity from untrusted forwarding headers; missing-peer tests must exercise the HTTP request boundary as well as the trust callback.
+
 Prepared subscription upgrades and capacity mutations share a durable organization reservation and immutable provider commands. Stop ambiguous replays before provider idempotency retention expires; never rotate potentially charged work on age alone. Paid upgrades must preserve purchased capacity and gate new entitlements on applied Stripe state. A failed pending upgrade must not trigger base-plan dunning. Cached canceled state alone cannot authorize another subscription: verify the exact provider subscription is terminal and fence cancellation against replacement subscriptions and newer checkout reservations.
 
 ### SEC-05: CSRF Protection On Session Mutations

@@ -1,6 +1,6 @@
 # DebugBundle OpenAI Plugin Listing
 
-Version: 1.0.1
+Version: 1.0.2
 Evidence state: production candidate with Developer Mode connection and bounded live-client evidence; not submitted, approved, published, or directory-discoverable
 
 ## Portal fields
@@ -17,7 +17,9 @@ Evidence state: production candidate with Developer Mode connection and bounded 
 - MCP URL: `https://mcp.debugbundle.com/mcp`
 - Availability: all countries supported by the OpenAI submission portal
 
-The upload artifact is the generated `debugbundle-openai-plugin-1.0.1.zip`, not the local source folder. It contains a remote `.mcp.json` and no `.app.json`. The old unpublished 1.0.0 form-created draft blocked ZIP updates: **Upload new version** first required its assigned internal name and then rejected the matching-name package with “Publish the existing MCP app before updating its plugin ZIP”; a fresh main-page attempt also matched that draft. The owner has now uploaded the ZIP as a new 1.0.1 draft with internal `plugin.json` name `debugbundle` and public `interface.displayName` `DebugBundle`; the portal also imported the skill and production MCP URL. The generated manifest imports five positive and three negative review cases. Enter private reviewer access and the accessible demo-recording URL through the secure review form; neither belongs in the ZIP unless a public recording URL is deliberately added to the manifest. Skill scanning, domain verification, OAuth connection, tool scanning, and review information remain separate portal checks.
+The upload artifact is the generated `debugbundle-openai-plugin-1.0.2.zip`, not the local source folder. It contains a remote `.mcp.json` with explicit OAuth/CIMD registration and no `.app.json`. The earlier 1.0.1 draft passed domain verification but failed to connect because the portal expected a pre-defined OAuth client ID. Upload 1.0.2 as a new version, inspect the saved `extensions["com.openai"].auth.client.mode: "cimd"` setting, and then connect. If the old registration remains locked, use a fresh **With MCP** draft and check domain-verification ownership before changing a challenge token. The old form-created 1.0.0 draft also rejected ZIP updates; preserve historical draft evidence until a replacement is checked. Keep internal package name `debugbundle` and public display name `DebugBundle`.
+
+The generated manifest imports five positive and three negative review cases. Enter private reviewer access and the accessible demo-recording URL through the secure review form; neither belongs in the ZIP unless a public recording URL is deliberately added to the manifest. Skill scanning, domain verification, OAuth connection, tool scanning, and review information remain separate portal checks.
 
 ## Long description
 

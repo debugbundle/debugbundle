@@ -1,4 +1,13 @@
-# DebugBundle 1.0.1
+# DebugBundle 1.0.2
+
+Portal-package authentication correction.
+
+- Explicitly declares OAuth with `client.mode: "cimd"` under the remote server's `extensions["com.openai"].auth` in the generated `.mcp.json`.
+- Includes no client ID, client secret, bearer header, or endpoint override; discovery and the approved CIMD identity continue to govern authentication.
+- Retains the existing `private_key_jwt` provider policy, OAuth scopes, twenty-three read-only tools, wire contract `1.0.0`, and 1.0.1 skill guidance.
+- Owner-supplied source revealed that the portal's CIMD predicate rejected `private_key_jwt`-only metadata before saving. A temporary local predicate correction cleared that portal blocker. Owner screenshots now show configured/authorized MCP, verified domain, all twenty-three expected tools and no findings in the latest scan. The provider policy is unchanged. Skill checks pass; reviewer information, review and publication remain separate gates.
+
+## 1.0.1
 
 Skill-routing correction for hosts where the read-only OpenAI connection and the separately authenticated DebugBundle CLI coexist.
 

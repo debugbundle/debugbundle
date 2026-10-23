@@ -33,8 +33,8 @@ export const reviewerFixturePath = join(
 export const dataMapPath = join(repoRoot, "contracts", "openai-plugin-v1-data-map.md");
 export const releaseManifestPath = join(openAiRoot, "release-manifest.json");
 
-const expectedVersion = "1.0.1";
-// Skill-only patch releases retain the independently frozen MCP wire contract.
+const expectedVersion = "1.0.2";
+// Skill and package-authentication patches retain the independently frozen MCP wire contract.
 const expectedContractVersion = "1.0.0";
 const expectedResource = "https://mcp.debugbundle.com";
 const expectedEndpoint = `${expectedResource}/mcp`;
@@ -62,6 +62,7 @@ const requiredSubmissionFiles = [
   "release-notes.md",
   "portal-review.json",
   "review-checklist.md",
+  "registration-diagnostics.md",
   "starter-prompts.json",
   "test-cases.json",
   "cli-handoff-cases.json"
@@ -607,7 +608,22 @@ export function portalPluginArchiveEntries() {
   entries.push({
     path: "debugbundle/.mcp.json",
     bytes: Buffer.from(
-      `${JSON.stringify({ mcpServers: { debugbundle: { url: expectedEndpoint } } }, null, 2)}\n`,
+      `${JSON.stringify(
+        {
+          mcpServers: {
+            debugbundle: {
+              url: expectedEndpoint,
+              extensions: {
+                "com.openai": {
+                  auth: { type: "oauth", client: { mode: "cimd" } }
+                }
+              }
+            }
+          }
+        },
+        null,
+        2
+      )}\n`,
       "utf8"
     )
   });

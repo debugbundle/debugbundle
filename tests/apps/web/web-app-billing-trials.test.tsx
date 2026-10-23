@@ -68,6 +68,7 @@ describe("web app - billing trial flows", () => {
   });
 
   it("starts the requested free trial from billing and refreshes the page state", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-06-04T00:00:00.000Z"));
     const user = userEvent.setup();
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
@@ -129,10 +130,12 @@ describe("web app - billing trial flows", () => {
     render(<App initialEntries={["/billing?trial=team"]} />);
 
     expect(await screen.findByText(/team trial ready to start/i)).toBeInTheDocument();
+    expect(screen.queryByText(/paid subscriptions unlock/i)).toBeNull();
     await user.click(screen.getByRole("button", { name: /start team trial/i }));
 
     expect(await screen.findByText(/team trial started successfully/i)).toBeInTheDocument();
     expect(await screen.findByText(/30 days left in your team trial/i)).toBeInTheDocument();
+    expect(screen.getByText(/paid subscriptions unlock on/i)).toBeInTheDocument();
   });
 
   it("shows paid conversion only when the requested free trial was already used", async () => {
@@ -227,10 +230,8 @@ describe("web app - billing trial flows", () => {
         .getAllByRole("button", { name: /upgrade to solo/i })
         .every((button) => button.hasAttribute("disabled"))
     ).toBe(true);
-    expect(screen.getByRole("link", { name: "Contact us" })).toHaveAttribute(
-      "href",
-      "https://debugbundle.com/contact/"
-    );
+    expect(screen.getByText(/contact us for help subscribing/i)).toBeInTheDocument();
+    expect(screen.queryByText(/paid subscriptions unlock/i)).toBeNull();
   });
 
   it("shows specific trial-start errors from the billing page", async () => {

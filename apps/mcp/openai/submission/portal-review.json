@@ -55,7 +55,7 @@
       }
     ]
   },
-  "release_notes": "DebugBundle 1.0.1 adds skill guidance for routing explicitly authorized changes through a separately installed and authenticated DebugBundle CLI. Its 23 hosted MCP tools, OAuth scopes, and read-only contract remain unchanged.",
+  "release_notes": "DebugBundle 1.0.2 explicitly selects CIMD OAuth client registration in the portal package. It retains the 1.0.1 CLI handoff guidance and the existing 23 hosted MCP tools, OAuth scopes, private_key_jwt authentication, and read-only contract.",
   "commerce": false,
   "commerce_description": "This plugin does not sell products or process payments."
 }

@@ -49,18 +49,17 @@ function preview(activeTrial: boolean, now = "2026-10-22T15:00:00Z") {
   return fetchMock;
 }
 
-it("guides a first-time Free account to its no-card trial and contact without issuing Checkout", async () => {
+it("offers a first-time Free account its trial without showing a paid-unlock notice or issuing Checkout", async () => {
   const fetchMock = preview(false);
   expect(
-    await screen.findByText(/paid subscriptions unlock after the first seven days of your trial/i)
+    await screen.findByText(/start a paid-plan trial before you subscribe/i)
   ).toBeInTheDocument();
+  expect(screen.queryByText("Paid subscriptions")).toBeNull();
+  expect(screen.queryByText(/paid subscriptions unlock/i)).toBeNull();
+  expect(screen.queryByRole("link", { name: "Contact us" })).toBeNull();
   expect(screen.getByRole("button", { name: "Start Solo trial" })).toBeEnabled();
   expect(screen.getByRole("button", { name: "Upgrade to Solo" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Upgrade to Team" })).toBeDisabled();
-  expect(screen.getByRole("link", { name: "Contact us" })).toHaveAttribute(
-    "href",
-    "https://debugbundle.com/contact/"
-  );
   expect(
     fetchMock.mock.calls.some(([url]) => requestUrl(url).endsWith("/v1/billing/checkout"))
   ).toBe(false);
@@ -69,6 +68,10 @@ it("guides a first-time Free account to its no-card trial and contact without is
 it("shows the exact unlock date, locks both trial purchase choices and refreshes eligibility on focus", async () => {
   preview(true);
   expect(await screen.findByText(/paid subscriptions unlock on/i)).toHaveTextContent("2026");
+  expect(screen.getByRole("link", { name: "Contact us" })).toHaveAttribute(
+    "href",
+    "https://debugbundle.com/contact/"
+  );
   expect(screen.getByRole("button", { name: "Convert to Solo paid" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Upgrade to Team" })).toBeDisabled();
   vi.setSystemTime(new Date("2026-10-29T15:00:00Z"));
@@ -76,7 +79,17 @@ it("shows the exact unlock date, locks both trial purchase choices and refreshes
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "Convert to Solo paid" })).toBeEnabled()
   );
-  expect(screen.queryByText(/paid subscriptions unlock on/i)).toBeNull();
+  expect(screen.queryByText("Paid subscriptions")).toBeNull();
+  expect(screen.queryByText(/paid subscriptions unlock/i)).toBeNull();
+  expect(screen.queryByRole("link", { name: "Contact us" })).toBeNull();
+});
+
+it("omits the paid-unlock notice when loading a trial whose payment wait has already elapsed", async () => {
+  preview(true, "2026-10-29T15:00:00Z");
+  expect(await screen.findByRole("button", { name: "Convert to Solo paid" })).toBeEnabled();
+  expect(screen.queryByText("Paid subscriptions")).toBeNull();
+  expect(screen.queryByText(/paid subscriptions unlock/i)).toBeNull();
+  expect(screen.queryByRole("link", { name: "Contact us" })).toBeNull();
 });
 
 it("automatically refreshes and unlocks while the billing page stays open", async () => {
@@ -87,4 +100,7 @@ it("automatically refreshes and unlocks while the billing page stays open", asyn
     () => expect(screen.getByRole("button", { name: "Convert to Solo paid" })).toBeEnabled(),
     { timeout: 2500 }
   );
+  expect(screen.queryByText("Paid subscriptions")).toBeNull();
+  expect(screen.queryByText(/paid subscriptions unlock/i)).toBeNull();
+  expect(screen.queryByRole("link", { name: "Contact us" })).toBeNull();
 });

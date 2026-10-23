@@ -28,7 +28,7 @@ describe("OpenAI plugin package", () => {
       ok: true,
       evidenceState: "local_connection_ready",
       connectionId: "plugin_asdk_app_6a99ba6c1e7881919091a592738692c6",
-      version: "1.0.1",
+      version: "1.0.2",
       manualGates: [],
       failures: []
     });
@@ -51,7 +51,7 @@ describe("OpenAI plugin package", () => {
     };
 
     expect(manifest.name).toBe("debugbundle");
-    expect(manifest.version).toBe("1.0.1");
+    expect(manifest.version).toBe("1.0.2");
     expect(manifest.interface.category).toBe("Developer Tools");
     expect(manifest.interface.capabilities).toEqual(["Read"]);
     expect(manifest.interface.defaultPrompt).toEqual([
@@ -63,9 +63,11 @@ describe("OpenAI plugin package", () => {
     expect(manifest.interface.defaultPrompt.every((prompt) => prompt.length <= 128)).toBe(true);
     expect(manifest.interface.composerIcon).toBe("./assets/icon-512.png");
     // Pin the approved icon without requiring private website source in public CI.
-    expect(createHash("sha256").update(readFileSync(join(pluginRoot, "assets/icon-512.png"))).digest("hex")).toBe(
-      "a05a29674a75a945b1a378c73c27322c9b1f14456329bec1fc1d986453696e30"
-    );
+    expect(
+      createHash("sha256")
+        .update(readFileSync(join(pluginRoot, "assets/icon-512.png")))
+        .digest("hex")
+    ).toBe("a05a29674a75a945b1a378c73c27322c9b1f14456329bec1fc1d986453696e30");
     expect(manifest.apps).toBe("./.app.json");
     expect(manifest.mcpServers).toBeUndefined();
     expect(existsSync(join(pluginRoot, ".app.json"))).toBe(true);

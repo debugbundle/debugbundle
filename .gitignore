@@ -31,3 +31,5 @@ sdks/
 .debugbundle/local/*
 !.debugbundle/local/connection.json
 .debugbundle/bundles/
+
+.debugbundle/agent-setup.lock

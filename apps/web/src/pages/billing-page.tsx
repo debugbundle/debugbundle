@@ -533,14 +533,8 @@ export function BillingPage(): JSX.Element {
       ) : (
         <>
           {trialCallout}
-          {isPurchaseLocked ? (
-            <BillingPurchaseNotice
-              unlockDate={
-                purchaseEligibility?.unlocks_at
-                  ? formatPurchaseUnlockDate(purchaseEligibility.unlocks_at)
-                  : null
-              }
-            />
+          {purchaseUnlocksAt !== null ? (
+            <BillingPurchaseNotice unlockDate={formatPurchaseUnlockDate(purchaseUnlocksAt)} />
           ) : null}
 
           <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">

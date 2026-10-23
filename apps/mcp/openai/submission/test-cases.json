@@ -1,5 +1,5 @@
 {
-  "version": "1.0.1",
+  "version": "1.0.2",
   "fixture": "tests/fixtures/openai-plugin-v1/reviewer-tenant.json",
   "minimums": { "positive": 10, "negative": 7 },
   "cases": [

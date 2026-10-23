@@ -1015,6 +1015,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Then** the OpenAI plugin retains independent strict semver and a deterministic manifest tying its version to source, deployed digest, MCP origin, registered app, skill, listing/tests, and assets
 - **And** the tracked manifest remains verifiable after its evidence-only commit by proving its recorded implementation commit is an ancestor and no committed path except the manifest differs
 - **And** an npm MCP publish cannot submit, publish, announce, or bump the OpenAI plugin
+- **And** local registration diagnostic ZIPs use a distinct internal name, preserve the compatibility layout and authentication/skill/review semantics, produce repeatable bytes, reject unqualified formats, and leave canonical release evidence unchanged
 - **And** placeholder, path, hash, asset, connection-ID, origin, schema, scope, annotation, and version drift checks fail before any external action
 
 ### AC-MCP-CLI-HANDOFF: Read-Only Connection With An Authorized CLI
@@ -1035,6 +1036,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **When** submission evidence is assembled
 - **Then** it includes verified publisher/legal URLs, the universal production MCP URL submitted from scratch, exact scanned tools, an outside-network reviewer login, five positive and three negative reproducible cases, privacy/data-map review, threat-model closure, and production monitoring evidence
 - **And** the ZIP-first **With MCP** artifact declares the hosted endpoint in `.mcp.json`, excludes the local Developer Mode `.app.json` mapping, carries submission-compliant listing fields and exactly five positive/three negative cases, and records the generated ZIP hash independently of the local source package
+- **And** the remote server declares `extensions["com.openai"].auth` as `{ "type": "oauth", "client": { "mode": "cimd" } }`, with no provided client credentials, bearer headers, or endpoint overrides
 - **And** submission or Cancel Review requires explicit owner approval after exact packet review
 - **And** approval does not publish; publication requires a separate explicit owner approval and post-publication verification in the shared ChatGPT/Codex Plugins Directory
 - **And** directory edits, announcements, press/social outreach, or recurring spend remain separate explicit approval gates
@@ -1354,7 +1356,7 @@ Mapped requirements: FR-BIL-10, FR-BIL-07 and FR-BIL-03.
 - The exact seven-day boundary is eligible; timezone and daylight-saving changes do not change the elapsed duration. Missing, malformed and future starts fail closed.
 - Previously paid resubscriptions use an organisation-scoped processed `invoice.paid` receipt. A customer, an unpaid terminal subscription or a receipt belonging to another organisation cannot bypass the wait. Existing terminal-subscription verification still applies.
 - A blocked attempt is neither retired nor replaced, regardless of age or plan choice. Already captured payments and webhook/return reconciliation remain valid.
-- Existing paid upgrades, downgrades, capacity and renewal paths remain available. The no-card trial remains 30 days. The existing billing UI shows the unlock date/time and Contact us link, disables unavailable first-purchase actions, preserves Start trial and refreshes at unlock or return/focus.
+- Existing paid upgrades, downgrades, capacity and renewal paths remain available. The no-card trial remains 30 days. The existing billing UI shows the unlock date/time and Contact us link only after a valid trial start and while the first purchase is locked; the entire notice is absent before trial start and once payment unlocks. It disables unavailable first-purchase actions, preserves Start trial and refreshes at unlock or return/focus.
 - Existing billing-summary and successful Checkout payloads remain unchanged. The contact link is a request for support, not an automatic early-purchase override.
 - The gate does not revoke previously issued hosted URLs, establish customer legitimacy or guarantee prevention of aged-account abuse. Live mitigation and release remain separately authorised.
 

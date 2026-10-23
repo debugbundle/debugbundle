@@ -76,7 +76,14 @@ describe("OpenAI plugin release automation", () => {
     ).toBe("debugbundle");
     expect(manifest.apps).toBeUndefined();
     expect(manifest.mcpServers).toBe("./.mcp.json");
-    expect(mcp.mcpServers.debugbundle.url).toBe("https://mcp.debugbundle.com/mcp");
+    expect(mcp.mcpServers.debugbundle).toEqual({
+      url: "https://mcp.debugbundle.com/mcp",
+      extensions: {
+        "com.openai": {
+          auth: { type: "oauth", client: { mode: "cimd" } }
+        }
+      }
+    });
     expect(manifest.interface.shortDescription.length).toBeLessThanOrEqual(30);
     expect(manifest.interface.supportURL).toBe("https://debugbundle.com/contact");
     expect(manifest.extensions["com.openai"].review.test_cases.positive).toHaveLength(5);
@@ -183,7 +190,7 @@ describe("OpenAI plugin release automation", () => {
       prohibited_actions: string[];
     };
 
-    expect(plan.version).toBe("1.0.1");
+    expect(plan.version).toBe("1.0.2");
     expect(plan.independent_from_npm_mcp_version).toBe(true);
     expect(plan.allowed_actions).toEqual([
       "validate_source",
@@ -229,8 +236,8 @@ describe("OpenAI plugin release automation", () => {
   it("fails closed when generated release artifacts drift", () => {
     const outputRoot = mkdtempSync(join(tmpdir(), "debugbundle-openai-artifacts-"));
     try {
-      writeFileSync(join(outputRoot, "debugbundle-openai-plugin-1.0.1.zip"), "stale-plugin");
-      writeFileSync(join(outputRoot, "debugbundle-openai-submission-1.0.1.zip"), "stale-packet");
+      writeFileSync(join(outputRoot, "debugbundle-openai-plugin-1.0.2.zip"), "stale-plugin");
+      writeFileSync(join(outputRoot, "debugbundle-openai-submission-1.0.2.zip"), "stale-packet");
       writeFileSync(join(outputRoot, "SHA256SUMS"), "stale-checksums\n");
 
       const completed = spawnSync(
@@ -255,7 +262,20 @@ describe("OpenAI plugin release automation", () => {
   });
 
   it("verifies the committed source manifest and exact package hashes without live access", () => {
-    const result = withCommittedSource((sourceRoot) => runJson(["verify"], sourceRoot)) as {
+    const result = withCommittedSource((sourceRoot) => {
+      const result = runJson(["verify"], sourceRoot) as {
+        manifest: { plugin_version: string };
+      };
+      // This checkout can precede an uncommitted package-version change.
+      const committedPackage = JSON.parse(
+        readFileSync(
+          join(sourceRoot, "apps/mcp/openai/debugbundle/.codex-plugin/plugin.json"),
+          "utf8"
+        )
+      ) as { version: string };
+      expect(result.manifest.plugin_version).toBe(committedPackage.version);
+      return result;
+    }) as {
       ok: boolean;
       failures: string[];
       manifest: {
@@ -270,7 +290,6 @@ describe("OpenAI plugin release automation", () => {
 
     expect(result.ok).toBe(true);
     expect(result.failures).toEqual([]);
-    expect(result.manifest.plugin_version).toBe("1.0.1");
     expect(result.manifest.registered_connection_id).toBe(
       "plugin_asdk_app_6a99ba6c1e7881919091a592738692c6"
     );

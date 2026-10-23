@@ -23,6 +23,35 @@ describe("explicit single-hop proxy trust", () => {
     expect(trust("172.18.0.1", 1)).toBe(false);
     expect(trust("198.51.100.1", 0)).toBe(false);
   });
+  it.each([undefined, null, 0, {}, [], "", " ", "not-an-ip"].map((address) => [address]))(
+    "rejects an unavailable or malformed immediate peer without throwing: %j",
+    (address) => {
+      const trust = createTrustedProxyPolicy("172.18.0.1");
+      if (trust === false) throw new Error("missing policy");
+      // A closed request socket can lose its address despite Fastify's string type.
+      expect(trust(address as string, 0)).toBe(false);
+    }
+  );
+  it("does not trust forwarded headers when the request socket loses its peer address", async () => {
+    const app = createApiServer({} as never, {
+      dogfoodingEnv: { API_TRUSTED_PROXY_IPS: "172.18.0.1" }
+    });
+    app.addHook("preHandler", async (request) => {
+      Object.defineProperty(request.raw.socket, "remoteAddress", { value: undefined });
+    });
+    app.get("/ip", async (request) => ({ ip: request.ip ?? null, ips: request.ips }));
+    try {
+      const response = await app.inject({
+        url: "/ip",
+        remoteAddress: "172.18.0.1",
+        headers: { "x-forwarded-for": "198.51.100.7, 203.0.113.10" }
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ ip: null, ips: [null] });
+    } finally {
+      await app.close();
+    }
+  });
   it("ignores spoofed forwarding on direct requests and uses only the rightmost client behind the managed proxy", async () => {
     const app = createApiServer({} as never, {
       dogfoodingEnv: { API_TRUSTED_PROXY_IPS: "172.18.0.1" }

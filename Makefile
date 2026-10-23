@@ -434,11 +434,15 @@ openai-plugin-validate:
 
 .PHONY: openai-plugin-check
 openai-plugin-check:
-	$(NODE_RUN) "apk add --no-cache git >/dev/null && corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm vitest run tests/apps/mcp/mcp-openai-plugin.test.ts tests/contracts/openai-plugin-skill-parity.test.ts tests/contracts/openai-plugin-cli-handoff.test.ts tests/contracts/agent-interface-routing.test.ts tests/infrastructure/openai-plugin-release.test.ts"
+	$(NODE_RUN) "apk add --no-cache git >/dev/null && corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm vitest run tests/apps/mcp/mcp-openai-plugin.test.ts tests/contracts/openai-plugin-skill-parity.test.ts tests/contracts/openai-plugin-cli-handoff.test.ts tests/contracts/agent-interface-routing.test.ts tests/infrastructure/openai-plugin-release.test.ts tests/infrastructure/openai-plugin-diagnostics.test.ts"
 
 .PHONY: openai-plugin-inspector-check
 openai-plugin-inspector-check:
 	$(NODE_RUN) "corepack enable && $(PNPM_INSTALL_RELAXED) && npx --yes @modelcontextprotocol/inspector@2.5.0 --cli ./node_modules/.bin/tsx scripts/openai-plugin-inspector-harness.ts --method tools/list --strict --format json >/dev/null"
+
+.PHONY: openai-plugin-diagnostics
+openai-plugin-diagnostics:
+	$(NODE_RUN) "node scripts/openai-plugin-diagnostics.mjs"
 
 .PHONY: openai-plugin-plan
 openai-plugin-plan:

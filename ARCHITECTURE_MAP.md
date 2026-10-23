@@ -638,6 +638,10 @@ Current retrieval implementation includes scoped artifact and log surfaces: `GET
 
 ### Official OpenAI MCP Flow (Local Candidate Implemented)
 
+The independent 1.0.2 package candidate is built by `scripts/openai-plugin-release-lib.mjs`. Its portal archive replaces the local Developer Mode mapping with a remote `.mcp.json` that explicitly declares OAuth and `extensions["com.openai"].auth.client.mode: "cimd"`. Discovery and the existing `private_key_jwt` provider policy remain authoritative; the twenty-three-tool wire contract and hosted runtime are unchanged. Owner screenshots on 2026-10-23 establish configured/authorized MCP, verified domain, all twenty-three expected tools and no findings in the latest metadata scan. Review information, reviewer-case execution and publication retain separate gates.
+
+`scripts/openai-plugin-diagnostics.mjs` derives an identity-only compatibility connection-test archive without changing the canonical release manifest. It was not uploaded and is no longer needed for the identified blocker. A temporary browser-local correction to the portal's `none`-only CIMD predicate enabled the successful owner-operated connection/scan; its scope, twelve-case offline reproduction and portal evidence are documented in `apps/mcp/openai/submission/registration-diagnostics.md`. The override is not DebugBundle runtime code, and explicit override-disabled persistence remains to be confirmed. A portable variant was rejected during schema review and is not emitted. `make openai-plugin-diagnostics` writes only local artifacts; tests cover deterministic bytes, preserved credential-free OAuth/skill/review semantics and canonical-evidence isolation.
+
 ```text
 ChatGPT/Codex
   → https://mcp.debugbundle.com/mcp

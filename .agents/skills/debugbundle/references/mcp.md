@@ -1,6 +1,6 @@
 # DebugBundle MCP Reference
 
-Use the same runtime-evidence-gated workflow through MCP when an agent is operating in connected mode.
+Use the same runtime-evidence-gated workflow through MCP when it is the selected available interface. CLI is primary where available; a hosted read-only connector never disables a separately authenticated CLI.
 
 ## Investigation Tools
 
@@ -16,8 +16,8 @@ Use the same runtime-evidence-gated workflow through MCP when an agent is operat
 - Prefer bundle retrieval tools before reading raw repository files.
 - Use MCP bundle access when the current issue originated in production or otherwise needs captured runtime evidence.
 - For deterministic local source, UI, layout, copy, calculation, refactor, or test-only issues, inspect source and tests first unless the user asks for DebugBundle evidence.
-- Resolve fixed or intentionally generated incidents with `resolve_incident` or `resolve_incidents` so active incidents stay actionable.
-- Fall back to local CLI processing when the project is local-only.
+- Resolve fixed or intentionally generated incidents with `resolve_incident` or `resolve_incidents` only when explicitly authorized, then verify the selected records.
+- Prefer local CLI processing for local-only evidence; use this MCP reference when MCP is selected.
 
 ## Noise and Capture Policy Tools
 
@@ -50,7 +50,7 @@ Use probes for targeted evidence gathering when incident bundles do not contain 
 
 ## Notification Tools
 
-- `list_alerts`, `create_alert`, `update_alert`, `delete_alert` — manage incident alert rules.
+- `list_alerts`, `create_alert`, `update_alert`, `delete_alert` — manage incident alert rules. `list_alert_groups` and `get_alert_group` inspect project-scoped delivery groups without raw payloads or destination secrets.
 - `list_webhooks`, `create_webhook`, `update_webhook`, `delete_webhook` — manage signed webhook destinations.
 - `test_webhook`, `list_webhook_deliveries` — validate webhook delivery and inspect delivery history.
 
@@ -83,7 +83,7 @@ Use these tools for endpoint downtime, public reachability, and project Health t
 
 ## Smoke-Test Cleanup Recipe
 
-1. Call `list_incidents` with `status: "active"`.
-2. Filter incidents whose titles show they were intentionally generated for smoke, dogfood, verification, or synthetic checks.
-3. Call `resolve_incidents` for verified synthetic incidents, or `resolve_incident` for a single incident.
-4. Call `list_incidents` again and confirm the needs-attention queue only contains actionable failures.
+1. Call `list_incidents` with explicit source/project scope and `status: "all"`; follow bounded pagination to locate the requested records.
+2. Verify the exact current records against the user's request; a smoke, dogfood, verification, or synthetic title is only a clue and never authorizes a write.
+3. Only with explicit authorization, call `resolve_incidents` for the selected verified synthetic incidents, or `resolve_incident` for a single incident.
+4. Call `list_incidents` again with the same scope and `status: "all"`, or re-read the exact IDs, and confirm their resulting state before reporting success.

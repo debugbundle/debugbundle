@@ -2,6 +2,8 @@
 
 The 1.0.1 skill-routing patch retains this 1.0.0 remote-MCP evidence. Its optional local CLI handoff uses separate existing authentication and explicit user authorization; no MCP permission or data projection expands. Fresh model handoff acceptance and public review/publication remain pending.
 
+The 1.0.2 package patch explicitly selects CIMD registration while retaining that skill, the approved production authentication policy and the same remote-MCP data projection. It does not refresh the historical reviewer/client evidence.
+
 
 Status: Engineering privacy review complete. The owner approved the OpenAI disclosure, customer-authorization, and restricted-data language on 2026-09-05, then supplied and approved Owen Far as the Malta-based operator/controller and all OpenAI-supported countries as the intended launch availability on 2026-09-08. The corresponding policy source is reconciled locally; its deployment and the OpenAI verified-publisher identity remain pending.
 

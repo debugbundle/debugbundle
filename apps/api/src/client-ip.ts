@@ -18,5 +18,7 @@ export function createTrustedProxyPolicy(
     throw new Error("API_TRUSTED_PROXY_IPS must contain at most 16 explicit IP addresses");
   }
   const trusted = new Set(ips);
-  return (address, hop) => hop === 0 && trusted.has(canonicalIp(address));
+  // A disconnected socket may no longer have an address. Never trust its headers.
+  return (address, hop) =>
+    hop === 0 && typeof address === "string" && trusted.has(canonicalIp(address));
 }

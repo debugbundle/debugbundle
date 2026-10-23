@@ -3586,6 +3586,8 @@ All agent distributions follow the [agent interface routing contract](agent-inte
 
 The `1.0.1` skill candidate adds [local CLI handoff guidance](../spec/openai-plugin-cli-handoff.md) for explicitly authorized changes when the host has a separately installed, authenticated CLI. It does not expand this MCP catalog or OAuth scopes; the frozen wire contract remains `1.0.0`. CLI project/record scope, existing user authorization, separate saved credentials, and post-write verification govern that host workflow.
 
+The `1.0.2` package candidate retains that skill and explicitly selects CIMD OAuth registration in the generated portal `.mcp.json`: each remote server has `extensions["com.openai"].auth` equal to `{ "type": "oauth", "client": { "mode": "cimd" } }`. The declaration contains no provided client ID/secret, bearer header, or endpoint override. The existing production CIMD identity, `private_key_jwt` policy, scopes, and `1.0.0` wire contract remain unchanged. Uploading a ZIP does not prove that an existing portal connection has replaced its saved registration.
+
 ### Canonical Hosts And Endpoints
 
 | Surface                     | Exact URL                                                            | Contract                                                                |

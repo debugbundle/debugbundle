@@ -1,6 +1,6 @@
 # DebugBundle OpenAI Plugin
 
-DebugBundle `1.0.1` is a combined OpenAI plugin candidate: a production-debugging skill plus an OAuth-protected remote MCP connection at `https://mcp.debugbundle.com/mcp`.
+DebugBundle `1.0.2` is a combined OpenAI plugin candidate: a production-debugging skill plus an OAuth-protected remote MCP connection at `https://mcp.debugbundle.com/mcp`.
 
 The remote MCP v1 surface is read-only. It can list authorized projects, services, incidents, improvements, and endpoint-health evidence; read existing bounded redacted artifacts; and inspect bounded aggregate usage, routes, devices, acquisition, actions, funnels, transitions, and incident impact. Its tools cannot access individual analytics journeys or custom dimensions, mutate projects, resolve incidents, create or reconfigure checks, generate artifacts, read local files, return raw logs, or send external messages.
 
@@ -10,7 +10,9 @@ In a shell-capable host such as Codex, the skill uses the independently installe
 
 This source folder contains the non-secret `.app.json` mapping captured from successful ChatGPT Developer Mode registration. It is for local combined-plugin testing only. The release driver builds a different portal ZIP: it omits `.app.json` and the `apps` reference, adds `.mcp.json` with the production remote endpoint, and embeds the selected five positive and three negative review cases. The public portal must still connect and scan `https://mcp.debugbundle.com/mcp` from scratch.
 
-The portal ZIP's `.mcp.json` points to the hosted read-only server. It does not bundle the separate `@debugbundle/mcp` stdio distribution. The video URL, private reviewer credential, domain challenge, tool scan, and final attestations are completed in the portal after local package preparation.
+The portal ZIP's `.mcp.json` points to the hosted read-only server and explicitly selects OAuth with `extensions["com.openai"].auth.client.mode: "cimd"`. It supplies no client credentials or endpoint overrides; discovery retains the production `private_key_jwt` policy. It does not bundle the separate `@debugbundle/mcp` stdio distribution. The video URL, private reviewer credential, domain challenge, tool scan, and final attestations are completed in the portal after local package preparation.
+
+Upload 1.0.2 through **Upload new version**, inspect the saved MCP JSON for `mode: "cimd"`, and then connect. OpenAI's [submission guidance](https://developers.openai.com/plugins/deploy/submission#configure-authentication-for-submission) warns that existing client registration can lock credential changes. If the old draft retains pre-defined OAuth, create a fresh **With MCP** draft using the same complete ZIP. Verify its saved CIMD configuration before connecting. Preserve the old draft until the replacement has been checked; draft deletion is a separate portal action. A fresh draft may require domain verification again; do not replace a challenge token used by another draft without checking the portal's allowed challenge origins.
 
 ## Local validation
 
