@@ -4,6 +4,51 @@ import { expect, it, vi } from "vitest";
 import { PendingButton } from "../../../apps/web/src/components/system/pending-button.js";
 import { usePendingAction } from "../../../apps/web/src/lib/use-pending-action.js";
 
+it("preserves pending transitions after a browser translator replaces the label text node", () => {
+  const view = render(
+    <PendingButton pending={false} pendingLabel="Saving">
+      Save
+    </PendingButton>
+  );
+  const button = screen.getByRole("button", { name: "Save" });
+  const label = document.createTreeWalker(button, NodeFilter.SHOW_TEXT).nextNode()!;
+  const translated = document.createElement("font");
+  translated.textContent = "Translated label";
+  label.parentNode!.replaceChild(translated, label);
+
+  expect(() =>
+    view.rerender(
+      <PendingButton pending pendingLabel="Saving">
+        Save
+      </PendingButton>
+    )
+  ).not.toThrow();
+  expect(button).toHaveAccessibleName("Saving");
+  expect(() => view.rerender(<PendingButton pending={false}>Save</PendingButton>)).not.toThrow();
+  expect(button).toHaveAccessibleName("Save");
+});
+
+it("can remove a translated conditional label without removing an unowned text node", () => {
+  const view = render(
+    <PendingButton pending={false} pendingLabel={null}>
+      Save
+    </PendingButton>
+  );
+  const button = screen.getByRole("button", { name: "Save" });
+  const text = document.createTreeWalker(button, NodeFilter.SHOW_TEXT).nextNode()!;
+  const translated = document.createElement("font");
+  translated.textContent = "Translated label";
+  text.parentNode!.replaceChild(translated, text);
+  expect(() =>
+    view.rerender(
+      <PendingButton pending pendingLabel={null}>
+        Save
+      </PendingButton>
+    )
+  ).not.toThrow();
+  expect(button).toHaveTextContent(/^$/);
+});
+
 it("distinguishes unavailable actions from running requests and restores the action after completion", () => {
   const click = vi.fn();
   const view = render(

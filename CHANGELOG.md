@@ -6,6 +6,14 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.19.2] - 2026-10-23
+
+### Fixed
+
+- Failed browser-session reads display an explicit retry state rather than an unhandled rejection or an inferred signed-out state. Concurrent retries share one request; explicit session refresh keeps its rejection contract and existing session.
+- Billing reads and Checkout-return polling handle network failures, preserve loaded data and the original Checkout context, and support retry without creating another purchase. The extracted hook retains the existing billing helper exports.
+- Pending buttons and auth submission labels retain a stable element around translated text, avoiding DOM insertion/removal errors when browser tools displace text nodes. Translation remains available and ordinary exceptions remain captured.
+
 ## [1.19.1] - 2026-10-23
 
 ### Fixed

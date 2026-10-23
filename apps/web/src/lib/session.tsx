@@ -20,6 +20,8 @@ interface SessionContextValue {
   session: SessionRecord | null;
   isLoading: boolean;
   sessionInvalidationCount: number;
+  sessionLoadError: boolean;
+  retrySession: () => Promise<void>;
   refreshSession: () => Promise<SessionRecord | null>;
   setSession: (session: SessionRecord | null) => void;
 }
@@ -31,6 +33,8 @@ export function SessionProvider({ children }: { children: ReactNode }): JSX.Elem
   const [isLoading, setIsLoading] = useState(true);
   const [sessionInvalidationCount, setSessionInvalidationCount] = useState(0);
   const hasBootstrappedSession = useRef(false);
+  const sessionRequestPending = useRef(false);
+  const [sessionLoadError, setSessionLoadError] = useState(false);
 
   const refreshSession = useCallback(async (): Promise<SessionRecord | null> => {
     const nextSession = await getSession();
@@ -38,20 +42,35 @@ export function SessionProvider({ children }: { children: ReactNode }): JSX.Elem
     return nextSession;
   }, []);
 
+  const retrySession = useCallback(async (): Promise<void> => {
+    if (sessionRequestPending.current) return;
+    sessionRequestPending.current = true;
+    setIsLoading(true);
+    try {
+      await refreshSession();
+      setSessionLoadError(false);
+    } catch {
+      // A failed read does not establish that the browser is signed out.
+      setSessionLoadError(true);
+    } finally {
+      sessionRequestPending.current = false;
+      setIsLoading(false);
+    }
+  }, [refreshSession]);
+
   useEffect(() => {
     if (hasBootstrappedSession.current) {
       return;
     }
 
     hasBootstrappedSession.current = true;
-    void refreshSession().finally(() => {
-      setIsLoading(false);
-    });
-  }, [refreshSession]);
+    void retrySession();
+  }, [retrySession]);
 
   useEffect(() => {
     return subscribeToBrowserSessionInvalidation(() => {
       setSession(null);
+      setSessionLoadError(false);
       setIsLoading(false);
       setSessionInvalidationCount((current) => current + 1);
     });
@@ -76,10 +95,12 @@ export function SessionProvider({ children }: { children: ReactNode }): JSX.Elem
       session,
       isLoading,
       sessionInvalidationCount,
+      sessionLoadError,
+      retrySession,
       refreshSession,
       setSession
     }),
-    [session, isLoading, sessionInvalidationCount, refreshSession]
+    [session, isLoading, sessionInvalidationCount, sessionLoadError, retrySession, refreshSession]
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

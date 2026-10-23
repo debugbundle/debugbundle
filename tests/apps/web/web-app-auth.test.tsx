@@ -30,6 +30,51 @@ afterEach(() => {
 });
 
 describe("web app - auth routes", () => {
+  it("can submit and advance the auth form after a translator replaces the button label", async () => {
+    let finish!: (response: Response) => void;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        return requestUrl(input).endsWith("/v1/auth/session")
+          ? jsonResponse(200, { session: null })
+          : new Promise<Response>((resolve) => {
+              finish = resolve;
+            });
+      })
+    );
+    render(<App initialEntries={["/login"]} />);
+    const button = await screen.findByRole("button", { name: "Send code" });
+    await userEvent.type(screen.getByRole("textbox", { name: /email/i }), "owner@example.com");
+    const text = document.createTreeWalker(button, NodeFilter.SHOW_TEXT).nextNode()!;
+    const translated = document.createElement("font");
+    translated.textContent = "Translated label";
+    text.parentNode!.replaceChild(translated, text);
+    await userEvent.click(button);
+    expect(button).toBeDisabled();
+    finish(new Response(JSON.stringify({ success: true }), { status: 200 }));
+    expect(await screen.findByRole("button", { name: "Verify code" })).toBeInTheDocument();
+  });
+
+  it("shows a retryable session failure rather than treating an unavailable session as signed out", async () => {
+    let attempts = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => {
+        attempts += 1;
+        return attempts === 1
+          ? Promise.reject(new TypeError("Failed to fetch"))
+          : jsonResponse(200, { session: null });
+      })
+    );
+
+    render(<App initialEntries={["/login"]} />);
+    expect(await screen.findByText("Your session could not be loaded")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Send code" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByRole("button", { name: "Send code" })).toBeInTheDocument();
+    expect(attempts).toBe(2);
+  });
+
   it("resolves hosted auth URLs through VITE_API_URL while preserving local relative paths", () => {
     expect(resolveApiBaseUrl({})).toBe("");
     expect(buildApiUrl("/v1/auth/session", {})).toBe("/v1/auth/session");

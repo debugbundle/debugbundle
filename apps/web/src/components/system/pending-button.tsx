@@ -29,7 +29,8 @@ export function PendingButton({
       ) : (
         icon
       )}
-      {pending && pendingLabel !== undefined ? pendingLabel : children}
+      {/* Keep translated text out of the icon's insertion/removal boundary. */}
+      <span>{pending && pendingLabel !== undefined ? pendingLabel : children}</span>
     </Button>
   );
 }

@@ -1,3 +1,5 @@
+import { LoadErrorCallout } from "../components/system/load-error-callout.js";
+import { useBillingCheckoutSync } from "./use-billing-checkout-sync.js";
 import { BillingPlanChangeControl } from "./billing-plan-change-control.js";
 import { BillingUpgradeDialog } from "./billing-upgrade-dialog.js";
 import { CreditCardIcon } from "lucide-react";
@@ -18,9 +20,7 @@ import {
 } from "../components/ui/card.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import {
-  confirmBillingCheckout,
   getBillingSummary,
-  isInvalidSessionError,
   openBillingPortal,
   startBillingCheckout,
   startBillingTrial,
@@ -38,6 +38,7 @@ import {
 import {
   billingReflectsCheckout,
   clearPendingBillingCheckout,
+  readPendingBillingCheckout,
   formatActiveProjectCount,
   formatAllowanceUnitCount,
   formatBillingWindowDescription,
@@ -47,13 +48,10 @@ import {
   getBillingWindowRefreshDelay,
   getBillingFirstPurchaseEligibility,
   formatPurchaseUnlockDate,
-  readPendingBillingCheckout,
   resolveRequestedTrialPlan,
   writePendingBillingCheckout
 } from "./billing-page-helpers.js";
 
-const BILLING_CHECKOUT_POLL_INTERVAL_MS = 250;
-const BILLING_CHECKOUT_MAX_POLL_ATTEMPTS = 6;
 const BILLING_BACKGROUND_REFRESH_MIN_INTERVAL_MS = 1_000;
 
 export function BillingPage(): JSX.Element {
@@ -75,7 +73,6 @@ export function BillingPage(): JSX.Element {
     billingStateRevisionRef.current += 1;
     setBilling(nextBilling);
   }, []);
-  const showBillingLoading = useDelayedVisibility(billing === null && !isForbidden);
   const checkoutStatus = searchParams.get("checkout");
   const checkoutSessionId = searchParams.get("session_id");
   const requestedTrialPlan = resolveRequestedTrialPlan(searchParams.get("trial"));
@@ -83,143 +80,17 @@ export function BillingPage(): JSX.Element {
   const purchaseUnlocksAt =
     purchaseEligibility?.allowed === false ? purchaseEligibility.unlocks_at : null;
 
-  useEffect(() => {
-    let cancelled = false;
-    let pollTimer: ReturnType<typeof setTimeout> | undefined;
-
-    const clearCheckoutReturn = (): void => {
-      clearPendingBillingCheckout();
-      setSearchParams(
-        (currentParams) => {
-          const nextParams = new URLSearchParams(currentParams);
-          nextParams.delete("checkout");
-          nextParams.delete("session_id");
-          return nextParams;
-        },
-        { replace: true }
-      );
-    };
-
-    const loadBillingSummary = async (): Promise<BillingSummaryRecord | null> => {
-      const revisionAtStart = billingStateRevisionRef.current;
-      try {
-        const nextBilling = await getBillingSummary();
-        if (cancelled) {
-          return null;
-        }
-
-        if (revisionAtStart === billingStateRevisionRef.current) {
-          commitBilling(nextBilling);
-        }
-        setIsForbidden(false);
-        return nextBilling;
-      } catch (error) {
-        if (cancelled) {
-          return null;
-        }
-
-        if (error instanceof Error && error.message === "forbidden") {
-          setIsForbidden(true);
-          return null;
-        }
-
-        if (isInvalidSessionError(error)) {
-          return null;
-        }
-
-        throw error;
-      }
-    };
-
-    const pendingCheckout = checkoutStatus === "success" ? readPendingBillingCheckout() : null;
-
-    const completeCheckoutReturn = (nextBilling: BillingSummaryRecord): void => {
-      commitBilling(nextBilling);
-      if (cancelled) {
-        return;
-      }
-
-      setCheckoutReturnDialog({ status: "success", plan: nextBilling.plan });
-      clearCheckoutReturn();
-      void refreshSession().catch(() => undefined);
-    };
-
-    const pollForCheckoutUpdate = async (
-      baseline: BillingSummaryRecord,
-      attemptsRemaining: number
-    ): Promise<void> => {
-      const nextBilling = await loadBillingSummary();
-      if (cancelled || nextBilling === null) {
-        clearCheckoutReturn();
-        return;
-      }
-
-      if (billingReflectsCheckout(nextBilling, pendingCheckout, baseline)) {
-        completeCheckoutReturn(nextBilling);
-        return;
-      }
-
-      if (attemptsRemaining <= 0) {
-        setCheckoutReturnDialog({ status: "delayed" });
-        clearCheckoutReturn();
-        return;
-      }
-
-      pollTimer = setTimeout(() => {
-        void pollForCheckoutUpdate(baseline, attemptsRemaining - 1);
-      }, BILLING_CHECKOUT_POLL_INTERVAL_MS);
-    };
-
-    void (async () => {
-      const initialBilling = await loadBillingSummary();
-      if (cancelled || checkoutStatus === null) {
-        return;
-      }
-
-      if (checkoutStatus === "canceled") {
-        setCheckoutReturnDialog({ status: "canceled" });
-        clearCheckoutReturn();
-        return;
-      }
-
-      if (checkoutStatus !== "success" || initialBilling === null) {
-        clearCheckoutReturn();
-        return;
-      }
-
-      setCheckoutReturnDialog({ status: "syncing" });
-
-      if (checkoutSessionId !== null) {
-        try {
-          const confirmedBilling = await confirmBillingCheckout(checkoutSessionId);
-          if (cancelled) {
-            return;
-          }
-
-          completeCheckoutReturn(confirmedBilling);
-          return;
-        } catch {
-          if (cancelled) {
-            return;
-          }
-        }
-      }
-
-      if (billingReflectsCheckout(initialBilling, pendingCheckout, null)) {
-        completeCheckoutReturn(initialBilling);
-        return;
-      }
-
-      await pollForCheckoutUpdate(initialBilling, BILLING_CHECKOUT_MAX_POLL_ATTEMPTS);
-    })();
-
-    return () => {
-      cancelled = true;
-      if (pollTimer !== undefined) {
-        clearTimeout(pollTimer);
-      }
-    };
-  }, [checkoutSessionId, checkoutStatus, commitBilling, refreshSession, setSearchParams]);
+  const { loadError, isRetrying, retry } = useBillingCheckoutSync({
+    checkoutSessionId,
+    checkoutStatus,
+    billingStateRevisionRef,
+    commitBilling,
+    refreshSession,
+    setCheckoutReturnDialog,
+    setIsForbidden,
+    setSearchParams
+  });
+  const showBillingLoading = useDelayedVisibility(billing === null && !isForbidden && !loadError);
 
   useEffect(() => {
     const usageWindowEndsAt = billing?.usage_window.ends_at;
@@ -515,6 +386,13 @@ export function BillingPage(): JSX.Element {
       />
 
       <PageHeader description="" />
+      {loadError ? (
+        <LoadErrorCallout
+          title="Billing details could not be loaded"
+          pending={isRetrying}
+          onRetry={retry}
+        />
+      ) : null}
 
       {isForbidden ? (
         <CalloutCard
@@ -791,15 +669,15 @@ export function BillingPage(): JSX.Element {
 
 export {
   billingReflectsCheckout,
+  clearPendingBillingCheckout,
+  readPendingBillingCheckout,
   CapacityDialog,
   CheckoutReturnDialog,
-  clearPendingBillingCheckout,
   formatActiveProjectCount,
   formatAllowanceUnitCount,
   formatBillingWindowDescription,
   formatDate,
   formatPlanName,
   getBillingWindowRefreshDelay,
-  readPendingBillingCheckout,
   writePendingBillingCheckout
 };

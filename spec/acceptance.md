@@ -2497,6 +2497,13 @@ Mapped requirements: FR-BIL-10, FR-BIL-07 and FR-BIL-03.
 - Only the submitted notification action is busy: Save, Pause and Resume remain distinct. Disabled validation, quota or permission states do not show a spinner.
 - Project Notifications appears in the existing collapsible settings sequence, closed initially and accessible by keyboard. Opening it exposes the unchanged editor. Account Notifications stays expanded.
 
+### AC-WEB-12: Read Recovery and Translated Loading Labels
+
+- A rejected initial session read shows an error with Retry and does not render a signed-out form. Retrying succeeds without overlapping requests; a confirmed absent session then permits sign-in. Explicit refresh failures preserve the established session and rejection contract.
+- A failed initial billing or Checkout-return read shows an error instead of an endless skeleton or unhandled rejection. Retry preserves the original Checkout session and any loaded data, confirms only that session and never starts another Checkout.
+- Replacing a loading button's text node with a translator-style element does not cause `insertBefore` or `removeChild` failures when pending state changes. The auth form can advance from Send code to Verify code after the same mutation. Labels and accessible names remain correct.
+- Existing permissions, invalid-session handling, trial/purchase gates, Checkout return and background billing refresh tests remain passing.
+
 ### AC-ANL-17: Analytics Settings
 
 - **Given** a project owner or admin opens project analytics settings

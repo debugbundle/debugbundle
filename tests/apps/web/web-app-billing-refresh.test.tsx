@@ -29,6 +29,76 @@ afterEach(() => {
 });
 
 describe("web app — billing summary refresh", () => {
+  it("retains loaded billing data and the Checkout session when return polling fails", async () => {
+    let reads = 0;
+    let confirmations = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+      if (url.endsWith("/v1/auth/session")) return jsonResponse(200, { session: createSession() });
+      if (url.endsWith("/v1/billing") && init?.method === undefined) {
+        reads += 1;
+        return reads === 2
+          ? Promise.reject(new TypeError("Failed to fetch"))
+          : jsonResponse(200, {
+              billing: createBillingSummary({ plan: reads > 2 ? "solo" : "free" })
+            });
+      }
+      if (url.endsWith("/v1/billing/checkout/confirm")) {
+        confirmations += 1;
+        expect(init?.body).toBe(JSON.stringify({ session_id: "cs_poll_retry" }));
+        return confirmations === 1
+          ? jsonResponse(503, { error: "billing_service_error" })
+          : jsonResponse(200, { billing: createBillingSummary({ plan: "solo" }) });
+      }
+      return jsonResponse(404, { error: "not_found" });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialEntries={["/billing?checkout=success&session_id=cs_poll_retry"]} />);
+    expect(await screen.findByText("Billing details could not be loaded")).toBeInTheDocument();
+    expect(screen.getByText("Current plan")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(confirmations).toBe(2));
+    expect(screen.queryByText("Billing details could not be loaded")).not.toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/billing/checkout"))
+    ).toBe(false);
+  });
+
+  it("retries a failed checkout-return read with the saved session without starting another checkout", async () => {
+    let attempts = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+      if (url.endsWith("/v1/auth/session")) return jsonResponse(200, { session: createSession() });
+      if (url.endsWith("/v1/billing") && init?.method === undefined) {
+        attempts += 1;
+        return attempts === 1
+          ? Promise.reject(new TypeError("Failed to fetch"))
+          : jsonResponse(200, { billing: createBillingSummary({ plan: "solo" }) });
+      }
+      if (url.endsWith("/v1/billing/checkout/confirm")) {
+        expect(init?.body).toBe(JSON.stringify({ session_id: "cs_existing" }));
+        return jsonResponse(200, { billing: createBillingSummary({ plan: "solo" }) });
+      }
+      return jsonResponse(404, { error: "not_found" });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialEntries={["/billing?checkout=success&session_id=cs_existing"]} />);
+
+    expect(await screen.findByText("Billing details could not be loaded")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("Current plan")).toBeInTheDocument();
+    expect(screen.queryByText("Billing details could not be loaded")).not.toBeInTheDocument();
+    expect(attempts).toBeGreaterThanOrEqual(2);
+    expect(
+      fetchMock.mock.calls.some(([input]) => requestUrl(input).endsWith("/v1/billing/checkout"))
+    ).toBe(false);
+    expect(
+      fetchMock.mock.calls.some(([input]) =>
+        requestUrl(input).endsWith("/v1/billing/checkout/confirm")
+      )
+    ).toBe(true);
+  });
+
   it("shows the exact reset time and refreshes just after the billing boundary", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date("2026-07-31T23:59:58.000Z"));

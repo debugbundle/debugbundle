@@ -41,6 +41,8 @@ durable continuation; million-visit load testing is deferred by the owner.
 
 # ARCHITECTURE MAP — DebugBundle
 
+Incident follow-up candidate (2026-10-23): `lib/session.tsx` owns deduplicated initial-read retry and distinguishes unavailable session data from confirmed sign-out. `components/system/load-error-callout.tsx` composes the existing callout/pending-button pattern for both session and billing reads. `pages/use-billing-checkout-sync.ts` owns the extracted cancellation/revision-fenced read and existing Checkout-return reconciliation, retaining Checkout context after read failure; `billing-page.tsx` preserves its helper exports. Stable label elements in PendingButton/auth submit keep translated text outside conditional-icon DOM operations. Private-cloud viewer-request rules canonicalize repeated/raw-backslash separators before same-origin static-site redirects. No schema, payment-domain or public API/CLI/MCP interface changes are introduced.
+
 Maintenance release (2026-10-23, core 1.19.1/site 1.6.8): `apps/api/src/client-ip.ts` rejects missing/non-string peers in the exact immediate-hop proxy callback; `apps/web/src/pages/billing-page.tsx` composes the existing purchase notice only while shared eligibility produces a future unlock time. In the site companion, `src/components/product-cta.tsx` owns reusable CTA copy/actions and theme-aware presentation, mounted once after article content by `app/(blog)/blog/[...slug]/page.tsx`. No new schema, domain service or public interface is introduced. See `spec/maintenance-release-20261023.md` for deployment identities and evidence.
 
 Local UI fixtures live in `scripts/dev-mock/`: synthetic base records, rolling dates,

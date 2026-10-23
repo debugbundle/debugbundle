@@ -94,6 +94,7 @@ help:
 	@echo "  make dev-mock-off    Restore the web frontend to the real local API"
 	@echo "  make dev-openai-plugin-preview Start dev with the local synthetic OpenAI UI review route"
 	@echo "  make dev-public      Start the public-site dev server at http://localhost:5292"
+	@echo "  make public-site-artifacts Refresh generated public API/reference artifacts"
 	@echo "  make dev-down        Stop the full local dev stack"
 	@echo "  make dev-reset       Drop local DB/cache/object-store state and rebuild from scratch"
 	@echo "  make api-run         Start API with env-driven dependencies on compose network"
@@ -616,9 +617,13 @@ shell:
 license-docs-check:
 	$(NODE_RUN) 'corepack pnpm vitest run tests/contracts/analytics-public-docs.test.ts tests/infrastructure/public-site-repo.test.ts'
 
+.PHONY: public-site-artifacts
+public-site-artifacts:
+	$(NODE_RUN) 'corepack enable && corepack pnpm public-site:artifacts'
+
 .PHONY: license-site-check
 license-site-check:
-	$(NODE_RUN) 'corepack enable && corepack pnpm public-site:artifacts'
+	$(MAKE) public-site-artifacts
 	$(MAKE) -C site test build typecheck NODE_IMAGE=$(NODE_IMAGE)
 
 .PHONY: mcp-ecosystem-check

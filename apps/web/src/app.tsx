@@ -21,6 +21,7 @@ import { createProjectRoutes } from "./app-project-routes.js";
 import { AppUpdateNotifier } from "./components/system/app-update-notifier.js";
 import { AuthLayout } from "./components/system/auth-layout.js";
 import { CalloutCard } from "./components/system/callout-card.js";
+import { LoadErrorCallout } from "./components/system/load-error-callout.js";
 import { DashboardIncidentsToday } from "./components/system/dashboard-incidents-today.js";
 import { RecentProjectsTable } from "./components/system/recent-projects-table.js";
 import { GitHubMark } from "./components/system/github-mark.js";
@@ -274,16 +275,17 @@ function AppToaster(): JSX.Element {
 }
 
 function RootGate(): JSX.Element {
-  const { isLoading, session, sessionInvalidationCount } = useSession();
+  const { isLoading, session, sessionInvalidationCount, sessionLoadError, retrySession } =
+    useSession();
   const location = useLocation();
   const navigate = useNavigate();
   const lastHandledInvalidationCount = useRef(0);
 
   useEffect(() => {
     setWebDogfoodingAnalyticsAuthState(
-      isLoading ? "unknown" : session === null ? "anonymous" : "authenticated"
+      isLoading || sessionLoadError ? "unknown" : session === null ? "anonymous" : "authenticated"
     );
-  }, [isLoading, session]);
+  }, [isLoading, session, sessionLoadError]);
 
   useEffect(() => {
     trackWebDogfoodingPageView(location.pathname);
@@ -302,6 +304,20 @@ function RootGate(): JSX.Element {
     showInfoToast("Your session expired. Please sign in again.");
     void navigate("/login", { replace: true });
   }, [location.pathname, navigate, sessionInvalidationCount]);
+
+  if (sessionLoadError && session === null) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-6">
+        <div className="w-full max-w-md">
+          <LoadErrorCallout
+            title="Your session could not be loaded"
+            pending={isLoading}
+            onRetry={() => void retrySession()}
+          />
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return <LoadingScreen />;
@@ -742,7 +758,7 @@ function EmailAuthPage({
               aria-describedby={requestErrorId}
             >
               {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
-              {isVerifyStep ? "Verify code" : "Send code"}
+              <span>{isVerifyStep ? "Verify code" : "Send code"}</span>
             </Button>
             {isVerifyStep ? (
               <div className="mt-3 flex flex-col gap-3 sm:flex-row">

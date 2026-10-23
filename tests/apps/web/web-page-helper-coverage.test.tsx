@@ -256,6 +256,8 @@ describe("web page helper coverage", () => {
       session: createSession(),
       isLoading: false,
       sessionInvalidationCount: 0,
+      sessionLoadError: false,
+      retrySession: vi.fn(async () => undefined),
       refreshSession: vi.fn(async () => createSession()),
       setSession: vi.fn()
     });
@@ -283,6 +285,8 @@ describe("web page helper coverage", () => {
       session: createSession(),
       isLoading: false,
       sessionInvalidationCount: 0,
+      sessionLoadError: false,
+      retrySession: vi.fn(async () => undefined),
       refreshSession: vi.fn(async () => createSession()),
       setSession: vi.fn()
     });
@@ -341,6 +345,8 @@ describe("web page helper coverage", () => {
       session: createSession(),
       isLoading: false,
       sessionInvalidationCount: 0,
+      sessionLoadError: false,
+      retrySession: vi.fn(async () => undefined),
       refreshSession: vi.fn(async () => createSession()),
       setSession: vi.fn()
     });
@@ -387,6 +393,8 @@ describe("web page helper coverage", () => {
       session: null,
       isLoading: false,
       sessionInvalidationCount: 0,
+      sessionLoadError: false,
+      retrySession: vi.fn(async () => undefined),
       refreshSession: vi.fn(async () => null),
       setSession: vi.fn()
     });
@@ -404,6 +412,8 @@ describe("web page helper coverage", () => {
       session: createSession(),
       isLoading: false,
       sessionInvalidationCount: 0,
+      sessionLoadError: false,
+      retrySession: vi.fn(async () => undefined),
       refreshSession: vi.fn(async () => createSession()),
       setSession: vi.fn()
     });
