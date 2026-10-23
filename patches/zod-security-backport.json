@@ -1,0 +1,11 @@
+{
+  "advisory": "GHSA-mrhx-c7xc-m3w5",
+  "version": "3.25.76",
+  "patch_sha256": "e7256d9542a1bfd92d02a88a06b62ee1c275779e08e46473c80f54477f409654",
+  "files": {
+    "v3/types.cjs": "5b1be7116c6aeff693f4b05c3a08d51009c42c578f5a068e83c887e2edf0815a",
+    "v3/types.js": "4a155b1ca67a7bbdc57c83121ed1e830fb4585997ab9595f0ef5d9b497352e7b",
+    "v4/core/schemas.cjs": "56d5f35203596b172ec0a9d3565d01cafc6cb5cb14d8cff98b0e7146e06265bd",
+    "v4/core/schemas.js": "e58ceee7358a660879f58cc8ec0c5cd0b59683171e38962a795460e60f6db034"
+  }
+}

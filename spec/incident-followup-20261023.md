@@ -30,3 +30,19 @@ The public-site edge handler normalizes repeated and raw-backslash path separato
 The session, billing and translated-label regressions failed before their fixes. Initial focused verification passes 77 tests and full typecheck; additional retained-data polling, auth translation and concurrency cases are included in the final gate. The full coverage suite, lint, site checks and final release qualification are in progress. Site-edge tests cover canonical paths, malformed network-path-like inputs, query preservation, static error behaviour and distribution configuration.
 
 No new schema, external distribution version or frozen OpenAI wire contract is introduced. Existing reviewer login/23 November expiry and OpenAI portal review/publication boundaries remain unchanged. No production payment, email or consumer canary is authorised by this document. Exact source identities, deployed proof and multi-project final incident readback must be recorded after shipping; this preparation record is not a deployment receipt.
+
+## Compatible security follow-up — 24 October
+
+Exact-source CI exposed GHSA-mrhx-c7xc-m3w5 before publication. Standalone Zod 4
+paths move to official 4.6.6; the retained Zod 3.25.76 interface uses a managed
+collection-bound backport, including its bundled v4 entry. The owner approved
+the exact core/site audit exception after automatic review requested explicit
+approval. Registry version findings remain visible and are accounted for only
+after installed hash and semantic verification. Other findings still block at
+the original severity. See `rules/release-governance.md` for the fail-closed gate.
+No public SDK schema API or package version changes with this local install fix.
+
+A separate API OAuth token failure regressed at 22:00 UTC on 23 October. It
+remains open pending diagnosis/recovery proof, independently of the eleven
+App/Site application failures. Runtime availability alone does not prove an
+authenticated connection has recovered.

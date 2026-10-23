@@ -79,7 +79,7 @@ jobs:
           RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
 
       - name: Audit dependencies
-        run: pnpm audit --audit-level=high
+        run: node scripts/dependency-audit.mjs --audit-level=high
 
       - name: Run core release quality gates
         run: |

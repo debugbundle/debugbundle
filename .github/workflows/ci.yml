@@ -32,7 +32,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Audit dependencies
-        run: pnpm audit --audit-level=high
+        run: node scripts/dependency-audit.mjs --audit-level=high
 
       - name: Lint
         run: pnpm lint

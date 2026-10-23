@@ -6,7 +6,11 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
-## [1.19.2] - 2026-10-23
+## [1.19.2] - 2026-10-24
+
+### Security
+
+- Backport early collection-bound validation to Zod 3.25.76 while retaining its public schema API, including its bundled v4 compatibility entry. Pin standalone Zod 4 dependencies to upstream 4.6.6. Audit gates account for GHSA-mrhx-c7xc-m3w5 only after every active legacy installation passes patch/file hashes and semantic checks; other findings retain the existing severity threshold. The registry still flags the legacy version. Unbounded collections are unchanged.
 
 ### Fixed
 

@@ -400,3 +400,24 @@ uses a separate report directory for the skill patch, and checks that ClawHub's
 latest version matches the requested skill version. Publish only from a committed
 source path; after publication, inspect the new ClawHub security audit because
 local skill folders cannot receive a ClawHub scan.
+
+## Verified legacy dependency security backport
+
+DebugBundle core and site retain Zod 3.25.76 for existing schema contracts. Their
+pnpm-managed patch moves bounded array/set checks ahead of element work and
+protects the package's bundled v4 bounded array/set/map entry points. Standalone
+Zod 4 paths use upstream 4.6.6. This is a maintained compatibility backport for
+GHSA-mrhx-c7xc-m3w5; it does not bound schemas that intentionally omit limits.
+The upstream registry still reports the legacy version as affected.
+
+Run `make audit` in each repository. The shared, identically vendored
+`scripts/dependency-audit.mjs` invokes native pnpm audit without an ignore list.
+It accounts for only that exact advisory/module/version after verifying the
+patch hash, all four installed compiled-file hashes in every active legacy
+instance, and bounded-collection semantic probes. Missing dependencies, drift,
+malformed audit data and command failures fail closed. All other advisories use
+the caller's original severity threshold. CI/release use high; site's local
+Make audit retains low. The matching policy and original MIT license live in
+`patches/`. Auditor regression tests run in both repositories. The owner approved
+this precise core/site exception on 24 October 2026; it does not authorise
+exceptions or changes in consumer products or independently published SDKs.

@@ -177,7 +177,7 @@ lint:
 
 .PHONY: audit
 audit:
-	$(NODE_RUN) "corepack enable && corepack pnpm audit --audit-level=high"
+	$(NODE_RUN) "corepack enable && node scripts/dependency-audit.mjs --audit-level=high"
 
 .PHONY: typecheck
 typecheck:

@@ -1,0 +1,198 @@
+diff --git a/v3/types.cjs b/v3/types.cjs
+index 11ed4dfc4745f9af1f1501874576b78b77d294ef..3a8908e53316a6cf13270b6d0e06236c0abed760 100644
+--- a/v3/types.cjs
++++ b/v3/types.cjs
+@@ -1790,6 +1790,8 @@ class ZodArray extends ZodType {
+                     exact: true,
+                     message: def.exactLength.message,
+                 });
++                // Reject oversized collections before allocating per-element validation results.
++                if (tooBig) return parseUtil_js_1.INVALID;
+                 status.dirty();
+             }
+         }
+@@ -1816,7 +1818,7 @@ class ZodArray extends ZodType {
+                     exact: false,
+                     message: def.maxLength.message,
+                 });
+-                status.dirty();
++                return parseUtil_js_1.INVALID;
+             }
+         }
+         if (ctx.common.async) {
+@@ -2843,7 +2845,7 @@ class ZodSet extends ZodType {
+                     exact: false,
+                     message: def.maxSize.message,
+                 });
+-                status.dirty();
++                return parseUtil_js_1.INVALID;
+             }
+         }
+         const valueType = this._def.valueType;
+diff --git a/v3/types.js b/v3/types.js
+index 40b11c0f01b2af54e0ed48e198607bd8836d9a63..be1638c87025d083f0e748264a5d565bedb5ff5f 100644
+--- a/v3/types.js
++++ b/v3/types.js
+@@ -1769,6 +1769,8 @@ export class ZodArray extends ZodType {
+                     exact: true,
+                     message: def.exactLength.message,
+                 });
++                // Reject oversized collections before allocating per-element validation results.
++                if (tooBig) return INVALID;
+                 status.dirty();
+             }
+         }
+@@ -1795,7 +1797,7 @@ export class ZodArray extends ZodType {
+                     exact: false,
+                     message: def.maxLength.message,
+                 });
+-                status.dirty();
++                return INVALID;
+             }
+         }
+         if (ctx.common.async) {
+@@ -2814,7 +2816,7 @@ export class ZodSet extends ZodType {
+                     exact: false,
+                     message: def.maxSize.message,
+                 });
+-                status.dirty();
++                return INVALID;
+             }
+         }
+         const valueType = this._def.valueType;
+diff --git a/v4/core/schemas.cjs b/v4/core/schemas.cjs
+index 7c77d2b5af031e086d535f4b2e1898cec17eda29..d0ab8c610a400e4891186ace08bd27baa0cb5df5 100644
+--- a/v4/core/schemas.cjs
++++ b/v4/core/schemas.cjs
+@@ -650,6 +650,39 @@ function handleArrayResult(result, final, index) {
+     }
+     final.value[index] = result.value;
+ }
++// Backport leading collection bounds without changing the legacy v4 check pipeline.
++function capCollectionSize(inst, size) {
++    const caps = [];
++    for (const check of inst._zod.def.checks ?? []) {
++        const def = check._zod.def;
++        if (!["min_length", "max_length", "length_equals", "min_size", "max_size", "size_equals"].includes(def.check)) break;
++        const maximum = def.maximum ?? def.length ?? def.size;
++        if (typeof maximum === "number" && maximum >= 0) caps.push([maximum, check]);
++    }
++    if (!caps.length) return;
++    // Classic and Mini finish their shared initialization before wrapping run.
++    inst._zod.deferred ??= [];
++    inst._zod.deferred.push(() => {
++        const run = inst._zod.run;
++        inst._zod.run = (payload, ctx) => {
++            const actual = size(payload.value);
++            for (const [maximum, check] of caps) {
++                if (actual <= maximum || (check._zod.def.when && !check._zod.def.when(payload))) continue;
++                const start = payload.issues.length;
++                check._zod.check(payload);
++                if (payload.issues.length > start) {
++                    payload.issues[start].continue = false;
++                    return payload;
++                }
++            }
++            return run(payload, ctx);
++        };
++    });
++}
++const arraySize = (input) => Array.isArray(input) ? input.length : -1;
++const mapSize = (input) => input instanceof Map ? input.size : -1;
++const setSize = (input) => input instanceof Set ? input.size : -1;
++
+ exports.$ZodArray = core.$constructor("$ZodArray", (inst, def) => {
+     exports.$ZodType.init(inst, def);
+     inst._zod.parse = (payload, ctx) => {
+@@ -683,6 +716,7 @@ exports.$ZodArray = core.$constructor("$ZodArray", (inst, def) => {
+         }
+         return payload; //handleArrayResultsAsync(parseResults, final);
+     };
++    capCollectionSize(inst, arraySize);
+ });
+ function handleObjectResult(result, final, key) {
+     // if(isOptional)
+@@ -1304,6 +1338,7 @@ exports.$ZodMap = core.$constructor("$ZodMap", (inst, def) => {
+             return Promise.all(proms).then(() => payload);
+         return payload;
+     };
++    capCollectionSize(inst, mapSize);
+ });
+ function handleMapResult(keyResult, valueResult, final, key, input, inst, ctx) {
+     if (keyResult.issues.length) {
+@@ -1364,6 +1399,7 @@ exports.$ZodSet = core.$constructor("$ZodSet", (inst, def) => {
+             return Promise.all(proms).then(() => payload);
+         return payload;
+     };
++    capCollectionSize(inst, setSize);
+ });
+ function handleSetResult(result, final) {
+     if (result.issues.length) {
+diff --git a/v4/core/schemas.js b/v4/core/schemas.js
+index 692ce1fc2d0e138b51b5af2bafe0e2b4a279c0bc..d2431c6e373768e2eae34b1e65adf08d74f098ec 100644
+--- a/v4/core/schemas.js
++++ b/v4/core/schemas.js
+@@ -619,6 +619,39 @@ function handleArrayResult(result, final, index) {
+     }
+     final.value[index] = result.value;
+ }
++// Backport leading collection bounds without changing the legacy v4 check pipeline.
++function capCollectionSize(inst, size) {
++    const caps = [];
++    for (const check of inst._zod.def.checks ?? []) {
++        const def = check._zod.def;
++        if (!["min_length", "max_length", "length_equals", "min_size", "max_size", "size_equals"].includes(def.check)) break;
++        const maximum = def.maximum ?? def.length ?? def.size;
++        if (typeof maximum === "number" && maximum >= 0) caps.push([maximum, check]);
++    }
++    if (!caps.length) return;
++    // Classic and Mini finish their shared initialization before wrapping run.
++    inst._zod.deferred ??= [];
++    inst._zod.deferred.push(() => {
++        const run = inst._zod.run;
++        inst._zod.run = (payload, ctx) => {
++            const actual = size(payload.value);
++            for (const [maximum, check] of caps) {
++                if (actual <= maximum || (check._zod.def.when && !check._zod.def.when(payload))) continue;
++                const start = payload.issues.length;
++                check._zod.check(payload);
++                if (payload.issues.length > start) {
++                    payload.issues[start].continue = false;
++                    return payload;
++                }
++            }
++            return run(payload, ctx);
++        };
++    });
++}
++const arraySize = (input) => Array.isArray(input) ? input.length : -1;
++const mapSize = (input) => input instanceof Map ? input.size : -1;
++const setSize = (input) => input instanceof Set ? input.size : -1;
++
+ export const $ZodArray = /*@__PURE__*/ core.$constructor("$ZodArray", (inst, def) => {
+     $ZodType.init(inst, def);
+     inst._zod.parse = (payload, ctx) => {
+@@ -652,6 +685,7 @@ export const $ZodArray = /*@__PURE__*/ core.$constructor("$ZodArray", (inst, def
+         }
+         return payload; //handleArrayResultsAsync(parseResults, final);
+     };
++    capCollectionSize(inst, arraySize);
+ });
+ function handleObjectResult(result, final, key) {
+     // if(isOptional)
+@@ -1273,6 +1307,7 @@ export const $ZodMap = /*@__PURE__*/ core.$constructor("$ZodMap", (inst, def) =>
+             return Promise.all(proms).then(() => payload);
+         return payload;
+     };
++    capCollectionSize(inst, mapSize);
+ });
+ function handleMapResult(keyResult, valueResult, final, key, input, inst, ctx) {
+     if (keyResult.issues.length) {
+@@ -1333,6 +1368,7 @@ export const $ZodSet = /*@__PURE__*/ core.$constructor("$ZodSet", (inst, def) =>
+             return Promise.all(proms).then(() => payload);
+         return payload;
+     };
++    capCollectionSize(inst, setSize);
+ });
+ function handleSetResult(result, final) {
+     if (result.issues.length) {
