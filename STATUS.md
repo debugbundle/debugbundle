@@ -1,3 +1,13 @@
+# Production follow-up complete — 24 October 2026
+
+Core **1.19.3** and site **1.6.10** are published and deployed from exact reviewed commits `c991294ccad14ee5eb257daac38fc58a0cdc1451` and `f7299dae6a42c0840821c685046b1d3aa0a8b015`, through trusted cloud `40606e14e156a0d27a6ca2b4ba2531d2aee1e677`. All exact-source CI/canonical-release/hosted gates pass. Independent runtime inspection verifies healthy API/worker, zero restarts, active processing, installed security patches and immutable image digest; migrations report zero new and 63 already applied. Verified 1.19.1 rollback and both images remain retained. Live SPA retry states, all 28 CTAs and safe malformed-path redirects pass independent readback. See [release evidence](spec/incident-followup-release-20261024.md).
+
+Independent active and all-status paginated reads at 07:50 UTC show **zero active incidents in all four DebugBundle projects**: API 44 resolved, App 19 resolved, Site seven resolved, WordPress SDK development empty. The OAuth connection now passes a fresh token exchange and authenticated MCP read; its earlier failure cause is unconfirmed. Thirteen App/Site noise/recovered records and eleven deployed application/path records are closed under the reviewed evidence; ordinary application errors remain captured. This is a current checkpoint, not a guarantee against future regressions.
+
+The owner reviewed the UI recovery changes and reauthorised production. The unchanged 1.19.2 tag was blocked by a newly updated dependency audit before publication/deployment; replacement 1.19.3 clears the added request-library findings while preserving the exact verified Zod exception and other severity gates. No consumer product, production payment/email or OAuth policy change was introduced. Exact owner-browser reproduction remains unverified. OpenAI portal reviewer/video/submission/publication gates remain separate. The existing reviewer login/23 November expiry is preserved. Later documentation/provenance commits do not change the deployed sources above.
+
+Earlier entries below are historical checkpoints.
+
 # Fresh production release qualification — 24 October 2026
 
 The owner reviewed the session/billing UI state changes and explicitly reauthorised production deployment. The complete previous candidate passes 4,668 tests / 566 files / 100 coverage shards, all six changed runtime coverage checks, full lint/typecheck/build and exact core/site/CLI CI. A fresh canonical-release audit then failed on two additional high findings in body-parser and Undici before publication or deployment; the 1.19.2 tag remains untouched. Compatible patched versions 2.4.0 and 8.12.2 are being qualified in replacement core 1.19.3, with site 1.6.10 references. No new UI or OAuth policy change is added.

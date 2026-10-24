@@ -416,7 +416,7 @@ It accounts for only that exact advisory/module/version after verifying the
 patch hash, all four installed compiled-file hashes in every active legacy
 instance, and bounded-collection semantic probes. Missing dependencies, drift,
 malformed audit data and command failures fail closed. All other advisories use
-the caller's original severity threshold. CI/release use high; site's local
+the caller's original severity threshold. Core CI/canonical release and site CI use high; site's local
 Make audit retains low. The matching policy and original MIT license live in
 `patches/`. Auditor regression tests run in both repositories. The owner approved
 this precise core/site exception on 24 October 2026; it does not authorise

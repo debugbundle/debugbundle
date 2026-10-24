@@ -47,7 +47,6 @@ remains open pending diagnosis/recovery proof, independently of the eleven
 App/Site application failures. Runtime availability alone does not prove an
 authenticated connection has recovered.
 
-
 ## Fresh release gate — 24 October morning
 
 After the owner reviewed the UI recovery states and explicitly reauthorised
@@ -68,3 +67,12 @@ only extension frames; its separate exact App/production/browser fingerprint
 rule retains context and is independently verified before closure. Eleven
 App/Site application incidents and the separate OAuth failure remain open until
 their respective production recovery conditions are demonstrated.
+
+## Final deployed checkpoint
+
+Core 1.19.3/site 1.6.10 are now deployed and all four DebugBundle projects have
+zero active incidents on independent paginated readback. OAuth token exchange
+and authenticated MCP reads have recovered. See
+[the 24 October release receipt](incident-followup-release-20261024.md) for exact
+sources, image identities, qualification and limits. Preparation states above
+are historical; OpenAI portal publication remains a separate gate.
