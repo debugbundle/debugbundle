@@ -46,3 +46,25 @@ A separate API OAuth token failure regressed at 22:00 UTC on 23 October. It
 remains open pending diagnosis/recovery proof, independently of the eleven
 App/Site application failures. Runtime availability alone does not prove an
 authenticated connection has recovered.
+
+
+## Fresh release gate — 24 October morning
+
+After the owner reviewed the UI recovery states and explicitly reauthorised
+production, the canonical 1.19.2 release audit found two newly reported high
+findings. It stopped before GitHub release creation or production deployment.
+The immutable failed tag remains unchanged. Replacement core **1.19.3** retains
+the reviewed application changes and updates body-parser 2.x to 2.4.0 and all
+Undici 8.x paths to at least 8.12.2 (direct dependency resolves 8.12.3).
+Site **1.6.10** refreshes its generated reference version. No new UI, authentication
+policy, schema or consumer-product change is added. The existing exact Zod
+backport exception and every other audit severity threshold remain unchanged.
+
+The preceding complete local run passed 4,668 tests across 566 files/100 shards
+and the unchanged changed-source coverage gate for all six runtime files. The
+replacement must pass its fresh audit, focused transport/security tests and
+exact-source CI before publication/deployment. A fresh App occurrence contains
+only extension frames; its separate exact App/production/browser fingerprint
+rule retains context and is independently verified before closure. Eleven
+App/Site application incidents and the separate OAuth failure remain open until
+their respective production recovery conditions are demonstrated.

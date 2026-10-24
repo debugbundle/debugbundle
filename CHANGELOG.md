@@ -6,7 +6,17 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
-## [1.19.2] - 2026-10-24
+## [1.19.3] - 2026-10-24
+
+### Security
+
+- Update body-parser 2.x paths to 2.4.0 and Undici 8.x paths to 8.12.2 for newly reported denial-of-service findings. Preserve the verified legacy Zod backport and existing audit severity gates.
+
+### Changed
+
+- Supersede the blocked 1.19.2 candidate. Its tag remains immutable; its canonical release audit failed before publication or deployment. This release includes the session/billing recovery and stable loading-label fixes described below.
+
+## [1.19.2] - Unpublished (release audit blocked)
 
 ### Security
 

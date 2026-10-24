@@ -1,3 +1,9 @@
+# Fresh production release qualification — 24 October 2026
+
+The owner reviewed the session/billing UI state changes and explicitly reauthorised production deployment. The complete previous candidate passes 4,668 tests / 566 files / 100 coverage shards, all six changed runtime coverage checks, full lint/typecheck/build and exact core/site/CLI CI. A fresh canonical-release audit then failed on two additional high findings in body-parser and Undici before publication or deployment; the 1.19.2 tag remains untouched. Compatible patched versions 2.4.0 and 8.12.2 are being qualified in replacement core 1.19.3, with site 1.6.10 references. No new UI or OAuth policy change is added.
+
+The fresh inventory has API 1, App 11 and Site 1 active incidents; the new App occurrence contains only extension frames and is eligible for a separate exact scoped context rule. The eleven previously identified App/Site application failures await deployment proof. The OAuth connection still failed after owner reconnection; provider metadata and JWKS returned 404 even with provider headers. It remains open. Production remains core 1.19.1/site 1.6.8 until all replacement gates pass.
+
 # App and Site incident follow-up — 2026-10-23
 
 The owner approved the recommended compatible Zod backport and its exact core/site audit exception on 24 October after automatic review requested explicit approval. Both proposed gates pass with verified installed hashes and semantic checks; all eight fail-closed auditor tests pass in each checkout. Core retains six low and 31 moderate findings; site has no unaccounted findings at its stricter local low threshold. Official standalone Zod 4 paths use 4.6.6. Full regression and exact-source CI remain required before publication. Eleven App/Site incidents await deployment; a fresh API OAuth token failure regressed at 22:00 UTC and is under separate investigation. No follow-up release has deployed yet.
