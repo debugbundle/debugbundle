@@ -123,6 +123,10 @@ if __name__ == "__main__":
                 raise RuntimeError(f"Expected Android API{args.api} runtime")
             adb("install", "-r", str(apk))
             adb("install", "-r", str(tests))
+            # AVDs are reused across qualification runs. Reset only the task-owned
+            # fixture app so earlier offline/performance queues cannot affect a
+            # clean-install delivery assertion against a new local endpoint.
+            adb("shell", "pm", "clear", "com.debugbundle.smoke")
             result = adb("shell", "am", "instrument", "-w", "-r", "-e", "class",
                 "com.debugbundle.smoke.InstalledEvidenceDeviceTest",
                 "com.debugbundle.smoke.test/androidx.test.runner.AndroidJUnitRunner", capture_output=True, timeout=180)

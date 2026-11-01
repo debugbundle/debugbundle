@@ -1,6 +1,10 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
 import { afterEach } from "vitest";
+
+// Coverage instrumentation includes cold lazy-route imports inside async UI
+// reads. Keep those semantic waits within Vitest's existing 15-second budget.
+if (process.env["VITEST_COVERAGE_SHARD"] === "1") configure({ asyncUtilTimeout: 5000 });
 
 const SANITIZED_TEST_ENV_KEYS = [
 	"APP_BASE_URL",

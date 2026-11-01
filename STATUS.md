@@ -1,62 +1,69 @@
-# Evidence quality and SDK parity: continuous implementation — 1 November 2026
+# Evidence quality and SDK parity: review candidate — 1 November 2026
 
-The active goal covers the entire [single-phase plan](spec/local/proposals/bundle-evidence-quality-sdk-parity-plan-2026-10-25.md). Ordered workstreams are dependencies, not stopping points. **The whole phase remains in progress.** Implementation spans all twelve maintained capture surfaces, their relays/wrappers/bridges and ordinary/restricted readers. The owner now authorises review-branch commits/pushes and GitHub Actions qualification. The release train must wait for owner review; no publication/deployment or consumer-product mutation is authorised.
+The single-phase implementation is committed on `codex/evidence-quality-sdk-parity`
+across DebugBundle core, all maintained SDK repositories and the documentation site.
+The [core draft PR](https://github.com/debugbundle/debugbundle/pull/10) and the
+[local release handoff](spec/local/proposals/bundle-evidence-quality-sdk-parity-release-handoff-2026-10-29.md)
+identify review sources, qualification receipts, dependency order and rollback.
+The [execution ledger](spec/local/proposals/bundle-evidence-quality-sdk-parity-execution-2026-10-25.md)
+retains red/green history. These are candidates, not publication or deployment receipts.
 
-The [release handoff](spec/local/proposals/bundle-evidence-quality-sdk-parity-release-handoff-2026-10-29.md) consolidates current acceptance, source/artifact inventories, open gates, release order and rollback. The [execution ledger](spec/local/proposals/bundle-evidence-quality-sdk-parity-execution-2026-10-25.md) retains red/green history and detailed receipts. Historical entries below describe earlier releases, not authority for this candidate.
+**Owner hold:** review-branch commits/pushes and GitHub Actions qualification are
+approved. The owner must check the candidate before any release train is triggered.
+No release tags, publication, deployment, production canaries or consumer-product
+adoption are authorised. Existing-component evidence-reader design is approved.
 
-**Implementation has resumed with the owner's1 November approval:** refresh the
-local JS lock, migrate maintained JavaScript schemas to upstream Zod4, and use
-GitHub Actions for Windows qualification. Shared-types3.0 is the proposed major
-for its exported Zod API; Node/Browser stay3.2 with compatible capture interfaces.
-The .NET draft PR [#1](https://github.com/debugbundle/debugbundle-dotnet/pull/1)
-passes all four Linux/Windows .NET8/10 CI jobs at
-`3c3725297e52ea53779f94e5aa4ed87b32a7c5de` (run41285933554). Two timer-sensitive
-acknowledgement tests now gate their fake retry responses; production code was
-unchanged. The same reviewed-commit packages pass installed .NET8/10 consumers.
-JavaScript603 tests and clean installed Node/Browser consumers pass; their fresh
-installed audit reports zero vulnerabilities. Full core and regenerated native
-schema qualification are in progress. Existing29 October artifact inventories
-must be refreshed after this migration; they are historical until that happens.
+## Candidate versions
 
-**Release hold:** present the final proposed versions, exact artifacts and passing
-review/CI evidence to the owner before triggering any release train.
-
-Core now implements bounded graphs, language-aware stacks, immutable evidence receipts, additive indexed correlation, deterministic primary/provenance/recovery, negotiated capabilities, capture-policy parity and the approved existing-component reader UI. Typed context cannot change incident lifecycle or alerts. The ordered `202610260001_add_typed_evidence_context` migration precedes activation; legacy schemas/fingerprints and restricted allowlists remain protected.
-
-Packaged local upgrade/rollback now passes: isolated Linux/arm64 images built with
-the unchanged hosted Dockerfile exercise1.19.3→1.20.0→1.19.3→1.20.0, actual API/active
-worker readiness and SDK config, migration refusal/idempotency, existing-data
-preservation and retained new evidence/policy during predecessor writes. The
-core inventory attaches hashes for the exact images and18 checks. All disposable
-fixtures were cleaned up. This is local schema/startup proof; hosted rollout and
-new-event draining before an old-worker downgrade remain separate requirements.
-
-| Candidate | Current local qualification |
+| Distribution | Proposed version and reason |
 | --- | --- |
-| Core 1.20.0; CLI/MCP/OpenClaw 1.18.0 | Lint/typecheck/build; 4,844 tests in 593 files/103 coverage batches; unchanged changed-source coverage; 179 integration tests/40 files. Versioned package/legacy contracts, CLI five-Node runtime/predecessor upgrade, OpenClaw contracts and native Codex 0.153.1 on Node22/24/26 pass. Retained CLI/MCP tarballs exactly match the tested bytes. |
-| Site 1.6.11 | 49 tests and generated references pass. Default Turbopack initially exhausted local memory; its full static export and typecheck pass with a two-CPU/six-GB container bound, as does the existing webpack target. |
-| Node/Browser 3.2.0; shared-types/redaction 2.7.0 | 603 tests/57 files and prior candidate coverage/build/installed checks pass. Final Browser compatibility source checks and native Chromium direct/relay/bundle tests pass. Final exact-installed refresh and independent dependency security remain blocked as listed below. |
-| Python 2.1.0 | 394 tests, Ruff/mypy, all-file coverage and wheel/sdist build; native installed Python3.10–3.14, final wheel consumer and same-input performance pass. Current inventory:95 sources/two artifacts. |
-| PHP 2.1.0 | 208 tests/3,497 assertions, PHPStan/all-file coverage, exact ZIP; native8.2–8.5 causes/fatal/HTTP and FPM request-end checks pass. Off/on allocation/time/pressure comparison passes. Inventory:121 sources/one artifact. |
-| Ruby 2.1.0 | 326 examples, RuboCop/all-file coverage, Rack/Rails/Sidekiq lanes and same installed gem on3.1.6/3.2/3.3/3.4.2/4.0 pass; safety/performance checks pass. Inventory:118 sources/one gem. |
-| Java 3.1.0 | Java17/21/25/26/27 verify/installed; Spring4.1.1/JDK27 and WildFly Jakarta/Javax agent/multi-WAR checks pass. Caller/worker performance passes. Inventory:205 sources/33 JAR/POM artifacts. |
-| Go 3.1.0 | Full tests/per-file80%, vet/race/lint; same module archive installed on1.21/1.26/1.27; performance passes. Own manifest:113 sources. |
-| .NET 2.1.0 | 191 tests/all64 production files meet coverage floor; same20 NuGet/symbol packages pass .NET8/10 native/ASP.NET relay consumers. Privacy allocation correction and caller/worker comparison pass. Inventory:173 sources. Windows/Linux 8/10 now pass on the review branch; rebuilt artifact consumers are being refreshed. |
-| Android 3.1.0 | Full source/metadata/all74 coverage floors, staged Maven consumers and APK build pass after the privacy allocation repair. Exact rebuilt artifacts pass native HTTP and twelve-row ART comparisons on each API23/36/37. Inventory188 sources/42 artifacts; per-run hashes prevent stale device receipt association. |
-| Swift 3.1.0 | Logging adapter compatibility repaired after actual Swift5.10 found an unavailable LogEvent type. Current163 host/166 iOS simulator tests and47-file coverage pass; actual Swift5.10 all-product build and installed logging/native HTTP consumer pass. Final exact archive SPM/CocoaPods/iOS15 and Swift5.10 consumers pass. Full5.10 XCTest needs a matching older Xcode framework; simulator cost measurements make no physical-device claim. |
-| React Native 3.1.0 | 125 tests/all-file coverage/typecheck/build; packed compatibility and npm/pnpm/Yarn consumers; final RN0.87.1/iOS26.2 HTTP delivery; iOS floor0.76.9 and Expo57; Android compilation0.76.9/0.82.1/0.85.3 pass. V8 facade performance passes. Inventory:106 sources/one tarball. Actual API37/RN0.87.1 Android native HTTP delivery and twelve Release Hermes comparison rows now pass against final native Maven bytes. |
-| WordPress staged 2.1.0 | 93 tests/461 assertions, PHPStan/all19 coverage floors. Exact prepublication ZIP with PHP2.1/Browser3.2 passes WP6.5.5/PHP8.2 and WP7.1.1/PHP8.2/8.5 native/asset/relay/outage/cron/revocation checks. Exact-ZIP wrapper off/on/pressure comparison passes; final publishable locks/assets await prerequisite packages. |
+| Core | 1.20.0: additive bounded evidence, typed context and provenance. |
+| Shared-types / redaction | 3.0.0 / 2.7.0: exported Zod schema API major; additive privacy helpers. |
+| Node / Browser | 3.2.0: compatible capture APIs and negotiated optional evidence. |
+| CLI / MCP / OpenClaw | 1.18.0: compatible readers and automation. |
+| Python / PHP / Ruby / .NET / WordPress | 2.1.0: compatible evidence/recovery additions; WordPress is staged until registry prerequisites exist. |
+| Java / Go / Android / Swift / React Native | 3.1.0: compatible native/framework/bridge additions. |
+| Site | 1.6.11: documentation update. |
+| Portable OpenAI plugin | 1.0.2 unchanged package bytes; candidate source provenance is local, with deployed runtime identity left unclaimed. |
 
-The same-input comparisons exposed repeated privacy-pattern allocations in Go, .NET, Android and React Native; operation-owned rules removed that work without weakening protection. Performance receipts distinguish caller/deferred worker, host/simulator/facade/device, and live/peak/sampled/cumulative allocation metrics.
+Maintained JavaScript schema code uses upstream Zod 4.6.7. Legacy identifier shape,
+partial maps, nullable response metadata, CLI profile errors and public tool metadata
+retain their contracts. Shared-package publication validates independent versions.
+Core/site published dogfooding dependencies retain their verified transitive Zod 3
+patch until ordered registry adoption. The independently published SDK candidate
+has a zero-vulnerability audit, with no SDK-specific audit exception. See
+`spec/zod-v4-migration.md` for migration and dependency boundaries.
 
-Open gates requiring continued work or external input:
+## Qualification boundaries
 
-- **JavaScript migration:** owner approved the local integrity refresh and upstream Zod 4 migration on 1 November. The new Node/Browser candidate passed 603 tests, installed delivery/privacy and a zero-vulnerability audit. Final regenerated artifacts are being reconciled; no SDK security exception is used.
-- **Windows qualification:** the exact .NET review commit `b45c5da48c31abf14db86918b6be384a66ee5045` passed Windows/Linux .NET 8/10 CI, run `41287703911`. Draft PR: https://github.com/debugbundle/debugbundle-dotnet/pull/1.
-- **Final qualification refresh:** the Zod 4 accepting schema has been regenerated across all nine native validators. Source checks and fresh installed matrices are in progress; older artifact/device receipts below are historical until their new bytes are verified.
-- **Release preparation:** finish source/artifact receipt reconciliation and outstanding qualification in the pre-ship handoff. Retain the passing bounded default-compiler and webpack receipts. Final registry-qualified WordPress packaging and post-publish MCP ecosystem checks depend on their ordered authorised release steps.
+- Core accepting contracts, deterministic bundles/readers, migration-before-startup
+  and predecessor rollback have local proof. Real-storage integration passes 179 tests
+  across 40 files. Full unit/coverage and committed-source provenance are separate gates.
+- Node/Browser pass 603 tests, per-file coverage and installed privacy/delivery on
+  supporting hosts; Node 22 native/fallback and installed consumers are separately
+  verified. Actual Chromium exercises causes, resources, CSP, recovery and teardown.
+- Python 398, PHP 208, Ruby 327 and .NET 191 tests retain coverage/privacy/safety gates;
+  native installed matrices and exact artifacts are inventoried. Windows/Linux
+  .NET 8/10 CI passes for the reviewed source.
+- Java's maintained compiler/framework/agent lanes and Go's floor/current installed
+  module, race and lint gates are separately retained. Ruby frame protection reuses
+  text only inside one bounded projection, with independent returned values.
+- Android API 23/36/37 native HTTP/ART and actual RN/Hermes delivery/cost rows identify
+  exact Maven/APK/tarball inputs. Connected CI and simulator measurements remain
+  distinct from physical-device performance claims.
+- Swift's host/iOS coverage, actual Swift 5.10 compiler/installed consumer,
+  SPM/CocoaPods and iOS 15 artifact checks are separate. Full Swift 5.10 XCTest needs
+  a matching older Xcode framework; this is a documented runtime tooling limitation.
+- The staged WordPress ZIP passes its native/browser/relay/spool/revocation runtime
+  matrix. Final registry locks/ZIP and post-publication MCP ecosystem checks belong
+  to the dependency-ordered authorised release, after owner review.
+- Site tests/typecheck and the bounded default-compiler static export pass. No
+  browser inspection or screenshots are required or claimed.
 
-Continue within DebugBundle only. Do not describe parity or release readiness as complete while these applicable gates remain open.
+The local handoff records exact current gate closure and CI identities. Do not mark
+whole-phase acceptance or infer a shipped release while an applicable gate is open.
+Consumer adoption requires separate product-specific consent. Historical checkpoints
+below describe earlier releases and do not authorise this candidate's release.
 
 # Production follow-up complete — 24 October 2026
 

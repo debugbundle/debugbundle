@@ -8,20 +8,28 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parent.parent
 SDK = {
+    "js": ("3.2.0", [], [
+        "/tmp/debugbundle-zod4-js-final-qualification2.log",
+        "/tmp/debugbundle-zod4-js-node22-runtime.log",
+        "/tmp/debugbundle-zod4-js-node22-installed2.log",
+        "/tmp/debugbundle-zod4-js-node26-qualification2.log",
+        "/tmp/debugbundle-zod4-js-runtime-audit.log",
+        "/tmp/debugbundle-zod4-browser-installed-chromium.log"]),
     "python": ("2.1.0", ["dist/debugbundle_python-2.1.0*"], [
-        "/tmp/debugbundle-zod4-python-schema-qualification2.log",
-        "/tmp/debugbundle-zod4-python-wheel-installed.log",
-        "/tmp/debugbundle-python-evidence-performance2.log"]),
+        "/tmp/debugbundle-zod4-python-final-source.log",
+        "/tmp/debugbundle-zod4-python-final-installed-3.12.log",
+        "/tmp/debugbundle-zod4-python-final-performance.log"]),
     "php": ("2.1.0", ["smoke/dist/debugbundle-sdk-php-worktree.zip"], [
         "/tmp/debugbundle-zod4-php-schema-qualification2.log",
         "/tmp/debugbundle-zod4-php-zip-installed.log",
-        "/tmp/debugbundle-php-evidence-performance1.log",
-        "/tmp/debugbundle-php-evidence-performance85.log"]),
+        "/tmp/debugbundle-zod4-php-final-performance.log",
+        "/tmp/debugbundle-zod4-php85-final-performance.log"]),
     "ruby": ("2.1.0", ["debugbundle-2.1.0.gem"], [
-        "/tmp/debugbundle-zod4-ruby-schema-qualification2.log",
+        "/tmp/debugbundle-zod4-ruby-frame-cache-gates.log",
         "/tmp/debugbundle-ruby-evidence-final-frameworks.log",
-        "/tmp/debugbundle-zod4-ruby-installed-matrix.log",
-        "/tmp/debugbundle-ruby-evidence-comparison2.log"]),
+        "/tmp/debugbundle-zod4-ruby-frame-cache-safety.log",
+        "/tmp/debugbundle-zod4-ruby-final-installed-matrix.log",
+        "/tmp/debugbundle-zod4-ruby-frame-cache-comparison.log"]),
     "java": ("3.1.0", ["debugbundle-*/target/debugbundle-*-3.1.0*.jar", "debugbundle-*/pom.xml", "pom.xml"], [
         "/tmp/debugbundle-zod4-java-wildfly.log",
         "/tmp/debugbundle-zod4-java-performance.log"]),
@@ -29,12 +37,12 @@ SDK = {
         "/tmp/debugbundle-zod4-dotnet-schema-qualification.log",
         "/tmp/debugbundle-zod4-dotnet-final-installed-net10.log",
         "/tmp/debugbundle-zod4-dotnet-final-pack-net8.log",
-        "/tmp/debugbundle-dotnet-evidence-performance2.log"]),
+        "/tmp/debugbundle-zod4-dotnet-final-performance.log"]),
     "react-native": ("3.1.0", [".smoke/debugbundle-sdk-react-native-3.1.0.tgz"], [
-        "/tmp/debugbundle-react-native-evidence-performance-final2.log",
-        "/tmp/debugbundle-react-native-evidence-privacy-final-native.log",
+        "/tmp/debugbundle-zod4-rn-facade-performance.log",
+        "/tmp/debugbundle-zod4-react-native-schema-qualification.log",
         "/tmp/debugbundle-zod4-rn-package-managers.log",
-        "/tmp/debugbundle-react-native-evidence-expo-ios.log"]),
+        "/tmp/debugbundle-zod4-rn-ios-runtime.log"]),
 }
 EXCLUDED = {".tmp", ".smoke", ".build", "build", "target", "dist", "artifacts", "tmp", "vendor", "node_modules", "bin", "obj"}
 
@@ -58,16 +66,31 @@ def source_inventory(repo):
     return sources
 
 
+def source_state(repo, sources):
+    changed = set(subprocess.check_output(["git", "-C", str(repo), "diff", "--name-only", "HEAD"], text=True).splitlines())
+    changed.update(subprocess.check_output(["git", "-C", str(repo), "ls-files", "--others", "--exclude-standard"], text=True).splitlines())
+    return "local candidate" if changed.intersection(item["path"] for item in sources) else "committed review candidate"
+
+
 def record(name):
     version, patterns, receipt_names = SDK[name]
     repo = ROOT / "sdks" / ("debugbundle-" + name)
     sources = source_inventory(repo)
     artifacts = sorted({path for pattern in patterns for path in repo.glob(pattern) if path.is_file() and not path.is_symlink()})
+    artifact_root = repo
+    if name == "js":
+        artifact_root = ROOT
+        artifacts = [ROOT / ".tmp/sdk-js-candidate" / f"debugbundle-sdk-{runtime}-{version}.tgz"
+                     for runtime in ["node", "browser"]]
+        for runtime, artifact in zip(["node", "browser"], artifacts):
+            installed = ROOT / ".tmp/sdk-js-installed" / artifact.name
+            if not artifact.is_file() or not installed.is_file() or artifact.read_bytes() != installed.read_bytes():
+                raise SystemExit(f"js: retained {runtime} archive differs from Node 22 installed consumer")
     if not artifacts or not sources:
         raise SystemExit(f"{name}: candidate source/artifacts missing; build and qualify first")
     receipts = [Path(value) for value in receipt_names]
     if name == "python":
-        receipts += [Path(f"/tmp/debugbundle-zod4-python-installed-{version}.log")
+        receipts += [Path(f"/tmp/debugbundle-zod4-python-final-installed-{version}.log")
                      for version in ["3.10", "3.11", "3.12", "3.13", "3.14"]]
     if name == "php":
         receipts += [Path("/tmp/debugbundle-zod4-php-coverage.log"), Path("/tmp/debugbundle-zod4-php-fpm.log")]
@@ -104,20 +127,21 @@ def record(name):
             if not all(native_checked.get("sdks/debugbundle-android/" + item["path"]) == item["sha256"] for item in native_artifacts):
                 continue
             receipts += [passed.parent / filename for filename in ["inputs.json", "react-native-inputs.json", "runtime.txt", "instrumentation.txt", "passed.json"]]
-            receipts.append(Path("/tmp/debugbundle-evidence-react-native-android-device3.log"))
+            receipts.append(Path("/tmp/debugbundle-zod4-rn-android-device2.log"))
             android_runtime = True
             break
     if any(not path.is_file() or path.stat().st_size == 0 for path in receipts):
         raise SystemExit(f"{name}: required qualification receipt missing")
     result = {
         "version": 1, "candidate_version": version,
-        "source_state": "CI-qualified review commit" if name == "dotnet" else "local candidate",
+        "source_state": "CI-qualified review commit" if name == "dotnet" else source_state(repo, sources),
         "base_commit": subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip(),
         "source_sha256": hashlib.sha256(json.dumps(sources, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
-        "sources": sources, "artifacts": [identity(path, repo) for path in artifacts],
+        "sources": sources, "artifact_root": "workspace" if name == "js" else "repository",
+        "artifacts": [identity(path, artifact_root) for path in artifacts],
         "receipts": [identity(path) for path in receipts], "recorder": identity(Path(__file__).resolve(), ROOT),
         "qualification": "Byte inventory only; consult the execution ledger for receipt scope and open gates.",
-        "remaining": ["whole-phase qualification and release handoff", "explicit publication authority"]
+        "remaining": ["owner review before release train", "explicit publication authority"]
         + (["Android runtime and Hermes/device performance"] if name == "react-native" and not android_runtime else []),
     }
     output = ROOT / ".tmp/evidence-release" / (name + ".json")

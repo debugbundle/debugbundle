@@ -291,9 +291,10 @@ privacy-js-verify:
 	$(NODE_RUN) "corepack enable && node scripts/test-js-sdk-with-local-redaction.mjs $(TEST_FILES)"
 
 .PHONY: privacy-js-candidate-check
+JS_CANDIDATE_NODE_IMAGE ?= $(NODE_IMAGE)
 privacy-js-candidate-check: license-prepare-shared
 	$(NODE_RUN) 'node scripts/prepare-js-sdk-candidate-lock.mjs --check'
-	docker run --rm -v "$(PWD):$(WORKDIR)" --tmpfs "$(WORKDIR)/sdks/debugbundle-js/.tmp" -w "$(WORKDIR)" node:24-alpine sh -lc 'corepack enable && node scripts/test-js-sdk-with-local-redaction.mjs --candidate && mkdir -p .tmp/sdk-js-candidate && cp sdks/debugbundle-js/.tmp/npm-packages/*.tgz .tmp/sdk-js-candidate/'
+	docker run --rm -v "$(PWD):$(WORKDIR)" --tmpfs "$(WORKDIR)/sdks/debugbundle-js/.tmp" -w "$(WORKDIR)" $(JS_CANDIDATE_NODE_IMAGE) sh -lc 'if ! command -v corepack >/dev/null 2>&1; then npm install --global corepack@0.34.1 >/dev/null; fi && corepack enable && node scripts/test-js-sdk-with-local-redaction.mjs --candidate && mkdir -p .tmp/sdk-js-candidate && cp sdks/debugbundle-js/.tmp/npm-packages/*.tgz .tmp/sdk-js-candidate/'
 
 .PHONY: js-candidate-lock
 js-candidate-lock: license-prepare-shared
@@ -304,8 +305,9 @@ js-candidate-audit:
 	$(NODE_RUN) 'node scripts/audit-js-sdk-candidate.mjs'
 
 .PHONY: privacy-js-local-smoke
+JS_SMOKE_NODE_IMAGE ?= node:26-alpine
 privacy-js-local-smoke: license-prepare-shared
-	docker run --rm -t -v "$(PWD):$(WORKDIR)" --tmpfs "$(WORKDIR)/sdks/debugbundle-js/.tmp" -w "$(WORKDIR)" node:26-alpine sh -lc 'npm install --global corepack@0.34.1 >/dev/null && corepack enable && node scripts/test-js-sdk-with-local-redaction.mjs --consumer'
+	docker run --rm -t -v "$(PWD):$(WORKDIR)" --tmpfs "$(WORKDIR)/sdks/debugbundle-js/.tmp" -w "$(WORKDIR)" $(JS_SMOKE_NODE_IMAGE) sh -lc 'npm install --global corepack@0.34.1 >/dev/null && corepack enable && node scripts/test-js-sdk-with-local-redaction.mjs --consumer && mkdir -p .tmp/sdk-js-installed && cp sdks/debugbundle-js/.tmp/npm-packages/*.tgz .tmp/sdk-js-installed/'
 
 .PHONY: incident-recovery-check
 incident-recovery-check:
@@ -345,6 +347,11 @@ billing-safety-format:
 .PHONY: coverage-focused
 coverage-focused:
 	$(NODE_RUN) "apk add --no-cache git >/dev/null && corepack enable && VITEST_COVERAGE_SHARD=1 corepack pnpm vitest run --coverage $(TEST_FILES) && node scripts/check-changed-file-coverage.mjs"
+
+# Recheck an existing merged report against the whole reviewed commit range.
+.PHONY: coverage-changed-check
+coverage-changed-check:
+	$(NODE_RUN) "apk add --no-cache git >/dev/null && BASE_SHA=$(BASE_SHA) HEAD_SHA=$(HEAD_SHA) node scripts/check-changed-file-coverage.mjs"
 
 .PHONY: format-focused
 format-focused:
@@ -408,7 +415,7 @@ candidate-build:
 
 .PHONY: evidence-artifact-manifests
 evidence-artifact-manifests:
-	python3 scripts/record-sdk-evidence-artifacts.py python php ruby java dotnet react-native
+	python3 scripts/record-sdk-evidence-artifacts.py js python php ruby java dotnet react-native
 
 .PHONY: evidence-release-manifest
 evidence-release-manifest:
@@ -523,11 +530,11 @@ openai-plugin-plan:
 
 .PHONY: openai-plugin-prepare
 openai-plugin-prepare:
-	$(NODE_RUN) "apk add --no-cache git >/dev/null && node scripts/release-openai-plugin.mjs prepare $(if $(OPENAI_REQUIRE_CONNECTION),--require-connection,) $(if $(OPENAI_API_IMAGE_DIGEST),--api-image-digest $(OPENAI_API_IMAGE_DIGEST),)"
+	$(NODE_RUN) "apk add --no-cache git >/dev/null && node scripts/release-openai-plugin.mjs prepare $(if $(OPENAI_REQUIRE_CONNECTION),--require-connection,) $(if $(OPENAI_API_IMAGE_DIGEST),--api-image-digest $(OPENAI_API_IMAGE_DIGEST),) $(if $(OPENAI_PLUGIN_OUTPUT),--output $(OPENAI_PLUGIN_OUTPUT),)"
 
 .PHONY: openai-plugin-verify
 openai-plugin-verify:
-	$(NODE_RUN) "apk add --no-cache git >/dev/null && node scripts/release-openai-plugin.mjs verify $(if $(OPENAI_REQUIRE_CONNECTION),--require-connection,) $(if $(OPENAI_API_IMAGE_DIGEST),--api-image-digest $(OPENAI_API_IMAGE_DIGEST),)"
+	$(NODE_RUN) "apk add --no-cache git >/dev/null && node scripts/release-openai-plugin.mjs verify $(if $(OPENAI_REQUIRE_CONNECTION),--require-connection,) $(if $(OPENAI_API_IMAGE_DIGEST),--api-image-digest $(OPENAI_API_IMAGE_DIGEST),) $(if $(OPENAI_PLUGIN_OUTPUT),--output $(OPENAI_PLUGIN_OUTPUT),)"
 
 .PHONY: ci
 ci: lint typecheck test build

@@ -1,5 +1,5 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, resolve, sep } from "node:path";
 import { toInputJsonSchema } from "../packages/shared-types/src/json-schema.js";
 
 import {
@@ -82,7 +82,12 @@ const targets: Record<string, string> = {
 const selected = (process.env["SDK_FIXTURE_TARGETS"] ?? "").split(",").filter(Boolean);
 const outputIndex = process.argv.indexOf("--schema-output");
 const output = outputIndex < 0 ? undefined : process.argv[outputIndex + 1];
-if (outputIndex >= 0 && (!output?.startsWith(".tmp/evidence-release/") || selected.length > 0))
+if (
+  outputIndex >= 0 &&
+  (!output?.startsWith(".tmp/evidence-release/") ||
+    !resolve(output).startsWith(resolve(".tmp/evidence-release") + sep) ||
+    selected.length > 0)
+)
   throw new Error("Isolated schema output requires .tmp/evidence-release/ and no SDK targets");
 const paths = [
   output ?? "tests/fixtures/evidence/event-envelope.schema.json",

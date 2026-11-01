@@ -54,7 +54,7 @@ def record(name, repo, artifacts, receipt_names, remaining):
     value = {
         "version": 1,
         "candidate_version": json.loads((repo / "package.json").read_text())["version"],
-        "source_state": "uncommitted local candidate",
+        "source_state": inventory.source_state(repo, sources),
         "base_commit": subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip(),
         "source_sha256": hashlib.sha256(json.dumps(sources, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
         "sources": sources,
@@ -87,15 +87,17 @@ if __name__ == "__main__":
         version = json.loads(manifest.read_text())["version"]
         artifacts.append(directory / f"{package}-{version}.tgz")
     record("core", ROOT, artifacts, [
-        "/tmp/debugbundle-evidence-core-final-unit4.log", "/tmp/debugbundle-evidence-core-final-integration3.log",
-        "/tmp/debugbundle-evidence-final-lint-types.log", "/tmp/debugbundle-evidence-versioned-package-contracts.log",
-        "/tmp/debugbundle-evidence-versioned-core-distributions.log", "/tmp/debugbundle-evidence-versioned-native-packages.log",
-        "/tmp/debugbundle-evidence-native-chromium-final.log",
-    ] + runtime_receipts(), ["final JS dependency/security and Windows qualification", "explicit commit/publication/deployment authority",
+        "/tmp/debugbundle-zod4-core-coverage5.log", "/tmp/debugbundle-zod4-core-integration2.log",
+        "/tmp/debugbundle-zod4-core-lint.log", "/tmp/debugbundle-zod4-final-typecheck.log",
+        "/tmp/debugbundle-zod4-shared-versions-green.log", "/tmp/debugbundle-zod4-schema-contracts7.log",
+        "/tmp/debugbundle-zod4-core-distributions-build.log", "/tmp/debugbundle-zod4-cli-installed-runtimes.log",
+        "/tmp/debugbundle-zod4-codex-installed-runtimes.log", "/tmp/debugbundle-zod4-browser-installed-chromium.log",
+        "/tmp/debugbundle-zod4-js-final-qualification2.log", "/tmp/debugbundle-zod4-js-runtime-audit.log",
+        "/tmp/debugbundle-zod4-final-native-fixtures-check.log",
+    ] + runtime_receipts(), ["owner review before release train", "explicit publication/deployment authority",
         "hosted exact-source rollout and rollback verification", "post-publication MCP ecosystem pipeline"])
     site = ROOT / "site"
     record("site", site, sorted(path for path in (site / "out").rglob("*") if path.is_file() and not path.is_symlink()), [
-        "/tmp/debugbundle-evidence-versioned-site-final.log", "/tmp/debugbundle-evidence-versioned-site-webpack.log",
-        "/tmp/debugbundle-evidence-versioned-site-bounded.log", "/tmp/debugbundle-evidence-reconciled-public-artifacts.log",
-        "/tmp/debugbundle-evidence-reconciled-site-tests.log",
-    ], ["explicit commit/publication/deployment authority"])
+        "/tmp/debugbundle-zod4-site-final-gates.log", "/tmp/debugbundle-zod4-site-final-export.log",
+        "/tmp/debugbundle-zod4-core-distributions-build.log",
+    ], ["owner review before release train", "explicit publication/deployment authority"])
