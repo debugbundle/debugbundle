@@ -2,6 +2,13 @@
 
 OpenClaw tools for runtime error reporting, crash reporting, incident response, live app monitoring, endpoint health checks, debug bundles, and product analytics. Monitoring is scoped to runtime failures, customer-facing incidents, and endpoint health; DebugBundle is not a generic infrastructure-monitoring platform.
 
+## Packaging update 1.18.1
+
+This coordinated patch preserves the 1.18.0 tool catalog, schemas, authentication
+and native approval policy. It provides a fresh immutable ClawHub version after
+an operational scanner failure; the failed 1.18.0 upload remains in platform
+history. Upload acceptance does not establish clean security or public availability.
+
 ## Install
 
 Requires OpenClaw 2026.6.9 or newer, the supported host baseline for native plugin approvals. Upgrade older hosts before installing the corrective release.

@@ -1,3 +1,14 @@
+# ClawHub follow-through — owner authorised 1.18.1 attempt
+
+The prior skill antivirus blocker has cleared. The plugin 1.18.0 upload is now
+failed/not recoverable after Skillspector failed before a verdict; public latest
+remains 1.17.0. The owner authorised one fresh coordinated MCP/OpenClaw/portable
+skill 1.18.1 patch, correcting stale install pins and using publisher 0.25.0.
+All 32 OpenClaw gates and 209 compatibility checks pass. Publication, native
+registry checks and final ClawHub security/discovery remain pending. No support
+issue is authorised; core, language SDKs, WordPress and hosted runtime stay on
+verified releases. See [patch evidence](spec/clawhub-publication-retry-20261101.md).
+
 # Release checkpoint — 1 November 2026
 
 All maintained SDKs and developer packages are published with passing native and

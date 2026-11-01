@@ -28,11 +28,7 @@
       "slug": "debugbundle",
       "gitBranch": "main",
       "catalog": {
-        "categories": [
-          "Operations",
-          "Development",
-          "Agents"
-        ],
+        "categories": ["Operations", "Development", "Agents"],
         "topics": [
           "debugging",
           "incident-response",
@@ -51,11 +47,7 @@
       "slug": "debugbundle",
       "displayName": "DebugBundle",
       "catalog": {
-        "categories": [
-          "Operations",
-          "Development",
-          "Agents"
-        ],
+        "categories": ["Operations", "Development", "Agents"],
         "topics": [
           "debugging",
           "incident-response",
@@ -66,7 +58,7 @@
       },
       "skillPath": "apps/mcp/clawhub/debugbundle",
       "cliPackage": "clawhub",
-      "cliVersion": "0.22.0",
+      "cliVersion": "0.25.0",
       "discoveryQueries": [
         { "query": "error reporting incident monitoring live apps", "maxRank": 10 },
         { "query": "runtime error reporting", "maxRank": 10 },
@@ -88,41 +80,27 @@
       "packagePath": "apps/openclaw-plugin",
       "pluginId": "debugbundle",
       "cliPackage": "clawhub",
-      "cliVersion": "0.22.0"
+      "cliVersion": "0.25.0"
     },
     "glama": {
       "type": "discovery",
       "listingUrl": "https://glama.ai/mcp/servers",
-      "searchTerms": [
-        "debugbundle",
-        "@debugbundle/mcp",
-        "com.debugbundle/mcp"
-      ]
+      "searchTerms": ["debugbundle", "@debugbundle/mcp", "com.debugbundle/mcp"]
     },
     "pulseMcp": {
       "type": "discovery",
       "listingUrl": "https://www.pulsemcp.com/servers/debugbundle",
-      "searchTerms": [
-        "debugbundle",
-        "com.debugbundle/mcp"
-      ]
+      "searchTerms": ["debugbundle", "com.debugbundle/mcp"]
     },
     "mcpSo": {
       "type": "discovery",
       "listingUrl": "https://mcp.so/server/debugbundle/debugbundle",
-      "searchTerms": [
-        "debugbundle",
-        "@debugbundle/mcp"
-      ]
+      "searchTerms": ["debugbundle", "@debugbundle/mcp"]
     },
     "lobehub": {
       "type": "discovery",
       "listingUrl": "https://lobehub.com/mcp",
-      "searchTerms": [
-        "debugbundle",
-        "@debugbundle/mcp",
-        "com.debugbundle/mcp"
-      ]
+      "searchTerms": ["debugbundle", "@debugbundle/mcp", "com.debugbundle/mcp"]
     }
   }
 }

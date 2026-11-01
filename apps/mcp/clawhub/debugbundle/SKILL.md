@@ -23,11 +23,11 @@ metadata:
         description: Optional DebugBundle API base URL for self-hosted or non-production environments.
     install:
       - kind: node
-        package: "@debugbundle/mcp@1.17.0"
+        package: "@debugbundle/mcp@1.18.1"
         bins:
           - debugbundle-mcp
       - kind: node
-        package: "@debugbundle/cli@1.17.0"
+        package: "@debugbundle/cli@1.18.0"
         bins:
           - debugbundle
     skillKey: debugbundle
@@ -72,6 +72,7 @@ Hosted operations can authenticate through one of these paths:
 
 - Existing CLI auth state in `~/.debugbundle/auth.json`.
 - `DEBUGBUNDLE_MEMBER_TOKEN` in the MCP server environment.
+
 Use existing saved or server-side authentication; never copy credentials into chat or tool arguments.
 
 Use `DEBUGBUNDLE_API_URL` only when the user is targeting self-hosted, staging, or another non-default API host.

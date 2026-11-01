@@ -4,6 +4,12 @@ This is the maintained inventory for first-party developer agent packages that b
 
 ## Published developer packages (2026-11-01)
 
+MCP/OpenClaw 1.18.1 packaging retry review: retain the verified developer-package
+versions and exact MCP 1.18.0 pins below. The patch corrects ClawHub install metadata
+and publisher tooling without changing MCP tools, schemas or authentication.
+Compatibility checks preserve the existing packages; no wrapper republish is
+required. See [the patch receipt](clawhub-publication-retry-20261101.md).
+
 | Host        | Package version | MCP pin  | Maintained source                                                           | Public channel                                                                                                  | Release and update route                                                                                                                                                                                                            |
 | ----------- | --------------- | -------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Codex       | `1.4.1`         | `1.18.0` | [`plugins/debugbundle-codex/`](../plugins/debugbundle-codex/)               | core Git marketplace in [`debugbundle/debugbundle`](https://github.com/debugbundle/debugbundle)                 | Publish the reviewed plugin and [catalog](../.agents/plugins/marketplace.json) on core `main`; verify a public Git marketplace install and upgrade.                                                                                 |

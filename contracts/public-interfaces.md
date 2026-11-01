@@ -3364,6 +3364,11 @@ Install surface: `@debugbundle/mcp` publishes a standalone stdio MCP server with
 
 Discovery surface: `apps/mcp/clawhub/debugbundle/SKILL.md` is the portable Agent Skill source published to ClawHub and Smithery Skills. Its frontmatter description, the MCP package/registry descriptions used by Claude and other MCP clients, and the OpenClaw package/manifest descriptions must stay aligned around truthful capability-first language. The release verifier checks configured ClawHub capability queries and maximum ranks after publication; exact-slug availability is not sufficient evidence of discoverability.
 
+For a coordinated portable-skill release, its exact MCP and CLI installer pins
+must match the selected package versions in the core manifests. Publish those
+packages before the skill. Historical immutable skill archives retain their
+original pins; new publication must not carry stale installer versions forward.
+
 ### 3.1 Core Tools
 
 ```
