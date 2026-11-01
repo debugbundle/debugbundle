@@ -10,7 +10,8 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 - Correct the portable ClawHub skill's installer pins to MCP 1.18.1 and CLI 1.18.0,
   with a regression against the coordinated package manifests. Refresh the direct
-  MCP install example and pin the ClawHub publisher to 0.25.0.
+  MCP install example. Use ClawHub 0.25.0 for plugin inspection/publication and
+  its supported 0.22.0 multipart skill publisher after upload-ticket HTTP 500s.
 - Prepare a fresh immutable OpenClaw 1.18.1 attempt after the platform scanner
   failed retained 1.18.0. Preserve tool schemas, authentication and native
   per-call approvals; exact-version security acceptance remains mandatory.

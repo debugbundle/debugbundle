@@ -58,7 +58,7 @@
       },
       "skillPath": "apps/mcp/clawhub/debugbundle",
       "cliPackage": "clawhub",
-      "cliVersion": "0.25.0",
+      "cliVersion": "0.22.0",
       "discoveryQueries": [
         { "query": "error reporting incident monitoring live apps", "maxRank": 10 },
         { "query": "runtime error reporting", "maxRank": 10 },

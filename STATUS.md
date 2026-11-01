@@ -1,13 +1,14 @@
 # ClawHub follow-through — owner authorised 1.18.1 attempt
 
-The prior skill antivirus blocker has cleared. The plugin 1.18.0 upload is now
-failed/not recoverable after Skillspector failed before a verdict; public latest
-remains 1.17.0. The owner authorised one fresh coordinated MCP/OpenClaw/portable
-skill 1.18.1 patch, correcting stale install pins and using publisher 0.25.0.
-All 32 OpenClaw gates and 209 compatibility checks pass. Publication, native
-registry checks and final ClawHub security/discovery remain pending. No support
-issue is authorised; core, language SDKs, WordPress and hosted runtime stay on
-verified releases. See [patch evidence](spec/clawhub-publication-retry-20261101.md).
+MCP 1.18.1 is published to npm and the official Registry from immutable fbfdd394.
+Full source CI, release CI and installed public checks on Node 22/24/26 pass.
+ClawHub accepted the plugin 1.18.1 upload after temporary write contention;
+its exact security checks remain pending. The portable skill's corrected MCP
+1.18.1 / CLI 1.18.0 pins are ready for the supported 0.22.0 multipart publisher,
+after 0.25.0 upload-ticket HTTP 500s. Plugin inspection/publication retains 0.25.0.
+Both exact ClawHub security/discovery gates remain open. No support issue is
+submitted; core, language SDKs, WordPress and hosted runtime retain their verified
+releases. See [patch evidence](spec/clawhub-publication-retry-20261101.md).
 
 # Release checkpoint — 1 November 2026
 
@@ -26,9 +27,9 @@ API/MCP readiness remains 200 and the app build remains 88a9a42c. Canonical core
 release workflow 41354190812 passes; public v1.20.0 and its immutable tag resolve
 to qualified ee225461. All independent publication steps are complete.
 
-ClawHub's missing skill antivirus result and scanner-failed staged plugin remain
-open acceptance gates. No further ClawHub/OpenClaw action or support communication
-is being taken. Final ecosystem completion remains unclaimed.
+The original skill 1.18.0 antivirus result has since cleared. Its failed plugin
+remains retained; the owner-authorised 1.18.1 attempt above is now active. Final
+ClawHub ecosystem completion remains unclaimed, with no support issue submitted.
 
 # Evidence quality and SDK parity: authorised release in progress — 1 November 2026
 

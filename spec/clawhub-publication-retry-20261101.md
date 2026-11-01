@@ -1,7 +1,8 @@
 # MCP and ClawHub packaging retry — 1 November 2026
 
-Status: owner-authorised 1.18.1 candidate; publication and platform security
-acceptance are pending. No support issue is authorised or submitted.
+Status: MCP 1.18.1 is published to npm and the official Registry. ClawHub accepted
+the plugin 1.18.1 upload and is checking it; the skill transport retry and both
+exact-version security outcomes remain pending. No support issue is submitted.
 
 ## Purpose and version decision
 
@@ -16,8 +17,13 @@ the plugin use **1.18.1** under their existing version-alignment contract. The
 portable skill also uses **1.18.1**, correcting its stale installer metadata to
 MCP 1.18.1 and the already-published CLI 1.18.0. A regression first reproduces the
 old 1.17.0 pins, then requires the selected package manifests' exact versions.
-ClawHub publisher/inspector tooling is pinned to 0.25.0 for both distributions.
-The MCP package's direct Codex example is updated to this patch.
+The MCP package's direct Codex example is updated to this patch. ClawHub's plugin
+publisher and inspector use 0.25.0. The portable skill publisher retains 0.22.0
+for its supported direct multipart transport: 0.25.0's upload-ticket requests
+failed twice with HTTP 500 before accepting either file. Both publishers use the
+same authenticated API and mandatory platform security checks. The two-file
+skill's 0.22.0 dry run passes; this transport correction does not require another
+MCP package version or changes to the immutable 1.18.1 npm artifact.
 
 No tool catalog, input schema, transport, authentication, redaction, native approval
 or SDK implementation changes. Core stays 1.20.0 and its deployed API/worker/app
@@ -54,6 +60,26 @@ discard the earlier attempt, or submit a support issue without owner direction.
 
 The stale-pin regression fails against the old skill. With corrected pins and the
 regenerated 1.18.1 plugin manifest, all 32 OpenClaw release checks and 209 MCP,
-OpenClaw and developer-plugin compatibility checks pass. ClawHub 0.25.0 inspection passes with zero warnings/breakages, and its package
-publish dry run passes. Registry publication and final platform outcomes remain
-separately pending.
+OpenClaw and developer-plugin compatibility checks pass. ClawHub 0.25.0 inspection
+passes with zero warnings/breakages, and its package publish dry run passes. The
+multipart configuration's 16 release/security/publication regressions pass.
+
+Immutable `mcp-v1.18.1` and npm `gitHead` identify
+`fbfdd394fac52087bb11489f53a2980c64ba057e`. The public npm archive has SHA-256
+`ba13e37b5257281019e46b693cb6e7f7d756b1b2f42fbf8935e3174f23e7287b`;
+its required README/license/server manifest and executable bytes match source.
+[MCP release 41359104108](https://github.com/debugbundle/debugbundle/actions/runs/41359104108),
+[full source CI 41359102668](https://github.com/debugbundle/debugbundle/actions/runs/41359102668)
+and CLI compatibility 41359102664 pass. Installed public MCP/Codex checks pass on
+Node 22, 24 and 26. The official Registry's immutable 1.18.1 entry is active/latest.
+The MCPB is prepared from that public archive, with native dependency and staged
+stdio checks passing. Runtime source under MCP, CLI and shared packages is
+unchanged from published MCP 1.18.0 source `c3bec35e`.
+
+ClawHub's first skill upload and one retry failed at upload-ticket file 1/2 with
+HTTP 500 (request IDs `46409b1815572a90` and `e2cb8530b871c048`). Exact owner reads
+confirm that skill 1.18.1 was not accepted. The first plugin call hit platform
+database write contention; after its backoff, one bounded same-version retry was
+accepted and exact publication status is pending at checks. Neither an upload
+receipt nor this pending status satisfies the final security gate. The existing
+1.18.0 failed plugin attempt and all immutable versions are retained.
