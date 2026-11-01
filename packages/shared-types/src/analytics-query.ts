@@ -5,7 +5,7 @@ const MAX_LAST_MS = 370 * 24 * 60 * 60 * 1000;
 
 export const AnalyticsMetricsQuerySchema = z
   .object({
-    project_id: z.string().uuid(),
+    project_id: z.string().guid(),
     from: z.string().datetime().optional(),
     to: z.string().datetime().optional(),
     last: z.string().trim().min(2).max(16).optional(),

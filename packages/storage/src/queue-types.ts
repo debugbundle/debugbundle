@@ -99,6 +99,7 @@ export interface ClaimedRedisJob<Payload> {
 }
 
 export interface NormalizeEventsJob {
+  received_at?: string;
   project_id: string;
   event_id: string;
   object_key: string;
@@ -138,6 +139,8 @@ export interface GroupIncidentJob {
 }
 
 export interface BuildBundleJob {
+  primary_event_id?: string;
+  primary_occurred_at?: string;
   project_id: string;
   incident_id: string;
   event_id: string;

@@ -84,14 +84,27 @@ async function pathExists(path: string, stat: StatReader): Promise<boolean> {
   }
 }
 
-function formatZodErrors(error: z.ZodError): ProfileValidationError[] {
+export function profileIssueMessage(issue: z.ZodIssue, input: unknown): string {
+  const value = issue.path.reduce<unknown>((parent, key) =>
+      parent !== null && typeof parent === "object" && Object.hasOwn(parent, key)
+        ? (parent as Record<PropertyKey, unknown>)[key] : undefined, input);
+  // Profile diagnostics are CLI output; preserve their established wording
+  // independently of the validation library's default error text.
+  return issue.code === "invalid_type"
+      ? value === undefined ? "Required"
+        : `Expected ${issue.expected}, received ${value === null ? "null" : Array.isArray(value) ? "array" : typeof value}`
+      : issue.message;
+}
+
+function formatZodErrors(error: z.ZodError, input: unknown): ProfileValidationError[] {
   return error.issues.map((issue) => {
     const path = issue.path.join(".");
+    const message = profileIssueMessage(issue, input);
 
     if (path === "services" || path.startsWith("services.")) {
       return {
         path,
-        message: issue.message,
+        message,
         suggestion: "Add service entries with name, kind, runtime, framework, paths, owns_routes, and depends_on.",
         example: '[{"name":"api","kind":"backend","runtime":"Node.js","framework":"Fastify","paths":["apps/api"],"owns_routes":["POST /checkout"],"depends_on":["worker"]}]'
       };
@@ -100,7 +113,7 @@ function formatZodErrors(error: z.ZodError): ProfileValidationError[] {
     if (path === "critical_paths" || path.startsWith("critical_paths.")) {
       return {
         path,
-        message: issue.message,
+        message,
         suggestion: "Use object entries so each critical path records its owner_service and review notes.",
         example: '[{"name":"checkout","owner_service":"api","notes":"Creates the order, charges the card, and enqueues fulfillment."}]'
       };
@@ -109,7 +122,7 @@ function formatZodErrors(error: z.ZodError): ProfileValidationError[] {
     if (path === "developer_workflows" || path.startsWith("developer_workflows.")) {
       return {
         path,
-        message: issue.message,
+        message,
         suggestion: "Provide install, build, test, and lint as command strings so agents can run the standard repo workflows.",
         example: '{"install":"pnpm install","build":"pnpm build","test":"pnpm test","lint":"pnpm lint"}'
       };
@@ -117,7 +130,7 @@ function formatZodErrors(error: z.ZodError): ProfileValidationError[] {
 
     return {
       path,
-      message: issue.message
+      message
     };
   });
 }
@@ -164,7 +177,7 @@ export async function validateProfile(
   if (!parsedProfile.success) {
     return {
       valid: false,
-      errors: formatZodErrors(parsedProfile.error)
+      errors: formatZodErrors(parsedProfile.error, parsedJson)
     };
   }
 

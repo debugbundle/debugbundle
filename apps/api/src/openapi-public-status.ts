@@ -57,7 +57,7 @@ export function publicStatusOperations(): OperationSpec[] {
             ? "Read settings for owners or the published link for collaborators"
             : `${action} project public status page (owner only)`,
         tags: ["Public status"],
-        params: z.object({ id: z.string().uuid() }).strict(),
+        params: z.object({ id: z.string().guid() }).strict(),
         security: anyMemberAuth,
         ...(action === "save"
           ? { requestBody: component("PublicStatusSettings", PublicStatusSettingsSchema) }

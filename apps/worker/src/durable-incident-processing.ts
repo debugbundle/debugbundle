@@ -1,4 +1,11 @@
-import { createBrowserRecoveryStore, lockBrowserRecoveryEvent } from "../../../packages/storage/src/browser-recovery-store.js";
+import {
+  createBrowserRecoveryStore,
+  lockBrowserRecoveryEvent
+} from "../../../packages/storage/src/browser-recovery-store.js";
+import {
+  createEvidenceContextStore,
+  lockEvidenceContextEvent
+} from "../../../packages/storage/src/evidence-context-store.js";
 import { createWorkerJobStore } from "../../../packages/storage/src/worker-job-store.js";
 import { z } from "zod";
 import { EventClassSchema, EventTypeSchema } from "../../../packages/shared-types/src/index.js";
@@ -32,9 +39,9 @@ import type { DurableWorkerQueue } from "./durable-queue.js";
 
 const SeveritySchema = z.enum(["low", "medium", "high", "critical"]);
 const IncidentImprovementSchema = z.object({
-  project_id: z.string().uuid(),
-  incident_id: z.string().uuid(),
-  event_id: z.string().uuid(),
+  project_id: z.string().guid(),
+  incident_id: z.string().guid(),
+  event_id: z.string().guid(),
   event_type: EventTypeSchema,
   service_name: z.string(),
   environment: z.string(),
@@ -45,7 +52,7 @@ const IncidentImprovementSchema = z.object({
   regressed_now: z.boolean(),
   regression_deploy: z
     .object({
-      deployment_id: z.string().uuid(),
+      deployment_id: z.string().guid(),
       commit_sha: z.string().nullable(),
       version: z.string().nullable(),
       branch: z.string().nullable(),
@@ -58,10 +65,10 @@ const IncidentImprovementSchema = z.object({
 const LifecycleSchema = z
   .object({
     channel: z.enum(["webhook", "github"]),
-    project_id: z.string().uuid(),
+    project_id: z.string().guid(),
     input: z.object({
-      project_id: z.string().uuid(),
-      incident_id: z.string().uuid(),
+      project_id: z.string().guid(),
+      incident_id: z.string().guid(),
       event_type: z.enum([
         "bundle.created",
         "bundle.updated",
@@ -127,7 +134,10 @@ export function createDurableIncidentProcessing(input: {
           queue,
           objectStore: input.objectStore,
           processedEventStore: createProcessedEventStore(tx),
-          recordBrowserRecoveryContext: (projectId, event) => createBrowserRecoveryStore(tx).record(projectId, event),
+          recordBrowserRecoveryContext: (projectId, event) =>
+            createBrowserRecoveryStore(tx).record(projectId, event),
+          recordEvidenceContext: (projectId, event, receivedAt, eventClass) =>
+            createEvidenceContextStore(tx).record(projectId, event, receivedAt, eventClass),
           requestAnomalyCounter: input.requestAnomalyCounter,
           deferImprovement: ({ project_id, event, event_class, object_key }) =>
             queue.enqueueInternal("evaluate-event-improvement", {
@@ -157,6 +167,7 @@ export function createDurableIncidentProcessing(input: {
           incidentStore: {
             ...metadata,
             async upsertIncident(data) {
+              await lockEvidenceContextEvent(tx, data.project_id, data.event_id);
               if (data.event_type === "frontend_exception") {
                 await lockBrowserRecoveryEvent(tx, data.project_id, data.event_id);
               }
@@ -203,7 +214,7 @@ export function createDurableIncidentProcessing(input: {
           },
           objectStore: {
             deleteObject: async ({ key }) => {
-              const projectId = z.string().uuid().parse(key.split("/")[1]);
+              const projectId = z.string().guid().parse(key.split("/")[1]);
               await queue.enqueueInternal("delete-retained-object", { project_id: projectId, key });
             }
           },
@@ -216,8 +227,8 @@ export function createDurableIncidentProcessing(input: {
         if (!payload) return { processed: false, reason: "no_jobs" };
         const job = z
           .object({
-            project_id: z.string().uuid(),
-            event_id: z.string().uuid(),
+            project_id: z.string().guid(),
+            event_id: z.string().guid(),
             object_key: z.string().min(1),
             event_class: EventClassSchema
           })
@@ -264,7 +275,7 @@ export function createDurableIncidentProcessing(input: {
     deleteRetainedObject: async () => {
       const payload = await input.queue.dequeueInternal("delete-retained-object");
       if (!payload) return { processed: false, reason: "no_jobs" };
-      const job = z.object({ project_id: z.string().uuid(), key: z.string() }).parse(payload);
+      const job = z.object({ project_id: z.string().guid(), key: z.string() }).parse(payload);
       if (!job.key.startsWith(`raw-events/${job.project_id}/`))
         throw new Error("worker_retention_scope_invalid");
       if (!input.objectStore.deleteObject) throw new Error("worker_object_deletion_unavailable");

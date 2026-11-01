@@ -7,7 +7,7 @@ import {
   AnalyticsFlowApiError,
   type AnalyticsFlowApi
 } from "../../cli/src/analytics-flow-commands.js";
-const scope = z.object({ bearerToken: z.string(), projectId: z.string().uuid() });
+const scope = z.object({ bearerToken: z.string(), projectId: z.string().guid() });
 const item = scope.extend({ flowKey: AnalyticsFlowKeySchema });
 export const ANALYTICS_FLOW_MCP_TOOL_NAMES = [
   "list_analytics_flows",

@@ -184,6 +184,9 @@ When a test fails, do not assume the test is wrong. Treat the failure as evidenc
 ### Interface Parity
 If a capability matters for automation, it must be available through API, CLI, and MCP. No capability may be dashboard-only. All three interfaces must call the same domain services.
 
+### SDK Capability, Safety and Reliability Parity
+For every SDK or SDK-evidence change, evaluate all maintained SDKs, framework adapters, relays, wrappers and native bridges before implementation. Follow [the mandatory SDK parity rule](rules/sdk-capability-parity.md), [the universal SDK contract](contracts/sdk-interface.md) and [the SDK testing strategy](rules/sdk-testing-strategy.md); record each surface's applicability, implementation or verified equivalence, runtime limitations and tests. Implement applicable improvements within the authorised scope; do not claim parity while an applicable gap is deferred or unverified.
+
 ### Bundle Determinism
 Given the same normalized events, the bundle generator must produce byte-identical output. No random IDs, no wall-clock timestamps in bundle generation.
 

@@ -15,6 +15,8 @@ import {
   loadRepresentativeRequestContext
 } from "../../../apps/worker/src/improvement-bundle-context.js";
 import { browserResourceEvent } from "../../helpers/browser-resource-fixtures.js";
+import { collectDiagnosticContext } from "../../../apps/worker/src/processor-evidence-context.js";
+import { hashEvidencePayload } from "../../../packages/storage/src/evidence-ingestion-receipt.js";
 
 const projectId = "00000000-0000-4000-8000-000000000001";
 const eventId = "00000000-0000-4000-8000-000000000002";
@@ -87,6 +89,60 @@ function dependencies(objectStore: ObjectStoreReader): BuildBundleWorkerDependen
     }
   } as unknown as BuildBundleWorkerDependencies;
 }
+
+it("verifies diagnostic object identity and time against its scoped storage receipt", async () => {
+  const event = createEventEnvelope({
+    event_type: "diagnostic_context",
+    event_id: eventId,
+    occurred_at: occurredAt,
+    service: { name: "web", environment: "production" },
+    payload: {
+      version: 1,
+      kind: "recovery",
+      failure_ref: "00000000-0000-4000-8000-000000000010",
+      scope: { kind: "operation", operation_id: "00000000-0000-4000-8000-000000000011" },
+      attempt_id: "00000000-0000-4000-8000-000000000012",
+      state: "attempt_completed"
+    }
+  });
+  const getObject = vi.fn().mockResolvedValue(gzipSync(Buffer.from(JSON.stringify(event))));
+  const deps = dependencies({ getObject });
+  deps.incidentStore.listEvidenceContextCandidates = vi
+    .fn()
+    .mockResolvedValue([{ event_id: eventId, occurred_at: occurredAt, received_at: occurredAt }]);
+  const input = {
+    dependencies: deps,
+    projectId,
+    service: "web",
+    environment: "production",
+    failures: [resourceEnvelope]
+  };
+  expect(await collectDiagnosticContext(input)).toHaveLength(1);
+  deps.incidentStore.listEvidenceContextCandidates = vi.fn().mockResolvedValue([
+    {
+      event_id: eventId,
+      occurred_at: occurredAt,
+      received_at: occurredAt,
+      payload_hash: hashEvidencePayload(event)
+    }
+  ]);
+  expect(await collectDiagnosticContext(input)).toHaveLength(1);
+  getObject.mockResolvedValue(
+    gzipSync(
+      Buffer.from(
+        JSON.stringify({ ...event, payload: { ...event.payload, state: "recovery_observed" } })
+      )
+    )
+  );
+  expect(await collectDiagnosticContext(input)).toEqual([]);
+  for (const changed of [
+    { ...event, event_id: "00000000-0000-4000-8000-000000000099" },
+    { ...event, occurred_at: "2026-09-14T00:00:01.000Z" }
+  ]) {
+    getObject.mockResolvedValue(gzipSync(Buffer.from(JSON.stringify(changed))));
+    expect(await collectDiagnosticContext(input)).toEqual([]);
+  }
+});
 
 const loaders: Array<[string, (objectStore: ObjectStoreReader) => Promise<unknown>, unknown]> = [
   [
@@ -175,9 +231,9 @@ it("loads only session-correlated recovery request candidates", async () => {
       duration_ms: 10
     }
   });
-  const getObject = vi.fn().mockResolvedValue(
-    gzipSync(Buffer.from(JSON.stringify(recovery), "utf8"))
-  );
+  const getObject = vi
+    .fn()
+    .mockResolvedValue(gzipSync(Buffer.from(JSON.stringify(recovery), "utf8")));
   const deps = dependencies({ getObject });
   deps.incidentStore.listRequestEventCandidatesForServiceWindow = vi.fn().mockResolvedValue([
     {

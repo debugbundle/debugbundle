@@ -18,7 +18,7 @@ export function notificationPreferencesOperations(): OperationSpec[] {
         summary: `${action} ${project ? "project" : "account"} notification preferences; shared mutations require owner/admin permission`,
         tags: ["Notifications"],
         security: anyMemberAuth,
-        ...(project ? { params: z.object({ id: z.string().uuid() }) } : {}),
+        ...(project ? { params: z.object({ id: z.string().guid() }) } : {}),
         query: z.object({ audience: NotificationAudienceSchema.default("personal") }),
         ...(action === "get"
           ? {}

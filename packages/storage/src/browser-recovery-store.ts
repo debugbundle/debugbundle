@@ -104,12 +104,22 @@ export function createBrowserRecoveryStore(db: Queryable): {
       if (kind !== "recovery") return;
       // Rebuild already-grouped resource incidents; an as-yet ungrouped resource's initial
       // build will read this committed index entry. Replays share the same durable job ID.
-      const incidents = await db.query<{ incident_id: string; occurrence_count: number }>(
+      const incidents = await db.query<{
+        incident_id: string;
+        occurrence_count: number;
+        primary_event_id: string;
+        primary_occurred_at: string;
+      }>(
         `
-        SELECT DISTINCT i.id AS incident_id, i.occurrence_count
+        SELECT DISTINCT i.id AS incident_id, i.occurrence_count,
+          primary_event.event_id AS primary_event_id, primary_event.occurred_at::text AS primary_occurred_at
         FROM browser_recovery_events r
         JOIN incident_events ie ON ie.event_id = r.event_id AND ie.is_sampled = true
         JOIN incidents i ON i.id = ie.incident_id AND i.project_id = r.project_id
+        JOIN LATERAL (SELECT event_id, occurred_at FROM incident_events p
+          WHERE p.incident_id=i.id AND p.is_sampled=true AND p.event_class='incident_signal'
+          AND p.event_type IN ('backend_exception','frontend_exception','request_event','log_event')
+          ORDER BY occurred_at DESC,event_id DESC LIMIT 1) primary_event ON true
         WHERE r.project_id = $1 AND r.service_name = $2 AND r.environment = $3 AND r.kind = 'resource'
           AND r.occurred_at BETWEEN $4::timestamptz - interval '30 seconds' AND $4::timestamptz
           AND r.expires_at > now()
@@ -131,7 +141,10 @@ export function createBrowserRecoveryStore(db: Queryable): {
           event_id: event.event_id,
           occurred_at: event.occurred_at,
           occurrence_count: incident.occurrence_count,
-          trigger: "new_context_type"
+          trigger: "new_context_type",
+          // The recovery event identifies this rebuild, never its primary failure.
+          primary_event_id: incident.primary_event_id,
+          primary_occurred_at: new Date(incident.primary_occurred_at).toISOString()
         });
     }
   };

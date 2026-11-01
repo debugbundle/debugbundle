@@ -7,6 +7,7 @@ import {
 import { WORKER_JOB_SCHEMA_MIGRATIONS } from "../../packages/storage/src/worker-job-schema.js";
 import {
   bootstrapStorageAndCreateBucket,
+  removeEvidenceSchemaFromLegacyFixture,
   createIntegrationPool,
   createQueryable,
   createS3AdminClient,
@@ -72,6 +73,7 @@ runIntegration("worker job forward migration", () => {
     // A pre-ledger self-host database must also upgrade without losing existing data.
     await pool.query("DROP TABLE worker_jobs");
     await pool.query("DELETE FROM storage_migration_ledger");
+    await removeEvidenceSchemaFromLegacyFixture(pool);
     const legacy = await migrate();
     expect(legacy.applied).toContain(WORKER_JOB_SCHEMA_MIGRATIONS[0]!.id);
     await expect(assertStorageSchemaMigrationsApplied(db)).resolves.toBeUndefined();

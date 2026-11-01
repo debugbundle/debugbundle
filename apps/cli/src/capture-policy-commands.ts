@@ -3,7 +3,7 @@ import {
   CapturePolicyUpdateSchema,
   RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES,
   type CapturePolicyResponse,
-  type CapturePolicyUpdate,
+  type CapturePolicyUpdate
 } from "../../../packages/shared-types/src/index.js";
 import { createCliHttpClient, runAuthenticatedCliCommand } from "./auth-context.js";
 import { readCliAuthState } from "./auth-state.js";
@@ -33,7 +33,12 @@ export class CapturePolicyApiError extends Error {
 }
 
 function toApiError(status: number, body: unknown, fallback: string): CapturePolicyApiError {
-  if (typeof body === "object" && body !== null && "error" in body && typeof body.error === "string") {
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    "error" in body &&
+    typeof body.error === "string"
+  ) {
     return new CapturePolicyApiError(status, body.error);
   }
 
@@ -43,8 +48,15 @@ function toApiError(status: number, body: unknown, fallback: string): CapturePol
 export function createCapturePolicyApi(httpClient: {
   request(request: CapturePolicyHttpRequest): Promise<CapturePolicyHttpResponse>;
 }): {
-  getCapturePolicy(input: { bearerToken: string; projectId: string }): Promise<CapturePolicyResponse>;
-  updateCapturePolicy(input: { bearerToken: string; projectId: string; update: CapturePolicyUpdate }): Promise<CapturePolicyResponse>;
+  getCapturePolicy(input: {
+    bearerToken: string;
+    projectId: string;
+  }): Promise<CapturePolicyResponse>;
+  updateCapturePolicy(input: {
+    bearerToken: string;
+    projectId: string;
+    update: CapturePolicyUpdate;
+  }): Promise<CapturePolicyResponse>;
 } {
   return {
     async getCapturePolicy(input): Promise<CapturePolicyResponse> {
@@ -161,6 +173,9 @@ function formatPolicy(response: CapturePolicyResponse): string {
     `capture_request_events: ${policy.capture_request_events}`,
     `capture_breadcrumbs: ${policy.capture_breadcrumbs}`,
     `capture_probe_events: ${policy.capture_probe_events}`,
+    ...(policy.capture_diagnostic_context === undefined
+      ? []
+      : [`capture_diagnostic_context: ${policy.capture_diagnostic_context}`]),
     `client_error_incidents: ${formatClientErrorIncidents(response)}`,
     `client_error_path_rules: ${formatClientErrorPathRules(response)}`
   ].join("\n");
@@ -173,7 +188,10 @@ export async function getCapturePolicyCommand(
     json?: boolean;
   },
   api: {
-    getCapturePolicy(input: { bearerToken: string; projectId: string }): Promise<CapturePolicyResponse>;
+    getCapturePolicy(input: {
+      bearerToken: string;
+      projectId: string;
+    }): Promise<CapturePolicyResponse>;
   }
 ): Promise<CliCommandResult> {
   try {
@@ -202,7 +220,11 @@ export async function setCapturePolicyCommand(
     json?: boolean;
   },
   api: {
-    updateCapturePolicy(input: { bearerToken: string; projectId: string; update: CapturePolicyUpdate }): Promise<CapturePolicyResponse>;
+    updateCapturePolicy(input: {
+      bearerToken: string;
+      projectId: string;
+      update: CapturePolicyUpdate;
+    }): Promise<CapturePolicyResponse>;
   }
 ): Promise<CliCommandResult> {
   try {
@@ -222,7 +244,9 @@ export async function setCapturePolicyCommand(
 
     return {
       exitCode: 0,
-      output: input.json ? JSON.stringify(response) : `Capture policy updated.\n${formatPolicy(response)}`
+      output: input.json
+        ? JSON.stringify(response)
+        : `Capture policy updated.\n${formatPolicy(response)}`
     };
   } catch (error) {
     return {
@@ -236,7 +260,9 @@ async function createAuthenticatedCapturePolicyApi(
   input: { authFilePath?: string },
   dependencies?: {
     readAuthState?: (input: { authFilePath?: string }) => Promise<CliAuthState>;
-    createHttpClient?: (input: { baseUrl: string }) => { request(request: CapturePolicyHttpRequest): Promise<CapturePolicyHttpResponse> };
+    createHttpClient?: (input: { baseUrl: string }) => {
+      request(request: CapturePolicyHttpRequest): Promise<CapturePolicyHttpResponse>;
+    };
     createApi?: typeof createCapturePolicyApi;
     fetchImpl?: typeof fetch;
   }
@@ -248,14 +274,16 @@ async function createAuthenticatedCapturePolicyApi(
   }
 
   const authState = await readAuthState(authStateInput);
-  const createHttpClient = dependencies?.createHttpClient ?? ((clientInput: { baseUrl: string }) => {
-    const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
-    if (dependencies?.fetchImpl !== undefined) {
-      httpClientDependencies.fetchImpl = dependencies.fetchImpl;
-    }
+  const createHttpClient =
+    dependencies?.createHttpClient ??
+    ((clientInput: { baseUrl: string }) => {
+      const httpClientDependencies: { fetchImpl?: typeof fetch } = {};
+      if (dependencies?.fetchImpl !== undefined) {
+        httpClientDependencies.fetchImpl = dependencies.fetchImpl;
+      }
 
-    return createCliHttpClient(clientInput, httpClientDependencies);
-  });
+      return createCliHttpClient(clientInput, httpClientDependencies);
+    });
   const httpClient = createHttpClient({ baseUrl: authState.base_url });
   const createApi = dependencies?.createApi ?? createCapturePolicyApi;
 
@@ -296,7 +324,12 @@ export async function setCapturePolicyWithAuthCommand(
     createApi: createAuthenticatedCapturePolicyApi,
     dependencies,
     runCommand: (authState, api) => {
-      const commandInput: { bearerToken: string; projectId: string; update: CapturePolicyUpdate; json?: boolean } = {
+      const commandInput: {
+        bearerToken: string;
+        projectId: string;
+        update: CapturePolicyUpdate;
+        json?: boolean;
+      } = {
         bearerToken: authState.bearer_token,
         projectId: input.projectId,
         update: input.update

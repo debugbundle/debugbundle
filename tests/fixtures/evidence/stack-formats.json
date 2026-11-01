@@ -1,0 +1,98 @@
+[
+  {
+    "runtime": "node",
+    "stack": "Error: failed\n    at run (/srv/app.js:12:3)",
+    "file": "/srv/app.js",
+    "line": 12,
+    "column": 3,
+    "function": "run"
+  },
+  {
+    "runtime": "browser",
+    "stack": "run@https://static.example.test/app.js:12:3",
+    "file": "https://static.example.test/app.js",
+    "line": 12,
+    "column": 3,
+    "function": "run"
+  },
+  {
+    "runtime": "browser",
+    "stack": "run@https://static.example.test/app.js:12:3\n@https://static.example.test/app.js:14:2",
+    "file": "https://static.example.test/app.js",
+    "line": 12,
+    "column": 3,
+    "function": "run"
+  },
+  {
+    "runtime": "php",
+    "stack": "Error: failed\n#0 /srv/app.php(12): Handler->run()\n#1 {main}",
+    "file": "/srv/app.php",
+    "line": 12,
+    "column": null,
+    "function": "Handler->run"
+  },
+  {
+    "runtime": "jvm",
+    "stack": "java.lang.IllegalStateException: failed\n\tat example.Handler.run(Handler.java:12)",
+    "file": "Handler.java",
+    "line": 12,
+    "column": null,
+    "function": "example.Handler.run"
+  },
+  {
+    "runtime": "android",
+    "stack": "java.lang.IllegalStateException: failed\n\tat example.Screen.open(Screen.kt:12)",
+    "file": "Screen.kt",
+    "line": 12,
+    "column": null,
+    "function": "example.Screen.open"
+  },
+  {
+    "runtime": "python",
+    "stack": "Error: failed\n  File \"/srv/app.py\", line 12, in run",
+    "file": "/srv/app.py",
+    "line": 12,
+    "column": null,
+    "function": "run"
+  },
+  {
+    "runtime": "ruby",
+    "stack": "/srv/app.rb:12:in `run'",
+    "file": "/srv/app.rb",
+    "line": 12,
+    "column": null,
+    "function": "run"
+  },
+  {
+    "runtime": "dotnet",
+    "stack": "System.Exception: failed\n   at Example.Handler.Run() in /srv/App.cs:line 12",
+    "file": "/srv/App.cs",
+    "line": 12,
+    "column": null,
+    "function": "Example.Handler.Run"
+  },
+  {
+    "runtime": "go",
+    "stack": "goroutine 1 [running]:\nexample.run()\n\t/srv/main.go:12 +0x12",
+    "file": "/srv/main.go",
+    "line": 12,
+    "column": null,
+    "function": "example.run"
+  },
+  {
+    "runtime": "swift",
+    "stack": "run() at /srv/App.swift:12",
+    "file": "/srv/App.swift",
+    "line": 12,
+    "column": null,
+    "function": "run"
+  },
+  {
+    "runtime": "react_native",
+    "stack": "run@index.android.bundle:1:1234",
+    "file": "index.android.bundle",
+    "line": 1,
+    "column": 1234,
+    "function": "run"
+  }
+]

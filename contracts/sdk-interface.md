@@ -7,6 +7,17 @@ The protected redaction contract below describes the next coordinated SDK releas
 
 This contract defines the standard interface that ALL DebugBundle SDKs must implement, regardless of language. It ensures behavioral consistency across Node.js, browser, Python, PHP/WordPress, Java, Go, Ruby, .NET, Android, Swift, React Native, and future language SDKs.
 
+## Cross-SDK change obligations
+
+Every SDK feature, safety/reliability fix and change to SDK evidence must follow
+[the SDK capability parity rule](../rules/sdk-capability-parity.md). Evaluate all
+maintained capture surfaces and their relays, wrappers and bridges; record
+implementation, verified equivalence or a precise runtime limitation. Applicable
+gaps remain explicit until implemented or separately scoped out. Shared semantics,
+privacy and reliability are the baseline; language-idiomatic APIs and documented
+runtime limitations are permitted. This obligation does not declare proposed
+features implemented or change the behaviour promised by installed versions.
+
 ---
 
 ## 1. Initialization
@@ -52,12 +63,14 @@ SDKs must expose a language-idiomatic `beforeSend` hook as an optional init conf
 **Hardened release boundary:** Existing published hook timing and accepted-event replacement semantics remain the compatibility baseline for those versions. A hardened SDK first rejects log records below the effective level and metadata-only capture policy, before constructing an event or invoking this hook. The hook cannot promote a rejected INFO record. Java3.0, Python2.0, Go3.0, Swift3.0, Android3.0 and .NET2.0 candidates run their hooks on existing bounded background delivery workers; see their versioned migration guides. Node3.0, browser3.0 and React Native3.0 defer hooks until capture returns on their JavaScript event loops. Every timing change has a versioned migration. Every accepted replacement receives complete canonical validation, mandatory sanitization and authoritative policy/rule evaluation before delivery. A backend/native callback that hangs may stall its bounded worker, but must not stall application capture or cause unbounded replacement workers. JavaScript callbacks retain the explicit event-loop responsibility below. Privacy-safe bounded admission before hook execution is allowed; unprotected input retention is not.
 
 Rules:
+
 - Return the event to keep shipping it.
 - Return `null` to drop the event locally.
 - A valid replacement may change any event field allowed by the canonical event schema; implementations must not invent additional identity immutability restrictions.
 - The SDK must validate the complete returned envelope against the canonical closed event schema.
 - If the hook throws, panics, or returns an invalid event, the SDK must keep the SDK-owned original event, emit only a bounded internal diagnostic where supported, and must not throw into host code.
 - The SDK-owned original is already sanitized. Every valid returned event must pass mandatory sanitization and complete canonical schema validation again before policy evaluation, buffering, persistence, or transmission. Failure of mandatory sanitization withholds the unsafe field or event without throwing into host code.
+- If a valid replacement cannot fit transport or ownership budgets after reducing optional SDK evidence, withhold it rather than restoring pre-hook content. A budget limit must not undo application redaction or suppression.
 - Mutating the hook input without returning a valid replacement must not mutate the SDK-owned original.
 - Hardened hook execution must not run application callbacks inline on request/response or logger capture calls. Node, browser and React Native hooks are deferred until capture returns on their JavaScript event loop: arbitrary closures cannot be isolated without breaking application state access, so application callbacks must return promptly and can delay that event loop if they block. This explicit JavaScript callback responsibility does not relax SDK queue, network, or overload bounds. Published legacy synchronous behavior remains version-specific until migrated.
 - Fatal signal handlers, hard-crash handlers, and shutdown paths may skip application hook execution when invoking user code is unsafe. Each affected SDK must document the restriction; replayed crash events use the normal hook pipeline when safe.
@@ -69,11 +82,11 @@ The .NET2 candidate projects admitted exception metadata and custom reference-st
 
 The Node.js SDK resolves its default transport from `projectMode` plus the configured environment when no explicit custom transport is supplied:
 
-| `projectMode` | Environment | Transport behavior |
-|---------------|-------------|--------------------|
-| `local-only` | any environment | File transport to `.debugbundle/local/events/` on the current machine; operators must run `debugbundle process` there or on a mounted copy of that directory |
-| `connected` | `local`, `development` | File transport to `.debugbundle/local/events/` |
-| `connected` | `staging`, `production` | HTTP transport to the configured ingestion endpoint |
+| `projectMode` | Environment             | Transport behavior                                                                                                                                           |
+| ------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `local-only`  | any environment         | File transport to `.debugbundle/local/events/` on the current machine; operators must run `debugbundle process` there or on a mounted copy of that directory |
+| `connected`   | `local`, `development`  | File transport to `.debugbundle/local/events/`                                                                                                               |
+| `connected`   | `staging`, `production` | HTTP transport to the configured ingestion endpoint                                                                                                          |
 
 Node file transport writes one batch per file using atomic temp-file + rename with the filename format `<timestamp>-<sequence>-<service>.events.json` so concurrent local services can write safely into the same events directory.
 
@@ -86,6 +99,7 @@ These behaviors are mandatory across all SDKs. A new language SDK is non-complia
 - SDKs must send the first 3 identical events normally within a 30-second window.
 - Additional identical events in that window must be suppressed locally.
 - Suppressed duplicates must be represented by an aggregate `error_suppressed` event carrying at minimum: fingerprint, suppressed count, first seen timestamp, last seen timestamp, and suppression window length.
+- Existing queue-pressure aggregates may also carry `reason: "queue_pressure"` and a nonempty `level` class. These optional fields are accepted without changing duplicate aggregation or incident classification.
 - Suppression happens before network transmission so storm control reduces ingestion and storage cost, not just UI noise.
 
 ### Loop Protection
@@ -180,39 +194,167 @@ Browser `window` `error` captures must preserve browser-native event metadata wh
 
 ## 2. Universal SDK Interface
 
+Accepted evidence candidate: [FR-EVID-01–09](../spec/bundle-evidence-quality.md)
+adds optional `captureRecovery(observation) → void`, context `failureRef` /
+`evidenceScope`, and a verified-path `evidenceCapabilities` installation option
+(language-idiomatic spellings). Existing capture return types remain unchanged.
+The specification freezes wire names, states, limits, safety and negotiation.
+These methods/options are not yet implemented across the SDK family and must not
+be documented as available in installed releases. Without complete-path support,
+new standalone context is disabled and ordinary errors retain their legacy shape.
+
+The current JavaScript source candidate implements `captureRecovery` on Node and
+Browser, `captureExceptionEvidence` (default true), `captureRecoveryObservations`
+(default false), and Browser `captureResourceObservations` (default true). Collection
+still requires negotiated support and authoritative capture policy; minimal policy
+disables standalone diagnostics and passive observations. A pin asserts the entire
+delivery/reader path, including local processing, relays or native bridges. Later
+discovery may revoke it. Existing config/ACK traffic carries the opt-in query;
+capture calls introduce no discovery request or additional polling.
+
+Recovery input has `failureRef`, `attemptId`, `state`, optional `evidenceScope`,
+technical `operation`, `statusCode` and `durationMs`. Browser uses a fresh page
+scope by default; Node can use an actively owned request/command/job scope or an
+explicit scope. `attempt_completed` and HTTP 200 leave recovery unknown. Only an
+application's explicit `recovery_observed` establishes its semantic outcome.
+Ordinary rules, sampling, privacy and queue limits remain enforced. A canonical
+`beforeSend` replacement may change any allowed field, including identity; the
+bounded diagnostic receipt follows the protected replacement and remains charged
+until ACK/drop, including offline retries.
+
+Node's new `runWithOperationContext({kind, name?, limitMs?}, callback)` awaits the
+callback and preserves its result/error while isolating concurrent operations.
+Elapsed time is monotonic; the configured limit is not time remaining. Framework
+request owners end on existing completion/close hooks. No active owner means no
+claimed execution context. Fatal automatic capture bypasses application hooks and
+uses the smaller crash budget; it remains subject to ordinary privacy and policy.
+
+The PHP source candidate implements the same camelCase capture flags, reference
+inputs and `captureRecovery()` method. `runWithOperationContext($options,
+$callback)` supplies a Fiber-local scope and preserves callback results/errors;
+Laravel/Symfony owners revoke state on completion and cannot clear a new owner
+after reset. PHP graphs use final native Throwable accessors, exclude arguments
+and custom formatting, and consume supplied PHP 8.5 fatal traces without enabling
+them. Earlier native fatal paths retain actual file/line with partial coverage.
+The smaller 4-KiB fatal total includes execution and typed reference metadata.
+Existing request-end best-effort delivery remains unchanged. PHP relays preserve
+new DTOs after privacy, negotiate on existing traffic and add indexed rejection
+details only for opted-in clients; legacy string errors remain compatible.
+
+The Java 3.1.0 source candidate adds `captureRecovery(Map)` and
+`runWithOperationContext(Map, Supplier<T>)` on the client and static facade.
+Builder/Spring/agent options use `captureExceptionEvidence` (default true),
+`captureRecoveryObservations` (default false) and `evidenceCapabilities`.
+Recovery/reference input names match the camelCase contract above. Native JVM
+causes/suppressed frames are retained on the existing worker; redirected stderr
+uses runtime-reported provenance. Completed owners revoke new execution and
+automatic diagnostic scope while legacy async correlation remains compatible.
+Fatal evidence bypasses hooks and uses the smaller total budget. Browser relays
+preserve closed observations and require complete native downstream ACKs before
+marking durable files delivered. Custom boolean forwarders remain accepted with
+pending spools. Maintained local JVM/runtime checks pass; performance and final release qualification
+remain open. This candidate is unpublished.
+
+The Go 3.1.0 source candidate adds `Config.CaptureExceptionEvidence` (optional
+boolean pointer, default true), `CaptureRecoveryObservations` (default false) and
+`EvidenceCapabilities`. `BeginOperation(ctx, OperationOptions)` returns `(ctx, end)`;
+`RunWithOperationContext(ctx, options, func(context.Context) error)` preserves the
+callback error/panic and revokes copied contexts on completion. HTTP/Gin/Echo own
+request scopes. `WithFailureReference(uuid, optionalScope)` attaches an explicit
+reference; `CaptureRecovery(ctx, RecoveryObservation)` records explicit observations
+with the same states and budgets. The default facade also supports recovery.
+`CapturePanic` observes without changing recover/rethrow semantics, bypasses hooks
+and uses the smaller combined metadata budget. Native `Error`/`Unwrap` callbacks
+share the existing bounded renderer; foreign formatters are not called. Go errors
+have no intrinsic throw stack; retained capture frames are labelled accordingly.
+Go relays preserve protected closed evidence and context, count actual native bytes
+including server credentials, and require complete ACKs for delivered spool markers.
+Legacy status-only custom acceptance remains compatible with pending spools. Final
+coverage/runtime/performance/artifact qualification remains open; nothing is published.
+
+The .NET source work adds `DebugBundleOptions.CaptureExceptionEvidence` (default
+true) and a snapshotted `EvidenceCapabilities` complete-path pin. Collection requires
+both local permission and proof. Native inner/aggregate evidence uses the existing
+weak-reference worker and base native stack getters; application overrides are
+withheld. Canonical owned hook results and final privacy preserve the latest primary
+through optional reduction. Native replies are bounded identity UTF-8 with a shared
+connection/body deadline; custom handlers remain responsible for cancellation.
+Matching native config paths may discover proof; file/custom policy polling does
+not qualify an unrelated reader hop. The existing `IDebugBundleClient` interface is
+retained. `BeginOperation` / `RunWithOperationContext[Async]` use revocable async
+ownership; `CaptureRecoveryObservations` defaults false. `CaptureRecovery` accepts
+only explicit outcomes and a fresh failure/attempt/scope, with
+`EvidenceContext.ForFailure` associating the original failure. Optional capability
+interfaces and extensions retain existing base-client implementors. Pending
+observations share the common diagnostic budgets and keep their receipts across
+retries and hook ID replacements. Native final byte partitioning and existing ACK
+proof rechecks preserve the accepted primary; observed fatal hooks use the smaller
+callback-free budget. ASP.NET/gRPC/Worker/Hangfire/Azure adapters provide revocable
+request/job ownership. The browser relay preserves closed evidence and protected
+context; existing header/query opt-in adds indexed 202 responses and a complete-path
+descriptor while legacy mixed-batch 400/string responses remain compatible.
+`DebugBundleRelayOptions.ForwardTransport` is optional: legacy custom success keeps
+spools pending, a held custom forwarder owns one worker, and native forwarding
+uses a shared maximum five-second deadline across byte-limited chunks and one-time
+compatible fallback. Only complete downstream ACKs create exclusive private spool
+markers. Final family qualification remains in progress; no new .NET release is claimed.
+
+The Python source candidate uses `capture_exception_evidence`,
+`capture_recovery_observations`, `evidence_capabilities`, `capture_recovery()` and
+context `failure_ref` / `evidence_scope`. `operation_context(options)` is a
+context manager usable around synchronous or asynchronous work; options are
+`kind`, optional technical `name` and `limit_ms`. Native ContextVar leases revoke
+completed/reinitialised owners, including copied async contexts. Python 3.11+
+native groups are supported; Python 3.10 has no group primitive. Native
+uncaught evidence bypasses hooks and uses the smaller total budget. Native HTTP
+ACK bodies are bounded to 256 KiB; synchronous HTTPX read/connect/write deadlines
+and explicit custom fetcher/transport limits remain advisory as documented in
+the candidate README. Python relays and framework relay factories preserve
+closed evidence and context with downstream proof intersection and indexed
+opt-in rejection details. Floor/runtime and installed qualification remain pending.
+
+Browser passive collection uses one resource observer and a CSP listener with
+bounded sanitized DTOs, expiry and at most one coalesced late context per failure.
+No historical performance-buffer scan, policy mutation or diagnostic request is
+introduced. Repeated URLs, redirects and redaction collisions remain ambiguous.
+Report-only CSP is not a block; document status is not resource status. Safe native
+cause traversal requires an engine Error brand check; otherwise retained outer
+trace interpretation remains available with an explicit unsupported limitation.
+Aggregate arrays are not traversed where array proxies cannot be safely rejected.
+
 Every language SDK must implement the same core methods. This universal interface makes the system scalable across languages — any developer or agent familiar with one SDK can immediately use another.
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `init` | `(config) → void` | Initialize the SDK. Must be called once. |
-| `captureException` | `(error, context?) → void` | Capture an exception/error object with stack trace. |
-| `captureError` | `(error, context?) → void` | Required convenience alias for `captureException` per `FR-SDK-16`. |
-| `captureLog` | `(message, level, context?) → void` | Capture a structured log entry at a given severity level. |
-| `captureRequest` | `(request, response, context?) → void` | Capture HTTP request/response metadata for request-event correlation. |
-| `captureMessage` | `(message, level?, context?) → void` | Capture an arbitrary message (breadcrumb, diagnostic, custom). |
-| `setContext` | `(key, value) → void` | Attach persistent context (user, org, request, deploy). |
-| `flush` | `() → Promise<void>` | Force-send all buffered events. Call before process exit. |
-| `probe` | `(label, data \| () → data, opts?) → void` | Buffer diagnostic data in per-label ring buffer; flushes alongside errors (all tiers). When remotely activated (paid tiers), also ships independently. Backend SDKs accept lazy callback + `{ heavy: true }` option; browser SDK accepts data only. |
-| `status` | `→ "healthy" \| "degraded" \| "disconnected"` | Read-only. `healthy`: last flush succeeded or idle. `degraded`: rate-limited (429). `disconnected`: not initialized or ≥3 consecutive failures. |
-| `lastEventAt` | `→ number \| null` | Read-only. Unix ms timestamp of last successful event delivery, or `null` if none yet. |
+| Method             | Signature                                     | Description                                                                                                                                                                                                                                         |
+| ------------------ | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `init`             | `(config) → void`                             | Initialize the SDK. Must be called once.                                                                                                                                                                                                            |
+| `captureException` | `(error, context?) → void`                    | Capture an exception/error object with stack trace.                                                                                                                                                                                                 |
+| `captureError`     | `(error, context?) → void`                    | Required convenience alias for `captureException` per `FR-SDK-16`.                                                                                                                                                                                  |
+| `captureLog`       | `(message, level, context?) → void`           | Capture a structured log entry at a given severity level.                                                                                                                                                                                           |
+| `captureRequest`   | `(request, response, context?) → void`        | Capture HTTP request/response metadata for request-event correlation.                                                                                                                                                                               |
+| `captureMessage`   | `(message, level?, context?) → void`          | Capture an arbitrary message (breadcrumb, diagnostic, custom).                                                                                                                                                                                      |
+| `setContext`       | `(key, value) → void`                         | Attach persistent context (user, org, request, deploy).                                                                                                                                                                                             |
+| `flush`            | `() → Promise<void>`                          | Force-send all buffered events. Call before process exit.                                                                                                                                                                                           |
+| `probe`            | `(label, data \| () → data, opts?) → void`    | Buffer diagnostic data in per-label ring buffer; flushes alongside errors (all tiers). When remotely activated (paid tiers), also ships independently. Backend SDKs accept lazy callback + `{ heavy: true }` option; browser SDK accepts data only. |
+| `status`           | `→ "healthy" \| "degraded" \| "disconnected"` | Read-only. `healthy`: last flush succeeded or idle. `degraded`: rate-limited (429). `disconnected`: not initialized or ≥3 consecutive failures.                                                                                                     |
+| `lastEventAt`      | `→ number \| null`                            | Read-only. Unix ms timestamp of last successful event delivery, or `null` if none yet.                                                                                                                                                              |
 
 ### Language Naming Conventions
 
 SDKs must use the idiomatic naming convention for the target language while keeping method names semantically identical:
 
-| Language | Style | Example |
-|----------|-------|---------|
-| Node.js / Browser | camelCase | `debugbundle.captureException(err)` |
-| Python | snake_case | `debugbundle.capture_exception(err)` |
-| PHP | camelCase (PSR) | `DebugBundle::captureException($e)` |
-| Go | PascalCase (exported) | `debugbundle.CaptureException(err)` |
-| Ruby | snake_case | `DebugBundle.capture_exception(err)` |
-| Java | camelCase | `DebugBundle.captureException(err)` |
-| C# | PascalCase | `DebugBundle.CaptureException(err)` |
-| Kotlin | camelCase | `DebugBundle.captureException(err)` |
-| Swift | camelCase | `DebugBundle.captureException(err)` |
-| Rust | snake_case | `debugbundle::capture_exception(err)` |
-| Dart | camelCase | `debugBundle.captureException(err)` |
+| Language          | Style                 | Example                               |
+| ----------------- | --------------------- | ------------------------------------- |
+| Node.js / Browser | camelCase             | `debugbundle.captureException(err)`   |
+| Python            | snake_case            | `debugbundle.capture_exception(err)`  |
+| PHP               | camelCase (PSR)       | `DebugBundle::captureException($e)`   |
+| Go                | PascalCase (exported) | `debugbundle.CaptureException(err)`   |
+| Ruby              | snake_case            | `DebugBundle.capture_exception(err)`  |
+| Java              | camelCase             | `DebugBundle.captureException(err)`   |
+| C#                | PascalCase            | `DebugBundle.CaptureException(err)`   |
+| Kotlin            | camelCase             | `DebugBundle.captureException(err)`   |
+| Swift             | camelCase             | `DebugBundle.captureException(err)`   |
+| Rust              | snake_case            | `debugbundle::capture_exception(err)` |
+| Dart              | camelCase             | `debugBundle.captureException(err)`   |
 
 ---
 
@@ -223,29 +365,29 @@ Before framework integrations, every backend SDK must support the **vanilla runt
 ### 3.1 Node.js — Vanilla Hooks
 
 ```js
-const debugbundle = require('@debugbundle/sdk-node');
+const debugbundle = require("@debugbundle/sdk-node");
 
 debugbundle.init({ projectToken: process.env.DEBUGBUNDLE_TOKEN });
 
 // Automatic hooks (opt-in)
-debugbundle.captureConsole();       // Wraps console.error, console.warn
-debugbundle.captureExceptions();    // process.on('uncaughtException')
-debugbundle.captureRejections();    // process.on('unhandledRejection')
+debugbundle.captureConsole(); // Wraps console.error, console.warn
+debugbundle.captureExceptions(); // process.on('uncaughtException')
+debugbundle.captureRejections(); // process.on('unhandledRejection')
 ```
 
-| Hook | Mechanism | Default |
-|------|-----------|---------|
-| `captureConsole()` | Monkey-patches `console.error` and `console.warn` | Off (opt-in) |
-| `captureExceptions()` | `process.on('uncaughtException', handler)` | On via `init()` |
-| `captureRejections()` | `process.on('unhandledRejection', handler)` | On via `init()` |
+| Hook                  | Mechanism                                         | Default         |
+| --------------------- | ------------------------------------------------- | --------------- |
+| `captureConsole()`    | Monkey-patches `console.error` and `console.warn` | Off (opt-in)    |
+| `captureExceptions()` | `process.on('uncaughtException', handler)`        | On via `init()` |
+| `captureRejections()` | `process.on('unhandledRejection', handler)`       | On via `init()` |
 
 **Logger integrations (optional, auto-detected):**
 
-| Logger | Integration | How |
-|--------|-------------|-----|
-| pino | Custom transport | `pino({ transport: { target: '@debugbundle/pino-transport' } })` |
-| winston | Custom transport | `logger.add(new DebugBundleTransport())` |
-| bunyan | Custom stream | `bunyan.createLogger({ streams: [{ stream: debugbundleStream }] })` |
+| Logger  | Integration      | How                                                                 |
+| ------- | ---------------- | ------------------------------------------------------------------- |
+| pino    | Custom transport | `pino({ transport: { target: '@debugbundle/pino-transport' } })`    |
+| winston | Custom transport | `logger.add(new DebugBundleTransport())`                            |
+| bunyan  | Custom stream    | `bunyan.createLogger({ streams: [{ stream: debugbundleStream }] })` |
 
 When `init()` is called, the SDK should auto-detect installed loggers (check `require.resolve`) and offer to register handlers. With framework integrations (Express/Fastify/Next.js), this is automatic.
 
@@ -262,19 +404,19 @@ DebugBundle::captureExceptions();   // set_exception_handler()
 DebugBundle::captureShutdown();     // register_shutdown_function() for fatal errors
 ```
 
-| Hook | Mechanism | Default |
-|------|-----------|---------|
-| `captureErrors()` | `set_error_handler()` | On via `init()` |
-| `captureExceptions()` | `set_exception_handler()` | On via `init()` |
-| `captureShutdown()` | `register_shutdown_function()` for fatal errors | On via `init()` |
+| Hook                  | Mechanism                                       | Default         |
+| --------------------- | ----------------------------------------------- | --------------- |
+| `captureErrors()`     | `set_error_handler()`                           | On via `init()` |
+| `captureExceptions()` | `set_exception_handler()`                       | On via `init()` |
+| `captureShutdown()`   | `register_shutdown_function()` for fatal errors | On via `init()` |
 
 **Logger integrations (optional):**
 
-| Logger | Integration | How |
-|--------|-------------|-----|
-| Monolog | Custom handler | `$logger->pushHandler(new DebugBundleHandler())` |
-| Laravel Log | Log channel | Add `'debugbundle'` channel to `config/logging.php` |
-| Symfony Log | Monolog config | Add handler in `monolog.yaml` |
+| Logger      | Integration    | How                                                 |
+| ----------- | -------------- | --------------------------------------------------- |
+| Monolog     | Custom handler | `$logger->pushHandler(new DebugBundleHandler())`    |
+| Laravel Log | Log channel    | Add `'debugbundle'` channel to `config/logging.php` |
+| Symfony Log | Monolog config | Add handler in `monolog.yaml`                       |
 
 Published PHP 1.x accumulates logs during the request and flushes synchronously at request termination. WordPress also calls `flush()` during its shutdown hook, and a batch-full capture can send inline. Existing installed 1.x behavior remains unchanged until an explicit major upgrade.
 
@@ -295,20 +437,20 @@ debugbundle.capture_exceptions()    # sys.excepthook
 debugbundle.capture_async()         # asyncio loop exception handler
 ```
 
-| Hook | Mechanism | Default |
-|------|-----------|---------|
-| `capture_logging()` | Adds `DebugBundleHandler` to `logging.getLogger()` | Off (opt-in) |
-| `capture_exceptions()` | Sets `sys.excepthook` | On via `init()` |
-| `capture_async()` | Sets `loop.set_exception_handler()` for asyncio | On when asyncio detected |
+| Hook                   | Mechanism                                          | Default                  |
+| ---------------------- | -------------------------------------------------- | ------------------------ |
+| `capture_logging()`    | Adds `DebugBundleHandler` to `logging.getLogger()` | Off (opt-in)             |
+| `capture_exceptions()` | Sets `sys.excepthook`                              | On via `init()`          |
+| `capture_async()`      | Sets `loop.set_exception_handler()` for asyncio    | On when asyncio detected |
 
 **Logger integrations (optional):**
 
-| Logger | Integration | How |
-|--------|-------------|-----|
-| stdlib `logging` | Custom Handler | `logging.getLogger().addHandler(DebugBundleHandler())` |
-| Django LOGGING | Dict config | Add handler to `LOGGING['handlers']` in `settings.py` |
-| structlog | Processor | `structlog.configure(processors=[..., debugbundle_processor])` |
-| loguru | Custom sink | `logger.add(debugbundle.loguru_sink)` |
+| Logger           | Integration    | How                                                            |
+| ---------------- | -------------- | -------------------------------------------------------------- |
+| stdlib `logging` | Custom Handler | `logging.getLogger().addHandler(DebugBundleHandler())`         |
+| Django LOGGING   | Dict config    | Add handler to `LOGGING['handlers']` in `settings.py`          |
+| structlog        | Processor      | `structlog.configure(processors=[..., debugbundle_processor])` |
+| loguru           | Custom sink    | `logger.add(debugbundle.loguru_sink)`                          |
 
 ### 3.4 Go — Vanilla Hooks (legacy v1 example)
 
@@ -330,17 +472,17 @@ func main() {
 }
 ```
 
-| Hook | Mechanism | Default |
-|------|-----------|---------|
+| Hook              | Mechanism                                                | Default         |
+| ----------------- | -------------------------------------------------------- | --------------- |
 | `CapturePanics()` | `recover()` wrapper — captures panic value + stack trace | On via `Init()` |
 
 **Logger integrations (optional):**
 
-| Logger | Integration | How |
-|--------|-------------|-----|
-| `log/slog` | Custom Handler | `slog.SetDefault(slog.New(debugbundle.SlogHandler()))` |
-| zerolog | Hook | `zerolog.New(os.Stdout).Hook(debugbundle.ZerologHook())` |
-| zap | Core wrapper | `zap.New(debugbundle.ZapCore(existingCore))` |
+| Logger     | Integration    | How                                                      |
+| ---------- | -------------- | -------------------------------------------------------- |
+| `log/slog` | Custom Handler | `slog.SetDefault(slog.New(debugbundle.SlogHandler()))`   |
+| zerolog    | Hook           | `zerolog.New(os.Stdout).Hook(debugbundle.ZerologHook())` |
+| zap        | Core wrapper   | `zap.New(debugbundle.ZapCore(existingCore))`             |
 
 Go's `context.Context` is the primary mechanism for per-request correlation. The SDK provides `debugbundle.WithContext(ctx)` to attach DebugBundle metadata to the request context.
 
@@ -355,17 +497,17 @@ DebugBundle.init(project_token: ENV['DEBUGBUNDLE_TOKEN'])
 DebugBundle.capture_exceptions   # at_exit + Thread exception handler
 ```
 
-| Hook | Mechanism | Default |
-|------|-----------|---------|
+| Hook                 | Mechanism                                              | Default       |
+| -------------------- | ------------------------------------------------------ | ------------- |
 | `capture_exceptions` | `at_exit` block + `Thread.report_on_exception` handler | On via `init` |
 
 **Logger integrations (optional):**
 
-| Logger | Integration | How |
-|--------|-------------|-----|
-| Ruby `Logger` | Custom device/formatter | `Logger.new(DebugBundle::LogDevice.new)` |
-| Rails logger | Broadcast subscriber | Auto-registered via Railtie |
-| Semantic Logger | Appender | `SemanticLogger.add_appender(appender: DebugBundle::SemanticAppender.new)` |
+| Logger          | Integration             | How                                                                        |
+| --------------- | ----------------------- | -------------------------------------------------------------------------- |
+| Ruby `Logger`   | Custom device/formatter | `Logger.new(DebugBundle::LogDevice.new)`                                   |
+| Rails logger    | Broadcast subscriber    | Auto-registered via Railtie                                                |
+| Semantic Logger | Appender                | `SemanticLogger.add_appender(appender: DebugBundle::SemanticAppender.new)` |
 
 Ruby's Rack middleware captures request context automatically. Sidekiq server middleware captures job context for background job errors.
 In the unreleased Ruby 2.0 safety candidate, automatic `at_exit` and unhandled-thread hooks wake the owned sender without waiting for transport. Delivery at immediate process exit is best-effort; applications that require a delivery attempt use an explicit, finite `flush` in a controlled shutdown window. A separate bounded poller retrieves remote configuration, leaving the sender available if that fetch stalls. On first use after a fork, the child discards inherited buffered events, request context, probes, locks, and worker state before starting fresh workers. The parent's effective capture restrictions remain active until the child refreshes remote configuration. Installed Ruby 1.x behavior remains unchanged until a versioned upgrade.
@@ -373,10 +515,10 @@ In the unreleased Ruby 2.0 safety candidate, automatic `at_exit` and unhandled-t
 ### 3.6 Browser — Vanilla Hooks
 
 ```js
-import { debugbundle } from '@debugbundle/sdk-browser';
+import { debugbundle } from "@debugbundle/sdk-browser";
 
 debugbundle.init({
-  projectToken: 'dbundle_proj_...',
+  projectToken: "dbundle_proj_..."
   // Browser-specific volume controls (all optional, shown with defaults):
   // maxBreadcrumbs: 10,
   // breadcrumbsOnErrorOnly: true,
@@ -396,15 +538,15 @@ debugbundle.init({
 // - Performance observer for long tasks (opt-in)
 ```
 
-| Hook | Mechanism | Default |
-|------|-----------|---------|
-| Global errors | `window.addEventListener('error', handler)` | On via `init()` |
-| Promise rejections | `window.addEventListener('unhandledrejection', handler)` | On via `init()` |
-| Console capture | Wraps `console.error`, `console.warn` | Off (opt-in via `captureConsole: true`) |
-| Network capture | `fetch` / `XMLHttpRequest` wrapping | On via `init()` (filterable via `networkFilter`) |
-| Click capture | `document.addEventListener('click', handler)` | On via `init()` |
-| Route change capture | `popstate` + `pushState`/`replaceState` wrapping | On via `init()` |
-| Device context | Snapshot on `init()` — UA, browser, OS, screen, viewport, touch, locale, connection, color scheme | On via `init()` (always collected) |
+| Hook                 | Mechanism                                                                                         | Default                                          |
+| -------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Global errors        | `window.addEventListener('error', handler)`                                                       | On via `init()`                                  |
+| Promise rejections   | `window.addEventListener('unhandledrejection', handler)`                                          | On via `init()`                                  |
+| Console capture      | Wraps `console.error`, `console.warn`                                                             | Off (opt-in via `captureConsole: true`)          |
+| Network capture      | `fetch` / `XMLHttpRequest` wrapping                                                               | On via `init()` (filterable via `networkFilter`) |
+| Click capture        | `document.addEventListener('click', handler)`                                                     | On via `init()`                                  |
+| Route change capture | `popstate` + `pushState`/`replaceState` wrapping                                                  | On via `init()`                                  |
+| Device context       | Snapshot on `init()` — UA, browser, OS, screen, viewport, touch, locale, connection, color scheme | On via `init()` (always collected)               |
 
 ### Device Context Collection
 
@@ -412,23 +554,24 @@ The browser SDK collects device/browser metadata once on `init()` and attaches i
 
 **Collected fields:**
 
-| Field | Source | Notes |
-|-------|--------|-------|
-| `user_agent` | `navigator.userAgent` | Raw UA string |
-| `browser.name` | Parsed from UA / `navigator.userAgentData` | e.g. `Chrome`, `Firefox`, `Safari` |
-| `browser.version` | Parsed from UA / `navigator.userAgentData` | e.g. `122.0.6261.94` |
-| `os.name` | Parsed from UA / `navigator.userAgentData` | e.g. `macOS`, `Windows`, `iOS`, `Android` |
-| `os.version` | Parsed from UA / `navigator.userAgentData` | e.g. `14.3`, `11`, `17.4` |
-| `device_type` | Derived from UA (mobile/tablet heuristics) | `desktop`, `mobile`, `tablet`, or `unknown` |
-| `screen` | `{ width: screen.width, height: screen.height }` | Physical screen resolution |
-| `viewport` | `{ width: window.innerWidth, height: window.innerHeight }` | CSS pixel viewport size |
-| `device_pixel_ratio` | `window.devicePixelRatio` | Retina/HiDPI scaling factor |
-| `touch_capable` | `navigator.maxTouchPoints > 0` | Touch input support |
-| `language` | `navigator.language` | BCP 47 language tag (e.g. `en-US`) |
-| `connection_type` | `navigator.connection?.effectiveType` | Network quality (`4g`, `3g`, `2g`, `slow-2g`) or `null` if unavailable |
-| `color_scheme_preference` | `matchMedia('(prefers-color-scheme: dark)')` | `light`, `dark`, `no-preference`, or `null` |
+| Field                     | Source                                                     | Notes                                                                  |
+| ------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `user_agent`              | `navigator.userAgent`                                      | Raw UA string                                                          |
+| `browser.name`            | Parsed from UA / `navigator.userAgentData`                 | e.g. `Chrome`, `Firefox`, `Safari`                                     |
+| `browser.version`         | Parsed from UA / `navigator.userAgentData`                 | e.g. `122.0.6261.94`                                                   |
+| `os.name`                 | Parsed from UA / `navigator.userAgentData`                 | e.g. `macOS`, `Windows`, `iOS`, `Android`                              |
+| `os.version`              | Parsed from UA / `navigator.userAgentData`                 | e.g. `14.3`, `11`, `17.4`                                              |
+| `device_type`             | Derived from UA (mobile/tablet heuristics)                 | `desktop`, `mobile`, `tablet`, or `unknown`                            |
+| `screen`                  | `{ width: screen.width, height: screen.height }`           | Physical screen resolution                                             |
+| `viewport`                | `{ width: window.innerWidth, height: window.innerHeight }` | CSS pixel viewport size                                                |
+| `device_pixel_ratio`      | `window.devicePixelRatio`                                  | Retina/HiDPI scaling factor                                            |
+| `touch_capable`           | `navigator.maxTouchPoints > 0`                             | Touch input support                                                    |
+| `language`                | `navigator.language`                                       | BCP 47 language tag (e.g. `en-US`)                                     |
+| `connection_type`         | `navigator.connection?.effectiveType`                      | Network quality (`4g`, `3g`, `2g`, `slow-2g`) or `null` if unavailable |
+| `color_scheme_preference` | `matchMedia('(prefers-color-scheme: dark)')`               | `light`, `dark`, `no-preference`, or `null`                            |
 
 **Collection rules:**
+
 - Collected once per session on `init()` — values are a snapshot, not live-updated.
 - `navigator.userAgentData` (Client Hints API) is preferred when available; falls back to `navigator.userAgent` parsing.
 - Fields that cannot be determined are set to `null`.
@@ -528,6 +671,7 @@ Required behavior:
 The browser SDK injects a `X-DebugBundle-Trace-Id` header (UUID v4) into same-origin `fetch` and `XMLHttpRequest` requests, and into cross-origin first-party requests that match `tracePropagationTargets`. Backend SDKs read this header and tag all events from that request with the trace ID. The SDK must not inject trace headers into arbitrary third-party absolute URLs by default.
 
 ### Browser SDK (Automatic)
+
 ```js
 // Same-origin and explicitly allowlisted outgoing requests include:
 // X-DebugBundle-Trace-Id: <uuid-v4>
@@ -535,6 +679,7 @@ The browser SDK injects a `X-DebugBundle-Trace-Id` header (UUID v4) into same-or
 ```
 
 ### Backend SDK (Automatic)
+
 ```js
 // Framework middleware reads X-DebugBundle-Trace-Id from incoming request headers.
 // If present, all events captured during that request include trace_id in the envelope.
@@ -542,6 +687,7 @@ The browser SDK injects a `X-DebugBundle-Trace-Id` header (UUID v4) into same-or
 ```
 
 ### Event Envelope
+
 ```json
 {
   "schema_version": "2026-03-01",
@@ -562,13 +708,13 @@ Backend SDKs should include safe runtime facts in `backend_exception.payload.run
 Current package scope: `@debugbundle/sdk-node`, `debugbundle-python`, `debugbundle/sdk-php`, and Java SDK `1.3.1+` capture safe backend process facts while excluding environment variables. Java maps `Runtime.totalMemory()` to `heap_total`, derives `heap_used` from `totalMemory() - freeMemory()`, sets unavailable `rss`, `external`, and `peak` values to `null`, and records `jvm_name` plus the `Runtime.maxMemory()` heap ceiling under `framework_extras` rather than mislabeling the ceiling as observed peak usage.
 Incidents use `trace_id` to link frontend breadcrumbs to backend exceptions. This enables the bundle to include the full user journey (frontend actions → backend failure) in a single debug context.
 
-| Behavior | Rule |
-|----------|------|
+| Behavior         | Rule                                                                                                                                        |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | Header injection | Browser SDK wraps `fetch`/`XHR`, injects `X-DebugBundle-Trace-Id` (UUID v4) into same-origin or explicitly allowlisted first-party requests |
-| Header reading | Backend middleware reads header, attaches to event context |
-| Missing header | No failure — backend events ungrouped from frontend |
-| Trace ID format | UUID v4, generated per outgoing browser request |
-| Envelope field | `correlation.trace_id` (optional) |
+| Header reading   | Backend middleware reads header, attaches to event context                                                                                  |
+| Missing header   | No failure — backend events ungrouped from frontend                                                                                         |
+| Trace ID format  | UUID v4, generated per outgoing browser request                                                                                             |
+| Envelope field   | `correlation.trace_id` (optional)                                                                                                           |
 
 ---
 
@@ -583,6 +729,7 @@ App Code → Logging Library → [DebugBundle Handler] → SDK Buffer → Batch 
 ```
 
 The DebugBundle handler sits alongside existing handlers. Logs flow to both destinations. This means:
+
 1. **No file system permissions needed** — capture is in-process
 2. **Real-time** — captured at emit time, zero latency
 3. **Structured** — receives the log record object (level, message, context, timestamp), not raw text
@@ -592,9 +739,9 @@ The DebugBundle handler sits alongside existing handlers. Logs flow to both dest
 
 ### Log Level Filtering
 
-| Init Config | Type | Default | Description |
-|-------------|------|---------|-------------|
-| `logLevel` | string | `"warning"` | Minimum log level to capture: `debug`, `info`, `warning`, `error`, `critical` |
+| Init Config | Type   | Default     | Description                                                                   |
+| ----------- | ------ | ----------- | ----------------------------------------------------------------------------- |
+| `logLevel`  | string | `"warning"` | Minimum log level to capture: `debug`, `info`, `warning`, `error`, `critical` |
 
 Events below the configured level are silently discarded. This keeps SDK overhead minimal in production.
 
@@ -701,21 +848,21 @@ Language SDKs should provide framework-specific middleware/plugins that auto-cap
 
 Framework integrations must auto-register log capture alongside error/request capture:
 
-| Framework | Logger | Auto-Registration |
-|-----------|--------|--------------------|
-| Express | Detected (pino/winston/bunyan/console) | `init()` auto-detects and hooks |
-| Fastify | pino (built-in) | Plugin hooks pino transport |
-| Next.js | Detected (console default) | Wrapper hooks console + detected |
-| Django | stdlib `logging` (built-in) | Middleware adds handler to root logger |
-| Flask | stdlib `logging` (built-in) | Error handler adds handler to app logger |
-| FastAPI | stdlib `logging` / loguru | Middleware auto-detects and hooks |
-| Laravel | Monolog (built-in) | Service provider registers log channel |
-| Symfony | Monolog (built-in) | Bundle registers handler in monolog config |
-| Spring Boot | Logback (default) / SLF4J backend | Starter registers DebugBundle appender/helper without replacing existing appenders |
-| Servlet/JAX-RS app servers | Java Util Logging / JBoss LogManager | Servlet/app-server adapter or javaagent registers handler where available |
-| Gin / Echo / net/http | Detected (slog/zerolog/zap) | `Init()` auto-detects and hooks |
-| Ruby on Rails | Rails logger (built-in) | Railtie registers broadcast subscriber |
-| Rack / Sidekiq | Detected (Ruby Logger / Semantic Logger) | `init` auto-detects and hooks |
+| Framework                  | Logger                                   | Auto-Registration                                                                  |
+| -------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------- |
+| Express                    | Detected (pino/winston/bunyan/console)   | `init()` auto-detects and hooks                                                    |
+| Fastify                    | pino (built-in)                          | Plugin hooks pino transport                                                        |
+| Next.js                    | Detected (console default)               | Wrapper hooks console + detected                                                   |
+| Django                     | stdlib `logging` (built-in)              | Middleware adds handler to root logger                                             |
+| Flask                      | stdlib `logging` (built-in)              | Error handler adds handler to app logger                                           |
+| FastAPI                    | stdlib `logging` / loguru                | Middleware auto-detects and hooks                                                  |
+| Laravel                    | Monolog (built-in)                       | Service provider registers log channel                                             |
+| Symfony                    | Monolog (built-in)                       | Bundle registers handler in monolog config                                         |
+| Spring Boot                | Logback (default) / SLF4J backend        | Starter registers DebugBundle appender/helper without replacing existing appenders |
+| Servlet/JAX-RS app servers | Java Util Logging / JBoss LogManager     | Servlet/app-server adapter or javaagent registers handler where available          |
+| Gin / Echo / net/http      | Detected (slog/zerolog/zap)              | `Init()` auto-detects and hooks                                                    |
+| Ruby on Rails              | Rails logger (built-in)                  | Railtie registers broadcast subscriber                                             |
+| Rack / Sidekiq             | Detected (Ruby Logger / Semantic Logger) | `init` auto-detects and hooks                                                      |
 
 ---
 
@@ -725,66 +872,66 @@ Framework integrations must auto-register log capture alongside error/request ca
 
 > Node.js and Browser live in the JS SDK monorepo: `github.com/debugbundle/debugbundle-js`. The maintained shared-types and redaction source remains in the core repository; the SDK monorepo consumes their published packages.
 
-| Language | Package | Registry | Phase | Status |
-|----------|---------|----------|-------|--------|
-| Node.js | `@debugbundle/sdk-node` | npm | Phase 8 | Released v1.6.0 (in `debugbundle-js` repo) |
-| Browser | `@debugbundle/sdk-browser` | npm | Phase 9 | Released v1.6.0 (in `debugbundle-js` repo) |
-| Python | `debugbundle-python` | PyPI | Phase 18 | Released v1.3.0 |
-| PHP | `debugbundle/sdk-php` | Packagist | Phase 18a | Released v1.3.0 |
-| Java | `com.debugbundle:debugbundle-java-core`, servlet/JAX-RS adapters, `com.debugbundle:debugbundle-spring-boot-starter`, and `com.debugbundle:debugbundle-java-agent` | Maven Central | Java SDK | Released v1.3.0 |
-| Go | Published v1: `github.com/debugbundle/debugbundle-go`; protected v2 candidate: `github.com/debugbundle/debugbundle-go/v2` | Go modules | Phase 18b | v1 published; v2 source candidate only |
-| Ruby | `debugbundle` | RubyGems | Phase 18c | Released v1.3.0 |
+| Language | Package                                                                                                                                                           | Registry      | Phase     | Status                                     |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | --------- | ------------------------------------------ |
+| Node.js  | `@debugbundle/sdk-node`                                                                                                                                           | npm           | Phase 8   | Released v1.6.0 (in `debugbundle-js` repo) |
+| Browser  | `@debugbundle/sdk-browser`                                                                                                                                        | npm           | Phase 9   | Released v1.6.0 (in `debugbundle-js` repo) |
+| Python   | `debugbundle-python`                                                                                                                                              | PyPI          | Phase 18  | Released v1.3.0                            |
+| PHP      | `debugbundle/sdk-php`                                                                                                                                             | Packagist     | Phase 18a | Released v1.3.0                            |
+| Java     | `com.debugbundle:debugbundle-java-core`, servlet/JAX-RS adapters, `com.debugbundle:debugbundle-spring-boot-starter`, and `com.debugbundle:debugbundle-java-agent` | Maven Central | Java SDK  | Released v1.3.0                            |
+| Go       | Published v1: `github.com/debugbundle/debugbundle-go`; protected v2 candidate: `github.com/debugbundle/debugbundle-go/v2`                                         | Go modules    | Phase 18b | v1 published; v2 source candidate only     |
+| Ruby     | `debugbundle`                                                                                                                                                     | RubyGems      | Phase 18c | Released v1.3.0                            |
 
 ### V1 SDK Targets (Wave 2 — Enterprise & Platform Depth)
 
-| Language | Package | Registry | Status |
-|----------|---------|----------|--------|
-| C# | `DebugBundle.Sdk` plus `DebugBundle.*` integrations | NuGet | Released v1.3.0 |
-| Kotlin (server) | `com.debugbundle:debugbundle-kotlin` | Maven Central | Planned |
-| Rust | `debugbundle` | crates.io | Planned |
+| Language        | Package                                             | Registry      | Status          |
+| --------------- | --------------------------------------------------- | ------------- | --------------- |
+| C#              | `DebugBundle.Sdk` plus `DebugBundle.*` integrations | NuGet         | Released v1.3.0 |
+| Kotlin (server) | `com.debugbundle:debugbundle-kotlin`                | Maven Central | Planned         |
+| Rust            | `debugbundle`                                       | crates.io     | Planned         |
 
 ### V1 SDK Targets (Wave 3 — Client & Mobile Expansion)
 
-| Language | Package | Registry | Status |
-|----------|---------|----------|--------|
-| Kotlin (Android) | `com.debugbundle:debugbundle-android` | Maven Central | Released v1.2.0 |
-| Swift (iOS) | `DebugBundle` | Swift Package Manager and CocoaPods | Released v1.2.0 through both registries |
-| React Native | `@debugbundle/sdk-react-native` | npm | Released v1.2.0 |
-| Dart / Flutter | `debugbundle` | pub.dev | Planned |
+| Language         | Package                               | Registry                            | Status                                  |
+| ---------------- | ------------------------------------- | ----------------------------------- | --------------------------------------- |
+| Kotlin (Android) | `com.debugbundle:debugbundle-android` | Maven Central                       | Released v1.2.0                         |
+| Swift (iOS)      | `DebugBundle`                         | Swift Package Manager and CocoaPods | Released v1.2.0 through both registries |
+| React Native     | `@debugbundle/sdk-react-native`       | npm                                 | Released v1.2.0                         |
+| Dart / Flutter   | `debugbundle`                         | pub.dev                             | Planned                                 |
 
 ### V1 Framework Support Matrix
 
-| Language | Framework | Integration Type |
-|----------|-----------|------------------|
-| Node.js | Express | Middleware |
-| Node.js | Fastify | Plugin |
-| Node.js | Next.js | API route wrapper |
-| Python | Django | Middleware |
-| Python | Flask | Error handler + before/after request |
-| Python | FastAPI | Middleware |
-| PHP | Laravel | Middleware + exception handler + service provider |
-| PHP | Symfony | Event subscriber + bundle |
-| Java | Spring Boot | Starter: servlet filter + MVC exception resolver + relay route |
-| Java | Servlet app servers (`jakarta.servlet`, `javax.servlet`) | Filter/listener + relay servlet |
-| Java | JAX-RS / RESTEasy (`jakarta.ws.rs`, `javax.ws.rs`) | Request/response filters + exception providers |
-| Go | net/http | Middleware |
-| Go | Gin | Middleware |
-| Go | Echo | Middleware |
-| Ruby | Ruby on Rails | Middleware + Railtie |
-| Ruby | Rack | Middleware |
-| Ruby | Sidekiq | Server middleware |
-| C# | ASP.NET Core | Middleware + browser relay endpoint |
-| C# | ASP.NET Core gRPC | Server interceptor |
-| C# | .NET Generic Host / Worker Service | Hosted-service helpers |
-| C# | Hangfire | Server filter |
-| C# | Azure Functions isolated worker | Worker middleware |
-| Kotlin (server) | Ktor | Plugin |
-| Kotlin (Android) | Android | Application lifecycle hooks |
-| Swift (iOS) | UIKit / SwiftUI | App lifecycle hooks |
-| Rust | Axum | Layer / middleware |
-| Rust | Actix Web | Middleware |
-| Dart / Flutter | Flutter | RunZonedGuarded + NavigatorObserver |
-| Browser | Vanilla / React / Next.js client-side / Vue / Angular / Svelte / SPA | Auto-capture hooks |
+| Language         | Framework                                                            | Integration Type                                               |
+| ---------------- | -------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Node.js          | Express                                                              | Middleware                                                     |
+| Node.js          | Fastify                                                              | Plugin                                                         |
+| Node.js          | Next.js                                                              | API route wrapper                                              |
+| Python           | Django                                                               | Middleware                                                     |
+| Python           | Flask                                                                | Error handler + before/after request                           |
+| Python           | FastAPI                                                              | Middleware                                                     |
+| PHP              | Laravel                                                              | Middleware + exception handler + service provider              |
+| PHP              | Symfony                                                              | Event subscriber + bundle                                      |
+| Java             | Spring Boot                                                          | Starter: servlet filter + MVC exception resolver + relay route |
+| Java             | Servlet app servers (`jakarta.servlet`, `javax.servlet`)             | Filter/listener + relay servlet                                |
+| Java             | JAX-RS / RESTEasy (`jakarta.ws.rs`, `javax.ws.rs`)                   | Request/response filters + exception providers                 |
+| Go               | net/http                                                             | Middleware                                                     |
+| Go               | Gin                                                                  | Middleware                                                     |
+| Go               | Echo                                                                 | Middleware                                                     |
+| Ruby             | Ruby on Rails                                                        | Middleware + Railtie                                           |
+| Ruby             | Rack                                                                 | Middleware                                                     |
+| Ruby             | Sidekiq                                                              | Server middleware                                              |
+| C#               | ASP.NET Core                                                         | Middleware + browser relay endpoint                            |
+| C#               | ASP.NET Core gRPC                                                    | Server interceptor                                             |
+| C#               | .NET Generic Host / Worker Service                                   | Hosted-service helpers                                         |
+| C#               | Hangfire                                                             | Server filter                                                  |
+| C#               | Azure Functions isolated worker                                      | Worker middleware                                              |
+| Kotlin (server)  | Ktor                                                                 | Plugin                                                         |
+| Kotlin (Android) | Android                                                              | Application lifecycle hooks                                    |
+| Swift (iOS)      | UIKit / SwiftUI                                                      | App lifecycle hooks                                            |
+| Rust             | Axum                                                                 | Layer / middleware                                             |
+| Rust             | Actix Web                                                            | Middleware                                                     |
+| Dart / Flutter   | Flutter                                                              | RunZonedGuarded + NavigatorObserver                            |
+| Browser          | Vanilla / React / Next.js client-side / Vue / Angular / Svelte / SPA | Auto-capture hooks                                             |
 
 ### 10.1 Mobile SDK Correlation Contract
 
@@ -792,12 +939,12 @@ Mobile SDKs (Kotlin Android, Swift iOS, React Native, Dart/Flutter) must impleme
 
 **Trace ID injection by platform:**
 
-| Platform | HTTP Client | Injection mechanism |
-|----------|------------|---------------------|
-| Kotlin Android | OkHttp | `Interceptor` that adds `X-DebugBundle-Trace-Id` header |
-| Swift iOS | URLSession | `URLProtocol` subclass or delegate wrapper that adds header |
-| React Native | fetch (JS bridge) | Same as browser SDK — fetch wrapper |
-| Dart / Flutter | `http` / `dio` | `Interceptor` that adds header |
+| Platform       | HTTP Client       | Injection mechanism                                         |
+| -------------- | ----------------- | ----------------------------------------------------------- |
+| Kotlin Android | OkHttp            | `Interceptor` that adds `X-DebugBundle-Trace-Id` header     |
+| Swift iOS      | URLSession        | `URLProtocol` subclass or delegate wrapper that adds header |
+| React Native   | fetch (JS bridge) | Same as browser SDK — fetch wrapper                         |
+| Dart / Flutter | `http` / `dio`    | `Interceptor` that adds header                              |
 
 Mobile trace injection must be scoped to explicit first-party propagation targets or explicitly instrumented first-party clients. SDKs must not add `X-DebugBundle-Trace-Id` to arbitrary third-party requests.
 
@@ -807,16 +954,16 @@ Mobile SDKs reuse the existing `frontend_exception` and `frontend_breadcrumb` ev
 
 **Extended device context fields (mobile SDKs):**
 
-| Field | Source | Notes |
-|-------|--------|-------|
-| `app_version` | App manifest / Info.plist | Semantic version string |
-| `build_number` | App manifest / Info.plist | Build identifier |
-| `release_channel` | SDK config | e.g., `production`, `beta`, `testflight` |
-| `jailbroken` | Root/jailbreak detection | `true`, `false`, or `null` if unavailable, disabled, or undetectable. Android uses this field for rooted-device status; Apple platforms use it for jailbreak status. |
-| `battery_level` | System API | 0.0–1.0 or `null` if unavailable |
-| `battery_charging` | System API | boolean or `null` |
-| `free_disk_bytes` | System API | Available disk space or `null` |
-| `free_memory_bytes` | System API | Available RAM or `null` |
+| Field               | Source                    | Notes                                                                                                                                                                |
+| ------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app_version`       | App manifest / Info.plist | Semantic version string                                                                                                                                              |
+| `build_number`      | App manifest / Info.plist | Build identifier                                                                                                                                                     |
+| `release_channel`   | SDK config                | e.g., `production`, `beta`, `testflight`                                                                                                                             |
+| `jailbroken`        | Root/jailbreak detection  | `true`, `false`, or `null` if unavailable, disabled, or undetectable. Android uses this field for rooted-device status; Apple platforms use it for jailbreak status. |
+| `battery_level`     | System API                | 0.0–1.0 or `null` if unavailable                                                                                                                                     |
+| `battery_charging`  | System API                | boolean or `null`                                                                                                                                                    |
+| `free_disk_bytes`   | System API                | Available disk space or `null`                                                                                                                                       |
+| `free_memory_bytes` | System API                | Available RAM or `null`                                                                                                                                              |
 
 **Offline queueing (mobile SDKs):**
 
@@ -832,12 +979,12 @@ Mobile SDKs must support offline event capture with deferred delivery:
 
 Mobile breadcrumbs capture screen transitions and user actions into the same breadcrumb ring buffer model as the browser SDK:
 
-| Platform | Navigation capture | Action capture |
-|----------|-------------------|----------------|
+| Platform       | Navigation capture                                                          | Action capture                     |
+| -------------- | --------------------------------------------------------------------------- | ---------------------------------- |
 | Kotlin Android | `ActivityLifecycleCallbacks` + `NavController.OnDestinationChangedListener` | Touch event logging (configurable) |
-| Swift iOS | `UINavigationControllerDelegate` + SwiftUI `NavigationStack` observer | Touch event logging (configurable) |
-| React Native | React Navigation listener | Same as browser SDK |
-| Dart / Flutter | `NavigatorObserver` | Gesture detection (configurable) |
+| Swift iOS      | `UINavigationControllerDelegate` + SwiftUI `NavigationStack` observer       | Touch event logging (configurable) |
+| React Native   | React Navigation listener                                                   | Same as browser SDK                |
+| Dart / Flutter | `NavigatorObserver`                                                         | Gesture detection (configurable)   |
 
 ---
 
@@ -858,14 +1005,14 @@ On `init()`, the SDK config response includes `probes_enabled: boolean` and `rem
 
 Backend SDKs poll `GET /v1/sdk/config` to discover active remote probe directives (paid tiers only). Free-tier backend SDKs do not poll.
 
-| Rule | Detail |
-|------|--------|
-| Default interval | 60 seconds (`probesPollInterval` init config) |
-| Active remote probes interval | 15 seconds (server instructs via `poll_interval_ms` in response) |
-| Caching | `ETag` / `If-None-Match` — server returns 304 on no change. Response is CDN-edge-cached (`s-maxage=30`). |
-| Failure | On poll failure, cached config stands. SDK does not crash or log errors to host. |
-| TTL enforcement | SDK deactivates expired remote probes locally based on `expires_at`, without waiting for next poll. |
-| Startup | First poll fires immediately on `init()` (paid tiers only). If it fails, SDK operates with always-on probes only (no remote activations). |
+| Rule                          | Detail                                                                                                                                    |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Default interval              | 60 seconds (`probesPollInterval` init config)                                                                                             |
+| Active remote probes interval | 15 seconds (server instructs via `poll_interval_ms` in response)                                                                          |
+| Caching                       | `ETag` / `If-None-Match` — server returns 304 on no change. Response is CDN-edge-cached (`s-maxage=30`).                                  |
+| Failure                       | On poll failure, cached config stands. SDK does not crash or log errors to host.                                                          |
+| TTL enforcement               | SDK deactivates expired remote probes locally based on `expires_at`, without waiting for next poll.                                       |
+| Startup                       | First poll fires immediately on `init()` (paid tiers only). If it fails, SDK operates with always-on probes only (no remote activations). |
 
 ### Browser SDK: Zero Polling (Piggyback + Session-Start Check, Paid Tiers Only)
 
@@ -878,14 +1025,14 @@ Instead, browser SDKs receive remote probe directives through (paid tiers only):
 
 Free-tier browser SDKs skip the session-start config check and ignore `probe_directives` in responses (always-on mode needs no remote config).
 
-| Rule | Detail |
-|------|--------|
-| Periodic polling | **Disabled.** Browser SDK never polls on an interval. |
-| Session start | Single `GET /v1/sdk/config` on `init()` (CDN-cached, paid tiers only). |
-| Event response | Read `probe_directives` from `POST /v1/events` response body (paid tiers only). |
-| Page lifecycle | Page reload = new `init()` = fresh config check. No mid-session polling. |
-| TTL enforcement | Same as backend — local `expires_at` check, no network needed. |
-| `probesPollInterval` config | **Not applicable** for browser SDK (ignored if set). |
+| Rule                        | Detail                                                                          |
+| --------------------------- | ------------------------------------------------------------------------------- |
+| Periodic polling            | **Disabled.** Browser SDK never polls on an interval.                           |
+| Session start               | Single `GET /v1/sdk/config` on `init()` (CDN-cached, paid tiers only).          |
+| Event response              | Read `probe_directives` from `POST /v1/events` response body (paid tiers only). |
+| Page lifecycle              | Page reload = new `init()` = fresh config check. No mid-session polling.        |
+| TTL enforcement             | Same as backend — local `expires_at` check, no network needed.                  |
+| `probesPollInterval` config | **Not applicable** for browser SDK (ignored if set).                            |
 
 ### Mobile SDK: Bounded Refresh (Piggyback + Lifecycle Check, Paid Tiers Only)
 
@@ -899,14 +1046,14 @@ Mobile SDKs receive remote probe directives through (paid tiers only):
 
 Free-tier mobile SDKs skip remote probe activation checks unless the config response is already needed for capture policy. Always-on probes still buffer locally and flush with errors.
 
-| Rule | Detail |
-|------|--------|
-| Periodic polling | Disabled by default. No fixed background poll loop. |
-| App/session start | Single `GET /v1/sdk/config` on `init()` when configured. |
-| Foreground resume | Optional bounded refresh after a minimum interval; no refresh storm on rapid lifecycle changes. |
-| Event response | Read `probe_directives` from `POST /v1/events` response body when present. |
-| Offline behavior | Cached config stands while offline; queued events keep original capture timestamps. |
-| TTL enforcement | Same as backend: local `expires_at` check, no network needed. |
+| Rule                        | Detail                                                                                                        |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Periodic polling            | Disabled by default. No fixed background poll loop.                                                           |
+| App/session start           | Single `GET /v1/sdk/config` on `init()` when configured.                                                      |
+| Foreground resume           | Optional bounded refresh after a minimum interval; no refresh storm on rapid lifecycle changes.               |
+| Event response              | Read `probe_directives` from `POST /v1/events` response body when present.                                    |
+| Offline behavior            | Cached config stands while offline; queued events keep original capture timestamps.                           |
+| TTL enforcement             | Same as backend: local `expires_at` check, no network needed.                                                 |
 | `probesPollInterval` config | Not applicable by default for mobile SDKs; a mobile-specific bounded refresh interval may be exposed instead. |
 
 ### Config Response Shape
@@ -954,6 +1101,26 @@ When active probes exist for a paid-tier project, the `POST /v1/events` response
 
 `probe_directives` is omitted when no active remote probes exist or for free-tier projects (no payload bloat).
 
+### Instrumentation and interpretation
+
+Application instrumentation supplies each label and its bounded data. Deploy new
+checkpoints before activating them; activation changes future matching checkpoint
+delivery when policy permits. It cannot inspect arbitrary locals, take a heap dump,
+inject code or reconstruct an unretained measurement. Built-in error/runtime/device
+collectors keep their separate, version-specific SDK settings and capabilities.
+
+Use fixed labels with allowlisted technical stages, booleans, counts and coarse
+buckets: media decode stage/input kind, observed auth session presence/result,
+named job dependency/attempt/result, or cache hit/miss/age bucket. Exclude customer
+identifiers, tokens/cookies, cache keys, media URLs and raw application payloads.
+HTTP 200 and attempt completion do not establish semantic recovery by themselves.
+
+An empty probe section establishes only that no matching retained observation is
+present for the selected incident/sample window. It does not prove delivery to all
+SDK instances, instrumentation presence/absence or label execution. Check deployed
+versions, scope, expiry, capture policy, sampling and retained delivery receipts.
+No registry, heartbeat or instance-discovery service is introduced by this work.
+
 ### Probe Method Behavior
 
 1. SDK maintains per-label ring buffers for probe data (bounded by `maxProbeLabels` × `maxProbeEntriesPerLabel`).
@@ -973,10 +1140,10 @@ Trigger tokens have their own independent TTL (up to 24 hours), which can be lon
 
 **Delivery mechanisms:**
 
-| Mechanism | Transport | Use case |
-|-----------|-----------|----------|
-| Query parameter | `?_debug_probe=dbundle_probe_...` | Browser URLs, shareable diagnostic links |
-| Header | `X-DebugBundle-Probe-Trigger: dbundle_probe_...` | Backend API calls, agent-initiated requests |
+| Mechanism       | Transport                                        | Use case                                    |
+| --------------- | ------------------------------------------------ | ------------------------------------------- |
+| Query parameter | `?_debug_probe=dbundle_probe_...`                | Browser URLs, shareable diagnostic links    |
+| Header          | `X-DebugBundle-Probe-Trigger: dbundle_probe_...` | Backend API calls, agent-initiated requests |
 
 **SDK validation (local, no API call):**
 
@@ -1031,23 +1198,23 @@ SDKs fetch this on `init()` alongside probe config. The policy and active rules 
 
 ### SDK Enforcement Rules
 
-| Control | Value | SDK Behavior |
-|---------|-------|-------------|
-| `capture_logs` | `off` | Discard all `log_event` before buffering |
-| `capture_logs` | `error` | Only buffer/ship `log_event` with level `error` or `critical` |
-| `capture_logs` | `warning` | Buffer/ship `log_event` with level `warning`, `error`, or `critical` |
-| `capture_logs` | `info` | Buffer/ship `log_event` with level `info` and above |
-| `capture_request_events` | `off` | Discard standalone `request_event` unless the response matches the active preset's immediate request-failure statuses, the resolved `immediate_client_error_statuses`, or a matching `immediate_client_error_path_rules` rule; those immediate request failures are still captured as incident signals |
-| `capture_request_events` | `failures_only` | Buffer/ship immediate request-failure `request_event` for the active preset (`minimal`: `5xx`; `balanced`: `5xx`, `408`, `423`, `424`, `425`, `429`; `investigative`: balanced plus `409`) plus any resolved status-wide or path-scoped client-error incident promotions. Unpromoted `4xx` responses such as generic `404` remain non-incident telemetry and are not emitted in `failures_only` unless another SDK feature explicitly captures all request telemetry. |
-| `capture_request_events` | `filtered` | Buffer/ship `request_event` matching configured filters; until custom filters are available, SDKs keep only immediate request failures and do not ship additional filtered request context |
-| `capture_request_events` | `all` | Buffer/ship all `request_event` |
-| `capture_breadcrumbs` | `local_only` | Keep breadcrumbs in local ring buffer; flush only with exceptions |
-| `capture_breadcrumbs` | `exception_only` | Ship breadcrumbs only when attached to an exception event |
-| `capture_breadcrumbs` | `standalone` | Ship standalone `frontend_breadcrumb` events independently |
-| `capture_probe_events` | `buffer_only` | Probes stay in ring buffer; flush only with errors (always-on mode) |
-| `immediate_client_error_statuses` | `[401,403,409,422]` etc. | Promote those project-selected `4xx` request failures to immediate standalone `request_event` incident signals across browser and backend SDKs |
-| `immediate_client_error_path_rules` | `[{ status_code: 404, path_pattern: "/checkout/*", methods: ["GET"] }]` | Promote only matching status+path+method client errors to immediate request incidents, useful for real application routes that should not 404 |
-| `capture_probe_events` | `standalone_when_activated` | Remote-activated probes ship independently (paid tiers only) |
+| Control                             | Value                                                                   | SDK Behavior                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ----------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `capture_logs`                      | `off`                                                                   | Discard all `log_event` before buffering                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `capture_logs`                      | `error`                                                                 | Only buffer/ship `log_event` with level `error` or `critical`                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `capture_logs`                      | `warning`                                                               | Buffer/ship `log_event` with level `warning`, `error`, or `critical`                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `capture_logs`                      | `info`                                                                  | Buffer/ship `log_event` with level `info` and above                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `capture_request_events`            | `off`                                                                   | Discard standalone `request_event` unless the response matches the active preset's immediate request-failure statuses, the resolved `immediate_client_error_statuses`, or a matching `immediate_client_error_path_rules` rule; those immediate request failures are still captured as incident signals                                                                                                                                                                |
+| `capture_request_events`            | `failures_only`                                                         | Buffer/ship immediate request-failure `request_event` for the active preset (`minimal`: `5xx`; `balanced`: `5xx`, `408`, `423`, `424`, `425`, `429`; `investigative`: balanced plus `409`) plus any resolved status-wide or path-scoped client-error incident promotions. Unpromoted `4xx` responses such as generic `404` remain non-incident telemetry and are not emitted in `failures_only` unless another SDK feature explicitly captures all request telemetry. |
+| `capture_request_events`            | `filtered`                                                              | Buffer/ship `request_event` matching configured filters; until custom filters are available, SDKs keep only immediate request failures and do not ship additional filtered request context                                                                                                                                                                                                                                                                            |
+| `capture_request_events`            | `all`                                                                   | Buffer/ship all `request_event`                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `capture_breadcrumbs`               | `local_only`                                                            | Keep breadcrumbs in local ring buffer; flush only with exceptions                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `capture_breadcrumbs`               | `exception_only`                                                        | Ship breadcrumbs only when attached to an exception event                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `capture_breadcrumbs`               | `standalone`                                                            | Ship standalone `frontend_breadcrumb` events independently                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `capture_probe_events`              | `buffer_only`                                                           | Probes stay in ring buffer; flush only with errors (always-on mode)                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `immediate_client_error_statuses`   | `[401,403,409,422]` etc.                                                | Promote those project-selected `4xx` request failures to immediate standalone `request_event` incident signals across browser and backend SDKs                                                                                                                                                                                                                                                                                                                        |
+| `immediate_client_error_path_rules` | `[{ status_code: 404, path_pattern: "/checkout/*", methods: ["GET"] }]` | Promote only matching status+path+method client errors to immediate request incidents, useful for real application routes that should not 404                                                                                                                                                                                                                                                                                                                         |
+| `capture_probe_events`              | `standalone_when_activated`                                             | Remote-activated probes ship independently (paid tiers only)                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 ### Fallback Behavior
 
@@ -1061,21 +1228,21 @@ SDKs do not assign `event_class` — that is the responsibility of the event-nor
 
 ### Capture Rule Actions
 
-| Action | SDK Behavior | Server Backstop |
-|--------|--------------|-----------------|
-| `demote` | Browser SDK converts matching incident-eligible browser events into context where possible. Node and other backend SDKs may send the event normally until local context-preservation parity exists. | Worker stores matching events as `context_signal`; they cannot create, reopen, regress, alert, or dispatch automation. |
-| `sample` | SDKs use deterministic sampling keyed by `project_id`, `rule_id`, and `event_id`. Sampled-out events are discarded locally where implemented. | Ingestion rejects sampled-out events with `capture_rule_sampled_out`; sampled-in events can optionally become context when `sample_event_class` is `context`. |
-| `drop` | SDKs discard matching events before buffering where implemented. | Ingestion rejects matching events with `capture_rule_dropped` before raw persistence. |
+| Action   | SDK Behavior                                                                                                                                                                                        | Server Backstop                                                                                                                                               |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `demote` | Browser SDK converts matching incident-eligible browser events into context where possible. Node and other backend SDKs may send the event normally until local context-preservation parity exists. | Worker stores matching events as `context_signal`; they cannot create, reopen, regress, alert, or dispatch automation.                                        |
+| `sample` | SDKs use deterministic sampling keyed by `project_id`, `rule_id`, and `event_id`. Sampled-out events are discarded locally where implemented.                                                       | Ingestion rejects sampled-out events with `capture_rule_sampled_out`; sampled-in events can optionally become context when `sample_event_class` is `context`. |
+| `drop`   | SDKs discard matching events before buffering where implemented.                                                                                                                                    | Ingestion rejects matching events with `capture_rule_dropped` before raw persistence.                                                                         |
 
 Capture-rule matchers support structured browser-noise fields including `browser_event_kind`, `browser_event_opaque`, `client_kind`, and `bot_family`. Bot matching is evidence for scoped operational demotion or sampling; it must not be treated as proof that the underlying browser behavior is impossible for human users.
 
 ### Capture Rule Runtime Parity
 
-| SDK | Local rule enforcement |
-|-----|------------------------|
-| Browser | `demote`, `sample`, and `drop` |
-| Node.js | `drop` and sampled-out `sample`; `demote` is server-enforced |
-| Python, PHP, Java, Go, Ruby | Server-side enforcement until local parity is added |
+| SDK                         | Local rule enforcement                                       |
+| --------------------------- | ------------------------------------------------------------ |
+| Browser                     | `demote`, `sample`, and `drop`                               |
+| Node.js                     | `drop` and sampled-out `sample`; `demote` is server-enforced |
+| Python, PHP, Java, Go, Ruby | Server-side enforcement until local parity is added          |
 
 ---
 
@@ -1091,12 +1258,12 @@ Server-side SDKs that support backend frameworks must provide relay handler adap
 
 Use these terms consistently in contracts, docs, release notes, and parity matrices:
 
-| Term | Meaning |
-|------|---------|
+| Term               | Meaning                                                                                                                                                                                                                          |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Full relay handler | Server SDK implements request validation, sanitization, framework adapters, local-only file writes, connected durable spool writes, connected cloud forwarding, credential isolation, and relay diagnostics using this contract. |
-| Relay foundation | Server SDK validates and sanitizes relay requests but leaves delivery to caller-owned callbacks or custom code. This is not full relay parity. |
-| Relay client path | Browser SDK sends events to a relay endpoint. Same-origin paths are inferred as relay; absolute backend relay URLs require explicit `transportMode: "relay"`. The Browser SDK is not a backend relay handler. |
-| Integration relay | Platform integration, such as WordPress, composes a server SDK relay path into a concrete framework or CMS route. |
+| Relay foundation   | Server SDK validates and sanitizes relay requests but leaves delivery to caller-owned callbacks or custom code. This is not full relay parity.                                                                                   |
+| Relay client path  | Browser SDK sends events to a relay endpoint. Same-origin paths are inferred as relay; absolute backend relay URLs require explicit `transportMode: "relay"`. The Browser SDK is not a backend relay handler.                    |
+| Integration relay  | Platform integration, such as WordPress, composes a server SDK relay path into a concrete framework or CMS route.                                                                                                                |
 
 Only a full relay handler may be marked as relay-handler compatible for V1. Foundation-only SDKs may be documented as manual relay integration helpers, but must not be presented as complete relay parity.
 
@@ -1108,15 +1275,15 @@ The relay handler runs on the user's backend and bridges browser events into the
 
 The browser SDK supports explicit `transportMode: "relay" | "direct"`. When omitted, it preserves endpoint-based inference for compatibility:
 
-| Config shape | Transport behavior |
-|---|---|
-| `transportMode: "relay"` + relative path (e.g., `/debugbundle/browser`) | Relay mode: POST to same-origin endpoint, no `Authorization` header, no `project_token` field |
+| Config shape                                                                                          | Transport behavior                                                                                                                                      |
+| ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `transportMode: "relay"` + relative path (e.g., `/debugbundle/browser`)                               | Relay mode: POST to same-origin endpoint, no `Authorization` header, no `project_token` field                                                           |
 | `transportMode: "relay"` + absolute backend URL (e.g., `https://api.example.com/debugbundle/browser`) | Relay mode for split frontend/backend deployments. Requires relay CORS preflight support and `allowedOrigins`. No browser-side DebugBundle credentials. |
-| Relative path with no `transportMode` | Compatibility inference: relay mode |
-| `transportMode: "direct"` + absolute ingestion URL + `projectToken` | Direct-to-cloud or direct-to-self-hosted: include `projectToken` |
-| Absolute URL with no `transportMode` + `projectToken` | Compatibility inference: direct mode |
-| Not set + `projectToken` present | Default direct-to-cloud |
-| Not set + no `projectToken` | SDK disabled (no-op) |
+| Relative path with no `transportMode`                                                                 | Compatibility inference: relay mode                                                                                                                     |
+| `transportMode: "direct"` + absolute ingestion URL + `projectToken`                                   | Direct-to-cloud or direct-to-self-hosted: include `projectToken`                                                                                        |
+| Absolute URL with no `transportMode` + `projectToken`                                                 | Compatibility inference: direct mode                                                                                                                    |
+| Not set + `projectToken` present                                                                      | Default direct-to-cloud                                                                                                                                 |
+| Not set + no `projectToken`                                                                           | SDK disabled (no-op)                                                                                                                                    |
 
 The browser SDK uses the relay wire shape (`{"batch": [...]}`) in relay mode and the ingestion wire shape (`{"events": [...]}`) in direct mode. Relay mode must remain credential-free even when the relay endpoint is an absolute URL.
 
@@ -1144,7 +1311,7 @@ On `pagehide` and hidden `visibilitychange`, direct mode must use authenticated 
         "environment": "production"
       },
       "correlation": { "trace_id": "uuid-v4" },
-      "payload": { }
+      "payload": {}
     }
   ]
 }
@@ -1152,14 +1319,14 @@ On `pagehide` and hidden `visibilitychange`, direct mode must use authenticated 
 
 **Response format:**
 
-| Status | Body | Meaning |
-|--------|------|---------|
-| 202 | `{ "accepted": N, "rejected": M, "errors": [{ "index": 0, "reason": "..." }] }` | Batch accounted; valid events may be accepted while other events are rejected |
-| 204 | — | Allowed CORS preflight for split frontend/backend relay |
-| 400 | `{ "accepted": 0, "rejected": 0, "errors": [{ "index": -1, "reason": "malformed_payload" }] }` | Request wrapper is malformed; no events were processed |
-| 413 | — | Request body exceeds 256 KB limit |
-| 403 | — | Origin validation failed |
-| 429 | — | Rate limited |
+| Status | Body                                                                                           | Meaning                                                                       |
+| ------ | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| 202    | `{ "accepted": N, "rejected": M, "errors": [{ "index": 0, "reason": "..." }] }`                | Batch accounted; valid events may be accepted while other events are rejected |
+| 204    | —                                                                                              | Allowed CORS preflight for split frontend/backend relay                       |
+| 400    | `{ "accepted": 0, "rejected": 0, "errors": [{ "index": -1, "reason": "malformed_payload" }] }` | Request wrapper is malformed; no events were processed                        |
+| 413    | —                                                                                              | Request body exceeds 256 KB limit                                             |
+| 403    | —                                                                                              | Origin validation failed                                                      |
+| 429    | —                                                                                              | Rate limited                                                                  |
 
 ### 13.5 Security Requirements (Mandatory)
 
@@ -1175,9 +1342,11 @@ All relay implementations must enforce these security controls:
    - `sdk_name` — forced to `@debugbundle/sdk-browser`.
    - `organization_id` — never accept from browser.
 7. **Field passthrough policy:** Preserve these browser-owned fields:
-  - `correlation.request_id`, `correlation.trace_id`, `correlation.session_id`, `correlation.user_id_hash` when supplied as strings or `null`.
-   - `service`, `environment` — accepted unless relay has explicit overrides.
-   - `occurred_at` — browser timestamp (relay may annotate `received_at`).
+
+- `correlation.request_id`, `correlation.trace_id`, `correlation.session_id`, `correlation.user_id_hash` when supplied as strings or `null`.
+- `service`, `environment` — accepted unless relay has explicit overrides.
+- `occurred_at` — browser timestamp (relay may annotate `received_at`).
+
 8. **Rate limiting:** Default 60 requests per minute per IP. Configurable via `rateLimitPerMinute`.
 9. **Credential isolation:** Browser never sends DebugBundle cloud credentials. Relay attaches credentials server-side when forwarding to cloud.
 
@@ -1185,28 +1354,28 @@ All relay implementations must enforce these security controls:
 
 Full relay handlers must implement these delivery modes without requiring caller-owned callbacks:
 
-| Mode | Behavior | Write destination |
-|------|----------|-------------------|
-| Local-only | Write validated events to local events directory | `.debugbundle/local/events/` |
-| Connected (durable) | Write to spool, then forward to cloud. Spool survives cloud failures. | `.debugbundle/local/browser-relay-spool/` |
-| Connected (low-latency) | Forward to cloud without local spool. `durableWrite: false` or the language-idiomatic equivalent. | No local write |
+| Mode                    | Behavior                                                                                          | Write destination                         |
+| ----------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| Local-only              | Write validated events to local events directory                                                  | `.debugbundle/local/events/`              |
+| Connected (durable)     | Write to spool, then forward to cloud. Spool survives cloud failures.                             | `.debugbundle/local/browser-relay-spool/` |
+| Connected (low-latency) | Forward to cloud without local spool. `durableWrite: false` or the language-idiomatic equivalent. | No local write                            |
 
 Default: connected durable (`durableWrite: true`). Local-only mode is selected by the server SDK's project-mode setting or language-idiomatic equivalent.
 
 All full relay handlers must support language-idiomatic equivalents for these options:
 
-| Option | Meaning |
-|--------|---------|
-| `projectMode` | `connected` or `local-only` delivery selection. |
-| `projectToken` | Server-side project token used only for connected forwarding. |
-| `endpoint` | Cloud or self-host ingestion endpoint for connected forwarding. |
-| `localEventsDir` | Destination for local-only relay event files. |
-| `spoolDir` | Destination for connected durable relay spool files. |
-| `durableWrite` | Whether connected mode writes to spool before forwarding. Defaults to true. |
-| `service` | Optional relay-level service override. |
-| `environment` | Optional relay-level environment override. |
-| `rateLimitPerMinute` | Per-IP relay request limit. Defaults to 60. |
-| `rateLimitStore` | Optional language-idiomatic persistent/shared rate-limit store for runtimes where in-memory request state is insufficient. |
+| Option               | Meaning                                                                                                                    |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `projectMode`        | `connected` or `local-only` delivery selection.                                                                            |
+| `projectToken`       | Server-side project token used only for connected forwarding.                                                              |
+| `endpoint`           | Cloud or self-host ingestion endpoint for connected forwarding.                                                            |
+| `localEventsDir`     | Destination for local-only relay event files.                                                                              |
+| `spoolDir`           | Destination for connected durable relay spool files.                                                                       |
+| `durableWrite`       | Whether connected mode writes to spool before forwarding. Defaults to true.                                                |
+| `service`            | Optional relay-level service override.                                                                                     |
+| `environment`        | Optional relay-level environment override.                                                                                 |
+| `rateLimitPerMinute` | Per-IP relay request limit. Defaults to 60.                                                                                |
+| `rateLimitStore`     | Optional language-idiomatic persistent/shared rate-limit store for runtimes where in-memory request state is insufficient. |
 
 The handler may still expose an `onAccept` callback for instrumentation or custom extension, but callback-only delivery is a relay foundation, not full relay parity.
 
@@ -1230,26 +1399,26 @@ The relay must never strip, overwrite, or regenerate `correlation.trace_id`.
 
 Relay handlers are subpath exports of the server SDK package:
 
-| Export | Purpose |
-|--------|---------|
-| `@debugbundle/sdk-node/relay` | Core relay logic |
-| `@debugbundle/sdk-node/relay/express` | Express middleware adapter |
-| `@debugbundle/sdk-node/relay/fastify` | Fastify plugin adapter |
-| `@debugbundle/sdk-node/relay/nextjs` | Next.js route handler export |
+| Export                                | Purpose                      |
+| ------------------------------------- | ---------------------------- |
+| `@debugbundle/sdk-node/relay`         | Core relay logic             |
+| `@debugbundle/sdk-node/relay/express` | Express middleware adapter   |
+| `@debugbundle/sdk-node/relay/fastify` | Fastify plugin adapter       |
+| `@debugbundle/sdk-node/relay/nextjs`  | Next.js route handler export |
 
 Usage examples:
 
 ```ts
 // Express
-import { debugBundleRelay } from '@debugbundle/sdk-node/relay/express';
-app.use('/debugbundle/browser', debugBundleRelay());
+import { debugBundleRelay } from "@debugbundle/sdk-node/relay/express";
+app.use("/debugbundle/browser", debugBundleRelay());
 
 // Fastify
-import { debugBundleRelayPlugin } from '@debugbundle/sdk-node/relay/fastify';
+import { debugBundleRelayPlugin } from "@debugbundle/sdk-node/relay/fastify";
 app.register(debugBundleRelayPlugin);
 
 // Next.js App Router (app/debugbundle/browser/route.ts)
-export { debugBundleRelay as POST } from '@debugbundle/sdk-node/relay/nextjs';
+export { debugBundleRelay as POST } from "@debugbundle/sdk-node/relay/nextjs";
 ```
 
 ### 13.10 Multi-Language Requirement
@@ -1258,24 +1427,24 @@ Any server-side SDK that provides framework integrations must also provide relay
 
 For V1, full relay parity applies to the shipped server SDK and integration surfaces:
 
-| Surface | Required relay adapters or route |
-|---------|----------------------------------|
-| Node.js SDK | Express middleware, Fastify plugin, Next.js route handler |
-| Python SDK | Django middleware, Flask route, FastAPI endpoint |
-| PHP SDK | Laravel middleware, Symfony controller |
+| Surface          | Required relay adapters or route                                                                                                 |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Node.js SDK      | Express middleware, Fastify plugin, Next.js route handler                                                                        |
+| Python SDK       | Django middleware, Flask route, FastAPI endpoint                                                                                 |
+| PHP SDK          | Laravel middleware, Symfony controller                                                                                           |
 | WordPress plugin | WordPress REST route that composes the PHP relay behavior and adds WordPress-appropriate persistent rate limiting/spool handling |
-| Java SDK | Spring Boot relay route plus servlet relay servlet for supported `jakarta.servlet` and `javax.servlet` app-server adapters |
+| Java SDK         | Spring Boot relay route plus servlet relay servlet for supported `jakarta.servlet` and `javax.servlet` app-server adapters       |
 
 When a runtime or integration is added to the shipped relay-capable surface list above, the core product follow-through is mandatory in the same change: update `debugbundle setup` service discovery and relay-guidance coverage, update the relevant CLI/public docs and interface contracts, and add focused CLI regression coverage proving the new surface is detected and receives exact relay guidance or deterministic scaffolding.
 
 Future server SDKs must implement the same full relay handler contract before they are marked relay-handler compatible:
 
-| SDK | Relay adapters |
-|-----|---------------|
-| Go | `net/http` handler |
-| Ruby | Rack middleware, Rails engine |
-| C# | ASP.NET Core endpoint mapping and middleware |
-| Kotlin (server) | Ktor plugin |
+| SDK             | Relay adapters                               |
+| --------------- | -------------------------------------------- |
+| Go              | `net/http` handler                           |
+| Ruby            | Rack middleware, Rails engine                |
+| C#              | ASP.NET Core endpoint mapping and middleware |
+| Kotlin (server) | Ktor plugin                                  |
 
 All server SDKs must implement sections 1–8, section 11, section 12, and section 13 of this contract before release.
 
@@ -1291,3 +1460,92 @@ settings. Backend SDKs are unchanged; direct HTTP callers can submit the same ex
 Malformed JavaScript initialization returns an inactive client. Attribution is restricted to
 source/campaign data fields and checked by the existing telemetry privacy policy before capture.
 The unpublished local operator-only candidate is replaced directly, without compatibility shims.
+
+### Android evidence candidate
+
+Android's additive candidate configures `DebugBundleEvidenceOptions` through `withEvidenceOptions`, preserving existing constructor/default/copy descriptors and the BeforeSend builder. SDK-owned copies/background preferences retain local flags and the normalized complete-path pin; application-owned ordinary copies apply the builders afterwards. Native config/ACK discovery uses only its actual transport path. New producer settings default to exception evidence enabled and recovery disabled, both subordinate to negotiated support and existing policy.
+
+`beginOperation`, `withOperationContext` and `withOperationContextSuspending` own fresh revocable thread/coroutine scopes. `DebugBundleEvidenceContext.forFailure` and `captureRecovery(DebugBundleRecoveryObservation)` use the canonical independent context protocol and all shared budgets. Native final JSON partitions actual wrapper/commas under256KiB, preserves finalized tails and reapplies proof/privacy. Persisted context remains held when startup policy is unavailable; known denial/downgrade remains authoritative. RN bridges preserve complete valid authored new DTOs and reject malformed new fields before legacy migration.
+
+Fatal records are protected before storage. Built-in root access remains best effort; custom Throwable fatal accessors are not invoked. Smaller next-launch graphs parse retained strings, with accurate native/unknown/capture/runtime-reported origins, no additional fatal-caller cause traversal and no application hook. ANR uses OS occurrence time and a persistence-first deduplicated receipt. The synthetic `captureRuntimeException(error, reportedAt, context, onPersisted)` integration method returns local admission; its callback means retention by the configured store, not downstream ACK. See `sdks/debugbundle-android/MIGRATION-3.1.md` for exact limitations and release gates.
+
+Swift candidate evidence options use `DebugBundleConfig.withEvidenceOptions(DebugBundleEvidenceOptions(...))`, preserving existing initializer signatures. `captureExceptionEvidence` defaults to true and `captureRecoveryObservations` to false; the optional `DebugBundleEvidenceCapabilities` pin asserts the complete delivery path. A descriptor has only version1 and the four shared feature names; unknown fields, duplicate/unknown features and unknown versions disable it. `intersect` accepts one through eight descriptors and retains only support shared by every hop. Native ingestion/config opts in with the existing `X-DebugBundle-Evidence: 1` header. Custom paths/transports require an explicit complete-path pin. Native responses are bounded at256KiB, require identity encoding and valid UTF-8, and share one total request deadline. These APIs remain unpublished candidates; parity and release qualification are tracked separately.
+
+The unpublished Swift candidate adds `beginOperation()` and synchronous/async `withOperationContext { ... }` on the client and static facade. Manual scopes are thread-local and must be closed on their synchronous owner; use the closure helper across suspension points. Task-local scopes propagate to structured/inheriting tasks, restore nesting and become inactive when the owning operation exits, including child tasks that outlive it. Detached work requires an explicit scope. Operation IDs are fresh opaque v4 UUIDs, bounded to32 nested leases; no operation name or application object is retained. `DebugBundleEvidenceContext.forFailure(failureRef, scope: ...)` prepares explicit failure correlation. Client disposal and facade replacement revoke owned scopes. These APIs do not retry application operations or infer recovery from successful HTTP responses.
+
+Swift's unpublished `captureRecovery(DebugBundleRecoveryObservation(...))` is available on the client and static facade. It accepts explicit failure/attempt IDs, state, optional page/operation scope, operation/status/duration and trace/session correlation; omitting scope uses the current operation. The caller must use fresh failure/attempt/scope v4 UUIDs. Only `recovery_observed` asserts observed recovery; `attempt_completed` and HTTP200 retain their literal meaning. Local opt-in, proven complete-path support, non-Minimal server policy and `capture_diagnostic_context` all gate capture and final delivery. Native recovery remains low priority and respects sampling/session limits. A joint64KiB metadata/pending ledger enforces50 windows, five attempts,20 observations and five-minute association. Hooks can replace valid IDs/types; queue ownership is reconciled to the accepted result and ACK/drop releases bytes without refunding allowances. Restored pending observations retain their original window and stay held during unknown startup policy. These candidates remain subject to final runtime/artifact/parity qualification.
+
+Swift native HTTP partitions each selected batch into actual-serializer byte prefixes of at most100 events and256KiB including wrapper/commas. Chunks share one monotonic flush deadline; finalized unsent tails remain charged and durable after errors/deadline expiry, and hooks are not repeated. Optional evidence is reduced from the latest accepted primary when necessary; a still-unfit primary is withheld. Opaque custom transports retain their existing one-call behavior. Startup restores only locally permitted diagnostics that have acquired the joint bounded association ownership; unknown server policy holds those envelopes without blocking ordinary failures.
+
+Swift queue retention optionally implements `DebugBundleAcknowledgingQueueStore.persistAcknowledging(events) -> Bool`. The unchanged `DebugBundleQueueStoring.persist` Void interface remains supported; it cannot by itself prove retained crash handoff. Native file queues acknowledge only a completed atomic write. A complete canonical ingestion ACK is the alternative proof; callbacks run outside capture/client/queue locks and only once. This is best-effort filesystem retention, not a claim of async-signal safety or power-loss durability.
+
+The unpublished Swift CrashReporter adds `replayPendingCrash(store:client:)` and a safe default no-callback overload. They preserve saved occurrence time and stable replay identity, skip application `beforeSend`/duplicate aggregation, and clear only the matching record after retained handoff or canonical acceptance. An explicit legacy `report:` callback keeps its existing caller-owned behavior and immediate clearing semantics. `persistFatalCrash(..., traceOrigin: DebugBundleCrashTraceOrigin, ...)` allows a native adapter to identify `nativeFatal`/`runtimeReported`/`capture` accurately; existing calls and legacy records use `unknown`. No Swift fatalError/Mach/signal handler or fabricated throw-site stack is added. Supplied crash frames yield at most two nodes/eight total frames/fourKiB combined additions; current-launch breadcrumbs/probes are not attached to a previous report or cleared by its ACK. Native Foundation snapshot/stack-copy and filesystem operations remain best effort. Protected crash files are private, regular-file-only, bounded to256KiB and version1; unsafe/unknown data is withheld. New private optional eventId/traceOrigin fields preserve legacy decoding, and older readers ignore them.
+
+Swift's default caught-NSException path and new `captureNSException(context:client:operation:)` overload retain supported built-in error propagation while reporting the native-supplied frames as `runtime_reported`. They use current-launch context and the normal deferred application hook; previous-crash replay remains hook-free and does not own current buffers. Explicit legacy report callbacks keep their existing non-escaping signature. Custom NSException subclasses/unsafe native string implementations use an unavailable snapshot without invoking their overridable getters. Foundation's supported native stack copying and the public bridged error construction remain runtime operations, not interruptible profiling. Disabled/unconfigured Swift clients never invoke probe producers; `probeFlushOnError: false` omits buffered probe data from error snapshots.
+
+### React Native evidence candidate
+
+The unpublished React Native3.1 candidate adds `captureExceptionEvidence` (default
+true), `captureRecoveryObservations` (default false), and an optional closed
+`evidenceCapabilities` complete-path pin. The client/facade getter reports effective
+JS/native/downstream support. Native proof is required even with a JS pin; old
+native binaries retain ordinary capture and disable new evidence. Both native
+wrappers forward options and proof through their existing config/status methods.
+Native minimal/diagnostic policy, sampling and offline ownership remain authoritative.
+
+The facade and client expose `beginOperation()`, `withOperationContext(callback)`
+and `captureRecovery(observation)`. Operation handles have `operationId`,
+`evidenceScope`, and idempotent `close()`. Implicit scopes are synchronous, nest to32,
+restore parents and revoke descendants on parent close or client reinitialization.
+The closure helper closes when the callback returns, including a returned promise.
+Across async work, pass an explicit scope instead of retaining an implicit scope.
+Failure context accepts fresh `failureRef` and `evidenceScope`; recovery accepts
+fresh failure/attempt IDs, optional scope, one of the five shared states, optional
+operation/status/duration and the four canonical correlation keys. The same
+five-minute,50-window,five-attempt,20-observation,64KiB joint bounds apply. Final
+hooks revalidate occurrence time, scope and source identity without refunding
+allowances. HTTP200/attempt completion is never semantic recovery.
+
+Hermes/JSC without native `Error.isError` reports unsupported cause traversal while
+retaining the outer error. Supported native own cause data is bounded; getters,
+aggregate iterators and application stack formatters are not invoked. V8/Hermes/JSC
+text yields runtime-reported frames where available. Fatal JS evidence uses the
+smaller shared budget and skips JS application hooks while preserving the prior
+handler. This adds no native signal/crash handler. Full canonical hook replacements
+retain any allowed event kind/SDK metadata and pass privacy/proof/policy again.
+The private native carrier can omit an unchanged JS device placeholder; the native
+worker hydrates only device metadata and preserves the authored evidence. Explicit
+hook device replacements are retained. See the SDK's `MIGRATION-3.1.md` for examples
+and exact engine/ownership limitations. Packaged/device qualification is separate
+from these source contracts.
+
+The iOS React Native wrapper additionally exposes optional
+`enqueueCanonicalEventJson(string)` for the private canonical carrier. It limits
+UTF-8 bytes and nesting before native JSON parsing; the ordinary native ownership,
+privacy and canonical validation still follow. JavaScript prefers it because
+TurboModule object conversion can omit nested nulls. Android's canonical map
+carrier preserves nulls. Existing object and legacy methods remain available.
+The new evidence members are optional on the structural `DebugBundleClient`
+interface; concrete clients and the facade provide them.
+
+### WordPress evidence candidate
+
+The coordinated plugin requires PHP2.1/browser3.2 artifacts. The restricted
+`debugbundle_evidence_options` filter accepts only Boolean
+`captureExceptionEvidence` (default true), `captureResourceObservations` (true)
+and `captureRecoveryObservations` (false). `debugbundle_sdk_ready` receives the
+configured PHP SDK after lifecycle registration; callback failures are contained.
+`window.DebugBundleWordPress` exposes the bundled browser SDK after its script
+loads, without requiring debug logging or exposing a project token.
+
+The existing relay URL accepts opt-in `debugbundle_evidence=1` or
+`X-DebugBundle-Evidence: 1`; only opted-in responses add current complete-path
+capability proof and indexed evidence errors. Relay admission/forwarding/spool
+replay intersect proof, local options and current project policy. Config reads
+on visitor requests remain local; cron refreshes the endpoint/token-scoped cache,
+including frontend-only installations. Ingestion ACK proof cannot extend policy
+expiry. Protected byte-bounded chunks are retained before browser acknowledgement,
+and forwarding preserves existing partial-ACK semantics within the original
+five-second whole-batch deadline. The plugin migration guide documents explicit
+failure/attempt associations and all five observation states. No response code
+or attempt completion is inferred to mean application recovery.

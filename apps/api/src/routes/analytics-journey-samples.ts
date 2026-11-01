@@ -15,12 +15,12 @@ import {
 import { isObjectNotFoundError, requireRateLimitedProjectAccess } from "../api-helpers.js";
 
 const AnalyticsJourneySampleParamsSchema = z.object({
-  id: z.string().uuid()
+  id: z.string().guid()
 }).strict();
 
 const AnalyticsJourneySamplesListQuerySchema = z
   .object({
-    project_id: z.string().uuid(),
+    project_id: z.string().guid(),
     service: z.string().trim().min(1).max(120).optional(),
     environment: z.string().trim().min(1).max(120).optional(),
     tag: z.string().trim().min(1).max(120).optional(),
@@ -31,7 +31,7 @@ const AnalyticsJourneySamplesListQuerySchema = z
 
 const AnalyticsJourneySampleQuerySchema = z
   .object({
-    project_id: z.string().uuid()
+    project_id: z.string().guid()
   })
   .strict();
 
@@ -200,7 +200,7 @@ function parseAnalyticsJourneySamplesCursor(
 
   const parsed = z.object({
     last_seen_at: z.string().datetime(),
-    sample_id: z.string().uuid()
+    sample_id: z.string().guid()
   }).safeParse({
     last_seen_at: new Date(parsedTimestamp).toISOString(),
     sample_id: sampleId

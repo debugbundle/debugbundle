@@ -17,7 +17,7 @@ import { CliAuthStateError, readCliAuthState } from "./auth-state.js";
 import type { CliAuthState } from "./auth-state.js";
 import { ConnectionConfigSchema } from "./connection-config.js";
 import { CONNECTION_FILE_PATH, PROFILE_FILE_PATH, SKILL_FILE_PATH } from "./local-scaffold.js";
-import { ProfileSchema, type ProfileValidationError } from "./profile-validation.js";
+import { ProfileSchema, profileIssueMessage, type ProfileValidationError } from "./profile-validation.js";
 import type { CliCommandResult } from "./token-commands.js";
 
 type FileReader = (path: string) => Promise<string>;
@@ -263,10 +263,10 @@ async function buildFileCheck(rootDirectory: string, name: string, filePath: str
   };
 }
 
-function formatZodErrors(error: z.ZodError): ProfileValidationError[] {
+function formatZodErrors(error: z.ZodError, input: unknown): ProfileValidationError[] {
   return error.issues.map((issue) => ({
     path: issue.path.join("."),
-    message: issue.message
+    message: profileIssueMessage(issue, input)
   }));
 }
 
@@ -312,7 +312,7 @@ async function loadProfile(rootDirectory: string, dependencies: { readFile: File
         message: `Invalid ${PROFILE_FILE_PATH}`
       },
       profile: null,
-      validationErrors: formatZodErrors(parsedDoctorProfile.error)
+      validationErrors: formatZodErrors(parsedDoctorProfile.error, parsedJson)
     };
   }
 
@@ -324,7 +324,7 @@ async function loadProfile(rootDirectory: string, dependencies: { readFile: File
       message: `Found ${PROFILE_FILE_PATH}`
     },
     profile: parsedDoctorProfile.data,
-    validationErrors: parsedFullProfile.success ? [] : formatZodErrors(parsedFullProfile.error)
+    validationErrors: parsedFullProfile.success ? [] : formatZodErrors(parsedFullProfile.error, parsedJson)
   };
 }
 

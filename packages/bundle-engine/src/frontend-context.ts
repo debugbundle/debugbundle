@@ -1,13 +1,11 @@
 import type { BundleV1, EventEnvelope } from "../../shared-types/src/index.js";
+import { parseStackFrames, selectUsefulFrame } from "./stack-frames.js";
 
 export type FrontendExceptionEnvelope = Extract<
   EventEnvelope,
   { event_type: "frontend_exception" }
 >;
-type FrontendBreadcrumbEnvelope = Extract<
-  EventEnvelope,
-  { event_type: "frontend_breadcrumb" }
->;
+type FrontendBreadcrumbEnvelope = Extract<EventEnvelope, { event_type: "frontend_breadcrumb" }>;
 type FrontendExceptionBreadcrumb = NonNullable<
   FrontendExceptionEnvelope["payload"]["breadcrumbs"]
 >[number];
@@ -59,6 +57,27 @@ function isBrowserSdkFallbackFrame(frame: string): boolean {
 export function deriveFirstApplicationFrame(
   errorContext: BundleErrorContext | null
 ): BundleV1["summary"]["first_application_frame"] {
+  if (errorContext?.exception_evidence !== undefined) {
+    const root = errorContext.exception_evidence.nodes.find(
+      (node) => node.id === errorContext.exception_evidence!.root_id
+    );
+    if (root?.trace_origin === "capture" || root?.trace_origin === "unavailable") return null;
+    const useful = selectUsefulFrame(
+      root?.frames.length
+        ? root.frames
+        : parseStackFrames(
+            root?.stack ?? errorContext.stack,
+            errorContext.exception_evidence.runtime
+          ).frames
+    );
+    return useful === null
+      ? null
+      : { file: useful.file, line: useful.line, function: useful.function };
+  }
+  if (errorContext !== null) {
+    const useful = selectUsefulFrame(parseStackFrames(errorContext.stack).frames);
+    if (useful !== null) return { file: useful.file, line: useful.line, function: useful.function };
+  }
   const firstFrame = errorContext?.top_frames[0];
   if (firstFrame === undefined) {
     return null;
@@ -145,9 +164,7 @@ function buildFrontendBreadcrumbKey(input: {
   return `${input.breadcrumb_type}:${input.ts}:${input.route ?? ""}:${stableJson(input.data)}`;
 }
 
-export function buildFrontendContext(
-  envelopes: EventEnvelope[]
-): BundleV1["context"]["frontend"] {
+export function buildFrontendContext(envelopes: EventEnvelope[]): BundleV1["context"]["frontend"] {
   const breadcrumbs = new Map<
     string,
     {

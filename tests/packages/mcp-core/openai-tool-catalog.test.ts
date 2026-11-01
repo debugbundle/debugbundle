@@ -15,14 +15,33 @@ const contractsPath = new URL(
 const schemasPath = new URL("../../fixtures/openai-plugin-v1/schemas.json", import.meta.url);
 
 describe("OpenAI MCP tool catalog", () => {
-  it("matches the exact frozen catalog and JSON schemas", async () => {
-    const [contracts, schemas] = await Promise.all([
+  it("preserves frozen contracts with only the optional bounded evidence summary", async () => {
+    const [contracts, schemas, evidenceSchema] = await Promise.all([
       readFile(contractsPath, "utf8").then((value) => JSON.parse(value) as { tools: unknown[] }),
-      readFile(schemasPath, "utf8").then((value) => JSON.parse(value) as unknown)
+      readFile(schemasPath, "utf8").then((value) => JSON.parse(value) as unknown),
+      readFile(
+        new URL("../../fixtures/openai-plugin-v1/evidence-summary-schema.json", import.meta.url),
+        "utf8"
+      ).then((value) => JSON.parse(value) as unknown)
     ]);
 
     expect(OPENAI_TOOL_CATALOG).toEqual(contracts.tools);
-    expect(OPENAI_SCHEMA_CONTRACT).toEqual(schemas);
+    const current = structuredClone(OPENAI_SCHEMA_CONTRACT) as {
+      $defs: Record<string, { properties?: Record<string, unknown>; required?: string[] }>;
+    };
+    // FR-EVID-08 adds output-only, optional summaries. Retain the historical
+    // fixture so inputs, authority and all existing output fields stay frozen.
+    expect(current.$defs["evidenceSummary"]).toEqual(evidenceSchema);
+    delete current.$defs["evidenceSummary"];
+    for (const name of ["bundleArtifact", "getIncidentContextOutput"]) {
+      const definition = current.$defs[name]!;
+      expect(definition.properties!["evidence_summary"]).toEqual({
+        $ref: "#/$defs/evidenceSummary"
+      });
+      expect(definition.required).not.toContain("evidence_summary");
+      delete definition.properties!["evidence_summary"];
+    }
+    expect(current).toEqual(schemas);
   });
 
   it("accepts only strict hosted inputs and preserves required project scope", () => {

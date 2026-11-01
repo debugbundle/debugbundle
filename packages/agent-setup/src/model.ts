@@ -32,7 +32,7 @@ const ManifestSchema = z
     selected_agents: z.array(z.enum(AGENTS)).max(AGENTS.length),
     selection_declared: z.boolean(),
     canonical: z.record(z.string(), Hash),
-    instructions: z.record(z.enum(AGENTS), Instruction).default({}),
+    instructions: z.partialRecord(z.enum(AGENTS), Instruction).default({}),
     claude: z
       .object({ mode: z.enum(["link", "copy"]), files: z.record(z.string(), Hash) })
       .strict()

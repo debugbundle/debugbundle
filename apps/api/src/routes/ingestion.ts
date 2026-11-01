@@ -1,3 +1,4 @@
+import { evidenceCapabilityResponse } from "../evidence-negotiation.js";
 import type { FastifyInstance } from "fastify";
 
 import {
@@ -10,7 +11,8 @@ import {
   classifyEvent,
   classifyInstalledJavaEventCompatibility,
   classifyInstalledMobileEventCompatibility,
-  validateEvent
+  validateEvent,
+  validateEventAtAdmission
 } from "../../../../packages/event-normalizer/src/index.js";
 import {
   countsTowardMonthlyIngestAllowance,
@@ -19,6 +21,7 @@ import {
 } from "../../../../packages/storage/src/index.js";
 import {
   getTierCapabilities,
+  EVENT_INGESTION_MAX_BODY_BYTES,
   resolvePolicy,
   PRESET_DEFAULTS,
   shouldCaptureEvent,
@@ -41,7 +44,6 @@ import {
   toRetryAfterSeconds as toAnalyticsRetryAfterSeconds
 } from "../analytics-quota.js";
 import { redactEvent } from "../api-helpers.js";
-import { SMALL_REQUEST_BODY_LIMIT_BYTES } from "../http-limits.js";
 import { parseCompatibleIngestionRequest } from "../ingestion-request-compatibility.js";
 import { isProjectTokenOriginAllowed } from "../project-token-origins.js";
 import {
@@ -65,7 +67,7 @@ import {
 type ValidDebugEvent = { index: number; event: ReturnType<typeof redactEvent> };
 
 export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
-  app.post("/v1/events", { bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES }, async (request, reply) => {
+  app.post("/v1/events", { bodyLimit: EVENT_INGESTION_MAX_BODY_BYTES }, async (request, reply) => {
     const projectAuth = await requireProjectToken({
       authorizationHeader: request.headers.authorization,
       resolveByTokenHash: (tokenHash) =>
@@ -146,7 +148,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
     const errors: Array<{ index: number; reason: string }> = [];
     const rejectedMetricEvents: IngestionRejectedMetricEvent[] = [];
     const rejectedDiagnosticEvents: IngestionRejectedDiagnosticEvent[] = [];
-    const validEvents: ValidDebugEvent[] = [];
+    let validEvents: ValidDebugEvent[] = [];
     const validAnalyticsEvents: ValidAnalyticsEvent[] = [];
 
     for (const [index, candidate] of parsedBody.data.events.entries()) {
@@ -188,13 +190,16 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
         continue;
       }
 
+      let event: ReturnType<typeof redactEvent>;
       try {
-        validEvents.push({ index, event: redactEvent(validation.data) });
+        event = redactEvent(validation.data);
       } catch {
         // Mandatory sanitization failure is a permanent per-index rejection, never a raw fallback.
         errors.push({ index, reason: "unsafe_event" });
         rejectedMetricEvents.push({ event_id: validation.data.event_id, reason: "unsafe_event" });
+        continue;
       }
+      validEvents.push({ index, event });
     }
 
     const sharedRateLimitedEventCount = validEvents.length + validAnalyticsEvents.length;
@@ -273,6 +278,34 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
         }
       }
     }
+
+    const admittedDebugEvents: ValidDebugEvent[] = [];
+    for (const { index, event } of validEvents) {
+      // Persist first receipt before time-based admission, including future context
+      // rejected now. Retry order must never refresh eligibility or raw identity.
+      const receipt = await dependencies.ingestionPersistence.claimEvidenceReceipt?.(
+        event,
+        project.project_id,
+        now.toISOString()
+      );
+      if (
+        receipt?.matches === false ||
+        !validateEventAtAdmission(event, receipt?.received_at ?? now.toISOString()).success
+      ) {
+        errors.push({ index, reason: "invalid_event" });
+        rejectedMetricEvents.push({ event_id: event.event_id, reason: "invalid_event" });
+        rejectedDiagnosticEvents.push(
+          buildRejectedDiagnosticFromEvent({
+            project_id: project.project_id,
+            rejection_reason: "invalid_event",
+            event
+          })
+        );
+        continue;
+      }
+      admittedDebugEvents.push({ index, event });
+    }
+    validEvents = admittedDebugEvents;
 
     const caps = getTierCapabilities(project.organization_plan);
     const analyticsSelection = await selectAcceptedAnalyticsEvents({
@@ -384,7 +417,14 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
                   },
                   ...(captureRulesNeedFingerprint
                     ? {
-                        ...buildEventFingerprintContext(entry.event, activeCaptureRules.flatMap(rule => rule.matcher.fingerprint === undefined ? [] : [rule.matcher.fingerprint.version]))
+                        ...buildEventFingerprintContext(
+                          entry.event,
+                          activeCaptureRules.flatMap((rule) =>
+                            rule.matcher.fingerprint === undefined
+                              ? []
+                              : [rule.matcher.fingerprint.version]
+                          )
+                        )
                       }
                     : {})
                 }),
@@ -592,6 +632,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
     let accepted = 0;
     for (const { event, captureRule } of debugEventsToPersist) {
       await dependencies.ingestionPersistence.persistAndEnqueue(event, project.project_id, {
+        receivedAt: now.toISOString(),
         capturePreset: capturePolicy.preset,
         immediateClientErrorStatuses: capturePolicy.immediate_client_error_statuses,
         immediateClientErrorPathRules: capturePolicy.immediate_client_error_path_rules,
@@ -764,6 +805,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
     }
 
     const responseBody: {
+      evidence_capabilities?: import("../../../../packages/shared-types/src/index.js").EvidenceCapabilities;
       accepted: number;
       rejected: number;
       errors: Array<{ index: number; reason: string }>;
@@ -780,7 +822,11 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
     } = {
       accepted,
       rejected: errors.length,
-      errors
+      errors,
+      ...evidenceCapabilityResponse(
+        request,
+        dependencies.ingestionPersistence.claimEvidenceReceipt !== undefined
+      )
     };
 
     if (caps.remote_probes && activeProbes.length > 0) {

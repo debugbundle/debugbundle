@@ -85,6 +85,13 @@ The MCP package release manifest must include package-level MCP Registry metadat
 5. Publish `@debugbundle/shared-types` and `@debugbundle/redaction` to npm
 6. Smoke-test clean installs from the registry
 
+The `shared-js-v*` tag or manual `version` input identifies shared-types. Redaction
+uses its independently reviewed manifest version. Validate both as stable versions
+before registry checks and use each exact version for registry state, packed
+consumers and published consumers. A shared-types schema API major does not require
+an unrelated redaction major. For the Zod 4 candidate the proposed pair is
+shared-types 3.0.0 / redaction 2.7.0; see `spec/zod-v4-migration.md`.
+
 **release.yml** — Runs on `v*` tags or manual dispatch:
 
 1. Validate that the requested stable version matches the root package version

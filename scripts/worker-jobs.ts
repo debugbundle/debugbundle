@@ -13,7 +13,7 @@ export const WorkerJobOperatorEnvSchema = z
     DB_PASSWORD: z.string().min(1),
     DB_NAME: z.string().min(1).default("debugbundle"),
     DB_SSL_MODE: z.string().optional(),
-    WORKER_JOB_PROJECT_ID: z.union([z.string().uuid(), z.literal("global")]),
+    WORKER_JOB_PROJECT_ID: z.union([z.string().guid(), z.literal("global")]),
     WORKER_JOB_ID: z
       .string()
       .regex(/^[a-f0-9]{64}$/)

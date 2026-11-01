@@ -3,11 +3,17 @@ import { createHash, randomUUID } from "node:crypto";
 import Stripe from "stripe";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 
-import { createApiDependencies, type BillingEmailService } from "../../apps/api/src/default-dependencies.ts";
+import {
+  createApiDependencies,
+  type BillingEmailService
+} from "../../apps/api/src/default-dependencies.ts";
 import { createApiServer } from "../../apps/api/src/server.js";
 import type { StripeConfig } from "../../apps/api/src/stripe-config.js";
 import { SESSION_COOKIE_NAME, buildCsrfToken } from "../../packages/auth/src/index.js";
-import { createPostgresBillingSyncStore, type Queryable } from "../../packages/storage/src/index.js";
+import {
+  createPostgresBillingSyncStore,
+  type Queryable
+} from "../../packages/storage/src/index.js";
 import {
   createIntegrationPool,
   createQueryable,
@@ -41,6 +47,11 @@ runIntegration("billing integration – stripe sync", () => {
       additionalProjectSlots: 0,
       existingProjectCount: 1
     });
+    // FR-BIL-10: this checkout fixture has completed the first-purchase wait.
+    await pool.query(
+      "UPDATE organizations SET trial_plan='team', trial_started_at=now()-interval '31 days', trial_ends_at=now()-interval '1 day' WHERE id=$1",
+      [owner.organizationId]
+    );
     const stripe = createStripeHarness();
     const emailSink = createBillingEmailSink({ recipientEmail: owner.email });
     const appContext = createBillingApp({
@@ -134,12 +145,16 @@ runIntegration("billing integration – stripe sync", () => {
         [owner.userId]
       );
       expect(expiredMemberTokenUsage.rows[0]?.last_used_at).toBeNull();
-      await pool.query(
-        "UPDATE member_tokens SET expires_at = NULL WHERE user_id = $1",
-        [owner.userId]
-      );
+      await pool.query("UPDATE member_tokens SET expires_at = NULL WHERE user_id = $1", [
+        owner.userId
+      ]);
 
-      stripe.checkoutCreate.mockResolvedValue({ url: "https://billing.stripe.test/checkout/team" });
+      stripe.checkoutCreate.mockResolvedValue({
+        id: "cs_checkout_team",
+        status: "open",
+        client_reference_id: owner.organizationId,
+        url: "https://billing.stripe.test/checkout/team"
+      });
       const checkout = await appContext.app.inject({
         method: "POST",
         url: "/v1/billing/checkout",
@@ -161,6 +176,11 @@ runIntegration("billing integration – stripe sync", () => {
           client_reference_id: owner.organizationId,
           metadata: { organization_id: owner.organizationId },
           line_items: [{ price: "price_team", quantity: 1 }]
+        }),
+        expect.objectContaining({
+          timeout: 8000,
+          maxNetworkRetries: 0,
+          idempotencyKey: expect.any(String)
         })
       );
 
@@ -488,10 +508,7 @@ async function seedOrganization(
     ]
   );
 
-  await pool.query(
-    `INSERT INTO users (id, email) VALUES ($1, $2)`,
-    [userId, email]
-  );
+  await pool.query(`INSERT INTO users (id, email) VALUES ($1, $2)`, [userId, email]);
 
   await pool.query(
     `
@@ -578,12 +595,17 @@ function createStripeHarness(): {
   };
 }
 
-function createBillingEmailSink(input: { recipientEmail: string }): BillingEmailService & { messages: BillingEmailMessage[] } {
+function createBillingEmailSink(input: {
+  recipientEmail: string;
+}): BillingEmailService & { messages: BillingEmailMessage[] } {
   const messages: BillingEmailMessage[] = [];
 
   return {
     managementUrl: "https://app.debugbundle.test/billing",
-    async getBillingContactForOrganization(): Promise<{ organizationName: string; recipientEmail: string }> {
+    async getBillingContactForOrganization(): Promise<{
+      organizationName: string;
+      recipientEmail: string;
+    }> {
       return {
         organizationName: "Billing Integration Org",
         recipientEmail: input.recipientEmail
@@ -647,7 +669,11 @@ function createBillingApp(input: {
   };
 }
 
-function buildStripeEvent(eventId: string, type: string, data: Record<string, unknown>): Stripe.Event {
+function buildStripeEvent(
+  eventId: string,
+  type: string,
+  data: Record<string, unknown>
+): Stripe.Event {
   return {
     id: eventId,
     type,

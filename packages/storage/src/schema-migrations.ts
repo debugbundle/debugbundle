@@ -1,4 +1,5 @@
 import { BILLING_PLAN_CHANGE_MIGRATION } from "./billing-plan-change-schema.js";
+import { EVIDENCE_CONTEXT_MIGRATIONS } from "./evidence-context-schema.js";
 import { NOTIFICATION_SCHEMA_MIGRATIONS } from "./notification-schema.js";
 import { BILLING_CHECKOUT_MIGRATION } from "./billing-checkout-schema.js";
 import { BILLING_SUBSCRIPTION_OPERATION_MIGRATION } from "./billing-subscription-operation-schema.js";
@@ -34,6 +35,7 @@ type StorageMigrationLedgerReconcileStatus =
 const STORAGE_MIGRATION_LEDGER_TABLE = "storage_migration_ledger";
 
 export const STORAGE_SCHEMA_MIGRATIONS: readonly StorageSchemaMigration[] = [
+  ...EVIDENCE_CONTEXT_MIGRATIONS,
   ...BASE_STORAGE_SCHEMA_MIGRATIONS,
   ...BROWSER_RECOVERY_MIGRATIONS,
   ...AVAILABILITY_CHECK_STORAGE_SCHEMA_MIGRATIONS,

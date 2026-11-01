@@ -7,6 +7,24 @@ Last updated: 2026-09-20
 
 ## 1. Functional Requirements
 
+### Bundle evidence quality (accepted candidate)
+
+The tracked [evidence specification](bundle-evidence-quality.md) defines the
+following additional requirements. Activation is gated by receiver/relay support
+and whole-family qualification; these entries do not describe released SDKs.
+
+| ID | Requirement |
+|---|---|
+| FR-EVID-01 | Optional, versioned, bounded structured exception graphs; retain legacy outer errors and UTF-8/privacy limits. |
+| FR-EVID-02 | Deterministic runtime-aware stack interpretation with honest origins and unchanged fingerprint/rule inputs. |
+| FR-EVID-03 | Safe native cause/aggregate/suppressed evidence, accurate fatal locations and isolated backend operation context. |
+| FR-EVID-04 | Browser-selected resource identity and bounded passive timing/status/CSP observations. |
+| FR-EVID-05 | Opt-in independently delivered typed recovery/resource context with explicit scopes, truthful outcomes and existing policy/metering. |
+| FR-EVID-06 | Fail-closed complete-path capability discovery/pinning and compatible downgrade before new emission. |
+| FR-EVID-07 | Additive migrated reference index, scoped hashes/expiry and transactional idempotent context rebuilds. |
+| FR-EVID-08 | Deterministic primary/source provenance and equivalent permitted reader facts with restricted projection privacy. |
+| FR-EVID-09 | Accurate probe guidance and all maintained SDK/relay/bridge qualification without hidden applicable gaps. |
+
 ### 1.1 SDK Capture
 
 > **Repo note:** Node.js and Browser SDK packages (`@debugbundle/sdk-node`, `@debugbundle/sdk-browser`) live in the JS SDK monorepo: `github.com/debugbundle/debugbundle-js`. The maintained source for `@debugbundle/shared-types` and `@debugbundle/redaction` lives in this core repository's `packages/`; the SDK repo consumes their published packages.

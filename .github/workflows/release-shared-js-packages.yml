@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Stable shared package version to publish (for example 0.1.0)
+        description: Stable shared-types version; redaction uses its reviewed manifest version
         required: true
         type: string
   push:
@@ -60,6 +60,31 @@ jobs:
 
           echo "value=$version" >> "$GITHUB_OUTPUT"
 
+      - name: Validate shared package versions
+        id: shared_versions
+        run: |
+          node --input-type=module <<'EOF'
+          import { appendFileSync, readFileSync } from "node:fs";
+
+          const expectedVersion = process.env.RELEASE_VERSION;
+          if (!expectedVersion) throw new Error("missing_release_version");
+          const stable = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/;
+          const versions = {};
+          for (const name of ["shared-types", "redaction"]) {
+            const manifest = JSON.parse(readFileSync(`packages/${name}/package.json`, "utf8"));
+            if (manifest.name !== `@debugbundle/${name}`) throw new Error("unexpected_package_name");
+            if (!stable.test(manifest.version)) throw new Error(`unexpected_prerelease_version:${manifest.version}`);
+            versions[name] = manifest.version;
+          }
+          if (versions["shared-types"] !== expectedVersion) {
+            throw new Error(`shared-types version ${versions["shared-types"]} does not match release ${expectedVersion}`);
+          }
+          if (!process.env.GITHUB_OUTPUT) throw new Error("missing_github_output");
+          appendFileSync(process.env.GITHUB_OUTPUT, `redaction=${versions.redaction}\n`);
+          EOF
+        env:
+          RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
+
       - name: Check published shared package state
         id: published_state
         run: |
@@ -75,11 +100,14 @@ jobs:
             throw new Error("missing_github_output");
           }
 
-          const packages = ["@debugbundle/shared-types", "@debugbundle/redaction"];
+          const packages = [
+            ["@debugbundle/shared-types", releaseVersion],
+            ["@debugbundle/redaction", process.env.REDACTION_VERSION]
+          ];
           const published = [];
 
-          for (const packageName of packages) {
-            const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(packageName)}/${releaseVersion}`);
+          for (const [packageName, version] of packages) {
+            const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(packageName)}/${version}`);
 
             if (response.status === 404) {
               continue;
@@ -89,7 +117,7 @@ jobs:
               throw new Error(`failed_to_check_${packageName.replaceAll("/", "_")}_${response.status}`);
             }
 
-            published.push(packageName);
+            published.push(`${packageName}@${version}`);
           }
 
           const state =
@@ -103,6 +131,7 @@ jobs:
           EOF
         env:
           RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
+          REDACTION_VERSION: ${{ steps.shared_versions.outputs.redaction }}
 
       - name: Abort on partially published shared package release
         if: steps.published_state.outputs.state == 'partial'
@@ -114,32 +143,6 @@ jobs:
       - name: Note already published shared package release
         if: steps.published_state.outputs.state == 'all'
         run: echo "Release version ${{ steps.release_version.outputs.value }} is already published for the shared JS packages; skipping publish steps."
-
-      - name: Validate shared package versions
-        run: |
-          node --input-type=module <<'EOF'
-          import { readFileSync } from "node:fs";
-
-          const expectedVersion = process.env.RELEASE_VERSION;
-          if (!expectedVersion) {
-            throw new Error("missing_release_version");
-          }
-
-          if (expectedVersion.includes("-")) {
-            throw new Error(`unexpected_prerelease_version:${expectedVersion}`);
-          }
-
-          const packageFiles = ["packages/shared-types/package.json", "packages/redaction/package.json"];
-
-          for (const packageFile of packageFiles) {
-            const packageJson = JSON.parse(readFileSync(packageFile, "utf8"));
-            if (packageJson.version !== expectedVersion) {
-              throw new Error(`${packageJson.name} version ${packageJson.version} does not match release ${expectedVersion}`);
-            }
-          }
-          EOF
-        env:
-          RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
 
       - name: Run shared package tests
         run: pnpm vitest run tests/packages/shared-types/shared-types.test.ts tests/packages/shared-types/tier-capabilities.test.ts tests/packages/shared-types/capture-policy.test.ts tests/packages/redaction/redaction.test.ts
@@ -176,7 +179,7 @@ jobs:
 
           npm install --prefix "$tmpdir" --no-package-lock \
             "$PWD/.tmp/shared-js-packages/debugbundle-shared-types-${RELEASE_VERSION}.tgz" \
-            "$PWD/.tmp/shared-js-packages/debugbundle-redaction-${RELEASE_VERSION}.tgz"
+            "$PWD/.tmp/shared-js-packages/debugbundle-redaction-${REDACTION_VERSION}.tgz"
 
           cd "$tmpdir"
           node --input-type=module <<'EOF'
@@ -193,6 +196,7 @@ jobs:
           EOF
         env:
           RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
+          REDACTION_VERSION: ${{ steps.shared_versions.outputs.redaction }}
 
       - name: Publish shared packages
         if: steps.published_state.outputs.state == 'none'
@@ -205,22 +209,22 @@ jobs:
         run: |
           set -euo pipefail
 
-          for package_name in @debugbundle/shared-types @debugbundle/redaction; do
+          for package_spec in "@debugbundle/shared-types@${RELEASE_VERSION}" "@debugbundle/redaction@${REDACTION_VERSION}"; do
             for attempt in $(seq 1 30); do
-              if npm view "${package_name}@${RELEASE_VERSION}" version >/dev/null 2>&1; then
+              if npm view "${package_spec}" version >/dev/null 2>&1; then
                 break
               fi
 
               if [[ "$attempt" == "30" ]]; then
-                echo "${package_name}@${RELEASE_VERSION} not visible on npm after propagation wait" >&2
-                npm view "${package_name}@${RELEASE_VERSION}" version
+                echo "${package_spec} not visible on npm after propagation wait" >&2
+                npm view "${package_spec}" version
                 exit 1
               fi
 
               sleep 10
             done
 
-            npm view "${package_name}@${RELEASE_VERSION}" version
+            npm view "${package_spec}" version
           done
 
           tmpdir="$(mktemp -d)"
@@ -234,7 +238,7 @@ jobs:
 
           npm install --prefix "$tmpdir" --no-package-lock \
             "@debugbundle/shared-types@${RELEASE_VERSION}" \
-            "@debugbundle/redaction@${RELEASE_VERSION}"
+            "@debugbundle/redaction@${REDACTION_VERSION}"
 
           cd "$tmpdir"
           node --input-type=module <<'EOF'
@@ -251,3 +255,4 @@ jobs:
           EOF
         env:
           RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
+          REDACTION_VERSION: ${{ steps.shared_versions.outputs.redaction }}

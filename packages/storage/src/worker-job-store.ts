@@ -64,7 +64,7 @@ export function createWorkerJobStore(db: Queryable): WorkerJobStore {
         )
         .digest("hex");
       const projectId =
-        payload["project_id"] === undefined ? null : z.string().uuid().parse(payload["project_id"]);
+        payload["project_id"] === undefined ? null : z.string().guid().parse(payload["project_id"]);
       if (options.dependsOn !== undefined) {
         z.string()
           .regex(/^[a-f0-9]{64}$/)
@@ -179,7 +179,7 @@ export function createWorkerJobStore(db: Queryable): WorkerJobStore {
     async inspect(input: { projectId: string | null; id?: string; limit?: number }) {
       const scope = z
         .object({
-          projectId: z.string().uuid().nullable(),
+          projectId: z.string().guid().nullable(),
           id: z
             .string()
             .regex(/^[a-f0-9]{64}$/)
@@ -198,7 +198,7 @@ export function createWorkerJobStore(db: Queryable): WorkerJobStore {
     },
     async retryFailed(input: { projectId: string | null; id: string }): Promise<boolean> {
       const scope = z
-        .object({ projectId: z.string().uuid().nullable(), id: z.string().regex(/^[a-f0-9]{64}$/) })
+        .object({ projectId: z.string().guid().nullable(), id: z.string().regex(/^[a-f0-9]{64}$/) })
         .parse(input);
       const result = await db.query(
         `UPDATE worker_jobs SET status = 'pending', attempts = 0, operator_retries = operator_retries + 1, available_at = now(), updated_at = now(), last_error_code = 'operator_retry_requested'

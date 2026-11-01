@@ -4,8 +4,8 @@ import { AgentTokenSchema } from "../../../packages/token-management/src/index.j
 import { anyMemberAuth, component, type OperationSpec } from "./openapi-model.js";
 import { apiError } from "./openapi-components.js";
 
-const projectParams = z.object({ id: z.string().uuid() });
-const incidentParams = projectParams.extend({ incidentId: z.string().uuid() });
+const projectParams = z.object({ id: z.string().guid() });
+const incidentParams = projectParams.extend({ incidentId: z.string().guid() });
 const errors = {
   "400": { description: "Invalid request.", schema: apiError },
   "401": {
@@ -47,7 +47,7 @@ export function agentOperations(): OperationSpec[] {
             "AgentProjectSummary",
             z
               .object({
-                project: z.object({ project_id: z.string().uuid(), name: z.string() }).strict()
+                project: z.object({ project_id: z.string().guid(), name: z.string() }).strict()
               })
               .strict()
           )
@@ -151,7 +151,7 @@ export function agentOperations(): OperationSpec[] {
       summary: "Revoke a project agent credential as an owner or admin",
       tags: ["Tokens"],
       security: anyMemberAuth,
-      params: projectParams.extend({ tokenId: z.string().uuid() }),
+      params: projectParams.extend({ tokenId: z.string().guid() }),
       responses: {
         ...errors,
         "200": {

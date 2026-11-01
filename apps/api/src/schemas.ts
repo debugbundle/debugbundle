@@ -105,13 +105,13 @@ export const GithubDeviceStartBodySchema = z
 
 export const GithubDevicePollBodySchema = z
   .object({
-    request_id: z.string().uuid()
+    request_id: z.string().guid()
   })
   .strict();
 
 export const GithubDeviceClaimBodySchema = z
   .object({
-    request_id: z.string().uuid(),
+    request_id: z.string().guid(),
     label: z.string().min(1).max(120)
   })
   .strict();
@@ -144,7 +144,7 @@ export const SlackAppCallbackQuerySchema = thirdPartyCallbackQuerySchema({
 
 export const SlackAppInstallUrlQuerySchema = z
   .object({
-    project_id: z.string().uuid(),
+    project_id: z.string().guid(),
     return_to: z.string().min(1).optional()
   })
   .strict();
@@ -206,8 +206,8 @@ export const UpdateGitHubDispatchRuleBodySchema = z
 
 export const GitHubDispatchRuleParamsSchema = z
   .object({
-    id: z.string().uuid(),
-    ruleId: z.string().uuid()
+    id: z.string().guid(),
+    ruleId: z.string().guid()
   })
   .strict();
 
@@ -228,8 +228,8 @@ export const GitHubDispatchDeliveriesQuerySchema = z
 
 export const GitHubDispatchDeliveryRetryParamsSchema = z
   .object({
-    id: z.string().uuid(),
-    deliveryId: z.string().uuid()
+    id: z.string().guid(),
+    deliveryId: z.string().guid()
   })
   .strict();
 
@@ -241,8 +241,8 @@ export const WebhookDeliveriesParamsSchema = z
 
 export const WebhookDeliveryRetryParamsSchema = z
   .object({
-    id: z.string().uuid(),
-    deliveryId: z.string().uuid()
+    id: z.string().guid(),
+    deliveryId: z.string().guid()
   })
   .strict();
 
@@ -313,7 +313,7 @@ const WeeklyReportSlackConfigSchema = z.union([
     .strict(),
   z
     .object({
-      slack_destination_id: z.string().uuid()
+      slack_destination_id: z.string().guid()
     })
     .strict()
 ]);
@@ -343,20 +343,20 @@ const WebhookFiltersSchema = z
 
 export const WebhooksQuerySchema = z
   .object({
-    project_id: z.string().uuid(),
+    project_id: z.string().guid(),
     limit: z.coerce.number().int().min(1).max(100).default(20)
   })
   .strict();
 
 export const WebhookParamsSchema = z
   .object({
-    id: z.string().uuid()
+    id: z.string().guid()
   })
   .strict();
 
 export const CreateWebhookBodySchema = z
   .object({
-    project_id: z.string().uuid(),
+    project_id: z.string().guid(),
     url: z.string().url().max(2000),
     events: z.array(WebhookEventTypeSchema).min(1),
     filters: WebhookFiltersSchema.default({}),
@@ -384,14 +384,14 @@ export const WebhookTestBodySchema = z
 
 export const AlertsQuerySchema = z
   .object({
-    project_id: z.string().uuid(),
+    project_id: z.string().guid(),
     limit: z.coerce.number().int().min(1).max(100).default(20)
   })
   .strict();
 
 export const WeeklyReportChannelsQuerySchema = z
   .object({
-    project_id: z.string().uuid(),
+    project_id: z.string().guid(),
     limit: z.coerce.number().int().min(1).max(100).default(20)
   })
   .strict();
@@ -405,7 +405,7 @@ export const WeeklyReportChannelParamsSchema = z
 export const CreateWeeklyReportChannelBodySchema = z.discriminatedUnion("channel", [
   z
     .object({
-      project_id: z.string().uuid(),
+      project_id: z.string().guid(),
       channel: z.literal("email"),
       config: WeeklyReportEmailConfigSchema,
       schedule: WeeklyReportScheduleSchema,
@@ -414,7 +414,7 @@ export const CreateWeeklyReportChannelBodySchema = z.discriminatedUnion("channel
     .strict(),
   z
     .object({
-      project_id: z.string().uuid(),
+      project_id: z.string().guid(),
       channel: z.literal("slack"),
       config: WeeklyReportSlackConfigSchema,
       schedule: WeeklyReportScheduleSchema,
@@ -436,20 +436,20 @@ export const UpdateWeeklyReportChannelBodySchema = z
 
 export const AlertParamsSchema = z
   .object({
-    id: z.string().uuid()
+    id: z.string().guid()
   })
   .strict();
 
 export const ProjectSlackDestinationDeleteParamsSchema = z
   .object({
-    id: z.string().uuid(),
-    destinationId: z.string().uuid()
+    id: z.string().guid(),
+    destinationId: z.string().guid()
   })
   .strict();
 
 const BaseCreateAlertBodySchema = {
-  project_id: z.string().uuid(),
-  service_id: z.string().uuid().optional(),
+  project_id: z.string().guid(),
+  service_id: z.string().guid().optional(),
   condition_type: AlertConditionTypeSchema,
   severity_min: z.enum(["low", "medium", "high", "critical"]).optional(),
   severity_lifecycle_scope: AlertSeverityLifecycleScopeSchema.optional(),
@@ -490,7 +490,7 @@ export const CreateAlertBodySchema = z.discriminatedUnion("channel", [
 ]);
 
 const BaseUpdateAlertBodySchema = {
-  service_id: z.string().uuid().nullable().optional(),
+  service_id: z.string().guid().nullable().optional(),
   condition_type: AlertConditionTypeSchema.optional(),
   severity_min: z.enum(["low", "medium", "high", "critical"]).nullable().optional(),
   severity_lifecycle_scope: AlertSeverityLifecycleScopeSchema.nullable().optional(),
@@ -549,7 +549,7 @@ export const UpdateAlertBodySchema = z
 
 export const IncidentsQuerySchema = z
   .object({
-    project_id: z.string().uuid().optional(),
+    project_id: z.string().guid().optional(),
     environment: z.string().min(1).optional(),
     service: z.string().min(1).optional(),
     status: z.enum(["active", "open", "resolved", "regressed"]).optional(),
@@ -563,7 +563,7 @@ export const IncidentsQuerySchema = z
 
 export const ImprovementsQuerySchema = z
   .object({
-    project_id: z.string().uuid().optional(),
+    project_id: z.string().guid().optional(),
     environment: z.string().min(1).optional(),
     service: z.string().min(1).optional(),
     status: z.enum(["open", "resolved", "snoozed"]).optional(),
@@ -584,14 +584,14 @@ export const ImprovementsQuerySchema = z
 
 export const BulkIncidentMutationBodySchema = z
   .object({
-    incident_ids: z.array(z.string().uuid()).min(1).max(1000)
+    incident_ids: z.array(z.string().guid()).min(1).max(1000)
   })
   .strict();
 
 export const IncidentsCursorSchema = z
   .object({
     last_seen_at: z.string().datetime(),
-    incident_id: z.string().uuid()
+    incident_id: z.string().guid()
   })
   .strict();
 
@@ -610,14 +610,14 @@ export const ImprovementSnoozeBodySchema = z
 
 export const ServicesQuerySchema = z
   .object({
-    project_id: z.string().uuid(),
+    project_id: z.string().guid(),
     limit: z.coerce.number().int().min(1).max(100).default(100)
   })
   .strict();
 
 export const IncidentParamsSchema = z
   .object({
-    id: z.string().uuid()
+    id: z.string().guid()
   })
   .strict();
 
@@ -629,54 +629,54 @@ export const ImprovementParamsSchema = z
 
 export const ProjectParamsSchema = z
   .object({
-    id: z.string().uuid()
+    id: z.string().guid()
   })
   .strict();
 
 export const ProjectCaptureRuleParamsSchema = z
   .object({
-    id: z.string().uuid(),
-    ruleId: z.string().uuid()
+    id: z.string().guid(),
+    ruleId: z.string().guid()
   })
   .strict();
 
 export const ProjectAvailabilityCheckParamsSchema = z
   .object({
-    id: z.string().uuid(),
-    checkId: z.string().uuid()
+    id: z.string().guid(),
+    checkId: z.string().guid()
   })
   .strict();
 
 export const ProjectImprovementParamsSchema = z
   .object({
-    id: z.string().uuid(),
+    id: z.string().guid(),
     improvementId: z.string().min(1)
   })
   .strict();
 
 export const ProjectScopedQuerySchema = z
   .object({
-    project_id: z.string().uuid()
+    project_id: z.string().guid()
   })
   .strict();
 
 export const OptionalProjectScopedQuerySchema = z
   .object({
-    project_id: z.string().uuid().optional()
+    project_id: z.string().guid().optional()
   })
   .strict();
 
 export const ProjectMemberParamsSchema = z
   .object({
-    id: z.string().uuid(),
-    userId: z.string().uuid()
+    id: z.string().guid(),
+    userId: z.string().guid()
   })
   .strict();
 
 export const ProjectInviteParamsSchema = z
   .object({
-    id: z.string().uuid(),
-    inviteId: z.string().uuid()
+    id: z.string().guid(),
+    inviteId: z.string().guid()
   })
   .strict();
 
@@ -692,20 +692,20 @@ export const ProbeActivateBodySchema = z
 
 export const ProbeDeactivateBodySchema = z
   .object({
-    activation_id: z.string().uuid()
+    activation_id: z.string().guid()
   })
   .strict();
 
 export const ProjectTokenParamsSchema = z
   .object({
-    id: z.string().uuid(),
-    tokenId: z.string().uuid()
+    id: z.string().guid(),
+    tokenId: z.string().guid()
   })
   .strict();
 
 export const MemberTokenParamsSchema = z
   .object({
-    tokenId: z.string().uuid()
+    tokenId: z.string().guid()
   })
   .strict();
 
@@ -810,7 +810,7 @@ export const BillingCapacityChangeBodySchema = z
 
 export const AdminBillingOverrideBodySchema = z
   .object({
-    organization_id: z.string().uuid().optional(),
+    organization_id: z.string().guid().optional(),
     plan: z.enum(["free", "solo", "team"]),
     additional_capacity_units: z.coerce
       .number()
@@ -884,7 +884,7 @@ export const CreateProjectTokenBodySchema = z
 
 export const LogsQuerySchema = z
   .object({
-    incident_id: z.string().uuid(),
+    incident_id: z.string().guid(),
     level: z.string().min(1).optional(),
     cursor: z.string().min(1).optional(),
     limit: z.coerce.number().int().min(1).max(100).default(20)
@@ -894,6 +894,6 @@ export const LogsQuerySchema = z
 export const LogsCursorSchema = z
   .object({
     occurred_at: z.string().datetime(),
-    event_id: z.string().uuid()
+    event_id: z.string().guid()
   })
   .strict();

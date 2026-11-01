@@ -9,7 +9,7 @@ export const AlertEmailConfigSchema = z
 const cooldownScope = z.enum(["incident", "project"]).optional();
 export const AlertSlackConfigSchema = z.union([
   z.object({ webhook_url: z.string().url().max(2000), cooldown_scope: cooldownScope }).strict(),
-  z.object({ slack_destination_id: z.string().uuid(), cooldown_scope: cooldownScope }).strict()
+  z.object({ slack_destination_id: z.string().guid(), cooldown_scope: cooldownScope }).strict()
 ]);
 export const AlertDiscordConfigSchema = z
   .object({ webhook_url: z.string().url().max(2000), cooldown_scope: cooldownScope })

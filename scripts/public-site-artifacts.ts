@@ -3,7 +3,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
+import { toInputJsonSchema } from '../packages/shared-types/src/json-schema.js';
+
 
 import { buildPublicOpenApiSpec } from '../apps/api/src/openapi.js';
 import { ProfileSchema } from '../apps/cli/src/profile-validation.js';
@@ -133,11 +134,7 @@ function withPublicSchemaMetadata(input: {
 }
 
 function toEmbeddedJsonSchema(schema: unknown): JsonSchemaDocument {
-  return zodToJsonSchema(schema as never, {
-    target: 'jsonSchema2019-09',
-    $refStrategy: 'none',
-    definitionPath: '$defs',
-  }) as JsonSchemaDocument;
+  return toInputJsonSchema(schema as z.ZodType) as JsonSchemaDocument;
 }
 
 function toPublicJsonSchema(input: {

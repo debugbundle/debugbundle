@@ -42,11 +42,11 @@ export const AlertResponseSchema = z
   .strict();
 
 export const AlertGroupSummarySchema = z.object({
-  group_id: z.string().uuid(),
+  group_id: z.string().guid(),
   kind: z.enum(["direct", "email_digest"]),
-  project_id: z.string().uuid(),
-  alert_id: z.string().uuid().nullable(),
-  root_incident_id: z.string().uuid().nullable(),
+  project_id: z.string().guid(),
+  alert_id: z.string().guid().nullable(),
+  root_incident_id: z.string().guid().nullable(),
   channel: AlertChannelSchema,
   status: z.enum(["pending", "delivered", "failed"]),
   member_count: z.number().int().min(0),
@@ -54,7 +54,7 @@ export const AlertGroupSummarySchema = z.object({
   delivered_at: z.string().nullable()
 }).strict();
 export const AlertGroupMemberSchema = z.object({
-  incident_id: z.string().uuid(),
+  incident_id: z.string().guid(),
   condition_type: z.string(),
   created_at: z.string()
 }).strict();

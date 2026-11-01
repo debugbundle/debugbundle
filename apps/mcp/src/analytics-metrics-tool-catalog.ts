@@ -167,7 +167,7 @@ export const ANALYTICS_METRICS_MCP_TOOL_CATALOG = [
     inputSchema: z.object({
       bearerToken: z.string(),
       projectId: z.string(),
-      opportunityId: z.string().uuid().optional(),
+      opportunityId: z.string().guid().optional(),
       analysisKind: AnalyticsBundleAnalysisKindSchema,
       from: z.string().optional(),
       to: z.string().optional(),

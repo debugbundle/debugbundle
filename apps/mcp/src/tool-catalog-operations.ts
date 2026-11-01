@@ -3,7 +3,7 @@ import { WebhookEventTypeSchema } from "../../../packages/webhook-client/src/ind
 
 import { ProjectColorTagSchema } from "../../../packages/shared-types/src/index.js";
 
-const jsonObjectSchema = z.record(z.unknown());
+const jsonObjectSchema = z.record(z.string(), z.unknown());
 const verificationEventTypeSchema = z.enum(["verification.passed", "verification.failed"]);
 const weeklyReportScheduleSchema = z.object({
   dayOfWeek: z.string(),
@@ -208,7 +208,7 @@ export const MCP_TOOL_CATALOG_OPERATIONS = [
       "List project-scoped alert delivery and email digest groups with bounded incident counts and no payloads or destination secrets.",
     inputSchema: z.object({
       bearerToken: z.string(),
-      projectId: z.string().uuid(),
+      projectId: z.string().guid(),
       limit: z.number().int().min(1).max(100).optional(),
       cursor: z.string().max(256).optional()
     })
@@ -220,9 +220,9 @@ export const MCP_TOOL_CATALOG_OPERATIONS = [
       "Inspect one project-scoped alert group and a paginated page of member incident IDs without raw logs or destination secrets.",
     inputSchema: z.object({
       bearerToken: z.string(),
-      projectId: z.string().uuid(),
+      projectId: z.string().guid(),
       kind: z.enum(["direct", "email_digest"]),
-      groupId: z.string().uuid(),
+      groupId: z.string().guid(),
       limit: z.number().int().min(1).max(100).optional(),
       cursor: z.string().max(256).optional()
     })

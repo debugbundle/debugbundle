@@ -1,6 +1,35 @@
 import { z } from "zod";
 import { RuntimeMemoryStatsSchema } from "./event-envelope.js";
 import { BrowserResourceContextSchema } from "./browser-resource-context.js";
+import {
+  BundleEvidenceSchema,
+  BundleRecoverySchema,
+  BundleResourceObservationsSchema
+} from "./bundle-evidence.js";
+import { ExecutionContextSchema } from "./diagnostic-context.js";
+export * from "./bundle-evidence.js";
+export * from "./evidence-interpretation.js";
+export { truncateUtf8, withinUtf8Budget } from "./evidence-bounds.js";
+export * from "./evidence-emission.js";
+export * from "./ingestion-wire.js";
+export { DiagnosticCaptureBudget } from "./diagnostic-capture-budget.js";
+export { parseNormalizedStackFrames, selectUsefulFrame, type ParsedStack } from "./stack-frames.js";
+import { ExceptionEvidenceV1Schema } from "./exception-evidence.js";
+export * from "./diagnostic-context.js";
+
+export {
+  EXCEPTION_EVIDENCE_LIMITS,
+  EvidenceFrameSchema,
+  ExceptionEvidenceV1Schema,
+  type EvidenceFrame,
+  type ExceptionEvidenceV1
+} from "./exception-evidence.js";
+export {
+  EvidenceCapabilityValues,
+  EvidenceCapabilitiesSchema,
+  intersectEvidenceCapabilities,
+  type EvidenceCapabilities
+} from "./evidence-capabilities.js";
 
 export {
   EventTypeValues,
@@ -8,6 +37,8 @@ export {
   MobileDeviceInfoSchema,
   RuntimeMemoryStatsSchema,
   EventEnvelopeSchema,
+  EVENT_INGESTION_MAX_BODY_BYTES,
+  EVENT_ENVELOPE_MAX_WIRE_BYTES,
   type EventEnvelope,
   createEventEnvelope
 } from "./event-envelope.js";
@@ -102,7 +133,9 @@ const ContextErrorSchema = z
     message: z.string().min(1),
     stack: z.string().min(1),
     handled: z.boolean(),
-    top_frames: z.array(z.string())
+    top_frames: z.array(z.string()),
+    exception_evidence: ExceptionEvidenceV1Schema.optional(),
+    exception_evidence_source: z.enum(["sdk", "retained_stack"]).optional()
   })
   .nullable();
 
@@ -232,7 +265,7 @@ const ProbeDataItemSchema = z.object({
   label: z.string().min(1),
   data: z.record(z.string(), z.unknown()),
   timestamp: z.string().datetime(),
-  activation_id: z.string().uuid().nullable()
+  activation_id: z.string().guid().nullable()
 });
 
 const ContextProbeDataSchema = z.object({
@@ -268,6 +301,10 @@ const ContextDeviceSchema = z.object({
 });
 
 const BundleContextSchema = z.object({
+  evidence: BundleEvidenceSchema.optional(),
+  recovery: BundleRecoverySchema.optional(),
+  resource_observations: BundleResourceObservationsSchema.optional(),
+  execution: ExecutionContextSchema.optional(),
   resource_failure: BrowserResourceContextSchema.optional(),
   error: ContextErrorSchema.nullable().optional(),
   request: ContextRequestSchema.nullable().optional(),

@@ -165,6 +165,37 @@ describe("api-retrieval core", () => {
         }
       },
       browser_signal: null,
+      evidence_interpretation: {
+        version: 1,
+        status: "unavailable",
+        primary_event_id: null,
+        captured_at: null,
+        generated_at: null,
+        retained_event_count: null,
+        retained_first_at: null,
+        retained_last_at: null,
+        exception: null,
+        recovery: "unknown",
+        passive: {
+          timing_count: 0,
+          observed_statuses: [],
+          unavailable_status_count: 0,
+          enforced_csp_count: 0,
+          report_only_csp_count: 0
+        },
+        facts: [
+          "Retained input coverage is unknown for this artifact.",
+          "Artifact generation time does not establish a new failure or a new measurement.",
+          "Application recovery is unknown. HTTP completion and missing terminal observations do not establish recovery."
+        ],
+        possible_causes: [],
+        importance:
+          "Use evidence from the primary occurrence to assess the failure. Recovery observations do not resolve or regress an incident automatically.",
+        next_evidence: [
+          "Capture a supported throw-site or native fatal trace during a bounded reproduction when available.",
+          "Record an explicit application recovery or persistent-failure observation for the same failure scope."
+        ]
+      },
       bundle: {
         status: "ready",
         body: expect.objectContaining({
@@ -223,7 +254,9 @@ describe("api-retrieval core", () => {
       suggested_next_checks: [
         "Inspect the POST /checkout handler behind this request-failure path.",
         "Start with src/routes/checkout.ts:41 from the first application frame.",
-        "Compare this incident against the most recent deploy and recent regressions."
+        "Compare this incident against the most recent deploy and recent regressions.",
+        "Capture a supported throw-site or native fatal trace during a bounded reproduction when available.",
+        "Record an explicit application recovery or persistent-failure observation for the same failure scope."
       ]
     });
   });

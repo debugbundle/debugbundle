@@ -1,7 +1,7 @@
 # Data Schemas — DebugBundle
 
 Version: v1
-Last updated: 2026-06-15
+Last updated: 2026-10-29
 
 ---
 
@@ -10,6 +10,53 @@ Last updated: 2026-06-15
 SDK ingestion events use the canonical `EventEnvelopeSchema` exported by `packages/shared-types`.
 
 Top-level envelope fields are strict. SDKs may include optional application metadata in `context`, but must not add ad-hoc root fields such as `sdk_language`.
+
+### Evidence additions (unreleased candidate)
+
+[The evidence specification](../spec/bundle-evidence-quality.md) freezes the new
+optional blocks and the closed `diagnostic_context` variants. Candidate envelope,
+privacy, ingestion, storage, worker, local-processing and reader paths preserve
+these fields. Generic application context remains compatible, including unrelated
+historical `context.evidence_reference` values. A strict typed reference and scoped
+association are required before it becomes evidence. No producer may infer
+complete-path support from shared exports or a package version alone.
+
+The frozen exception graph uses flat integer node references, at most eight nodes,
+four edges of depth, five children/32 frames per node and 32 KiB total UTF-8 JSON.
+Native text/outer identity stays intact. Diagnostic context is always
+`context_signal`, never fingerprinted or used to change incident lifecycle.
+The specification defines policy/metering, capability negotiation and the additive
+reference-index migration required before activation. Legacy envelopes, bundle
+field types, fingerprints and stored history remain authoritative.
+
+All added exception JSON together, including optional execution/resource evidence
+and a valid typed reference, must fit 32 KiB. This new limit does not constrain an
+old event's arbitrary custom context. Privacy/budget failure drops optional evidence
+before sacrificing an otherwise admissible original error.
+
+Capability discovery uses the existing SDK-config and ingestion responses, opted
+into with `debugbundle_evidence=1` or `X-DebugBundle-Evidence: 1`. Missing, invalid
+or unknown descriptors disable new evidence. Non-opted-in responses retain their
+existing shape. The candidate JavaScript relay also retains its string `errors`
+array and adds optional indexed `evidence_errors` for opted-in browser clients;
+counts and indices refer to the original input batch. It never advertises support
+beyond the intersection of its parser and verified downstream capabilities.
+
+The default acceptor claims first receipt and a hash of the protected payload for
+diagnostic events/typed failure references before time admission or raw writes.
+Changed content under an already claimed evidence event ID is `invalid_event`;
+ordinary events perform no receipt query. Rejected future context keeps its
+receipt until bounded cleanup. Custom persistence adapters may implement the
+optional `claimEvidenceReceipt` method; absent support advertises an empty
+descriptor and retains legacy API/reader behavior. Available hashes are checked
+when hydrating context so overwritten raw bytes cannot supply a replacement
+recovery outcome. The additive evidence migration includes this receipt table
+and must run before API/worker readiness permits activation.
+
+Ingestion ACK discovery grants proof only after canonical counts/error indices
+validate for the submitted batch. Malformed ACKs revoke advertised proof rather
+than enabling features. Bodyless explicit custom transports retain legacy
+compatibility; they supply no new negotiated proof.
 
 ```json
 {
@@ -61,6 +108,26 @@ The canonical debugging artifact. A bundle is a **captured image in time** of a 
 3. Additive fields should be preferred over breaking changes.
 4. A context block version bump should happen only when that block's meaning or structure changes incompatibly.
 5. A new optional context block does not require a new `bundle_version`.
+
+### Optional evidence contexts (unreleased candidate)
+
+The strict schemas in `packages/shared-types/src/bundle-evidence.ts` and
+`exception-evidence.ts` implement [FR-EVID-01 and FR-EVID-08](../spec/bundle-evidence-quality.md).
+All additions remain optional in Bundle v1; older artifacts need no rewrite.
+
+| Context                    | Version 1 meaning and bounds                                                                                                                                                                                                                                                                                                           |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `error.exception_evidence` | The bounded exception graph defined above, retaining the outer error and original sanitised text. Existing `error.top_frames` remains strings.                                                                                                                                                                                         |
+| `evidence`                 | Primary event ID, retained input count and first/last capture times, plus at most 20 source-event observations. Observation kinds are `exception`, `resource_observation`, `recovery` and `probe`; availability is `observed`, `unknown`, `unsupported`, `truncated` or `not_retained`.                                                |
+| `recovery`                 | An overall `unknown`, `recovered`, `persisted` or `conflicting` outcome, truncation flag and at most five attempts with at most 20 observations in total. Each observation retains its source event ID, capture time and explicit recovery state; optional operation, HTTP status and duration retain the diagnostic payload's bounds. |
+| `resource_observations`    | At most ten items pairing a source event ID with the strict passive timing or CSP observation defined in FR-EVID-04.                                                                                                                                                                                                                   |
+
+Retained counts and ranges describe available input, not total incident impact.
+`captured_at` and `signal.signal_id` identify the primary failure; incident first/last
+times describe occurrence history and metadata generation times describe the artifact.
+A context-triggered rebuild preserves the primary failure's identity and capture
+time. HTTP completion alone cannot establish recovery. Missing or conflicting
+observations remain explicit. Restricted readers retain their existing allowlists.
 
 ### Full Top-Level Structure
 
@@ -545,16 +612,16 @@ Common wrapper for the canonical debug SDK event family:
 
 **`event_class` assignment:** This field is NOT set by SDKs. It is assigned by the event-normalizer during worker processing based on the following classification rules:
 
-| event_type            | Assigned event_class                     | Notes                                                                                                                                                                                                                                                                                                                                                                        |
-| --------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `backend_exception`   | `incident_signal`                        | Always                                                                                                                                                                                                                                                                                                                                                                       |
-| `frontend_exception`  | `incident_signal`                        | Always                                                                                                                                                                                                                                                                                                                                                                       |
+| event_type            | Assigned event_class                     | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| --------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `backend_exception`   | `incident_signal`                        | Always                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `frontend_exception`  | `incident_signal`                        | Always                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `log_event`           | `incident_signal` or `context_signal`    | `incident_signal` when `level` is `error`, `fatal`, or `critical`, except Java redirected-stderr stack continuation lines (`Caused by:`, `at`, `... N more`, and related frames) from `stderr` or `org.jboss.stdio` logger identities, which are `context_signal` and attach to the parent exception when the SDK can assemble it; `context_signal` otherwise. An ordinary Java application ERROR with similar text remains an incident. |
-| `request_event`       | `incident_signal` or `context_signal`    | `incident_signal` when `response_status` matches the active capture preset's immediate request-failure statuses (`minimal`: `5xx`; `balanced`: `5xx`, `408`, `423`, `424`, `425`, `429`; `investigative`: balanced plus `409`), the project's resolved `immediate_client_error_statuses`, or a matching `immediate_client_error_path_rules` rule; `context_signal` otherwise |
-| `frontend_breadcrumb` | `context_signal`                         | Journey context for exceptions                                                                                                                                                                                                                                                                                                                                               |
-| `deploy_metadata`     | `context_signal`                         | Release correlation                                                                                                                                                                                                                                                                                                                                                          |
-| `error_suppressed`    | `operational_signal`                     | Platform operations only                                                                                                                                                                                                                                                                                                                                                     |
-| `probe_event`         | `context_signal` or `operational_signal` | `context_signal` when flushed with an error (always-on); `operational_signal` when standalone remote-activated                                                                                                                                                                                                                                                               |
+| `request_event`       | `incident_signal` or `context_signal`    | `incident_signal` when `response_status` matches the active capture preset's immediate request-failure statuses (`minimal`: `5xx`; `balanced`: `5xx`, `408`, `423`, `424`, `425`, `429`; `investigative`: balanced plus `409`), the project's resolved `immediate_client_error_statuses`, or a matching `immediate_client_error_path_rules` rule; `context_signal` otherwise                                                             |
+| `frontend_breadcrumb` | `context_signal`                         | Journey context for exceptions                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `deploy_metadata`     | `context_signal`                         | Release correlation                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `error_suppressed`    | `operational_signal`                     | Platform operations only                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `probe_event`         | `context_signal` or `operational_signal` | `context_signal` when flushed with an error (always-on); `operational_signal` when standalone remote-activated                                                                                                                                                                                                                                                                                                                           |
 
 `event_class` is immutable after normalization (INV-15). It drives billing (Free meters only `incident_signal`), incident eligibility (only `incident_signal` creates incidents), and surfacing rules.
 
@@ -1342,22 +1409,22 @@ The counters and uptime denominator include only verified endpoint outcomes. Mon
 
 ### 5.10 alert_rules
 
-| Column             | Type        | Constraints            |
-| ------------------ | ----------- | ---------------------- |
-| id                 | uuid        | PK                     |
-| project_id         | uuid        | FK → projects, CASCADE |
-| created_by_user_id | uuid        | NOT NULL, FK → users   |
-| service_id         | uuid        | FK → services, CASCADE |
-| channel            | text        | NOT NULL               |
-| condition_type     | text        | NOT NULL               |
-| severity_min       | text        |                        |
-| cooldown_seconds   | integer     | NOT NULL DEFAULT 0     |
-| config             | jsonb       | NOT NULL DEFAULT '{}'  |
-| signing_secret     | text        | Internal per-rule HMAC key; nullable for non-webhook rules and legacy rows awaiting provisioning |
-| webhook_payload_version | smallint | NOT NULL DEFAULT 0, CHECK IN (0, 1) |
-| is_enabled         | boolean     | NOT NULL DEFAULT true  |
-| created_at         | timestamptz | NOT NULL DEFAULT now() |
-| updated_at         | timestamptz | NOT NULL DEFAULT now() |
+| Column                  | Type        | Constraints                                                                                      |
+| ----------------------- | ----------- | ------------------------------------------------------------------------------------------------ |
+| id                      | uuid        | PK                                                                                               |
+| project_id              | uuid        | FK → projects, CASCADE                                                                           |
+| created_by_user_id      | uuid        | NOT NULL, FK → users                                                                             |
+| service_id              | uuid        | FK → services, CASCADE                                                                           |
+| channel                 | text        | NOT NULL                                                                                         |
+| condition_type          | text        | NOT NULL                                                                                         |
+| severity_min            | text        |                                                                                                  |
+| cooldown_seconds        | integer     | NOT NULL DEFAULT 0                                                                               |
+| config                  | jsonb       | NOT NULL DEFAULT '{}'                                                                            |
+| signing_secret          | text        | Internal per-rule HMAC key; nullable for non-webhook rules and legacy rows awaiting provisioning |
+| webhook_payload_version | smallint    | NOT NULL DEFAULT 0, CHECK IN (0, 1)                                                              |
+| is_enabled              | boolean     | NOT NULL DEFAULT true                                                                            |
+| created_at              | timestamptz | NOT NULL DEFAULT now()                                                                           |
+| updated_at              | timestamptz | NOT NULL DEFAULT now()                                                                           |
 
 Migration `202609250002_version_alert_webhook_payloads` preserves legacy custom webhook JSON with version 0 and marks existing explicitly signed rules as version 1. Every custom alert webhook is signed; eligible legacy rules atomically acquire a stable per-rule key before delivery. Explicit key creation or rotation selects version 1 with group references. Provider-native Slack/Discord requests retain their existing formats. Keys are excluded from ordinary management and group-read responses; explicit creation/rotation reveals the key once.
 
@@ -1387,6 +1454,36 @@ Exact replay idempotency still keys on `(alert_id, incident_id, dedupe_key)`. Op
 Opaque browser resource incidents retain per-resource notification identities and use a separate optional `coalescing_key` in `alert_deliveries`. This hashed key includes project/service/environment/session, page origin/path, resource host, interruption class and a fixed ten-second capture-time bucket. Alert evaluation scopes the burst key by severity so escalation is not suppressed by a lower-severity delivery. Immediate channels must pass both the existing configured cooldown and the burst check; the burst key remains effective through worker backlog rather than expiring with delivery wall-clock time. Distinct lifecycle transitions and later capture-time buckets remain eligible when configured cooldown permits. Database transactions lock before the suppression read snapshot. Email retains distinct per-incident items in the project/recipient digest. Email `config.aggregation_window_seconds` accepts 1–300 seconds, default 10. Immediate-channel `config.cooldown_scope` accepts `incident` (default) or `project`; project scope remains isolated to the selected rule, environment and severity. No raw session identifier or page query is stored in a notification key.
 
 `browser_recovery_events` is an internal reference index introduced by migration `202609220001_add_browser_recovery_context`: `event_id` UUID primary key, cascading `project_id`, `service_name`, `environment`, `kind` (`resource` or `recovery`), `occurred_at`, nullable project-scoped `session_hash`/`trace_hash` (at least one required), and `expires_at`. Expiry is at most seven days after the earlier of capture and insertion. No request payload, URL or raw correlation value is stored. Scheduled retention prunes bounded batches; project deletion cascades. Indexes support scoped time-window reads and expiry. Requests and standalone network breadcrumbs can be indexed even when classified as context.
+
+### Typed evidence indexes (unreleased candidate)
+
+Forward migration `202610260001_add_typed_evidence_context` adds two separate
+tables without changing `browser_recovery_events` or rewriting historical data:
+
+- `evidence_ingestion_receipts`: composite primary key `(project_id, event_id)`,
+  cascading project FK, capture time, immutable first receipt time, protected
+  canonical payload SHA-256, diagnostic flag and expiry. Its expiry index supports
+  bounded cleanup. A reused identity with changed protected bytes is rejected;
+  replay cannot refresh admission time. Ordinary legacy events need no receipt.
+- `evidence_context_events`: event UUID primary key, cascading project FK,
+  service/environment, kind (`failure`, `resource_observation`, `recovery`), capture
+  and first receipt times, failure/scope hashes, scope kind (`page`, `operation`),
+  nullable session/trace/attempt hashes, expiry and `is_retained` (default true).
+  Page scope requires a session hash. Scope/time and expiry indexes support bounded
+  association and cleanup. Reference hashes are project-domain-separated; no raw
+  correlation identifiers or payloads belong in this index.
+
+The same migration adds nullable `capture_policies.capture_diagnostic_context`.
+Resolved minimal policy disables it; balanced/investigative permit locally opted-in
+diagnostics. Context remains subject to existing policy, metering and retention.
+Association, immutable receipts and expiry follow FR-EVID-05–07 and the canonical
+storage definitions in `packages/storage/src/evidence-context-schema.ts`.
+Bootstrap mirrors these tables only for an empty database. Run the ordered,
+checksum-validated migration before activating API/worker code; readiness refuses
+missing migrations. Rollback must retain the tables and an accepting reader while
+new producers remain installed. An older strict-ledger runtime may reject the new
+migration, so qualify the exact rollback runtime as described in the
+[self-host update procedure](../deploy/selfhost/README.md).
 
 ### 5.10b alert_email_digests
 
@@ -1955,7 +2052,6 @@ Non-resource grouping uses fingerprint v2 for the scoped WildFly calendar normal
 
 Server ingestion also removes credentials/query/fragment from frontend exception HTTP(S) stack locations before persistence, including submissions from installed older SDKs. This protects new ingested events; historical stored artifacts still follow the bounded repair policy.
 
-
 ### Browser resource incident evidence
 
 `bundle_version` remains `1`. Optional `context.resource_failure` uses `version: 1` and contains sanitized `host`, exact resource `path`, element `type`, nullable `first_party`, `role`, nullable `provider`, `title`, `optional_candidate`, `diagnosis`, and `routes`. Roles are `analytics`, `advertising`, `tag_manager`, `authentication`, `application_asset`, or `unknown`. Origin and dependency role are independent. Absolute targets without a page origin stay unknown; root-relative targets are same-origin even when the host is unavailable; `optional_candidate` is a provider-based review-confidence hint, never an automatic severity or capture decision or a prerequisite for explicit resource controls.
@@ -1978,16 +2074,15 @@ Forward migration `202609240001_add_alert_delivery_members` adds `alert_delivery
 
 Migration `202610080001_add_public_status_pages` adds three independent tables; existing availability data is unchanged.
 
-| Table | Fields and constraints |
-| --- | --- |
-| `public_status_pages` | UUID primary key; unique `anchor_project_id` FK projects/cascade; owner user and organization FKs/cascade; unique 24-lowercase-hex `public_id`; 1–120 character title; enabled defaults false; created/updated timestamps. |
-| `public_status_page_projects` | Page/project FKs/cascade; composite page/project primary key; position 0–49; project reverse index for deletion. |
-| `public_status_page_checks` | Composite page/project FK/cascade; check FK/cascade; page/check primary key; check reverse index for deletion. Domain validates check membership and current ownership before writes and on public reads. |
+| Table                         | Fields and constraints                                                                                                                                                                                                     |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `public_status_pages`         | UUID primary key; unique `anchor_project_id` FK projects/cascade; owner user and organization FKs/cascade; unique 24-lowercase-hex `public_id`; 1–120 character title; enabled defaults false; created/updated timestamps. |
+| `public_status_page_projects` | Page/project FKs/cascade; composite page/project primary key; position 0–49; project reverse index for deletion.                                                                                                           |
+| `public_status_page_checks`   | Composite page/project FK/cascade; check FK/cascade; page/check primary key; check reverse index for deletion. Domain validates check membership and current ownership before writes and on public reads.                  |
 
 Selections are an atomic replace under an anchor lock. The anchor must be first; project IDs and check IDs are unique; at most 50 projects, 50 checks/project and 500 checks/page. Publishing requires a selected check; enabled pages emptied later by deletion remain valid but render no published checks. The URL identifier is stable while the page exists. It is a public locator, not a credential. Nothing is published by migration or check creation.
 
 Public DTO schemas live in `packages/shared-types/src/public-status.ts`. `PublicStatusPage` contains title and project rows. Each row/check contains only an anonymous key, sanitized name, current state, nullable uptime/latest verified timestamp and exactly 30 daily aggregates. Daily aggregates contain day/state/impact and total/success/failed/degraded counts plus downtime seconds; no internal IDs or incident references.
-
 
 ## Notification preferences and daily email
 

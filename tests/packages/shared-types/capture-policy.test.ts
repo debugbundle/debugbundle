@@ -19,7 +19,7 @@ import {
   getDefaultPreset,
   shouldCaptureEvent,
   type CapturePolicyRecord,
-  type ResolvedCapturePolicy,
+  type ResolvedCapturePolicy
 } from "../../../packages/shared-types/src/capture-policy.ts";
 
 describe("event class", () => {
@@ -67,7 +67,7 @@ describe("preset defaults", () => {
       capture_breadcrumbs: "local_only",
       capture_probe_events: "buffer_only",
       immediate_client_error_statuses: [],
-      immediate_client_error_path_rules: [],
+      immediate_client_error_path_rules: []
     });
   });
 
@@ -78,7 +78,7 @@ describe("preset defaults", () => {
       capture_breadcrumbs: "exception_only",
       capture_probe_events: "buffer_only",
       immediate_client_error_statuses: [],
-      immediate_client_error_path_rules: [],
+      immediate_client_error_path_rules: []
     });
   });
 
@@ -89,7 +89,7 @@ describe("preset defaults", () => {
       capture_breadcrumbs: "standalone",
       capture_probe_events: "standalone_when_activated",
       immediate_client_error_statuses: [...RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES],
-      immediate_client_error_path_rules: [],
+      immediate_client_error_path_rules: []
     });
   });
 });
@@ -104,7 +104,7 @@ describe("capture policy schema", () => {
     capture_probe_events: null,
     immediate_client_error_statuses: null,
     immediate_client_error_path_rules: null,
-    updated_at: "2026-03-19T00:00:00Z",
+    updated_at: "2026-03-19T00:00:00Z"
   };
 
   it("accepts a valid record with null overrides", () => {
@@ -168,14 +168,44 @@ describe("capture policy update schema", () => {
 
   it("rejects invalid values", () => {
     expect(CapturePolicyUpdateSchema.safeParse({ preset: "custom" }).success).toBe(false);
-    expect(CapturePolicyUpdateSchema.safeParse({ immediate_client_error_statuses: [399] }).success).toBe(false);
-    expect(CapturePolicyUpdateSchema.safeParse({
-      immediate_client_error_path_rules: [{ status_code: 404, path_pattern: "/checkout/*/bad" }]
-    }).success).toBe(false);
+    expect(
+      CapturePolicyUpdateSchema.safeParse({ immediate_client_error_statuses: [399] }).success
+    ).toBe(false);
+    expect(
+      CapturePolicyUpdateSchema.safeParse({
+        immediate_client_error_path_rules: [{ status_code: 404, path_pattern: "/checkout/*/bad" }]
+      }).success
+    ).toBe(false);
   });
 });
 
 describe("resolvePolicy", () => {
+  it.each(["minimal", "balanced", "investigative"] as const)(
+    "resolves diagnostic defaults and minimal prohibition for %s",
+    (preset) => {
+      const record: CapturePolicyRecord = {
+        project_id: "00000000-0000-4000-8000-000000000001",
+        preset,
+        capture_logs: null,
+        capture_request_events: null,
+        capture_breadcrumbs: null,
+        capture_probe_events: null,
+        immediate_client_error_statuses: null,
+        immediate_client_error_path_rules: null,
+        updated_at: "2026-10-26T00:00:00Z"
+      };
+      expect(resolvePolicy(record)).not.toHaveProperty("capture_diagnostic_context"); // Legacy records retain their shape.
+      expect(
+        resolvePolicy({ ...record, capture_diagnostic_context: null }).capture_diagnostic_context
+      ).toBe(preset !== "minimal");
+      expect(
+        resolvePolicy({ ...record, capture_diagnostic_context: true }).capture_diagnostic_context
+      ).toBe(preset !== "minimal");
+      expect(
+        resolvePolicy({ ...record, capture_diagnostic_context: false }).capture_diagnostic_context
+      ).toBe(false);
+    }
+  );
   it("uses preset defaults when all overrides are null", () => {
     const record: CapturePolicyRecord = {
       project_id: "00000000-0000-4000-8000-000000000001",
@@ -186,11 +216,11 @@ describe("resolvePolicy", () => {
       capture_probe_events: null,
       immediate_client_error_statuses: null,
       immediate_client_error_path_rules: null,
-      updated_at: "2026-03-19T00:00:00Z",
+      updated_at: "2026-03-19T00:00:00Z"
     };
     expect(resolvePolicy(record)).toEqual({
       preset: "minimal",
-      ...PRESET_DEFAULTS.minimal,
+      ...PRESET_DEFAULTS.minimal
     });
   });
 
@@ -203,8 +233,10 @@ describe("resolvePolicy", () => {
       capture_breadcrumbs: null,
       capture_probe_events: null,
       immediate_client_error_statuses: [422, 403],
-      immediate_client_error_path_rules: [{ status_code: 404, path_pattern: "/checkout/*", methods: ["GET"] }],
-      updated_at: "2026-03-19T00:00:00Z",
+      immediate_client_error_path_rules: [
+        { status_code: 404, path_pattern: "/checkout/*", methods: ["GET"] }
+      ],
+      updated_at: "2026-03-19T00:00:00Z"
     };
     const resolved = resolvePolicy(record);
     expect(resolved.capture_logs).toBe("info");
@@ -221,26 +253,28 @@ describe("resolvePolicy", () => {
 
 describe("capture policy response schema", () => {
   it("accepts resolved policy plus raw overrides", () => {
-    expect(CapturePolicyResponseSchema.safeParse({
-      access_mode: "manage",
-      policy: {
-        preset: "investigative",
-        capture_logs: "info",
-        capture_request_events: "all",
-        capture_breadcrumbs: "standalone",
-        capture_probe_events: "standalone_when_activated",
-        immediate_client_error_statuses: [...RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES],
-        immediate_client_error_path_rules: []
-      },
-      overrides: {
-        capture_logs: null,
-        capture_request_events: null,
-        capture_breadcrumbs: null,
-        capture_probe_events: null,
-        immediate_client_error_statuses: null,
-        immediate_client_error_path_rules: null
-      }
-    }).success).toBe(true);
+    expect(
+      CapturePolicyResponseSchema.safeParse({
+        access_mode: "manage",
+        policy: {
+          preset: "investigative",
+          capture_logs: "info",
+          capture_request_events: "all",
+          capture_breadcrumbs: "standalone",
+          capture_probe_events: "standalone_when_activated",
+          immediate_client_error_statuses: [...RECOMMENDED_IMMEDIATE_CLIENT_ERROR_STATUSES],
+          immediate_client_error_path_rules: []
+        },
+        overrides: {
+          capture_logs: null,
+          capture_request_events: null,
+          capture_breadcrumbs: null,
+          capture_probe_events: null,
+          immediate_client_error_statuses: null,
+          immediate_client_error_path_rules: null
+        }
+      }).success
+    ).toBe(true);
   });
 });
 
@@ -259,7 +293,7 @@ describe("client error status helpers", () => {
       capture_probe_events: null,
       immediate_client_error_statuses: [],
       immediate_client_error_path_rules: null,
-      updated_at: "2026-03-19T00:00:00Z",
+      updated_at: "2026-03-19T00:00:00Z"
     };
 
     expect(getCapturePolicyOverrides(record)).toEqual({
@@ -273,11 +307,13 @@ describe("client error status helpers", () => {
   });
 
   it("normalizes path-scoped client error rules", () => {
-    expect(normalizeImmediateClientErrorPathRules([
-      { status_code: 404, path_pattern: "/checkout//", methods: [] },
-      { status_code: 404, path_pattern: "/checkout/", methods: [] },
-      { status_code: 404, path_pattern: "/checkout/*", methods: ["POST", "GET"] }
-    ])).toEqual([
+    expect(
+      normalizeImmediateClientErrorPathRules([
+        { status_code: 404, path_pattern: "/checkout//", methods: [] },
+        { status_code: 404, path_pattern: "/checkout/", methods: [] },
+        { status_code: 404, path_pattern: "/checkout/*", methods: ["POST", "GET"] }
+      ])
+    ).toEqual([
       { status_code: 404, path_pattern: "/checkout/", methods: [] },
       { status_code: 404, path_pattern: "/checkout/*", methods: ["GET", "POST"] }
     ]);
@@ -308,13 +344,21 @@ describe("getDefaultPreset", () => {
 
 describe("getRequestAnomalyThreshold", () => {
   it("returns no anomaly threshold for minimal preset contextual failures", () => {
-    expect(getRequestAnomalyThreshold({ responseStatus: 404, capturePreset: "minimal" })).toBeNull();
+    expect(
+      getRequestAnomalyThreshold({ responseStatus: 404, capturePreset: "minimal" })
+    ).toBeNull();
   });
 
   it("returns no anomaly threshold for unpromoted 4xx request failures", () => {
-    expect(getRequestAnomalyThreshold({ responseStatus: 404, capturePreset: "balanced" })).toBeNull();
-    expect(getRequestAnomalyThreshold({ responseStatus: 403, capturePreset: "investigative" })).toBeNull();
-    expect(getRequestAnomalyThreshold({ responseStatus: 410, capturePreset: "balanced" })).toBeNull();
+    expect(
+      getRequestAnomalyThreshold({ responseStatus: 404, capturePreset: "balanced" })
+    ).toBeNull();
+    expect(
+      getRequestAnomalyThreshold({ responseStatus: 403, capturePreset: "investigative" })
+    ).toBeNull();
+    expect(
+      getRequestAnomalyThreshold({ responseStatus: 410, capturePreset: "balanced" })
+    ).toBeNull();
   });
 });
 
@@ -336,7 +380,9 @@ describe("classifyRequestStatus", () => {
         requestPath: "/checkout/123",
         httpMethod: "GET",
         capturePreset: "balanced",
-        immediateClientErrorPathRules: [{ status_code: 404, path_pattern: "/checkout/*", methods: ["GET"] }]
+        immediateClientErrorPathRules: [
+          { status_code: 404, path_pattern: "/checkout/*", methods: ["GET"] }
+        ]
       })
     ).toBe("incident_signal");
 
@@ -346,7 +392,9 @@ describe("classifyRequestStatus", () => {
         requestPath: "/pricing",
         httpMethod: "GET",
         capturePreset: "balanced",
-        immediateClientErrorPathRules: [{ status_code: 404, path_pattern: "/checkout/*", methods: ["GET"] }]
+        immediateClientErrorPathRules: [
+          { status_code: 404, path_pattern: "/checkout/*", methods: ["GET"] }
+        ]
       })
     ).toBe("context_signal");
   });
@@ -355,7 +403,10 @@ describe("classifyRequestStatus", () => {
 describe("shouldCaptureEvent", () => {
   const minimal: ResolvedCapturePolicy = { preset: "minimal", ...PRESET_DEFAULTS.minimal };
   const balanced: ResolvedCapturePolicy = { preset: "balanced", ...PRESET_DEFAULTS.balanced };
-  const investigative: ResolvedCapturePolicy = { preset: "investigative", ...PRESET_DEFAULTS.investigative };
+  const investigative: ResolvedCapturePolicy = {
+    preset: "investigative",
+    ...PRESET_DEFAULTS.investigative
+  };
 
   it("always accepts exceptions regardless of policy", () => {
     expect(shouldCaptureEvent(minimal, "backend_exception", {})).toBe(true);
@@ -409,17 +460,43 @@ describe("shouldCaptureEvent", () => {
     const policy: ResolvedCapturePolicy = {
       ...minimal,
       capture_request_events: "off",
-      immediate_client_error_path_rules: [{ status_code: 404, path_pattern: "/checkout/*", methods: ["GET"] }]
+      immediate_client_error_path_rules: [
+        { status_code: 404, path_pattern: "/checkout/*", methods: ["GET"] }
+      ]
     };
 
-    expect(shouldCaptureEvent(policy, "request_event", { method: "GET", path: "/checkout/123", response_status: 404 })).toBe(true);
-    expect(shouldCaptureEvent(policy, "request_event", { method: "GET", path: "/robots.txt", response_status: 404 })).toBe(false);
+    expect(
+      shouldCaptureEvent(policy, "request_event", {
+        method: "GET",
+        path: "/checkout/123",
+        response_status: 404
+      })
+    ).toBe(true);
+    expect(
+      shouldCaptureEvent(policy, "request_event", {
+        method: "GET",
+        path: "/robots.txt",
+        response_status: 404
+      })
+    ).toBe(false);
   });
 
   it("always accepts immediate request incident statuses on minimal", () => {
-    expect(shouldCaptureEvent({ ...minimal, capture_request_events: "off" }, "request_event", { response_status: 500 })).toBe(true);
-    expect(shouldCaptureEvent({ ...minimal, capture_request_events: "off" }, "request_event", { response_status: 503 })).toBe(true);
-    expect(shouldCaptureEvent({ ...minimal, capture_request_events: "off" }, "request_event", { response_status: 429 })).toBe(false);
+    expect(
+      shouldCaptureEvent({ ...minimal, capture_request_events: "off" }, "request_event", {
+        response_status: 500
+      })
+    ).toBe(true);
+    expect(
+      shouldCaptureEvent({ ...minimal, capture_request_events: "off" }, "request_event", {
+        response_status: 503
+      })
+    ).toBe(true);
+    expect(
+      shouldCaptureEvent({ ...minimal, capture_request_events: "off" }, "request_event", {
+        response_status: 429
+      })
+    ).toBe(false);
     expect(shouldCaptureEvent(minimal, "request_event", { response_status: 200 })).toBe(false);
   });
 

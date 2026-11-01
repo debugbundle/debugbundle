@@ -3,23 +3,56 @@ import { describe, expect, it, vi } from "vitest";
 import { runCli } from "../../../apps/cli/src/main.js";
 
 describe("cli main capture-policy routing", () => {
+  it.each(["true", "false", "null"])(
+    "routes the diagnostic context override %s as a typed value",
+    async (raw) => {
+      const setCapturePolicyCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "updated" });
+      const result = await runCli(
+        [
+          "capture-policy",
+          "set",
+          "--project",
+          "proj_123",
+          "--override",
+          `capture_diagnostic_context=${raw}`
+        ],
+        { setCapturePolicyCommand }
+      );
+      expect(result.exitCode).toBe(0);
+      expect(setCapturePolicyCommand).toHaveBeenCalledWith({
+        projectId: "proj_123",
+        update: { capture_diagnostic_context: raw === "null" ? null : raw === "true" }
+      });
+    }
+  );
+  it("rejects string-shaped diagnostic context override values before API calls", async () => {
+    const setCapturePolicyCommand = vi.fn();
+    const result = await runCli(
+      [
+        "capture-policy",
+        "set",
+        "--project",
+        "proj_123",
+        "--override",
+        "capture_diagnostic_context=off"
+      ],
+      { setCapturePolicyCommand }
+    );
+    expect(result.exitCode).toBe(4);
+    expect(setCapturePolicyCommand).not.toHaveBeenCalled();
+  });
   it("routes capture-policy get arguments into the get command", async () => {
     const getCapturePolicyCommand = vi.fn().mockResolvedValue({
       exitCode: 0,
       output: "capture-policy-get"
     });
 
-    const result = await runCli([
-      "capture-policy",
-      "get",
-      "--project",
-      "proj_123",
-      "--auth-file",
-      "/tmp/auth.json",
-      "--json"
-    ], {
-      getCapturePolicyCommand
-    });
+    const result = await runCli(
+      ["capture-policy", "get", "--project", "proj_123", "--auth-file", "/tmp/auth.json", "--json"],
+      {
+        getCapturePolicyCommand
+      }
+    );
 
     expect(getCapturePolicyCommand).toHaveBeenCalledWith({
       projectId: "proj_123",
@@ -35,29 +68,32 @@ describe("cli main capture-policy routing", () => {
       output: "capture-policy-set"
     });
 
-    const result = await runCli([
-      "capture-policy",
-      "set",
-      "--project",
-      "proj_123",
-      "--preset",
-      "investigative",
-      "--override",
-      "capture_logs=info",
-      "--override",
-      "capture_request_events=all",
-      "--override",
-      "capture_breadcrumbs=null",
-      "--client-error-incidents",
-      "custom",
-      "--client-error-statuses",
-      "422,401,422",
-      "--auth-file",
-      "/tmp/auth.json",
-      "--json"
-    ], {
-      setCapturePolicyCommand
-    });
+    const result = await runCli(
+      [
+        "capture-policy",
+        "set",
+        "--project",
+        "proj_123",
+        "--preset",
+        "investigative",
+        "--override",
+        "capture_logs=info",
+        "--override",
+        "capture_request_events=all",
+        "--override",
+        "capture_breadcrumbs=null",
+        "--client-error-incidents",
+        "custom",
+        "--client-error-statuses",
+        "422,401,422",
+        "--auth-file",
+        "/tmp/auth.json",
+        "--json"
+      ],
+      {
+        setCapturePolicyCommand
+      }
+    );
 
     expect(setCapturePolicyCommand).toHaveBeenCalledWith({
       projectId: "proj_123",
@@ -103,11 +139,20 @@ describe("cli main capture-policy routing", () => {
     expect(invalidOverride.exitCode).toBe(4);
     expect(invalidOverride.output).toContain("Invalid value for --override.");
     expect(invalidClientErrorStatuses.exitCode).toBe(4);
-    expect(invalidClientErrorStatuses.output).toContain("Invalid value for --client-error-statuses.");
+    expect(invalidClientErrorStatuses.output).toContain(
+      "Invalid value for --client-error-statuses."
+    );
   });
 
   it("rejects unknown options on capture-policy routes", async () => {
-    const result = await runCli(["capture-policy", "get", "--project", "proj_123", "--unknown", "value"]);
+    const result = await runCli([
+      "capture-policy",
+      "get",
+      "--project",
+      "proj_123",
+      "--unknown",
+      "value"
+    ]);
 
     expect(result.exitCode).toBe(4);
     expect(result.output).toContain("Unknown option --unknown.");

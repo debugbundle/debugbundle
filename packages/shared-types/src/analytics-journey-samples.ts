@@ -72,8 +72,8 @@ export type AnalyticsJourneySampleEvent = z.infer<typeof AnalyticsJourneySampleE
 
 export const AnalyticsJourneySampleMetadataSchema = z
   .object({
-    sample_id: z.string().uuid(),
-    project_id: z.string().uuid(),
+    sample_id: z.string().guid(),
+    project_id: z.string().guid(),
     service: z.string().trim().min(1).max(120).nullable(),
     environment: z.string().trim().min(1).max(120).nullable(),
     session_id_hash: AnalyticsHashLikeSchema,
@@ -104,8 +104,8 @@ export type AnalyticsJourneySamplesListResponse = z.infer<
 export const AnalyticsJourneySampleArtifactSchema = z
   .object({
     schema_version: z.literal("analytics_journey_sample.v1"),
-    sample_id: z.string().uuid(),
-    project_id: z.string().uuid(),
+    sample_id: z.string().guid(),
+    project_id: z.string().guid(),
     service: z.string().trim().min(1).max(120),
     environment: z.string().trim().min(1).max(120),
     session_id_hash: AnalyticsHashLikeSchema,

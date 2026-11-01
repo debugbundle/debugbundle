@@ -33,7 +33,7 @@ export function createAnalyticsFlowApi(http: AnalyticsFlowHttpClient): Analytics
     `/v1/projects/${encodeURIComponent(input.projectId)}/analytics/flows`;
   async function request<T>(
     input: Parameters<AnalyticsFlowHttpClient["request"]>[0],
-    schema: z.ZodType<T, z.ZodTypeDef, unknown>
+    schema: z.ZodType<T, unknown>
   ): Promise<T> {
     const response = await http.request(input);
     if (response.status !== 200) {

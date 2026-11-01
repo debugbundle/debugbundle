@@ -84,7 +84,14 @@ it("records resource references without scheduling extra incident builds", async
 it("schedules idempotent scoped rebuilds for existing resource incidents", async () => {
   const query = vi.fn().mockImplementation(async (sql: string) => ({
     rows: sql.includes("SELECT DISTINCT i.id")
-      ? [{ incident_id: "00000000-0000-4000-8000-000000000010", occurrence_count: 2 }]
+      ? [
+          {
+            incident_id: "00000000-0000-4000-8000-000000000010",
+            occurrence_count: 2,
+            primary_event_id: "00000000-0000-4000-8000-000000000011",
+            primary_occurred_at: "2026-09-22T10:00:00.000Z"
+          }
+        ]
       : []
   }));
   await createBrowserRecoveryStore({ query }).record(projectId, recovery());
@@ -96,7 +103,9 @@ it("schedules idempotent scoped rebuilds for existing resource incidents", async
     project_id: projectId,
     incident_id: "00000000-0000-4000-8000-000000000010",
     occurrence_count: 2,
-    trigger: "new_context_type"
+    trigger: "new_context_type",
+    primary_event_id: "00000000-0000-4000-8000-000000000011",
+    primary_occurred_at: "2026-09-22T10:00:00.000Z"
   });
 });
 
@@ -121,7 +130,9 @@ it("uses the indexed event correlation locks and propagates storage failure for 
 });
 
 it("prunes expired recovery references in a bounded retention batch", async () => {
-  const query = vi.fn().mockResolvedValue({ rows: [{ event_id: "expired" }] });
+  const query = vi.fn().mockImplementation(async (sql: string) => ({
+    rows: sql.includes("DELETE FROM browser_recovery_events") ? [{ event_id: "expired" }] : []
+  }));
   expect(
     await createPostgresRetentionStore({ query }).pruneExpiredBrowserRecoveryEvents!({
       now: "2026-09-22T10:00:00.000Z",

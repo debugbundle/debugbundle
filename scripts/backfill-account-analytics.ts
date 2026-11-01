@@ -13,7 +13,7 @@ const AccountAnalyticsBackfillEnvSchema = z.object({
   DB_NAME: z.string().min(1).default("debugbundle"),
   DB_SSL_MODE: z.string().optional(),
   ANALYTICS_HASH_SECRET: z.string().min(1),
-  ACCOUNT_ANALYTICS_ORGANIZATION_ID: z.string().uuid().optional(),
+  ACCOUNT_ANALYTICS_ORGANIZATION_ID: z.string().guid().optional(),
   ACCOUNT_ANALYTICS_BACKFILL_AT: z.string().datetime().optional()
 });
 

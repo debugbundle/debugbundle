@@ -253,6 +253,38 @@ After installation, the GitHub automation panel in Project Settings should show 
 - Your API must be reachable by GitHub for the installation callback (`/v1/github/app/callback`) and webhook delivery (`/v1/github/app/webhook`). This requires a public URL or a tunnel/proxy.
 - The worker must be able to reach `https://api.github.com` to acquire installation tokens and send `repository_dispatch` events.
 
+## Evidence candidate migration (unreleased)
+
+Before activating the evidence candidate, apply
+`202610260001_add_typed_evidence_context` with the ordered `db-migrate` service.
+It adds the scoped reference index, evidence-only first-receipt/payload-hash
+claims and nullable diagnostic capture-policy override. API/worker readiness
+requires its checksum and tables; bootstrap remains for empty schemas only.
+Rejected future diagnostic submissions keep their original receipt, and raw
+context cleanup retains retry references until object deletion succeeds.
+Ordinary ingestion adds no receipt database call. No backfill or destructive
+schema step is required.
+
+Activate producers only after every acceptor, worker, relay and reader in their
+path is qualified. Capability pins assert that complete path. Keep additive
+schema on rollback; qualify the exact rollback runtime against the migrated
+ledger before release. Database compatibility does not imply that the predecessor
+can process new diagnostic events: keep accepting readers/workers until new
+emission is disabled and their queued work has drained. Candidate publication, deployment and consumer adoption remain
+separate release actions.
+
+For local operator qualification with the private cloud companion available,
+`make evidence-runtime-prepare evidence-runtime-build evidence-runtime-check`
+stages the candidate and the designated core1.19.3 predecessor, builds local
+images with the companion's runtime Dockerfile, and checks actual API/worker
+startup and config before/after migration and rollback. Preparation refuses to
+overwrite an existing context; select a fresh `EVIDENCE_RUNTIME_DIR` under
+`.tmp/evidence-release/` for changed sources. The check uses its own internal
+Docker network and synthetic Postgres/Redis/S3, publishes no ports or images,
+and removes only its labelled fixtures. Context/image/fixture hashes and
+readiness/data-preservation receipts stay in that directory. It does not replace
+qualification of the exact release images on the target hosted architecture.
+
 ## Durable worker upgrade
 
 The durable worker release requires forward migration `202609130001_add_durable_worker_jobs`. Use the normal `db-migrate` dependency before starting the new worker; do not bootstrap an existing database. Pending work moves from Redis into Postgres when the worker adopts it. Internal worker `/ready` reports `worker_job_protocol: postgres-v1` and `processing_enabled: true` during normal processing. Self-host startup leaves `WORKER_START_PAUSED` at its compatible default `0`.

@@ -124,6 +124,7 @@ export const CLI_USAGE_LINES = [
   "  debugbundle weekly-report update <channel-id> [--day-of-week <day>] [--hour-of-day <0-23>] [--timezone <iana>] [--config-json <json>] [--is-enabled <true|false>] [--auth-file <path>] [--json]",
   "  debugbundle weekly-report delete <channel-id> [--auth-file <path>] [--json]",
   "  debugbundle capture-policy get --project <id> [--auth-file <path>] [--json]",
+  "  debugbundle capture-policy set --project <id> --override capture_diagnostic_context=<true|false|null> [--json]",
   "  debugbundle capture-policy set --project <id> [--preset <minimal|balanced|investigative>] [--override <key=value>] [--client-error-incidents <preset-default|none|recommended|custom>] [--client-error-statuses <400,401,...>] [--client-error-path-rule <404=/path/*@GET,POST>] [--client-error-path-rules-json <json|null>] [--auth-file <path>] [--json]",
   "  debugbundle capture-rule list --project-id <id> [--auth-file <path>] [--json]",
   "  debugbundle capture-rule suggest <incident-id> [--auth-file <path>] [--json]",

@@ -9,6 +9,7 @@ const CAPTURE_RULE_EVENT_TYPES = [
   "deploy_metadata",
   "error_suppressed",
   "probe_event",
+  "diagnostic_context"
 ] as const;
 
 const CAPTURE_RULE_RUNTIME_VALUES = [
@@ -19,7 +20,7 @@ const CAPTURE_RULE_RUNTIME_VALUES = [
   "java",
   "go",
   "ruby",
-  "unknown",
+  "unknown"
 ] as const;
 
 export const CaptureRuleActionValues = ["demote", "sample", "drop"] as const;
@@ -126,7 +127,7 @@ const UrlMatcherSchema = z
     host: z.string().min(1).max(255).optional(),
     host_suffix: z.string().min(1).max(255).optional(),
     path_prefix: z.string().min(1).max(1024).optional(),
-    path_equals: z.string().min(1).max(1024).optional(),
+    path_equals: z.string().min(1).max(1024).optional()
   })
   .transform((value) => {
     const normalized: CaptureRuleUrlMatcher = {};
@@ -150,22 +151,29 @@ const UrlMatcherSchema = z
 
     return normalized;
   })
-  .refine((value) => hasValue(value.host) || hasValue(value.host_suffix) || hasValue(value.path_prefix) || hasValue(value.path_equals), {
-    message: "URL matchers must include at least one host or path constraint.",
-  });
+  .refine(
+    (value) =>
+      hasValue(value.host) ||
+      hasValue(value.host_suffix) ||
+      hasValue(value.path_prefix) ||
+      hasValue(value.path_equals),
+    {
+      message: "URL matchers must include at least one host or path constraint."
+    }
+  );
 
 const StatusRangeSchema = z
   .object({
     start: z.number().int().min(100).max(599),
-    end: z.number().int().min(100).max(599),
+    end: z.number().int().min(100).max(599)
   })
   .refine((value) => value.start <= value.end, {
-    message: "Status range start must be less than or equal to end.",
+    message: "Status range start must be less than or equal to end."
   });
 
 export const CaptureRuleFingerprintSchema = z.object({
   version: z.string().min(1).max(32),
-  value: z.string().min(1).max(256),
+  value: z.string().min(1).max(256)
 });
 
 export type CaptureRuleFingerprint = z.infer<typeof CaptureRuleFingerprintSchema>;
@@ -175,7 +183,9 @@ function normalizeStringArray(values: readonly string[] | undefined): string[] |
     return undefined;
   }
 
-  return Array.from(new Set(values.map((value) => value.trim()).filter((value) => value.length > 0)));
+  return Array.from(
+    new Set(values.map((value) => value.trim()).filter((value) => value.length > 0))
+  );
 }
 
 function normalizeNumberArray(values: readonly number[] | undefined): number[] | undefined {
@@ -232,11 +242,13 @@ export const CaptureRuleMatcherSchema = z
     request_url: UrlMatcherSchema.optional(),
     status_codes: z.array(z.number().int().min(100).max(599)).min(1).optional(),
     status_ranges: z.array(StatusRangeSchema).min(1).optional(),
-    fingerprint: CaptureRuleFingerprintSchema.optional(),
+    fingerprint: CaptureRuleFingerprintSchema.optional()
   })
   .transform((value) => {
     const normalized: CaptureRuleMatcher = {};
-    const eventTypes = normalizeStringArray(value.event_types) as CaptureRuleEventType[] | undefined;
+    const eventTypes = normalizeStringArray(value.event_types) as
+      | CaptureRuleEventType[]
+      | undefined;
     const services = normalizeStringArray(value.services);
     const environments = normalizeStringArray(value.environments);
     const runtime = normalizeStringArray(value.runtime) as CaptureRuleRuntime[] | undefined;
@@ -334,13 +346,13 @@ export const CaptureRuleMatcherSchema = z
       "request_url",
       "status_codes",
       "status_ranges",
-      "fingerprint",
+      "fingerprint"
     ] as const;
 
     if (!narrowingKeys.some((key) => hasValue(value[key]))) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Capture rules must include at least one narrowing field beyond event_types.",
+        message: "Capture rules must include at least one narrowing field beyond event_types."
       });
     }
 
@@ -349,42 +361,43 @@ export const CaptureRuleMatcherSchema = z
       if (!hasResourceConstraint) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Resource-error rules require a resource URL constraint or an exact fingerprint.",
+          message: "Resource-error rules require a resource URL constraint or an exact fingerprint."
         });
       }
     }
   });
 
-const CaptureRuleCoreObjectSchema = z
-  .object({
-    name: z.string().trim().min(1).max(120),
-    description: z.string().trim().max(500).nullable(),
-    enabled: z.boolean(),
-    action: CaptureRuleActionSchema,
-    matcher: CaptureRuleMatcherSchema,
-    sample_rate: z.number().min(0).max(1).nullable(),
-    sample_event_class: CaptureRuleSampleEventClassSchema.nullable(),
-    created_by_user_id: z.string().min(1).max(120).nullable(),
-    created_from_incident_id: z.string().min(1).max(120).nullable(),
-    created_from_event_id: z.string().min(1).max(120).nullable(),
-    expires_at: z.string().datetime().nullable(),
-  });
+const CaptureRuleCoreObjectSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(500).nullable(),
+  enabled: z.boolean(),
+  action: CaptureRuleActionSchema,
+  matcher: CaptureRuleMatcherSchema,
+  sample_rate: z.number().min(0).max(1).nullable(),
+  sample_event_class: CaptureRuleSampleEventClassSchema.nullable(),
+  created_by_user_id: z.string().min(1).max(120).nullable(),
+  created_from_incident_id: z.string().min(1).max(120).nullable(),
+  created_from_event_id: z.string().min(1).max(120).nullable(),
+  expires_at: z.string().datetime().nullable()
+});
 
-function addCaptureRuleActionValidation<Schema extends z.AnyZodObject>(schema: Schema): z.ZodEffects<Schema> {
+function addCaptureRuleActionValidation<Schema extends z.ZodObject>(
+  schema: Schema
+): Schema {
   return schema.superRefine((value, context) => {
     if (value["action"] === "sample") {
       if (value["sample_rate"] === null) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["sample_rate"],
-          message: "Sample rules require sample_rate.",
+          message: "Sample rules require sample_rate."
         });
       }
       if (value["sample_event_class"] === null) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["sample_event_class"],
-          message: "Sample rules require sample_event_class.",
+          message: "Sample rules require sample_event_class."
         });
       }
       return;
@@ -394,7 +407,7 @@ function addCaptureRuleActionValidation<Schema extends z.AnyZodObject>(schema: S
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["sample_rate"],
-        message: "Only sample rules can set sample_rate.",
+        message: "Only sample rules can set sample_rate."
       });
     }
 
@@ -402,7 +415,7 @@ function addCaptureRuleActionValidation<Schema extends z.AnyZodObject>(schema: S
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["sample_event_class"],
-        message: "Only sample rules can set sample_event_class.",
+        message: "Only sample rules can set sample_event_class."
       });
     }
   });
@@ -410,12 +423,12 @@ function addCaptureRuleActionValidation<Schema extends z.AnyZodObject>(schema: S
 
 export const CaptureRuleSchema = addCaptureRuleActionValidation(
   CaptureRuleCoreObjectSchema.extend({
-  id: z.string().uuid(),
-  project_id: z.string().min(1).max(120),
-  hit_count: z.number().int().nonnegative(),
-  last_matched_at: z.string().datetime().nullable(),
-  created_at: z.string().datetime(),
-  updated_at: z.string().datetime(),
+    id: z.string().guid(),
+    project_id: z.string().min(1).max(120),
+    hit_count: z.number().int().nonnegative(),
+    last_matched_at: z.string().datetime().nullable(),
+    created_at: z.string().datetime(),
+    updated_at: z.string().datetime()
   })
 );
 
@@ -433,7 +446,7 @@ export const CaptureRuleCreateSchema = z
     created_by_user_id: z.string().min(1).max(120).nullable().default(null),
     created_from_incident_id: z.string().min(1).max(120).nullable().default(null),
     created_from_event_id: z.string().min(1).max(120).nullable().default(null),
-    expires_at: z.string().datetime().nullable().default(null),
+    expires_at: z.string().datetime().nullable().default(null)
   })
   .superRefine((value, context) => {
     if (value.action === "sample") {
@@ -441,7 +454,7 @@ export const CaptureRuleCreateSchema = z
         context.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["sample_rate"],
-          message: "Sample rules require sample_rate.",
+          message: "Sample rules require sample_rate."
         });
       }
       return;
@@ -451,7 +464,7 @@ export const CaptureRuleCreateSchema = z
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["sample_rate"],
-        message: "Only sample rules can set sample_rate.",
+        message: "Only sample rules can set sample_rate."
       });
     }
 
@@ -459,14 +472,14 @@ export const CaptureRuleCreateSchema = z
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["sample_event_class"],
-        message: "Only sample rules can set sample_event_class.",
+        message: "Only sample rules can set sample_event_class."
       });
     }
   })
   .transform((value) => ({
     ...value,
     sample_rate: value.action === "sample" ? value.sample_rate! : null,
-    sample_event_class: value.action === "sample" ? (value.sample_event_class ?? "preserve") : null,
+    sample_event_class: value.action === "sample" ? (value.sample_event_class ?? "preserve") : null
   }));
 
 export type CaptureRuleCreate = z.infer<typeof CaptureRuleCreateSchema>;
@@ -480,13 +493,13 @@ export const CaptureRuleUpdateSchema = z
     matcher: CaptureRuleMatcherSchema.optional(),
     sample_rate: z.number().min(0).max(1).nullable().optional(),
     sample_event_class: CaptureRuleSampleEventClassSchema.nullable().optional(),
-    expires_at: z.string().datetime().nullable().optional(),
+    expires_at: z.string().datetime().nullable().optional()
   })
   .superRefine((value, context) => {
     if (Object.keys(value).length === 0) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "At least one capture rule field must be provided.",
+        message: "At least one capture rule field must be provided."
       });
     }
 
@@ -496,14 +509,15 @@ export const CaptureRuleUpdateSchema = z
         context.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["sample_rate"],
-          message: "Sample rule updates must include sample_rate when changing action to sample.",
+          message: "Sample rule updates must include sample_rate when changing action to sample."
         });
       }
       if (!("sample_event_class" in value)) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["sample_event_class"],
-          message: "Sample rule updates must include sample_event_class when changing action to sample.",
+          message:
+            "Sample rule updates must include sample_event_class when changing action to sample."
         });
       }
       return;
@@ -513,7 +527,7 @@ export const CaptureRuleUpdateSchema = z
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["sample_rate"],
-        message: "Sample rule fields can only be updated while setting action to sample.",
+        message: "Sample rule fields can only be updated while setting action to sample."
       });
     }
 
@@ -521,7 +535,7 @@ export const CaptureRuleUpdateSchema = z
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["sample_event_class"],
-        message: "Sample rule fields can only be updated while setting action to sample.",
+        message: "Sample rule fields can only be updated while setting action to sample."
       });
     }
   });
@@ -529,21 +543,21 @@ export const CaptureRuleUpdateSchema = z
 export type CaptureRuleUpdate = z.infer<typeof CaptureRuleUpdateSchema>;
 
 export const CaptureRuleResponseSchema = z.object({
-  rule: CaptureRuleSchema,
+  rule: CaptureRuleSchema
 });
 
 export type CaptureRuleResponse = z.infer<typeof CaptureRuleResponseSchema>;
 
 export const CaptureRulesResponseSchema = z.object({
   access_mode: z.enum(["manage", "preview"]),
-  rules: z.array(CaptureRuleSchema),
+  rules: z.array(CaptureRuleSchema)
 });
 
 export type CaptureRulesResponse = z.infer<typeof CaptureRulesResponseSchema>;
 
 export const CaptureRulesFileSchema = z.object({
   version: z.literal(1),
-  rules: z.array(CaptureRuleSchema),
+  rules: z.array(CaptureRuleSchema)
 });
 
 export type CaptureRulesFile = z.infer<typeof CaptureRulesFileSchema>;

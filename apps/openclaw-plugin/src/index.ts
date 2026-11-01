@@ -1,6 +1,7 @@
 import { defineToolPlugin } from "openclaw/plugin-sdk/tool-plugin";
 import { Type, type TSchema } from "typebox";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { z } from "zod";
+import { toInputJsonSchema } from "../../../packages/shared-types/src/json-schema.js";
 
 import { createDefaultMcpTools } from "../../mcp/src/default-tools.js";
 import { MCP_TOOL_CATALOG } from "../../mcp/src/tool-catalog.js";
@@ -22,10 +23,7 @@ function toOpenClawToolName(name: DebugBundleMcpToolName): `debugbundle_${DebugB
 
 function toTypeBoxSchema(schema: unknown): TSchema {
   return Type.Unsafe(
-    zodToJsonSchema(schema as never, {
-      target: "jsonSchema2019-09",
-      $refStrategy: "none"
-    }) as Record<string, unknown>
+    toInputJsonSchema(schema as z.ZodType)
   );
 }
 

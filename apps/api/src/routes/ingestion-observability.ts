@@ -50,7 +50,7 @@ export function getQuotaRetryAfterMs(resetAt: string, now: Date): number {
 export function readRejectedMetricEventId(candidate: unknown, index: number): string {
   if (typeof candidate === "object" && candidate !== null) {
     const eventId = (candidate as Record<string, unknown>)["event_id"];
-    if (z.string().uuid().safeParse(eventId).success) return eventId as string;
+    if (z.string().guid().safeParse(eventId).success) return eventId as string;
   }
   return `invalid_event_index_${index}`;
 }

@@ -12,6 +12,31 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it("accepts installed queue-pressure summaries while rejecting unknown suppression fields", () => {
+  const event = createEventEnvelope({
+    event_type: "error_suppressed",
+    service: { name: "fixture", environment: "test" },
+    payload: {
+      fingerprint: "queue-pressure",
+      suppressed_count: 50,
+      window_seconds: 60,
+      first_seen: "2026-10-26T10:00:00.000Z",
+      last_seen: "2026-10-26T10:00:00.000Z",
+      reason: "queue_pressure",
+      level: "error"
+    }
+  });
+  expect(EventEnvelopeSchema.safeParse(event).success).toBe(true);
+  expect(
+    EventEnvelopeSchema.safeParse({ ...event, payload: { ...event.payload, reason: "unknown" } })
+      .success
+  ).toBe(false);
+  expect(
+    EventEnvelopeSchema.safeParse({ ...event, payload: { ...event.payload, unknown: true } })
+      .success
+  ).toBe(false);
+});
+
 // ---------------------------------------------------------------------------
 // Minimal valid bundle fixture
 // ---------------------------------------------------------------------------
@@ -254,7 +279,8 @@ describe("shared-types event envelope", () => {
       payload: {
         name: "TypeError",
         message: "Cannot read properties of null",
-        stack: "TypeError: Cannot read properties of null\n  at CheckoutPage (src/pages/Checkout.tsx:42)",
+        stack:
+          "TypeError: Cannot read properties of null\n  at CheckoutPage (src/pages/Checkout.tsx:42)",
         route: "/checkout",
         browser: { name: "Chrome", version: "122.0.6261.94" },
         device: {
@@ -269,7 +295,7 @@ describe("shared-types event envelope", () => {
           connection_type: "4g",
           color_scheme_preference: "dark"
         },
-        dom_context: { mode: "lightweight", html_excerpt: "<button id=\"pay\">Pay Now</button>" }
+        dom_context: { mode: "lightweight", html_excerpt: '<button id="pay">Pay Now</button>' }
       }
     });
 
@@ -290,7 +316,8 @@ describe("shared-types event envelope", () => {
       payload: {
         name: "TypeError",
         message: "Cannot read properties of null",
-        stack: "TypeError: Cannot read properties of null\n  at CheckoutPage (src/pages/Checkout.tsx:42)",
+        stack:
+          "TypeError: Cannot read properties of null\n  at CheckoutPage (src/pages/Checkout.tsx:42)",
         route: "/checkout",
         browser: { name: "Chrome", version: "122.0" },
         dom_context: null
@@ -314,10 +341,11 @@ describe("shared-types event envelope", () => {
       payload: {
         name: "TypeError",
         message: "Cannot read properties of null",
-        stack: "TypeError: Cannot read properties of null\n  at CheckoutPage (src/pages/Checkout.tsx:42)",
+        stack:
+          "TypeError: Cannot read properties of null\n  at CheckoutPage (src/pages/Checkout.tsx:42)",
         route: "/checkout",
         browser: { name: "Chrome", version: "122.0" },
-        dom_context: { mode: "lightweight", html_excerpt: "<button id=\"pay\">Pay</button>" },
+        dom_context: { mode: "lightweight", html_excerpt: '<button id="pay">Pay</button>' },
         breadcrumbs: [
           {
             breadcrumb_type: "route_change",
@@ -672,7 +700,9 @@ describe("shared-types BundleV1Schema", () => {
       clicks: [{ selector: "#buy-btn", label: "Buy Now", ts: "2026-03-10T12:00:00.000Z" }],
       form_submissions: [],
       console_logs: [],
-      network_requests: [{ method: "POST", url: "/api/order", status: 500, ts: "2026-03-10T12:00:00.000Z" }],
+      network_requests: [
+        { method: "POST", url: "/api/order", status: 500, ts: "2026-03-10T12:00:00.000Z" }
+      ],
       exceptions: [],
       dom_context: { mode: "lightweight", html_excerpt: "<div>...</div>" }
     };

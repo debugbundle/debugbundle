@@ -36,6 +36,24 @@ export async function processNextNormalizeEventsJob(
     return { processed: false, reason: "invalid_event" };
   }
 
+  if (event.event_type === "diagnostic_context") {
+    const receipt = await dependencies.processedEventStore.upsertProcessedEvent({
+      event_id: event.event_id,
+      project_id: job.project_id,
+      event_type: event.event_type,
+      fingerprint: "diagnostic_context",
+      normalized_message: "diagnostic_context"
+    });
+    if (receipt?.inserted !== false)
+      await dependencies.recordEvidenceContext?.(
+        job.project_id,
+        event,
+        job.received_at ?? event.occurred_at,
+        "context_signal"
+      );
+    return { processed: true };
+  }
+
   const normalized = normalizeEvent(event);
   const computedFingerprint = fingerprint(normalized);
   const captureRule = job.capture_rule ?? null;
@@ -82,6 +100,12 @@ export async function processNextNormalizeEventsJob(
   }
 
   await dependencies.recordBrowserRecoveryContext?.(job.project_id, event);
+  await dependencies.recordEvidenceContext?.(
+    job.project_id,
+    event,
+    job.received_at ?? event.occurred_at,
+    eventClass
+  );
 
   const improvementInput = {
     project_id: job.project_id,
@@ -107,7 +131,10 @@ export async function processNextNormalizeEventsJob(
     });
   }
 
-  const resourceRoute = normalized.resource_type === undefined ? null : normalizeResourceRoute(normalized.route_template);
+  const resourceRoute =
+    normalized.resource_type === undefined
+      ? null
+      : normalizeResourceRoute(normalized.route_template);
   const alertNotification = buildAlertNotificationContext({
     projectId: job.project_id,
     event,
@@ -127,10 +154,14 @@ export async function processNextNormalizeEventsJob(
     ...(alertNotification.coalescing_window_seconds === undefined
       ? {}
       : { alert_coalescing_window_seconds: alertNotification.coalescing_window_seconds }),
-    ...(alertNotification.coalescing_key === undefined ? {} : { alert_coalescing_key: alertNotification.coalescing_key }),
+    ...(alertNotification.coalescing_key === undefined
+      ? {}
+      : { alert_coalescing_key: alertNotification.coalescing_key }),
     fingerprint_version: fingerprintVersion(normalized),
     normalized_message: normalized.normalized_message,
-    ...(normalized.incident_title === undefined ? {} : { incident_title: normalized.incident_title }),
+    ...(normalized.incident_title === undefined
+      ? {}
+      : { incident_title: normalized.incident_title }),
     ...(resourceRoute === null ? {} : { resource_route: resourceRoute }),
     matched_fields: matchedFields,
     occurred_at: event.occurred_at,

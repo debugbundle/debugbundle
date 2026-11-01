@@ -1,4 +1,5 @@
 import { gunzipSync, gzipSync } from "node:zlib";
+import { collectDiagnosticContext } from "./processor-evidence-context.js";
 import { buildBundle } from "../../../packages/bundle-engine/src/index.js";
 import { buildReproduction } from "../../../packages/repro-engine/src/index.js";
 import type {
@@ -162,6 +163,23 @@ export async function processNextBuildBundleJob(
       incidentEnvelopes
     });
     const workerEnv = dependencies.env ?? process.env;
+    const primaryOverride =
+      job.primary_event_id !== undefined &&
+      job.primary_occurred_at !== undefined &&
+      bundleMetadata.source_event_id === job.event_id &&
+      incidentEnvelopes.some((item) => item.eventId === job.primary_event_id)
+        ? { id: job.primary_event_id, at: job.primary_occurred_at }
+        : null;
+    const diagnosticContexts = await collectDiagnosticContext({
+      dependencies,
+      projectId: incident.project_id,
+      service: incident.service_name,
+      environment: incident.environment,
+      // The bundle describes one primary occurrence. Query its bounded context
+      // directly so older retained failures cannot exhaust the candidate limit.
+      failures: incidentEnvelopes.filter((item) => item.eventClass === "incident_signal" &&
+        item.eventId === (primaryOverride?.id ?? bundleMetadata.source_event_id)).map((item) => item.envelope)
+    });
     const workloadDeploy =
       incident.service_id === null
         ? null
@@ -169,7 +187,7 @@ export async function processNextBuildBundleJob(
             project_id: incident.project_id,
             service_id: incident.service_id,
             environment: incident.environment,
-            occurred_at: bundleMetadata.source_occurred_at
+            occurred_at: primaryOverride?.at ?? bundleMetadata.source_occurred_at
           });
     const bundle = buildBundle({
       ...(workloadDeploy == null ? {} : { configuredDeploy: workloadDeploy }),
@@ -182,13 +200,17 @@ export async function processNextBuildBundleJob(
         generation_number: bundleMetadata.generation_number,
         created_at: bundleMetadata.created_at,
         updated_at: bundleMetadata.updated_at,
-        source_event_id: bundleMetadata.source_event_id,
-        source_occurred_at: bundleMetadata.source_occurred_at
+        source_event_id: primaryOverride?.id ?? bundleMetadata.source_event_id,
+        source_occurred_at: primaryOverride?.at ?? bundleMetadata.source_occurred_at
       },
       sourceEnvelopes: [...incidentEnvelopes, ...correlatedLogEnvelopes].map(
         (incidentEnvelope) => incidentEnvelope.envelope
       ),
+      failureEventIds: incidentEnvelopes
+        .filter((item) => item.eventClass === "incident_signal")
+        .map((item) => item.eventId),
       correlatedRecoveryEnvelopes,
+      diagnosticContexts,
       probeDataItems: probeDataItems
     });
 

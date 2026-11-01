@@ -1,11 +1,28 @@
 import { nodeFetch } from "../../../packages/node-http/src/index.js";
-import { readFile as readFileFromFs, stat as statFromFs, rename as renameFromFs, writeFile as writeFileFromFs, mkdir as mkdirFromFs } from "node:fs/promises";
+import {
+  readFile as readFileFromFs,
+  stat as statFromFs,
+  rename as renameFromFs,
+  writeFile as writeFileFromFs,
+  mkdir as mkdirFromFs
+} from "node:fs/promises";
 import { join } from "node:path";
 
-import { formatAcceptedLogFormats, parseAcceptedLogFormat, parseLogFile } from "../../../packages/log-parser/src/index.js";
+import {
+  formatAcceptedLogFormats,
+  parseAcceptedLogFormat,
+  parseLogFile
+} from "../../../packages/log-parser/src/index.js";
+
+import { partitionEventsForIngestion } from "../../../packages/shared-types/src/index.js";
 
 import { readConnectionConfig } from "./connection-config.js";
-import { buildEventFileName, LOCAL_EVENTS_DIRECTORY_PATH, readProfile, type ProcessSummary } from "./ingest-command.js";
+import {
+  buildEventFileName,
+  LOCAL_EVENTS_DIRECTORY_PATH,
+  readProfile,
+  type ProcessSummary
+} from "./ingest-command.js";
 import { processCommand as defaultProcessCommand } from "./process-command.js";
 import type { CliCommandResult } from "./token-commands.js";
 
@@ -31,7 +48,15 @@ type WatchCommandDependencies = {
   readFile?: FileReader;
   readEnv?: (name: string) => string | undefined;
   rename?: FileRenamer;
-  sendEvents?: (input: { baseUrl: string; projectToken: string; events: Array<unknown> }) => Promise<{ accepted: number; rejected: number; errors: Array<{ index: number; reason: string }> }>;
+  sendEvents?: (input: {
+    baseUrl: string;
+    projectToken: string;
+    events: Array<unknown>;
+  }) => Promise<{
+    accepted: number;
+    rejected: number;
+    errors: Array<{ index: number; reason: string }>;
+  }>;
   signal?: AbortSignal;
   sleep?: Sleeper;
   stat?: StatReader;
@@ -46,7 +71,11 @@ function normalizeBaseUrl(baseUrl: string): string {
 async function sendEventsToApi(
   input: { baseUrl: string; projectToken: string; events: Array<unknown> },
   dependencies?: { fetchImpl?: typeof fetch }
-): Promise<{ accepted: number; rejected: number; errors: Array<{ index: number; reason: string }> }> {
+): Promise<{
+  accepted: number;
+  rejected: number;
+  errors: Array<{ index: number; reason: string }>;
+}> {
   const fetchImpl = dependencies?.fetchImpl ?? nodeFetch;
   const response = await fetchImpl(`${normalizeBaseUrl(input.baseUrl)}/v1/events`, {
     method: "POST",
@@ -67,7 +96,11 @@ async function sendEventsToApi(
     error?: string;
   };
   if (response.status < 200 || response.status >= 300) {
-    throw new Error(typeof body.error === "string" ? body.error : `watch_cloud_ingestion_failed:${response.status}`);
+    throw new Error(
+      typeof body.error === "string"
+        ? body.error
+        : `watch_cloud_ingestion_failed:${response.status}`
+    );
   }
 
   return {
@@ -104,41 +137,59 @@ export async function watchCommand(
   }
 
   const cwd = dependencies.cwd ?? (() => process.cwd());
-  const mkdir = dependencies.mkdir ?? (async (path: string, options: { recursive: true }) => mkdirFromFs(path, options));
+  const mkdir =
+    dependencies.mkdir ??
+    (async (path: string, options: { recursive: true }) => mkdirFromFs(path, options));
   const pollIntervalMs = dependencies.pollIntervalMs ?? 1000;
   const processLocalEvents = dependencies.processCommand ?? defaultProcessCommand;
   const readFile = dependencies.readFile ?? (async (path: string) => readFileFromFs(path));
   const readEnv = dependencies.readEnv ?? ((name: string) => process.env[name]);
-  const rename = dependencies.rename ?? (async (sourcePath: string, destinationPath: string) => renameFromFs(sourcePath, destinationPath));
-  const fetchDependencies = dependencies.fetchImpl === undefined ? undefined : { fetchImpl: dependencies.fetchImpl };
-  const sendEvents = dependencies.sendEvents ?? ((requestInput: { baseUrl: string; projectToken: string; events: Array<unknown> }) => sendEventsToApi(requestInput, fetchDependencies));
+  const rename =
+    dependencies.rename ??
+    (async (sourcePath: string, destinationPath: string) =>
+      renameFromFs(sourcePath, destinationPath));
+  const fetchDependencies =
+    dependencies.fetchImpl === undefined ? undefined : { fetchImpl: dependencies.fetchImpl };
+  const sendEvents =
+    dependencies.sendEvents ??
+    ((requestInput: { baseUrl: string; projectToken: string; events: Array<unknown> }) =>
+      sendEventsToApi(requestInput, fetchDependencies));
   const signal = dependencies.signal;
-  const sleep = dependencies.sleep ?? (async (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
+  const sleep =
+    dependencies.sleep ??
+    (async (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
   const stat = dependencies.stat ?? statFromFs;
-  const writeFile = dependencies.writeFile ?? (async (path: string, content: string) => writeFileFromFs(path, content, "utf8"));
+  const writeFile =
+    dependencies.writeFile ??
+    (async (path: string, content: string) => writeFileFromFs(path, content, "utf8"));
 
   try {
     const rootDirectory = cwd();
-    const profile = await readProfile(rootDirectory, async (path) => (await readFile(path)).toString("utf8"));
+    const profile = await readProfile(rootDirectory, async (path) =>
+      (await readFile(path)).toString("utf8")
+    );
     const eventDirectory = join(rootDirectory, LOCAL_EVENTS_DIRECTORY_PATH);
     const useCloudDelivery = input.cloud === true;
-    const connectionConfig = useCloudDelivery ? await readConnectionConfig(rootDirectory, async (path) => (await readFile(path)).toString("utf8")) : null;
+    const connectionConfig = useCloudDelivery
+      ? await readConnectionConfig(rootDirectory, async (path) =>
+          (await readFile(path)).toString("utf8")
+        )
+      : null;
     const projectToken = useCloudDelivery ? readEnv("DEBUGBUNDLE_PROJECT_TOKEN") : undefined;
-    const cloudBaseUrl = useCloudDelivery ? connectionConfig?.cloud_base_url ?? null : null;
+    const cloudBaseUrl = useCloudDelivery ? (connectionConfig?.cloud_base_url ?? null) : null;
     if (
-      useCloudDelivery
-      && (
-        connectionConfig === null
-        || connectionConfig.mode !== "connected"
-        || cloudBaseUrl === null
-        || connectionConfig.environments.production.delivery !== "cloud-enabled"
-        || typeof projectToken !== "string"
-        || projectToken.length === 0
-      )
+      useCloudDelivery &&
+      (connectionConfig === null ||
+        connectionConfig.mode !== "connected" ||
+        cloudBaseUrl === null ||
+        connectionConfig.environments.production.delivery !== "cloud-enabled" ||
+        typeof projectToken !== "string" ||
+        projectToken.length === 0)
     ) {
       return {
         exitCode: 4,
-        output: "Cloud watch requires a connected project with cloud delivery enabled and DEBUGBUNDLE_PROJECT_TOKEN set."
+        output:
+          "Cloud watch requires a connected project with cloud delivery enabled and DEBUGBUNDLE_PROJECT_TOKEN set."
       };
     }
 
@@ -164,8 +215,12 @@ export async function watchCommand(
         const fileBuffer = await readFile(input.logPath);
         const comparableTailLength = Math.min(Buffer.byteLength(knownTail), offset);
         if (comparableTailLength > 0) {
-          const previousTail = fileBuffer.subarray(offset - comparableTailLength, offset).toString("utf8");
-          const expectedTail = Buffer.from(knownTail).subarray(Buffer.byteLength(knownTail) - comparableTailLength).toString("utf8");
+          const previousTail = fileBuffer
+            .subarray(offset - comparableTailLength, offset)
+            .toString("utf8");
+          const expectedTail = Buffer.from(knownTail)
+            .subarray(Buffer.byteLength(knownTail) - comparableTailLength)
+            .toString("utf8");
           if (previousTail !== expectedTail) {
             offset = 0;
             pendingChunk = "";
@@ -190,31 +245,46 @@ export async function watchCommand(
 
           if (events.length > 0) {
             if (useCloudDelivery) {
-              const result = await sendEvents({
-                baseUrl: cloudBaseUrl as string,
-                projectToken: projectToken as string,
-                events
-              });
-              if (result.accepted < events.length || result.rejected > 0 || result.errors.length > 0) {
+              const batches = partitionEventsForIngestion(events);
+              if (batches === null)
                 return {
                   exitCode: 1,
-                  output: "Cloud watch ingestion did not fully accept the appended batch."
+                  output: "Cloud watch event exceeds the ingestion byte limit."
                 };
+              for (const batch of batches) {
+                const result = await sendEvents({
+                  baseUrl: cloudBaseUrl as string,
+                  projectToken: projectToken as string,
+                  events: batch
+                });
+                if (
+                  result.accepted !== batch.length ||
+                  result.rejected !== 0 ||
+                  result.errors.length !== 0
+                ) {
+                  return {
+                    exitCode: 1,
+                    output: "Cloud watch ingestion did not fully accept the appended batch."
+                  };
+                }
+                eventsIngested += batch.length;
+                batchesWritten += 1;
               }
-
-              eventsIngested += events.length;
-              batchesWritten += 1;
             } else {
-              const eventFile = buildEventFileName(events, `${input.logPath}:${batchesWritten + 1}`);
+              const eventFile = buildEventFileName(
+                events,
+                `${input.logPath}:${batchesWritten + 1}`
+              );
               const destinationPath = join(eventDirectory, eventFile);
               const temporaryPath = `${destinationPath}.tmp`;
 
               await writeFile(temporaryPath, `${JSON.stringify(events, null, 2)}\n`);
               await rename(temporaryPath, destinationPath);
 
-              const processResult = dependencies.processCommand === undefined
-                ? await processLocalEvents({ json: true }, { cwd })
-                : await processLocalEvents({ json: true });
+              const processResult =
+                dependencies.processCommand === undefined
+                  ? await processLocalEvents({ json: true }, { cwd })
+                  : await processLocalEvents({ json: true });
               if (processResult.exitCode !== 0) {
                 return processResult;
               }
@@ -240,20 +310,25 @@ export async function watchCommand(
       log_path: input.logPath,
       format: parsedFormat,
       events_ingested: eventsIngested,
-      ...(useCloudDelivery ? { batches_shipped: batchesWritten } : { batches_written: batchesWritten }),
+      ...(useCloudDelivery
+        ? { batches_shipped: batchesWritten }
+        : { batches_written: batchesWritten }),
       ...(useCloudDelivery ? {} : { process_runs: processRuns, last_event_file: lastEventFile }),
       stopped_by: "signal"
     };
 
     return {
       exitCode: 0,
-      output: input.json === true ? JSON.stringify(outputSummary, null, 2) : formatHumanOutput({
-        format: parsedFormat,
-        logPath: input.logPath,
-        eventsIngested,
-        batchesHandled: batchesWritten,
-        actionLabel: useCloudDelivery ? "Shipped cloud batches" : `Ran local processing`
-      })
+      output:
+        input.json === true
+          ? JSON.stringify(outputSummary, null, 2)
+          : formatHumanOutput({
+              format: parsedFormat,
+              logPath: input.logPath,
+              eventsIngested,
+              batchesHandled: batchesWritten,
+              actionLabel: useCloudDelivery ? "Shipped cloud batches" : `Ran local processing`
+            })
     };
   } catch (error) {
     return {

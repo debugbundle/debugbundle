@@ -290,7 +290,10 @@ function registerApiCors(
           appendVaryHeader(reply.getHeader("Vary"), "Access-Control-Request-Headers")
         );
         reply.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        reply.header("Access-Control-Allow-Headers", "Authorization, Content-Type");
+        reply.header(
+          "Access-Control-Allow-Headers",
+          "Authorization, Content-Type, X-DebugBundle-Evidence"
+        );
         reply.header("Access-Control-Max-Age", "86400");
 
         return reply.status(204).send();

@@ -1,7 +1,8 @@
 import { notificationPreferencesOperations } from "./openapi-notification-preferences.js";
 import { publicStatusOperations } from "./openapi-public-status.js";
 import { agentOperations } from "./openapi-agent.js";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { z } from "zod";
+import { toInputJsonSchema } from "../../../packages/shared-types/src/json-schema.js";
 import { SESSION_COOKIE_NAME, type JsonSchemaDocument, type SchemaSpec } from "./openapi-model.js";
 import { foundationOperations } from "./openapi-foundation.js";
 import { evidenceOperations } from "./openapi-evidence.js";
@@ -19,11 +20,7 @@ function toJsonSchema(schema: unknown): JsonSchemaDocument {
     ("type" in schema || "$ref" in schema || "anyOf" in schema)
   )
     return schema as JsonSchemaDocument;
-  const document = zodToJsonSchema(schema as never, {
-    target: "jsonSchema2019-09",
-    $refStrategy: "none",
-    definitionPath: "$defs"
-  }) as JsonSchemaDocument;
+  const document = toInputJsonSchema(schema as z.ZodType) as JsonSchemaDocument;
 
   delete document["$schema"];
   return document;

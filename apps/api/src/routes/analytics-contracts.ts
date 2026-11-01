@@ -59,13 +59,13 @@ export const AnalyticsFunnelParamsSchema = z
 
 export const AnalyticsIncidentImpactParamsSchema = z
   .object({
-    id: z.string().uuid()
+    id: z.string().guid()
   })
   .strict();
 
 export const AnalyticsOpportunitiesQuerySchema = z
   .object({
-    project_id: z.string().uuid().optional(),
+    project_id: z.string().guid().optional(),
     status: z
       .union([AnalyticsOpportunityStatusSchema, z.literal("all")])
       .optional()
@@ -95,19 +95,19 @@ export const AnalyticsOpportunitiesQuerySchema = z
 
 export const AnalyticsOpportunityParamsSchema = z
   .object({
-    id: z.string().uuid()
+    id: z.string().guid()
   })
   .strict();
 
 export const AnalyticsBundleParamsSchema = z
   .object({
-    id: z.string().uuid()
+    id: z.string().guid()
   })
   .strict();
 
 export const AnalyticsBundlesListQuerySchema = z
   .object({
-    project_id: z.string().uuid().optional(),
+    project_id: z.string().guid().optional(),
     status: z
       .union([AnalyticsBundleGenerationStatusSchema, z.literal("all")])
       .optional()
@@ -135,14 +135,14 @@ export const AnalyticsBundlesListQuerySchema = z
 
 export const AnalyticsBundleQuerySchema = z
   .object({
-    project_id: z.string().uuid()
+    project_id: z.string().guid()
   })
   .strict();
 
 export const AnalyticsBundleCreateBodySchema = z
   .object({
-    project_id: z.string().uuid(),
-    opportunity_id: z.string().uuid().nullable().optional(),
+    project_id: z.string().guid(),
+    opportunity_id: z.string().guid().nullable().optional(),
     analysis_kind: AnalyticsBundleAnalysisKindSchema,
     from: z.string().datetime().optional(),
     to: z.string().datetime().optional(),
@@ -156,7 +156,7 @@ export const AnalyticsBundleCreateBodySchema = z
       .refine((value) => !value.includes("?") && !value.includes("#"))
       .nullable()
       .optional(),
-    incident_id: z.string().uuid().nullable().optional(),
+    incident_id: z.string().guid().nullable().optional(),
     deploy_id: z.string().trim().min(1).max(120).nullable().optional(),
     filters: z.record(z.string(), z.unknown()).optional().default({})
   })
@@ -235,7 +235,7 @@ function parseCursor<TimestampKey extends string, IdKey extends string>(
   const timestamp = rawCursor.slice(0, separatorIndex);
   const id = rawCursor.slice(separatorIndex + 1);
   const parsedTimestamp = Date.parse(timestamp);
-  const parsedId = z.string().uuid().safeParse(id);
+  const parsedId = z.string().guid().safeParse(id);
   if (Number.isNaN(parsedTimestamp) || !parsedId.success) {
     return null;
   }

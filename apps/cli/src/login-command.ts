@@ -55,7 +55,7 @@ const ApiErrorResponseSchema = z
 
 const DeviceStartResponseSchema = z
   .object({
-    request_id: z.string().uuid(),
+    request_id: z.string().guid(),
     user_code: z.string().min(1),
     verification_uri: z.string().url(),
     interval_seconds: z.number().int().positive(),
@@ -218,7 +218,7 @@ async function maybePromptForLoginInput(
   };
 }
 
-function mapInputValidationError(parsedInput: z.SafeParseError<unknown>): string {
+function mapInputValidationError(parsedInput: z.ZodSafeParseError<unknown>): string {
   if (parsedInput.error.issues.some((issue) => issue.message === "github_mode_conflict")) {
     return "Choose only one of --github, --github-cli, or --github-device.";
   }

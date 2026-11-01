@@ -46,17 +46,12 @@ export const AnalyticsFlowDefinitionInputSchema = z
     "Step keys must be unique."
   );
 export type AnalyticsFlowDefinitionInput = z.infer<typeof AnalyticsFlowDefinitionInputSchema>;
-export const AnalyticsFlowDefinitionSchema = AnalyticsFlowDefinitionInputSchema.innerType()
-  .extend({
-    id: z.string().uuid(),
-    project_id: z.string().uuid(),
-    version: z.number().int().positive(),
-    archived_at: z.string().datetime().nullable()
-  })
-  .refine(
-    (value) => new Set(value.steps.map((step) => step.step_key)).size === value.steps.length,
-    "Step keys must be unique."
-  );
+export const AnalyticsFlowDefinitionSchema = AnalyticsFlowDefinitionInputSchema.safeExtend({
+  id: z.string().guid(),
+  project_id: z.string().guid(),
+  version: z.number().int().positive(),
+  archived_at: z.string().datetime().nullable()
+});
 export type AnalyticsFlowDefinition = z.infer<typeof AnalyticsFlowDefinitionSchema>;
 const Count = z.number().int().nonnegative();
 export const AnalyticsFlowReportSchema = z.object({

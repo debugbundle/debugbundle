@@ -131,6 +131,8 @@ function buildMigratedRuntimeSchemaRows(sql: string): { rows: Record<string, unk
         { table_name: "incidents" },
         { table_name: "incident_events" },
         { table_name: "browser_recovery_events" },
+        { table_name: "evidence_context_events" },
+        { table_name: "evidence_ingestion_receipts" },
         { table_name: "alert_rules" },
         { table_name: "notification_preferences" },
         { table_name: "notification_daily_batches" },
@@ -285,6 +287,25 @@ describe("api runtime start", () => {
     ).rejects.toThrow("db_schema_missing_tables");
     expect(listenMock).not.toHaveBeenCalled();
   });
+
+  it.each(["evidence_context_events", "evidence_ingestion_receipts"])(
+    "refuses startup when the evidence migration table %s is missing",
+    async (missingTable): Promise<void> => {
+      queryMock.mockImplementation(async (sql: string) => {
+        const result = buildMigratedRuntimeSchemaRows(sql);
+        return sql.includes("information_schema.tables")
+          ? { rows: result.rows.filter((row) => row["table_name"] !== missingTable) }
+          : result;
+      });
+      await expect(
+        startApiServerFromEnv({
+          DEBUGBUNDLE_PROBE_TRIGGER_SECRET: "test-probe-secret",
+          ANALYTICS_HASH_SECRET: "test-analytics-secret"
+        })
+      ).rejects.toThrow(`db_schema_missing_tables: ${missingTable}`);
+      expect(listenMock).not.toHaveBeenCalled();
+    }
+  );
 
   it("should wire stripe webhook dependencies including optional billing and audit services", async (): Promise<void> => {
     const billingSummaryReader = {

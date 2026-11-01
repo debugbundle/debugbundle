@@ -135,6 +135,13 @@ export const MCP_TOOL_CATALOG = [
         capture_request_events: z.string().nullable().optional(),
         capture_breadcrumbs: z.string().nullable().optional(),
         capture_probe_events: z.string().nullable().optional(),
+        capture_diagnostic_context: z
+          .boolean()
+          .nullable()
+          .optional()
+          .describe(
+            "Enable standalone diagnostic context, disable it, or restore preset defaults with null. Minimal policy always disables it; SDK opt-in and verified path support remain required."
+          ),
         immediate_client_error_statuses: z
           .array(z.number().int().min(400).max(499))
           .nullable()

@@ -1,5 +1,16 @@
-import { RESOURCE_FINGERPRINT_VERSION, fingerprint, fingerprintVersion, type FingerprintVersion } from "./fingerprints.js";
-export { FINGERPRINT_VERSION, RESOURCE_FINGERPRINT_VERSION, fingerprint, fingerprintVersion, inferMatchedFields } from "./fingerprints.js";
+import {
+  RESOURCE_FINGERPRINT_VERSION,
+  fingerprint,
+  fingerprintVersion,
+  type FingerprintVersion
+} from "./fingerprints.js";
+export {
+  FINGERPRINT_VERSION,
+  RESOURCE_FINGERPRINT_VERSION,
+  fingerprint,
+  fingerprintVersion,
+  inferMatchedFields
+} from "./fingerprints.js";
 export type { FingerprintVersion } from "./fingerprints.js";
 export { sanitizeEvent } from "./event-privacy.js";
 export { protectAnalyticsEvent } from "./analytics-privacy.js";
@@ -36,6 +47,8 @@ export {
 } from "./mobile-event-compatibility.js";
 export type { InstalledMobileCompatibility } from "./mobile-event-compatibility.js";
 
+export { validateEventAtAdmission } from "./admission.js";
+
 export interface NormalizedEvent {
   event_type: EventEnvelope["event_type"];
   environment: string;
@@ -53,7 +66,6 @@ export interface NormalizedEvent {
   payload: unknown;
 }
 
-
 type CorrelationKey = "request_id" | "trace_id" | "session_id" | "user_id_hash";
 
 const PAYLOAD_ALLOWED_KEYS: Record<string, Set<string>> = {
@@ -65,6 +77,8 @@ const PAYLOAD_ALLOWED_KEYS: Record<string, Set<string>> = {
     "request",
     "response",
     "runtime",
+    "exception_evidence",
+    "execution",
     "probe_data"
   ]),
   request_event: new Set([
@@ -93,6 +107,8 @@ const PAYLOAD_ALLOWED_KEYS: Record<string, Set<string>> = {
     "browser_event",
     "rejection_reason",
     "dom_context",
+    "exception_evidence",
+    "resource_observations",
     "probe_data"
   ]),
   deploy_metadata: new Set(["commit_sha", "version", "branch", "environment", "deployed_at"]),
@@ -466,7 +482,9 @@ function normalizeMessage(message: string, version: FingerprintVersion): string 
     return knownDatabaseMessage;
   }
 
-  return collapseWhitespace(normalizeScalarTokens(version === "v1" ? message : normalizeJavaTimerMessage(message)));
+  return collapseWhitespace(
+    normalizeScalarTokens(version === "v1" ? message : normalizeJavaTimerMessage(message))
+  );
 }
 
 function normalizeRoute(path: string | null): string | null {
@@ -579,7 +597,10 @@ export function validateEvent(
   return EventEnvelopeSchema.safeParse(normalizeCompatibleEventCandidate(candidate));
 }
 
-export function normalizeEvent(event: EventEnvelope, version: FingerprintVersion = RESOURCE_FINGERPRINT_VERSION): NormalizedEvent {
+export function normalizeEvent(
+  event: EventEnvelope,
+  version: FingerprintVersion = RESOURCE_FINGERPRINT_VERSION
+): NormalizedEvent {
   const redactedPayload = redact(event.payload as JsonValue).redacted;
 
   if (event.event_type === "backend_exception") {
@@ -641,8 +662,11 @@ export function normalizeEvent(event: EventEnvelope, version: FingerprintVersion
         : { host: null, path: null };
     const topFrames = browserEvent?.opaque === true ? [] : selectTopFrames(event.payload.stack);
     const resource = describeBrowserResource(browserEvent);
-    const concreteResource = version === RESOURCE_FINGERPRINT_VERSION && browserEvent?.opaque === true && resource?.host != null && resource.type !== null;
-
+    const concreteResource =
+      version === RESOURCE_FINGERPRINT_VERSION &&
+      browserEvent?.opaque === true &&
+      resource?.host != null &&
+      resource.type !== null;
 
     return {
       event_type: event.event_type,
@@ -681,7 +705,10 @@ export function normalizeEvent(event: EventEnvelope, version: FingerprintVersion
 const INCIDENT_LOG_LEVELS = new Set(["error", "fatal", "critical"]);
 
 /** Only server-derived aliases may preserve rules created before a grouping upgrade. */
-export function buildEventFingerprintContext(event: EventEnvelope, requestedVersions: readonly string[] = []): {
+export function buildEventFingerprintContext(
+  event: EventEnvelope,
+  requestedVersions: readonly string[] = []
+): {
   fingerprint: { version: string; value: string };
   fingerprint_aliases: { version: string; value: string }[];
 } {
@@ -690,8 +717,8 @@ export function buildEventFingerprintContext(event: EventEnvelope, requestedVers
   return {
     fingerprint: { version, value: fingerprint(normalized) },
     fingerprint_aliases: (["v1", "v2"] as const)
-      .filter(legacy => legacy !== version && requestedVersions.includes(legacy))
-      .map(legacy => ({ version: legacy, value: fingerprint(normalizeEvent(event, legacy)) }))
+      .filter((legacy) => legacy !== version && requestedVersions.includes(legacy))
+      .map((legacy) => ({ version: legacy, value: fingerprint(normalizeEvent(event, legacy)) }))
   };
 }
 
@@ -702,12 +729,17 @@ function getRequestResponseStatus(payload?: Record<string, unknown>): number | n
 
 function isJavaStackContinuation(payload?: Record<string, unknown>): boolean {
   const message = payload?.["message"];
-  if (typeof message !== "string" || message.length > 16_384 || /[\r\n]/.test(message)) return false;
+  if (typeof message !== "string" || message.length > 16_384 || /[\r\n]/.test(message))
+    return false;
   const attributes = payload?.["attributes"];
-  if (attributes === null || typeof attributes !== "object" || Array.isArray(attributes)) return false;
-  if (!isJavaRedirectedStderrLogger((attributes as Record<string, unknown>)["logger"])) return false;
+  if (attributes === null || typeof attributes !== "object" || Array.isArray(attributes))
+    return false;
+  if (!isJavaRedirectedStderrLogger((attributes as Record<string, unknown>)["logger"]))
+    return false;
   if ("throwable" in attributes && attributes.throwable !== null) return false;
-  return /^\s*(?:at\s+[\w.$/]+\([^\r\n]*\)|\.\.\.\s+\d+\s+more|(?:Caused by|Suppressed):\s+[\w.$/]+(?:Exception|Error|Throwable)(?::[^\r\n]*|\s|$))\s*$/.test(message);
+  return /^\s*(?:at\s+[\w.$/]+\([^\r\n]*\)|\.\.\.\s+\d+\s+more|(?:Caused by|Suppressed):\s+[\w.$/]+(?:Exception|Error|Throwable)(?::[^\r\n]*|\s|$))\s*$/.test(
+    message
+  );
 }
 
 /**

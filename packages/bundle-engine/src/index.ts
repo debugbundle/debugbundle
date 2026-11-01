@@ -1,4 +1,23 @@
-import { BundleV1Schema, browserResourceDiagnosis, describeBrowserResource, type BundleV1, type EventEnvelope } from "../../shared-types/src/index.js";
+import { buildRuntimeContext, buildDeviceContext } from "./occurrence-context.js";
+import { associateDiagnosticEvidence, buildEvidenceProvenance } from "./diagnostic-evidence.js";
+import { buildErrorContext } from "./error-context.js";
+import {
+  selectLatestEnvelope,
+  selectLatestEnvelopeByType,
+  isBackendExceptionEnvelope,
+  isRequestEventEnvelope,
+  isLogEventEnvelope,
+  isDeployMetadataEnvelope,
+  selectPrimarySignalEnvelope,
+  deriveBundleSdk
+} from "./envelope-selection.js";
+import {
+  BundleV1Schema,
+  browserResourceDiagnosis,
+  describeBrowserResource,
+  type BundleV1,
+  type EventEnvelope
+} from "../../shared-types/src/index.js";
 import { buildBrowserResourceContext } from "./browser-resource-context.js";
 import { redact, type JsonValue } from "../../redaction/src/index.js";
 import type { BundleBuildContext, BuildBundleJob } from "../../storage/src/index.js";
@@ -42,128 +61,21 @@ export interface BuildBundleInput {
     source_occurred_at: string;
   };
   sourceEnvelopes: EventEnvelope[];
+  /** Authoritative classification, when supplied by the worker/local processor. */
+  failureEventIds?: readonly string[];
   correlatedRecoveryEnvelopes?: EventEnvelope[];
+  diagnosticContexts?: Array<{ event: EventEnvelope; received_at: string }>;
   probeDataItems: BundleProbeDataItem[];
 }
 
-type BackendExceptionEnvelope = Extract<EventEnvelope, { event_type: "backend_exception" }>;
-type RequestEventEnvelope = Extract<EventEnvelope, { event_type: "request_event" }>;
-type LogEventEnvelope = Extract<EventEnvelope, { event_type: "log_event" }>;
-type DeployMetadataEnvelope = Extract<EventEnvelope, { event_type: "deploy_metadata" }>;
 type BundleErrorContext = Exclude<BundleV1["context"]["error"], null | undefined>;
 type BundleRequestContext = Exclude<BundleV1["context"]["request"], null | undefined>;
 type BundleResponseContext = Exclude<BundleV1["context"]["response"], null | undefined>;
 type BundleDependenciesContext = Exclude<BundleV1["context"]["dependencies"], null | undefined>;
-type BundleRuntimeMemory = NonNullable<
-  Exclude<BundleV1["context"]["runtime"], null | undefined>["memory"]
->;
-type BackendRuntimePayload = BackendExceptionEnvelope["payload"]["runtime"] & {
-  platform?: string | null;
-  arch?: string | null;
-  pid?: number | null;
-  cwd?: string | null;
-  uptime_sec?: number | null;
-  hostname?: string | null;
-  thread_id?: string | number | null;
-  framework_version?: string | null;
-  memory?: BundleRuntimeMemory | null;
-  framework_extras?: Record<string, unknown> | null;
-};
-
 const DYNAMIC_SEGMENT_PATTERN = /^(?:\d+|[0-9a-f]{8}-[0-9a-f-]{27}|[A-Za-z0-9_-]{24,})$/;
 
 function toIsoTimestamp(value: string): string {
   return new Date(value).toISOString();
-}
-
-function selectLatestEnvelope(
-  envelopes: EventEnvelope[],
-  predicate: (envelope: EventEnvelope) => boolean
-): EventEnvelope | null {
-  for (let index = envelopes.length - 1; index >= 0; index -= 1) {
-    const envelope = envelopes[index];
-    if (envelope !== undefined && predicate(envelope)) {
-      return envelope;
-    }
-  }
-
-  return null;
-}
-
-function selectLatestEnvelopeByType<TEnvelope extends EventEnvelope>(
-  envelopes: EventEnvelope[],
-  predicate: (envelope: EventEnvelope) => envelope is TEnvelope
-): TEnvelope | null {
-  for (let index = envelopes.length - 1; index >= 0; index -= 1) {
-    const envelope = envelopes[index];
-    if (envelope !== undefined && predicate(envelope)) {
-      return envelope;
-    }
-  }
-
-  return null;
-}
-
-function isBackendExceptionEnvelope(envelope: EventEnvelope): envelope is BackendExceptionEnvelope {
-  return envelope.event_type === "backend_exception";
-}
-
-function isRequestEventEnvelope(envelope: EventEnvelope): envelope is RequestEventEnvelope {
-  return envelope.event_type === "request_event";
-}
-
-function isLogEventEnvelope(envelope: EventEnvelope): envelope is LogEventEnvelope {
-  return envelope.event_type === "log_event";
-}
-
-function isDeployMetadataEnvelope(envelope: EventEnvelope): envelope is DeployMetadataEnvelope {
-  return envelope.event_type === "deploy_metadata";
-}
-
-function selectPrimarySignalEnvelope(
-  envelopes: EventEnvelope[],
-  sourceEventId: string
-): EventEnvelope | null {
-  const sourceEnvelope = envelopes.find((envelope) => envelope.event_id === sourceEventId);
-  if (sourceEnvelope !== undefined) {
-    return sourceEnvelope;
-  }
-
-  return (
-    selectLatestEnvelope(
-      envelopes,
-      (envelope) =>
-        envelope.event_type === "backend_exception" ||
-        envelope.event_type === "frontend_exception" ||
-        envelope.event_type === "request_event"
-    ) ?? null
-  );
-}
-
-function deriveBundleSdk(envelopes: EventEnvelope[], sourceEventId: string): BundleV1["sdk"] {
-  const sourceEnvelope = envelopes.find((envelope) => envelope.event_id === sourceEventId);
-  if (sourceEnvelope !== undefined) {
-    return {
-      name: sourceEnvelope.sdk_name,
-      version: sourceEnvelope.sdk_version
-    };
-  }
-
-  const latestCapturedEnvelope = selectLatestEnvelope(
-    envelopes,
-    (envelope) => envelope.event_type !== "probe_event"
-  );
-  if (latestCapturedEnvelope !== null) {
-    return {
-      name: latestCapturedEnvelope.sdk_name,
-      version: latestCapturedEnvelope.sdk_version
-    };
-  }
-
-  return {
-    name: "unknown",
-    version: "unknown"
-  };
 }
 
 function mapSignalType(
@@ -196,14 +108,6 @@ function inferSignalTypeFromSourceEventTypes(
   }
 
   return "exception";
-}
-
-function extractTopFrames(stack: string): string[] {
-  return stack
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.startsWith("at "))
-    .slice(0, 3);
 }
 
 function decodeRouteSegment(segment: string): string {
@@ -253,69 +157,6 @@ function normalizeRouteTemplate(path: string | null): string | null {
     .map((segment) => (isDynamicRouteSegment(segment) ? "{param}" : segment));
 
   return normalizedSegments.length === 0 ? "/" : `/${normalizedSegments.join("/")}`;
-}
-
-function buildErrorContext(
-  envelopes: EventEnvelope[],
-  incident: BundleBuildContext,
-  primarySignalEnvelope: EventEnvelope | null
-): BundleErrorContext | null {
-  if (primarySignalEnvelope !== null && isBackendExceptionEnvelope(primarySignalEnvelope)) {
-    return {
-      version: 1,
-      name: primarySignalEnvelope.payload.name,
-      message: primarySignalEnvelope.payload.message,
-      stack: primarySignalEnvelope.payload.stack,
-      handled: primarySignalEnvelope.payload.handled,
-      top_frames: extractTopFrames(primarySignalEnvelope.payload.stack)
-    };
-  }
-
-  if (primarySignalEnvelope !== null && isFrontendExceptionEnvelope(primarySignalEnvelope)) {
-    return {
-      version: 1,
-      name: primarySignalEnvelope.payload.name,
-      message: primarySignalEnvelope.payload.message,
-      stack: primarySignalEnvelope.payload.stack,
-      handled: false,
-      top_frames: extractTopFrames(primarySignalEnvelope.payload.stack)
-    };
-  }
-
-  const envelope =
-    selectLatestEnvelopeByType(envelopes, isBackendExceptionEnvelope) ??
-    selectLatestEnvelopeByType(envelopes, isFrontendExceptionEnvelope);
-
-  if (envelope === null) {
-    if (
-      !incident.source_event_types.includes("backend_exception") &&
-      !incident.source_event_types.includes("frontend_exception")
-    ) {
-      return null;
-    }
-
-    const fallbackName = incident.source_event_types.includes("frontend_exception")
-      ? "frontend_exception"
-      : "backend_exception";
-
-    return {
-      version: 1,
-      name: fallbackName,
-      message: incident.title,
-      stack: "unavailable",
-      handled: false,
-      top_frames: []
-    };
-  }
-
-  return {
-    version: 1,
-    name: envelope.payload.name,
-    message: envelope.payload.message,
-    stack: envelope.payload.stack,
-    handled: envelope.event_type === "backend_exception" ? envelope.payload.handled : false,
-    top_frames: extractTopFrames(envelope.payload.stack)
-  };
 }
 
 function buildRequestContext(envelopes: EventEnvelope[]): BundleRequestContext | null {
@@ -460,7 +301,10 @@ function buildSummaryGuidance(input: {
         likely_cause: browserResourceDiagnosis(resource),
         confidence: 0.35,
         recommended_action:
-          "Check the affected resource and routes, browser network failures, CSP and provider availability." + (resource?.optional_candidate === true ? " If the dependency is optional for your app, review a resource-scoped noise rule." : " Verify whether application functionality is affected.")
+          "Check the affected resource and routes, browser network failures, CSP and provider availability." +
+          (resource?.optional_candidate === true
+            ? " If the dependency is optional for your app, review a resource-scoped noise rule."
+            : " Verify whether application functionality is affected.")
       };
     }
 
@@ -673,32 +517,6 @@ function buildDeployContext(
   };
 }
 
-function buildRuntimeContext(envelopes: EventEnvelope[]): BundleV1["context"]["runtime"] {
-  const backendException = selectLatestEnvelopeByType(envelopes, isBackendExceptionEnvelope);
-  if (backendException === null) {
-    return null;
-  }
-
-  const runtime = backendException.payload.runtime as BackendRuntimePayload;
-
-  return {
-    version: 1,
-    name: backendException.service.runtime ?? "unknown",
-    runtime_version: runtime.version,
-    platform: runtime.platform ?? null,
-    arch: runtime.arch ?? null,
-    pid: runtime.pid ?? null,
-    cwd: runtime.cwd ?? null,
-    uptime_sec: runtime.uptime_sec ?? null,
-    hostname: runtime.hostname ?? null,
-    thread_id: runtime.thread_id ?? null,
-    framework: backendException.service.framework ?? null,
-    framework_version: runtime.framework_version ?? null,
-    memory: runtime.memory ?? null,
-    framework_extras: runtime.framework_extras ?? null
-  };
-}
-
 function buildGitContext(
   envelopes: EventEnvelope[],
   configuredDeploy: BuildBundleInput["configuredDeploy"]
@@ -734,35 +552,6 @@ function buildGitContext(
   };
 }
 
-function buildDeviceContext(envelopes: EventEnvelope[]): BundleV1["context"]["device"] {
-  const envelope = selectLatestEnvelopeByType(envelopes, isFrontendExceptionEnvelope);
-  if (
-    envelope === null ||
-    envelope.payload.device === undefined ||
-    envelope.payload.device === null
-  ) {
-    return null;
-  }
-
-  return {
-    version: 1,
-    user_agent: envelope.payload.device.user_agent,
-    browser: {
-      name: envelope.payload.browser?.name ?? null,
-      version: envelope.payload.browser?.version ?? null
-    },
-    os: envelope.payload.device.os,
-    device_type: envelope.payload.device.device_type,
-    screen: envelope.payload.device.screen,
-    viewport: envelope.payload.device.viewport,
-    device_pixel_ratio: envelope.payload.device.device_pixel_ratio,
-    touch_capable: envelope.payload.device.touch_capable,
-    language: envelope.payload.device.language,
-    connection_type: envelope.payload.device.connection_type,
-    color_scheme_preference: envelope.payload.device.color_scheme_preference
-  };
-}
-
 export function buildBundle(input: BuildBundleInput): BundleV1 {
   const sourceEnvelopes = [...input.sourceEnvelopes].sort((left, right) => {
     const occurredAtComparison = left.occurred_at.localeCompare(right.occurred_at);
@@ -776,7 +565,7 @@ export function buildBundle(input: BuildBundleInput): BundleV1 {
     sourceEnvelopes,
     input.bundleMetadata.source_event_id
   );
-  const errorContext = buildErrorContext(sourceEnvelopes, input.incident, primarySignalEnvelope);
+  const errorContext = buildErrorContext(input.incident, primarySignalEnvelope);
   const requestContext = buildRequestContext(sourceEnvelopes);
   const responseContext = buildResponseContext(sourceEnvelopes);
   const logsContext = buildLogsContext(sourceEnvelopes);
@@ -793,17 +582,32 @@ export function buildBundle(input: BuildBundleInput): BundleV1 {
     input.job.trigger,
     input.configuredDeploy
   );
-  const runtimeContext = buildRuntimeContext(sourceEnvelopes);
+  const primaryEnvelopes = primarySignalEnvelope === null ? [] : [primarySignalEnvelope];
+  const runtimeContext = buildRuntimeContext(primaryEnvelopes);
   const gitContext = buildGitContext(deploymentEnvelopes, input.configuredDeploy);
-  const deviceContext = buildDeviceContext(sourceEnvelopes);
+  const deviceContext = buildDeviceContext(primaryEnvelopes);
+  const diagnostics = associateDiagnosticEvidence({
+    failure: primarySignalEnvelope,
+    sources: sourceEnvelopes,
+    ...(input.failureEventIds === undefined ? {} : { failureEventIds: input.failureEventIds }),
+    contexts: input.diagnosticContexts ?? []
+  });
   const dependenciesContext = buildDependenciesContext(
     input.incident,
     errorContext,
     requestContext
   );
-  const browserEventCandidate = getPrimaryBrowserExceptionEvent(sourceEnvelopes, primarySignalEnvelope);
+  const browserEventCandidate =
+    primarySignalEnvelope === null
+      ? null
+      : getPrimaryBrowserExceptionEvent([primarySignalEnvelope], primarySignalEnvelope);
   // Related resource context must not replace the diagnosis or frame of an application exception.
-  const browserEvent = browserEventCandidate?.kind === "resource_error" && primarySignalEnvelope !== null && !isFrontendExceptionEnvelope(primarySignalEnvelope) ? null : browserEventCandidate;
+  const browserEvent =
+    browserEventCandidate?.kind === "resource_error" &&
+    primarySignalEnvelope !== null &&
+    !isFrontendExceptionEnvelope(primarySignalEnvelope)
+      ? null
+      : browserEventCandidate;
   const opaqueBrowserError = isOpaqueBrowserError(errorContext, browserEvent);
   const resourceContext = buildBrowserResourceContext(
     browserEvent,
@@ -823,12 +627,18 @@ export function buildBundle(input: BuildBundleInput): BundleV1 {
       ? toIsoTimestamp(primarySignalEnvelope.occurred_at)
       : toIsoTimestamp(input.bundleMetadata.source_occurred_at);
   const bundleSdk = deriveBundleSdk(sourceEnvelopes, input.bundleMetadata.source_event_id);
+  const primaryService =
+    primarySignalEnvelope?.event_type === "probe_event"
+      ? undefined
+      : primarySignalEnvelope?.service;
   const serviceRuntime =
+    primaryService?.runtime ??
     input.incident.service_runtime ??
     selectLatestEnvelope(sourceEnvelopes, (envelope) => envelope.event_type !== "probe_event")
       ?.service.runtime ??
     null;
   const serviceFramework =
+    primaryService?.framework ??
     input.incident.service_framework ??
     selectLatestEnvelope(sourceEnvelopes, (envelope) => envelope.event_type !== "probe_event")
       ?.service.framework ??
@@ -902,6 +712,20 @@ export function buildBundle(input: BuildBundleInput): BundleV1 {
       regression_suspected: input.job.trigger === "regression_reopen"
     },
     context: {
+      evidence: buildEvidenceProvenance({
+        primary: primarySignalEnvelope,
+        primaryEventId: input.bundleMetadata.source_event_id,
+        sources: sourceEnvelopes,
+        contexts: diagnostics.events
+      }),
+      ...(diagnostics.recovery === undefined ? {} : { recovery: diagnostics.recovery }),
+      ...(diagnostics.resources === undefined
+        ? {}
+        : { resource_observations: diagnostics.resources }),
+      ...(primarySignalEnvelope?.event_type === "backend_exception" &&
+      primarySignalEnvelope.payload.execution
+        ? { execution: primarySignalEnvelope.payload.execution }
+        : {}),
       ...(resourceContext === undefined ? {} : { resource_failure: resourceContext }),
       error: errorContext,
       request: requestContext,

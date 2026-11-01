@@ -7,7 +7,7 @@ import {
   PublicStatusApiError,
   type PublicStatusApi
 } from "../../cli/src/public-status-commands.js";
-const scope = z.object({ bearerToken: z.string().min(1), projectId: z.string().uuid() }).strict();
+const scope = z.object({ bearerToken: z.string().min(1), projectId: z.string().guid() }).strict();
 export const PUBLIC_STATUS_MCP_TOOL_NAMES = [
   "get_public_status_page",
   "save_public_status_page",

@@ -1,6 +1,10 @@
 import { validateEvent } from "../../../packages/event-normalizer/src/index.js";
 import { EventTypeValues, type EventEnvelope } from "../../../packages/shared-types/src/index.js";
 import { isRecord } from "./cli-fs-helpers.js";
+import {
+  parseLocalDiagnosticState,
+  type LocalDiagnosticState
+} from "./local-diagnostic-context.js";
 type Severity = "low" | "medium" | "high" | "critical";
 const EVENT_TYPE_SET = new Set<string>(EventTypeValues);
 function isEventType(value: unknown): value is EventEnvelope["event_type"] {
@@ -31,9 +35,10 @@ export type LocalIncidentState = {
   reproduction_path: string;
   generation_number: number;
   source_events: EventEnvelope[];
+  failure_event_ids?: string[];
 };
 
-export type LocalProcessingState = {
+export type LocalProcessingState = LocalDiagnosticState & {
   version: 1;
   last_processed_event_file: string | null;
   incidents: Record<string, LocalIncidentState>;
@@ -172,7 +177,15 @@ function parseIncidentState(candidate: unknown): LocalIncidentState | null {
     bundle_path: bundlePath,
     reproduction_path: reproductionPath,
     generation_number: generationNumber,
-    source_events: validatedSourceEvents.sort(compareEventEnvelopes)
+    source_events: validatedSourceEvents.sort(compareEventEnvelopes),
+    ...(Array.isArray(candidate["failure_event_ids"]) &&
+    candidate["failure_event_ids"].every((id) => typeof id === "string")
+      ? {
+          failure_event_ids: candidate["failure_event_ids"].filter((id) =>
+            validatedSourceEvents.some((event) => event.event_id === id)
+          )
+        }
+      : {})
   };
 }
 
@@ -191,6 +204,8 @@ export function parseState(rawState: string): LocalProcessingState | null {
   if (!isRecord(incidents)) {
     return null;
   }
+  const diagnostic = parseLocalDiagnosticState(parsed);
+  if (diagnostic === null) return null;
 
   const parsedIncidents: Record<string, LocalIncidentState> = {};
   for (const [incidentId, incidentValue] of Object.entries(incidents).sort(([left], [right]) =>
@@ -207,6 +222,7 @@ export function parseState(rawState: string): LocalProcessingState | null {
   return {
     version: 1,
     last_processed_event_file: lastProcessedEventFile,
+    ...diagnostic,
     incidents: parsedIncidents
   };
 }

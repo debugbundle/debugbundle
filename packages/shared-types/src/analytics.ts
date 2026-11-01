@@ -343,10 +343,10 @@ export type AnalyticsPayload = z.infer<typeof AnalyticsPayloadSchema>;
 export const AnalyticsEventEnvelopeSchema = z
   .object({
     schema_version: z.literal(ANALYTICS_EVENT_SCHEMA_VERSION),
-    event_id: z.string().uuid(),
+    event_id: z.string().guid(),
     event_type: z.literal("analytics_event"),
     project_token: z.string().trim().min(1).max(256).optional(),
-    project_id: z.string().uuid().nullable().optional(),
+    project_id: z.string().guid().nullable().optional(),
     occurred_at: z.string().datetime(),
     sdk_name: z.string().trim().min(1).max(120),
     sdk_version: z.string().trim().min(1).max(80),
@@ -370,7 +370,7 @@ export type AnalyticsMetricsSegment = z.infer<typeof AnalyticsMetricsSegmentSche
 
 const AnalyticsUsageSummarySchema = z
   .object({
-    project_id: z.string().uuid(),
+    project_id: z.string().guid(),
     from: z.string().datetime(),
     to: z.string().datetime(),
     granularity: AnalyticsMetricsGranularitySchema,
@@ -416,7 +416,7 @@ export type AnalyticsUsageSummaryResponse = z.infer<typeof AnalyticsUsageSummary
 
 const AnalyticsMetricsWindowSchema = z
   .object({
-    project_id: z.string().uuid(),
+    project_id: z.string().guid(),
     from: z.string().datetime(),
     to: z.string().datetime(),
     granularity: AnalyticsMetricsGranularitySchema,
@@ -457,7 +457,7 @@ const AnalyticsJourneyPatternSchema = z
     transition_count: z.number().int().nonnegative(),
     unique_sessions: z.number().int().nonnegative(),
     transition_share: z.number().min(0).max(1),
-    sample_ids: z.array(z.string().uuid()).max(3).default([])
+    sample_ids: z.array(z.string().guid()).max(3).default([])
   })
   .strict();
 
@@ -500,7 +500,7 @@ const AnalyticsIncidentImpactJourneyPatternSchema = z
     from_route_key: z.string().trim().min(1).max(2048),
     to_route_key: z.string().trim().min(1).max(2048),
     affected_sessions: z.number().int().nonnegative(),
-    sample_ids: z.array(z.string().uuid()).max(3)
+    sample_ids: z.array(z.string().guid()).max(3)
   })
   .strict();
 
@@ -524,14 +524,14 @@ const AnalyticsIncidentImpactConversionDeltaSchema = z
 const AnalyticsIncidentImpactBundleStateSchema = z
   .object({
     status: z.enum(["not_requested", "pending", "running", "completed", "failed"]),
-    generation_id: z.string().uuid().nullable(),
+    generation_id: z.string().guid().nullable(),
     failure_reason: z.string().trim().min(1).max(240).nullable()
   })
   .strict();
 
 export const AnalyticsIncidentImpactResponseSchema = z
   .object({
-    incident_id: z.string().uuid(),
+    incident_id: z.string().guid(),
     window: AnalyticsMetricsWindowSchema,
     affected_sessions: z.number().int().nonnegative(),
     affected_routes: z.array(AnalyticsIncidentImpactRouteSchema).max(100),
@@ -630,7 +630,7 @@ export type AnalyticsFunnelStepMetric = z.infer<typeof AnalyticsFunnelStepMetric
 
 const AnalyticsFunnelSummarySchema = z
   .object({
-    project_id: z.string().uuid(),
+    project_id: z.string().guid(),
     funnel_key: z.string().trim().min(1).max(120),
     from: z.string().datetime(),
     to: z.string().datetime(),

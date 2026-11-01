@@ -1,7 +1,8 @@
 import { createInterface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
 
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { z } from "zod";
+import { toInputJsonSchema } from "../../../packages/shared-types/src/json-schema.js";
 
 import packageJson from "../package.json" with { type: "json" };
 import { MCP_TOOL_CATALOG } from "./tool-catalog.js";
@@ -98,10 +99,7 @@ function toToolErrorResponse(error: unknown): unknown {
 }
 
 function toJsonSchema(schema: unknown): Record<string, unknown> {
-  return zodToJsonSchema(schema as never, {
-    target: "jsonSchema2019-09",
-    $refStrategy: "none"
-  }) as Record<string, unknown>;
+  return toInputJsonSchema(schema as z.ZodType);
 }
 
 export function createMcpServer(input: { tools: ToolRegistry; localAuth?: boolean; agentRead?: boolean }): {

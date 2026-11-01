@@ -29,7 +29,7 @@ export type CaptureRuleEvaluationUrl = z.infer<typeof CaptureRuleEvaluationUrlSc
 
 export const CaptureRuleEvaluationContextSchema = z.object({
   project_id: z.string().min(1).max(120),
-  event_id: z.string().uuid(),
+  event_id: z.string().guid(),
   event_type: CaptureRuleEventTypeSchema,
   service: z.string().min(1).optional(),
   environment: z.string().min(1).optional(),

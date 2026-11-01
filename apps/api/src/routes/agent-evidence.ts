@@ -8,8 +8,8 @@ import type { ApiDependencies } from "../api-types.js";
 import { enforceRequestRateLimit } from "../api-helpers.js";
 import { createOpenAiHostedOperations } from "../openai-mcp-operations.js";
 
-const ProjectParams = z.object({ id: z.string().uuid() });
-const IncidentParams = ProjectParams.extend({ incidentId: z.string().uuid() });
+const ProjectParams = z.object({ id: z.string().guid() });
+const IncidentParams = ProjectParams.extend({ incidentId: z.string().guid() });
 const ListQuery = z.object({ limit: z.coerce.number().int().min(1).max(50).optional(), cursor: z.string().max(2048).optional() }).strict();
 const POLICY = "telemetry-privacy-v1";
 

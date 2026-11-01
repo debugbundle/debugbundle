@@ -54,6 +54,7 @@ export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagement
   publicStatusTrustProxy?: boolean;
   alertGroupInspection?: AlertGroupInspectionStore;
   ingestionPersistence: Pick<IngestionPersistenceService, "persistAndEnqueue"> &
+    Partial<Pick<IngestionPersistenceService, "claimEvidenceReceipt">> &
     Partial<AnalyticsIngestionPersistenceService>;
   ingestionMetadata: Pick<IngestionMetadataService, "resolveProjectByTokenHash">;
   accountAnalytics?: Pick<AccountAnalyticsStore, "recordMetricDeltas"> | undefined;

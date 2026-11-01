@@ -1,4 +1,5 @@
 import { createNotificationPreferencesStore } from "../../../packages/storage/src/notification-preferences-store.js";
+import { createEvidenceIngestionReceiptStore } from "../../../packages/storage/src/evidence-ingestion-receipt.js";
 import { parsePublicStatusBaseUrl } from "../../../packages/shared-types/src/public-status.js";
 import { createPublicStatusPageStore } from "../../../packages/storage/src/public-status-store.js";
 import { createPostgresAnalyticsFlowStore } from "../../../packages/storage/src/analytics-flow-store.js";
@@ -101,7 +102,8 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
         });
   const ingestionPersistence = createIngestionPersistenceService({
     objectStore: input.objectStore,
-    queue: input.queue
+    queue: input.queue,
+    evidenceReceipts: createEvidenceIngestionReceiptStore(input.db)
   });
 
   const accountStore = createPostgresAccountStore(input.db, {
@@ -493,6 +495,10 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
               input.update.capture_breadcrumbs !== undefined
                 ? input.update.capture_breadcrumbs
                 : (existingRecord?.capture_breadcrumbs ?? null),
+            capture_diagnostic_context:
+              input.update.capture_diagnostic_context !== undefined
+                ? input.update.capture_diagnostic_context
+                : (existingRecord?.capture_diagnostic_context ?? null),
             capture_probe_events:
               input.update.capture_probe_events !== undefined
                 ? input.update.capture_probe_events

@@ -3,13 +3,15 @@ import { describe, expect, it, vi } from "vitest";
 import { createApiServer } from "../../../apps/api/src/server.js";
 import type { ApiDependencies } from "../../../apps/api/src/api-types.js";
 
-function createDependencies(overrides: {
-  auditLogging?: ApiDependencies["auditLogging"];
-  memberAuth?: ApiDependencies["memberAuth"];
-  capturePolicyManagement?: ApiDependencies["capturePolicyManagement"];
-  projectManagement?: ApiDependencies["projectManagement"];
-  authRateLimiter?: ApiDependencies["authRateLimiter"];
-} = {}): ReturnType<typeof createApiServer> {
+function createDependencies(
+  overrides: {
+    auditLogging?: ApiDependencies["auditLogging"];
+    memberAuth?: ApiDependencies["memberAuth"];
+    capturePolicyManagement?: ApiDependencies["capturePolicyManagement"];
+    projectManagement?: ApiDependencies["projectManagement"];
+    authRateLimiter?: ApiDependencies["authRateLimiter"];
+  } = {}
+): ReturnType<typeof createApiServer> {
   return createApiServer({
     ingestionPersistence: { persistAndEnqueue: vi.fn() },
     ingestionMetadata: { resolveProjectByTokenHash: vi.fn() },
@@ -63,6 +65,49 @@ function createDependencies(overrides: {
 }
 
 describe("capture-policy routes", () => {
+  it.each([true, false, null])(
+    "keeps the diagnostic override %s typed and reports minimal policy disabled",
+    async (value) => {
+      const upsertCapturePolicyForProject = vi
+        .fn()
+        .mockResolvedValue({
+          project_id: "00000000-0000-0000-0000-000000000001",
+          preset: "minimal",
+          capture_logs: null,
+          capture_request_events: null,
+          capture_breadcrumbs: null,
+          capture_probe_events: null,
+          capture_diagnostic_context: value,
+          immediate_client_error_statuses: null,
+          immediate_client_error_path_rules: null,
+          updated_at: "2026-10-27T00:00:00Z"
+        });
+      const app = createDependencies({
+        capturePolicyManagement: {
+          getCapturePolicyForProject: vi.fn(),
+          upsertCapturePolicyForProject
+        }
+      });
+      try {
+        const response = await app.inject({
+          method: "PATCH",
+          url: "/v1/projects/00000000-0000-0000-0000-000000000001/capture-policy",
+          headers: { authorization: "Bearer dbundle_mem_owner_token" },
+          payload: { capture_diagnostic_context: value }
+        });
+        expect(response.statusCode).toBe(200);
+        expect(response.json()).toMatchObject({
+          policy: { capture_diagnostic_context: false },
+          overrides: { capture_diagnostic_context: value }
+        });
+        expect(upsertCapturePolicyForProject).toHaveBeenCalledWith(
+          expect.objectContaining({ update: { capture_diagnostic_context: value } })
+        );
+      } finally {
+        await app.close();
+      }
+    }
+  );
   describe("GET /v1/projects/:id/capture-policy", () => {
     it("returns the resolved capture policy for a project", async () => {
       const app = createDependencies({
@@ -88,7 +133,10 @@ describe("capture-policy routes", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json<{ policy: Record<string, unknown>; overrides: Record<string, unknown> }>();
+      const body = response.json<{
+        policy: Record<string, unknown>;
+        overrides: Record<string, unknown>;
+      }>();
       expect(body).toEqual({
         access_mode: "manage",
         policy: expect.objectContaining({
@@ -221,7 +269,10 @@ describe("capture-policy routes", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json<{ policy: Record<string, unknown>; overrides: Record<string, unknown> }>();
+      const body = response.json<{
+        policy: Record<string, unknown>;
+        overrides: Record<string, unknown>;
+      }>();
       expect(body).toEqual({
         access_mode: "manage",
         policy: expect.objectContaining({
@@ -350,7 +401,10 @@ describe("capture-policy routes", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json<{ policy: Record<string, unknown>; overrides: Record<string, unknown> }>();
+      const body = response.json<{
+        policy: Record<string, unknown>;
+        overrides: Record<string, unknown>;
+      }>();
       expect(body).toEqual({
         access_mode: "manage",
         policy: expect.objectContaining({
@@ -423,7 +477,10 @@ describe("capture-policy routes", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json<{ policy: Record<string, unknown>; overrides: Record<string, unknown> }>();
+      const body = response.json<{
+        policy: Record<string, unknown>;
+        overrides: Record<string, unknown>;
+      }>();
       expect(body).toEqual({
         access_mode: "manage",
         policy: expect.objectContaining({

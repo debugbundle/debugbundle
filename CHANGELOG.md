@@ -6,6 +6,21 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.20.0] - Unpublished candidate (2026-10-29)
+
+### Security
+
+- Migrate maintained core schemas to upstream Zod 4.6.7 and replace the old JSON
+  Schema converter with native export. Shared-types uses its own major3.0 version
+  for exported Zod API changes; preserve event/Bundle v1, MCP/OpenClaw inputs,
+  legacy UUID shapes, partial records and CLI profile diagnostics. Existing
+  published dogfooding dependencies retain their separately verified legacy patch
+  until the ordered SDK publication/adoption step.
+
+### Added
+
+- Unreleased evidence-quality candidate: bounded exception graphs, normalized runtime frames, explicit recovery/resource context, complete-path capability negotiation, additive storage migration and scoped late-context rebuilds. Bundles retain primary capture identity and distinguish capture times from artifact updates. Ordinary and restricted readers expose appropriately scoped interpretation. Existing SDKs, fingerprints and stored history remain compatible; producer rollout and whole-family qualification are still in progress.
+
 ## [1.19.3] - 2026-10-24
 
 ### Security

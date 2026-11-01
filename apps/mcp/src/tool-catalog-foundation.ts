@@ -402,7 +402,7 @@ export const MCP_TOOL_CATALOG_FOUNDATION = [
     group: "tokens",
     description:
       "List project-scoped read-only agent credentials. Requires owner or project admin.",
-    inputSchema: z.object({ bearerToken: z.string(), projectId: z.string().uuid() })
+    inputSchema: z.object({ bearerToken: z.string(), projectId: z.string().guid() })
   },
   {
     name: "create_agent_token",
@@ -411,7 +411,7 @@ export const MCP_TOOL_CATALOG_FOUNDATION = [
       "Create a single-project minimized read credential, returned once. Requires owner or project admin.",
     inputSchema: z.object({
       bearerToken: z.string(),
-      projectId: z.string().uuid(),
+      projectId: z.string().guid(),
       label: z.string().min(1).max(120),
       expiresAt: z.string().datetime().optional()
     })
@@ -422,8 +422,8 @@ export const MCP_TOOL_CATALOG_FOUNDATION = [
     description: "Revoke a project-scoped agent credential. Requires owner or project admin.",
     inputSchema: z.object({
       bearerToken: z.string(),
-      projectId: z.string().uuid(),
-      tokenId: z.string().uuid()
+      projectId: z.string().guid(),
+      tokenId: z.string().guid()
     })
   },
   {

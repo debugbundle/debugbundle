@@ -41,8 +41,8 @@ export const NotificationPreferencesSchema = z
   .object({
     channels: NotificationChannelsSchema,
     daily: NotificationScheduleSchema.nullable(),
-    pauses: z.record(NotificationChannelSchema, pauseState),
-    discard_before: z.record(NotificationChannelSchema, history)
+    pauses: z.partialRecord(NotificationChannelSchema, pauseState),
+    discard_before: z.partialRecord(NotificationChannelSchema, history)
   })
   .strict();
 export type NotificationPreferences = z.infer<typeof NotificationPreferencesSchema>;
@@ -210,7 +210,7 @@ export function resolveNotificationPolicy(input: {
 
 export const NotificationSettingsResponseSchema = z.object({
   audience: NotificationAudienceSchema,
-  project_id: z.string().uuid().nullable(),
+  project_id: z.string().guid().nullable(),
   can_manage: z.boolean(),
   settings: NotificationPreferencesSchema,
   account: NotificationPreferencesSchema,

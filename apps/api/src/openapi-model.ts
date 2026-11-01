@@ -315,7 +315,7 @@ export const WebSessionSchema = z
 export const SessionResponseSchema = z.object({ session: WebSessionSchema.nullable() }).strict();
 export const GithubDeviceStartResponseSchema = z
   .object({
-    request_id: z.string().uuid(),
+    request_id: z.string().guid(),
     user_code: z.string(),
     verification_uri: z.string().url(),
     interval_seconds: z.number().int().positive(),
@@ -416,13 +416,13 @@ export const AccountDeletionResponseSchema = z
   .strict();
 export const SlackDestinationSchema = z
   .object({
-    slack_destination_id: z.string().uuid(),
-    organization_id: z.string().uuid(),
+    slack_destination_id: z.string().guid(),
+    organization_id: z.string().guid(),
     slack_team_id: z.string().min(1),
     slack_team_name: z.string().nullable(),
     slack_channel_id: z.string().min(1),
     slack_channel_name: z.string().nullable(),
-    installed_by_member_id: z.string().uuid().nullable(),
+    installed_by_member_id: z.string().guid().nullable(),
     is_active: z.boolean(),
     created_at: z.string().datetime(),
     updated_at: z.string().datetime()
@@ -466,7 +466,7 @@ export const AccountAvatarImportResponseSchema = z
   .strict();
 export const ProjectInviteSchema = z
   .object({
-    invite_id: z.string().uuid(),
+    invite_id: z.string().guid(),
     project_id: z.string(),
     email: z.string().email(),
     role: z.enum(["admin", "member"]),
@@ -506,7 +506,7 @@ export const ProjectUpdateResponseSchema = z
   .strict();
 export const ProbeActivationSchema = z
   .object({
-    activation_id: z.string().uuid(),
+    activation_id: z.string().guid(),
     label_pattern: z.string(),
     service: z.string(),
     environment: z.string(),
@@ -526,7 +526,7 @@ export const ProbeActivationListResponseSchema = z
 export const ProbeDeactivationResponseSchema = z
   .object({
     deactivated: z
-      .object({ activation_id: z.string().uuid(), deactivated_at: z.string().datetime() })
+      .object({ activation_id: z.string().guid(), deactivated_at: z.string().datetime() })
       .strict()
   })
   .strict();
@@ -604,8 +604,8 @@ export const AvailabilityCheckLimitsSchema = z
   .strict();
 export const AvailabilityCheckRecordSchema = z
   .object({
-    check_id: z.string().uuid(),
-    project_id: z.string().uuid(),
+    check_id: z.string().guid(),
+    project_id: z.string().guid(),
     name: z.string(),
     url: z.string().url(),
     method: z.enum(["GET", "HEAD"]),
@@ -623,7 +623,7 @@ export const AvailabilityCheckRecordSchema = z
     organization_plan: z.enum(["free", "solo", "team"]),
     consecutive_failures: z.number().int().nonnegative(),
     consecutive_successes: z.number().int().nonnegative(),
-    linked_incident_id: z.string().uuid().nullable(),
+    linked_incident_id: z.string().guid().nullable(),
     linked_incident_status: AvailabilityIncidentStatusSchema.nullable(),
     last_checked_at: z.string().datetime().nullable(),
     next_check_at: z.string().datetime().nullable(),
@@ -638,9 +638,9 @@ export const AvailabilityCheckRecordSchema = z
   .strict();
 export const AvailabilityCheckResultRecordSchema = z
   .object({
-    result_id: z.string().uuid(),
-    check_id: z.string().uuid(),
-    project_id: z.string().uuid(),
+    result_id: z.string().guid(),
+    check_id: z.string().guid(),
+    project_id: z.string().guid(),
     started_at: z.string().datetime(),
     completed_at: z.string().datetime(),
     duration_ms: z.number().int().nonnegative(),
@@ -655,8 +655,8 @@ export const AvailabilityCheckResultRecordSchema = z
   .strict();
 export const AvailabilityCheckDailyRollupRecordSchema = z
   .object({
-    check_id: z.string().uuid(),
-    project_id: z.string().uuid(),
+    check_id: z.string().guid(),
+    project_id: z.string().guid(),
     day: z.string(),
     state: z.enum(["unknown", "operational", "degraded", "down", "paused"]),
     total_checks: z.number().int().nonnegative(),
@@ -667,7 +667,7 @@ export const AvailabilityCheckDailyRollupRecordSchema = z
     first_checked_at: z.string().datetime().nullable(),
     last_checked_at: z.string().datetime().nullable(),
     downtime_seconds: z.number().int().nonnegative(),
-    incident_ids: z.array(z.string().uuid())
+    incident_ids: z.array(z.string().guid())
   })
   .strict();
 export const AvailabilityCheckListResponseSchema = z

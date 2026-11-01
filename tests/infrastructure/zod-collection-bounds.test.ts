@@ -5,7 +5,7 @@ import * as z4 from "zod/v4";
 
 const require = createRequire(import.meta.url);
 
-describe("legacy Zod collection security backport", () => {
+describe("bounded Zod collection validation", () => {
   it.each(["max", "length"] as const)(
     "rejects oversized %s arrays before running element validators",
     (method) => {
@@ -66,7 +66,7 @@ describe("legacy Zod collection security backport", () => {
     expect(validate).not.toHaveBeenCalled();
   });
 
-  it("protects the bundled v4 compatibility entry point's bounded collections", () => {
+  it("protects the explicit v4 entry point's bounded collections", () => {
     const validate = vi.fn((value: unknown) => value);
     const element = z4.preprocess(validate, z4.string());
     const results = [

@@ -11,6 +11,47 @@ import {
 } from "../../../apps/cli/src/capture-policy-commands.js";
 
 describe("cli capture-policy commands", () => {
+  it.each([
+    { status: 401, body: { error: "invalid_member_token" }, message: "invalid_member_token" },
+    { status: 503, body: null, message: "Failed to get capture policy." },
+    { status: 503, body: { error: 42 }, message: "Failed to get capture policy." },
+    { status: 200, body: {}, message: "Invalid capture policy response." }
+  ])(
+    "rejects unsuccessful or invalid policy reads: $status/$message",
+    async ({ status, body, message }) => {
+      const api = createCapturePolicyApi({ request: vi.fn().mockResolvedValue({ status, body }) });
+      await expect(
+        api.getCapturePolicy({ bearerToken: "synthetic", projectId: "project" })
+      ).rejects.toMatchObject({
+        name: "CapturePolicyApiError",
+        status: status === 200 ? 500 : status,
+        message
+      });
+    }
+  );
+
+  it.each([
+    { status: 400, body: { error: "invalid_payload" }, message: "invalid_payload" },
+    { status: 503, body: "unavailable", message: "Failed to update capture policy." },
+    { status: 200, body: {}, message: "Invalid capture policy response." }
+  ])(
+    "rejects unsuccessful or invalid policy updates: $status/$message",
+    async ({ status, body, message }) => {
+      const api = createCapturePolicyApi({ request: vi.fn().mockResolvedValue({ status, body }) });
+      await expect(
+        api.updateCapturePolicy({
+          bearerToken: "synthetic",
+          projectId: "project",
+          update: { capture_diagnostic_context: true }
+        })
+      ).rejects.toMatchObject({
+        name: "CapturePolicyApiError",
+        status: status === 200 ? 500 : status,
+        message
+      });
+    }
+  );
+
   it("renders capture policy in human mode", async () => {
     const result = await getCapturePolicyCommand(
       {
@@ -25,6 +66,7 @@ describe("cli capture-policy commands", () => {
             capture_request_events: "failures_only",
             capture_breadcrumbs: "exception_only",
             capture_probe_events: "buffer_only",
+            capture_diagnostic_context: false,
             immediate_client_error_statuses: [],
             immediate_client_error_path_rules: [
               { status_code: 404, path_pattern: "/checkout/*", methods: ["GET", "POST"] }
@@ -47,6 +89,7 @@ describe("cli capture-policy commands", () => {
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain("preset: balanced");
     expect(result.output).toContain("capture_logs: warning");
+    expect(result.output).toContain("capture_diagnostic_context: false");
     expect(result.output).toContain("client_error_incidents: preset default (none)");
     expect(result.output).toContain("client_error_path_rules: custom (404=/checkout/*@GET,POST)");
   });
@@ -210,7 +253,9 @@ describe("cli capture-policy commands", () => {
         projectId: "proj_1"
       },
       {
-        readAuthState: vi.fn().mockRejectedValue(new CliAuthStateError("auth_state_missing", "Not logged in."))
+        readAuthState: vi
+          .fn()
+          .mockRejectedValue(new CliAuthStateError("auth_state_missing", "Not logged in."))
       }
     );
 
@@ -221,15 +266,27 @@ describe("cli capture-policy commands", () => {
   it("maps API error statuses to CLI exit codes", async () => {
     const unauthorized = await getCapturePolicyCommand(
       { bearerToken: "dbundle_mem_x", projectId: "proj_1" },
-      { getCapturePolicy: vi.fn().mockRejectedValue(new CapturePolicyApiError(401, "invalid_member_token")) }
+      {
+        getCapturePolicy: vi
+          .fn()
+          .mockRejectedValue(new CapturePolicyApiError(401, "invalid_member_token"))
+      }
     );
     const notFound = await getCapturePolicyCommand(
       { bearerToken: "dbundle_mem_x", projectId: "proj_1" },
-      { getCapturePolicy: vi.fn().mockRejectedValue(new CapturePolicyApiError(404, "project_not_found")) }
+      {
+        getCapturePolicy: vi
+          .fn()
+          .mockRejectedValue(new CapturePolicyApiError(404, "project_not_found"))
+      }
     );
     const badRequest = await setCapturePolicyCommand(
       { bearerToken: "dbundle_mem_x", projectId: "proj_1", update: { preset: "balanced" } },
-      { updateCapturePolicy: vi.fn().mockRejectedValue(new CapturePolicyApiError(400, "invalid_payload")) }
+      {
+        updateCapturePolicy: vi
+          .fn()
+          .mockRejectedValue(new CapturePolicyApiError(400, "invalid_payload"))
+      }
     );
 
     expect(unauthorized.exitCode).toBe(2);
@@ -255,7 +312,8 @@ describe("cli capture-policy commands", () => {
   });
 
   it("builds GET and PATCH requests against the capture-policy API", async () => {
-    const request = vi.fn()
+    const request = vi
+      .fn()
       .mockResolvedValueOnce({
         status: 200,
         body: {
@@ -300,7 +358,10 @@ describe("cli capture-policy commands", () => {
       });
     const api = createCapturePolicyApi({ request });
 
-    const policy = await api.getCapturePolicy({ bearerToken: "dbundle_mem_x", projectId: "proj_1" });
+    const policy = await api.getCapturePolicy({
+      bearerToken: "dbundle_mem_x",
+      projectId: "proj_1"
+    });
     const updated = await api.updateCapturePolicy({
       bearerToken: "dbundle_mem_owner",
       projectId: "proj_1",

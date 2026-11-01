@@ -53,6 +53,49 @@ time under `telemetry-privacy-v1`. Certified responses carry the matching respon
 consumers such as `debugbundle/action@v2` can reject legacy or unknown server output before writing
 an artifact.
 
+## Bundle Evidence Terms
+
+### Structured Exception Evidence
+
+An optional, bounded graph of an error and its safely available causes, related
+errors and stack frames. Trace origin and parsing status distinguish throw-site,
+native, capture-time and unavailable evidence. It supplements the retained outer
+error without changing incident fingerprints or promising locals or symbolication.
+
+### Diagnostic Context
+
+A closed context-only event carrying a passive resource observation or an explicit
+recovery observation. It can enrich a retained failure within the specified scope
+and event-time window; it cannot create, reopen, resolve or notify an incident.
+
+### Evidence Reference and Scope
+
+Fresh opaque failure and page/operation references used to associate typed evidence
+within one project, service and environment. Page scope also requires a matching
+session; operation scope requires matching trace identity when present. References
+are not user or resource identifiers and are stored as project-separated hashes.
+
+### Observed Recovery
+
+An explicit `recovery_observed` application outcome for a scoped failure and attempt.
+An HTTP success, completed attempt or missing outcome does not prove it. Retained
+contradictory outcomes remain conflicting rather than being silently overwritten.
+
+### Evidence Provenance
+
+The primary failure identity, retained input count and capture-time range, and
+source/time/availability of bounded observations in a bundle. Artifact generation
+time does not renew old measurements; retained inputs do not establish total impact.
+
+### Complete-Path Capability
+
+Verified support shared by every parser, relay, native bridge and receiver on a
+delivery path. A versioned capability descriptor is intersected across that path;
+missing or unknown support keeps new evidence disabled. Capability is not consent,
+capture-policy permission or release qualification.
+
+These terms follow the [bundle evidence specification](../spec/bundle-evidence-quality.md).
+
 ## Browser Resource Incident Terms
 
 ### Browser Resource Incident
@@ -249,7 +292,6 @@ browser. Server history is retained; Show cleared permits inspection and retry, 
 new failure IDs remain visible.
 
 **Public status page:** An opt-in, owner-controlled availability projection anchored to one project, with explicit same-owner/account project and check selections. It publishes names and bounded availability aggregates, never check diagnostics.
-
 
 ## Notification delivery terms
 

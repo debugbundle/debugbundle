@@ -1,4 +1,5 @@
 export type JsonPrimitive = string | number | boolean | null;
+export { sanitizeBrowserStackUrls } from "./browser-stack.js";
 export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
 export type JsonObject = { [key: string]: JsonValue };
 
@@ -35,7 +36,14 @@ function redactInternal(
 
     seen.add(value);
     const redactedArray = value.map((entry, index) =>
-      redactInternal(entry, path.length === 0 ? `[${index}]` : `${path}[${index}]`, sensitiveKeys, replacement, touchedPaths, seen)
+      redactInternal(
+        entry,
+        path.length === 0 ? `[${index}]` : `${path}[${index}]`,
+        sensitiveKeys,
+        replacement,
+        touchedPaths,
+        seen
+      )
     );
     seen.delete(value);
     return redactedArray;
@@ -62,18 +70,37 @@ function redactInternal(
       continue;
     }
 
-    output[key] = redactInternal(nestedValue, nextPath, sensitiveKeys, replacement, touchedPaths, seen);
+    output[key] = redactInternal(
+      nestedValue,
+      nextPath,
+      sensitiveKeys,
+      replacement,
+      touchedPaths,
+      seen
+    );
   }
 
   seen.delete(value);
   return output;
 }
 
-export function redact<T extends JsonValue>(payload: T, options?: RedactionOptions): RedactionResult<T> {
-  const sensitiveKeys = options?.sensitiveKeys?.map((key) => key.trim().toLowerCase()) ?? [...DEFAULT_SENSITIVE_KEYS];
+export function redact<T extends JsonValue>(
+  payload: T,
+  options?: RedactionOptions
+): RedactionResult<T> {
+  const sensitiveKeys = options?.sensitiveKeys?.map((key) => key.trim().toLowerCase()) ?? [
+    ...DEFAULT_SENSITIVE_KEYS
+  ];
   const replacement = options?.replacement ?? "[REDACTED]";
   const touchedPaths: string[] = [];
-  const redacted = redactInternal(payload, "", sensitiveKeys, replacement, touchedPaths, new WeakSet<object>()) as T;
+  const redacted = redactInternal(
+    payload,
+    "",
+    sensitiveKeys,
+    replacement,
+    touchedPaths,
+    new WeakSet<object>()
+  ) as T;
 
   return {
     redacted,

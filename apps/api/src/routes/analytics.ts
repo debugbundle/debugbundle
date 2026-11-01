@@ -132,7 +132,7 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
     }
 
     const parsedQuery = z
-      .object({ project_id: z.string().uuid() })
+      .object({ project_id: z.string().guid() })
       .strict()
       .safeParse(request.query);
     if (!parsedQuery.success) {

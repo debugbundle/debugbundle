@@ -3,7 +3,7 @@ import { isObjectMissing } from "../../../packages/storage/src/object-store-erro
 import { parseStoredEvent } from "../../../packages/event-normalizer/src/index.js";
 import type { BundleBuildContext } from "../../../packages/storage/src/index.js";
 import { buildRawEventObjectKey } from "../../../packages/storage/src/index.js";
-import { type EventEnvelope } from "../../../packages/shared-types/src/index.js";
+import { type EventClass, type EventEnvelope } from "../../../packages/shared-types/src/index.js";
 import { type BuildBundleWorkerDependencies } from "./processor-shared.js";
 
 export function parseEventEnvelopeFromRaw(rawBody: Buffer): EventEnvelope | null {
@@ -17,6 +17,7 @@ export function toIsoTimestamp(value: string): string {
 export type LoadedIncidentEnvelope = {
   eventId: string;
   eventType: EventEnvelope["event_type"];
+  eventClass?: EventClass;
   occurredAt: string;
   envelope: EventEnvelope;
 };
@@ -99,6 +100,7 @@ export async function loadIncidentEnvelopes(input: {
       envelopes.push({
         eventId: eventRef.event_id,
         eventType: eventRef.event_type,
+        ...(eventRef.event_class === undefined ? {} : { eventClass: eventRef.event_class }),
         occurredAt: eventRef.occurred_at,
         envelope
       });
@@ -338,15 +340,18 @@ export async function collectCorrelatedRecoveryEnvelopes(input: {
   // Each retained occurrence has its own bounded window; long-lived incidents must
   // not scan days of unrelated requests or starve the newest recovery evidence.
   const candidatesById = new Map<string, { event_id: string; occurred_at: string }>();
-  for (const resource of [...resourceEnvelopes].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt) || a.eventId.localeCompare(b.eventId)).slice(0, 3)) {
-    const candidates = await input.dependencies.incidentStore.listRequestEventCandidatesForServiceWindow({
-      project_id: input.incident.project_id,
-      service_name: input.incident.service_name,
-      environment: input.incident.environment,
-      window_start: new Date(resource.occurredAt).toISOString(),
-      window_end: new Date(Date.parse(resource.occurredAt) + 30_000).toISOString(),
-      resource_event_ids: [resource.eventId]
-    });
+  for (const resource of [...resourceEnvelopes]
+    .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt) || a.eventId.localeCompare(b.eventId))
+    .slice(0, 3)) {
+    const candidates =
+      await input.dependencies.incidentStore.listRequestEventCandidatesForServiceWindow({
+        project_id: input.incident.project_id,
+        service_name: input.incident.service_name,
+        environment: input.incident.environment,
+        window_start: new Date(resource.occurredAt).toISOString(),
+        window_end: new Date(Date.parse(resource.occurredAt) + 30_000).toISOString(),
+        resource_event_ids: [resource.eventId]
+      });
     for (const candidate of candidates) candidatesById.set(candidate.event_id, candidate);
   }
   const candidates = [...candidatesById.values()];

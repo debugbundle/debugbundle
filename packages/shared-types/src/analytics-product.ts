@@ -40,8 +40,8 @@ export type AnalyticsBundleGenerationStatus = z.infer<typeof AnalyticsBundleGene
 
 const AnalyticsOpportunityRecordSchema = z
   .object({
-    opportunity_id: z.string().uuid(),
-    project_id: z.string().uuid(),
+    opportunity_id: z.string().guid(),
+    project_id: z.string().guid(),
     project_name: z.string().trim().min(1).max(200),
     project_color_tag: z.string().trim().min(1).max(32).nullable(),
     service: z.string().trim().min(1).max(120).nullable(),
@@ -53,13 +53,13 @@ const AnalyticsOpportunityRecordSchema = z
     title: z.string().trim().min(1).max(240),
     summary: z.string().trim().min(1).max(2000),
     evidence: z.record(z.string(), z.unknown()),
-    related_incident_ids: z.array(z.string().uuid()).max(100),
+    related_incident_ids: z.array(z.string().guid()).max(100),
     related_deploy_ids: z.array(z.string().trim().min(1).max(128)).max(100),
     first_detected_at: z.string().datetime(),
     last_detected_at: z.string().datetime(),
     resolved_at: z.string().datetime().nullable(),
     snoozed_until: z.string().datetime().nullable(),
-    bundle_generation_id: z.string().uuid().nullable(),
+    bundle_generation_id: z.string().guid().nullable(),
     bundle_status: AnalyticsOpportunityBundleStatusSchema,
     bundle_created_at: z.string().datetime().nullable(),
     bundle_updated_at: z.string().datetime().nullable(),
@@ -88,12 +88,12 @@ export type AnalyticsOpportunityResponse = z.infer<typeof AnalyticsOpportunityRe
 
 export const AnalyticsBundleGenerationRecordSchema = z
   .object({
-    generation_id: z.string().uuid(),
-    project_id: z.string().uuid(),
+    generation_id: z.string().guid(),
+    project_id: z.string().guid(),
     project_name: z.string().trim().min(1).max(200).optional(),
     project_color_tag: z.string().trim().min(1).max(32).nullable().optional(),
-    opportunity_id: z.string().uuid().nullable(),
-    requested_by_user_id: z.string().uuid().nullable(),
+    opportunity_id: z.string().guid().nullable(),
+    requested_by_user_id: z.string().guid().nullable(),
     analysis_kind: AnalyticsBundleAnalysisKindSchema,
     analysis_spec: z.record(z.string(), z.unknown()),
     input_fingerprint: AnalyticsSafeHashSchema,
@@ -121,7 +121,7 @@ export type AnalyticsBundleGenerationsListResponse = z.infer<
 
 const AnalyticsBundleProjectSchema = z
   .object({
-    project_id: z.string().uuid(),
+    project_id: z.string().guid(),
     service: z.string().trim().min(1).max(120).nullable(),
     environment: z.string().trim().min(1).max(120).nullable()
   })

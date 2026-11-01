@@ -56,6 +56,7 @@ Each SDK must include a test suite that validates compliance against `contracts/
 3. **Safety invariants** — Assert `INV-2` (SDK never crashes host): invalid config, null inputs, network failures, and malformed server responses all result in silent degradation.
 4. **Redaction contract** — Default sensitive fields list matches `contracts/sdk-interface.md` §6.
 5. **Relay parity contract** — Server SDKs with backend framework integrations must pass the shared browser relay compliance fixtures for all supported V1 adapters. Foundation-only callback handlers must not be marked full relay-compatible.
+6. **Cross-SDK change conformance** — Follow [the SDK capability parity rule](sdk-capability-parity.md) for every SDK or SDK-evidence change. Record all maintained surfaces, their applicability and test evidence. Exercise shared language-neutral fixtures through each applicable SDK and changed relay/bridge/wrapper; verify claimed existing equivalence and runtime limitations. An applicable deferred or unverified gap cannot count as parity-complete.
 
 ### Relay Compliance Fixtures
 
@@ -152,11 +153,11 @@ SDK repos can fetch these from the public site URL or vendor them as test fixtur
 
 ## 7. JS SDK (debugbundle-js) — Current Setup
 
-The JS SDK tests run as part of the core monorepo's Vitest suite during the workspace-bridge period:
+The JS SDK has its own tests, TypeScript configuration and published dependencies:
 
 - **Test location:** `sdks/debugbundle-js/tests/packages/sdk-node/` and `sdks/debugbundle-js/tests/packages/sdk-browser/`
-- **Included by:** Root `vitest.config.ts` includes `sdks/debugbundle-js/tests/**/*.test.ts`
-- **TypeScript:** Root `tsconfig.json` includes `sdks/debugbundle-js/**/*.ts`
-- **Dependencies:** `@debugbundle/shared-types`, `@debugbundle/redaction`, `@debugbundle/auth` resolved via `workspace:*` through `pnpm-workspace.yaml`
+- **Runner:** `sdks/debugbundle-js/vitest.config.ts`; core test success does not imply SDK test success.
+- **TypeScript:** The SDK's own `typecheck` script validates its public and internal interfaces.
+- **Coordinated dependencies:** `make privacy-js-candidate-check` stages exact local shared-types/redaction archives, checks their candidate lock integrity, and runs source/coverage/build plus clean installed consumers. Temporary dependency links are guarded against concurrent verification and restored afterwards.
 
-When the JS SDK repo becomes standalone, it will have its own `vitest.config.ts` and the workspace deps will become published npm packages.
+`make browser-evidence-check` uses those coordinated dependencies for automated native Chromium source qualification. It runs in the pinned official Playwright1.63.0 image with external networking disabled and exercises local synthetic HTTP/relay/bundle boundaries. It does not replace the clean installed-artifact gate.

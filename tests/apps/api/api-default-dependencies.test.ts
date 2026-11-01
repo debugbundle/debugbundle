@@ -36,7 +36,11 @@ describe("api-default-dependency-mocks core", () => {
       db
     });
 
-    expect(createIngestionPersistenceServiceMock).toHaveBeenCalledWith({ objectStore, queue });
+    expect(createIngestionPersistenceServiceMock).toHaveBeenCalledWith({
+      objectStore,
+      queue,
+      evidenceReceipts: { claim: expect.any(Function) }
+    });
     expect(createPostgresMetadataStoreMock).toHaveBeenCalledWith(db, {});
     expect(createPostgresAuthStoreMock).toHaveBeenCalledWith(db, {});
     expect(createPostgresWeeklyReportChannelStoreMock).toHaveBeenCalledWith(db);

@@ -39,10 +39,10 @@ export type PublicStatusApi = {
 };
 export function createPublicStatusApi(http: PublicStatusHttpClient): PublicStatusApi {
   const path = (scope: Scope): string =>
-    `/v1/projects/${encodeURIComponent(z.string().uuid().parse(scope.projectId))}/status-page`;
+    `/v1/projects/${encodeURIComponent(z.string().guid().parse(scope.projectId))}/status-page`;
   async function request<T>(
     input: Parameters<PublicStatusHttpClient["request"]>[0],
-    schema: z.ZodType<T, z.ZodTypeDef, unknown>
+    schema: z.ZodType<T, unknown>
   ): Promise<T> {
     const result = await http.request(input);
     if (result.status !== 200) {

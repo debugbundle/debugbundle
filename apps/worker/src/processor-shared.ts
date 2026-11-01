@@ -39,6 +39,7 @@ import type {
 } from "../../../packages/storage/src/index.js";
 import {
   describeBrowserResourceInterruption,
+  type EventClass,
   type EventEnvelope
 } from "../../../packages/shared-types/src/index.js";
 import { type ImprovementBundleWorkerDependencies } from "./improvement-bundles.js";
@@ -98,6 +99,12 @@ export interface ProcessedEventStore {
 }
 
 export interface NormalizeWorkerDependencies {
+  recordEvidenceContext?: (
+    projectId: string,
+    event: EventEnvelope,
+    receivedAt: string,
+    eventClass: EventClass
+  ) => Promise<void>;
   recordBrowserRecoveryContext?: (projectId: string, event: EventEnvelope) => Promise<void>;
   deferImprovement?: (
     input: Omit<
@@ -192,6 +199,7 @@ export interface BuildBundleWorkerDependencies {
         | "listProbeEventCandidatesForServiceWindow"
         | "listLogEventCandidatesForServiceWindow"
         | "listRequestEventCandidatesForServiceWindow"
+        | "listEvidenceContextCandidates"
         | "hasBundleGenerationForSourceEvent"
         | "markBundleGenerationFailure"
         | "pruneRetainedBundleOwnersForProject"

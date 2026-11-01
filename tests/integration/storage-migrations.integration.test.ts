@@ -19,6 +19,7 @@ import {
   createS3AdminClient,
   runIntegration,
   bootstrapStorageAndCreateBucket,
+  removeEvidenceSchemaFromLegacyFixture,
   seedOwnedProject
 } from "../helpers/integration-setup.ts";
 
@@ -682,6 +683,7 @@ runIntegration("storage bootstrap integration", () => {
 
     const bootstrapBeforeMigration = await bootstrapStorageSchema(createQueryable(pool));
     expect(bootstrapBeforeMigration).toEqual({ status: "already_bootstrapped" });
+    await removeEvidenceSchemaFromLegacyFixture(pool);
 
     const migrated = await migrateStorageSchema(createQueryable(pool));
     expect(migrated.applied).toEqual(STORAGE_SCHEMA_MIGRATIONS.map((migration) => migration.id));
@@ -765,6 +767,7 @@ runIntegration("storage bootstrap integration", () => {
     await pool.query("ALTER TABLE organizations DROP COLUMN trial_ends_at");
     await pool.query("ALTER TABLE organizations DROP COLUMN trial_started_at");
     await pool.query("ALTER TABLE organizations DROP COLUMN trial_plan");
+    await removeEvidenceSchemaFromLegacyFixture(pool);
 
     const migrated = await migrateStorageSchema(createQueryable(pool));
     expect(migrated.applied).toEqual(STORAGE_SCHEMA_MIGRATIONS.map((migration) => migration.id));
@@ -813,6 +816,7 @@ runIntegration("storage bootstrap integration", () => {
       "ALTER TABLE github_dispatch_rules DROP CONSTRAINT github_dispatch_rules_created_by_user_id_fkey"
     );
     await pool.query("ALTER TABLE github_dispatch_rules DROP COLUMN created_by_user_id");
+    await removeEvidenceSchemaFromLegacyFixture(pool);
 
     const migrated = await migrateStorageSchema(createQueryable(pool));
     expect(migrated.applied).toEqual(STORAGE_SCHEMA_MIGRATIONS.map((migration) => migration.id));

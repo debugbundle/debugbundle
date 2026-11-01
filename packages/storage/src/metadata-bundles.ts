@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { createEvidenceContextReader } from "./evidence-context-reader.js";
 import { pruneRetainedBundleOwnersForProject } from "./retained-bundle-pruning.js";
 import type {
   BuildBundleJob,
@@ -25,8 +26,10 @@ export function createMetadataBundles(
   | "listProbeEventCandidatesForServiceWindow"
   | "listLogEventCandidatesForServiceWindow"
   | "listRequestEventCandidatesForServiceWindow"
+  | "listEvidenceContextCandidates"
 > {
   return {
+    ...createEvidenceContextReader(db),
     async getDeploymentForServiceAt(input) {
       const result = await db.query<{
         commit_sha: string;
@@ -290,6 +293,7 @@ export function createMetadataBundles(
           SELECT
             ie.event_id,
             ie.event_type,
+            ie.event_class,
             ie.occurred_at::text AS occurred_at
           FROM incident_events ie
           WHERE ie.incident_id = $1

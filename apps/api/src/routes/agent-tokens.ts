@@ -5,8 +5,8 @@ import type { ApiDependencies } from "../api-types.js";
 import { requireRateLimitedProjectAccess } from "../api-helpers.js";
 import { recordAuditLog, resolveAuditActorType } from "../audit-logging.js";
 
-const ProjectId = z.object({ id: z.string().uuid() });
-const TokenId = ProjectId.extend({ tokenId: z.string().uuid() });
+const ProjectId = z.object({ id: z.string().guid() });
+const TokenId = ProjectId.extend({ tokenId: z.string().guid() });
 const CreateBody = z.object({
   label: z.string().trim().min(1).max(120),
   expires_at: z.string().datetime().optional()

@@ -164,9 +164,9 @@ function parseReviewerConfig(
     .object({
       credentialHash: z.string().min(32),
       expiresAt: z.string().datetime(),
-      userId: z.string().uuid(),
-      organizationId: z.string().uuid(),
-      projectId: z.string().uuid()
+      userId: z.string().guid(),
+      organizationId: z.string().guid(),
+      projectId: z.string().guid()
     })
     .safeParse({
       credentialHash: env["OPENAI_REVIEWER_CREDENTIAL_HASH"],

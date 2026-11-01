@@ -164,6 +164,13 @@ export async function handleCapturePolicyCommand(
 
       const key = override.slice(0, separatorIndex);
       const rawValue = override.slice(separatorIndex + 1);
+      if (key === "capture_diagnostic_context") {
+        if (rawValue !== "true" && rawValue !== "false" && rawValue !== "null") {
+          throw new CliInputError("Invalid value for --override.");
+        }
+        update.capture_diagnostic_context = rawValue === "null" ? null : rawValue === "true";
+        continue;
+      }
       if (
         key !== "capture_logs" &&
         key !== "capture_request_events" &&

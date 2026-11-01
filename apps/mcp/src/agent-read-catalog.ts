@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-const projectId = z.string().uuid();
-const incidentId = z.string().uuid();
+const projectId = z.string().guid();
+const incidentId = z.string().guid();
 
 export const AGENT_READ_MCP_TOOL_CATALOG = [
   { name: "agent_project_summary", description: "Read this credential's project summary.", inputSchema: z.object({ projectId }).strict() },

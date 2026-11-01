@@ -38,6 +38,13 @@ export interface RetentionExpiredIncidentReference {
 }
 
 export interface RetentionStore {
+  listExpiredDiagnosticRawEvents?(input: {
+    now: string;
+    limit: number;
+  }): Promise<RetentionRawEventReference[]>;
+  deleteExpiredDiagnosticRawEvents?(input: {
+    references: RetentionRawEventReference[];
+  }): Promise<void>;
   pruneExpiredBrowserRecoveryEvents?(input: { now: string; limit: number }): Promise<number>;
   listExpiredSampledRawEvents(input: {
     now: string;

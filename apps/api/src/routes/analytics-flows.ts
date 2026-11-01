@@ -20,7 +20,7 @@ import { recordAuditLog, resolveAuditActorType } from "../audit-logging.js";
 import { getRequestOrigin, isProjectTokenOriginAllowed } from "../project-token-origins.js";
 import type { ApiDependencies } from "../api-types.js";
 
-const Scope = z.object({ id: z.string().uuid(), key: AnalyticsFlowKeySchema });
+const Scope = z.object({ id: z.string().guid(), key: AnalyticsFlowKeySchema });
 type Operation = keyof typeof schemas;
 
 export function registerAnalyticsFlowRoutes(
@@ -111,7 +111,7 @@ async function managementAccess(
   projectId: string;
   auth: NonNullable<Awaited<ReturnType<typeof requireRateLimitedProjectAccess>>>;
 } | null> {
-  const params = z.object({ id: z.string().uuid() }).passthrough().safeParse(request.params);
+  const params = z.object({ id: z.string().guid() }).passthrough().safeParse(request.params);
   if (!params.success) {
     await reply.status(400).send({ error: "invalid_project_id" });
     return null;

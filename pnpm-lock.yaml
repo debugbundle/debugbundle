@@ -55,7 +55,7 @@ importers:
         version: 2.6.0
       "@modelcontextprotocol/sdk":
         specifier: 1.32.1
-        version: 1.32.1(zod@3.25.76(patch_hash=e7256d9542a1bfd92d02a88a06b62ee1c275779e08e46473c80f54477f409654))
+        version: 1.32.1(zod@4.6.7)
       "@node-rs/argon2":
         specifier: ^2.0.2
         version: 2.0.2
@@ -84,11 +84,8 @@ importers:
         specifier: ^8.12.2
         version: 8.12.3
       zod:
-        specifier: ^3.24.2
-        version: 3.25.76(patch_hash=e7256d9542a1bfd92d02a88a06b62ee1c275779e08e46473c80f54477f409654)
-      zod-to-json-schema:
-        specifier: ^3.25.2
-        version: 3.25.2(zod@3.25.76(patch_hash=e7256d9542a1bfd92d02a88a06b62ee1c275779e08e46473c80f54477f409654))
+        specifier: ^4.6.7
+        version: 4.6.7
     devDependencies:
       "@debugbundle/cli":
         specifier: workspace:*
@@ -197,9 +194,6 @@ importers:
       typebox:
         specifier: ^1.3.0
         version: 1.3.0
-      zod-to-json-schema:
-        specifier: ^3.25.2
-        version: 3.25.2(zod@3.25.76(patch_hash=e7256d9542a1bfd92d02a88a06b62ee1c275779e08e46473c80f54477f409654))
     devDependencies:
       esbuild:
         specifier: ^0.27.3
@@ -308,8 +302,8 @@ importers:
   packages/shared-types:
     dependencies:
       zod:
-        specifier: ^3.24.2
-        version: 3.25.76(patch_hash=e7256d9542a1bfd92d02a88a06b62ee1c275779e08e46473c80f54477f409654)
+        specifier: ^4.6.7
+        version: 4.6.7
 
 packages:
   "@adobe/css-tools@4.4.4":
@@ -3072,6 +3066,7 @@ packages:
         integrity: sha512-aJaAX7vHe5i66smoSSID7t4rKY08PbD8EBU7DOloixvhOozfYWdcSYE4l6/tjkZ0vBZhGjheWzB2mh31sLgCMA==
       }
     engines: { node: ">=18.0.0" }
+    deprecated: Deprecated due to a bug in custom logger data redaction. See https://github.com/aws/aws-sdk-js-v3/issues/8393.
 
   "@smithy/types@4.13.1":
     resolution:
@@ -7615,6 +7610,12 @@ packages:
         integrity: sha512-4UmzQUF5fxvfcYHlbjBmejU+w+hbDnWFx4aS8kBx7nPBHcO2SqPbpAG8snbdg+Xse4pRefR98hgjFgIMCI/UhA==
       }
 
+  zod@4.6.7:
+    resolution:
+      {
+        integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==
+      }
+
 snapshots:
   "@adobe/css-tools@4.4.4": {}
 
@@ -8606,28 +8607,6 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  "@modelcontextprotocol/sdk@1.32.1(zod@3.25.76(patch_hash=e7256d9542a1bfd92d02a88a06b62ee1c275779e08e46473c80f54477f409654))":
-    dependencies:
-      "@hono/node-server": 1.19.12(hono@4.12.25)
-      ajv: 8.18.0
-      ajv-formats: 3.0.1(ajv@8.18.0)
-      content-type: 1.0.5
-      cors: 2.8.6
-      cross-spawn: 7.0.6
-      eventsource: 3.0.7
-      eventsource-parser: 3.0.6
-      express: 5.2.1
-      express-rate-limit: 8.3.2(express@5.2.1)
-      hono: 4.12.25
-      jose: 6.2.10
-      json-schema-typed: 8.0.2
-      pkce-challenge: 5.0.1
-      raw-body: 3.0.2
-      zod: 3.25.76(patch_hash=e7256d9542a1bfd92d02a88a06b62ee1c275779e08e46473c80f54477f409654)
-      zod-to-json-schema: 3.25.2(zod@3.25.76(patch_hash=e7256d9542a1bfd92d02a88a06b62ee1c275779e08e46473c80f54477f409654))
-    transitivePeerDependencies:
-      - supports-color
-
   "@modelcontextprotocol/sdk@1.32.1(zod@4.6.6)":
     dependencies:
       "@hono/node-server": 1.19.12(hono@4.12.25)
@@ -8647,6 +8626,28 @@ snapshots:
       raw-body: 3.0.2
       zod: 4.6.6
       zod-to-json-schema: 3.25.2(zod@4.6.6)
+    transitivePeerDependencies:
+      - supports-color
+
+  "@modelcontextprotocol/sdk@1.32.1(zod@4.6.7)":
+    dependencies:
+      "@hono/node-server": 1.19.12(hono@4.12.25)
+      ajv: 8.18.0
+      ajv-formats: 3.0.1(ajv@8.18.0)
+      content-type: 1.0.5
+      cors: 2.8.6
+      cross-spawn: 7.0.6
+      eventsource: 3.0.7
+      eventsource-parser: 3.0.6
+      express: 5.2.1
+      express-rate-limit: 8.3.2(express@5.2.1)
+      hono: 4.12.25
+      jose: 6.2.10
+      json-schema-typed: 8.0.2
+      pkce-challenge: 5.0.1
+      raw-body: 3.0.2
+      zod: 4.6.7
+      zod-to-json-schema: 3.25.2(zod@4.6.7)
     transitivePeerDependencies:
       - supports-color
 
@@ -12553,14 +12554,16 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
-  zod-to-json-schema@3.25.2(zod@3.25.76(patch_hash=e7256d9542a1bfd92d02a88a06b62ee1c275779e08e46473c80f54477f409654)):
-    dependencies:
-      zod: 3.25.76(patch_hash=e7256d9542a1bfd92d02a88a06b62ee1c275779e08e46473c80f54477f409654)
-
   zod-to-json-schema@3.25.2(zod@4.6.6):
     dependencies:
       zod: 4.6.6
 
+  zod-to-json-schema@3.25.2(zod@4.6.7):
+    dependencies:
+      zod: 4.6.7
+
   zod@3.25.76(patch_hash=e7256d9542a1bfd92d02a88a06b62ee1c275779e08e46473c80f54477f409654): {}
 
   zod@4.6.6: {}
+
+  zod@4.6.7: {}

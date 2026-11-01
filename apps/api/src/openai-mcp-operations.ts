@@ -1,4 +1,5 @@
 import { isObjectMissing } from "../../../packages/storage/src/object-store-errors.js";
+import { projectEvidenceSummary } from "../../../packages/mcp-core/src/evidence-summary.js";
 import type {
   OpenAiHostedOperations,
   OpenAiMcpPrincipal
@@ -181,6 +182,7 @@ function bundleArtifact(body: Record<string, unknown>): Record<string, unknown> 
     typeof summary["recommended_action"] === "string" ? [summary["recommended_action"]] : [];
   return {
     bundle_version: Number(body["bundle_version"] ?? 1),
+    evidence_summary: projectEvidenceSummary(body),
     primary_signal: mapPrimarySignal(body),
     deploy: mapDeploy(body),
     redaction: mapRedaction(body),
@@ -403,6 +405,7 @@ export function createOpenAiHostedOperations(input: {
       return {
         incident: mapIncident(record(incident), dashboardBaseUrl),
         primary_signal: mapPrimarySignal(bundleBody),
+        evidence_summary: projectEvidenceSummary(bundleBody),
         bundle_status: bundle.status,
         reproduction_status: reproduction.status,
         deploy: mapDeploy(bundleBody),

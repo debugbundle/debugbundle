@@ -192,7 +192,7 @@ export function notificationsOperations(): OperationSpec[] {
       summary: "Update an alert rule",
       tags: ["Alerts"],
       security: anyMemberAuth,
-      params: component("AlertPathParams", z.object({ id: z.string().uuid() }).strict()).schema,
+      params: component("AlertPathParams", z.object({ id: z.string().guid() }).strict()).schema,
       requestBody: component("UpdateAlertBody", UpdateAlertBodySchema),
       responses: {
         "200": { description: "Updated alert rule.", schema: alertResponse },
@@ -209,7 +209,7 @@ export function notificationsOperations(): OperationSpec[] {
       summary: "Delete an alert rule",
       tags: ["Alerts"],
       security: anyMemberAuth,
-      params: component("AlertPathParams", z.object({ id: z.string().uuid() }).strict()).schema,
+      params: component("AlertPathParams", z.object({ id: z.string().guid() }).strict()).schema,
       responses: {
         "204": { description: "Alert rule deleted." },
         "400": { description: "Invalid alert id.", schema: apiError },

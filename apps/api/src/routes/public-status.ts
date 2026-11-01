@@ -22,7 +22,7 @@ function publicReadIp(request: FastifyRequest, trustProxy: boolean): string {
   const header = request.headers["x-forwarded-for"];
   if (!trustProxy || typeof header !== "string" || header.length > 1024) return request.ip;
   const last = header.split(",").at(-1)?.trim();
-  const ip = z.string().ip().safeParse(last);
+  const ip = z.union([z.ipv4(), z.ipv6()]).safeParse(last);
   return ip.success ? ip.data : request.ip;
 }
 

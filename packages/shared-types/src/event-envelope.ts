@@ -1,4 +1,17 @@
 import { z } from "zod";
+import { ExceptionEvidenceV1Schema } from "./exception-evidence.js";
+import { withinUtf8Budget } from "./evidence-bounds.js";
+import {
+  DiagnosticContextPayloadSchema,
+  EvidenceReferenceSchema,
+  ExecutionContextSchema,
+  ResourceObservationsSchema
+} from "./diagnostic-context.js";
+
+/** Existing ingestion/relay body ceiling, including the compact JSON wrapper.
+ * Batch size is a count ceiling; senders must also bound actual UTF-8 wire bytes. */
+export const EVENT_INGESTION_MAX_BODY_BYTES = 256 * 1024;
+export const EVENT_ENVELOPE_MAX_WIRE_BYTES = EVENT_INGESTION_MAX_BODY_BYTES - 13;
 
 /** CSPRNG-backed UUID v4 using Web Crypto API (available in all target runtimes: Node 18+, modern browsers). */
 function createUuidV4(): string {
@@ -26,7 +39,8 @@ export const EventTypeValues = [
   "frontend_exception",
   "deploy_metadata",
   "error_suppressed",
-  "probe_event"
+  "probe_event",
+  "diagnostic_context"
 ] as const;
 
 export const EventTypeSchema = z.enum(EventTypeValues);
@@ -60,7 +74,7 @@ const InlineProbeDataItemSchema = z
     label: z.string().min(1),
     data: z.record(z.string(), z.unknown()),
     timestamp: z.string().datetime(),
-    activation_id: z.string().uuid().nullable()
+    activation_id: z.string().guid().nullable()
   })
   .strict();
 
@@ -116,7 +130,9 @@ const BackendExceptionPayloadSchema = z
       body: z.unknown().optional()
     }),
     runtime: BackendRuntimePayloadSchema,
-    probe_data: InlineProbeDataSchema.optional()
+    probe_data: InlineProbeDataSchema.optional(),
+    exception_evidence: ExceptionEvidenceV1Schema.optional(),
+    execution: ExecutionContextSchema.optional()
   })
   .strict();
 
@@ -305,7 +321,9 @@ const FrontendExceptionPayloadSchema = z
       })
       .nullable()
       .optional(),
-    probe_data: InlineProbeDataSchema.optional()
+    probe_data: InlineProbeDataSchema.optional(),
+    exception_evidence: ExceptionEvidenceV1Schema.optional(),
+    resource_observations: ResourceObservationsSchema.optional()
   })
   .strict();
 
@@ -324,7 +342,10 @@ const ErrorSuppressedPayloadFields = {
   suppressed_count: z.number().int().nonnegative(),
   window_seconds: z.number().int().positive(),
   first_seen: z.string().datetime(),
-  last_seen: z.string().datetime()
+  last_seen: z.string().datetime(),
+  // Released SDKs already distinguish queue pressure from duplicate suppression.
+  reason: z.literal("queue_pressure").optional(),
+  level: z.string().min(1).optional()
 };
 
 const ErrorSuppressedPayloadSchema = z.union([
@@ -335,7 +356,7 @@ const ErrorSuppressedPayloadSchema = z.union([
 const ProbeEventPayloadFields = {
   label: z.string().min(1),
   data: z.record(z.string(), z.unknown()),
-  activation_id: z.string().uuid().nullable(),
+  activation_id: z.string().guid().nullable(),
   probe_label_pattern: z.string().min(1)
 };
 
@@ -347,10 +368,10 @@ const ProbeEventPayloadSchema = z.union([
 const EnvelopeBaseSchema = z
   .object({
     schema_version: z.string().min(1),
-    event_id: z.string().uuid(),
+    event_id: z.string().guid(),
     event_type: EventTypeSchema,
     project_token: z.string().min(1).optional(),
-    project_id: z.string().uuid().nullable().optional(),
+    project_id: z.string().guid().nullable().optional(),
     sdk_name: z.string().min(1),
     sdk_version: z.string().min(1),
     service: ServiceSchema,
@@ -368,6 +389,10 @@ const MOBILE_SDK_NAMES = new Set([
 
 export const EventEnvelopeSchema = z
   .discriminatedUnion("event_type", [
+    EnvelopeBaseSchema.extend({
+      event_type: z.literal("diagnostic_context"),
+      payload: DiagnosticContextPayloadSchema
+    }),
     EnvelopeBaseSchema.extend({
       event_type: z.literal("backend_exception"),
       payload: BackendExceptionPayloadSchema
@@ -402,6 +427,43 @@ export const EventEnvelopeSchema = z
     })
   ])
   .superRefine((event, context) => {
+    if (event.event_type === "backend_exception" || event.event_type === "frontend_exception") {
+      const payload = event.payload;
+      const additions: Record<string, unknown> = {};
+      if (payload.exception_evidence !== undefined)
+        additions["exception_evidence"] = payload.exception_evidence;
+      if (event.event_type === "backend_exception" && event.payload.execution !== undefined)
+        additions["execution"] = event.payload.execution;
+      if (
+        event.event_type === "frontend_exception" &&
+        event.payload.resource_observations !== undefined
+      )
+        additions["resource_observations"] = event.payload.resource_observations;
+      // Only new payload additions opt into this limit. Historical arbitrary
+      // context stays admissible, including an unrelated same-named custom key.
+      if (Object.keys(additions).length > 0) {
+        const reference = EvidenceReferenceSchema.safeParse(event.context?.["evidence_reference"]);
+        if (reference.success) additions["evidence_reference"] = reference.data;
+        if (!withinUtf8Budget(JSON.stringify(additions), 32 * 1024))
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Added exception evidence exceeds its UTF-8 byte budget",
+            path: ["payload"]
+          });
+      }
+    }
+    // Exception/log context was historically open application data. A same-named
+    // custom field cannot invalidate an installed SDK's original error. Storage
+    // and association independently require a valid typed reference and scope.
+    if (event.event_type === "diagnostic_context") {
+      if (event.payload.scope.kind === "page" && !event.correlation?.session_id?.trim()) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Page evidence requires a session",
+          path: ["correlation", "session_id"]
+        });
+      }
+    }
     if (event.event_type !== "frontend_exception") {
       return;
     }

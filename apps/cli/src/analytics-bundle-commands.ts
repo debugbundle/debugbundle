@@ -68,7 +68,7 @@ export interface AnalyticsBundleCreateCommandInput {
 const AnalyticsBundlePendingResponseSchema = z
   .object({
     status: z.literal("pending"),
-    bundle_generation_id: z.string().uuid()
+    bundle_generation_id: z.string().guid()
   })
   .strict();
 

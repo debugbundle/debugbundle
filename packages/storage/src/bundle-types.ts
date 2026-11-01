@@ -1,4 +1,8 @@
-import type { EventEnvelope, BrowserResourceRoutes } from "../../shared-types/src/index.js";
+import type {
+  EventClass,
+  EventEnvelope,
+  BrowserResourceRoutes
+} from "../../shared-types/src/index.js";
 import type { BuildBundleJob } from "./queue-types.js";
 
 export type RetainedBundleOwnerReference =
@@ -36,6 +40,7 @@ export interface BundleBuildContext {
 export interface IncidentEventReference {
   event_id: string;
   event_type: EventEnvelope["event_type"];
+  event_class?: EventClass;
   occurred_at: string;
 }
 
@@ -54,7 +59,18 @@ export interface RequestEventCandidateReference {
   occurred_at: string;
 }
 
+export interface EvidenceContextCandidateReference extends RequestEventCandidateReference {
+  received_at: string;
+  payload_hash?: string | null;
+}
+
 export interface BundleBuildContextStore {
+  listEvidenceContextCandidates?(input: {
+    project_id: string;
+    service_name: string;
+    environment: string;
+    failure_event_ids: string[];
+  }): Promise<EvidenceContextCandidateReference[]>;
   getDeploymentForServiceAt?(input: {
     project_id: string;
     service_id: string;

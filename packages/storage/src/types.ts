@@ -1,5 +1,13 @@
 import type { BundleBuildContextStore } from "./bundle-types.js";
-export type { BundleBuildContext, BundleBuildContextStore, RetainedBundleOwnerReference, IncidentEventReference, ProbeEventCandidateReference, LogEventCandidateReference, RequestEventCandidateReference } from "./bundle-types.js";
+export type {
+  BundleBuildContext,
+  BundleBuildContextStore,
+  RetainedBundleOwnerReference,
+  IncidentEventReference,
+  ProbeEventCandidateReference,
+  LogEventCandidateReference,
+  RequestEventCandidateReference
+} from "./bundle-types.js";
 import type { NormalizedEvent } from "../../event-normalizer/src/index.js";
 import type {
   CapturePreset,
@@ -133,10 +141,16 @@ export type {
 } from "./retention-types.js";
 
 export interface IngestionPersistenceService {
+  claimEvidenceReceipt?(
+    event: EventEnvelope,
+    projectId: string,
+    receivedAt: string
+  ): Promise<import("./evidence-ingestion-receipt.js").EvidenceReceiptResult>;
   persistAndEnqueue(
     event: EventEnvelope,
     projectId: string,
     options?: {
+      receivedAt?: string;
       capturePreset?: CapturePreset;
       immediateClientErrorStatuses?: number[];
       immediateClientErrorPathRules?: ImmediateClientErrorPathRule[];

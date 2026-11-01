@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const PublicStatusIdSchema = z.string().regex(/^[a-f0-9]{24}$/);
 const selection = z
-  .object({ project_id: z.string().uuid(), check_ids: z.array(z.string().uuid()).max(50) })
+  .object({ project_id: z.string().guid(), check_ids: z.array(z.string().guid()).max(50) })
   .strict();
 export const PublicStatusSettingsSchema = z
   .object({
@@ -65,9 +65,9 @@ export const PublicStatusManagementSchema = z
   .strict();
 export const PublicStatusOptionsQueryObjectSchema = z
   .object({
-    cursor: z.string().uuid().optional(),
-    check_project_id: z.string().uuid().optional(),
-    check_cursor: z.string().uuid().optional()
+    cursor: z.string().guid().optional(),
+    check_project_id: z.string().guid().optional(),
+    check_cursor: z.string().guid().optional()
   })
   .strict();
 export const PublicStatusOptionsQuerySchema = PublicStatusOptionsQueryObjectSchema.refine(
@@ -81,17 +81,17 @@ export const PublicStatusOptionsSchema = z
       .array(
         z
           .object({
-            project_id: z.string().uuid(),
+            project_id: z.string().guid(),
             name: z.string(),
             checks: z
-              .array(z.object({ check_id: z.string().uuid(), name: z.string() }).strict())
+              .array(z.object({ check_id: z.string().guid(), name: z.string() }).strict())
               .max(50),
-            next_check_cursor: z.string().uuid().nullable()
+            next_check_cursor: z.string().guid().nullable()
           })
           .strict()
       )
       .max(50),
-    next_cursor: z.string().uuid().nullable()
+    next_cursor: z.string().guid().nullable()
   })
   .strict();
 export type PublicStatusSettings = z.infer<typeof PublicStatusSettingsSchema>;

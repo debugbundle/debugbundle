@@ -1,4 +1,8 @@
 import { TIER_CAPABILITIES } from "../../shared-types/src/index.js";
+import {
+  createEvidenceContextRetentionStore,
+  cleanupDiagnosticContextRaw
+} from "./evidence-context-retention.js";
 
 import {
   buildAnalyticsRawEventObjectKey,
@@ -98,6 +102,7 @@ async function pruneExpiredAnalyticsRollupTable(input: {
 
 export function createPostgresRetentionStore(db: Queryable): RetentionStore {
   return {
+    ...createEvidenceContextRetentionStore(db),
     async pruneExpiredBrowserRecoveryEvents(input) {
       const result = await db.query(
         `DELETE FROM browser_recovery_events WHERE event_id IN (
@@ -105,7 +110,19 @@ export function createPostgresRetentionStore(db: Queryable): RetentionStore {
         ORDER BY expires_at, event_id LIMIT $2) RETURNING event_id`,
         [input.now, input.limit]
       );
-      return result.rows.length;
+      const context = await db.query(
+        `DELETE FROM evidence_context_events WHERE event_id IN (
+        SELECT event_id FROM evidence_context_events WHERE kind='failure' AND expires_at <= $1::timestamptz
+        ORDER BY expires_at,event_id LIMIT $2) RETURNING event_id`,
+        [input.now, input.limit]
+      );
+      const receipts = await db.query(
+        `DELETE FROM evidence_ingestion_receipts WHERE (project_id,event_id) IN (
+          SELECT project_id,event_id FROM evidence_ingestion_receipts WHERE is_diagnostic=false AND expires_at <= $1::timestamptz
+          ORDER BY expires_at,project_id,event_id LIMIT $2) RETURNING event_id`,
+        [input.now, input.limit]
+      );
+      return result.rows.length + context.rows.length + receipts.rows.length;
     },
     async listExpiredSampledRawEvents(input): Promise<RetentionRawEventReference[]> {
       const result = await db.query<RetentionRawEventReference & Record<string, unknown>>(
@@ -515,6 +532,11 @@ export function createRetentionCleanupService(input: {
       }
 
       for (let batchIndex = 0; batchIndex < maxBatches; batchIndex += 1) {
+        const diagnosticRaw = await cleanupDiagnosticContextRaw(
+          input.retentionStore,
+          input.objectStore,
+          { now: job.scheduled_at, limit: batchSize }
+        );
         const prunedRecovery =
           (await input.retentionStore.pruneExpiredBrowserRecoveryEvents?.({
             now: job.scheduled_at,
@@ -549,6 +571,7 @@ export function createRetentionCleanupService(input: {
 
         if (
           prunedRecovery === 0 &&
+          diagnosticRaw.found === 0 &&
           expiredReferences.length === 0 &&
           expiredAnalyticsRawEvents.length === 0 &&
           expiredAnalyticsJourneySamples.length === 0 &&
@@ -667,6 +690,7 @@ export function createRetentionCleanupService(input: {
 
         if (
           deletedReferences.length === 0 &&
+          diagnosticRaw.deleted === 0 &&
           deletedAnalyticsRawEvents.length === 0 &&
           deletedAnalyticsJourneySamples.length === 0 &&
           prunedAnalyticsRollups.deleted_rows === 0 &&
@@ -679,6 +703,7 @@ export function createRetentionCleanupService(input: {
 
         if (
           prunedRecovery < batchSize &&
+          diagnosticRaw.found < batchSize &&
           expiredReferences.length < batchSize &&
           expiredAnalyticsRawEvents.length < batchSize &&
           expiredAnalyticsJourneySamples.length < batchSize &&

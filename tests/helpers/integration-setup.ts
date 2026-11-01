@@ -30,8 +30,7 @@ export const s3Bucket = process.env["S3_BUCKET"] ?? "debugbundle-raw-events";
 
 /* ── Conditional describe (skipped when RUN_INTEGRATION !== "1") ── */
 
-export const runIntegration =
-  process.env["RUN_INTEGRATION"] === "1" ? describe : describe.skip;
+export const runIntegration = process.env["RUN_INTEGRATION"] === "1" ? describe : describe.skip;
 
 /* ── Factory helpers ───────────────────────────────────────── */
 
@@ -56,17 +55,13 @@ export function createS3AdminClient(): S3Client {
 
 export function createQueryable(pool: Pool): Queryable {
   return {
-    query: async <Row extends Record<string, unknown>>(
-      sql: string,
-      params: unknown[]
-    ) => pool.query<Row>(sql, params),
+    query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) =>
+      pool.query<Row>(sql, params),
     transaction: async <Result>(callback: (db: Queryable) => Promise<Result>) => {
       const client = await pool.connect();
       const tx: Queryable = {
-        query: async <Row extends Record<string, unknown>>(
-          sql: string,
-          params: unknown[]
-        ) => client.query<Row>(sql, params)
+        query: async <Row extends Record<string, unknown>>(sql: string, params: unknown[]) =>
+          client.query<Row>(sql, params)
       };
 
       try {
@@ -191,6 +186,12 @@ export async function seedOwnedProject(input: {
 }
 
 /* ── Suite lifecycle ───────────────────────────────────────── */
+
+/** Reconstruct pre-evidence schemas only inside the disposable migration fixtures. */
+export async function removeEvidenceSchemaFromLegacyFixture(pool: Pool): Promise<void> {
+  await pool.query("DROP TABLE evidence_context_events, evidence_ingestion_receipts");
+  await pool.query("ALTER TABLE capture_policies DROP COLUMN capture_diagnostic_context");
+}
 
 export async function bootstrapStorageAndCreateBucket(
   pool: Pool,

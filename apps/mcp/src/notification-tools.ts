@@ -13,7 +13,7 @@ const scope = z
   .object({
     bearerToken: z.string().min(1),
     audience: NotificationAudienceSchema.default("personal"),
-    projectId: z.string().uuid().optional()
+    projectId: z.string().guid().optional()
   })
   .strict();
 export const NOTIFICATION_MCP_TOOL_NAMES = [

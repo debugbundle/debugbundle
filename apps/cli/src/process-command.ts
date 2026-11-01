@@ -1,3 +1,18 @@
+import {
+  pathExists,
+  readState,
+  readEventBatches,
+  serializeState,
+  type EventBatch
+} from "./local-processing-files.js";
+import {
+  collectLocalDiagnosticContext,
+  parseDiagnosticReceipts
+} from "./local-diagnostic-context.js";
+import {
+  writeLocalBundleArtifacts,
+  rebuildLocalDiagnosticArtifacts
+} from "./local-bundle-artifacts.js";
 import { createHash } from "node:crypto";
 import {
   mkdir as mkdirFromFs,
@@ -15,13 +30,9 @@ import {
   classifyEvent,
   fingerprint,
   inferMatchedFields,
-  normalizeEvent,
-  validateEvent
+  normalizeEvent
 } from "../../../packages/event-normalizer/src/index.js";
-import { buildBundle } from "../../../packages/bundle-engine/src/index.js";
-import { buildReproduction } from "../../../packages/repro-engine/src/index.js";
 import {
-  BundleV1Schema,
   classifyRequestStatus,
   inferFrontendExceptionSeverity,
   getRequestAnomalyThreshold,
@@ -30,9 +41,12 @@ import {
   type EventClass,
   type EventEnvelope
 } from "../../../packages/shared-types/src/index.js";
-import type { BundleBuildContext, BuildBundleJob } from "../../../packages/storage/src/index.js";
-import { isRecord } from "./cli-fs-helpers.js";
-import { compareEventEnvelopes, parseState, type LocalIncidentState, type LocalProcessingState } from "./local-processing-state.js";
+import type { BuildBundleJob } from "../../../packages/storage/src/index.js";
+import {
+  compareEventEnvelopes,
+  type LocalIncidentState,
+  type LocalProcessingState
+} from "./local-processing-state.js";
 import type { CliCommandResult } from "./token-commands.js";
 
 type DirectoryMaker = (path: string, options: { recursive: true }) => Promise<void>;
@@ -44,6 +58,7 @@ type Severity = "low" | "medium" | "high" | "critical";
 
 type ProcessCommandDependencies = {
   cwd?: () => string;
+  now?: () => Date;
   mkdir?: DirectoryMaker;
   readFile?: FileReader;
   readdir?: DirectoryReader;
@@ -53,30 +68,25 @@ type ProcessCommandDependencies = {
 
 export type ProcessSummary =
   | {
-    status: "ok";
-    processed: false;
-    files_processed: number;
-    events_processed: number;
-    incidents_processed: number;
-    services: Array<{ service: string; incidents: number }>;
-    last_processed_event_file: string | null;
-    message: string;
-  }
+      status: "ok";
+      processed: false;
+      files_processed: number;
+      events_processed: number;
+      incidents_processed: number;
+      services: Array<{ service: string; incidents: number }>;
+      last_processed_event_file: string | null;
+      message: string;
+    }
   | {
-    status: "ok";
-    processed: true;
-    files_processed: number;
-    events_processed: number;
-    incidents_processed: number;
-    services: Array<{ service: string; incidents: number }>;
-    last_processed_event_file: string;
-    message?: undefined;
-  };
-
-type EventBatch = {
-  fileName: string;
-  events: EventEnvelope[];
-};
+      status: "ok";
+      processed: true;
+      files_processed: number;
+      events_processed: number;
+      incidents_processed: number;
+      services: Array<{ service: string; incidents: number }>;
+      last_processed_event_file: string;
+      message?: undefined;
+    };
 
 type AggregatedIncident = {
   incidentId: string;
@@ -98,11 +108,6 @@ const LOCAL_EVENTS_DIRECTORY_PATH = ".debugbundle/local/events";
 const LOCAL_STATE_FILE_PATH = ".debugbundle/local/state.json";
 const LOCAL_BUNDLE_DIRECTORY_PATH = ".debugbundle/bundles/local";
 const LOCAL_REPRODUCTION_DIRECTORY_PATH = ".debugbundle/bundles/local/reproductions";
-const CLI_GENERATOR_VERSION = "cli-process-local-v1";
-const CLI_SDK = {
-  name: "debugbundle-cli",
-  version: "0.1.0"
-} as const;
 function inferSeverity(
   event: EventEnvelope,
   capturePreset: CapturePreset,
@@ -113,7 +118,10 @@ function inferSeverity(
   }
 
   if (event.event_type === "request_event") {
-    return classifyRequestStatus({ responseStatus: event.payload.response_status, capturePreset }) === "incident_signal"
+    return classifyRequestStatus({
+      responseStatus: event.payload.response_status,
+      capturePreset
+    }) === "incident_signal"
       ? "high"
       : "low";
   }
@@ -142,7 +150,6 @@ function severityRank(severity: Severity): number {
       return 1;
   }
 }
-
 
 function classifyEnvelope(envelope: EventEnvelope, capturePreset: CapturePreset): EventClass {
   return classifyEvent(
@@ -185,39 +192,42 @@ function selectCanonicalAggregate(aggregates: AggregatedIncident[]): AggregatedI
 function mergeAggregateGroup(aggregates: AggregatedIncident[]): AggregatedIncident {
   const canonicalAggregate = selectCanonicalAggregate(aggregates);
 
-  return aggregates.reduce<AggregatedIncident>((merged, aggregate) => {
-    for (const matchedField of aggregate.matchedFields) {
-      merged.matchedFields.add(matchedField);
-    }
+  return aggregates.reduce<AggregatedIncident>(
+    (merged, aggregate) => {
+      for (const matchedField of aggregate.matchedFields) {
+        merged.matchedFields.add(matchedField);
+      }
 
-    for (const signalEventType of aggregate.signalEventTypes) {
-      merged.signalEventTypes.add(signalEventType);
-    }
+      for (const signalEventType of aggregate.signalEventTypes) {
+        merged.signalEventTypes.add(signalEventType);
+      }
 
-    for (const traceId of aggregate.traceIds) {
-      merged.traceIds.add(traceId);
-    }
+      for (const traceId of aggregate.traceIds) {
+        merged.traceIds.add(traceId);
+      }
 
-    merged.newEvents = mergeSourceEvents(merged.newEvents, aggregate.newEvents);
-    for (const mergedIncidentId of aggregate.mergedIncidentIds) {
-      merged.mergedIncidentIds.add(mergedIncidentId);
+      merged.newEvents = mergeSourceEvents(merged.newEvents, aggregate.newEvents);
+      for (const mergedIncidentId of aggregate.mergedIncidentIds) {
+        merged.mergedIncidentIds.add(mergedIncidentId);
+      }
+      return merged;
+    },
+    {
+      incidentId: canonicalAggregate.incidentId,
+      projectId: canonicalAggregate.projectId,
+      serviceName: canonicalAggregate.serviceName,
+      environment: canonicalAggregate.environment,
+      fingerprint: canonicalAggregate.fingerprint,
+      matchedFields: new Set(canonicalAggregate.matchedFields),
+      newEvents: [...canonicalAggregate.newEvents],
+      mergedIncidentIds: new Set(canonicalAggregate.mergedIncidentIds),
+      signalEventTypes: new Set(canonicalAggregate.signalEventTypes),
+      traceIds: new Set(canonicalAggregate.traceIds),
+      title: canonicalAggregate.title,
+      kind: canonicalAggregate.kind,
+      severity: canonicalAggregate.severity
     }
-    return merged;
-  }, {
-    incidentId: canonicalAggregate.incidentId,
-    projectId: canonicalAggregate.projectId,
-    serviceName: canonicalAggregate.serviceName,
-    environment: canonicalAggregate.environment,
-    fingerprint: canonicalAggregate.fingerprint,
-    matchedFields: new Set(canonicalAggregate.matchedFields),
-    newEvents: [...canonicalAggregate.newEvents],
-    mergedIncidentIds: new Set(canonicalAggregate.mergedIncidentIds),
-    signalEventTypes: new Set(canonicalAggregate.signalEventTypes),
-    traceIds: new Set(canonicalAggregate.traceIds),
-    title: canonicalAggregate.title,
-    kind: canonicalAggregate.kind,
-    severity: canonicalAggregate.severity
-  });
+  );
 }
 
 function hashIdentifier(parts: string[], prefix: string, length: number): string {
@@ -225,8 +235,17 @@ function hashIdentifier(parts: string[], prefix: string, length: number): string
   return `${prefix}_${digest.slice(0, length)}`;
 }
 
-function deriveIncidentId(projectId: string, serviceName: string, environment: string, incidentFingerprint: string): string {
-  return hashIdentifier([projectId, serviceName, environment, incidentFingerprint], "inc_local", 16);
+function deriveIncidentId(
+  projectId: string,
+  serviceName: string,
+  environment: string,
+  incidentFingerprint: string
+): string {
+  return hashIdentifier(
+    [projectId, serviceName, environment, incidentFingerprint],
+    "inc_local",
+    16
+  );
 }
 
 function deriveServiceId(projectId: string, serviceName: string): string {
@@ -237,7 +256,10 @@ function mergeMatchedFields(existingFields: string[], nextFields: Iterable<strin
   return [...new Set([...existingFields, ...nextFields])].sort();
 }
 
-function mergeSourceEvents(existingEvents: EventEnvelope[], nextEvents: EventEnvelope[]): EventEnvelope[] {
+function mergeSourceEvents(
+  existingEvents: EventEnvelope[],
+  nextEvents: EventEnvelope[]
+): EventEnvelope[] {
   const merged = new Map<string, EventEnvelope>();
 
   for (const event of existingEvents) {
@@ -314,21 +336,32 @@ function countOccurrencesInWindow(events: EventEnvelope[], windowSeconds: number
   }).length;
 }
 
-function passesRequestAnomalyThreshold(events: EventEnvelope[], threshold: { minimum_occurrences_5m: number; minimum_ratio_5m_to_1h: number }): boolean {
+function passesRequestAnomalyThreshold(
+  events: EventEnvelope[],
+  threshold: { minimum_occurrences_5m: number; minimum_ratio_5m_to_1h: number }
+): boolean {
   const occurrences5m = countOccurrencesInWindow(events, 5 * 60);
   const occurrences1h = countOccurrencesInWindow(events, 60 * 60);
   const baseline1hPer5m = occurrences1h / 12;
   const ratio = occurrences5m / Math.max(baseline1hPer5m, 1);
 
-  return occurrences5m >= threshold.minimum_occurrences_5m && ratio >= threshold.minimum_ratio_5m_to_1h;
+  return (
+    occurrences5m >= threshold.minimum_occurrences_5m && ratio >= threshold.minimum_ratio_5m_to_1h
+  );
 }
 
-function collectRequestAnomalyAggregates(batches: EventBatch[], capturePreset: CapturePreset): AggregatedIncident[] {
+function collectRequestAnomalyAggregates(
+  batches: EventBatch[],
+  capturePreset: CapturePreset
+): AggregatedIncident[] {
   const grouped = new Map<string, AggregatedIncident>();
 
   for (const batch of batches) {
     for (const event of batch.events) {
-      if (event.event_type !== "request_event" || classifyEnvelope(event, capturePreset) !== "context_signal") {
+      if (
+        event.event_type !== "request_event" ||
+        classifyEnvelope(event, capturePreset) !== "context_signal"
+      ) {
         continue;
       }
 
@@ -338,7 +371,12 @@ function collectRequestAnomalyAggregates(batches: EventBatch[], capturePreset: C
       const routeTemplate = normalizedEvent.route_template;
       const threshold = getRequestAnomalyThreshold({ responseStatus, capturePreset });
 
-      if (threshold === null || responseStatus === null || method === null || routeTemplate === null) {
+      if (
+        threshold === null ||
+        responseStatus === null ||
+        method === null ||
+        routeTemplate === null
+      ) {
         continue;
       }
 
@@ -363,14 +401,25 @@ function collectRequestAnomalyAggregates(batches: EventBatch[], capturePreset: C
         routeTemplate,
         responseStatus
       });
-      const incidentId = deriveIncidentId(projectId, event.service.name, event.service.environment, incidentFingerprint);
+      const incidentId = deriveIncidentId(
+        projectId,
+        event.service.name,
+        event.service.environment,
+        incidentFingerprint
+      );
       const aggregate = grouped.get(incidentId) ?? {
         incidentId,
         projectId,
         serviceName: event.service.name,
         environment: event.service.environment,
         fingerprint: incidentFingerprint,
-        matchedFields: new Set<string>(["request_anomaly", "route_template", "http_method", "http_status", "environment"]),
+        matchedFields: new Set<string>([
+          "request_anomaly",
+          "route_template",
+          "http_method",
+          "http_status",
+          "environment"
+        ]),
         newEvents: [],
         mergedIncidentIds: new Set<string>([incidentId]),
         signalEventTypes: new Set<EventEnvelope["event_type"]>(["request_event"]),
@@ -402,25 +451,6 @@ function collectRequestAnomalyAggregates(batches: EventBatch[], capturePreset: C
     .sort((left, right) => left.incidentId.localeCompare(right.incidentId));
 }
 
-function buildBundleContext(incident: LocalIncidentState): BundleBuildContext {
-  return {
-    incident_id: incident.incident_id,
-    project_id: incident.project_id,
-    service_id: incident.service_id,
-    service_name: incident.service_name,
-    service_runtime: incident.service_runtime,
-    service_framework: incident.service_framework,
-    environment: incident.environment,
-    fingerprint: incident.fingerprint,
-    title: incident.title,
-    severity: incident.severity,
-    first_seen_at: incident.first_seen_at,
-    last_seen_at: incident.last_seen_at,
-    occurrence_count: incident.occurrence_count,
-    source_event_types: [...incident.source_event_types]
-  };
-}
-
 function requireProjectId(event: EventEnvelope): string {
   if (typeof event.project_id !== "string") {
     throw new Error(`Local event ${event.event_id} is missing project_id.`);
@@ -430,7 +460,9 @@ function requireProjectId(event: EventEnvelope): string {
 }
 
 function formatServiceSummary(services: Array<{ service: string; incidents: number }>): string[] {
-  return services.map(({ service, incidents }) => `- ${incidents} incident${incidents === 1 ? "" : "s"} in ${service}`);
+  return services.map(
+    ({ service, incidents }) => `- ${incidents} incident${incidents === 1 ? "" : "s"} in ${service}`
+  );
 }
 
 function formatProcessOutput(summary: ProcessSummary): string {
@@ -443,60 +475,6 @@ function formatProcessOutput(summary: ProcessSummary): string {
     ...formatServiceSummary(summary.services),
     `Last processed event file: ${summary.last_processed_event_file}`
   ].join("\n");
-}
-
-async function pathExists(path: string, stat: StatReader): Promise<boolean> {
-  try {
-    await stat(path);
-    return true;
-  } catch (error) {
-    if (isRecord(error) && error["code"] === "ENOENT") {
-      return false;
-    }
-
-    throw error;
-  }
-}
-
-async function readState(statePath: string, readFile: FileReader, stat: StatReader): Promise<LocalProcessingState | null> {
-  if (!(await pathExists(statePath, stat))) {
-    return null;
-  }
-
-  try {
-    return parseState(await readFile(statePath));
-  } catch {
-    return null;
-  }
-}
-
-async function readEventBatches(eventDirectoryPath: string, fileNames: string[], readFile: FileReader): Promise<EventBatch[]> {
-  const batches: EventBatch[] = [];
-
-  for (const fileName of fileNames) {
-    const filePath = join(eventDirectoryPath, fileName);
-    const parsed = JSON.parse(await readFile(filePath)) as unknown;
-    if (!Array.isArray(parsed)) {
-      throw new Error(`Invalid local event batch in ${join(LOCAL_EVENTS_DIRECTORY_PATH, fileName)}.`);
-    }
-
-    const validatedEvents: EventEnvelope[] = [];
-    for (const eventCandidate of parsed) {
-      const validated = validateEvent(eventCandidate);
-      if (!validated.success) {
-        const issue = validated.error.issues[0]?.message ?? "Unknown event validation error.";
-        throw new Error(`Invalid local event in ${join(LOCAL_EVENTS_DIRECTORY_PATH, fileName)}: ${issue}`);
-      }
-      validatedEvents.push(validated.data);
-    }
-
-    batches.push({
-      fileName,
-      events: validatedEvents.sort(compareEventEnvelopes)
-    });
-  }
-
-  return batches;
 }
 
 function buildNoNewEventsSummary(lastProcessedEventFile: string | null): ProcessSummary {
@@ -530,39 +508,19 @@ function buildProcessedSummary(input: {
   };
 }
 
-function sortIncidentRecord(incident: LocalIncidentState): LocalIncidentState {
-  return {
-    ...incident,
-    matched_fields: [...incident.matched_fields].sort(),
-    source_event_types: [...incident.source_event_types].sort(),
-    source_events: [...incident.source_events].sort(compareEventEnvelopes)
-  };
-}
-
-function serializeState(state: LocalProcessingState): string {
-  const incidents = Object.fromEntries(
-    Object.entries(state.incidents)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([incidentId, incident]) => [incidentId, sortIncidentRecord(incident)])
-  );
-
-  return `${JSON.stringify({
-    version: 1,
-    last_processed_event_file: state.last_processed_event_file,
-    incidents
-  }, null, 2)}\n`;
-}
-
 export async function processCommand(
   input: { json?: boolean; preset?: CapturePreset },
   dependencies: ProcessCommandDependencies = {}
 ): Promise<CliCommandResult> {
   const cwd = dependencies.cwd ?? (() => process.cwd());
   const mkdir = dependencies.mkdir ?? mkdirFromFs;
-  const readFile = dependencies.readFile ?? ((filePath: string) => readFileFromFs(filePath, "utf8"));
+  const readFile =
+    dependencies.readFile ?? ((filePath: string) => readFileFromFs(filePath, "utf8"));
   const readdir = dependencies.readdir ?? readdirFromFs;
   const stat = dependencies.stat ?? statFromFs;
-  const writeFile = dependencies.writeFile ?? ((filePath: string, content: string) => writeFileFromFs(filePath, content, "utf8"));
+  const writeFile =
+    dependencies.writeFile ??
+    ((filePath: string, content: string) => writeFileFromFs(filePath, content, "utf8"));
   const rootDirectory = cwd();
   const eventsDirectoryPath = join(rootDirectory, LOCAL_EVENTS_DIRECTORY_PATH);
   const statePath = join(rootDirectory, LOCAL_STATE_FILE_PATH);
@@ -575,20 +533,26 @@ export async function processCommand(
   await mkdir(reproductionDirectoryPath, { recursive: true });
 
   const previousState = await readState(statePath, readFile, stat);
+  const receivedAt = (dependencies.now ?? (() => new Date()))().toISOString();
 
-  const eventFileNames = await pathExists(eventsDirectoryPath, stat)
-    ? (await readdir(eventsDirectoryPath)).filter((fileName) => fileName.endsWith(".events.json")).sort()
+  const eventFileNames = (await pathExists(eventsDirectoryPath, stat))
+    ? (await readdir(eventsDirectoryPath))
+        .filter((fileName) => fileName.endsWith(".events.json"))
+        .sort()
     : [];
 
   const lastProcessedEventFile = previousState?.last_processed_event_file ?? null;
-  const newEventFileNames = lastProcessedEventFile === null
-    ? eventFileNames
-    : eventFileNames.filter((fileName) => fileName > lastProcessedEventFile);
+  const newEventFileNames =
+    lastProcessedEventFile === null
+      ? eventFileNames
+      : eventFileNames.filter((fileName) => fileName > lastProcessedEventFile);
   const processAllEventFiles = input.preset !== undefined;
   const targetEventFileNames = processAllEventFiles ? eventFileNames : newEventFileNames;
 
   if (targetEventFileNames.length === 0) {
-    const summary = buildNoNewEventsSummary(previousState?.last_processed_event_file ?? eventFileNames.at(-1) ?? null);
+    const summary = buildNoNewEventsSummary(
+      previousState?.last_processed_event_file ?? eventFileNames.at(-1) ?? null
+    );
     return {
       exitCode: 0,
       output: input.json === true ? JSON.stringify(summary) : formatProcessOutput(summary)
@@ -596,11 +560,31 @@ export async function processCommand(
   }
 
   const batches = await readEventBatches(eventsDirectoryPath, targetEventFileNames, readFile);
+  const diagnosticReceiptPath = join(rootDirectory, ".debugbundle/local/evidence-receipts.json");
+  const receipts = (await pathExists(diagnosticReceiptPath, stat))
+    ? parseDiagnosticReceipts(JSON.parse(await readFile(diagnosticReceiptPath)))
+    : {};
+  for (const [id, at] of Object.entries(previousState?.diagnostic_receipts ?? {})) {
+    if (receipts[id] === undefined || Date.parse(at) < Date.parse(receipts[id])) receipts[id] = at;
+  }
+  const diagnostics = collectLocalDiagnosticContext(
+    { ...previousState, diagnostic_receipts: receipts },
+    batches.flatMap((batch) => batch.events),
+    receivedAt
+  );
+  // Receipt durability precedes artifact processing, including rejected context.
+  // State loss or an interrupted rebuild cannot renew its admission timestamp.
+  if (diagnostics.diagnostic_receipts) {
+    await writeFile(diagnosticReceiptPath, `${JSON.stringify(diagnostics.diagnostic_receipts)}\n`);
+  }
   const incidents = new Map<string, LocalIncidentState>(
     processAllEventFiles ? [] : Object.entries(previousState?.incidents ?? {})
   );
   const aggregates = new Map<string, AggregatedIncident>();
-  const traceCorrelationGroups = new Map<string, { incidentIds: Set<string>; hasBackend: boolean; hasFrontend: boolean }>();
+  const traceCorrelationGroups = new Map<
+    string,
+    { incidentIds: Set<string>; hasBackend: boolean; hasFrontend: boolean }
+  >();
   let eventsProcessed = 0;
 
   for (const batch of batches) {
@@ -613,7 +597,12 @@ export async function processCommand(
       const normalizedEvent = normalizeEvent(event);
       const incidentFingerprint = fingerprint(normalizedEvent);
       const projectId = requireProjectId(event);
-      const incidentId = deriveIncidentId(projectId, event.service.name, event.service.environment, incidentFingerprint);
+      const incidentId = deriveIncidentId(
+        projectId,
+        event.service.name,
+        event.service.environment,
+        incidentFingerprint
+      );
       const aggregate: AggregatedIncident = aggregates.get(incidentId) ?? {
         incidentId,
         projectId,
@@ -682,14 +671,19 @@ export async function processCommand(
       return;
     }
 
-    const [nextRoot, absorbedRoot] = leftParent.localeCompare(rightParent) <= 0
-      ? [leftParent, rightParent]
-      : [rightParent, leftParent];
+    const [nextRoot, absorbedRoot] =
+      leftParent.localeCompare(rightParent) <= 0
+        ? [leftParent, rightParent]
+        : [rightParent, leftParent];
     aggregateParent.set(absorbedRoot, nextRoot);
   }
 
   for (const traceCorrelationGroup of traceCorrelationGroups.values()) {
-    if (!traceCorrelationGroup.hasBackend || !traceCorrelationGroup.hasFrontend || traceCorrelationGroup.incidentIds.size < 2) {
+    if (
+      !traceCorrelationGroup.hasBackend ||
+      !traceCorrelationGroup.hasFrontend ||
+      traceCorrelationGroup.incidentIds.size < 2
+    ) {
       continue;
     }
 
@@ -715,10 +709,14 @@ export async function processCommand(
   const mergedAggregates = [...mergedAggregatesByRoot.values()]
     .map((aggregateGroup) => mergeAggregateGroup(aggregateGroup))
     .sort((left, right) => left.incidentId.localeCompare(right.incidentId));
-  const requestAnomalyAggregates = input.preset === undefined ? [] : collectRequestAnomalyAggregates(batches, capturePreset);
-  const finalizedAggregates = [...mergedAggregates, ...requestAnomalyAggregates].sort((left, right) => left.incidentId.localeCompare(right.incidentId));
+  const requestAnomalyAggregates =
+    input.preset === undefined ? [] : collectRequestAnomalyAggregates(batches, capturePreset);
+  const finalizedAggregates = [...mergedAggregates, ...requestAnomalyAggregates].sort(
+    (left, right) => left.incidentId.localeCompare(right.incidentId)
+  );
 
   const services = new Map<string, number>();
+  const writtenIncidents = new Set<string>();
 
   for (const aggregate of finalizedAggregates) {
     const incidentId = aggregate.incidentId;
@@ -726,12 +724,15 @@ export async function processCommand(
     const existingIncidents = [...aggregate.mergedIncidentIds]
       .map((mergedIncidentId) => incidents.get(mergedIncidentId))
       .filter((incident): incident is LocalIncidentState => incident !== undefined);
-    const existing = existingIncidents.find((incident) => incident.incident_id === incidentId) ?? existingIncidents[0];
+    const existing =
+      existingIncidents.find((incident) => incident.incident_id === incidentId) ??
+      existingIncidents[0];
     const existingSourceEvents = existingIncidents.flatMap((incident) => incident.source_events);
     const combinedSourceEvents = mergeSourceEvents(existingSourceEvents, aggregate.newEvents);
-    const signalEvents = aggregate.kind === "request_anomaly"
-      ? combinedSourceEvents
-      : combinedSourceEvents.filter((event) => isIncidentSignalEnvelope(event, capturePreset));
+    const signalEvents =
+      aggregate.kind === "request_anomaly"
+        ? combinedSourceEvents
+        : combinedSourceEvents.filter((event) => isIncidentSignalEnvelope(event, capturePreset));
     if (signalEvents.length === 0) {
       continue;
     }
@@ -743,10 +744,11 @@ export async function processCommand(
     }
 
     const sourceEventTypes = [...new Set(signalEvents.map((event) => event.event_type))].sort();
-    const severity = signalEvents
-      .map((event) => inferSeverity(event, capturePreset, aggregate.kind))
-      .sort((left, right) => severityRank(right) - severityRank(left))[0] ?? aggregate.severity;
-    const generationNumber = signalEvents.length;
+    const severity =
+      signalEvents
+        .map((event) => inferSeverity(event, capturePreset, aggregate.kind))
+        .sort((left, right) => severityRank(right) - severityRank(left))[0] ?? aggregate.severity;
+    const generationNumber = Math.max(signalEvents.length, (existing?.generation_number ?? 0) + 1);
     const bundlePath = `${LOCAL_BUNDLE_DIRECTORY_PATH}/${incidentId}.bundle.json`;
     const reproductionPath = `${LOCAL_REPRODUCTION_DIRECTORY_PATH}/${incidentId}.reproduction.json`;
     const incident: LocalIncidentState = {
@@ -759,60 +761,44 @@ export async function processCommand(
       service_framework: latestSignalEvent.service.framework ?? existing?.service_framework ?? null,
       environment: aggregate.environment,
       fingerprint: aggregate.fingerprint,
-      fingerprint_version: aggregate.kind === "request_anomaly" ? FINGERPRINT_VERSION : fingerprintVersion(normalizeEvent(latestSignalEvent)),
+      fingerprint_version:
+        aggregate.kind === "request_anomaly"
+          ? FINGERPRINT_VERSION
+          : fingerprintVersion(normalizeEvent(latestSignalEvent)),
       title: aggregate.title,
       severity,
-      status: existingIncidents.some((incidentState) => incidentState.status === "resolved") ? "open" : existing?.status ?? "open",
+      status: existingIncidents.some((incidentState) => incidentState.status === "resolved")
+        ? "open"
+        : (existing?.status ?? "open"),
       first_seen_at: firstSignalEvent.occurred_at,
       last_seen_at: latestSignalEvent.occurred_at,
       occurrence_count: signalEvents.length,
       source_event_id: latestSignalEvent.event_id,
       source_occurred_at: latestSignalEvent.occurred_at,
       source_event_types: sourceEventTypes,
-      matched_fields: mergeMatchedFields(existingIncidents.flatMap((incidentState) => incidentState.matched_fields), aggregate.matchedFields),
+      matched_fields: mergeMatchedFields(
+        existingIncidents.flatMap((incidentState) => incidentState.matched_fields),
+        aggregate.matchedFields
+      ),
       bundle_path: bundlePath,
       reproduction_path: reproductionPath,
       generation_number: generationNumber,
-      source_events: combinedSourceEvents
+      source_events: combinedSourceEvents,
+      failure_event_ids: signalEvents.map((event) => event.event_id)
     };
 
-    const jobTrigger: BuildBundleJob["trigger"] = existing?.status === "resolved" ? "regression_reopen" : "occurrence_threshold";
-    const bundle = buildBundle({
-      job: {
-        trigger: jobTrigger
-      },
-      incident: buildBundleContext(incident),
-      bundleMetadata: {
-        generation_number: generationNumber,
-        created_at: incident.first_seen_at,
-        updated_at: incident.last_seen_at,
-        source_event_id: incident.source_event_id,
-        source_occurred_at: incident.source_occurred_at
-      },
-      sourceEnvelopes: combinedSourceEvents,
-      probeDataItems: []
+    const jobTrigger: BuildBundleJob["trigger"] =
+      existing?.status === "resolved" ? "regression_reopen" : "occurrence_threshold";
+    await writeLocalBundleArtifacts({
+      rootDirectory,
+      incident,
+      contexts: diagnostics.diagnostic_contexts ?? [],
+      updatedAt: receivedAt,
+      trigger: jobTrigger,
+      writeFile,
+      readFile
     });
-    const reproduction = buildReproduction(bundle);
-    const finalizedBundle = BundleV1Schema.parse({
-      ...bundle,
-      sdk: CLI_SDK,
-      reproduction,
-      links: {
-        ...bundle.links,
-        self: bundlePath,
-        reproduction: reproductionPath
-      },
-      metadata: {
-        ...bundle.metadata,
-        created_at: incident.first_seen_at,
-        updated_at: incident.last_seen_at,
-        generator_version: CLI_GENERATOR_VERSION,
-        generation_number: generationNumber
-      }
-    });
-
-    await writeFile(join(rootDirectory, bundlePath), `${JSON.stringify(finalizedBundle, null, 2)}\n`);
-    await writeFile(join(rootDirectory, reproductionPath), `${JSON.stringify(reproduction, null, 2)}\n`);
+    writtenIncidents.add(incidentId);
 
     for (const mergedIncidentId of aggregate.mergedIncidentIds) {
       if (mergedIncidentId !== incidentId) {
@@ -824,11 +810,29 @@ export async function processCommand(
     services.set(incident.service_name, (services.get(incident.service_name) ?? 0) + 1);
   }
 
+  for (const [id, incident] of incidents) {
+    if (writtenIncidents.has(id)) continue;
+    incidents.set(
+      id,
+      await rebuildLocalDiagnosticArtifacts({
+        rootDirectory,
+        incident,
+        contexts: diagnostics.diagnostic_contexts ?? [],
+        updatedAt: receivedAt,
+        writeFile,
+        readFile
+      })
+    );
+  }
+
   const finalProcessedEventFile = targetEventFileNames[targetEventFileNames.length - 1] as string;
   const nextState: LocalProcessingState = {
     version: 1,
     last_processed_event_file: finalProcessedEventFile,
-    incidents: Object.fromEntries([...incidents.entries()].sort(([left], [right]) => left.localeCompare(right)))
+    ...diagnostics,
+    incidents: Object.fromEntries(
+      [...incidents.entries()].sort(([left], [right]) => left.localeCompare(right))
+    )
   };
   await writeFile(statePath, serializeState(nextState));
 
@@ -836,10 +840,12 @@ export async function processCommand(
     filesProcessed: newEventFileNames.length,
     eventsProcessed,
     incidentsProcessed: finalizedAggregates.length,
-    services: [...services.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([service, count]) => ({
-      service,
-      incidents: count
-    })),
+    services: [...services.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([service, count]) => ({
+        service,
+        incidents: count
+      })),
     lastProcessedEventFile: finalProcessedEventFile
   });
 

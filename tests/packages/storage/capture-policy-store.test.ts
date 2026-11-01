@@ -13,7 +13,7 @@ describe("capture policy store", () => {
         capture_breadcrumbs: null,
         capture_probe_events: null,
         immediate_client_error_statuses: null,
-        updated_at: "2026-03-15T00:00:00.000Z",
+        updated_at: "2026-03-15T00:00:00.000Z"
       };
       const query = vi.fn().mockResolvedValue({ rows: [row] });
 
@@ -45,14 +45,14 @@ describe("capture policy store", () => {
         capture_breadcrumbs: null,
         capture_probe_events: null,
         immediate_client_error_statuses: null,
-        updated_at: "2026-03-15T00:00:00.000Z",
+        updated_at: "2026-03-15T00:00:00.000Z"
       };
       const query = vi.fn().mockResolvedValue({ rows: [row] });
 
       const store = createPostgresCapturePolicyStore({ query });
       const result = await store.upsertCapturePolicy({
         project_id: "proj_123",
-        preset: "minimal",
+        preset: "minimal"
       });
 
       expect(result).toEqual(row);
@@ -72,7 +72,7 @@ describe("capture policy store", () => {
         capture_breadcrumbs: null,
         capture_probe_events: null,
         immediate_client_error_statuses: [401, 403],
-        updated_at: "2026-03-15T01:00:00.000Z",
+        updated_at: "2026-03-15T01:00:00.000Z"
       };
       const query = vi.fn().mockResolvedValue({ rows: [row] });
 
@@ -81,7 +81,7 @@ describe("capture policy store", () => {
         project_id: "proj_123",
         preset: "balanced",
         capture_logs: "info",
-        immediate_client_error_statuses: [401, 403],
+        immediate_client_error_statuses: [401, 403]
       });
 
       expect(result).toEqual(row);
@@ -96,7 +96,7 @@ describe("capture policy store", () => {
         capture_breadcrumbs: null,
         capture_probe_events: null,
         immediate_client_error_statuses: [],
-        updated_at: "2026-03-15T02:00:00.000Z",
+        updated_at: "2026-03-15T02:00:00.000Z"
       };
       const query = vi.fn().mockResolvedValue({ rows: [row] });
 
@@ -106,13 +106,14 @@ describe("capture policy store", () => {
         preset: "investigative",
         capture_logs: null,
         capture_request_events: "all",
-        immediate_client_error_statuses: [],
+        immediate_client_error_statuses: []
       });
 
       expect(result).toEqual(row);
-      // Verify all 8 params are passed
+      // The new nullable context override follows the preserved eight existing parameters.
       const params = query.mock.calls[0]![1] as unknown[];
-      expect(params).toHaveLength(8);
+      expect(params).toHaveLength(9);
+      expect(params[8]).toBeNull();
       expect(params[6]).toBe(JSON.stringify([]));
       expect(params[7]).toBeNull();
     });
@@ -128,7 +129,7 @@ describe("capture policy store", () => {
         capture_breadcrumbs: null,
         capture_probe_events: null,
         immediate_client_error_statuses: null,
-        updated_at: "2026-03-15T00:00:00.000Z",
+        updated_at: "2026-03-15T00:00:00.000Z"
       };
       const query = vi.fn().mockResolvedValue({ rows: [row] });
 
@@ -151,7 +152,7 @@ describe("capture policy store", () => {
         capture_breadcrumbs: null,
         capture_probe_events: null,
         immediate_client_error_statuses: null,
-        updated_at: "2026-03-15T00:00:00.000Z",
+        updated_at: "2026-03-15T00:00:00.000Z"
       };
       const query = vi.fn().mockResolvedValue({ rows: [row] });
 
@@ -172,7 +173,7 @@ describe("capture policy store", () => {
         capture_breadcrumbs: null,
         capture_probe_events: null,
         immediate_client_error_statuses: null,
-        updated_at: "2026-03-15T00:00:00.000Z",
+        updated_at: "2026-03-15T00:00:00.000Z"
       };
       const query = vi.fn().mockResolvedValue({ rows: [row] });
 

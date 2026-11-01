@@ -1,90 +1,100 @@
 import { MutationOutcomeUnconfirmedError } from "./mutation-outcome.js";
 export { MutationOutcomeUnconfirmedError, formatMutationOutcomeError } from "./mutation-outcome.js";
 import { z } from "zod";
-import { ProjectColorTagSchema, type ProjectColorTag } from "../../shared-types/src/index.js";
+import {
+  ProjectColorTagSchema,
+  EvidenceInterpretationSchema,
+  type ProjectColorTag
+} from "../../shared-types/src/index.js";
 
-const ProjectColorTagResponseSchema = z.unknown().transform((value, context): ProjectColorTag | null => {
-  if (value === undefined || value === null) {
-    return null;
-  }
+const ProjectColorTagResponseSchema = z
+  .unknown()
+  .optional()
+  .transform((value, context): ProjectColorTag | null => {
+    if (value === undefined || value === null) {
+      return null;
+    }
 
-  const parsed = ProjectColorTagSchema.safeParse(value);
-  if (!parsed.success) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Invalid project color tag"
-    });
-    return z.NEVER;
-  }
+    const parsed = ProjectColorTagSchema.safeParse(value);
+    if (!parsed.success) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Invalid project color tag"
+      });
+      return z.NEVER;
+    }
 
-  return parsed.data;
+    return parsed.data;
+  });
+
+export const IncidentReasonSchema = z.object({
+  kind: z.enum(["backend_exception", "frontend_exception", "request_failure", "error_log"]),
+  description: z.string(),
+  event_type: z.enum(["backend_exception", "frontend_exception", "request_event", "log_event"]),
+  event_class: z.literal("incident_signal"),
+  matched_policy: z.string()
 });
 
-export const IncidentReasonSchema = z
-  .object({
-    kind: z.enum(["backend_exception", "frontend_exception", "request_failure", "error_log"]),
-    description: z.string(),
-    event_type: z.enum(["backend_exception", "frontend_exception", "request_event", "log_event"]),
-    event_class: z.literal("incident_signal"),
-    matched_policy: z.string()
-  });
+export const IncidentSchema = z.object({
+  incident_id: z.string(),
+  project_id: z.string(),
+  project_name: z.string(),
+  project_color_tag: ProjectColorTagResponseSchema,
+  service_id: z.string().nullable(),
+  service_name: z.string().nullable(),
+  latest_deployment_id: z.string().nullable(),
+  environment: z.string(),
+  fingerprint: z.string(),
+  fingerprint_version: z.string(),
+  title: z.string(),
+  severity: z.string(),
+  status: z.string(),
+  first_seen_at: z.string(),
+  last_seen_at: z.string(),
+  occurrence_count: z.number().int(),
+  spike_detected_at: z.string().nullable(),
+  resolved_at: z.string().nullable().optional(),
+  regressed_at: z.string().nullable(),
+  matched_fields: z.array(z.string()),
+  incident_reason: IncidentReasonSchema.optional()
+});
 
-export const IncidentSchema = z
-  .object({
-    incident_id: z.string(),
-    project_id: z.string(),
-    project_name: z.string(),
-    project_color_tag: ProjectColorTagResponseSchema,
-    service_id: z.string().nullable(),
-    service_name: z.string().nullable(),
-    latest_deployment_id: z.string().nullable(),
-    environment: z.string(),
-    fingerprint: z.string(),
-    fingerprint_version: z.string(),
-    title: z.string(),
-    severity: z.string(),
-    status: z.string(),
-    first_seen_at: z.string(),
-    last_seen_at: z.string(),
-    occurrence_count: z.number().int(),
-    spike_detected_at: z.string().nullable(),
-    resolved_at: z.string().nullable().optional(),
-    regressed_at: z.string().nullable(),
-    matched_fields: z.array(z.string()),
-    incident_reason: IncidentReasonSchema.optional()
-  });
-
-export const ImprovementSchema = z
-  .object({
-    improvement_id: z.string(),
-    project_id: z.string(),
-    project_name: z.string(),
-    project_color_tag: ProjectColorTagResponseSchema,
-    project_slug: z.string(),
-    service_id: z.string().nullable(),
-    service_name: z.string(),
-    service_runtime: z.string().nullable(),
-    service_framework: z.string().nullable(),
-    environment: z.string(),
-    kind: z.enum(["warning_hotspot", "slow_request", "request_failure_pattern", "recurring_incident", "post_deploy_regression"]),
-    status: z.enum(["open", "resolved", "snoozed"]),
-    severity: z.enum(["low", "medium", "high", "critical"]),
-    confidence: z.number(),
-    fingerprint: z.string(),
-    title: z.string(),
-    summary: z.string(),
-    occurrence_count: z.number().int(),
-    evidence: z.record(z.unknown()),
-    related_incident_ids: z.array(z.string()),
-    first_detected_at: z.string(),
-    last_detected_at: z.string(),
-    resolved_at: z.string().nullable(),
-    snoozed_until: z.string().nullable(),
-    bundle_generation_number: z.number().int(),
-    bundle_created_at: z.string().nullable(),
-    bundle_updated_at: z.string().nullable(),
-    bundle_failure_reason: z.string().nullable()
-  });
+export const ImprovementSchema = z.object({
+  improvement_id: z.string(),
+  project_id: z.string(),
+  project_name: z.string(),
+  project_color_tag: ProjectColorTagResponseSchema,
+  project_slug: z.string(),
+  service_id: z.string().nullable(),
+  service_name: z.string(),
+  service_runtime: z.string().nullable(),
+  service_framework: z.string().nullable(),
+  environment: z.string(),
+  kind: z.enum([
+    "warning_hotspot",
+    "slow_request",
+    "request_failure_pattern",
+    "recurring_incident",
+    "post_deploy_regression"
+  ]),
+  status: z.enum(["open", "resolved", "snoozed"]),
+  severity: z.enum(["low", "medium", "high", "critical"]),
+  confidence: z.number(),
+  fingerprint: z.string(),
+  title: z.string(),
+  summary: z.string(),
+  occurrence_count: z.number().int(),
+  evidence: z.record(z.string(), z.unknown()),
+  related_incident_ids: z.array(z.string()),
+  first_detected_at: z.string(),
+  last_detected_at: z.string(),
+  resolved_at: z.string().nullable(),
+  snoozed_until: z.string().nullable(),
+  bundle_generation_number: z.number().int(),
+  bundle_created_at: z.string().nullable(),
+  bundle_updated_at: z.string().nullable(),
+  bundle_failure_reason: z.string().nullable()
+});
 
 type ParsedIncidentRecord = z.infer<typeof IncidentSchema>;
 export type IncidentRecord = Omit<ParsedIncidentRecord, "project_color_tag"> & {
@@ -96,169 +106,151 @@ export type ImprovementRecord = Omit<ParsedImprovementRecord, "project_color_tag
   project_color_tag: ProjectColorTag | null;
 };
 
-export const ServiceSchema = z
-  .object({
-    service_id: z.string(),
-    project_id: z.string(),
-    name: z.string(),
-    runtime: z.string().nullable(),
-    framework: z.string().nullable(),
-    environment: z.string()
-  });
+export const ServiceSchema = z.object({
+  service_id: z.string(),
+  project_id: z.string(),
+  name: z.string(),
+  runtime: z.string().nullable(),
+  framework: z.string().nullable(),
+  environment: z.string()
+});
 
-export const LogSchema = z
-  .object({
-    event_id: z.string(),
-    event_type: z.string(),
-    occurred_at: z.string(),
-    is_sampled: z.boolean(),
-    level: z.string().nullable()
-  });
+export const LogSchema = z.object({
+  event_id: z.string(),
+  event_type: z.string(),
+  occurred_at: z.string(),
+  is_sampled: z.boolean(),
+  level: z.string().nullable()
+});
 
-export const IncidentsResponseSchema = z
-  .object({
-    incidents: z.array(IncidentSchema),
-    next_cursor: z.string().nullable().optional(),
-    total_pages: z.number().int().positive().optional()
-  });
+export const IncidentsResponseSchema = z.object({
+  incidents: z.array(IncidentSchema),
+  next_cursor: z.string().nullable().optional(),
+  total_pages: z.number().int().positive().optional()
+});
 
-export const IncidentResponseSchema = z
-  .object({
-    incident: IncidentSchema
-  });
+export const IncidentResponseSchema = z.object({
+  incident: IncidentSchema
+});
 
-export const BulkIncidentResponseSchema = z
-  .object({
-    incidents: z.array(IncidentSchema)
-  });
+export const BulkIncidentResponseSchema = z.object({
+  incidents: z.array(IncidentSchema)
+});
 
-export const ImprovementResponseSchema = z
-  .object({
-    improvement: ImprovementSchema
-  });
+export const ImprovementResponseSchema = z.object({
+  improvement: ImprovementSchema
+});
 
-export const IncidentContextArtifactSchema = z
-  .object({
-    status: z.enum(["ready", "pending", "failed"]),
-    body: z.unknown().optional(),
-    reason: z.string().nullable().optional()
-  });
+export const IncidentContextArtifactSchema = z.object({
+  status: z.enum(["ready", "pending", "failed"]),
+  body: z.unknown().optional(),
+  reason: z.string().nullable().optional()
+});
 
-export const IncidentContextLogsSchema = z
-  .object({
-    source: z.enum(["retrieval", "bundle_context", "none"]),
-    items: z.array(z.unknown()),
-    next_cursor: z.string().nullable()
-  });
+export const IncidentContextLogsSchema = z.object({
+  source: z.enum(["retrieval", "bundle_context", "none"]),
+  items: z.array(z.unknown()),
+  next_cursor: z.string().nullable()
+});
 
-export const IncidentContextDeploySchema = z
-  .object({
-    latest_deployment_id: z.string().nullable(),
-    commit_sha: z.string().nullable(),
-    deploy_version: z.string().nullable(),
-    branch: z.string().nullable(),
-    deployed_at: z.string().nullable(),
-    regression_window: z.boolean().nullable()
-  });
+export const IncidentContextDeploySchema = z.object({
+  latest_deployment_id: z.string().nullable(),
+  commit_sha: z.string().nullable(),
+  deploy_version: z.string().nullable(),
+  branch: z.string().nullable(),
+  deployed_at: z.string().nullable(),
+  regression_window: z.boolean().nullable()
+});
 
-export const IncidentContextGroupingSchema = z
-  .object({
-    fingerprint: z.string(),
-    fingerprint_version: z.string(),
-    matched_fields: z.array(z.string())
-  });
+export const IncidentContextGroupingSchema = z.object({
+  fingerprint: z.string(),
+  fingerprint_version: z.string(),
+  matched_fields: z.array(z.string())
+});
 
-export const IncidentContextVisibilitySchema = z
-  .object({
-    grouping: z.string(),
-    bundle_regeneration: z.string(),
-    spike_detection: z.string(),
-    notification_cooldown: z.string()
-  });
+export const IncidentContextVisibilitySchema = z.object({
+  grouping: z.string(),
+  bundle_regeneration: z.string(),
+  spike_detection: z.string(),
+  notification_cooldown: z.string()
+});
 
-export const IncidentContextRedactionSchema = z
-  .object({
-    redacted: z.boolean(),
-    fields: z.array(z.string()),
-    notes: z.string().nullable()
-  });
+export const IncidentContextRedactionSchema = z.object({
+  redacted: z.boolean(),
+  fields: z.array(z.string()),
+  notes: z.string().nullable()
+});
 
-export const IncidentContextPrimarySignalSchema = z
-  .object({
-    kind: IncidentReasonSchema.shape.kind.nullable(),
-    event_type: z.string().nullable(),
-    event_class: z.string().nullable(),
-    description: z.string(),
-    severity: z.string(),
-    service_name: z.string().nullable(),
-    environment: z.string(),
-    error_type: z.string().nullable(),
-    error_message: z.string().nullable(),
-    request_method: z.string().nullable(),
-    request_path: z.string().nullable(),
-    route_template: z.string().nullable(),
-    response_status: z.number().nullable(),
-    first_application_frame: z
-      .object({
-        file: z.string().nullable(),
-        line: z.number().nullable(),
-        function: z.string().nullable()
-      })
-      .nullable()
-  });
+export const IncidentContextPrimarySignalSchema = z.object({
+  kind: IncidentReasonSchema.shape.kind.nullable(),
+  event_type: z.string().nullable(),
+  event_class: z.string().nullable(),
+  description: z.string(),
+  severity: z.string(),
+  service_name: z.string().nullable(),
+  environment: z.string(),
+  error_type: z.string().nullable(),
+  error_message: z.string().nullable(),
+  request_method: z.string().nullable(),
+  request_path: z.string().nullable(),
+  route_template: z.string().nullable(),
+  response_status: z.number().nullable(),
+  first_application_frame: z
+    .object({
+      file: z.string().nullable(),
+      line: z.number().nullable(),
+      function: z.string().nullable()
+    })
+    .nullable()
+});
 
-export const IncidentContextBrowserSignalSchema = z
-  .object({
-    browser_event_kind: z.string().nullable(),
-    browser_event_opaque: z.boolean().nullable(),
-    browser_event_message: z.string().nullable(),
-    client_kind: z.enum(["human", "bot", "unknown"]),
-    bot_family: z.string().nullable()
-  });
+export const IncidentContextBrowserSignalSchema = z.object({
+  browser_event_kind: z.string().nullable(),
+  browser_event_opaque: z.boolean().nullable(),
+  browser_event_message: z.string().nullable(),
+  client_kind: z.enum(["human", "bot", "unknown"]),
+  bot_family: z.string().nullable()
+});
 
-export const IncidentContextSchema = z
-  .object({
-    incident: IncidentSchema,
-    incident_reason: IncidentReasonSchema.nullable(),
-    primary_signal: IncidentContextPrimarySignalSchema,
-    bundle: IncidentContextArtifactSchema,
-    reproduction: IncidentContextArtifactSchema,
-    logs: IncidentContextLogsSchema,
-    deploy: IncidentContextDeploySchema,
-    grouping: IncidentContextGroupingSchema,
-    visibility: IncidentContextVisibilitySchema,
-    redaction: IncidentContextRedactionSchema.nullable(),
-    browser_signal: IncidentContextBrowserSignalSchema.nullable().optional(),
-    suggested_next_checks: z.array(z.string())
-  });
+export const IncidentContextSchema = z.object({
+  incident: IncidentSchema,
+  incident_reason: IncidentReasonSchema.nullable(),
+  primary_signal: IncidentContextPrimarySignalSchema,
+  bundle: IncidentContextArtifactSchema,
+  reproduction: IncidentContextArtifactSchema,
+  logs: IncidentContextLogsSchema,
+  deploy: IncidentContextDeploySchema,
+  grouping: IncidentContextGroupingSchema,
+  visibility: IncidentContextVisibilitySchema,
+  redaction: IncidentContextRedactionSchema.nullable(),
+  browser_signal: IncidentContextBrowserSignalSchema.nullable().optional(),
+  evidence_interpretation: EvidenceInterpretationSchema.optional(),
+  suggested_next_checks: z.array(z.string())
+});
 
 type ParsedIncidentContext = z.infer<typeof IncidentContextSchema>;
 export type IncidentContextRecord = Omit<ParsedIncidentContext, "incident"> & {
   incident: IncidentRecord;
 };
 
-export const ServicesResponseSchema = z
-  .object({
-    services: z.array(ServiceSchema)
-  });
+export const ServicesResponseSchema = z.object({
+  services: z.array(ServiceSchema)
+});
 
-export const ImprovementsResponseSchema = z
-  .object({
-    improvements: z.array(ImprovementSchema),
-    next_cursor: z.string().nullable().optional(),
-    total_pages: z.number().int().positive().optional()
-  });
+export const ImprovementsResponseSchema = z.object({
+  improvements: z.array(ImprovementSchema),
+  next_cursor: z.string().nullable().optional(),
+  total_pages: z.number().int().positive().optional()
+});
 
-export const LogsResponseSchema = z
-  .object({
-    logs: z.array(LogSchema),
-    next_cursor: z.string().nullable().optional()
-  });
+export const LogsResponseSchema = z.object({
+  logs: z.array(LogSchema),
+  next_cursor: z.string().nullable().optional()
+});
 
-export const PendingStatusSchema = z
-  .object({
-    status: z.literal("pending")
-  });
+export const PendingStatusSchema = z.object({
+  status: z.literal("pending")
+});
 
 export const BundleSchema = z
   .object({
@@ -266,21 +258,19 @@ export const BundleSchema = z
   })
   .passthrough();
 
-export const ReproductionArtifactsSchema = z
-  .object({
-    curl: z.string().nullable().optional(),
-    httpie: z.string().nullable().optional(),
-    json_spec: z.unknown().nullable().optional()
-  });
+export const ReproductionArtifactsSchema = z.object({
+  curl: z.string().nullable().optional(),
+  httpie: z.string().nullable().optional(),
+  json_spec: z.unknown().nullable().optional()
+});
 
-export const ReproductionSchema = z
-  .object({
-    possible: z.boolean(),
-    confidence: z.number(),
-    reason: z.string(),
-    artifacts: ReproductionArtifactsSchema.nullable(),
-    feasibility_reference: z.unknown().nullable()
-  });
+export const ReproductionSchema = z.object({
+  possible: z.boolean(),
+  confidence: z.number(),
+  reason: z.string(),
+  artifacts: ReproductionArtifactsSchema.nullable(),
+  feasibility_reference: z.unknown().nullable()
+});
 
 export const BundleResponseSchema = z.union([PendingStatusSchema, BundleSchema]);
 
@@ -330,7 +320,7 @@ function parseApiError(status: number, body: unknown): never {
 
 async function expectParsed<TParsed>(
   responsePromise: Promise<HttpResponse>,
-  schema: z.ZodType<TParsed, z.ZodTypeDef, unknown>
+  schema: z.ZodType<TParsed, unknown>
 ): Promise<TParsed> {
   const response = await responsePromise;
   if (response.status < 200 || response.status >= 300) {
@@ -349,7 +339,7 @@ async function expectParsed<TParsed>(
 // Preserve definite HTTP rejections and never retry a mutation here.
 async function expectMutation<TParsed>(
   responsePromise: Promise<HttpResponse>,
-  schema: z.ZodType<TParsed, z.ZodTypeDef, unknown>
+  schema: z.ZodType<TParsed, unknown>
 ): Promise<TParsed> {
   let response: HttpResponse;
   try {
@@ -358,13 +348,16 @@ async function expectMutation<TParsed>(
     throw new MutationOutcomeUnconfirmedError();
   }
   if (response.status >= 500) throw new MutationOutcomeUnconfirmedError(response.status);
-  if (response.status < 200 || response.status >= 300) parseApiError(response.status, response.body);
+  if (response.status < 200 || response.status >= 300)
+    parseApiError(response.status, response.body);
   const parsed = schema.safeParse(response.body);
   if (!parsed.success) throw new MutationOutcomeUnconfirmedError(response.status);
   return parsed.data;
 }
 
-async function expectServices(responsePromise: Promise<HttpResponse>): Promise<Array<z.infer<typeof ServiceSchema>>> {
+async function expectServices(
+  responsePromise: Promise<HttpResponse>
+): Promise<Array<z.infer<typeof ServiceSchema>>> {
   const parsed = await expectParsed(responsePromise, ServicesResponseSchema);
   return parsed.services;
 }
@@ -404,12 +397,21 @@ export function createRetrievalApi(client: HttpClient): {
     limit?: number;
   }): Promise<{ incidents: IncidentRecord[]; next_cursor: string | null }>;
   getIncident(input: { bearerToken: string; incidentId: string }): Promise<IncidentRecord>;
-  getIncidentContext(input: { bearerToken: string; incidentId: string }): Promise<IncidentContextRecord>;
+  getIncidentContext(input: {
+    bearerToken: string;
+    incidentId: string;
+  }): Promise<IncidentContextRecord>;
   resolveIncident(input: { bearerToken: string; incidentId: string }): Promise<IncidentRecord>;
-  resolveIncidents(input: { bearerToken: string; incidentIds: string[] }): Promise<IncidentRecord[]>;
+  resolveIncidents(input: {
+    bearerToken: string;
+    incidentIds: string[];
+  }): Promise<IncidentRecord[]>;
   reopenIncident(input: { bearerToken: string; incidentId: string }): Promise<IncidentRecord>;
   reopenIncidents(input: { bearerToken: string; incidentIds: string[] }): Promise<IncidentRecord[]>;
-  getBundle(input: { bearerToken: string; incidentId: string }): Promise<z.infer<typeof PendingStatusSchema> | z.infer<typeof BundleSchema>>;
+  getBundle(input: {
+    bearerToken: string;
+    incidentId: string;
+  }): Promise<z.infer<typeof PendingStatusSchema> | z.infer<typeof BundleSchema>>;
   listLogs(input: {
     bearerToken: string;
     incidentId: string;
@@ -417,8 +419,15 @@ export function createRetrievalApi(client: HttpClient): {
     cursor?: string;
     limit?: number;
   }): Promise<{ logs: Array<z.infer<typeof LogSchema>>; next_cursor: string | null }>;
-  getReproduction(input: { bearerToken: string; incidentId: string }): Promise<z.infer<typeof PendingStatusSchema> | z.infer<typeof ReproductionSchema>>;
-  listServices(input: { bearerToken: string; projectId: string; limit?: number }): Promise<Array<z.infer<typeof ServiceSchema>>>;
+  getReproduction(input: {
+    bearerToken: string;
+    incidentId: string;
+  }): Promise<z.infer<typeof PendingStatusSchema> | z.infer<typeof ReproductionSchema>>;
+  listServices(input: {
+    bearerToken: string;
+    projectId: string;
+    limit?: number;
+  }): Promise<Array<z.infer<typeof ServiceSchema>>>;
   listImprovements(input: {
     bearerToken: string;
     projectId?: string;
@@ -431,8 +440,14 @@ export function createRetrievalApi(client: HttpClient): {
     limit?: number;
   }): Promise<{ improvements: ImprovementRecord[]; next_cursor: string | null }>;
   getImprovement(input: { bearerToken: string; improvementId: string }): Promise<ImprovementRecord>;
-  resolveImprovement(input: { bearerToken: string; improvementId: string }): Promise<ImprovementRecord>;
-  reopenImprovement(input: { bearerToken: string; improvementId: string }): Promise<ImprovementRecord>;
+  resolveImprovement(input: {
+    bearerToken: string;
+    improvementId: string;
+  }): Promise<ImprovementRecord>;
+  reopenImprovement(input: {
+    bearerToken: string;
+    improvementId: string;
+  }): Promise<ImprovementRecord>;
   snoozeImprovement(input: {
     bearerToken: string;
     improvementId: string;
@@ -442,7 +457,11 @@ export function createRetrievalApi(client: HttpClient): {
     bearerToken: string;
     projectId: string;
     improvementId: string;
-  }): Promise<z.infer<typeof PendingStatusSchema> | z.infer<typeof BundleSchema> | { status: "failed"; reason: string }>;
+  }): Promise<
+    | z.infer<typeof PendingStatusSchema>
+    | z.infer<typeof BundleSchema>
+    | { status: "failed"; reason: string }
+  >;
 } {
   return {
     async listIncidents(input) {

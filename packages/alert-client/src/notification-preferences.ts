@@ -45,7 +45,7 @@ export function createNotificationApi(http: NotificationHttpClient): Notificatio
       const base =
         scope.projectId === undefined
           ? "/v1/account"
-          : `/v1/projects/${z.string().uuid().parse(scope.projectId)}`;
+          : `/v1/projects/${z.string().guid().parse(scope.projectId)}`;
       const payload =
         action === "get"
           ? undefined

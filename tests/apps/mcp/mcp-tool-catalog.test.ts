@@ -6,6 +6,25 @@ import { PROBE_MCP_TOOL_CATALOG } from "../../../apps/mcp/src/probe-tool-catalog
 import { MCP_TOOL_CATALOG, MCP_TOOL_NAMES } from "../../../apps/mcp/src/tool-catalog.js";
 
 describe("mcp tool catalog", () => {
+  it.each([true, false, null])(
+    "preserves the typed diagnostic context override %s through tool validation",
+    (value) => {
+      const tool = MCP_TOOL_CATALOG.find((entry) => entry.name === "update_capture_policy")!;
+      const parsed = tool.inputSchema.parse({
+        bearerToken: "member",
+        projectId: "project",
+        update: { capture_diagnostic_context: value }
+      });
+      expect(parsed).toHaveProperty("update.capture_diagnostic_context", value);
+      expect(
+        tool.inputSchema.safeParse({
+          bearerToken: "member",
+          projectId: "project",
+          update: { capture_diagnostic_context: "false" }
+        }).success
+      ).toBe(false);
+    }
+  );
   it("registers health-check and probe catalog entries in the published registry", () => {
     expect(HEALTH_CHECK_MCP_TOOL_CATALOG.map((entry) => entry.name)).toEqual([
       "list_health_checks",

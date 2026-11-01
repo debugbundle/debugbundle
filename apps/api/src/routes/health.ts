@@ -1,3 +1,4 @@
+import { evidenceCapabilityResponse, sdkEvidencePolicy } from "../evidence-negotiation.js";
 import { createHash } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 
@@ -146,12 +147,17 @@ export function registerHealthRoutes(
 
     const includesAnalyticsConfig = request.headers["x-debugbundle-analytics-config"] === "1";
     let analyticsConfig = DISABLED_ANALYTICS_SDK_CONFIG;
-    if (includesAnalyticsConfig && caps.analytics_bundle && dependencies.analyticsSettingsManagement !== undefined) {
+    if (
+      includesAnalyticsConfig &&
+      caps.analytics_bundle &&
+      dependencies.analyticsSettingsManagement !== undefined
+    ) {
       try {
-        const analyticsSettings = await dependencies.analyticsSettingsManagement.getAnalyticsSettingsForProject({
-          organization_id: "",
-          project_id: projectAuth.context.project_id
-        });
+        const analyticsSettings =
+          await dependencies.analyticsSettingsManagement.getAnalyticsSettingsForProject({
+            organization_id: "",
+            project_id: projectAuth.context.project_id
+          });
         if (analyticsSettings !== null) {
           analyticsConfig = toAnalyticsSdkConfig(analyticsSettings);
         }
@@ -166,7 +172,11 @@ export function registerHealthRoutes(
       active_probes: caps.remote_probes ? activations : [],
       poll_interval_ms: 60000,
       ...(includesAnalyticsConfig ? { analytics: analyticsConfig } : {}),
-      capture_policy: capturePolicy,
+      capture_policy: sdkEvidencePolicy(capturePolicy, request),
+      ...evidenceCapabilityResponse(
+        request,
+        dependencies.ingestionPersistence.claimEvidenceReceipt !== undefined
+      ),
       capture_rules: captureRules,
       ...(caps.remote_probes
         ? { trigger_token_key: deriveProbeTriggerTokenKey(projectAuth.context.project_id) }
@@ -175,7 +185,7 @@ export function registerHealthRoutes(
 
     const etag = `"${createHash("sha256").update(JSON.stringify(responseBody), "utf8").digest("hex").slice(0, 16)}"`;
     reply.header("Cache-Control", "public, s-maxage=30");
-    reply.header("Vary", "X-DebugBundle-Analytics-Config");
+    reply.header("Vary", "X-DebugBundle-Analytics-Config, X-DebugBundle-Evidence");
     reply.header("ETag", etag);
 
     const ifNoneMatch = request.headers["if-none-match"];

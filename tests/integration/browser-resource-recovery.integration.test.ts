@@ -183,9 +183,10 @@ runIntegration("browser recovery correlation through durable processing", () => 
           expect((await build()).processed).toBe(true);
         }
         const incidents = (
-          await pool.query<{ id: string; occurrence_count: number }>("SELECT id, occurrence_count FROM incidents WHERE project_id = $1", [
-            projectId
-          ])
+          await pool.query<{ id: string; occurrence_count: number }>(
+            "SELECT id, occurrence_count FROM incidents WHERE project_id = $1",
+            [projectId]
+          )
         ).rows;
         expect(incidents).toHaveLength(1);
         const incident = incidents[0];
@@ -196,6 +197,8 @@ runIntegration("browser recovery correlation through durable processing", () => 
             await objectStore.getObject({ key: buildBundleObjectKey(projectId, incident.id) })
           ).toString()
         );
+        expect(bundle.captured_at).toBe(resource.occurred_at);
+        expect(bundle.context.evidence.primary_event_id).toBe(resource.event_id);
         expect(bundle.context.resource_failure.recovery_failures).toEqual([
           expect.objectContaining({
             path: "/api/signed-url/refresh",

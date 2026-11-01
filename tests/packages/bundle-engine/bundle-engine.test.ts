@@ -78,7 +78,9 @@ describe("bundle-engine", () => {
     const serializedBundle = JSON.stringify(bundle);
 
     expect(serializedBundle).toBe(deployMetadataGoldenFixture);
-    expect(BundleV1Schema.parse(bundle)).toEqual(BundleV1Schema.parse(JSON.parse(deployMetadataGoldenFixture)));
+    expect(BundleV1Schema.parse(bundle)).toEqual(
+      BundleV1Schema.parse(JSON.parse(deployMetadataGoldenFixture))
+    );
   });
 
   it("should keep probe_data items deterministic in output ordering", (): void => {
@@ -367,7 +369,8 @@ describe("bundle-engine", () => {
           payload: {
             name: "TypeError",
             message: "Cannot read properties of undefined",
-            stack: "TypeError: Cannot read properties of undefined\n    at CheckoutPage (src/Checkout.tsx:12:3)",
+            stack:
+              "TypeError: Cannot read properties of undefined\n    at CheckoutPage (src/Checkout.tsx:12:3)",
             route: "/checkout",
             browser: {
               name: "Chrome",
@@ -482,8 +485,10 @@ describe("bundle-engine", () => {
     });
     expect(bundle.context.deploy?.regression_window).toBe(false);
     expect(bundle.context.git?.commit_short).toBe("abcdef1");
-    expect(bundle.context.runtime?.name).toBe("node");
-    expect(bundle.context.device?.browser.name).toBe("Chrome");
+    // The primary is the request event; neighbouring exception measurements remain
+    // related context and cannot supply its runtime snapshot or client device.
+    expect(bundle.context.runtime).toBeNull();
+    expect(bundle.context.device).toBeNull();
   });
 
   it("should include inline frontend exception breadcrumbs without requiring standalone breadcrumb envelopes", (): void => {
@@ -528,7 +533,8 @@ describe("bundle-engine", () => {
           payload: {
             name: "TypeError",
             message: "Cannot read properties of undefined",
-            stack: "TypeError: Cannot read properties of undefined\n    at CheckoutPage (src/Checkout.tsx:12:3)",
+            stack:
+              "TypeError: Cannot read properties of undefined\n    at CheckoutPage (src/Checkout.tsx:12:3)",
             route: "/checkout",
             browser: {
               name: "Chrome",
@@ -823,11 +829,14 @@ describe("bundle-engine", () => {
         {
           name: "github_api",
           status: "failed",
-          notes: "GitHub API returned an unexpected response shape while handling GET /v1/github/app/install-url."
+          notes:
+            "GitHub API returned an unexpected response shape while handling GET /v1/github/app/install-url."
         }
       ]
     });
-    expect(bundle.summary.likely_cause).toContain("GitHub API returned a response that did not match the expected schema");
+    expect(bundle.summary.likely_cause).toContain(
+      "GitHub API returned a response that did not match the expected schema"
+    );
     expect(bundle.summary.recommended_action).toContain("Inspect the GitHub API response handling");
     expect(bundle.summary.confidence).toBeGreaterThan(0.5);
     expect(bundle.context.deploy).toEqual({
@@ -867,12 +876,16 @@ describe("bundle-engine", () => {
     });
     expect(bundle.links).toEqual({
       self: "https://api.debugbundle.com/v1/incidents/75f07eaf-e1ad-4a8a-abb2-2f2f030e6c37/bundle",
-      reproduction: "https://api.debugbundle.com/v1/incidents/75f07eaf-e1ad-4a8a-abb2-2f2f030e6c37/reproduction",
+      reproduction:
+        "https://api.debugbundle.com/v1/incidents/75f07eaf-e1ad-4a8a-abb2-2f2f030e6c37/reproduction",
       incident: "https://app.debugbundle.com/incidents/75f07eaf-e1ad-4a8a-abb2-2f2f030e6c37",
       project: "https://app.debugbundle.com/projects/proj_debugbundle_api",
       docs: "https://debugbundle.com/docs/bundles"
     });
-    expect(bundle.redaction.fields).toEqual(["context.request.headers.authorization", "context.request.headers.cookie"]);
+    expect(bundle.redaction.fields).toEqual([
+      "context.request.headers.authorization",
+      "context.request.headers.cookie"
+    ]);
     expect(bundle.redaction.notes).toBe("Sensitive bundle fields were redacted before storage.");
   });
 

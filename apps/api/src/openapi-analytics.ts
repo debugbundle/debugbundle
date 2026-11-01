@@ -66,7 +66,7 @@ const AnalyticsSafeRouteSchema = z
   .regex(/^[^?#]+$/);
 const AnalyticsSummaryQuerySchema = z
   .object({
-    project_id: z.string().uuid(),
+    project_id: z.string().guid(),
     from: z.string().datetime().optional(),
     to: z.string().datetime().optional(),
     last: z.string().optional(),
@@ -90,10 +90,10 @@ const AnalyticsSummaryQuerySchema = z
   .strict();
 
 const AnalyticsFunnelParamsSchema = z.object({ key: z.string().min(1).max(120) }).strict();
-const AnalyticsOpportunityParamsSchema = z.object({ id: z.string().uuid() }).strict();
+const AnalyticsOpportunityParamsSchema = z.object({ id: z.string().guid() }).strict();
 const AnalyticsOpportunitiesQuerySchema = z
   .object({
-    project_id: z.string().uuid().optional(),
+    project_id: z.string().guid().optional(),
     status: z.enum(["open", "resolved", "snoozed", "all"]).optional(),
     kind: AnalyticsBundleAnalysisKindSchema.optional(),
     service: z.string().min(1).max(120).optional(),
@@ -109,7 +109,7 @@ const AnalyticsOpportunitiesQuerySchema = z
   .strict();
 const AnalyticsBundlesQuerySchema = z
   .object({
-    project_id: z.string().uuid().optional(),
+    project_id: z.string().guid().optional(),
     status: z.union([AnalyticsBundleGenerationStatusSchema, z.literal("all")]).optional(),
     kind: AnalyticsBundleAnalysisKindSchema.optional(),
     service: z.string().min(1).max(120).optional(),
@@ -121,27 +121,27 @@ const AnalyticsBundlesQuerySchema = z
     limit: z.number().int().min(1).max(100).optional()
   })
   .strict();
-const AnalyticsOpportunityQuerySchema = z.object({ project_id: z.string().uuid() }).strict();
-const AnalyticsBundleParamsSchema = z.object({ id: z.string().uuid() }).strict();
-const AnalyticsBundleQuerySchema = z.object({ project_id: z.string().uuid() }).strict();
+const AnalyticsOpportunityQuerySchema = z.object({ project_id: z.string().guid() }).strict();
+const AnalyticsBundleParamsSchema = z.object({ id: z.string().guid() }).strict();
+const AnalyticsBundleQuerySchema = z.object({ project_id: z.string().guid() }).strict();
 const AnalyticsBundleCreateSchema = z
   .object({
-    project_id: z.string().uuid(),
-    opportunity_id: z.string().uuid().nullable().optional(),
+    project_id: z.string().guid(),
+    opportunity_id: z.string().guid().nullable().optional(),
     analysis_kind: AnalyticsBundleAnalysisKindSchema,
     from: z.string().datetime().optional(),
     to: z.string().datetime().optional(),
     last: z.string().min(2).max(16).optional(),
     funnel: z.string().min(1).max(120).nullable().optional(),
     route: AnalyticsSafeRouteSchema.nullable().optional(),
-    incident_id: z.string().uuid().nullable().optional(),
+    incident_id: z.string().guid().nullable().optional(),
     deploy_id: z.string().min(1).max(120).nullable().optional(),
     filters: z.record(z.string(), z.unknown()).optional()
   })
   .strict();
 const AnalyticsBundleResponseSchema = z.union([
   AnalyticsBundleV1Schema,
-  z.object({ status: z.literal("pending"), bundle_generation_id: z.string().uuid() }).strict(),
+  z.object({ status: z.literal("pending"), bundle_generation_id: z.string().guid() }).strict(),
   z.object({ status: z.literal("failed"), reason: z.string() }).strict()
 ]);
 const AnalyticsJourneySamplesQuerySchema = AnalyticsSummaryQuerySchema.pick({
@@ -155,9 +155,9 @@ const AnalyticsJourneySamplesQuerySchema = AnalyticsSummaryQuerySchema.pick({
     limit: z.number().int().min(1).max(100).optional()
   })
   .strict();
-const AnalyticsJourneySampleParamsSchema = z.object({ id: z.string().uuid() }).strict();
-const AnalyticsIncidentImpactParamsSchema = z.object({ id: z.string().uuid() }).strict();
-const AnalyticsSavedFunnelProjectParamsSchema = z.object({ id: z.string().uuid() }).strict();
+const AnalyticsJourneySampleParamsSchema = z.object({ id: z.string().guid() }).strict();
+const AnalyticsIncidentImpactParamsSchema = z.object({ id: z.string().guid() }).strict();
+const AnalyticsSavedFunnelProjectParamsSchema = z.object({ id: z.string().guid() }).strict();
 const AnalyticsSavedFunnelParamsSchema = AnalyticsSavedFunnelProjectParamsSchema.extend({
   funnelKey: AnalyticsSavedFunnelKeySchema
 }).strict();
@@ -584,7 +584,7 @@ function publicFlowOperations(options: {
   apiError: SchemaComponent;
 }): OperationSpec[] {
   const base = "/v1/projects/{id}/analytics/flows";
-  const project = z.object({ id: z.string().uuid() });
+  const project = z.object({ id: z.string().guid() });
   const item = project.extend({ key: AnalyticsFlowKeySchema });
   const errors = {
     "400": { description: "Invalid input.", schema: options.apiError },

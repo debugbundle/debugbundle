@@ -1,6 +1,6 @@
 {
   "name": "@debugbundle/shared-types",
-  "version": "2.6.0",
+  "version": "3.0.0",
   "private": true,
   "type": "module",
   "license": "Apache-2.0",
@@ -12,7 +12,7 @@
     "build": "pnpm --dir ../.. exec tsc -p packages/shared-types/tsconfig.build.json"
   },
   "dependencies": {
-    "zod": "^3.24.2"
+    "zod": "^4.6.7"
   },
   "repository": {
     "type": "git",

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { ProjectColorTagSchema, type ProjectColorTag } from "../../shared-types/src/index.js";
 
-const ProjectColorTagResponseSchema = z.unknown().transform((value, context): ProjectColorTag | null => {
+const ProjectColorTagResponseSchema = z.unknown().optional().transform((value, context): ProjectColorTag | null => {
   if (value === undefined || value === null) {
     return null;
   }

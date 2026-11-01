@@ -27,7 +27,7 @@ export function registerNotificationPreferencesRoutes(
         url: action === "get" || action === "update" ? base : `${base}/${action}`,
         async handler(request, reply) {
           const query = querySchema.safeParse(request.query);
-          const params = z.object({ id: z.string().uuid() }).safeParse(request.params);
+          const params = z.object({ id: z.string().guid() }).safeParse(request.params);
           if (!query.success || (project && !params.success))
             return reply.status(400).send({ error: "invalid_notification_scope" });
           const projectId = project && params.success ? params.data.id : null;

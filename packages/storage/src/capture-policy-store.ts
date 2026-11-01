@@ -1,5 +1,8 @@
 import { getDefaultPreset } from "../../shared-types/src/index.js";
-import type { CapturePolicyRecord, ImmediateClientErrorPathRule } from "../../shared-types/src/index.js";
+import type {
+  CapturePolicyRecord,
+  ImmediateClientErrorPathRule
+} from "../../shared-types/src/index.js";
 import type { Queryable } from "./types.js";
 
 export interface CapturePolicyStore {
@@ -11,6 +14,7 @@ export interface CapturePolicyStore {
     capture_request_events?: string | null;
     capture_breadcrumbs?: string | null;
     capture_probe_events?: string | null;
+    capture_diagnostic_context?: boolean | null;
     immediate_client_error_statuses?: number[] | null;
     immediate_client_error_path_rules?: ImmediateClientErrorPathRule[] | null;
   }): Promise<CapturePolicyRecord>;
@@ -24,7 +28,7 @@ export function createPostgresCapturePolicyStore(db: Queryable): CapturePolicySt
         `
           SELECT project_id, preset, capture_logs, capture_request_events,
                  capture_breadcrumbs, capture_probe_events, immediate_client_error_statuses,
-                 immediate_client_error_path_rules, updated_at
+                 immediate_client_error_path_rules, capture_diagnostic_context, updated_at
           FROM capture_policies
           WHERE project_id = $1
           LIMIT 1
@@ -41,9 +45,9 @@ export function createPostgresCapturePolicyStore(db: Queryable): CapturePolicySt
           INSERT INTO capture_policies (
             project_id, preset, capture_logs, capture_request_events,
             capture_breadcrumbs, capture_probe_events, immediate_client_error_statuses,
-            immediate_client_error_path_rules, updated_at
+            immediate_client_error_path_rules, capture_diagnostic_context, updated_at
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, NOW())
+          VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, NOW())
           ON CONFLICT (project_id)
           DO UPDATE SET
             preset = EXCLUDED.preset,
@@ -51,12 +55,13 @@ export function createPostgresCapturePolicyStore(db: Queryable): CapturePolicySt
             capture_request_events = EXCLUDED.capture_request_events,
             capture_breadcrumbs = EXCLUDED.capture_breadcrumbs,
             capture_probe_events = EXCLUDED.capture_probe_events,
+            capture_diagnostic_context = EXCLUDED.capture_diagnostic_context,
             immediate_client_error_statuses = EXCLUDED.immediate_client_error_statuses,
             immediate_client_error_path_rules = EXCLUDED.immediate_client_error_path_rules,
             updated_at = NOW()
           RETURNING project_id, preset, capture_logs, capture_request_events,
                     capture_breadcrumbs, capture_probe_events, immediate_client_error_statuses,
-                    immediate_client_error_path_rules, updated_at
+                    immediate_client_error_path_rules, capture_diagnostic_context, updated_at
         `,
         [
           input.project_id,
@@ -65,12 +70,15 @@ export function createPostgresCapturePolicyStore(db: Queryable): CapturePolicySt
           input.capture_request_events ?? null,
           input.capture_breadcrumbs ?? null,
           input.capture_probe_events ?? null,
-          input.immediate_client_error_statuses === undefined || input.immediate_client_error_statuses === null
+          input.immediate_client_error_statuses === undefined ||
+          input.immediate_client_error_statuses === null
             ? null
             : JSON.stringify(input.immediate_client_error_statuses),
-          input.immediate_client_error_path_rules === undefined || input.immediate_client_error_path_rules === null
+          input.immediate_client_error_path_rules === undefined ||
+          input.immediate_client_error_path_rules === null
             ? null
             : JSON.stringify(input.immediate_client_error_path_rules),
+          input.capture_diagnostic_context ?? null
         ]
       );
 
@@ -84,18 +92,18 @@ export function createPostgresCapturePolicyStore(db: Queryable): CapturePolicySt
           INSERT INTO capture_policies (
             project_id, preset, capture_logs, capture_request_events,
             capture_breadcrumbs, capture_probe_events, immediate_client_error_statuses,
-            immediate_client_error_path_rules, updated_at
+            immediate_client_error_path_rules, capture_diagnostic_context, updated_at
           )
-          VALUES ($1, $2, NULL, NULL, NULL, NULL, NULL, NULL, NOW())
+          VALUES ($1, $2, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NOW())
           ON CONFLICT (project_id) DO NOTHING
           RETURNING project_id, preset, capture_logs, capture_request_events,
                     capture_breadcrumbs, capture_probe_events, immediate_client_error_statuses,
-                    immediate_client_error_path_rules, updated_at
+                    immediate_client_error_path_rules, capture_diagnostic_context, updated_at
         `,
         [projectId, preset]
       );
 
       return result.rows[0]!;
-    },
+    }
   };
 }

@@ -1,4 +1,8 @@
 import { gzipSync } from "node:zlib";
+import {
+  requiresEvidenceReceipt,
+  type EvidenceIngestionReceiptStore
+} from "./evidence-ingestion-receipt.js";
 
 import {
   deriveIncidentTitle,
@@ -19,7 +23,7 @@ import {
 import type { AccountAnalyticsStore } from "./account-analytics-store.js";
 import type {
   AnalyticsIngestionPersistenceService,
-  AnalyticsQueueClient,
+  AnalyticsQueueClient
 } from "./analytics-ingestion-jobs.js";
 import {
   buildAnalyticsRawEventObjectKey,
@@ -39,7 +43,7 @@ import type {
   QueueClient,
   ResolveMemberResult,
   ResolveProjectResult,
-  UpsertIncidentResult,
+  UpsertIncidentResult
 } from "./types.js";
 
 interface CreateIngestionMetadataServiceInput {
@@ -62,7 +66,10 @@ export function createIngestionMetadataService(
     },
 
     async persistEventMetadata(input: PersistEventMetadataInput): Promise<UpsertIncidentResult> {
-      const severity = input.event.event_type === "frontend_exception" ? inferFrontendExceptionSeverity(input.event) : inferSeverity(input.event.event_type);
+      const severity =
+        input.event.event_type === "frontend_exception"
+          ? inferFrontendExceptionSeverity(input.event)
+          : inferSeverity(input.event.event_type);
       const incident = await store.upsertIncident({
         event_id: input.event.event_id,
         event_type: input.event.event_type,
@@ -87,7 +94,10 @@ export function createIngestionMetadataService(
           : {})
       });
 
-      const resourceRoute = input.normalizedEvent.resource_type === undefined ? null : normalizeResourceRoute(input.normalizedEvent.route_template);
+      const resourceRoute =
+        input.normalizedEvent.resource_type === undefined
+          ? null
+          : normalizeResourceRoute(input.normalizedEvent.route_template);
       await store.insertIncidentEvent({
         incident_id: incident.incident_id,
         event_id: input.event.event_id,
@@ -171,7 +181,9 @@ export function createIngestionMetadataService(
   };
 }
 
-export function createMemberAuthService(store: Pick<MetadataStore, "resolveMemberByTokenHash">): MemberAuthService {
+export function createMemberAuthService(
+  store: Pick<MetadataStore, "resolveMemberByTokenHash">
+): MemberAuthService {
   return {
     async resolveMemberByTokenHash(tokenHash: string): Promise<ResolveMemberResult | null> {
       return store.resolveMemberByTokenHash(tokenHash);
@@ -186,6 +198,7 @@ export function createMemberAuthService(store: Pick<MetadataStore, "resolveMembe
 interface CreateIngestionPersistenceServiceInput {
   objectStore: ObjectStoreClient;
   queue: QueueClient;
+  evidenceReceipts?: EvidenceIngestionReceiptStore;
 }
 
 export function createIngestionPersistenceService(
@@ -194,10 +207,21 @@ export function createIngestionPersistenceService(
   const analyticsQueue = input.queue as typeof input.queue & AnalyticsQueueClient;
 
   return {
+    ...(input.evidenceReceipts === undefined
+      ? {}
+      : {
+          async claimEvidenceReceipt(event: EventEnvelope, projectId: string, receivedAt: string) {
+            const protectedEvent = sanitizeEvent(event);
+            return requiresEvidenceReceipt(protectedEvent)
+              ? input.evidenceReceipts!.claim(projectId, protectedEvent, receivedAt)
+              : { received_at: receivedAt, matches: true };
+          }
+        }),
     async persistAndEnqueue(
       event: EventEnvelope,
       projectId: string,
       options?: {
+        receivedAt?: string;
         capturePreset?: CapturePreset;
         immediateClientErrorStatuses?: number[];
         immediateClientErrorPathRules?: ImmediateClientErrorPathRule[];
@@ -211,7 +235,19 @@ export function createIngestionPersistenceService(
       });
 
       // The storage boundary also protects direct callers that bypass the HTTP adapter.
-      const body = gzipSync(Buffer.from(JSON.stringify(sanitizeEvent(event)), "utf8"));
+      const protectedEvent = sanitizeEvent(event);
+      let receipt: string | undefined;
+      if (requiresEvidenceReceipt(protectedEvent)) {
+        if (!input.evidenceReceipts) throw new Error("evidence_receipts_unavailable");
+        const claim = await input.evidenceReceipts.claim(
+          projectId,
+          protectedEvent,
+          options?.receivedAt ?? new Date().toISOString()
+        );
+        if (!claim.matches) throw new Error("evidence_receipt_conflict");
+        receipt = claim.received_at;
+      }
+      const body = gzipSync(Buffer.from(JSON.stringify(protectedEvent), "utf8"));
 
       await input.objectStore.putObject({
         key: objectKey,
@@ -224,6 +260,7 @@ export function createIngestionPersistenceService(
         project_id: projectId,
         event_id: event.event_id,
         object_key: objectKey,
+        ...(receipt === undefined ? {} : { received_at: receipt }),
         ...(options?.capturePreset === undefined ? {} : { capture_preset: options.capturePreset }),
         ...(options?.immediateClientErrorStatuses === undefined
           ? {}

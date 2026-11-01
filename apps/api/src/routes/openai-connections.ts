@@ -7,7 +7,7 @@ import { resolveBrowserSession } from "../api-helpers.js";
 import type { ApiDependencies } from "../api-types.js";
 import { recordAuditLog } from "../audit-logging.js";
 
-const RevokeConnectionBodySchema = z.object({ grant_id: z.string().uuid() }).strict();
+const RevokeConnectionBodySchema = z.object({ grant_id: z.string().guid() }).strict();
 
 export function registerOpenAiConnectionRoutes(
   app: FastifyInstance,

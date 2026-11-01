@@ -54,7 +54,7 @@ export const AnalyticsSavedFunnelUpdateSchema = z
 export type AnalyticsSavedFunnelUpdate = z.infer<typeof AnalyticsSavedFunnelUpdateSchema>;
 
 export const AnalyticsSavedFunnelSchema = AnalyticsSavedFunnelCreateSchema.extend({
-  project_id: z.string().uuid(),
+  project_id: z.string().guid(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime(),
   archived_at: z.string().datetime().nullable()

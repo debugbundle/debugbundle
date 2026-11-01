@@ -7,6 +7,16 @@ Last updated: 2026-09-20
 
 ## 1. SDK Acceptance
 
+### Evidence-quality acceptance (accepted candidate)
+
+[AC-EVID-01–09](bundle-evidence-quality.md#acceptance) are the executable acceptance
+obligations for FR-EVID-01–09. They cover exception graph budgets/relationships,
+runtime stack locations and stable grouping, native causes/fatal context, passive
+resource evidence, scoped independent recovery, complete-path negotiation,
+production-safe context migrations, reader provenance/privacy and cross-SDK
+qualification. They supplement all existing acceptance below. Schema unit tests
+alone cannot close ingestion, relay, framework, device or release gates.
+
 ### AC-SDK-01: Node SDK Basic Capture
 
 - **Given** a Node.js Express app with `@debugbundle/sdk-node` installed and initialized

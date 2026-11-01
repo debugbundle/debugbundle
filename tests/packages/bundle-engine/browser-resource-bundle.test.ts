@@ -104,6 +104,7 @@ describe("browser resource bundles", () => {
     args.sourceEnvelopes = [
       browserResourceEvent({ url: "https://accounts.google.com/gsi/client" })
     ];
+    args.bundleMetadata.source_event_id = args.sourceEnvelopes[0]!.event_id;
     const bundle = buildBundle(args);
     expect(bundle.context.resource_failure).toMatchObject({
       role: "authentication",
@@ -263,8 +264,14 @@ it("ignores invalid breadcrumb methods and produces schema-valid recovery eviden
   const args = input();
   const resource = args.sourceEnvelopes[0]!;
   if (resource.event_type !== "frontend_exception") throw new Error("expected resource");
-  resource.payload.breadcrumbs = [{ breadcrumb_type: "network_request", route: "/", ts: resource.occurred_at,
-    data: { method: "x".repeat(100), url: "/api/refresh", status: 404 } }];
+  resource.payload.breadcrumbs = [
+    {
+      breadcrumb_type: "network_request",
+      route: "/",
+      ts: resource.occurred_at,
+      data: { method: "x".repeat(100), url: "/api/refresh", status: 404 }
+    }
+  ];
   expect(BundleV1Schema.safeParse(buildBundle(args)).success).toBe(true);
   expect(buildBundle(args).context.resource_failure?.recovery_failures).toBeUndefined();
 });

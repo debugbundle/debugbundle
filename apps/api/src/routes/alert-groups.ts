@@ -6,15 +6,15 @@ import type { ApiDependencies } from "../api-types.js";
 import { requireRateLimitedProjectAccess } from "../api-helpers.js";
 
 const GroupQuerySchema = z.object({
-  project_id: z.string().uuid(),
+  project_id: z.string().guid(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   cursor: z.string().min(1).max(256).regex(/^[A-Za-z0-9_-]+$/).optional()
 }).strict();
 const GroupParamsSchema = z.object({
   kind: z.enum(["direct", "email_digest"]),
-  id: z.string().uuid()
+  id: z.string().guid()
 }).strict();
-const CursorSchema = z.object({ created_at: z.string().min(1).max(64), id: z.string().uuid() }).strict();
+const CursorSchema = z.object({ created_at: z.string().min(1).max(64), id: z.string().guid() }).strict();
 
 function encodeCursor(cursor: AlertGroupCursor | null): string | null {
   return cursor === null ? null : Buffer.from(JSON.stringify(cursor)).toString("base64url");

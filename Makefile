@@ -263,6 +263,12 @@ codex-plugin-pack:
 codex-plugin-smoke: codex-plugin-pack
 	docker run --rm -v "$(PWD):/source:ro" -e CODEX_SMOKE_VERSION="$(CODEX_SMOKE_VERSION)" -e MCP_SMOKE_CANDIDATE=1 $(CODEX_SMOKE_NODE_IMAGE) node /source/scripts/smoke-codex-plugin.mjs
 
+.PHONY: codex-plugin-runtime-check
+codex-plugin-runtime-check: codex-plugin-pack
+	@set -eu; for runtime_image in node:22-bookworm node:24-bookworm node:26-bookworm; do \
+	  docker run --rm -v "$(PWD):/source:ro" -e CODEX_SMOKE_VERSION="$(CODEX_SMOKE_VERSION)" -e MCP_SMOKE_CANDIDATE=1 $$runtime_image node /source/scripts/smoke-codex-plugin.mjs; \
+	done
+
 .PHONY: codex-plugin-smoke-published
 codex-plugin-smoke-published:
 	docker run --rm -v "$(PWD):/source:ro" -e CODEX_SMOKE_VERSION="$(CODEX_SMOKE_VERSION)" -e MCP_SMOKE_PUBLISHED=1 $(CODEX_SMOKE_NODE_IMAGE) node /source/scripts/smoke-codex-plugin.mjs
@@ -286,7 +292,16 @@ privacy-js-verify:
 
 .PHONY: privacy-js-candidate-check
 privacy-js-candidate-check: license-prepare-shared
+	$(NODE_RUN) 'node scripts/prepare-js-sdk-candidate-lock.mjs --check'
 	docker run --rm -v "$(PWD):$(WORKDIR)" --tmpfs "$(WORKDIR)/sdks/debugbundle-js/.tmp" -w "$(WORKDIR)" node:24-alpine sh -lc 'corepack enable && node scripts/test-js-sdk-with-local-redaction.mjs --candidate && mkdir -p .tmp/sdk-js-candidate && cp sdks/debugbundle-js/.tmp/npm-packages/*.tgz .tmp/sdk-js-candidate/'
+
+.PHONY: js-candidate-lock
+js-candidate-lock: license-prepare-shared
+	$(NODE_RUN) 'node scripts/prepare-js-sdk-candidate-lock.mjs $(LOCK_ARGS)'
+
+.PHONY: js-candidate-audit
+js-candidate-audit:
+	$(NODE_RUN) 'node scripts/audit-js-sdk-candidate.mjs'
 
 .PHONY: privacy-js-local-smoke
 privacy-js-local-smoke: license-prepare-shared
@@ -297,8 +312,8 @@ incident-recovery-check:
 	python3 scripts/incident-recovery-check.py
 
 .PHONY: browser-evidence-check
-browser-evidence-check:
-	docker run --rm -v "$(CURDIR):/workspace" -w /workspace node:24-bookworm sh -lc 'apt-get update -qq && apt-get install -y -qq --no-install-recommends chromium >/dev/null && node --import tsx scripts/check-browser-evidence.mjs'
+browser-evidence-check: license-prepare-shared
+	docker run --rm --network none -v "$(CURDIR):/workspace" -w /workspace mcr.microsoft.com/playwright:v1.63.0-noble sh -lc 'set -- /ms-playwright/chromium-*/chrome-linux*/chrome; test "$$#" -eq 1 && CHROMIUM_PATH="$$1" node scripts/test-js-sdk-with-local-redaction.mjs --browser-evidence'
 
 test-focused:
 	$(NODE_RUN) "apk add --no-cache git >/dev/null && corepack enable && corepack pnpm vitest run $(TEST_FILES)"
@@ -391,6 +406,63 @@ test-all-quick:
 candidate-build:
 	$(NODE_RUN) "corepack enable && corepack pnpm --dir packages/shared-types build && corepack pnpm --dir apps/cli build && corepack pnpm --dir apps/mcp build && corepack pnpm --dir apps/web build"
 
+.PHONY: evidence-artifact-manifests
+evidence-artifact-manifests:
+	python3 scripts/record-sdk-evidence-artifacts.py python php ruby java dotnet react-native
+
+.PHONY: evidence-release-manifest
+evidence-release-manifest:
+	python3 scripts/record-evidence-release.py
+
+EVIDENCE_RUNTIME_DIR ?= $(PWD)/.tmp/evidence-release/runtime
+.PHONY: evidence-runtime-prepare evidence-runtime-build evidence-runtime-check
+evidence-runtime-prepare:
+	python3 scripts/rehearse-evidence-runtime.py prepare --directory "$(EVIDENCE_RUNTIME_DIR)"
+evidence-runtime-build:
+	python3 scripts/rehearse-evidence-runtime.py build --directory "$(EVIDENCE_RUNTIME_DIR)"
+evidence-runtime-check:
+	python3 scripts/rehearse-evidence-runtime.py check --directory "$(EVIDENCE_RUNTIME_DIR)"
+
+# Inspect official macOS/arm64 emulator packages without changing installed SDKs.
+.PHONY: evidence-android-emulator-catalog
+evidence-android-emulator-catalog:
+	docker run --rm --platform linux/arm64 -v "$(PWD):/workspace" -w /workspace \
+	  -e REPO_OS_OVERRIDE=macosx -e ANDROID_USER_HOME=/workspace/.tmp/android-emulator-home \
+	  gradle:9.4.1-jdk21 sh -c 'sdks/debugbundle-android/.android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=/workspace/.tmp/android-macos --list --channel=0'
+
+.PHONY: evidence-android-emulator-prepare
+ANDROID_EVIDENCE_API ?= 37
+evidence-android-emulator-prepare:
+	sh scripts/prepare-evidence-android-emulator.sh $(ANDROID_EVIDENCE_API)
+
+.PHONY: evidence-android-device
+evidence-android-device:
+	python3 scripts/run-evidence-android-device.py --api $(ANDROID_EVIDENCE_API)
+
+.PHONY: evidence-react-native-android-device
+evidence-react-native-android-device:
+	python3 scripts/run-evidence-android-device.py --api 37 --react-native
+
+.PHONY: evidence-android-device-performance
+evidence-android-device-performance:
+	python3 scripts/run-evidence-android-device.py --api $(ANDROID_EVIDENCE_API) --performance
+
+.PHONY: evidence-swift-floor-prepare
+evidence-swift-floor-prepare:
+	sh scripts/prepare-evidence-swift-floor.sh
+
+.PHONY: evidence-swift-floor
+evidence-swift-floor:
+	sh scripts/run-evidence-swift-floor.sh
+
+.PHONY: evidence-swift-floor-consumer
+evidence-swift-floor-consumer:
+	sh scripts/run-evidence-swift-floor.sh consumer
+
+.PHONY: evidence-core-pack
+evidence-core-pack:
+	$(NODE_RUN) 'mkdir -p .tmp/evidence-release/npm && npm pack ./apps/cli --ignore-scripts --pack-destination .tmp/evidence-release/npm && npm pack ./apps/mcp --ignore-scripts --pack-destination .tmp/evidence-release/npm && npm pack ./apps/openclaw-plugin --ignore-scripts --pack-destination .tmp/evidence-release/npm'
+
 .PHONY: build
 build:
 	$(NODE_RUN) "corepack enable && corepack pnpm build"
@@ -465,6 +537,8 @@ INTEGRATION_TEST_FILES ?= tests/integration/analytics-public-flows.integration.t
 .PHONY: test-integration
 INTEGRATION_TEST_FILES += tests/integration/agent-token.integration.test.ts
 INTEGRATION_TEST_FILES += tests/integration/browser-resource-recovery.integration.test.ts
+INTEGRATION_TEST_FILES += tests/integration/typed-evidence-context.integration.test.ts
+INTEGRATION_TEST_FILES += tests/integration/ingestion-bundle-context-triggers.integration.test.ts tests/integration/ingestion-bundle-occurrence-context.integration.test.ts tests/integration/ingestion-bundle-probe-context.integration.test.ts tests/integration/ingestion-bundle-trigger-precedence.integration.test.ts tests/integration/ingestion-bundle-reproduction.integration.test.ts
 INTEGRATION_TEST_FILES += tests/integration/alert-retry-ownership.integration.test.ts
 INTEGRATION_TEST_FILES += tests/integration/analytics-flow-runtime.integration.test.ts
 INTEGRATION_TEST_FILES += tests/integration/list-pagination-counts.integration.test.ts
@@ -473,6 +547,10 @@ INTEGRATION_TEST_FILES += tests/integration/browser-resource-capture.integration
 INTEGRATION_TEST_FILES += tests/integration/notification-preferences.integration.test.ts
 # Optional absolute module path inside /workspace for a separately built Browser SDK candidate.
 INTEGRATION_FLOW_SDK_MODULE ?=
+# Real-storage fixtures include 1,001 sequential delivery transitions and cold
+# artifact generation. Keep their test budget separate from unit-test defaults;
+# transport and deadline assertions retain their own explicit bounds.
+INTEGRATION_TEST_TIMEOUT ?= 15000
 test-integration:
 	@set -e; \
 	trap 'POSTGRES_PORT=$(INTEGRATION_POSTGRES_PORT) REDIS_PORT=$(INTEGRATION_REDIS_PORT) LOCALSTACK_PORT=$(INTEGRATION_LOCALSTACK_PORT) API_PORT=$(INTEGRATION_API_PORT) WEB_PORT=$(INTEGRATION_WEB_PORT) APP_BASE_URL=$(INTEGRATION_APP_BASE_URL) VITE_API_URL=$(INTEGRATION_WEB_API_URL) CONTAINER_PREFIX=$(INTEGRATION_CONTAINER_PREFIX) DEBUGBUNDLE_PROBE_TRIGGER_SECRET=$(INTEGRATION_PROBE_TRIGGER_SECRET) ANALYTICS_HASH_SECRET=$(INTEGRATION_ANALYTICS_HASH_SECRET) $(INTEGRATION_COMPOSE) down -v' EXIT; \
@@ -492,7 +570,7 @@ test-integration:
 		-e S3_ENDPOINT=http://localstack:4566 \
 		-e S3_REGION=us-east-1 \
 		-e S3_BUCKET=debugbundle-raw-events \
-		$(NODE_IMAGE) sh -lc "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm db:bootstrap && corepack pnpm db:migrate && corepack pnpm vitest run --no-file-parallelism --maxWorkers=1 $(INTEGRATION_TEST_FILES)"
+		$(NODE_IMAGE) sh -lc "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm db:bootstrap && corepack pnpm db:migrate && corepack pnpm vitest run --no-file-parallelism --maxWorkers=1 --testTimeout=$(INTEGRATION_TEST_TIMEOUT) $(INTEGRATION_TEST_FILES)"
 
 .PHONY: test-mixed-version-api
 test-mixed-version-api: install
@@ -620,6 +698,10 @@ license-docs-check:
 .PHONY: public-site-artifacts
 public-site-artifacts:
 	$(NODE_RUN) 'corepack enable && corepack pnpm public-site:artifacts'
+
+.PHONY: evidence-fixtures
+evidence-fixtures:
+	$(NODE_RUN) 'SDK_FIXTURE_TARGETS="$(SDK_FIXTURE_TARGETS)" corepack pnpm exec tsx scripts/sync-evidence-fixtures.ts $(FIXTURE_ARGS)'
 
 .PHONY: license-site-check
 license-site-check:

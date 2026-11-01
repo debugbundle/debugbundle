@@ -16,6 +16,7 @@ import {
   PaginationPrevious
 } from "../ui/pagination.js";
 import { Table, TableHeader, TableBody, TableRow, TableCell, TableHead } from "../ui/table.js";
+import { EvidenceSection, IncidentEvidenceReader } from "./incident-evidence-reader.js";
 export function IncidentContextTab({ incidentId }: { incidentId: string }): JSX.Element {
   const [context, setContext] = useState<Awaited<ReturnType<typeof getIncidentContext>> | null>(
     null
@@ -78,7 +79,13 @@ export function IncidentContextTab({ incidentId }: { incidentId: string }): JSX.
                 Reproduction: {context.reproduction.status}
               </Badge>
             </div>
-            <p className="text-sm text-muted-foreground">{context.primary_signal.description}</p>
+            <IncidentEvidenceReader
+              bundle={context.bundle.body}
+              primaryDescription={context.primary_signal.description}
+              {...(context.evidence_interpretation === undefined
+                ? {}
+                : { interpretation: context.evidence_interpretation })}
+            />
             {context.suggested_next_checks.length === 0 ? null : (
               <ul className="list-disc pl-5">
                 {context.suggested_next_checks.map((check) => (
@@ -86,7 +93,9 @@ export function IncidentContextTab({ incidentId }: { incidentId: string }): JSX.
                 ))}
               </ul>
             )}
-            <HighlightedCodeBlock code={JSON.stringify(context, null, 2)} />
+            <EvidenceSection title="full incident context">
+              <HighlightedCodeBlock code={JSON.stringify(context, null, 2)} />
+            </EvidenceSection>
           </>
         )}
       </CardContent>
