@@ -85,12 +85,20 @@ registrations are retired; negative audit fixtures remain fail-closed.
 
 Codex 1.4.1, Gemini 1.3.1 and Claude 1.18.0 use published MCP 1.18.0. Native local
 package checks discover 139 tools and pass their auth, retrieval, update and removal
-controls with disposable fixtures. Default-branch publication, public installation,
-the mandatory MCP ecosystem pipeline, final hosted/site rollout, rollback retention,
-monitoring and scoped dogfooding readback remain separate release receipts.
+controls with disposable fixtures. Public Codex/Claude GitHub checks and Gemini
+GitHub Release upgrade pass. Final hosted/site rollout, rollback retention,
+monitoring and remaining native/ClawHub gates retain separate receipts.
 
 The [local handoff](local/proposals/bundle-evidence-quality-sdk-parity-release-handoff-2026-10-29.md)
 and machine-readable train ledger retain current progress. Simulator/emulator
 measurements do not assert physical-device performance. OpenAI plugin 1.0.2 retains
 its independent frozen package and portal authority; this train performs no portal
 submission or publication.
+
+## Current release verification
+
+Full core [CI 41336331684](https://github.com/debugbundle/debugbundle/actions/runs/41336331684) passes at `88a9a42c1762bab1f5bb7e73f908d67eeb67b99a`, now merged to main. Site 1.6.11 CI and canonical release pass. Java and Android corrected publisher runs 41333697745 and 41333017156 complete successfully. Swift CocoaPods 3.1.1 is published and a fresh public installed-consumer native smoke passes; a test-only startup-policy fixture correction retains the immutable SDK tag/runtime. React Native retains its 3.1.0 version with Swift >=3.1.1.
+
+An independent public Node 3.2.0 canary through the accepting runtime acknowledges native cause evidence, redaction, execution context, opted-in recovery and a legacy-shaped error. Two primary incidents are processed, recovery creates no incident, and the stored reader returns correlated recovery and causes without the test secret. Only the disposable DebugBundle-owned fixture is deleted after verification.
+
+The official MCP Registry accepts and directly exposes 1.18.0. The verifier formerly searched only ten historical records; a deterministic red/green regression now requires the exact-version endpoint and rejects mismatched identity or missing versions. [Smithery confirms](https://smithery.ai/future) its publishing API/CLI/accounts were retired on 31 October. Its 403 is recorded as a retired channel, with no new publication claim. ClawHub skill and OpenClaw plugin 1.18.0 uploads are accepted; exact-version clean security/discovery gates remain pending.

@@ -1,12 +1,12 @@
-# Evidence quality and SDK parity: review candidate — 1 November 2026
+# Evidence quality and SDK parity: authorised release in progress — 1 November 2026
 
-The single-phase implementation is committed on `codex/evidence-quality-sdk-parity`
+The single-phase implementation is merged to core `main` at `88a9a42c1762bab1f5bb7e73f908d67eeb67b99a`
 across DebugBundle core, all maintained SDK repositories and the documentation site.
-The [core draft PR](https://github.com/debugbundle/debugbundle/pull/10) and the
+The [merged core PR](https://github.com/debugbundle/debugbundle/pull/10) and the
 [local release handoff](spec/local/proposals/bundle-evidence-quality-sdk-parity-release-handoff-2026-10-29.md)
 identify review sources, qualification receipts, dependency order and rollback.
 The [execution ledger](spec/local/proposals/bundle-evidence-quality-sdk-parity-execution-2026-10-25.md)
-retains red/green history. These are candidates, not publication or deployment receipts.
+retains red/green history. Current publication and independent production receipts are recorded in the [tracked release evidence](spec/bundle-evidence-quality-release-20261101.md).
 
 The owner's final audit adds durable payload identity to local CLI diagnostic
 receipts. A reproduced replay regression showed that editing a rejected future
@@ -24,15 +24,15 @@ JS SDK, CLI and MCP publication gates pass. Remaining SDK/plugin, own-consumer a
 final hosted/site gates are tracked in the local handoff. Other products and existing
 WordPress-site installations require separate consent. Existing-component design is approved.
 
-## Candidate versions
+## Release versions
 
-| Distribution | Proposed version and reason |
+| Distribution | Version and reason |
 | --- | --- |
 | Core | 1.20.0: additive bounded evidence, typed context and provenance. |
 | Shared-types / redaction | 3.0.0 / 2.7.0: exported Zod schema API major; additive privacy helpers. |
 | Node / Browser | 3.2.0: compatible capture APIs and negotiated optional evidence. |
 | CLI / MCP / OpenClaw | 1.18.0: compatible readers and automation. |
-| Python / PHP / Ruby / .NET / WordPress | 2.1.0: compatible evidence/recovery additions; WordPress is staged until registry prerequisites exist. |
+| Python / PHP / Ruby / .NET / WordPress | 2.1.0: compatible evidence/recovery additions; WordPress.org public ZIP and installed-runtime smoke pass. |
 | Java / Go / Android / React Native | 3.1.0: compatible native/framework/bridge additions. |
 | Swift | 3.1.1: evidence additions plus corrected native deadline cancellation; tagged 3.1.0 attempt retained. |
 | Site | 1.6.11: documentation update. |
@@ -43,7 +43,7 @@ partial maps, nullable response metadata, CLI profile errors and public tool met
 retain their contracts. Shared-package publication validates independent versions.
 The authorised core/site registry adoption removes their active transitive Zod 3
 instances; unused patch registrations are retired and installed-graph tests require
-that legacy instances remain absent. The independently published SDK candidate
+that legacy instances remain absent. The independently published JS SDK
 has a zero-vulnerability audit, with no SDK-specific audit exception. See
 `spec/zod-v4-migration.md` for migration and dependency boundaries.
 

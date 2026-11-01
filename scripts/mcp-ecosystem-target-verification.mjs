@@ -20,10 +20,16 @@ export async function verifyTargets(context, report, { runCommand, parseJsonFrom
   for (const [targetKey, target] of verificationTargetEntries(context)) {
     try {
       if (targetKey === "officialRegistry") {
-        const payload = await fetchJson(
-          `https://registry.modelcontextprotocol.io/v0/servers?search=${encodeURIComponent(context.serverJson.name)}&limit=10`
+        // Search is paginated across historical releases; its first page can omit
+        // the just-published version. Verify the immutable release directly.
+        const payload = await fetchOptionalJson(
+          `https://registry.modelcontextprotocol.io/v0/servers/${encodeURIComponent(context.serverJson.name)}/versions/${encodeURIComponent(context.version)}`
         );
-        const entry = findOfficialRegistryEntry(payload, context.serverJson.name, context.version);
+        const entry = findOfficialRegistryEntry(
+          { servers: payload === undefined ? [] : [payload] },
+          context.serverJson.name,
+          context.version
+        );
         report.verify.officialRegistry =
           entry === undefined
             ? {
