@@ -177,18 +177,25 @@ or unrelated data mutation was performed. All seven DebugBundle alarms remain OK
 and the exact active API baseline remains one pre-existing OAuth incident with its
 original count/timestamp and no next page.
 
-### Deferred ClawHub acceptance
+### ClawHub acceptance and authorised follow-through
 
-ClawHub skill 1.18.0 is public with clean final review/moderation. Owner-requested
-rescan `w17cddbzbyn37bfn045mvz5yz18hcy6x` succeeds and writes back, but VirusTotal
-remains null. The required antivirus gate has not passed.
+ClawHub skill 1.18.0 is public with clean final review/moderation. Its previously
+missing VirusTotal result has since arrived clean. The owner-requested rescan
+`w17cddbzbyn37bfn045mvz5yz18hcy6x` and original scanner evidence are retained.
 
-OpenClaw plugin 1.18.0 upload is accepted but the documented publication endpoint
-reports pending checks. Its secret scan is clean; ClawScan failed before a verdict
-because Skillspector failed. Exact package-version/list endpoints return 500 and
-public latest remains 1.17.0. The documented recovery implementation rejects
-pending attempts, so no recovery override was attempted. No scanner gate is waived.
+OpenClaw plugin 1.18.0 is now failed/not recoverable. Its secret scan is clean;
+ClawScan failed before a verdict because Skillspector failed, and public latest
+remains 1.17.0 at the retry checkpoint. ClawHub's recovery implementation applies
+to its original OpenClaw release-authorised attempts, not this ordinary publisher
+upload. No recovery override or scanner waiver was attempted.
 Smithery is a retired publisher channel under its official 31 October notice.
+
+The owner subsequently authorised one fresh coordinated 1.18.1 packaging retry.
+MCP 1.18.1 is published on npm and the official Registry, with full source CI and
+installed native checks passing. ClawHub accepted the fresh plugin for checks;
+the skill remains absent after server errors/timeouts. Exact-version security
+and discovery remain open. See [the current patch evidence](clawhub-publication-retry-20261101.md)
+for the immutable artifact, supported multipart publisher and final outcomes.
 
 Automatic approval review initially rejected React Native main promotion and the
 canonical core tag while these mandatory ClawHub gates remained open; neither
@@ -218,4 +225,4 @@ still reports build 88a9a42c. Site source identities and completed edge/invalida
 checks are retained with the successful workflow. All seven production alarms
 remain OK and the exact API incident baseline is unchanged. All independent
 core, SDK, WordPress and site publication steps are complete. Final ClawHub
-security/discovery acceptance remains open at the owner's direction.
+security/discovery acceptance remains open in the authorised follow-through above.

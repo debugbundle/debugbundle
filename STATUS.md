@@ -4,11 +4,13 @@ MCP 1.18.1 is published to npm and the official Registry from immutable fbfdd394
 Full source CI, release CI and installed public checks on Node 22/24/26 pass.
 ClawHub accepted the plugin 1.18.1 upload after temporary write contention;
 its exact security checks remain pending. The portable skill's corrected MCP
-1.18.1 / CLI 1.18.0 pins are ready for the supported 0.22.0 multipart publisher,
-after 0.25.0 upload-ticket HTTP 500s. Plugin inspection/publication retains 0.25.0.
+1.18.1 / CLI 1.18.0 pins remain absent on ClawHub after upload-ticket HTTP 500s
+and supported multipart server errors/timeouts. Plugin inspection/publication
+retains 0.25.0; the skill's compatible multipart publisher is pinned to 0.22.0.
 Both exact ClawHub security/discovery gates remain open. No support issue is
 submitted; core, language SDKs, WordPress and hosted runtime retain their verified
-releases. See [patch evidence](spec/clawhub-publication-retry-20261101.md).
+releases. No further uploads or version bumps are planned while these external
+outcomes remain unresolved. See [patch evidence](spec/clawhub-publication-retry-20261101.md).
 
 # Release checkpoint — 1 November 2026
 

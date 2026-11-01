@@ -1,8 +1,9 @@
 # MCP and ClawHub packaging retry — 1 November 2026
 
-Status: MCP 1.18.1 is published to npm and the official Registry. ClawHub accepted
-the plugin 1.18.1 upload and is checking it; the skill transport retry and both
-exact-version security outcomes remain pending. No support issue is submitted.
+Status at 23:23 UTC on 1 November: MCP 1.18.1 is published to npm and the official
+Registry. ClawHub accepted plugin 1.18.1 and is checking it. The skill remains
+absent after server errors/timeouts. Both exact-version acceptance gates stay
+open. No support issue is submitted; no further upload/version churn is planned.
 
 ## Purpose and version decision
 
@@ -72,6 +73,10 @@ its required README/license/server manifest and executable bytes match source.
 [full source CI 41359102668](https://github.com/debugbundle/debugbundle/actions/runs/41359102668)
 and CLI compatibility 41359102664 pass. Installed public MCP/Codex checks pass on
 Node 22, 24 and 26. The official Registry's immutable 1.18.1 entry is active/latest.
+The full published-source run passes 4,849 cases with 15 expected private-site
+skips. The transport-only follow-up's CLI compatibility 41361333152 and all three
+Gemini lanes pass; full follow-up CI 41361333106 is still running its tests after
+passing lint/type checks. That pending follow-up is not a new npm release.
 The MCPB is prepared from that public archive, with native dependency and staged
 stdio checks passing. Runtime source under MCP, CLI and shared packages is
 unchanged from published MCP 1.18.0 source `c3bec35e`.
@@ -83,3 +88,30 @@ database write contention; after its backoff, one bounded same-version retry was
 accepted and exact publication status is pending at checks. Neither an upload
 receipt nor this pending status satisfies the final security gate. The existing
 1.18.0 failed plugin attempt and all immutable versions are retained.
+
+The committed multipart follow-up is `9887bf4b`, with unchanged OpenAI source-only
+provenance in `e5d72c5d`. The supported multipart skill request returned a server
+error; one final bounded retry timed out after 120 seconds. Post-request owner
+reads still return 404 for skill 1.18.1 and pending checks for plugin 1.18.1.
+The accepted plugin artifact SHA-256 is
+`c90cf890645b8c3fa204836be604eb932e16f85aad55c61bdccd8569c78200e8`;
+its public-download/hash gate is unavailable while it is held. Do not retry the
+accepted plugin. A later retry of the absent skill must first reconcile exact
+owner state again; a timeout alone cannot establish that a write was rejected.
+
+The unchanged strict ecosystem verifier passes official Registry 1.18.1 and fails
+both exact ClawHub gates because neither version can be read publicly. No scan,
+moderation or discovery assertion is weakened. MCP.so finds the existing listing;
+Glama returns 401, PulseMCP returns 403 and LobeHub requires manual indexing
+confirmation. Those directory results do not prove 1.18.1 publication. The new
+skill's bounded seven-query discovery check cannot qualify an absent version.
+Publisher receipts and exact owner reads are retained under
+`.tmp/mcp-ecosystem/1.18.1/` and `.tmp/evidence-release/` locally.
+
+ClawHub documents [authenticated multipart publication](https://github.com/openclaw/clawhub/blob/main/docs/http-api.md)
+and its [0.23.3 upload-ticket transport change](https://github.com/openclaw/clawhub/blob/main/CHANGELOG.md).
+This attempt preserves those supported transports and mandatory server checks.
+The remaining gate is external platform acceptance; the independently completed
+core/SDK/WordPress/site releases do not depend on it. Wait for the accepted
+plugin's exact result and retry the absent skill only after service recovery;
+no new version or support communication is implied by this receipt.
