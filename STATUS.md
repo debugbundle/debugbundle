@@ -17,10 +17,12 @@ pass; the handoff records the final refreshed distribution/CI/runtime identities
 SDK source and packaged artifact identities were rechecked against all thirteen
 inventories, with live readback of the ten successful qualification workflows.
 
-**Owner hold:** review-branch commits/pushes and GitHub Actions qualification are
-approved. The owner must check the candidate before any release train is triggered.
-No release tags, publication, deployment, production canaries or consumer-product
-adoption are authorised. Existing-component evidence-reader design is approved.
+**Release authorised on 1 November:** the owner approved the reviewed DebugBundle
+release train, including own dogfooding and WordPress distribution. Accepting core
+1.20.0 and migration 64 are independently verified in production; shared packages,
+JS SDK, CLI and MCP publication gates pass. Remaining SDK/plugin, own-consumer and
+final hosted/site gates are tracked in the local handoff. Other products and existing
+WordPress-site installations require separate consent. Existing-component design is approved.
 
 ## Candidate versions
 
@@ -31,25 +33,29 @@ adoption are authorised. Existing-component evidence-reader design is approved.
 | Node / Browser | 3.2.0: compatible capture APIs and negotiated optional evidence. |
 | CLI / MCP / OpenClaw | 1.18.0: compatible readers and automation. |
 | Python / PHP / Ruby / .NET / WordPress | 2.1.0: compatible evidence/recovery additions; WordPress is staged until registry prerequisites exist. |
-| Java / Go / Android / Swift / React Native | 3.1.0: compatible native/framework/bridge additions. |
+| Java / Go / Android / React Native | 3.1.0: compatible native/framework/bridge additions. |
+| Swift | 3.1.1: evidence additions plus corrected native deadline cancellation; tagged 3.1.0 attempt retained. |
 | Site | 1.6.11: documentation update. |
 | Portable OpenAI plugin | 1.0.2 unchanged package bytes; candidate source provenance is local, with deployed runtime identity left unclaimed. |
 
 Maintained JavaScript schema code uses upstream Zod 4.6.7. Legacy identifier shape,
 partial maps, nullable response metadata, CLI profile errors and public tool metadata
 retain their contracts. Shared-package publication validates independent versions.
-Core/site published dogfooding dependencies retain their verified transitive Zod 3
-patch until ordered registry adoption. The independently published SDK candidate
+The authorised core/site registry adoption removes their active transitive Zod 3
+instances; unused patch registrations are retired and installed-graph tests require
+that legacy instances remain absent. The independently published SDK candidate
 has a zero-vulnerability audit, with no SDK-specific audit exception. See
 `spec/zod-v4-migration.md` for migration and dependency boundaries.
 
 ## Qualification boundaries
 
 - Core accepting contracts, deterministic bundles/readers, migration-before-startup
-  and predecessor rollback have local proof. Real-storage integration passes 179 tests
-  across 40 files with one pre-existing optional analytics-flow SDK test skipped.
-  Full unit/coverage passes 4,849 tests across 594 files; changed-source coverage
-  and all thirteen committed-source provenance checks pass.
+  and predecessor rollback have local proof. The final pre-release audit covers 4,862 core cases across 594 files (4,847 in
+  public CI plus 15 private-site cases locally), 180 real-storage integration
+  cases with no skips, changed-source coverage and all thirteen committed-source
+  provenance checks. Registry adoption adds passing consumer, type/build and
+  native developer-client checks; final source CI and rollout are recorded in
+  the handoff.
 - Node/Browser pass 603 tests, per-file coverage and installed privacy/delivery on
   supporting hosts; Node 22 native/fallback and installed consumers are separately
   verified. Actual Chromium exercises causes, resources, CSP, recovery and teardown.

@@ -178,7 +178,7 @@ The private site's `content/docs/mcp/codex.mdx`, `content/docs/mcp/claude-code.m
   validators' closed vocabulary. Shared-types 3.0 exposes Zod 4 schema APIs;
   dependency order and compatibility are in `spec/zod-v4-migration.md`.
 
-- **Evidence candidate:** shared `exception-evidence.ts`/`evidence-bounds.ts` own bounded graph/UTF-8 rules; `stack-frames.ts` interprets normalized text independently of fingerprinting; `diagnostic-context.ts`/`bundle-evidence.ts` own typed scope, recovery, resource and provenance shapes; `evidence-capabilities.ts`/`evidence-emission.ts` own strict path proof and downgrade; `evidence-interpretation.ts` supplies shared reader facts and guidance. `spec/bundle-evidence-quality.md` owns the candidate contract and rollout gates. Receiver/worker/local implementations and every maintained SDK have qualification recorded in STATUS and the release handoff; publication remains separately held for owner review.
+- **Evidence candidate:** shared `exception-evidence.ts`/`evidence-bounds.ts` own bounded graph/UTF-8 rules; `stack-frames.ts` interprets normalized text independently of fingerprinting; `diagnostic-context.ts`/`bundle-evidence.ts` own typed scope, recovery, resource and provenance shapes; `evidence-capabilities.ts`/`evidence-emission.ts` own strict path proof and downgrade; `evidence-interpretation.ts` supplies shared reader facts and guidance. `spec/bundle-evidence-quality.md` owns the candidate contract and rollout gates. Receiver/worker/local implementations and every maintained SDK have qualification recorded in STATUS and the release handoff; the owner-authorised dependency-ordered release is in progress.
 - **Evidence paths:** API `evidence-negotiation.ts` adapts opt-in discovery on existing requests; worker `processor-evidence-context.ts` loads scoped retained objects using immutable receipts. Storage `evidence-ingestion-receipt.ts` claims evidence identities before future-time admission or raw writes without adding receipt queries to ordinary ingestion. `evidence-context-{schema,store,reader,retention}.ts` owns the additive migration, hashed correlation locks/index, durable rebuild intents and cleanup tombstones. CLI `local-diagnostic-context.ts`, `local-processing-files.ts` and `local-bundle-artifacts.ts` persist first receipts and protected payload hashes outside rebuildable state, and rebuild artifacts without lifecycle changes. Bundle `error-context.ts`, `occurrence-context.ts` and `diagnostic-evidence.ts` preserve selected-primary measurements and deterministic recovery/provenance. Dashboard `incident-evidence-reader.tsx` composes existing controls; `mcp-core/evidence-summary.ts` separately allowlists restricted summaries. Python splits native snapshots/wire validation, proof/HTTP, operation/scope leases, diagnostic budgets, recovery capture and flush delivery into their owning modules; `canonical_event.py` owns native JSON and interprets the vendored runtime
   `event-envelope.schema.json`; `ingestion_wire.py` provides the exact native
   serializer, optional-evidence fitting and ordered byte prefixes/chunks.
@@ -1010,3 +1010,10 @@ Docker network. `runtime-evidence-schema-fixture.mjs` exercises the images' actu
 storage and readiness functions. Image/context/fixture identities and HTTP
 readiness/config receipts remain under `.tmp/evidence-release/`. These local
 checks do not publish images or replace exact hosted rollout verification.
+
+Swift native HTTP deadline ownership: `DebugBundleHTTPReply.ReplyCompletion` owns
+one terminal continuation and both cancellation handles. Native reads keep their
+byte/encoding cap and check cancellation; timeout does not await a late Foundation
+callback. HTTP body encoding shares the request deadline. Swift 3.1.1 and the RN
+Swift minimum carry this correction; other SDK timeout implementations do not use
+the structured task-group wait that caused this failure.

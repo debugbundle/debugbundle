@@ -36,5 +36,3 @@ overrides:
   "flatted@>=3.0.0 <3.4.2": 3.4.2
   "source-map-js@>=1.0.0 <1.2.2": 1.2.2
   "proxy-addr@>=2.0.0 <2.0.8": 2.0.8
-patchedDependencies:
-  zod@3.25.76: patches/zod@3.25.76.patch

@@ -56,3 +56,11 @@ remove legacy patch/accounting only when no active dependency requires it.
 
 No release tag, registry publication, hosted deployment, installed WordPress site,
 or consumer-product adoption is authorised by these local qualification steps.
+
+## Registry adoption on 1 November 2026
+
+DebugBundle core/app/site now adopt the published shared-types 3.0.0, redaction
+2.7.0 and Node/Browser 3.2.0 family. Resolution reports no active Zod 3 instance,
+so the unused workspace patch registrations are removed. Installed-graph tests
+require the absence of legacy Zod. Historical backport policy files and negative
+audit fixtures remain available; no legacy advisory is exempted for this graph.

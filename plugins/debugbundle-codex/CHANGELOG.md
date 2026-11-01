@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.4.1] - 2026-11-01
+
+- Pin verified MCP 1.18.0 for bounded evidence explanations, explicit recovery observations and provenance. Preserve local authentication, interface guidance and existing tool contracts.
+
 ## [1.4.0] - 2026-10-19
 
 - Adopt verified MCP 1.17.0 with account and project notification preferences, channel pauses and daily email digest schedules. Preserve local authentication and existing tool contracts.

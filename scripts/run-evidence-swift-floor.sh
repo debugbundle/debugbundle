@@ -6,12 +6,13 @@ task_swift=$(cat "$task_dir/compiler-paths.txt")
 task_sdk=/Library/Developer/CommandLineTools/SDKs/MacOSX14.5.sdk
 test -x "$task_swift"
 test -d "$task_sdk"
-task_artifact="$task_root/sdks/debugbundle-swift/.tmp/evidence-artifacts/debugbundle-swift-3.1.0-candidate.tar.gz"
+task_version=$(python3 -c 'import json,re,sys; version=json.load(open(sys.argv[1]))["candidate_version"]; assert re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version); print(version)' "$task_root/sdks/debugbundle-swift/.tmp/evidence-artifact-manifest.json")
+task_artifact="$task_root/sdks/debugbundle-swift/.tmp/evidence-artifacts/debugbundle-swift-$task_version-candidate.tar.gz"
 test -f "$task_artifact"
 task_run=$(mktemp -d "$task_dir/qualification.XXXXXX")
 shasum -a 256 "$task_artifact" > "$task_run/artifact.sha256"
 tar -xzf "$task_artifact" -C "$task_run"
-task_source="$task_run/debugbundle-swift-3.1.0"
+task_source="$task_run/debugbundle-swift-$task_version"
 export PATH="$(dirname "$task_swift"):$PATH"
 export SDKROOT="$task_sdk"
 export CLANG_MODULE_CACHE_PATH="$task_run/clang-cache"

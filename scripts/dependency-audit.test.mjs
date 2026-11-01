@@ -78,7 +78,7 @@ test("missing, malformed and inconsistent reports fail closed", () => {
   assert.throws(() => evaluateAudit(report(), { auditLevel: "unknown" }));
 });
 
-test("every active legacy instance has the approved patch and compiled bytes", () => {
+test("the published SDK adoption removes active legacy Zod instances", () => {
   const result = spawnSync(
     "pnpm",
     ["list", "zod", "--depth", "Infinity", "--recursive", "--json"],
@@ -86,8 +86,7 @@ test("every active legacy instance has the approved patch and compiled bytes", (
   );
   assert.equal(result.status, 0);
   const roots = collectLegacyRoots(JSON.parse(result.stdout));
-  assert.ok(roots.length > 0);
-  assert.equal(verifyLegacyBackport(root, roots), roots.length);
+  assert.equal(roots.length, 0);
 });
 
 test("a drifted or missing installed file cannot satisfy the backport policy", () => {

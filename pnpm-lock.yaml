@@ -29,9 +29,6 @@ overrides:
   source-map-js@>=1.0.0 <1.2.2: 1.2.2
   proxy-addr@>=2.0.0 <2.0.8: 2.0.8
 
-patchedDependencies:
-  zod@3.25.76: e7256d9542a1bfd92d02a88a06b62ee1c275779e08e46473c80f54477f409654
-
 importers:
   .:
     dependencies:
@@ -45,14 +42,14 @@ importers:
         specifier: workspace:*
         version: link:packages/auth
       "@debugbundle/redaction":
-        specifier: 2.6.0
-        version: 2.6.0
+        specifier: 2.7.0
+        version: 2.7.0
       "@debugbundle/sdk-node":
-        specifier: 3.1.0
-        version: 3.1.0
+        specifier: 3.2.0
+        version: 3.2.0
       "@debugbundle/shared-types":
-        specifier: 2.6.0
-        version: 2.6.0
+        specifier: 3.0.0
+        version: 3.0.0
       "@modelcontextprotocol/sdk":
         specifier: 1.32.1
         version: 1.32.1(zod@4.6.7)
@@ -208,8 +205,8 @@ importers:
   apps/web:
     dependencies:
       "@debugbundle/sdk-browser":
-        specifier: 3.1.0
-        version: 3.1.0
+        specifier: 3.2.0
+        version: 3.2.0
       "@fontsource-variable/geist":
         specifier: ^5.2.8
         version: 5.2.8
@@ -816,40 +813,28 @@ packages:
       }
     engines: { node: ">=18" }
 
-  "@debugbundle/redaction@2.1.0":
+  "@debugbundle/redaction@2.7.0":
     resolution:
       {
-        integrity: sha512-+IXVGehnYXwYE2niSRg0KVkPCmqm4FPhbHlz3XWCEIqrsPopSNcay14VMmdAPInsBy9FdVhP1J4CRWM8VCj8Cg==
+        integrity: sha512-9oJ1cXZl5qBs746KYRqgZV+ggLw8O8UONkPVK2A+8Z/TtRljqhw5GuhVLuCnml2TIU3vemuuSAiHVrcUmXRorg==
       }
 
-  "@debugbundle/redaction@2.6.0":
+  "@debugbundle/sdk-browser@3.2.0":
     resolution:
       {
-        integrity: sha512-+X2ZJig4HMTaVGd0OkK894EpfPN2vJoPddhUddIBvA5OKEkyd/XtyM5BJCHQcBnU9/nSARVgt6/wYhDczNK/vg==
+        integrity: sha512-t8TkvuPG9yF1ePYizUAtO8x4a0/ESm52GL/P3r15ESqMmbtrFA9njMwaOqBRwrBzFgGe9kDG94aVwBZtrIp60g==
       }
 
-  "@debugbundle/sdk-browser@3.1.0":
+  "@debugbundle/sdk-node@3.2.0":
     resolution:
       {
-        integrity: sha512-MAQcf4fzYwSmokSmgjoW1c/Vu/GZsdLFgxWKMDD+uX8uVtaXSBTxhXHrfKvzcA3JoPrmnAaozondcUOjCoGzug==
+        integrity: sha512-e1lTHDoR6uQDGb12QNJHA0WFSfiIngNvJcEicS7PXOAMfi5ZcsY/PiFKbRx4i/+Y4ttzmKOjI7doHEmzAyIxFg==
       }
 
-  "@debugbundle/sdk-node@3.1.0":
+  "@debugbundle/shared-types@3.0.0":
     resolution:
       {
-        integrity: sha512-5Zlmi2L69NHH3+442Ex84am7Bvzr3g4dPBhtQ0785wj7u7g6OqP+K41jGggDO+H1W3MYUPeRRCJKq1DwMF6nzg==
-      }
-
-  "@debugbundle/shared-types@2.1.0":
-    resolution:
-      {
-        integrity: sha512-dB2XWLm+3VGd5dGQ4bM1PuUYkCB96iJlFrs+Mgio1MbVBu9GEQhk1h+HC4hVCyyiXvb9+NOClF8e648XPA1Cxg==
-      }
-
-  "@debugbundle/shared-types@2.6.0":
-    resolution:
-      {
-        integrity: sha512-dTS74QxTeEkVUE8kDRCDURX1lh7J2KiaObdmZJOK14duh0hHyuKmq1LbwRB/bRN3faKnz9jcqpFnKU8+UgZYVw==
+        integrity: sha512-aXm3r0V5/huk62jW9jQdcifDwGCsawidlJkYojIf4IoT/9ZBPwR0XLyvQa/Wlt23AmLbK8xxlbJmia2l/Yx7gQ==
       }
 
   "@earendil-works/pi-tui@0.78.0":
@@ -7598,12 +7583,6 @@ packages:
     peerDependencies:
       zod: 4.6.6
 
-  zod@3.25.76:
-    resolution:
-      {
-        integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==
-      }
-
   zod@4.6.6:
     resolution:
       {
@@ -8265,28 +8244,22 @@ snapshots:
 
   "@csstools/css-tokenizer@3.0.4": {}
 
-  "@debugbundle/redaction@2.1.0": {}
+  "@debugbundle/redaction@2.7.0": {}
 
-  "@debugbundle/redaction@2.6.0": {}
-
-  "@debugbundle/sdk-browser@3.1.0":
+  "@debugbundle/sdk-browser@3.2.0":
     dependencies:
-      "@debugbundle/redaction": 2.1.0
-      "@debugbundle/shared-types": 2.1.0
+      "@debugbundle/redaction": 2.7.0
+      "@debugbundle/shared-types": 3.0.0
 
-  "@debugbundle/sdk-node@3.1.0":
+  "@debugbundle/sdk-node@3.2.0":
     dependencies:
-      "@debugbundle/redaction": 2.1.0
-      "@debugbundle/shared-types": 2.1.0
-      zod: 3.25.76(patch_hash=e7256d9542a1bfd92d02a88a06b62ee1c275779e08e46473c80f54477f409654)
+      "@debugbundle/redaction": 2.7.0
+      "@debugbundle/shared-types": 3.0.0
+      zod: 4.6.7
 
-  "@debugbundle/shared-types@2.1.0":
+  "@debugbundle/shared-types@3.0.0":
     dependencies:
-      zod: 3.25.76(patch_hash=e7256d9542a1bfd92d02a88a06b62ee1c275779e08e46473c80f54477f409654)
-
-  "@debugbundle/shared-types@2.6.0":
-    dependencies:
-      zod: 3.25.76(patch_hash=e7256d9542a1bfd92d02a88a06b62ee1c275779e08e46473c80f54477f409654)
+      zod: 4.6.7
 
   "@earendil-works/pi-tui@0.78.0":
     dependencies:
@@ -12561,8 +12534,6 @@ snapshots:
   zod-to-json-schema@3.25.2(zod@4.6.7):
     dependencies:
       zod: 4.6.7
-
-  zod@3.25.76(patch_hash=e7256d9542a1bfd92d02a88a06b62ee1c275779e08e46473c80f54477f409654): {}
 
   zod@4.6.6: {}
 

@@ -6,20 +6,23 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
-## [1.20.0] - Unpublished candidate (2026-10-29)
+## [1.20.0] - 2026-11-01
 
 ### Security
 
 - Migrate maintained core schemas to upstream Zod 4.6.7 and replace the old JSON
   Schema converter with native export. Shared-types uses its own major3.0 version
   for exported Zod API changes; preserve event/Bundle v1, MCP/OpenClaw inputs,
-  legacy UUID shapes, partial records and CLI profile diagnostics. Existing
-  published dogfooding dependencies retain their separately verified legacy patch
-  until the ordered SDK publication/adoption step.
+  legacy UUID shapes, partial records and CLI profile diagnostics. Registry adoption of the published
+  Node/Browser 3.2 family removes active legacy Zod 3 and its workspace patch registrations.
 
 ### Added
 
-- Unreleased evidence-quality candidate: bounded exception graphs, normalized runtime frames, explicit recovery/resource context, complete-path capability negotiation, additive storage migration and scoped late-context rebuilds. Bundles retain primary capture identity and distinguish capture times from artifact updates. Ordinary and restricted readers expose appropriately scoped interpretation. Existing SDKs, fingerprints and stored history remain compatible; whole-family qualification is recorded in the release handoff and rollout awaits owner review.
+- Add evidence quality: bounded exception graphs, normalized runtime frames, explicit recovery/resource context, complete-path capability negotiation, additive storage migration and scoped late-context rebuilds. Bundles retain primary capture identity and distinguish capture times from artifact updates. Ordinary and restricted readers expose appropriately scoped interpretation. Existing SDKs, fingerprints and stored history remain compatible; whole-family qualification and the owner-authorised rollout are recorded in the release handoff.
+
+### Changed
+
+- Adopt published SDK dependencies for DebugBundle-owned app/API/site dogfooding and pin MCP 1.18 in independently versioned Codex 1.4.1, Gemini 1.3.1 and Claude 1.18 developer packages.
 
 ### Fixed
 
