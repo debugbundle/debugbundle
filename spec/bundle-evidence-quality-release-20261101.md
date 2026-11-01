@@ -192,8 +192,8 @@ Smithery is a retired publisher channel under its official 31 October notice.
 
 The owner subsequently authorised one fresh coordinated 1.18.1 packaging retry.
 MCP 1.18.1 is published on npm and the official Registry, with full source CI and
-installed native checks passing. ClawHub accepted the fresh plugin for checks;
-the skill remains absent after server errors/timeouts. Exact-version security
+installed native checks passing. ClawHub accepted both fresh distributions for
+checks, with delayed skill acceptance after a client timeout. Exact-version security
 and discovery remain open. See [the current patch evidence](clawhub-publication-retry-20261101.md)
 for the immutable artifact, supported multipart publisher and final outcomes.
 
