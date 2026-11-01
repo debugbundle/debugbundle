@@ -410,10 +410,11 @@ local skill folders cannot receive a ClawHub scan.
 
 ## Verified legacy dependency security backport
 
-DebugBundle core and site retain Zod 3.25.76 for existing schema contracts. Their
+DebugBundle core and site retain transitive Zod 3.25.76 through their published
+dogfooding SDK dependencies until ordered adoption of the new SDKs. Their
 pnpm-managed patch moves bounded array/set checks ahead of element work and
 protects the package's bundled v4 bounded array/set/map entry points. Standalone
-Zod 4 paths use upstream 4.6.6. This is a maintained compatibility backport for
+maintained Zod 4 paths use upstream 4.6.7. This is a maintained compatibility backport for
 GHSA-mrhx-c7xc-m3w5; it does not bound schemas that intentionally omit limits.
 The upstream registry still reports the legacy version as affected.
 

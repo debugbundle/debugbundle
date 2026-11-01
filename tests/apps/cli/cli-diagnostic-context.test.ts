@@ -4,6 +4,11 @@ import { join } from "node:path";
 import { expect, it } from "vitest";
 import { processCommand } from "../../../apps/cli/src/process-command.js";
 import {
+  collectLocalDiagnosticContext,
+  parseDiagnosticReceipts,
+  parseLocalDiagnosticState
+} from "../../../apps/cli/src/local-diagnostic-context.js";
+import {
   BundleV1Schema,
   createEventEnvelope,
   type EventEnvelope
@@ -35,14 +40,17 @@ function failure() {
     }
   });
 }
-function recovery(seconds = 2) {
+function recovery(
+  seconds = 2,
+  state: "recovery_observed" | "failure_persisted" = "recovery_observed"
+) {
   return createEventEnvelope({
     event_id: id(2),
     project_id: id(99),
     event_type: "diagnostic_context",
     occurred_at: at(seconds),
     service,
-    payload: { ...reference, kind: "recovery", attempt_id: id(92), state: "recovery_observed" }
+    payload: { ...reference, kind: "recovery", attempt_id: id(92), state }
   });
 }
 async function fixture() {
@@ -62,7 +70,13 @@ async function fixture() {
       >;
       diagnostic_receipts?: Record<string, string>;
     };
-  return { root, batch, state, statePath };
+  return {
+    root,
+    batch,
+    state,
+    statePath,
+    receiptPath: join(root, ".debugbundle/local/evidence-receipts.json")
+  };
 }
 it.each([false, true])(
   "joins local context in either arrival order without creating or reopening incidents, contextFirst=%s",
@@ -110,4 +124,106 @@ it("keeps a rejected future context's first receipt during a full replay", async
     JSON.parse(await readFile(join(f.root, incident.bundle_path), "utf8"))
   );
   expect(bundle.context.recovery?.outcome).toBe("unknown");
+});
+
+it("rejects changed diagnostic payloads after a full local replay", async () => {
+  const f = await fixture();
+  await f.batch("001", [failure(), recovery(62)]);
+  await processCommand({}, { cwd: () => f.root, now: () => new Date(at(0)) });
+  // Editing an initially rejected event must not turn it into accepted recovery
+  // evidence when the ordinary processing state has to be rebuilt.
+  await f.batch("001", [failure(), recovery(2)]);
+  await writeFile(f.statePath, "{corrupt");
+  await processCommand({}, { cwd: () => f.root, now: () => new Date(at(100)) });
+  const incident = Object.values((await f.state()).incidents)[0]!;
+  const bundle = BundleV1Schema.parse(
+    JSON.parse(await readFile(join(f.root, incident.bundle_path), "utf8"))
+  );
+  expect(bundle.context.recovery?.outcome).toBe("unknown");
+  expect(incident.occurrence_count).toBe(1);
+});
+
+it.each([false, true])(
+  "keeps an accepted payload's identity when its file changes, rebuild=%s",
+  async (rebuild) => {
+    const f = await fixture();
+    await f.batch("001", [failure(), recovery()]);
+    await processCommand({}, { cwd: () => f.root, now: () => new Date(at(3)) });
+    const changed = recovery(2, "failure_persisted");
+    await f.batch("001", [failure(), changed]);
+    if (rebuild) await writeFile(f.statePath, "{corrupt");
+    await processCommand({ preset: "minimal" }, { cwd: () => f.root, now: () => new Date(at(4)) });
+    const incident = Object.values((await f.state()).incidents)[0]!;
+    const bundle = BundleV1Schema.parse(
+      JSON.parse(await readFile(join(f.root, incident.bundle_path), "utf8"))
+    );
+    expect(bundle.context.recovery?.outcome).toBe(rebuild ? "unknown" : "recovered");
+  }
+);
+
+it("accepts canonical retries and upgrades timestamp-only ledgers without renewing them", async () => {
+  const f = await fixture();
+  await f.batch("001", [failure(), recovery()]);
+  await writeFile(f.receiptPath, JSON.stringify({ [id(2)]: at(3) }));
+  await processCommand({}, { cwd: () => f.root, now: () => new Date(at(4)) });
+  const original = JSON.parse(await readFile(f.receiptPath, "utf8"));
+  expect(original[id(2)]).toEqual({
+    received_at: at(3),
+    payload_hash: expect.stringMatching(/^[a-f0-9]{64}$/)
+  });
+  const retry = recovery();
+  retry.service = { runtime: "node", environment: "local", name: "api" };
+  await f.batch("001", [failure(), retry]);
+  await writeFile(f.statePath, "{corrupt");
+  await processCommand({}, { cwd: () => f.root, now: () => new Date(at(5)) });
+  expect(JSON.parse(await readFile(f.receiptPath, "utf8"))).toEqual(original);
+  const incident = Object.values((await f.state()).incidents)[0]!;
+  const bundle = BundleV1Schema.parse(
+    JSON.parse(await readFile(join(f.root, incident.bundle_path), "utf8"))
+  );
+  expect(bundle.context.recovery?.outcome).toBe("recovered");
+});
+
+it.each([
+  null,
+  { invalid: at(0) },
+  { [id(2)]: "not a date" },
+  { [id(2)]: { received_at: at(0), payload_hash: "invalid" } },
+  { [id(2)]: { received_at: at(0), payload_hash: 3 } },
+  { [id(2)]: { received_at: at(0), unexpected: true } }
+])("rejects corrupt durable receipt ledgers instead of renewing evidence: %j", (ledger) => {
+  expect(() => parseDiagnosticReceipts(ledger)).toThrow("Invalid local evidence receipt ledger.");
+});
+
+it("preserves legacy processing state and rejects malformed payload identity metadata", () => {
+  const legacy = {
+    diagnostic_contexts: [{ event: recovery(), received_at: at(3) }],
+    diagnostic_receipts: { [id(2)]: at(3) }
+  };
+  expect(parseLocalDiagnosticState(legacy)?.diagnostic_contexts).toHaveLength(1);
+  for (const hashes of [[], { [id(2)]: "invalid" }, { [id(3)]: "a".repeat(64) }])
+    expect(parseLocalDiagnosticState({ ...legacy, diagnostic_payload_hashes: hashes })).toBeNull();
+});
+
+it("retains chronological context and immutable receipts after payload expiry", () => {
+  const first = { ...recovery(1), event_id: id(3) };
+  const second = recovery(2);
+  const collected = collectLocalDiagnosticContext(null, [second, first], at(3));
+  expect(collected.diagnostic_contexts?.map(({ event }) => event.event_id)).toEqual([id(3), id(2)]);
+  expect(collectLocalDiagnosticContext(null, [first, second], at(3))).toEqual(collected);
+  const expired = collectLocalDiagnosticContext(collected, [], at(8 * 86_400));
+  expect(expired.diagnostic_contexts).toEqual([]);
+  expect(expired.diagnostic_payload_hashes).toEqual(collected.diagnostic_payload_hashes);
+  expect(expired.diagnostic_receipts).toEqual(collected.diagnostic_receipts);
+});
+
+it("withholds retained context that disagrees with its durable payload identity", () => {
+  const collected = collectLocalDiagnosticContext(null, [recovery()], at(3));
+  const changed = {
+    ...collected,
+    diagnostic_contexts: [{ event: recovery(2, "failure_persisted"), received_at: at(3) }]
+  };
+  const checked = collectLocalDiagnosticContext(changed, [], at(4));
+  expect(checked.diagnostic_contexts).toEqual([]);
+  expect(checked.diagnostic_payload_hashes).toEqual(collected.diagnostic_payload_hashes);
 });

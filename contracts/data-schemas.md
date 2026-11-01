@@ -1478,6 +1478,12 @@ Resolved minimal policy disables it; balanced/investigative permit locally opted
 diagnostics. Context remains subject to existing policy, metering and retention.
 Association, immutable receipts and expiry follow FR-EVID-05–07 and the canonical
 storage definitions in `packages/storage/src/evidence-context-schema.ts`.
+Local CLI `.debugbundle/local/evidence-receipts.json` independently retains each
+diagnostic event's first `received_at` and protected canonical `payload_hash`.
+Processing-state loss cannot reset either identity. Timestamp-only entries remain
+readable and bind the first available protected payload without renewing receipt
+time; missing historical hashes do not prove historical byte identity. Malformed
+durable receipts fail closed. Reordered JSON keys retain the same payload hash.
 Bootstrap mirrors these tables only for an empty database. Run the ordered,
 checksum-validated migration before activating API/worker code; readiness refuses
 missing migrations. Rollback must retain the tables and an accepting reader while

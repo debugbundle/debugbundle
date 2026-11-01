@@ -41,17 +41,18 @@ durable continuation; million-visit load testing is deferred by the owner.
 
 # SYSTEM OVERVIEW — DebugBundle
 
-Mobile/WordPress evidence candidate update (29 October, unpublished): Android's
+Mobile/WordPress evidence candidate (unpublished): Android's
 canonical bridge and installed Maven artifacts preserve permitted identities and
 unknown runtime metadata. Swift's worker enriches device-bearing events only;
 recovery retains its closed payload and legacy probe compatibility remains intact.
-React Native passes 124 source tests plus actual RN0.87.1/iOS26.2 HTTP delivery.
+React Native has source and installed iOS/Android HTTP delivery qualification.
 Its additive bounded JSON-string carrier avoids TurboModule's nested-null removal;
-older canonical-object/legacy methods remain available. WordPress passes 91 tests
-and existing coverage with cron-only config caching, policy-aware relay/spool
-replay and explicit recovery integration. Exact updated artifacts, remaining
-runtime/performance matrices and whole-phase gates continue. STATUS.md contains
-current receipts and supersedes intermediate progress descriptions below.
+older canonical-object/legacy methods remain available. WordPress's staged ZIP
+has coverage and installed runtime proof for cron-only config caching,
+policy-aware relay/spool replay and explicit recovery integration. Final public
+dependency locks and the publishable ZIP follow prerequisite SDK publication.
+STATUS.md and the release handoff identify current sources, qualification and
+the owner review hold before the release train.
 
 Evidence quality is a continuous candidate implementation under
 `spec/bundle-evidence-quality.md` (FR-EVID-01–09 / AC-EVID-01–09). Shared bounded
@@ -59,7 +60,10 @@ graphs, normalized frame parsing, typed context, capability proof/downgrade and
 evidence interpretation feed accepting API/worker, hashed scoped storage and local
 CLI paths. Migration `202610260001_add_typed_evidence_context` precedes dependent
 runtime; evidence-only ingestion receipts retain first admission time and a hash
-of the protected payload, including rejected future context. Raw context cleanup
+of the protected payload, including rejected future context. Local CLI receipts
+persist that same protected identity separately from rebuildable processing state;
+editing a diagnostic file cannot revive rejected or replace accepted evidence.
+Timestamp-only local ledgers preserve their first receipt during upgrade. Raw context cleanup
 retains retry tombstones. Ordinary ingestion adds no receipt database call. Context cannot change
 incident lifecycle. Bundle measurements remain attached to the selected primary
 occurrence; retained coverage, capture time and artifact generation are separate.
@@ -97,20 +101,20 @@ lease; close retains in-flight accounting until completion and permanent disposa
 revokes a replaced singleton project. Ruby's canonical hook interpreter consumes
 the vendored Draft 7 schema and conditional identity refinements; Rack/Rails relays
 preserve closed evidence and mark spools only after complete downstream acceptance.
-The receiver remains capped at 256 KiB. Node, Browser, Python and Ruby candidate senders
+The receiver remains capped at 256 KiB. Maintained candidate senders
 select actual JSON byte-sized network batches while preserving local files.
 Shared `ingestion-wire.ts` fits protected primary events independently of SDK
-transport ownership. Node/Python/PHP relays split after server metadata expansion and keep
-complete, exclusive spool markers; other senders/relays still require this work.
-Ruby artifact/runtime qualification remains in progress. Shared semantic/JSON-byte corpora supplement
+transport ownership. Maintained relays split after server metadata expansion and keep
+complete, exclusive spool markers. Shared semantic/JSON-byte corpora supplement
 the generated Draft 7 schema; JSON Schema alone cannot express graph reachability
 or total evidence byte limits.
 Java's candidate now owns bounded native JSON hook copies, a vendored canonical
 schema interpreter, semantic graph/reference/resource refinements and exact
 metadata JSON byte counting. Native ingestion/config replies share
-`BoundedHttpResponse` for pre-parse limits and deadlines. Its producer, recovery,
-proof, policy, relay and final-wire integration still remain open. Other
-SDK/relay/bridge implementations and whole-phase qualification remain open. No candidate is published or deployed.
+`BoundedHttpResponse` for pre-parse limits and deadlines. Producer, recovery,
+proof, policy, relay and final-wire paths have installed/runtime qualification.
+The release handoff records every SDK/relay/bridge's applicable proof and runtime
+limitations. No candidate is published or deployed.
 
 SDK change planning and completion must follow `rules/sdk-capability-parity.md`:
 evaluate all twelve maintained capture surfaces plus relays/wrappers/bridges,

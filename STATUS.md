@@ -8,6 +8,15 @@ identify review sources, qualification receipts, dependency order and rollback.
 The [execution ledger](spec/local/proposals/bundle-evidence-quality-sdk-parity-execution-2026-10-25.md)
 retains red/green history. These are candidates, not publication or deployment receipts.
 
+The owner's final audit adds durable payload identity to local CLI diagnostic
+receipts. A reproduced replay regression showed that editing a rejected future
+event could make it appear recovered after processing-state loss. The fix retains
+the original receipt and protected payload hash, preserves legacy timestamp-only
+ledgers and rejects corrupt receipts. Targeted CLI regression, type and lint checks
+pass; the handoff records the final refreshed distribution/CI/runtime identities.
+SDK source and packaged artifact identities were rechecked against all thirteen
+inventories, with live readback of the ten successful qualification workflows.
+
 **Owner hold:** review-branch commits/pushes and GitHub Actions qualification are
 approved. The owner must check the candidate before any release train is triggered.
 No release tags, publication, deployment, production canaries or consumer-product

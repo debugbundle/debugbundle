@@ -7,7 +7,8 @@ import {
 } from "./local-processing-files.js";
 import {
   collectLocalDiagnosticContext,
-  parseDiagnosticReceipts
+  parseDiagnosticReceipts,
+  serializeDiagnosticReceipts
 } from "./local-diagnostic-context.js";
 import {
   writeLocalBundleArtifacts,
@@ -561,21 +562,29 @@ export async function processCommand(
 
   const batches = await readEventBatches(eventsDirectoryPath, targetEventFileNames, readFile);
   const diagnosticReceiptPath = join(rootDirectory, ".debugbundle/local/evidence-receipts.json");
-  const receipts = (await pathExists(diagnosticReceiptPath, stat))
+  const ledger = (await pathExists(diagnosticReceiptPath, stat))
     ? parseDiagnosticReceipts(JSON.parse(await readFile(diagnosticReceiptPath)))
-    : {};
+    : { diagnostic_receipts: {}, diagnostic_payload_hashes: {} };
+  const receipts: Record<string, string> = ledger.diagnostic_receipts;
   for (const [id, at] of Object.entries(previousState?.diagnostic_receipts ?? {})) {
     if (receipts[id] === undefined || Date.parse(at) < Date.parse(receipts[id])) receipts[id] = at;
   }
   const diagnostics = collectLocalDiagnosticContext(
-    { ...previousState, diagnostic_receipts: receipts },
+    {
+      ...previousState,
+      diagnostic_receipts: receipts,
+      diagnostic_payload_hashes: {
+        ...previousState?.diagnostic_payload_hashes,
+        ...ledger.diagnostic_payload_hashes
+      }
+    },
     batches.flatMap((batch) => batch.events),
     receivedAt
   );
   // Receipt durability precedes artifact processing, including rejected context.
-  // State loss or an interrupted rebuild cannot renew its admission timestamp.
+  // State loss or an interrupted rebuild cannot renew its time or payload identity.
   if (diagnostics.diagnostic_receipts) {
-    await writeFile(diagnosticReceiptPath, `${JSON.stringify(diagnostics.diagnostic_receipts)}\n`);
+    await writeFile(diagnosticReceiptPath, serializeDiagnosticReceipts(diagnostics));
   }
   const incidents = new Map<string, LocalIncidentState>(
     processAllEventFiles ? [] : Object.entries(previousState?.incidents ?? {})

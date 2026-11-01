@@ -19,7 +19,13 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ### Added
 
-- Unreleased evidence-quality candidate: bounded exception graphs, normalized runtime frames, explicit recovery/resource context, complete-path capability negotiation, additive storage migration and scoped late-context rebuilds. Bundles retain primary capture identity and distinguish capture times from artifact updates. Ordinary and restricted readers expose appropriately scoped interpretation. Existing SDKs, fingerprints and stored history remain compatible; producer rollout and whole-family qualification are still in progress.
+- Unreleased evidence-quality candidate: bounded exception graphs, normalized runtime frames, explicit recovery/resource context, complete-path capability negotiation, additive storage migration and scoped late-context rebuilds. Bundles retain primary capture identity and distinguish capture times from artifact updates. Ordinary and restricted readers expose appropriately scoped interpretation. Existing SDKs, fingerprints and stored history remain compatible; whole-family qualification is recorded in the release handoff and rollout awaits owner review.
+
+### Fixed
+
+- Preserve local diagnostic payload identity across processing-state rebuilds, so
+  edited event files cannot turn rejected context into recovery evidence. Retain
+  compatibility with timestamp-only local receipt ledgers.
 
 ## [1.19.3] - 2026-10-24
 

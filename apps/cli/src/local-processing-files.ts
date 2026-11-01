@@ -103,7 +103,8 @@ export function serializeState(state: LocalProcessingState): string {
         ? {}
         : {
             diagnostic_contexts: state.diagnostic_contexts,
-            diagnostic_receipts: state.diagnostic_receipts
+            diagnostic_receipts: state.diagnostic_receipts,
+            diagnostic_payload_hashes: state.diagnostic_payload_hashes
           })
     },
     null,
