@@ -419,9 +419,9 @@ evidence-artifact-manifests:
 
 .PHONY: evidence-release-manifest
 evidence-release-manifest:
-	python3 scripts/record-evidence-release.py
+	EVIDENCE_RUNTIME_DIR="$(EVIDENCE_RUNTIME_DIR)" python3 scripts/record-evidence-release.py
 
-EVIDENCE_RUNTIME_DIR ?= $(PWD)/.tmp/evidence-release/runtime
+EVIDENCE_RUNTIME_DIR ?= $(PWD)/.tmp/evidence-release/runtime-reviewed
 .PHONY: evidence-runtime-prepare evidence-runtime-build evidence-runtime-check
 evidence-runtime-prepare:
 	python3 scripts/rehearse-evidence-runtime.py prepare --directory "$(EVIDENCE_RUNTIME_DIR)"

@@ -3,6 +3,7 @@
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import subprocess
 
@@ -18,7 +19,7 @@ def require_same(left, right):
 
 
 def runtime_receipts():
-    directory = ROOT / ".tmp/evidence-release/runtime-zod4"
+    directory = Path(os.environ.get("EVIDENCE_RUNTIME_DIR", str(ROOT / ".tmp/evidence-release/runtime-reviewed"))).resolve()
     images_path = directory / "images.json"
     images = json.loads(images_path.read_text())
     candidate = images["contexts"]["candidate"]
