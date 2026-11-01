@@ -1,3 +1,24 @@
+# Release checkpoint — 1 November 2026
+
+All maintained SDKs and developer packages are published with passing native and
+registry consumer gates. Core 1.20.0 is live from 88a9a42c with healthy API/worker,
+active processing, verified migrations/rollback and passing owned live canaries.
+Full current core/site/Swift CI passes. See the [current release evidence](spec/bundle-evidence-quality-release-20261101.md)
+for exact versions, hashes and the qualified live retention count difference.
+
+The owner explicitly authorised finishing independent publications while leaving
+ClawHub/OpenClaw for later consideration. React Native main is promoted to
+44ce6a67 with its documentation correction; the published 3.1.0 tag is unchanged.
+Site 1.6.11 is deployed from b9196030: six served routes and 23 JavaScript assets
+match S3 byte-for-byte, cache rules pass, and Browser 3.2.0 evidence code is served.
+API/MCP readiness remains 200 and the app build remains 88a9a42c. Canonical core
+release workflow 41354190812 passes; public v1.20.0 and its immutable tag resolve
+to qualified ee225461. All independent publication steps are complete.
+
+ClawHub's missing skill antivirus result and scanner-failed staged plugin remain
+open acceptance gates. No further ClawHub/OpenClaw action or support communication
+is being taken. Final ecosystem completion remains unclaimed.
+
 # Evidence quality and SDK parity: authorised release in progress — 1 November 2026
 
 The single-phase implementation is merged to core `main` at `88a9a42c1762bab1f5bb7e73f908d67eeb67b99a`

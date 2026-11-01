@@ -1,6 +1,6 @@
 # Zod 4 migration
 
-The evidence-quality candidate uses Zod 4.6.7 throughout maintained JavaScript
+The evidence-quality release uses Zod 4.6.7 throughout maintained JavaScript
 schema code. This accompanies FR-EVID-01–09 and AC-EVID-01–09; the functional
 evidence contract remains in [bundle-evidence-quality.md](bundle-evidence-quality.md).
 
@@ -11,11 +11,13 @@ objects and TypeScript annotations change major APIs. Direct schema consumers
 must migrate from Zod 3 effects/`innerType()` and three-parameter `ZodType`
 annotations. Refined objects use Zod 4 `safeExtend()`.
 
-Node and Browser remain **3.2.0** candidates: their capture signatures, ordinary
+Node and Browser are published as **3.2.0**: their capture signatures, ordinary
 delivery, and optional evidence negotiation remain compatible. Core remains
 **1.20.0**, CLI/MCP/OpenClaw **1.18.0**, redaction **2.7.0**, and the documentation
-site **1.6.11**. These are proposed release versions, not publication receipts.
-The owner must review the candidate before the release train starts.
+site **1.6.11**. The owner authorised the release train on 1 November 2026 and
+subsequently deferred ClawHub/OpenClaw acceptance while authorising the remaining
+independent publications. Published SDK, deployed core/site and outstanding
+distribution proof are recorded in [release evidence](bundle-evidence-quality-release-20261101.md).
 
 Legacy UUID-shaped identifiers use `guid()` so Zod 4's stricter UUID version and
 variant check does not reject persisted identifiers or existing requests. Explicit
@@ -48,11 +50,11 @@ updates only their reviewed SDK lock identities and Zod graph, restores temporar
 dependency links, and tests clean installed consumers. An ordinary registry-only
 install cannot resolve unpublished versions; that is an ordered release step.
 
-Core/site dogfooding pins remain on already published SDK 3.1 until the new SDKs
-exist. Their transitive Zod 3 receives the existing verified collection-bound
-patch and narrowly scoped audit accounting. It must not be forcibly overridden to
-Zod 4. After the new SDK release, resolve these pins through the registry and
-remove legacy patch/accounting only when no active dependency requires it.
+Before ordered publication, core/site dogfooding pins stayed on published SDK 3.1
+with its verified transitive Zod 3 collection-bound patch and narrowly scoped audit
+accounting. The adoption below resolves new pins through the registry and removes
+unused patch registrations only after no active dependency requires them. A forced
+Zod major override is not a supported migration path.
 
 No release tag, registry publication, hosted deployment, installed WordPress site,
 or consumer-product adoption is authorised by these local qualification steps.

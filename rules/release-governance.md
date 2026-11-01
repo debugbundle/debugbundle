@@ -412,8 +412,11 @@ local skill folders cannot receive a ClawHub scan.
 
 ## Verified legacy dependency security backport
 
-DebugBundle core and site retain transitive Zod 3.25.76 through their published
-dogfooding SDK dependencies until ordered adoption of the new SDKs. Their
+Before the 1 November 2026 SDK adoption, DebugBundle core and site retained
+transitive Zod 3.25.76 through their published dogfooding SDK dependencies. The
+registry-adopted core/site graphs now contain no legacy Zod 3, so their unused
+patch registrations are removed. Historical patch files and negative audit
+fixtures remain to reject unverified legacy graphs. The maintained
 pnpm-managed patch moves bounded array/set checks ahead of element work and
 protects the package's bundled v4 bounded array/set/map entry points. Standalone
 maintained Zod 4 paths use upstream 4.6.7. This is a maintained compatibility backport for

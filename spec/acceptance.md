@@ -1,13 +1,13 @@
 # Acceptance Criteria — DebugBundle
 
 Version: v1
-Last updated: 2026-09-20
+Last updated: 2026-11-01
 
 ---
 
 ## 1. SDK Acceptance
 
-### Evidence-quality acceptance (accepted candidate)
+### Evidence-quality acceptance
 
 [AC-EVID-01–09](bundle-evidence-quality.md#acceptance) are the executable acceptance
 obligations for FR-EVID-01–09. They cover exception graph budgets/relationships,
@@ -15,7 +15,10 @@ runtime stack locations and stable grouping, native causes/fatal context, passiv
 resource evidence, scoped independent recovery, complete-path negotiation,
 production-safe context migrations, reader provenance/privacy and cross-SDK
 qualification. They supplement all existing acceptance below. Schema unit tests
-alone cannot close ingestion, relay, framework, device or release gates.
+alone cannot close ingestion, relay, framework, device or release gates. The
+[release evidence](bundle-evidence-quality-release-20261101.md) records published
+SDK/native verification and deployed core proof; ClawHub/OpenClaw acceptance
+remains explicitly deferred.
 
 ### AC-SDK-01: Node SDK Basic Capture
 
@@ -2897,7 +2900,6 @@ not assert browser, provider, release or installed-client acceptance.
 Billing audit additions: prove quote cancellation makes zero payment calls, stale/tampered quotes fail closed, hosted authentication preserves existing capacity, API/CLI/MCP report payment_required without success, terminal summaries remove paid capacity, discounts/tax survive reductions, unrelated schedules remain untouched, verified-owner/CSRF boundaries hold, concurrent webhooks enqueue one transition notification, notification failure rolls back event/state, and stale Checkout returns cannot overwrite newer billing state. Exercise ordered forward migration 202610220003 and missing-ledger readiness in disposable PostgreSQL.
 
 Billing audit edge cases: ambiguous unsaved Checkout requests stop provider replay before the 24-hour idempotency retention boundary without releasing their reservation. Production cannot use static payment-link fallback. Capacity reduction rejects missing authoritative periods and unrelated future price, discount, tax or metadata changes. Local mock preview supports the approved quote/confirmation path without contacting Stripe.
-
 
 ### AC-BILL-08: Scheduled Team-to-Solo Change
 

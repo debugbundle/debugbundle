@@ -86,8 +86,8 @@ registrations are retired; negative audit fixtures remain fail-closed.
 Codex 1.4.1, Gemini 1.3.1 and Claude 1.18.0 use published MCP 1.18.0. Native local
 package checks discover 139 tools and pass their auth, retrieval, update and removal
 controls with disposable fixtures. Public Codex/Claude GitHub checks and Gemini
-GitHub Release upgrade pass. Final hosted/site rollout, rollback retention,
-monitoring and remaining native/ClawHub gates retain separate receipts.
+GitHub Release upgrade pass. Final hosted/site rollout, rollback retention, monitoring and native gates have
+separate receipts below; ClawHub acceptance remains explicitly deferred.
 
 The [local handoff](local/proposals/bundle-evidence-quality-sdk-parity-release-handoff-2026-10-29.md)
 and machine-readable train ledger retain current progress. Simulator/emulator
@@ -102,3 +102,120 @@ Full core [CI 41336331684](https://github.com/debugbundle/debugbundle/actions/ru
 An independent public Node 3.2.0 canary through the accepting runtime acknowledges native cause evidence, redaction, execution context, opted-in recovery and a legacy-shaped error. Two primary incidents are processed, recovery creates no incident, and the stored reader returns correlated recovery and causes without the test secret. Only the disposable DebugBundle-owned fixture is deleted after verification.
 
 The official MCP Registry accepts and directly exposes 1.18.0. The verifier formerly searched only ten historical records; a deterministic red/green regression now requires the exact-version endpoint and rejects mismatched identity or missing versions. [Smithery confirms](https://smithery.ai/future) its publishing API/CLI/accounts were retired on 31 October. Its 403 is recorded as a retired channel, with no new publication claim. ClawHub skill and OpenClaw plugin 1.18.0 uploads are accepted; exact-version clean security/discovery gates remain pending.
+
+## Latest verified state
+
+All maintained SDK release workflows and public registry consumer gates pass.
+React Native [41337102827](https://github.com/debugbundle/debugbundle-react-native/actions/runs/41337102827)
+passes every compatibility, wrapper, published Android/Swift native runtime and
+npm installed-package gate. Its first npm smoke saw a stale registry packument;
+a publisher-only retry passed without changing the package. The public tarball
+SHA-256 is `3a45da5981ca0982d254c586a1c1350a8d6b544f53d8319f7718cb8232a80c8f`.
+Its native sources, manifest, podspec, README and license match reviewed source
+`7c0942fa1f0bf06e44375cc9fdd6d571fb4c848d`; the podspec enforces Swift >=3.1.1.
+Publishing the verified tarball omits npm gitHead, so provenance uses the workflow
+revision, integrity and independent source-byte comparison.
+
+Swift's complete public CocoaPods workflow
+[41337695438](https://github.com/debugbundle/debugbundle-swift/actions/runs/41337695438)
+and fresh three-lane [CI 41340601382](https://github.com/debugbundle/debugbundle-swift/actions/runs/41340601382)
+pass. The latter uses documentation-only descendant
+`c027476f9cda008d40365af34675be98cc71067d` with original deadline/performance
+assertions and timeouts. Two earlier simulator fixture failures remain in the
+receipts. An automatic review rejected a proposed fixture timeout change; it was
+not applied. No runtime patch beyond published Swift 3.1.1 was needed.
+
+| Distribution                 | Version                | Verified result                                                                      |
+| ---------------------------- | ---------------------- | ------------------------------------------------------------------------------------ |
+| Shared-types / redaction     | 3.0.0 / 2.7.0          | Published, independent registry consumers                                            |
+| Node / Browser               | 3.2.0                  | Published; 603 cases and installed delivery/privacy                                  |
+| Python / PHP / Ruby / .NET   | 2.1.0                  | Published; maintained native/compiler/installed matrices                             |
+| Java / Go / Android          | 3.1.0                  | Published; native and public family/module consumers                                 |
+| Swift                        | 3.1.1                  | SPM/CocoaPods public delivery and compiler/native checks                             |
+| React Native                 | 3.1.0                  | npm/GitHub release; real published-native Android/iOS runtime gates                  |
+| WordPress                    | 2.1.0                  | GitHub and WordPress.org; actual public ZIP installed smoke                          |
+| CLI / MCP                    | 1.18.0                 | npm and installed compatibility; exact official Registry entry                       |
+| Codex / Gemini / Claude Code | 1.4.1 / 1.3.1 / 1.18.0 | Public native install/auth/update/removal and 139-tool discovery                     |
+| Site                         | 1.6.11                 | Canonical source release, CI/export and hosted deployment; independent S3/CDN checks |
+
+[Core CI 41339187661](https://github.com/debugbundle/debugbundle/actions/runs/41339187661)
+passes at release source `ee2254617938f9d8f83f47ed3f92157c6d18b483`.
+[Site CI 41340746606](https://github.com/debugbundle/site/actions/runs/41340746606)
+passes at `b91960302bdadcafc3f9db65984000d21ef6a9fd`.
+React Native main now includes documentation-only follow-up
+`44ce6a67219f94e87d5fb9ecb38dd8b7146a752d`, correcting its written Swift floor to
+the already-enforced 3.1.1. The published package and immutable tag are unchanged.
+
+### Production identity, retention and observation
+
+[Final hosted run 41338599261](https://github.com/debugbundle/debugbundle-cloud/actions/runs/41338599261)
+passes with product `88a9a42c1762bab1f5bb7e73f908d67eeb67b99a` and the previous
+site deliberately retained. Later core changes are release helper/tests/docs and
+OpenAI provenance only; API/worker/dashboard implementation has not drifted.
+Both live containers independently report that exact revision and image digest
+`sha256:b27b9a60cd68ee31caf06c48c007c47cbcdd4e47bbfc3c0257f206b1be8c35dd`, healthy
+with zero restarts. Installed versions are Node 3.2.0, shared-types 3.0.0 and
+redaction 2.7.0. Worker processing is active with `postgres-v1`. Public API/MCP
+readiness is 200, the SPA serves build 88a9a42c with no-cache version metadata,
+and the existing OAuth resource/scopes remain intact.
+
+The owner script applied retention successfully. Independent dry-run agrees:
+active `20261101185344-1251b026d291`, previous accepting
+`20261101171453-c90804d297e8`, both exact API/worker image references retained,
+and zero obsolete release directories/image references. The helper hash matches
+trusted cloud source. Approximately 47 GB disk and 897 MB available memory were
+observed after rollout.
+
+A second fresh public Node 3.2.0 live canary passes against this runtime and deletes
+only its new fixture. All 64 migration checksums match. Projects remain 38;
+live incident count moved from 547 to 546 across a successful scheduled retention
+cleanup at 18:58 UTC. Incident-expiry/deletion SQL is unchanged from the predecessor,
+no organization quota rotations occurred, and the canary organization is well
+below its 6,000 retained-bundle cap. This is consistent with normal expiration;
+the aggregate baseline cannot identify the individual expired row. No restoration
+or unrelated data mutation was performed. All seven DebugBundle alarms remain OK,
+and the exact active API baseline remains one pre-existing OAuth incident with its
+original count/timestamp and no next page.
+
+### Deferred ClawHub acceptance
+
+ClawHub skill 1.18.0 is public with clean final review/moderation. Owner-requested
+rescan `w17cddbzbyn37bfn045mvz5yz18hcy6x` succeeds and writes back, but VirusTotal
+remains null. The required antivirus gate has not passed.
+
+OpenClaw plugin 1.18.0 upload is accepted but the documented publication endpoint
+reports pending checks. Its secret scan is clean; ClawScan failed before a verdict
+because Skillspector failed. Exact package-version/list endpoints return 500 and
+public latest remains 1.17.0. The documented recovery implementation rejects
+pending attempts, so no recovery override was attempted. No scanner gate is waived.
+Smithery is a retired publisher channel under its official 31 October notice.
+
+Automatic approval review initially rejected React Native main promotion and the
+canonical core tag while these mandatory ClawHub gates remained open; neither
+rejected write ran. The owner subsequently explicitly directed: "Let's do
+everything else and leave the openclaw thing for the end if it's not a blocker."
+This authorises the independent core release, React Native main promotion, site
+deployment and evidence reconciliation with ClawHub acceptance explicitly open.
+The qualified core and SDK delivery paths do not depend on ClawHub publication.
+No ClawHub acceptance criterion is waived and full ecosystem completion remains
+unclaimed. Its prepared support issue stays a draft; no communication is authorised.
+
+### Independent publication follow-through
+
+React Native main promotion is independently read back at `44ce6a67219f94e87d5fb9ecb38dd8b7146a752d`.
+[Core release 41354190812](https://github.com/debugbundle/debugbundle/actions/runs/41354190812)
+passes from qualified source `ee2254617938f9d8f83f47ed3f92157c6d18b483`; the
+public [v1.20.0 release](https://github.com/debugbundle/debugbundle/releases/tag/v1.20.0)
+and immutable tag independently resolve to that exact revision. [Site deployment 41354208886](https://github.com/debugbundle/debugbundle-cloud/actions/runs/41354208886)
+passes from trusted cloud `7797818535880b9afcc3c0526d5aa82ecffc71cb`, product
+`ee2254617938f9d8f83f47ed3f92157c6d18b483` and site
+`b91960302bdadcafc3f9db65984000d21ef6a9fd`. These runs do not republish SDKs or
+redeploy API/worker images. Independent readback checks six served routes and all
+23 loaded JavaScript assets against S3 byte-for-byte, current Node/Browser 3.2.0
+docs, revalidating HTML and immutable hashed JavaScript. Served SDK 3.2.0 and
+structured-evidence code are present. API/MCP readiness remains 200 and the app
+still reports build 88a9a42c. Site source identities and completed edge/invalidation
+checks are retained with the successful workflow. All seven production alarms
+remain OK and the exact API incident baseline is unchanged. All independent
+core, SDK, WordPress and site publication steps are complete. Final ClawHub
+security/discovery acceptance remains open at the owner's direction.

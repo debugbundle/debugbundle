@@ -1,6 +1,8 @@
 # Bundle evidence quality
 
-Status: accepted implementation contract; candidate work, not a released capability.
+Status: implemented and qualified; SDKs published, core and site deployed on
+1 November 2026. Canonical core v1.20.0 is published; ClawHub/OpenClaw
+acceptance is explicitly deferred. See [release evidence](bundle-evidence-quality-release-20261101.md).
 Established: 25 October 2026.
 
 This specification promotes the evidence-quality proposal into the tracked source
