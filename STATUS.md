@@ -38,7 +38,9 @@ has a zero-vulnerability audit, with no SDK-specific audit exception. See
 
 - Core accepting contracts, deterministic bundles/readers, migration-before-startup
   and predecessor rollback have local proof. Real-storage integration passes 179 tests
-  across 40 files. Full unit/coverage and committed-source provenance are separate gates.
+  across 40 files with one pre-existing optional analytics-flow SDK test skipped.
+  Full unit/coverage passes 4,849 tests across 594 files; changed-source coverage
+  and all thirteen committed-source provenance checks pass.
 - Node/Browser pass 603 tests, per-file coverage and installed privacy/delivery on
   supporting hosts; Node 22 native/fallback and installed consumers are separately
   verified. Actual Chromium exercises causes, resources, CSP, recovery and teardown.

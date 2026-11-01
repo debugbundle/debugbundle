@@ -199,8 +199,9 @@ adds optional `captureRecovery(observation) → void`, context `failureRef` /
 `evidenceScope`, and a verified-path `evidenceCapabilities` installation option
 (language-idiomatic spellings). Existing capture return types remain unchanged.
 The specification freezes wire names, states, limits, safety and negotiation.
-These methods/options are not yet implemented across the SDK family and must not
-be documented as available in installed releases. Without complete-path support,
+These methods/options are implemented in the maintained SDK source candidates
+described below. They are not available in published installations until the
+corresponding candidate is released and adopted. Without complete-path support,
 new standalone context is disabled and ordinary errors retain their legacy shape.
 
 The current JavaScript source candidate implements `captureRecovery` on Node and
@@ -252,8 +253,8 @@ automatic diagnostic scope while legacy async correlation remains compatible.
 Fatal evidence bypasses hooks and uses the smaller total budget. Browser relays
 preserve closed observations and require complete native downstream ACKs before
 marking durable files delivered. Custom boolean forwarders remain accepted with
-pending spools. Maintained local JVM/runtime checks pass; performance and final release qualification
-remain open. This candidate is unpublished.
+pending spools. This candidate is unpublished; current qualification receipts and
+release gates are recorded in the release handoff linked from `STATUS.md`.
 
 The Go 3.1.0 source candidate adds `Config.CaptureExceptionEvidence` (optional
 boolean pointer, default true), `CaptureRecoveryObservations` (default false) and
@@ -269,8 +270,8 @@ share the existing bounded renderer; foreign formatters are not called. Go error
 have no intrinsic throw stack; retained capture frames are labelled accordingly.
 Go relays preserve protected closed evidence and context, count actual native bytes
 including server credentials, and require complete ACKs for delivered spool markers.
-Legacy status-only custom acceptance remains compatible with pending spools. Final
-coverage/runtime/performance/artifact qualification remains open; nothing is published.
+Legacy status-only custom acceptance remains compatible with pending spools.
+This candidate is unpublished; qualification and publication are separate states.
 
 The .NET source work adds `DebugBundleOptions.CaptureExceptionEvidence` (default
 true) and a snapshotted `EvidenceCapabilities` complete-path pin. Collection requires
@@ -297,7 +298,7 @@ descriptor while legacy mixed-batch 400/string responses remain compatible.
 spools pending, a held custom forwarder owns one worker, and native forwarding
 uses a shared maximum five-second deadline across byte-limited chunks and one-time
 compatible fallback. Only complete downstream ACKs create exclusive private spool
-markers. Final family qualification remains in progress; no new .NET release is claimed.
+markers. Reviewed-source qualification does not claim a published .NET release.
 
 The Python source candidate uses `capture_exception_evidence`,
 `capture_recovery_observations`, `evidence_capabilities`, `capture_recovery()` and
@@ -311,7 +312,8 @@ ACK bodies are bounded to 256 KiB; synchronous HTTPX read/connect/write deadline
 and explicit custom fetcher/transport limits remain advisory as documented in
 the candidate README. Python relays and framework relay factories preserve
 closed evidence and context with downstream proof intersection and indexed
-opt-in rejection details. Floor/runtime and installed qualification remain pending.
+opt-in rejection details. Runtime and installed-artifact receipts are recorded
+separately from publication in the release handoff linked from `STATUS.md`.
 
 Browser passive collection uses one resource observer and a CSP listener with
 bounded sanitized DTOs, expiry and at most one coalesced late context per failure.

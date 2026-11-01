@@ -4,42 +4,6 @@ This glossary defines durable product terms used across requirements, contracts,
 and implementation documentation. Source-of-truth requirements and contracts remain
 authoritative when a term's behavior is specified in more detail.
 
-## Bundle Evidence Terms
-
-### Evidence Provenance
-
-The source and coverage of retained evidence: which occurrence supplied a measurement,
-when it was captured, and which inputs are missing. Capture time, incident history and
-artifact generation time have different meanings.
-
-### Typed Diagnostic Context
-
-A bounded, versioned resource or recovery observation that can enrich a matching failure
-without creating an incident or changing its occurrence count or lifecycle.
-
-### Failure Reference and Operation Scope
-
-A failure reference identifies a failure within an explicit page, session, trace or
-operation boundary. An operation scope is a revocable local execution lease; a completed
-request or job cannot be revived by later asynchronous work.
-
-### Recovery Observation
-
-An explicitly reported attempt or outcome associated with a failure. HTTP completion
-alone does not prove that the original application operation recovered.
-
-### Passive Resource Observation
-
-Bounded browser timing, status or CSP metadata observed without making a diagnostic
-request. Missing or ambiguous values remain unknown; a report-only CSP violation is
-not a block and a coincident violation does not establish causation.
-
-### Complete-Path Capability Proof
-
-Verified support across the SDK's destination and every relay/receiver on that path.
-Missing or revoked proof disables optional additions while ordinary capture continues.
-See `spec/bundle-evidence-quality.md` for the normative contracts and limits.
-
 ## Agent Connection Terms
 
 ### Agent-Aware Setup
@@ -98,7 +62,7 @@ errors and stack frames. Trace origin and parsing status distinguish throw-site,
 native, capture-time and unavailable evidence. It supplements the retained outer
 error without changing incident fingerprints or promising locals or symbolication.
 
-### Diagnostic Context
+### Typed Diagnostic Context
 
 A closed context-only event carrying a passive resource observation or an explicit
 recovery observation. It can enrich a retained failure within the specified scope
@@ -123,7 +87,24 @@ The primary failure identity, retained input count and capture-time range, and
 source/time/availability of bounded observations in a bundle. Artifact generation
 time does not renew old measurements; retained inputs do not establish total impact.
 
-### Complete-Path Capability
+### Revocable Operation Scope
+
+An SDK-local execution lease for a request, command or job. Completion revokes
+execution metadata and automatic evidence association, including copied async
+contexts, without changing the application's result or native error propagation.
+
+### Recovery Observation
+
+An explicitly reported attempt or outcome associated with a failure. HTTP completion
+alone does not prove that the original application operation recovered.
+
+### Passive Resource Observation
+
+Bounded browser timing, status or CSP metadata observed without making a diagnostic
+request. Missing or ambiguous values remain unknown; a report-only CSP violation is
+not a block and a coincident violation does not establish causation.
+
+### Complete-Path Capability Proof
 
 Verified support shared by every parser, relay, native bridge and receiver on a
 delivery path. A versioned capability descriptor is intersected across that path;
