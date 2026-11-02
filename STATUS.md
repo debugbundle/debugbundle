@@ -1,3 +1,26 @@
+# Next mobile release — CocoaPods Trunk transition pending, 2 November 2026
+
+The owner requested a durable handoff for the next release. The
+[transition checklist](spec/cocoapods-trunk-transition.md) records the announced
+1–7 November read-only test and 2 December 2026 permanent freeze, current
+Swift 3.1.1 / React Native 3.1.0 release evidence, affected workflows and exact
+next-release checks. Mandatory agent instructions and release governance link it.
+
+Open: qualify a native pod installation path independent of new Trunk writes for
+RN/brownfield iOS, adapt Swift release automation while retaining its checks, and
+update matching SDK/site migration guidance with clean-consumer runtime proof.
+Native SPM already exists; RN's SPM manifest is only a test harness. This is a
+documentation handoff, not an implemented or qualified migration. No SDK/site
+files, dependencies, workflows, published versions or consumer products changed;
+the owner subsequently authorised committing and pushing this documentation only.
+SDK publication, deployment and consumer changes remain outside this follow-up.
+Independent releases remain separately scoped.
+
+Handoff verification: all transition references and local checklist links resolve;
+Docker Prettier leaves the checklist unchanged, and the existing release-governance
+suite passes all five tests. Pre-ship review finds documentation-only changes with
+no runtime, trust-boundary or schema change. The six migration gates remain open.
+
 # ClawHub follow-through — owner authorised 1.18.1 attempt
 
 MCP 1.18.1 is published to npm and the official Registry from immutable fbfdd394.

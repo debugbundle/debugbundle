@@ -45,6 +45,15 @@ durable continuation; million-visit load testing is deferred by the owner.
 
 # ARCHITECTURE MAP — DebugBundle
 
+CocoaPods distribution follow-up (2 November 2026):
+`sdks/debugbundle-swift/Package.swift` already owns native SPM products;
+`sdks/debugbundle-swift/.github/workflows/publish-cocoapods.yml` still writes to
+Trunk. RN's `DebugBundleReactNative.podspec` resolves the native Swift pod through
+the public catalogue; its `Package.swift` is a stubbed test harness. The
+pending `spec/cocoapods-trunk-transition.md` checklist owns the next mobile
+release's installation, automation, documentation and consumer-proof requirements.
+No implementation boundary has changed in this handoff.
+
 React Native candidate boundaries (29 October, unpublished): `safe-error-fields.ts`
 shares accessor-free primitive error reads between redaction and
 `exception-evidence.ts`. `canonical-schema.ts`, `owned-json.ts` and

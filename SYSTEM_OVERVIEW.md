@@ -45,6 +45,14 @@ durable continuation; million-visit load testing is deferred by the owner.
 
 # SYSTEM OVERVIEW — DebugBundle
 
+CocoaPods release follow-up (2 November 2026): read
+`spec/cocoapods-trunk-transition.md` before planning the next release. Announced
+Trunk read-only dates are 1–7 November testing and 2 December 2026 permanent.
+Native Swift already supports SPM; RN's pod dependency still needs a qualified
+path independent of new Trunk writes. Swift automation and consumer/docs gates
+remain pending. This handoff changes no SDK runtime or distribution; independent
+package releases remain separately scoped.
+
 Mobile/WordPress evidence candidate (unpublished): Android's
 canonical bridge and installed Maven artifacts preserve permitted identities and
 unknown runtime metadata. Swift's worker enriches device-bearing events only;

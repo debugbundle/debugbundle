@@ -187,6 +187,10 @@ If a capability matters for automation, it must be available through API, CLI, a
 ### SDK Capability, Safety and Reliability Parity
 For every SDK or SDK-evidence change, evaluate all maintained SDKs, framework adapters, relays, wrappers and native bridges before implementation. Follow [the mandatory SDK parity rule](rules/sdk-capability-parity.md), [the universal SDK contract](contracts/sdk-interface.md) and [the SDK testing strategy](rules/sdk-testing-strategy.md); record each surface's applicability, implementation or verified equivalence, runtime limitations and tests. Implement applicable improvements within the authorised scope; do not claim parity while an applicable gap is deferred or unverified.
 
+### CocoaPods Trunk Transition
+
+Before planning the next release, read [the CocoaPods transition checklist](spec/cocoapods-trunk-transition.md). The announced Trunk read-only test is 1–7 November 2026, with permanent read-only on 2 December 2026; refresh the provider schedule at release preparation. Apply the pending distribution and clean-consumer gates to Swift/React Native releases, preserve existing installs, and do not treat React Native's test-only `Package.swift` as production SPM support. Independent releases remain separately scoped; the migration is not yet implemented or qualified.
+
 ### Bundle Determinism
 Given the same normalized events, the bundle generator must produce byte-identical output. No random IDs, no wall-clock timestamps in bundle generation.
 

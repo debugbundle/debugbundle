@@ -1,7 +1,7 @@
 # Release & Open-Source Governance — DebugBundle
 
 Version: v1
-Last updated: 2026-10-20
+Last updated: 2026-11-02
 
 ---
 
@@ -196,6 +196,22 @@ Every standalone SDK repository must adopt the same release-hardening pattern be
 3. Any package family that is documented as version-aligned must publish as one coherent family and must avoid mixed-version public snippets.
 4. New SDK plans in `spec/sdks/*.md` must describe their release workflow, clean-install smoke path, and publish-time compatibility matrix before implementation starts.
 
+### CocoaPods Trunk Transition — Mobile Release Preflight
+
+Before planning the next release, review the pending
+[CocoaPods transition checklist](../spec/cocoapods-trunk-transition.md).
+The provider announces read-only testing on 1–7 November 2026 and permanent
+read-only on 2 December 2026; refresh the schedule before an affected release.
+Existing specs remain available. Swift already supports SPM, but React Native's
+native Swift dependency still resolves through CocoaPods Trunk.
+
+For the next Swift/React Native release, qualify a native installation source
+independent of new Trunk writes and adapt release automation without weakening
+tests or published-consumer gates. Never report a denied Trunk publication as a
+successful publication. Record the supported channel and exact artifact evidence
+before publishing a dependent RN release. The transition remains unimplemented;
+unrelated package releases are not blocked by this mobile-distribution follow-up.
+
 ### V1 Release Train Order
 
 The V1 release train must publish dependency roots before dependent wrappers. Do not publish a package that embeds, pins, wraps, or documents another DebugBundle package until that prerequisite version is visible from the target registry and its published-artifact smoke has passed.
@@ -203,7 +219,7 @@ The V1 release train must publish dependency roots before dependent wrappers. Do
 1. Publish core-owned shared JS packages from `debugbundle/debugbundle`: `@debugbundle/shared-types` and `@debugbundle/redaction`.
 2. Publish the JS SDK family from `debugbundle/debugbundle-js`: `@debugbundle/sdk-node` and `@debugbundle/sdk-browser` at the same version, after the matching shared-package version is already on npm.
 3. Publish independent backend SDKs and package families whose public artifacts do not bundle another DebugBundle SDK: Python, PHP, Java, Go, Ruby, Android, Swift, .NET, CLI, and MCP. Version-aligned package families must publish coherently as one family.
-4. Publish React Native only after the Android Maven package family and Swift/CocoaPods package it delegates to are published and smoke-tested.
+4. Publish React Native only after the Android Maven package family and the Swift native package it delegates to are available from their supported public sources and smoke-tested through the actual RN consumer path. Apply the CocoaPods transition preflight above; SPM availability alone does not establish RN pod dependency resolution.
 5. Publish WordPress only after the PHP SDK and browser SDK versions it requires are published and smoke-tested; rebuild the bundled browser asset from those exact published versions before assembling the plugin ZIP.
 6. Bump internal dogfooding manifests only after their referenced registry versions exist, then run hosted/source-deploy validation.
 7. Update the Claude Code catalog, plugin manifest, and pinned MCP install command only after that npm MCP version is published and its registry smoke passes. Source package release candidates must not make marketplace installs resolve an unpublished version.
