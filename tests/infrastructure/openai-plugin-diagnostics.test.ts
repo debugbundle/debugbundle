@@ -31,7 +31,8 @@ function entriesFor(variant: string): Map<string, Buffer> {
   const entries = JSON.parse(
     execFileSync(process.execPath, ["--input-type=module", "--eval", program, variant], {
       cwd: repoRoot,
-      encoding: "utf8"
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"]
     })
   ) as Entry[];
   return new Map(entries.map((entry) => [entry.path, Buffer.from(entry.base64, "base64")]));

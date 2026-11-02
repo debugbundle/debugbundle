@@ -19,7 +19,7 @@ function runJson(args: string[], cwd = repoRoot): unknown {
 function withCommittedSource<T>(run: (sourceRoot: string) => T): T {
   const sourceRoot = mkdtempSync(join(tmpdir(), "debugbundle-openai-committed-"));
   try {
-    // Published provenance is checked against committed files, independently of local edits.
+    // Release fixtures use committed source, independently of unrelated local edits.
     execFileSync("git", ["clone", "--quiet", "--shared", "--no-checkout", repoRoot, sourceRoot]);
     execFileSync("git", ["checkout", "--quiet", "--detach", "HEAD"], { cwd: sourceRoot });
     return run(sourceRoot);
@@ -261,8 +261,10 @@ describe("OpenAI plugin release automation", () => {
     }
   });
 
-  it("verifies the committed source manifest and exact package hashes without live access", () => {
+  it("verifies a freshly prepared source manifest and exact package hashes without live access", () => {
     const result = withCommittedSource((sourceRoot) => {
+      // Release evidence is tied to its source commit; later core commits need a new local candidate.
+      runJson(["prepare"], sourceRoot);
       const result = runJson(["verify"], sourceRoot) as {
         manifest: { plugin_version: string };
       };
@@ -354,6 +356,8 @@ describe("OpenAI plugin release automation", () => {
 
   it("rejects release provenance after a tracked source edit", () => {
     withCommittedSource((sourceRoot) => {
+      runJson(["prepare"], sourceRoot);
+      expect(runJson(["verify"], sourceRoot)).toMatchObject({ ok: true, failures: [] });
       writeFileSync(join(sourceRoot, "STATUS.md"), "unreleased local candidate\n");
       const completed = spawnSync(
         process.execPath,
