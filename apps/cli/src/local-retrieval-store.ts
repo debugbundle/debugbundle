@@ -1,5 +1,6 @@
 import { readFile as readFileFromFs, writeFile as writeFileToFs } from "node:fs/promises";
 import { join } from "node:path";
+import { z } from "zod";
 
 import { sanitizeTelemetry } from "../../../packages/redaction/src/index.js";
 import { RetrievalApiError } from "../../../packages/retrieval-client/src/index.js";
@@ -21,6 +22,7 @@ export type LocalRetrievalStoreDependencies = {
 
 type LocalConnection = {
   mode: "local-only" | "connected";
+  cloud_project_id?: unknown;
 };
 
 export type LocalIncidentRecord = {
@@ -111,7 +113,8 @@ function parseLocalConnection(candidate: unknown): LocalConnection {
   }
 
   return {
-    mode: candidate["mode"]
+    mode: candidate["mode"],
+    ...(candidate["cloud_project_id"] === undefined ? {} : { cloud_project_id: candidate["cloud_project_id"] })
   };
 }
 
@@ -266,6 +269,26 @@ export async function readLocalConnectionConfig(
 
     throw error;
   }
+}
+
+const IncidentProjectIdSchema = z.string().trim().min(1);
+
+// A connected workspace must never turn an omitted project into an account-wide
+// read. Explicit selection still permits deliberate cross-project member reads.
+export async function resolveCloudIncidentProjectId(
+  projectId: string | undefined,
+  dependencies?: LocalRetrievalStoreDependencies
+): Promise<string | undefined> {
+  if (projectId !== undefined) {
+    const parsed = IncidentProjectIdSchema.safeParse(projectId);
+    if (!parsed.success) throw createReadError(400, "invalid_project_id");
+    return parsed.data;
+  }
+  const connection = await readLocalConnectionConfig(dependencies);
+  if (connection?.mode !== "connected") return undefined;
+  const parsed = IncidentProjectIdSchema.safeParse(connection.cloud_project_id);
+  if (!parsed.success) throw createReadError(400, "invalid_local_connection_config");
+  return parsed.data;
 }
 
 export async function readLocalState(dependencies?: LocalRetrievalStoreDependencies): Promise<LocalState> {

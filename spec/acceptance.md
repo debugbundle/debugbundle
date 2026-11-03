@@ -893,6 +893,11 @@ Native logger level/silent/processor filtering runs before SDK capture; enabled-
 Each MCP tool must produce results that match its API/CLI equivalent:
 
 - Incident list parity (`debugbundle_list_incidents` = `GET /v1/incidents` = `debugbundle incidents --json`)
+- In a connected workspace, omitted incident-list project scope resolves to its
+  configured cloud project on every cloud page, including explicit cloud reads.
+  Explicit project selection takes precedence; local evidence remains local.
+  Missing, null or blank connected project IDs fail before network dispatch,
+  while unconnected account-wide member reads remain available.
 - Incident resolve parity (`resolve_incident` = `POST /v1/incidents/{id}/resolve` = `debugbundle resolve <id> --json`) and bulk resolve parity (`resolve_incidents` = `POST /v1/incidents/resolve` = `debugbundle resolve <id> <id> --json`)
 - Bundle parity (`debugbundle_get_bundle` = `GET /v1/incidents/{id}/bundle` = `debugbundle bundle <id> --json`)
 - Reproduction parity (`debugbundle_get_reproduction` = `GET /v1/incidents/{id}/reproduction` = `debugbundle reproduce <id> --json`)
@@ -1129,6 +1134,13 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** package and manifest descriptions use the same truthful capability-first positioning as the shared DebugBundle skill
 - **And** ClawHub package validation and dry-run publish pass before the package is published
 - **And** the assembled plugin excludes unused hosted/server modules and runtime dynamic-code compilation
+- **And** native Node ESM imports the emitted bundle, registers its full tool
+  catalog and performs compressed, project-scoped loopback incident reads with
+  pagination on Node 22, 24 and 26, without a TypeScript/CommonJS loader masking
+  packaging errors. Missing connection scope fails before a request.
+- **And** the packed artifact installs through the normal installer in a clean,
+  pinned OpenClaw host, runtime inspection reports all catalog tools loaded, and
+  the installed entry matches qualified bytes and completes the same native read.
 
 ### AC-OPENCLAW-04: Skill And Plugin Security Acceptance
 

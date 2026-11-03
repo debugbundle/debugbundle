@@ -2,12 +2,16 @@
 
 OpenClaw tools for runtime error reporting, crash reporting, incident response, live app monitoring, endpoint health checks, debug bundles, and product analytics. Monitoring is scoped to runtime failures, customer-facing incidents, and endpoint health; DebugBundle is not a generic infrastructure-monitoring platform.
 
-## Packaging update 1.18.1
+## Corrective update 1.18.2
 
-This coordinated patch preserves the 1.18.0 tool catalog, schemas, authentication
-and native approval policy. It provides a fresh immutable ClawHub version after
-an operational scanner failure; the failed 1.18.0 upload remains in platform
-history. Upload acceptance does not establish clean security or public availability.
+This update fixes native ESM loading of the bundled HTTP client and preserves the
+connected project's filter on incident requests and pagination. It retains the
+existing tool catalog, authentication and native per-call approval policy.
+
+ClawHub recovered unchanged versions 1.18.0 and 1.18.1, but reported these separate
+runtime and scope defects in [issue #4214](https://github.com/openclaw/clawhub/issues/4214#issuecomment-6588056002).
+Published artifacts remain immutable; corrective release acceptance still requires
+exact-version security review and verification in an installed OpenClaw host.
 
 ## Install
 
@@ -26,6 +30,22 @@ The plugin reuses the same auth precedence as the DebugBundle MCP server:
 - Existing DebugBundle CLI auth state from `debugbundle login`.
 
 Use `DEBUGBUNDLE_API_URL` for self-hosted or non-production API hosts.
+
+In a connected workspace, incident lists default to `cloud_project_id` from
+`.debugbundle/local/connection.json`, including `source: "cloud"` and all cloud
+pages. An explicit `projectId` selects that project instead. Local evidence keeps
+its existing selection. A missing or empty connected cloud project returns
+`invalid_local_connection_config` before making an incident-list request; supply
+the intended `projectId` explicitly or repair the connection. Outside a connected
+workspace, authenticated account-wide incident listings remain available.
+
+`make openclaw-plugin-check` now imports the emitted ESM with native Node and
+executes a synthetic loopback read, in addition to manifest validation.
+`make openclaw-runtime-check` repeats that proof across Node 22, 24 and 26. These
+checks do not contact production or publish packages.
+`make openclaw-installed-check` packs the candidate, installs a fresh pinned
+OpenClaw host in Docker, uses the normal plugin installer and verifies runtime
+loading plus scoped requests from the installed artifact.
 
 ## Tools
 

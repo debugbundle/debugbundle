@@ -1,8 +1,9 @@
+import { tmpdir } from "node:os";
 import { readFileSync } from "node:fs";
-import { writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CliAuthStateError } from "../../../apps/cli/src/auth-state.js";
 import {
@@ -15,6 +16,17 @@ import {
   listIncidentsWithAuthCommand
 } from "../../../apps/cli/src/retrieval-commands.js";
 import { createLocalRetrievalFixture } from "../../helpers/local-retrieval-fixture.js";
+
+// Account-wide cases must not inherit the developer checkout's connection.
+let workspace: string;
+beforeEach(async () => {
+  workspace = await mkdtemp(join(tmpdir(), "debugbundle-retrieval-unconnected-"));
+  vi.spyOn(process, "cwd").mockReturnValue(workspace);
+});
+afterEach(async () => {
+  vi.restoreAllMocks();
+  await rm(workspace, { recursive: true, force: true });
+});
 
 describe("cli retrieval authentication and sources", () => {
   it("loads stored auth state and forwards it into incidents retrieval", async () => {
@@ -580,6 +592,7 @@ describe("cli retrieval authentication and sources", () => {
     expect(result.exitCode).toBe(0);
     expect(listIncidents).toHaveBeenCalledWith({
       bearerToken: "dbundle_mem_saved",
+      projectId: "proj_cloud",
       status: "active"
     });
     expect(JSON.parse(result.output)).toEqual({

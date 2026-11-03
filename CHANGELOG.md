@@ -6,6 +6,18 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### CLI 1.18.1 and MCP/OpenClaw 1.18.2 — 2026-11-03
+
+- Fix native ESM loading of bundled CommonJS HTTP dependencies with Node's
+  `createRequire`, preserving the pinned HTTP client and existing tool schemas.
+- Scope CLI/MCP/OpenClaw cloud incident listings to the connected project by
+  default, retaining explicit project selection and local evidence. Missing
+  connected scope fails closed instead of requesting account-wide incidents.
+- Add emitted-bundle runtime verification, compressed scoped pagination,
+  approval and invalid-scope checks to OpenClaw preflight, plus a Node 22/24/26
+  runtime target. Validate the packed artifact through a clean installed OpenClaw
+  host before publication.
+
 ### MCP/OpenClaw packaging 1.18.1
 
 - Correct the portable ClawHub skill's installer pins to MCP 1.18.1 and CLI 1.18.0,

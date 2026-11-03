@@ -1,3 +1,22 @@
+Corrective release preparation (3 November 2026): owner authorised CLI 1.18.1,
+MCP/OpenClaw 1.18.2, their applicable developer pin updates and site 1.6.12 with
+the new verification article. `make openclaw-installed-check` adds normal archive
+installation, real host runtime inspection and installed-byte/native-request
+proof to mandatory preflight. Publication and live acceptance remain pending;
+API/worker and language SDK releases are unchanged. See the current remediation
+record for exact release evidence and remaining gates.
+
+OpenClaw runtime and scope correction (3 November 2026, local candidate):
+`apps/cli/src/local-retrieval-store.ts::resolveCloudIncidentProjectId` owns the
+connected cloud-list default shared by CLI and MCP (and their OpenClaw projection),
+with explicit project precedence and fail-closed missing connection scope. Local
+selection stays separate. The OpenClaw build banner initializes native Node
+`createRequire` for bundled CommonJS dependencies; `scripts/check-runtime.mjs`
+inside the plugin package executes the emitted ESM through the real host SDK
+against isolated loopback fixtures. `make openclaw-release-check` includes its
+Node 22/24/26 matrix. No public schema, SDK, database or hosted runtime changes.
+Release state is recorded in `spec/openclaw-runtime-scope-remediation-20261103.md`.
+
 ClawHub follow-through (2 November 2026): MCP 1.18.1 is published to npm and the official Registry from immutable fbfdd394, with full source CI and installed native checks passing. ClawHub skill 1.18.1 is public with source-identical files and clean final review/moderation, but VirusTotal is missing and discovery passes 5/7 queries. Plugin 1.18.1 is accepted pending checks. The skill pins MCP 1.18.1 / CLI 1.18.0 and uses the supported 0.22.0 multipart publisher after 0.25.0 upload-ticket HTTP 500s; its accepted write appeared after the client timeout. Plugin inspection/publication stays on 0.25.0. Do not resubmit either accepted version. No core/SDK deployment or consumer adoption is included; see `spec/clawhub-publication-retry-20261101.md`.
 
 Release integration (1 November 2026): deployed core API/worker and dashboard consume published Node/Browser 3.2.0 with shared-types 3.0.0/redaction 2.7.0; deployed site 1.6.11 consumes Browser 3.2.0. Developer packages pin published MCP 1.18.0. React Native main preserves its published 3.1.0 runtime with a documentation-only correction to the enforced Swift >=3.1.1 floor. Release verification reads the exact immutable official Registry version instead of a paginated historical search page. Smithery publisher retirement, owner-deferred ClawHub/OpenClaw acceptance and current distribution proof are recorded in `spec/bundle-evidence-quality-release-20261101.md`; consumer products are outside this rollout.

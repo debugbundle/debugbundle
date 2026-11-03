@@ -1,6 +1,6 @@
 {
   "name": "@debugbundle/openclaw-plugin",
-  "version": "1.18.1",
+  "version": "1.18.2",
   "private": false,
   "description": "OpenClaw tools for runtime error reporting, incident response, live app monitoring, health checks, debug bundles, and product analytics.",
   "license": "Apache-2.0",
@@ -46,10 +46,10 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node22 --external:@node-rs/argon2 --external:openclaw --outfile=dist/index.js --metafile=../../.tmp/openclaw-plugin-metafile.json && node scripts/check-bundle.mjs && node scripts/write-types.mjs",
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node22 --external:@node-rs/argon2 --external:openclaw --banner:js=\"import { createRequire as __debugbundleCreateRequire } from 'node:module';const require = __debugbundleCreateRequire(import.meta.url);\" --outfile=dist/index.js --metafile=../../.tmp/openclaw-plugin-metafile.json && node scripts/check-bundle.mjs && node scripts/write-types.mjs",
     "plugin:build": "openclaw plugins build --entry ./dist/index.js",
     "plugin:validate": "openclaw plugins validate --root . --entry ./dist/index.js",
-    "plugin:check": "npm run build && openclaw plugins build --entry ./dist/index.js --check && npm run plugin:validate",
+    "plugin:check": "npm run build && node scripts/check-runtime.mjs && openclaw plugins build --entry ./dist/index.js --check && npm run plugin:validate",
     "prepack": "npm run plugin:check"
   },
   "dependencies": {

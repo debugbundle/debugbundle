@@ -3117,6 +3117,16 @@ debugbundle analytics bundle get <bundle-generation-id> --project-id <id> [--jso
 
 Current local CLI retrieval behavior: when `.debugbundle/local/connection.json` is configured with `"mode": "local-only"`, `debugbundle incidents`, `debugbundle inspect`, `debugbundle resolve`, `debugbundle reopen`, `debugbundle bundle`, and `debugbundle reproduce` read `.debugbundle/local/state.json`, `.debugbundle/bundles/local/`, and `.debugbundle/bundles/local/reproductions/` directly without requiring `debugbundle login`. Local incident listing preserves the machine-readable `{ incidents, next_cursor }` shape and applies `project_id`, `environment`, `service`, `status`, `severity`, `first_seen_after` / `--first-seen-after`, `attention_after` / `--attention-after`, `cursor`, and `limit` filters against the local incident index.
 
+Connected incident-list project scope (CLI, MCP and OpenClaw): when no explicit
+project is supplied, cloud requests use the connection's `cloud_project_id`,
+including every pagination request and explicit cloud-source reads. Explicit
+`--project-id` / `projectId` takes precedence. This cloud default does not filter
+out the workspace's local evidence. A connected configuration missing a nonblank
+string project ID returns `invalid_local_connection_config` before listing cloud
+incidents; select the intended project explicitly or repair the connection.
+Unconnected account-wide member reads remain supported. API member authorization
+and public CLI/MCP tool schemas are unchanged.
+
 Current connected-mode retrieval behavior: when `.debugbundle/local/connection.json` is configured as `"connected"`, `debugbundle incidents` now merges matching local and cloud incidents by default, preserves `cursor` / `limit` pagination after the merged sort order is applied, and annotates cloud-backed incident payloads with `source: "cloud"` so origin is explicit in both human and JSON output. `--source local` and `--source cloud` still narrow the same commands to a single store. `debugbundle inspect`, `debugbundle resolve`, `debugbundle reopen`, `debugbundle bundle`, and `debugbundle reproduce` now probe the local store first and then fall back to cloud. When multiple cloud-backed incident ids are passed to `debugbundle resolve` or `debugbundle reopen`, the CLI collapses them into one hosted bulk mutation request while keeping local incidents on the existing local-state path. When `debugbundle bundle` or `debugbundle reproduce` fetches from cloud, the returned payload is also written to `.debugbundle/bundles/cloud/<incident-id>.bundle.json` or `.debugbundle/bundles/cloud/reproductions/<incident-id>.reproduction.json`, overwriting the cached snapshot on later explicit fetches; cloud resolve and cloud reopen rewrite cached status fields when a cached copy exists, and the same explicit cloud cache activity prunes `.debugbundle/bundles/cloud/` entries older than 30 days since last access.
 
 When cloud retrieval returns `retrieval_api_error: 200:invalid_response_shape`, the CLI should include an update hint because the most common cause is an older installed CLI parsing a newer cloud response shape.

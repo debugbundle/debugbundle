@@ -45,7 +45,10 @@ export async function createLocalRetrievalFixture(input?: {
 
   await writeFile(
     join(rootDirectory, ".debugbundle", "local", "connection.json"),
-    JSON.stringify({ mode: input?.mode ?? "local-only" }),
+    JSON.stringify({
+      mode: input?.mode ?? "local-only",
+      ...(input?.mode === "connected" ? { cloud_project_id: "proj_cloud" } : {})
+    }),
     "utf8"
   );
 

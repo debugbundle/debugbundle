@@ -380,6 +380,14 @@ Incident/improvement lifecycle writes with an unreadable success response, a tra
 
 **FR-MCP-02:** MCP must be a thin adapter over the same domain services used by CLI/API.
 
+Connected-workspace incident listings through CLI, MCP and OpenClaw default the
+cloud request's `project_id` to `.debugbundle/local/connection.json`'s
+`cloud_project_id`, including every cloud pagination request and explicit cloud
+source reads. An explicitly selected project takes precedence. A connected
+configuration without a usable project fails before any incident-list request;
+it must never silently expand to account-wide results. Local evidence selection
+is unchanged, and unconnected account-wide member reads remain supported.
+
 **FR-MCP-03:** MCP responses must be deterministic, compact, machine-readable, redaction-aware, and consistent with CLI/API results. `verify_cloud` must accept `trigger5xx` and `trigger4xxStatus` so agents can run the same active hosted 5xx proof path as `debugbundle verify cloud --trigger-5xx` and the same configured-client-error proof path as `debugbundle verify cloud --trigger-4xx <status>`. Additive ordinary stdio tool `verify_app_event` provides real SDK-driven app proof, forwarding `service`, `traceId`, and `requestId` to the same CLI verifier with `expectAppEvent: true`. App-event proof requires a nonblank service or correlation hint and never sends synthetic events. Preserve the frozen `verify_cloud` schema/description, hosted read-only catalog and restricted-agent authority.
 
 **FR-MCP-04:** The official OpenAI Plugin v1 product is an independently versioned `1.0.0` distribution that combines one tailored DebugBundle skill with an OAuth-protected remote MCP server. It has no custom MCP UI and exposes only the twenty-three read-only tools frozen in `contracts/public-interfaces.md` and `tests/fixtures/openai-plugin-v1/tool-contracts.json`.

@@ -21,6 +21,7 @@ import {
   listLocalIncidents,
   reopenLocalIncident,
   readLocalConnectionConfig,
+  resolveCloudIncidentProjectId,
   resolveLocalIncident
 } from "../../cli/src/local-retrieval-store.js";
 
@@ -175,13 +176,14 @@ async function listAllCloudIncidents(
   }
 ): Promise<Array<Record<string, unknown> & { source: RetrievalSource }>> {
   const filters = readIncidentListFilters(input);
+  const projectId = await resolveCloudIncidentProjectId(filters.projectId);
   const incidents: Array<Record<string, unknown> & { source: RetrievalSource }> = [];
   let cursor: string | undefined;
 
   while (true) {
     const response = await api.listIncidents({
       bearerToken: await requireCloudBearerToken(input),
-      ...(filters.projectId === undefined ? {} : { projectId: filters.projectId }),
+      ...(projectId === undefined ? {} : { projectId }),
       ...(filters.environment === undefined ? {} : { environment: filters.environment }),
       ...(filters.service === undefined ? {} : { service: filters.service }),
       ...(filters.status === undefined ? {} : { status: filters.status }),
@@ -331,8 +333,9 @@ export function createRetrievalMcpTools(api: {
         } = {
           bearerToken: await requireCloudBearerToken(input)
         };
-        if (incidentFilters.projectId !== undefined) {
-          requestInput.projectId = incidentFilters.projectId;
+        const projectId = await resolveCloudIncidentProjectId(incidentFilters.projectId);
+        if (projectId !== undefined) {
+          requestInput.projectId = projectId;
         }
         if (incidentFilters.environment !== undefined) {
           requestInput.environment = incidentFilters.environment;

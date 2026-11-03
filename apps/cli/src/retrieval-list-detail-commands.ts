@@ -18,6 +18,7 @@ import {
   getLocalReproduction,
   listLocalIncidents,
   readLocalConnectionConfig,
+  resolveCloudIncidentProjectId,
   type LocalRetrievalStoreDependencies
 } from "./local-retrieval-store.js";
 import {
@@ -377,10 +378,11 @@ async function mapCombinedIncidentListResult(
     },
     dependencies
   );
+  const cloudProjectId = await resolveCloudIncidentProjectId(input.projectId, dependencies);
   const cloudIncidents = await listAllCloudIncidents(
     {
       bearerToken: input.bearerToken,
-      ...(input.projectId === undefined ? {} : { projectId: input.projectId }),
+      ...(cloudProjectId === undefined ? {} : { projectId: cloudProjectId }),
       ...(input.environment === undefined ? {} : { environment: input.environment }),
       ...(input.service === undefined ? {} : { service: input.service }),
       ...(input.status === undefined ? {} : { status: input.status }),
@@ -583,7 +585,7 @@ export async function listIncidentsWithAuthCommand(
   return runAuthenticatedCliCommand(input, {
     createApi: createAuthenticatedRetrievalApi,
     dependencies,
-    runCommand: (authState, api) => {
+    runCommand: async (authState, api) => {
       const commandInput: {
         bearerToken: string;
         projectId?: string;
@@ -600,8 +602,11 @@ export async function listIncidentsWithAuthCommand(
         bearerToken: authState.bearer_token
       };
 
-      if (input.projectId !== undefined) {
-        commandInput.projectId = input.projectId;
+      try {
+        const projectId = await resolveCloudIncidentProjectId(input.projectId, dependencies);
+        if (projectId !== undefined) commandInput.projectId = projectId;
+      } catch (error) {
+        return mapErrorToResult(error);
       }
       if (input.environment !== undefined) {
         commandInput.environment = input.environment;

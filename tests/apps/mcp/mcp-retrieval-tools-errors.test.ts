@@ -116,6 +116,7 @@ describe("mcp retrieval tools auth and error handling", () => {
 
       expect(listIncidents).toHaveBeenNthCalledWith(1, {
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_cloud",
         environment: "production",
         service: "checkout-api",
         status: "open",
@@ -123,6 +124,7 @@ describe("mcp retrieval tools auth and error handling", () => {
       });
       expect(listIncidents).toHaveBeenNthCalledWith(2, {
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_cloud",
         environment: "production",
         service: "checkout-api",
         status: "open",

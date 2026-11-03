@@ -1,3 +1,21 @@
+Corrective release preparation (3 November 2026): owner authorised CLI 1.18.1,
+MCP/OpenClaw 1.18.2, their applicable developer pin updates and site 1.6.12 with
+the new verification article. `make openclaw-installed-check` adds normal archive
+installation, real host runtime inspection and installed-byte/native-request
+proof to mandatory preflight. Publication and live acceptance remain pending;
+API/worker and language SDK releases are unchanged. See the current remediation
+record for exact release evidence and remaining gates.
+
+OpenClaw corrective candidate (3 November 2026, unreleased): ClawHub's maintainer
+confirmed publication recovery of unchanged plugin 1.18.0/1.18.1 in issue #4214,
+but identified missing connected-project incident filters and a native ESM
+`node:assert` load failure. CLI/MCP/OpenClaw now share connection-based cloud list
+scope; the plugin bundle supplies Node `createRequire` for its pinned CommonJS
+HTTP dependency. Mandatory emitted-bundle runtime checks cover Node 22/24/26,
+compressed scoped pagination, approval metadata and missing-scope rejection.
+Published artifacts are unchanged; exact corrective release/security acceptance
+remains pending. See `spec/openclaw-runtime-scope-remediation-20261103.md`.
+
 ClawHub follow-through (2 November 2026): MCP 1.18.1 is published to npm and the official Registry from immutable fbfdd394, with full source CI and installed native checks passing. ClawHub skill 1.18.1 is public with source-identical files and clean final review/moderation, but VirusTotal is missing and discovery passes 5/7 queries. Plugin 1.18.1 is accepted pending checks. The skill pins MCP 1.18.1 / CLI 1.18.0 and uses the supported 0.22.0 multipart publisher after 0.25.0 upload-ticket HTTP 500s; its accepted write appeared after the client timeout. Plugin inspection/publication stays on 0.25.0. Do not resubmit either accepted version. No core/SDK deployment or consumer adoption is included; see `spec/clawhub-publication-retry-20261101.md`.
 
 Evidence release (1 November 2026): core 1.20.0 and migration 64 are live from registry-adopted `88a9a42c`, with Node/Browser 3.2.0. All maintained SDKs are published; Swift is 3.1.1 and React Native is 3.1.0 with that corrected Swift floor. Site 1.6.11 is deployed from `b9196030`; independent S3/CDN byte and cache checks confirm its published Browser SDK and current documentation. Disposable owned-project live canaries verify structured causes, redaction, operation/recovery context, legacy delivery and stored-reader parity. Public Codex 1.4.1, Claude 1.18.0 and Gemini 1.3.1 pass native installed checks. The owner explicitly deferred ClawHub/OpenClaw acceptance while authorising the remaining independent publications; its security gates stay open. Smithery publishing is retired by the provider. See `spec/bundle-evidence-quality-release-20261101.md` for exact identities, rollback and limits.

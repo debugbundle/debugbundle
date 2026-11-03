@@ -1,7 +1,21 @@
-import { describe, expect, it, vi } from "vitest";
+import { tmpdir } from "node:os";
+import { mkdtemp, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RetrievalApiError } from "../../../packages/retrieval-client/src/index.js";
 import { createRetrievalMcpTools } from "../../../apps/mcp/src/retrieval-tools.js";
+
+// Account-wide cases must not inherit the developer checkout's connection.
+let workspace: string;
+beforeEach(async () => {
+  workspace = await mkdtemp(join(tmpdir(), "debugbundle-retrieval-unconnected-"));
+  vi.spyOn(process, "cwd").mockReturnValue(workspace);
+});
+afterEach(async () => {
+  vi.restoreAllMocks();
+  await rm(workspace, { recursive: true, force: true });
+});
 
 describe("mcp retrieval tools artifacts", () => {
   it("scrubs historical incident, log, and context output at the final tool boundary", async () => {

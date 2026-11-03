@@ -700,6 +700,7 @@ describe("cli retrieval commands connected", () => {
 
     expect(listIncidents).toHaveBeenNthCalledWith(1, {
       bearerToken: "dbundle_mem_saved",
+      projectId: "proj_cloud",
       environment: "production",
       service: "checkout-api",
       status: "open",
@@ -707,6 +708,7 @@ describe("cli retrieval commands connected", () => {
     });
     expect(listIncidents).toHaveBeenNthCalledWith(2, {
       bearerToken: "dbundle_mem_saved",
+      projectId: "proj_cloud",
       environment: "production",
       service: "checkout-api",
       status: "open",

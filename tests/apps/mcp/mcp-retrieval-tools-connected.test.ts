@@ -63,6 +63,7 @@ describe("mcp retrieval tools connected mode", () => {
       });
       expect(listIncidents).toHaveBeenCalledWith({
         bearerToken: "dbundle_mem_x",
+        projectId: "proj_cloud",
         status: "active"
       });
     } finally {

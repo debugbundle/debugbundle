@@ -1,5 +1,13 @@
 # @debugbundle/cli
 
+In a connected workspace, `debugbundle incidents` and `--source cloud` default
+their cloud requests to the connection's `cloud_project_id`. `--project-id <id>`
+overrides that default. All cloud pages retain the selected project; local
+evidence keeps its existing selection. An unusable connected project returns
+`invalid_local_connection_config` before a list request: pass the intended
+`--project-id` or repair the connection. Account-wide reads remain supported
+outside a connected workspace.
+
 Command-line interface for DebugBundle.
 
 Notification preferences support account and project scopes, personal email or shared

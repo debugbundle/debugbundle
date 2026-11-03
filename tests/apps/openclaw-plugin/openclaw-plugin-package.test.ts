@@ -64,6 +64,7 @@ describe("openclaw plugin package", () => {
       "plugin:validate": "openclaw plugins validate --root . --entry ./dist/index.js",
       "plugin:check": expect.stringContaining("openclaw plugins build --entry ./dist/index.js --check")
     });
+    expect(packageJson.scripts?.["plugin:check"]).toContain("node scripts/check-runtime.mjs");
     expect(packageJson.openclaw).toMatchObject({
       extensions: ["./dist/index.js"],
       compat: {

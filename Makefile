@@ -77,6 +77,8 @@ help:
 	@echo "  make gemini-extension-verify-public Check public Gemini files and version tag against core"
 	@echo "  make codex-plugin-smoke     Verify a fresh Codex client against synthetic data"
 	@echo "  make openclaw-plugin-check  Build and validate the OpenClaw companion package"
+	@echo "  make openclaw-runtime-check Verify the emitted plugin on native Node 22/24/26"
+	@echo "  make openclaw-installed-check Verify the packed plugin in a clean OpenClaw host"
 	@echo "  make openclaw-release-check  Validate both OpenClaw distributions before publication"
 	@echo "  make openai-plugin-validate  Validate the source-ready OpenAI plugin package"
 	@echo "  make openai-plugin-check     Run package, skill, and release contract tests"
@@ -234,8 +236,19 @@ gemini-extension-smoke:
 openclaw-plugin-check:
 	$(NODE_RUN) "corepack enable && corepack pnpm --dir apps/openclaw-plugin plugin:check"
 
+.PHONY: openclaw-runtime-check
+openclaw-runtime-check: openclaw-plugin-check
+	@for runtime_image in node:22-alpine node:24-alpine node:26-alpine; do \
+	  docker run --rm --network none -v "$(PWD):/workspace:ro" -w /workspace "$$runtime_image" node apps/openclaw-plugin/scripts/check-runtime.mjs || exit $$?; \
+	done
+
+.PHONY: openclaw-installed-check
+openclaw-installed-check: openclaw-plugin-check
+	$(NODE_RUN) 'mkdir -p .tmp/openclaw-installed-package && npm pack ./apps/openclaw-plugin --ignore-scripts --pack-destination .tmp/openclaw-installed-package >/dev/null'
+	docker run --rm -v "$(PWD):/source:ro" -v "$(PWD)/.tmp/openclaw-installed-proof:/proof" -e OPENCLAW_CHECK_OUTPUT=/proof $(if $(OPENCLAW_CHECK_SPEC),-e OPENCLAW_CHECK_SPEC="$(OPENCLAW_CHECK_SPEC)",) node:24-bookworm node /source/scripts/check-openclaw-installed.mjs
+
 .PHONY: openclaw-release-check
-openclaw-release-check: openclaw-plugin-check
+openclaw-release-check: openclaw-plugin-check openclaw-runtime-check openclaw-installed-check
 	$(MAKE) test-focused TEST_FILES='tests/apps/openclaw-plugin tests/contracts/openclaw-plugin-parity.test.ts tests/apps/mcp/mcp-clawhub-skill.test.ts tests/apps/mcp/mcp-legacy-contract.test.ts tests/apps/mcp/mcp-ecosystem-release.test.ts tests/apps/mcp/mcp-ecosystem-security.test.ts tests/apps/mcp/mcp-ecosystem-publication.test.ts tests/contracts/codex-developer-plugin.test.ts --maxWorkers=2'
 
 .PHONY: openclaw-plugin-build

@@ -1,3 +1,39 @@
+# Authorised corrective release and site publication — 3 November 2026
+
+Owner authorised a careful final audit followed by package publication and the
+DebugBundle site production release, including the new article. Candidates:
+CLI 1.18.1, MCP/OpenClaw/ClawHub skill 1.18.2 and site 1.6.12. Clean installed
+OpenClaw 2026.6.9 now passes normal archive installation, full 139-tool runtime
+loading and scoped requests. Final source/CI and registry/security/live gates
+are in progress. Developer wrapper pin adoption follows npm publication with
+independent patch versions. No consumer product, API/worker or language SDK
+release is included. See `spec/openclaw-runtime-scope-remediation-20261103.md`.
+
+# OpenClaw follow-up — 3 November 2026, local corrective candidate
+
+ClawHub maintainer Patrick-Erichsen confirmed unchanged plugin 1.18.0 and 1.18.1
+published with matching anonymous downloads and successful installations in
+[issue #4214](https://github.com/openclaw/clawhub/issues/4214#issuecomment-6588056002).
+Publication is recovered; the same comment reports missing connected-project
+incident filters and native ESM `node:assert` load failures. Keep the issue open.
+
+Both defects were reproduced locally before fixes. The candidate shares explicit
+or connected project scope across cloud CLI/MCP/OpenClaw list requests and all
+pages, fails closed on unusable connected scope, and retains local/global
+unconnected behaviour. A Node `createRequire` build banner fixes bundled CommonJS
+HTTP imports; native emitted-artifact checks are now mandatory before release.
+
+Current proof: 879 CLI/MCP/OpenClaw regressions across 124 files, 35 final edge
+checks (overlapping), full typecheck, full/changed-file lint and formatting pass.
+Native Node 22/24/26 pass loading, all 139 tool registrations, compressed scoped
+pagination, approval metadata and fail-closed missing project checks. Mandatory
+OpenClaw release preflight passes its 32 tests plus native artifact/manifest and
+runtime gates. Pre-ship review finds no additional implementation gaps. No versions bumped, commits, pushes, publications, issue replies,
+hosted deployments or consumer changes in this follow-up. Next: owner review and fresh release approval before
+choosing/releasing new immutable patch versions. ClawHub security re-review and
+exact published installation/runtime acceptance remain release gates. Detailed evidence:
+`spec/openclaw-runtime-scope-remediation-20261103.md`.
+
 # Next mobile release — CocoaPods Trunk transition pending, 2 November 2026
 
 The owner requested a durable handoff for the next release. The
@@ -21,7 +57,7 @@ Docker Prettier leaves the checklist unchanged, and the existing release-governa
 suite passes all five tests. Pre-ship review finds documentation-only changes with
 no runtime, trust-boundary or schema change. The six migration gates remain open.
 
-# ClawHub follow-through — owner authorised 1.18.1 attempt
+# Historical ClawHub checkpoint — owner authorised 1.18.1 attempt
 
 MCP 1.18.1 is published to npm and the official Registry from immutable fbfdd394.
 Full source CI, release CI and installed public checks on Node 22/24/26 pass.
