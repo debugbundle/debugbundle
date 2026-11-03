@@ -206,3 +206,7 @@ authentication and five invalid-scope cases with no network request. The same
 139 tools, schemas, optional approvals and local evidence behavior are retained.
 The installed fixture closes its loopback server and removes its disposable
 state; no database, server deployment or consumer product change is required.
+
+Source CI 41639765863 passed lint/typecheck and native Gemini Node22/24/26 but found one additional stdio test assertion for the old doctor description. The documented metadata clarification also applies there; the original name/schema/result assertions are preserved. The complete CLI/MCP suite and fresh full CI must pass before publication.
+
+The complete CLI/MCP regression suite passes all 869 tests across 120 files after the metadata expectation is reconciled. Diagnostic runtime code and version candidates are unchanged.
