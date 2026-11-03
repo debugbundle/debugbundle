@@ -25,7 +25,11 @@ const server = createServer((request, response) => {
   const url = new URL(request.url, "http://127.0.0.1");
   const nextCursor =
     url.searchParams.has("limit") || url.searchParams.has("cursor") ? null : "fixture-page-2";
-  const body = gzipSync(JSON.stringify({ incidents: [], next_cursor: nextCursor }));
+  const body = gzipSync(
+    JSON.stringify(
+      url.pathname === "/health" ? { status: "ok" } : { incidents: [], next_cursor: nextCursor }
+    )
+  );
   response.setHeader("content-type", "application/json");
   response.setHeader("content-encoding", "gzip");
   response.setHeader("content-length", body.length);
@@ -96,8 +100,60 @@ try {
     /invalid_local_connection_config/u
   );
   assert.equal(requests.length, 3);
+
+  const apiUrl = `http://127.0.0.1:${server.address().port}`;
+  const authFilePath = join(root, "synthetic-auth.json");
+  await writeFile(
+    authFilePath,
+    JSON.stringify({
+      bearer_token: "synthetic-member-token",
+      base_url: apiUrl
+    })
+  );
+  const connection = {
+    mode: "connected",
+    cloud_project_id: "00000000-0000-4000-8000-000000000001",
+    cloud_base_url: apiUrl,
+    environments: {
+      local: { delivery: "local-only" },
+      development: { delivery: "local-only" },
+      staging: { delivery: "local-only" },
+      production: { delivery: "cloud-enabled" }
+    }
+  };
+  await writeFile(join(root, ".debugbundle/local/connection.json"), JSON.stringify(connection));
+  const diagnosis = await tools
+    .get("debugbundle_doctor")
+    .execute("fixture-doctor", { authFilePath });
+  assert.ok(
+    JSON.parse(diagnosis.content[0].text).checks.some(
+      (check) => check.name === "connected-api" && check.status === "ok"
+    )
+  );
+  assert.equal(requests.length, 5);
+  assert.equal(requests[3].url, "/health");
+  assert.equal(requests[3].authorization, undefined);
+  const probeUrl = new URL(requests[4].url, apiUrl);
+  assert.equal(probeUrl.pathname, "/v1/incidents");
+  assert.equal(probeUrl.searchParams.get("limit"), "1");
+  assert.equal(probeUrl.searchParams.get("project_id"), connection.cloud_project_id);
+  assert.equal(requests[4].authorization, "Bearer synthetic-member-token");
+  for (const projectId of [null, "", "   ", undefined, 42]) {
+    await writeFile(
+      join(root, ".debugbundle/local/connection.json"),
+      JSON.stringify({
+        ...connection,
+        cloud_project_id: projectId
+      })
+    );
+    const invalid = await tools
+      .get("debugbundle_doctor")
+      .execute("fixture-invalid-doctor", { authFilePath });
+    assert.equal(JSON.parse(invalid.content[0].text).status, "error");
+    assert.equal(requests.length, 5, "invalid diagnostic project scope must make no request");
+  }
   console.log(
-    `OpenClaw native ESM runtime passed on ${process.version}: ${tools.size} tools, compressed scoped pagination, approval and fail-closed checks.`
+    `OpenClaw native ESM runtime passed on ${process.version}: ${tools.size} tools, compressed scoped pagination/doctor, approval and fail-closed checks.`
   );
 } finally {
   process.chdir(originalCwd);

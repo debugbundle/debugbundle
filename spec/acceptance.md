@@ -902,6 +902,7 @@ Each MCP tool must produce results that match its API/CLI equivalent:
 - Bundle parity (`debugbundle_get_bundle` = `GET /v1/incidents/{id}/bundle` = `debugbundle bundle <id> --json`)
 - Reproduction parity (`debugbundle_get_reproduction` = `GET /v1/incidents/{id}/reproduction` = `debugbundle reproduce <id> --json`)
 - Doctor parity (`debugbundle_doctor` = `debugbundle doctor --json`)
+- Connected doctor uses its saved project on the one-incident auth probe; invalid scope makes no network request. Local-only mode remains offline, and reports do not return incident data.
 - Verification parity (`debugbundle_verify_local` / `debugbundle_verify_cloud` = CLI verify equivalents); additive `verify_app_event` matches `verify cloud --expect-app-event` through both ordinary and local-auth schemas, accepts nonblank service/traceId/requestId scope and rejects synthetic mode injection. The original verification contracts remain frozen.
 - Capture policy parity (`get_capture_policy` / `update_capture_policy` = `debugbundle capture-policy get/set --json`)
 - Probe parity (`activate_probe` / `list_active_probes` / `deactivate_probe` = `debugbundle probe activate/list/deactivate --json`)

@@ -1,3 +1,7 @@
+# Diagnostic scope correction — 3 November 2026
+
+ClawHub 1.18.2 final review found an additional unscoped `doctor` authentication probe. New regressions reproduce it; the correction passes 43 doctor/MCP checks. CLI 1.18.2 and MCP/OpenClaw/skill 1.18.3 are prepared as new immutable candidates, with emitted/installed diagnostic qualification and fresh CI/publication still pending. 1.18.2 is published but fails exact security acceptance; no scanner bypass is used. Source CI 41635642589 additionally caught a stale developer-distribution ledger row, now reconciled with manifests. Site 1.6.12 has passing source CI; final production publication awaits the corrected developer guidance.
+
 # Corrective npm release verified; ecosystem and developer promotion in progress
 
 CLI 1.18.1 and MCP 1.18.2 are published from 74ed1e8b with successful source and

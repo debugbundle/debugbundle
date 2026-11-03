@@ -10,6 +10,89 @@ import {
 } from "../../helpers/cli-doctor.js";
 
 describe("cli-doctor connection", () => {
+  it.each([null, "", "   ", undefined, 42])(
+    "makes no network request when a connected project scope is unusable: %j",
+    async (projectId) => {
+      const rootDirectory = await createDoctorFixtureRepository();
+      await setupCommand({}, { cwd: () => rootDirectory });
+      await writeFile(
+        join(rootDirectory, ".debugbundle/local/connection.json"),
+        JSON.stringify({
+          mode: "connected",
+          cloud_project_id: projectId,
+          cloud_base_url: "https://selfhost.debugbundle.test",
+          environments: {
+            local: { delivery: "local-only" },
+            development: { delivery: "local-only" },
+            staging: { delivery: "local-only" },
+            production: { delivery: "cloud-enabled" }
+          }
+        })
+      );
+      const fetchImpl = vi.fn();
+      const result = await doctorCommand(
+        { json: true },
+        {
+          cwd: () => rootDirectory,
+          fetchImpl,
+          readAuthState: vi.fn().mockResolvedValue({
+            bearer_token: "synthetic-member",
+            base_url: "https://selfhost.debugbundle.test"
+          })
+        }
+      );
+      expect(result.exitCode).toBe(1);
+      expect(JSON.parse(result.output).status).toBe("error");
+      expect(fetchImpl).not.toHaveBeenCalled();
+    }
+  );
+
+  it("trims and encodes the connected project in the bounded authentication probe", async () => {
+    const rootDirectory = await createDoctorFixtureRepository();
+    await setupCommand({}, { cwd: () => rootDirectory });
+    await writeFile(
+      join(rootDirectory, ".debugbundle/local/connection.json"),
+      JSON.stringify({
+        mode: "connected",
+        cloud_project_id: "  project/with?reserved&values  ",
+        cloud_base_url: "https://selfhost.debugbundle.test",
+        environments: {
+          local: { delivery: "local-only" },
+          development: { delivery: "local-only" },
+          staging: { delivery: "local-only" },
+          production: { delivery: "cloud-enabled" }
+        }
+      })
+    );
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 200, text: async () => '{"status":"ok"}' })
+      .mockResolvedValueOnce({ status: 200, text: async () => '{"incidents":[]}' });
+    const result = await doctorCommand(
+      { json: true },
+      {
+        cwd: () => rootDirectory,
+        fetchImpl,
+        readAuthState: vi.fn().mockResolvedValue({
+          bearer_token: "synthetic-member",
+          base_url: "https://selfhost.debugbundle.test"
+        })
+      }
+    );
+    const request = new URL(fetchImpl.mock.calls[1]![0] as string);
+    expect(request.pathname).toBe("/v1/incidents");
+    expect([...request.searchParams]).toEqual([
+      ["limit", "1"],
+      ["project_id", "project/with?reserved&values"]
+    ]);
+    expect(JSON.parse(result.output).checks).toContainEqual(
+      expect.objectContaining({
+        name: "connected-api",
+        status: "ok"
+      })
+    );
+  });
+
   it("validates connected API reachability and member-token auth for self-hosted base URLs", async () => {
     const rootDirectory = await createDoctorFixtureRepository();
 
@@ -103,7 +186,7 @@ describe("cli-doctor connection", () => {
     });
     expect(fetchImpl).toHaveBeenNthCalledWith(
       2,
-      "https://selfhost.debugbundle.test/v1/incidents?limit=1",
+      "https://selfhost.debugbundle.test/v1/incidents?limit=1&project_id=proj_selfhost_1",
       {
         method: "GET",
         headers: {

@@ -1,5 +1,7 @@
 # @debugbundle/cli
 
+Connected `doctor` diagnostics check API health and saved member authentication with a one-incident probe restricted to `cloud_project_id`. Missing or blank connected project scope fails before any request. Incident contents are discarded and are not included in the report. Local-only diagnostics make no cloud request.
+
 In a connected workspace, `debugbundle incidents` and `--source cloud` default
 their cloud requests to the connection's `cloud_project_id`. `--project-id <id>`
 overrides that default. All cloud pages retain the selected project; local

@@ -170,3 +170,39 @@ qualified candidate, and native scoped reads/pagination/approval/fail-closed
 checks pass. The minimum 2026.6.9 host remains independently qualified. All 34
 developer package contract/routing/publication checks pass with the updated
 Codex/Claude/Gemini pins; their public installation checks follow promotion.
+
+## Additional diagnostic path found by exact-version review
+
+The accepted 1.18.2 upload is public, but its final review is suspicious because
+`doctor` still sends an unscoped authenticated `/v1/incidents?limit=1` probe.
+Ordinary lists and pagination are corrected; diagnostics discarded the returned
+incident data, so this is an overly broad read rather than a demonstrated
+agent-facing disclosure or authorization bypass. The finding is valid.
+
+Five new/updated assertions fail before the fix. The shared CLI doctor path now
+validates and trims its connected project before any network request and adds an
+encoded `project_id` to the one-incident probe. Null, missing, blank and non-string
+scope never dispatch. Local-only diagnostics remain offline. All 43 doctor/MCP
+checks pass. Tool metadata explicitly discloses connected health and saved-member
+authentication checks. Native emitted/installed qualification now also executes
+this diagnostic path and asserts scope, limit, credentials and fail-closed state.
+No language SDK, server authorization, database or customer data changes apply.
+
+The implementation change requires new immutable CLI 1.18.2 and MCP/OpenClaw/skill
+1.18.3 patches. Published 1.18.2 remains untouched. Developer wrapper adoption
+follows successful npm publication. Full CI 41635642589 found one stale ledger
+row after developer pin adoption; reconcile the ledger, preserve the test and
+require the new source CI to pass. The initial source 74ed remains qualified.
+Final security review and antivirus must still pass; lexical discovery is 5/7.
+
+The legacy stdio/OpenClaw parity gate caught the intentional doctor description clarification. A narrow compatibility allowance covers only its two descriptions under the documented connected-diagnostic contract; the historical fixture remains unchanged; all schemas, names, approval flags and result shapes remain identical. This is an explicit metadata correction, not a change to the separately frozen hosted OpenAI catalog.
+
+Diagnostic candidate local qualification passes full workspace typecheck,
+changed-code lint, 43 doctor/MCP regressions, 18 focused scope/catalog/ledger
+checks (overlapping), and mandatory OpenClaw preflight: all 32 tests, emitted
+Node 22/24/26 runtime checks and a clean installed 2026.6.9 host. Native doctor
+checks include project/limit encoding, unauthenticated health, synthetic member
+authentication and five invalid-scope cases with no network request. The same
+139 tools, schemas, optional approvals and local evidence behavior are retained.
+The installed fixture closes its loopback server and removes its disposable
+state; no database, server deployment or consumer product change is required.

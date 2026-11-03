@@ -515,6 +515,17 @@ async function buildConnectedApiCheck(input: {
     return null;
   }
 
+  // Diagnostics must never broaden a connected workspace into an account-wide
+  // incident read, including when incomplete connection state is being diagnosed.
+  const projectId = input.connection.cloud_project_id?.trim();
+  if (!projectId) {
+    return {
+      name: "connected-api",
+      status: "error",
+      message: `Invalid connected project scope in ${CONNECTION_FILE_PATH}; run debugbundle connect before verifying member-token auth.`
+    };
+  }
+
   const connectionBaseUrl = input.connection.cloud_base_url === null ? null : normalizeBaseUrl(input.connection.cloud_base_url);
   const authBaseUrl = input.authState === null ? null : normalizeBaseUrl(input.authState.base_url);
   const baseUrl = authBaseUrl ?? connectionBaseUrl;
@@ -570,7 +581,8 @@ async function buildConnectedApiCheck(input: {
 
   let incidentsResponse: Awaited<ReturnType<typeof input.fetchImpl>>;
   try {
-    incidentsResponse = await input.fetchImpl(`${baseUrl}/v1/incidents?limit=1`, {
+    const query = new URLSearchParams({ limit: "1", project_id: projectId });
+    incidentsResponse = await input.fetchImpl(`${baseUrl}/v1/incidents?${query}`, {
       method: "GET",
       headers: {
         accept: "application/json",

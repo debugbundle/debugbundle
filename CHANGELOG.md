@@ -6,6 +6,13 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+### CLI 1.18.2 and MCP/OpenClaw 1.18.3 — 2026-11-03
+
+- Restrict the connected `doctor` authentication probe to its configured project
+  with a one-incident limit. Invalid scope fails before any network request.
+- Disclose connected-mode health/authentication reads in doctor tool metadata and
+  qualify the emitted/installed plugin's actual diagnostic requests.
+
 ### CLI 1.18.1 and MCP/OpenClaw 1.18.2 — 2026-11-03
 
 - Fix native ESM loading of bundled CommonJS HTTP dependencies with Node's

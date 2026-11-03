@@ -1,8 +1,10 @@
 # @debugbundle/openclaw-plugin
 
+Connected `doctor` diagnostics check API health and saved member authentication with a one-incident probe restricted to `cloud_project_id`. Missing or blank connected project scope fails before any request. Incident contents are discarded and are not included in the report. Local-only diagnostics make no cloud request.
+
 OpenClaw tools for runtime error reporting, crash reporting, incident response, live app monitoring, endpoint health checks, debug bundles, and product analytics. Monitoring is scoped to runtime failures, customer-facing incidents, and endpoint health; DebugBundle is not a generic infrastructure-monitoring platform.
 
-## Corrective update 1.18.2
+## Corrective update 1.18.3
 
 This update fixes native ESM loading of the bundled HTTP client and preserves the
 connected project's filter on incident requests and pagination. It retains the

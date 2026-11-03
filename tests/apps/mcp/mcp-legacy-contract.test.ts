@@ -28,16 +28,35 @@ function addOptionalDiagnosticPolicy(schema: PolicySchema): void {
   };
 }
 
+function discloseConnectedDoctor(tool: { description: string }): void {
+  // Connected doctor already performs health/auth reads. Correct only its
+  // incomplete metadata; retain the historical schema, name and approval flags.
+  expect(tool.description).toBe("Run local DebugBundle environment diagnostics.");
+  tool.description =
+    "Run DebugBundle environment diagnostics. Connected mode checks API health and saved member authentication with one incident request restricted to the connected project; incident contents are not returned.";
+}
+
 describe("legacy MCP and OpenClaw contract", () => {
   it("preserves the frozen stdio and OpenClaw public surface as tools are added", async () => {
     const expected = JSON.parse(await readFile(legacyContractPath, "utf8")) as {
       initialization: { result: { serverInfo: { version: string } } };
-      tools: { result: { tools: Array<{ name: string; inputSchema: PolicySchema }> } };
+      tools: {
+        result: { tools: Array<{ name: string; description: string; inputSchema: PolicySchema }> };
+      };
       openClaw: {
         names: string[];
-        tools: Array<{ openClawToolName: string; optional: boolean; parameters: PolicySchema }>;
+        tools: Array<{
+          openClawToolName: string;
+          description: string;
+          optional: boolean;
+          parameters: PolicySchema;
+        }>;
       };
     };
+    discloseConnectedDoctor(expected.tools.result.tools.find((tool) => tool.name === "doctor")!);
+    discloseConnectedDoctor(
+      expected.openClaw.tools.find((tool) => tool.openClawToolName === "debugbundle_doctor")!
+    );
     // AC-OPENCLAW-02 security correction: retain the historical fixture and
     // permit only these two default-exposure changes, not schema/catalog drift.
     for (const tool of expected.openClaw.tools) {

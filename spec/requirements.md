@@ -359,6 +359,8 @@ Incident/improvement lifecycle writes with an unreadable success response, a tra
 **FR-CLI-08:** Setup follows a four-stage lifecycle: Discover (detect language, framework, deployment target) → Configure (install SDK, add config, register project) → Validate (check local correctness) → Verify (prove end-to-end works).
 
 **FR-CLI-09:** `doctor` checks: detected language/framework, backend SDK installed, browser SDK installed, project token found, required env vars present, ingestion API reachable, sample event sendable, redaction config present.
+Connected-mode doctor authentication probes must be bounded to one incident in the configured cloud project; invalid project scope fails before any network dispatch, and the report must not expose incident contents. Local-only diagnostics do not query cloud incidents.
+
 
 **FR-CLI-10:** `validate --fix` may safely: add missing config stubs, update example env files, write starter ignore/redaction config, add missing initialization snippets. Must never silently overwrite user code — all changes reported.
 

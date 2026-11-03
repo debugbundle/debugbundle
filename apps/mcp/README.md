@@ -1,5 +1,7 @@
 # @debugbundle/mcp
 
+Connected `doctor` diagnostics check API health and saved member authentication with a one-incident probe restricted to `cloud_project_id`. Missing or blank connected project scope fails before any request. Incident contents are discarded and are not included in the report. Local-only diagnostics make no cloud request.
+
 Connected-workspace incident lists use the saved connection's `cloud_project_id`
 unless `projectId` is explicitly supplied. This also applies to `source: "cloud"`
 and every cloud page. An unusable connected project fails with
@@ -9,7 +11,7 @@ member reads retain their existing behaviour.
 
 MCP server for runtime error reporting, crash reporting, incident response, endpoint health checks, debug bundles, and product analytics. DebugBundle lets agents inspect customer-facing incidents, deterministic bundles, product-usage evidence, reproductions, probes, alerts, webhooks, projects, and setup state through the same management surface as the API and CLI. It is production debugging infrastructure, not a generic infrastructure-monitoring or observability platform.
 
-## Corrective update 1.18.2
+## Corrective update 1.18.3
 
 Connected incident lists now retain their selected cloud project across all pages,
 including explicit cloud reads. Invalid connected scope fails before the list
@@ -63,7 +65,7 @@ Use `npx -y @debugbundle/mcp` in clients that require noninteractive package exe
 | Claude Desktop local MCP      | local MCP server config                                                    | uses local machine auth/config                       |
 | Claude Code plugin            | `/plugin marketplace add debugbundle/debugbundle`                          | installs bundled MCP config and DebugBundle skill    |
 | Codex developer plugin        | `codex plugin add debugbundle-codex@debugbundle`                           | repository marketplace; local MCP and workflow skill |
-| Codex direct MCP              | `codex mcp add debugbundle -- npx -y @debugbundle/mcp@1.18.2 --local-auth` | app, CLI, and IDE on the same host                   |
+| Codex direct MCP              | `codex mcp add debugbundle -- npx -y @debugbundle/mcp@1.18.3 --local-auth` | app, CLI, and IDE on the same host                   |
 | Cursor                        | MCP config with `npx @debugbundle/mcp`                                     | stdio transport                                      |
 | VS Code / GitHub MCP Registry | `com.debugbundle/mcp`                                                      | official registry metadata                           |
 | OpenClaw / ClawHub            | DebugBundle skill plus MCP config                                          | use the published skill for workflow guidance        |

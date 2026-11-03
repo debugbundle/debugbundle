@@ -38,7 +38,7 @@ export const MCP_TOOL_CATALOG_FOUNDATION = [
   {
     name: "doctor",
     group: "setup",
-    description: "Run local DebugBundle environment diagnostics.",
+    description: "Run DebugBundle environment diagnostics. Connected mode checks API health and saved member authentication with one incident request restricted to the connected project; incident contents are not returned.",
     inputSchema: z.object({
       authFilePath: z.string().optional(),
       privacy: z.boolean().optional()

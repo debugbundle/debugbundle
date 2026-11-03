@@ -1,3 +1,5 @@
+Diagnostic request boundary (3 November 2026): `doctor-command.ts` validates the connected cloud project before network dispatch and scopes its one-incident authentication probe. CLI/MCP/OpenClaw share that path. Native emitted/installed checks cover doctor requests and invalid scope; tool metadata discloses connected health/authentication reads. CLI 1.18.2 and MCP/OpenClaw 1.18.3 are new candidates after the published 1.18.2 review found this additional path. See `spec/openclaw-runtime-scope-remediation-20261103.md`.
+
 Published corrective server boundary (3 November 2026): CLI 1.18.1 and MCP
 1.18.2 are verified public artifacts from 74ed1e8b. Developer pin adoption
 preserves that implementation while advancing Codex/Claude/Gemini independently.
