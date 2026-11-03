@@ -1,3 +1,16 @@
+# Corrective npm release verified; ecosystem and developer promotion in progress
+
+CLI 1.18.1 and MCP 1.18.2 are published from 74ed1e8b with successful source and
+release CI, npm provenance/SRI integrity and actual scoped read-only production
+requests. Native OpenClaw qualification passes both the supported 2026.6.9 floor
+and current 2026.10.10 host, including all 139 tools and exact installed bytes.
+Developer patches Codex 1.4.2, Claude 1.18.1 and Gemini 1.3.2 adopt the published
+MCP 1.18.2 pin; promotion/native public checks are underway. Site 1.6.12 source
+f692b8c has green CI and awaits its final consent-guide update and deployment.
+Registry's short-lived login must be refreshed immediately before publish.
+ClawHub exact-version publication/security and remote installed-runtime gates
+remain open. See `spec/openclaw-runtime-scope-remediation-20261103.md`.
+
 # Authorised corrective release and site publication — 3 November 2026
 
 Owner authorised a careful final audit followed by package publication and the

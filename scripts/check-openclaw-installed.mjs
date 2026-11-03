@@ -12,6 +12,7 @@ const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const packageJson = JSON.parse(
   readFileSync(join(sourceRoot, "apps/openclaw-plugin/package.json"), "utf8")
 );
+const hostVersion = process.env.OPENCLAW_CHECK_HOST_VERSION ?? packageJson.devDependencies.openclaw;
 const root = mkdtempSync(join(tmpdir(), "debugbundle-openclaw-installed-"));
 const host = join(root, "host");
 const state = join(root, "state");
@@ -44,7 +45,7 @@ function run(name, command, args) {
 
 try {
   mkdirSync(state);
-  console.log(`Installing clean OpenClaw ${packageJson.devDependencies.openclaw} host.`);
+  console.log(`Installing clean OpenClaw ${hostVersion} host.`);
   run("host-install", "npm", [
     "install",
     "--prefix",
@@ -52,11 +53,31 @@ try {
     "--no-audit",
     "--no-fund",
     "--ignore-scripts",
-    `openclaw@${packageJson.devDependencies.openclaw}`
+    `openclaw@${hostVersion}`
   ]);
   const bin = join(host, "node_modules/openclaw/openclaw.mjs");
   console.log(`Installing DebugBundle ${packageJson.version} through the normal plugin installer.`);
-  run("plugin-install", process.execPath, [bin, "plugins", "install", installSpec]);
+  const installArgs = [bin, "plugins", "install", installSpec];
+  if (process.env.OPENCLAW_CHECK_TRUST_LOCAL === "1") {
+    // New hosts require explicit trust for an unreviewed local archive. Only our
+    // exact built candidate may use this acknowledgement; remote installs must
+    // retain normal ClawHub security enforcement without a force flag.
+    assert.equal(
+      resolve(installSpec),
+      join(
+        sourceRoot,
+        ".tmp/openclaw-installed-package",
+        `debugbundle-openclaw-plugin-${packageJson.version}.tgz`
+      )
+    );
+    installArgs.push("--force");
+  }
+  if (process.env.OPENCLAW_CHECK_ACCEPT_CAPABILITIES === "1") {
+    // The release fixture reviews our fixed catalog and hook before accepting
+    // the host's normal one-time capability consent. Install policy still runs.
+    installArgs.push("--accept-capabilities");
+  }
+  run("plugin-install", process.execPath, installArgs);
   const config = JSON.parse(readFileSync(configPath, "utf8"));
   config.plugins ??= {};
   config.plugins.allow = ["debugbundle"];
@@ -93,7 +114,7 @@ try {
     installedEntry
   ]);
   console.log(
-    `Installed OpenClaw ${packageJson.devDependencies.openclaw} loads DebugBundle ${packageJson.version}; installed native scoped requests pass.`
+    `Installed OpenClaw ${hostVersion} loads DebugBundle ${packageJson.version}; installed native scoped requests pass.`
   );
 } catch (error) {
   process.stderr.write(error.stderr?.toString() ?? "");

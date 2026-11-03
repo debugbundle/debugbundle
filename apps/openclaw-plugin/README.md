@@ -21,6 +21,14 @@ Requires OpenClaw 2026.6.9 or newer, the supported host baseline for native plug
 openclaw plugins install clawhub:@debugbundle/openclaw-plugin
 ```
 
+Current OpenClaw hosts ask third-party plugin operators to review declared
+capabilities. For noninteractive installation, review this plugin's tool catalog
+and approval policy first, then repeat the same ClawHub command with
+`--accept-capabilities` if requested. Capability consent does not bypass install
+security policy or grant approval for individual optional tool calls. Normal
+ClawHub installs do not need the local-source `--force` acknowledgement. See
+[OpenClaw capability consent](https://docs.openclaw.ai/plugins/manage-plugins#capability-consent).
+
 ## Authentication
 
 The plugin reuses the same auth precedence as the DebugBundle MCP server:

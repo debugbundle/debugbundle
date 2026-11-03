@@ -1,5 +1,16 @@
 # Agent distribution ledger
 
+## Corrective pin adoption — 3 November 2026
+
+CLI 1.18.1 and MCP 1.18.2 are published from `74ed1e8b` with passing release CI,
+provenance/integrity verification and actual read-only connected-project requests.
+Codex 1.4.2, Claude Code 1.18.1 and Gemini CLI 1.3.2 now adopt the published MCP
+1.18.2 pin so their users receive the incident scope fix. Authentication, public
+tool contracts and workflow skills are unchanged. Public promotion and native
+installed-client verification are in progress; the older table below is retained
+as the 1 November historical record. Current evidence is recorded in
+`spec/openclaw-runtime-scope-remediation-20261103.md`.
+
 This is the maintained inventory for first-party developer agent packages that bundle the local DebugBundle MCP server and a workflow skill. It complements the [MCP ecosystem release manifest](../apps/mcp/ecosystem-release-manifest.json), which tracks the npm server, MCP Registry, Smithery, ClawHub, OpenClaw, and downstream discovery. That pipeline does not publish Codex, Claude Code, or Gemini CLI packages. The hosted, read-only [OpenAI plugin](../apps/mcp/openai/release-manifest.json) has its own release gate.
 
 ## Published developer packages (2026-11-01)

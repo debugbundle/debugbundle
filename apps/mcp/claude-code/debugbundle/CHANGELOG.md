@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.18.1] - 2026-11-03
+
+- Adopt published MCP 1.18.2 for connected-project incident scoping and stable pagination. Preserve local authentication, tool contracts and CLI-first guidance.
+
 ## [1.18.0] - 2026-11-01
 
 - Pin verified MCP 1.18.0 for bounded evidence explanations, explicit recovery observations and provenance. Preserve local authentication, interface guidance and existing tool contracts.

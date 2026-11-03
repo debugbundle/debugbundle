@@ -245,7 +245,7 @@ openclaw-runtime-check: openclaw-plugin-check
 .PHONY: openclaw-installed-check
 openclaw-installed-check: openclaw-plugin-check
 	$(NODE_RUN) 'mkdir -p .tmp/openclaw-installed-package && npm pack ./apps/openclaw-plugin --ignore-scripts --pack-destination .tmp/openclaw-installed-package >/dev/null'
-	docker run --rm -v "$(PWD):/source:ro" -v "$(PWD)/.tmp/openclaw-installed-proof:/proof" -e OPENCLAW_CHECK_OUTPUT=/proof $(if $(OPENCLAW_CHECK_SPEC),-e OPENCLAW_CHECK_SPEC="$(OPENCLAW_CHECK_SPEC)",) node:24-bookworm node /source/scripts/check-openclaw-installed.mjs
+	docker run --rm -v "$(PWD):/source:ro" -v "$(PWD)/.tmp/openclaw-installed-proof:/proof" -e OPENCLAW_CHECK_OUTPUT=/proof $(if $(OPENCLAW_CHECK_ACCEPT_CAPABILITIES),-e OPENCLAW_CHECK_ACCEPT_CAPABILITIES="$(OPENCLAW_CHECK_ACCEPT_CAPABILITIES)",) $(if $(OPENCLAW_CHECK_TRUST_LOCAL),-e OPENCLAW_CHECK_TRUST_LOCAL="$(OPENCLAW_CHECK_TRUST_LOCAL)",) $(if $(OPENCLAW_CHECK_HOST_VERSION),-e OPENCLAW_CHECK_HOST_VERSION="$(OPENCLAW_CHECK_HOST_VERSION)",) $(if $(OPENCLAW_CHECK_SPEC),-e OPENCLAW_CHECK_SPEC="$(OPENCLAW_CHECK_SPEC)",) node:24-bookworm node /source/scripts/check-openclaw-installed.mjs
 
 .PHONY: openclaw-release-check
 openclaw-release-check: openclaw-plugin-check openclaw-runtime-check openclaw-installed-check

@@ -129,3 +129,44 @@ comment or additional release action has been taken in this local correction.
 6. Reconcile release records. Keep issue #4214 open while any security or native
    installed-runtime acceptance is incomplete. Do not create more versions for
    an operational scanner failure or bypass held security outcomes.
+
+## Publication progress
+
+- Corrective source `74ed1e8b08abd76ac500c28806ddd33621fbed2d` passes full CI
+  `41628553335`, including all 103 coverage shards and build. CLI runtime CI
+  `41628553432` passes the supported matrix. A broad local run passed 4,884
+  checks and timed out two API checks; both owning files then passed all 23
+  tests at unchanged limits. No test timeout was raised.
+- CLI 1.18.1 (`41631915939`) and MCP 1.18.2 (`41631915937`) are published with
+  successful release workflows. Downloaded artifacts have the expected source
+  commit, npm provenance and exact SRI integrity. Both published packages made
+  real read-only requests against the connected DebugBundle production project,
+  returning only its one active incident.
+- Site source `f692b8c329dd1e82346922510ae46375f176ca4c` passes CI `41630937542`,
+  49 local site checks, typecheck, production build and 16 core/site contract
+  checks. Production deployment remains pending developer distribution updates.
+- The initial Registry publication returned 401 because its five-minute DNS
+  session expired before publication. Renew immediately before retry; no version
+  change or authentication-policy weakening is required.
+- Current public OpenClaw is 2026.10.10. Unlike the 2026.6.9 floor, it requires
+  explicit trust confirmation for a local archive outside ClawHub review.
+  `OPENCLAW_CHECK_TRUST_LOCAL=1` acknowledges only the exact locally built
+  candidate path, inside a disposable profile. It cannot be applied to a remote
+  ClawHub install. This is local artifact qualification, not security acceptance;
+  the published ClawHub installation must pass normally without that flag.
+
+The current host also requires separate third-party capability consent.
+Qualification reviews DebugBundle's fixed 139-tool catalog and approval hook,
+then uses `OPENCLAW_CHECK_ACCEPT_CAPABILITIES=1` in the disposable profile.
+The vendor documents this normal consent separately from source acknowledgement;
+neither flag overrides installer security policy. Production instructions ask
+operators to review capabilities before the normal consent flag. Remote
+ClawHub qualification never sets the local-source force flag.
+
+Current-host qualification passes on OpenClaw 2026.10.10 after the documented
+source and capability acknowledgements in the disposable test profile. Runtime
+inspection reports all 139 tools loaded, installed JavaScript bytes match the
+qualified candidate, and native scoped reads/pagination/approval/fail-closed
+checks pass. The minimum 2026.6.9 host remains independently qualified. All 34
+developer package contract/routing/publication checks pass with the updated
+Codex/Claude/Gemini pins; their public installation checks follow promotion.

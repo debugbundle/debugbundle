@@ -1,5 +1,13 @@
 # DebugBundle for Gemini CLI changelog
 
+## [1.3.2] - 2026-11-03
+
+- Adopt published MCP 1.18.2 for connected-project incident scoping and stable pagination. Preserve local authentication, tool contracts and CLI-first guidance.
+
+## [1.3.1] - 2026-11-01
+
+- Adopt published MCP 1.18.0 for bounded evidence explanations, explicit recovery observations and provenance.
+
 ## [1.3.0] - 2026-10-19
 
 - Adopt verified MCP 1.17.0 with account and project notification preferences, channel pauses and daily email digest schedules. Preserve local authentication and existing tool contracts.

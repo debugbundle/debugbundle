@@ -1,3 +1,11 @@
+Published corrective server boundary (3 November 2026): CLI 1.18.1 and MCP
+1.18.2 are verified public artifacts from 74ed1e8b. Developer pin adoption
+preserves that implementation while advancing Codex/Claude/Gemini independently.
+`check-openclaw-installed.mjs` supports explicit current-host, reviewed local-source
+trust and normal capability-consent fixture options; none override remote install
+security. Minimum and current host runtime/installed-byte proof both pass. Live
+site and exact ClawHub acceptance are tracked in the remediation record.
+
 Corrective release preparation (3 November 2026): owner authorised CLI 1.18.1,
 MCP/OpenClaw 1.18.2, their applicable developer pin updates and site 1.6.12 with
 the new verification article. `make openclaw-installed-check` adds normal archive
