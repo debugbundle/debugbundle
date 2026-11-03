@@ -1,3 +1,22 @@
+# Site 1.6.12 live; diagnostic package correction awaiting CI
+
+The owner prioritised the new blog URL. Site 1.6.12 is live from immutable
+f44843f7 with product artifact source 74ed1e8b through site-only deployment
+41642470636. All three checkout SHAs match; independent S3/CDN verification
+passes for eight pages and 26 assets, including the new article, blog index,
+sitemap, canonical URL, redirects and cache policy. App build 88a9a42c remains
+unchanged; API/MCP readiness and API/App/Site health checks pass. Active incident
+baselines remain API 1, App 0, Site 8, with no new incident IDs after deployment.
+Article: https://debugbundle.com/blog/ai-fix-passes-locally-production-still-fails/
+
+The additional doctor scope fix is qualified locally (869 CLI/MCP tests in 120
+files, targeted coverage over both changed production files, native Node22/24/26,
+minimum/current installed OpenClaw hosts). Source 751474ec awaits full CI
+41641533811 before CLI 1.18.2 and MCP/OpenClaw/skill 1.18.3 publication. Site 1.6.13
+candidate 30b0f62a already has green CI; its new guidance is held until the named
+packages are public. Exact ClawHub security gates remain open. No API/worker,
+language SDK or consumer-product release is included in this correction.
+
 # Diagnostic scope correction — 3 November 2026
 
 ClawHub 1.18.2 final review found an additional unscoped `doctor` authentication probe. New regressions reproduce it; the correction passes 43 doctor/MCP checks. CLI 1.18.2 and MCP/OpenClaw/skill 1.18.3 are prepared as new immutable candidates, with emitted/installed diagnostic qualification and fresh CI/publication still pending. 1.18.2 is published but fails exact security acceptance; no scanner bypass is used. Source CI 41635642589 additionally caught a stale developer-distribution ledger row, now reconciled with manifests. Site 1.6.12 has passing source CI; final production publication awaits the corrected developer guidance.

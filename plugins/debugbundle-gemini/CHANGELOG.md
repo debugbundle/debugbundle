@@ -1,5 +1,9 @@
 # DebugBundle for Gemini CLI changelog
 
+## [1.3.3] - 2026-11-03
+
+- Adopt published MCP 1.18.3 with the project-scoped, bounded doctor authentication probe. Preserve tool schemas, local auth and explicit mutation consent.
+
 ## [1.3.2] - 2026-11-03
 
 - Adopt published MCP 1.18.2 for connected-project incident scoping and stable pagination. Preserve local authentication, tool contracts and CLI-first guidance.

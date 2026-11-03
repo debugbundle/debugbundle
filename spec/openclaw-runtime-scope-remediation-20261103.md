@@ -210,3 +210,47 @@ state; no database, server deployment or consumer product change is required.
 Source CI 41639765863 passed lint/typecheck and native Gemini Node22/24/26 but found one additional stdio test assertion for the old doctor description. The documented metadata clarification also applies there; the original name/schema/result assertions are preserved. The complete CLI/MCP suite and fresh full CI must pass before publication.
 
 The complete CLI/MCP regression suite passes all 869 tests across 120 files after the metadata expectation is reconciled. Diagnostic runtime code and version candidates are unchanged.
+
+## Prioritised site publication
+
+The owner requested the new blog URL while diagnostic source CI was running.
+Promoted the already qualified site 1.6.12 tag/source
+`f44843f79849b5d30f2b39440365e332fea21d73` with verified product artifact source
+`74ed1e8b08abd76ac500c28806ddd33621fbed2d` through site-only cloud workflow
+`41642470636`; it succeeds from cloud source
+`7797818535880b9afcc3c0526d5aa82ecffc71cb`. Checkout git-log output confirms all
+three exact sources. No API/worker or app deployment is performed.
+
+Independent verification compares eight served pages and 26 linked JS/CSS assets
+with deployed S3 bytes, checks cache policy, article title/date/canonical/indexing,
+blog index, sitemap and slash redirect. App build remains
+`88a9a42c1762bab1f5bb7e73f908d67eeb67b99a`; API/MCP readiness and the three
+DebugBundle API/App/Site endpoint-health checks pass. Active baselines remain
+1/0/8 respectively, with no new active incident IDs. These are release readbacks,
+not a claim that all existing incidents are resolved. Rollback site source is
+`b91960302bdadcafc3f9db65984000d21ef6a9fd`; no rollback is required.
+
+The article is live at
+https://debugbundle.com/blog/ai-fix-passes-locally-production-still-fails/.
+The same article blob `4277946c0868b1143c9578ac0dbe38685fff53bc` is retained in
+private site 1.6.13 candidate `30b0f62a92ca1a2f09ea16e4dc4935978a4528b8`, CI
+`41640631181` success. That follow-up updates diagnostic guidance only and stays
+held until MCP 1.18.3 is published and its developer pins are qualified.
+
+## Verified diagnostic publication and developer adoption
+
+Source `751474ecbf69630ef6628f3e159bea94ce6c1c0f` passes full source CI
+`41641533811` (all 103 coverage shards, lint/typecheck/build) and CLI runtime CI
+`41641533951`. Independent local range coverage passes both changed source
+files across `3c4486ae..751474ec`. CLI 1.18.2 and MCP 1.18.3 are published from
+that exact source. Downloaded npm SRI, provenance and `gitHead` match; actual
+read-only production incident lists and the corrected connected doctor succeed
+for both artifacts. Registry propagation briefly returned 404 on a cached URL;
+canonical exact-version metadata confirms both immutable releases. No re-upload
+or version change is used. Official MCP Registry 1.18.3 publication succeeds.
+The MCP workflow's post-publication native Codex gate is still finishing.
+
+Codex 1.4.3, Claude Code 1.18.2 and Gemini CLI 1.3.3 adopt the verified published
+MCP pin. All 28 developer packaging/routing/ledger checks pass before promotion.
+Their native public installation checks and the exact ClawHub security/runtime
+gates follow; source-runtime code is unchanged by this metadata adoption.
