@@ -1,30 +1,15 @@
-Diagnostic scope follow-up (3 November 2026): `doctor-command.ts` validates the connected cloud project before network dispatch and scopes its one-incident authentication probe. CLI/MCP/OpenClaw share that path. Native emitted/installed checks cover doctor requests and invalid scope; tool metadata discloses connected health/authentication reads. CLI 1.18.2 and MCP/OpenClaw 1.18.3 are new candidates after the published 1.18.2 review found this additional path. See `spec/openclaw-runtime-scope-remediation-20261103.md`.
-
-Published corrective server boundary (3 November 2026): CLI 1.18.1 and MCP
-1.18.2 are verified public artifacts from 74ed1e8b. Developer pin adoption
-preserves that implementation while advancing Codex/Claude/Gemini independently.
-`check-openclaw-installed.mjs` supports explicit current-host, reviewed local-source
-trust and normal capability-consent fixture options; none override remote install
-security. Minimum and current host runtime/installed-byte proof both pass. Live
-site and exact ClawHub acceptance are tracked in the remediation record.
-
-Corrective release preparation (3 November 2026): owner authorised CLI 1.18.1,
-MCP/OpenClaw 1.18.2, their applicable developer pin updates and site 1.6.12 with
-the new verification article. `make openclaw-installed-check` adds normal archive
-installation, real host runtime inspection and installed-byte/native-request
-proof to mandatory preflight. Publication and live acceptance remain pending;
-API/worker and language SDK releases are unchanged. See the current remediation
-record for exact release evidence and remaining gates.
-
-OpenClaw corrective candidate (3 November 2026, unreleased): ClawHub's maintainer
-confirmed publication recovery of unchanged plugin 1.18.0/1.18.1 in issue #4214,
-but identified missing connected-project incident filters and a native ESM
-`node:assert` load failure. CLI/MCP/OpenClaw now share connection-based cloud list
-scope; the plugin bundle supplies Node `createRequire` for its pinned CommonJS
-HTTP dependency. Mandatory emitted-bundle runtime checks cover Node 22/24/26,
-compressed scoped pagination, approval metadata and missing-scope rejection.
-Published artifacts are unchanged; exact corrective release/security acceptance
-remains pending. See `spec/openclaw-runtime-scope-remediation-20261103.md`.
+Corrective release (3 November 2026) is complete: CLI 1.18.2 and MCP/OpenClaw/
+skill 1.18.3 preserve connected project scope across incident lists, pagination
+and the bounded doctor authentication probe. Invalid scope fails before dispatch.
+OpenClaw supplies Node createRequire for bundled CommonJS HTTP dependencies;
+normal public installation on the current host loads all 139 tools and passes
+installed-byte/scoped native request checks. Both exact ClawHub security gates
+and anonymous source parity pass. Developer patches Codex 1.4.3, Claude 1.18.2
+and Gemini 1.3.3 use verified published MCP 1.18.3 and pass public native checks.
+Site 1.6.13 and the new verification article are live and independently checked;
+API/app build 88a9a42c and language SDK releases are unchanged. Broad discovery
+remains 5/7, retained as an external limit in the strict report. See
+`spec/openclaw-runtime-scope-remediation-20261103.md` for exact evidence/rollback.
 
 ClawHub follow-through (2 November 2026): MCP 1.18.1 is published to npm and the official Registry from immutable fbfdd394, with full source CI and installed native checks passing. ClawHub skill 1.18.1 is public with source-identical files and clean final review/moderation, but VirusTotal is missing and discovery passes 5/7 queries. Plugin 1.18.1 is accepted pending checks. The skill pins MCP 1.18.1 / CLI 1.18.0 and uses the supported 0.22.0 multipart publisher after 0.25.0 upload-ticket HTTP 500s; its accepted write appeared after the client timeout. Plugin inspection/publication stays on 0.25.0. Do not resubmit either accepted version. No core/SDK deployment or consumer adoption is included; see `spec/clawhub-publication-retry-20261101.md`.
 

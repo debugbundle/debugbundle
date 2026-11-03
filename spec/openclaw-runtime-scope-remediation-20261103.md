@@ -1,8 +1,12 @@
 # OpenClaw native runtime and connected incident scope correction
 
-Status: owner-authorised release preparation on 3 November 2026. Candidates are
-CLI 1.18.1 and MCP/OpenClaw 1.18.2; publication and exact-version acceptance are
-pending. Existing immutable 1.18.0/1.18.1 artifacts are unchanged.
+Status: owner-authorised corrective release complete on 3 November 2026.
+CLI 1.18.2, MCP/OpenClaw/skill 1.18.3 and their independent developer patches are
+published and verified. Both exact ClawHub security gates, anonymous file parity
+and a normal public installed-runtime check pass. Site 1.6.13 is verified in
+production. Existing 1.18.0/1.18.1/1.18.2 artifacts remain immutable. Broad search
+is 5/7; the strict aggregate discovery verifier remains partial for those external
+relevance results, independently of completed release/security/runtime acceptance.
 
 ## Confirmed upstream state
 
@@ -254,3 +258,58 @@ Codex 1.4.3, Claude Code 1.18.2 and Gemini CLI 1.3.3 adopt the verified publishe
 MCP pin. All 28 developer packaging/routing/ledger checks pass before promotion.
 Their native public installation checks and the exact ClawHub security/runtime
 gates follow; source-runtime code is unchanged by this metadata adoption.
+
+## Final acceptance — 3 November 2026
+
+- Qualified runtime source: `751474ecbf69630ef6628f3e159bea94ce6c1c0f`, full CI
+  `41641533811` and CLI runtime `41641533951` success. Local complete client
+  regression: 869 tests / 120 files. The independent changed-file coverage check
+  spans the complete diagnostic correction, not just its later test-only commit.
+- CLI 1.18.2 release `41645479461` succeeds. MCP 1.18.3 release `41645479786`
+  succeeds on attempt 2. Attempt 1 timed out installing npm test dependencies
+  before Codex startup; the retry detects the published version and skips pack/
+  publication. The same immutable npm artifacts have exact source, SRI and
+  provenance, and pass real scoped production list and doctor reads.
+- Official Registry 1.18.3 is found. Both exact ClawHub 1.18.3 distributions have
+  clean final reviews and antivirus; skill moderation is clean and unblocked.
+  Complete scanner findings/final dispositions are retained in the report.
+  Heuristic license/auth/HTTP-parser/redaction matches are not claimed to have
+  individually passed: the platform adjudicates them under its clean final
+  outcome. No scanner findings, policies or approval gates are suppressed.
+- Anonymous skill and plugin downloads match every reviewed source/qualified
+  packed file. Normal public exact-version installation on OpenClaw 2026.10.10
+  loads all 139 tools, compares installed entry bytes and completes scoped
+  incident/pagination/doctor requests, invalid-scope rejection and approval
+  metadata checks. Only normal capability consent is used; no local trust/force
+  flag is supplied. The minimum host and native Node 22/24/26 proof also pass.
+- Codex 1.4.3 and Claude 1.18.2 are public from `e4b9b47e`; Gemini 1.3.3 is public
+  from `8178c633`, tag `v1.3.3`. All 28 developer contracts and native public
+  install/discovery/auth/update/removal checks pass. Developer full CI
+  `41647357939` and CLI runtime `41647357818` succeed. The published Gemini ZIP
+  SHA-256 is `16824b42b073ec3c40a282c7d45c493c8fcb7920220dc7df359c0fbb8921f1e3`;
+  downloaded bytes and all five public source files match.
+- Final site 1.6.13 release `41648273664` and site-only production deployment
+  `41648981900` succeed from site `30b0f62a`, product `751474ec` and cloud
+  `77978185`. Checkout output confirms all exact identities. Independent checks
+  pass nine served pages, 26 JS/CSS assets and the public doctor schema against
+  S3 bytes, the new article/index/sitemap/canonical/redirect, and cache policy.
+  The earlier prioritised 1.6.12 promotion remains a separate retained receipt.
+  The verified rollback site is `f44843f7`, which also retains the article.
+- API/app runtime remains `88a9a42c`; API/MCP readiness and API/App/Site endpoint
+  health pass. Active incident counts remain 1/0/8, with no new active IDs after
+  either site deployment. This is a bounded release observation, not resolution
+  of those pre-existing incidents. No consumer product or existing WordPress
+  site is changed. No additional API/worker or language SDK release is needed.
+
+Broad capability discovery remains 5/7; the strict aggregate verifier therefore
+returns partial. Its thresholds and metadata are unchanged. This external
+ranking limitation is recorded separately from completed mandatory security and
+normal installation/runtime acceptance. The original plan's release/handoff row
+is reconciled as complete. Issue #4214 can be updated with this evidence by an
+authorised follow-up; this train posts no support comment and does not close it.
+
+Receipts are retained under `.tmp/evidence-release/doctor-20261103/`, including
+`train.json`, npm and anonymous ClawHub artifact proof, complete ecosystem report,
+public client/installed-host logs and final site byte/deployment verification.
+
+Final pre-ship/reconciliation review confirms unchanged API/worker/database and SDK capture boundaries, preserved member/project token separation, closed disposable resources, complete changed-path coverage, matching public documentation and the existing glossary definitions. No new domain term or migration is introduced. The original local proposal, execution ledger and handoff are updated locally; their intentionally ignored `spec/local/` files are not forced into the public repository.

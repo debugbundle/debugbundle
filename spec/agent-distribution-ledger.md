@@ -1,33 +1,18 @@
-Current diagnostic adoption: Codex 1.4.3, Claude Code 1.18.2 and Gemini CLI 1.3.3 are prepared against verified npm MCP 1.18.3. Promotion and new public installation checks are pending; the table reflects these candidates. Source runtime 751474ec passed full CI 41641533811 and exact npm provenance/integrity plus scoped production list/doctor reads.
-
 # Agent distribution ledger
 
-## Corrective pin adoption — 3 November 2026
+## Published developer packages — 3 November 2026
 
-CLI 1.18.1 and MCP 1.18.2 are published from `74ed1e8b` with passing release CI,
-provenance/integrity verification and actual read-only connected-project requests.
-Codex 1.4.2, Claude Code 1.18.1 and Gemini CLI 1.3.2 now adopt the published MCP
-1.18.2 pin so their users receive the incident scope fix. Authentication, public
-tool contracts and workflow skills are unchanged. Public promotion and native
-installed-client verification are in progress; the older table below is retained
-as the 1 November historical record. Current evidence is recorded in
-`spec/openclaw-runtime-scope-remediation-20261103.md`.
+Current diagnostic adoption is public and verified: Codex 1.4.3 and Claude Code 1.18.2 from core `e4b9b47e9a2689d4c68907b0f5359a6a5077a3be`, and Gemini CLI 1.3.3 from standalone `8178c633f431ec315f0a41847ab2ae28fce05814` / tag `v1.3.3`, all pin published MCP 1.18.3. All 28 developer contracts and native public install/discovery/auth/update/removal checks pass, along with developer CI 41647357939. The downloaded Gemini ZIP SHA-256 is `16824b42b073ec3c40a282c7d45c493c8fcb7920220dc7df359c0fbb8921f1e3`; all five source files match. Qualified runtime 751474ec passes full CI, npm provenance/integrity and actual scoped production list/doctor reads. See [final corrective evidence](openclaw-runtime-scope-remediation-20261103.md).
 
 This is the maintained inventory for first-party developer agent packages that bundle the local DebugBundle MCP server and a workflow skill. It complements the [MCP ecosystem release manifest](../apps/mcp/ecosystem-release-manifest.json), which tracks the npm server, MCP Registry, Smithery, ClawHub, OpenClaw, and downstream discovery. That pipeline does not publish Codex, Claude Code, or Gemini CLI packages. The hosted, read-only [OpenAI plugin](../apps/mcp/openai/release-manifest.json) has its own release gate.
-
-## Published developer packages (2026-11-01)
-
-MCP/OpenClaw 1.18.1 packaging retry review: retain the verified developer-package
-versions and exact MCP 1.18.0 pins below. The patch corrects ClawHub install metadata
-and publisher tooling without changing MCP tools, schemas or authentication.
-Compatibility checks preserve the existing packages; no wrapper republish is
-required. See [the patch receipt](clawhub-publication-retry-20261101.md).
 
 | Host        | Package version | MCP pin  | Maintained source                                                           | Public channel                                                                                                  | Release and update route                                                                                                                                                                                                            |
 | ----------- | --------------- | -------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Codex       | `1.4.3`         | `1.18.3` | [`plugins/debugbundle-codex/`](../plugins/debugbundle-codex/)               | core Git marketplace in [`debugbundle/debugbundle`](https://github.com/debugbundle/debugbundle)                 | Publish the reviewed plugin and [catalog](../.agents/plugins/marketplace.json) on core `main`; verify a public Git marketplace install and upgrade.                                                                                 |
 | Claude Code | `1.18.2`        | `1.18.3` | [`apps/mcp/claude-code/debugbundle/`](../apps/mcp/claude-code/debugbundle/) | core Git marketplace in [`debugbundle/debugbundle`](https://github.com/debugbundle/debugbundle)                 | Publish the reviewed plugin and [catalog](../.claude-plugin/marketplace.json) on core `main`; verify a public marketplace install and update.                                                                                       |
 | Gemini CLI  | `1.3.3`         | `1.18.3` | [`plugins/debugbundle-gemini/`](../plugins/debugbundle-gemini/)             | standalone Git repository [`debugbundle/debugbundle-gemini`](https://github.com/debugbundle/debugbundle-gemini) | Copy the validated package to public `main`, tag the version, publish a GitHub Release with the validated ZIP, run `make gemini-extension-verify-public`, verify a fresh Git install/update, and check gallery indexing separately. |
+
+## Earlier release evidence
 
 Earlier 3 November public evidence: Codex 1.4.2 and Claude 1.18.1 are served from core `3c4486aedd47d39b378f1d7f8cef4f9e47c7b49d`; Gemini 1.3.2 is served from standalone `ba6fb5e2cb1eecebf4b4acc4664b7d5df1fe70be` and tag `v1.3.2`. All use published MCP 1.18.2. Native public install/update/removal, tool discovery and credential-boundary checks pass; the released Gemini ZIP matches SHA-256 `fdd127f595f209262c1dfe5268c68996807f822ee9cf2f80db70cf6863fe0e9f`. The diagnostic follow-up will advance pins only after its new npm publication.
 

@@ -1,51 +1,32 @@
-# Site 1.6.12 live; diagnostic package correction awaiting CI
+# Corrective releases and site verified — 3 November 2026
 
-The owner prioritised the new blog URL. Site 1.6.12 is live from immutable
-f44843f7 with product artifact source 74ed1e8b through site-only deployment
-41642470636. All three checkout SHAs match; independent S3/CDN verification
-passes for eight pages and 26 assets, including the new article, blog index,
-sitemap, canonical URL, redirects and cache policy. App build 88a9a42c remains
-unchanged; API/MCP readiness and API/App/Site health checks pass. Active incident
-baselines remain API 1, App 0, Site 8, with no new incident IDs after deployment.
+CLI 1.18.2, MCP/OpenClaw/ClawHub skill 1.18.3, Codex 1.4.3, Claude Code 1.18.2
+and Gemini CLI 1.3.3 are public and verified. Runtime source 751474ec passes
+full CI 41641533811 (103 coverage shards/build); developer source e4b9b47e
+passes CI 41647357939. Exact npm source/provenance/integrity and actual scoped
+production list/doctor reads pass. Both exact ClawHub final security/antivirus
+gates and anonymous source parity pass. A normal public current-host OpenClaw
+installation loads all 139 tools and performs scoped native/doctor requests
+without a force flag. Minimum-host and Node 22/24/26 runtime proof also pass.
+
+Site 1.6.13 is live from 30b0f62a through site-only run 41648981900, using
+qualified product 751474ec and cloud 77978185. Independent S3/CDN verification
+passes nine pages, 26 JS/CSS assets, the current doctor schema, article/index/
+sitemap/canonical/redirect and cache policy. Rollback site f44843f7 is verified
+and retains the article. API/app build 88a9a42c is unchanged; API/MCP readiness
+and API/App/Site health checks pass. Active baselines remain 1/0/8, with no new
+active IDs observed after deployment. No consumer product or existing WordPress
+site is changed, and no API/worker or language SDK release is needed here.
+
 Article: https://debugbundle.com/blog/ai-fix-passes-locally-production-still-fails/
 
-The additional doctor scope fix is qualified locally (869 CLI/MCP tests in 120
-files, targeted coverage over both changed production files, native Node22/24/26,
-minimum/current installed OpenClaw hosts). Source 751474ec awaits full CI
-41641533811 before CLI 1.18.2 and MCP/OpenClaw/skill 1.18.3 publication. Site 1.6.13
-candidate 30b0f62a already has green CI; its new guidance is held until the named
-packages are public. Exact ClawHub security gates remain open. No API/worker,
-language SDK or consumer-product release is included in this correction.
+The original evidence plan's release/handoff row is complete. Broad ClawHub
+search remains 5/7 and the strict aggregate verifier remains partial for those
+external relevance results; mandatory security/runtime checks pass. No support
+comment or issue closure is sent. See the final acceptance and exact receipts in
+`spec/openclaw-runtime-scope-remediation-20261103.md`.
 
-# Diagnostic scope correction — 3 November 2026
-
-ClawHub 1.18.2 final review found an additional unscoped `doctor` authentication probe. New regressions reproduce it; the correction passes 43 doctor/MCP checks. CLI 1.18.2 and MCP/OpenClaw/skill 1.18.3 are prepared as new immutable candidates, with emitted/installed diagnostic qualification and fresh CI/publication still pending. 1.18.2 is published but fails exact security acceptance; no scanner bypass is used. Source CI 41635642589 additionally caught a stale developer-distribution ledger row, now reconciled with manifests. Site 1.6.12 has passing source CI; final production publication awaits the corrected developer guidance.
-
-# Corrective npm release verified; ecosystem and developer promotion in progress
-
-CLI 1.18.1 and MCP 1.18.2 are published from 74ed1e8b with successful source and
-release CI, npm provenance/SRI integrity and actual scoped read-only production
-requests. Native OpenClaw qualification passes both the supported 2026.6.9 floor
-and current 2026.10.10 host, including all 139 tools and exact installed bytes.
-Developer patches Codex 1.4.2, Claude 1.18.1 and Gemini 1.3.2 adopt the published
-MCP 1.18.2 pin; promotion/native public checks are underway. Site 1.6.12 source
-f692b8c has green CI and awaits its final consent-guide update and deployment.
-Registry's short-lived login must be refreshed immediately before publish.
-ClawHub exact-version publication/security and remote installed-runtime gates
-remain open. See `spec/openclaw-runtime-scope-remediation-20261103.md`.
-
-# Authorised corrective release and site publication — 3 November 2026
-
-Owner authorised a careful final audit followed by package publication and the
-DebugBundle site production release, including the new article. Candidates:
-CLI 1.18.1, MCP/OpenClaw/ClawHub skill 1.18.2 and site 1.6.12. Clean installed
-OpenClaw 2026.6.9 now passes normal archive installation, full 139-tool runtime
-loading and scoped requests. Final source/CI and registry/security/live gates
-are in progress. Developer wrapper pin adoption follows npm publication with
-independent patch versions. No consumer product, API/worker or language SDK
-release is included. See `spec/openclaw-runtime-scope-remediation-20261103.md`.
-
-# OpenClaw follow-up — 3 November 2026, local corrective candidate
+# Historical local correction checkpoint — 3 November 2026
 
 ClawHub maintainer Patrick-Erichsen confirmed unchanged plugin 1.18.0 and 1.18.1
 published with matching anonymous downloads and successful installations in
