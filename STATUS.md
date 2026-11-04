@@ -1,11 +1,18 @@
-# Project/service release train — authorised and in preparation
+# Project/service release train — production backend live, distribution checks running
 
-4 November 2026. The owner authorised production release and asked for the complete
-DebugBundle release train to be accounted for. Core 1.21.0, CLI/MCP/OpenClaw 1.19.0,
-shared-types 3.1.0 and independently versioned developer/site distributions are
-being prepared. SDK sources remain unchanged and their public artifacts will be
-verified. Live consolidation of the owner's existing projects remains later.
-See `spec/project-service-release-20261104.md` for per-surface status.
+4 November 2026. Core API/worker 1.21.0 is healthy in production after the ordered
+64-to-66 migration. Earlier migration records and existing project/service/token
+IDs are preserved. Merge apply remains disabled, with zero merge operations.
+App/site bytes remain at their prior versions during this backend-first stage.
+
+CLI/MCP 1.19.0 and shared-types 3.1.0 are public with successful release gates.
+Redaction 2.7.0 is retained byte for byte. Developer packages now pin published
+MCP 1.19.0; catalogue promotion, ClawHub security/installation, standalone Gemini
+and the final app/site rollout remain in progress. Fresh public consumers pass
+for all maintained SDKs; JS SDK documentation was corrected without changing code
+or immutable SDK artifacts. No consumer product was changed. Live consolidation
+of the owner's existing projects remains later.
+See `spec/project-service-release-20261104.md` for exact identities and receipts.
 
 # Project/service consolidation — locally qualified candidate
 
@@ -17,12 +24,14 @@ sealed-image and retained-client qualification pass for the corrected candidate.
 4 November 2026. The owner authorised one implementation phase following the
 nine ordered slices and recommended, simple defaults. The subsequent production release is authorised; live consolidation of named
 projects and consumer adoption remain separately scoped. Slices 0–7 are implemented
-and locally qualified. Slice 8 remains open for separate release/live approval.
+and locally qualified. Slice 8 release work is authorised and in progress; live consolidation and
+repository adoption remain separate completion gates.
 
 Source of truth: `spec/project-service-consolidation.md`, FR-PJS-01–04 and
 AC-PJS-01–03. The initial worktree was clean; all candidate changes are scoped to
-DebugBundle and its own documentation/distributions. All eleven SDK repositories
-remain clean. No consumer product or production data/configuration was changed.
+DebugBundle and its own documentation/distributions. At the local audit, all eleven SDK repositories remained clean and no consumer
+product or production data/configuration had been changed. The production release
+is tracked separately above.
 
 Implemented: first-class logical services and repository/environment context;
 retained origin/input/view identities; checked API/client/CLI/ordinary MCP merge

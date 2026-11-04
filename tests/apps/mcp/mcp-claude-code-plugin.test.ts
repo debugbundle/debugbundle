@@ -140,7 +140,7 @@ describe("mcp Claude Code plugin marketplace package", () => {
     expect(pluginMcp.mcpServers?.["debugbundle"]).toEqual({
       type: "stdio",
       command: "npx",
-      args: ["-y", "@debugbundle/mcp@1.18.3", "--local-auth"],
+      args: ["-y", "@debugbundle/mcp@1.19.0", "--local-auth"],
       env: {
         DEBUGBUNDLE_MEMBER_TOKEN: "${user_config.member_token}",
         DEBUGBUNDLE_API_URL: "${user_config.api_url}"

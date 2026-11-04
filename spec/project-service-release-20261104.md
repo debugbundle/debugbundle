@@ -116,3 +116,24 @@ shared types. The correction verifies both packed SHA-512 integrities first,
 retains exact existing artifacts, and publishes only missing archives. The local
 registry plan retains redaction 2.7.0 byte for byte and publishes shared types
 3.1.0. A mismatched existing archive or a failed registry check aborts the pair.
+
+## Published client and support packages
+
+CLI 1.19.0 is public from core `016c2501f129bd46b860332b9ba19ca78d2c34fb`:
+[workflow 41825151782](https://github.com/debugbundle/debugbundle/actions/runs/41825151782)
+passes native and installed checks across Node 22, 24, 26.0.0, 26.2.0 and 26.
+MCP 1.19.0 is public from `bed9d491f10f2b7565313e6b140db5cfdd2e2ada`:
+[workflow 41825779172](https://github.com/debugbundle/debugbundle/actions/runs/41825779172)
+passes Node 22/24/26 package, native Codex, published Codex and OpenClaw gates.
+Shared-types 3.1.0 is public from the same reviewed source through
+[workflow 41825773703](https://github.com/debugbundle/debugbundle/actions/runs/41825773703).
+Redaction 2.7.0 was verified and retained, without a redundant version bump or
+republish. Exact npm integrity/provenance metadata is retained in the local
+release receipts. Core now adopts the public shared-types 3.1.0 dependency;
+retained SDKs continue using their declared compatible support dependencies.
+
+The JS SDK public guides at documentation commit
+`8358dba` now identify their evidence APIs as published in 3.2.0 and explain that
+core support packages are independently versioned. Five existing repository
+metadata/documentation tests pass. Runtime sources, package versions and existing
+immutable tags/artifacts are unchanged.
