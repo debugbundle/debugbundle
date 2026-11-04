@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { gzipSync } from "node:zlib";
+import { checkLocalCorrelation } from "../../../scripts/check-local-correlation.mjs";
 
 // Import the emitted ESM in native Node, without a TypeScript/CommonJS loader
 // that can hide unsupported dynamic requires in bundled dependencies.
@@ -152,6 +153,12 @@ try {
     assert.equal(JSON.parse(invalid.content[0].text).status, "error");
     assert.equal(requests.length, 5, "invalid diagnostic project scope must make no request");
   }
+  await checkLocalCorrelation(root, async () => {
+    const result = await tools.get("debugbundle_verify_local").execute("scope-fixture", {});
+    assert.equal(result.isError, undefined);
+    assert.equal(JSON.parse(result.content[0].text).status, "healthy", result.content[0].text);
+  });
+  assert.equal(requests.length, 5, "local verification must not make a cloud request");
   console.log(
     `OpenClaw native ESM runtime passed on ${process.version}: ${tools.size} tools, compressed scoped pagination/doctor, approval and fail-closed checks.`
   );

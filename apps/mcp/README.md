@@ -1,6 +1,17 @@
 # @debugbundle/mcp
 
-## Project/service consolidation 1.19.0
+## Local correlation safety in 1.19.1
+
+Trace correlation crosses services only within the same project and environment.
+If an older cache contains mixed retained source events, reads and incremental
+processing fail with `local_incident_scope_mismatch`. Preserve the local store,
+then explicitly rebuild from its retained event files using
+`debugbundle process --preset <minimal|balanced|investigative>` with the desired
+capture preset. This rebuild regenerates local incident/artifact state; it does
+not change cloud records or the retained event files.
+
+
+## Project/service consolidation 1.19.1
 
 Add logical service context and checked project-merge preview, apply, status,
 verification, resume and cancellation. Existing identities, credentials and
@@ -72,7 +83,7 @@ Use `npx -y @debugbundle/mcp` in clients that require noninteractive package exe
 | Claude Desktop local MCP      | local MCP server config                                                    | uses local machine auth/config                       |
 | Claude Code plugin            | `/plugin marketplace add debugbundle/debugbundle`                          | installs bundled MCP config and DebugBundle skill    |
 | Codex developer plugin        | `codex plugin add debugbundle-codex@debugbundle`                           | repository marketplace; local MCP and workflow skill |
-| Codex direct MCP              | `codex mcp add debugbundle -- npx -y @debugbundle/mcp@1.19.0 --local-auth` | app, CLI, and IDE on the same host                   |
+| Codex direct MCP              | `codex mcp add debugbundle -- npx -y @debugbundle/mcp@1.19.1 --local-auth` | app, CLI, and IDE on the same host                   |
 | Cursor                        | MCP config with `npx @debugbundle/mcp`                                     | stdio transport                                      |
 | VS Code / GitHub MCP Registry | `com.debugbundle/mcp`                                                      | official registry metadata                           |
 | OpenClaw / ClawHub            | DebugBundle skill plus MCP config                                          | use the published skill for workflow guidance        |

@@ -2,7 +2,7 @@
 
 ## [1.5.0] - 2026-11-04
 
-- Adopt MCP 1.19.0 for logical services and checked project consolidation. Preserve local authentication, existing scopes and the CLI-first workflow.
+- Adopt MCP 1.19.1 for logical services and checked project consolidation. Preserve local authentication, existing scopes and the CLI-first workflow.
 
 ## [1.4.3] - 2026-11-03
 

@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { sanitizeTelemetry } from "../../../packages/redaction/src/index.js";
 import { RetrievalApiError } from "../../../packages/retrieval-client/src/index.js";
+import { sourceEventsMatchScope } from "../../../packages/event-normalizer/src/local-correlation-scope.js";
 import {
   deriveIncidentReasonFromSignal,
   deriveIncidentReasonFromSourceEventTypes,
@@ -72,7 +73,10 @@ function projectLocalEvidence<T>(value: T): T {
   return projected.value as T;
 }
 
-async function readLocalArtifact(path: string, dependencies?: LocalRetrievalStoreDependencies): Promise<unknown> {
+async function readLocalArtifact(
+  path: string,
+  dependencies?: LocalRetrievalStoreDependencies
+): Promise<unknown> {
   const readFile = dependencies?.readFile ?? readFileFromFs;
   const raw = await readFile(path, "utf8");
   if (Buffer.byteLength(raw, "utf8") > MAX_ARTIFACT_BYTES) {
@@ -94,7 +98,10 @@ function createReadError(status: number, code: string): RetrievalApiError {
   return new RetrievalApiError(status, code);
 }
 
-async function readJsonFile(path: string, dependencies?: LocalRetrievalStoreDependencies): Promise<unknown> {
+async function readJsonFile(
+  path: string,
+  dependencies?: LocalRetrievalStoreDependencies
+): Promise<unknown> {
   const readFile = dependencies?.readFile ?? readFileFromFs;
   try {
     return JSON.parse(await readFile(path, "utf8"));
@@ -108,13 +115,18 @@ async function readJsonFile(path: string, dependencies?: LocalRetrievalStoreDepe
 }
 
 function parseLocalConnection(candidate: unknown): LocalConnection {
-  if (!isRecord(candidate) || (candidate["mode"] !== "local-only" && candidate["mode"] !== "connected")) {
+  if (
+    !isRecord(candidate) ||
+    (candidate["mode"] !== "local-only" && candidate["mode"] !== "connected")
+  ) {
     throw createReadError(400, "invalid_local_connection_config");
   }
 
   return {
     mode: candidate["mode"],
-    ...(candidate["cloud_project_id"] === undefined ? {} : { cloud_project_id: candidate["cloud_project_id"] })
+    ...(candidate["cloud_project_id"] === undefined
+      ? {}
+      : { cloud_project_id: candidate["cloud_project_id"] })
   };
 }
 
@@ -147,6 +159,16 @@ function parseLocalIncident(candidate: unknown): LocalIncidentRecord {
     }
   }
 
+  if (
+    !sourceEventsMatchScope({
+      projectId: candidate["project_id"] as string,
+      environment: candidate["environment"] as string,
+      sourceEvents: candidate["source_events"]
+    })
+  ) {
+    throw createReadError(409, "local_incident_scope_mismatch");
+  }
+
   if (candidate["source"] !== "local") {
     throw createReadError(400, "invalid_local_state");
   }
@@ -161,10 +183,16 @@ function parseLocalIncident(candidate: unknown): LocalIncidentRecord {
   if (regressedAt !== undefined && regressedAt !== null && typeof regressedAt !== "string") {
     throw createReadError(400, "invalid_local_state");
   }
-  if (typeof candidate["occurrence_count"] !== "number" || typeof candidate["generation_number"] !== "number") {
+  if (
+    typeof candidate["occurrence_count"] !== "number" ||
+    typeof candidate["generation_number"] !== "number"
+  ) {
     throw createReadError(400, "invalid_local_state");
   }
-  if (!isStringArray(candidate["source_event_types"]) || !isStringArray(candidate["matched_fields"])) {
+  if (
+    !isStringArray(candidate["source_event_types"]) ||
+    !isStringArray(candidate["matched_fields"])
+  ) {
     throw createReadError(400, "invalid_local_state");
   }
 
@@ -220,7 +248,10 @@ function parseLocalState(candidate: unknown): LocalState {
   }
 
   const incidents = Object.fromEntries(
-    Object.entries(candidate["incidents"]).map(([incidentId, incident]) => [incidentId, parseLocalIncident(incident)])
+    Object.entries(candidate["incidents"]).map(([incidentId, incident]) => [
+      incidentId,
+      parseLocalIncident(incident)
+    ])
   );
 
   const lastProcessedEventFile = candidate["last_processed_event_file"];
@@ -261,7 +292,9 @@ export async function readLocalConnectionConfig(
 ): Promise<LocalConnection | null> {
   const rootDirectory = getWorkspaceRoot(dependencies);
   try {
-    return parseLocalConnection(await readJsonFile(join(rootDirectory, CONNECTION_FILE_PATH), dependencies));
+    return parseLocalConnection(
+      await readJsonFile(join(rootDirectory, CONNECTION_FILE_PATH), dependencies)
+    );
   } catch (error) {
     if (isRecord(error) && error["code"] === "ENOENT") {
       return null;
@@ -291,7 +324,9 @@ export async function resolveCloudIncidentProjectId(
   return parsed.data;
 }
 
-export async function readLocalState(dependencies?: LocalRetrievalStoreDependencies): Promise<LocalState> {
+export async function readLocalState(
+  dependencies?: LocalRetrievalStoreDependencies
+): Promise<LocalState> {
   const rootDirectory = getWorkspaceRoot(dependencies);
   try {
     return parseLocalState(await readJsonFile(getStateFilePath(rootDirectory), dependencies));
@@ -312,7 +347,10 @@ export async function readLocalState(dependencies?: LocalRetrievalStoreDependenc
   }
 }
 
-export async function writeLocalState(state: LocalState, dependencies?: LocalRetrievalStoreDependencies): Promise<void> {
+export async function writeLocalState(
+  state: LocalState,
+  dependencies?: LocalRetrievalStoreDependencies
+): Promise<void> {
   const rootDirectory = getWorkspaceRoot(dependencies);
   const writeFile = dependencies?.writeFile ?? writeFileToFs;
   await writeFile(getStateFilePath(rootDirectory), `${JSON.stringify(state, null, 2)}\n`, "utf8");
@@ -331,7 +369,9 @@ async function updateLocalIncidentStatus(
   const nextIncident: LocalIncidentRecord = {
     ...incident,
     status: input.status,
-    ...(input.status === "resolved" ? { resolved_at: new Date().toISOString() } : { resolved_at: null })
+    ...(input.status === "resolved"
+      ? { resolved_at: new Date().toISOString() }
+      : { resolved_at: null })
   };
 
   state.incidents[input.incidentId] = nextIncident;
@@ -354,9 +394,15 @@ export async function listLocalIncidents(
   dependencies?: LocalRetrievalStoreDependencies
 ): Promise<{ incidents: LocalIncidentRecord[]; next_cursor: string | null }> {
   const incidents = Object.values((await readLocalState(dependencies)).incidents)
-    .filter((incident) => (input.projectId === undefined ? true : incident.project_id === input.projectId))
-    .filter((incident) => (input.environment === undefined ? true : incident.environment === input.environment))
-    .filter((incident) => (input.service === undefined ? true : incident.service_name === input.service))
+    .filter((incident) =>
+      input.projectId === undefined ? true : incident.project_id === input.projectId
+    )
+    .filter((incident) =>
+      input.environment === undefined ? true : incident.environment === input.environment
+    )
+    .filter((incident) =>
+      input.service === undefined ? true : incident.service_name === input.service
+    )
     .filter((incident) => {
       if (input.status === undefined || input.status === "all") {
         return true;
@@ -367,24 +413,40 @@ export async function listLocalIncidents(
 
       return incident.status === input.status;
     })
-    .filter((incident) => (input.severity === undefined ? true : incident.severity === input.severity))
-    .filter((incident) => (input.firstSeenAfter === undefined ? true : incident.first_seen_at >= input.firstSeenAfter))
+    .filter((incident) =>
+      input.severity === undefined ? true : incident.severity === input.severity
+    )
+    .filter((incident) =>
+      input.firstSeenAfter === undefined ? true : incident.first_seen_at >= input.firstSeenAfter
+    )
     .filter((incident) => {
       if (input.attentionAfter === undefined) {
         return true;
       }
 
-      return incident.first_seen_at >= input.attentionAfter || (incident.regressed_at != null && incident.regressed_at >= input.attentionAfter);
+      return (
+        incident.first_seen_at >= input.attentionAfter ||
+        (incident.regressed_at != null && incident.regressed_at >= input.attentionAfter)
+      );
     })
     .sort(sortIncidentsDescending);
 
-  const startIndex = input.cursor === undefined ? 0 : incidents.findIndex((incident) => buildCursor(incident) === input.cursor) + 1;
-  const pagedIncidents = input.limit === undefined ? incidents.slice(startIndex) : incidents.slice(startIndex, startIndex + input.limit);
+  const startIndex =
+    input.cursor === undefined
+      ? 0
+      : incidents.findIndex((incident) => buildCursor(incident) === input.cursor) + 1;
+  const pagedIncidents =
+    input.limit === undefined
+      ? incidents.slice(startIndex)
+      : incidents.slice(startIndex, startIndex + input.limit);
   const hasMore = input.limit !== undefined && startIndex + input.limit < incidents.length;
 
   return {
     incidents: pagedIncidents.map(projectLocalEvidence),
-    next_cursor: hasMore && pagedIncidents.length > 0 ? buildCursor(pagedIncidents[pagedIncidents.length - 1]!) : null
+    next_cursor:
+      hasMore && pagedIncidents.length > 0
+        ? buildCursor(pagedIncidents[pagedIncidents.length - 1]!)
+        : null
   };
 }
 
@@ -408,7 +470,10 @@ export async function getLocalBundle(
   const incident = (await readLocalState(dependencies)).incidents[input.incidentId];
   if (incident === undefined) throw createReadError(404, "incident_not_found");
   try {
-    return await readLocalArtifact(resolveWorkspacePath(rootDirectory, incident.bundle_path), dependencies);
+    return await readLocalArtifact(
+      resolveWorkspacePath(rootDirectory, incident.bundle_path),
+      dependencies
+    );
   } catch (error) {
     if (isRecord(error) && error["code"] === "ENOENT") {
       throw createReadError(404, "bundle_not_found");
@@ -430,7 +495,10 @@ export async function getLocalReproduction(
   const incident = (await readLocalState(dependencies)).incidents[input.incidentId];
   if (incident === undefined) throw createReadError(404, "incident_not_found");
   try {
-    return await readLocalArtifact(resolveWorkspacePath(rootDirectory, incident.reproduction_path), dependencies);
+    return await readLocalArtifact(
+      resolveWorkspacePath(rootDirectory, incident.reproduction_path),
+      dependencies
+    );
   } catch (error) {
     if (isRecord(error) && error["code"] === "ENOENT") {
       throw createReadError(404, "reproduction_not_found");
@@ -448,7 +516,10 @@ export async function resolveLocalIncident(
   input: { incidentId: string },
   dependencies?: LocalRetrievalStoreDependencies
 ): Promise<LocalIncidentRecord> {
-  return updateLocalIncidentStatus({ incidentId: input.incidentId, status: "resolved" }, dependencies);
+  return updateLocalIncidentStatus(
+    { incidentId: input.incidentId, status: "resolved" },
+    dependencies
+  );
 }
 
 export async function reopenLocalIncident(

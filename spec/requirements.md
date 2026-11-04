@@ -212,7 +212,7 @@ Public status visibility changes save immediately from the enable switch. First 
 
 ### 1.4 Grouping & Incident Lifecycle
 
-**FR-GRP-01:** Normalization pipeline must apply: (a) route template normalization — replace dynamic path segments (UUIDs, numeric IDs, encoded tokens) with `{param}` placeholders, (b) message canonicalization — strip volatile values (UUIDs, emails, timestamps, IP addresses, hex strings) from error messages before fingerprinting, (c) stack frame selection — extract top N application frames (skip library/vendor frames), (d) path normalization — strip `node_modules/`, `vendor/`, `site-packages/`, `.venv/` and similar from frame paths.
+**FR-GRP-01:** Normalization pipeline must apply: (a) route template normalization — replace dynamic path segments (UUIDs, numeric IDs, encoded tokens) with `{param}` placeholders, (b) message canonicalization — strip volatile values (UUIDs, emails, timestamps, IP addresses, hex strings) from error messages before fingerprinting, (c) stack frame selection — extract top N application frames (skip library/vendor frames), (d) path normalization — strip `node_modules/`, `vendor/`, `site-packages/`, `.venv/` and similar from frame paths. Full-stack trace correlation must remain within the same project and environment even when a trace ID is reused. Local cached evidence with retained out-of-scope source events must fail closed until an explicit rebuild.
 
 **FR-GRP-02:** Rolling frequency counters must track incident occurrence rates across 1-minute, 5-minute, 1-hour, and 24-hour sliding windows. Counters are Redis-backed (volatile) with periodic snapshot to Postgres for durability.
 

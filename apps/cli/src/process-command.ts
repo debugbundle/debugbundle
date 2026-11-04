@@ -1,4 +1,10 @@
 import {
+  formatProcessOutput,
+  buildNoNewEventsSummary,
+  buildProcessedSummary
+} from "./local-processing-summary.js";
+export type { ProcessSummary } from "./local-processing-summary.js";
+import {
   pathExists,
   readState,
   readEventBatches,
@@ -31,6 +37,8 @@ import {
   classifyEvent,
   fingerprint,
   inferMatchedFields,
+  buildTraceCorrelationKey,
+  sourceEventsMatchScope,
   normalizeEvent
 } from "../../../packages/event-normalizer/src/index.js";
 import {
@@ -66,28 +74,6 @@ type ProcessCommandDependencies = {
   stat?: StatReader;
   writeFile?: FileWriter;
 };
-
-export type ProcessSummary =
-  | {
-      status: "ok";
-      processed: false;
-      files_processed: number;
-      events_processed: number;
-      incidents_processed: number;
-      services: Array<{ service: string; incidents: number }>;
-      last_processed_event_file: string | null;
-      message: string;
-    }
-  | {
-      status: "ok";
-      processed: true;
-      files_processed: number;
-      events_processed: number;
-      incidents_processed: number;
-      services: Array<{ service: string; incidents: number }>;
-      last_processed_event_file: string;
-      message?: undefined;
-    };
 
 type AggregatedIncident = {
   incidentId: string;
@@ -460,55 +446,6 @@ function requireProjectId(event: EventEnvelope): string {
   return event.project_id;
 }
 
-function formatServiceSummary(services: Array<{ service: string; incidents: number }>): string[] {
-  return services.map(
-    ({ service, incidents }) => `- ${incidents} incident${incidents === 1 ? "" : "s"} in ${service}`
-  );
-}
-
-function formatProcessOutput(summary: ProcessSummary): string {
-  if (!summary.processed) {
-    return summary.message;
-  }
-
-  return [
-    `Processed ${summary.events_processed} events from ${summary.files_processed} files into ${summary.incidents_processed} incidents.`,
-    ...formatServiceSummary(summary.services),
-    `Last processed event file: ${summary.last_processed_event_file}`
-  ].join("\n");
-}
-
-function buildNoNewEventsSummary(lastProcessedEventFile: string | null): ProcessSummary {
-  return {
-    status: "ok",
-    processed: false,
-    files_processed: 0,
-    events_processed: 0,
-    incidents_processed: 0,
-    services: [],
-    last_processed_event_file: lastProcessedEventFile,
-    message: "No new events to process."
-  };
-}
-
-function buildProcessedSummary(input: {
-  filesProcessed: number;
-  eventsProcessed: number;
-  incidentsProcessed: number;
-  services: Array<{ service: string; incidents: number }>;
-  lastProcessedEventFile: string;
-}): ProcessSummary {
-  return {
-    status: "ok",
-    processed: true,
-    files_processed: input.filesProcessed,
-    events_processed: input.eventsProcessed,
-    incidents_processed: input.incidentsProcessed,
-    services: input.services,
-    last_processed_event_file: input.lastProcessedEventFile
-  };
-}
-
 export async function processCommand(
   input: { json?: boolean; preset?: CapturePreset },
   dependencies: ProcessCommandDependencies = {}
@@ -548,6 +485,24 @@ export async function processCommand(
       ? eventFileNames
       : eventFileNames.filter((fileName) => fileName > lastProcessedEventFile);
   const processAllEventFiles = input.preset !== undefined;
+  if (
+    !processAllEventFiles &&
+    Object.values(previousState?.incidents ?? {}).some(
+      (incident) =>
+        !sourceEventsMatchScope({
+          projectId: incident.project_id,
+          environment: incident.environment,
+          sourceEvents: incident.source_events
+        })
+    )
+  ) {
+    const failure = {
+      error: "local_incident_scope_mismatch",
+      message:
+        "Retained local evidence crosses project or environment boundaries. Preserve the local store, then explicitly rebuild retained events with debugbundle process --preset <minimal|balanced|investigative>."
+    };
+    return { exitCode: 1, output: input.json === true ? JSON.stringify(failure) : failure.message };
+  }
   const targetEventFileNames = processAllEventFiles ? eventFileNames : newEventFileNames;
 
   if (targetEventFileNames.length === 0) {
@@ -639,7 +594,8 @@ export async function processCommand(
       // A resource and an application exception may share a trace without sharing a failure.
       if (traceId !== null && normalizedEvent.resource_type === undefined) {
         aggregate.traceIds.add(traceId);
-        const traceCorrelationGroup = traceCorrelationGroups.get(traceId) ?? {
+        const traceKey = buildTraceCorrelationKey(projectId, event.service.environment, traceId);
+        const traceCorrelationGroup = traceCorrelationGroups.get(traceKey) ?? {
           incidentIds: new Set<string>(),
           hasBackend: false,
           hasFrontend: false
@@ -648,7 +604,7 @@ export async function processCommand(
         traceCorrelationGroup.incidentIds.add(incidentId);
         traceCorrelationGroup.hasBackend ||= event.event_type === "backend_exception";
         traceCorrelationGroup.hasFrontend ||= event.event_type === "frontend_exception";
-        traceCorrelationGroups.set(traceId, traceCorrelationGroup);
+        traceCorrelationGroups.set(traceKey, traceCorrelationGroup);
       }
 
       aggregates.set(incidentId, aggregate);

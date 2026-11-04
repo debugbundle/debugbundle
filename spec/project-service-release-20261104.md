@@ -13,22 +13,22 @@ passed. See [qualification](project-service-qualification.md) for exact receipts
 
 | Surface                              | Candidate/current version   | Release disposition                                          | Current result                                                                         |
 | ------------------------------------ | --------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
-| Core API/worker and app              | 1.21.0                      | New minor release; forward migrations before runtime         | Preparing                                                                              |
-| Shared types                         | 3.1.0                       | Publish additive schemas first                               | Preparing                                                                              |
-| Redaction                            | 2.7.0                       | Unchanged; verify published artifact                         | Pending verification                                                                   |
-| CLI                                  | 1.19.0                      | Publish and verify clean installed commands                  | Preparing                                                                              |
-| MCP                                  | 1.19.0                      | Publish; exact Registry entry and installed native clients   | Preparing                                                                              |
-| OpenClaw plugin / portable skill     | 1.19.0                      | Publish both; require exact security and runtime acceptance  | Preparing                                                                              |
-| Codex developer plugin               | 1.5.0                       | Promote marketplace only after MCP publication               | Preparing                                                                              |
-| Claude Code developer plugin         | 1.19.0                      | Promote marketplace only after MCP publication               | Preparing                                                                              |
-| Gemini CLI extension                 | 1.4.0                       | Standalone repository, tag, archive and public installation  | Preparing                                                                              |
-| Public site/docs                     | 1.7.0                       | Publish aligned guidance and verify served artifacts         | Preparing                                                                              |
-| Hosted OpenAI connection             | Existing read-only contract | Verify live endpoint; independent submission gates remain    | Pending verification                                                                   |
+| Core API/worker and app              | 1.21.0                      | New minor release; forward migrations before runtime         | Corrective qualification in progress                                                   |
+| Shared types                         | 3.1.0                       | Publish additive schemas first                               | Corrective qualification in progress                                                   |
+| Redaction                            | 2.7.0                       | Unchanged; verify published artifact                         | Verified existing public artifact                                                      |
+| CLI                                  | 1.19.1                      | Publish and verify clean installed commands                  | Corrective qualification in progress                                                   |
+| MCP                                  | 1.19.1                      | Publish; exact Registry entry and installed native clients   | Corrective qualification in progress                                                   |
+| OpenClaw plugin / portable skill     | 1.19.1                      | Publish both; require exact security and runtime acceptance  | Corrective qualification in progress                                                   |
+| Codex developer plugin               | 1.5.0                       | Promote marketplace only after MCP publication               | Corrective qualification in progress                                                   |
+| Claude Code developer plugin         | 1.19.1                      | Promote marketplace only after MCP publication               | Corrective qualification in progress                                                   |
+| Gemini CLI extension                 | 1.4.1                       | Standalone repository, tag, archive and public installation  | Corrective qualification in progress                                                   |
+| Public site/docs                     | 1.7.0                       | Publish aligned guidance and verify served artifacts         | Corrective qualification in progress                                                   |
+| Hosted OpenAI connection             | Existing read-only contract | Verify live endpoint; independent submission gates remain    | Verified existing public artifact                                                      |
 | Node / Browser SDKs                  | 3.2.0                       | Unchanged; verify current public artifacts and compatibility | Fresh clean public consumer checks pass                                                |
 | Python / PHP / Ruby / .NET SDKs      | 2.1.0                       | Unchanged; verify current public artifacts and compatibility | Fresh clean public consumer checks pass                                                |
 | Java / Go / Android SDKs             | 3.1.0                       | Unchanged; verify current public artifacts and compatibility | Fresh clean public consumer checks pass                                                |
-| Swift SDK                            | 3.1.1                       | Unchanged; preserve existing SPM/CocoaPods installs          | Pending verification                                                                   |
-| React Native SDK                     | 3.1.0                       | Unchanged; preserve published native dependency floors       | Pending verification                                                                   |
+| Swift SDK                            | 3.1.1                       | Unchanged; preserve existing SPM/CocoaPods installs          | Verified existing public artifact                                                      |
+| React Native SDK                     | 3.1.0                       | Unchanged; preserve published native dependency floors       | Verified existing public artifact                                                      |
 | WordPress plugin                     | 2.1.0                       | Unchanged; verify public ZIP without changing consumer sites | Exact WordPress.org ZIP passes disposable native/browser/relay/retry/revocation checks |
 | Smithery publisher / skill publisher | Retired                     | Excluded; provider retirement reconfirmed                    | No publication claimed                                                                 |
 
@@ -57,7 +57,9 @@ platform security acceptance or deployed-runtime proof.
 
 ## Fresh retained-SDK package qualification
 
-All eleven SDK repositories remain clean at their previously qualified commits.
+All eleven SDK runtime sources retain their previously qualified commits. The JS
+repository has a documentation-only follow-up recorded below; all worktrees are
+clean.
 Fresh public consumers pass for Node/Browser 3.2.0, Python/PHP/Ruby/.NET 2.1.0,
 Java/Go/Android 3.1.0, Swift 3.1.1 and React Native 3.1.0. Swift uses a clean
 published CocoaPods consumer with native iOS execution; React Native's fresh npm
@@ -137,3 +139,36 @@ The JS SDK public guides at documentation commit
 core support packages are independently versioned. Five existing repository
 metadata/documentation tests pass. Runtime sources, package versions and existing
 immutable tags/artifacts are unchanged.
+
+## Corrective local trace scope gate
+
+The first 1.19.0 package release checks passed, but ClawHub's final plugin review
+reported a reproducible local-processing defect: a reused trace ID could combine
+frontend/backend events from different projects or environments. No hosted
+authorization bypass was established. This blocks the train; the review is not
+waived. The complete platform findings remain in the exact-version local report.
+
+New executable scope regressions fail against the original artifact source
+(four failures, with the same-scope control passing). The fix keys local trace
+correlation by project, environment and trace. Readers and incremental processing
+refuse a mixed retained cache without rewriting it. An explicit capture-preset
+rebuild can regenerate scoped state/artifacts from preserved raw event files.
+The compiled CLI/OpenClaw runtime gates now exercise actual local processing with
+reused traces across both scopes. CLI/MCP/OpenClaw 1.19.1 supersede the first
+attempt; developer catalogues wait for that publication, and the already public
+Gemini 1.4.0 will be updated through immutable 1.4.1.
+
+The staged API/worker is unaffected by this local-processing defect. Its two
+handled predecessor-worker deadlocks were confined to the migration boundary;
+all 11 enabled checks resumed, with zero stale claims, expired jobs, deadlock jobs
+or blocked queries. Production aggregate tenancy confirms multiple accounts and
+owners, so no single-user assumption is used. The exact npm signatures and
+attestations of seven installed packages verify cryptographically; public archive
+integrity and GitHub workflow/source provenance are retained separately.
+
+The corrected source passes 916 CLI/MCP/OpenClaw and developer contract cases,
+plus explicit malformed-cache reader regressions. The exact pre-fix source
+reproduction yields four failures and one passing same-scope control. Fresh native
+CLI tarball checks pass on Node 22, 24, 26.0.0, 26.2.0 and 26; native emitted
+OpenClaw checks pass on Node 22/24/26, including actual `verify_local` processing
+of six events into four project/environment groups without cloud requests.

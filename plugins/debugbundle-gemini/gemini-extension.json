@@ -1,6 +1,6 @@
 {
   "name": "debugbundle-gemini",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Investigate runtime errors, incidents, health checks, debug bundles, and product analytics with DebugBundle in Gemini CLI.",
   "mcpServers": {
     "debugbundle": {

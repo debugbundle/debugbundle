@@ -117,7 +117,7 @@ describe("mcp Claude Code plugin marketplace package", () => {
         { type?: string; command?: string; args?: string[]; env?: Record<string, string> }
       >;
     };
-    expect(pluginManifest.version).toBe("1.19.0");
+    expect(pluginManifest.version).toBe("1.19.1");
 
     expect(pluginManifest).toMatchObject({
       name: "debugbundle",

@@ -587,6 +587,9 @@ Native logger level/silent/processor filtering runs before SDK capture; enabled-
 - **When** grouping runs
 - **Then** they produce separate incidents
 
+- **And** frontend/backend events sharing a trace ID across projects or environments remain separate; same-scope full-stack events still correlate
+- **And** readers and incremental processing reject a mixed retained cache without rewriting it; an explicit preset rebuild regenerates separate scoped artifacts from retained events
+
 ### AC-GRP-03: Normalization Stability
 
 - **Given** a route `/users/550e8400-e29b-41d4-a716-446655440000/orders` and a route `/users/123/orders`

@@ -1,4 +1,5 @@
 import { checkAgentSetup } from "./check-cli-agent-setup.mjs";
+import { checkLocalCorrelation } from "./check-local-correlation.mjs";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createServer } from "node:http";
@@ -149,6 +150,7 @@ try {
   );
   await run(["setup", "--non-interactive"], 0, false);
   await checkAgentSetup(root, run);
+  await checkLocalCorrelation(root, () => run(["process"], 0, false));
   await mkdir(join(root, ".debugbundle", "local"), { recursive: true });
   const options = {
     key: await readFile(keyFile),

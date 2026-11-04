@@ -170,6 +170,13 @@ Each incident carries a `fingerprint_version` field indicating the algorithm ver
 
 ---
 
+Trace IDs are correlation hints, not project or environment identity. Full-stack
+correlation may cross services only inside the same project and environment.
+Local processing and readers reject retained source events that cross their
+incident's project/environment scope. A mixed cache requires an explicit preset
+rebuild from preserved event files; ordinary reads and incremental processing
+must not silently rewrite it.
+
 ## INV-13: Self-Host / Cloud Parity
 
 The self-hosted deployment must run the same core services as the cloud deployment. No feature may be cloud-only except billing integration and managed infrastructure concerns. The `docker-compose.yml` in `deploy/selfhost/` must produce a fully functional system.

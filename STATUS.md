@@ -5,7 +5,9 @@
 IDs are preserved. Merge apply remains disabled, with zero merge operations.
 App/site bytes remain at their prior versions during this backend-first stage.
 
-CLI/MCP 1.19.0 and shared-types 3.1.0 are public with successful release gates.
+CLI/MCP 1.19.0 and shared-types 3.1.0 are public. ClawHub review then identified
+a reproducible local trace-scope defect, blocking completion. Corrective CLI/MCP
+and OpenClaw 1.19.1 are in qualification; Gemini will advance to 1.4.1.
 Redaction 2.7.0 is retained byte for byte. Developer packages now pin published
 MCP 1.19.0; catalogue promotion, ClawHub security/installation, standalone Gemini
 and the final app/site rollout remain in progress. Fresh public consumers pass

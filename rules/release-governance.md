@@ -454,3 +454,10 @@ Make audit retains low. The matching policy and original MIT license live in
 `patches/`. Auditor regression tests run in both repositories. The owner approved
 this precise core/site exception on 24 October 2026; it does not authorise
 exceptions or changes in consumer products or independently published SDKs.
+
+Local-processing releases must exercise project/environment isolation through the
+compiled CLI and OpenClaw artifact gates, including a reused trace ID across
+scopes and useful same-scope full-stack grouping. Source-only grouping tests do
+not establish that a published bundle contains the correction. Retained mixed
+caches must fail closed on reads and ordinary processing until an explicit
+capture-preset rebuild from preserved events.

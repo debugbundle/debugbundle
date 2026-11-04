@@ -8,6 +8,13 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [1.21.0] - 2026-11-04
 
+### Fixed
+
+- Scope local full-stack trace correlation by project and environment. Reject
+  retained mixed-source caches before reads or incremental processing; an explicit
+  preset rebuild regenerates scoped artifacts from retained events. CLI, MCP and
+  OpenClaw 1.19.1 supersede the initial 1.19.0 distribution attempt.
+
 ### Added
 
 - Add logical services with repository context and environments inside one

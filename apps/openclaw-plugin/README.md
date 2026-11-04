@@ -1,6 +1,17 @@
 # @debugbundle/openclaw-plugin
 
-## Project/service consolidation 1.19.0
+## Local correlation safety in 1.19.1
+
+Trace correlation crosses services only within the same project and environment.
+If an older cache contains mixed retained source events, reads and incremental
+processing fail with `local_incident_scope_mismatch`. Preserve the local store,
+then explicitly rebuild from its retained event files using
+`debugbundle process --preset <minimal|balanced|investigative>` with the desired
+capture preset. This rebuild regenerates local incident/artifact state; it does
+not change cloud records or the retained event files.
+
+
+## Project/service consolidation 1.19.1
 
 Add logical service context and checked project-merge preview, apply, status,
 verification, resume and cancellation. Existing identities, credentials and

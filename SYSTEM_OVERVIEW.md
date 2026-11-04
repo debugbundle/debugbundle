@@ -829,3 +829,10 @@ simulator, device and installed-artifact measurements are separate proof layers.
 hashes in `.tmp/evidence-release/`; it neither rebuilds nor grants acceptance.
 Workspace-owned Android emulators and the signed Swift5.10 toolchain supply actual native qualification; SwiftLog retains its original interface on older compilers and its LogEvent interface on Swift6.2+. Current qualification, JS dependency/approval and Windows gates, measurement limits and release order belong in STATUS and the execution/release handoff. The full core regression/coverage/integration and CLI/MCP/web builds pass.
 No candidate publication, hosted deployment or consumer adoption is claimed.
+
+Local trace correlation uses `event-normalizer/src/local-correlation-scope.ts`
+to key project, environment and trace together. CLI processing and all bundled
+MCP/OpenClaw readers reject mixed retained incident source events until an
+explicit preset rebuild; valid legacy records remain compatible. Local summary
+formatting lives in `apps/cli/src/local-processing-summary.ts`; functional trace
+regressions and reusable processing fixtures are separate from general CLI cases.

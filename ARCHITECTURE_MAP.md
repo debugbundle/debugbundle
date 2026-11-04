@@ -1134,3 +1134,10 @@ byte/encoding cap and check cancellation; timeout does not await a late Foundati
 callback. HTTP body encoding shares the request deadline. Swift 3.1.1 and the RN
 Swift minimum carry this correction; other SDK timeout implementations do not use
 the structured task-group wait that caused this failure.
+
+Local trace correlation uses `event-normalizer/src/local-correlation-scope.ts`
+to key project, environment and trace together. CLI processing and all bundled
+MCP/OpenClaw readers reject mixed retained incident source events until an
+explicit preset rebuild; valid legacy records remain compatible. Local summary
+formatting lives in `apps/cli/src/local-processing-summary.ts`; functional trace
+regressions and reusable processing fixtures are separate from general CLI cases.

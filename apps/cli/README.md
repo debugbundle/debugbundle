@@ -1,5 +1,16 @@
 # @debugbundle/cli
 
+## Local correlation safety in 1.19.1
+
+Trace correlation crosses services only within the same project and environment.
+If an older cache contains mixed retained source events, reads and incremental
+processing fail with `local_incident_scope_mismatch`. Preserve the local store,
+then explicitly rebuild from its retained event files using
+`debugbundle process --preset <minimal|balanced|investigative>` with the desired
+capture preset. This rebuild regenerates local incident/artifact state; it does
+not change cloud records or the retained event files.
+
+
 Connected `doctor` diagnostics check API health and saved member authentication with a one-incident probe restricted to `cloud_project_id`. Missing or blank connected project scope fails before any request. Incident contents are discarded and are not included in the report. Local-only diagnostics make no cloud request.
 
 In a connected workspace, `debugbundle incidents` and `--source cloud` default
