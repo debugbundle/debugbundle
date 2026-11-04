@@ -1,9 +1,11 @@
 # Project/service consolidation qualification
 
-Locally qualified candidate, 4 November 2026. One implementation phase, governed
+Archived pre-release local audit, 4 November 2026. One implementation phase, governed
 by FR-PJS-01–04, AC-PJS-01–03 and the acceptance matrix in
-`project-service-consolidation.md`. No release, hosted activation, live merge,
-consumer repository edit or production canary has been performed.
+`project-service-consolidation.md`. These local receipts predate publication. The
+subsequent authorised production release is complete; see
+[the final release receipt](project-service-release-20261104.md). Hosted merge
+activation, owner-project consolidation and consumer adoption remain separate.
 
 ## Executed local evidence
 
@@ -91,7 +93,8 @@ checked against the actual parser and remain unchanged.
 
 Pre-ship review, final coverage/static checks, lock-ownership review and local
 reconciliation pass. Slices 0–7 are locally qualified. The whole delivery remains
-open at slice 8 for separately authorised release, live consolidation and adoption.
+open at slice 8 for live consolidation and adoption. Its separately authorised
+production release is now qualified in the linked release receipt.
 
 Lock ownership regression is fixed: replaced locks are preserved and require
 review. Its focused adoption/CLI lane passes 11 cases, including multi-service
@@ -154,9 +157,9 @@ requires final release identities and checks against the actual hosted fleet.
 
 ## Release and live gates
 
-Recommended next minor release line: core 1.21.0, CLI/MCP/OpenClaw 1.19.0.
-These are preparation choices, not published versions; final manifests/version
-changes belong to separately authorised release preparation. SDK code/wire
+The original recommendation was core 1.21.0 and CLI/MCP/OpenClaw 1.19.0. The
+actual published and production-qualified line is core 1.21.0, corrective clients
+1.19.1 and site 1.7.0; see the final release receipt for exact identities. SDK code/wire
 formats are unchanged and no SDK release or consumer upgrade is required by the
 logical consolidation model.
 

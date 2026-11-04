@@ -1,12 +1,13 @@
 # Projects, services and agent-driven project consolidation
 
 **Created:** 2026-10-25  
-**Status:** Implementation and local qualification passed on 2026-11-04. Release and live consolidation remain separately gated.  
+**Status:** Implemented, released and production-qualified on 2026-11-04: core 1.21.0, clients 1.19.1, site 1.7.0. Merge apply remains disabled; live consolidation and repository adoption remain separate gates.
+
 **Delivery:** One implementation phase, nine ordered slices (0–8).  
 **Scope:** DebugBundle core, CLI, ordinary MCP, existing readers, setup guidance and release documentation.  
 **Tracker:** [TODO.md](../TODO.md) → Project/service model and agent-driven consolidation.
 
-This tracked implementation contract supersedes the original local proposal. The owner approved one implementation phase with the recommended defaults, a simple agent workflow, and preservation of existing functionality. Continue through local qualification and release preparation; publication, deployment, live consolidation and consumer adoption retain separate authorisation gates.
+This tracked implementation contract supersedes the original local proposal. The owner approved one implementation phase with the recommended defaults, a simple agent workflow, and preservation of existing functionality. The authorised production release is complete; see [its exact receipt](project-service-release-20261104.md). Live consolidation, repository adoption and their deployed-runtime evidence retain separate authorisation gates.
 
 ## 1. Recommended outcome
 

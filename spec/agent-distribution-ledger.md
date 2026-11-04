@@ -1,17 +1,17 @@
 # Agent distribution ledger
 
-## Project/service release candidate — 4 November 2026
+## Project/service release — 4 November 2026
 
-The authorised train prepares Codex 1.5.0, Claude Code 1.19.1 and Gemini CLI
-1.4.1, pinning published and clean-install-verified corrective MCP 1.19.1. Default-branch
-promotion waits for final source CI and public native catalogue checks. The package
-source and skills include the logical
-service and checked consolidation workflow. Public default-branch promotion waits
-for exact MCP registry publication and installed verification. Per-surface results
-are recorded in `project-service-release-20261104.md`; the earlier published
-identities below remain historical evidence until the new public checks pass.
+Codex 1.5.0, Claude Code 1.19.1 and Gemini CLI 1.4.1 are public and pin verified
+MCP 1.19.1. Core marketplace source is `3292618b`; standalone Gemini source is
+`ed7d95232d0c5c51dfa22a15ff115bc8b30a66f0` / tag `v1.4.1`. Exact package,
+source/native/public Git install/update/auth/removal and production reads pass.
+Gemini's real public 1.4.0-to-1.4.1 update also passes. Its ZIP SHA-256 is
+`32b16dc8a0e484d4d88e5d30b6f4adcd332650f420a96465eca9c19a08aab3cc`.
+See [the final release receipt](project-service-release-20261104.md). Historical
+identities below remain prior-release evidence, not current candidate versions.
 
-## Current candidate package inventory
+## Current published package inventory
 
 This is the maintained inventory for first-party developer agent packages that bundle the local DebugBundle MCP server and a workflow skill. It complements the [MCP ecosystem release manifest](../apps/mcp/ecosystem-release-manifest.json), which tracks the npm server, MCP Registry, Smithery, ClawHub, OpenClaw, and downstream discovery. That pipeline does not publish Codex, Claude Code, or Gemini CLI packages. The hosted, read-only [OpenAI plugin](../apps/mcp/openai/release-manifest.json) has its own release gate.
 

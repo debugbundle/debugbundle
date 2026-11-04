@@ -1,23 +1,34 @@
-# Project/service release train — production backend live, distribution checks running
+# Project/service release train — shipped and verified
 
-4 November 2026. Core API/worker 1.21.0 is healthy in production after the ordered
-64-to-66 migration. Earlier migration records and existing project/service/token
-IDs are preserved. Merge apply remains disabled, with zero merge operations.
-App/site bytes remain at their prior versions during this backend-first stage.
+4 November 2026. Core/API/worker/app 1.21.0 and site 1.7.0 are live from core
+`3292618b` / site `c9cab5e`, with healthy containers, zero restarts and all eight
+production alarms OK. Ordered migrations are at 66; all earlier 64 ledger
+records and historical project/service/token IDs remain intact. A verified
+compatible 1.21.0 previous stable release is retained; the six-image gate passes.
 
-CLI/MCP 1.19.0 and shared-types 3.1.0 are public. ClawHub review then identified
-a reproducible local trace-scope defect, blocking completion. Corrective CLI/MCP
-1.19.1 are now public with successful release gates; OpenClaw security acceptance
-remains pending and Gemini will advance to 1.4.1.
-Redaction 2.7.0 is retained byte for byte. Developer packages now pin published
-MCP 1.19.1; catalogue promotion, ClawHub security/installation, standalone Gemini
-and the final app/site rollout remain in progress. Fresh public consumers pass
-for all maintained SDKs; JS SDK documentation was corrected without changing code
-or immutable SDK artifacts. No consumer product was changed. Live consolidation
-of the owner's existing projects remains later.
+CLI/MCP/OpenClaw and the portable skill are 1.19.1; shared-types is 3.1.0,
+redaction remains byte-identical 2.7.0, and public Codex 1.5.0 / Claude Code
+1.19.1 / Gemini 1.4.1 pin MCP 1.19.1. Both exact ClawHub security/antivirus gates
+and normal remote installs pass. Public developer install/update/auth/removal,
+new/retained clients against production, all maintained SDK public consumers and
+the independent unchanged hosted OpenAI connection pass. Broad ClawHub discovery
+remains the separately tracked 5/7 result; retired Smithery publishing is excluded.
+
+Release review caught and corrected cross-project/environment local trace
+correlation. Mixed old caches now fail closed until an explicit retained-event
+rebuild. Exact npm 1.19.1 bytes pass the final isolated merge/restart/evidence
+rehearsal. Full exact-source CI passes 5,133 cases across 110 shards; coverage,
+static, migration and public contract gates pass. Thirty served app/site resources
+match S3 bytes and cache headers. Two handled predecessor-worker errors occurred
+once at the first migration boundary, recovered and did not recur; evidence stays.
+
+Production is multi-account/multi-owner. Merge apply remains disabled and no
+existing project was merged. The owner's scattered-project exercise, explicitly
+authorised repository adoption and deployed-runtime verification remain the next
+separate task. No consumer product was changed.
 See `spec/project-service-release-20261104.md` for exact identities and receipts.
 
-# Project/service consolidation — locally qualified candidate
+# Project/service consolidation — implementation audit
 
 Final audit passed (4 November): daily notification scope, current-membership
 and concurrent canonical-pause gaps are fixed. Five new database regressions
@@ -27,7 +38,7 @@ sealed-image and retained-client qualification pass for the corrected candidate.
 4 November 2026. The owner authorised one implementation phase following the
 nine ordered slices and recommended, simple defaults. The subsequent production release is authorised; live consolidation of named
 projects and consumer adoption remain separately scoped. Slices 0–7 are implemented
-and locally qualified. Slice 8 release work is authorised and in progress; live consolidation and
+and locally qualified. Slice 8 production release qualification is complete; live consolidation and
 repository adoption remain separate completion gates.
 
 Source of truth: `spec/project-service-consolidation.md`, FR-PJS-01–04 and

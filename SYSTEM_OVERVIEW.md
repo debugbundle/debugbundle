@@ -196,7 +196,7 @@ Incident title selection uses one shared event-normalizer helper across hosted g
 
 The unpublished transport candidate's final audit covers Swift ACK arithmetic safety, Java nonblocking close cleanup and configured ingestion deadlines, HTTP-date and response-relative retry delays, retry hints on partial/protocol/server failures, and Go oversized-response rejection. Existing no-hint service-failure timing, public interfaces and installer responsibilities are preserved. Publication remains owner-held.
 
-## Project/service consolidation candidate
+## Project/service consolidation — released core 1.21.0 / clients 1.19.1
 
 Checked merge preview/apply/status/verify/resume/cancel are available through
 API, CLI and ordinary MCP, with server apply disabled by default. The receipt's
@@ -211,7 +211,10 @@ candidate clients on disposable real API/worker/Postgres/Redis/S3 infrastructure
 (`make project-service-runtime`). It verifies old credentials, new scope,
 immutable object hashes, worker restart, compatible API restart and origin cleanup.
 The cloud companion owns image contract labels and the read-only immutable
-candidate/active/rollback qualification gate; actual deployment remains separate.
+candidate/active/rollback qualification gate. The actual hosted images, preserved
+IDs/ledger, served assets and current/retained clients pass production verification;
+see `spec/project-service-release-20261104.md`. Merge apply remains disabled and
+the actual owner-project consolidation/adoption exercise is still pending.
 Its stack workflow can stage the API/worker with `deploy_assets=false` before
 client distribution, then publish aligned app/site assets through the normal
 default path while retaining that compatible runtime as the rollback floor.
@@ -224,7 +227,7 @@ work. Physical evidence, jobs and deliveries keep immutable origin namespaces;
 logical ownership and flattened legacy read scopes change atomically. Retained
 service names and fixed credential snapshots preserve original authority and
 history. Catalogue API/CLI/MCP adapters, canonical incident projections and a
-durable operation engine are implemented as candidates; apply remains
+durable operation engine are released; apply remains
 default-disabled behind the public checked workflow. Implementation and local
 database/artifact qualification pass; merge activation, release and live
 consolidation remain separately gated. No new grouping layer or migration UI

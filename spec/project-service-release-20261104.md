@@ -9,31 +9,30 @@ Postgres cases; 180 general integration cases passed with one existing optional
 skip. Static, coverage, retained-client and sealed migration/rollback rehearsals
 passed. See [qualification](project-service-qualification.md) for exact receipts.
 
-## Distribution inventory
+## Distribution inventory — released and verified
 
-| Surface                              | Candidate/current version   | Release disposition                                          | Current result                                                                         |
-| ------------------------------------ | --------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
-| Core API/worker and app              | 1.21.0                      | New minor release; forward migrations before runtime         | Corrective qualification in progress                                                   |
-| Shared types                         | 3.1.0                       | Publish additive schemas first                               | Corrective qualification in progress                                                   |
-| Redaction                            | 2.7.0                       | Unchanged; verify published artifact                         | Verified existing public artifact                                                      |
-| CLI                                  | 1.19.1                      | Publish and verify clean installed commands                  | Corrective qualification in progress                                                   |
-| MCP                                  | 1.19.1                      | Publish; exact Registry entry and installed native clients   | Corrective qualification in progress                                                   |
-| OpenClaw plugin / portable skill     | 1.19.1                      | Publish both; require exact security and runtime acceptance  | Corrective qualification in progress                                                   |
-| Codex developer plugin               | 1.5.0                       | Promote marketplace only after MCP publication               | Corrective qualification in progress                                                   |
-| Claude Code developer plugin         | 1.19.1                      | Promote marketplace only after MCP publication               | Corrective qualification in progress                                                   |
-| Gemini CLI extension                 | 1.4.1                       | Standalone repository, tag, archive and public installation  | Corrective qualification in progress                                                   |
-| Public site/docs                     | 1.7.0                       | Publish aligned guidance and verify served artifacts         | Corrective qualification in progress                                                   |
-| Hosted OpenAI connection             | Existing read-only contract | Verify live endpoint; independent submission gates remain    | Verified existing public artifact                                                      |
-| Node / Browser SDKs                  | 3.2.0                       | Unchanged; verify current public artifacts and compatibility | Fresh clean public consumer checks pass                                                |
-| Python / PHP / Ruby / .NET SDKs      | 2.1.0                       | Unchanged; verify current public artifacts and compatibility | Fresh clean public consumer checks pass                                                |
-| Java / Go / Android SDKs             | 3.1.0                       | Unchanged; verify current public artifacts and compatibility | Fresh clean public consumer checks pass                                                |
-| Swift SDK                            | 3.1.1                       | Unchanged; preserve existing SPM/CocoaPods installs          | Verified existing public artifact                                                      |
-| React Native SDK                     | 3.1.0                       | Unchanged; preserve published native dependency floors       | Verified existing public artifact                                                      |
-| WordPress plugin                     | 2.1.0                       | Unchanged; verify public ZIP without changing consumer sites | Exact WordPress.org ZIP passes disposable native/browser/relay/retry/revocation checks |
-| Smithery publisher / skill publisher | Retired                     | Excluded; provider retirement reconfirmed                    | No publication claimed                                                                 |
+| Surface                          | Version                             | Result                                                                         |
+| -------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------ |
+| Core API/worker and app          | 1.21.0                              | Live, healthy; source 3292618b; compatible rollback verified                   |
+| Shared types                     | 3.1.0                               | Public; signatures, provenance and exact integrity verified                    |
+| Redaction                        | 2.7.0                               | Retained byte for byte; public consumer verified                               |
+| CLI / MCP                        | 1.19.1                              | Public; native installs, exact runtime rehearsal and live reads pass           |
+| OpenClaw plugin / portable skill | 1.19.1                              | Exact final review, antivirus and moderation pass; normal public installs pass |
+| Codex developer plugin           | 1.5.0                               | Public core marketplace; native Git install/update/auth/removal pass           |
+| Claude Code developer plugin     | 1.19.1                              | Public core marketplace; native Git install/update/auth/removal pass           |
+| Gemini CLI extension             | 1.4.1                               | Public repository/tag/ZIP; actual public 1.4.0 to 1.4.1 upgrade passes         |
+| Public site/docs                 | 1.7.0                               | Live; matching source CI and served/S3 bytes/cache headers verified            |
+| Hosted OpenAI connection         | Existing read-only 23-tool contract | Live authenticated response unchanged from baseline; no new submission         |
+| Node / Browser SDKs              | 3.2.0                               | Fresh public consumers pass; runtime sources/artifacts unchanged               |
+| Python / PHP / Ruby / .NET SDKs  | 2.1.0                               | Fresh public consumers pass; .NET canonical release record reconciled          |
+| Java / Go / Android SDKs         | 3.1.0                               | Fresh public consumers pass                                                    |
+| Swift SDK                        | 3.1.1                               | Fresh public CocoaPods native consumer passes; existing SPM evidence retained  |
+| React Native SDK                 | 3.1.0                               | Fresh npm consumer passes; exact-version native evidence retained              |
+| WordPress plugin                 | 2.1.0                               | Official ZIP passes disposable native/browser/relay/retry/revocation checks    |
+| Smithery publishing              | Retired                             | Excluded; no new publication claimed                                           |
 
 Private internal workspace packages are delivered in the core/client artifacts;
-they are not independent registry publications. Existing SDK sources and wire
+they are not independent registry publications. Existing SDK runtime sources and wire
 formats are unchanged, with the applicability matrix retained in
 `project-service-sdk-compatibility.md`.
 
@@ -49,11 +48,11 @@ served credential/origin/cache gates in the cloud runbook pass. Publication or a
 healthy readiness endpoint does not close that activation gate. No existing
 project is consolidated by this release.
 
-## Evidence and outstanding gates
+## Historical preparation record
 
-Release preparation is in progress. Add source/CI/workflow/registry/installation
-and production receipts here as each gate completes. An accepted upload is not
-platform security acceptance or deployed-runtime proof.
+The stage records below retain the preparation and corrective-release history.
+The final production receipt supersedes their earlier pending states. Upload,
+platform security acceptance and deployed-runtime proof remain distinct evidence.
 
 ## Fresh retained-SDK package qualification
 
@@ -84,13 +83,12 @@ requests. The current host's local-archive trust acknowledgement applies only to
 the reviewed local candidate; remote ClawHub security and normal installation
 remain mandatory publication gates.
 
-The standalone-site CI currently checks the public core default branch. Its
+The initial standalone-site CI checked the older public core default branch. Its
 new 149-tool documentation correctly conflicts with that branch's older 139-tool
-catalogue until core promotion. The matching candidate documentation checks pass
-locally. Rerun the unchanged site contract gate after core promotion; do not lower
-the documented count or weaken the assertion.
+catalogue until core promotion. The unchanged site contract gate subsequently passed
+against the promoted 149-tool core; no assertion was weakened.
 
-## Backend-first production stage
+## Backend-first production stage (historical receipt)
 
 Cloud source `8d564cb8de16733696d8d1233b2234e298a6c51c` deployed core
 `016c2501f129bd46b860332b9ba19ca78d2c34fb` in
@@ -119,7 +117,7 @@ retains exact existing artifacts, and publishes only missing archives. The local
 registry plan retains redaction 2.7.0 byte for byte and publishes shared types
 3.1.0. A mismatched existing archive or a failed registry check aborts the pair.
 
-## Published client and support packages
+## Initial client/support publication (historical receipt)
 
 CLI 1.19.0 is public from core `016c2501f129bd46b860332b9ba19ca78d2c34fb`:
 [workflow 41825151782](https://github.com/debugbundle/debugbundle/actions/runs/41825151782)
@@ -145,7 +143,7 @@ immutable tags/artifacts are unchanged.
 The first 1.19.0 package release checks passed, but ClawHub's final plugin review
 reported a reproducible local-processing defect: a reused trace ID could combine
 frontend/backend events from different projects or environments. No hosted
-authorization bypass was established. This blocks the train; the review is not
+authorization bypass was established. This blocked the initial attempt; the review was not
 waived. The complete platform findings remain in the exact-version local report.
 
 New executable scope regressions fail against the original artifact source
@@ -155,8 +153,8 @@ refuse a mixed retained cache without rewriting it. An explicit capture-preset
 rebuild can regenerate scoped state/artifacts from preserved raw event files.
 The compiled CLI/OpenClaw runtime gates now exercise actual local processing with
 reused traces across both scopes. CLI/MCP/OpenClaw 1.19.1 supersede the first
-attempt; developer catalogues wait for that publication, and the already public
-Gemini 1.4.0 will be updated through immutable 1.4.1.
+attempt. Developer catalogues subsequently adopted that publication, and public
+Gemini 1.4.0 was updated through immutable 1.4.1.
 
 The staged API/worker is unaffected by this local-processing defect. Its two
 handled predecessor-worker deadlocks were confined to the migration boundary;
@@ -182,7 +180,7 @@ and MCP 1.19.1 passes
 both from `1bce158b430267160be1d1b10d4a8e10c74e0233`. Their installed scope
 regressions and native clients pass. The developer catalogues now pin that verified
 package. Exact Registry/ClawHub acceptance, public developer catalogue promotion
-and final app/site production rollout remain open gates.
+and final app/site rollout were subsequently completed in the final receipt below.
 
 Fresh public CLI 1.19.1 and MCP 1.19.1 read the actual production project, its
 three retained service IDs and three logical definitions; connected diagnostics
@@ -191,3 +189,84 @@ and MCP 1.18.3 still read the same live project and original service IDs, with t
 old 139-tool catalogue intact. These checks are read-only and project-scoped.
 The two migration-boundary incidents remain single occurrences with their
 evidence retained; no later recurrence appeared in these reads.
+
+## Final production receipt
+
+Production rollout
+[41837159203](https://github.com/debugbundle/debugbundle-cloud/actions/runs/41837159203)
+completed successfully from cloud `a3e8892ed4794ac6466b3eb99f7689169f2137e0`,
+core `3292618b59dc5388786278c662fa3afa1ae8d279` and site
+`c9cab5efa64372686bac780308de2a8238440da5`. Canonical core
+[v1.21.0](https://github.com/debugbundle/debugbundle/releases/tag/v1.21.0)
+and site [v1.7.0](https://github.com/debugbundle/site/releases/tag/v1.7.0)
+release workflows pass (`41835815532` and `41836473330`). The matching site
+contract rerun `41831740785` passes after core promotion.
+
+Exact-source CI `41832699365` passes all 110 shards (5,133 cases, including 103
+real Postgres cases), lint, typecheck, build and native Gemini on Node 22/24/26.
+Merged coverage is 87.78% lines, 90.14% functions, 78.64% branches and 86.82%
+statements. All 220 changed source files pass the existing coverage gate; 24
+below-threshold files pass its changed-line rule. CLI runtime CI `41832698839`
+passes the supported Node matrix. The later documentation-only reconciliation
+does not rebuild or replace these immutable release artifacts.
+
+The active API/worker image digest is
+`sha256:4776feced637f813c7a48d381a153e4c446dc1fc7b462ed81e5359fcad6b97b4`,
+with source revision `3292618b`. The verified previous stable image is
+`sha256:bb44f1e2a03fca201e0721923b5e46246cb8be9c5f9c173ce7208c9996da94c2`
+from the first compatible 1.21.0 stage. All six candidate/active/stable API/worker
+references pass `project-services-v1` and `postgres-v1`. Both actual containers
+match the active image references, are healthy, and have zero restarts/OOMs.
+Retention leaves exactly the active release and that verified previous stable.
+
+The ledger remains at 66 with all previous 64 records, checksums and application
+timestamps unchanged. Historical project/service/token IDs are preserved;
+membership, alert-rule, agent-token and probe identities remain unchanged. All
+service instances have logical definitions. Legacy bindings and merge operations
+are both zero. All 11 enabled endpoint checks resumed with no stale claims,
+expired jobs, deadlock jobs or blocked queries. The two handled predecessor-worker
+migration-boundary incidents remain single occurrences; their evidence and the
+pre-existing incident are retained. All eight existing production alarms are OK.
+
+The served app build ID is exactly `3292618b59dc5388786278c662fa3afa1ae8d279`.
+The new service guide and OpenAPI schema return 200. Thirty app/site resources,
+including 24 JS/CSS assets, match their S3 origin SHA-256 bytes with the expected
+cache headers; duplicate HTTP header values are preserved in receipts. Existing
+SDK credentials return 200 with private/no-store, credential/origin Vary and
+correct browser CORS. OAuth discovery and the hosted MCP contract remain valid;
+the independent authenticated OpenAI service response is unchanged from baseline.
+New and retained public CLI/MCP clients pass actual scoped production reads.
+
+Both exact ClawHub 1.19.1 final reviews and antivirus scans pass; portable-skill
+moderation is clean/unblocked. Normal remote installation succeeds without force
+for both the portable skill and the plugin on current OpenClaw 2026.10.10. The
+plugin's installed native runtime registers 149 tools and passes scoped reads and
+local correlation processing. Broad search discovery remains the previously
+separated 5/7 result; it is not security or installation acceptance. Smithery's
+retired publishing path and OpenAI's separate submission remain outside this
+release. Gemini `ed7d95232d0c5c51dfa22a15ff115bc8b30a66f0` / `v1.4.1` has ZIP
+SHA-256 `32b16dc8a0e484d4d88e5d30b6f4adcd332650f420a96465eca9c19a08aab3cc`;
+all five public files match and a normal public 1.4.0-to-1.4.1 upgrade passes.
+
+The final isolated merge rehearsal passes with CLI/MCP archives byte-identical to
+npm 1.19.1: CLI SHA-256
+`4c4fd7ccd36352ee2084e83340f870aa61105db593bab13502987d3c8e7ee31c`,
+MCP `3f8b02136a2e5d1e3b4524f65ff169f17e9238755e99466b9e3fb915c192e0d4`.
+Original SDK tokens, new credential scopes, worker/API restarts, six immutable
+objects and origin cleanup pass. Owned fixture containers/volumes are removed.
+Seven installed packages have verified npm registry signatures and attestations.
+
+### Deliberately separate next task
+
+Production is multi-account/multi-owner. Merge apply remains disabled. No existing
+project was consolidated, no consumer product was changed, and no repository was
+adopted. Inventory the owner's actual named DebugBundle projects and refresh
+access/settings before activation/preview/apply. Report server consolidation,
+separately authorised repository edits and their deployed-runtime verification as
+independent completion gates. The overall consolidation TODO stays open for that
+later work; production release qualification is complete.
+
+Local receipts are under `.tmp/project-service-release-20261104/`,
+`.tmp/mcp-ecosystem/1.19.1/report.json` and
+`.tmp/project-service-runtime/receipt.json`. They contain exact public artifact,
+header, image, migration, preservation, installation and monitoring evidence.

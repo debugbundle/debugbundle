@@ -363,3 +363,10 @@ new failure IDs remain visible.
 - **Subscription operation:** A durable, fenced owner request to change the existing subscription's plan or capacity. Prepared commands and provider keys survive retries; elapsed time alone never authorises another charge.
 - **Pending payment:** An invoice still awaiting payment or authentication. Upgrade/capacity entitlements remain at their previous values until the provider applies the paid change.
 - **First-purchase unlock:** Seven complete 24-hour days from the authoritative no-card trial start. Processed organisation-scoped paid-invoice history exempts previously paid accounts; account age is not evidence of legitimacy.
+
+### Trace correlation
+
+Joining frontend and backend evidence by trace ID within the same project and
+environment. A trace can cross services; its reuse cannot combine projects or
+environments. Mixed retained local source evidence is refused until an explicit
+rebuild from preserved event files.

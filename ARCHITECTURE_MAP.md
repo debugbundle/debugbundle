@@ -74,7 +74,7 @@ durable continuation; million-visit load testing is deferred by the owner.
 
 # ARCHITECTURE MAP — DebugBundle
 
-Project/service consolidation is an authorised, unreleased candidate tracked in
+Project/service consolidation shipped in core 1.21.0 and clients 1.19.1, tracked in
 `spec/project-service-consolidation.md`. Storage `service-definition-schema.ts`
 owns additive logical-service DDL, predecessor-writer linking and the ordered
 forward migration. `project-merge-plan.ts` owns pure checked planning and stable
@@ -96,8 +96,10 @@ snapshots; `packages/project-adoption` owns bounded local file planning/apply an
 preservation. Catalogue, retained-view pagination and downstream compatibility
 adapters are implemented. `make project-service-runtime` qualifies installed
 clients, SDK capture, worker restart, preserved S3 bytes and compatible API
-restart on disposable infrastructure. Local source and artifact checks pass;
-actual fleet, release and live consolidation qualification remain pending.
+restart on disposable infrastructure. Production release, retained-client reads,
+served assets and the actual hosted candidate/active/stable image gate pass; see
+`spec/project-service-release-20261104.md`. Merge activation and the owner
+consolidation/adoption exercise remain separate and pending.
 The cloud stack workflow's optional `deploy_assets=false` keeps current frontend
 assets during the first compatible API/worker stage; the default complete rollout
 publishes the aligned app/site after client qualification.
