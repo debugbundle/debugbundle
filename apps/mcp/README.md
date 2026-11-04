@@ -1,5 +1,12 @@
 # @debugbundle/mcp
 
+## Project/service consolidation 1.19.0
+
+Add logical service context and checked project-merge preview, apply, status,
+verification, resume and cancellation. Existing identities, credentials and
+restricted scopes remain compatible. Merge apply requires a qualified compatible
+core 1.21.0 runtime and remains disabled by default.
+
 Connected `doctor` diagnostics check API health and saved member authentication with a one-incident probe restricted to `cloud_project_id`. Missing or blank connected project scope fails before any request. Incident contents are discarded and are not included in the report. Local-only diagnostics make no cloud request.
 
 Connected-workspace incident lists use the saved connection's `cloud_project_id`
@@ -65,7 +72,7 @@ Use `npx -y @debugbundle/mcp` in clients that require noninteractive package exe
 | Claude Desktop local MCP      | local MCP server config                                                    | uses local machine auth/config                       |
 | Claude Code plugin            | `/plugin marketplace add debugbundle/debugbundle`                          | installs bundled MCP config and DebugBundle skill    |
 | Codex developer plugin        | `codex plugin add debugbundle-codex@debugbundle`                           | repository marketplace; local MCP and workflow skill |
-| Codex direct MCP              | `codex mcp add debugbundle -- npx -y @debugbundle/mcp@1.18.3 --local-auth` | app, CLI, and IDE on the same host                   |
+| Codex direct MCP              | `codex mcp add debugbundle -- npx -y @debugbundle/mcp@1.19.0 --local-auth` | app, CLI, and IDE on the same host                   |
 | Cursor                        | MCP config with `npx @debugbundle/mcp`                                     | stdio transport                                      |
 | VS Code / GitHub MCP Registry | `com.debugbundle/mcp`                                                      | official registry metadata                           |
 | OpenClaw / ClawHub            | DebugBundle skill plus MCP config                                          | use the published skill for workflow guidance        |

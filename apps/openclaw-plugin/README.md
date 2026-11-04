@@ -1,5 +1,12 @@
 # @debugbundle/openclaw-plugin
 
+## Project/service consolidation 1.19.0
+
+Add logical service context and checked project-merge preview, apply, status,
+verification, resume and cancellation. Existing identities, credentials and
+restricted scopes remain compatible. Merge apply requires a qualified compatible
+core 1.21.0 runtime and remains disabled by default.
+
 Connected `doctor` diagnostics check API health and saved member authentication with a one-incident probe restricted to `cloud_project_id`. Missing or blank connected project scope fails before any request. Incident contents are discarded and are not included in the report. Local-only diagnostics make no cloud request.
 
 OpenClaw tools for runtime error reporting, crash reporting, incident response, live app monitoring, endpoint health checks, debug bundles, and product analytics. Monitoring is scoped to runtime failures, customer-facing incidents, and endpoint health; DebugBundle is not a generic infrastructure-monitoring platform.
