@@ -3,25 +3,29 @@
 ## Project/service release candidate — 4 November 2026
 
 The authorised train prepares Codex 1.5.0, Claude Code 1.19.0 and Gemini CLI
-1.4.0, each pinning MCP 1.19.0. The package source and skills include the logical
+1.4.0, targeting MCP 1.19.0 after verified publication. During pre-publication
+qualification the catalogues retain the verified MCP 1.18.3 pin. The package
+source and skills include the logical
 service and checked consolidation workflow. Public default-branch promotion waits
 for exact MCP registry publication and installed verification. Per-surface results
 are recorded in `project-service-release-20261104.md`; the earlier published
 identities below remain historical evidence until the new public checks pass.
 
-## Published developer packages — 3 November 2026
-
-Current diagnostic adoption is public and verified: Codex 1.4.3 and Claude Code 1.18.2 from core `e4b9b47e9a2689d4c68907b0f5359a6a5077a3be`, and Gemini CLI 1.3.3 from standalone `8178c633f431ec315f0a41847ab2ae28fce05814` / tag `v1.3.3`, all pin published MCP 1.18.3. All 28 developer contracts and native public install/discovery/auth/update/removal checks pass, along with developer CI 41647357939. The downloaded Gemini ZIP SHA-256 is `16824b42b073ec3c40a282c7d45c493c8fcb7920220dc7df359c0fbb8921f1e3`; all five source files match. Qualified runtime 751474ec passes full CI, npm provenance/integrity and actual scoped production list/doctor reads. See [final corrective evidence](openclaw-runtime-scope-remediation-20261103.md).
+## Current candidate package inventory
 
 This is the maintained inventory for first-party developer agent packages that bundle the local DebugBundle MCP server and a workflow skill. It complements the [MCP ecosystem release manifest](../apps/mcp/ecosystem-release-manifest.json), which tracks the npm server, MCP Registry, Smithery, ClawHub, OpenClaw, and downstream discovery. That pipeline does not publish Codex, Claude Code, or Gemini CLI packages. The hosted, read-only [OpenAI plugin](../apps/mcp/openai/release-manifest.json) has its own release gate.
 
 | Host        | Package version | MCP pin  | Maintained source                                                           | Public channel                                                                                                  | Release and update route                                                                                                                                                                                                            |
 | ----------- | --------------- | -------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Codex       | `1.4.3`         | `1.18.3` | [`plugins/debugbundle-codex/`](../plugins/debugbundle-codex/)               | core Git marketplace in [`debugbundle/debugbundle`](https://github.com/debugbundle/debugbundle)                 | Publish the reviewed plugin and [catalog](../.agents/plugins/marketplace.json) on core `main`; verify a public Git marketplace install and upgrade.                                                                                 |
-| Claude Code | `1.18.2`        | `1.18.3` | [`apps/mcp/claude-code/debugbundle/`](../apps/mcp/claude-code/debugbundle/) | core Git marketplace in [`debugbundle/debugbundle`](https://github.com/debugbundle/debugbundle)                 | Publish the reviewed plugin and [catalog](../.claude-plugin/marketplace.json) on core `main`; verify a public marketplace install and update.                                                                                       |
-| Gemini CLI  | `1.3.3`         | `1.18.3` | [`plugins/debugbundle-gemini/`](../plugins/debugbundle-gemini/)             | standalone Git repository [`debugbundle/debugbundle-gemini`](https://github.com/debugbundle/debugbundle-gemini) | Copy the validated package to public `main`, tag the version, publish a GitHub Release with the validated ZIP, run `make gemini-extension-verify-public`, verify a fresh Git install/update, and check gallery indexing separately. |
+| Codex       | `1.5.0`         | `1.18.3` | [`plugins/debugbundle-codex/`](../plugins/debugbundle-codex/)               | core Git marketplace in [`debugbundle/debugbundle`](https://github.com/debugbundle/debugbundle)                 | Publish the reviewed plugin and [catalog](../.agents/plugins/marketplace.json) on core `main`; verify a public Git marketplace install and upgrade.                                                                                 |
+| Claude Code | `1.19.0`        | `1.18.3` | [`apps/mcp/claude-code/debugbundle/`](../apps/mcp/claude-code/debugbundle/) | core Git marketplace in [`debugbundle/debugbundle`](https://github.com/debugbundle/debugbundle)                 | Publish the reviewed plugin and [catalog](../.claude-plugin/marketplace.json) on core `main`; verify a public marketplace install and update.                                                                                       |
+| Gemini CLI  | `1.4.0`         | `1.18.3` | [`plugins/debugbundle-gemini/`](../plugins/debugbundle-gemini/)             | standalone Git repository [`debugbundle/debugbundle-gemini`](https://github.com/debugbundle/debugbundle-gemini) | Copy the validated package to public `main`, tag the version, publish a GitHub Release with the validated ZIP, run `make gemini-extension-verify-public`, verify a fresh Git install/update, and check gallery indexing separately. |
 
 ## Earlier release evidence
+
+## Published developer packages — 3 November 2026
+
+Current diagnostic adoption is public and verified: Codex 1.4.3 and Claude Code 1.18.2 from core `e4b9b47e9a2689d4c68907b0f5359a6a5077a3be`, and Gemini CLI 1.3.3 from standalone `8178c633f431ec315f0a41847ab2ae28fce05814` / tag `v1.3.3`, all pin published MCP 1.18.3. All 28 developer contracts and native public install/discovery/auth/update/removal checks pass, along with developer CI 41647357939. The downloaded Gemini ZIP SHA-256 is `16824b42b073ec3c40a282c7d45c493c8fcb7920220dc7df359c0fbb8921f1e3`; all five source files match. Qualified runtime 751474ec passes full CI, npm provenance/integrity and actual scoped production list/doctor reads. See [final corrective evidence](openclaw-runtime-scope-remediation-20261103.md).
 
 Earlier 3 November public evidence: Codex 1.4.2 and Claude 1.18.1 are served from core `3c4486aedd47d39b378f1d7f8cef4f9e47c7b49d`; Gemini 1.3.2 is served from standalone `ba6fb5e2cb1eecebf4b4acc4664b7d5df1fe70be` and tag `v1.3.2`. All use published MCP 1.18.2. Native public install/update/removal, tool discovery and credential-boundary checks pass; the released Gemini ZIP matches SHA-256 `fdd127f595f209262c1dfe5268c68996807f822ee9cf2f80db70cf6863fe0e9f`. The diagnostic follow-up will advance pins only after its new npm publication.
 

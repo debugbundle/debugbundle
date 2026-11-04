@@ -17,7 +17,7 @@ describe("web app - project settings layout", () => {
     const source = "10000000-0000-4000-8000-000000000001",
       target = "10000000-0000-4000-8000-000000000002";
     const fetchMock = vi.fn((request: RequestInfo | URL) => {
-      const url = new URL(requestUrl(request));
+      const url = new URL(requestUrl(request), "http://localhost");
       if (url.pathname === "/v1/auth/session")
         return jsonResponse(200, { session: createSession({ organization_plan: "team" }) });
       if (url.pathname === "/v1/projects")

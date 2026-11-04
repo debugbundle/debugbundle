@@ -49,7 +49,7 @@ it("finishes loading when the retained project request is rejected", async () =>
   vi.stubGlobal(
     "fetch",
     vi.fn((request: RequestInfo | URL) => {
-      const url = new URL(requestUrl(request));
+      const url = new URL(requestUrl(request), "http://localhost");
       if (url.searchParams.has("project_id")) return Promise.reject(new Error("request_failed"));
       return jsonResponse(200, { projects: [] });
     })
@@ -62,7 +62,7 @@ it("does not replace the current project with a late retained-view response", as
   vi.stubGlobal(
     "fetch",
     vi.fn((request: RequestInfo | URL) => {
-      const url = new URL(requestUrl(request));
+      const url = new URL(requestUrl(request), "http://localhost");
       if (url.searchParams.get("project_id") === source)
         return new Promise<Response>((resolve) => {
           finish = resolve;
