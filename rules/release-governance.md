@@ -82,14 +82,18 @@ The MCP package release manifest must include package-level MCP Registry metadat
 2. Run focused shared-package tests
 3. Build the shared packages and prepare publish manifests
 4. Pack and smoke-test staged artifacts
-5. Publish `@debugbundle/shared-types` and `@debugbundle/redaction` to npm
+5. Verify both packed SHA-512 integrity values against exact npm versions; retain
+   identical published artifacts and publish only missing packages
 6. Smoke-test clean installs from the registry
 
 The `shared-js-v*` tag or manual `version` input identifies shared-types. Redaction
 uses its independently reviewed manifest version. Validate both as stable versions
 before registry checks and use each exact version for registry state, packed
 consumers and published consumers. A shared-types schema API major does not require
-an unrelated redaction major. For the Zod 4 candidate the proposed pair is
+an unrelated redaction major. A partially published pair is safe to resume only
+after both candidate archives are checked: any published identity or integrity
+mismatch aborts before either package is published. Registry errors other than an
+exact-version 404 fail closed. For the Zod 4 candidate the proposed pair is
 shared-types 3.0.0 / redaction 2.7.0; see `spec/zod-v4-migration.md`.
 
 **release.yml** — Runs on `v*` tags or manual dispatch:

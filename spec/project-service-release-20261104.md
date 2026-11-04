@@ -87,3 +87,32 @@ new 149-tool documentation correctly conflicts with that branch's older 139-tool
 catalogue until core promotion. The matching candidate documentation checks pass
 locally. Rerun the unchanged site contract gate after core promotion; do not lower
 the documented count or weaken the assertion.
+
+## Backend-first production stage
+
+Cloud source `8d564cb8de16733696d8d1233b2234e298a6c51c` deployed core
+`016c2501f129bd46b860332b9ba19ca78d2c34fb` in
+[workflow 41822124561](https://github.com/debugbundle/debugbundle-cloud/actions/runs/41822124561).
+The API/worker image digest is
+`sha256:bb44f1e2a03fca201e0721923b5e46246cb8be9c5f9c173ce7208c9996da94c2`.
+Both containers are healthy with zero restarts. `deploy_assets=false` retained all
+33 common public resource hashes, including the prior app and site. This is a
+backend stage, not completion of the full release train.
+
+The production schema has 66 ledger entries; all previous 64 entries, checksums
+and application timestamps are unchanged. The historical project, service and
+project-token ID hashes match the pre-release capture exactly when excluding
+normal rows created after that capture. Member, agent-token, alert-rule and probe
+identity hashes also match. All service instances have definitions. There are
+zero legacy project bindings and zero merge operations; merge apply remains off.
+A managed database snapshot, `debugbundle-db-pre-project-services-20261104`, is
+available. Existing SDK config credentials return 200 with `private, no-store`,
+`Vary: Authorization, Origin` and the expected browser CORS origin. The independent
+hosted OpenAI connection returns the same three service IDs before and after.
+
+The shared-package workflow's initial attempt stopped before any npm write: it
+incorrectly required an unchanged redaction version to be bumped alongside new
+shared types. The correction verifies both packed SHA-512 integrities first,
+retains exact existing artifacts, and publishes only missing archives. The local
+registry plan retains redaction 2.7.0 byte for byte and publishes shared types
+3.1.0. A mismatched existing archive or a failed registry check aborts the pair.

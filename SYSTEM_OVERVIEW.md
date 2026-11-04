@@ -212,6 +212,9 @@ candidate clients on disposable real API/worker/Postgres/Redis/S3 infrastructure
 immutable object hashes, worker restart, compatible API restart and origin cleanup.
 The cloud companion owns image contract labels and the read-only immutable
 candidate/active/rollback qualification gate; actual deployment remains separate.
+Its stack workflow can stage the API/worker with `deploy_assets=false` before
+client distribution, then publish aligned app/site assets through the normal
+default path while retaining that compatible runtime as the rollback floor.
 
 The owner authorised one implementation phase on 3 November 2026 under
 `spec/project-service-consolidation.md`. Logical service definitions are additive

@@ -97,12 +97,16 @@ describe("shared js package release workflow", () => {
 
     expect(workflow).toContain("name: Release Shared JS Packages");
     expect(workflow).toContain("shared-js-v*");
-    expect(workflow).toContain("steps.published_state.outputs.state == 'all'");
-    expect(workflow).toContain(
-      "npm publish ./.tmp/shared-js-publish/shared-types --tag latest --access public"
+    expect(workflow).toContain("steps.publication.outputs.publish_shared_types == 'true'");
+    expect(workflow).toContain("steps.publication.outputs.publish_redaction == 'true'");
+    expect(workflow.indexOf("node scripts/check-shared-js-publication.mjs")).toBeLessThan(
+      workflow.indexOf("npm publish")
     );
     expect(workflow).toContain(
-      "npm publish ./.tmp/shared-js-publish/redaction --tag latest --access public"
+      'npm publish "./.tmp/shared-js-packages/debugbundle-shared-types-${RELEASE_VERSION}.tgz" --tag latest --access public'
+    );
+    expect(workflow).toContain(
+      'npm publish "./.tmp/shared-js-packages/debugbundle-redaction-${REDACTION_VERSION}.tgz" --tag latest --access public'
     );
     expect(workflow).toContain("Smoke test published shared JS packages");
     expect(workflow).toContain("debugbundle-shared-js-registry-smoke");

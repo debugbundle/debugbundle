@@ -98,6 +98,9 @@ adapters are implemented. `make project-service-runtime` qualifies installed
 clients, SDK capture, worker restart, preserved S3 bytes and compatible API
 restart on disposable infrastructure. Local source and artifact checks pass;
 actual fleet, release and live consolidation qualification remain pending.
+The cloud stack workflow's optional `deploy_assets=false` keeps current frontend
+assets during the first compatible API/worker stage; the default complete rollout
+publishes the aligned app/site after client qualification.
 See FR-PJS / AC-PJS and `spec/project-service-operations.md`.
 
 `project-rule-access.ts` shares the accepted origin predicate between immediate,
