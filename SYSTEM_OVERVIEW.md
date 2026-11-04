@@ -213,8 +213,13 @@ immutable object hashes, worker restart, compatible API restart and origin clean
 The cloud companion owns image contract labels and the read-only immutable
 candidate/active/rollback qualification gate. The actual hosted images, preserved
 IDs/ledger, served assets and current/retained clients pass production verification;
-see `spec/project-service-release-20261104.md`. Merge apply remains disabled and
-the actual owner-project consolidation/adoption exercise is still pending.
+see `spec/project-service-release-20261104.md`. The owner subsequently approved
+activation and the API/App/Site server merge. Hosted merging is enabled;
+canonical DebugBundle retains the API ID with App/Site as preserved-origin
+services. Exact receipts, unchanged credentials/history, reconciled analytics
+and actual runtime read/health checks are in `spec/project-service-live-20261104.md`.
+The published cloud control preserves activation by default. Repository adoption
+and fresh synthetic SDK canaries were excluded from the accepted task.
 Its stack workflow can stage the API/worker with `deploy_assets=false` before
 client distribution, then publish aligned app/site assets through the normal
 default path while retaining that compatible runtime as the rollback floor.

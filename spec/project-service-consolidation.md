@@ -1,7 +1,7 @@
 # Projects, services and agent-driven project consolidation
 
 **Created:** 2026-10-25  
-**Status:** Implemented, released and production-qualified on 2026-11-04: core 1.21.0, clients 1.19.1, site 1.7.0. Merge apply remains disabled; live consolidation and repository adoption remain separate gates.
+**Status:** Implemented, released and production-qualified on 2026-11-04: core 1.21.0, clients 1.19.1, site 1.7.0. Hosted merging was subsequently enabled and the owner's API/App/Site server consolidation completed. Repository adoption was excluded; fresh post-merge SDK-event acceptance was not triggered or observed. See `project-service-live-20261104.md` for exact receipts and qualified runtime checks.
 
 **Delivery:** One implementation phase, nine ordered slices (0–8).  
 **Scope:** DebugBundle core, CLI, ordinary MCP, existing readers, setup guidance and release documentation.  
@@ -438,16 +438,18 @@ no claim that local tests prove deployment or the owner's actual migration.
 
 ### Slice 8 — Authorised release, owner adoption and reconciliation
 
-- [ ] Under separate release authorisation, deploy migrations and compatible
+- [x] Under separate release authorisation, deploy migrations and compatible
       runtime first, verify readiness, then publish supported CLI/MCP and enable merge.
       Follow the MCP ecosystem synchronisation pipeline for any new MCP release.
-- [ ] Refresh a read-only inventory of the owner's actual named projects, confirm
+- [x] Refresh a read-only inventory of the owner's actual named projects, confirm
       ownership/settings/data assumptions, select mappings and produce a live preview.
-- [ ] Apply only the authorised consolidation, reconcile its receipt and adopt
-      each separately authorised repository. Keep old tokens working throughout.
-- [ ] Verify actual runtime routing/evidence and delivery only within authorised
-      scope; record pending deployments or inaccessible repositories honestly.
-- [ ] Run post-phase reconciliation: tracked specs/contracts/rules, overview/map,
+- [x] Apply only the authorised consolidation and reconcile its receipt; all
+      original tokens remain valid. Repository adoption was excluded by the
+      narrowed owner task and is not claimed.
+- [ ] Fresh post-merge SDK-event acceptance is not triggered or observed. Actual
+      existing-token configuration, history, analytics, routing, health, queues
+      and monitoring pass; synthetic canaries/delivery tests were excluded.
+- [x] Run post-phase reconciliation: tracked specs/contracts/rules, overview/map,
       glossary, STATUS, site/setup/API/CLI/MCP docs and TODO agree with shipped reality.
 
 **Exit:** Server consolidation and agreed adoption/verification are complete with
@@ -504,15 +506,15 @@ online migration; do not weaken compatibility to fit the schedule.
 
 Track these outcomes separately in the execution receipt:
 
-| Outcome                                     | Status on 2026-11-04                                     |
-| ------------------------------------------- | -------------------------------------------------------- |
-| Proposal and TODO link                      | Superseded by this tracked implementation contract       |
-| Tracked contracts and implementation slices | Implemented; final audit corrections qualified           |
-| Local qualification and migration rehearsal | Passed for the final audited candidate                   |
-| Runtime/client release                      | Pending explicit authorisation and release qualification |
-| Owner's server-side project consolidation   | Pending live inventory and authorisation                 |
-| Each named repository adoption              | Pending its applicable authorisation                     |
-| Actual deployed runtime verification        | Pending authorised deployment/verification               |
+| Outcome                                     | Status on 2026-11-04                                                 |
+| ------------------------------------------- | -------------------------------------------------------------------- |
+| Proposal and TODO link                      | Superseded by this tracked implementation contract                   |
+| Tracked contracts and implementation slices | Implemented; final audit corrections qualified                       |
+| Local qualification and migration rehearsal | Passed for the final audited candidate                               |
+| Runtime/client release                      | Released and independently verified                                  |
+| Owner's server-side project consolidation   | Completed and independently verified                                 |
+| Each named repository adoption              | Excluded from the narrowed owner task                                |
+| Actual deployed runtime verification        | Existing-token/read/health gates pass; fresh SDK event not exercised |
 
 The resulting product should feel simpler: select **DebugBundle**, inspect its
 services, and let an agent manage a reviewed consolidation when needed. The

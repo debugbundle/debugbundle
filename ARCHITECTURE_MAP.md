@@ -98,8 +98,14 @@ adapters are implemented. `make project-service-runtime` qualifies installed
 clients, SDK capture, worker restart, preserved S3 bytes and compatible API
 restart on disposable infrastructure. Production release, retained-client reads,
 served assets and the actual hosted candidate/active/stable image gate pass; see
-`spec/project-service-release-20261104.md`. Merge activation and the owner
-consolidation/adoption exercise remain separate and pending.
+`spec/project-service-release-20261104.md`. The owner-approved API/App/Site server
+merge is complete under the retained API ID, named DebugBundle; its receipt and
+separately qualified runtime checks are in `spec/project-service-live-20261104.md`.
+The cloud stack's published `project_merges_enabled` input passes a validated
+preserve/true/false selection to `hosted-image-rollout.sh`, changing the candidate
+env through the existing rollout. Default/omitted selection preserves the flag.
+Workflow `41909113370` activated hosted merging. Repository adoption and fresh
+canaries were excluded from this server exercise.
 The cloud stack workflow's optional `deploy_assets=false` keeps current frontend
 assets during the first compatible API/worker stage; the default complete rollout
 publishes the aligned app/site after client qualification.

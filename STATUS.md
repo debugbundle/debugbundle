@@ -1,3 +1,31 @@
+# Owner's three-project consolidation — server merge completed
+
+4 November 2026. The owner approved the narrow activation/merge. Cloud `b0daa141`
+/ workflow `41909113370` enabled merging through the normal rollout, preserving
+MCP and skipping frontend publication. A fresh available DebugBundle snapshot
+precedes mutation. API's shared analytics policy matches App/Site; SDK analytics
+opt-in remains App/Site only.
+
+Operation `f38fb964-4cce-4eca-9a73-e3528998b253` completed and independently verifies
+with no failures. Canonical DebugBundle retains the API ID and imports App/Site.
+All five service definitions/instances, 78 incident histories, nine tokens'
+immutable credentials/scopes, 66 ledger records and six scope-identity groups are
+preserved. Old source IDs retain their original views. Three historical bundle
+responses are byte-identical. Analytics reconcile to 110 pageviews/41 sessions
+with explicit origin-count semantics.
+
+Active API/worker `6fb7afe9e94d` and stable `4776feced637` pass the six-image gate.
+Both containers are healthy with zero restarts/OOMs; there are no expired jobs or
+leases. All three checks ran after cutover and pass; all eight alarms are OK.
+Thirty-four served resources and four old browser credential/origin pairs pass.
+Hosted MCP reads canonical and legacy views correctly.
+
+Server consolidation is complete. Repository adoption and synthetic canaries were
+excluded; no application/profile/SDK/token edits or consumer changes occurred.
+Runtime reads/configuration/health are verified; no fresh post-merge SDK event was
+triggered or observed. The existing CLI GitHub-status limitation remains separate.
+See `spec/project-service-live-20261104.md` for exact provenance and limits.
+
 # Project/service release train — shipped and verified
 
 4 November 2026. Core/API/worker/app 1.21.0 and site 1.7.0 are live from core
