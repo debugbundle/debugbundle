@@ -172,3 +172,22 @@ reproduction yields four failures and one passing same-scope control. Fresh nati
 CLI tarball checks pass on Node 22, 24, 26.0.0, 26.2.0 and 26; native emitted
 OpenClaw checks pass on Node 22/24/26, including actual `verify_local` processing
 of six events into four project/environment groups without cloud requests.
+
+## Corrective package publication and live retained clients
+
+Corrective CLI 1.19.1 passes
+[workflow 41831495218](https://github.com/debugbundle/debugbundle/actions/runs/41831495218),
+and MCP 1.19.1 passes
+[workflow 41831500100](https://github.com/debugbundle/debugbundle/actions/runs/41831500100),
+both from `1bce158b430267160be1d1b10d4a8e10c74e0233`. Their installed scope
+regressions and native clients pass. The developer catalogues now pin that verified
+package. Exact Registry/ClawHub acceptance, public developer catalogue promotion
+and final app/site production rollout remain open gates.
+
+Fresh public CLI 1.19.1 and MCP 1.19.1 read the actual production project, its
+three retained service IDs and three logical definitions; connected diagnostics
+succeed and the MCP exposes 149 tools. Independently, retained public CLI 1.18.2
+and MCP 1.18.3 still read the same live project and original service IDs, with the
+old 139-tool catalogue intact. These checks are read-only and project-scoped.
+The two migration-boundary incidents remain single occurrences with their
+evidence retained; no later recurrence appeared in these reads.
