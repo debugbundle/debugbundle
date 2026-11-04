@@ -1,5 +1,9 @@
 # @debugbundle/cli
 
+## Installation guidance in 1.19.2
+
+Prefer one project per system across service repositories, reuse existing connections, and keep separate projects for different access or privacy policies. Inspect existing projects before first-time connect; name matching does not infer system membership.
+
 ## Local correlation safety in 1.19.1
 
 Trace correlation crosses services only within the same project and environment.

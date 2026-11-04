@@ -111,6 +111,12 @@ assets during the first compatible API/worker stage; the default complete rollou
 publishes the aligned app/site after client qualification.
 See FR-PJS / AC-PJS and `spec/project-service-operations.md`.
 
+Setup guidance is owned by CLI `agent-interface-guidance.ts` and embedded through
+`local-scaffold.ts`; the sync script keeps five skill sources aligned. The site's
+`agent-install-prompt.ts` shares its prompt across installation entry points.
+The 5 November clarification of project reuse is authorised for release;
+`connect-command.ts` still matches a slugified profile name.
+
 `project-rule-access.ts` shares the accepted origin predicate between immediate,
 short-digest and daily notification storage. `notification-daily-store.ts` keeps
 original item/accounting namespaces but resolves membership and preparation policy

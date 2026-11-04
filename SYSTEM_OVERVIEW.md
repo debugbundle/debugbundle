@@ -198,6 +198,11 @@ The unpublished transport candidate's final audit covers Swift ACK arithmetic sa
 
 ## Project/service consolidation — released core 1.21.0 / clients 1.19.1
 
+The 5 November setup-guidance follow-up is authorised for release: prefer one project
+per system across service repositories, preserve existing connections, and
+explain name-based `connect`. It changes the canonical/distributed skills and
+site installation guides, not runtime selection. Publication is in progress.
+
 Checked merge preview/apply/status/verify/resume/cancel are available through
 API, CLI and ordinary MCP, with server apply disabled by default. The receipt's
 secret-free adoption manifest supports one-root CLI preview/apply and ordinary

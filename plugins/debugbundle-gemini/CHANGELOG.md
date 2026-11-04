@@ -1,5 +1,9 @@
 # DebugBundle for Gemini CLI changelog
 
+## [1.4.2] - 2026-11-05
+
+- Default installation guidance to one project per system across repositories, preserve existing connections and adopt MCP 1.19.2.
+
 ## [1.4.1] - 2026-11-04
 
 - Adopt MCP 1.19.1: keep local trace correlation within its project and environment, and reject mixed retained caches until an explicit rebuild. Preserve authentication, tool schemas and valid existing local stores.

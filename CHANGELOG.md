@@ -30,6 +30,11 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## Earlier independently published client releases
 
+### CLI/MCP/OpenClaw 1.19.2 — 2026-11-05
+
+- Default installation guidance to one project per system across service repositories. Preserve existing connections and policy boundaries; explain name-based connect and keep project merging explicit.
+- Align Codex 1.5.1, Claude Code 1.19.2 and Gemini CLI 1.4.2 with MCP 1.19.2. Prepare the independent OpenAI 1.0.3 skill candidate without changing its hosted read-only contract.
+
 ### CLI 1.18.2 and MCP/OpenClaw 1.18.3 — 2026-11-03
 
 - Restrict the connected `doctor` authentication probe to its configured project

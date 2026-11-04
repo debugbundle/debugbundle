@@ -3,6 +3,36 @@
 4 November 2026. FR-PJS-01–04 / AC-PJS-01–03. The owner approved the narrow
 activation and merge after clarification of the existing analytics model.
 
+## Installation guidance follow-up — 5 November
+
+Locally verified; the owner subsequently authorised the release train. The default is now explicit: reuse one
+project per system across service repositories, preserving existing connections
+and separating projects for different access/privacy policies. Canonical CLI
+guidance and all five distributed skill sources agree. The site install prompt,
+six setup/API/CLI guides and llms.txt match; stale upcoming/release-candidate
+wording is removed. The connection guide explains current name-based selection
+and how to bind a known project ID without creating another project.
+
+The install prompt is 236 words (34 added); the shared project/service section
+remains four bullets, 232 words. No CLI selection behavior, runtime, schema,
+credential, project data or consumer installation changed.
+
+Validation: one core and two site regressions first failed as expected; then all
+10 guidance tests, 44 site tests and eight audit-helper tests passed. Core/site
+typechecks, focused lint/format, whitespace checks and the 143-page static build
+pass. Seven exported HTML entry points, the new connection anchor and exported
+llms.txt contain the final guidance. Prior pushed-main CI and CLI runtime checks
+are both successful. The pre-ship review found no changed runtime trust boundary
+or schema path; specs/contracts/overview/map match and no new glossary term is
+needed.
+
+Release scope is this guidance-only core/site diff: commit/push, publish the site
+and affected CLI/MCP/agent distributions through their existing channels, then
+verify published guidance. Installed caches are never edited directly. The
+OpenAI portal submission remains a separate existing process. This follow-up has
+entered the authorised release train; see `project-guidance-release-20261105.md`.
+The successful server merge below is unchanged.
+
 ## Final receipt
 
 - Canonical **DebugBundle**, slug `debugbundle`, retains API project ID

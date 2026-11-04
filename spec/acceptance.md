@@ -1551,7 +1551,7 @@ Mapped requirements: FR-PJS-02/03. Execute the complete acceptance matrix in `pr
 
 ### AC-PJS-03: Safe agent adoption
 
-Mapped requirement: FR-PJS-04. Explicit roots, secret-free manifest/diff, repeated adoption, monorepo and separate repositories, custom profile/cache preservation, stale files, symlink escape and unavailable repositories are covered. A fixture agent discovers all services without widening an explicit filter. Keep local, release, live consolidation, consumer changes and deployed-runtime evidence distinct.
+Mapped requirements: FR-PJS-01/04. Explicit roots, secret-free manifest/diff, repeated adoption, monorepo and separate repositories, custom profile/cache preservation, stale files, symlink escape and unavailable repositories are covered. A fixture agent discovers all services without widening an explicit filter. Generated/distributed skills and the installation prompt default to reusing the system's project across repositories, preserve existing connections, explain name-based `connect`, and keep policy-separated projects and local-only setup distinct. Keep local, release, live consolidation, consumer changes and deployed-runtime evidence distinct.
 
 ### AC-PROF-01: Static Profile Detection
 

@@ -25,6 +25,22 @@ function routing(text: string): string {
 }
 
 describe("agent-independent interface routing", () => {
+  it("defaults installation to the existing system project without inferring cross-repository membership", () => {
+    const text = routing(buildSkill());
+    for (const instruction of [
+      "Prefer one project per system",
+      "even across repositories",
+      "Reuse the system's existing project",
+      "preserve an existing connection",
+      "access or privacy policies",
+      "connect matches the profile name"
+    ]) {
+      expect(text).toContain(instruction);
+    }
+    const scope = text.slice(text.indexOf("### Project and service scope"));
+    expect(scope.trim().split(/\s+/u).length).toBeLessThanOrEqual(250);
+  });
+
   it("guides consolidation through explicit mappings and separate completion gates", () => {
     const text = routing(buildSkill());
     for (const instruction of [
