@@ -35,8 +35,9 @@ function setup(
       return { rows: options.page === null ? [] : [options.page ?? page] };
     if (sql.startsWith("SELECT pp.project_id"))
       return { rows: options.selections ?? statusSettings.projects };
-    if (sql.startsWith("SELECT id::text AS project_id"))
+    if (sql.startsWith("WITH locked"))
       return { rows: options.invalidProject ? [] : [{ project_id: scope.project_id }] };
+    if (sql.startsWith("SELECT debugbundle_assert_")) return { rows: [] };
     if (sql.startsWith("SELECT id::text AS check_id"))
       return {
         rows: options.invalidCheck

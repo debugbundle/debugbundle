@@ -362,7 +362,8 @@ export async function handleCaptureRuleCommand(
       "matcher-json",
       "sample-rate",
       "sample-event-class",
-      "expires-at"
+      "expires-at",
+      "project-scope"
     ]);
     ensureNoExtraPositionals(parsedArgv, 3);
 
@@ -372,6 +373,12 @@ export async function handleCaptureRuleCommand(
     }
 
     const update: CaptureRuleUpdate = {};
+    const projectScope = readStringOption(parsedArgv, "project-scope");
+    if (projectScope !== undefined) {
+      if (projectScope !== "current_project")
+        throw new CliInputError("Invalid value for --project-scope.");
+      update.project_scope = projectScope;
+    }
     const name = readStringOption(parsedArgv, "name");
     if (name !== undefined) {
       update["name"] = name;
@@ -465,7 +472,10 @@ export async function handleProbeCommand(
       "service",
       "environment",
       "ttl-seconds",
-      "trigger-ttl-seconds"
+      "trigger-ttl-seconds",
+      "sdk-project-id",
+      "sdk-token-id",
+      "sdk-service"
     ]);
     ensureNoExtraPositionals(parsedArgv, 3);
 
@@ -485,6 +495,9 @@ export async function handleProbeCommand(
       environment?: string;
       ttlSeconds?: number;
       triggerTtlSeconds?: number;
+      sdkProjectId?: string;
+      sdkTokenId?: string;
+      sdkService?: string;
       authFilePath?: string;
       json?: boolean;
     });
@@ -500,6 +513,12 @@ export async function handleProbeCommand(
     if (ttlSeconds !== undefined) {
       input.ttlSeconds = ttlSeconds;
     }
+    const sdkProjectId = readStringOption(parsedArgv, "sdk-project-id");
+    if (sdkProjectId !== undefined) input.sdkProjectId = sdkProjectId;
+    const sdkTokenId = readStringOption(parsedArgv, "sdk-token-id");
+    if (sdkTokenId !== undefined) input.sdkTokenId = sdkTokenId;
+    const sdkService = readStringOption(parsedArgv, "sdk-service");
+    if (sdkService !== undefined) input.sdkService = sdkService;
     const triggerTtlSeconds = readIntegerOption(parsedArgv, "trigger-ttl-seconds");
     if (triggerTtlSeconds !== undefined) {
       input.triggerTtlSeconds = triggerTtlSeconds;

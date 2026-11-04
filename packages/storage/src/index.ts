@@ -2,6 +2,11 @@
 // External consumers continue importing from this file unchanged.
 
 export * from "./types.js";
+export {
+  createServiceDefinitionStore,
+  ServiceDefinitionError,
+  type ServiceDefinitionStore
+} from "./service-definition-store.js";
 export type {
   AccountAnalyticsStore,
   AdminAnalyticsSummary,

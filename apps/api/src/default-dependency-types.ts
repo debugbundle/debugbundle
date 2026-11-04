@@ -37,6 +37,7 @@ import type { BillingEmailService } from "./default-dependency-helpers.js";
 import type { createBillingManagement } from "./billing-management.js";
 
 export interface CreateApiDependenciesInput {
+  projectMergesEnabled?: boolean;
   objectStore: ObjectStoreClient & ObjectStoreReader & ObjectStorePrefixDeleter;
   queue: QueueClient;
   db: Queryable;

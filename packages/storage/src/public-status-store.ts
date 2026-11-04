@@ -93,11 +93,21 @@ async function validateSelection(
   // anchor first deadlocks when two pages include one another. Ownership stays stable
   // through commit; NO KEY UPDATE still permits unrelated foreign-key reference reads.
   const projects = await db.query<{ project_id: string }>(
-    `SELECT id::text AS project_id FROM projects
-    WHERE id=ANY($1::uuid[]) AND organization_id=$2::uuid AND owner_user_id=$3::uuid ORDER BY id FOR NO KEY UPDATE`,
+    `WITH locked AS MATERIALIZED (
+      SELECT id FROM projects WHERE id=ANY(ARRAY(
+        SELECT DISTINCT unnest(debugbundle_project_origins(debugbundle_canonical_project(p.id)))
+        FROM projects p WHERE p.id=ANY($1::uuid[]) AND p.organization_id=$2::uuid AND p.owner_user_id=$3::uuid
+      )) ORDER BY id FOR NO KEY UPDATE
+    ) SELECT p.id::text AS project_id FROM projects p JOIN locked ON locked.id=p.id
+    WHERE p.id=ANY($1::uuid[]) AND p.organization_id=$2::uuid AND p.owner_user_id=$3::uuid`,
     [ids, scope.organization_id, scope.owner_user_id]
   );
   if (projects.rows.length !== ids.length) throw new PublicStatusError("invalid_selection");
+  // The complete origin sets are already locked above. Check the cutover fence
+  // without upgrading locks that would block unrelated foreign-key reads.
+  await db.query("SELECT debugbundle_assert_project_scope_current(id) FROM unnest($1::uuid[]) id", [
+    ids
+  ]);
   const requested = value.projects.flatMap((p) =>
     p.check_ids.map((check_id) => ({ check_id, project_id: p.project_id }))
   );
@@ -165,6 +175,13 @@ export function createPublicStatusPageStore(db: Queryable): PublicStatusPageStor
       return runInTransaction(db, async (tx) => {
         await ownedAnchor(tx, scope);
         await validateSelection(tx, scope, value);
+        // Retained publications remain manageable at their original anchor. New
+        // publications must use the canonical project.
+        await tx.query(
+          `SELECT debugbundle_assert_canonical_project_write($1::uuid)
+          WHERE NOT EXISTS(SELECT 1 FROM public_status_pages WHERE anchor_project_id=$1::uuid)`,
+          [scope.project_id]
+        );
         const page = (
           await tx.query<PageRow>(
             `INSERT INTO public_status_pages(id,anchor_project_id,organization_id,owner_user_id,public_id,title,enabled)

@@ -152,6 +152,7 @@ export async function handleWebhookCommand(
 
   if (action === "update") {
     expectNoUnknownOptions(parsedArgv, [
+      "project-scope",
       "auth-file",
       "json",
       "project-id",
@@ -176,6 +177,7 @@ export async function handleWebhookCommand(
       webhookId: requirePositional(parsedArgv, 2, "webhook-id")
     } as {
       projectId: string;
+      projectScope?: "current_project";
       webhookId: string;
       url?: string;
       events?: string[];
@@ -184,6 +186,12 @@ export async function handleWebhookCommand(
       authFilePath?: string;
       json?: boolean;
     });
+    const projectScope = readStringOption(parsedArgv, "project-scope");
+    if (projectScope !== undefined) {
+      if (projectScope !== "current_project")
+        throw new CliInputError("Invalid value for --project-scope.");
+      input.projectScope = projectScope;
+    }
     const url = readStringOption(parsedArgv, "url");
     if (url !== undefined) {
       input.url = url;
@@ -205,7 +213,8 @@ export async function handleWebhookCommand(
       input.url === undefined &&
       input.events === undefined &&
       input.filters === undefined &&
-      input.isEnabled === undefined
+      input.isEnabled === undefined &&
+      input.projectScope === undefined
     ) {
       throw new CliInputError("At least one webhook field must be provided.");
     }

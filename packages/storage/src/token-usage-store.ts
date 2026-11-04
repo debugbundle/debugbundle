@@ -14,13 +14,16 @@ export async function resolveProjectTokenAndRecordUsage(
         SELECT
           pt.id AS token_id,
           pt.project_id,
+          p.id AS canonical_project_id,
+          p.capture_rules_require_server,
+          COALESCE(pt.scope_origin_ids,ARRAY[pt.project_id]) AS scope_origin_ids,
           p.organization_id,
           COALESCE(o.plan, 'free') AS organization_plan,
           COALESCE(pt.allowed_origins, '[]'::jsonb) AS allowed_origins,
           pt.revoked_at,
           pt.expires_at
         FROM project_tokens pt
-        JOIN projects p ON p.id = pt.project_id
+        JOIN projects p ON p.id = debugbundle_canonical_project(pt.project_id)
         JOIN organizations o ON o.id = p.organization_id
         WHERE pt.token_hash = $1
           AND o.suspended_at IS NULL
@@ -41,6 +44,9 @@ export async function resolveProjectTokenAndRecordUsage(
       )
       SELECT
         resolved_token.project_id,
+        resolved_token.canonical_project_id,
+        resolved_token.scope_origin_ids,
+        resolved_token.capture_rules_require_server,
         resolved_token.organization_id,
         resolved_token.organization_plan,
         resolved_token.allowed_origins,

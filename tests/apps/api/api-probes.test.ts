@@ -58,6 +58,58 @@ describe("api probe routes", () => {
     expect(response.json()).toEqual({ error: "upgrade_required" });
   });
 
+  it("forwards an explicit SDK issuer and returns its runtime identity", async () => {
+    const create = vi.fn().mockResolvedValue({
+      organization_plan: "team",
+      activation: {
+        activation_id: "11111111-1111-4111-8111-111111111111",
+        label_pattern: "checkout.*",
+        service: "web",
+        environment: "production",
+        expires_at: "2026-03-11T01:00:00.000Z",
+        trigger_expires_at: "2026-03-11T01:00:00.000Z"
+      },
+      trigger_token: "signed",
+      runtime_scope_origin_ids: [
+        "00000000-0000-4000-8000-000000000001",
+        "00000000-0000-4000-8000-000000000002"
+      ],
+      runtime_project_id: "00000000-0000-4000-8000-000000000002",
+      runtime_service: "Site"
+    });
+    const app = createServer({
+      probeManagement: mockedObject<NonNullable<ApiServerDependencies["probeManagement"]>>({
+        createProbeActivationForProjectInOrganization: create
+      })
+    });
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/projects/00000000-0000-4000-8000-000000000001/probes/activate",
+      headers: { authorization: "Bearer dbundle_mem_test" },
+      payload: {
+        label_pattern: "checkout.*",
+        service: "Site",
+        ttl_seconds: 300,
+        sdk_project_id: "00000000-0000-4000-8000-000000000002",
+        sdk_token_id: "00000000-0000-4000-8000-000000000003",
+        sdk_service: "Site"
+      }
+    });
+    expect(response.statusCode).toBe(201);
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sdk_project_id: "00000000-0000-4000-8000-000000000002",
+        sdk_token_id: "00000000-0000-4000-8000-000000000003",
+        sdk_service: "Site"
+      })
+    );
+    expect(response.json()).toMatchObject({
+      runtime_project_id: "00000000-0000-4000-8000-000000000002",
+      runtime_service: "Site"
+    });
+    await app.close();
+  });
+
   it("should reject remote probe activation when monthly activation quota is exhausted", async (): Promise<void> => {
     const createProbeActivationForProjectInOrganization = vi.fn();
     const queueProjectOperationalEmailDelivery = vi
@@ -755,6 +807,7 @@ describe("api probe routes", () => {
       })
     );
     expect(probeManagement.deactivateProbeActivationForProjectInOrganization).toHaveBeenCalledWith({
+      actor_user_id: "usr_member",
       organization_id: "org_owner",
       project_id: "00000000-0000-4000-8000-000000000001",
       activation_id: "11111111-1111-4111-8111-111111111111",

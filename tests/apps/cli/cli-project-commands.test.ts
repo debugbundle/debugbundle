@@ -1,16 +1,44 @@
 import { describe, expect, it, vi } from "vitest";
 
+it("forwards an explicit retained project ID", async () => {
+  const listProjects = vi.fn().mockResolvedValue([]);
+  await listProjectsCommand({ bearerToken: "member", projectId: "retained" }, { listProjects });
+  expect(listProjects).toHaveBeenCalledWith({ bearerToken: "member", projectId: "retained" });
+});
+
 import { CliAuthStateError } from "../../../apps/cli/src/auth-state.js";
 import {
   deleteProjectCommand,
   deleteProjectWithAuthCommand,
   listProjectsCommand,
+  listProjectsWithAuthCommand,
   createProjectCommand,
   updateProjectCommand
 } from "../../../apps/cli/src/project-commands.js";
 import { ProjectManagementApiError } from "../../../packages/project-management-client/src/index.js";
 
 describe("cli project commands", () => {
+  it("authenticates and forwards the retained view through the real typed client", async () => {
+    const request = vi.fn().mockResolvedValue({ status: 200, body: { projects: [] } });
+    const projectId = "10000000-0000-4000-8000-000000000001";
+    const result = await listProjectsWithAuthCommand(
+      { projectId, limit: 3, json: true },
+      {
+        readAuthState: async () => ({
+          bearer_token: "member",
+          base_url: "https://api.example.test"
+        }),
+        createHttpClient: () => ({ request })
+      }
+    );
+    expect(result).toEqual({ exitCode: 0, output: JSON.stringify({ projects: [] }) });
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: expect.stringContaining(`project_id=${projectId}`),
+        bearerToken: "member"
+      })
+    );
+  });
   it("renders project list in human and json modes", async () => {
     const projects = [
       { project_id: "proj_1", name: "Main App", slug: "main-app" },
@@ -153,7 +181,9 @@ describe("cli project commands", () => {
         projectId: "proj_1"
       },
       {
-        readAuthState: vi.fn().mockRejectedValue(new CliAuthStateError("auth_state_missing", "Not logged in."))
+        readAuthState: vi
+          .fn()
+          .mockRejectedValue(new CliAuthStateError("auth_state_missing", "Not logged in."))
       }
     );
 
@@ -163,7 +193,9 @@ describe("cli project commands", () => {
         projectId: "missing"
       },
       {
-        deleteProject: vi.fn().mockRejectedValue(new ProjectManagementApiError(404, "project_not_found"))
+        deleteProject: vi
+          .fn()
+          .mockRejectedValue(new ProjectManagementApiError(404, "project_not_found"))
       }
     );
 
@@ -174,7 +206,9 @@ describe("cli project commands", () => {
         slug: "taken"
       },
       {
-        updateProject: vi.fn().mockRejectedValue(new ProjectManagementApiError(409, "project_slug_taken"))
+        updateProject: vi
+          .fn()
+          .mockRejectedValue(new ProjectManagementApiError(409, "project_slug_taken"))
       }
     );
 

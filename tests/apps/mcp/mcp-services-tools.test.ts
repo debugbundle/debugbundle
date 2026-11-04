@@ -1,9 +1,27 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { RetrievalApiError } from "../../../packages/retrieval-client/src/index.js";
-import { SERVICE_MCP_TOOL_NAMES, createServicesMcpTools } from "../../../apps/mcp/src/services-tools.js";
+import {
+  SERVICE_MCP_TOOL_NAMES,
+  createServicesMcpTools
+} from "../../../apps/mcp/src/services-tools.js";
 
 describe("mcp services tools", () => {
+  it("forwards service page offsets", async () => {
+    const listServices = vi.fn().mockResolvedValue([]);
+    await createServicesMcpTools({ listServices }).list_services({
+      bearerToken: "member",
+      projectId: "project",
+      limit: 100,
+      offset: 1100
+    });
+    expect(listServices).toHaveBeenCalledWith({
+      bearerToken: "member",
+      projectId: "project",
+      limit: 100,
+      offset: 1100
+    });
+  });
   it("declares service tool parity", () => {
     expect(SERVICE_MCP_TOOL_NAMES).toEqual(["list_services"]);
   });

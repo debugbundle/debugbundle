@@ -35,25 +35,27 @@ export function parseArgv(argv: string[]): ParsedArgv {
     }
 
     if (
-      token === "--fix"
-      || token === "--json"
-      || token === "--check-relay"
-      || token === "--privacy"
-      || token === "--help"
-      || token === "--version"
-      || token === "--non-interactive"
-      || token === "--local"
-      || token === "--cloud"
-      || token === "--events"
-      || token === "--bundles"
-      || token === "--all"
-      || token === "--all-projects"
-      || token === "--trigger-5xx"
-      || token === "--expect-app-event"
-      || token === "--github"
-      || token === "--github-cli"
-      || token === "--github-device"
-      || token === "--clear-color-tag"
+      token === "--fix" ||
+      token === "--json" ||
+      token === "--check-relay" ||
+      token === "--privacy" ||
+      token === "--help" ||
+      token === "--version" ||
+      token === "--non-interactive" ||
+      token === "--local" ||
+      token === "--cloud" ||
+      token === "--events" ||
+      token === "--bundles" ||
+      token === "--all" ||
+      token === "--all-projects" ||
+      token === "--trigger-5xx" ||
+      token === "--expect-app-event" ||
+      token === "--github" ||
+      token === "--github-cli" ||
+      token === "--github-device" ||
+      token === "--clear-color-tag" ||
+      token === "--clear-description" ||
+      token === "--clear-repository"
     ) {
       options.set(token.slice(2), true);
       continue;
@@ -142,7 +144,10 @@ export function readStringOption(parsedArgv: ParsedArgv, optionName: string): st
   return undefined;
 }
 
-export function readStringListOption(parsedArgv: ParsedArgv, optionName: string): string[] | undefined {
+export function readStringListOption(
+  parsedArgv: ParsedArgv,
+  optionName: string
+): string[] | undefined {
   const value = parsedArgv.options.get(optionName);
   if (typeof value === "string") {
     return [value];
@@ -163,14 +168,19 @@ type WeeklyReportDayOfWeek =
   | "saturday"
   | "sunday";
 
-export function readWeeklyReportDayOfWeekOption(parsedArgv: ParsedArgv, optionName: string): WeeklyReportDayOfWeek | undefined {
+export function readWeeklyReportDayOfWeekOption(
+  parsedArgv: ParsedArgv,
+  optionName: string
+): WeeklyReportDayOfWeek | undefined {
   const value = readStringOption(parsedArgv, optionName);
 
   if (value === undefined) {
     return undefined;
   }
 
-  if (["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].includes(value)) {
+  if (
+    ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].includes(value)
+  ) {
     return value as WeeklyReportDayOfWeek;
   }
 
@@ -232,7 +242,10 @@ export function readCsvOption(parsedArgv: ParsedArgv, optionName: string): strin
   return values;
 }
 
-export function readBooleanStringOption(parsedArgv: ParsedArgv, optionName: string): boolean | undefined {
+export function readBooleanStringOption(
+  parsedArgv: ParsedArgv,
+  optionName: string
+): boolean | undefined {
   const rawValue = readStringOption(parsedArgv, optionName);
   if (rawValue === undefined) {
     return undefined;

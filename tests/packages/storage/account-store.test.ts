@@ -1,3 +1,4 @@
+import { projectDeletionControlRows } from "../../helpers/project-deletion.js";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -11,6 +12,50 @@ function rowsResult<Row extends Record<string, unknown>>(rows: Row[]): { rows: R
 }
 
 describe("postgres account store", () => {
+  it.each(["github", "gravatar"])(
+    "preserves %s avatar identity through the account store facade",
+    async (source) => {
+      const query = vi.fn().mockResolvedValue({
+        rows: [
+          {
+            user_id: "usr_123",
+            avatar_source: source,
+            avatar_object_key: "avatars/usr_123.png",
+            avatar_content_type: "image/png",
+            avatar_updated_at: "2026-11-04T12:00:00.000Z"
+          }
+        ]
+      });
+      expect(
+        await createPostgresAccountStore({ query }).getUserAvatar({ user_id: "usr_123" })
+      ).toEqual({
+        user_id: "usr_123",
+        source,
+        object_key: "avatars/usr_123.png",
+        content_type: "image/png",
+        updated_at: "2026-11-04T12:00:00.000Z"
+      });
+      expect(query).toHaveBeenCalledWith(expect.stringContaining("FROM users"), ["usr_123"]);
+    }
+  );
+  it.each(["member", "admin"])(
+    "rejects account deletion after current owner-role loss to %s",
+    async (role) => {
+      const query = vi.fn(
+        async (sql: string) =>
+          projectDeletionControlRows(sql) ?? { rows: sql.includes("SELECT role") ? [{ role }] : [] }
+      );
+      const result = await createPostgresAccountStore({
+        query: query as Queryable["query"]
+      }).deleteAccountForOrganization({
+        organization_id: "org_123",
+        user_id: "usr_123",
+        deleted_at: "2026-11-04T12:00:00.000Z"
+      });
+      expect(result).toBeNull();
+      expect(query.mock.calls.some(([sql]) => sql.includes("DELETE FROM"))).toBe(false);
+    }
+  );
   it("returns null export when the user is not a member of the organization", async (): Promise<void> => {
     const query = vi.fn().mockResolvedValue(rowsResult([]));
     const store = createPostgresAccountStore({ query } as Queryable);
@@ -27,14 +72,30 @@ describe("postgres account store", () => {
 
   it("exports account data with project-scoped records", async (): Promise<void> => {
     const query = vi.fn(async (sqlText: string) => {
+      const control = projectDeletionControlRows(sqlText, ["proj_123", "proj_456"]);
+      if (control) return control;
       if (sqlText.includes("FROM users u")) {
-        return rowsResult([{ data: { user_id: "usr_123", email: "owen@example.com", has_email_auth: true, has_github_oauth: true } }]);
+        return rowsResult([
+          {
+            data: {
+              user_id: "usr_123",
+              email: "owen@example.com",
+              has_email_auth: true,
+              has_github_oauth: true
+            }
+          }
+        ]);
       }
       if (sqlText.includes("FROM organizations o")) {
         return rowsResult([{ data: { organization_id: "org_123", name: "Acme" } }]);
       }
-      if (sqlText.includes("FROM organization_members om") && sqlText.includes("JOIN users u ON u.id = om.user_id")) {
-        return rowsResult([{ data: { user_id: "usr_123", email: "owen@example.com", role: "owner" } }]);
+      if (
+        sqlText.includes("FROM organization_members om") &&
+        sqlText.includes("JOIN users u ON u.id = om.user_id")
+      ) {
+        return rowsResult([
+          { data: { user_id: "usr_123", email: "owen@example.com", role: "owner" } }
+        ]);
       }
       if (sqlText.includes("FROM project_invites")) {
         return rowsResult([{ data: { invite_id: "inv_123" } }]);
@@ -46,7 +107,9 @@ describe("postgres account store", () => {
         return rowsResult([{ data: { project_id: "proj_123", name: "Main App" } }]);
       }
       if (sqlText.includes("FROM project_members")) {
-        return rowsResult([{ data: { project_member_id: "pm_123", project_id: "proj_123", user_id: "usr_456" } }]);
+        return rowsResult([
+          { data: { project_member_id: "pm_123", project_id: "proj_123", user_id: "usr_456" } }
+        ]);
       }
       if (sqlText.includes("FROM project_tokens")) {
         return rowsResult([{ data: { token_id: "proj_tok_123", project_id: "proj_123" } }]);
@@ -66,8 +129,13 @@ describe("postgres account store", () => {
       if (sqlText.includes("FROM processed_events")) {
         return rowsResult([{ data: { project_id: "proj_123", event_id: "evt_123" } }]);
       }
-      if (sqlText.includes("FROM improvement_opportunities") && !sqlText.includes("JOIN improvement_opportunities")) {
-        return rowsResult([{ data: { improvement_opportunity_id: "imp_123", project_id: "proj_123" } }]);
+      if (
+        sqlText.includes("FROM improvement_opportunities") &&
+        !sqlText.includes("JOIN improvement_opportunities")
+      ) {
+        return rowsResult([
+          { data: { improvement_opportunity_id: "imp_123", project_id: "proj_123" } }
+        ]);
       }
       if (sqlText.includes("FROM incidents") && !sqlText.includes("JOIN incidents ON")) {
         return rowsResult([{ data: { incident_id: "inc_123", project_id: "proj_123" } }]);
@@ -79,10 +147,14 @@ describe("postgres account store", () => {
         return rowsResult([{ data: { alert_id: "alert_123", project_id: "proj_123" } }]);
       }
       if (sqlText.includes("FROM slack_destinations")) {
-        return rowsResult([{ data: { slack_destination_id: "sd_123", organization_id: "org_123" } }]);
+        return rowsResult([
+          { data: { slack_destination_id: "sd_123", organization_id: "org_123" } }
+        ]);
       }
       if (sqlText.includes("FROM alert_deliveries")) {
-        return rowsResult([{ data: { delivery_id: "alert_delivery_123", project_id: "proj_123" } }]);
+        return rowsResult([
+          { data: { delivery_id: "alert_delivery_123", project_id: "proj_123" } }
+        ]);
       }
       if (sqlText.includes("FROM alert_email_digests")) {
         return rowsResult([{ data: { digest_id: "aed_123", project_id: "proj_123" } }]);
@@ -91,7 +163,9 @@ describe("postgres account store", () => {
         return rowsResult([{ data: { digest_item_id: "aedi_123", project_id: "proj_123" } }]);
       }
       if (sqlText.includes("FROM weekly_report_channels")) {
-        return rowsResult([{ data: { weekly_report_channel_id: "wrc_123", project_id: "proj_123" } }]);
+        return rowsResult([
+          { data: { weekly_report_channel_id: "wrc_123", project_id: "proj_123" } }
+        ]);
       }
       if (sqlText.includes("FROM weekly_report_deliveries")) {
         return rowsResult([{ data: { delivery_id: "wrd_123", project_id: "proj_123" } }]);
@@ -101,13 +175,17 @@ describe("postgres account store", () => {
       }
       if (sqlText.includes("FROM agent_tokens")) {
         expect(sqlText).not.toContain("token_hash");
-        return rowsResult([{ data: { token_id: "at_123", project_id: "proj_123", scope: "incident:read-minimized" } }]);
+        return rowsResult([
+          { data: { token_id: "at_123", project_id: "proj_123", scope: "incident:read-minimized" } }
+        ]);
       }
       if (sqlText.includes("FROM webhook_deliveries")) {
         return rowsResult([{ data: { delivery_id: "whd_123", project_id: "proj_123" } }]);
       }
       if (sqlText.includes("FROM project_github_repos")) {
-        return rowsResult([{ data: { project_github_repo_id: "pgr_123", project_id: "proj_123" } }]);
+        return rowsResult([
+          { data: { project_github_repo_id: "pgr_123", project_id: "proj_123" } }
+        ]);
       }
       if (sqlText.includes("FROM github_dispatch_rules")) {
         return rowsResult([{ data: { rule_id: "rule_123", project_id: "proj_123" } }]);
@@ -116,13 +194,32 @@ describe("postgres account store", () => {
         return rowsResult([{ data: { delivery_id: "ghd_123", project_id: "proj_123" } }]);
       }
       if (sqlText.includes("FROM incident_events")) {
-        return rowsResult([{ data: { incident_id: "inc_123", project_id: "proj_123", event_id: "evt_123", is_sampled: true } }]);
+        return rowsResult([
+          {
+            data: {
+              incident_id: "inc_123",
+              project_id: "proj_123",
+              event_id: "evt_123",
+              is_sampled: true
+            }
+          }
+        ]);
       }
       if (sqlText.includes("FROM improvement_opportunity_events")) {
-        return rowsResult([{ data: { improvement_opportunity_id: "imp_123", project_id: "proj_123", event_id: "evt_imp_123" } }]);
+        return rowsResult([
+          {
+            data: {
+              improvement_opportunity_id: "imp_123",
+              project_id: "proj_123",
+              event_id: "evt_imp_123"
+            }
+          }
+        ]);
       }
       if (sqlText.includes("FROM github_installations")) {
-        return rowsResult([{ data: { github_installation_id: "ghi_123", organization_id: "org_123" } }]);
+        return rowsResult([
+          { data: { github_installation_id: "ghi_123", organization_id: "org_123" } }
+        ]);
       }
       if (sqlText.includes("FROM github_marketplace_accounts")) {
         return rowsResult([{ data: { marketplace_account_id: 42, organization_id: "org_123" } }]);
@@ -137,19 +234,33 @@ describe("postgres account store", () => {
         return rowsResult([{ data: { delivery_id: "ghm_123", marketplace_account_id: 42 } }]);
       }
       if (sqlText.includes("FROM plan_cleanup_tasks")) {
-        return rowsResult([{ data: { task_id: "pct_123", organization_id: "org_123", project_id: "proj_123" } }]);
+        return rowsResult([
+          { data: { task_id: "pct_123", organization_id: "org_123", project_id: "proj_123" } }
+        ]);
       }
       if (sqlText.includes("FROM operational_email_deliveries")) {
-        return rowsResult([{ data: { delivery_id: "op_email_123", organization_id: "org_123", project_id: "proj_123" } }]);
+        return rowsResult([
+          {
+            data: {
+              delivery_id: "op_email_123",
+              organization_id: "org_123",
+              project_id: "proj_123"
+            }
+          }
+        ]);
       }
       if (sqlText.includes("FROM audit_logs")) {
         return rowsResult([{ data: { audit_log_id: "audit_123", organization_id: "org_123" } }]);
       }
 
-      if (sqlText.includes("FROM notification_preferences")) return rowsResult([{ user_id: "usr_123", preferences: {} }]);
-      if (sqlText.includes("FROM notification_daily_batches")) return rowsResult([{ id: "daily_123", recipient: "owen@example.com" }]);
-      if (sqlText.includes("FROM notification_daily_items")) return rowsResult([{ batch_id: "daily_123", project_id: "proj_123" }]);
-      if (sqlText.includes("FROM notification_daily_allowance_usage")) return rowsResult([{ batch_id: "daily_123", project_id: "proj_123", billable: true }]);
+      if (sqlText.includes("FROM notification_preferences"))
+        return rowsResult([{ user_id: "usr_123", preferences: {} }]);
+      if (sqlText.includes("FROM notification_daily_batches"))
+        return rowsResult([{ id: "daily_123", recipient: "owen@example.com" }]);
+      if (sqlText.includes("FROM notification_daily_items"))
+        return rowsResult([{ batch_id: "daily_123", project_id: "proj_123" }]);
+      if (sqlText.includes("FROM notification_daily_allowance_usage"))
+        return rowsResult([{ batch_id: "daily_123", project_id: "proj_123", billable: true }]);
 
       throw new Error(`Unhandled SQL in exportAccountForOrganization: ${sqlText}`);
     });
@@ -167,16 +278,22 @@ describe("postgres account store", () => {
         notification_preferences: [{ user_id: "usr_123", preferences: {} }],
         notification_daily_batches: [{ id: "daily_123", recipient: "owen@example.com" }],
         notification_daily_items: [{ batch_id: "daily_123", project_id: "proj_123" }],
-        notification_daily_allowance_usage: [{ batch_id: "daily_123", project_id: "proj_123", billable: true }],
+        notification_daily_allowance_usage: [
+          { batch_id: "daily_123", project_id: "proj_123", billable: true }
+        ],
         export_version: 1,
         exported_at: "2026-04-06T00:00:00.000Z",
         user: expect.objectContaining({ user_id: "usr_123" }),
         organization: expect.objectContaining({ organization_id: "org_123" }),
         projects: [expect.objectContaining({ project_id: "proj_123" })],
-        agent_tokens: [expect.objectContaining({ token_id: "at_123", scope: "incident:read-minimized" })],
+        agent_tokens: [
+          expect.objectContaining({ token_id: "at_123", scope: "incident:read-minimized" })
+        ],
         project_members: [expect.objectContaining({ project_member_id: "pm_123" })],
         probe_activations: [expect.objectContaining({ activation_id: "probe_123" })],
-        improvement_opportunities: [expect.objectContaining({ improvement_opportunity_id: "imp_123" })],
+        improvement_opportunities: [
+          expect.objectContaining({ improvement_opportunity_id: "imp_123" })
+        ],
         improvement_opportunity_events: [expect.objectContaining({ event_id: "evt_imp_123" })],
         incidents: [expect.objectContaining({ incident_id: "inc_123" })],
         incident_events: [expect.objectContaining({ event_id: "evt_123" })],
@@ -197,6 +314,8 @@ describe("postgres account store", () => {
 
   it("blocks deletion when the user is the sole owner of another organization", async (): Promise<void> => {
     const query = vi.fn(async (sqlText: string) => {
+      const control = projectDeletionControlRows(sqlText, ["proj_123", "proj_456"]);
+      if (control) return control;
       if (sqlText === "BEGIN") {
         return rowsResult([]);
       }
@@ -227,6 +346,8 @@ describe("postgres account store", () => {
 
   it("blocks deletion when the user owns a project in another organization", async (): Promise<void> => {
     const query = vi.fn(async (sqlText: string) => {
+      const control = projectDeletionControlRows(sqlText, ["proj_123", "proj_456"]);
+      if (control) return control;
       if (sqlText === "BEGIN") {
         return rowsResult([]);
       }
@@ -243,7 +364,9 @@ describe("postgres account store", () => {
         return rowsResult([]);
       }
 
-      throw new Error(`Unhandled SQL in deleteAccountForOrganization project-owner guard: ${sqlText}`);
+      throw new Error(
+        `Unhandled SQL in deleteAccountForOrganization project-owner guard: ${sqlText}`
+      );
     });
 
     const store = createPostgresAccountStore({ query } as Queryable);
@@ -260,6 +383,8 @@ describe("postgres account store", () => {
 
   it("deletes organization, remaining memberships, and the user record", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string) => {
+      const control = projectDeletionControlRows(sqlText, ["proj_123", "proj_456"]);
+      if (control) return control;
       if (sqlText.includes("SELECT role") && sqlText.includes("FROM organization_members")) {
         return rowsResult([{ role: "owner" }]);
       }
@@ -281,13 +406,20 @@ describe("postgres account store", () => {
           }
         ]);
       }
-      if (sqlText.includes("DELETE FROM member_tokens") && sqlText.includes("WHERE organization_id = $1")) {
+      if (
+        sqlText.includes("DELETE FROM member_tokens") &&
+        sqlText.includes("WHERE organization_id = $1")
+      ) {
         return rowsResult([{ token_id: "tok_123" }]);
       }
       if (sqlText.includes("FROM account_analytics_accounts")) {
         return rowsResult([{ analytics_account_id: "analytics_123" }]);
       }
-      if (sqlText.includes("SELECT") && sqlText.includes("FROM organizations") && sqlText.includes("created_at::text AS created_at")) {
+      if (
+        sqlText.includes("SELECT") &&
+        sqlText.includes("FROM organizations") &&
+        sqlText.includes("created_at::text AS created_at")
+      ) {
         return rowsResult([
           {
             organization_id: "org_123",
@@ -334,7 +466,10 @@ describe("postgres account store", () => {
       if (sqlText.includes("DELETE FROM processed_billing_events")) {
         return rowsResult([]);
       }
-      if (sqlText.includes("DELETE FROM audit_logs") && sqlText.includes("WHERE organization_id = $1")) {
+      if (
+        sqlText.includes("DELETE FROM audit_logs") &&
+        sqlText.includes("WHERE organization_id = $1")
+      ) {
         return rowsResult([]);
       }
       if (sqlText.includes("DELETE FROM projects")) {
@@ -343,13 +478,19 @@ describe("postgres account store", () => {
       if (sqlText.includes("DELETE FROM organizations")) {
         return rowsResult([{ organization_id: "org_123" }]);
       }
-      if (sqlText.includes("DELETE FROM organization_members") && sqlText.includes("WHERE user_id = $1")) {
+      if (
+        sqlText.includes("DELETE FROM organization_members") &&
+        sqlText.includes("WHERE user_id = $1")
+      ) {
         return rowsResult([]);
       }
       if (sqlText.includes("DELETE FROM member_tokens") && sqlText.includes("WHERE user_id = $1")) {
         return rowsResult([{ token_id: "tok_user_123" }]);
       }
-      if (sqlText.includes("DELETE FROM audit_logs") && sqlText.includes("WHERE actor_user_id = $1")) {
+      if (
+        sqlText.includes("DELETE FROM audit_logs") &&
+        sqlText.includes("WHERE actor_user_id = $1")
+      ) {
         return rowsResult([]);
       }
       if (sqlText.includes("DELETE FROM notification_daily_batches")) return rowsResult([]);
@@ -401,6 +542,8 @@ describe("postgres account store", () => {
 
   it("allows deletion when another organization still has a different owner and removes the collaborator membership", async (): Promise<void> => {
     const query = vi.fn(async (sqlText: string) => {
+      const control = projectDeletionControlRows(sqlText, ["proj_123", "proj_456"]);
+      if (control) return control;
       if (sqlText === "BEGIN" || sqlText === "COMMIT") {
         return rowsResult([]);
       }
@@ -425,13 +568,19 @@ describe("postgres account store", () => {
           }
         ]);
       }
-      if (sqlText.includes("DELETE FROM member_tokens") && sqlText.includes("WHERE organization_id = $1")) {
+      if (
+        sqlText.includes("DELETE FROM member_tokens") &&
+        sqlText.includes("WHERE organization_id = $1")
+      ) {
         return rowsResult([]);
       }
       if (sqlText.includes("DELETE FROM processed_billing_events")) {
         return rowsResult([]);
       }
-      if (sqlText.includes("DELETE FROM audit_logs") && sqlText.includes("WHERE organization_id = $1")) {
+      if (
+        sqlText.includes("DELETE FROM audit_logs") &&
+        sqlText.includes("WHERE organization_id = $1")
+      ) {
         return rowsResult([]);
       }
       if (sqlText.includes("DELETE FROM projects")) {
@@ -440,13 +589,19 @@ describe("postgres account store", () => {
       if (sqlText.includes("DELETE FROM organizations")) {
         return rowsResult([{ organization_id: "org_123" }]);
       }
-      if (sqlText.includes("DELETE FROM organization_members") && sqlText.includes("WHERE user_id = $1")) {
+      if (
+        sqlText.includes("DELETE FROM organization_members") &&
+        sqlText.includes("WHERE user_id = $1")
+      ) {
         return rowsResult([]);
       }
       if (sqlText.includes("DELETE FROM member_tokens") && sqlText.includes("WHERE user_id = $1")) {
         return rowsResult([{ token_id: "tok_user_123" }]);
       }
-      if (sqlText.includes("DELETE FROM audit_logs") && sqlText.includes("WHERE actor_user_id = $1")) {
+      if (
+        sqlText.includes("DELETE FROM audit_logs") &&
+        sqlText.includes("WHERE actor_user_id = $1")
+      ) {
         return rowsResult([]);
       }
       if (sqlText.includes("DELETE FROM notification_daily_batches")) return rowsResult([]);
@@ -454,7 +609,9 @@ describe("postgres account store", () => {
         return rowsResult([]);
       }
 
-      throw new Error(`Unhandled SQL in deleteAccountForOrganization collaborator cleanup: ${sqlText}`);
+      throw new Error(
+        `Unhandled SQL in deleteAccountForOrganization collaborator cleanup: ${sqlText}`
+      );
     });
 
     const store = createPostgresAccountStore({ query } as Queryable);
@@ -472,7 +629,10 @@ describe("postgres account store", () => {
       user_deleted: true,
       deleted_member_token_count: 1
     });
-    expect(query).toHaveBeenCalledWith(expect.stringContaining("DELETE FROM notification_daily_batches"), ["usr_123"]);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("DELETE FROM notification_daily_batches"),
+      ["usr_123"]
+    );
     expect(query).toHaveBeenCalledWith("COMMIT", []);
   });
 });

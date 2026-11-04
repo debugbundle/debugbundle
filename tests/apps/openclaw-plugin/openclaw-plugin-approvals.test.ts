@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import plugin, {
+  DEBUGBUNDLE_OPENCLAW_TOOL_NAMES,
   DEBUGBUNDLE_OPENCLAW_OPTIONAL_TOOL_NAMES
 } from "../../../apps/openclaw-plugin/src/index.js";
 
@@ -15,7 +16,9 @@ describe("OpenClaw mutation approval registration", () => {
     const on = vi.fn();
     const registerTool = vi.fn();
     plugin.register({ on, registerTool, pluginConfig: {} } as never);
-    expect(getToolPluginMetadata(plugin)?.tools).toHaveLength(139);
+    expect(getToolPluginMetadata(plugin)?.tools).toHaveLength(
+      DEBUGBUNDLE_OPENCLAW_TOOL_NAMES.length
+    );
     expect(on).toHaveBeenCalledWith("before_tool_call", expect.any(Function));
     const hook = on.mock.calls[0]?.[1] as (event: unknown) => unknown;
     expect(DEBUGBUNDLE_OPENCLAW_OPTIONAL_TOOL_NAMES).toEqual(
@@ -24,6 +27,11 @@ describe("OpenClaw mutation approval registration", () => {
         "debugbundle_update_notification_preferences",
         "debugbundle_pause_notifications",
         "debugbundle_resume_notifications",
+        "debugbundle_apply_project_merge",
+        "debugbundle_resume_project_merge",
+        "debugbundle_cancel_project_merge",
+        "debugbundle_create_service_definition",
+        "debugbundle_update_service_definition",
         "debugbundle_billing_plan_change"
       ])
     );
@@ -44,7 +52,7 @@ describe("OpenClaw mutation approval registration", () => {
     }
     expect(hook({ toolName: "debugbundle_list_incidents", params: {} })).toBeUndefined();
     expect(hook({ toolName: "other_plugin_delete", params: {} })).toBeUndefined();
-    expect(registerTool).toHaveBeenCalledTimes(139);
+    expect(registerTool).toHaveBeenCalledTimes(DEBUGBUNDLE_OPENCLAW_TOOL_NAMES.length);
   });
 
   it("fails before registering tools when the host cannot install the safety hook", () => {

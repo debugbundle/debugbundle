@@ -2,6 +2,7 @@ export const AVAILABILITY_CHECK_BOOTSTRAP_STATEMENTS = [
   `
     CREATE TABLE availability_checks (
       id uuid PRIMARY KEY,
+      service_definition_id uuid REFERENCES service_definitions(id) ON DELETE RESTRICT,
       project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       created_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
       name text NOT NULL,

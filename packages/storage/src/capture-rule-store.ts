@@ -1,4 +1,10 @@
-import type { CaptureRule, CaptureRuleAction, CaptureRuleMatcher, CaptureRuleSampleEventClass } from "../../shared-types/src/index.js";
+import type {
+  CaptureRule,
+  CaptureRuleAction,
+  CaptureRuleMatcher,
+  CaptureRuleSampleEventClass,
+  CaptureRuleUpdate
+} from "../../shared-types/src/index.js";
 import type { Queryable } from "./types.js";
 
 type CaptureRuleRow = Omit<
@@ -16,7 +22,10 @@ type CaptureRuleRow = Omit<
 export interface CaptureRuleStore {
   getCaptureRuleById(input: { id: string; project_id: string }): Promise<CaptureRule | null>;
   listCaptureRulesByProjectId(projectId: string): Promise<CaptureRule[]>;
-  listActiveCaptureRulesByProjectId(input: { project_id: string; now: string }): Promise<CaptureRule[]>;
+  listActiveCaptureRulesByProjectId(input: {
+    project_id: string;
+    now: string;
+  }): Promise<CaptureRule[]>;
   createCaptureRule(input: {
     id: string;
     project_id: string;
@@ -32,31 +41,28 @@ export interface CaptureRuleStore {
     created_from_event_id?: string | null;
     expires_at?: string | null;
   }): Promise<CaptureRule>;
-  updateCaptureRule(input: {
+  updateCaptureRule(
+    input: { id: string; project_id: string } & CaptureRuleUpdate
+  ): Promise<CaptureRule | null>;
+  deleteCaptureRule(input: { id: string; project_id: string }): Promise<boolean>;
+  recordCaptureRuleMatch(input: {
     id: string;
     project_id: string;
-    name?: string;
-    description?: string | null;
-    enabled?: boolean;
-    action?: CaptureRuleAction;
-    matcher?: CaptureRuleMatcher;
-    sample_rate?: number | null;
-    sample_event_class?: CaptureRuleSampleEventClass | null;
-    expires_at?: string | null;
-  }): Promise<CaptureRule | null>;
-  deleteCaptureRule(input: { id: string; project_id: string }): Promise<boolean>;
-  recordCaptureRuleMatch(input: { id: string; project_id: string; matched_at: string }): Promise<void>;
+    matched_at: string;
+  }): Promise<void>;
 }
 
-function selectColumns(): string {
+function selectColumns(viewParameter?: string): string {
   return `
     id,
     project_id,
+    scope_origin_ids,
+    ${viewParameter ? `CASE WHEN ${viewParameter}::uuid=debugbundle_canonical_project(${viewParameter}::uuid) THEN ${viewParameter}::uuid ELSE filter_project_id END AS filter_project_id` : "filter_project_id"},
     name,
     description,
     enabled,
     action,
-    matcher,
+    ${viewParameter ? `debugbundle_rule_view_matcher(${viewParameter}::uuid,COALESCE(filter_project_id,project_id),matcher) AS matcher` : "matcher"},
     sample_rate,
     sample_event_class,
     created_by_user_id,
@@ -95,9 +101,9 @@ export function createPostgresCaptureRuleStore(db: Queryable): CaptureRuleStore 
     async getCaptureRuleById(input) {
       const result = await db.query<CaptureRuleRow>(
         `
-          SELECT ${selectColumns()}
+          SELECT ${selectColumns("$2")}
           FROM capture_rules
-          WHERE id = $1 AND project_id = $2
+          WHERE id = $1 AND project_id=ANY(debugbundle_project_origins($2::uuid))
           LIMIT 1
         `,
         [input.id, input.project_id]
@@ -109,9 +115,9 @@ export function createPostgresCaptureRuleStore(db: Queryable): CaptureRuleStore 
     async listCaptureRulesByProjectId(projectId) {
       const result = await db.query<CaptureRuleRow>(
         `
-          SELECT ${selectColumns()}
+          SELECT ${selectColumns("$1")}
           FROM capture_rules
-          WHERE project_id = $1
+          WHERE project_id=ANY(debugbundle_project_origins($1::uuid))
           ORDER BY updated_at DESC, created_at DESC, id ASC
         `,
         [projectId]
@@ -121,19 +127,28 @@ export function createPostgresCaptureRuleStore(db: Queryable): CaptureRuleStore 
     },
 
     async listActiveCaptureRulesByProjectId(input) {
-      const result = await db.query<CaptureRuleRow>(
+      const result = await db.query<CaptureRuleRow & { runtime_service_names?: string[] | null }>(
         `
-          SELECT ${selectColumns()}
-          FROM capture_rules
-          WHERE project_id = $1
-            AND enabled = TRUE
-            AND (expires_at IS NULL OR expires_at > $2::timestamptz)
-          ORDER BY updated_at DESC, created_at DESC, id ASC
-        `,
+        SELECT ${selectColumns()},debugbundle_rule_service_names(COALESCE(filter_project_id,project_id),$1::uuid,matcher->'services') AS runtime_service_names
+        FROM capture_rules
+        WHERE project_id=ANY(debugbundle_project_origins(debugbundle_canonical_project($1::uuid)))
+          AND $1::uuid=ANY(COALESCE(scope_origin_ids,ARRAY[project_id]))
+          AND enabled=TRUE AND (expires_at IS NULL OR expires_at>$2::timestamptz)
+        ORDER BY updated_at DESC,created_at DESC,id ASC`,
         [input.project_id, input.now]
       );
-
-      return result.rows.map(normalizeCaptureRuleRow);
+      return result.rows.flatMap(({ runtime_service_names, ...row }) => {
+        if (runtime_service_names?.length === 0) return [];
+        const record = normalizeCaptureRuleRow(row);
+        return [
+          {
+            ...record,
+            matcher: runtime_service_names
+              ? { ...record.matcher, services: runtime_service_names }
+              : record.matcher
+          }
+        ];
+      });
     },
 
     async createCaptureRule(input) {
@@ -174,7 +189,7 @@ export function createPostgresCaptureRuleStore(db: Queryable): CaptureRuleStore 
           input.created_by_user_id ?? null,
           input.created_from_incident_id ?? null,
           input.created_from_event_id ?? null,
-          input.expires_at ?? null,
+          input.expires_at ?? null
         ]
       );
 
@@ -234,6 +249,17 @@ export function createPostgresCaptureRuleStore(db: Queryable): CaptureRuleStore 
         paramIndex += 1;
       }
 
+      if (input.project_scope === "current_project") {
+        updates.push(`scope_origin_ids = debugbundle_project_origins($${paramIndex}::uuid)`);
+        params.push(input.project_id);
+        paramIndex += 1;
+      }
+      if (input.matcher !== undefined) {
+        updates.push(`filter_project_id = $${paramIndex}::uuid`);
+        params.push(input.project_id);
+        paramIndex += 1;
+      }
+
       if (updates.length === 0) {
         throw new Error("capture_rule_update_empty");
       }
@@ -243,10 +269,11 @@ export function createPostgresCaptureRuleStore(db: Queryable): CaptureRuleStore 
 
       const result = await db.query<CaptureRuleRow>(
         `
+          WITH checked AS MATERIALIZED(SELECT debugbundle_begin_project_rule_write($${paramIndex + 1}::uuid) AS allowed)
           UPDATE capture_rules
           SET ${updates.join(", ")}
-          WHERE id = $${paramIndex} AND project_id = $${paramIndex + 1}
-          RETURNING ${selectColumns()}
+          FROM checked WHERE checked.allowed AND id = $${paramIndex} AND project_id=ANY(debugbundle_project_origins($${paramIndex + 1}::uuid))
+          RETURNING ${selectColumns(`$${paramIndex + 1}`)}
         `,
         params
       );
@@ -257,8 +284,9 @@ export function createPostgresCaptureRuleStore(db: Queryable): CaptureRuleStore 
     async deleteCaptureRule(input) {
       const result = await db.query<{ id: string }>(
         `
-          DELETE FROM capture_rules
-          WHERE id = $1 AND project_id = $2
+          WITH checked AS MATERIALIZED(SELECT debugbundle_begin_project_rule_write($2::uuid) AS allowed)
+          DELETE FROM capture_rules USING checked
+          WHERE checked.allowed AND id = $1 AND project_id=ANY(debugbundle_project_origins($2::uuid))
           RETURNING id
         `,
         [input.id, input.project_id]
@@ -274,10 +302,11 @@ export function createPostgresCaptureRuleStore(db: Queryable): CaptureRuleStore 
           SET hit_count = hit_count + 1,
               last_matched_at = $1::timestamptz,
               updated_at = updated_at
-          WHERE id = $2 AND project_id = $3
+          WHERE id = $2 AND $3::uuid=ANY(COALESCE(scope_origin_ids,ARRAY[project_id]))
+            AND debugbundle_canonical_project(project_id)=debugbundle_canonical_project($3::uuid)
         `,
         [input.matched_at, input.id, input.project_id]
       );
-    },
+    }
   };
 }

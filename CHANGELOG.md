@@ -6,6 +6,23 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.21.0] - 2026-11-04
+
+### Added
+
+- Add logical services with repository context and environments inside one
+  project, plus checked API/CLI/MCP consolidation without a Product/Group layer
+  or a new tier requirement. Preserve existing IDs, tokens, evidence and scopes.
+- Add a secret-free adoption manifest and checked one-repository CLI preview/apply,
+  preserving local service names, credentials, custom profile data and caches.
+- Add two forward migrations, readiness guards and bounded cutover/recovery
+  qualification. Apply remains disabled by default. Release, live consolidation,
+  consumer adoption and deployed-runtime acceptance are separate gates.
+- Preserve daily-notification rule scopes and canonical recipient membership, and recheck pauses changed during delivery preparation.
+- Release CLI/MCP/OpenClaw 1.19.0 and shared-types 3.1.0 independently; existing SDK wire formats and installed credentials remain compatible.
+
+## Earlier independently published client releases
+
 ### CLI 1.18.2 and MCP/OpenClaw 1.18.3 — 2026-11-03
 
 - Restrict the connected `doctor` authentication probe to its configured project

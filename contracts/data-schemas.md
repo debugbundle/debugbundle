@@ -1209,6 +1209,29 @@ The signed-in Settings projection is derived from `oauth_authorization_grants` j
 
 ### 5.6 services
 
+`service_definition_id` is an additive stable logical-service reference. Existing
+`id`/public `service_id` continues to identify the environment-specific instance.
+`service_definitions` owns `id`, canonical `project_id`, immutable
+`origin_project_id`/`input_name` lineage, unique `(project_id,name)`, optional
+`description`, `repository_url`, `repository_root`, and creation/update times.
+An installed predecessor's instance inserts acquire the link at the database
+boundary; no SDK upgrade is required. The real forward migration is
+`202611030001_add_service_definitions`; dependent API/worker readiness requires
+its checksum. Bootstrap only creates the final empty schema. Consolidation
+contracts and outstanding qualification are in `spec/project-service-consolidation.md`.
+
+The companion consolidation migration `202611030002_add_project_consolidation`
+also adds `availability_checks.service_definition_id` (nullable FK to logical
+services, RESTRICT), with exact configured-name backfill and origin validation.
+Health results, rollups and check project IDs stay original. Analytics funnel
+definitions and bundle generations add immutable `scope_origin_ids uuid[]`;
+historical NULL means original project only. Weekly deliveries use the same
+snapshot convention. `weekly_report_channel_aliases` retains and flattens
+equivalent schedule identities and the originating operation reference. Weekly
+channel deletion sets historical delivery channel IDs to NULL rather than deleting
+accepted claims. All final bootstrap columns/functions are created directly;
+existing databases receive these additions only through the forward migration.
+
 | Column      | Type                            | Constraints                   |
 | ----------- | ------------------------------- | ----------------------------- |
 | id          | uuid                            | PK                            |
@@ -1570,21 +1593,30 @@ Digest-item notification keys follow the same cooldown semantics as immediate de
 
 ### 5.14 probe_activations (Remote Activations — Solo+ Only)
 
-| Column             | Type        | Constraints            |
-| ------------------ | ----------- | ---------------------- |
-| id                 | uuid        | PK                     |
-| project_id         | uuid        | FK → projects, CASCADE |
-| label_pattern      | text        | NOT NULL               |
-| service            | text        | NOT NULL DEFAULT '\*'  |
-| environment        | text        | NOT NULL DEFAULT '\*'  |
-| activated_by       | uuid        | FK → users             |
-| trigger_token_hash | text        | NOT NULL               |
-| expires_at         | timestamptz | NOT NULL               |
-| trigger_expires_at | timestamptz | NOT NULL               |
-| deactivated_at     | timestamptz |                        |
-| created_at         | timestamptz | NOT NULL DEFAULT now() |
+| Column                | Type        | Constraints                                                   |
+| --------------------- | ----------- | ------------------------------------------------------------- |
+| id                    | uuid        | PK                                                            |
+| project_id            | uuid        | FK → projects, CASCADE                                        |
+| label_pattern         | text        | NOT NULL                                                      |
+| service               | text        | NOT NULL DEFAULT '\*'                                         |
+| environment           | text        | NOT NULL DEFAULT '\*'                                         |
+| created_by_member_id  | uuid        | NOT NULL; creating user identity                              |
+| trigger_token_hash    | text        | Nullable for installed predecessors; SHA-256 for new tokens   |
+| scope_origin_ids      | uuid[]      | Immutable snapshot; legacy NULL means original project only   |
+| service_definition_id | uuid        | Nullable FK; named activation links immutable service lineage |
+| expires_at            | timestamptz | NOT NULL                                                      |
+| trigger_expires_at    | timestamptz | NOT NULL                                                      |
+| deactivated_at        | timestamptz |                                                               |
+| created_at            | timestamptz | NOT NULL DEFAULT now()                                        |
 
 This table only tracks **remote activations** (Solo+). Always-on probe mode has no server-side state — ring buffers are purely local to the SDK.
+
+The consolidation forward migration adds the token hash column expected by the
+activation writer; it does not rewrite the predecessor ledger. Existing activation
+IDs/expiry/signing keys remain intact. Named activations use original project/input
+names; canonical management and SDK configuration project retained service names.
+Only `deactivated_at` may change after creation. The five-active-probe limit spans
+all canonical origins and is protected by the project write fence.
 
 **Indexes:**
 

@@ -643,6 +643,22 @@ describe("retrieval api client", () => {
     });
   });
 
+  it("forwards an explicit service page offset without changing the response shape", async () => {
+    const request = vi.fn<HttpClient["request"]>().mockResolvedValue({
+      status: 200,
+      body: { services: [] }
+    });
+    const api = createRetrievalApi({ request });
+    await expect(
+      api.listServices({ bearerToken: "member", projectId: "project", limit: 100, offset: 1100 })
+    ).resolves.toEqual([]);
+    expect(request).toHaveBeenCalledWith({
+      method: "GET",
+      path: "/v1/services?project_id=project&limit=100&offset=1100",
+      bearerToken: "member"
+    });
+  });
+
   it("calls logs route with incident filter, level, cursor, and limit", async () => {
     const request = vi.fn<HttpClient["request"]>().mockResolvedValue({
       status: 200,

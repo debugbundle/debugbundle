@@ -1074,7 +1074,7 @@ Free-tier mobile SDKs skip remote probe activation checks unless the config resp
     }
   ],
   "poll_interval_ms": 60000,
-  "trigger_token_key": "project-scoped signing key for trigger-token validation"
+  "trigger_token_key": "credential-snapshot-scoped signing key for trigger-token validation"
 }
 ```
 
@@ -1102,6 +1102,16 @@ When active probes exist for a paid-tier project, the `POST /v1/events` response
 ```
 
 `probe_directives` is omitted when no active remote probes exist or for free-tier projects (no payload bloat).
+
+In the unreleased project/service consolidation candidate, installed tokens keep
+their issuer, key and origin snapshot. Configuration and piggyback directives
+project narrower original wildcards onto service names inside that snapshot;
+multiple service directives may retain one activation ID. Multi-origin credentials
+receive no SDK-side capture rules: the server evaluates the full origin-scoped set.
+The envelope, matching rules, trigger signatures and directive array are unchanged.
+Optional piggyback refresh failure cannot reject an already durable event batch.
+SDK configuration caches vary by Authorization, Origin and negotiated capability
+headers. Family source/installed-artifact qualification remains a separate gate.
 
 ### Instrumentation and interpretation
 
@@ -1150,7 +1160,7 @@ Trigger tokens have their own independent TTL (up to 24 hours), which can be lon
 **SDK validation (local, no API call):**
 
 1. Extract trigger token from query param or header (header takes precedence if both present).
-2. Verify HMAC-SHA256 signature using the project-scoped `trigger_token_key` delivered by `GET /v1/sdk/config`.
+2. Verify HMAC-SHA256 using the credential-snapshot-scoped `trigger_token_key` delivered by `GET /v1/sdk/config`. Original single-origin credentials retain their deployed key; deliberately broader credentials use a separate key bound to their saved origin scope.
 3. Check `trigger_expires_at` embedded in the token payload — reject if expired. Note: this is the trigger token's own expiry, independent of the activation's `expires_at`.
 4. Check label/service/environment scope — only activate matching probes.
 5. If valid: activate matching probes for **this single request/session only**.

@@ -333,6 +333,29 @@ browser-evidence-check: license-prepare-shared
 test-focused:
 	$(NODE_RUN) "apk add --no-cache git >/dev/null && corepack enable && corepack pnpm vitest run $(TEST_FILES)"
 
+.PHONY: project-service-test project-service-format project-service-check project-service-integration
+project-service-test:
+	$(NODE_RUN) "node_modules/.bin/vitest run --reporter=dot $(if $(TEST_FILES),$(TEST_FILES),tests/packages/storage/project-merge-plan.test.ts)"
+
+project-service-format:
+	test -n "$(FORMAT_FILES)"
+	$(NODE_RUN) "node_modules/.bin/prettier --write $(FORMAT_FILES)"
+
+project-service-check:
+	test -n "$(LINT_FILES)"
+	$(NODE_RUN) "node_modules/.bin/tsc --noEmit -p tsconfig.json && node_modules/.bin/eslint $(LINT_FILES) && node_modules/.bin/prettier --check $(LINT_FILES)"
+
+project-service-integration:
+	sh scripts/test-project-services-integration.sh
+
+.PHONY: project-service-runtime
+project-service-runtime: candidate-build
+	sh scripts/test-project-service-runtime.sh
+
+.PHONY: project-service-predecessor-fixture
+project-service-predecessor-fixture:
+	sh scripts/capture-project-service-predecessor.sh
+
 .PHONY: test-billing-checkout-integration
 test-billing-checkout-integration:
 	sh scripts/test-billing-checkout-integration.sh
@@ -407,7 +430,7 @@ cli-setup-upgrade-check: cli-runtime-pack
 
 .PHONY: test-unit
 test-unit:
-	$(NODE_RUN) "apk add --no-cache git >/dev/null && corepack enable && BASE_SHA=$(BASE_SHA) HEAD_SHA=$(HEAD_SHA) corepack pnpm test"
+	PROJECT_SERVICE_UNIT=1 NODE_IMAGE="$(NODE_IMAGE)" BASE_SHA="$(BASE_SHA)" HEAD_SHA="$(HEAD_SHA)" sh scripts/test-project-services-integration.sh
 
 .PHONY: test
 test: test-unit

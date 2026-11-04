@@ -59,10 +59,59 @@ type WeeklyReportChannelRecord = {
 };
 
 describe("worker weekly reporting", () => {
+  it("queues a retried accepted report with the claim's original channel and project", async () => {
+    const enqueue = vi.fn().mockResolvedValue(undefined);
+    await scheduleWeeklyReports({
+      queue: { enqueue },
+      batchSize: 10,
+      now: new Date("2026-03-16T10:30:00.000Z"),
+      weeklyReportingStore: {
+        listProjectsWithWeeklyActivity: vi.fn().mockResolvedValue(["canonical"])
+      },
+      weeklyReportChannelStore: {
+        listEnabledWeeklyReportChannels: vi.fn().mockResolvedValue([
+          {
+            channel_id: "current-channel",
+            project_id: "canonical",
+            channel: "email",
+            config: { to: ["owner@example.test"] },
+            schedule: { day_of_week: "monday", hour_of_day: 9, timezone: "UTC" },
+            is_enabled: true,
+            created_at: "2026-03-01T00:00:00.000Z",
+            updated_at: "2026-03-01T00:00:00.000Z"
+          }
+        ])
+      },
+      weeklyReportDeliveryStore: {
+        claimWeeklyReportDelivery: vi.fn().mockResolvedValue({
+          delivery_id: "accepted",
+          created: true,
+          project_id: "origin",
+          weekly_report_channel_id: "origin-channel"
+        })
+      }
+    });
+    expect(enqueue).toHaveBeenCalledWith(
+      "generate-weekly-report",
+      expect.objectContaining({
+        delivery_id: "accepted",
+        project_id: "origin",
+        weekly_report_channel_id: "origin-channel"
+      })
+    );
+  });
   it("should return no_jobs when generate-weekly-report queue is empty", async (): Promise<void> => {
-    const dequeue = vi.fn<(jobName: "generate-weekly-report") => Promise<WeeklyReportJob | null>>().mockResolvedValue(null);
+    const dequeue = vi
+      .fn<(jobName: "generate-weekly-report") => Promise<WeeklyReportJob | null>>()
+      .mockResolvedValue(null);
     const getWeeklyProjectReport = vi
-      .fn<(input: { project_id: string; window_start: string; window_end: string }) => Promise<WeeklyProjectReport | null>>()
+      .fn<
+        (input: {
+          project_id: string;
+          window_start: string;
+          window_end: string;
+        }) => Promise<WeeklyProjectReport | null>
+      >()
       .mockResolvedValue(null);
 
     const result = await processNextGenerateWeeklyReportJob({
@@ -88,15 +137,23 @@ describe("worker weekly reporting", () => {
   });
 
   it("should suppress generate-weekly-report processing when the project has no activity", async (): Promise<void> => {
-    const dequeue = vi.fn<(jobName: "generate-weekly-report") => Promise<WeeklyReportJob | null>>().mockResolvedValue({
-      delivery_id: "wrd_123",
-      weekly_report_channel_id: "wr_123",
-      project_id: "proj_123",
-      window_start: "2026-03-09T00:00:00.000Z",
-      window_end: "2026-03-16T00:00:00.000Z"
-    });
+    const dequeue = vi
+      .fn<(jobName: "generate-weekly-report") => Promise<WeeklyReportJob | null>>()
+      .mockResolvedValue({
+        delivery_id: "wrd_123",
+        weekly_report_channel_id: "wr_123",
+        project_id: "proj_123",
+        window_start: "2026-03-09T00:00:00.000Z",
+        window_end: "2026-03-16T00:00:00.000Z"
+      });
     const getWeeklyProjectReport = vi
-      .fn<(input: { project_id: string; window_start: string; window_end: string }) => Promise<WeeklyProjectReport | null>>()
+      .fn<
+        (input: {
+          project_id: string;
+          window_start: string;
+          window_end: string;
+        }) => Promise<WeeklyProjectReport | null>
+      >()
       .mockResolvedValue(null);
 
     const result = await processNextGenerateWeeklyReportJob({
@@ -130,21 +187,30 @@ describe("worker weekly reporting", () => {
     expect(result).toEqual({ processed: false, reason: "no_activity" });
     expect(getWeeklyProjectReport).toHaveBeenCalledWith({
       project_id: "proj_123",
+      delivery_id: "wrd_123",
       window_start: "2026-03-09T00:00:00.000Z",
       window_end: "2026-03-16T00:00:00.000Z"
     });
   });
 
   it("should process generate-weekly-report jobs when weekly activity exists", async (): Promise<void> => {
-    const dequeue = vi.fn<(jobName: "generate-weekly-report") => Promise<WeeklyReportJob | null>>().mockResolvedValue({
-      delivery_id: "wrd_123",
-      weekly_report_channel_id: "wr_123",
-      project_id: "proj_123",
-      window_start: "2026-03-09T00:00:00.000Z",
-      window_end: "2026-03-16T00:00:00.000Z"
-    });
+    const dequeue = vi
+      .fn<(jobName: "generate-weekly-report") => Promise<WeeklyReportJob | null>>()
+      .mockResolvedValue({
+        delivery_id: "wrd_123",
+        weekly_report_channel_id: "wr_123",
+        project_id: "proj_123",
+        window_start: "2026-03-09T00:00:00.000Z",
+        window_end: "2026-03-16T00:00:00.000Z"
+      });
     const getWeeklyProjectReport = vi
-      .fn<(input: { project_id: string; window_start: string; window_end: string }) => Promise<WeeklyProjectReport | null>>()
+      .fn<
+        (input: {
+          project_id: string;
+          window_start: string;
+          window_end: string;
+        }) => Promise<WeeklyProjectReport | null>
+      >()
       .mockResolvedValue({
         project_id: "proj_123",
         project_name: "Checkout API",
@@ -161,7 +227,13 @@ describe("worker weekly reporting", () => {
         top_spiking_incidents: []
       });
     const markWeeklyReportDeliveryResult = vi
-      .fn<(input: { delivery_id: string; delivered: boolean; error_message: string | null }) => Promise<{ status: "delivered" | "failed" }>>()
+      .fn<
+        (input: {
+          delivery_id: string;
+          delivered: boolean;
+          error_message: string | null;
+        }) => Promise<{ status: "delivered" | "failed" }>
+      >()
       .mockResolvedValue({ status: "delivered" });
     const deliver = vi.fn().mockResolvedValue(undefined);
 
@@ -216,15 +288,23 @@ describe("worker weekly reporting", () => {
   });
 
   it("should mark weekly delivery failed when the weekly report channel no longer exists", async (): Promise<void> => {
-    const dequeue = vi.fn<(jobName: "generate-weekly-report") => Promise<WeeklyReportJob | null>>().mockResolvedValue({
-      delivery_id: "wrd_123",
-      weekly_report_channel_id: "wr_missing",
-      project_id: "proj_123",
-      window_start: "2026-03-09T00:00:00.000Z",
-      window_end: "2026-03-16T00:00:00.000Z"
-    });
+    const dequeue = vi
+      .fn<(jobName: "generate-weekly-report") => Promise<WeeklyReportJob | null>>()
+      .mockResolvedValue({
+        delivery_id: "wrd_123",
+        weekly_report_channel_id: "wr_missing",
+        project_id: "proj_123",
+        window_start: "2026-03-09T00:00:00.000Z",
+        window_end: "2026-03-16T00:00:00.000Z"
+      });
     const getWeeklyProjectReport = vi
-      .fn<(input: { project_id: string; window_start: string; window_end: string }) => Promise<WeeklyProjectReport | null>>()
+      .fn<
+        (input: {
+          project_id: string;
+          window_start: string;
+          window_end: string;
+        }) => Promise<WeeklyProjectReport | null>
+      >()
       .mockResolvedValue({
         project_id: "proj_123",
         project_name: "Checkout API",
@@ -272,15 +352,23 @@ describe("worker weekly reporting", () => {
   });
 
   it("should process slack weekly delivery jobs when weekly activity exists", async (): Promise<void> => {
-    const dequeue = vi.fn<(jobName: "generate-weekly-report") => Promise<WeeklyReportJob | null>>().mockResolvedValue({
-      delivery_id: "wrd_124",
-      weekly_report_channel_id: "wr_slack",
-      project_id: "proj_123",
-      window_start: "2026-03-09T00:00:00.000Z",
-      window_end: "2026-03-16T00:00:00.000Z"
-    });
+    const dequeue = vi
+      .fn<(jobName: "generate-weekly-report") => Promise<WeeklyReportJob | null>>()
+      .mockResolvedValue({
+        delivery_id: "wrd_124",
+        weekly_report_channel_id: "wr_slack",
+        project_id: "proj_123",
+        window_start: "2026-03-09T00:00:00.000Z",
+        window_end: "2026-03-16T00:00:00.000Z"
+      });
     const getWeeklyProjectReport = vi
-      .fn<(input: { project_id: string; window_start: string; window_end: string }) => Promise<WeeklyProjectReport | null>>()
+      .fn<
+        (input: {
+          project_id: string;
+          window_start: string;
+          window_end: string;
+        }) => Promise<WeeklyProjectReport | null>
+      >()
       .mockResolvedValue({
         project_id: "proj_123",
         project_name: "Checkout API",
@@ -328,21 +416,31 @@ describe("worker weekly reporting", () => {
         }
       })
     ).resolves.toEqual({ processed: true });
-    const deliveredReport = deliver.mock.calls[0]?.[0] as { delivery_id?: string; channel?: { channel?: string } } | undefined;
+    const deliveredReport = deliver.mock.calls[0]?.[0] as
+      | { delivery_id?: string; channel?: { channel?: string } }
+      | undefined;
     expect(deliveredReport?.delivery_id).toBe("wrd_124");
     expect(deliveredReport?.channel?.channel).toBe("slack");
   });
 
   it("should mark weekly delivery failed when transport delivery raises an error", async (): Promise<void> => {
-    const dequeue = vi.fn<(jobName: "generate-weekly-report") => Promise<WeeklyReportJob | null>>().mockResolvedValue({
-      delivery_id: "wrd_123",
-      weekly_report_channel_id: "wr_123",
-      project_id: "proj_123",
-      window_start: "2026-03-09T00:00:00.000Z",
-      window_end: "2026-03-16T00:00:00.000Z"
-    });
+    const dequeue = vi
+      .fn<(jobName: "generate-weekly-report") => Promise<WeeklyReportJob | null>>()
+      .mockResolvedValue({
+        delivery_id: "wrd_123",
+        weekly_report_channel_id: "wr_123",
+        project_id: "proj_123",
+        window_start: "2026-03-09T00:00:00.000Z",
+        window_end: "2026-03-16T00:00:00.000Z"
+      });
     const getWeeklyProjectReport = vi
-      .fn<(input: { project_id: string; window_start: string; window_end: string }) => Promise<WeeklyProjectReport | null>>()
+      .fn<
+        (input: {
+          project_id: string;
+          window_start: string;
+          window_end: string;
+        }) => Promise<WeeklyProjectReport | null>
+      >()
       .mockResolvedValue({
         project_id: "proj_123",
         project_name: "Checkout API",
@@ -359,7 +457,13 @@ describe("worker weekly reporting", () => {
         top_spiking_incidents: []
       });
     const markWeeklyReportDeliveryResult = vi
-      .fn<(input: { delivery_id: string; delivered: boolean; error_message: string | null }) => Promise<{ status: "delivered" | "failed" }>>()
+      .fn<
+        (input: {
+          delivery_id: string;
+          delivered: boolean;
+          error_message: string | null;
+        }) => Promise<{ status: "delivered" | "failed" }>
+      >()
       .mockResolvedValue({ status: "failed" });
 
     const result = await processNextGenerateWeeklyReportJob({
@@ -405,16 +509,20 @@ describe("worker weekly reporting", () => {
       .fn<(jobName: "generate-weekly-report", payload: WeeklyReportJob) => Promise<void>>()
       .mockResolvedValue(undefined);
     const listProjectsWithWeeklyActivity = vi
-      .fn<(input: { window_start: string; window_end: string; limit: number }) => Promise<string[]>>()
+      .fn<
+        (input: { window_start: string; window_end: string; limit: number }) => Promise<string[]>
+      >()
       .mockResolvedValue(["proj_123", "proj_456"]);
     const claimWeeklyReportDelivery = vi
-      .fn<(input: {
-        weekly_report_channel_id: string;
-        project_id: string;
-        window_start: string;
-        window_end: string;
-        channel: "email" | "slack";
-      }) => Promise<WeeklyReportDelivery>>()
+      .fn<
+        (input: {
+          weekly_report_channel_id: string;
+          project_id: string;
+          window_start: string;
+          window_end: string;
+          channel: "email" | "slack";
+        }) => Promise<WeeklyReportDelivery>
+      >()
       .mockResolvedValue({ delivery_id: "wrd_123", created: true });
 
     const count = await scheduleWeeklyReports({
@@ -472,16 +580,20 @@ describe("worker weekly reporting", () => {
       .fn<(jobName: "generate-weekly-report", payload: WeeklyReportJob) => Promise<void>>()
       .mockResolvedValue(undefined);
     const listProjectsWithWeeklyActivity = vi
-      .fn<(input: { window_start: string; window_end: string; limit: number }) => Promise<string[]>>()
+      .fn<
+        (input: { window_start: string; window_end: string; limit: number }) => Promise<string[]>
+      >()
       .mockResolvedValue(["proj_123", "proj_456"]);
     const claimWeeklyReportDelivery = vi
-      .fn<(input: {
-        weekly_report_channel_id: string;
-        project_id: string;
-        window_start: string;
-        window_end: string;
-        channel: "email" | "slack";
-      }) => Promise<WeeklyReportDelivery>>()
+      .fn<
+        (input: {
+          weekly_report_channel_id: string;
+          project_id: string;
+          window_start: string;
+          window_end: string;
+          channel: "email" | "slack";
+        }) => Promise<WeeklyReportDelivery>
+      >()
       .mockImplementation(async (input) => ({
         delivery_id: input.project_id === "proj_123" ? "wrd_123" : "wrd_456",
         created: true
@@ -540,16 +652,20 @@ describe("worker weekly reporting", () => {
       .fn<(jobName: "generate-weekly-report", payload: WeeklyReportJob) => Promise<void>>()
       .mockResolvedValue(undefined);
     const listProjectsWithWeeklyActivity = vi
-      .fn<(input: { window_start: string; window_end: string; limit: number }) => Promise<string[]>>()
+      .fn<
+        (input: { window_start: string; window_end: string; limit: number }) => Promise<string[]>
+      >()
       .mockResolvedValue(["proj_123"]);
     const claimWeeklyReportDelivery = vi
-      .fn<(input: {
-        weekly_report_channel_id: string;
-        project_id: string;
-        window_start: string;
-        window_end: string;
-        channel: "email" | "slack";
-      }) => Promise<WeeklyReportDelivery>>()
+      .fn<
+        (input: {
+          weekly_report_channel_id: string;
+          project_id: string;
+          window_start: string;
+          window_end: string;
+          channel: "email" | "slack";
+        }) => Promise<WeeklyReportDelivery>
+      >()
       .mockResolvedValue({ delivery_id: "wrd_existing", created: false });
 
     const count = await scheduleWeeklyReports({
@@ -591,18 +707,16 @@ it("isolates weekly report projects after per-recipient pauses are applied", asy
   const deliver = vi.fn<WeeklyReportTransport["deliver"]>();
   await processNextGenerateWeeklyReportJob({
     queue: {
-      dequeue: vi
-        .fn()
-        .mockResolvedValue({
-          delivery_id: "d1",
-          delivery_ids: ["d1", "d2"],
-          weekly_report_channel_id: "c1",
-          weekly_report_channel_ids: ["c1", "c2"],
-          project_id: "p1",
-          project_ids: ["p1", "p2"],
-          window_start: "2026-10-01T00:00:00Z",
-          window_end: "2026-10-08T00:00:00Z"
-        })
+      dequeue: vi.fn().mockResolvedValue({
+        delivery_id: "d1",
+        delivery_ids: ["d1", "d2"],
+        weekly_report_channel_id: "c1",
+        weekly_report_channel_ids: ["c1", "c2"],
+        project_id: "p1",
+        project_ids: ["p1", "p2"],
+        window_start: "2026-10-01T00:00:00Z",
+        window_end: "2026-10-08T00:00:00Z"
+      })
     },
     weeklyReportingStore: {
       getWeeklyProjectReport: vi.fn(async ({ project_id }) => ({

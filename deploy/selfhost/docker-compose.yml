@@ -15,7 +15,8 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-debugbundle} -d ${POSTGRES_DB:-debugbundle}"]
+      test:
+        ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-debugbundle} -d ${POSTGRES_DB:-debugbundle}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -49,7 +50,11 @@ services:
       - localstack-data:/var/lib/localstack
       - ./localstack-init:/etc/localstack/init/ready.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "awslocal s3api head-bucket --bucket ${S3_BUCKET:-debugbundle-raw-events} >/dev/null 2>&1"]
+      test:
+        [
+          "CMD-SHELL",
+          "awslocal s3api head-bucket --bucket ${S3_BUCKET:-debugbundle-raw-events} >/dev/null 2>&1"
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -138,6 +143,7 @@ services:
       API_HOST: 0.0.0.0
       API_PORT: "3000"
       AGENT_TOKEN_ISSUANCE_ENABLED: ${AGENT_TOKEN_ISSUANCE_ENABLED:-false}
+      PROJECT_MERGES_ENABLED: ${PROJECT_MERGES_ENABLED:-false}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:5291}
       PUBLIC_STATUS_PAGE_BASE_URL: ${PUBLIC_STATUS_PAGE_BASE_URL:-}
       PUBLIC_STATUS_TRUST_PROXY: ${PUBLIC_STATUS_TRUST_PROXY:-false}

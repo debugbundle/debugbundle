@@ -444,6 +444,28 @@ const toolInputs: Record<(typeof OPENAI_TOOL_NAMES)[number], Record<string, unkn
 };
 
 describe("dedicated OpenAI hosted readers", () => {
+  it("keeps incident-impact reads at the requested retained project view", async () => {
+    const fixture = createDependencies();
+    fixture.dependencies.incidentRetrieval.getIncidentForOrganization.mockImplementation(
+      async (...args: unknown[]) => {
+        const selected = args[0] as { project_id?: string } | undefined;
+        return { ...incident, project_id: selected?.project_id ?? "project_canonical" };
+      }
+    );
+    const operations = createOpenAiHostedOperations({
+      dependencies: fixture.dependencies as never,
+      dashboardBaseUrl: "https://app.debugbundle.com"
+    });
+    await expect(
+      operations.get_incident_impact?.({
+        principal: PRINCIPAL,
+        input: { projectId: "project_1", incidentId: "incident_1" }
+      })
+    ).resolves.toMatchObject({ incident_id: "incident_1", window: { project_id: "project_1" } });
+    expect(fixture.dependencies.incidentRetrieval.getIncidentForOrganization).toHaveBeenCalledWith(
+      expect.objectContaining({ project_id: "project_1", user_id: PRINCIPAL.userId })
+    );
+  });
   it("explains related-incident coverage without claiming failed generation", async () => {
     const fixture = createDependencies();
     fixture.dependencies.improvementManagement.getImprovementForOrganization.mockResolvedValue({

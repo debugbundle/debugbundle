@@ -317,7 +317,7 @@ export function createMetadataBundles(
           LEFT JOIN services s ON s.id = i.service_id
           WHERE i.project_id = $1
             AND i.environment = $2
-            AND COALESCE(s.name, 'unknown') = $3
+            AND COALESCE(s.name, 'unknown') = ANY(debugbundle_service_input_names($1,$3))
             AND ie.event_type = 'probe_event'
             AND ie.occurred_at >= $4::timestamptz
             AND ie.occurred_at <= $5::timestamptz
@@ -346,7 +346,7 @@ export function createMetadataBundles(
           LEFT JOIN services s ON s.id = i.service_id
           WHERE i.project_id = $1
             AND i.environment = $2
-            AND COALESCE(s.name, 'unknown') = $3
+            AND COALESCE(s.name, 'unknown') = ANY(debugbundle_service_input_names($1,$3))
             AND ie.event_type = 'log_event'
             AND ie.is_sampled = true
             AND ie.occurred_at >= $4::timestamptz
@@ -379,7 +379,7 @@ export function createMetadataBundles(
           LEFT JOIN services s ON s.id = i.service_id
           WHERE i.project_id = $1
             AND i.environment = $2
-            AND COALESCE(s.name, 'unknown') = $3
+            AND COALESCE(s.name, 'unknown') = ANY(debugbundle_service_input_names($1,$3))
             AND ie.event_type = 'request_event'
             AND ie.is_sampled = true
             AND ie.occurred_at >= $4::timestamptz
@@ -387,13 +387,13 @@ export function createMetadataBundles(
           UNION
           SELECT recovery.event_id, recovery.occurred_at::text AS occurred_at, 0 AS priority
           FROM browser_recovery_events recovery
-          WHERE recovery.project_id = $1 AND recovery.environment = $2 AND recovery.service_name = $3
+          WHERE recovery.project_id = $1 AND recovery.environment = $2 AND recovery.service_name = ANY(debugbundle_service_input_names($1,$3))
             AND recovery.kind = 'recovery' AND recovery.expires_at > now()
             AND recovery.occurred_at BETWEEN $4::timestamptz AND $5::timestamptz
             AND EXISTS (
               SELECT 1 FROM browser_recovery_events resource
               WHERE resource.event_id = ANY($6::uuid[]) AND resource.project_id = recovery.project_id
-                AND resource.service_name = recovery.service_name AND resource.environment = recovery.environment
+                AND resource.service_name = ANY(debugbundle_service_input_names(recovery.project_id,recovery.service_name)) AND resource.environment = recovery.environment
                 AND resource.kind = 'resource' AND resource.expires_at > now()
                 AND recovery.occurred_at BETWEEN resource.occurred_at AND resource.occurred_at + interval '30 seconds'
                 AND ((resource.session_hash IS NOT NULL AND resource.session_hash = recovery.session_hash)

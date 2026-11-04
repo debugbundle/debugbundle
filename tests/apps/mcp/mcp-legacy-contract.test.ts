@@ -36,6 +36,31 @@ function discloseConnectedDoctor(tool: { description: string }): void {
     "Run DebugBundle environment diagnostics. Connected mode checks API health and saved member authentication with one incident request restricted to the connected project; incident contents are not returned.";
 }
 
+function addOptionalProjectInputs(name: string, schema: unknown): void {
+  // FR-PJS: allow only these documented optional extensions. The historical
+  // fixture continues to protect every old field, required list and annotation.
+  const scope = { const: "current_project", type: "string" };
+  const uuid = { format: "uuid", type: "string" };
+  const additions: Record<string, Record<string, unknown>> = {
+    update_github_dispatch_rule: { projectScope: scope },
+    update_webhook: { projectScope: scope },
+    update_alert: { projectScope: scope },
+    list_projects: { projectId: uuid },
+    activate_probe: {
+      sdkProjectId: uuid,
+      sdkTokenId: uuid,
+      sdkService: { maxLength: 200, minLength: 1, type: "string" }
+    },
+    list_services: { offset: { maximum: 100000, minimum: 0, type: "integer" } }
+  };
+  const target = schema as { properties: Record<string, unknown>; required?: string[] };
+  for (const [field, definition] of Object.entries(additions[name] ?? {})) {
+    expect(target.properties).not.toHaveProperty(field);
+    expect(target.required ?? []).not.toContain(field);
+    target.properties[field] = definition;
+  }
+}
+
 describe("legacy MCP and OpenClaw contract", () => {
   it("preserves the frozen stdio and OpenClaw public surface as tools are added", async () => {
     const expected = JSON.parse(await readFile(legacyContractPath, "utf8")) as {
@@ -77,6 +102,10 @@ describe("legacy MCP and OpenClaw contract", () => {
         (tool) => tool.openClawToolName === "debugbundle_update_capture_policy"
       )!.parameters
     );
+    for (const tool of expected.tools.result.tools)
+      addOptionalProjectInputs(tool.name, tool.inputSchema);
+    for (const tool of expected.openClaw.tools)
+      addOptionalProjectInputs(tool.openClawToolName.replace(/^debugbundle_/, ""), tool.parameters);
     const successfulServer = createMcpServer({
       tools: {
         doctor: vi.fn().mockResolvedValue({ status: "healthy" })

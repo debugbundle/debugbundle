@@ -1,6 +1,7 @@
 import { claimDailyNotification } from "./notification-daily-claims.js";
 import { preserveDailyNotificationUsage } from "./notification-daily-usage.js";
 import { alertNotificationHistorySql } from "./alert-notification-history.js";
+import { ruleCoversOriginSql } from "./project-rule-access.js";
 import { randomUUID } from "node:crypto";
 import {
   nextDailyNotificationAt,
@@ -100,7 +101,7 @@ export function createNotificationDailyStore(db: Queryable): NotificationDailySt
         `WITH scoped AS (
         SELECT d.* FROM alert_email_digest_items d JOIN alert_email_digests b ON b.id = d.digest_id AND b.project_id = d.project_id
         JOIN incidents i ON i.id = d.incident_id AND i.project_id = d.project_id
-        JOIN alert_rules a ON a.id = d.alert_id AND a.project_id = d.project_id
+        JOIN alert_rules a ON a.id = d.alert_id AND ${ruleCoversOriginSql("a", "d.project_id")}
         WHERE d.digest_id = $1 AND ($2::uuid IS NULL OR d.incident_id > $2) AND a.is_enabled
         AND a.channel = 'email' AND lower(a.config->>'to') = lower(b.recipient)
       ), groups AS (
@@ -154,13 +155,14 @@ export function createNotificationDailyStore(db: Queryable): NotificationDailySt
         if (!hasDelivery && input.allow_new_delivery === false)
           return { created_delivery: false, allowance_exhausted: true };
         // Appending to a converted short digest preserves its already-accounted status.
+        // Evidence/accounting stay in the origin; recipient membership is canonical.
         const inserted = await tx.query<{ id: string }>(
           `INSERT INTO notification_daily_items(id, batch_id, project_id, alert_id, incident_id, episode_at, occurred_at, notification_key, billable, recipient_user_id)
           SELECT $1, $2, i.project_id, a.id, i.id, COALESCE(i.regressed_at, i.first_seen_at), $6, $10, $8,
-            (SELECT u.id FROM users u JOIN projects p ON p.id = i.project_id
+            (SELECT u.id FROM users u JOIN projects p ON p.id = debugbundle_canonical_project(i.project_id)
               WHERE lower(u.email) = lower($7) AND (p.owner_user_id = u.id OR EXISTS(
                 SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id = u.id)) LIMIT 1)
-          FROM incidents i JOIN alert_rules a ON a.id = $3 AND a.project_id = i.project_id
+          FROM incidents i JOIN alert_rules a ON a.id = $3 AND ${ruleCoversOriginSql("a", "i.project_id")}
           WHERE i.id = $4 AND i.project_id = $5 AND i.status <> 'resolved' AND a.is_enabled AND $6::timestamptz >= $9::timestamptz - interval '30 days'
           AND a.channel = 'email' AND lower(a.config->>'to') = lower($7)
           AND ($11 <= 0 OR $12::boolean OR NOT EXISTS(
@@ -222,7 +224,9 @@ export function createNotificationDailyStore(db: Queryable): NotificationDailySt
         i.title AS summary, COALESCE(s.name, 'unknown') AS service_name, i.environment, i.severity
         FROM notification_daily_items d JOIN notification_daily_batches b ON b.id = d.batch_id
         JOIN incidents i ON i.id = d.incident_id AND i.project_id = d.project_id
-        JOIN projects p ON p.id = i.project_id JOIN alert_rules a ON a.id = d.alert_id AND a.project_id = p.id
+        JOIN projects p ON p.id = i.project_id
+        JOIN projects canonical ON canonical.id = debugbundle_canonical_project(i.project_id)
+        JOIN alert_rules a ON a.id = d.alert_id AND ${ruleCoversOriginSql("a", "i.project_id")}
         LEFT JOIN services s ON s.id = i.service_id
         WHERE b.id = $1 AND b.claim_token = $2 AND b.status = 'pending'
         AND i.status <> 'resolved' AND a.is_enabled AND a.channel = 'email'
@@ -231,8 +235,8 @@ export function createNotificationDailyStore(db: Queryable): NotificationDailySt
           WHERE sent.incident_id = d.incident_id AND sent.episode_at = d.episode_at
           AND delivered.recipient = b.recipient AND delivered.status = 'delivered')
         AND (d.recipient_user_id IS NULL OR EXISTS(SELECT 1 FROM users u WHERE u.id = d.recipient_user_id
-          AND lower(u.email) = b.recipient AND (p.owner_user_id = u.id OR EXISTS(
-            SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id = u.id))))
+          AND lower(u.email) = b.recipient AND (canonical.owner_user_id = u.id OR EXISTS(
+            SELECT 1 FROM project_members pm WHERE pm.project_id = canonical.id AND pm.user_id = u.id))))
         AND ($3::uuid IS NULL OR i.id > $3)
         ORDER BY i.id, d.occurred_at DESC, d.id LIMIT 250`,
         [batch.id, batch.claim_token, after]
@@ -240,12 +244,14 @@ export function createNotificationDailyStore(db: Queryable): NotificationDailySt
       return result.rows;
     },
     async policyRevision(batch: DailyNotificationBatch): Promise<string> {
+      // Preparation and the final revision check must observe the same effective
+      // project policies, including a pause changed through a retained identifier.
       const result = await db.query<{ revision: string }>(
         `SELECT md5(COALESCE(string_agg(n.id::text || n.preferences::text, '|' ORDER BY n.id), '')) AS revision
         FROM notification_preferences n WHERE (n.project_id IS NULL OR n.project_id IN (
-          SELECT project_id FROM notification_daily_items WHERE batch_id = $1)) AND (
+          SELECT debugbundle_canonical_project(project_id) FROM notification_daily_items WHERE batch_id = $1)) AND (
           n.user_id IN (SELECT id FROM users WHERE lower(email) = lower($2)) OR n.organization_id IN (
-            SELECT p.organization_id FROM projects p JOIN notification_daily_items d ON d.project_id = p.id WHERE d.batch_id = $1))`,
+            SELECT p.organization_id FROM projects p JOIN notification_daily_items d ON debugbundle_canonical_project(d.project_id) = p.id WHERE d.batch_id = $1))`,
         [batch.id, batch.recipient]
       );
       return result.rows[0]?.revision ?? "";

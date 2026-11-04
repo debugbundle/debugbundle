@@ -41,27 +41,17 @@ export function buildMonthlyRawIngestedEventsMetricSelect(input: {
   billableIncidentEventsPredicate: string;
 }): string {
   return `
-    SELECT GREATEST(
+    SELECT COALESCE(SUM(GREATEST(
       (
-        SELECT COUNT(*)::int
-        FROM incident_events ie
-        JOIN incidents i ON i.id = ie.incident_id
-        WHERE i.project_id = ${input.projectIdSql}
+        SELECT COUNT(*)::int FROM incident_events ie
+        JOIN incidents i ON i.id=ie.incident_id
+        WHERE i.project_id=origin.origin_id
           AND (${input.billableIncidentEventsPredicate})
-          AND ie.occurred_at >= ${input.startsAtSql}::timestamptz
-          AND ie.occurred_at < ${input.endsAtSql}::timestamptz
-      ),
-      COALESCE(
-        (
-          SELECT puc.raw_ingested_events::int
-          FROM project_usage_counters puc
-          WHERE puc.project_id = ${input.projectIdSql}
-            AND puc.period_starts_at = ${input.startsAtSql}::timestamptz
-          LIMIT 1
-        ),
-        0
-      )
-    )::int
+          AND ie.occurred_at>=${input.startsAtSql}::timestamptz
+          AND ie.occurred_at<${input.endsAtSql}::timestamptz
+      ), COALESCE((SELECT puc.raw_ingested_events FROM project_usage_counters puc
+          WHERE puc.project_id=origin.origin_id AND puc.period_starts_at=${input.startsAtSql}::timestamptz),0)
+    )),0)::int FROM unnest(debugbundle_project_origins(${input.projectIdSql})) origin(origin_id)
   `;
 }
 
@@ -79,26 +69,26 @@ export function buildProjectMetricsJsonSql(input: {
       'open_incidents', (
         SELECT COUNT(*)::int
         FROM incidents i
-        WHERE i.project_id = ${input.projectIdSql}
+        WHERE i.project_id = ANY(debugbundle_project_origins(${input.projectIdSql}))
           AND i.status = 'open'
       ),
       'regressed_incidents', (
         SELECT COUNT(*)::int
         FROM incidents i
-        WHERE i.project_id = ${input.projectIdSql}
+        WHERE i.project_id = ANY(debugbundle_project_origins(${input.projectIdSql}))
           AND i.status = 'regressed'
       ),
       'opened_incidents_today', (
         SELECT COUNT(*)::int
         FROM incidents i
-        WHERE i.project_id = ${input.projectIdSql}
+        WHERE i.project_id = ANY(debugbundle_project_origins(${input.projectIdSql}))
           AND i.first_seen_at >= ${input.dayStartsAtSql}::timestamptz
           AND i.first_seen_at < ${input.dayEndsAtSql}::timestamptz
       ),
       'attention_incidents_today', (
         SELECT COUNT(*)::int
         FROM incidents i
-        WHERE i.project_id = ${input.projectIdSql}
+        WHERE i.project_id = ANY(debugbundle_project_origins(${input.projectIdSql}))
           AND (
             (
               i.first_seen_at >= ${input.dayStartsAtSql}::timestamptz
@@ -114,14 +104,14 @@ export function buildProjectMetricsJsonSql(input: {
       'opened_incidents_month', (
         SELECT COUNT(*)::int
         FROM incidents i
-        WHERE i.project_id = ${input.projectIdSql}
+        WHERE i.project_id = ANY(debugbundle_project_origins(${input.projectIdSql}))
           AND i.first_seen_at >= ${input.monthStartsAtSql}::timestamptz
           AND i.first_seen_at < ${input.monthEndsAtSql}::timestamptz
       ),
       'monthly_bundle_requests', (
         SELECT COUNT(*)::int
         FROM bundle_generations bg
-        WHERE bg.project_id = ${input.projectIdSql}
+        WHERE bg.project_id = ANY(debugbundle_project_origins(${input.projectIdSql}))
           AND bg.created_at >= ${input.monthStartsAtSql}::timestamptz
           AND bg.created_at < ${input.monthEndsAtSql}::timestamptz
       ),
@@ -136,7 +126,7 @@ export function buildProjectMetricsJsonSql(input: {
       'retained_bundles', (
         SELECT COUNT(DISTINCT bg.incident_id)::int
         FROM bundle_generations bg
-        WHERE bg.project_id = ${input.projectIdSql}
+        WHERE bg.project_id = ANY(debugbundle_project_origins(${input.projectIdSql}))
       ),
       'monthly_alert_deliveries', ${input.alertDeliveriesSelect}
     )
@@ -187,7 +177,7 @@ export function buildAlertDeliveriesCountSelect(input: {
     parts.push(`
       SELECT ad.created_at
       FROM alert_deliveries ad
-      WHERE ad.project_id = p.id
+      WHERE ad.project_id = ANY(debugbundle_project_origins(p.id))
         AND ad.created_at >= $2::timestamptz
         AND ad.created_at < $3::timestamptz
     `);
@@ -197,7 +187,7 @@ export function buildAlertDeliveriesCountSelect(input: {
     parts.push(`
       SELECT dig.created_at
       FROM alert_email_digests dig
-      WHERE dig.project_id = p.id
+      WHERE dig.project_id = ANY(debugbundle_project_origins(p.id))
         AND dig.created_at >= $2::timestamptz
         AND dig.created_at < $3::timestamptz
     `);
@@ -251,6 +241,9 @@ export function normalizeProjectMetrics(value: unknown): ProjectRecord["metrics"
 export function mapProjectRow(row: ProjectRecord & Record<string, unknown>): ProjectRecord {
   return {
     project_id: row.project_id,
+    ...(typeof row.canonical_project_id === "string" && row.canonical_project_id !== row.project_id
+      ? { canonical_project_id: row.canonical_project_id }
+      : {}),
     organization_id: row.organization_id,
     owner_user_id: row.owner_user_id,
     owner_email: row.owner_email,

@@ -1,6 +1,11 @@
 import { ProjectManagementApiError } from "../../../packages/project-management-client/src/index.js";
 
-export const PROJECT_MCP_TOOL_NAMES = ["list_projects", "create_project", "update_project", "delete_project"] as const;
+export const PROJECT_MCP_TOOL_NAMES = [
+  "list_projects",
+  "create_project",
+  "update_project",
+  "delete_project"
+] as const;
 
 function mapMcpError(error: unknown): never {
   if (error instanceof ProjectManagementApiError) {
@@ -11,7 +16,11 @@ function mapMcpError(error: unknown): never {
 }
 
 export function createProjectMcpTools(api: {
-  listProjects(input: { bearerToken: string; limit?: number }): Promise<unknown[]>;
+  listProjects(input: {
+    bearerToken: string;
+    limit?: number;
+    projectId?: string;
+  }): Promise<unknown[]>;
   createProject(input: {
     bearerToken: string;
     name: string;
@@ -28,17 +37,21 @@ export function createProjectMcpTools(api: {
     colorTag?: string | null;
   }): Promise<unknown>;
   deleteProject(input: { bearerToken: string; projectId: string }): Promise<unknown>;
-}): Record<(typeof PROJECT_MCP_TOOL_NAMES)[number], (input: Record<string, unknown>) => Promise<unknown>> {
+}): Record<
+  (typeof PROJECT_MCP_TOOL_NAMES)[number],
+  (input: Record<string, unknown>) => Promise<unknown>
+> {
   return {
     async list_projects(input) {
       try {
-        const requestInput: { bearerToken: string; limit?: number } = {
+        const requestInput: { bearerToken: string; limit?: number; projectId?: string } = {
           bearerToken: String(input["bearerToken"])
         };
         if (typeof input["limit"] === "number") {
           requestInput.limit = input["limit"];
         }
 
+        if (typeof input["projectId"] === "string") requestInput.projectId = input["projectId"];
         return { projects: await api.listProjects(requestInput) };
       } catch (error) {
         mapMcpError(error);

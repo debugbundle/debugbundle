@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
+import { projectImprovementView } from "../../../../packages/storage/src/project-evidence-projection.js";
 
 import { sanitizeTelemetry } from "../../../../packages/redaction/src/index.js";
 import { buildImprovementBundleObjectKey } from "../../../../packages/storage/src/index.js";
@@ -34,7 +35,9 @@ async function buildBundlePendingOrFailureState(input: {
   relatedIncidentIds: string[];
   bundleGenerationNumber: number;
   bundleFailureReason: string | null;
-}): Promise<{ status: "pending" } | { status: "failed"; reason: string; related_incident_ids?: string[] }> {
+}): Promise<
+  { status: "pending" } | { status: "failed"; reason: string; related_incident_ids?: string[] }
+> {
   if (input.kind === "recurring_incident" || input.kind === "post_deploy_regression") {
     return {
       status: "failed",
@@ -43,7 +46,10 @@ async function buildBundlePendingOrFailureState(input: {
     };
   }
 
-  if (input.bundleFailureReason === "monthly_quota_exceeded" || input.bundleFailureReason === "bundle_generation_disabled") {
+  if (
+    input.bundleFailureReason === "monthly_quota_exceeded" ||
+    input.bundleFailureReason === "bundle_generation_disabled"
+  ) {
     return {
       status: "failed",
       reason: input.bundleFailureReason
@@ -59,11 +65,12 @@ async function buildBundlePendingOrFailureState(input: {
 
   if (input.bundleFailureReason === "build_error" || input.bundleGenerationNumber > 0) {
     if (input.dependencies.improvementBundleRegeneration !== undefined) {
-      const regenerationQueued = await input.dependencies.improvementBundleRegeneration.requestRegeneration({
-        organization_id: input.organizationId,
-        project_id: input.projectId,
-        opportunity_id: input.opportunityId
-      });
+      const regenerationQueued =
+        await input.dependencies.improvementBundleRegeneration.requestRegeneration({
+          organization_id: input.organizationId,
+          project_id: input.projectId,
+          opportunity_id: input.opportunityId
+        });
 
       if (!regenerationQueued) {
         return {
@@ -97,9 +104,17 @@ async function buildBundlePendingOrFailureState(input: {
   };
 }
 
-export function registerImprovementRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
+export function registerImprovementRoutes(
+  app: FastifyInstance,
+  dependencies: ApiDependencies
+): void {
   app.get("/v1/improvements", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "retrieval-read");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "retrieval-read"
+    );
     if (member === null) {
       return;
     }
@@ -121,8 +136,12 @@ export function registerImprovementRoutes(app: FastifyInstance, dependencies: Ap
     const improvementsRequest = {
       organization_id: member.organization_id,
       user_id: member.member_id,
-      ...(parsedQuery.data.project_id === undefined ? {} : { project_id: parsedQuery.data.project_id }),
-      ...(parsedQuery.data.environment === undefined ? {} : { environment: parsedQuery.data.environment }),
+      ...(parsedQuery.data.project_id === undefined
+        ? {}
+        : { project_id: parsedQuery.data.project_id }),
+      ...(parsedQuery.data.environment === undefined
+        ? {}
+        : { environment: parsedQuery.data.environment }),
       ...(parsedQuery.data.service === undefined ? {} : { service: parsedQuery.data.service }),
       ...(parsedQuery.data.status === undefined ? {} : { status: parsedQuery.data.status }),
       ...(parsedQuery.data.severity === undefined ? {} : { severity: parsedQuery.data.severity }),
@@ -130,24 +149,40 @@ export function registerImprovementRoutes(app: FastifyInstance, dependencies: Ap
       ...(parsedCursor === null ? {} : { cursor: parsedCursor }),
       limit: parsedQuery.data.limit
     };
-    const improvements = await dependencies.improvementManagement.listImprovementsForOrganization(improvementsRequest);
-    const totalCount = parsedCursor === null
-      ? await dependencies.improvementManagement.countImprovementsForOrganization?.(improvementsRequest)
-      : undefined;
+    const improvements =
+      await dependencies.improvementManagement.listImprovementsForOrganization(improvementsRequest);
+    const totalCount =
+      parsedCursor === null
+        ? await dependencies.improvementManagement.countImprovementsForOrganization?.(
+            improvementsRequest
+          )
+        : undefined;
 
-    const nextCursorRecord = improvements.length >= parsedQuery.data.limit ? improvements.at(-1) : undefined;
+    const nextCursorRecord =
+      improvements.length >= parsedQuery.data.limit ? improvements.at(-1) : undefined;
     const nextCursor =
-      nextCursorRecord === undefined ? null : `${serializeCursorTimestamp(nextCursorRecord.last_detected_at)}|${nextCursorRecord.improvement_id}`;
+      nextCursorRecord === undefined
+        ? null
+        : `${serializeCursorTimestamp(nextCursorRecord.last_detected_at)}|${nextCursorRecord.improvement_id}`;
 
     return sendSafeImprovement(reply, {
-      improvements,
+      improvements: improvements.map((improvement) =>
+        projectImprovementView(improvement, parsedQuery.data.project_id)
+      ),
       next_cursor: nextCursor,
-      ...(totalCount === undefined ? {} : { total_pages: Math.max(1, Math.ceil(totalCount / parsedQuery.data.limit)) })
+      ...(totalCount === undefined
+        ? {}
+        : { total_pages: Math.max(1, Math.ceil(totalCount / parsedQuery.data.limit)) })
     });
   });
 
   app.get("/v1/improvements/:id", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "retrieval-read");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "retrieval-read"
+    );
     if (member === null) {
       return;
     }
@@ -171,11 +206,16 @@ export function registerImprovementRoutes(app: FastifyInstance, dependencies: Ap
       return reply.status(404).send({ error: "improvement_not_found" });
     }
 
-    return sendSafeImprovement(reply, { improvement });
+    return sendSafeImprovement(reply, { improvement: projectImprovementView(improvement) });
   });
 
   app.post("/v1/improvements/:id/resolve", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "retrieval-write");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "retrieval-write"
+    );
     if (member === null) {
       return;
     }
@@ -201,11 +241,16 @@ export function registerImprovementRoutes(app: FastifyInstance, dependencies: Ap
       return reply.status(404).send({ error: "improvement_not_found" });
     }
 
-    return sendSafeImprovement(reply, { improvement });
+    return sendSafeImprovement(reply, { improvement: projectImprovementView(improvement) });
   });
 
   app.post("/v1/improvements/:id/reopen", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "retrieval-write");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "retrieval-write"
+    );
     if (member === null) {
       return;
     }
@@ -229,11 +274,16 @@ export function registerImprovementRoutes(app: FastifyInstance, dependencies: Ap
       return reply.status(404).send({ error: "improvement_not_found" });
     }
 
-    return sendSafeImprovement(reply, { improvement });
+    return sendSafeImprovement(reply, { improvement: projectImprovementView(improvement) });
   });
 
   app.post("/v1/improvements/:id/snooze", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "retrieval-write");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "retrieval-write"
+    );
     if (member === null) {
       return;
     }
@@ -267,7 +317,7 @@ export function registerImprovementRoutes(app: FastifyInstance, dependencies: Ap
       return reply.status(404).send({ error: "improvement_not_found" });
     }
 
-    return sendSafeImprovement(reply, { improvement });
+    return sendSafeImprovement(reply, { improvement: projectImprovementView(improvement) });
   });
 
   app.get("/v1/projects/:id/improvements/:improvementId/bundle", async (request, reply) => {
@@ -291,30 +341,43 @@ export function registerImprovementRoutes(app: FastifyInstance, dependencies: Ap
     const improvement = await dependencies.improvementManagement.getImprovementForOrganization({
       organization_id: auth.access.organization_id,
       improvement_id: parsedParams.data.improvementId,
-      user_id: auth.member.member_id
+      user_id: auth.member.member_id,
+      project_id: parsedParams.data.id,
+      origin_project_ids: auth.access.origin_project_ids ?? [parsedParams.data.id]
     });
-    if (improvement === null || improvement.project_id !== parsedParams.data.id) {
+    if (
+      improvement === null ||
+      !(auth.access.origin_project_ids ?? [parsedParams.data.id]).includes(improvement.project_id)
+    ) {
       return reply.status(404).send({ error: "improvement_not_found" });
     }
 
-    const key = buildImprovementBundleObjectKey(parsedParams.data.id, parsedParams.data.improvementId);
+    const key = buildImprovementBundleObjectKey(
+      improvement.project_id,
+      parsedParams.data.improvementId
+    );
 
     try {
       const compressed = await dependencies.objectStoreReader.getObject({ key });
       const artifact = readSanitizedArtifact(compressed);
-      return reply.status(200).send(artifact ?? {
-        status: "failed", reason: "bundle_artifact_unavailable"
-      });
+      return reply.status(200).send(
+        artifact ?? {
+          status: "failed",
+          reason: "bundle_artifact_unavailable"
+        }
+      );
     } catch (error) {
       if (isObjectNotFoundError(error)) {
         return reply.status(200).send(
           await buildBundlePendingOrFailureState({
             dependencies,
             organizationId: auth.access.organization_id,
-            projectId: parsedParams.data.id,
+            projectId: improvement.project_id,
             opportunityId: parsedParams.data.improvementId,
             kind: typeof improvement.kind === "string" ? improvement.kind : "",
-            relatedIncidentIds: Array.isArray(improvement.related_incident_ids) ? improvement.related_incident_ids : [],
+            relatedIncidentIds: Array.isArray(improvement.related_incident_ids)
+              ? improvement.related_incident_ids
+              : [],
             bundleGenerationNumber: improvement.bundle_generation_number,
             bundleFailureReason: improvement.bundle_failure_reason
           })

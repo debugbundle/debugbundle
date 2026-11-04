@@ -106,6 +106,7 @@ describe("mcp github tools", () => {
   });
 
   it("returns github rule payloads", async () => {
+    const update = vi.fn().mockResolvedValue({ rule_id: "rule_1", enabled: false });
     const tools = createGitHubMcpTools({
       getInstallation: vi.fn().mockResolvedValue({}),
       listRepositories: vi.fn().mockResolvedValue([]),
@@ -116,7 +117,7 @@ describe("mcp github tools", () => {
       createProjectRule: vi
         .fn()
         .mockResolvedValue({ rule_id: "rule_1", name: "High severity incidents" }),
-      updateProjectRule: vi.fn().mockResolvedValue({ rule_id: "rule_1", enabled: false }),
+      updateProjectRule: update,
       deleteProjectRule: vi.fn().mockResolvedValue(undefined),
       setProjectRepo: vi.fn().mockResolvedValue({}),
       removeProjectRepo: vi.fn().mockResolvedValue(undefined)
@@ -147,9 +148,14 @@ describe("mcp github tools", () => {
         bearerToken: "dbundle_mem_x",
         projectId: "proj_1",
         ruleId: "rule_1",
+        projectScope: "current_project",
         enabled: false
       })
     ).resolves.toEqual({ rule: { rule_id: "rule_1", enabled: false } });
+
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({ projectScope: "current_project" })
+    );
 
     await expect(
       tools.delete_github_dispatch_rule({

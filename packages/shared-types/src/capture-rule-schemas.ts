@@ -381,9 +381,7 @@ const CaptureRuleCoreObjectSchema = z.object({
   expires_at: z.string().datetime().nullable()
 });
 
-function addCaptureRuleActionValidation<Schema extends z.ZodObject>(
-  schema: Schema
-): Schema {
+function addCaptureRuleActionValidation<Schema extends z.ZodObject>(schema: Schema): Schema {
   return schema.superRefine((value, context) => {
     if (value["action"] === "sample") {
       if (value["sample_rate"] === null) {
@@ -425,6 +423,8 @@ export const CaptureRuleSchema = addCaptureRuleActionValidation(
   CaptureRuleCoreObjectSchema.extend({
     id: z.string().guid(),
     project_id: z.string().min(1).max(120),
+    scope_origin_ids: z.array(z.string().guid()).max(1000).nullable().optional(),
+    filter_project_id: z.string().guid().nullable().optional(),
     hit_count: z.number().int().nonnegative(),
     last_matched_at: z.string().datetime().nullable(),
     created_at: z.string().datetime(),
@@ -486,6 +486,7 @@ export type CaptureRuleCreate = z.infer<typeof CaptureRuleCreateSchema>;
 
 export const CaptureRuleUpdateSchema = z
   .object({
+    project_scope: z.literal("current_project").optional(),
     name: z.string().trim().min(1).max(120).optional(),
     description: z.string().trim().max(500).nullable().optional(),
     enabled: z.boolean().optional(),

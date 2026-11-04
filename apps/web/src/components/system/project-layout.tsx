@@ -71,11 +71,24 @@ export function ProjectLayout(): JSX.Element {
 
     setProject(undefined);
     setActiveProject(null);
+    let current = true;
 
     void (async () => {
       const projects = await listProjects();
-      setProject(projects.find((c) => c.project_id === projectId) ?? null);
-    })();
+      if (!current) return;
+      const selected = projects.find((candidate) => candidate.project_id === projectId);
+      if (selected !== undefined) setProject(selected);
+      else {
+        const retained = await listProjects(projectId);
+        if (current)
+          setProject(retained.find((candidate) => candidate.project_id === projectId) ?? null);
+      }
+    })().catch(() => {
+      if (current) setProject(null);
+    });
+    return () => {
+      current = false;
+    };
   }, [projectId, setActiveProject]);
 
   useEffect(() => {

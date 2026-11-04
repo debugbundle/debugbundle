@@ -1,4 +1,5 @@
-import { evidenceCapabilityResponse } from "../evidence-negotiation.js";
+import { completeIngestion } from "./ingestion-completion.js";
+import { resolveIngestionProjectScopes } from "../ingestion-project-scopes.js";
 import type { FastifyInstance } from "fastify";
 
 import {
@@ -16,8 +17,7 @@ import {
 } from "../../../../packages/event-normalizer/src/index.js";
 import {
   countsTowardMonthlyIngestAllowance,
-  queueAllowanceLimitReachedNotification,
-  queueAllowanceThresholdNotifications
+  queueAllowanceLimitReachedNotification
 } from "../../../../packages/storage/src/index.js";
 import {
   getTierCapabilities,
@@ -149,7 +149,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
     const rejectedMetricEvents: IngestionRejectedMetricEvent[] = [];
     const rejectedDiagnosticEvents: IngestionRejectedDiagnosticEvent[] = [];
     let validEvents: ValidDebugEvent[] = [];
-    const validAnalyticsEvents: ValidAnalyticsEvent[] = [];
+    let validAnalyticsEvents: ValidAnalyticsEvent[] = [];
 
     for (const [index, candidate] of parsedBody.data.events.entries()) {
       if (isAnalyticsEventCandidate(candidate)) {
@@ -202,6 +202,31 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
       validEvents.push({ index, event });
     }
 
+    const serviceScopes = await resolveIngestionProjectScopes(dependencies, project, [
+      ...new Set([...validEvents, ...validAnalyticsEvents].map(({ event }) => event.service.name))
+    ]);
+    const eventOrigins = new Map<number, string>();
+    function admitScope(entry: { index: number; event: { service: { name: string } } }): boolean {
+      const origin = serviceScopes.get(entry.event.service.name)?.origin_project_id;
+      if (origin == null) {
+        errors.push({ index: entry.index, reason: "service_scope_denied" });
+        return false;
+      }
+      eventOrigins.set(entry.index, origin);
+      return true;
+    }
+    validEvents = validEvents.filter(admitScope);
+    validAnalyticsEvents = validAnalyticsEvents.filter(admitScope).map((entry) => ({
+      ...entry,
+      event: { ...entry.event, project_id: eventOrigins.get(entry.index)! }
+    }));
+    const originFor = (index: number): string => eventOrigins.get(index)!;
+    const eventOriginIds = new Map(
+      [...validEvents, ...validAnalyticsEvents].map(({ index, event }) => [
+        event.event_id,
+        originFor(index)
+      ])
+    );
     const sharedRateLimitedEventCount = validEvents.length + validAnalyticsEvents.length;
 
     if (
@@ -237,9 +262,9 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
             }))
           );
           rejectedDiagnosticEvents.push(
-            ...validEvents.map(({ event }) =>
+            ...validEvents.map(({ index, event }) =>
               buildRejectedDiagnosticFromEvent({
-                project_id: project.project_id,
+                project_id: originFor(index),
                 rejection_reason: "rate_limited",
                 event
               })
@@ -254,7 +279,8 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
             organization_plan: project.organization_plan,
             occurred_at: now.toISOString(),
             accepted_events: [],
-            rejected_events: rejectedMetricEvents
+            rejected_events: rejectedMetricEvents,
+            event_origins: eventOriginIds
           });
           if (metricRecordResult === "recorded") {
             await recordRejectedDiagnosticsBestEffort({
@@ -285,7 +311,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
       // rejected now. Retry order must never refresh eligibility or raw identity.
       const receipt = await dependencies.ingestionPersistence.claimEvidenceReceipt?.(
         event,
-        project.project_id,
+        originFor(index),
         now.toISOString()
       );
       if (
@@ -296,7 +322,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
         rejectedMetricEvents.push({ event_id: event.event_id, reason: "invalid_event" });
         rejectedDiagnosticEvents.push(
           buildRejectedDiagnosticFromEvent({
-            project_id: project.project_id,
+            project_id: originFor(index),
             rejection_reason: "invalid_event",
             event
           })
@@ -313,7 +339,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
       events: validAnalyticsEvents,
       organizationId: project.organization_id,
       organizationPlan: project.organization_plan,
-      projectId: project.project_id,
+      projectId: project.canonical_project_id ?? project.project_id,
       analyticsAvailable: caps.analytics_bundle
     });
     errors.push(...analyticsSelection.errors);
@@ -327,7 +353,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
     if (dependencies.capturePolicyManagement !== undefined) {
       const policyRecord = await dependencies.capturePolicyManagement.getCapturePolicyForProject({
         organization_id: "",
-        project_id: project.project_id
+        project_id: project.canonical_project_id ?? project.project_id
       });
       if (policyRecord !== null) {
         capturePolicy = resolvePolicy(policyRecord);
@@ -335,15 +361,21 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
     }
 
     const capturedEvents: typeof validEvents = [];
-    const activeCaptureRules =
-      dependencies.captureRuleManagement === undefined
-        ? []
-        : await dependencies.captureRuleManagement.listActiveCaptureRulesForProject({
-            project_id: project.project_id,
-            now: now.toISOString()
-          });
-    const captureRulesNeedFingerprint = activeCaptureRules.some(
-      (rule) => rule.matcher.fingerprint !== undefined
+    const rulesByOrigin = new Map(
+      await Promise.all(
+        [...new Set(validEvents.map(({ index }) => originFor(index)))].map(
+          async (origin) =>
+            [
+              origin,
+              dependencies.captureRuleManagement === undefined
+                ? []
+                : await dependencies.captureRuleManagement.listActiveCaptureRulesForProject({
+                    project_id: origin,
+                    now: now.toISOString()
+                  })
+            ] as const
+        )
+      )
     );
     let matchedRuleHits: Array<{ event_index: number; rule_id: string; matched_at: string }> = [];
     const acceptedEvents: Array<{
@@ -354,6 +386,10 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
     }> = [];
 
     for (const entry of validEvents) {
+      const activeCaptureRules = rulesByOrigin.get(originFor(entry.index)) ?? [];
+      const captureRulesNeedFingerprint = activeCaptureRules.some(
+        (rule) => rule.matcher.fingerprint !== undefined
+      );
       if (
         !caps.remote_probes &&
         entry.event.event_type === "probe_event" &&
@@ -369,7 +405,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
         });
         rejectedDiagnosticEvents.push(
           buildRejectedDiagnosticFromEvent({
-            project_id: project.project_id,
+            project_id: originFor(entry.index),
             rejection_reason: "remote_probes_disabled",
             event: entry.event
           })
@@ -402,7 +438,10 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
             : evaluateCaptureRules(
                 activeCaptureRules,
                 buildCaptureRuleEvaluationContext({
-                  project_id: project.project_id,
+                  project_id: originFor(entry.index),
+                  service_aliases: serviceScopes.get(entry.event.service.name)?.service_aliases ?? [
+                    entry.event.service.name
+                  ],
                   event: {
                     event_id: entry.event.event_id,
                     event_type: entry.event.event_type,
@@ -444,7 +483,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
           });
           rejectedDiagnosticEvents.push(
             buildRejectedDiagnosticFromEvent({
-              project_id: project.project_id,
+              project_id: originFor(entry.index),
               rejection_reason: "capture_rule_dropped",
               event: entry.event
             })
@@ -465,7 +504,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
           });
           rejectedDiagnosticEvents.push(
             buildRejectedDiagnosticFromEvent({
-              project_id: project.project_id,
+              project_id: originFor(entry.index),
               rejection_reason: "capture_rule_sampled_out",
               event: entry.event
             })
@@ -499,7 +538,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
         });
         rejectedDiagnosticEvents.push(
           buildRejectedDiagnosticFromEvent({
-            project_id: project.project_id,
+            project_id: originFor(entry.index),
             rejection_reason: "capture_policy_rejected",
             event: entry.event
           })
@@ -571,9 +610,9 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
               }))
             );
             rejectedDiagnosticEvents.push(
-              ...quotaRejectedEvents.map(({ event }) =>
+              ...quotaRejectedEvents.map(({ index, event }) =>
                 buildRejectedDiagnosticFromEvent({
-                  project_id: project.project_id,
+                  project_id: originFor(index),
                   rejection_reason: "monthly_quota_exceeded",
                   event
                 })
@@ -601,7 +640,8 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
                 organization_plan: project.organization_plan,
                 occurred_at: now.toISOString(),
                 accepted_events: [],
-                rejected_events: rejectedMetricEvents
+                rejected_events: rejectedMetricEvents,
+                event_origins: eventOriginIds
               });
               if (metricRecordResult === "recorded") {
                 await recordRejectedDiagnosticsBestEffort({
@@ -630,8 +670,8 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
     }
 
     let accepted = 0;
-    for (const { event, captureRule } of debugEventsToPersist) {
-      await dependencies.ingestionPersistence.persistAndEnqueue(event, project.project_id, {
+    for (const { index, event, captureRule } of debugEventsToPersist) {
+      await dependencies.ingestionPersistence.persistAndEnqueue(event, originFor(index), {
         receivedAt: now.toISOString(),
         capturePreset: capturePolicy.preset,
         immediateClientErrorStatuses: capturePolicy.immediate_client_error_statuses,
@@ -674,7 +714,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
       const persistedAnalyticsClaimKeys = new Set<string>();
       try {
         for (const { event } of acceptedAnalyticsEvents) {
-          await persistAnalyticsAndEnqueue(event, project.project_id);
+          await persistAnalyticsAndEnqueue(event, event.project_id!);
           for (const claimKey of getAnalyticsQuotaClaimKeysForEvent(event)) {
             persistedAnalyticsClaimKeys.add(claimKey);
           }
@@ -703,7 +743,7 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
       await Promise.allSettled(
         matchedRuleHits.map((match) =>
           recordCaptureRuleMatch({
-            project_id: project.project_id,
+            project_id: originFor(match.event_index),
             rule_id: match.rule_id,
             matched_at: match.matched_at
           })
@@ -711,130 +751,23 @@ export function registerIngestionRoutes(app: FastifyInstance, dependencies: ApiD
       );
     }
 
-    if (
-      billingCountedEventsCount > 0 &&
-      usageWindowStartsAt !== null &&
-      project.organization_id !== undefined &&
-      dependencies.billingManagement?.incrementOrgUsageCounter !== undefined
-    ) {
-      await dependencies.billingManagement.incrementOrgUsageCounter({
-        organization_id: project.organization_id,
-        period_starts_at: usageWindowStartsAt,
-        count: billingCountedEventsCount
-      });
-    }
-
-    if (
-      billingCountedEventsCount > 0 &&
-      usageWindowStartsAt !== null &&
-      dependencies.billingManagement?.incrementProjectUsageCounter !== undefined
-    ) {
-      try {
-        await dependencies.billingManagement.incrementProjectUsageCounter({
-          project_id: project.project_id,
-          period_starts_at: usageWindowStartsAt,
-          count: billingCountedEventsCount
-        });
-      } catch {
-        request.log.warn(
-          {
-            project_id: project.project_id,
-            period_starts_at: usageWindowStartsAt
-          },
-          "project_usage_counter_increment_failed"
-        );
-      }
-    }
-
-    if (
-      billingCountedEventsCount > 0 &&
-      previousRawIngestAllowanceUsed !== null &&
-      rawIngestAllowanceLimit !== null &&
-      dependencies.operationalEmailDelivery !== undefined
-    ) {
-      await queueAllowanceThresholdNotifications({
-        store: dependencies.operationalEmailDelivery,
-        project_id: project.project_id,
-        meter: "monthly_raw_ingested_events",
-        previous_used: previousRawIngestAllowanceUsed,
-        next_used: previousRawIngestAllowanceUsed + billingCountedEventsCount,
-        limit: rawIngestAllowanceLimit,
-        usage_window_starts_at: usageWindowStartsAt,
-        usage_window_ends_at: usageWindowEndsAt
-      });
-    }
-
-    const metricRecordResult = await recordIngestionMetricBatchBestEffort({
+    const responseBody = await completeIngestion({
       dependencies,
-      log: request.log,
-      organization_id: project.organization_id,
-      project_id: project.project_id,
-      organization_plan: project.organization_plan,
-      occurred_at: now.toISOString(),
-      accepted_events: debugEventsToPersist.map(({ event, eventClass }) => ({
-        event_id: event.event_id,
-        event_class: eventClass,
-        event_type: event.event_type
-      })),
-      rejected_events: rejectedMetricEvents
-    });
-    if (metricRecordResult === "recorded") {
-      await recordRejectedDiagnosticsBestEffort({
-        dependencies,
-        log: request.log,
-        organization_id: project.organization_id,
-        occurred_at: now.toISOString(),
-        rejected_events: rejectedDiagnosticEvents
-      });
-    }
-
-    let activeProbes: Array<{
-      activation_id: string;
-      label_pattern: string;
-      service: string;
-      environment: string;
-      expires_at: string;
-      trigger_expires_at: string;
-    }> = [];
-
-    if (caps.remote_probes && dependencies.probeManagement !== undefined) {
-      activeProbes = await dependencies.probeManagement.listActiveProbesForProject({
-        project_id: project.project_id,
-        now: new Date().toISOString()
-      });
-    }
-
-    const responseBody: {
-      evidence_capabilities?: import("../../../../packages/shared-types/src/index.js").EvidenceCapabilities;
-      accepted: number;
-      rejected: number;
-      errors: Array<{ index: number; reason: string }>;
-      probe_directives?: {
-        active_probes: Array<{
-          activation_id: string;
-          label_pattern: string;
-          service: string;
-          environment: string;
-          expires_at: string;
-          trigger_expires_at: string;
-        }>;
-      };
-    } = {
+      request,
+      project,
+      now,
       accepted,
-      rejected: errors.length,
       errors,
-      ...evidenceCapabilityResponse(
-        request,
-        dependencies.ingestionPersistence.claimEvidenceReceipt !== undefined
-      )
-    };
-
-    if (caps.remote_probes && activeProbes.length > 0) {
-      responseBody.probe_directives = {
-        active_probes: activeProbes
-      };
-    }
-
+      events: debugEventsToPersist,
+      event_origins: eventOriginIds,
+      rejected_metrics: rejectedMetricEvents,
+      rejected_diagnostics: rejectedDiagnosticEvents,
+      billed_count: billingCountedEventsCount,
+      usage_starts_at: usageWindowStartsAt,
+      usage_ends_at: usageWindowEndsAt,
+      previous_used: previousRawIngestAllowanceUsed,
+      allowance_limit: rawIngestAllowanceLimit
+    });
     return reply.status(202).send(responseBody);
   });
 }

@@ -117,65 +117,72 @@ describe("api-default-dependency-mocks github", () => {
     expect(createIngestionMetadataServiceMock).toHaveBeenCalled();
   });
 
-  it("should create a default dispatch rule when assigning a repo to a project with no existing rules", async (): Promise<void> => {
-    const githubStore = {
-      getGitHubInstallationForOrganization: vi.fn().mockResolvedValue({
-        id: "ghi_1",
-        installation_id: 42,
-        account_login: "testorg",
-        account_type: "Organization",
-        status: "active"
-      }),
-      upsertProjectGitHubRepoForOrganization: vi.fn().mockResolvedValue({
-        id: "pgr_1",
-        project_id: "proj_1",
-        installation_id: "ghi_1",
-        repo_owner: "testorg",
-        repo_name: "myrepo",
-        default_branch: "main",
-        created_at: "2026-03-26T00:00:00.000Z",
-        updated_at: "2026-03-26T00:00:00.000Z"
-      }),
-      listProjectGitHubRulesForOrganization: vi.fn().mockResolvedValue([]),
-      createProjectGitHubRuleForOrganization: vi.fn().mockResolvedValue({
-        rule_id: "rule_default",
-        project_id: "proj_1",
-        name: "Default triage rule",
-        enabled: true,
-        event_types: ["bundle.created", "bundle.reopened"],
-        environments: [],
-        services: [],
-        severity_min: "high",
-        bundle_type: null,
-        incident_status: "new_or_reopened",
-        cooldown_seconds: 300,
-        created_at: "2026-03-26T00:00:00.000Z",
-        updated_at: "2026-03-26T00:00:00.000Z"
-      }),
-      deleteGitHubInstallationForOrganization: vi.fn(),
-      deleteProjectGitHubRepoForOrganization: vi.fn(),
-      getProjectGitHubRepoForOrganization: vi.fn(),
-      getProjectGitHubRuleForOrganization: vi.fn(),
-      updateProjectGitHubRuleForOrganization: vi.fn(),
-      deleteProjectGitHubRuleForOrganization: vi.fn(),
-      listProjectGitHubDeliveriesForOrganization: vi.fn(),
-      retryGitHubDispatchDelivery: vi.fn(),
-      upsertGitHubInstallationForOrganization: vi.fn()
-    };
-    createPostgresGitHubStoreMock.mockReturnValue(githubStore);
+  it.each([false, true])(
+    "creates a default rule only for a canonical binding (retained=%s)",
+    async (retained): Promise<void> => {
+      createPostgresMetadataStoreMock.mockReturnValue({
+        resolveProjectAccessForUser: vi
+          .fn()
+          .mockResolvedValue(
+            retained ? { canonical_project_id: "root_1" } : { project_id: "proj_1" }
+          )
+      });
+      const githubStore = {
+        getGitHubInstallationForOrganization: vi.fn().mockResolvedValue({
+          id: "ghi_1",
+          installation_id: 42,
+          account_login: "testorg",
+          account_type: "Organization",
+          status: "active"
+        }),
+        upsertProjectGitHubRepoForOrganization: vi.fn().mockResolvedValue({
+          id: "pgr_1",
+          project_id: "proj_1",
+          installation_id: "ghi_1",
+          repo_owner: "testorg",
+          repo_name: "myrepo",
+          default_branch: "main",
+          created_at: "2026-03-26T00:00:00.000Z",
+          updated_at: "2026-03-26T00:00:00.000Z"
+        }),
+        listProjectGitHubRulesForOrganization: vi.fn().mockResolvedValue([]),
+        createProjectGitHubRuleForOrganization: vi.fn().mockResolvedValue({
+          rule_id: "rule_default",
+          project_id: "proj_1",
+          name: "Default triage rule",
+          enabled: true,
+          event_types: ["bundle.created", "bundle.reopened"],
+          environments: [],
+          services: [],
+          severity_min: "high",
+          bundle_type: null,
+          incident_status: "new_or_reopened",
+          cooldown_seconds: 300,
+          created_at: "2026-03-26T00:00:00.000Z",
+          updated_at: "2026-03-26T00:00:00.000Z"
+        }),
+        deleteGitHubInstallationForOrganization: vi.fn(),
+        deleteProjectGitHubRepoForOrganization: vi.fn(),
+        getProjectGitHubRepoForOrganization: vi.fn(),
+        getProjectGitHubRuleForOrganization: vi.fn(),
+        updateProjectGitHubRuleForOrganization: vi.fn(),
+        deleteProjectGitHubRuleForOrganization: vi.fn(),
+        listProjectGitHubDeliveriesForOrganization: vi.fn(),
+        retryGitHubDispatchDelivery: vi.fn(),
+        upsertGitHubInstallationForOrganization: vi.fn()
+      };
+      createPostgresGitHubStoreMock.mockReturnValue(githubStore);
 
-    const githubAppClient = {
-      getInstallUrl: vi
-        .fn()
-        .mockResolvedValue("https://github.com/apps/debugbundle-automation/installations/new"),
-      getInstallation: vi.fn().mockResolvedValue({
-        installation_id: 42,
-        account_login: "testorg",
-        account_type: "Organization" as const
-      }),
-      listRepositories: vi
-        .fn()
-        .mockResolvedValue([
+      const githubAppClient = {
+        getInstallUrl: vi
+          .fn()
+          .mockResolvedValue("https://github.com/apps/debugbundle-automation/installations/new"),
+        getInstallation: vi.fn().mockResolvedValue({
+          installation_id: 42,
+          account_login: "testorg",
+          account_type: "Organization" as const
+        }),
+        listRepositories: vi.fn().mockResolvedValue([
           {
             id: 1,
             owner: "testorg",
@@ -185,44 +192,50 @@ describe("api-default-dependency-mocks github", () => {
             private: false
           }
         ]),
-      verifyWebhookSignature: vi.fn().mockReturnValue(true)
-    };
+        verifyWebhookSignature: vi.fn().mockReturnValue(true)
+      };
 
-    const deps = createApiDependencies({
-      objectStore: { putObject: vi.fn(), getObject: vi.fn(), deleteObjectsByPrefix: vi.fn() },
-      queue: { enqueue: vi.fn() },
-      db: { query: vi.fn() },
-      githubAppClient
-    });
+      const deps = createApiDependencies({
+        objectStore: { putObject: vi.fn(), getObject: vi.fn(), deleteObjectsByPrefix: vi.fn() },
+        queue: { enqueue: vi.fn() },
+        db: { query: vi.fn() },
+        githubAppClient
+      });
 
-    const result = await deps.githubManagement!.setProjectRepoForOrganization({
-      organization_id: "org_1",
-      project_id: "proj_1",
-      created_by_user_id: "usr_1",
-      owner: "testorg",
-      repo: "myrepo"
-    });
+      const result = await deps.githubManagement!.setProjectRepoForOrganization({
+        organization_id: "org_1",
+        project_id: "proj_1",
+        created_by_user_id: "usr_1",
+        owner: "testorg",
+        repo: "myrepo"
+      });
 
-    expect(typeof result).not.toBe("string");
-    expect(githubStore.listProjectGitHubRulesForOrganization).toHaveBeenCalledWith({
-      organization_id: "org_1",
-      project_id: "proj_1"
-    });
-    expect(githubStore.createProjectGitHubRuleForOrganization).toHaveBeenCalledWith({
-      organization_id: "org_1",
-      project_id: "proj_1",
-      created_by_user_id: "usr_1",
-      name: "Default triage rule",
-      enabled: true,
-      event_types: ["bundle.created", "bundle.reopened"],
-      environments: [],
-      services: [],
-      severity_min: "high",
-      bundle_type: null,
-      incident_status: "new_or_reopened",
-      cooldown_seconds: 300
-    });
-  });
+      expect(typeof result).not.toBe("string");
+      if (retained) {
+        expect(githubStore.listProjectGitHubRulesForOrganization).not.toHaveBeenCalled();
+        expect(githubStore.createProjectGitHubRuleForOrganization).not.toHaveBeenCalled();
+        return;
+      }
+      expect(githubStore.listProjectGitHubRulesForOrganization).toHaveBeenCalledWith({
+        organization_id: "org_1",
+        project_id: "proj_1"
+      });
+      expect(githubStore.createProjectGitHubRuleForOrganization).toHaveBeenCalledWith({
+        organization_id: "org_1",
+        project_id: "proj_1",
+        created_by_user_id: "usr_1",
+        name: "Default triage rule",
+        enabled: true,
+        event_types: ["bundle.created", "bundle.reopened"],
+        environments: [],
+        services: [],
+        severity_min: "high",
+        bundle_type: null,
+        incident_status: "new_or_reopened",
+        cooldown_seconds: 300
+      });
+    }
+  );
 
   it("should not create a default dispatch rule when the project already has rules", async (): Promise<void> => {
     const githubStore = {
@@ -268,18 +281,16 @@ describe("api-default-dependency-mocks github", () => {
         account_login: "testorg",
         account_type: "Organization" as const
       }),
-      listRepositories: vi
-        .fn()
-        .mockResolvedValue([
-          {
-            id: 1,
-            owner: "testorg",
-            name: "myrepo",
-            full_name: "testorg/myrepo",
-            default_branch: "main",
-            private: false
-          }
-        ]),
+      listRepositories: vi.fn().mockResolvedValue([
+        {
+          id: 1,
+          owner: "testorg",
+          name: "myrepo",
+          full_name: "testorg/myrepo",
+          default_branch: "main",
+          private: false
+        }
+      ]),
       verifyWebhookSignature: vi.fn().mockReturnValue(true)
     };
 
@@ -309,18 +320,16 @@ describe("api-default-dependency-mocks github", () => {
         .fn()
         .mockResolvedValue("https://github.com/apps/debugbundle-automation/installations/new"),
       getInstallation: vi.fn(),
-      listRepositories: vi
-        .fn()
-        .mockResolvedValue([
-          {
-            id: 1,
-            owner: "debugbundle",
-            name: "app",
-            full_name: "debugbundle/app",
-            default_branch: "main",
-            private: false
-          }
-        ]),
+      listRepositories: vi.fn().mockResolvedValue([
+        {
+          id: 1,
+          owner: "debugbundle",
+          name: "app",
+          full_name: "debugbundle/app",
+          default_branch: "main",
+          private: false
+        }
+      ]),
       verifyWebhookSignature: vi.fn().mockReturnValue(true)
     };
     const buildDeps = (githubStore: Record<string, unknown>) => {
@@ -654,18 +663,16 @@ describe("api-default-dependency-mocks github", () => {
         .fn()
         .mockResolvedValue("https://github.com/apps/debugbundle-automation/installations/new"),
       getInstallation: vi.fn(),
-      listRepositories: vi
-        .fn()
-        .mockResolvedValue([
-          {
-            id: 1,
-            owner: "debugbundle",
-            name: "app",
-            full_name: "debugbundle/app",
-            default_branch: "main",
-            private: false
-          }
-        ]),
+      listRepositories: vi.fn().mockResolvedValue([
+        {
+          id: 1,
+          owner: "debugbundle",
+          name: "app",
+          full_name: "debugbundle/app",
+          default_branch: "main",
+          private: false
+        }
+      ]),
       verifyWebhookSignature: vi.fn().mockReturnValue(true)
     };
 

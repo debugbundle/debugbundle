@@ -49,7 +49,8 @@ export function createNotificationPreferencesStore(db: Queryable): NotificationP
   async function read(scope: NotificationScope, tx = db): Promise<NotificationPreferences> {
     const rows = await tx.query<{ preferences: unknown }>(
       `SELECT preferences FROM notification_preferences
-      WHERE ${scope.audience === "personal" ? "user_id" : "organization_id"} = $1 AND project_id IS NOT DISTINCT FROM $2::uuid`,
+      WHERE ${scope.audience === "personal" ? "user_id" : "organization_id"} = $1 AND project_id IS NOT DISTINCT FROM
+        CASE WHEN $2::uuid IS NULL THEN NULL ELSE debugbundle_canonical_project($2::uuid) END`,
       [scope.owner_id, scope.project_id]
     );
     return rows.rows[0] === undefined
@@ -66,7 +67,7 @@ export function createNotificationPreferencesStore(db: Queryable): NotificationP
     let shared: NotificationSettingsResponse["shared"];
     if (scope.audience === "personal" && scope.project_id !== null) {
       const project = await db.query<{ organization_id: string }>(
-        "SELECT organization_id FROM projects WHERE id = $1",
+        "SELECT organization_id FROM projects WHERE id = debugbundle_canonical_project($1::uuid)",
         [scope.project_id]
       );
       const organizationId = project.rows[0]?.organization_id;
@@ -149,7 +150,7 @@ export function createNotificationPreferencesStore(db: Queryable): NotificationP
             `UPDATE notification_daily_batches b SET next_attempt_at = $4
             WHERE b.status = 'pending' AND EXISTS(
               SELECT 1 FROM notification_daily_items d JOIN projects p ON p.id = d.project_id
-              WHERE d.batch_id = b.id AND ($3::uuid IS NULL OR p.id = $3)
+              WHERE d.batch_id = b.id AND ($3::uuid IS NULL OR debugbundle_canonical_project(p.id) = $3)
               AND (($1 = 'shared' AND p.organization_id = $2::uuid) OR
                 ($1 = 'personal' AND b.recipient = (SELECT lower(email) FROM users WHERE id = $2::uuid))))`,
             [scope.audience, scope.owner_id, scope.project_id, now.toISOString()]
@@ -167,9 +168,9 @@ export function createNotificationPreferencesStore(db: Queryable): NotificationP
       }>(
         `
         SELECT p.organization_id, u.id AS user_id,
-          EXISTS(SELECT 1 FROM incidents i WHERE i.id = $3::uuid AND i.project_id = p.id
+          EXISTS(SELECT 1 FROM incidents i WHERE i.id = $3::uuid AND i.project_id=ANY(debugbundle_project_origins(p.id))
             AND i.fingerprint_version = 'availability-v1') AS health
-        FROM projects p LEFT JOIN users u ON lower(u.email) = lower($2::text) WHERE p.id = $1`,
+        FROM projects p LEFT JOIN users u ON lower(u.email) = lower($2::text) WHERE p.id = debugbundle_canonical_project($1::uuid)`,
         [input.project_id, input.recipient ?? null, input.incident_id ?? null]
       );
       const row = context.rows[0];

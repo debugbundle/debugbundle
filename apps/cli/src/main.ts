@@ -22,46 +22,96 @@ import {
   listIncidentsWithAuthCommand as defaultListIncidentsCommand
 } from "./retrieval-commands.js";
 import { listServicesWithAuthCommand as defaultListServicesCommand } from "./services-command.js";
+import {
+  handleProjectAdoptionCommand,
+  projectAdoptionWithAuthCommand
+} from "./project-adoption-commands.js";
+import {
+  handleProjectMergeCommand,
+  projectMergeWithAuthCommand
+} from "./project-merge-commands.js";
+import {
+  handleServiceDefinitionCommand,
+  serviceDefinitionWithAuthCommand
+} from "./service-definition-commands.js";
 import { smokeCommand as defaultSmokeCommand } from "./smoke-command.js";
 import { formatUsage } from "./usage.js";
 import { validateCommand as defaultValidateCommand } from "./validate-command.js";
-import { verifyCloudCommand as defaultVerifyCloudCommand, verifyLocalCommand as defaultVerifyLocalCommand } from "./verify-command.js";
+import {
+  verifyCloudCommand as defaultVerifyCloudCommand,
+  verifyLocalCommand as defaultVerifyLocalCommand
+} from "./verify-command.js";
 import { whoamiCommand as defaultWhoamiCommand } from "./whoami-command.js";
-import { appendCommonAuthOptions, CliInputError, ensureNoExtraPositionals, expectNoUnknownOptions, parseArgv, readBooleanOption, readIntegerOption, readLimitOption, readStringOption, readStringListOption, requirePositional } from "./argv-helpers.js";
-import { handleAlertCommand, handleAnalyticsCommand, handleBillingCommand, handleCapturePolicyCommand, handleGithubCommand, handleHealthCommand, handleImprovementsCommand, handleMemberCommand, handleProbeCommand, handleProjectCommand, handleSlackCommand, handleTokenCommand, handleWebhookCommand, handleWeeklyReportCommand, type ManagementCommandDependencies } from "./management-command-handlers.js";
-import { handleCaptureRuleCommand, type CaptureRuleCommandDependencies } from "./capture-rule-command-handler.js";
+import {
+  appendCommonAuthOptions,
+  CliInputError,
+  ensureNoExtraPositionals,
+  expectNoUnknownOptions,
+  parseArgv,
+  readBooleanOption,
+  readIntegerOption,
+  readLimitOption,
+  readStringOption,
+  readStringListOption,
+  requirePositional
+} from "./argv-helpers.js";
+import {
+  handleAlertCommand,
+  handleAnalyticsCommand,
+  handleBillingCommand,
+  handleCapturePolicyCommand,
+  handleGithubCommand,
+  handleHealthCommand,
+  handleImprovementsCommand,
+  handleMemberCommand,
+  handleProbeCommand,
+  handleProjectCommand,
+  handleSlackCommand,
+  handleTokenCommand,
+  handleWebhookCommand,
+  handleWeeklyReportCommand,
+  type ManagementCommandDependencies
+} from "./management-command-handlers.js";
+import {
+  handleCaptureRuleCommand,
+  type CaptureRuleCommandDependencies
+} from "./capture-rule-command-handler.js";
 import type { CliCommandResult } from "./token-commands.js";
 import { CapturePresetSchema } from "../../../packages/shared-types/src/index.js";
 import packageJson from "../package.json" with { type: "json" };
 
-export type CliDependencies = ManagementCommandDependencies & CaptureRuleCommandDependencies & {
-  notificationCommand?: typeof notificationWithAuthCommand;
-  agentReadCommand?: typeof defaultAgentReadCommand;
-  analyzeCommand?: typeof defaultAnalyzeCommand;
-  cleanCommand?: typeof defaultCleanCommand;
-  connectCommand?: typeof defaultConnectCommand;
-  doctorCommand?: typeof defaultDoctorCommand;
-  ingestCommand?: typeof defaultIngestCommand;
-  watchCommand?: typeof defaultWatchCommand;
-  setupCommand?: typeof defaultSetupCommand;
-  loginCommand?: typeof defaultLoginCommand;
-  processCommand?: typeof defaultProcessCommand;
-  profileValidateCommand?: typeof defaultProfileValidateCommand;
-  smokeCommand?: typeof defaultSmokeCommand;
-  validateCommand?: typeof defaultValidateCommand;
-  verifyLocalCommand?: typeof defaultVerifyLocalCommand;
-  verifyCloudCommand?: typeof defaultVerifyCloudCommand;
-  whoamiCommand?: typeof defaultWhoamiCommand;
-  listIncidentsCommand?: typeof defaultListIncidentsCommand;
-  getIncidentContextCommand?: typeof defaultGetIncidentContextCommand;
-  getIncidentCommand?: typeof defaultGetIncidentCommand;
-  resolveIncidentCommand?: typeof defaultResolveIncidentCommand;
-  reopenIncidentCommand?: typeof defaultReopenIncidentCommand;
-  getBundleCommand?: typeof defaultGetBundleCommand;
-  getLogsCommand?: typeof defaultGetLogsCommand;
-  getReproductionCommand?: typeof defaultGetReproductionCommand;
-  listServicesCommand?: typeof defaultListServicesCommand;
-};
+export type CliDependencies = ManagementCommandDependencies &
+  CaptureRuleCommandDependencies & {
+    projectMergeCommand?: typeof projectMergeWithAuthCommand;
+    projectAdoptionCommand?: typeof projectAdoptionWithAuthCommand;
+    serviceDefinitionCommand?: typeof serviceDefinitionWithAuthCommand;
+    notificationCommand?: typeof notificationWithAuthCommand;
+    agentReadCommand?: typeof defaultAgentReadCommand;
+    analyzeCommand?: typeof defaultAnalyzeCommand;
+    cleanCommand?: typeof defaultCleanCommand;
+    connectCommand?: typeof defaultConnectCommand;
+    doctorCommand?: typeof defaultDoctorCommand;
+    ingestCommand?: typeof defaultIngestCommand;
+    watchCommand?: typeof defaultWatchCommand;
+    setupCommand?: typeof defaultSetupCommand;
+    loginCommand?: typeof defaultLoginCommand;
+    processCommand?: typeof defaultProcessCommand;
+    profileValidateCommand?: typeof defaultProfileValidateCommand;
+    smokeCommand?: typeof defaultSmokeCommand;
+    validateCommand?: typeof defaultValidateCommand;
+    verifyLocalCommand?: typeof defaultVerifyLocalCommand;
+    verifyCloudCommand?: typeof defaultVerifyCloudCommand;
+    whoamiCommand?: typeof defaultWhoamiCommand;
+    listIncidentsCommand?: typeof defaultListIncidentsCommand;
+    getIncidentContextCommand?: typeof defaultGetIncidentContextCommand;
+    getIncidentCommand?: typeof defaultGetIncidentCommand;
+    resolveIncidentCommand?: typeof defaultResolveIncidentCommand;
+    reopenIncidentCommand?: typeof defaultReopenIncidentCommand;
+    getBundleCommand?: typeof defaultGetBundleCommand;
+    getLogsCommand?: typeof defaultGetLogsCommand;
+    getReproductionCommand?: typeof defaultGetReproductionCommand;
+    listServicesCommand?: typeof defaultListServicesCommand;
+  };
 
 type MainDependencies = CliDependencies & {
   argv?: string[];
@@ -70,7 +120,9 @@ type MainDependencies = CliDependencies & {
   setExitCode?: (code: number) => void;
 };
 
-function readRetrievalSource(parsedArgv: ReturnType<typeof parseArgv>): "local" | "cloud" | undefined {
+function readRetrievalSource(
+  parsedArgv: ReturnType<typeof parseArgv>
+): "local" | "cloud" | undefined {
   const source = readStringOption(parsedArgv, "source");
   if (source === undefined) {
     return undefined;
@@ -83,7 +135,10 @@ function readRetrievalSource(parsedArgv: ReturnType<typeof parseArgv>): "local" 
   throw new CliInputError("Invalid value for --source.");
 }
 
-export async function runCli(argv: string[], dependencies: CliDependencies = {}): Promise<CliCommandResult> {
+export async function runCli(
+  argv: string[],
+  dependencies: CliDependencies = {}
+): Promise<CliCommandResult> {
   try {
     const parsedArgv = parseArgv(argv);
 
@@ -117,23 +172,42 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
         ensureNoExtraPositionals(parsedArgv, 2);
         const baseUrl = readStringOption(parsedArgv, "base-url");
         const authFilePath = readStringOption(parsedArgv, "auth-file");
-        return (dependencies.agentReadCommand ?? defaultAgentReadCommand)({ action,
-          ...(baseUrl === undefined ? {} : { baseUrl }), ...(authFilePath === undefined ? {} : { authFilePath }) });
+        return (dependencies.agentReadCommand ?? defaultAgentReadCommand)({
+          action,
+          ...(baseUrl === undefined ? {} : { baseUrl }),
+          ...(authFilePath === undefined ? {} : { authFilePath })
+        });
       }
-      const names = ["project_summary", "list_incidents", "get_incident", "get_incident_context", "get_bundle"] as const;
-      if (!names.includes(action as typeof names[number])) throw new CliInputError("Unknown agent read command.");
+      const names = [
+        "project_summary",
+        "list_incidents",
+        "get_incident",
+        "get_incident_context",
+        "get_bundle"
+      ] as const;
+      if (!names.includes(action as (typeof names)[number]))
+        throw new CliInputError("Unknown agent read command.");
       expectNoUnknownOptions(parsedArgv, ["base-url", "auth-file", "limit", "cursor"]);
-      ensureNoExtraPositionals(parsedArgv, action === "project_summary" || action === "list_incidents" ? 3 : 4);
+      ensureNoExtraPositionals(
+        parsedArgv,
+        action === "project_summary" || action === "list_incidents" ? 3 : 4
+      );
       const baseUrl = readStringOption(parsedArgv, "base-url");
       const authFilePath = readStringOption(parsedArgv, "auth-file");
       const cursor = readStringOption(parsedArgv, "cursor");
       const limit = readLimitOption(parsedArgv);
-      if (action !== "list_incidents" && (cursor !== undefined || limit !== undefined)) throw new CliInputError("List options apply only to list_incidents.");
+      if (action !== "list_incidents" && (cursor !== undefined || limit !== undefined))
+        throw new CliInputError("List options apply only to list_incidents.");
       return (dependencies.agentReadCommand ?? defaultAgentReadCommand)({
-        action: action as typeof names[number], projectId: requirePositional(parsedArgv, 2, "project-id"),
-        ...(action === "project_summary" || action === "list_incidents" ? {} : { incidentId: requirePositional(parsedArgv, 3, "incident-id") }),
-        ...(baseUrl === undefined ? {} : { baseUrl }), ...(authFilePath === undefined ? {} : { authFilePath }),
-        ...(cursor === undefined ? {} : { cursor }), ...(limit === undefined ? {} : { limit })
+        action: action as (typeof names)[number],
+        projectId: requirePositional(parsedArgv, 2, "project-id"),
+        ...(action === "project_summary" || action === "list_incidents"
+          ? {}
+          : { incidentId: requirePositional(parsedArgv, 3, "incident-id") }),
+        ...(baseUrl === undefined ? {} : { baseUrl }),
+        ...(authFilePath === undefined ? {} : { authFilePath }),
+        ...(cursor === undefined ? {} : { cursor }),
+        ...(limit === undefined ? {} : { limit })
       });
     }
 
@@ -180,7 +254,11 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
       const nonInteractive = readBooleanOption(parsedArgv, "non-interactive");
       const agents = readStringListOption(parsedArgv, "agent");
       if (agents !== undefined) {
-        try { parseAgents(agents); } catch (error) { throw new CliInputError(error instanceof Error ? error.message : String(error)); }
+        try {
+          parseAgents(agents);
+        } catch (error) {
+          throw new CliInputError(error instanceof Error ? error.message : String(error));
+        }
       }
       return await (dependencies.setupCommand ?? defaultSetupCommand)({
         ...(agents === undefined ? {} : { agents }),
@@ -193,7 +271,9 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
       expectNoUnknownOptions(parsedArgv, ["auth-file", "json"]);
       ensureNoExtraPositionals(parsedArgv, 1);
 
-      return await (dependencies.connectCommand ?? defaultConnectCommand)(appendCommonAuthOptions(parsedArgv, {}));
+      return await (dependencies.connectCommand ?? defaultConnectCommand)(
+        appendCommonAuthOptions(parsedArgv, {})
+      );
     }
 
     if (command === "ingest") {
@@ -247,7 +327,9 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
 
       return await (dependencies.processCommand ?? defaultProcessCommand)({
         ...(json === true ? { json: true } : {}),
-        ...(preset !== undefined ? { preset: preset as "minimal" | "balanced" | "investigative" } : {})
+        ...(preset !== undefined
+          ? { preset: preset as "minimal" | "balanced" | "investigative" }
+          : {})
       });
     }
 
@@ -288,7 +370,9 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
         ensureNoExtraPositionals(parsedArgv, 2);
 
         const json = readBooleanOption(parsedArgv, "json");
-        return await (dependencies.profileValidateCommand ?? defaultProfileValidateCommand)(json === true ? { json: true } : {});
+        return await (dependencies.profileValidateCommand ?? defaultProfileValidateCommand)(
+          json === true ? { json: true } : {}
+        );
       }
 
       throw new CliInputError("Unknown profile command.");
@@ -300,11 +384,25 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
         expectNoUnknownOptions(parsedArgv, ["json"]);
         ensureNoExtraPositionals(parsedArgv, 2);
 
-        return await (dependencies.verifyLocalCommand ?? defaultVerifyLocalCommand)(readBooleanOption(parsedArgv, "json") === true ? { json: true } : {});
+        return await (dependencies.verifyLocalCommand ?? defaultVerifyLocalCommand)(
+          readBooleanOption(parsedArgv, "json") === true ? { json: true } : {}
+        );
       }
 
       if (subcommand === "cloud") {
-        expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id", "service", "environment", "max-age-minutes", "trigger-5xx", "trigger-4xx", "expect-app-event", "trace-id", "request-id"]);
+        expectNoUnknownOptions(parsedArgv, [
+          "auth-file",
+          "json",
+          "project-id",
+          "service",
+          "environment",
+          "max-age-minutes",
+          "trigger-5xx",
+          "trigger-4xx",
+          "expect-app-event",
+          "trace-id",
+          "request-id"
+        ]);
         ensureNoExtraPositionals(parsedArgv, 2);
 
         const projectId = readStringOption(parsedArgv, "project-id");
@@ -314,8 +412,12 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
 
         const input = appendCommonAuthOptions(parsedArgv, {
           projectId,
-          ...(readStringOption(parsedArgv, "service") === undefined ? {} : { service: readStringOption(parsedArgv, "service") }),
-          ...(readStringOption(parsedArgv, "environment") === undefined ? {} : { environment: readStringOption(parsedArgv, "environment") })
+          ...(readStringOption(parsedArgv, "service") === undefined
+            ? {}
+            : { service: readStringOption(parsedArgv, "service") }),
+          ...(readStringOption(parsedArgv, "environment") === undefined
+            ? {}
+            : { environment: readStringOption(parsedArgv, "environment") })
         } as {
           projectId: string;
           service?: string;
@@ -360,7 +462,14 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
     }
 
     if (command === "smoke") {
-      expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id", "service", "environment", "max-age-minutes"]);
+      expectNoUnknownOptions(parsedArgv, [
+        "auth-file",
+        "json",
+        "project-id",
+        "service",
+        "environment",
+        "max-age-minutes"
+      ]);
       ensureNoExtraPositionals(parsedArgv, 1);
 
       const projectId = readStringOption(parsedArgv, "project-id");
@@ -370,8 +479,12 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
 
       const input = appendCommonAuthOptions(parsedArgv, {
         projectId,
-        ...(readStringOption(parsedArgv, "service") === undefined ? {} : { service: readStringOption(parsedArgv, "service") }),
-        ...(readStringOption(parsedArgv, "environment") === undefined ? {} : { environment: readStringOption(parsedArgv, "environment") })
+        ...(readStringOption(parsedArgv, "service") === undefined
+          ? {}
+          : { service: readStringOption(parsedArgv, "service") }),
+        ...(readStringOption(parsedArgv, "environment") === undefined
+          ? {}
+          : { environment: readStringOption(parsedArgv, "environment") })
       } as {
         projectId: string;
         service?: string;
@@ -390,20 +503,31 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
     }
 
     if (command === "login") {
-      expectNoUnknownOptions(parsedArgv, ["auth-file", "base-url", "json", "github", "github-cli", "github-device", "label"]);
+      expectNoUnknownOptions(parsedArgv, [
+        "auth-file",
+        "base-url",
+        "json",
+        "github",
+        "github-cli",
+        "github-device",
+        "label"
+      ]);
       ensureNoExtraPositionals(parsedArgv, 2);
 
       const bearerToken = parsedArgv.positionals[1];
-      const input = appendCommonAuthOptions(parsedArgv, {} as {
-        bearerToken?: string;
-        baseUrl?: string;
-        authFilePath?: string;
-        json?: boolean;
-        github?: boolean;
-        githubCli?: boolean;
-        githubDevice?: boolean;
-        label?: string;
-      });
+      const input = appendCommonAuthOptions(
+        parsedArgv,
+        {} as {
+          bearerToken?: string;
+          baseUrl?: string;
+          authFilePath?: string;
+          json?: boolean;
+          github?: boolean;
+          githubCli?: boolean;
+          githubDevice?: boolean;
+          label?: string;
+        }
+      );
       if (bearerToken !== undefined) {
         input.bearerToken = bearerToken;
       }
@@ -431,27 +555,45 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
     if (command === "whoami") {
       expectNoUnknownOptions(parsedArgv, ["auth-file", "json"]);
       ensureNoExtraPositionals(parsedArgv, 1);
-      return await (dependencies.whoamiCommand ?? defaultWhoamiCommand)(appendCommonAuthOptions(parsedArgv, {}));
+      return await (dependencies.whoamiCommand ?? defaultWhoamiCommand)(
+        appendCommonAuthOptions(parsedArgv, {})
+      );
     }
 
     if (command === "incidents") {
-      expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "source", "project-id", "environment", "service", "status", "severity", "first-seen-after", "attention-after", "cursor", "limit"]);
+      expectNoUnknownOptions(parsedArgv, [
+        "auth-file",
+        "json",
+        "source",
+        "project-id",
+        "environment",
+        "service",
+        "status",
+        "severity",
+        "first-seen-after",
+        "attention-after",
+        "cursor",
+        "limit"
+      ]);
       ensureNoExtraPositionals(parsedArgv, 1);
 
-      const input = appendCommonAuthOptions(parsedArgv, {} as {
-        authFilePath?: string;
-        json?: boolean;
-        projectId?: string;
-        environment?: string;
-        service?: string;
-        status?: string;
-        severity?: string;
-        firstSeenAfter?: string;
-        attentionAfter?: string;
-        cursor?: string;
-        limit?: number;
-        source?: "local" | "cloud";
-      });
+      const input = appendCommonAuthOptions(
+        parsedArgv,
+        {} as {
+          authFilePath?: string;
+          json?: boolean;
+          projectId?: string;
+          environment?: string;
+          service?: string;
+          status?: string;
+          severity?: string;
+          firstSeenAfter?: string;
+          attentionAfter?: string;
+          cursor?: string;
+          limit?: number;
+          source?: "local" | "cloud";
+        }
+      );
       const source = readRetrievalSource(parsedArgv);
       if (source !== undefined) {
         input.source = source;
@@ -501,7 +643,12 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
       ensureNoExtraPositionals(parsedArgv, 2);
       const input = appendCommonAuthOptions(parsedArgv, {
         incidentId: requirePositional(parsedArgv, 1, "incident-id")
-      } as { incidentId: string; authFilePath?: string; json?: boolean; source?: "local" | "cloud" });
+      } as {
+        incidentId: string;
+        authFilePath?: string;
+        json?: boolean;
+        source?: "local" | "cloud";
+      });
       const source = readRetrievalSource(parsedArgv);
       if (source !== undefined) {
         input.source = source;
@@ -514,12 +661,19 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
       ensureNoExtraPositionals(parsedArgv, 2);
       const input = appendCommonAuthOptions(parsedArgv, {
         incidentId: requirePositional(parsedArgv, 1, "incident-id")
-      } as { incidentId: string; authFilePath?: string; json?: boolean; source?: "local" | "cloud" });
+      } as {
+        incidentId: string;
+        authFilePath?: string;
+        json?: boolean;
+        source?: "local" | "cloud";
+      });
       const source = readRetrievalSource(parsedArgv);
       if (source !== undefined) {
         input.source = source;
       }
-      return await (dependencies.getIncidentContextCommand ?? defaultGetIncidentContextCommand)(input);
+      return await (dependencies.getIncidentContextCommand ?? defaultGetIncidentContextCommand)(
+        input
+      );
     }
 
     if (command === "resolve") {
@@ -529,7 +683,12 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
       }
       const input = appendCommonAuthOptions(parsedArgv, {
         incidentIds: parsedArgv.positionals.slice(1)
-      } as { incidentIds: string[]; authFilePath?: string; json?: boolean; source?: "local" | "cloud" });
+      } as {
+        incidentIds: string[];
+        authFilePath?: string;
+        json?: boolean;
+        source?: "local" | "cloud";
+      });
       const source = readRetrievalSource(parsedArgv);
       if (source !== undefined) {
         input.source = source;
@@ -544,7 +703,12 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
       }
       const input = appendCommonAuthOptions(parsedArgv, {
         incidentIds: parsedArgv.positionals.slice(1)
-      } as { incidentIds: string[]; authFilePath?: string; json?: boolean; source?: "local" | "cloud" });
+      } as {
+        incidentIds: string[];
+        authFilePath?: string;
+        json?: boolean;
+        source?: "local" | "cloud";
+      });
       const source = readRetrievalSource(parsedArgv);
       if (source !== undefined) {
         input.source = source;
@@ -557,7 +721,12 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
       ensureNoExtraPositionals(parsedArgv, 2);
       const input = appendCommonAuthOptions(parsedArgv, {
         incidentId: requirePositional(parsedArgv, 1, "incident-id")
-      } as { incidentId: string; authFilePath?: string; json?: boolean; source?: "local" | "cloud" });
+      } as {
+        incidentId: string;
+        authFilePath?: string;
+        json?: boolean;
+        source?: "local" | "cloud";
+      });
       const source = readRetrievalSource(parsedArgv);
       if (source !== undefined) {
         input.source = source;
@@ -570,7 +739,12 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
       ensureNoExtraPositionals(parsedArgv, 2);
       const input = appendCommonAuthOptions(parsedArgv, {
         incidentId: requirePositional(parsedArgv, 1, "incident-id")
-      } as { incidentId: string; authFilePath?: string; json?: boolean; source?: "local" | "cloud" });
+      } as {
+        incidentId: string;
+        authFilePath?: string;
+        json?: boolean;
+        source?: "local" | "cloud";
+      });
       const source = readRetrievalSource(parsedArgv);
       if (source !== undefined) {
         input.source = source;
@@ -609,7 +783,12 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
     }
 
     if (command === "services") {
-      expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id", "limit"]);
+      if (parsedArgv.positionals[1] !== undefined)
+        return await handleServiceDefinitionCommand(
+          parsedArgv,
+          dependencies.serviceDefinitionCommand
+        );
+      expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id", "limit", "offset"]);
       ensureNoExtraPositionals(parsedArgv, 1);
       const projectId = readStringOption(parsedArgv, "project-id");
       if (projectId === undefined) {
@@ -621,12 +800,18 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
         authFilePath?: string;
         json?: boolean;
         limit?: number;
+        offset?: number;
       });
       const limit = readLimitOption(parsedArgv);
       if (limit !== undefined) {
         input.limit = limit;
       }
 
+      const offset = readIntegerOption(parsedArgv, "offset");
+      if (offset !== undefined) {
+        if (offset < 0 || offset > 100_000) throw new CliInputError("Invalid value for --offset.");
+        input.offset = offset;
+      }
       return await (dependencies.listServicesCommand ?? defaultListServicesCommand)(input);
     }
 
@@ -643,6 +828,10 @@ export async function runCli(argv: string[], dependencies: CliDependencies = {})
     }
 
     if (command === "project") {
+      if (parsedArgv.positionals[1] === "merge" && parsedArgv.positionals[2] === "adopt")
+        return await handleProjectAdoptionCommand(parsedArgv, dependencies.projectAdoptionCommand);
+      if (parsedArgv.positionals[1] === "merge")
+        return await handleProjectMergeCommand(parsedArgv, dependencies.projectMergeCommand);
       return await handleProjectCommand(parsedArgv, dependencies);
     }
 
@@ -717,9 +906,11 @@ export async function main(dependencies: MainDependencies = {}): Promise<void> {
   const argv = dependencies.argv ?? process.argv.slice(2);
   const stdout = dependencies.stdout ?? ((text: string) => process.stdout.write(text));
   const stderr = dependencies.stderr ?? ((text: string) => process.stderr.write(text));
-  const setExitCode = dependencies.setExitCode ?? ((code: number) => {
-    process.exitCode = code;
-  });
+  const setExitCode =
+    dependencies.setExitCode ??
+    ((code: number) => {
+      process.exitCode = code;
+    });
 
   const result = await runCli(argv, dependencies);
   if (result.output.length > 0) {

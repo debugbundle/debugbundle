@@ -33,7 +33,7 @@ export interface AlertRuleRecord extends Record<string, unknown> {
 /** Internal worker projection; management reads never include the secret. */
 export interface AlertRuleForDelivery extends AlertRuleRecord {
   signing_secret?: string | null;
-    webhook_payload_version?: number;
+  webhook_payload_version?: number;
 }
 
 export interface DeleteAlertResult {
@@ -61,6 +61,7 @@ export interface AlertManagementStore {
     is_enabled: boolean;
   }): Promise<AlertRuleRecord | null>;
   updateAlertForOrganization(input: {
+    project_scope?: "current_project";
     organization_id: string;
     alert_id: string;
     project_id?: string;
@@ -196,8 +197,12 @@ export interface AlertDeliveryStore {
     severity: "low" | "medium" | "high" | "critical";
     lifecycle_event?: AlertSeverityLifecycleEvent;
   }): Promise<AlertRuleForDelivery[]>;
-  createAlertDeliveryIntent(input: CreateAlertDeliveryIntentInput): Promise<{ delivery_id: string | null; created: boolean }>;
-  markAlertDeliveryResult(input: MarkAlertDeliveryResultInput): Promise<{ status: "delivered" | "failed" }>;
+  createAlertDeliveryIntent(
+    input: CreateAlertDeliveryIntentInput
+  ): Promise<{ delivery_id: string | null; created: boolean }>;
+  markAlertDeliveryResult(
+    input: MarkAlertDeliveryResultInput
+  ): Promise<{ status: "delivered" | "failed" }>;
   queueAlertEmailDigestItem(input: QueueAlertEmailDigestItemInput): Promise<{
     digest_id: string | null;
     created: boolean;

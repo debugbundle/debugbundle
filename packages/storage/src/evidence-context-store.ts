@@ -41,9 +41,12 @@ export async function lockEvidenceContextEvent(
     ]);
 }
 async function lock(db: Queryable, values: string[]): Promise<void> {
-  await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
-    JSON.stringify(["evidence_context", ...values])
-  ]);
+  // Both deployed names share one correlation lock, while projects remain isolated.
+  await db.query(
+    `SELECT pg_advisory_xact_lock(hashtextextended(
+    jsonb_set($1::jsonb,'{2}',to_jsonb(debugbundle_service_input_name($2,$3)))::text,0))`,
+    [JSON.stringify(["evidence_context", ...values]), values[0], values[1]]
+  );
 }
 
 /** Called in the normalization transaction, sharing its receipt and durable rebuild ownership. */
@@ -129,7 +132,7 @@ export function createEvidenceContextStore(db: Queryable): {
       // Overflow rows remain cleanup/receipt tombstones until their raw objects expire.
       await db.query(
         `UPDATE evidence_context_events SET is_retained=false WHERE event_id IN (
-      SELECT event_id FROM evidence_context_events WHERE project_id=$1 AND service_name=$2 AND environment=$3
+      SELECT event_id FROM evidence_context_events WHERE project_id=$1 AND service_name=ANY(debugbundle_service_input_names($1,$2)) AND environment=$3
         AND failure_hash=$4 AND scope_kind=$5 AND scope_hash=$6 AND (kind='failure')=$7
       ORDER BY occurred_at,event_id OFFSET $8)`,
         [
@@ -159,10 +162,10 @@ export function createEvidenceContextStore(db: Queryable): {
         AND p.event_class='incident_signal'
         AND p.event_type IN ('backend_exception','frontend_exception','request_event','log_event')
         ORDER BY occurred_at DESC,event_id DESC LIMIT 1) primary_event ON true
-      WHERE f.project_id=$1 AND f.service_name=$2 AND f.environment=$3 AND f.failure_hash=$4 AND f.scope_kind=$5 AND f.scope_hash=$6
+      WHERE f.project_id=$1 AND f.service_name=ANY(debugbundle_service_input_names($1,$2)) AND f.environment=$3 AND f.failure_hash=$4 AND f.scope_kind=$5 AND f.scope_hash=$6
         AND f.kind='failure' AND f.expires_at>now() AND $7::timestamptz BETWEEN f.occurred_at AND f.occurred_at + interval '5 minutes'
         AND ((f.scope_kind='page' AND f.session_hash=$8) OR (f.scope_kind='operation' AND f.trace_hash IS NOT DISTINCT FROM $9::text))
-        AND NOT EXISTS (SELECT 1 FROM evidence_context_events other WHERE other.project_id=f.project_id AND other.service_name=f.service_name
+        AND NOT EXISTS (SELECT 1 FROM evidence_context_events other WHERE other.project_id=f.project_id AND other.service_name=ANY(debugbundle_service_input_names(f.project_id,f.service_name))
           AND other.environment=f.environment AND other.failure_hash=f.failure_hash AND other.scope_kind=f.scope_kind AND other.scope_hash=f.scope_hash
           AND other.kind='failure' AND other.event_id<>f.event_id AND other.expires_at>now())
       ORDER BY i.id LIMIT 50`,

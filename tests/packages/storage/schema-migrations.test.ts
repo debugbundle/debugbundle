@@ -325,6 +325,22 @@ describe("storage schema migrations", () => {
 
   it("should seed the migration ledger instead of replaying history for a current bootstrap schema", async (): Promise<void> => {
     const currentSchemaColumns = [
+      { table_name: "projects", column_name: "capture_rules_require_server" },
+      { table_name: "capture_rules", column_name: "scope_origin_ids" },
+      { table_name: "capture_rules", column_name: "filter_project_id" },
+      { table_name: "probe_activations", column_name: "trigger_token_hash" },
+      { table_name: "probe_activations", column_name: "scope_origin_ids" },
+      { table_name: "probe_activations", column_name: "service_definition_id" },
+      { table_name: "service_input_aliases", column_name: "service_definition_id" },
+      { table_name: "service_project_aliases", column_name: "service_definition_id" },
+      { table_name: "service_project_aliases", column_name: "is_current" },
+      { table_name: "project_legacy_bindings", column_name: "scope_origin_ids" },
+      { table_name: "project_merge_operations", column_name: "committed_at" },
+      { table_name: "project_tokens", column_name: "scope_origin_ids" },
+      { table_name: "agent_tokens", column_name: "scope_origin_ids" },
+      { table_name: "services", column_name: "service_definition_id" },
+      { table_name: "service_definitions", column_name: "origin_project_id" },
+      { table_name: "service_definitions", column_name: "repository_default_project_id" },
       { table_name: "capture_policies", column_name: "capture_diagnostic_context" },
       { table_name: "evidence_context_events", column_name: "received_at" },
       { table_name: "evidence_context_events", column_name: "is_retained" },
@@ -385,6 +401,7 @@ describe("storage schema migrations", () => {
       .mockResolvedValueOnce({
         rows: [{ definition: "CHECK includes plan_schedule and plan_cancel" }]
       })
+      .mockResolvedValueOnce({ rows: [{ project_service_schema_available: true }] })
       .mockResolvedValue({ rows: [] });
 
     const result = await migrateStorageSchema({ query } as Queryable);

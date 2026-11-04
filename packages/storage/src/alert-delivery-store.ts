@@ -1,4 +1,5 @@
 import { alertNotificationHistorySql } from "./alert-notification-history.js";
+import { ruleCoversOriginSql } from "./project-rule-access.js";
 import { randomBytes, randomUUID } from "node:crypto";
 
 import { getTierCapabilities } from "../../shared-types/src/index.js";
@@ -97,7 +98,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
         cooldown_seconds: number;
         config: Record<string, unknown>;
         signing_secret: string | null;
-  webhook_payload_version: number;
+        webhook_payload_version: number;
         is_enabled: boolean;
         created_at: string;
         updated_at: string;
@@ -121,31 +122,37 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
             ar.created_at::text AS created_at,
             ar.updated_at::text AS updated_at
           FROM alert_rules ar
-          JOIN projects p ON p.id = ar.project_id
+          JOIN projects p ON p.id = debugbundle_canonical_project(ar.project_id)
           JOIN organizations o ON o.id = p.organization_id
           LEFT JOIN services s ON s.id = ar.service_id
-          WHERE ar.project_id = $1
+          WHERE ar.project_id=ANY(debugbundle_project_origins(debugbundle_canonical_project($1::uuid)))
+            AND $1::uuid=ANY(COALESCE(ar.scope_origin_ids,ARRAY[ar.project_id]))
             AND ar.is_enabled = true
             AND ar.condition_type = $2
-            AND (ar.service_id IS NULL OR (s.name = $3 AND s.environment = $4))
+            AND (ar.service_id IS NULL OR (s.project_id=$1 AND s.name=ANY(debugbundle_service_input_names($1,$3)) AND s.environment = $4))
           ORDER BY ar.created_at DESC, ar.id DESC
         `,
         [input.project_id, input.condition_type, input.service_name, input.environment]
       );
 
       const alerts = result.rows
-        .filter((row) => row.channel !== "slack" || getTierCapabilities(row.organization_plan).slack_integration)
+        .filter(
+          (row) =>
+            row.channel !== "slack" || getTierCapabilities(row.organization_plan).slack_integration
+        )
         .map(mapAlertRuleRow)
-        .filter((alert) =>
-          alert.condition_type !== "severity_threshold" ||
-          matchesSeverityLifecycleScope({
-            scope: alert.severity_lifecycle_scope,
-            lifecycleEvent: input.lifecycle_event
-          })
+        .filter(
+          (alert) =>
+            alert.condition_type !== "severity_threshold" ||
+            matchesSeverityLifecycleScope({
+              scope: alert.severity_lifecycle_scope,
+              lifecycleEvent: input.lifecycle_event
+            })
         )
         .filter(
           (alert) =>
-            alert.severity_min === null || SEVERITY_RANK[input.severity] >= SEVERITY_RANK[alert.severity_min]
+            alert.severity_min === null ||
+            SEVERITY_RANK[input.severity] >= SEVERITY_RANK[alert.severity_min]
         );
       // Upgrade eligible legacy rules lazily with independent CSPRNG keys. The
       // atomic COALESCE keeps concurrent evaluators on the same persisted key.
@@ -154,10 +161,15 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
       for (const alert of alerts) {
         if (alert.channel === "webhook" && !alert.signing_secret) {
           const upgraded = await db.query<{ signing_secret: string }>(
-            `UPDATE alert_rules SET signing_secret = COALESCE(NULLIF(signing_secret, ''), $3)
-             WHERE id = $1 AND project_id = $2 AND channel = 'webhook' AND is_enabled = true
+            `WITH management_scope AS MATERIALIZED (SELECT debugbundle_begin_project_rule_write(debugbundle_canonical_project($2::uuid)))
+             UPDATE alert_rules SET signing_secret = COALESCE(NULLIF(signing_secret, ''), $3)
+             FROM management_scope WHERE id = $1 AND project_id = $2 AND channel = 'webhook' AND is_enabled = true
              RETURNING signing_secret`,
-            [alert.alert_id, alert.project_id, `dbundle_asec_${randomBytes(32).toString("base64url")}`]
+            [
+              alert.alert_id,
+              alert.project_id,
+              `dbundle_asec_${randomBytes(32).toString("base64url")}`
+            ]
           );
           const secret = upgraded.rows[0]?.signing_secret;
           if (!secret) continue; // Deleted/disabled rules must not send unsigned.
@@ -187,11 +199,17 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
         return db.transaction(async (tx) => {
           // Acquire before the INSERT statement takes its READ COMMITTED snapshot.
           // An advisory lock inside that INSERT cannot see a concurrent winner.
-          for (const key of [input.notification_key, input.coalescing_key].filter((key): key is string => key !== undefined).sort()) {
-            await tx.query("SELECT pg_advisory_xact_lock(hashtext(($1::uuid)::text), hashtext($2))", [input.alert_id, key]);
+          for (const key of [input.notification_key, input.coalescing_key]
+            .filter((key): key is string => key !== undefined)
+            .sort()) {
+            await tx.query(
+              "SELECT pg_advisory_xact_lock(hashtext(($1::uuid)::text), hashtext($2))",
+              [input.alert_id, key]
+            );
           }
-          return createPostgresAlertDeliveryStore({ query: (sql, params) => tx.query(sql, params) })
-            .createAlertDeliveryIntent(input);
+          return createPostgresAlertDeliveryStore({
+            query: (sql, params) => tx.query(sql, params)
+          }).createAlertDeliveryIntent(input);
         });
       }
       const result = await db.query<{ delivery_id: string; created: boolean }>(
@@ -236,7 +254,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
             SELECT pg_advisory_xact_lock(hashtext(($2::uuid)::text), hashtext($7))
           ) lock_row
           JOIN alert_rules scoped_rule
-            ON scoped_rule.id = $2::uuid AND scoped_rule.project_id = $3::uuid
+            ON scoped_rule.id = $2::uuid AND ${ruleCoversOriginSql("scoped_rule", "$3::uuid")}
           JOIN incidents scoped_incident
             ON scoped_incident.id = $4::uuid AND scoped_incident.project_id = $3::uuid
           WHERE $15::boolean AND ($10 <= 0
@@ -396,9 +414,13 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
     }> {
       if (db.transaction !== undefined) {
         return db.transaction(async (tx) => {
-          await tx.query("SELECT pg_advisory_xact_lock(hashtext(($1::uuid)::text), hashtext($2))", [input.alert_id, input.notification_key]);
-          return createPostgresAlertDeliveryStore({ query: (sql, params) => tx.query(sql, params) })
-            .queueAlertEmailDigestItem(input);
+          await tx.query("SELECT pg_advisory_xact_lock(hashtext(($1::uuid)::text), hashtext($2))", [
+            input.alert_id,
+            input.notification_key
+          ]);
+          return createPostgresAlertDeliveryStore({
+            query: (sql, params) => tx.query(sql, params)
+          }).queueAlertEmailDigestItem(input);
         });
       }
       const result = await db.query<{
@@ -415,7 +437,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
             FROM alert_rules scoped_rule
             JOIN incidents scoped_incident
               ON scoped_incident.id = $6::uuid AND scoped_incident.project_id = $2::uuid
-            WHERE scoped_rule.id = $5::uuid AND scoped_rule.project_id = $2::uuid
+            WHERE scoped_rule.id = $5::uuid AND ${ruleCoversOriginSql("scoped_rule", "$2::uuid")}
           ),
           upserted_digest AS (
             INSERT INTO alert_email_digests (
@@ -648,7 +670,7 @@ export function createPostgresAlertDeliveryStore(db: Queryable): AlertDeliverySt
             JOIN incidents incident ON incident.id = items.incident_id
               AND incident.project_id = digest.project_id
             JOIN alert_rules scoped_rule ON scoped_rule.id = items.alert_id
-              AND scoped_rule.project_id = digest.project_id
+              AND ${ruleCoversOriginSql("scoped_rule", "digest.project_id")}
             WHERE items.digest_id = $1::uuid
           ), incident_matches AS (
             SELECT incident_id, array_agg(DISTINCT condition_type ORDER BY condition_type) AS condition_types

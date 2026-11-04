@@ -3,6 +3,62 @@ import { describe, expect, it, vi } from "vitest";
 import { createOpenAiHostedToolHandlers } from "../../../packages/mcp-core/src/index.js";
 
 describe("OpenAI hosted MCP handlers", () => {
+  it("keeps consolidated analytics coverage visible without changing the frozen structured shape", async () => {
+    const origin_scope = {
+      origin_project_ids: [
+        "10000000-0000-4000-8000-000000000001",
+        "10000000-0000-4000-8000-000000000002"
+      ],
+      unique_count_semantics: "sum_of_origin_scoped_counts"
+    };
+    const handlers = createOpenAiHostedToolHandlers({
+      operations: {
+        get_usage_summary: async () => ({
+          summary: {
+            project_id: "project",
+            from: "2026-11-01T00:00:00.000Z",
+            to: "2026-11-03T00:00:00.000Z",
+            granularity: "day",
+            service: null,
+            environment: null,
+            sessions: 2,
+            pageviews: 4,
+            active_visitors: 2,
+            new_visitors: 2,
+            returning_visitors: 0,
+            exits: 1,
+            conversions: 0,
+            origin_scope
+          },
+          breakdowns: {
+            device_types: [],
+            browsers: [],
+            os: [],
+            languages: [],
+            referrers: [],
+            auth_states: []
+          }
+        })
+      }
+    });
+    const result = await handlers.get_usage_summary({
+      principal: {
+        userId: "owner",
+        organizationId: "account",
+        grantId: "grant",
+        scopes: ["debugbundle:analytics:read"]
+      },
+      input: { projectId: "project" }
+    });
+    expect(result.structuredContent).toMatchObject({ summary: { active_visitors: 2 } });
+    expect(result.structuredContent["summary"]).not.toHaveProperty("origin_scope");
+    expect(
+      result.content.some(
+        (item) =>
+          item.text.includes("2 original project namespaces") && item.text.includes("unique counts")
+      )
+    ).toBe(true);
+  });
   it("uses injected dedicated readers and enforces the combined incident/artifact scope", async () => {
     const getIncidentContext = vi.fn().mockResolvedValue({
       incident: {

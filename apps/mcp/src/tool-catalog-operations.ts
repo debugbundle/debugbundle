@@ -40,6 +40,7 @@ export const MCP_TOOL_CATALOG_OPERATIONS = [
     group: "webhooks",
     description: "Update a webhook endpoint.",
     inputSchema: z.object({
+      projectScope: z.literal("current_project").optional(),
       bearerToken: z.string(),
       projectId: z.string(),
       webhookId: z.string(),
@@ -249,6 +250,7 @@ export const MCP_TOOL_CATALOG_OPERATIONS = [
     group: "alerts",
     description: "Update an alert rule, including optional severity-threshold lifecycle scope.",
     inputSchema: z.object({
+      projectScope: z.literal("current_project").optional(),
       bearerToken: z.string(),
       projectId: z.string(),
       alertId: z.string(),
@@ -291,6 +293,7 @@ export const MCP_TOOL_CATALOG_OPERATIONS = [
     description: "List projects in the organization.",
     inputSchema: z.object({
       bearerToken: z.string(),
+      projectId: z.string().guid().optional(),
       limit: z.number().optional()
     })
   },

@@ -10,6 +10,8 @@ const PROJECT_ID = "11111111-1111-4111-8111-111111111111";
 describe("analytics metrics store", () => {
   it("reads aggregate usage summary and bounded breakdowns from analytics rollups", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      if (sqlText.startsWith("SELECT debugbundle_project_origins"))
+        return { rows: [{ origin_ids: [PROJECT_ID] }] };
       if (
         sqlText.includes("FROM analytics_session_rollups") &&
         sqlText.includes("SUM(new_visitors)")
@@ -149,6 +151,8 @@ describe("analytics metrics store", () => {
 
   it("reads route, referrer, device, and funnel aggregates from rollups", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      if (sqlText.startsWith("SELECT debugbundle_project_origins"))
+        return { rows: [{ origin_ids: [PROJECT_ID] }] };
       if (sqlText.includes("FROM analytics_route_rollups")) {
         return {
           rows: [
@@ -282,6 +286,8 @@ describe("analytics metrics store", () => {
 
   it("reads aggregate journey patterns from transition rollups", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      if (sqlText.startsWith("SELECT debugbundle_project_origins"))
+        return { rows: [{ origin_ids: [PROJECT_ID] }] };
       if (sqlText.includes("FROM analytics_transition_rollups")) {
         expect(params.at(-1)).toBe(2);
         return {
@@ -378,6 +384,8 @@ describe("analytics metrics store", () => {
 
   it("can suppress retained journey samples and bundle-generation state for aggregate-only consumers", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string) => {
+      if (sqlText.startsWith("SELECT debugbundle_project_origins"))
+        return { rows: [{ origin_ids: [PROJECT_ID] }] };
       if (sqlText.includes("FROM analytics_transition_rollups")) {
         return {
           rows: [
@@ -437,6 +445,8 @@ describe("analytics metrics store", () => {
   it("narrows route and journey-pattern queries to an explicit route context", async (): Promise<void> => {
     const observed: Array<{ sql: string; params: unknown[] }> = [];
     const queryMock = vi.fn(async (sql: string, params: unknown[]) => {
+      if (sql.startsWith("SELECT debugbundle_project_origins"))
+        return { rows: [{ origin_ids: [PROJECT_ID] }] };
       observed.push({ sql, params });
       return { rows: [] };
     });
@@ -471,6 +481,8 @@ describe("analytics metrics store", () => {
 
   it("parameterizes built-in and custom dimension filters", async (): Promise<void> => {
     const queryMock = vi.fn(async (sql: string, params: unknown[]) => {
+      if (sql.startsWith("SELECT debugbundle_project_origins"))
+        return { rows: [{ origin_ids: [PROJECT_ID] }] };
       void sql;
       void params;
       return { rows: [] };
@@ -534,6 +546,8 @@ describe("analytics metrics store", () => {
   it("reads incident impact only from correlation links, aggregate ledgers, and generation metadata", async (): Promise<void> => {
     const incidentId = "00000000-0000-4000-8000-000000000701";
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      if (sqlText.startsWith("SELECT debugbundle_project_origins"))
+        return { rows: [{ origin_ids: [PROJECT_ID] }] };
       if (sqlText.includes("GROUP BY links.route_key")) {
         return { rows: [{ route_key: "/checkout", affected_sessions: "4" }] };
       }
@@ -584,7 +598,7 @@ describe("analytics metrics store", () => {
         };
       }
       if (
-        sqlText.includes("COUNT(DISTINCT links.subject_hash)") &&
+        sqlText.includes("COUNT(DISTINCT (links.project_id,links.subject_hash))") &&
         sqlText.includes("analytics_incident_session_links")
       ) {
         return { rows: [{ affected_sessions: "4" }] };
@@ -642,6 +656,8 @@ describe("analytics metrics store", () => {
 
   it("applies dimension filters to the linked incident session population", async (): Promise<void> => {
     const queryMock = vi.fn(async (sql: string, params: unknown[]) => {
+      if (sql.startsWith("SELECT debugbundle_project_origins"))
+        return { rows: [{ origin_ids: [PROJECT_ID] }] };
       void sql;
       void params;
       return { rows: [] };

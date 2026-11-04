@@ -64,6 +64,32 @@ function server(
 afterEach(() => {
   vi.clearAllMocks();
 });
+it("allows the current owner to manage a retained status page through its original anchor", async () => {
+  const app = server("owner", {
+    projectManagement: mockedObject<ApiDependencies["projectManagement"]>({
+      resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+        project_id: statusProjectId,
+        canonical_project_id: "00000000-0000-4000-8000-000000000099",
+        organization_id: "org",
+        owner_user_id: "owner",
+        effective_role: "owner",
+        organization_plan: "team"
+      })
+    })
+  });
+  const response = await app.inject({
+    method: "PUT",
+    url: `/v1/projects/${statusProjectId}/status-page`,
+    headers: { authorization: "Bearer dbundle_mem_test" },
+    payload: statusSettings
+  });
+  expect(response.statusCode).toBe(200);
+  expect(store.saveSettings).toHaveBeenCalledWith(
+    expect.objectContaining({ project_id: statusProjectId, owner_user_id: "owner" }),
+    statusSettings
+  );
+  await app.close();
+});
 it("reads an anonymous, bounded projection without member auth or writes", async () => {
   const app = server();
   try {

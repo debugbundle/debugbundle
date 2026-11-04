@@ -160,6 +160,7 @@ describe("mcp webhook tools", () => {
       bearerToken: "dbundle_mem_x",
       projectId: "proj_1",
       webhookId: "wh_3",
+      projectScope: "current_project",
       url: "https://hooks.example.test/updated",
       events: ["bundle.updated"],
       filters: { verification: true },
@@ -170,6 +171,7 @@ describe("mcp webhook tools", () => {
         bearerToken: "dbundle_mem_x",
         projectId: "proj_1",
         webhookId: "wh_3",
+        projectScope: "current_project",
         deliveryId: "del_3"
       })
     ).resolves.toEqual({ delivery_id: "del_3", event_type: "verification.failed" });
@@ -186,6 +188,7 @@ describe("mcp webhook tools", () => {
       bearerToken: "dbundle_mem_x",
       projectId: "proj_1",
       webhookId: "wh_3",
+      projectScope: "current_project",
       url: "https://hooks.example.test/updated",
       events: ["bundle.updated"],
       filters: { verification: true },

@@ -341,6 +341,7 @@ export function createWebhookApi(client: HttpClient): {
     webhookId: string;
   }): Promise<WebhookRecord>;
   updateWebhook(input: {
+    projectScope?: "current_project";
     bearerToken: string;
     projectId: string;
     webhookId: string;
@@ -426,11 +427,14 @@ export function createWebhookApi(client: HttpClient): {
 
     async updateWebhook(input) {
       const body: {
+        project_scope?: "current_project";
         url?: string;
         events?: string[];
         filters?: Record<string, unknown>;
         is_enabled?: boolean;
       } = {};
+
+      if (input.projectScope) body.project_scope = input.projectScope;
 
       if (input.url !== undefined) {
         body.url = input.url;

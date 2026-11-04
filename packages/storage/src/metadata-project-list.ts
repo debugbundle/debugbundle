@@ -41,24 +41,25 @@ export function createMetadataProjectList(
         `
           SELECT
             p.id AS project_id,
+            canonical_project.id AS canonical_project_id,
             p.organization_id,
-            p.owner_user_id,
+            canonical_project.owner_user_id,
             owner_user.email AS owner_email,
             CASE
-              WHEN p.owner_user_id = $1::uuid THEN 'owned'
+              WHEN canonical_project.owner_user_id = $1::uuid THEN 'owned'
               ELSE 'shared'
             END AS relationship,
             CASE
-              WHEN p.owner_user_id <> $1::uuid THEN 'shared_with_you'
+              WHEN canonical_project.owner_user_id <> $1::uuid THEN 'shared_with_you'
               WHEN EXISTS (
                 SELECT 1
                 FROM project_members shared_members
-                WHERE shared_members.project_id = p.id
+                WHERE shared_members.project_id = canonical_project.id
               )
                 OR EXISTS (
                   SELECT 1
                   FROM project_invites pending_invites
-                  WHERE pending_invites.project_id = p.id
+                  WHERE pending_invites.project_id = canonical_project.id
                     AND pending_invites.accepted_at IS NULL
                     AND pending_invites.canceled_at IS NULL
                     AND pending_invites.expires_at > now()
@@ -67,7 +68,7 @@ export function createMetadataProjectList(
               ELSE 'private'
             END AS sharing_state,
             CASE
-              WHEN p.owner_user_id = $1::uuid THEN 'owner'
+              WHEN canonical_project.owner_user_id = $1::uuid THEN 'owner'
               ELSE pm.role
             END AS effective_role,
             p.name,
@@ -87,15 +88,16 @@ export function createMetadataProjectList(
             p.created_at::text AS created_at,
             p.updated_at::text AS updated_at
           FROM projects p
-          JOIN organizations o ON o.id = p.organization_id
-          JOIN users owner_user ON owner_user.id = p.owner_user_id
+          JOIN projects canonical_project ON canonical_project.id=debugbundle_canonical_project(p.id)
+          JOIN organizations o ON o.id = canonical_project.organization_id
+          JOIN users owner_user ON owner_user.id = canonical_project.owner_user_id
           LEFT JOIN project_members pm
-            ON pm.project_id = p.id
+            ON pm.project_id = canonical_project.id
            AND pm.user_id = $1::uuid
-          WHERE p.owner_user_id = $1::uuid
-             OR pm.user_id IS NOT NULL
+          WHERE (canonical_project.owner_user_id = $1::uuid OR pm.user_id IS NOT NULL)
+            AND ${input.project_id === undefined ? "NOT EXISTS(SELECT 1 FROM project_legacy_bindings b WHERE b.legacy_project_id=p.id)" : "p.id=$7::uuid"}
           ORDER BY
-            CASE WHEN p.owner_user_id = $1::uuid THEN 0 ELSE 1 END,
+            CASE WHEN canonical_project.owner_user_id = $1::uuid THEN 0 ELSE 1 END,
             p.created_at DESC,
             p.id DESC
           LIMIT $6
@@ -106,7 +108,8 @@ export function createMetadataProjectList(
           usageWindow.ends_at,
           dayWindow.starts_at,
           dayWindow.ends_at,
-          input.limit
+          input.limit,
+          ...(input.project_id === undefined ? [] : [input.project_id])
         ]
       );
 
@@ -173,6 +176,7 @@ export function createMetadataProjectList(
           JOIN organizations o ON o.id = p.organization_id
           JOIN users owner_user ON owner_user.id = p.owner_user_id
           WHERE p.organization_id = $1
+            AND NOT EXISTS(SELECT 1 FROM project_legacy_bindings b WHERE b.legacy_project_id=p.id)
           ORDER BY p.created_at DESC, p.id DESC
           LIMIT $6
         `,
@@ -194,7 +198,7 @@ export function createMetadataProjectList(
         `
           SELECT id
           FROM projects
-          WHERE id = $1
+          WHERE id = debugbundle_canonical_project($1::uuid)
             AND (
               (
                 $3::uuid IS NULL
@@ -227,16 +231,19 @@ export function createMetadataProjectList(
           SELECT
             s.id AS service_id,
             s.project_id,
-            s.name,
+            s.service_definition_id,
+            COALESCE((SELECT a.name FROM service_project_aliases a WHERE a.project_id=$1 AND a.service_definition_id=d.id AND a.is_current),s.name) AS name,
             s.runtime,
             s.framework,
             s.environment
           FROM services s
-          WHERE s.project_id = $1
-          ORDER BY s.name ASC, s.environment ASC, s.id ASC
+          JOIN service_definitions d ON d.id=s.service_definition_id
+          WHERE s.project_id=ANY(debugbundle_project_origins($1::uuid))
+          ORDER BY name ASC, s.environment ASC, s.id ASC
           LIMIT $2
+          OFFSET $3
         `,
-        [input.project_id, input.limit]
+        [input.project_id, input.limit, input.offset ?? 0]
       );
 
       return result.rows;

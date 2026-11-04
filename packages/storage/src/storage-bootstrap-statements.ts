@@ -1,5 +1,14 @@
 import { STORAGE_BOOTSTRAP_INCIDENT_STATEMENTS } from "./storage-bootstrap-incident-statements.js";
 import { STORAGE_BOOTSTRAP_ACCOUNT_ANALYTICS_STATEMENTS } from "./storage-bootstrap-account-analytics-statements.js";
+import {
+  SERVICE_DEFINITION_TABLE,
+  SERVICE_DEFINITION_LINK_STATEMENTS
+} from "./service-definition-schema.js";
+import {
+  SERVICE_INPUT_ALIAS_TABLE,
+  SERVICE_PROJECT_ALIAS_TABLE,
+  SERVICE_INPUT_ALIAS_STATEMENTS
+} from "./service-input-alias-schema.js";
 
 export const STORAGE_BOOTSTRAP_STATEMENTS = [
   `
@@ -58,6 +67,7 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
   `
     CREATE TABLE projects (
       id uuid PRIMARY KEY,
+      capture_rules_require_server boolean NOT NULL DEFAULT false,
       organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
       owner_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       name text NOT NULL,
@@ -78,9 +88,16 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
     ON projects (organization_id, slug)
   `,
   `
+    ${SERVICE_DEFINITION_TABLE}
+  `,
+  SERVICE_INPUT_ALIAS_TABLE,
+  SERVICE_PROJECT_ALIAS_TABLE,
+  ...SERVICE_INPUT_ALIAS_STATEMENTS,
+  `
     CREATE TABLE services (
       id uuid PRIMARY KEY,
       project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      service_definition_id uuid NOT NULL REFERENCES service_definitions(id) ON DELETE RESTRICT,
       name text NOT NULL,
       runtime text,
       framework text,
@@ -88,12 +105,16 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now(),
       UNIQUE (project_id, name, environment)
+      , UNIQUE(service_definition_id,environment)
     )
   `,
+  "CREATE INDEX services_definition_idx ON services(service_definition_id)",
+  ...SERVICE_DEFINITION_LINK_STATEMENTS,
   `
     CREATE TABLE project_tokens (
       id uuid PRIMARY KEY,
       project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      scope_origin_ids uuid[],
       token_hash text UNIQUE NOT NULL,
       label text NOT NULL,
       allowed_origins jsonb NOT NULL DEFAULT '[]'::jsonb,
@@ -274,6 +295,7 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
       issuer_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
       project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      scope_origin_ids uuid[],
       label text NOT NULL CHECK (length(label) BETWEEN 1 AND 120),
       scope text NOT NULL CHECK (scope = 'incident:read-minimized'),
       policy_version text NOT NULL CHECK (policy_version = 'telemetry-privacy-v1'),
@@ -332,6 +354,9 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
   `
     CREATE TABLE probe_activations (
       id uuid PRIMARY KEY,
+      trigger_token_hash text,
+      scope_origin_ids uuid[],
+      service_definition_id uuid REFERENCES service_definitions(id) ON DELETE RESTRICT,
       project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       created_by_member_id uuid NOT NULL,
       label_pattern text NOT NULL,
@@ -365,6 +390,8 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
   `
     CREATE TABLE capture_rules (
       id uuid PRIMARY KEY,
+      scope_origin_ids uuid[],
+      filter_project_id uuid REFERENCES projects(id) ON DELETE CASCADE,
       project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       name text NOT NULL,
       description text,
@@ -438,8 +465,9 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
   `
     CREATE TABLE weekly_report_deliveries (
       id uuid PRIMARY KEY,
+      scope_origin_ids uuid[],
       project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-      weekly_report_channel_id uuid REFERENCES weekly_report_channels(id) ON DELETE CASCADE,
+      weekly_report_channel_id uuid REFERENCES weekly_report_channels(id) ON DELETE SET NULL,
       window_start timestamptz NOT NULL,
       window_end timestamptz NOT NULL,
       channel text NOT NULL,
@@ -466,6 +494,8 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
   `
     CREATE TABLE alert_rules (
       id uuid PRIMARY KEY,
+      scope_origin_ids uuid[],
+      filter_project_id uuid REFERENCES projects(id) ON DELETE CASCADE,
       project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       created_by_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       service_id uuid REFERENCES services(id) ON DELETE CASCADE,
@@ -606,6 +636,8 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
   `
     CREATE TABLE agent_webhooks (
       id uuid PRIMARY KEY,
+      scope_origin_ids uuid[],
+      filter_project_id uuid REFERENCES projects(id) ON DELETE CASCADE,
       project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       created_by_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       url text NOT NULL,
@@ -734,6 +766,8 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
   `
     CREATE TABLE github_dispatch_rules (
       id uuid PRIMARY KEY,
+      scope_origin_ids uuid[],
+      filter_project_id uuid REFERENCES projects(id) ON DELETE CASCADE,
       project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       created_by_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       name text NOT NULL,

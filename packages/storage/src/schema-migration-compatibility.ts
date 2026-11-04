@@ -1,6 +1,23 @@
 import { REQUIRED_API_TABLES, REQUIRED_WORKER_TABLES, type Queryable } from "./migrations.js";
+import { projectServiceSchemaAvailable } from "./project-service-schema-check.js";
 
 const CURRENT_SCHEMA_SENTINEL_COLUMNS = [
+  { table_name: "projects", column_name: "capture_rules_require_server" },
+  { table_name: "capture_rules", column_name: "scope_origin_ids" },
+  { table_name: "capture_rules", column_name: "filter_project_id" },
+  { table_name: "probe_activations", column_name: "trigger_token_hash" },
+  { table_name: "probe_activations", column_name: "scope_origin_ids" },
+  { table_name: "probe_activations", column_name: "service_definition_id" },
+  { table_name: "service_input_aliases", column_name: "service_definition_id" },
+  { table_name: "service_project_aliases", column_name: "service_definition_id" },
+  { table_name: "service_project_aliases", column_name: "is_current" },
+  { table_name: "project_legacy_bindings", column_name: "scope_origin_ids" },
+  { table_name: "project_merge_operations", column_name: "committed_at" },
+  { table_name: "project_tokens", column_name: "scope_origin_ids" },
+  { table_name: "agent_tokens", column_name: "scope_origin_ids" },
+  { table_name: "services", column_name: "service_definition_id" },
+  { table_name: "service_definitions", column_name: "origin_project_id" },
+  { table_name: "service_definitions", column_name: "repository_default_project_id" },
   { table_name: "billing_subscription_operations", column_name: "parameters" },
   { table_name: "billing_checkout_attempts", column_name: "parameters" },
   { table_name: "alert_deliveries", column_name: "coalescing_key" },
@@ -115,8 +132,10 @@ export async function isCurrentStorageSchemaBaseline(db: Queryable): Promise<boo
     "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid='billing_subscription_operations'::regclass AND conname='billing_subscription_operations_kind_check'",
     []
   );
-  return ["plan_schedule", "plan_cancel"].every((kind) =>
-    operations.rows[0]?.definition.includes(kind)
+  return (
+    ["plan_schedule", "plan_cancel"].every((kind) =>
+      operations.rows[0]?.definition.includes(kind)
+    ) && (await projectServiceSchemaAvailable(db))
   );
 }
 

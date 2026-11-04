@@ -71,7 +71,7 @@ export function createPostgresAnalyticsSettingsStore(db: Queryable): AnalyticsSe
         FROM projects
         JOIN organizations ON organizations.id = projects.organization_id
         LEFT JOIN project_analytics_settings settings ON settings.project_id = projects.id
-        WHERE projects.id = $1
+        WHERE projects.id = debugbundle_canonical_project($1::uuid)
         LIMIT 1
       `,
       [projectId]

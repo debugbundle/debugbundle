@@ -1,6 +1,10 @@
 import { ProbeApiError } from "../../cli/src/probe-commands.js";
 
-export const PROBE_MCP_TOOL_NAMES = ["activate_probe", "list_active_probes", "deactivate_probe"] as const;
+export const PROBE_MCP_TOOL_NAMES = [
+  "activate_probe",
+  "list_active_probes",
+  "deactivate_probe"
+] as const;
 
 function mapMcpError(error: unknown): never {
   if (error instanceof ProbeApiError) {
@@ -19,17 +23,20 @@ export function createProbeMcpTools(api: {
     environment?: string;
     ttlSeconds?: number;
     triggerTtlSeconds?: number;
+    sdkProjectId?: string;
+    sdkTokenId?: string;
+    sdkService?: string;
   }): Promise<unknown>;
-  listActiveProbes(input: {
-    bearerToken: string;
-    projectId: string;
-  }): Promise<unknown>;
+  listActiveProbes(input: { bearerToken: string; projectId: string }): Promise<unknown>;
   deactivateProbe(input: {
     bearerToken: string;
     projectId: string;
     activationId: string;
   }): Promise<unknown>;
-}): Record<(typeof PROBE_MCP_TOOL_NAMES)[number], (input: Record<string, unknown>) => Promise<unknown>> {
+}): Record<
+  (typeof PROBE_MCP_TOOL_NAMES)[number],
+  (input: Record<string, unknown>) => Promise<unknown>
+> {
   return {
     async activate_probe(input) {
       try {
@@ -41,6 +48,9 @@ export function createProbeMcpTools(api: {
           environment?: string;
           ttlSeconds?: number;
           triggerTtlSeconds?: number;
+          sdkProjectId?: string;
+          sdkTokenId?: string;
+          sdkService?: string;
         } = {
           bearerToken: String(input["bearerToken"]),
           projectId: String(input["projectId"]),
@@ -55,6 +65,10 @@ export function createProbeMcpTools(api: {
         if (typeof input["ttlSeconds"] === "number") {
           requestInput.ttlSeconds = input["ttlSeconds"];
         }
+        if (typeof input["sdkProjectId"] === "string")
+          requestInput.sdkProjectId = input["sdkProjectId"];
+        if (typeof input["sdkTokenId"] === "string") requestInput.sdkTokenId = input["sdkTokenId"];
+        if (typeof input["sdkService"] === "string") requestInput.sdkService = input["sdkService"];
         if (typeof input["triggerTtlSeconds"] === "number") {
           requestInput.triggerTtlSeconds = input["triggerTtlSeconds"];
         }

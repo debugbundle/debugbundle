@@ -7,7 +7,7 @@ export function createMetadataWeeklyReports(
     async listProjectsWithWeeklyActivity(input): Promise<string[]> {
       const result = await db.query<{ project_id: string } & Record<string, unknown>>(
         `
-          SELECT DISTINCT activity.project_id
+          SELECT DISTINCT debugbundle_canonical_project(activity.project_id::uuid)::text AS project_id
           FROM (
             SELECT bg.project_id::text AS project_id
             FROM bundle_generations bg
@@ -45,7 +45,7 @@ export function createMetadataWeeklyReports(
               AND i.spike_detected_at >= $1::timestamptz
               AND i.spike_detected_at < $2::timestamptz
           ) AS activity
-          ORDER BY activity.project_id ASC
+          ORDER BY project_id ASC
           LIMIT $3
         `,
         [input.window_start, input.window_end, input.limit]
@@ -71,10 +71,14 @@ export function createMetadataWeeklyReports(
         } & Record<string, unknown>
       >(
         `
-          WITH activity AS (
+          WITH report_scope AS (
+            SELECT CASE WHEN $4::uuid IS NULL THEN debugbundle_project_origins($1::uuid)
+              ELSE (SELECT COALESCE(scope_origin_ids,ARRAY[project_id]) FROM weekly_report_deliveries
+                WHERE id=$4 AND project_id=$1 AND window_start=$2::timestamptz AND window_end=$3::timestamptz) END AS origins
+          ), activity AS (
             SELECT 1
             FROM bundle_generations bg
-            WHERE bg.project_id = $1::uuid
+            WHERE bg.project_id=ANY(COALESCE((SELECT origins FROM report_scope),ARRAY[]::uuid[]))
               AND bg.created_at >= $2::timestamptz
               AND bg.created_at < $3::timestamptz
 
@@ -82,7 +86,7 @@ export function createMetadataWeeklyReports(
 
             SELECT 1
             FROM incidents i
-            WHERE i.project_id = $1::uuid
+            WHERE i.project_id=ANY(COALESCE((SELECT origins FROM report_scope),ARRAY[]::uuid[]))
               AND i.first_seen_at >= $2::timestamptz
               AND i.first_seen_at < $3::timestamptz
 
@@ -90,7 +94,7 @@ export function createMetadataWeeklyReports(
 
             SELECT 1
             FROM incidents i
-            WHERE i.project_id = $1::uuid
+            WHERE i.project_id=ANY(COALESCE((SELECT origins FROM report_scope),ARRAY[]::uuid[]))
               AND i.regressed_at IS NOT NULL
               AND i.regressed_at >= $2::timestamptz
               AND i.regressed_at < $3::timestamptz
@@ -99,7 +103,7 @@ export function createMetadataWeeklyReports(
 
             SELECT 1
             FROM incidents i
-            WHERE i.project_id = $1::uuid
+            WHERE i.project_id=ANY(COALESCE((SELECT origins FROM report_scope),ARRAY[]::uuid[]))
               AND i.resolved_at IS NOT NULL
               AND i.resolved_at >= $2::timestamptz
               AND i.resolved_at < $3::timestamptz
@@ -108,7 +112,7 @@ export function createMetadataWeeklyReports(
 
             SELECT 1
             FROM incidents i
-            WHERE i.project_id = $1::uuid
+            WHERE i.project_id=ANY(COALESCE((SELECT origins FROM report_scope),ARRAY[]::uuid[]))
               AND i.spike_detected_at IS NOT NULL
               AND i.spike_detected_at >= $2::timestamptz
               AND i.spike_detected_at < $3::timestamptz
@@ -121,7 +125,7 @@ export function createMetadataWeeklyReports(
               i.occurrence_count,
               i.spike_detected_at::text AS spike_detected_at
             FROM incidents i
-            WHERE i.project_id = $1::uuid
+            WHERE i.project_id=ANY(COALESCE((SELECT origins FROM report_scope),ARRAY[]::uuid[]))
               AND i.spike_detected_at IS NOT NULL
               AND i.spike_detected_at >= $2::timestamptz
               AND i.spike_detected_at < $3::timestamptz
@@ -137,7 +141,7 @@ export function createMetadataWeeklyReports(
             COALESCE((
               SELECT COUNT(*)::integer
               FROM bundle_generations bg
-              WHERE bg.project_id = $1::uuid
+              WHERE bg.project_id=ANY(COALESCE((SELECT origins FROM report_scope),ARRAY[]::uuid[]))
                 AND bg.bundle_type = 'failure'
                 AND bg.created_at >= $2::timestamptz
                 AND bg.created_at < $3::timestamptz
@@ -145,7 +149,7 @@ export function createMetadataWeeklyReports(
             COALESCE((
               SELECT COUNT(*)::integer
               FROM bundle_generations bg
-              WHERE bg.project_id = $1::uuid
+              WHERE bg.project_id=ANY(COALESCE((SELECT origins FROM report_scope),ARRAY[]::uuid[]))
                 AND bg.bundle_type = 'improvement'
                 AND bg.created_at >= $2::timestamptz
                 AND bg.created_at < $3::timestamptz
@@ -153,14 +157,14 @@ export function createMetadataWeeklyReports(
             COALESCE((
               SELECT COUNT(*)::integer
               FROM incidents i
-              WHERE i.project_id = $1::uuid
+              WHERE i.project_id=ANY(COALESCE((SELECT origins FROM report_scope),ARRAY[]::uuid[]))
                 AND i.first_seen_at >= $2::timestamptz
                 AND i.first_seen_at < $3::timestamptz
             ), 0) AS new_incidents,
             COALESCE((
               SELECT COUNT(*)::integer
               FROM incidents i
-              WHERE i.project_id = $1::uuid
+              WHERE i.project_id=ANY(COALESCE((SELECT origins FROM report_scope),ARRAY[]::uuid[]))
                 AND i.resolved_at IS NOT NULL
                 AND i.resolved_at >= $2::timestamptz
                 AND i.resolved_at < $3::timestamptz
@@ -168,7 +172,7 @@ export function createMetadataWeeklyReports(
             COALESCE((
               SELECT COUNT(*)::integer
               FROM incidents i
-              WHERE i.project_id = $1::uuid
+              WHERE i.project_id=ANY(COALESCE((SELECT origins FROM report_scope),ARRAY[]::uuid[]))
                 AND i.first_seen_at >= $2::timestamptz
                 AND i.first_seen_at < $3::timestamptz
                 AND i.resolved_at IS NOT NULL
@@ -178,7 +182,7 @@ export function createMetadataWeeklyReports(
             COALESCE((
               SELECT COUNT(*)::integer
               FROM incidents i
-              WHERE i.project_id = $1::uuid
+              WHERE i.project_id=ANY(COALESCE((SELECT origins FROM report_scope),ARRAY[]::uuid[]))
                 AND i.regressed_at IS NOT NULL
                 AND i.regressed_at >= $2::timestamptz
                 AND i.regressed_at < $3::timestamptz
@@ -199,7 +203,7 @@ export function createMetadataWeeklyReports(
           JOIN projects p ON p.id = $1::uuid
           LIMIT 1
         `,
-        [input.project_id, input.window_start, input.window_end]
+        [input.project_id, input.window_start, input.window_end, input.delivery_id ?? null]
       );
 
       const row = result.rows[0];

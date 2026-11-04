@@ -14,6 +14,7 @@ import type {
 } from "../../../packages/storage/src/index.js";
 import { z } from "zod";
 import type { ApiDependencies } from "./api-types.js";
+import { rejectConsolidatedProjectWrite } from "./project-consolidation-http.js";
 import { ImprovementsCursorSchema, IncidentsCursorSchema, LogsCursorSchema } from "./schemas.js";
 
 export type RequestRateLimitBucket =
@@ -272,6 +273,7 @@ export async function requireRateLimitedProjectAccess(
   input: {
     bucket: RequestRateLimitBucket;
     projectId: string;
+    allowLegacyMutation?: boolean;
   }
 ): Promise<{ member: ResolveMemberResult; access: ProjectAccessRecord } | null> {
   const member = await requireRateLimitedMemberAuth(request, reply, dependencies, input.bucket);
@@ -294,6 +296,13 @@ export async function requireRateLimitedProjectAccess(
   }
   if (isSharedProjectAccessSuspended(access)) {
     await reply.status(403).send({ error: "shared_access_suspended" });
+    return null;
+  }
+  if (
+    input.bucket === "management-write" &&
+    !input.allowLegacyMutation &&
+    rejectConsolidatedProjectWrite(reply, access)
+  ) {
     return null;
   }
 

@@ -102,11 +102,19 @@ function toJsonSchema(schema: unknown): Record<string, unknown> {
   return toInputJsonSchema(schema as z.ZodType);
 }
 
-export function createMcpServer(input: { tools: ToolRegistry; localAuth?: boolean; agentRead?: boolean }): {
+export function createMcpServer(input: {
+  tools: ToolRegistry;
+  localAuth?: boolean;
+  agentRead?: boolean;
+}): {
   handleRequest(request: JsonRpcRequest): Promise<JsonRpcResponse | null>;
 } {
-  const catalog = input.agentRead === true ? AGENT_READ_MCP_TOOL_CATALOG
-    : input.localAuth === true ? LOCAL_AUTH_MCP_TOOL_CATALOG : MCP_TOOL_CATALOG;
+  const catalog =
+    input.agentRead === true
+      ? AGENT_READ_MCP_TOOL_CATALOG
+      : input.localAuth === true
+        ? LOCAL_AUTH_MCP_TOOL_CATALOG
+        : MCP_TOOL_CATALOG;
   return {
     async handleRequest(request) {
       if (request.method === "notifications/initialized") {
@@ -138,7 +146,8 @@ export function createMcpServer(input: { tools: ToolRegistry; localAuth?: boolea
             tools: catalog.map((tool) => ({
               name: tool.name,
               description: tool.description,
-              inputSchema: toJsonSchema(tool.inputSchema)
+              inputSchema: toJsonSchema(tool.inputSchema),
+              ...("annotations" in tool ? { annotations: tool.annotations } : {})
             }))
           }
         };

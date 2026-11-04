@@ -320,6 +320,7 @@ export function createGitHubManagementApi(client: HttpClient): {
     enabled?: boolean;
   }): Promise<GitHubDispatchRule>;
   updateProjectRule(input: {
+    projectScope?: "current_project";
     bearerToken: string;
     projectId: string;
     ruleId: string;
@@ -458,6 +459,7 @@ export function createGitHubManagementApi(client: HttpClient): {
           path: `/v1/projects/${input.projectId}/github/rules/${input.ruleId}`,
           bearerToken: input.bearerToken,
           body: {
+            ...(input.projectScope ? { project_scope: input.projectScope } : {}),
             ...(input.name === undefined ? {} : { name: input.name }),
             ...(input.eventTypes === undefined ? {} : { event_types: input.eventTypes }),
             ...(input.environments === undefined ? {} : { environments: input.environments }),

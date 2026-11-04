@@ -4,11 +4,30 @@ import { describe, expect, it, vi } from "vitest";
 
 import { RetrievalApiError } from "../../../packages/retrieval-client/src/index.js";
 import { CliAuthStateError } from "../../../apps/cli/src/auth-state.js";
-import { listServicesCommand, listServicesWithAuthCommand } from "../../../apps/cli/src/services-command.js";
+import {
+  listServicesCommand,
+  listServicesWithAuthCommand
+} from "../../../apps/cli/src/services-command.js";
 
-const servicesGolden = readFileSync(new URL("../../fixtures/cli-services.golden.txt", import.meta.url), "utf8");
+const servicesGolden = readFileSync(
+  new URL("../../fixtures/cli-services.golden.txt", import.meta.url),
+  "utf8"
+);
 
 describe("cli services command", () => {
+  it("forwards service page offsets and retains the existing JSON shape", async () => {
+    const listServices = vi.fn().mockResolvedValue([]);
+    const result = await listServicesCommand(
+      { bearerToken: "member", projectId: "project", offset: 1100, json: true },
+      { listServices }
+    );
+    expect(listServices).toHaveBeenCalledWith({
+      bearerToken: "member",
+      projectId: "project",
+      offset: 1100
+    });
+    expect(JSON.parse(result.output)).toEqual({ services: [] });
+  });
   it("renders service list in human mode", async () => {
     const result = await listServicesCommand(
       {
@@ -205,7 +224,9 @@ describe("cli services command", () => {
         projectId: "proj_123"
       },
       {
-        readAuthState: vi.fn().mockRejectedValue(new CliAuthStateError("auth_state_missing", "Not logged in."))
+        readAuthState: vi
+          .fn()
+          .mockRejectedValue(new CliAuthStateError("auth_state_missing", "Not logged in."))
       }
     );
 

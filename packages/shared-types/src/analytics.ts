@@ -368,6 +368,12 @@ const AnalyticsMetricsSegmentSchema = z
 
 export type AnalyticsMetricsSegment = z.infer<typeof AnalyticsMetricsSegmentSchema>;
 
+const AnalyticsOriginScopeSchema = z
+  .object({
+    origin_project_ids: z.array(z.string().guid()).min(1).max(1000),
+    unique_count_semantics: z.literal("sum_of_origin_scoped_counts")
+  })
+  .strict();
 const AnalyticsUsageSummarySchema = z
   .object({
     project_id: z.string().guid(),
@@ -382,7 +388,8 @@ const AnalyticsUsageSummarySchema = z
     new_visitors: z.number().int().nonnegative(),
     returning_visitors: z.number().int().nonnegative(),
     exits: z.number().int().nonnegative(),
-    conversions: z.number().int().nonnegative()
+    conversions: z.number().int().nonnegative(),
+    origin_scope: AnalyticsOriginScopeSchema.optional()
   })
   .strict()
   .refine((value) => Date.parse(value.from) <= Date.parse(value.to), {
@@ -421,7 +428,8 @@ const AnalyticsMetricsWindowSchema = z
     to: z.string().datetime(),
     granularity: AnalyticsMetricsGranularitySchema,
     service: z.string().trim().min(1).max(120).nullable(),
-    environment: z.string().trim().min(1).max(120).nullable()
+    environment: z.string().trim().min(1).max(120).nullable(),
+    origin_scope: AnalyticsOriginScopeSchema.optional()
   })
   .strict();
 

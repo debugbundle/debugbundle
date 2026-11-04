@@ -1,6 +1,14 @@
 import { AlertApiError } from "../../../packages/alert-client/src/index.js";
 
-export const ALERT_MCP_TOOL_NAMES = ["list_alerts", "list_alert_groups", "get_alert_group", "create_alert", "update_alert", "rotate_alert_webhook_secret", "delete_alert"] as const;
+export const ALERT_MCP_TOOL_NAMES = [
+  "list_alerts",
+  "list_alert_groups",
+  "get_alert_group",
+  "create_alert",
+  "update_alert",
+  "rotate_alert_webhook_secret",
+  "delete_alert"
+] as const;
 
 function mapMcpError(error: unknown): never {
   if (error instanceof AlertApiError) {
@@ -12,8 +20,20 @@ function mapMcpError(error: unknown): never {
 
 export function createAlertMcpTools(api: {
   listAlerts(input: { bearerToken: string; projectId: string; limit?: number }): Promise<unknown[]>;
-  listAlertGroups(input: { bearerToken: string; projectId: string; limit?: number; cursor?: string }): Promise<unknown>;
-  getAlertGroup(input: { bearerToken: string; projectId: string; kind: "direct" | "email_digest"; groupId: string; limit?: number; cursor?: string }): Promise<unknown>;
+  listAlertGroups(input: {
+    bearerToken: string;
+    projectId: string;
+    limit?: number;
+    cursor?: string;
+  }): Promise<unknown>;
+  getAlertGroup(input: {
+    bearerToken: string;
+    projectId: string;
+    kind: "direct" | "email_digest";
+    groupId: string;
+    limit?: number;
+    cursor?: string;
+  }): Promise<unknown>;
   createAlert(input: {
     bearerToken: string;
     projectId: string;
@@ -27,6 +47,7 @@ export function createAlertMcpTools(api: {
     isEnabled?: boolean;
   }): Promise<unknown>;
   updateAlert(input: {
+    projectScope?: "current_project";
     bearerToken: string;
     projectId: string;
     alertId: string;
@@ -41,7 +62,10 @@ export function createAlertMcpTools(api: {
     isEnabled?: boolean;
   }): Promise<unknown>;
   deleteAlert(input: { bearerToken: string; projectId: string; alertId: string }): Promise<unknown>;
-}): Record<(typeof ALERT_MCP_TOOL_NAMES)[number], (input: Record<string, unknown>) => Promise<unknown>> {
+}): Record<
+  (typeof ALERT_MCP_TOOL_NAMES)[number],
+  (input: Record<string, unknown>) => Promise<unknown>
+> {
   return {
     async list_alerts(input) {
       try {
@@ -62,7 +86,8 @@ export function createAlertMcpTools(api: {
     async list_alert_groups(input) {
       try {
         return await api.listAlertGroups({
-          bearerToken: String(input["bearerToken"]), projectId: String(input["projectId"]),
+          bearerToken: String(input["bearerToken"]),
+          projectId: String(input["projectId"]),
           ...(typeof input["limit"] === "number" ? { limit: input["limit"] } : {}),
           ...(typeof input["cursor"] === "string" ? { cursor: input["cursor"] } : {})
         });
@@ -76,8 +101,10 @@ export function createAlertMcpTools(api: {
         const kind = input["kind"];
         if (kind !== "direct" && kind !== "email_digest") throw new Error("invalid_group_kind");
         return await api.getAlertGroup({
-          bearerToken: String(input["bearerToken"]), projectId: String(input["projectId"]),
-          kind, groupId: String(input["groupId"]),
+          bearerToken: String(input["bearerToken"]),
+          projectId: String(input["projectId"]),
+          kind,
+          groupId: String(input["groupId"]),
           ...(typeof input["limit"] === "number" ? { limit: input["limit"] } : {}),
           ...(typeof input["cursor"] === "string" ? { cursor: input["cursor"] } : {})
         });
@@ -133,6 +160,7 @@ export function createAlertMcpTools(api: {
         const requestInput: {
           bearerToken: string;
           projectId: string;
+          projectScope?: "current_project";
           alertId: string;
           serviceId?: string | null;
           channel?: string;
@@ -147,6 +175,9 @@ export function createAlertMcpTools(api: {
           projectId: String(input["projectId"]),
           alertId: String(input["alertId"])
         };
+        if (input["projectScope"] === "current_project")
+          requestInput.projectScope = "current_project";
+
         if (typeof input["serviceId"] === "string") {
           requestInput.serviceId = input["serviceId"];
         } else if (input["serviceId"] === null) {
@@ -186,13 +217,15 @@ export function createAlertMcpTools(api: {
 
     async rotate_alert_webhook_secret(input) {
       try {
-        return { alert: await api.updateAlert({
-          bearerToken: String(input["bearerToken"]),
-          projectId: String(input["projectId"]),
-          alertId: String(input["alertId"]),
-          channel: "webhook",
-          rotateSigningSecret: true
-        }) };
+        return {
+          alert: await api.updateAlert({
+            bearerToken: String(input["bearerToken"]),
+            projectId: String(input["projectId"]),
+            alertId: String(input["alertId"]),
+            channel: "webhook",
+            rotateSigningSecret: true
+          })
+        };
       } catch (error) {
         mapMcpError(error);
       }

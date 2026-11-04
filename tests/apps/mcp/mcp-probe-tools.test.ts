@@ -103,7 +103,10 @@ describe("mcp probe tools", () => {
       service: "api",
       environment: "production",
       ttlSeconds: 1800,
-      triggerTtlSeconds: 3600
+      triggerTtlSeconds: 3600,
+      sdkProjectId: "00000000-0000-4000-8000-000000000001",
+      sdkTokenId: "00000000-0000-4000-8000-000000000002",
+      sdkService: "old-name"
     });
 
     expect(api.activateProbe).toHaveBeenCalledWith({
@@ -113,7 +116,10 @@ describe("mcp probe tools", () => {
       service: "api",
       environment: "production",
       ttlSeconds: 1800,
-      triggerTtlSeconds: 3600
+      triggerTtlSeconds: 3600,
+      sdkProjectId: "00000000-0000-4000-8000-000000000001",
+      sdkTokenId: "00000000-0000-4000-8000-000000000002",
+      sdkService: "old-name"
     });
   });
 });

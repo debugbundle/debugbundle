@@ -161,6 +161,9 @@ export interface IngestionPersistenceService {
 
 export interface ResolveProjectResult {
   project_id: string;
+  canonical_project_id?: string;
+  scope_origin_ids?: string[];
+  capture_rules_require_server?: boolean;
   organization_id?: string;
   organization_plan?: string;
   allowed_origins?: string[] | null;
@@ -193,6 +196,7 @@ export interface ResolveMemberResult {
 
 export interface ProjectRecord {
   project_id: string;
+  canonical_project_id?: string;
   organization_id: string;
   owner_user_id: string;
   owner_email: string;
@@ -220,9 +224,14 @@ export interface ProjectRecord {
   updated_at: string;
 }
 
-export type DeletedProjectRecord = Omit<ProjectRecord, "metrics">;
+export type DeletedProjectRecord = Omit<ProjectRecord, "metrics"> & {
+  /** Internal cleanup handoff, removed before returning a public project record. */
+  storage_origin_ids?: string[];
+};
 
 export interface ProjectAccessRecord {
+  canonical_project_id?: string;
+  origin_project_ids?: string[];
   project_id: string;
   project_name?: string;
   organization_id: string;
@@ -367,6 +376,7 @@ export interface ProbeManagementStore {
   listActiveProbesForProject(input: {
     project_id: string;
     now: string;
+    scope_origin_ids?: string[];
   }): Promise<ProbeActivationRecord[]>;
   listActiveProbesForProjectInOrganization(input: {
     organization_id: string;
@@ -377,6 +387,9 @@ export interface ProbeManagementStore {
     organization_id: string;
     project_id: string;
     created_by_member_id: string;
+    sdk_project_id?: string;
+    sdk_token_id?: string;
+    sdk_service?: string;
     label_pattern: string;
     service: string;
     environment: string;
@@ -387,12 +400,16 @@ export interface ProbeManagementStore {
     activation: ProbeActivationRecord;
     trigger_token: string;
     concurrent_limit_exceeded?: boolean;
+    runtime_project_id?: string;
+    runtime_scope_origin_ids?: string[];
+    runtime_service?: string;
   } | null>;
   deactivateProbeActivationForProjectInOrganization(input: {
     organization_id: string;
     project_id: string;
     activation_id: string;
     deactivated_at: string;
+    actor_user_id?: string;
   }): Promise<{
     organization_plan: TierName;
     deactivated: { activation_id: string; deactivated_at: string };
@@ -541,6 +558,11 @@ export interface UpsertIncidentResult {
 }
 
 export interface IncidentRetrievalRecord extends Record<string, unknown> {
+  /** Storage namespace remains project_id; public projections use this current owner. */
+  canonical_project_id?: string;
+  service_definition_id?: string | null;
+  canonical_service_name?: string | null;
+  project_view_service_name?: string | null;
   incident_id: string;
   project_id: string;
   project_name: string;
@@ -567,6 +589,10 @@ export interface IncidentRetrievalRecord extends Record<string, unknown> {
 export type IncidentRetrievalStatusFilter = "active" | IncidentRetrievalRecord["status"];
 
 export interface ImprovementRetrievalRecord extends Record<string, unknown> {
+  canonical_project_id?: string;
+  service_definition_id?: string | null;
+  canonical_service_name?: string | null;
+  project_view_service_name?: string | null;
   improvement_id: string;
   project_id: string;
   project_name: string;
@@ -710,6 +736,8 @@ export interface MetadataStore {
     organization_id: string;
     user_id?: string;
     project_id?: string;
+    /** Server-supplied credential snapshot; never a caller query parameter. */
+    origin_project_ids?: string[];
     environment?: string;
     service?: string;
     status?: IncidentRetrievalStatusFilter;
@@ -723,6 +751,8 @@ export interface MetadataStore {
     organization_id: string;
     incident_id: string;
     user_id?: string;
+    project_id?: string;
+    origin_project_ids?: string[];
   }): Promise<IncidentRetrievalRecord | null>;
   resolveIncidentForOrganization(
     input: ResolveIncidentForOrganizationInput
@@ -741,6 +771,7 @@ export interface MetadataStore {
     user_id?: string;
     project_id: string;
     limit: number;
+    offset?: number;
   }): Promise<ServiceRetrievalRecord[] | null>;
   listIncidentLogsForOrganization(input: {
     organization_id: string;
@@ -776,6 +807,7 @@ export interface ImprovementRetrievalStore {
     organization_id: string;
     user_id?: string;
     project_id?: string;
+    origin_project_ids?: string[];
     environment?: string;
     service?: string;
     status?: "open" | "resolved" | "snoozed";
@@ -793,6 +825,8 @@ export interface ImprovementRetrievalStore {
     organization_id: string;
     improvement_id: string;
     user_id?: string;
+    project_id?: string;
+    origin_project_ids?: string[];
   }): Promise<ImprovementRetrievalRecord | null>;
   resolveImprovementForOrganization(
     input: ResolveImprovementForOrganizationInput
@@ -871,6 +905,9 @@ export interface PersistEventMetadataInput {
 }
 
 export interface IngestionMetadataService {
+  resolveCredentialServiceScopes?: (
+    input: import("./project-ingestion-scope.js").CredentialServiceScope
+  ) => Promise<import("./project-ingestion-scope.js").CredentialServiceResolution[]>;
   resolveProjectByTokenHash(tokenHash: string): Promise<ResolveProjectResult | null>;
   resolveProjectFromToken(token: string): Promise<ResolveProjectResult | null>;
   persistEventMetadata(input: PersistEventMetadataInput): Promise<UpsertIncidentResult>;

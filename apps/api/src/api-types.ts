@@ -45,6 +45,8 @@ import type { ApiManagementDependencies } from "./api-management-types.js";
 import type { OpenAiHostedReadDependencies } from "./openai-mcp-operations.js";
 
 export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagementDependencies {
+  projectMerges?: import("../../../packages/storage/src/project-merge-store.js").ProjectMergeStore;
+  serviceDefinitions?: import("../../../packages/storage/src/service-definition-store.js").ServiceDefinitionStore;
   notificationPreferences?: Pick<
     import("../../../packages/storage/src/notification-preferences-store.js").NotificationPreferencesStore,
     "get" | "update"
@@ -56,7 +58,13 @@ export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagement
   ingestionPersistence: Pick<IngestionPersistenceService, "persistAndEnqueue"> &
     Partial<Pick<IngestionPersistenceService, "claimEvidenceReceipt">> &
     Partial<AnalyticsIngestionPersistenceService>;
-  ingestionMetadata: Pick<IngestionMetadataService, "resolveProjectByTokenHash">;
+  ingestionMetadata: Pick<IngestionMetadataService, "resolveProjectByTokenHash"> & {
+    resolveCredentialServiceScopes?: (
+      input: import("../../../packages/storage/src/project-ingestion-scope.js").CredentialServiceScope
+    ) => Promise<
+      import("../../../packages/storage/src/project-ingestion-scope.js").CredentialServiceResolution[]
+    >;
+  };
   accountAnalytics?: Pick<AccountAnalyticsStore, "recordMetricDeltas"> | undefined;
   ingestionRejectionDiagnostics?:
     | Pick<IngestionRejectionDiagnosticStore, "recordRejectedDiagnostics">
@@ -123,6 +131,7 @@ export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagement
       organization_id: string;
       user_id?: string;
       project_id?: string;
+      origin_project_ids?: string[];
       environment?: string;
       service?: string;
       status?: "active" | "open" | "resolved" | "regressed";
@@ -137,6 +146,8 @@ export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagement
       organization_id: string;
       incident_id: string;
       user_id?: string;
+      project_id?: string;
+      origin_project_ids?: string[];
     }): Promise<IncidentRetrievalRecord | null>;
     resolveIncidentForOrganization?(input: {
       organization_id: string;
@@ -180,6 +191,7 @@ export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagement
       user_id?: string;
       project_id: string;
       limit: number;
+      offset?: number;
     }): Promise<ServiceRetrievalRecord[] | null>;
     listIncidentLogsForOrganization(input: {
       organization_id: string;
@@ -263,6 +275,7 @@ export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagement
           updated_at: string;
         } | null>;
         updateAlertForOrganization(input: {
+          project_scope?: "current_project";
           organization_id: string;
           alert_id: string;
           project_id?: string;
@@ -371,7 +384,11 @@ export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagement
   cdnPurge?: ((projectId: string) => void | Promise<void>) | undefined;
   probeManagement?:
     | {
-        listActiveProbesForProject(input: { project_id: string; now: string }): Promise<
+        listActiveProbesForProject(input: {
+          project_id: string;
+          now: string;
+          scope_origin_ids?: string[];
+        }): Promise<
           Array<{
             activation_id: string;
             label_pattern: string;
@@ -400,6 +417,9 @@ export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagement
           organization_id: string;
           project_id: string;
           created_by_member_id: string;
+          sdk_project_id?: string;
+          sdk_token_id?: string;
+          sdk_service?: string;
           label_pattern: string;
           service: string;
           environment: string;
@@ -417,12 +437,16 @@ export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagement
           };
           trigger_token: string;
           concurrent_limit_exceeded?: boolean;
+          runtime_project_id?: string;
+          runtime_scope_origin_ids?: string[];
+          runtime_service?: string;
         } | null>;
         deactivateProbeActivationForProjectInOrganization(input: {
           organization_id: string;
           project_id: string;
           activation_id: string;
           deactivated_at: string;
+          actor_user_id?: string;
         }): Promise<{
           organization_plan: string;
           deactivated: {
@@ -449,6 +473,7 @@ export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagement
     | {
         listCaptureRulesForProject(input: {
           organization_id: string;
+          actor_user_id?: string;
           project_id: string;
         }): Promise<CaptureRule[]>;
         listActiveCaptureRulesForProject(input: {
@@ -457,18 +482,21 @@ export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagement
         }): Promise<CaptureRule[]>;
         createCaptureRuleForProject(input: {
           organization_id: string;
+          actor_user_id?: string;
           project_id: string;
           id: string;
           create: CaptureRuleCreate;
         }): Promise<CaptureRule | null>;
         updateCaptureRuleForProject(input: {
           organization_id: string;
+          actor_user_id?: string;
           project_id: string;
           rule_id: string;
           update: CaptureRuleUpdate;
         }): Promise<CaptureRule | null>;
         deleteCaptureRuleForProject(input: {
           organization_id: string;
+          actor_user_id?: string;
           project_id: string;
           rule_id: string;
         }): Promise<boolean>;

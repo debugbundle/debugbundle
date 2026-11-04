@@ -25,6 +25,20 @@ function routing(text: string): string {
 }
 
 describe("agent-independent interface routing", () => {
+  it("guides consolidation through explicit mappings and separate completion gates", () => {
+    const text = routing(buildSkill());
+    for (const instruction of [
+      "services are its applications/processes",
+      "suggested_service_mappings",
+      "plan_digest",
+      "idempotency_key",
+      "preserve existing SDK tokens",
+      "repository checks",
+      "deployed-runtime verification"
+    ]) {
+      expect(text.toLowerCase()).toContain(instruction.toLowerCase());
+    }
+  });
   it("keeps generated cleanup examples scoped and explicitly authorized", () => {
     const reference = buildCliReference();
     const cleanup = reference.slice(reference.indexOf("### Smoke-Test Cleanup Recipe"));

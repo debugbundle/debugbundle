@@ -5,12 +5,16 @@ import { SESSION_COOKIE_NAME, buildCsrfToken } from "../../../packages/auth/src/
 import { mockedObject, type MockedMethods } from "../../helpers/vitest.ts";
 
 type ApiServerDependencies = Parameters<typeof createApiServer>[0];
-type AuthRateLimiterDependency = MockedMethods<NonNullable<ApiServerDependencies["authRateLimiter"]>>;
+type AuthRateLimiterDependency = MockedMethods<
+  NonNullable<ApiServerDependencies["authRateLimiter"]>
+>;
 type AuditLoggingDependency = MockedMethods<NonNullable<ApiServerDependencies["auditLogging"]>>;
 type MemberAuthDependency = MockedMethods<ApiServerDependencies["memberAuth"]>;
 type WebAuthDependency = MockedMethods<NonNullable<ApiServerDependencies["webAuth"]>>;
 type TokenManagementDependency = MockedMethods<ApiServerDependencies["tokenManagement"]>;
-type ProjectManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["projectManagement"]>>;
+type ProjectManagementDependency = MockedMethods<
+  NonNullable<ApiServerDependencies["projectManagement"]>
+>;
 
 const defaultProjectAccess = {
   project_id: "00000000-0000-4000-8000-000000000001",
@@ -22,14 +26,16 @@ const defaultProjectAccess = {
   organization_plan: "team"
 } as const;
 
-function createServer(overrides: {
-  authRateLimiter?: Partial<AuthRateLimiterDependency>;
-  auditLogging?: Partial<AuditLoggingDependency>;
-  memberAuth?: MemberAuthDependency;
-  webAuth?: Partial<WebAuthDependency>;
-  projectManagement?: ProjectManagementDependency;
-  tokenManagement?: TokenManagementDependency;
-} = {}): ReturnType<typeof createApiServer> {
+function createServer(
+  overrides: {
+    authRateLimiter?: Partial<AuthRateLimiterDependency>;
+    auditLogging?: Partial<AuditLoggingDependency>;
+    memberAuth?: MemberAuthDependency;
+    webAuth?: Partial<WebAuthDependency>;
+    projectManagement?: ProjectManagementDependency;
+    tokenManagement?: TokenManagementDependency;
+  } = {}
+): ReturnType<typeof createApiServer> {
   return createApiServer({
     ingestionPersistence: {
       persistAndEnqueue: vi.fn()
@@ -41,18 +47,22 @@ function createServer(overrides: {
       ? {}
       : {
           authRateLimiter: {
-            claimRequest: overrides.authRateLimiter.claimRequest ?? vi.fn().mockResolvedValue({
-              allowed: true,
-              limit: 100,
-              remaining: 99,
-              retry_after_ms: 0
-            })
+            claimRequest:
+              overrides.authRateLimiter.claimRequest ??
+              vi.fn().mockResolvedValue({
+                allowed: true,
+                limit: 100,
+                remaining: 99,
+                retry_after_ms: 0
+              })
           }
         }),
     memberAuth:
       overrides.memberAuth ??
       mockedObject<ApiServerDependencies["memberAuth"]>({
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "usr_123", organization_id: "org_123" })
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "usr_123", organization_id: "org_123" })
       }),
     projectManagement:
       overrides.projectManagement ??
@@ -63,17 +73,16 @@ function createServer(overrides: {
         updateProjectForUser: vi.fn().mockResolvedValue(null),
         deleteProjectForUser: vi.fn().mockResolvedValue(null)
       }),
-    webAuth:
-      mockedObject<NonNullable<ApiServerDependencies["webAuth"]>>({
-        requestEmailCode: vi.fn(),
-        verifyEmailCode: vi.fn(),
-        beginGithubAuth: vi.fn(),
-        completeGithubAuth: vi.fn(),
-        acceptInviteForSession: vi.fn(),
-        resolveSessionByToken: vi.fn().mockResolvedValue(null),
-        revokeSessionByToken: vi.fn().mockResolvedValue(false),
-        ...overrides.webAuth
-      }),
+    webAuth: mockedObject<NonNullable<ApiServerDependencies["webAuth"]>>({
+      requestEmailCode: vi.fn(),
+      verifyEmailCode: vi.fn(),
+      beginGithubAuth: vi.fn(),
+      completeGithubAuth: vi.fn(),
+      acceptInviteForSession: vi.fn(),
+      resolveSessionByToken: vi.fn().mockResolvedValue(null),
+      revokeSessionByToken: vi.fn().mockResolvedValue(false),
+      ...overrides.webAuth
+    }),
     tokenManagement:
       overrides.tokenManagement ??
       mockedObject<ApiServerDependencies["tokenManagement"]>({
@@ -100,7 +109,8 @@ function createServer(overrides: {
       ? {}
       : {
           auditLogging: {
-            createAuditLog: overrides.auditLogging.createAuditLog ?? vi.fn().mockResolvedValue(undefined)
+            createAuditLog:
+              overrides.auditLogging.createAuditLog ?? vi.fn().mockResolvedValue(undefined)
           }
         })
   });
@@ -177,6 +187,7 @@ describe("api token management routes", () => {
       ]
     });
     expect(tokenManagement.listProjectTokensForOrganization).toHaveBeenCalledWith({
+      actor_user_id: "usr_123",
       organization_id: "org_123",
       project_id: "00000000-0000-4000-8000-000000000001",
       limit: 10
@@ -184,18 +195,20 @@ describe("api token management routes", () => {
   });
 
   it("should list project tokens for collaborators using the shared project's organization", async (): Promise<void> => {
-    const projectManagement = mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>({
-      resolveProjectAccessForUser: vi.fn().mockResolvedValue({
-        ...defaultProjectAccess,
-        organization_id: "org_shared",
-        relationship: "shared",
-        effective_role: "member"
-      }),
-      listProjectsForUser: vi.fn().mockResolvedValue([]),
-      createProjectForUser: vi.fn().mockResolvedValue(null),
-      updateProjectForUser: vi.fn().mockResolvedValue(null),
-      deleteProjectForUser: vi.fn().mockResolvedValue(null)
-    });
+    const projectManagement = mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>(
+      {
+        resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+          ...defaultProjectAccess,
+          organization_id: "org_shared",
+          relationship: "shared",
+          effective_role: "member"
+        }),
+        listProjectsForUser: vi.fn().mockResolvedValue([]),
+        createProjectForUser: vi.fn().mockResolvedValue(null),
+        updateProjectForUser: vi.fn().mockResolvedValue(null),
+        deleteProjectForUser: vi.fn().mockResolvedValue(null)
+      }
+    );
     const tokenManagement = {
       listProjectTokensForOrganization: vi.fn().mockResolvedValue([]),
       createProjectTokenForOrganization: vi.fn().mockResolvedValue(null),
@@ -216,6 +229,7 @@ describe("api token management routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(tokenManagement.listProjectTokensForOrganization).toHaveBeenCalledWith({
+      actor_user_id: "usr_123",
       organization_id: "org_shared",
       project_id: "00000000-0000-4000-8000-000000000001",
       limit: 10
@@ -342,18 +356,20 @@ describe("api token management routes", () => {
   });
 
   it("should create project tokens for shared-project admins using the shared project's scope", async (): Promise<void> => {
-    const projectManagement = mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>({
-      resolveProjectAccessForUser: vi.fn().mockResolvedValue({
-        ...defaultProjectAccess,
-        organization_id: "org_shared",
-        relationship: "shared",
-        effective_role: "admin"
-      }),
-      listProjectsForUser: vi.fn().mockResolvedValue([]),
-      createProjectForUser: vi.fn().mockResolvedValue(null),
-      updateProjectForUser: vi.fn().mockResolvedValue(null),
-      deleteProjectForUser: vi.fn().mockResolvedValue(null)
-    });
+    const projectManagement = mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>(
+      {
+        resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+          ...defaultProjectAccess,
+          organization_id: "org_shared",
+          relationship: "shared",
+          effective_role: "admin"
+        }),
+        listProjectsForUser: vi.fn().mockResolvedValue([]),
+        createProjectForUser: vi.fn().mockResolvedValue(null),
+        updateProjectForUser: vi.fn().mockResolvedValue(null),
+        deleteProjectForUser: vi.fn().mockResolvedValue(null)
+      }
+    );
     const tokenManagement = {
       listProjectTokensForOrganization: vi.fn().mockResolvedValue([]),
       createProjectTokenForOrganization: vi.fn().mockResolvedValue({
@@ -396,18 +412,20 @@ describe("api token management routes", () => {
   });
 
   it("should block plain shared-project members from project token credential management", async (): Promise<void> => {
-    const projectManagement = mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>({
-      resolveProjectAccessForUser: vi.fn().mockResolvedValue({
-        ...defaultProjectAccess,
-        organization_id: "org_shared",
-        relationship: "shared",
-        effective_role: "member"
-      }),
-      listProjectsForUser: vi.fn().mockResolvedValue([]),
-      createProjectForUser: vi.fn().mockResolvedValue(null),
-      updateProjectForUser: vi.fn().mockResolvedValue(null),
-      deleteProjectForUser: vi.fn().mockResolvedValue(null)
-    });
+    const projectManagement = mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>(
+      {
+        resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+          ...defaultProjectAccess,
+          organization_id: "org_shared",
+          relationship: "shared",
+          effective_role: "member"
+        }),
+        listProjectsForUser: vi.fn().mockResolvedValue([]),
+        createProjectForUser: vi.fn().mockResolvedValue(null),
+        updateProjectForUser: vi.fn().mockResolvedValue(null),
+        deleteProjectForUser: vi.fn().mockResolvedValue(null)
+      }
+    );
     const tokenManagement = {
       listProjectTokensForOrganization: vi.fn().mockResolvedValue([]),
       createProjectTokenForOrganization: vi.fn().mockResolvedValue(null),
@@ -524,7 +542,9 @@ describe("api token management routes", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json<{ token: { revoked_at: string } }>().token.revoked_at).toBe("2026-03-11T01:00:00.000Z");
+    expect(response.json<{ token: { revoked_at: string } }>().token.revoked_at).toBe(
+      "2026-03-11T01:00:00.000Z"
+    );
   });
 
   it("should return not found and validation errors for project token revoke", async (): Promise<void> => {
@@ -622,7 +642,11 @@ describe("api token management routes", () => {
       }
     });
     expect(createResponse.statusCode).toBe(201);
-    expect(createResponse.json<{ token: { plaintext: string } }>().token.plaintext.startsWith("dbundle_mem_")).toBe(true);
+    expect(
+      createResponse
+        .json<{ token: { plaintext: string } }>()
+        .token.plaintext.startsWith("dbundle_mem_")
+    ).toBe(true);
 
     const revokeResponse = await app.inject({
       method: "POST",
@@ -632,7 +656,9 @@ describe("api token management routes", () => {
       }
     });
     expect(revokeResponse.statusCode).toBe(200);
-    expect(revokeResponse.json<{ token: { revoked_at: string } }>().token.revoked_at).toBe("2026-03-11T01:00:00.000Z");
+    expect(revokeResponse.json<{ token: { revoked_at: string } }>().token.revoked_at).toBe(
+      "2026-03-11T01:00:00.000Z"
+    );
   });
 
   it("should validate member token lifecycle request shapes", async (): Promise<void> => {
@@ -873,7 +899,9 @@ describe("api token management routes", () => {
     });
 
     expect(response.statusCode).toBe(201);
-    expect(response.json<{ token: { plaintext: string } }>().token.plaintext.startsWith("dbundle_mem_")).toBe(true);
+    expect(
+      response.json<{ token: { plaintext: string } }>().token.plaintext.startsWith("dbundle_mem_")
+    ).toBe(true);
     expect(tokenManagement.listMemberTokensForOrganization).not.toHaveBeenCalled();
     expect(tokenManagement.createMemberTokenForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",

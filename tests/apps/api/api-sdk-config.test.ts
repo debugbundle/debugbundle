@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApiServer } from "../../../apps/api/src/server.ts";
+import { deriveProbeTriggerTokenKey } from "../../../packages/auth/src/index.js";
 import { createProbeRouteServer as createServer } from "../../helpers/api-probe-server.js";
 const originalProbeTriggerSecret = process.env["DEBUGBUNDLE_PROBE_TRIGGER_SECRET"];
 
@@ -108,8 +109,10 @@ describe("api SDK config", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.headers["cache-control"]).toBe("public, s-maxage=30");
-    expect(response.headers["vary"]).toBe("X-DebugBundle-Analytics-Config, X-DebugBundle-Evidence");
+    expect(response.headers["cache-control"]).toBe("private, no-store");
+    expect(response.headers["vary"]).toBe(
+      "Authorization, Origin, X-DebugBundle-Analytics-Config, X-DebugBundle-Evidence"
+    );
     expect(response.json()).toEqual({
       probes_enabled: true,
       remote_probes_enabled: false,
@@ -298,12 +301,14 @@ describe("api SDK config", () => {
     });
   });
 
-  it("should return sdk config with active probes for paid tier projects", async (): Promise<void> => {
+  it("returns probes with the immutable credential scope signing key for paid projects", async (): Promise<void> => {
     const app = createServer({
       ingestionMetadata: {
-        resolveProjectByTokenHash: vi
-          .fn()
-          .mockResolvedValue({ project_id: "proj_123", organization_plan: "solo" })
+        resolveProjectByTokenHash: vi.fn().mockResolvedValue({
+          project_id: "proj_123",
+          organization_plan: "solo",
+          scope_origin_ids: ["proj_123", "proj_adopted"]
+        })
       },
       probeManagement: {
         listActiveProbesForProject: vi.fn().mockResolvedValue([
@@ -347,7 +352,12 @@ describe("api SDK config", () => {
     });
     expect(body).not.toBeNull();
     expect(Array.isArray(body)).toBe(false);
-    expect((body as Record<string, unknown>)["trigger_token_key"]).toEqual(expect.any(String));
+    expect((body as Record<string, unknown>)["trigger_token_key"]).toBe(
+      deriveProbeTriggerTokenKey("proj_123", ["proj_123", "proj_adopted"])
+    );
+    expect((body as Record<string, unknown>)["trigger_token_key"]).not.toBe(
+      deriveProbeTriggerTokenKey("proj_123")
+    );
   });
 
   it("should return balanced capture policy defaults for solo projects without a stored policy row", async (): Promise<void> => {

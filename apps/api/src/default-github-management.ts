@@ -27,7 +27,8 @@ export function createDefaultGitHubManagement(input: {
 }): NonNullable<ApiDependencies["githubManagement"]> {
   return {
     getInstallUrl: () => input.githubAppClient.getInstallUrl(),
-    getInstallationForOrganization: (request) => input.githubStore.getGitHubInstallationForOrganization(request),
+    getInstallationForOrganization: (request) =>
+      input.githubStore.getGitHubInstallationForOrganization(request),
     disconnectInstallationForOrganization: (request) =>
       input.githubStore.deleteGitHubInstallationForOrganization(request),
     async listRepositoriesForOrganization(requestInput) {
@@ -44,9 +45,12 @@ export function createDefaultGitHubManagement(input: {
         return "installation_removed";
       }
 
-      return input.githubAppClient.listRepositories({ installationId: installation.installation_id });
+      return input.githubAppClient.listRepositories({
+        installationId: installation.installation_id
+      });
     },
-    getProjectRepoForOrganization: (request) => input.githubStore.getProjectGitHubRepoForOrganization(request),
+    getProjectRepoForOrganization: (request) =>
+      input.githubStore.getProjectGitHubRepoForOrganization(request),
     listProjectDeliveriesForOrganization: (request) =>
       input.githubStore.listProjectGitHubDeliveriesForOrganization(request),
     async retryProjectDeliveryForOrganization(requestInput) {
@@ -71,12 +75,14 @@ export function createDefaultGitHubManagement(input: {
         return "repo_not_found";
       }
 
-      const retried = await input.githubStore.retryProjectGitHubDeliveryForOrganization(requestInput);
+      const retried =
+        await input.githubStore.retryProjectGitHubDeliveryForOrganization(requestInput);
       return retried ?? "delivery_not_found";
     },
     listProjectRulesForOrganization: (request) =>
       input.githubStore.listProjectGitHubRulesForOrganization(request),
-    getProjectRuleForOrganization: (request) => input.githubStore.getProjectGitHubRuleForOrganization(request),
+    getProjectRuleForOrganization: (request) =>
+      input.githubStore.getProjectGitHubRuleForOrganization(request),
     async createProjectRuleForOrganization(requestInput) {
       const repo = await input.githubStore.getProjectGitHubRepoForOrganization({
         organization_id: requestInput.organization_id,
@@ -110,7 +116,8 @@ export function createDefaultGitHubManagement(input: {
 
       const created = await runInTransaction(input.db, async (tx) => {
         const txGitHubStore = createPostgresGitHubStore(tx);
-        const createdRule = await txGitHubStore.createProjectGitHubRuleForOrganization(requestInput);
+        const createdRule =
+          await txGitHubStore.createProjectGitHubRuleForOrganization(requestInput);
 
         if (createdRule !== null && input.accountAnalyticsStore !== undefined) {
           await input.accountAnalyticsStore.withDb(tx).recordMetricDeltas({
@@ -169,32 +176,37 @@ export function createDefaultGitHubManagement(input: {
         installationId: installation.installation_id
       });
       const repository = repositories.find(
-        (candidate) => candidate.owner === requestInput.owner && candidate.name === requestInput.repo
+        (candidate) =>
+          candidate.owner === requestInput.owner && candidate.name === requestInput.repo
       );
       if (repository === undefined) {
         return "repo_not_found";
       }
 
-      const stored = await input.githubStore.upsertProjectGitHubRepoForOrganization({
-        organization_id: requestInput.organization_id,
-        project_id: requestInput.project_id,
-        installation_id: installation.id,
-        repo_owner: repository.owner,
-        repo_name: repository.name,
-        default_branch: repository.default_branch
-      });
-
-      if (stored === null) {
-        return "project_not_found";
-      }
-
-      const existingRules = await input.githubStore.listProjectGitHubRulesForOrganization({
-        organization_id: requestInput.organization_id,
-        project_id: requestInput.project_id
-      });
-      if (existingRules === null || existingRules.length === 0) {
-        await runInTransaction(input.db, async (tx) => {
-          const txGitHubStore = createPostgresGitHubStore(tx);
+      return runInTransaction(input.db, async (tx) => {
+        const txGitHubStore = createPostgresGitHubStore(tx);
+        const stored = await txGitHubStore.upsertProjectGitHubRepoForOrganization({
+          actor_user_id: requestInput.created_by_user_id,
+          organization_id: requestInput.organization_id,
+          project_id: requestInput.project_id,
+          installation_id: installation.id,
+          repo_owner: repository.owner,
+          repo_name: repository.name,
+          default_branch: repository.default_branch
+        });
+        if (stored === null) return "project_not_found";
+        // Updating a retained scalar binding preserves its original rule set.
+        // It must never create a new whole-canonical-project default policy.
+        const access = await input.metadataStore.resolveProjectAccessForUser?.({
+          user_id: requestInput.created_by_user_id,
+          project_id: requestInput.project_id
+        });
+        if (access?.canonical_project_id) return stored;
+        const existingRules = await txGitHubStore.listProjectGitHubRulesForOrganization({
+          organization_id: requestInput.organization_id,
+          project_id: requestInput.project_id
+        });
+        if (existingRules === null || existingRules.length === 0) {
           const defaultRule = await txGitHubStore.createProjectGitHubRuleForOrganization({
             organization_id: requestInput.organization_id,
             project_id: requestInput.project_id,
@@ -209,22 +221,18 @@ export function createDefaultGitHubManagement(input: {
             incident_status: "new_or_reopened",
             cooldown_seconds: 300
           });
-
           if (defaultRule !== null && input.accountAnalyticsStore !== undefined) {
             await input.accountAnalyticsStore.withDb(tx).recordMetricDeltas({
               organization_id: requestInput.organization_id,
               occurred_at: defaultRule.created_at,
               source: "github_dispatch_rule_created",
               dedupe_key: `github_dispatch_rule_created:${defaultRule.rule_id}`,
-              deltas: {
-                github_dispatch_rules_created: 1
-              }
+              deltas: { github_dispatch_rules_created: 1 }
             });
           }
-        });
-      }
-
-      return stored;
+        }
+        return stored;
+      });
     },
     removeProjectRepoForOrganization: (request) =>
       input.githubStore.deleteProjectGitHubRepoForOrganization(request),
@@ -255,7 +263,8 @@ export function createDefaultGitHubManagement(input: {
       }
 
       const installation =
-        typeof request.payload["installation"] === "object" && request.payload["installation"] !== null
+        typeof request.payload["installation"] === "object" &&
+        request.payload["installation"] !== null
           ? (request.payload["installation"] as Record<string, unknown>)
           : null;
       const installationId = installation?.["id"];

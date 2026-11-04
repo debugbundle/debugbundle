@@ -1,5 +1,14 @@
 # Agent distribution ledger
 
+## Project/service release candidate — 4 November 2026
+
+The authorised train prepares Codex 1.5.0, Claude Code 1.19.0 and Gemini CLI
+1.4.0, each pinning MCP 1.19.0. The package source and skills include the logical
+service and checked consolidation workflow. Public default-branch promotion waits
+for exact MCP registry publication and installed verification. Per-surface results
+are recorded in `project-service-release-20261104.md`; the earlier published
+identities below remain historical evidence until the new public checks pass.
+
 ## Published developer packages — 3 November 2026
 
 Current diagnostic adoption is public and verified: Codex 1.4.3 and Claude Code 1.18.2 from core `e4b9b47e9a2689d4c68907b0f5359a6a5077a3be`, and Gemini CLI 1.3.3 from standalone `8178c633f431ec315f0a41847ab2ae28fce05814` / tag `v1.3.3`, all pin published MCP 1.18.3. All 28 developer contracts and native public install/discovery/auth/update/removal checks pass, along with developer CI 41647357939. The downloaded Gemini ZIP SHA-256 is `16824b42b073ec3c40a282c7d45c493c8fcb7920220dc7df359c0fbb8921f1e3`; all five source files match. Qualified runtime 751474ec passes full CI, npm provenance/integrity and actual scoped production list/doctor reads. See [final corrective evidence](openclaw-runtime-scope-remediation-20261103.md).

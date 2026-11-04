@@ -1,5 +1,6 @@
 import type { ImprovementOpportunityStore } from "./improvement-opportunity-store.js";
 import type { PostgresMetadataStore, Queryable } from "./types.js";
+import { appendProjectReadScope, appendServiceDefinitionFilter } from "./project-read-scope.js";
 
 type IncidentCountInput = Omit<
   Parameters<PostgresMetadataStore["listIncidentsForOrganization"]>[0],
@@ -36,20 +37,14 @@ export async function countIncidentsForOrganization(
     )`
   ];
 
-  if (input.project_id !== undefined) {
-    params.push(input.project_id);
-    conditions.push(`i.project_id = $${params.length}`);
-  }
+  const projectParameter = appendProjectReadScope(params, conditions, input, "i.project_id");
 
   if (input.environment !== undefined) {
     params.push(input.environment);
     conditions.push(`i.environment = $${params.length}`);
   }
 
-  if (input.service !== undefined) {
-    params.push(input.service);
-    conditions.push(`s.name = $${params.length}`);
-  }
+  appendServiceDefinitionFilter(params, conditions, input, projectParameter);
 
   if (input.status === "active") {
     conditions.push(`i.status IN ('open', 'regressed')`);
@@ -85,8 +80,9 @@ export async function countIncidentsForOrganization(
   const result = await db.query<{ total: string }>(
     `SELECT COUNT(*) AS total
      FROM incidents i
-     JOIN projects p ON p.id = i.project_id
+     JOIN projects p ON p.id = debugbundle_canonical_project(i.project_id)
      LEFT JOIN services s ON s.id = i.service_id
+     LEFT JOIN service_definitions sd ON sd.id=s.service_definition_id
      WHERE ${conditions.join("\n       AND ")}`,
     params
   );
@@ -97,7 +93,7 @@ export async function countImprovementsForOrganization(
   db: Queryable,
   input: ImprovementCountInput
 ): Promise<number> {
-  const parameters: Array<string | number | null> = [input.organization_id, input.user_id ?? null];
+  const parameters: unknown[] = [input.organization_id, input.user_id ?? null];
   const predicates = [
     `(
       (
@@ -177,18 +173,12 @@ export async function countImprovementsForOrganization(
     )`
   ];
 
-  if (input.project_id !== undefined) {
-    parameters.push(input.project_id);
-    predicates.push(`io.project_id = $${parameters.length}::uuid`);
-  }
+  const projectParameter = appendProjectReadScope(parameters, predicates, input, "io.project_id");
   if (input.environment !== undefined) {
     parameters.push(input.environment);
     predicates.push(`io.environment = $${parameters.length}`);
   }
-  if (input.service !== undefined) {
-    parameters.push(input.service);
-    predicates.push(`io.service_name = $${parameters.length}`);
-  }
+  appendServiceDefinitionFilter(parameters, predicates, input, projectParameter, "io.service_name");
   if (input.status !== undefined) {
     parameters.push(input.status);
     predicates.push(`${effectiveImprovementStatusSql()} = $${parameters.length}`);
@@ -204,8 +194,9 @@ export async function countImprovementsForOrganization(
   const result = await db.query<{ total: string }>(
     `SELECT COUNT(*) AS total
      FROM improvement_opportunities io
-     JOIN projects p ON p.id = io.project_id
+     JOIN projects p ON p.id = debugbundle_canonical_project(io.project_id)
      LEFT JOIN services s ON s.id = io.service_id
+     LEFT JOIN service_definitions sd ON sd.id=s.service_definition_id
      WHERE ${predicates.join("\n       AND ")}`,
     parameters
   );

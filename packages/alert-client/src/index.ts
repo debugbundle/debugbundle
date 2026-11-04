@@ -8,7 +8,11 @@ export const AlertConditionTypeSchema = z.enum([
   "severity_threshold",
   "regression_after_deploy"
 ]);
-export const AlertSeverityLifecycleScopeSchema = z.enum(["new_incident", "incident_regressed", "both"]);
+export const AlertSeverityLifecycleScopeSchema = z.enum([
+  "new_incident",
+  "incident_regressed",
+  "both"
+]);
 
 export const AlertSchema = z
   .object({
@@ -41,32 +45,40 @@ export const AlertResponseSchema = z
   })
   .strict();
 
-export const AlertGroupSummarySchema = z.object({
-  group_id: z.string().guid(),
-  kind: z.enum(["direct", "email_digest"]),
-  project_id: z.string().guid(),
-  alert_id: z.string().guid().nullable(),
-  root_incident_id: z.string().guid().nullable(),
-  channel: AlertChannelSchema,
-  status: z.enum(["pending", "delivered", "failed"]),
-  member_count: z.number().int().min(0),
-  created_at: z.string(),
-  delivered_at: z.string().nullable()
-}).strict();
-export const AlertGroupMemberSchema = z.object({
-  incident_id: z.string().guid(),
-  condition_type: z.string(),
-  created_at: z.string()
-}).strict();
-export const AlertGroupListResponseSchema = z.object({
-  groups: z.array(AlertGroupSummarySchema),
-  next_cursor: z.string().nullable()
-}).strict();
-export const AlertGroupResponseSchema = z.object({
-  group: AlertGroupSummarySchema,
-  members: z.array(AlertGroupMemberSchema),
-  next_cursor: z.string().nullable()
-}).strict();
+export const AlertGroupSummarySchema = z
+  .object({
+    group_id: z.string().guid(),
+    kind: z.enum(["direct", "email_digest"]),
+    project_id: z.string().guid(),
+    alert_id: z.string().guid().nullable(),
+    root_incident_id: z.string().guid().nullable(),
+    channel: AlertChannelSchema,
+    status: z.enum(["pending", "delivered", "failed"]),
+    member_count: z.number().int().min(0),
+    created_at: z.string(),
+    delivered_at: z.string().nullable()
+  })
+  .strict();
+export const AlertGroupMemberSchema = z
+  .object({
+    incident_id: z.string().guid(),
+    condition_type: z.string(),
+    created_at: z.string()
+  })
+  .strict();
+export const AlertGroupListResponseSchema = z
+  .object({
+    groups: z.array(AlertGroupSummarySchema),
+    next_cursor: z.string().nullable()
+  })
+  .strict();
+export const AlertGroupResponseSchema = z
+  .object({
+    group: AlertGroupSummarySchema,
+    members: z.array(AlertGroupMemberSchema),
+    next_cursor: z.string().nullable()
+  })
+  .strict();
 
 export const ApiErrorResponseSchema = z
   .object({
@@ -159,9 +171,25 @@ async function expectAlert(responsePromise: Promise<HttpResponse>): Promise<Aler
 }
 
 export function createAlertApi(client: HttpClient): {
-  listAlerts(input: { bearerToken: string; projectId: string; limit?: number }): Promise<AlertRecord[]>;
-  listAlertGroups(input: { bearerToken: string; projectId: string; limit?: number; cursor?: string }): Promise<AlertGroupListResponse>;
-  getAlertGroup(input: { bearerToken: string; projectId: string; kind: "direct" | "email_digest"; groupId: string; limit?: number; cursor?: string }): Promise<AlertGroupResponse>;
+  listAlerts(input: {
+    bearerToken: string;
+    projectId: string;
+    limit?: number;
+  }): Promise<AlertRecord[]>;
+  listAlertGroups(input: {
+    bearerToken: string;
+    projectId: string;
+    limit?: number;
+    cursor?: string;
+  }): Promise<AlertGroupListResponse>;
+  getAlertGroup(input: {
+    bearerToken: string;
+    projectId: string;
+    kind: "direct" | "email_digest";
+    groupId: string;
+    limit?: number;
+    cursor?: string;
+  }): Promise<AlertGroupResponse>;
   createAlert(input: {
     bearerToken: string;
     projectId: string;
@@ -175,6 +203,7 @@ export function createAlertApi(client: HttpClient): {
     isEnabled?: boolean;
   }): Promise<AlertRecord>;
   updateAlert(input: {
+    projectScope?: "current_project";
     bearerToken: string;
     projectId: string;
     alertId: string;
@@ -188,7 +217,11 @@ export function createAlertApi(client: HttpClient): {
     rotateSigningSecret?: boolean;
     isEnabled?: boolean;
   }): Promise<AlertRecord>;
-  deleteAlert(input: { bearerToken: string; projectId: string; alertId: string }): Promise<{ alert_id: string }>;
+  deleteAlert(input: {
+    bearerToken: string;
+    projectId: string;
+    alertId: string;
+  }): Promise<{ alert_id: string }>;
 } {
   return {
     async listAlerts(input) {
@@ -207,7 +240,8 @@ export function createAlertApi(client: HttpClient): {
         path: `/v1/alert-groups${buildQuery({ project_id: input.projectId, limit: input.limit, cursor: input.cursor })}`,
         bearerToken: input.bearerToken
       });
-      if (response.status < 200 || response.status >= 300) parseApiError(response.status, response.body);
+      if (response.status < 200 || response.status >= 300)
+        parseApiError(response.status, response.body);
       const parsed = AlertGroupListResponseSchema.safeParse(response.body);
       if (!parsed.success) throw new AlertApiError(response.status, "invalid_response_shape");
       return parsed.data;
@@ -219,7 +253,8 @@ export function createAlertApi(client: HttpClient): {
         path: `/v1/alert-groups/${input.kind}/${encodeURIComponent(input.groupId)}${buildQuery({ project_id: input.projectId, limit: input.limit, cursor: input.cursor })}`,
         bearerToken: input.bearerToken
       });
-      if (response.status < 200 || response.status >= 300) parseApiError(response.status, response.body);
+      if (response.status < 200 || response.status >= 300)
+        parseApiError(response.status, response.body);
       const parsed = AlertGroupResponseSchema.safeParse(response.body);
       if (!parsed.success) throw new AlertApiError(response.status, "invalid_response_shape");
       return parsed.data;
@@ -275,6 +310,7 @@ export function createAlertApi(client: HttpClient): {
 
     async updateAlert(input) {
       const body: {
+        project_scope?: "current_project";
         service_id?: string | null;
         channel?: AlertChannel;
         condition_type?: AlertConditionType;
@@ -285,6 +321,8 @@ export function createAlertApi(client: HttpClient): {
         rotate_signing_secret?: true;
         is_enabled?: boolean;
       } = {};
+
+      if (input.projectScope) body.project_scope = input.projectScope;
 
       if (input.serviceId !== undefined) {
         body.service_id = input.serviceId;

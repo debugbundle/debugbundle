@@ -1,3 +1,5 @@
+import { ruleActorAllowedSql } from "./project-rule-access.js";
+import { runInTransaction } from "./transaction.js";
 import { randomUUID } from "node:crypto";
 import type {
   MemberTokenRecord,
@@ -21,13 +23,12 @@ export function createMetadataTokens(
     async listProjectTokensForOrganization(input): Promise<ProjectTokenRecord[] | null> {
       const scopedProject = await db.query<{ id: string }>(
         `
-          SELECT id
-          FROM projects
-          WHERE id = $1
-            AND organization_id = $2
+          SELECT p.id FROM projects p
+          WHERE p.id=debugbundle_canonical_project($1::uuid) AND p.organization_id=$2
+            AND ${ruleActorAllowedSql("p.id", "$3::uuid", "NULL::uuid")}
           LIMIT 1
         `,
-        [input.project_id, input.organization_id]
+        [input.project_id, input.organization_id, input.actor_user_id ?? null]
       );
 
       if (scopedProject.rows[0] === undefined) {
@@ -37,44 +38,48 @@ export function createMetadataTokens(
       const result = await db.query<ProjectTokenRecord & Record<string, unknown>>(
         `
           SELECT
-            id AS token_id,
-            project_id,
-            label,
-            COALESCE(allowed_origins, '[]'::jsonb) AS allowed_origins,
-            created_at::text AS created_at,
-            last_used_at::text AS last_used_at,
-            revoked_at::text AS revoked_at,
-            expires_at::text AS expires_at
-          FROM project_tokens
-          WHERE project_id = $1
-            AND revoked_at IS NULL
-          ORDER BY created_at DESC
+            pt.id AS token_id,
+            pt.project_id,
+            pt.label,
+            COALESCE(pt.allowed_origins, '[]'::jsonb) AS allowed_origins,
+            pt.created_at::text AS created_at,
+            pt.last_used_at::text AS last_used_at,
+            pt.revoked_at::text AS revoked_at,
+            pt.expires_at::text AS expires_at
+          FROM project_tokens pt JOIN projects p ON p.id=debugbundle_canonical_project(pt.project_id)
+          WHERE pt.project_id=ANY(debugbundle_project_origins($1::uuid)) AND p.organization_id=$3::uuid
+            AND ${ruleActorAllowedSql("p.id", "$4::uuid", "NULL::uuid")}
+            AND pt.revoked_at IS NULL
+          ORDER BY pt.created_at DESC,pt.id DESC
           LIMIT $2
         `,
-        [input.project_id, input.limit]
+        [input.project_id, input.limit, input.organization_id, input.actor_user_id ?? null]
       );
 
       return result.rows;
     },
 
     async createProjectTokenForOrganization(input): Promise<ProjectTokenRecord | null> {
-      const scopedProject = await db.query<{ id: string }>(
-        `
-          SELECT id
-          FROM projects
-          WHERE id = $1
-            AND organization_id = $2
+      return runInTransaction(db, async (db) => {
+        await db.query("SELECT debugbundle_assert_canonical_project_write($1::uuid)", [
+          input.project_id
+        ]);
+        const scopedProject = await db.query<{ id: string }>(
+          `
+          SELECT p.id FROM projects p
+          WHERE p.id=$1::uuid AND p.organization_id=$2::uuid
+            AND ${ruleActorAllowedSql("p.id", "$3::uuid", "p.owner_user_id")}
           LIMIT 1
         `,
-        [input.project_id, input.organization_id]
-      );
+          [input.project_id, input.organization_id, input.actor_user_id ?? null]
+        );
 
-      if (scopedProject.rows[0] === undefined) {
-        return null;
-      }
+        if (scopedProject.rows[0] === undefined) {
+          return null;
+        }
 
-      const result = await db.query<ProjectTokenRecord & Record<string, unknown>>(
-        `
+        const result = await db.query<ProjectTokenRecord & Record<string, unknown>>(
+          `
           INSERT INTO project_tokens (id, project_id, token_hash, label, allowed_origins, created_at)
           VALUES ($1, $2, $3, $4, $5::jsonb, now())
           RETURNING
@@ -87,28 +92,31 @@ export function createMetadataTokens(
             revoked_at::text AS revoked_at,
             expires_at::text AS expires_at
         `,
-        [
-          randomUUID(),
-          input.project_id,
-          input.token_hash,
-          input.label,
-          JSON.stringify(input.allowed_origins)
-        ]
-      );
+          [
+            randomUUID(),
+            input.project_id,
+            input.token_hash,
+            input.label,
+            JSON.stringify(input.allowed_origins)
+          ]
+        );
 
-      return result.rows[0] ?? null;
+        return result.rows[0] ?? null;
+      });
     },
 
     async revokeProjectTokenForOrganization(input): Promise<ProjectTokenRecord | null> {
       const result = await db.query<ProjectTokenRecord & Record<string, unknown>>(
         `
+          WITH scope AS MATERIALIZED(SELECT debugbundle_assert_project_scope_write($3::uuid))
           UPDATE project_tokens pt
           SET revoked_at = $1
-          FROM projects p
+          FROM scope CROSS JOIN projects p
           WHERE pt.id = $2
-            AND pt.project_id = $3
-            AND p.id = pt.project_id
+            AND pt.project_id=ANY(debugbundle_project_origins($3::uuid))
+            AND p.id = debugbundle_canonical_project(pt.project_id)
             AND p.organization_id = $4
+            AND ${ruleActorAllowedSql("p.id", "$5::uuid", "p.owner_user_id")}
             AND pt.revoked_at IS NULL
           RETURNING
             pt.id AS token_id,
@@ -120,7 +128,13 @@ export function createMetadataTokens(
             pt.revoked_at::text AS revoked_at,
             pt.expires_at::text AS expires_at
         `,
-        [input.revoked_at, input.token_id, input.project_id, input.organization_id]
+        [
+          input.revoked_at,
+          input.token_id,
+          input.project_id,
+          input.organization_id,
+          input.actor_user_id ?? null
+        ]
       );
 
       return result.rows[0] ?? null;

@@ -253,7 +253,7 @@ export function createPostgresWeeklyReportChannelStore(db: Queryable): WeeklyRep
           FROM weekly_report_channels wrc
           JOIN projects p ON p.id = wrc.project_id
           JOIN organizations o ON o.id = p.organization_id
-          WHERE wrc.is_enabled = true
+          WHERE wrc.is_enabled = true AND p.id=debugbundle_canonical_project(p.id)
           ORDER BY wrc.created_at ASC
           LIMIT $1
         `,
@@ -275,13 +275,17 @@ export function createPostgresWeeklyReportChannelStore(db: Queryable): WeeklyRep
             wrc.schedule_day_of_week,
             wrc.schedule_hour_of_day,
             wrc.schedule_timezone,
-            wrc.is_enabled,
+            (wrc.is_enabled AND (p.id=debugbundle_canonical_project(p.id) OR EXISTS(
+              SELECT 1 FROM weekly_report_channel_aliases aliases JOIN weekly_report_channels current_channel ON current_channel.id=aliases.canonical_channel_id
+              WHERE aliases.legacy_channel_id=wrc.id AND current_channel.is_enabled))) AS is_enabled,
             wrc.created_at::text AS created_at,
             wrc.updated_at::text AS updated_at
           FROM weekly_report_channels wrc
           JOIN projects p ON p.id = wrc.project_id
           JOIN organizations o ON o.id = p.organization_id
-          WHERE wrc.id = $1
+          WHERE wrc.id = $1 AND (p.id=debugbundle_canonical_project(p.id) OR EXISTS(
+            SELECT 1 FROM weekly_report_channel_aliases aliases JOIN weekly_report_channels current_channel ON current_channel.id=aliases.canonical_channel_id
+            WHERE aliases.legacy_channel_id=wrc.id AND current_channel.project_id=debugbundle_canonical_project(p.id)))
           LIMIT 1
         `,
         [input.channel_id]

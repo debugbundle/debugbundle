@@ -10,7 +10,7 @@ import { readAnalyticsFlowReport } from "./analytics-flow-reports.js";
 import { runInTransaction } from "./transaction.js";
 import type { Queryable } from "./types.js";
 
-type Scope = { project_id: string; flow_key: string };
+type Scope = { project_id: string; flow_key: string; origin_project_ids?: string[] };
 type Capture = Scope & { context: string; origin: string; now: string };
 type DefinitionRow = {
   id: string;
@@ -71,8 +71,9 @@ async function definition(
 ): Promise<AnalyticsFlowDefinition> {
   const result = await db.query<DefinitionRow>(
     `SELECT id,project_id,version,definition,archived_at
-    FROM analytics_flow_definitions WHERE project_id=$1 AND flow_key=$2`,
-    [scope.project_id, scope.flow_key]
+    FROM analytics_flow_definitions WHERE project_id=ANY(debugbundle_project_origins($1::uuid)) AND flow_key=$2
+    AND ($3::uuid[] IS NULL OR project_id=ANY($3::uuid[]))`,
+    [scope.project_id, scope.flow_key, scope.origin_project_ids ?? null]
   );
   if (!result.rows[0] || (active && result.rows[0].archived_at !== null))
     throw new AnalyticsFlowError("not_found");
@@ -155,7 +156,7 @@ export function createPostgresAnalyticsFlowStore(db: Queryable): AnalyticsFlowSt
     async list(input: { project_id: string }): Promise<AnalyticsFlowDefinition[]> {
       const rows = await db.query<DefinitionRow>(
         `SELECT id,project_id,version,definition,archived_at
-        FROM analytics_flow_definitions WHERE project_id=$1 ORDER BY flow_key LIMIT 100`,
+        FROM analytics_flow_definitions WHERE project_id=ANY(debugbundle_project_origins($1::uuid)) ORDER BY flow_key LIMIT 100`,
         [input.project_id]
       );
       return rows.rows.map(mapDefinition);
@@ -170,7 +171,8 @@ export function createPostgresAnalyticsFlowStore(db: Queryable): AnalyticsFlowSt
     }): Promise<AnalyticsFlowDefinition> {
       const parsed = AnalyticsFlowDefinitionInputSchema.parse(input.definition);
       return runInTransaction(db, async (tx) => {
-        // Project locking serializes definition admission against the fixed tier cap.
+        // The complete origin fence serializes definition admission against the fixed tier cap.
+        await tx.query("SELECT debugbundle_begin_project_rule_write($1::uuid)", [input.project_id]);
         const projects = await tx.query<{ plan: string; max_saved_funnels: number | null }>(
           `SELECT o.plan,settings.max_saved_funnels FROM projects p
           JOIN organizations o ON o.id=p.organization_id LEFT JOIN project_analytics_settings settings ON settings.project_id=p.id
@@ -180,12 +182,12 @@ export function createPostgresAnalyticsFlowStore(db: Queryable): AnalyticsFlowSt
         if (!projects.rows[0]) throw new AnalyticsFlowError("not_found");
         const existing = await tx.query<DefinitionRow>(
           `SELECT id,project_id,version,definition,archived_at FROM analytics_flow_definitions
-          WHERE project_id=$1 AND flow_key=$2 FOR UPDATE`,
+          WHERE project_id=ANY(debugbundle_project_origins($1::uuid)) AND flow_key=$2 FOR UPDATE`,
           [input.project_id, parsed.flow_key]
         );
         const counts = await tx.query<{ active: string; total: string }>(
           `SELECT COUNT(*) FILTER(WHERE archived_at IS NULL)::text active,
-          COUNT(*)::text total FROM analytics_flow_definitions WHERE project_id=$1`,
+          COUNT(*)::text total FROM analytics_flow_definitions WHERE project_id=ANY(debugbundle_project_origins($1::uuid))`,
           [input.project_id]
         );
         const cap = Math.min(
@@ -210,17 +212,26 @@ export function createPostgresAnalyticsFlowStore(db: Queryable): AnalyticsFlowSt
           VALUES($1,$2,$3,$4::jsonb,$5,$5) ON CONFLICT(project_id,flow_key) DO UPDATE SET
           definition=EXCLUDED.definition,version=analytics_flow_definitions.version+1,archived_at=NULL,updated_at=EXCLUDED.updated_at
           RETURNING id,project_id,version,definition,archived_at`,
-          [randomUUID(), input.project_id, parsed.flow_key, JSON.stringify(parsed), input.now]
+          [
+            randomUUID(),
+            existing.rows[0]?.project_id ?? input.project_id,
+            parsed.flow_key,
+            JSON.stringify(parsed),
+            input.now
+          ]
         );
         return mapDefinition(result.rows[0]!);
       });
     },
     async archive(input: Scope & { now: string }): Promise<void> {
-      const flow = await definition(db, input, false);
-      await db.query(
-        `UPDATE analytics_flow_definitions SET archived_at=COALESCE(archived_at,$2),updated_at=$2 WHERE id=$1`,
-        [flow.id, input.now]
-      );
+      await runInTransaction(db, async (tx) => {
+        await tx.query("SELECT debugbundle_begin_project_rule_write($1::uuid)", [input.project_id]);
+        const flow = await definition(tx, input, false);
+        await tx.query(
+          `UPDATE analytics_flow_definitions SET archived_at=COALESCE(archived_at,$2),updated_at=$2 WHERE id=$1`,
+          [flow.id, input.now]
+        );
+      });
     },
     async start(
       input: Capture & { step_key: string; source?: string; campaign?: string }
@@ -356,10 +367,11 @@ export function createPostgresAnalyticsFlowStore(db: Queryable): AnalyticsFlowSt
       });
     },
     async withdraw(input: Scope & { context: string; origin: string }): Promise<void> {
+      const flow = await definition(db, input, false);
       await db.query(
         `DELETE FROM analytics_flow_runs WHERE context_hash=$1 AND origin=$2 AND flow_id IN
-        (SELECT id FROM analytics_flow_definitions WHERE project_id=$3 AND flow_key=$4)`,
-        [hash(input.context), input.origin, input.project_id, input.flow_key]
+        (SELECT id FROM analytics_flow_definitions WHERE id=$3)`,
+        [hash(input.context), input.origin, flow.id]
       );
     },
     async report(input: Scope & AnalyticsFlowReport["window"]): Promise<AnalyticsFlowReport> {

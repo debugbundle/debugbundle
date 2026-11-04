@@ -49,7 +49,11 @@ export async function listAlertsCommand(
     json?: boolean;
   },
   api: {
-    listAlerts(input: { bearerToken: string; projectId: string; limit?: number }): Promise<AlertRecord[]>;
+    listAlerts(input: {
+      bearerToken: string;
+      projectId: string;
+      limit?: number;
+    }): Promise<AlertRecord[]>;
   }
 ): Promise<CliCommandResult> {
   try {
@@ -67,7 +71,10 @@ export async function listAlertsCommand(
       output: input.json ? JSON.stringify({ alerts }) : formatAlertTable(alerts)
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -79,7 +86,12 @@ export async function listAlertsWithAuthCommand(
     createApi: createAuthenticatedAlertApi,
     dependencies,
     runCommand: (authState, api) => {
-      const commandInput: { bearerToken: string; projectId: string; limit?: number; json?: boolean } = {
+      const commandInput: {
+        bearerToken: string;
+        projectId: string;
+        limit?: number;
+        json?: boolean;
+      } = {
         bearerToken: authState.bearer_token,
         projectId: input.projectId
       };
@@ -98,81 +110,155 @@ export async function listAlertsWithAuthCommand(
 }
 
 export async function listAlertGroupsCommand(
-  input: { bearerToken: string; projectId: string; limit?: number; cursor?: string; json?: boolean },
-  api: { listAlertGroups(request: { bearerToken: string; projectId: string; limit?: number; cursor?: string }): Promise<AlertGroupListResponse> }
+  input: {
+    bearerToken: string;
+    projectId: string;
+    limit?: number;
+    cursor?: string;
+    json?: boolean;
+  },
+  api: {
+    listAlertGroups(request: {
+      bearerToken: string;
+      projectId: string;
+      limit?: number;
+      cursor?: string;
+    }): Promise<AlertGroupListResponse>;
+  }
 ): Promise<CliCommandResult> {
   try {
     const result = await api.listAlertGroups({
-      bearerToken: input.bearerToken, projectId: input.projectId,
+      bearerToken: input.bearerToken,
+      projectId: input.projectId,
       ...(input.limit === undefined ? {} : { limit: input.limit }),
       ...(input.cursor === undefined ? {} : { cursor: input.cursor })
     });
-    const lines = result.groups.map((group) =>
-      `${group.group_id} | ${group.kind} | ${group.channel} | ${group.status} | incidents=${group.member_count} | root=${group.root_incident_id ?? "none"} | ${group.created_at}`
+    const lines = result.groups.map(
+      (group) =>
+        `${group.group_id} | ${group.kind} | ${group.channel} | ${group.status} | incidents=${group.member_count} | root=${group.root_incident_id ?? "none"} | ${group.created_at}`
     );
     return {
       exitCode: 0,
-      output: input.json ? JSON.stringify(result)
-        : [...(lines.length === 0 ? ["No alert groups found."] : lines),
-          ...(result.next_cursor === null ? [] : [`Next cursor: ${result.next_cursor}`])].join("\n")
+      output: input.json
+        ? JSON.stringify(result)
+        : [
+            ...(lines.length === 0 ? ["No alert groups found."] : lines),
+            ...(result.next_cursor === null ? [] : [`Next cursor: ${result.next_cursor}`])
+          ].join("\n")
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
 export async function listAlertGroupsWithAuthCommand(
-  input: { authFilePath?: string; projectId: string; limit?: number; cursor?: string; json?: boolean },
+  input: {
+    authFilePath?: string;
+    projectId: string;
+    limit?: number;
+    cursor?: string;
+    json?: boolean;
+  },
   dependencies?: Parameters<typeof createAuthenticatedAlertApi>[1]
 ): Promise<CliCommandResult> {
   return runAuthenticatedCliCommand(input, {
-    createApi: createAuthenticatedAlertApi, dependencies,
-    runCommand: (authState, api) => listAlertGroupsCommand({
-      bearerToken: authState.bearer_token, projectId: input.projectId,
-      ...(input.limit === undefined ? {} : { limit: input.limit }),
-      ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
-      ...(input.json === undefined ? {} : { json: input.json })
-    }, api)
+    createApi: createAuthenticatedAlertApi,
+    dependencies,
+    runCommand: (authState, api) =>
+      listAlertGroupsCommand(
+        {
+          bearerToken: authState.bearer_token,
+          projectId: input.projectId,
+          ...(input.limit === undefined ? {} : { limit: input.limit }),
+          ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
+          ...(input.json === undefined ? {} : { json: input.json })
+        },
+        api
+      )
   });
 }
 
 export async function getAlertGroupCommand(
-  input: { bearerToken: string; projectId: string; kind: "direct" | "email_digest"; groupId: string; limit?: number; cursor?: string; json?: boolean },
-  api: { getAlertGroup(request: { bearerToken: string; projectId: string; kind: "direct" | "email_digest"; groupId: string; limit?: number; cursor?: string }): Promise<AlertGroupResponse> }
+  input: {
+    bearerToken: string;
+    projectId: string;
+    kind: "direct" | "email_digest";
+    groupId: string;
+    limit?: number;
+    cursor?: string;
+    json?: boolean;
+  },
+  api: {
+    getAlertGroup(request: {
+      bearerToken: string;
+      projectId: string;
+      kind: "direct" | "email_digest";
+      groupId: string;
+      limit?: number;
+      cursor?: string;
+    }): Promise<AlertGroupResponse>;
+  }
 ): Promise<CliCommandResult> {
   try {
     const result = await api.getAlertGroup({
-      bearerToken: input.bearerToken, projectId: input.projectId,
-      kind: input.kind, groupId: input.groupId,
+      bearerToken: input.bearerToken,
+      projectId: input.projectId,
+      kind: input.kind,
+      groupId: input.groupId,
       ...(input.limit === undefined ? {} : { limit: input.limit }),
       ...(input.cursor === undefined ? {} : { cursor: input.cursor })
     });
     return {
       exitCode: 0,
-      output: input.json ? JSON.stringify(result) : [
-        `${result.group.group_id} | ${result.group.kind} | ${result.group.channel} | ${result.group.status} | incidents=${result.group.member_count}`,
-        ...result.members.map((member) => `${member.incident_id} | ${member.condition_type} | ${member.created_at}`),
-        ...(result.next_cursor === null ? [] : [`Next cursor: ${result.next_cursor}`])
-      ].join("\n")
+      output: input.json
+        ? JSON.stringify(result)
+        : [
+            `${result.group.group_id} | ${result.group.kind} | ${result.group.channel} | ${result.group.status} | incidents=${result.group.member_count}`,
+            ...result.members.map(
+              (member) => `${member.incident_id} | ${member.condition_type} | ${member.created_at}`
+            ),
+            ...(result.next_cursor === null ? [] : [`Next cursor: ${result.next_cursor}`])
+          ].join("\n")
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
 export async function getAlertGroupWithAuthCommand(
-  input: { authFilePath?: string; projectId: string; kind: "direct" | "email_digest"; groupId: string; limit?: number; cursor?: string; json?: boolean },
+  input: {
+    authFilePath?: string;
+    projectId: string;
+    kind: "direct" | "email_digest";
+    groupId: string;
+    limit?: number;
+    cursor?: string;
+    json?: boolean;
+  },
   dependencies?: Parameters<typeof createAuthenticatedAlertApi>[1]
 ): Promise<CliCommandResult> {
   return runAuthenticatedCliCommand(input, {
-    createApi: createAuthenticatedAlertApi, dependencies,
-    runCommand: (authState, api) => getAlertGroupCommand({
-      bearerToken: authState.bearer_token, projectId: input.projectId,
-      kind: input.kind, groupId: input.groupId,
-      ...(input.limit === undefined ? {} : { limit: input.limit }),
-      ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
-      ...(input.json === undefined ? {} : { json: input.json })
-    }, api)
+    createApi: createAuthenticatedAlertApi,
+    dependencies,
+    runCommand: (authState, api) =>
+      getAlertGroupCommand(
+        {
+          bearerToken: authState.bearer_token,
+          projectId: input.projectId,
+          kind: input.kind,
+          groupId: input.groupId,
+          ...(input.limit === undefined ? {} : { limit: input.limit }),
+          ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
+          ...(input.json === undefined ? {} : { json: input.json })
+        },
+        api
+      )
   });
 }
 
@@ -243,13 +329,20 @@ export async function createAlertCommand(
     const alert = await api.createAlert(requestInput);
     return {
       exitCode: 0,
-      output: input.json ? JSON.stringify({ alert }) : [
-        `Alert created: ${alert.alert_id}`,
-        ...(alert.signing_secret === undefined ? [] : [`Signing secret (shown once): ${alert.signing_secret}`])
-      ].join("\n")
+      output: input.json
+        ? JSON.stringify({ alert })
+        : [
+            `Alert created: ${alert.alert_id}`,
+            ...(alert.signing_secret === undefined
+              ? []
+              : [`Signing secret (shown once): ${alert.signing_secret}`])
+          ].join("\n")
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -322,6 +415,7 @@ export async function updateAlertCommand(
   input: {
     bearerToken: string;
     projectId: string;
+    projectScope?: "current_project";
     alertId: string;
     serviceId?: string | null;
     channel?: AlertChannel;
@@ -338,6 +432,7 @@ export async function updateAlertCommand(
     updateAlert(input: {
       bearerToken: string;
       projectId: string;
+      projectScope?: "current_project";
       alertId: string;
       serviceId?: string | null;
       channel?: AlertChannel;
@@ -355,6 +450,7 @@ export async function updateAlertCommand(
     const requestInput: {
       bearerToken: string;
       projectId: string;
+      projectScope?: "current_project";
       alertId: string;
       serviceId?: string | null;
       channel?: AlertChannel;
@@ -370,6 +466,8 @@ export async function updateAlertCommand(
       projectId: input.projectId,
       alertId: input.alertId
     };
+    if (input.projectScope) requestInput.projectScope = input.projectScope;
+
     if (input.serviceId !== undefined) {
       requestInput.serviceId = input.serviceId;
     }
@@ -401,13 +499,20 @@ export async function updateAlertCommand(
     const alert = await api.updateAlert(requestInput);
     return {
       exitCode: 0,
-      output: input.json ? JSON.stringify({ alert }) : [
-        `Alert updated: ${alert.alert_id}`,
-        ...(alert.signing_secret === undefined ? [] : [`Signing secret (shown once): ${alert.signing_secret}`])
-      ].join("\n")
+      output: input.json
+        ? JSON.stringify({ alert })
+        : [
+            `Alert updated: ${alert.alert_id}`,
+            ...(alert.signing_secret === undefined
+              ? []
+              : [`Signing secret (shown once): ${alert.signing_secret}`])
+          ].join("\n")
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -415,6 +520,7 @@ export async function updateAlertWithAuthCommand(
   input: {
     authFilePath?: string;
     projectId: string;
+    projectScope?: "current_project";
     alertId: string;
     serviceId?: string | null;
     channel?: AlertChannel;
@@ -436,6 +542,7 @@ export async function updateAlertWithAuthCommand(
       const commandInput: {
         bearerToken: string;
         projectId: string;
+        projectScope?: "current_project";
         alertId: string;
         serviceId?: string | null;
         channel?: AlertChannel;
@@ -452,6 +559,8 @@ export async function updateAlertWithAuthCommand(
         projectId: input.projectId,
         alertId: input.alertId
       };
+      if (input.projectScope) commandInput.projectScope = input.projectScope;
+
       if (input.serviceId !== undefined) {
         commandInput.serviceId = input.serviceId;
       }
@@ -498,7 +607,11 @@ export async function deleteAlertCommand(
     json?: boolean;
   },
   api: {
-    deleteAlert(input: { bearerToken: string; projectId: string; alertId: string }): Promise<{ alert_id: string }>;
+    deleteAlert(input: {
+      bearerToken: string;
+      projectId: string;
+      alertId: string;
+    }): Promise<{ alert_id: string }>;
   }
 ): Promise<CliCommandResult> {
   try {
@@ -512,7 +625,10 @@ export async function deleteAlertCommand(
       output: input.json ? JSON.stringify({ alert }) : `Alert deleted: ${alert.alert_id}`
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -524,7 +640,12 @@ export async function deleteAlertWithAuthCommand(
     createApi: createAuthenticatedAlertApi,
     dependencies,
     runCommand: (authState, api) => {
-      const commandInput: { bearerToken: string; projectId: string; alertId: string; json?: boolean } = {
+      const commandInput: {
+        bearerToken: string;
+        projectId: string;
+        alertId: string;
+        json?: boolean;
+      } = {
         bearerToken: authState.bearer_token,
         projectId: input.projectId,
         alertId: input.alertId

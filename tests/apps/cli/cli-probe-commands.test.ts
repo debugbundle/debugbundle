@@ -3,9 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 import {
   ProbeApiError,
   activateProbeCommand,
+  createProbeApi,
   listActiveProbesCommand,
   deactivateProbeCommand,
-  activateProbeWithAuthCommand
+  activateProbeWithAuthCommand,
+  listActiveProbesWithAuthCommand,
+  deactivateProbeWithAuthCommand
 } from "../../../apps/cli/src/probe-commands.js";
 import { CliAuthStateError } from "../../../apps/cli/src/auth-state.js";
 
@@ -18,6 +21,64 @@ const activationFixture = {
 };
 
 describe("cli probe commands", () => {
+  it("retains API error codes for failed probe transports", async () => {
+    const api = createProbeApi({
+      request: async () => ({ status: 409, body: { error: "project_configuration_busy" } })
+    });
+    await expect(
+      api.activateProbe({ bearerToken: "member", projectId: "project", labelPattern: "debug.*" })
+    ).rejects.toMatchObject({ status: 409, code: "project_configuration_busy" });
+  });
+  it("reuses saved authentication for probe listing and deactivation", async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 200, body: { activations: [activationFixture] } })
+      .mockResolvedValueOnce({ status: 200, body: { deactivated: true } });
+    const dependencies = {
+      readAuthState: async () => ({ bearer_token: "member", base_url: "https://api.example.test" }),
+      createHttpClient: () => ({ request })
+    };
+    const listed = await listActiveProbesWithAuthCommand(
+      { projectId: "project", json: true },
+      dependencies
+    );
+    expect(JSON.parse(listed.output)).toEqual({ activations: [activationFixture] });
+    const stopped = await deactivateProbeWithAuthCommand(
+      { projectId: "project", activationId: "act_1", json: true },
+      dependencies
+    );
+    expect(JSON.parse(stopped.output)).toEqual({ deactivated: true });
+    expect(request.mock.calls.every(([call]) => call.bearerToken === "member")).toBe(true);
+  });
+  it("forwards an explicitly adopted SDK issuer through the command and HTTP client", async () => {
+    const request = vi.fn().mockResolvedValue({
+      status: 201,
+      body: { activation: activationFixture, trigger_token: "signed" }
+    });
+    const result = await activateProbeCommand(
+      {
+        bearerToken: "dbundle_mem_x",
+        projectId: "canonical",
+        labelPattern: "debug.*",
+        sdkProjectId: "sdk-issuer",
+        sdkTokenId: "token-id",
+        sdkService: "old-name",
+        json: true
+      },
+      createProbeApi({ request })
+    );
+    expect(result.exitCode).toBe(0);
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: {
+          label_pattern: "debug.*",
+          sdk_project_id: "sdk-issuer",
+          sdk_token_id: "token-id",
+          sdk_service: "old-name"
+        }
+      })
+    );
+  });
   it("renders activate probe output in human and json modes", async () => {
     const api = {
       activateProbe: vi.fn().mockResolvedValue({
@@ -149,7 +210,11 @@ describe("cli probe commands", () => {
   it("maps auth failures from auth wrapper", async () => {
     const result = await activateProbeWithAuthCommand(
       { projectId: "proj_1", labelPattern: "x" },
-      { readAuthState: vi.fn().mockRejectedValue(new CliAuthStateError("auth_state_missing", "Not logged in.")) }
+      {
+        readAuthState: vi
+          .fn()
+          .mockRejectedValue(new CliAuthStateError("auth_state_missing", "Not logged in."))
+      }
     );
     expect(result.exitCode).toBe(2);
     expect(result.output).toBe("Not logged in.");

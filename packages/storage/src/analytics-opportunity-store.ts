@@ -102,8 +102,12 @@ export function createPostgresAnalyticsOpportunityStore(db: Queryable): Analytic
           nextRecord === undefined
             ? null
             : `${nextRecord.last_detected_at}|${nextRecord.opportunity_id}`,
-        ...(input.include_total === true && input.cursor === undefined && (result.rows.length === 0 || result.rows[0]?.total_count !== undefined)
-          ? { total_pages: Math.max(1, Math.ceil(Number(result.rows[0]?.total_count ?? 0) / limit)) }
+        ...(input.include_total === true &&
+        input.cursor === undefined &&
+        (result.rows.length === 0 || result.rows[0]?.total_count !== undefined)
+          ? {
+              total_pages: Math.max(1, Math.ceil(Number(result.rows[0]?.total_count ?? 0) / limit))
+            }
           : {})
       });
     },
@@ -129,8 +133,12 @@ export function createPostgresAnalyticsOpportunityStore(db: Queryable): Analytic
           nextRecord === undefined
             ? null
             : `${nextRecord.last_detected_at}|${nextRecord.opportunity_id}`,
-        ...(input.include_total === true && input.cursor === undefined && (result.rows.length === 0 || result.rows[0]?.total_count !== undefined)
-          ? { total_pages: Math.max(1, Math.ceil(Number(result.rows[0]?.total_count ?? 0) / limit)) }
+        ...(input.include_total === true &&
+        input.cursor === undefined &&
+        (result.rows.length === 0 || result.rows[0]?.total_count !== undefined)
+          ? {
+              total_pages: Math.max(1, Math.ceil(Number(result.rows[0]?.total_count ?? 0) / limit))
+            }
           : {})
       });
     },
@@ -140,7 +148,7 @@ export function createPostgresAnalyticsOpportunityStore(db: Queryable): Analytic
         `
           ${buildAnalyticsOpportunitySelect()}
           WHERE p.organization_id = $1::uuid
-            AND ao.project_id = $2::uuid
+            AND ao.project_id=ANY(debugbundle_project_origins($2::uuid))
             AND ao.id = $3::uuid
           LIMIT 1
         `,
@@ -199,7 +207,7 @@ function buildAnalyticsOpportunitySelect(includeTotal = false): string {
       bg.updated_at AS bundle_updated_at,
       COALESCE(bg.failure_reason, ao.bundle_failure_reason) AS bundle_failure_reason
     FROM analytics_opportunities ao
-    JOIN projects p ON p.id = ao.project_id
+    JOIN projects p ON p.id = debugbundle_canonical_project(ao.project_id)
     LEFT JOIN LATERAL (
       SELECT
         abg.id,
@@ -233,7 +241,7 @@ function buildAnalyticsOpportunityWhere(input: {
 
   if (input.project_id !== undefined) {
     params.push(input.project_id);
-    conditions.push(`ao.project_id = $${params.length}::uuid`);
+    conditions.push(`ao.project_id=ANY(debugbundle_project_origins($${params.length}::uuid))`);
   }
 
   if (input.status !== undefined) {
@@ -267,7 +275,11 @@ function buildAnalyticsOpportunityWhere(input: {
 
   if (input.service !== undefined) {
     params.push(input.service);
-    conditions.push(`ao.service = $${params.length}`);
+    conditions.push(
+      input.project_id
+        ? `debugbundle_service_matches($2::uuid,ao.project_id,ao.service,$${params.length})`
+        : `EXISTS(SELECT 1 FROM service_input_aliases a JOIN service_definitions d ON d.id=a.service_definition_id WHERE a.origin_project_id=ao.project_id AND a.input_name=ao.service AND d.name=$${params.length})`
+    );
   }
 
   if (input.environment !== undefined) {

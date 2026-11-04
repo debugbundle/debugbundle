@@ -122,6 +122,12 @@ function buildMigratedRuntimeSchemaRows(sql: string): { rows: Record<string, unk
         { table_name: "public_status_page_projects" },
         { table_name: "public_status_page_checks" },
         { table_name: "services" },
+        { table_name: "service_input_aliases" },
+        { table_name: "service_project_aliases" },
+        { table_name: "project_merge_operations" },
+        { table_name: "project_merge_participants" },
+        { table_name: "project_legacy_bindings" },
+        { table_name: "service_definitions" },
         { table_name: "deployments" },
         { table_name: "bundle_generations" },
         { table_name: "improvement_opportunities" },
@@ -188,6 +194,10 @@ function buildMigratedRuntimeSchemaRows(sql: string): { rows: Record<string, unk
     };
   }
 
+  if (sql.includes("AS project_service_schema_available")) {
+    return { rows: [{ project_service_schema_available: true }] };
+  }
+
   if (sql.includes("to_regclass")) {
     return { rows: [{ relation_name: "storage_migration_ledger" }] };
   }
@@ -249,7 +259,11 @@ describe("api runtime start", () => {
       API_PORT: "3010"
     });
 
-    expect(queryMock).toHaveBeenCalledTimes(3);
+    expect(queryMock).toHaveBeenCalledTimes(4);
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining("AS project_service_schema_available"),
+      expect.any(Array)
+    );
     expect(pingMock).toHaveBeenCalledOnce();
     expect(s3SendMock).toHaveBeenCalledOnce();
     expect(endMock).toHaveBeenCalledOnce();
@@ -288,8 +302,17 @@ describe("api runtime start", () => {
     expect(listenMock).not.toHaveBeenCalled();
   });
 
-  it.each(["evidence_context_events", "evidence_ingestion_receipts"])(
-    "refuses startup when the evidence migration table %s is missing",
+  it.each([
+    "evidence_context_events",
+    "evidence_ingestion_receipts",
+    "service_input_aliases",
+    "service_project_aliases",
+    "project_merge_operations",
+    "project_merge_participants",
+    "project_legacy_bindings",
+    "service_definitions"
+  ])(
+    "refuses startup when the required migration table %s is missing",
     async (missingTable): Promise<void> => {
       queryMock.mockImplementation(async (sql: string) => {
         const result = buildMigratedRuntimeSchemaRows(sql);

@@ -56,9 +56,9 @@ export function createPostgresAnalyticsSavedFunnelStore(db: Queryable): Analytic
         `
           SELECT ${savedFunnelColumns("afd")}
           FROM analytics_funnel_definitions afd
-          JOIN projects p ON p.id = afd.project_id
+          JOIN projects p ON p.id = debugbundle_canonical_project(afd.project_id)
           WHERE p.organization_id = $1::uuid
-            AND afd.project_id = $2::uuid
+            AND afd.project_id=ANY(debugbundle_project_origins($2::uuid))
             AND afd.archived_at IS NULL
           ORDER BY afd.updated_at DESC, afd.funnel_key ASC
         `,
@@ -70,6 +70,7 @@ export function createPostgresAnalyticsSavedFunnelStore(db: Queryable): Analytic
     async createSavedFunnelForProject(input) {
       const definition = AnalyticsSavedFunnelCreateSchema.parse(input.definition);
       return runInTransaction(db, async (tx) => {
+        await tx.query("SELECT debugbundle_begin_project_rule_write($1::uuid)", [input.project_id]);
         const project = await tx.query<{
           max_saved_funnels: unknown;
           organization_plan: unknown;
@@ -90,11 +91,11 @@ export function createPostgresAnalyticsSavedFunnelStore(db: Queryable): Analytic
         const projectRow = project.rows[0];
         if (projectRow === undefined) return { status: "project_not_found" };
 
-        const existing = await tx.query<{ archived_at: unknown }>(
+        const existing = await tx.query<{ archived_at: unknown; project_id: string }>(
           `
-            SELECT archived_at
+            SELECT archived_at,project_id
             FROM analytics_funnel_definitions
-            WHERE project_id = $1::uuid
+            WHERE project_id=ANY(debugbundle_project_origins($1::uuid))
               AND funnel_key = $2
             LIMIT 1
           `,
@@ -108,7 +109,7 @@ export function createPostgresAnalyticsSavedFunnelStore(db: Queryable): Analytic
           `
             SELECT COUNT(*) AS active_count
             FROM analytics_funnel_definitions
-            WHERE project_id = $1::uuid
+            WHERE project_id=ANY(debugbundle_project_origins($1::uuid))
               AND archived_at IS NULL
           `,
           [input.project_id]
@@ -144,7 +145,7 @@ export function createPostgresAnalyticsSavedFunnelStore(db: Queryable): Analytic
             RETURNING ${savedFunnelColumns("analytics_funnel_definitions")}
           `,
           [
-            input.project_id,
+            existing.rows[0]?.project_id ?? input.project_id,
             definition.funnel_key,
             definition.display_name,
             JSON.stringify(definition.steps),
@@ -161,15 +162,16 @@ export function createPostgresAnalyticsSavedFunnelStore(db: Queryable): Analytic
       const update = AnalyticsSavedFunnelUpdateSchema.parse(input.update);
       const result = await db.query<SavedFunnelRow>(
         `
+          WITH management_scope AS MATERIALIZED(SELECT debugbundle_begin_project_rule_write($2::uuid))
           UPDATE analytics_funnel_definitions afd
           SET
             display_name = COALESCE($4, afd.display_name),
             steps = COALESCE($5::jsonb, afd.steps),
             updated_at = now()
-          FROM projects p
-          WHERE p.id = afd.project_id
+          FROM management_scope CROSS JOIN projects p
+          WHERE p.id = debugbundle_canonical_project(afd.project_id)
             AND p.organization_id = $1::uuid
-            AND afd.project_id = $2::uuid
+            AND afd.project_id=ANY(debugbundle_project_origins($2::uuid))
             AND afd.funnel_key = $3
             AND afd.archived_at IS NULL
           RETURNING ${savedFunnelColumns("afd")}
@@ -189,12 +191,13 @@ export function createPostgresAnalyticsSavedFunnelStore(db: Queryable): Analytic
     async archiveSavedFunnelForProject(input) {
       const result = await db.query<SavedFunnelRow>(
         `
+          WITH management_scope AS MATERIALIZED(SELECT debugbundle_begin_project_rule_write($2::uuid))
           UPDATE analytics_funnel_definitions afd
           SET archived_at = now(), updated_at = now()
-          FROM projects p
-          WHERE p.id = afd.project_id
+          FROM management_scope CROSS JOIN projects p
+          WHERE p.id = debugbundle_canonical_project(afd.project_id)
             AND p.organization_id = $1::uuid
-            AND afd.project_id = $2::uuid
+            AND afd.project_id=ANY(debugbundle_project_origins($2::uuid))
             AND afd.funnel_key = $3
             AND afd.archived_at IS NULL
           RETURNING ${savedFunnelColumns("afd")}

@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { PROJECT_SERVICE_TEST_FILES } from "./project-service-test-files.mjs";
 
 const require = createRequire(import.meta.url);
 const { createCoverageMap } = require("istanbul-lib-coverage");
@@ -72,9 +73,10 @@ function buildShardGroups(files) {
 
   for (const file of files) {
     const segments = file.split("/");
-    const groupKey = segments[1] === "apps" || segments[1] === "packages"
-      ? `${segments[0]}/${segments[1]}/${segments[2]}`
-      : `${segments[0]}/${segments[1]}`;
+    const groupKey =
+      segments[1] === "apps" || segments[1] === "packages"
+        ? `${segments[0]}/${segments[1]}/${segments[2]}`
+        : `${segments[0]}/${segments[1]}`;
     const existing = grouped.get(groupKey) ?? [];
     existing.push(file);
     grouped.set(groupKey, existing);
@@ -95,12 +97,14 @@ function buildShardGroups(files) {
   return shards;
 }
 
-function runShard(shard, shardNumber, shardCount) {
+function runShard(shard, shardNumber, shardCount, environment = {}) {
   const shardCoverageDir = path.join(SHARD_ROOT, shard.name);
   rmSync(shardCoverageDir, { recursive: true, force: true });
   mkdirSync(shardCoverageDir, { recursive: true });
 
-  console.log(`coverage shard ${shardNumber}/${shardCount}: ${shard.name} (${shard.files.length} files)`);
+  console.log(
+    `coverage shard ${shardNumber}/${shardCount}: ${shard.name} (${shard.files.length} files)`
+  );
 
   execFileSync(
     "pnpm",
@@ -113,6 +117,7 @@ function runShard(shard, shardNumber, shardCount) {
       "--pool=forks",
       "--maxWorkers=1",
       "--no-file-parallelism",
+      "--testTimeout=15000",
       ...shard.files
     ],
     {
@@ -122,7 +127,8 @@ function runShard(shard, shardNumber, shardCount) {
         ...process.env,
         NODE_OPTIONS: process.env.NODE_OPTIONS ?? "--max-old-space-size=6144",
         VITEST_COVERAGE_SHARD: "1",
-        VITEST_COVERAGE_DIR: shardCoverageDir
+        VITEST_COVERAGE_DIR: shardCoverageDir,
+        ...environment
       }
     }
   );
@@ -148,7 +154,11 @@ function buildMergedCoverage(coverageFiles) {
 function writeMergedCoverageArtifacts(coverageMap) {
   mkdirSync(COVERAGE_ROOT, { recursive: true });
 
-  writeFileSync(path.join(COVERAGE_ROOT, "coverage-final.json"), JSON.stringify(coverageMap.toJSON()), "utf8");
+  writeFileSync(
+    path.join(COVERAGE_ROOT, "coverage-final.json"),
+    JSON.stringify(coverageMap.toJSON()),
+    "utf8"
+  );
 
   const summary = {
     total: coverageMap.getCoverageSummary().toJSON()
@@ -160,7 +170,11 @@ function writeMergedCoverageArtifacts(coverageMap) {
     summary[relativeFile] = fileSummary;
   }
 
-  writeFileSync(path.join(COVERAGE_ROOT, "coverage-summary.json"), JSON.stringify(summary, null, 2), "utf8");
+  writeFileSync(
+    path.join(COVERAGE_ROOT, "coverage-summary.json"),
+    JSON.stringify(summary, null, 2),
+    "utf8"
+  );
 
   const total = summary.total;
   console.log(
@@ -169,11 +183,39 @@ function writeMergedCoverageArtifacts(coverageMap) {
 }
 
 function main() {
+  if (
+    process.env.PROJECT_SERVICE_DB_COVERAGE !== "isolated" ||
+    !["postgres", "127.0.0.1", "localhost"].includes(process.env.DB_HOST ?? "")
+  ) {
+    throw new Error(
+      "project_service_isolated_database_required: use make test-unit or the documented disposable CI Postgres service"
+    );
+  }
   rmSync(COVERAGE_ROOT, { recursive: true, force: true });
 
   const files = collectTestFiles(TESTS_ROOT).sort();
   const shards = buildShardGroups(files);
-  const coverageFiles = shards.map((shard, index) => runShard(shard, index + 1, shards.length));
+  const coverageFiles = [],
+    failures = [];
+  const allShards = [
+    ...shards,
+    { name: "project-service-postgres", files: PROJECT_SERVICE_TEST_FILES }
+  ];
+  for (const [index, shard] of allShards.entries()) {
+    try {
+      coverageFiles.push(
+        runShard(
+          shard,
+          index + 1,
+          allShards.length,
+          shard.name === "project-service-postgres" ? { RUN_INTEGRATION: "1" } : {}
+        )
+      );
+    } catch {
+      failures.push(shard.name);
+    }
+  }
+  if (failures.length) throw new Error(`coverage_shards_failed:${failures.join(",")}`);
   const mergedCoverage = buildMergedCoverage(coverageFiles);
   writeMergedCoverageArtifacts(mergedCoverage);
 

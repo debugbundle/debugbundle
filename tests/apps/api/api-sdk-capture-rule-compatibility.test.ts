@@ -2,6 +2,37 @@ import { mockedObject } from "../../helpers/vitest.js";
 import { expect, it, vi } from "vitest";
 import { createApiServer } from "../../../apps/api/src/server.js";
 import { createBaseDependencies } from "../../helpers/api-capture-rule-ingestion.js";
+
+it.each([
+  { scope_origin_ids: ["proj_123", "proj_source"], capture_rules_require_server: false },
+  { scope_origin_ids: ["proj_123"], capture_rules_require_server: true }
+])(
+  "keeps multi-origin and renamed-view rules on the server for installed SDKs: %j",
+  async (scope) => {
+    const rule = { project_id: "proj_123", matcher: { services: ["web"] }, action: "drop" };
+    const dependencies = createBaseDependencies({
+      captureRuleManagement: mockedObject<
+        NonNullable<Parameters<typeof createApiServer>[0]["captureRuleManagement"]>
+      >({
+        listActiveCaptureRulesForProject: vi.fn().mockResolvedValue([rule])
+      })
+    });
+    dependencies.ingestionMetadata.resolveProjectByTokenHash = vi.fn().mockResolvedValue({
+      project_id: "proj_123",
+      organization_plan: "free",
+      ...scope
+    });
+    const app = createApiServer(dependencies);
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/sdk/config",
+      headers: { authorization: "Bearer dbundle_proj_test" }
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().capture_rules).toEqual([]);
+    await app.close();
+  }
+);
 it.each([
   { browser_page_visibility_state: "hidden" as const },
   { browser_target_tag_name: "script" }

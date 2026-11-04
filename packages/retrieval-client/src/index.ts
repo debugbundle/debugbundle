@@ -427,6 +427,7 @@ export function createRetrievalApi(client: HttpClient): {
     bearerToken: string;
     projectId: string;
     limit?: number;
+    offset?: number;
   }): Promise<Array<z.infer<typeof ServiceSchema>>>;
   listImprovements(input: {
     bearerToken: string;
@@ -642,6 +643,7 @@ export function createRetrievalApi(client: HttpClient): {
       if (input.limit !== undefined) {
         query.set("limit", String(input.limit));
       }
+      if (input.offset !== undefined) query.set("offset", String(input.offset));
 
       return expectServices(
         client.request({

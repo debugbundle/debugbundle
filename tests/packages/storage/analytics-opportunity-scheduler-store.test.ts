@@ -29,7 +29,7 @@ describe("analytics opportunity scheduler store", () => {
     ]);
 
     expect(query).toHaveBeenCalledWith(
-      expect.stringContaining("FROM project_analytics_settings settings"),
+      expect.stringContaining("ON settings.project_id=debugbundle_canonical_project(origin.id)"),
       [
         "11111111-1111-4111-8111-111111111111",
         "2026-03-04T00:00:00.000Z",

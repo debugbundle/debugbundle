@@ -201,7 +201,13 @@ async function capture(
   const store = dependencies.analyticsFlows;
   if (!store) return reply.status(503).send({ error: "analytics_flows_unavailable" });
   const scope = { project_id: params.data.id, flow_key: params.data.key };
-  const input = { ...scope, ...body.data, origin, now: new Date().toISOString() };
+  const input = {
+    ...scope,
+    ...body.data,
+    origin_project_ids: auth.context.scope_origin_ids ?? [auth.context.project_id],
+    origin,
+    now: new Date().toISOString()
+  };
   if (operation === "withdraw") {
     await store.withdraw(input);
     return { withdrawn: true };
@@ -255,6 +261,7 @@ async function capture(
       const start = schemas.start.parse(body.data);
       result = await store.start({
         ...scope,
+        origin_project_ids: input.origin_project_ids,
         context: start.context,
         origin,
         now: input.now,

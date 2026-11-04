@@ -87,7 +87,7 @@ async function pruneExpiredAnalyticsRollupTable(input: {
       WHERE target.ctid IN (
         SELECT candidate.ctid
         FROM ${input.tableName} candidate
-        LEFT JOIN project_analytics_settings settings ON settings.project_id = candidate.project_id
+        LEFT JOIN project_analytics_settings settings ON settings.project_id = debugbundle_canonical_project(candidate.project_id)
         WHERE candidate.${input.dateColumn ?? "bucket_start"} < ${retentionCutoff}
         ORDER BY candidate.${input.dateColumn ?? "bucket_start"} ASC, candidate.project_id ASC
         LIMIT $2
@@ -194,7 +194,7 @@ export function createPostgresRetentionStore(db: Queryable): RetentionStore {
             ail.event_id::text AS event_id,
             ail.occurred_at::text AS occurred_at
           FROM analytics_ingestion_ledger ail
-          LEFT JOIN project_analytics_settings settings ON settings.project_id = ail.project_id
+          LEFT JOIN project_analytics_settings settings ON settings.project_id = debugbundle_canonical_project(ail.project_id)
           WHERE ail.occurred_at < (
             $1::timestamptz - make_interval(days => COALESCE(settings.raw_retention_days, 1)::int)
           )
@@ -355,7 +355,7 @@ export function createPostgresRetentionStore(db: Queryable): RetentionStore {
         `DELETE FROM analytics_flow_rollups WHERE ctid IN (
         SELECT candidate.ctid FROM analytics_flow_rollups candidate
         JOIN analytics_flow_definitions flow ON flow.id=candidate.flow_id
-        LEFT JOIN project_analytics_settings settings ON settings.project_id=flow.project_id
+        LEFT JOIN project_analytics_settings settings ON settings.project_id=debugbundle_canonical_project(flow.project_id)
         WHERE candidate.cohort_date < $1::timestamptz - make_interval(months=>COALESCE(settings.aggregate_retention_months,12)::int)
         ORDER BY candidate.cohort_date,candidate.flow_id LIMIT $2) RETURNING 1`,
         [input.now, input.limit]
@@ -385,7 +385,7 @@ export function createPostgresRetentionStore(db: Queryable): RetentionStore {
             abg.completed_at::text AS completed_at,
             abg.updated_at::text AS updated_at
           FROM analytics_bundle_generations abg
-          LEFT JOIN project_analytics_settings settings ON settings.project_id = abg.project_id
+          LEFT JOIN project_analytics_settings settings ON settings.project_id = debugbundle_canonical_project(abg.project_id)
           WHERE abg.status IN ('completed', 'failed')
             AND COALESCE(abg.completed_at, abg.updated_at, abg.created_at) < (
               $1::timestamptz - make_interval(months => COALESCE(settings.aggregate_retention_months, 12)::int)

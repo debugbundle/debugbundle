@@ -103,11 +103,13 @@ export interface RecordedAvailabilityCheckExecution {
 
 export interface AvailabilityCheckStore {
   listChecksForProjectInOrganization(input: {
+    actor_user_id?: string;
     organization_id: string;
     project_id: string;
     limit: number;
   }): Promise<AvailabilityCheckRecord[] | null>;
   getCheckForProjectInOrganization(input: {
+    actor_user_id?: string;
     organization_id: string;
     project_id: string;
     check_id: string;
@@ -131,6 +133,7 @@ export interface AvailabilityCheckStore {
     now: string;
   }): Promise<AvailabilityCheckRecord | "project_not_found" | "limit_reached" | "interval_too_low">;
   updateCheckForProjectInOrganization(input: {
+    actor_user_id?: string;
     organization_id: string;
     project_id: string;
     check_id: string;
@@ -147,20 +150,29 @@ export interface AvailabilityCheckStore {
     service_name?: string | null;
     enabled?: boolean;
     now: string;
-  }): Promise<AvailabilityCheckRecord | "check_not_found" | "limit_reached" | "interval_too_low">;
+  }): Promise<
+    | AvailabilityCheckRecord
+    | "check_not_found"
+    | "limit_reached"
+    | "interval_too_low"
+    | "service_scope_conflict"
+  >;
   deleteCheckForProjectInOrganization(input: {
+    actor_user_id?: string;
     organization_id: string;
     project_id: string;
     check_id: string;
     deleted_at: string;
   }): Promise<boolean>;
   listResultsForCheckInOrganization(input: {
+    actor_user_id?: string;
     organization_id: string;
     project_id: string;
     check_id: string;
     limit: number;
   }): Promise<AvailabilityCheckResultRecord[] | null>;
   listDailyRollupsForCheckInOrganization(input: {
+    actor_user_id?: string;
     organization_id: string;
     project_id: string;
     check_id: string;

@@ -1538,6 +1538,18 @@ Mapped requirements: FR-BIL-10, FR-BIL-07 and FR-BIL-03.
 
 ## 15. Profile Acceptance
 
+### AC-PJS-01: Stable logical services
+
+Mapped requirement: FR-PJS-01. Fresh bootstrap and populated forward migration preserve environment-specific IDs; same-named instances in a project share one definition and independent projects stay distinct. Concurrent old writers work without new SDK fields. Cross-project links fail closed; ordinary project deletion still cleans up. Repository overrides/defaults, bounded relative roots, complete pagination and local-subset profile updates have API/CLI/MCP parity.
+
+### AC-PJS-02: Checked consolidation
+
+Mapped requirements: FR-PJS-02/03. Execute the complete acceptance matrix in `project-service-consolidation.md`: all origins/dependencies inventoried, unchanged control, compatible access/settings, explicit collision-free mappings, bounded atomic cutover, concurrent ingestion/worker/management, stale plans, duplicate apply/resume, cancellation, crash before/after commit, old tokens/links/artifacts, exact delivery/privacy/analytics/usage/retention and compatible rollback. Missing migrations or unclassified dependencies block activation. A pure planner test does not establish runtime consolidation safety.
+
+### AC-PJS-03: Safe agent adoption
+
+Mapped requirement: FR-PJS-04. Explicit roots, secret-free manifest/diff, repeated adoption, monorepo and separate repositories, custom profile/cache preservation, stale files, symlink escape and unavailable repositories are covered. A fixture agent discovers all services without widening an explicit filter. Keep local, release, live consolidation, consumer changes and deployed-runtime evidence distinct.
+
 ### AC-PROF-01: Static Profile Detection
 
 - **Given** a repository with `package.json`, `pyproject.toml`, `docker-compose.yml`, and CI configs

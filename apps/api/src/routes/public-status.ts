@@ -15,6 +15,7 @@ import type { ApiDependencies } from "../api-types.js";
 import { requireRateLimitedProjectAccess } from "../api-helpers.js";
 import { hashAuditIdentifier, recordAuditLog, resolveAuditActorType } from "../audit-logging.js";
 import { ProjectParamsSchema } from "../schemas.js";
+import { isProjectConsolidationDatabaseError } from "../project-consolidation-http.js";
 
 function publicReadIp(request: FastifyRequest, trustProxy: boolean): string {
   // Only opt in behind a trusted private proxy that appends the actual peer IP.
@@ -76,7 +77,8 @@ export function registerPublicStatusRoutes(
         if (!params.success) return reply.status(400).send({ error: "invalid_project_id" });
         const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
           projectId: params.data.id,
-          bucket: action === "save" ? "management-write" : "management-read"
+          bucket: action === "save" ? "management-write" : "management-read",
+          allowLegacyMutation: action === "save"
         });
         if (!auth) return;
         const manage = auth.access.effective_role === "owner";
@@ -193,6 +195,7 @@ export function registerPublicStatusRoutes(
               ip_address: request.ip,
               metadata: { reason: error instanceof PublicStatusError ? error.code : "unavailable" }
             });
+          if (isProjectConsolidationDatabaseError(error)) throw error;
           if (error instanceof PublicStatusError)
             return reply.status(error.code === "not_found" ? 404 : 400).send({
               error:

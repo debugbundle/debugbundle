@@ -1,12 +1,23 @@
 import type { FastifyInstance } from "fastify";
+import { rejectConsolidatedProjectWrite } from "../project-consolidation-http.js";
 
 import type { ApiDependencies } from "../api-types.js";
 import { isSharedProjectAccessSuspended, requireRateLimitedMemberAuth } from "../api-helpers.js";
-import { CreateProjectBodySchema, ProjectParamsSchema, ProjectsQuerySchema, UpdateProjectBodySchema } from "../schemas.js";
+import {
+  CreateProjectBodySchema,
+  ProjectParamsSchema,
+  ProjectsQuerySchema,
+  UpdateProjectBodySchema
+} from "../schemas.js";
 
 export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   app.get("/v1/projects", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-read");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "management-read"
+    );
     if (member === null) {
       return;
     }
@@ -23,14 +34,22 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
     const projects = await projectManagement.listProjectsForUser({
       user_id: member.member_id,
       now: new Date().toISOString(),
-      limit: parsedQuery.data.limit
+      limit: parsedQuery.data.limit,
+      ...(parsedQuery.data.project_id === undefined
+        ? {}
+        : { project_id: parsedQuery.data.project_id })
     });
 
     return reply.status(200).send({ projects });
   });
 
   app.post("/v1/projects", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-write");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "management-write"
+    );
     if (member === null) {
       return;
     }
@@ -65,7 +84,12 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
   });
 
   app.patch("/v1/projects/:id", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-write");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "management-write"
+    );
     if (member === null) {
       return;
     }
@@ -101,6 +125,7 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
     if (access.effective_role !== "owner" && access.effective_role !== "admin") {
       return reply.status(403).send({ error: "forbidden" });
     }
+    if (rejectConsolidatedProjectWrite(reply, access)) return;
 
     const project = await projectManagement.updateProjectForUser({
       user_id: member.member_id,
@@ -125,7 +150,12 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
   });
 
   app.delete("/v1/projects/:id", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-write");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "management-write"
+    );
     if (member === null) {
       return;
     }
@@ -156,6 +186,7 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
     if (access.effective_role !== "owner") {
       return reply.status(403).send({ error: "forbidden" });
     }
+    if (rejectConsolidatedProjectWrite(reply, access)) return;
 
     const project = await projectManagement.deleteProjectForUser({
       user_id: member.member_id,

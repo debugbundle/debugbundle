@@ -6,6 +6,17 @@ import {
 } from "../../helpers/api-retrieval.js";
 
 describe("api-retrieval services", () => {
+  it("accepts an explicit offset beyond the former first thousand services", async () => {
+    const app = createServer();
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/services?project_id=550e8400-e29b-41d4-a716-446655440000&limit=10&offset=1100",
+      headers: { authorization: "Bearer dbundle_mem_test" }
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toHaveProperty("services");
+  });
+
   it("should reject services listing when member authorization header is missing", async (): Promise<void> => {
     const app = createServer();
 

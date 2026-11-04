@@ -12,7 +12,10 @@ export const PROBE_MCP_TOOL_CATALOG = [
       service: z.string().optional(),
       environment: z.string().optional(),
       ttlSeconds: z.number().optional(),
-      triggerTtlSeconds: z.number().optional()
+      triggerTtlSeconds: z.number().optional(),
+      sdkProjectId: z.string().guid().optional(),
+      sdkTokenId: z.string().guid().optional(),
+      sdkService: z.string().min(1).max(200).optional()
     })
   },
   {

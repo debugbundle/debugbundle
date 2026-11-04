@@ -8,7 +8,7 @@ import {
   requireMemberAuth,
   requireRateLimitedMemberAuth,
   requireRateLimitedProjectAccess,
-  resolveBrowserSession,
+  resolveBrowserSession
 } from "../api-helpers.js";
 import {
   ProjectParamsSchema,
@@ -16,11 +16,13 @@ import {
   MemberTokenParamsSchema,
   TokenListQuerySchema,
   CreateProjectTokenBodySchema,
-  CreateTokenBodySchema,
+  CreateTokenBodySchema
 } from "../schemas.js";
 import { normalizeProjectTokenAllowedOrigins } from "../project-token-origins.js";
 
-function serializeProjectToken<T extends { allowed_origins?: string[] }>(token: T): T & { allowed_origins: string[] } {
+function serializeProjectToken<T extends { allowed_origins?: string[] }>(
+  token: T
+): T & { allowed_origins: string[] } {
   return {
     ...token,
     allowed_origins: token.allowed_origins ?? []
@@ -52,6 +54,7 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
     }
 
     const tokens = await dependencies.tokenManagement.listProjectTokensForOrganization({
+      actor_user_id: auth.member.member_id,
       organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id,
       limit: parsedQuery.data.limit
@@ -92,7 +95,9 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
       });
     }
 
-    const allowedOrigins = normalizeProjectTokenAllowedOrigins(parsedBody.data.allowed_origins ?? []);
+    const allowedOrigins = normalizeProjectTokenAllowedOrigins(
+      parsedBody.data.allowed_origins ?? []
+    );
     if (allowedOrigins === null) {
       return reply.status(400).send({
         error: "invalid_allowed_origins"
@@ -101,6 +106,7 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
 
     const generated = generateProjectToken(parsedParams.data.id);
     const created = await dependencies.tokenManagement.createProjectTokenForOrganization({
+      actor_user_id: auth.member.member_id,
       organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id,
       label: parsedBody.data.label,
@@ -164,6 +170,7 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
 
     const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
       bucket: "management-write",
+      allowLegacyMutation: true,
       projectId: parsedParams.data.id
     });
     if (auth === null) {
@@ -174,6 +181,7 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
     }
 
     const revoked = await dependencies.tokenManagement.revokeProjectTokenForOrganization({
+      actor_user_id: auth.member.member_id,
       organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id,
       token_id: parsedParams.data.tokenId,
@@ -220,7 +228,12 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
   });
 
   app.get("/v1/member/tokens", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-read");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "management-read"
+    );
     if (member === null) {
       return;
     }
@@ -335,7 +348,12 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
   });
 
   app.post("/v1/member/tokens/:tokenId/revoke", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-write");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "management-write"
+    );
     if (member === null) {
       return;
     }

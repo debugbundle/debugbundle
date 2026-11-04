@@ -1,7 +1,11 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { rejectConsolidatedProjectWrite } from "../project-consolidation-http.js";
 
 import { generateProjectInviteToken } from "../../../../packages/auth/src/index.js";
-import type { ProjectAccessRecord, ResolveMemberResult } from "../../../../packages/storage/src/index.js";
+import type {
+  ProjectAccessRecord,
+  ResolveMemberResult
+} from "../../../../packages/storage/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import { buildProjectMemberAvatarUrl } from "../avatar-urls.js";
 import {
@@ -62,14 +66,22 @@ function toPublicProjectMember(
   };
 }
 
-export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
+export function registerProjectMemberRoutes(
+  app: FastifyInstance,
+  dependencies: ApiDependencies
+): void {
   async function requireProjectAccess(input: {
     request: FastifyRequest;
     reply: FastifyReply;
     projectId: string;
     bucket: "management-read" | "management-write";
   }): Promise<{ member: ResolveMemberResult; access: ProjectAccessRecord } | null> {
-    const member = await requireRateLimitedMemberAuth(input.request, input.reply, dependencies, input.bucket);
+    const member = await requireRateLimitedMemberAuth(
+      input.request,
+      input.reply,
+      dependencies,
+      input.bucket
+    );
     if (member === null) {
       return null;
     }
@@ -90,6 +102,8 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
       input.reply.status(403).send({ error: "shared_access_suspended" });
       return null;
     }
+    if (input.bucket === "management-write" && rejectConsolidatedProjectWrite(input.reply, access))
+      return null;
 
     return {
       member,
@@ -113,7 +127,10 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
       return;
     }
     const projectCollaboration = dependencies.projectCollaboration;
-    if (projectCollaboration === undefined || projectCollaboration.listMembersForProject === undefined) {
+    if (
+      projectCollaboration === undefined ||
+      projectCollaboration.listMembersForProject === undefined
+    ) {
       return reply.status(404).send({ error: "member_management_not_available" });
     }
 
@@ -163,7 +180,9 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
       return reply.status(404).send({ error: "project_not_found" });
     }
 
-    const member = listed.members.find((candidate) => candidate.user_id === parsedParams.data.userId);
+    const member = listed.members.find(
+      (candidate) => candidate.user_id === parsedParams.data.userId
+    );
     if (member === undefined) {
       return reply.status(404).send({ error: "member_not_found" });
     }
@@ -175,9 +194,11 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
       return reply.status(404).send({ error: "avatar_not_found" });
     }
 
-    const body = await dependencies.objectStoreReader.getObject({
-      key: avatar.object_key
-    }).catch(() => null);
+    const body = await dependencies.objectStoreReader
+      .getObject({
+        key: avatar.object_key
+      })
+      .catch(() => null);
     if (body === null) {
       return reply.status(404).send({ error: "avatar_not_found" });
     }
@@ -206,7 +227,10 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
       return reply.status(403).send({ error: "forbidden" });
     }
     const projectCollaboration = dependencies.projectCollaboration;
-    if (projectCollaboration === undefined || projectCollaboration.listPendingInvitesForProject === undefined) {
+    if (
+      projectCollaboration === undefined ||
+      projectCollaboration.listPendingInvitesForProject === undefined
+    ) {
       return reply.status(404).send({ error: "member_management_not_available" });
     }
 
@@ -245,7 +269,10 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
       return reply.status(403).send({ error: "forbidden" });
     }
     const projectCollaboration = dependencies.projectCollaboration;
-    if (projectCollaboration === undefined || projectCollaboration.createInviteForProject === undefined) {
+    if (
+      projectCollaboration === undefined ||
+      projectCollaboration.createInviteForProject === undefined
+    ) {
       return reply.status(404).send({ error: "member_management_not_available" });
     }
     if (browserSession?.email_verified_at === null) {
@@ -320,7 +347,10 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
       return reply.status(403).send({ error: "forbidden" });
     }
     const projectCollaboration = dependencies.projectCollaboration;
-    if (projectCollaboration === undefined || projectCollaboration.cancelInviteForProject === undefined) {
+    if (
+      projectCollaboration === undefined ||
+      projectCollaboration.cancelInviteForProject === undefined
+    ) {
       return reply.status(404).send({ error: "member_management_not_available" });
     }
     if (browserSession?.email_verified_at === null) {
@@ -358,7 +388,10 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
       return reply.status(403).send({ error: "forbidden" });
     }
     const projectCollaboration = dependencies.projectCollaboration;
-    if (projectCollaboration === undefined || projectCollaboration.updateProjectMemberRole === undefined) {
+    if (
+      projectCollaboration === undefined ||
+      projectCollaboration.updateProjectMemberRole === undefined
+    ) {
       return reply.status(404).send({ error: "member_management_not_available" });
     }
 
@@ -380,7 +413,9 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
       return reply.status(409).send({ error: "owner_role_change_not_allowed" });
     }
 
-    return reply.status(200).send({ member: toPublicProjectMember(parsedParams.data.id, updated.member) });
+    return reply
+      .status(200)
+      .send({ member: toPublicProjectMember(parsedParams.data.id, updated.member) });
   });
 
   app.delete("/v1/projects/:id/members/:userId", async (request, reply) => {
@@ -402,7 +437,10 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
       return reply.status(403).send({ error: "forbidden" });
     }
     const projectCollaboration = dependencies.projectCollaboration;
-    if (projectCollaboration === undefined || projectCollaboration.removeProjectMember === undefined) {
+    if (
+      projectCollaboration === undefined ||
+      projectCollaboration.removeProjectMember === undefined
+    ) {
       return reply.status(404).send({ error: "member_management_not_available" });
     }
 
@@ -418,7 +456,9 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
       return reply.status(409).send({ error: "owner_removal_not_allowed" });
     }
 
-    return reply.status(200).send({ member: toPublicProjectMember(parsedParams.data.id, removed.member) });
+    return reply
+      .status(200)
+      .send({ member: toPublicProjectMember(parsedParams.data.id, removed.member) });
   });
 
   app.delete("/v1/projects/:id/membership", async (request, reply) => {
@@ -437,7 +477,10 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
       return;
     }
     const projectCollaboration = dependencies.projectCollaboration;
-    if (projectCollaboration === undefined || projectCollaboration.leaveProjectMembership === undefined) {
+    if (
+      projectCollaboration === undefined ||
+      projectCollaboration.leaveProjectMembership === undefined
+    ) {
       return reply.status(404).send({ error: "member_management_not_available" });
     }
 
@@ -452,6 +495,8 @@ export function registerProjectMemberRoutes(app: FastifyInstance, dependencies: 
       return reply.status(409).send({ error: "owner_leave_not_allowed" });
     }
 
-    return reply.status(200).send({ member: toPublicProjectMember(parsedParams.data.id, left.member) });
+    return reply
+      .status(200)
+      .send({ member: toPublicProjectMember(parsedParams.data.id, left.member) });
   });
 }

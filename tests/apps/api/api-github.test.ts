@@ -2,28 +2,39 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { createApiServer } from "../../../apps/api/src/server.ts";
-import { GITHUB_APP_INSTALL_STATE_COOKIE_NAME, SESSION_COOKIE_NAME } from "../../../packages/auth/src/index.js";
+import {
+  GITHUB_APP_INSTALL_STATE_COOKIE_NAME,
+  SESSION_COOKIE_NAME
+} from "../../../packages/auth/src/index.js";
 import { mockedObject, type MockedMethods } from "../../helpers/vitest.ts";
 
 type ApiServerDependencies = Parameters<typeof createApiServer>[0];
 type MemberAuthDependency = MockedMethods<ApiServerDependencies["memberAuth"]>;
 type WebAuthDependency = MockedMethods<NonNullable<ApiServerDependencies["webAuth"]>>;
-type ProjectManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["projectManagement"]>>;
-type BillingManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["billingManagement"]>>;
-type GitHubManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["githubManagement"]>>;
+type ProjectManagementDependency = MockedMethods<
+  NonNullable<ApiServerDependencies["projectManagement"]>
+>;
+type BillingManagementDependency = MockedMethods<
+  NonNullable<ApiServerDependencies["billingManagement"]>
+>;
+type GitHubManagementDependency = MockedMethods<
+  NonNullable<ApiServerDependencies["githubManagement"]>
+>;
 
 const InstallUrlResponseSchema = z.object({
   install_url: z.string().url()
 });
 
-function createServer(overrides: {
-  memberAuth?: MemberAuthDependency;
-  webAuth?: Partial<WebAuthDependency>;
-  projectManagement?: Partial<ProjectManagementDependency>;
-  billingManagement?: Partial<BillingManagementDependency>;
-  githubManagement?: Partial<GitHubManagementDependency>;
-  authRateLimiter?: ApiServerDependencies["authRateLimiter"];
-} = {}) {
+function createServer(
+  overrides: {
+    memberAuth?: MemberAuthDependency;
+    webAuth?: Partial<WebAuthDependency>;
+    projectManagement?: Partial<ProjectManagementDependency>;
+    billingManagement?: Partial<BillingManagementDependency>;
+    githubManagement?: Partial<GitHubManagementDependency>;
+    authRateLimiter?: ApiServerDependencies["authRateLimiter"];
+  } = {}
+) {
   return createApiServer({
     ingestionPersistence: { persistAndEnqueue: vi.fn() },
     ingestionMetadata: { resolveProjectByTokenHash: vi.fn() },
@@ -67,7 +78,9 @@ function createServer(overrides: {
       listServicesForOrganization: vi.fn().mockResolvedValue([])
     },
     objectStoreReader: { getObject: vi.fn() },
-    webhookDelivery: { listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue({ deliveries: [] }) },
+    webhookDelivery: {
+      listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue({ deliveries: [] })
+    },
     projectManagement: mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>({
       resolveProjectAccessForUser: vi.fn().mockResolvedValue({
         project_id: "00000000-0000-4000-8000-000000000001",
@@ -95,48 +108,50 @@ function createServer(overrides: {
       ...overrides.billingManagement
     }),
     githubManagement: mockedObject<NonNullable<ApiServerDependencies["githubManagement"]>>({
-        getInstallUrl: vi.fn().mockResolvedValue("https://github.com/apps/debugbundle-automation/installations/new"),
-        getInstallationForOrganization: vi.fn().mockResolvedValue({
-          id: "ghi_1",
-          installation_id: 123,
-          account_login: "debugbundle",
-          account_type: "Organization",
-          status: "active",
-          created_at: "2026-03-26T00:00:00.000Z",
-          updated_at: "2026-03-26T00:00:00.000Z"
-        }),
-        disconnectInstallationForOrganization: vi.fn().mockResolvedValue(true),
-        listRepositoriesForOrganization: vi.fn().mockResolvedValue([]),
-        getProjectRepoForOrganization: vi.fn().mockResolvedValue(null),
-        listProjectDeliveriesForOrganization: vi.fn().mockResolvedValue([]),
-        retryProjectDeliveryForOrganization: vi.fn().mockResolvedValue(null),
-        setProjectRepoForOrganization: vi.fn().mockResolvedValue({
-          id: "pgr_1",
-          project_id: "proj_1",
-          installation_id: "ghi_1",
-          repo_owner: "debugbundle",
-          repo_name: "app",
-          default_branch: "main",
-          created_at: "2026-03-26T00:00:00.000Z",
-          updated_at: "2026-03-26T00:00:00.000Z"
-        }),
-        removeProjectRepoForOrganization: vi.fn().mockResolvedValue(true),
-        listProjectRulesForOrganization: vi.fn().mockResolvedValue([]),
-        getProjectRuleForOrganization: vi.fn().mockResolvedValue(null),
-        createProjectRuleForOrganization: vi.fn().mockResolvedValue(null),
-        updateProjectRuleForOrganization: vi.fn().mockResolvedValue(null),
-        deleteProjectRuleForOrganization: vi.fn().mockResolvedValue(false),
-        completeGithubInstallationForOrganization: vi.fn().mockResolvedValue({
-          id: "ghi_1",
-          installation_id: 123,
-          account_login: "debugbundle",
-          account_type: "Organization",
-          status: "active",
-          created_at: "2026-03-26T00:00:00.000Z",
-          updated_at: "2026-03-26T00:00:00.000Z"
-        }),
-        verifyWebhookSignature: vi.fn().mockReturnValue(true),
-        processWebhook: vi.fn().mockResolvedValue(undefined),
+      getInstallUrl: vi
+        .fn()
+        .mockResolvedValue("https://github.com/apps/debugbundle-automation/installations/new"),
+      getInstallationForOrganization: vi.fn().mockResolvedValue({
+        id: "ghi_1",
+        installation_id: 123,
+        account_login: "debugbundle",
+        account_type: "Organization",
+        status: "active",
+        created_at: "2026-03-26T00:00:00.000Z",
+        updated_at: "2026-03-26T00:00:00.000Z"
+      }),
+      disconnectInstallationForOrganization: vi.fn().mockResolvedValue(true),
+      listRepositoriesForOrganization: vi.fn().mockResolvedValue([]),
+      getProjectRepoForOrganization: vi.fn().mockResolvedValue(null),
+      listProjectDeliveriesForOrganization: vi.fn().mockResolvedValue([]),
+      retryProjectDeliveryForOrganization: vi.fn().mockResolvedValue(null),
+      setProjectRepoForOrganization: vi.fn().mockResolvedValue({
+        id: "pgr_1",
+        project_id: "proj_1",
+        installation_id: "ghi_1",
+        repo_owner: "debugbundle",
+        repo_name: "app",
+        default_branch: "main",
+        created_at: "2026-03-26T00:00:00.000Z",
+        updated_at: "2026-03-26T00:00:00.000Z"
+      }),
+      removeProjectRepoForOrganization: vi.fn().mockResolvedValue(true),
+      listProjectRulesForOrganization: vi.fn().mockResolvedValue([]),
+      getProjectRuleForOrganization: vi.fn().mockResolvedValue(null),
+      createProjectRuleForOrganization: vi.fn().mockResolvedValue(null),
+      updateProjectRuleForOrganization: vi.fn().mockResolvedValue(null),
+      deleteProjectRuleForOrganization: vi.fn().mockResolvedValue(false),
+      completeGithubInstallationForOrganization: vi.fn().mockResolvedValue({
+        id: "ghi_1",
+        installation_id: 123,
+        account_login: "debugbundle",
+        account_type: "Organization",
+        status: "active",
+        created_at: "2026-03-26T00:00:00.000Z",
+        updated_at: "2026-03-26T00:00:00.000Z"
+      }),
+      verifyWebhookSignature: vi.fn().mockReturnValue(true),
+      processWebhook: vi.fn().mockResolvedValue(undefined),
       ...overrides.githubManagement
     })
   });
@@ -186,7 +201,9 @@ describe("api github routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json().installation.account_login).toBe("debugbundle");
-    expect(githubManagement.getInstallationForOrganization).toHaveBeenCalledWith({ organization_id: "org_123" });
+    expect(githubManagement.getInstallationForOrganization).toHaveBeenCalledWith({
+      organization_id: "org_123"
+    });
   });
 
   it("returns a null installation when no github app is connected yet", async () => {
@@ -205,13 +222,17 @@ describe("api github routes", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ installation: null });
-    expect(githubManagement.getInstallationForOrganization).toHaveBeenCalledWith({ organization_id: "org_123" });
+    expect(githubManagement.getInstallationForOrganization).toHaveBeenCalledWith({
+      organization_id: "org_123"
+    });
   });
 
   it("returns the GitHub App install URL for authenticated callers on solo tiers", async () => {
     vi.stubEnv("GITHUB_APP_STATE_SECRET", "github-app-state-secret");
     const githubManagement = {
-      getInstallUrl: vi.fn().mockResolvedValue("https://github.com/apps/debugbundle-automation/installations/new")
+      getInstallUrl: vi
+        .fn()
+        .mockResolvedValue("https://github.com/apps/debugbundle-automation/installations/new")
     };
     const app = createServer({ githubManagement });
 
@@ -230,7 +251,9 @@ describe("api github routes", () => {
     expect(installUrl.pathname).toBe("/apps/debugbundle-automation/installations/new");
     expect(installUrl.searchParams.get("state")).toEqual(expect.any(String));
     expect(githubManagement.getInstallUrl).toHaveBeenCalledTimes(1);
-    expect(String(response.headers["set-cookie"])).toContain(`${GITHUB_APP_INSTALL_STATE_COOKIE_NAME}=`);
+    expect(String(response.headers["set-cookie"])).toContain(
+      `${GITHUB_APP_INSTALL_STATE_COOKIE_NAME}=`
+    );
   });
 
   it("allows installation reads but still rejects install flows when the organization tier lacks access", async () => {
@@ -374,6 +397,7 @@ describe("api github routes", () => {
     expect(deleteRuleResponse.statusCode).toBe(204);
     expect(removeProjectRepoForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",
+      actor_user_id: "usr_123",
       project_id: projectId
     });
     expect(deleteProjectRuleForOrganization).toHaveBeenCalledWith({
@@ -455,7 +479,9 @@ describe("api github routes", () => {
     expect(installUrlFromResponse.origin).toBe("https://github.com");
     expect(installUrlFromResponse.pathname).toBe("/apps/debugbundle-automation/installations/new");
     expect(installState).toEqual(expect.any(String));
-    expect(String(installUrlResponse.headers["set-cookie"])).toContain(`${GITHUB_APP_INSTALL_STATE_COOKIE_NAME}=`);
+    expect(String(installUrlResponse.headers["set-cookie"])).toContain(
+      `${GITHUB_APP_INSTALL_STATE_COOKIE_NAME}=`
+    );
 
     const callbackResponse = await app.inject({
       method: "GET",
@@ -475,8 +501,12 @@ describe("api github routes", () => {
       repo: "app"
     });
     expect(callbackResponse.statusCode).toBe(302);
-    expect(callbackResponse.headers.location).toBe(`http://localhost:5291/projects/${projectId}/github`);
-    expect(String(callbackResponse.headers["set-cookie"])).toContain(`${GITHUB_APP_INSTALL_STATE_COOKIE_NAME}=;`);
+    expect(callbackResponse.headers.location).toBe(
+      `http://localhost:5291/projects/${projectId}/github`
+    );
+    expect(String(callbackResponse.headers["set-cookie"])).toContain(
+      `${GITHUB_APP_INSTALL_STATE_COOKIE_NAME}=;`
+    );
     expect(githubManagement.completeGithubInstallationForOrganization).toHaveBeenCalledWith({
       organization_id: "org_123",
       installation_id: 123
@@ -548,8 +578,12 @@ describe("api github routes", () => {
     });
 
     expect(response.statusCode).toBe(302);
-    expect(response.headers.location).toBe("https://app.debugbundle.com/projects?github_app_setup=external");
-    expect(String(response.headers["set-cookie"])).toContain(`${GITHUB_APP_INSTALL_STATE_COOKIE_NAME}=;`);
+    expect(response.headers.location).toBe(
+      "https://app.debugbundle.com/projects?github_app_setup=external"
+    );
+    expect(String(response.headers["set-cookie"])).toContain(
+      `${GITHUB_APP_INSTALL_STATE_COOKIE_NAME}=;`
+    );
     expect(githubManagement.completeGithubInstallationForOrganization).not.toHaveBeenCalled();
   });
 

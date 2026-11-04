@@ -184,6 +184,46 @@ function createServer(
 }
 
 describe("api availability check routes", () => {
+  it("returns an actionable scope conflict and forwards the current actor to health management", async () => {
+    const update = vi.fn().mockResolvedValue("service_scope_conflict");
+    const app = createServer({
+      availabilityCheckManagement: mockedObject<
+        NonNullable<ApiServerDependencies["availabilityCheckManagement"]>
+      >({ updateCheckForProjectInOrganization: update })
+    });
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/v1/projects/${checkFixture.project_id}/availability-checks/${checkFixture.check_id}`,
+      headers: { authorization: "Bearer dbundle_mem_test" },
+      payload: { service_name: "another-service" }
+    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({ error: "service_scope_conflict" });
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ actor_user_id: "usr_123" }));
+    await app.close();
+  });
+  it("retains the common retryable conflict response when a cutover fences a health update", async () => {
+    const app = createServer({
+      availabilityCheckManagement: mockedObject<
+        NonNullable<ApiServerDependencies["availabilityCheckManagement"]>
+      >({
+        updateCheckForProjectInOrganization: vi
+          .fn()
+          .mockRejectedValue(
+            Object.assign(new Error("project_merge_in_progress"), { code: "40001" })
+          )
+      })
+    });
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/v1/projects/${checkFixture.project_id}/availability-checks/${checkFixture.check_id}`,
+      headers: { authorization: "Bearer dbundle_mem_test" },
+      payload: { name: "Endpoint" }
+    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({ error: "project_merge_in_progress", retryable: true });
+    await app.close();
+  });
   it("lists, fetches, mutates, tests, and reads retained history for owner access", async () => {
     const availabilityCheckManagement = mockedObject<
       NonNullable<ApiServerDependencies["availabilityCheckManagement"]>

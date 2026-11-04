@@ -315,6 +315,7 @@ export const ANALYTICS_BOOTSTRAP_STATEMENTS = [
   `,
   `
     CREATE TABLE analytics_funnel_definitions (
+      scope_origin_ids uuid[],
       project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       funnel_key text NOT NULL,
       display_name text NOT NULL,
@@ -492,6 +493,7 @@ export const ANALYTICS_BOOTSTRAP_STATEMENTS = [
   `,
   `
     CREATE TABLE analytics_bundle_generations (
+      scope_origin_ids uuid[],
       id uuid PRIMARY KEY,
       project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
       opportunity_id uuid REFERENCES analytics_opportunities(id) ON DELETE SET NULL,

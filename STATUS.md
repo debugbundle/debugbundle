@@ -1,3 +1,86 @@
+# Project/service release train — authorised and in preparation
+
+4 November 2026. The owner authorised production release and asked for the complete
+DebugBundle release train to be accounted for. Core 1.21.0, CLI/MCP/OpenClaw 1.19.0,
+shared-types 3.1.0 and independently versioned developer/site distributions are
+being prepared. SDK sources remain unchanged and their public artifacts will be
+verified. Live consolidation of the owner's existing projects remains later.
+See `spec/project-service-release-20261104.md` for per-surface status.
+
+# Project/service consolidation — locally qualified candidate
+
+Final audit passed (4 November): daily notification scope, current-membership
+and concurrent canonical-pause gaps are fixed. Five new database regressions
+failed before the fix and now pass. Complete coverage, integration, static,
+sealed-image and retained-client qualification pass for the corrected candidate.
+
+4 November 2026. The owner authorised one implementation phase following the
+nine ordered slices and recommended, simple defaults. The subsequent production release is authorised; live consolidation of named
+projects and consumer adoption remain separately scoped. Slices 0–7 are implemented
+and locally qualified. Slice 8 remains open for separate release/live approval.
+
+Source of truth: `spec/project-service-consolidation.md`, FR-PJS-01–04 and
+AC-PJS-01–03. The initial worktree was clean; all candidate changes are scoped to
+DebugBundle and its own documentation/distributions. All eleven SDK repositories
+remain clean. No consumer product or production data/configuration was changed.
+
+Implemented: first-class logical services and repository/environment context;
+retained origin/input/view identities; checked API/client/CLI/ordinary MCP merge
+preview/apply/status/verify/resume/cancel; actor-bound idempotency, durable leases,
+atomic cutover, bounded writer fences and truthful post-commit verification;
+scoped downstream automation/analytics/health/lifecycle handling; complete service
+pagination and retained deep-link fetching; one-root local adoption with safe
+semantic diffs, preserved credentials/custom data/caches and explicit remaining
+gates. No Product/Group layer, Business dependency or migration UI was added.
+
+The two ordered migrations preserve the exact committed predecessor's 64 ledger
+checksums. Fresh bootstrap and populated upgrades are separately exercised;
+readiness rejects missing migrations/functions/columns or disabled scope guards.
+`PROJECT_MERGES_ENABLED` remains false by default in core/self-host/cloud templates.
+Ordinary management writes serialize within a bounded fence; direct trigger
+fences remain non-blocking. Current membership and multi-user revocation are
+verified; the live account's actual users/access still require a fresh inventory.
+
+Executed evidence is tracked in `spec/project-service-qualification.md`:
+
+- The final complete run passes 5,131 tests across 110 shards, including all 103
+  real Postgres cases. The unchanged coverage gate passes for all 215 changed
+  source files (87.79% lines, 90.15% functions, 78.61% branches, 86.83% statements).
+  Repository-wide lint, typecheck and formatting pass. The old sequential GitHub
+  miss-path fixture now models the bounded transaction; expectations are intact.
+- The full existing integration lane passes 180 cases with one existing optional
+  skip. The consolidation Postgres lane passes 103 cases across thirteen files,
+  including a 1,000-service cutover, exact NULL-scope predecessor GitHub rule,
+  first health-check registration, concurrency, nested origins and retry/crash.
+- Installed retained CLI 1.18.2/MCP 1.18.3/Node SDK 3.2.0 and packed candidate
+  clients pass against real disposable API/worker/DB/Redis/S3. Original tokens,
+  intentional new scope, worker restart, compatible API restart, six immutable
+  S3 objects and complete canonical-origin cleanup pass.
+- The sealed predecessor/candidate image rehearsal passes exact migration/startup
+  refusal, row/column/checksum preservation, idempotence, legacy writes and
+  pre-merge API/worker rollback. Post-merge rollback requires the new contract.
+- Source equivalents pass across all twelve SDK capture surfaces, including both
+  React Native native bridge harnesses. This is not new production-device or
+  per-language installed-artifact proof; no SDK release or consumer upgrade is
+  required by the unchanged wire protocol.
+- Core candidate builds, OpenClaw validation and clean pinned-host installation
+  pass; all 149 tools load with native scoped requests. Public documentation
+  tests/typecheck/static build pass. Hosted workflow/image gate tests pass.
+
+Local pre-ship review and source/spec/contract/glossary reconciliation pass. The
+frozen old MCP contract and exact predecessor checksums remain protected. All
+application/runtime files match the refreshed sealed final-audit image context;
+later changes are documentation only. Exact source/image/archive identities and
+logs are recorded in the qualification report. No known local check remains open.
+
+Release is now authorised and tracked above; activation and live adoption retain
+their documented gates.
+Before enabling apply: qualify every actual API/worker, a verified compatible
+stable rollback and served credential/origin/cache behaviour. Obtain named
+project approval and refresh ownership/access/settings/mappings before live apply.
+Each consumer repository edit/deployment/canary requires explicit product/action
+consent. Server, repository and deployed-runtime completion are independent.
+
 # Corrective releases and site verified — 3 November 2026
 
 CLI 1.18.2, MCP/OpenClaw/ClawHub skill 1.18.3, Codex 1.4.3, Claude Code 1.18.2
@@ -767,3 +850,28 @@ Local billing purchase-wait candidate: FR-BIL-10 / AC-BILL-09 now enforce seven 
 Swift evidence foundation (28 October, unpublished): the embedded canonical-schema loader, full native hook ownership/validation, shared semantic and receiving-byte fixtures, and complete correlation projection pass 106 tests plus the unchanged 80% floor in all 35 executable files. Android's separate installed Maven consumer passes four checks against retained 3.1.0 artifacts; its current manifest records 182 source inputs and 42 artifacts. Native/device/performance and whole-phase qualification remain open. New hook-classification corrections require refreshed final receipts; these intermediate results do not establish parity completion or release readiness.
 
 Swift native evidence progress (28 October, unpublished): 118 tests and the unchanged >=80% coverage floor pass across39 production files. `DebugBundleExceptionEvidence` collects bounded exact-NSError underlying/aggregate relationships on the existing worker with weak admission ownership; capture stacks are labelled capture and unavailable Swift/custom causes remain explicit. `DebugBundleHTTPReply` bounds native replies/total deadlines; `DebugBundleEvidenceController` gates optional details and `DebugBundleDeliveryQueue.refineBatch` persists compatible retry reductions. Public capture APIs moved to `DebugBundleClientCapture.swift` (305 lines), leaving the delivery/config owner644 lines. Recovery/operation ownership, crash/native wire partitioning, bridges and final qualification remain open. Android's refreshed manifest retains182 source inputs and42 artifacts after164 module/four installed tests passed.
+
+Current in-flight work: scoped probe HMAC keys and optional exact SDK token/name
+selection. A proposed wildcard default using the whole activation scope was
+rejected by automatic review and was not applied; the original narrow issuer
+default is retained. Finish integration/type/interface/docs checks, then complete
+alert/webhook/GitHub scoped management and delivery without changing old ledgers.
+
+Automation progress: all four rule kinds now retain creation snapshots; canonical
+updates edit original rows through a fenced context and recheck actual membership.
+Explicit widening is available through typed HTTP clients, CLI and ordinary MCP.
+Real Postgres proves retained filter translation, repository destinations, stale
+role rejection, imported-incident delivery/digest guards and dedupe. GitHub and
+webhook domains/types were split below the file limit with stable public exports.
+Next: finish automation read/policy/audit and delivery retry checks, qualify
+canonical notification settings, then converge weekly schedules while preserving
+already accepted windows/claims, followed by health/analytics readers.
+
+Weekly transition candidate: forward migration adds internal channel aliases and
+immutable delivery origin snapshots. Equivalent schedules converge; already
+accepted windows do not cause a new combined resend. Original accepted reports
+finish/retry with their original IDs, channel, project and scope, including after
+a second merge. Suppressed claims never reopen. Channel deletion now preserves
+delivery history via SET NULL instead of cascading claim records. Verify the
+surviving schedule's disable/delete effect on retained jobs, final type/lint and
+worker scheduler retry-identity tests, then finish the remaining downstream audit.

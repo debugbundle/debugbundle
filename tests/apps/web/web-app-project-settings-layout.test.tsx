@@ -13,6 +13,32 @@ afterEach(() => {
 });
 
 describe("web app - project settings layout", () => {
+  it("loads a retained project deep link through the exact view fallback", async () => {
+    const source = "10000000-0000-4000-8000-000000000001",
+      target = "10000000-0000-4000-8000-000000000002";
+    const fetchMock = vi.fn((request: RequestInfo | URL) => {
+      const url = new URL(requestUrl(request));
+      if (url.pathname === "/v1/auth/session")
+        return jsonResponse(200, { session: createSession({ organization_plan: "team" }) });
+      if (url.pathname === "/v1/projects")
+        return jsonResponse(200, {
+          projects: [
+            createProject({
+              project_id: url.searchParams.has("project_id") ? source : target,
+              organization_plan: "team",
+              ...(url.searchParams.has("project_id") ? { canonical_project_id: target } : {})
+            })
+          ]
+        });
+      return jsonResponse(404, { error: "not_found" });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialEntries={[`/projects/${source}/settings`]} />);
+    expect(await screen.findByRole("button", { name: "Capture policy" })).toBeVisible();
+    expect(
+      fetchMock.mock.calls.some(([request]) => requestUrl(request).includes(`project_id=${source}`))
+    ).toBe(true);
+  });
   it("renders reusable collapsed settings sections and places weekly reports before project details", async () => {
     vi.stubGlobal(
       "fetch",

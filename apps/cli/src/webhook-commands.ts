@@ -236,6 +236,7 @@ export async function updateWebhookCommand(
   input: {
     bearerToken: string;
     projectId: string;
+    projectScope?: "current_project";
     webhookId: string;
     url?: string;
     events?: string[];
@@ -247,6 +248,7 @@ export async function updateWebhookCommand(
     updateWebhook(input: {
       bearerToken: string;
       projectId: string;
+      projectScope?: "current_project";
       webhookId: string;
       url?: string;
       events?: string[];
@@ -259,6 +261,7 @@ export async function updateWebhookCommand(
     const requestInput: {
       bearerToken: string;
       projectId: string;
+      projectScope?: "current_project";
       webhookId: string;
       url?: string;
       events?: string[];
@@ -269,6 +272,8 @@ export async function updateWebhookCommand(
       projectId: input.projectId,
       webhookId: input.webhookId
     };
+
+    if (input.projectScope) requestInput.projectScope = input.projectScope;
 
     if (input.url !== undefined) {
       requestInput.url = input.url;
@@ -300,6 +305,7 @@ export async function updateWebhookWithAuthCommand(
   input: {
     authFilePath?: string;
     projectId: string;
+    projectScope?: "current_project";
     webhookId: string;
     url?: string;
     events?: string[];
@@ -316,6 +322,7 @@ export async function updateWebhookWithAuthCommand(
       const commandInput: {
         bearerToken: string;
         projectId: string;
+        projectScope?: "current_project";
         webhookId: string;
         url?: string;
         events?: string[];
@@ -327,6 +334,8 @@ export async function updateWebhookWithAuthCommand(
         projectId: input.projectId,
         webhookId: input.webhookId
       };
+
+      if (input.projectScope) commandInput.projectScope = input.projectScope;
 
       if (input.url !== undefined) {
         commandInput.url = input.url;

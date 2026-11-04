@@ -44,10 +44,11 @@ export function createAgentTokenStore(db: Queryable): AgentTokenStore {
     async resolveByTokenHash(tokenHash) {
       const result = await db.query<AgentTokenContext & Record<string, unknown>>(
         `SELECT at.id AS token_id, at.issuer_user_id AS user_id, at.organization_id, at.project_id,
+                COALESCE(at.scope_origin_ids,ARRAY[at.project_id]) AS scope_origin_ids,
                 at.scope, at.policy_version, at.revoked_at::text AS revoked_at,
                 at.expires_at::text AS expires_at
          FROM agent_tokens at
-         JOIN projects p ON p.id = at.project_id AND p.organization_id = at.organization_id
+         JOIN projects p ON p.id = debugbundle_canonical_project(at.project_id) AND p.organization_id = at.organization_id
          JOIN organizations org ON org.id = p.organization_id AND org.suspended_at IS NULL
          LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = at.issuer_user_id
          WHERE at.token_hash = $1

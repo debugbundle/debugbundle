@@ -41,6 +41,7 @@ type RepresentativeJourneyScore = Omit<
 
 export async function readRepresentativeJourneySamples(input: {
   project_id: string;
+  origin_project_ids?: string[];
   analysis_kind: AnalyticsBundleGenerationRecord["analysis_kind"];
   journeys: JourneyPatternEvidence[];
   analyticsJourneySampleStore: Pick<
@@ -65,6 +66,7 @@ export async function readRepresentativeJourneySamples(input: {
     try {
       const sample = await input.analyticsJourneySampleStore.getAnalyticsJourneySampleForProject({
         project_id: input.project_id,
+        ...(input.origin_project_ids ? { origin_project_ids: input.origin_project_ids } : {}),
         sample_id: candidate.sample_id,
         now
       });
@@ -75,7 +77,7 @@ export async function readRepresentativeJourneySamples(input: {
       );
       if (
         artifact === null ||
-        artifact.project_id !== input.project_id ||
+        artifact.project_id !== sample.project_id ||
         artifact.sample_id !== sample.sample_id
       ) {
         input.logger?.warn?.(
@@ -149,7 +151,9 @@ function compareRepresentativeJourneyCandidates(
   left: Omit<RepresentativeJourneyCandidate, "selection_rank">,
   right: Omit<RepresentativeJourneyCandidate, "selection_rank">
 ): number {
-  return compareRepresentativeJourneyScores(left, right) || left.sample_id.localeCompare(right.sample_id);
+  return (
+    compareRepresentativeJourneyScores(left, right) || left.sample_id.localeCompare(right.sample_id)
+  );
 }
 
 function compareRepresentativeJourneyScores(

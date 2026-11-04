@@ -1,6 +1,10 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
-import { hash as argon2Hash, verify as argon2Verify, type Options as Argon2Options } from "@node-rs/argon2";
+import {
+  hash as argon2Hash,
+  verify as argon2Verify,
+  type Options as Argon2Options
+} from "@node-rs/argon2";
 
 export const PROJECT_TOKEN_PREFIX = "dbundle_proj_";
 export const MEMBER_TOKEN_PREFIX = "dbundle_mem_";
@@ -31,6 +35,9 @@ export interface ProbeTriggerTokenPayload {
 
 export interface ProjectTokenContext {
   project_id: string;
+  canonical_project_id?: string;
+  scope_origin_ids?: string[];
+  capture_rules_require_server?: boolean;
   organization_id?: string;
   organization_plan?: string;
   allowed_origins?: string[] | null;
@@ -50,6 +57,7 @@ export interface AgentTokenContext {
   user_id: string;
   organization_id: string;
   project_id: string;
+  scope_origin_ids?: string[];
   scope: "incident:read-minimized";
   policy_version: "telemetry-privacy-v1";
   revoked_at: string | null;
@@ -165,14 +173,22 @@ export type AcceptProjectInviteStoreResult =
     };
 
 export interface AuthEmailSender {
-  sendEmailAuthCode(input: { email: string; code: string; expires_in_minutes: number }): Promise<void>;
+  sendEmailAuthCode(input: {
+    email: string;
+    code: string;
+    expires_in_minutes: number;
+  }): Promise<void>;
   sendProjectInviteEmail(input: {
     email: string;
     token: string;
     inviter_name: string;
     project_title: string;
   }): Promise<void>;
-  sendAccountDeletionOtp?(input: { email: string; code: string; expires_in_minutes: number }): Promise<void>;
+  sendAccountDeletionOtp?(input: {
+    email: string;
+    code: string;
+    expires_in_minutes: number;
+  }): Promise<void>;
 }
 
 export interface CookieOptions {
@@ -226,7 +242,9 @@ export function isValidCsrfToken(sessionToken: string, csrfToken: string): boole
   return isTimingSafeEqualUtf8(buildCsrfToken(sessionToken), csrfToken);
 }
 
-export function readRequiredProbeTriggerSecret(env: Record<string, string | undefined> = process.env): string {
+export function readRequiredProbeTriggerSecret(
+  env: Record<string, string | undefined> = process.env
+): string {
   const secret = env["DEBUGBUNDLE_PROBE_TRIGGER_SECRET"]?.trim();
 
   if (secret === undefined || secret.length === 0) {
@@ -250,7 +268,10 @@ export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-export function deriveOrganizationIdentity(email: string): { organization_name: string; organization_slug: string } {
+export function deriveOrganizationIdentity(email: string): {
+  organization_name: string;
+  organization_slug: string;
+} {
   const localPart = normalizeEmail(email).split("@")[0] ?? "workspace";
   const normalizedBase = localPart
     .replace(/[^a-z0-9]+/g, "-")
@@ -277,7 +298,10 @@ export function generateSessionToken(): string {
   return randomBytes(24).toString("hex");
 }
 
-export function isRecordInactive(record: { revoked_at?: string | null; expires_at?: string | null }, now: Date): boolean {
+export function isRecordInactive(
+  record: { revoked_at?: string | null; expires_at?: string | null },
+  now: Date
+): boolean {
   return isTokenRevoked(record.revoked_at) || isTokenExpired(record.expires_at, now);
 }
 
@@ -320,11 +344,18 @@ export async function verifyPassword(password: string, passwordHash: string): Pr
   }
 }
 
-function buildCookieAttributes(input: { sameSite: "Strict" | "Lax"; secure: boolean | undefined }): string {
+function buildCookieAttributes(input: {
+  sameSite: "Strict" | "Lax";
+  secure: boolean | undefined;
+}): string {
   return `Path=/; HttpOnly; ${input.secure === false ? "" : "Secure; "}SameSite=${input.sameSite}`;
 }
 
-export function buildSessionCookie(sessionToken: string, expiresAt: string, options: CookieOptions = {}): string {
+export function buildSessionCookie(
+  sessionToken: string,
+  expiresAt: string,
+  options: CookieOptions = {}
+): string {
   return `${SESSION_COOKIE_NAME}=${encodeURIComponent(sessionToken)}; ${buildCookieAttributes({ sameSite: "Strict", secure: options.secure })}; Expires=${new Date(expiresAt).toUTCString()}`;
 }
 
@@ -332,7 +363,11 @@ export function buildClearedSessionCookie(options: CookieOptions = {}): string {
   return `${SESSION_COOKIE_NAME}=; ${buildCookieAttributes({ sameSite: "Strict", secure: options.secure })}; Expires=${new Date(0).toUTCString()}; Max-Age=0`;
 }
 
-export function buildGithubOauthStateCookie(state: string, expiresAt: string, options: CookieOptions = {}): string {
+export function buildGithubOauthStateCookie(
+  state: string,
+  expiresAt: string,
+  options: CookieOptions = {}
+): string {
   return `${GITHUB_OAUTH_STATE_COOKIE_NAME}=${encodeURIComponent(state)}; ${buildCookieAttributes({ sameSite: "Lax", secure: options.secure })}; Expires=${new Date(expiresAt).toUTCString()}`;
 }
 
@@ -340,7 +375,11 @@ export function buildClearedGithubOauthStateCookie(options: CookieOptions = {}):
   return `${GITHUB_OAUTH_STATE_COOKIE_NAME}=; ${buildCookieAttributes({ sameSite: "Lax", secure: options.secure })}; Expires=${new Date(0).toUTCString()}; Max-Age=0`;
 }
 
-export function buildGitHubAppInstallStateCookie(state: string, expiresAt: string, options: CookieOptions = {}): string {
+export function buildGitHubAppInstallStateCookie(
+  state: string,
+  expiresAt: string,
+  options: CookieOptions = {}
+): string {
   return `${GITHUB_APP_INSTALL_STATE_COOKIE_NAME}=${encodeURIComponent(state)}; ${buildCookieAttributes({ sameSite: "Lax", secure: options.secure })}; Expires=${new Date(expiresAt).toUTCString()}`;
 }
 
@@ -348,7 +387,10 @@ export function buildClearedGitHubAppInstallStateCookie(options: CookieOptions =
   return `${GITHUB_APP_INSTALL_STATE_COOKIE_NAME}=; ${buildCookieAttributes({ sameSite: "Lax", secure: options.secure })}; Expires=${new Date(0).toUTCString()}; Max-Age=0`;
 }
 
-export function readCookieValue(cookieHeader: string | undefined, cookieName: string): string | null {
+export function readCookieValue(
+  cookieHeader: string | undefined,
+  cookieName: string
+): string | null {
   if (cookieHeader === undefined) {
     return null;
   }
@@ -375,18 +417,39 @@ export function readCookieValue(cookieHeader: string | undefined, cookieName: st
   return null;
 }
 
-export function deriveProbeTriggerTokenKey(projectId: string): string {
+export function deriveProbeTriggerTokenKey(
+  projectId: string,
+  scopeOriginIds?: readonly string[]
+): string {
   const secret = readRequiredProbeTriggerSecret();
-  return createHmac("sha256", secret).update(projectId, "utf8").digest("hex");
+  const origins =
+    scopeOriginIds === undefined
+      ? undefined
+      : [...new Set(scopeOriginIds.map((id) => id.toLowerCase()))].sort();
+  if (
+    origins !== undefined &&
+    (origins.length === 0 || origins.length > 1000 || origins.some((id) => !id || id.length > 200))
+  )
+    throw new Error("probe_scope_invalid");
+  // Preserve installed single-origin keys byte for byte. A broader credential
+  // receives a separate key bound to its immutable snapshot, never today's root.
+  const identity =
+    origins === undefined || (origins.length === 1 && origins[0] === projectId.toLowerCase())
+      ? projectId
+      : JSON.stringify(["debugbundle-probe-scope-v1", projectId.toLowerCase(), origins]);
+  return createHmac("sha256", secret).update(identity, "utf8").digest("hex");
 }
 
 export function generateProbeTriggerToken(input: {
   projectId: string;
+  scopeOriginIds?: readonly string[];
   payload: ProbeTriggerTokenPayload;
 }): { plaintext: string; hash: string; key: string } {
-  const key = deriveProbeTriggerTokenKey(input.projectId);
+  const key = deriveProbeTriggerTokenKey(input.projectId, input.scopeOriginIds);
   const payloadSegment = Buffer.from(JSON.stringify(input.payload), "utf8").toString("base64url");
-  const signatureSegment = createHmac("sha256", key).update(payloadSegment, "utf8").digest("base64url");
+  const signatureSegment = createHmac("sha256", key)
+    .update(payloadSegment, "utf8")
+    .digest("base64url");
   const plaintext = `${PROBE_TRIGGER_TOKEN_PREFIX}${payloadSegment}.${signatureSegment}`;
 
   return {
@@ -426,7 +489,9 @@ export function isTokenRevoked(revokedAt: string | null | undefined): boolean {
   return revokedAt !== undefined && revokedAt !== null;
 }
 
-async function validateToken<Context extends { revoked_at?: string | null; expires_at?: string | null }>(
+async function validateToken<
+  Context extends { revoked_at?: string | null; expires_at?: string | null }
+>(
   token: string,
   expectedPrefix: string,
   resolveByTokenHash: TokenHashResolver<Context>,
@@ -488,10 +553,18 @@ export async function validateAgentToken(
   resolveByTokenHash: TokenHashResolver<AgentTokenContext>,
   options: { now?: Date } = {}
 ): Promise<AuthValidationResult<AgentTokenContext>> {
-  const result = await validateToken(token, AGENT_TOKEN_PREFIX, resolveByTokenHash, options.now ?? new Date());
+  const result = await validateToken(
+    token,
+    AGENT_TOKEN_PREFIX,
+    resolveByTokenHash,
+    options.now ?? new Date()
+  );
   if (!result.ok) return result;
-  if (result.context.scope !== "incident:read-minimized" ||
-      result.context.policy_version !== "telemetry-privacy-v1" || !result.context.expires_at) {
+  if (
+    result.context.scope !== "incident:read-minimized" ||
+    result.context.policy_version !== "telemetry-privacy-v1" ||
+    !result.context.expires_at
+  ) {
     return { ok: false, error: "invalid_token" };
   }
   return result;

@@ -1,3 +1,4 @@
+import { isProjectConsolidationDatabaseError } from "../project-consolidation-http.js";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 
 import { getTierCapabilities } from "../../../../packages/shared-types/src/index.js";
@@ -119,6 +120,7 @@ export function registerAvailabilityCheckRoutes(
 
     const checks =
       await dependencies.availabilityCheckManagement.listChecksForProjectInOrganization({
+        actor_user_id: auth.member.member_id,
         organization_id: auth.access.organization_id,
         project_id: parsedParams.data.id,
         limit: parsedQuery.data.limit
@@ -152,6 +154,7 @@ export function registerAvailabilityCheckRoutes(
     }
 
     const check = await dependencies.availabilityCheckManagement.getCheckForProjectInOrganization({
+      actor_user_id: auth.member.member_id,
       organization_id: auth.access.organization_id,
       project_id: parsedParams.data.id,
       check_id: parsedParams.data.checkId
@@ -297,6 +300,7 @@ export function registerAvailabilityCheckRoutes(
 
       return reply.status(201).send({ check: created });
     } catch (error) {
+      if (isProjectConsolidationDatabaseError(error)) throw error;
       const mapped = mapAvailabilityValidationError(error);
       await recordAvailabilityAudit(request, dependencies, {
         organization_id: auth.access.organization_id,
@@ -347,6 +351,7 @@ export function registerAvailabilityCheckRoutes(
     try {
       const updated =
         await dependencies.availabilityCheckManagement.updateCheckForProjectInOrganization({
+          actor_user_id: auth.member.member_id,
           organization_id: auth.access.organization_id,
           project_id: parsedParams.data.id,
           check_id: parsedParams.data.checkId,
@@ -381,6 +386,17 @@ export function registerAvailabilityCheckRoutes(
           now: new Date().toISOString()
         });
 
+      if (updated === "service_scope_conflict") {
+        await recordAvailabilityAudit(request, dependencies, {
+          organization_id: auth.access.organization_id,
+          actor_user_id: auth.member.member_id,
+          action: "availability_check.update",
+          target_id: parsedParams.data.checkId,
+          status: "failure",
+          metadata: { project_id: parsedParams.data.id, reason: updated }
+        });
+        return reply.status(409).send({ error: updated });
+      }
       if (updated === "check_not_found") {
         await recordAvailabilityAudit(request, dependencies, {
           organization_id: auth.access.organization_id,
@@ -449,6 +465,7 @@ export function registerAvailabilityCheckRoutes(
 
       return reply.status(200).send({ check: updated });
     } catch (error) {
+      if (isProjectConsolidationDatabaseError(error)) throw error;
       const mapped = mapAvailabilityValidationError(error);
       await recordAvailabilityAudit(request, dependencies, {
         organization_id: auth.access.organization_id,
@@ -492,6 +509,7 @@ export function registerAvailabilityCheckRoutes(
 
     const deleted =
       await dependencies.availabilityCheckManagement.deleteCheckForProjectInOrganization({
+        actor_user_id: auth.member.member_id,
         organization_id: auth.access.organization_id,
         project_id: parsedParams.data.id,
         check_id: parsedParams.data.checkId,
@@ -551,6 +569,7 @@ export function registerAvailabilityCheckRoutes(
 
     const results =
       await dependencies.availabilityCheckManagement.listResultsForCheckInOrganization({
+        actor_user_id: auth.member.member_id,
         organization_id: auth.access.organization_id,
         project_id: parsedParams.data.id,
         check_id: parsedParams.data.checkId,
@@ -588,6 +607,7 @@ export function registerAvailabilityCheckRoutes(
 
     const rollups =
       await dependencies.availabilityCheckManagement.listDailyRollupsForCheckInOrganization({
+        actor_user_id: auth.member.member_id,
         organization_id: auth.access.organization_id,
         project_id: parsedParams.data.id,
         check_id: parsedParams.data.checkId,
@@ -644,6 +664,7 @@ export function registerAvailabilityCheckRoutes(
       });
       return reply.status(200).send(tested);
     } catch (error) {
+      if (isProjectConsolidationDatabaseError(error)) throw error;
       const mapped = mapAvailabilityValidationError(error);
       await recordAvailabilityAudit(request, dependencies, {
         organization_id: auth.access.organization_id,

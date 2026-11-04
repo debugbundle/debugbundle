@@ -4,6 +4,45 @@ This glossary defines durable product terms used across requirements, contracts,
 and implementation documentation. Source-of-truth requirements and contracts remain
 authoritative when a term's behavior is specified in more detail.
 
+## Project and Service Terms
+
+### Project
+
+The system investigated together and its shared access/settings boundary. Its
+applications and processes are services; they do not require a Product/Group
+layer or a Business plan merely to share a project.
+
+### Logical Service Definition
+
+A stable application/process identity (`service_definition_id`) with repository
+context and observed environments. It is distinct from the existing
+environment-specific `service_id`, whose meaning remains unchanged.
+
+### Origin Namespace
+
+The original physical project identity retained for evidence, jobs, deliveries,
+privacy identities, credentials, immutable object paths and historical scope.
+Consolidation changes logical ownership without rewriting that history.
+
+### Canonical Project and Retained View
+
+The canonical project owns the combined service catalogue and current access.
+An old project ID remains a retained view over its original origin closure;
+access uses current canonical membership, and old credentials never widen.
+Project-wide writes through that old ID return a canonical-scope conflict.
+
+### Checked Consolidation
+
+Owner-authorised preview and atomic apply using an exact plan digest and stable
+idempotency key. Access/settings conflicts are explicit. A committed server
+operation does not imply repository adoption or deployed-runtime acceptance.
+
+### Adoption Manifest
+
+A credential-free, immutable merge-receipt snapshot of service/repository/input
+metadata. It guides separately authorised repository edits and identifies the
+remaining repository and deployed-runtime gates.
+
 ## Agent Connection Terms
 
 ### Agent-Aware Setup

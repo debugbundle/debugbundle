@@ -1,4 +1,7 @@
-import type { ImprovementBundleSensitivity, ImprovementSettings } from "../../shared-types/src/index.js";
+import type {
+  ImprovementBundleSensitivity,
+  ImprovementSettings
+} from "../../shared-types/src/index.js";
 import type { Queryable } from "./types.js";
 
 type ImprovementSettingsRow = ImprovementSettings & Record<string, unknown>;
@@ -19,7 +22,7 @@ export function createPostgresImprovementSettingsStore(db: Queryable): Improveme
         `
           SELECT automated_improvement_bundles_enabled, improvement_bundle_sensitivity
           FROM projects
-          WHERE id = $1
+          WHERE id = debugbundle_canonical_project($1::uuid)
           LIMIT 1
         `,
         [projectId]
@@ -63,6 +66,6 @@ export function createPostgresImprovementSettingsStore(db: Queryable): Improveme
       );
 
       return result.rows[0] ?? null;
-    },
+    }
   };
 }

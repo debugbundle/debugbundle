@@ -32,9 +32,11 @@ async function lockCorrelations(
     .filter((key): key is string => key !== null)
     .sort();
   for (const key of keys)
-    await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
-      JSON.stringify(["browser_recovery", project, service, environment, key])
-    ]);
+    await db.query(
+      `SELECT pg_advisory_xact_lock(hashtextextended(
+      jsonb_set($1::jsonb,'{2}',to_jsonb(debugbundle_service_input_name($2,$3)))::text,0))`,
+      [JSON.stringify(["browser_recovery", project, service, environment, key]), project, service]
+    );
 }
 
 export async function lockBrowserRecoveryEvent(
@@ -120,7 +122,7 @@ export function createBrowserRecoveryStore(db: Queryable): {
           WHERE p.incident_id=i.id AND p.is_sampled=true AND p.event_class='incident_signal'
           AND p.event_type IN ('backend_exception','frontend_exception','request_event','log_event')
           ORDER BY occurred_at DESC,event_id DESC LIMIT 1) primary_event ON true
-        WHERE r.project_id = $1 AND r.service_name = $2 AND r.environment = $3 AND r.kind = 'resource'
+        WHERE r.project_id = $1 AND r.service_name = ANY(debugbundle_service_input_names($1,$2)) AND r.environment = $3 AND r.kind = 'resource'
           AND r.occurred_at BETWEEN $4::timestamptz - interval '30 seconds' AND $4::timestamptz
           AND r.expires_at > now()
           AND (($5::text IS NOT NULL AND r.session_hash = $5) OR ($6::text IS NOT NULL AND r.trace_hash = $6))

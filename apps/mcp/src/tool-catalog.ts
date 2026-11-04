@@ -11,6 +11,14 @@ import {
   ANALYTICS_FLOW_MCP_TOOL_CATALOG
 } from "./analytics-flow-tools.js";
 import { z } from "zod";
+import {
+  PROJECT_MERGE_MCP_TOOL_NAMES,
+  PROJECT_MERGE_MCP_TOOL_CATALOG
+} from "./project-merge-tools.js";
+import {
+  SERVICE_DEFINITION_MCP_TOOL_NAMES,
+  SERVICE_DEFINITION_MCP_TOOL_CATALOG
+} from "./service-definition-tools.js";
 
 import { ALERT_MCP_TOOL_NAMES } from "./alert-tools.js";
 import { ANALYZE_MCP_TOOL_NAMES } from "./analyze-tools.js";
@@ -42,6 +50,8 @@ import { WEBHOOK_MCP_TOOL_NAMES } from "./webhook-tools.js";
 import { WEEKLY_REPORT_MCP_TOOL_NAMES } from "./weekly-report-tools.js";
 
 type McpToolName =
+  | (typeof PROJECT_MERGE_MCP_TOOL_NAMES)[number]
+  | (typeof SERVICE_DEFINITION_MCP_TOOL_NAMES)[number]
   | (typeof NOTIFICATION_MCP_TOOL_NAMES)[number]
   | (typeof PUBLIC_STATUS_MCP_TOOL_NAMES)[number]
   | (typeof ANALYTICS_FLOW_MCP_TOOL_NAMES)[number]
@@ -96,6 +106,12 @@ type McpToolGroup =
   | "weekly_reports";
 
 type McpToolCatalogEntry = {
+  annotations?: {
+    readOnlyHint: boolean;
+    destructiveHint: boolean;
+    idempotentHint: boolean;
+    openWorldHint: boolean;
+  };
   name: McpToolName;
   group: McpToolGroup;
   description: string;
@@ -105,6 +121,8 @@ import { MCP_TOOL_CATALOG_FOUNDATION } from "./tool-catalog-foundation.js";
 import { MCP_TOOL_CATALOG_OPERATIONS } from "./tool-catalog-operations.js";
 
 export const MCP_TOOL_CATALOG = [
+  ...PROJECT_MERGE_MCP_TOOL_CATALOG,
+  ...SERVICE_DEFINITION_MCP_TOOL_CATALOG,
   ...NOTIFICATION_MCP_TOOL_CATALOG,
   ...PUBLIC_STATUS_MCP_TOOL_CATALOG,
   ...ANALYTICS_FLOW_MCP_TOOL_CATALOG,
@@ -250,7 +268,8 @@ export const MCP_TOOL_CATALOG = [
     inputSchema: z.object({
       bearerToken: z.string(),
       projectId: z.string(),
-      limit: z.number().optional()
+      limit: z.number().optional(),
+      offset: z.number().int().min(0).max(100_000).optional()
     })
   }
 ] satisfies readonly McpToolCatalogEntry[];

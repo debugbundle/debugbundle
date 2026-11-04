@@ -167,6 +167,17 @@ Every capability must be available through all applicable interfaces. Operations
 
 ## 1. HTTP API
 
+Project/service consolidation adds checked member-authenticated preview, apply,
+status-by-ID/key, read-only verification, resume and pre-cutover cancellation at
+`/v1/project-merges`. API, typed project-management client, `project merge`
+commands and the six ordinary MCP merge tools share one domain engine. Exact
+payloads, responses, error/retry semantics, annotations and adoption commands are
+defined in [the operations contract](../spec/project-service-operations.md) and
+the generated OpenAPI `ProjectMerge*` components. Server apply defaults to off;
+the hosted read-only OpenAI catalogue is unchanged. The filesystem adoption
+helper is local CLI functionality; API/MCP agents receive the same secret-free
+manifest and can use their authorised filesystem tools.
+
 ### Project-scoped agent evidence connection (`telemetry-privacy-v1`)
 
 This additive credential is separate from member, project, probe, and hosted OAuth tokens. `dbundle_agent_` is hashed in `agent_tokens`, returned once with `Cache-Control: no-store`, bound to one project and `incident:read-minimized`, and expires after 30 days by default (at most 90). Old API versions reject its prefix. Issuer loss of project access, organization suspension, expiry, revocation, unknown scope, or unknown policy version denies reads. Creation is disabled by default and returns `503 agent_token_issuance_unavailable` until `AGENT_TOKEN_ISSUANCE_ENABLED=true` is set on every serving API replica **after** the forward migration and full replica rollout. List, revoke, and already-issued restricted reads do not use this creation gate. Rollback may make agent reads unavailable but cannot promote authority.
@@ -1102,11 +1113,48 @@ Quota exhausted: `429 { "error": "analytics_quota_exceeded", "retry_after_ms": <
 
 ### 1.3 Services
 
+Logical service metadata is additive to the existing environment-instance list:
+
+| API                                                     | CLI                                                               | Ordinary MCP                |
+| ------------------------------------------------------- | ----------------------------------------------------------------- | --------------------------- |
+| `GET /v1/projects/:id/service-definitions`              | `services list --project-id <id> [--limit 1-200] [--cursor <id>]` | `list_service_definitions`  |
+| `GET /v1/projects/:id/service-definitions/:serviceId`   | `services get <definition-id> --project-id <id>`                  | `get_service_definition`    |
+| `POST /v1/projects/:id/service-definitions`             | `services create --name <name> --project-id <id>`                 | `create_service_definition` |
+| `PATCH /v1/projects/:id/service-definitions/:serviceId` | `services update <definition-id> --project-id <id>`               | `update_service_definition` |
+
+Mutations require current project owner/admin access; reads require current
+project access. Shared-access suspension, ordinary session CSRF, member auth and
+management rate limits apply. Metadata uses `name`, nullable `description`,
+nullable credential-free HTTPS `repository_url`, and nullable bounded POSIX
+`repository_root` relative to that repository. Reject empty/dot/parent/absolute/
+backslash/control-character path segments. Clearing overrides restores the
+project's primary repository. This metadata never clones a repository or changes
+GitHub installation permissions. Existing GitHub automation qualification remains
+part of the consolidation contract.
+
+List returns `{services,next_cursor}` in stable definition-ID order; default 100,
+maximum 200, and callers must follow the returned cursor. Other operations return
+`{service}`. Records contain `service_definition_id`, `project_id`,
+`origin_project_id`, `name`, retained `input_name`, nullable metadata, effective
+`repository: {url,root,source}` or null, sorted `environments`, and timestamps.
+Existing `service_id` keeps its meaning. Rename preserves the old input name and
+instance identity; names conflicting with another definition's retained input
+name return `409 service_name_conflict`. Existing SDK naming remains supported.
+
+CLI accepts `--auth-file` and `--json`. Metadata writes accept `--description`,
+`--repository-url` and `--repository-root`; update also accepts `--name`,
+`--clear-description` and `--clear-repository`. Clear flags conflict with supplied
+values. The existing `services --project-id <id>` command remains the instance
+list. Ordinary MCP takes `projectId`, `serviceDefinitionId` where applicable,
+`service` for creation and `update` for changes using the shared snake-case
+metadata shape. Read tools advertise read-only; mutations are optional in
+OpenClaw. Frozen hosted/restricted catalogs do not gain these tools.
+
 | Method | Path           | Auth                            | Description                 |
 | ------ | -------------- | ------------------------------- | --------------------------- |
 | GET    | `/v1/services` | Browser Session or Member Token | List services for a project |
 
-**Query params (services):** `project_id` (required), `limit` (optional, 1-100, default 100)
+**Query params (services):** `project_id` (required), `limit` (optional, 1-100, default 100), `offset` (optional, 0-100000, default 0). Services are ordered by displayed name, environment and stable instance ID. For a complete inventory, advance `offset` by `limit` until a page contains fewer than `limit` rows. An exact multiple needs a final empty page. Pages reflect current data rather than a cross-request snapshot. The CLI exposes `services --offset` and ordinary MCP exposes `list_services.offset`; hosted MCP retains its existing opaque `next_cursor` contract. Dashboard scope controls load all pages and fail explicitly at the inventory bound.
 
 Current API implementation scope (Phase 7 kickoff slice):
 
@@ -2065,29 +2113,48 @@ Always-on probes (ring buffer + error-flush) require no API endpoints — they a
 }
 ```
 
-| Field                 | Required | Default       | Constraint                                         |
-| --------------------- | -------- | ------------- | -------------------------------------------------- |
-| `label_pattern`       | Yes      | —             | Dot-notation label or wildcard (`checkout.*`, `*`) |
-| `service`             | No       | `*` (all)     | Scope to specific service                          |
-| `environment`         | No       | `*` (all)     | Scope to specific environment                      |
-| `ttl_seconds`         | Yes      | —             | Passive activation TTL (max 3600s / 1 hour)        |
-| `trigger_ttl_seconds` | No       | `ttl_seconds` | Trigger token TTL (max 86400s / 24 hours)          |
-| `sample_rate`         | No       | `1.0`         | 0.0–1.0                                            |
+| Field                 | Required | Default                   | Constraint                                                         |
+| --------------------- | -------- | ------------------------- | ------------------------------------------------------------------ |
+| `label_pattern`       | Yes      | —                         | Dot-notation label or wildcard (`checkout.*`, `*`)                 |
+| `service`             | No       | `*` (all)                 | Scope to specific service                                          |
+| `environment`         | No       | `*` (all)                 | Scope to specific environment                                      |
+| `ttl_seconds`         | Yes      | —                         | Passive activation TTL (max 3600s / 1 hour)                        |
+| `trigger_ttl_seconds` | No       | `ttl_seconds`             | Trigger token TTL (max 86400s / 24 hours)                          |
+| `sdk_project_id`      | No       | Preserved deployed issuer | Explicit freshly adopted SDK issuer in the same canonical closure  |
+| `sdk_token_id`        | No       | Original issuer scope     | Active deployed token ID; selects its exact immutable snapshot     |
+| `sdk_service`         | No       | Preserved input name      | Actual deployed service name, verified against the same definition |
 
 **Activate response:**
 
 ```json
 {
-  "activation_id": "uuid",
-  "label_pattern": "checkout.*",
-  "service": "checkout-api",
-  "environment": "production",
-  "expires_at": "ISO8601",
-  "trigger_expires_at": "ISO8601",
-  "created_at": "ISO8601",
-  "trigger_token": "dbundle_probe_..."
+  "activation": {
+    "activation_id": "uuid",
+    "label_pattern": "checkout.*",
+    "service": "checkout-api",
+    "environment": "production",
+    "expires_at": "ISO8601",
+    "trigger_expires_at": "ISO8601"
+  },
+  "trigger_token": "dbundle_probe_...",
+  "runtime_project_id": "SDK credential issuer UUID",
+  "runtime_service": "deployed SDK service name"
 }
 ```
+
+The unreleased consolidation candidate defaults triggers to the original SDK
+issuer/input identity. Optional `sdk_token_id` selects an active deployed token's
+exact immutable snapshot and `sdk_service` its retained name; `sdk_project_id`
+selects a freshly adopted issuer view. CLI uses `--sdk-token-id`, `--sdk-service`
+and `--sdk-project-id`; ordinary MCP uses `sdkTokenId`, `sdkService`, `sdkProjectId`.
+Responses also report `runtime_scope_origin_ids`. Manager lists include optional
+`origin_project_id`, `service_definition_id` and `scope_origin_ids`. Installed
+single-origin keys and signatures remain valid. Broader/restricted credentials
+receive a separate key bound to their saved origin snapshot. An old wildcard
+therefore cannot expand during merge. Incompatible wildcard scopes return 409
+`probe_scope_requires_service`; invalid or expired/revoked SDK context returns
+400 `probe_sdk_context_invalid`. Combined active activations retain the five-probe
+limit. These options require no SDK protocol change.
 
 `expires_at` controls the passive polling window. `trigger_expires_at` controls how long the trigger token remains valid (can be up to 24h after creation). The `trigger_token` is HMAC-SHA256 signed and scoped to this activation's labels, service, and environment. Attach it to a specific HTTP request via query parameter `_debug_probe` or header `X-DebugBundle-Probe-Trigger` to activate matching probes for that single request without waiting for SDK polling.
 
@@ -2119,7 +2186,7 @@ If the shared `monthly_remote_activations` allowance is exhausted, activation re
 
 **SDK config response (GET /v1/sdk/config):**
 
-Response headers: `Cache-Control: public, s-maxage=30` and `Vary: X-DebugBundle-Analytics-Config` (CDN-edge-cacheable). Purged on probe activate/deactivate.
+Response headers: `Cache-Control: private, no-store` and `Vary: Authorization, Origin, X-DebugBundle-Analytics-Config, X-DebugBundle-Evidence`. Configuration and probe verification keys are credential-specific and must not be shared by an intermediary cache. SDK polling retains its normal local interval. Before enabling consolidation, expire or invalidate the predecessor's 30-second edge entries.
 
 Send `X-DebugBundle-Analytics-Config: 1` to opt into the optional `analytics` block. Requests without that header retain the legacy response shape.
 
@@ -2469,7 +2536,7 @@ Content-Type: application/json
 
 Request body matches the shared capture-rule schema and supports `action: "demote" | "sample" | "drop"` plus matcher fields such as `event_types`, `services`, `environments`, `runtime`, `browser_event_kind`, `browser_event_opaque`, `browser_page_visibility_state`, `browser_page_ready_state`, `browser_target_tag_name`, `browser_target_attributes`, `client_kind`, `bot_family`, `message_equals`, `message_contains`, `error_name`, `resource_url`, `request_url`, `status_codes`, `first_party`, and optional `fingerprint`. `browser_target_attributes` accepts the bounded keys `rel`, `as`, `type`, `media`, `cross_origin`, `async`, `defer`, and `integrity_present`; string fields are trimmed and lowercased and every requested field must be present and equal. Exact-fingerprint matchers are evaluated at ingestion against the server-derived, versioned canonical fingerprint used by worker grouping; clients do not provide or control the evaluated fingerprint.
 
-If any active rule uses page lifecycle, target tag, or target-attribute predicates, `GET /v1/sdk/config` returns an empty capture-rule list. Hosted ingestion evaluates the entire set. This preserves rule precedence when older SDKs cannot evaluate every predicate, including broad local drops overridden by narrower hosted rules.
+If any active rule uses page lifecycle, target tag, or target-attribute predicates, `GET /v1/sdk/config` returns an empty capture-rule list. A credential with multiple origin namespaces also receives an empty rule list because installed SDKs cannot enforce origin snapshots. Hosted ingestion evaluates the entire set. This preserves rule precedence when older SDKs cannot evaluate every predicate, including broad local drops overridden by narrower hosted rules.
 
 **Suggest capture rules from an incident:**
 
@@ -3215,7 +3282,7 @@ Current local `debugbundle analyze` behavior reads `.debugbundle/bundles/local/`
 ### 2.11 Probe Commands (Remote Activation — Solo+ Only)
 
 ```
-debugbundle probe activate <project-id> --label-pattern <pattern> [--service <name>] [--environment <name>] [--ttl-seconds <n>] [--trigger-ttl-seconds <n>] [--auth-file <path>] [--json]
+debugbundle probe activate <project-id> --label-pattern <pattern> [--service <name>] [--environment <name>] [--ttl-seconds <n>] [--trigger-ttl-seconds <n>] [--sdk-project-id <issuer-id>] [--auth-file <path>] [--json]
 debugbundle probe list <project-id> [--auth-file <path>] [--json]
 debugbundle probe deactivate <project-id> <activation-id> [--auth-file <path>] [--json]
 ```
@@ -3256,7 +3323,7 @@ debugbundle capture-rule list --project-id <id> [--auth-file <path>] [--json]
 debugbundle capture-rule suggest <incident-id> [--auth-file <path>] [--json]
 debugbundle capture-rule create-from-suggestion <incident-id> --suggestion-id <id> [--name <name>] [--description <text>] [--enabled <true|false>] [--expires-at <ISO8601>] [--auth-file <path>] [--json]
 debugbundle capture-rule create --project-id <id> --name <name> --action <demote|sample|drop> --matcher-json <json> [--description <text>] [--enabled <true|false>] [--sample-rate <0-1>] [--sample-event-class <preserve|context>] [--expires-at <ISO8601>] [--auth-file <path>] [--json]
-debugbundle capture-rule update <rule-id> --project-id <id> [--name <name>] [--description <text>] [--enabled <true|false>] [--action <demote|sample|drop>] [--matcher-json <json>] [--sample-rate <0-1>] [--sample-event-class <preserve|context>] [--expires-at <ISO8601|null>] [--auth-file <path>] [--json]
+debugbundle capture-rule update <rule-id> --project-id <id> [--name <name>] [--description <text>] [--enabled <true|false>] [--action <demote|sample|drop>] [--matcher-json <json>] [--sample-rate <0-1>] [--sample-event-class <preserve|context>] [--expires-at <ISO8601|null>] [--project-scope <current_project>] [--auth-file <path>] [--json]
 debugbundle capture-rule delete <rule-id> --project-id <id> [--auth-file <path>] [--json]
 ```
 
@@ -4047,3 +4114,13 @@ Browser sessions require verified owner access and CSRF for writes; owner member
 Malformed input returns 400; unauthenticated 401; role/verification/CSRF failure 403; unsafe state, stale quote or conflicts 409; limits 429; unavailable billing/provider 503. A timeout does not imply failure at Stripe: retry the same confirmed operation. CLI: `billing plan-change status|preview|schedule --confirmation-token <token>|cancel --schedule-id <id>` with common auth/json options. CLI conflicts exit 5. Ordinary MCP `billing_plan_change` accepts `action`, `bearerToken`, and action-specific `confirmationToken` or `scheduleId`; preview and explicit confirmation precede schedule. All adapters call the shared billing domain.
 
 Temporary first-purchase policy (local candidate): `POST /v1/billing/checkout` additionally returns `409 {"error":"paid_purchase_locked"}` before returning/replaying a first-purchase request until seven complete 24-hour days after the immutable trial start. Missing or invalid starts fail closed. A processed organisation-scoped `invoice.paid` receipt preserves previously paid resubscriptions; existing provider-terminal verification still applies. Paid plan management and completed-payment confirmation are unchanged. Existing billing summary, CLI/MCP retrieval and successful `{url}` payloads are unchanged; automation may read existing trial timestamps, while Checkout remains owner/browser-only. No additional purchase route or support override is introduced. Existing issued Stripe URLs are not revoked. See FR-BIL-10 and AC-BILL-09.
+
+### Consolidation candidate: explicit automation scope
+
+The unreleased project/service candidate adds optional
+`project_scope: "current_project"` to capture-rule, alert, webhook and GitHub-rule
+PATCH bodies. It snapshots the current origin closure. Ordinary edits preserve
+the previous scope; later merges never silently expand an old rule. CLI update
+commands accept `--project-scope current_project`; ordinary MCP update tools use
+`projectScope: "current_project"`. Existing response keys, rule IDs, signing
+secrets, destination associations and delivery namespaces remain unchanged.

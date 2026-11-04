@@ -1,4 +1,7 @@
+import { createCaptureRuleManagement } from "../../../packages/storage/src/capture-rule-management.js";
 import { createNotificationPreferencesStore } from "../../../packages/storage/src/notification-preferences-store.js";
+import { createServiceDefinitionStore } from "../../../packages/storage/src/service-definition-store.js";
+import { createProjectMergeStore } from "../../../packages/storage/src/project-merge-store.js";
 import { createEvidenceIngestionReceiptStore } from "../../../packages/storage/src/evidence-ingestion-receipt.js";
 import { parsePublicStatusBaseUrl } from "../../../packages/shared-types/src/public-status.js";
 import { createPublicStatusPageStore } from "../../../packages/storage/src/public-status-store.js";
@@ -15,8 +18,6 @@ import {
 } from "../../../packages/auth/src/index.js";
 import {
   getDefaultPreset,
-  type CaptureRuleCreate,
-  type CaptureRuleUpdate,
   type CapturePolicyUpdate,
   type ImprovementSettingsUpdate
 } from "../../../packages/shared-types/src/index.js";
@@ -32,7 +33,6 @@ import {
   createPostgresIngestionRejectionDiagnosticStore,
   createPostgresAuthStore,
   createPostgresCapturePolicyStore,
-  createPostgresCaptureRuleStore,
   createPostgresImprovementOpportunityStore,
   createPostgresImprovementSettingsStore,
   createPostgresGitHubMarketplaceStore,
@@ -57,6 +57,7 @@ import {
 import { createBillingManagement } from "./billing-management.js";
 import { createDefaultAnalyticsDependencies } from "./default-analytics-dependencies.js";
 import { createOpenAiHostedReadDependencies } from "./openai-mcp-dependencies.js";
+import { resolveCredentialServiceScopes } from "../../../packages/storage/src/project-ingestion-scope.js";
 import { createEnvBillingLinkProvider } from "./billing-links.js";
 import { createDefaultGitHubManagement } from "./default-github-management.js";
 import { createDefaultRegenerationDependencies } from "./default-regeneration-dependencies.js";
@@ -120,7 +121,6 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
     ...(accountAnalyticsStore === undefined ? {} : { accountAnalyticsStore })
   });
   const capturePolicyStore = createPostgresCapturePolicyStore(input.db);
-  const captureRuleStore = createPostgresCaptureRuleStore(input.db);
   const improvementOpportunityStore = createPostgresImprovementOpportunityStore(input.db, {
     ...(accountAnalyticsStore === undefined ? {} : { accountAnalyticsStore })
   });
@@ -270,6 +270,10 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
 
   return {
     notificationPreferences: createNotificationPreferencesStore(input.db),
+    serviceDefinitions: createServiceDefinitionStore(input.db),
+    projectMerges: createProjectMergeStore(input.db, {
+      enabled: input.projectMergesEnabled === true
+    }),
     publicStatusPages: createPublicStatusPageStore(input.db),
     publicStatusTrustProxy: input.publicStatusTrustProxy ?? false,
     publicStatusBaseUrl: parsePublicStatusBaseUrl(
@@ -278,7 +282,10 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
     ).toString(),
     analyticsFlows: createPostgresAnalyticsFlowStore(input.db),
     ingestionPersistence,
-    ingestionMetadata,
+    ingestionMetadata: {
+      ...ingestionMetadata,
+      resolveCredentialServiceScopes: (request) => resolveCredentialServiceScopes(input.db, request)
+    },
     ...(accountAnalyticsStore === undefined ? {} : { accountAnalytics: accountAnalyticsStore }),
     ...(ingestionRejectionDiagnosticStore === undefined
       ? {}
@@ -341,11 +348,16 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
       deleteProjectForUser: async (deleteInput) => {
         const result = await metadataStore.deleteProjectForUser!(deleteInput);
         if (result !== null) {
-          await deleteProjectObjects(input.objectStore, deleteInput.project_id).catch(
-            () => undefined
+          await Promise.all(
+            (result.storage_origin_ids ?? [deleteInput.project_id]).map((origin) =>
+              deleteProjectObjects(input.objectStore, origin).catch(() => undefined)
+            )
           );
         }
-        return result;
+        if (result === null) return null;
+        const { storage_origin_ids: _origins, ...project } = result;
+        void _origins;
+        return project;
       },
       listProjectsForOrganization: (input) => metadataStore.listProjectsForOrganization(input),
       createProjectForOrganization: (input) => metadataStore.createProjectForOrganization(input),
@@ -353,11 +365,16 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
       deleteProjectForOrganization: async (deleteInput) => {
         const result = await metadataStore.deleteProjectForOrganization(deleteInput);
         if (result !== null) {
-          await deleteProjectObjects(input.objectStore, deleteInput.project_id).catch(
-            () => undefined
+          await Promise.all(
+            (result.storage_origin_ids ?? [deleteInput.project_id]).map((origin) =>
+              deleteProjectObjects(input.objectStore, origin).catch(() => undefined)
+            )
           );
         }
-        return result;
+        if (result === null) return null;
+        const { storage_origin_ids: _origins, ...project } = result;
+        void _origins;
+        return project;
       }
     },
     accountManagement: {
@@ -529,154 +546,9 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
         });
       }
     },
-    captureRuleManagement: {
-      listCaptureRulesForProject: (input: { organization_id: string; project_id: string }) => {
-        void input.organization_id;
-        return captureRuleStore.listCaptureRulesByProjectId(input.project_id);
-      },
-      listActiveCaptureRulesForProject: (input: { project_id: string; now: string }) =>
-        captureRuleStore.listActiveCaptureRulesByProjectId(input),
-      createCaptureRuleForProject: async (input: {
-        organization_id: string;
-        project_id: string;
-        id: string;
-        create: CaptureRuleCreate;
-      }) => {
-        const projects = await metadataStore.listProjectsForOrganization({
-          organization_id: input.organization_id,
-          now: new Date().toISOString(),
-          limit: 1_000
-        });
-        const project = projects.find((candidate) => candidate.project_id === input.project_id);
-        if (project === undefined) {
-          return null;
-        }
-
-        return runInTransaction(rootDb, async (tx) => {
-          const txCaptureRuleStore = createPostgresCaptureRuleStore(tx);
-          const created = await txCaptureRuleStore.createCaptureRule({
-            id: input.id,
-            project_id: input.project_id,
-            name: input.create.name,
-            description: input.create.description,
-            enabled: input.create.enabled,
-            action: input.create.action,
-            matcher: input.create.matcher,
-            sample_rate: input.create.sample_rate,
-            sample_event_class: input.create.sample_event_class,
-            created_by_user_id: input.create.created_by_user_id,
-            created_from_incident_id: input.create.created_from_incident_id,
-            created_from_event_id: input.create.created_from_event_id,
-            expires_at: input.create.expires_at
-          });
-
-          if (created !== null && accountAnalyticsStore !== undefined) {
-            await accountAnalyticsStore.withDb(tx).recordMetricDeltas({
-              organization_id: input.organization_id,
-              occurred_at: created.created_at,
-              source: "capture_rule_created",
-              dedupe_key: `capture_rule_created:${created.id}`,
-              deltas: {
-                capture_rules_created: 1
-              }
-            });
-          }
-
-          return created;
-        });
-      },
-      updateCaptureRuleForProject: (input: {
-        organization_id: string;
-        project_id: string;
-        rule_id: string;
-        update: CaptureRuleUpdate;
-      }) => {
-        void input.organization_id;
-        const update: {
-          id: string;
-          project_id: string;
-          name?: string;
-          description?: string | null;
-          enabled?: boolean;
-          action?: "demote" | "sample" | "drop";
-          matcher?: CaptureRuleCreate["matcher"];
-          sample_rate?: number | null;
-          sample_event_class?: "preserve" | "context" | null;
-          expires_at?: string | null;
-        } = {
-          id: input.rule_id,
-          project_id: input.project_id
-        };
-
-        if (input.update.name !== undefined) {
-          update.name = input.update.name;
-        }
-        if (input.update.description !== undefined) {
-          update.description = input.update.description;
-        }
-        if (input.update.enabled !== undefined) {
-          update.enabled = input.update.enabled;
-        }
-        if (input.update.action !== undefined) {
-          update.action = input.update.action;
-          if (input.update.action !== "sample") {
-            update.sample_rate = null;
-            update.sample_event_class = null;
-          }
-        }
-        if (input.update.matcher !== undefined) {
-          update.matcher = input.update.matcher;
-        }
-        if (input.update.sample_rate !== undefined) {
-          update.sample_rate = input.update.sample_rate;
-        }
-        if (input.update.sample_event_class !== undefined) {
-          update.sample_event_class = input.update.sample_event_class;
-        }
-        if (input.update.expires_at !== undefined) {
-          update.expires_at = input.update.expires_at;
-        }
-
-        return captureRuleStore.updateCaptureRule(update);
-      },
-      deleteCaptureRuleForProject: async (input: {
-        organization_id: string;
-        project_id: string;
-        rule_id: string;
-      }) => {
-        return runInTransaction(rootDb, async (tx) => {
-          const txCaptureRuleStore = createPostgresCaptureRuleStore(tx);
-          const deleted = await txCaptureRuleStore.deleteCaptureRule({
-            id: input.rule_id,
-            project_id: input.project_id
-          });
-
-          if (deleted && accountAnalyticsStore !== undefined) {
-            await accountAnalyticsStore.withDb(tx).recordMetricDeltas({
-              organization_id: input.organization_id,
-              occurred_at: new Date().toISOString(),
-              source: "capture_rule_deleted",
-              dedupe_key: `capture_rule_deleted:${input.rule_id}`,
-              deltas: {
-                capture_rules_deleted: 1
-              }
-            });
-          }
-
-          return deleted;
-        });
-      },
-      recordCaptureRuleMatch: (input: {
-        project_id: string;
-        rule_id: string;
-        matched_at: string;
-      }) =>
-        captureRuleStore.recordCaptureRuleMatch({
-          id: input.rule_id,
-          project_id: input.project_id,
-          matched_at: input.matched_at
-        })
-    },
+    captureRuleManagement: createCaptureRuleManagement(rootDb, {
+      ...(accountAnalyticsStore ? { accountAnalyticsStore } : {})
+    }),
     improvementSettingsManagement: {
       getImprovementSettingsForProject: (input: {
         organization_id: string;

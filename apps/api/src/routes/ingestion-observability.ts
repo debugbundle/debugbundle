@@ -64,28 +64,39 @@ export async function recordIngestionMetricBatchBestEffort(input: {
   occurred_at: string;
   accepted_events: IngestionAcceptedMetricEvent[];
   rejected_events: IngestionRejectedMetricEvent[];
+  event_origins?: ReadonlyMap<string, string>;
 }): Promise<"recorded" | "skipped"> {
   if (input.dependencies.accountAnalytics === undefined || input.organization_id === undefined) {
     return "skipped";
   }
 
-  const metricBatch = buildIngestionMetricBatch({
-    project_id: input.project_id,
-    organization_plan: input.organization_plan,
-    accepted_events: input.accepted_events,
-    rejected_events: input.rejected_events
-  });
-  if (metricBatch === null) return "skipped";
-
+  const origins = new Set(
+    [...input.accepted_events, ...input.rejected_events].map(
+      (event) => input.event_origins?.get(event.event_id) ?? input.project_id
+    )
+  );
+  let recorded = false;
   try {
-    const result = await input.dependencies.accountAnalytics.recordMetricDeltas({
-      organization_id: input.organization_id,
-      occurred_at: input.occurred_at,
-      source: "ingestion_batch",
-      dedupe_key: metricBatch.dedupe_key,
-      deltas: metricBatch.deltas
-    });
-    return result === "recorded" ? "recorded" : "skipped";
+    for (const origin of origins) {
+      const inOrigin = (event: { event_id: string }): boolean =>
+        (input.event_origins?.get(event.event_id) ?? input.project_id) === origin;
+      const metricBatch = buildIngestionMetricBatch({
+        project_id: origin,
+        organization_plan: input.organization_plan,
+        accepted_events: input.accepted_events.filter(inOrigin),
+        rejected_events: input.rejected_events.filter(inOrigin)
+      });
+      if (metricBatch === null) continue;
+      const result = await input.dependencies.accountAnalytics.recordMetricDeltas({
+        organization_id: input.organization_id,
+        occurred_at: input.occurred_at,
+        source: "ingestion_batch",
+        dedupe_key: metricBatch.dedupe_key,
+        deltas: metricBatch.deltas
+      });
+      recorded ||= result === "recorded";
+    }
+    return recorded ? "recorded" : "skipped";
   } catch {
     input.log.warn(
       { project_id: input.project_id, organization_id: input.organization_id },
@@ -103,7 +114,8 @@ export function buildRejectedDiagnosticFromCandidate(input: {
 }): IngestionRejectedDiagnosticEvent {
   const service = readObjectField(input.candidate, "service");
   return {
-    rejection_reason: input.rejection_reason === "unsafe_event" ? "invalid_event" : input.rejection_reason,
+    rejection_reason:
+      input.rejection_reason === "unsafe_event" ? "invalid_event" : input.rejection_reason,
     project_id: input.project_id,
     sdk_name: readStringField(input.candidate, "sdk_name", 120),
     sdk_version: readStringField(input.candidate, "sdk_version", 64),
@@ -122,7 +134,8 @@ export function buildRejectedDiagnosticFromEvent(input: {
   event: ReturnType<typeof redactEvent>;
 }): IngestionRejectedDiagnosticEvent {
   return {
-    rejection_reason: input.rejection_reason === "unsafe_event" ? "invalid_event" : input.rejection_reason,
+    rejection_reason:
+      input.rejection_reason === "unsafe_event" ? "invalid_event" : input.rejection_reason,
     project_id: input.project_id,
     sdk_name: sanitizeDiagnosticText(input.event.sdk_name, 120),
     sdk_version: sanitizeDiagnosticText(input.event.sdk_version, 64),
@@ -146,7 +159,8 @@ export async function recordRejectedDiagnosticsBestEffort(input: {
     input.organization_id === undefined ||
     input.dependencies.ingestionRejectionDiagnostics === undefined ||
     input.rejected_events.length === 0
-  ) return;
+  )
+    return;
 
   try {
     await input.dependencies.ingestionRejectionDiagnostics.recordRejectedDiagnostics({
@@ -178,7 +192,7 @@ function readObjectField(candidate: unknown, key: string): Record<string, unknow
   if (typeof candidate !== "object" || candidate === null) return null;
   const value = (candidate as Record<string, unknown>)[key];
   return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? value as Record<string, unknown>
+    ? (value as Record<string, unknown>)
     : null;
 }
 

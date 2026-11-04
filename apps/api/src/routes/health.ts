@@ -1,5 +1,6 @@
 import { evidenceCapabilityResponse, sdkEvidencePolicy } from "../evidence-negotiation.js";
 import { createHash } from "node:crypto";
+import { SDK_CONFIG_MAX_BYTES } from "../../../../packages/shared-types/src/sdk-config-limits.js";
 import type { FastifyInstance } from "fastify";
 
 import {
@@ -88,6 +89,9 @@ export function registerHealthRoutes(
   });
 
   app.get("/v1/sdk/config", async (request, reply) => {
+    // Probe verification keys and capture directives depend on the credential's
+    // immutable origin snapshot, so shared caches must never reuse this response.
+    reply.header("Cache-Control", "private, no-store");
     const projectAuth = await requireProjectToken({
       authorizationHeader: request.headers.authorization,
       resolveByTokenHash: (tokenHash) =>
@@ -113,6 +117,9 @@ export function registerHealthRoutes(
         ? []
         : await dependencies.probeManagement.listActiveProbesForProject({
             project_id: projectAuth.context.project_id,
+            ...(projectAuth.context.scope_origin_ids
+              ? { scope_origin_ids: projectAuth.context.scope_origin_ids }
+              : {}),
             now: nowIso
           });
 
@@ -138,12 +145,14 @@ export function registerHealthRoutes(
             project_id: projectAuth.context.project_id,
             now: nowIso
           });
-    // An older SDK can ignore lifecycle predicates or execute a broader drop before
-    // a server-only exception to it. Evaluate the whole rule set at ingestion when
-    // any rule requires server evidence, preserving specificity and precedence.
-    const captureRules = activeCaptureRules.some(captureRuleRequiresServerEvaluation)
-      ? []
-      : activeCaptureRules;
+    // Older SDKs cannot enforce origin snapshots or server-only predicates.
+    // Evaluate the whole set at ingestion to preserve scope and precedence.
+    const captureRules =
+      projectAuth.context.capture_rules_require_server === true ||
+      (projectAuth.context.scope_origin_ids?.length ?? 1) > 1 ||
+      activeCaptureRules.some(captureRuleRequiresServerEvaluation)
+        ? []
+        : activeCaptureRules;
 
     const includesAnalyticsConfig = request.headers["x-debugbundle-analytics-config"] === "1";
     let analyticsConfig = DISABLED_ANALYTICS_SDK_CONFIG;
@@ -179,13 +188,23 @@ export function registerHealthRoutes(
       ),
       capture_rules: captureRules,
       ...(caps.remote_probes
-        ? { trigger_token_key: deriveProbeTriggerTokenKey(projectAuth.context.project_id) }
+        ? {
+            trigger_token_key: deriveProbeTriggerTokenKey(
+              projectAuth.context.project_id,
+              projectAuth.context.scope_origin_ids
+            )
+          }
         : {})
     };
 
-    const etag = `"${createHash("sha256").update(JSON.stringify(responseBody), "utf8").digest("hex").slice(0, 16)}"`;
-    reply.header("Cache-Control", "public, s-maxage=30");
-    reply.header("Vary", "X-DebugBundle-Analytics-Config, X-DebugBundle-Evidence");
+    const encodedBody = JSON.stringify(responseBody);
+    if (Buffer.byteLength(encodedBody) > SDK_CONFIG_MAX_BYTES)
+      return reply.status(503).send({ error: "sdk_config_limit_exceeded" });
+    const etag = `"${createHash("sha256").update(encodedBody, "utf8").digest("hex").slice(0, 16)}"`;
+    reply.header(
+      "Vary",
+      "Authorization, Origin, X-DebugBundle-Analytics-Config, X-DebugBundle-Evidence"
+    );
     reply.header("ETag", etag);
 
     const ifNoneMatch = request.headers["if-none-match"];

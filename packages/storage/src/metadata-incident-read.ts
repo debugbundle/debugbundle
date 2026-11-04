@@ -6,6 +6,7 @@ import type {
 } from "./types.js";
 import { type IncidentRetrievalRow, mapIncidentRetrievalRow } from "./metadata-incident-shared.js";
 import { mapOptionalRow } from "./metadata-shared.js";
+import { appendProjectReadScope, appendServiceDefinitionFilter } from "./project-read-scope.js";
 
 export function createMetadataIncidentRead(
   db: Queryable
@@ -41,20 +42,14 @@ export function createMetadataIncidentRead(
         )`
       ];
 
-      if (input.project_id !== undefined) {
-        params.push(input.project_id);
-        conditions.push(`i.project_id = $${params.length}`);
-      }
+      const projectParameter = appendProjectReadScope(params, conditions, input, "i.project_id");
 
       if (input.environment !== undefined) {
         params.push(input.environment);
         conditions.push(`i.environment = $${params.length}`);
       }
 
-      if (input.service !== undefined) {
-        params.push(input.service);
-        conditions.push(`s.name = $${params.length}`);
-      }
+      appendServiceDefinitionFilter(params, conditions, input, projectParameter);
 
       if (input.status === "active") {
         conditions.push(`i.status IN ('open', 'regressed')`);
@@ -105,6 +100,9 @@ export function createMetadataIncidentRead(
           SELECT
             i.id AS incident_id,
             i.project_id,
+            CASE WHEN p.id<>i.project_id THEN p.id END AS canonical_project_id,
+            sd.id AS service_definition_id, sd.name AS canonical_service_name,
+            ${projectParameter === undefined ? "NULL::text" : `(SELECT a.name FROM service_project_aliases a WHERE a.project_id=$${projectParameter} AND a.service_definition_id=sd.id AND a.is_current)`} AS project_view_service_name,
             p.name AS project_name,
             p.color_tag AS project_color_tag,
             i.service_id,
@@ -127,8 +125,9 @@ export function createMetadataIncidentRead(
             primary_signal.event_class AS incident_reason_event_class,
             primary_signal.level AS incident_reason_level
           FROM incidents i
-          JOIN projects p ON p.id = i.project_id
+          JOIN projects p ON p.id = debugbundle_canonical_project(i.project_id)
           LEFT JOIN services s ON s.id = i.service_id
+          LEFT JOIN service_definitions sd ON sd.id=s.service_definition_id
           LEFT JOIN LATERAL (
             SELECT ie.event_type, ie.event_class, ie.level
             FROM incident_events ie
@@ -148,11 +147,22 @@ export function createMetadataIncidentRead(
     },
 
     async getIncidentForOrganization(input): Promise<IncidentRetrievalRecord | null> {
+      const params: unknown[] = [input.organization_id, input.incident_id, input.user_id ?? null];
+      const scopeConditions: string[] = [];
+      const projectParameter = appendProjectReadScope(
+        params,
+        scopeConditions,
+        input,
+        "i.project_id"
+      );
       const result = await db.query<IncidentRetrievalRow>(
         `
           SELECT
             i.id AS incident_id,
             i.project_id,
+            CASE WHEN p.id<>i.project_id THEN p.id END AS canonical_project_id,
+            sd.id AS service_definition_id, sd.name AS canonical_service_name,
+            ${projectParameter === undefined ? "NULL::text" : `(SELECT a.name FROM service_project_aliases a WHERE a.project_id=$${projectParameter} AND a.service_definition_id=sd.id AND a.is_current)`} AS project_view_service_name,
             p.name AS project_name,
             p.color_tag AS project_color_tag,
             i.service_id,
@@ -175,8 +185,9 @@ export function createMetadataIncidentRead(
             primary_signal.event_class AS incident_reason_event_class,
             primary_signal.level AS incident_reason_level
           FROM incidents i
-          JOIN projects p ON p.id = i.project_id
+          JOIN projects p ON p.id = debugbundle_canonical_project(i.project_id)
           LEFT JOIN services s ON s.id = i.service_id
+          LEFT JOIN service_definitions sd ON sd.id=s.service_definition_id
           LEFT JOIN LATERAL (
             SELECT ie.event_type, ie.event_class, ie.level
             FROM incident_events ie
@@ -204,9 +215,10 @@ export function createMetadataIncidentRead(
                 )
               )
             )
+            ${scopeConditions.map((condition) => `AND ${condition}`).join("\n")}
           LIMIT 1
         `,
-        [input.organization_id, input.incident_id, input.user_id ?? null]
+        params
       );
 
       return mapOptionalRow(result.rows[0], mapIncidentRetrievalRow);
@@ -227,7 +239,7 @@ export function createMetadataIncidentRead(
             ie.level
           FROM incident_events ie
           JOIN incidents i ON i.id = ie.incident_id
-          JOIN projects p ON p.id = i.project_id
+          JOIN projects p ON p.id = debugbundle_canonical_project(i.project_id)
           WHERE i.id = $1
             AND (
               (
@@ -274,7 +286,7 @@ export function createMetadataIncidentRead(
         `
           SELECT i.bundle_failure_reason
           FROM incidents i
-          JOIN projects p ON p.id = i.project_id
+          JOIN projects p ON p.id = debugbundle_canonical_project(i.project_id)
           WHERE p.organization_id = $1
             AND i.id = $2
           LIMIT 1
@@ -307,7 +319,7 @@ export function createMetadataIncidentRead(
             i.occurrence_count,
             COALESCE(i.bundle_trigger, 'regeneration') AS trigger
           FROM incidents i
-          JOIN projects p ON p.id = i.project_id
+          JOIN projects p ON p.id = debugbundle_canonical_project(i.project_id)
           LEFT JOIN LATERAL (
             SELECT
               ie.event_id,

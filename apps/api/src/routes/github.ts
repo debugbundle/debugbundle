@@ -134,10 +134,16 @@ function readGitHubInstallState(
   if (returnTo === null) {
     return null;
   }
-  if (typeof payloadRecord.organization_id !== "string" || payloadRecord.organization_id.length === 0) {
+  if (
+    typeof payloadRecord.organization_id !== "string" ||
+    payloadRecord.organization_id.length === 0
+  ) {
     return null;
   }
-  if (typeof payloadRecord.expires_at !== "string" || Number.isNaN(Date.parse(payloadRecord.expires_at))) {
+  if (
+    typeof payloadRecord.expires_at !== "string" ||
+    Number.isNaN(Date.parse(payloadRecord.expires_at))
+  ) {
     return null;
   }
   if (Date.parse(payloadRecord.expires_at) <= now.getTime()) {
@@ -209,11 +215,18 @@ function mapGithubManagementError(error: string): { status: number; body: { erro
 
 export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   app.get("/v1/github/app/install-url", async (request, reply) => {
-    const parsedQuery = GitHubAppInstallUrlQuerySchema.merge(OptionalProjectScopedQuerySchema).safeParse(request.query);
+    const parsedQuery = GitHubAppInstallUrlQuerySchema.merge(
+      OptionalProjectScopedQuerySchema
+    ).safeParse(request.query);
     if (!parsedQuery.success) {
       return reply.status(400).send({ error: "invalid_query" });
     }
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-read");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "management-read"
+    );
     if (member === null) {
       return;
     }
@@ -262,7 +275,9 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
 
     reply.header(
       "Set-Cookie",
-      buildGitHubAppInstallStateCookie(installState.token, installState.expires_at, { secure: shouldUseSecureCookies() })
+      buildGitHubAppInstallStateCookie(installState.token, installState.expires_at, {
+        secure: shouldUseSecureCookies()
+      })
     );
     return reply.status(200).send({ install_url: installUrl.toString() });
   });
@@ -272,7 +287,12 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
     if (!parsedQuery.success) {
       return reply.status(400).send({ error: "invalid_query" });
     }
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-read");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "management-read"
+    );
     if (member === null) {
       return;
     }
@@ -299,7 +319,12 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
   });
 
   app.delete("/v1/github/installation", async (request, reply) => {
-    const member = await requireRateLimitedOwnerMemberAuth(request, reply, dependencies, "management-write");
+    const member = await requireRateLimitedOwnerMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "management-write"
+    );
     if (member === null) {
       return;
     }
@@ -310,6 +335,7 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
       return reply.status(503).send({ error: "github_not_configured" });
     }
     const deleted = await dependencies.githubManagement.disconnectInstallationForOrganization({
+      actor_user_id: member.member_id,
       organization_id: member.organization_id
     });
     if (!deleted) {
@@ -324,7 +350,12 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
     if (!parsedQuery.success) {
       return reply.status(400).send({ error: "invalid_query" });
     }
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-read");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "management-read"
+    );
     if (member === null) {
       return;
     }
@@ -399,7 +430,8 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
     }
     const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
       bucket: "management-write",
-      projectId: parsedParams.data.id
+      projectId: parsedParams.data.id,
+      allowLegacyMutation: true
     });
     if (auth === null) {
       return;
@@ -445,7 +477,8 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
     }
     const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
       bucket: "management-write",
-      projectId: parsedParams.data.id
+      projectId: parsedParams.data.id,
+      allowLegacyMutation: true
     });
     if (auth === null) {
       return;
@@ -458,6 +491,7 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
     }
     const removed = await dependencies.githubManagement.removeProjectRepoForOrganization({
       organization_id: auth.access.organization_id,
+      actor_user_id: auth.member.member_id,
       project_id: parsedParams.data.id
     });
     if (!removed) {
@@ -670,6 +704,7 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
     }
 
     const updateInput: {
+      project_scope?: "current_project";
       organization_id: string;
       project_id: string;
       rule_id: string;
@@ -691,6 +726,8 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
       actor_user_id: auth.member.member_id,
       actor_role: auth.access.effective_role
     };
+
+    if (parsedBody.data.project_scope) updateInput.project_scope = parsedBody.data.project_scope;
 
     if (parsedBody.data.name !== undefined) {
       updateInput.name = parsedBody.data.name;
@@ -768,7 +805,10 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
     }
 
     const stateSecret = resolveGitHubAppInstallStateSecret();
-    const stateCookie = readCookieValue(request.headers.cookie, GITHUB_APP_INSTALL_STATE_COOKIE_NAME);
+    const stateCookie = readCookieValue(
+      request.headers.cookie,
+      GITHUB_APP_INSTALL_STATE_COOKIE_NAME
+    );
     const queryState = parsedQuery.data.state;
     if (
       stateSecret === null ||
@@ -776,7 +816,10 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
       stateCookie === null ||
       !isTimingSafeEqualUtf8(stateCookie, queryState)
     ) {
-      reply.header("Set-Cookie", buildClearedGitHubAppInstallStateCookie({ secure: shouldUseSecureCookies() }));
+      reply.header(
+        "Set-Cookie",
+        buildClearedGitHubAppInstallStateCookie({ secure: shouldUseSecureCookies() })
+      );
       if (queryState === undefined && stateCookie === null) {
         return reply.redirect(buildExternalGitHubAppSetupRedirectUrl());
       }
@@ -785,26 +828,37 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
 
     const installState = readGitHubInstallState(queryState, stateSecret);
     if (installState === null) {
-      reply.header("Set-Cookie", buildClearedGitHubAppInstallStateCookie({ secure: shouldUseSecureCookies() }));
+      reply.header(
+        "Set-Cookie",
+        buildClearedGitHubAppInstallStateCookie({ secure: shouldUseSecureCookies() })
+      );
       return reply.status(400).send({ error: "invalid_state" });
     }
 
-    const installation = await dependencies.githubManagement.completeGithubInstallationForOrganization({
-      organization_id: installState.organization_id,
-      installation_id: parsedQuery.data.installation_id
-    });
+    const installation =
+      await dependencies.githubManagement.completeGithubInstallationForOrganization({
+        organization_id: installState.organization_id,
+        installation_id: parsedQuery.data.installation_id
+      });
     if (installation === "github_not_configured") {
       return reply.status(503).send({ error: "github_not_configured" });
     }
 
-    reply.header("Set-Cookie", buildClearedGitHubAppInstallStateCookie({ secure: shouldUseSecureCookies() }));
+    reply.header(
+      "Set-Cookie",
+      buildClearedGitHubAppInstallStateCookie({ secure: shouldUseSecureCookies() })
+    );
     return reply.redirect(`${resolveAppRedirectBaseUrl()}${installState.return_to}`);
   });
 
   app.register((scope) => {
-    scope.addContentTypeParser("application/json", { parseAs: "buffer" }, (_request, body, done) => {
-      done(null, body);
-    });
+    scope.addContentTypeParser(
+      "application/json",
+      { parseAs: "buffer" },
+      (_request, body, done) => {
+        done(null, body);
+      }
+    );
 
     scope.post("/v1/github/app/webhook", async (request, reply) => {
       if (dependencies.githubManagement === undefined) {
@@ -818,7 +872,9 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
       if (!(request.body instanceof Buffer)) {
         return reply.status(400).send({ error: "invalid_body" });
       }
-      if (!dependencies.githubManagement.verifyWebhookSignature({ rawBody: request.body, signature })) {
+      if (
+        !dependencies.githubManagement.verifyWebhookSignature({ rawBody: request.body, signature })
+      ) {
         return reply.status(400).send({ error: "invalid_signature" });
       }
 

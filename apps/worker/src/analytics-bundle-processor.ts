@@ -167,6 +167,7 @@ async function buildAnalyticsBundleInput(input: {
   }
   const metricsInput = {
     project_id: input.generation.project_id,
+    origin_project_ids: input.generation.scope_origin_ids ?? [input.generation.project_id],
     from: spec.from,
     to: spec.to,
     granularity: spec.granularity,
@@ -199,6 +200,7 @@ async function buildAnalyticsBundleInput(input: {
     ...readRecordArray(input.generation.analysis_spec["representative_journeys"]),
     ...(await readRepresentativeJourneySamples({
       project_id: input.generation.project_id,
+      origin_project_ids: input.generation.scope_origin_ids ?? [input.generation.project_id],
       analysis_kind: input.generation.analysis_kind,
       journeys: journeys.patterns,
       analyticsJourneySampleStore: input.analyticsJourneySampleStore,
@@ -286,6 +288,7 @@ async function buildIncidentImpactAnalyticsBundleInput(input: {
 }): Promise<AnalyticsBundleBuildInput> {
   const metricsInput = {
     project_id: input.generation.project_id,
+    origin_project_ids: input.generation.scope_origin_ids ?? [input.generation.project_id],
     from: input.spec.from,
     to: input.spec.to,
     granularity: input.spec.granularity,
@@ -347,6 +350,7 @@ async function buildIncidentImpactAnalyticsBundleInput(input: {
     journey_patterns: impact.journey_patterns,
     representative_journeys: await readRepresentativeJourneySamples({
       project_id: input.generation.project_id,
+      origin_project_ids: input.generation.scope_origin_ids ?? [input.generation.project_id],
       analysis_kind: input.generation.analysis_kind,
       journeys: impact.journey_patterns,
       analyticsJourneySampleStore: input.analyticsJourneySampleStore,

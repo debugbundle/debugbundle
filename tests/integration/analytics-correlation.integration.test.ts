@@ -75,6 +75,9 @@ runIntegration("analytics incident correlation integration", () => {
         [incidentId, projectId, `fingerprint-${order}`, occurredAt]
       );
 
+      // Isolate correlation serialization from the first observation's service
+      // registration lock; unseen-service creation has its own concurrency tests.
+      await pool.query("SELECT debugbundle_observe_service($1,'web')", [projectId]);
       const analyticsWrite = (): Promise<{ recorded: boolean }> =>
         rollupStore.recordAnalyticsEvent({
           project_id: projectId,

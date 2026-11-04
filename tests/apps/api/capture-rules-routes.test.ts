@@ -184,6 +184,89 @@ function createBrowserNoiseBundleBuffer(
 }
 
 describe("capture rule routes", () => {
+  it("uses canonical owner context for a shared incident while retaining the original artifact namespace", async () => {
+    const source = "00000000-0000-0000-0000-000000000001",
+      root = "00000000-0000-0000-0000-000000000002";
+    const list = vi.fn().mockResolvedValue([]),
+      create = vi.fn().mockResolvedValue({
+        ...rule,
+        project_id: root,
+        matcher: { ...rule.matcher, services: ["Site"] }
+      });
+    const getObject = vi.fn().mockResolvedValue(createBrowserNoiseBundleBuffer());
+    const audit = vi.fn().mockResolvedValue(undefined);
+    const app = createDependencies({
+      memberAuth: {
+        resolveMemberByTokenHash: vi
+          .fn()
+          .mockResolvedValue({ member_id: "collaborator", organization_id: "org_home" })
+      },
+      projectManagement: {
+        listProjectsForOrganization: vi.fn(),
+        createProjectForOrganization: vi.fn(),
+        updateProjectForOrganization: vi.fn(),
+        deleteProjectForOrganization: vi.fn(),
+        resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+          project_id: source,
+          canonical_project_id: root,
+          organization_id: "org_owner",
+          owner_user_id: "owner",
+          effective_role: "admin",
+          relationship: "shared",
+          organization_plan: "team"
+        })
+      },
+      incidentRetrieval: {
+        listIncidentsForOrganization: vi.fn(),
+        listIncidentLogsForOrganization: vi.fn(),
+        getIncidentForOrganization: vi.fn().mockResolvedValue({
+          ...createIncidentFixture(),
+          canonical_project_id: root,
+          canonical_service_name: "Site"
+        })
+      },
+      captureRuleManagement: {
+        listCaptureRulesForProject: list,
+        listActiveCaptureRulesForProject: vi.fn(),
+        createCaptureRuleForProject: create,
+        updateCaptureRuleForProject: vi.fn(),
+        deleteCaptureRuleForProject: vi.fn()
+      },
+      objectStoreReader: { getObject },
+      auditLogging: { createAuditLog: audit }
+    });
+    const suggested = await app.inject({
+      method: "POST",
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/capture-rule-suggestion",
+      headers: { authorization: "Bearer dbundle_mem_test_token" }
+    });
+    expect(suggested.statusCode).toBe(200);
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/incidents/550e8400-e29b-41d4-a716-446655440123/capture-rules",
+      headers: { authorization: "Bearer dbundle_mem_test_token" },
+      payload: { suggestion_id: "resource_context" }
+    });
+    expect(response.statusCode).toBe(201);
+    expect(list).toHaveBeenCalledWith({
+      organization_id: "org_owner",
+      actor_user_id: "collaborator",
+      project_id: root
+    });
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organization_id: "org_owner",
+        actor_user_id: "collaborator",
+        project_id: root,
+        create: expect.objectContaining({
+          matcher: expect.objectContaining({ services: ["Site"] })
+        })
+      })
+    );
+    expect(getObject).toHaveBeenCalledWith({ key: expect.stringContaining(`/${source}/`) });
+    expect(audit).toHaveBeenCalledWith(expect.objectContaining({ organization_id: "org_owner" }));
+    await app.close();
+  });
   it("lists capture rules for project viewers", async () => {
     const app = createDependencies({
       captureRuleManagement: {

@@ -4,14 +4,27 @@ import { createPostgresWeeklyReportDeliveryStore } from "../../../packages/stora
 
 describe("weekly report delivery store", () => {
   it("claims weekly email delivery for a fresh or retryable window", async (): Promise<void> => {
-    const query = vi
+    const history = vi
       .fn()
-      .mockResolvedValueOnce({
-        rows: [{ delivery_id: "weekly_123", status: "pending", claimed: true }]
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce([
+        {
+          delivery_id: "weekly_123",
+          project_id: "proj_123",
+          weekly_report_channel_id: "wrc_123",
+          status: "delivered",
+          last_error: null
+        }
+      ]);
+    const query = vi.fn().mockImplementation((sql: string) =>
+      Promise.resolve({
+        rows: sql.includes("FROM weekly_report_deliveries d")
+          ? history()
+          : sql.includes("INSERT INTO weekly_report_deliveries")
+            ? [{ delivery_id: "weekly_123" }]
+            : []
       })
-      .mockResolvedValueOnce({
-        rows: [{ delivery_id: "weekly_123", status: "delivered", claimed: false }]
-      });
+    );
 
     const store = createPostgresWeeklyReportDeliveryStore({ query });
 
@@ -32,8 +45,14 @@ describe("weekly report delivery store", () => {
 
     expect(created).toEqual({ delivery_id: "weekly_123", created: true });
     expect(alreadyDelivered).toEqual({ delivery_id: "weekly_123", created: false });
-    expect(String(query.mock.calls[0]?.[0] ?? "")).toMatch(
-      /ON CONFLICT \(weekly_report_channel_id, window_start, window_end\)\s+WHERE weekly_report_channel_id IS NOT NULL/
+    expect(
+      String(
+        query.mock.calls.find(([sql]) =>
+          String(sql).includes("INSERT INTO weekly_report_deliveries")
+        )?.[0] ?? ""
+      )
+    ).toMatch(
+      /ON CONFLICT\(weekly_report_channel_id,window_start,window_end\) WHERE weekly_report_channel_id IS NOT NULL/
     );
   });
 

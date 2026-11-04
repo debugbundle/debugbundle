@@ -1,4 +1,5 @@
 import { beforeEach, vi } from "vitest";
+import { createHash } from "node:crypto";
 
 vi.mock("../../packages/storage/src/billing-subscription-operation-store.js", async () => {
   const { createMemoryBillingSubscriptionOperationStore } =
@@ -148,10 +149,8 @@ vi.mock("../../packages/storage/src/index.js", () => ({
     objectStore: { deleteObjectsByPrefix(prefix: string): Promise<void> },
     projectId: string
   ): Promise<void> => {
-    await objectStore.deleteObjectsByPrefix(`raw-events/${projectId}/`);
-    await objectStore.deleteObjectsByPrefix(`bundles/${projectId}/`);
-    await objectStore.deleteObjectsByPrefix(`improvement-bundles/${projectId}/`);
-    await objectStore.deleteObjectsByPrefix(`reproductions/${projectId}/`);
+    const { deleteProjectObjects } = await import("../../packages/storage/src/helpers.js");
+    return deleteProjectObjects(objectStore, projectId);
   },
   executeAvailabilityCheck: executeAvailabilityCheckMock,
   validateAvailabilityCheckDefinition: validateAvailabilityCheckDefinitionMock,
@@ -219,6 +218,7 @@ vi.mock("../../packages/storage/src/index.js", () => ({
 }));
 
 vi.mock("../../packages/auth/src/index.js", () => ({
+  hashToken: (token: string) => createHash("sha256").update(token).digest("hex"),
   createGitHubOAuthClient: createGitHubOAuthClientMock,
   createGitHubCliAuthService: createGitHubCliAuthServiceMock,
   createAccountDeletionChallengeService: createAccountDeletionChallengeServiceMock,

@@ -28,7 +28,12 @@ export class ProbeApiError extends Error {
 }
 
 function toApiError(status: number, body: unknown): ProbeApiError {
-  if (typeof body === "object" && body !== null && "error" in body && typeof body.error === "string") {
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    "error" in body &&
+    typeof body.error === "string"
+  ) {
     return new ProbeApiError(status, body.error);
   }
 
@@ -54,6 +59,9 @@ export function createProbeApi(httpClient: {
     environment?: string;
     ttlSeconds?: number;
     triggerTtlSeconds?: number;
+    sdkProjectId?: string;
+    sdkTokenId?: string;
+    sdkService?: string;
   }): Promise<{ activation: ActivationLike; trigger_token: string }>;
   listActiveProbes(input: {
     bearerToken: string;
@@ -79,6 +87,9 @@ export function createProbeApi(httpClient: {
       if (input.ttlSeconds !== undefined) {
         body["ttl_seconds"] = input.ttlSeconds;
       }
+      if (input.sdkProjectId !== undefined) body["sdk_project_id"] = input.sdkProjectId;
+      if (input.sdkTokenId !== undefined) body["sdk_token_id"] = input.sdkTokenId;
+      if (input.sdkService !== undefined) body["sdk_service"] = input.sdkService;
       if (input.triggerTtlSeconds !== undefined) {
         body["trigger_ttl_seconds"] = input.triggerTtlSeconds;
       }
@@ -164,6 +175,9 @@ export async function activateProbeCommand(
     environment?: string;
     ttlSeconds?: number;
     triggerTtlSeconds?: number;
+    sdkProjectId?: string;
+    sdkTokenId?: string;
+    sdkService?: string;
     json?: boolean;
   },
   api: {
@@ -175,6 +189,9 @@ export async function activateProbeCommand(
       environment?: string;
       ttlSeconds?: number;
       triggerTtlSeconds?: number;
+      sdkProjectId?: string;
+      sdkTokenId?: string;
+      sdkService?: string;
     }): Promise<{ activation: ActivationLike; trigger_token: string }>;
   }
 ): Promise<CliCommandResult> {
@@ -187,6 +204,9 @@ export async function activateProbeCommand(
       environment?: string;
       ttlSeconds?: number;
       triggerTtlSeconds?: number;
+      sdkProjectId?: string;
+      sdkTokenId?: string;
+      sdkService?: string;
     } = {
       bearerToken: input.bearerToken,
       projectId: input.projectId,
@@ -201,6 +221,9 @@ export async function activateProbeCommand(
     if (input.ttlSeconds !== undefined) {
       requestInput.ttlSeconds = input.ttlSeconds;
     }
+    if (input.sdkProjectId !== undefined) requestInput.sdkProjectId = input.sdkProjectId;
+    if (input.sdkTokenId !== undefined) requestInput.sdkTokenId = input.sdkTokenId;
+    if (input.sdkService !== undefined) requestInput.sdkService = input.sdkService;
     if (input.triggerTtlSeconds !== undefined) {
       requestInput.triggerTtlSeconds = input.triggerTtlSeconds;
     }
@@ -216,7 +239,10 @@ export async function activateProbeCommand(
       output: `Probe activated: ${result.activation.activation_id} (${result.activation.label_pattern})\nTrigger token: ${result.trigger_token}`
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -250,11 +276,17 @@ export async function listActiveProbesCommand(
     return {
       exitCode: 0,
       output: result.activations
-        .map((a) => `${a.activation_id} ${a.label_pattern} (${a.service}/${a.environment}) expires ${a.expires_at}`)
+        .map(
+          (a) =>
+            `${a.activation_id} ${a.label_pattern} (${a.service}/${a.environment}) expires ${a.expires_at}`
+        )
         .join("\n")
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -289,7 +321,10 @@ export async function deactivateProbeCommand(
       output: result.deactivated ? "Probe deactivated." : "Probe was already inactive."
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -297,7 +332,9 @@ async function createAuthenticatedProbeApi(
   input: { authFilePath?: string },
   dependencies?: {
     readAuthState?: (input: { authFilePath?: string }) => Promise<CliAuthState>;
-    createHttpClient?: (input: { baseUrl: string }) => { request(request: ProbeHttpRequest): Promise<ProbeHttpResponse> };
+    createHttpClient?: (input: { baseUrl: string }) => {
+      request(request: ProbeHttpRequest): Promise<ProbeHttpResponse>;
+    };
     createApi?: typeof createProbeApi;
   }
 ): Promise<{ authState: CliAuthState; api: ReturnType<typeof createProbeApi> }> {
@@ -308,7 +345,9 @@ async function createAuthenticatedProbeApi(
   }
 
   const authState = await readAuth(authStateInput);
-  const createHttpClient = dependencies?.createHttpClient ?? ((clientInput: { baseUrl: string }) => createCliHttpClient(clientInput));
+  const createHttpClient =
+    dependencies?.createHttpClient ??
+    ((clientInput: { baseUrl: string }) => createCliHttpClient(clientInput));
   const httpClient = createHttpClient({ baseUrl: authState.base_url });
   const createApi = dependencies?.createApi ?? createProbeApi;
 
@@ -324,6 +363,9 @@ export async function activateProbeWithAuthCommand(
     environment?: string;
     ttlSeconds?: number;
     triggerTtlSeconds?: number;
+    sdkProjectId?: string;
+    sdkTokenId?: string;
+    sdkService?: string;
     json?: boolean;
   },
   dependencies?: Parameters<typeof createAuthenticatedProbeApi>[1]
@@ -354,7 +396,11 @@ export async function listActiveProbesWithAuthCommand(
     dependencies,
     runCommand: (authState, api) =>
       listActiveProbesCommand(
-        { bearerToken: authState.bearer_token, projectId: input.projectId, ...(input.json === undefined ? {} : { json: input.json }) },
+        {
+          bearerToken: authState.bearer_token,
+          projectId: input.projectId,
+          ...(input.json === undefined ? {} : { json: input.json })
+        },
         { listActiveProbes: (ri) => api.listActiveProbes(ri) }
       )
   });
@@ -374,7 +420,12 @@ export async function deactivateProbeWithAuthCommand(
     dependencies,
     runCommand: (authState, api) =>
       deactivateProbeCommand(
-        { bearerToken: authState.bearer_token, projectId: input.projectId, activationId: input.activationId, ...(input.json === undefined ? {} : { json: input.json }) },
+        {
+          bearerToken: authState.bearer_token,
+          projectId: input.projectId,
+          activationId: input.activationId,
+          ...(input.json === undefined ? {} : { json: input.json })
+        },
         { deactivateProbe: (ri) => api.deactivateProbe(ri) }
       )
   });

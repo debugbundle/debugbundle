@@ -175,6 +175,7 @@ export async function handleAlertCommand(
 
   if (action === "update") {
     expectNoUnknownOptions(parsedArgv, [
+      "project-scope",
       "auth-file",
       "json",
       "project-id",
@@ -199,6 +200,7 @@ export async function handleAlertCommand(
       alertId: requirePositional(parsedArgv, 2, "alert-id")
     } as {
       projectId: string;
+      projectScope?: "current_project";
       alertId: string;
       serviceId?: string | null;
       channel?: string;
@@ -213,6 +215,12 @@ export async function handleAlertCommand(
       json?: boolean;
     });
 
+    const projectScope = readStringOption(parsedArgv, "project-scope");
+    if (projectScope !== undefined) {
+      if (projectScope !== "current_project")
+        throw new CliInputError("Invalid value for --project-scope.");
+      input.projectScope = projectScope;
+    }
     const serviceId = readStringOption(parsedArgv, "service-id");
     if (serviceId !== undefined) {
       input.serviceId = serviceId === "null" ? null : serviceId;
@@ -259,7 +267,8 @@ export async function handleAlertCommand(
       input.cooldownSeconds === undefined &&
       input.config === undefined &&
       input.rotateSigningSecret === undefined &&
-      input.isEnabled === undefined
+      input.isEnabled === undefined &&
+      input.projectScope === undefined
     ) {
       throw new CliInputError("At least one alert field must be provided.");
     }

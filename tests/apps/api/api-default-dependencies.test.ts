@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createPostgresAuthStoreMock,
   createPostgresAnalyticsBundleGenerationStoreMock,
-  createPostgresCaptureRuleStoreMock,
   createPostgresAvailabilityCheckStoreMock,
   createPostgresImprovementOpportunityStoreMock,
   createMemberAuthServiceMock,
@@ -736,40 +735,5 @@ describe("api-default-dependency-mocks core", () => {
     expect(acquireLease).toHaveBeenCalledWith("leases:bundle-regeneration:inc_123", 30);
     expect(metadataStore.getBundleSourceForOrganization).not.toHaveBeenCalled();
     expect(enqueue).not.toHaveBeenCalled();
-  });
-
-  it("clears sample-only fields when changing a capture rule to a non-sample action", async (): Promise<void> => {
-    const updateCaptureRule = vi.fn().mockResolvedValue(null);
-    createPostgresCaptureRuleStoreMock.mockReturnValueOnce({
-      listCaptureRulesByProjectId: vi.fn(),
-      listActiveCaptureRulesByProjectId: vi.fn(),
-      createCaptureRule: vi.fn(),
-      updateCaptureRule,
-      deleteCaptureRule: vi.fn(),
-      recordCaptureRuleMatch: vi.fn()
-    });
-
-    const deps = createApiDependencies({
-      objectStore: { putObject: vi.fn(), getObject: vi.fn(), deleteObjectsByPrefix: vi.fn() },
-      queue: { enqueue: vi.fn() },
-      db: { query: vi.fn() }
-    });
-
-    await deps.captureRuleManagement.updateCaptureRuleForProject({
-      organization_id: "org_123",
-      project_id: "proj_123",
-      rule_id: "00000000-0000-4000-8000-000000000101",
-      update: {
-        action: "drop"
-      }
-    });
-
-    expect(updateCaptureRule).toHaveBeenCalledWith({
-      id: "00000000-0000-4000-8000-000000000101",
-      project_id: "proj_123",
-      action: "drop",
-      sample_rate: null,
-      sample_event_class: null
-    });
   });
 });

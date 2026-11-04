@@ -1,18 +1,41 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { ProjectManagementApiError } from "../../../packages/project-management-client/src/index.js";
-import { createProjectMcpTools, PROJECT_MCP_TOOL_NAMES } from "../../../apps/mcp/src/project-tools.js";
+import {
+  createProjectMcpTools,
+  PROJECT_MCP_TOOL_NAMES
+} from "../../../apps/mcp/src/project-tools.js";
 
 describe("mcp project tools", () => {
+  it("forwards an explicit retained project view", async () => {
+    const listProjects = vi.fn().mockResolvedValue([]);
+    const tools = createProjectMcpTools({
+      listProjects,
+      createProject: vi.fn(),
+      updateProject: vi.fn(),
+      deleteProject: vi.fn()
+    });
+    await tools.list_projects({ bearerToken: "member", projectId: "retained" });
+    expect(listProjects).toHaveBeenCalledWith({ bearerToken: "member", projectId: "retained" });
+  });
   it("declares project tool parity", () => {
-    expect(PROJECT_MCP_TOOL_NAMES).toEqual(["list_projects", "create_project", "update_project", "delete_project"]);
+    expect(PROJECT_MCP_TOOL_NAMES).toEqual([
+      "list_projects",
+      "create_project",
+      "update_project",
+      "delete_project"
+    ]);
   });
 
   it("returns project payloads for all operations", async () => {
     const tools = createProjectMcpTools({
       listProjects: vi.fn().mockResolvedValue([{ project_id: "proj_1", name: "Main App" }]),
-      createProject: vi.fn().mockResolvedValue({ project_id: "proj_2", name: "New App", slug: "new-app" }),
-      updateProject: vi.fn().mockResolvedValue({ project_id: "proj_2", name: "Renamed App", slug: "new-app" }),
+      createProject: vi
+        .fn()
+        .mockResolvedValue({ project_id: "proj_2", name: "New App", slug: "new-app" }),
+      updateProject: vi
+        .fn()
+        .mockResolvedValue({ project_id: "proj_2", name: "Renamed App", slug: "new-app" }),
       deleteProject: vi.fn().mockResolvedValue({ project_id: "proj_1", name: "Main App" })
     });
 
@@ -57,15 +80,21 @@ describe("mcp project tools", () => {
 
   it("maps api and unknown errors", async () => {
     const apiErrorTools = createProjectMcpTools({
-      listProjects: vi.fn().mockRejectedValue(new ProjectManagementApiError(404, "project_not_found")),
+      listProjects: vi
+        .fn()
+        .mockRejectedValue(new ProjectManagementApiError(404, "project_not_found")),
       createProject: vi.fn().mockRejectedValue(new Error("network")),
-      updateProject: vi.fn().mockRejectedValue(new ProjectManagementApiError(409, "project_slug_taken")),
-      deleteProject: vi.fn().mockRejectedValue(new ProjectManagementApiError(404, "project_not_found"))
+      updateProject: vi
+        .fn()
+        .mockRejectedValue(new ProjectManagementApiError(409, "project_slug_taken")),
+      deleteProject: vi
+        .fn()
+        .mockRejectedValue(new ProjectManagementApiError(404, "project_not_found"))
     });
 
-    await expect(
-      apiErrorTools.list_projects({ bearerToken: "dbundle_mem_x" })
-    ).rejects.toThrow("mcp_tool_error:project_not_found");
+    await expect(apiErrorTools.list_projects({ bearerToken: "dbundle_mem_x" })).rejects.toThrow(
+      "mcp_tool_error:project_not_found"
+    );
 
     await expect(
       apiErrorTools.create_project({

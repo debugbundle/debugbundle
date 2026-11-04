@@ -1,3 +1,4 @@
+import { readAnalyticsOriginScope } from "./analytics-metrics-queries.js";
 import {
   AnalyticsIncidentImpactResponseSchema,
   type AnalyticsIncidentImpactResponse,
@@ -7,6 +8,7 @@ import type { Queryable } from "./types.js";
 
 export interface AnalyticsIncidentImpactInput {
   project_id: string;
+  origin_project_ids?: string[];
   incident_id: string;
   from: string;
   to: string;
@@ -54,20 +56,22 @@ export async function readAnalyticsIncidentImpact(
   options?: AnalyticsIncidentImpactReadOptions
 ): Promise<AnalyticsIncidentImpactResponse> {
   const limit = normalizeLimit(input.limit);
-  const [affectedSessionResult, routes, funnels, deviceTypes, browsers, journeys, bundle] = await Promise.all([
-    readAffectedSessionCount(db, input),
-    readAffectedRoutes(db, input, limit),
-    readAffectedFunnels(db, input, limit),
-    readAffectedSegments(db, input, limit, "device_type"),
-    readAffectedSegments(db, input, limit, "browser_family"),
-    readAffectedJourneyPatterns(db, input, limit),
-    options?.includeBundleState === false
-      ? Promise.resolve(null)
-      : readIncidentImpactBundleState(db, input)
-  ]);
-  const sampleIdsByTransition = options?.includeSampleIds === false
-    ? new Map<string, string[]>()
-    : await readAffectedJourneySampleIds(db, input, journeys.rows);
+  const [affectedSessionResult, routes, funnels, deviceTypes, browsers, journeys, bundle] =
+    await Promise.all([
+      readAffectedSessionCount(db, input),
+      readAffectedRoutes(db, input, limit),
+      readAffectedFunnels(db, input, limit),
+      readAffectedSegments(db, input, limit, "device_type"),
+      readAffectedSegments(db, input, limit, "browser_family"),
+      readAffectedJourneyPatterns(db, input, limit),
+      options?.includeBundleState === false
+        ? Promise.resolve(null)
+        : readIncidentImpactBundleState(db, input)
+    ]);
+  const sampleIdsByTransition =
+    options?.includeSampleIds === false
+      ? new Map<string, string[]>()
+      : await readAffectedJourneySampleIds(db, input, journeys.rows);
 
   return AnalyticsIncidentImpactResponseSchema.parse({
     incident_id: input.incident_id,
@@ -77,6 +81,7 @@ export async function readAnalyticsIncidentImpact(
       to: input.to,
       granularity: input.granularity,
       service: input.service ?? null,
+      ...(await readAnalyticsOriginScope(db, input.project_id, input.origin_project_ids)),
       environment: input.environment ?? null
     },
     affected_sessions: toNonNegativeInteger(affectedSessionResult.rows[0]?.affected_sessions),
@@ -94,27 +99,34 @@ export async function readAnalyticsIncidentImpact(
       from_route_key: toNonEmptyString(row.from_route_key, "unknown"),
       to_route_key: toNonEmptyString(row.to_route_key, "unknown"),
       affected_sessions: toNonNegativeInteger(row.affected_sessions),
-      sample_ids: sampleIdsByTransition.get(toTransitionTag(
-        toNonEmptyString(row.from_route_key, "unknown"),
-        toNonEmptyString(row.to_route_key, "unknown")
-      )) ?? []
+      sample_ids:
+        sampleIdsByTransition.get(
+          toTransitionTag(
+            toNonEmptyString(row.from_route_key, "unknown"),
+            toNonEmptyString(row.to_route_key, "unknown")
+          )
+        ) ?? []
     })),
     conversion_delta: {
       availability: "unavailable",
       value: null,
       unit: "percentage_points"
     },
-    analytics_bundle: bundle === null
-      ? { status: "not_requested", generation_id: null, failure_reason: null }
-      : bundle
+    analytics_bundle:
+      bundle === null
+        ? { status: "not_requested", generation_id: null, failure_reason: null }
+        : bundle
   });
 }
 
-async function readAffectedSessionCount(db: Queryable, input: AnalyticsIncidentImpactInput): Promise<{ rows: CountRow[] }> {
+async function readAffectedSessionCount(
+  db: Queryable,
+  input: AnalyticsIncidentImpactInput
+): Promise<{ rows: CountRow[] }> {
   const where = buildLinkWhere(input);
   return await db.query<CountRow>(
     `
-      SELECT COUNT(DISTINCT links.subject_hash)::bigint AS affected_sessions
+      SELECT COUNT(DISTINCT (links.project_id,links.subject_hash))::bigint AS affected_sessions
       FROM analytics_incident_session_links links
       ${where.sql}
     `,
@@ -132,7 +144,7 @@ async function readAffectedRoutes(
     `
       SELECT
         links.route_key,
-        COUNT(DISTINCT links.subject_hash)::bigint AS affected_sessions
+        COUNT(DISTINCT (links.project_id,links.subject_hash))::bigint AS affected_sessions
       FROM analytics_incident_session_links links
       ${where.sql}
       GROUP BY links.route_key
@@ -164,7 +176,7 @@ async function readAffectedFunnels(
       )
       SELECT
         split_part(uniques.rollup_key, '|', 1) AS funnel_key,
-        COUNT(DISTINCT uniques.subject_hash)::bigint AS affected_sessions
+        COUNT(DISTINCT (uniques.project_id,uniques.subject_hash))::bigint AS affected_sessions
       FROM linked_subjects links
       JOIN analytics_rollup_uniques uniques
         ON uniques.project_id = links.project_id
@@ -189,14 +201,15 @@ async function readAffectedSegments(
   segment: "device_type" | "browser_family"
 ): Promise<{ rows: SegmentRow[] }> {
   const where = buildLinkWhere(input);
-  const expression = segment === "device_type"
-    ? "COALESCE(NULLIF(route_rollups.device_type, ''), 'unknown')"
-    : "COALESCE(NULLIF(route_rollups.browser_family, ''), 'unknown')";
+  const expression =
+    segment === "device_type"
+      ? "COALESCE(NULLIF(route_rollups.device_type, ''), 'unknown')"
+      : "COALESCE(NULLIF(route_rollups.browser_family, ''), 'unknown')";
   return await db.query<SegmentRow>(
     `
       SELECT
         ${expression} AS value,
-        COUNT(DISTINCT links.subject_hash)::bigint AS affected_sessions
+        COUNT(DISTINCT (links.project_id,links.subject_hash))::bigint AS affected_sessions
       FROM analytics_incident_session_links links
       JOIN analytics_route_rollups route_rollups
         ON route_rollups.project_id = links.project_id
@@ -237,7 +250,7 @@ async function readAffectedJourneyPatterns(
       SELECT
         split_part(uniques.rollup_key, '|', 1) AS from_route_key,
         split_part(uniques.rollup_key, '|', 2) AS to_route_key,
-        COUNT(DISTINCT uniques.subject_hash)::bigint AS affected_sessions
+        COUNT(DISTINCT (uniques.project_id,uniques.subject_hash))::bigint AS affected_sessions
       FROM linked_subjects links
       JOIN analytics_rollup_uniques uniques
         ON uniques.project_id = links.project_id
@@ -260,10 +273,16 @@ async function readAffectedJourneySampleIds(
   input: AnalyticsIncidentImpactInput,
   patterns: JourneyPatternRow[]
 ): Promise<Map<string, string[]>> {
-  const transitionTags = [...new Set(patterns.map((pattern) => toTransitionTag(
-    toNonEmptyString(pattern.from_route_key, "unknown"),
-    toNonEmptyString(pattern.to_route_key, "unknown")
-  )))];
+  const transitionTags = [
+    ...new Set(
+      patterns.map((pattern) =>
+        toTransitionTag(
+          toNonEmptyString(pattern.from_route_key, "unknown"),
+          toNonEmptyString(pattern.to_route_key, "unknown")
+        )
+      )
+    )
+  ];
   if (transitionTags.length === 0) {
     return new Map();
   }
@@ -348,7 +367,11 @@ async function readAffectedJourneySampleIds(
 async function readIncidentImpactBundleState(
   db: Queryable,
   input: AnalyticsIncidentImpactInput
-): Promise<{ status: "pending" | "running" | "completed" | "failed"; generation_id: string; failure_reason: string | null } | null> {
+): Promise<{
+  status: "pending" | "running" | "completed" | "failed";
+  generation_id: string;
+  failure_reason: string | null;
+} | null> {
   const result = await db.query<BundleStateRow>(
     `
       SELECT
@@ -356,7 +379,7 @@ async function readIncidentImpactBundleState(
         status,
         failure_reason
       FROM analytics_bundle_generations
-      WHERE project_id = $1::uuid
+      WHERE project_id=ANY(debugbundle_project_origins($1::uuid))
         AND analysis_kind = 'incident_impact'
         AND (
           analysis_spec ->> 'incident_id' = $2::text
@@ -373,28 +396,48 @@ async function readIncidentImpactBundleState(
   }
 
   const status = row.status;
-  if (status !== "pending" && status !== "running" && status !== "completed" && status !== "failed") {
+  if (
+    status !== "pending" &&
+    status !== "running" &&
+    status !== "completed" &&
+    status !== "failed"
+  ) {
     return null;
   }
   return {
     status,
     generation_id: row.generation_id,
-    failure_reason: typeof row.failure_reason === "string" && row.failure_reason.length > 0 ? row.failure_reason : null
+    failure_reason:
+      typeof row.failure_reason === "string" && row.failure_reason.length > 0
+        ? row.failure_reason
+        : null
   };
 }
 
 function buildLinkWhere(input: AnalyticsIncidentImpactInput): { sql: string; params: unknown[] } {
-  const params: unknown[] = [input.project_id, input.incident_id, input.from, input.to, input.granularity];
+  const params: unknown[] = [
+    input.project_id,
+    input.incident_id,
+    input.from,
+    input.to,
+    input.granularity
+  ];
   const conditions = [
-    "links.project_id = $1::uuid",
+    "links.project_id=ANY(debugbundle_project_origins($1::uuid))",
     "links.incident_id = $2::uuid",
     "links.bucket_start >= $3::timestamptz",
     "links.bucket_start < $4::timestamptz",
     "links.bucket_granularity = $5"
   ];
+  if (input.origin_project_ids !== undefined) {
+    params.push(input.origin_project_ids);
+    conditions.push(`links.project_id=ANY($${params.length}::uuid[])`);
+  }
   if (input.service !== undefined) {
     params.push(input.service);
-    conditions.push(`links.service = $${params.length}`);
+    conditions.push(
+      `debugbundle_service_matches($1::uuid,links.project_id,links.service,$${params.length})`
+    );
   }
   if (input.environment !== undefined) {
     params.push(input.environment);
@@ -435,7 +478,9 @@ function buildLinkWhere(input: AnalyticsIncidentImpactInput): { sql: string; par
     }
   }
 
-  for (const [key, value] of Object.entries(input.custom_dimensions ?? {}).sort(([left], [right]) => left.localeCompare(right))) {
+  for (const [key, value] of Object.entries(input.custom_dimensions ?? {}).sort(([left], [right]) =>
+    left.localeCompare(right)
+  )) {
     params.push(key, value);
     rollupFilters.push(
       `jsonb_extract_path_text(filtered_rollups.dimensions, 'custom_dimensions', $${params.length - 1}::text) = $${params.length}`

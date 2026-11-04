@@ -137,6 +137,7 @@ export async function processNextGenerateWeeklyReportJob(
 
     const report = await dependencies.weeklyReportingStore.getWeeklyProjectReport({
       project_id: projectId,
+      delivery_id: deliveryId,
       window_start: job.window_start,
       window_end: job.window_end
     });

@@ -19,6 +19,7 @@ interface RecordImprovementOpportunityOccurrenceInput {
   severity: ImprovementOpportunitySeverity;
   confidence: number;
   fingerprint: string;
+  original_fingerprint?: string;
   title: string;
   summary: string;
   evidence: Record<string, unknown>;
@@ -124,11 +125,19 @@ export async function recordImprovementOpportunityOccurrence(
     } & Record<string, unknown>
   >(
     `
-      WITH existing_opportunity AS (
+      WITH prior_event_opportunity AS (
+        SELECT prior.fingerprint FROM improvement_opportunity_events ioe
+        JOIN improvement_opportunities prior ON prior.id=ioe.improvement_opportunity_id
+        WHERE prior.project_id=$2::uuid AND prior.kind=$5 AND prior.fingerprint=ANY(ARRAY[$8,$20]::text[])
+          AND ioe.event_id=$13::uuid
+        ORDER BY CASE WHEN prior.fingerprint=$20 THEN 0 ELSE 1 END,prior.id LIMIT 1
+      ), effective_fingerprint AS (
+        SELECT COALESCE((SELECT fingerprint FROM prior_event_opportunity),$8) AS fingerprint
+      ), existing_opportunity AS (
         SELECT status
         FROM improvement_opportunities
         WHERE project_id = $2::uuid
-          AND fingerprint = $8
+          AND fingerprint = (SELECT fingerprint FROM effective_fingerprint)
         LIMIT 1
       ),
       existing_event AS (
@@ -136,7 +145,7 @@ export async function recordImprovementOpportunityOccurrence(
         FROM improvement_opportunity_events ioe
         JOIN improvement_opportunities existing ON existing.id = ioe.improvement_opportunity_id
         WHERE existing.project_id = $2::uuid
-          AND existing.fingerprint = $8
+          AND existing.fingerprint = (SELECT fingerprint FROM effective_fingerprint)
           AND ioe.event_id = $13::uuid
         LIMIT 1
       ),
@@ -181,7 +190,7 @@ export async function recordImprovementOpportunityOccurrence(
           'open',
           $6,
           $7::numeric,
-          $8,
+          (SELECT fingerprint FROM effective_fingerprint),
           $9,
           $10,
           1,
@@ -196,7 +205,9 @@ export async function recordImprovementOpportunityOccurrence(
         ON CONFLICT (project_id, fingerprint)
         DO UPDATE SET
           service_id = CASE
-            WHEN EXISTS (SELECT 1 FROM existing_event) THEN improvement_opportunities.service_id
+            WHEN EXISTS (SELECT 1 FROM existing_event) OR EXISTS (
+              SELECT 1 FROM project_legacy_bindings WHERE canonical_project_id=debugbundle_canonical_project($2::uuid)
+            ) THEN improvement_opportunities.service_id
             ELSE COALESCE(
               improvement_opportunities.service_id,
               (
@@ -364,7 +375,8 @@ export async function recordImprovementOpportunityOccurrence(
       typeof input.evidence["duration_ms"] === "number" ? input.evidence["duration_ms"] : null,
       typeof input.evidence["slow_request_duration_threshold_ms"] === "number"
         ? input.evidence["slow_request_duration_threshold_ms"]
-        : null
+        : null,
+      input.original_fingerprint ?? input.fingerprint
     ]
   );
 

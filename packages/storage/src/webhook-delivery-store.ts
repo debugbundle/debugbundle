@@ -1,9 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { createWebhookManagementStore } from "./webhook-management-store.js";
 
 import type {
   CreateWebhookDeliveryIntentInput,
-  CreateWebhookTestDeliveryResult,
-  DeleteWebhookResult,
   DeliverWebhookJob,
   MarkWebhookDeliveryAttemptInput,
   MarkWebhookDeliveryAttemptResult,
@@ -11,11 +10,9 @@ import type {
   MatchingWebhookInput,
   Queryable,
   WebhookDeliveryStatus,
-  WebhookFilters,
   WebhookDeliveryIntent,
   WebhookDeliveryStore,
-  WebhookEventType,
-  WebhookRecord,
+  WebhookEventType
 } from "./types.js";
 
 const WEBHOOK_DELIVERY_RETRY_DELAYS_SECONDS = [1, 5, 30, 120, 600] as const;
@@ -28,287 +25,29 @@ const SEVERITY_RANK: Record<"low" | "medium" | "high" | "critical", number> = {
   critical: 4
 };
 
-function mapWebhookRow(row: {
-  webhook_id: string;
-  project_id: string;
-  created_by_user_id: string;
-  url: string;
-  events: string[];
-  filters: Record<string, unknown>;
-  is_enabled: boolean;
-  created_at: string;
-  updated_at: string;
-}): WebhookRecord {
-  return {
-    webhook_id: row.webhook_id,
-    project_id: row.project_id,
-    created_by_user_id: row.created_by_user_id,
-    url: row.url,
-    events: row.events as WebhookRecord["events"],
-    filters: row.filters as WebhookFilters,
-    is_enabled: row.is_enabled,
-    created_at: row.created_at,
-    updated_at: row.updated_at
-  };
-}
-
 export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDeliveryStore {
   return {
-    async listWebhooksForOrganization(input): Promise<WebhookRecord[] | null> {
-      const scopedProject = await db.query<{ id: string }>(
-        `
-          SELECT id
-          FROM projects
-          WHERE id = $1
-            AND organization_id = $2
-          LIMIT 1
-        `,
-        [input.project_id, input.organization_id]
-      );
-
-      if (scopedProject.rows[0] === undefined) {
-        return null;
-      }
-
-      const result = await db.query<{
-        webhook_id: string;
-        project_id: string;
-        created_by_user_id: string;
-        url: string;
-        events: string[];
-        filters: Record<string, unknown>;
-        is_enabled: boolean;
-        created_at: string;
-        updated_at: string;
-      }>(
-        `
-          SELECT
-            id AS webhook_id,
-            project_id,
-            created_by_user_id,
-            url,
-            events,
-            filters,
-            is_enabled,
-            created_at::text AS created_at,
-            updated_at::text AS updated_at
-          FROM agent_webhooks
-          WHERE project_id = $1
-          ORDER BY created_at DESC
-          LIMIT $2
-        `,
-        [input.project_id, input.limit]
-      );
-
-      return result.rows.map(mapWebhookRow);
-    },
-
-    async createWebhookForOrganization(input): Promise<WebhookRecord | null> {
-      const scopedProject = await db.query<{ id: string }>(
-        `
-          SELECT id
-          FROM projects
-          WHERE id = $1
-            AND organization_id = $2
-          LIMIT 1
-        `,
-        [input.project_id, input.organization_id]
-      );
-
-      if (scopedProject.rows[0] === undefined) {
-        return null;
-      }
-
-      const result = await db.query<{
-        webhook_id: string;
-        project_id: string;
-        created_by_user_id: string;
-        url: string;
-        events: string[];
-        filters: Record<string, unknown>;
-        is_enabled: boolean;
-        created_at: string;
-        updated_at: string;
-      }>(
-        `
-          INSERT INTO agent_webhooks (
-            id,
-            project_id,
-            created_by_user_id,
-            url,
-            secret_hash,
-            events,
-            filters,
-            is_enabled,
-            created_at,
-            updated_at
-          )
-          VALUES ($1, $2, $3::uuid, $4, $5, $6::text[], $7::jsonb, $8, now(), now())
-          RETURNING
-            id AS webhook_id,
-            project_id,
-            created_by_user_id,
-            url,
-            events,
-            filters,
-            is_enabled,
-            created_at::text AS created_at,
-            updated_at::text AS updated_at
-        `,
-        [
-          randomUUID(),
-          input.project_id,
-          input.created_by_user_id,
-          input.url,
-          input.signing_secret,
-          input.events,
-          JSON.stringify(input.filters),
-          input.is_enabled
-        ]
-      );
-
-      const created = result.rows[0];
-      return created === undefined ? null : mapWebhookRow(created);
-    },
-
-    async getWebhookForOrganization(input): Promise<WebhookRecord | null> {
-      const result = await db.query<{
-        webhook_id: string;
-        project_id: string;
-        created_by_user_id: string;
-        url: string;
-        events: string[];
-        filters: Record<string, unknown>;
-        is_enabled: boolean;
-        created_at: string;
-        updated_at: string;
-      }>(
-        `
-          SELECT
-            aw.id AS webhook_id,
-            aw.project_id,
-            aw.created_by_user_id,
-            aw.url,
-            aw.events,
-            aw.filters,
-            aw.is_enabled,
-            aw.created_at::text AS created_at,
-            aw.updated_at::text AS updated_at
-          FROM agent_webhooks aw
-          JOIN projects p ON p.id = aw.project_id
-          WHERE aw.id = $1
-            AND p.organization_id = $2
-            AND ($3::uuid IS NULL OR aw.project_id = $3::uuid)
-          LIMIT 1
-        `,
-        [input.webhook_id, input.organization_id, input.project_id ?? null]
-      );
-
-      const record = result.rows[0];
-      return record === undefined ? null : mapWebhookRow(record);
-    },
-
-    async updateWebhookForOrganization(input): Promise<WebhookRecord | null> {
-      const result = await db.query<{
-        webhook_id: string;
-        project_id: string;
-        created_by_user_id: string;
-        url: string;
-        events: string[];
-        filters: Record<string, unknown>;
-        is_enabled: boolean;
-        created_at: string;
-        updated_at: string;
-      }>(
-        `
-          UPDATE agent_webhooks aw
-          SET
-            url = COALESCE($3, aw.url),
-            events = COALESCE($4::text[], aw.events),
-            filters = COALESCE($5::jsonb, aw.filters),
-            is_enabled = COALESCE($6::boolean, aw.is_enabled),
-            updated_at = now()
-          FROM projects p
-          WHERE aw.id = $1
-            AND p.id = aw.project_id
-            AND p.organization_id = $2
-            AND ($7::uuid IS NULL OR aw.project_id = $7::uuid)
-            AND (
-              $8::uuid IS NULL
-              OR $9::text IN ('owner', 'admin')
-              OR aw.created_by_user_id = $8::uuid
-            )
-          RETURNING
-            aw.id AS webhook_id,
-            aw.project_id,
-            aw.created_by_user_id,
-            aw.url,
-            aw.events,
-            aw.filters,
-            aw.is_enabled,
-            aw.created_at::text AS created_at,
-            aw.updated_at::text AS updated_at
-        `,
-        [
-          input.webhook_id,
-          input.organization_id,
-          input.url ?? null,
-          input.events ?? null,
-          input.filters === undefined ? null : JSON.stringify(input.filters),
-          input.is_enabled ?? null,
-          input.project_id ?? null,
-          input.actor_user_id ?? null,
-          input.actor_role ?? null
-        ]
-      );
-
-      const updated = result.rows[0];
-      return updated === undefined ? null : mapWebhookRow(updated);
-    },
-
-    async deleteWebhookForOrganization(input): Promise<DeleteWebhookResult | null> {
-      const result = await db.query<{ webhook_id: string }>(
-        `
-          DELETE FROM agent_webhooks aw
-          USING projects p
-          WHERE aw.id = $1
-            AND p.id = aw.project_id
-            AND p.organization_id = $2
-            AND ($3::uuid IS NULL OR aw.project_id = $3::uuid)
-            AND (
-              $4::uuid IS NULL
-              OR $5::text IN ('owner', 'admin')
-              OR aw.created_by_user_id = $4::uuid
-            )
-          RETURNING aw.id AS webhook_id
-        `,
-        [
-          input.webhook_id,
-          input.organization_id,
-          input.project_id ?? null,
-          input.actor_user_id ?? null,
-          input.actor_role ?? null
-        ]
-      );
-
-      return result.rows[0] ?? null;
-    },
-
+    ...createWebhookManagementStore(db),
     async listMatchingWebhooks(input: MatchingWebhookInput): Promise<MatchingWebhook[]> {
       const result = await db.query<{
         webhook_id: string;
         target_url: string;
         signing_secret: string;
         filters: Record<string, unknown>;
+        has_service_filter?: boolean;
       }>(
         `
           SELECT
             id AS webhook_id,
             url AS target_url,
             secret_hash AS signing_secret,
-            filters
+            CASE WHEN jsonb_typeof(filters->'service')='array' AND jsonb_array_length(filters->'service')>0
+              THEN jsonb_set(filters,'{service}',to_jsonb(debugbundle_rule_service_names(COALESCE(filter_project_id,project_id),$1,filters->'service')))
+              ELSE filters END AS filters,
+            (jsonb_typeof(filters->'service')='array' AND jsonb_array_length(filters->'service')>0) AS has_service_filter
           FROM agent_webhooks
-          WHERE project_id = $1
+          WHERE project_id=ANY(debugbundle_project_origins(debugbundle_canonical_project($1::uuid)))
+            AND $1::uuid=ANY(COALESCE(scope_origin_ids,ARRAY[project_id]))
             AND is_enabled = true
             AND ($2 = ANY(events))
         `,
@@ -321,15 +60,21 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
         const filters = row.filters;
         const environmentFilter = filters["environment"];
         if (Array.isArray(environmentFilter) && environmentFilter.length > 0) {
-          const values = environmentFilter.filter((value): value is string => typeof value === "string");
+          const values = environmentFilter.filter(
+            (value): value is string => typeof value === "string"
+          );
           if (values.length > 0 && !values.includes(input.environment)) {
             return false;
           }
         }
 
         const serviceFilter = filters["service"];
+        if (row.has_service_filter && (!Array.isArray(serviceFilter) || serviceFilter.length === 0))
+          return false;
         if (Array.isArray(serviceFilter) && serviceFilter.length > 0) {
-          const values = serviceFilter.filter((value): value is string => typeof value === "string");
+          const values = serviceFilter.filter(
+            (value): value is string => typeof value === "string"
+          );
           if (values.length > 0 && !values.includes(input.service_name)) {
             return false;
           }
@@ -343,8 +88,14 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
         }
 
         const bundleTypeFilter = filters["bundle_type"];
-        if (Array.isArray(bundleTypeFilter) && bundleTypeFilter.length > 0 && input.bundle_type !== undefined) {
-          const values = bundleTypeFilter.filter((value): value is string => typeof value === "string");
+        if (
+          Array.isArray(bundleTypeFilter) &&
+          bundleTypeFilter.length > 0 &&
+          input.bundle_type !== undefined
+        ) {
+          const values = bundleTypeFilter.filter(
+            (value): value is string => typeof value === "string"
+          );
           if (values.length > 0 && !values.includes(input.bundle_type)) {
             return false;
           }
@@ -361,7 +112,9 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
       });
     },
 
-    async createDeliveryIntent(input: CreateWebhookDeliveryIntentInput): Promise<{ delivery_id: string }> {
+    async createDeliveryIntent(
+      input: CreateWebhookDeliveryIntentInput
+    ): Promise<{ delivery_id: string }> {
       const deliveryId = randomUUID();
 
       await db.query(
@@ -398,105 +151,6 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
 
       return {
         delivery_id: deliveryId
-      };
-    },
-
-    async createTestDeliveryForOrganization(input): Promise<CreateWebhookTestDeliveryResult | null> {
-      const scopedWebhook = await db.query<{
-        webhook_id: string;
-        project_id: string;
-        target_url: string;
-        signing_secret: string;
-      }>(
-        `
-          SELECT
-            aw.id AS webhook_id,
-            aw.project_id,
-            aw.url AS target_url,
-            aw.secret_hash AS signing_secret
-          FROM agent_webhooks aw
-          JOIN projects p ON p.id = aw.project_id
-          WHERE aw.id = $1
-            AND p.organization_id = $2
-            AND ($3::uuid IS NULL OR aw.project_id = $3::uuid)
-          LIMIT 1
-        `,
-        [input.webhook_id, input.organization_id, input.project_id ?? null]
-      );
-
-      const webhook = scopedWebhook.rows[0];
-      if (webhook === undefined) {
-        return null;
-      }
-
-      const deliveryId = randomUUID();
-      const payloadIncidentId = randomUUID();
-      const occurredAt = new Date().toISOString();
-      const payload = {
-        delivery_id: deliveryId,
-        event: input.event_type,
-        event_type: input.event_type,
-        occurred_at: occurredAt,
-        project_id: webhook.project_id,
-        webhook_id: webhook.webhook_id,
-        incident_id: payloadIncidentId,
-        test: true,
-        data: {
-          message: "Synthetic webhook test delivery"
-        }
-      } satisfies Record<string, unknown>;
-
-      await db.query(
-        `
-          INSERT INTO webhook_deliveries (
-            id,
-            webhook_id,
-            project_id,
-            incident_id,
-            event_type,
-            target_url,
-            signing_secret,
-            status,
-            attempt_count,
-            occurred_at,
-            next_attempt_at,
-            payload,
-            created_at,
-            updated_at
-          )
-          VALUES (
-            $1,
-            $2,
-            $3,
-            $4,
-            $5,
-            $6,
-            $7,
-            'retrying',
-            0,
-            $8::timestamptz,
-            now() + interval '30 seconds',
-            $9::jsonb,
-            now(),
-            now()
-          )
-        `,
-        [
-          deliveryId,
-          webhook.webhook_id,
-          webhook.project_id,
-          null,
-          input.event_type,
-          webhook.target_url,
-          webhook.signing_secret,
-          occurredAt,
-          JSON.stringify(payload)
-        ]
-      );
-
-      return {
-        delivery_id: deliveryId,
-        event_type: input.event_type
       };
     },
 
@@ -623,26 +277,23 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
       webhookId: string;
       organizationId: string;
       limit: number;
-    }): Promise<
-      | {
-          deliveries: Array<{
-            delivery_id: string;
-            event_type: WebhookEventType;
-            status: WebhookDeliveryStatus;
-            attempt_count: number;
-            next_attempt_at: string | null;
-            last_response_code: number | null;
-            last_attempted_at: string | null;
-            last_error: string | null;
-          }>;
-        }
-      | null
-    > {
+    }): Promise<{
+      deliveries: Array<{
+        delivery_id: string;
+        event_type: WebhookEventType;
+        status: WebhookDeliveryStatus;
+        attempt_count: number;
+        next_attempt_at: string | null;
+        last_response_code: number | null;
+        last_attempted_at: string | null;
+        last_error: string | null;
+      }>;
+    } | null> {
       const scopedWebhook = await db.query<{ webhook_id: string }>(
         `
           SELECT aw.id AS webhook_id
           FROM agent_webhooks aw
-          JOIN projects p ON p.id = aw.project_id
+          JOIN projects p ON p.id = debugbundle_canonical_project(aw.project_id)
           WHERE aw.id = $1
             AND p.organization_id = $2
           LIMIT 1
@@ -685,7 +336,9 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
       return { deliveries: deliveriesResult.rows };
     },
 
-    async markDeliveryAttempt(input: MarkWebhookDeliveryAttemptInput): Promise<MarkWebhookDeliveryAttemptResult> {
+    async markDeliveryAttempt(
+      input: MarkWebhookDeliveryAttemptInput
+    ): Promise<MarkWebhookDeliveryAttemptResult> {
       if (input.delivered) {
         await db.query(
           `
@@ -772,10 +425,11 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
         if (failureStreak >= WEBHOOK_CONSECUTIVE_FAILURE_DISABLE_THRESHOLD) {
           await db.query(
             `
+              WITH management_scope AS MATERIALIZED (SELECT debugbundle_begin_project_rule_write((SELECT debugbundle_canonical_project(project_id) FROM agent_webhooks WHERE id=$1)))
               UPDATE agent_webhooks
               SET is_enabled = false,
                   updated_at = now()
-              WHERE id = $1
+              FROM management_scope WHERE id = $1
                 AND is_enabled = true
             `,
             [webhookId]
@@ -806,62 +460,6 @@ export function createPostgresWebhookDeliveryStore(db: Queryable): WebhookDelive
         status: "failed",
         next_attempt: null
       };
-    },
-
-    async retryDeliveryForOrganization(input: {
-      organization_id: string;
-      project_id?: string;
-      webhook_id: string;
-      delivery_id: string;
-      actor_user_id?: string;
-      actor_role?: "owner" | "admin" | "member";
-    }): Promise<{ delivery_id: string; event_type: WebhookEventType } | null> {
-      const scopedWebhook = await db.query<{ webhook_id: string }>(
-        `
-          SELECT aw.id AS webhook_id
-          FROM agent_webhooks aw
-          JOIN projects p ON p.id = aw.project_id
-          WHERE aw.id = $1
-            AND p.organization_id = $2
-            AND ($3::uuid IS NULL OR aw.project_id = $3::uuid)
-            AND aw.is_enabled = true
-            AND (
-              $4::uuid IS NULL
-              OR $5::text IN ('owner', 'admin')
-              OR aw.created_by_user_id = $4::uuid
-            )
-          LIMIT 1
-        `,
-        [
-          input.webhook_id,
-          input.organization_id,
-          input.project_id ?? null,
-          input.actor_user_id ?? null,
-          input.actor_role ?? null
-        ]
-      );
-
-      if (scopedWebhook.rows[0] === undefined) {
-        return null;
-      }
-
-      const result = await db.query<{ delivery_id: string; event_type: WebhookEventType }>(
-        `
-          UPDATE webhook_deliveries
-          SET status = 'retrying',
-              attempt_count = 0,
-              next_attempt_at = now(),
-              last_error = NULL,
-              updated_at = now()
-          WHERE id = $1
-            AND webhook_id = $2
-            AND status IN ('failed', 'disabled')
-          RETURNING id AS delivery_id, event_type
-        `,
-        [input.delivery_id, input.webhook_id]
-      );
-
-      return result.rows[0] ?? null;
     }
   };
 }

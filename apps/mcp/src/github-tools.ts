@@ -53,6 +53,7 @@ export function createGitHubMcpTools(api: {
     enabled?: boolean;
   }): Promise<unknown>;
   updateProjectRule?(input: {
+    projectScope?: "current_project";
     bearerToken: string;
     projectId: string;
     ruleId: string;
@@ -174,6 +175,9 @@ export function createGitHubMcpTools(api: {
             bearerToken: String(input["bearerToken"]),
             projectId: String(input["projectId"]),
             ruleId: String(input["ruleId"]),
+            ...(input["projectScope"] === "current_project"
+              ? { projectScope: "current_project" as const }
+              : {}),
             ...(typeof input["name"] === "string" ? { name: input["name"] } : {}),
             ...(Array.isArray(input["eventTypes"])
               ? { eventTypes: input["eventTypes"].map((value) => String(value)) }

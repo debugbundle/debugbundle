@@ -40,11 +40,13 @@ import type {
 export interface ApiManagementDependencies {
   tokenManagement: {
     listProjectTokensForOrganization(input: {
+      actor_user_id?: string;
       organization_id: string;
       project_id: string;
       limit: number;
     }): Promise<ProjectTokenRecord[] | null>;
     createProjectTokenForOrganization(input: {
+      actor_user_id?: string;
       organization_id: string;
       project_id: string;
       label: string;
@@ -52,6 +54,7 @@ export interface ApiManagementDependencies {
       token_hash: string;
     }): Promise<ProjectTokenRecord | null>;
     revokeProjectTokenForOrganization(input: {
+      actor_user_id?: string;
       organization_id: string;
       project_id: string;
       token_id: string;
@@ -85,6 +88,7 @@ export interface ApiManagementDependencies {
           user_id: string;
           now: string;
           limit: number;
+          project_id?: string;
         }): Promise<ProjectRecord[]>;
         createProjectForUser?(input: {
           user_id: string;
@@ -228,11 +232,13 @@ export interface ApiManagementDependencies {
   availabilityCheckManagement?:
     | {
         listChecksForProjectInOrganization(input: {
+          actor_user_id?: string;
           organization_id: string;
           project_id: string;
           limit: number;
         }): Promise<AvailabilityCheckRecord[] | null>;
         getCheckForProjectInOrganization(input: {
+          actor_user_id?: string;
           organization_id: string;
           project_id: string;
           check_id: string;
@@ -258,6 +264,7 @@ export interface ApiManagementDependencies {
           AvailabilityCheckRecord | "project_not_found" | "limit_reached" | "interval_too_low"
         >;
         updateCheckForProjectInOrganization(input: {
+          actor_user_id?: string;
           organization_id: string;
           project_id: string;
           check_id: string;
@@ -275,21 +282,28 @@ export interface ApiManagementDependencies {
           enabled?: boolean;
           now: string;
         }): Promise<
-          AvailabilityCheckRecord | "check_not_found" | "limit_reached" | "interval_too_low"
+          | AvailabilityCheckRecord
+          | "check_not_found"
+          | "limit_reached"
+          | "interval_too_low"
+          | "service_scope_conflict"
         >;
         deleteCheckForProjectInOrganization(input: {
+          actor_user_id?: string;
           organization_id: string;
           project_id: string;
           check_id: string;
           deleted_at: string;
         }): Promise<boolean>;
         listResultsForCheckInOrganization(input: {
+          actor_user_id?: string;
           organization_id: string;
           project_id: string;
           check_id: string;
           limit: number;
         }): Promise<AvailabilityCheckResultRecord[] | null>;
         listDailyRollupsForCheckInOrganization(input: {
+          actor_user_id?: string;
           organization_id: string;
           project_id: string;
           check_id: string;
@@ -390,6 +404,7 @@ export interface ApiManagementDependencies {
           organization_id: string;
           user_id?: string;
           project_id?: string;
+          origin_project_ids?: string[];
           environment?: string;
           service?: string;
           status?: "open" | "resolved" | "snoozed";
@@ -414,6 +429,8 @@ export interface ApiManagementDependencies {
           organization_id: string;
           improvement_id: string;
           user_id?: string;
+          project_id?: string;
+          origin_project_ids?: string[];
         }): Promise<ImprovementRetrievalRecord | null>;
         resolveImprovementForOrganization?(input: {
           organization_id: string;
@@ -441,7 +458,10 @@ export interface ApiManagementDependencies {
         getInstallationForOrganization(input: {
           organization_id: string;
         }): Promise<GitHubInstallationRecord | null>;
-        disconnectInstallationForOrganization(input: { organization_id: string }): Promise<boolean>;
+        disconnectInstallationForOrganization(input: {
+          organization_id: string;
+          actor_user_id?: string;
+        }): Promise<boolean>;
         listRepositoriesForOrganization(input: {
           organization_id: string;
         }): Promise<
@@ -500,6 +520,7 @@ export interface ApiManagementDependencies {
           GitHubDispatchRuleRecord | "project_not_found" | "repo_not_found" | "rule_limit_reached"
         >;
         updateProjectRuleForOrganization(input: {
+          project_scope?: "current_project";
           organization_id: string;
           project_id: string;
           rule_id: string;
@@ -537,6 +558,7 @@ export interface ApiManagementDependencies {
           | "repo_not_found"
         >;
         removeProjectRepoForOrganization(input: {
+          actor_user_id?: string;
           organization_id: string;
           project_id: string;
         }): Promise<boolean>;

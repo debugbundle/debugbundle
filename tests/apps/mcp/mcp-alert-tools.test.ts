@@ -20,7 +20,9 @@ describe("mcp alert tools", () => {
     const tools = createAlertMcpTools({
       listAlerts: vi.fn().mockResolvedValue([{ alert_id: "al_1" }]),
       listAlertGroups: vi.fn().mockResolvedValue({ groups: [], next_cursor: null }),
-      getAlertGroup: vi.fn().mockResolvedValue({ group: { group_id: "group-id" }, members: [], next_cursor: null }),
+      getAlertGroup: vi
+        .fn()
+        .mockResolvedValue({ group: { group_id: "group-id" }, members: [], next_cursor: null }),
       createAlert: vi.fn().mockResolvedValue({ alert_id: "al_2" }),
       updateAlert: vi.fn().mockResolvedValue({ alert_id: "al_2", is_enabled: false }),
       deleteAlert: vi.fn().mockResolvedValue({ alert_id: "al_2" })
@@ -36,11 +38,17 @@ describe("mcp alert tools", () => {
       alerts: [{ alert_id: "al_1" }]
     });
 
-    await expect(tools.list_alert_groups({ bearerToken: "dbundle_mem_x", projectId: "proj_1" }))
-      .resolves.toEqual({ groups: [], next_cursor: null });
-    await expect(tools.get_alert_group({
-      bearerToken: "dbundle_mem_x", projectId: "proj_1", kind: "direct", groupId: "group-id"
-    })).resolves.toEqual({ group: { group_id: "group-id" }, members: [], next_cursor: null });
+    await expect(
+      tools.list_alert_groups({ bearerToken: "dbundle_mem_x", projectId: "proj_1" })
+    ).resolves.toEqual({ groups: [], next_cursor: null });
+    await expect(
+      tools.get_alert_group({
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        kind: "direct",
+        groupId: "group-id"
+      })
+    ).resolves.toEqual({ group: { group_id: "group-id" }, members: [], next_cursor: null });
 
     await expect(
       tools.create_alert({
@@ -132,6 +140,7 @@ describe("mcp alert tools", () => {
       bearerToken: "dbundle_mem_x",
       projectId: "proj_1",
       alertId: "al_3",
+      projectScope: "current_project",
       serviceId: null,
       channel: "slack",
       conditionType: "error_spike",
@@ -158,6 +167,7 @@ describe("mcp alert tools", () => {
       bearerToken: "dbundle_mem_x",
       projectId: "proj_1",
       alertId: "al_3",
+      projectScope: "current_project",
       serviceId: null,
       channel: "slack",
       conditionType: "error_spike",
@@ -167,11 +177,17 @@ describe("mcp alert tools", () => {
       config: null,
       isEnabled: true
     });
-    await tools.rotate_alert_webhook_secret({ bearerToken: "dbundle_mem_x", projectId: "proj_1",
-      alertId: "al_3" });
+    await tools.rotate_alert_webhook_secret({
+      bearerToken: "dbundle_mem_x",
+      projectId: "proj_1",
+      alertId: "al_3"
+    });
     expect(api.updateAlert).toHaveBeenLastCalledWith({
-      bearerToken: "dbundle_mem_x", projectId: "proj_1", alertId: "al_3",
-      channel: "webhook", rotateSigningSecret: true
+      bearerToken: "dbundle_mem_x",
+      projectId: "proj_1",
+      alertId: "al_3",
+      channel: "webhook",
+      rotateSigningSecret: true
     });
   });
 });

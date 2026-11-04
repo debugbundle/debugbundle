@@ -1,3 +1,4 @@
+import { prepareProjectNamespaceDeletion } from "./project-namespace-deletion.js";
 import { randomUUID } from "node:crypto";
 import { buildBillableIncidentEventsPredicateSql } from "./helpers.js";
 import { runInTransaction } from "./transaction.js";
@@ -337,11 +338,16 @@ export function createMetadataUserProjects(
 
     async deleteProjectForUser(input): Promise<DeletedProjectRecord | null> {
       const deleteProject = async (queryable: Queryable): Promise<DeletedProjectRecord | null> => {
+        const origins = await prepareProjectNamespaceDeletion(queryable, {
+          project_id: input.project_id,
+          owner_user_id: input.user_id
+        });
+        if (origins === null) return null;
         const result = await queryable.query<DeletedProjectRecord & Record<string, unknown>>(
           `
           WITH deleted_project AS (
             DELETE FROM projects
-            WHERE id = $2::uuid
+            WHERE id = ANY($2::uuid[])
               AND owner_user_id = $1::uuid
             RETURNING
               id AS project_id,
@@ -372,11 +378,15 @@ export function createMetadataUserProjects(
           FROM deleted_project dp
           JOIN organizations o ON o.id = dp.organization_id
           JOIN users owner_user ON owner_user.id = dp.owner_user_id
+          WHERE dp.project_id=$3::uuid
         `,
-          [input.user_id, input.project_id]
+          [input.user_id, origins, input.project_id]
         );
 
-        const project = result.rows[0] === undefined ? null : mapDeletedProjectRow(result.rows[0]);
+        const project =
+          result.rows[0] === undefined
+            ? null
+            : { ...mapDeletedProjectRow(result.rows[0]), storage_origin_ids: origins };
         if (project !== null && accountAnalyticsStore !== undefined) {
           await recordProjectMetric(accountAnalyticsStore, queryable, {
             organization_id: project.organization_id,
@@ -388,10 +398,6 @@ export function createMetadataUserProjects(
 
         return project;
       };
-
-      if (accountAnalyticsStore === undefined) {
-        return deleteProject(db);
-      }
 
       return runInTransaction(db, deleteProject);
     }

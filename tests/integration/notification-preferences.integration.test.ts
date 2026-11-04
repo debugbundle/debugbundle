@@ -1,3 +1,4 @@
+import { restoreStoragePredecessor } from "../helpers/storage-predecessor.js";
 import { randomUUID } from "node:crypto";
 import { beforeAll, afterAll, afterEach, expect, it, vi } from "vitest";
 import {
@@ -77,6 +78,7 @@ runIntegration("notification preferences and durable daily delivery", () => {
     return { projectId, org, ownerUserId, email, alertId, incident };
   }
   it("requires the ordered forward migration before new runtime readiness", async () => {
+    await restoreStoragePredecessor(pool);
     const retainedProject = randomUUID(),
       retainedOrg = randomUUID();
     await seedOwnedProject({

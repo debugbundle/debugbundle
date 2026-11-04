@@ -59,6 +59,7 @@ async function listExistingCaptureRulesForSuggestions(input: {
   dependencies: ApiDependencies;
   organizationId: string;
   projectId: string;
+  actorUserId: string;
 }): Promise<CaptureRule[]> {
   if (input.dependencies.captureRuleManagement === undefined) {
     return [];
@@ -67,6 +68,7 @@ async function listExistingCaptureRulesForSuggestions(input: {
   return (
     (await input.dependencies.captureRuleManagement.listCaptureRulesForProject({
       organization_id: input.organizationId,
+      actor_user_id: input.actorUserId,
       project_id: input.projectId
     })) ?? []
   );
@@ -195,6 +197,7 @@ export function registerCaptureRuleRoutes(
 
     const rules = await dependencies.captureRuleManagement.listCaptureRulesForProject({
       organization_id: auth.access.organization_id,
+      actor_user_id: auth.member.member_id,
       project_id: parsedParams.data.id
     });
 
@@ -234,6 +237,7 @@ export function registerCaptureRuleRoutes(
 
     const rule = await dependencies.captureRuleManagement.createCaptureRuleForProject({
       organization_id: auth.access.organization_id,
+      actor_user_id: auth.member.member_id,
       project_id: parsedParams.data.id,
       id: randomUUID(),
       create: parsedBody.data
@@ -296,6 +300,7 @@ export function registerCaptureRuleRoutes(
 
     const incident = await dependencies.incidentRetrieval.getIncidentForOrganization({
       organization_id: member.organization_id,
+      user_id: member.member_id,
       incident_id: parsedParams.data.id
     });
     if (incident === null) {
@@ -316,7 +321,7 @@ export function registerCaptureRuleRoutes(
 
     const bundle = await readBundleForCaptureRuleSuggestions({
       dependencies,
-      organizationId: member.organization_id,
+      organizationId: access?.organization_id ?? member.organization_id,
       incidentId: incident.incident_id,
       projectId: incident.project_id
     });
@@ -352,12 +357,18 @@ export function registerCaptureRuleRoutes(
         occurrence_count: incident.occurrence_count,
         matched_fields: incident.matched_fields
       },
-      bundle: bundle.bundle
+      bundle: {
+        ...bundle.bundle,
+        ...(bundle.bundle.service && incident.canonical_service_name
+          ? { service: { ...bundle.bundle.service, name: incident.canonical_service_name } }
+          : {})
+      }
     });
     const existingRules = await listExistingCaptureRulesForSuggestions({
       dependencies,
-      organizationId: member.organization_id,
-      projectId: incident.project_id
+      actorUserId: member.member_id,
+      organizationId: access?.organization_id ?? member.organization_id,
+      projectId: access?.canonical_project_id ?? incident.project_id
     });
 
     return reply.status(200).send(
@@ -395,6 +406,7 @@ export function registerCaptureRuleRoutes(
 
     const incident = await dependencies.incidentRetrieval.getIncidentForOrganization({
       organization_id: member.organization_id,
+      user_id: member.member_id,
       incident_id: parsedParams.data.id
     });
     if (incident === null) {
@@ -424,7 +436,7 @@ export function registerCaptureRuleRoutes(
 
     const bundle = await readBundleForCaptureRuleSuggestions({
       dependencies,
-      organizationId: member.organization_id,
+      organizationId: access.organization_id,
       incidentId: incident.incident_id,
       projectId: incident.project_id
     });
@@ -442,7 +454,12 @@ export function registerCaptureRuleRoutes(
         occurrence_count: incident.occurrence_count,
         matched_fields: incident.matched_fields
       },
-      bundle: bundle.bundle
+      bundle: {
+        ...bundle.bundle,
+        ...(bundle.bundle.service && incident.canonical_service_name
+          ? { service: { ...bundle.bundle.service, name: incident.canonical_service_name } }
+          : {})
+      }
     }).find((candidate) => candidate.suggestion_id === parsedBody.data.suggestion_id);
 
     if (suggestion === undefined) {
@@ -463,8 +480,9 @@ export function registerCaptureRuleRoutes(
 
     const existingRules = await listExistingCaptureRulesForSuggestions({
       dependencies,
-      organizationId: member.organization_id,
-      projectId: incident.project_id
+      actorUserId: member.member_id,
+      organizationId: access.organization_id,
+      projectId: access.canonical_project_id ?? incident.project_id
     });
     const existingRule = findExistingCaptureRuleForSuggestion(existingRules, create);
     if (existingRule !== null) {
@@ -472,8 +490,9 @@ export function registerCaptureRuleRoutes(
     }
 
     const rule = await dependencies.captureRuleManagement.createCaptureRuleForProject({
-      organization_id: member.organization_id,
-      project_id: incident.project_id,
+      organization_id: access.organization_id,
+      actor_user_id: member.member_id,
+      project_id: access.canonical_project_id ?? incident.project_id,
       id: randomUUID(),
       create
     });
@@ -483,7 +502,7 @@ export function registerCaptureRuleRoutes(
     }
 
     await recordAuditLog(dependencies.auditLogging, {
-      organization_id: member.organization_id,
+      organization_id: access.organization_id,
       actor_user_id: member.member_id,
       actor_type: resolveAuditActorType(request.headers),
       action: "capture_rule.create_from_suggestion",
@@ -493,7 +512,8 @@ export function registerCaptureRuleRoutes(
       ip_address: request.ip,
       metadata: {
         incident_id: incident.incident_id,
-        project_id: incident.project_id,
+        project_id: access.canonical_project_id ?? incident.project_id,
+        ...(access.canonical_project_id ? { origin_project_id: incident.project_id } : {}),
         suggestion_id: suggestion.suggestion_id,
         action: rule.action,
         name: rule.name
@@ -531,6 +551,7 @@ export function registerCaptureRuleRoutes(
 
     const rule = await dependencies.captureRuleManagement.updateCaptureRuleForProject({
       organization_id: auth.access.organization_id,
+      actor_user_id: auth.member.member_id,
       project_id: parsedParams.data.id,
       rule_id: parsedParams.data.ruleId,
       update: parsedBody.data
@@ -597,6 +618,7 @@ export function registerCaptureRuleRoutes(
 
     const deleted = await dependencies.captureRuleManagement.deleteCaptureRuleForProject({
       organization_id: auth.access.organization_id,
+      actor_user_id: auth.member.member_id,
       project_id: parsedParams.data.id,
       rule_id: parsedParams.data.ruleId
     });

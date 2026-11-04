@@ -21,6 +21,8 @@ import {
   listAnalyticsOpportunities,
   listIncidents,
   listImprovements,
+  listServices,
+  listProjects,
   listProjectAvailabilityCheckDailyRollups,
   listProjectAvailabilityCheckResults,
   listProjectAvailabilityChecks,
@@ -42,23 +44,73 @@ afterEach(() => {
 });
 
 describe("web api client", () => {
-  it.each([listAnalyticsBundles, listAnalyticsOpportunities])("requests analytics totals only on the initial page", async (list) => {
-    const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ next_cursor: null, total_pages: 3 }), { status: 200 }));
+  it("requests the exact project view for retained deep links", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ projects: [] })));
     vi.stubGlobal("fetch", fetchMock);
-    await expect(list({ limit: 10 })).resolves.toMatchObject({ total_pages: 3 });
-    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("include_total=true");
-    await list({ limit: 10, cursor: "next" });
-    expect(String(fetchMock.mock.calls[1]?.[0])).not.toContain("include_total");
+    await listProjects("10000000-0000-4000-8000-000000000001");
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
+      "project_id=10000000-0000-4000-8000-000000000001"
+    );
   });
+  it("loads all service pages for the existing scope controls", async () => {
+    const first = Array.from({ length: 100 }, (_, index) => ({
+      service_id: `service-${index}`,
+      name: `Service ${index}`
+    }));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ services: first })))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ services: [{ service_id: "last", name: "Last" }] }))
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const services = await listServices("project");
+    expect(services).toHaveLength(101);
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain("offset=100");
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ credentials: "include" });
+  });
+  it.each([listAnalyticsBundles, listAnalyticsOpportunities])(
+    "requests analytics totals only on the initial page",
+    async (list) => {
+      const fetchMock = vi
+        .fn()
+        .mockImplementation(
+          async () =>
+            new Response(JSON.stringify({ next_cursor: null, total_pages: 3 }), { status: 200 })
+        );
+      vi.stubGlobal("fetch", fetchMock);
+      await expect(list({ limit: 10 })).resolves.toMatchObject({ total_pages: 3 });
+      expect(String(fetchMock.mock.calls[0]?.[0])).toContain("include_total=true");
+      await list({ limit: 10, cursor: "next" });
+      expect(String(fetchMock.mock.calls[1]?.[0])).not.toContain("include_total");
+    }
+  );
 
   it("passes list page totals through the public API exports", async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ incidents: [], next_cursor: null, total_pages: 3 }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ improvements: [], next_cursor: null, total_pages: 4 }), { status: 200 }));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ incidents: [], next_cursor: null, total_pages: 3 }), {
+          status: 200
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ improvements: [], next_cursor: null, total_pages: 4 }), {
+          status: 200
+        })
+      );
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(listIncidents({ limit: 10 })).resolves.toEqual({ incidents: [], nextCursor: null, totalPages: 3 });
-    await expect(listImprovements({ limit: 10 })).resolves.toEqual({ improvements: [], nextCursor: null, totalPages: 4 });
+    await expect(listIncidents({ limit: 10 })).resolves.toEqual({
+      incidents: [],
+      nextCursor: null,
+      totalPages: 3
+    });
+    await expect(listImprovements({ limit: 10 })).resolves.toEqual({
+      improvements: [],
+      nextCursor: null,
+      totalPages: 4
+    });
   });
 
   it("calls project availability-check endpoints with browser-session credentials", async () => {
@@ -573,14 +625,12 @@ describe("web api client", () => {
   it("falls back to the default export filename when content disposition is missing", async () => {
     vi.stubGlobal(
       "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
-          new Response(JSON.stringify({ organization_id: "org_123" }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" }
-          })
-        )
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ organization_id: "org_123" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        })
+      )
     );
 
     const result = await exportAccountData();

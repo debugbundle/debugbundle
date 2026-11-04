@@ -23,7 +23,8 @@ const sampleRow = {
   first_seen_at: "2026-07-09T10:00:00.000Z",
   last_seen_at: "2026-07-09T10:05:00.000Z",
   dimensions_summary: { device_type: "mobile" },
-  object_key: "analytics-journeys/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222.json.gz",
+  object_key:
+    "analytics-journeys/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222.json.gz",
   has_artifact: true,
   expires_at: "2026-07-16T10:05:00.000Z",
   created_at: "2026-07-09T10:05:01.000Z"
@@ -108,7 +109,9 @@ describe("analytics journey sample store", () => {
       expect(sqlText).toContain("has_artifact = true");
       expect(sqlText).toContain("first_seen_at = LEAST");
       expect(sqlText).toContain("last_seen_at = GREATEST");
-      expect(sqlText).toContain("analytics_journey_samples.analysis_tags || EXCLUDED.analysis_tags");
+      expect(sqlText).toContain(
+        "analytics_journey_samples.analysis_tags || EXCLUDED.analysis_tags"
+      );
       expect(params).toEqual([
         SAMPLE_ID,
         PROJECT_ID,
@@ -158,10 +161,10 @@ describe("analytics journey sample store", () => {
   it("lists retained project samples with filters and cursor pagination", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
       expect(sqlText).toContain("FROM analytics_journey_samples");
-      expect(sqlText).toContain("project_id = $1::uuid");
+      expect(sqlText).toContain("project_id=ANY(debugbundle_project_origins($1::uuid))");
       expect(sqlText).toContain("expires_at > $2::timestamptz");
       expect(sqlText).toContain("has_artifact = true");
-      expect(sqlText).toContain("service = $3");
+      expect(sqlText).toContain("debugbundle_service_matches($1::uuid,project_id,service,$3)");
       expect(sqlText).toContain("environment = $4");
       expect(sqlText).toContain("analysis_tags @> ARRAY[$5]::text[]");
       expect(sqlText).toContain("(last_seen_at, id) < ($6::timestamptz, $7::uuid)");
@@ -204,23 +207,25 @@ describe("analytics journey sample store", () => {
         now: NOW
       })
     ).resolves.toEqual({
-      samples: [{
-        sample_id: SAMPLE_ID,
-        project_id: PROJECT_ID,
-        service: "web",
-        environment: "production",
-        session_id_hash: "sha256:session",
-        correlation_session_hash: "project-scoped-session",
-        visitor_id_hash: "sha256:visitor",
-        analysis_tags: ["checkout", "loop"],
-        first_seen_at: "2026-07-09T10:00:00.000Z",
-        last_seen_at: "2026-07-09T10:05:00.000Z",
-        dimensions_summary: { device_type: "mobile" },
-        has_artifact: true,
-        object_key: sampleRow.object_key,
-        expires_at: "2026-07-16T10:05:00.000Z",
-        created_at: "2026-07-09T10:05:01.000Z"
-      }],
+      samples: [
+        {
+          sample_id: SAMPLE_ID,
+          project_id: PROJECT_ID,
+          service: "web",
+          environment: "production",
+          session_id_hash: "sha256:session",
+          correlation_session_hash: "project-scoped-session",
+          visitor_id_hash: "sha256:visitor",
+          analysis_tags: ["checkout", "loop"],
+          first_seen_at: "2026-07-09T10:00:00.000Z",
+          last_seen_at: "2026-07-09T10:05:00.000Z",
+          dimensions_summary: { device_type: "mobile" },
+          has_artifact: true,
+          object_key: sampleRow.object_key,
+          expires_at: "2026-07-16T10:05:00.000Z",
+          created_at: "2026-07-09T10:05:01.000Z"
+        }
+      ],
       next_cursor: `2026-07-09T10:05:00.000Z|${SAMPLE_ID}`
     });
   });
@@ -228,11 +233,11 @@ describe("analytics journey sample store", () => {
   it("gets one retained project sample by id", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
       expect(sqlText).toContain("FROM analytics_journey_samples");
-      expect(sqlText).toContain("project_id = $1::uuid");
+      expect(sqlText).toContain("project_id=ANY(debugbundle_project_origins($1::uuid))");
       expect(sqlText).toContain("id = $2::uuid");
       expect(sqlText).toContain("expires_at > $3::timestamptz");
       expect(sqlText).toContain("has_artifact = true");
-      expect(params).toEqual([PROJECT_ID, SAMPLE_ID, NOW]);
+      expect(params).toEqual([PROJECT_ID, SAMPLE_ID, NOW, null]);
       return { rows: [{ ...sampleRow, service: "", environment: "" }] };
     });
     const store = createPostgresAnalyticsJourneySampleStore(createDb(queryMock));
@@ -253,21 +258,29 @@ describe("analytics journey sample store", () => {
   });
 
   it("normalizes Postgres timestamptz text before returning public sample metadata", async (): Promise<void> => {
-    const store = createPostgresAnalyticsJourneySampleStore(createDb(vi.fn().mockResolvedValue({
-      rows: [{
-        ...sampleRow,
-        first_seen_at: "2026-07-09 10:00:00+00",
-        last_seen_at: "2026-07-09 10:05:00+00",
-        expires_at: "2026-07-16 10:05:00+00",
-        created_at: "2026-07-09 10:05:01+00"
-      }]
-    })));
+    const store = createPostgresAnalyticsJourneySampleStore(
+      createDb(
+        vi.fn().mockResolvedValue({
+          rows: [
+            {
+              ...sampleRow,
+              first_seen_at: "2026-07-09 10:00:00+00",
+              last_seen_at: "2026-07-09 10:05:00+00",
+              expires_at: "2026-07-16 10:05:00+00",
+              created_at: "2026-07-09 10:05:01+00"
+            }
+          ]
+        })
+      )
+    );
 
-    await expect(store.getAnalyticsJourneySampleForProject({
-      project_id: PROJECT_ID,
-      sample_id: SAMPLE_ID,
-      now: NOW
-    })).resolves.toMatchObject({
+    await expect(
+      store.getAnalyticsJourneySampleForProject({
+        project_id: PROJECT_ID,
+        sample_id: SAMPLE_ID,
+        now: NOW
+      })
+    ).resolves.toMatchObject({
       first_seen_at: "2026-07-09T10:00:00.000Z",
       last_seen_at: "2026-07-09T10:05:00.000Z",
       expires_at: "2026-07-16T10:05:00.000Z",
@@ -284,17 +297,19 @@ describe("analytics journey sample store", () => {
       sample_id: SAMPLE_ID
     });
 
-    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining("DELETE FROM analytics_journey_samples"), [
-      PROJECT_ID,
-      SAMPLE_ID
-    ]);
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining("DELETE FROM analytics_journey_samples"),
+      [PROJECT_ID, SAMPLE_ID]
+    );
   });
 
   it("builds stable journey sample cursors", (): void => {
-    expect(buildAnalyticsJourneySamplesCursor({
-      last_seen_at: "2026-07-09T10:05:00.000Z",
-      sample_id: SAMPLE_ID
-    })).toBe(`2026-07-09T10:05:00.000Z|${SAMPLE_ID}`);
+    expect(
+      buildAnalyticsJourneySamplesCursor({
+        last_seen_at: "2026-07-09T10:05:00.000Z",
+        sample_id: SAMPLE_ID
+      })
+    ).toBe(`2026-07-09T10:05:00.000Z|${SAMPLE_ID}`);
   });
 });
 

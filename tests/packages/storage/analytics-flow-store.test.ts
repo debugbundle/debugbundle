@@ -44,6 +44,7 @@ function setup(
 ) {
   const query = vi.fn(async (sql: string, _params: unknown[]) => {
     void _params;
+    if (sql === "SELECT debugbundle_begin_project_rule_write($1::uuid)") return { rows: [] };
     let rows: unknown[] = [];
     if (sql.includes("FOR UPDATE OF p"))
       rows = options.missingProject ? [] : [{ plan: "free", max_saved_funnels: null }];
@@ -236,12 +237,7 @@ it.each([
 it("withdraws only the hashed context at the exact project, flow and origin", async () => {
   const { store, query } = setup();
   await store.withdraw(input);
-  expect(writes(query)[0]?.[1]).toEqual([
-    hash(context),
-    input.origin,
-    scope.project_id,
-    scope.flow_key
-  ]);
+  expect(writes(query)[0]?.[1]).toEqual([hash(context), input.origin, flowDefinition.id]);
 });
 it("reports bounded aggregate comparisons, drop-off and average elapsed seconds", async () => {
   const { store } = setup({

@@ -313,10 +313,14 @@ export async function sendAnalyticsBundleGenerationResponse(
     }
     return reply.status(500).send({ error: "analytics_bundle_artifact_unavailable" });
   }
-  if (bundleArtifact === null) return reply.status(503).send({ error: "privacy_projection_unavailable" });
+  if (bundleArtifact === null)
+    return reply.status(503).send({ error: "privacy_projection_unavailable" });
   const parsedBundle = AnalyticsBundleV1Schema.safeParse(bundleArtifact);
   return parsedBundle.success
-    ? reply.header("x-debugbundle-privacy-policy", "telemetry-privacy-v1").status(200).send(parsedBundle.data)
+    ? reply
+        .header("x-debugbundle-privacy-policy", "telemetry-privacy-v1")
+        .status(200)
+        .send(parsedBundle.data)
     : reply.status(500).send({ error: "analytics_bundle_artifact_invalid" });
 }
 
@@ -380,12 +384,15 @@ export async function requireAnalyticsIncidentImpactQuery(
     await reply.status(404).send({ error: "analytics_metrics_not_available" });
     return null;
   }
+  const origins = auth.access.origin_project_ids ?? [parsedQuery.data.project_id];
   const incident = await dependencies.incidentRetrieval.getIncidentForOrganization({
     organization_id: auth.access.organization_id,
     incident_id: incidentId,
-    user_id: auth.member.member_id
+    user_id: auth.member.member_id,
+    project_id: parsedQuery.data.project_id,
+    origin_project_ids: origins
   });
-  if (incident === null || incident.project_id !== parsedQuery.data.project_id) {
+  if (incident === null || !origins.includes(incident.project_id)) {
     await reply.status(404).send({ error: "incident_not_found" });
     return null;
   }

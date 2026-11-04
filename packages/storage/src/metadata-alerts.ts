@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
+import { ruleActorAllowedSql } from "./project-rule-access.js";
 import {
   defaultSeverityLifecycleScopeForCondition,
   normalizeSeverityLifecycleScopeForCondition
@@ -31,7 +32,7 @@ export function createMetadataAlerts(
         `
           SELECT id
           FROM projects
-          WHERE id = $1
+          WHERE id = debugbundle_canonical_project($1::uuid)
             AND organization_id = $2
           LIMIT 1
         `,
@@ -73,7 +74,7 @@ export function createMetadataAlerts(
             created_at::text AS created_at,
             updated_at::text AS updated_at
           FROM alert_rules
-          WHERE project_id = $1
+          WHERE project_id=ANY(debugbundle_project_origins($1::uuid))
           ORDER BY created_at DESC, id DESC
           LIMIT $2
         `,
@@ -91,7 +92,7 @@ export function createMetadataAlerts(
           LEFT JOIN services s ON s.id = $3::uuid
           WHERE p.id = $1
             AND p.organization_id = $2
-            AND ($3::uuid IS NULL OR s.project_id = p.id)
+            AND ($3::uuid IS NULL OR s.project_id=ANY(debugbundle_project_origins(p.id)))
           LIMIT 1
         `,
         [input.project_id, input.organization_id, input.service_id ?? null]
@@ -122,6 +123,7 @@ export function createMetadataAlerts(
         updated_at: string;
       }>(
         `
+          WITH management_scope AS MATERIALIZED (SELECT debugbundle_begin_project_rule_write($2::uuid))
           INSERT INTO alert_rules (
             id,
             project_id,
@@ -139,7 +141,8 @@ export function createMetadataAlerts(
             created_at,
             updated_at
           )
-          VALUES ($1, $2, $3::uuid, $4::uuid, $5, $6, $7, $8, $9, $10::jsonb, $11, $13, $12, now(), now())
+          SELECT $1::uuid, $2::uuid, $3::uuid, $4::uuid, $5, $6, $7, $8, $9, $10::jsonb, $11, $13, $12, now(), now()
+          FROM management_scope WHERE ${ruleActorAllowedSql("$2::uuid", "$3::uuid", "$3::uuid")}
           RETURNING
             id AS alert_id,
             project_id,
@@ -166,7 +169,9 @@ export function createMetadataAlerts(
           severityLifecycleScope,
           input.cooldown_seconds,
           JSON.stringify(input.config),
-          input.channel === "webhook" ? input.signing_secret ?? `dbundle_asec_${randomBytes(32).toString("base64url")}` : null,
+          input.channel === "webhook"
+            ? (input.signing_secret ?? `dbundle_asec_${randomBytes(32).toString("base64url")}`)
+            : null,
           input.is_enabled,
           input.channel === "webhook" && input.signing_secret !== undefined ? 1 : 0
         ]
@@ -206,9 +211,11 @@ export function createMetadataAlerts(
         updated_at: string;
       }>(
         `
+          WITH management_scope AS MATERIALIZED (SELECT debugbundle_begin_project_rule_write(COALESCE($16::uuid,(SELECT debugbundle_canonical_project(project_id) FROM alert_rules WHERE id=$1))))
           UPDATE alert_rules ar
           SET
             service_id = CASE WHEN $3::boolean THEN $4::uuid ELSE ar.service_id END,
+            scope_origin_ids=CASE WHEN $20::boolean THEN debugbundle_project_origins(p.id) ELSE ar.scope_origin_ids END,
             channel = COALESCE($5, ar.channel),
             condition_type = COALESCE($6, ar.condition_type),
             severity_min = CASE WHEN $7::boolean THEN $8 ELSE ar.severity_min END,
@@ -221,28 +228,24 @@ export function createMetadataAlerts(
             config = CASE WHEN $13::boolean THEN COALESCE($14::jsonb, '{}'::jsonb) ELSE ar.config END,
             signing_secret = CASE
               WHEN COALESCE($5::text, ar.channel) <> 'webhook' THEN NULL
-              ELSE COALESCE($19::text, NULLIF(ar.signing_secret, ''), $20::text)
+              ELSE COALESCE($18::text, NULLIF(ar.signing_secret, ''), $19::text)
             END,
             webhook_payload_version = CASE
               WHEN COALESCE($5::text, ar.channel) <> 'webhook' THEN 0
-              WHEN $19::text IS NOT NULL THEN 1
+              WHEN $18::text IS NOT NULL THEN 1
               ELSE ar.webhook_payload_version
             END,
             is_enabled = COALESCE($15::boolean, ar.is_enabled),
             updated_at = now()
-          FROM projects p
+          FROM management_scope CROSS JOIN projects p
           LEFT JOIN services s ON s.id = $4::uuid
           WHERE ar.id = $1
-            AND p.id = ar.project_id
+            AND p.id = debugbundle_canonical_project(ar.project_id)
             AND p.organization_id = $2
-            AND ($16::uuid IS NULL OR ar.project_id = $16::uuid)
-            AND (
-              $17::uuid IS NULL
-              OR $18::text IN ('owner', 'admin')
-              OR ar.created_by_user_id = $17::uuid
-            )
-            AND ($4::uuid IS NULL OR $3::boolean = false OR s.project_id = ar.project_id)
-            AND ($19::text IS NULL OR COALESCE($5::text, ar.channel) = 'webhook')
+            AND ($16::uuid IS NULL OR ar.project_id=ANY(debugbundle_project_origins($16::uuid)))
+            AND ${ruleActorAllowedSql("p.id", "$17::uuid", "ar.created_by_user_id")}
+            AND ($4::uuid IS NULL OR $3::boolean = false OR s.project_id=ANY(CASE WHEN $20::boolean THEN debugbundle_project_origins(p.id) ELSE COALESCE(ar.scope_origin_ids,ARRAY[ar.project_id]) END))
+            AND ($18::text IS NULL OR COALESCE($5::text, ar.channel) = 'webhook')
           RETURNING
             ar.id AS alert_id,
             ar.project_id,
@@ -276,9 +279,9 @@ export function createMetadataAlerts(
           input.is_enabled ?? null,
           input.project_id ?? null,
           input.actor_user_id ?? null,
-          input.actor_role ?? null,
           input.signing_secret ?? null,
-          `dbundle_asec_${randomBytes(32).toString("base64url")}`
+          `dbundle_asec_${randomBytes(32).toString("base64url")}`,
+          input.project_scope === "current_project"
         ]
       );
 
@@ -288,25 +291,21 @@ export function createMetadataAlerts(
     async deleteAlertForOrganization(input): Promise<DeleteAlertResult | null> {
       const result = await db.query<DeleteAlertResult & Record<string, unknown>>(
         `
+          WITH management_scope AS MATERIALIZED (SELECT debugbundle_begin_project_rule_write(COALESCE($3::uuid,(SELECT debugbundle_canonical_project(project_id) FROM alert_rules WHERE id=$1))))
           DELETE FROM alert_rules ar
-          USING projects p
+          USING management_scope,projects p
           WHERE ar.id = $1
-            AND p.id = ar.project_id
+            AND p.id = debugbundle_canonical_project(ar.project_id)
             AND p.organization_id = $2
-            AND ($3::uuid IS NULL OR ar.project_id = $3::uuid)
-            AND (
-              $4::uuid IS NULL
-              OR $5::text IN ('owner', 'admin')
-              OR ar.created_by_user_id = $4::uuid
-            )
+            AND ($3::uuid IS NULL OR ar.project_id=ANY(debugbundle_project_origins($3::uuid)))
+            AND ${ruleActorAllowedSql("p.id", "$4::uuid", "ar.created_by_user_id")}
           RETURNING ar.id AS alert_id
         `,
         [
           input.alert_id,
           input.organization_id,
           input.project_id ?? null,
-          input.actor_user_id ?? null,
-          input.actor_role ?? null
+          input.actor_user_id ?? null
         ]
       );
 

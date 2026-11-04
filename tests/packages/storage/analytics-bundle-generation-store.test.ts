@@ -32,13 +32,29 @@ const generationRow = {
 describe("analytics bundle generation store", () => {
   it("skips totals for legacy calls and cursor pages, and counts empty opted-in pages", async () => {
     const query = vi.fn().mockResolvedValue({ rows: [] });
-    const store = createPostgresAnalyticsBundleGenerationStore({ query: query as Queryable["query"] });
-    for (const extra of [{}, { include_total: true, cursor: { created_at: "2026-07-08T10:00:00.000Z", generation_id: GENERATION_ID } }]) {
-      const result = await store.listAnalyticsBundleGenerationsForProject({ project_id: PROJECT_ID, limit: 10, ...extra });
+    const store = createPostgresAnalyticsBundleGenerationStore({
+      query: query as Queryable["query"]
+    });
+    for (const extra of [
+      {},
+      {
+        include_total: true,
+        cursor: { created_at: "2026-07-08T10:00:00.000Z", generation_id: GENERATION_ID }
+      }
+    ]) {
+      const result = await store.listAnalyticsBundleGenerationsForProject({
+        project_id: PROJECT_ID,
+        limit: 10,
+        ...extra
+      });
       expect(result).not.toHaveProperty("total_pages");
       expect(query.mock.lastCall?.[0]).not.toContain("COUNT(*) OVER()");
     }
-    const empty = await store.listAnalyticsBundleGenerationsForProject({ project_id: PROJECT_ID, limit: 10, include_total: true });
+    const empty = await store.listAnalyticsBundleGenerationsForProject({
+      project_id: PROJECT_ID,
+      limit: 10,
+      include_total: true
+    });
     expect(empty.total_pages).toBe(1);
     expect(query.mock.lastCall?.[0]).toContain("COUNT(*) OVER()");
   });
@@ -252,7 +268,7 @@ describe("analytics bundle generation store", () => {
   it("gets a project-scoped generation by id", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
       expect(sqlText).toContain("FROM analytics_bundle_generations");
-      expect(sqlText).toContain("WHERE project_id = $1::uuid");
+      expect(sqlText).toContain("WHERE project_id=ANY(debugbundle_project_origins($1::uuid))");
       expect(sqlText).toContain("AND id = $2::uuid");
       expect(params).toEqual([PROJECT_ID, GENERATION_ID]);
       return { rows: [generationRow] };
@@ -276,7 +292,7 @@ describe("analytics bundle generation store", () => {
     const overflowGenerationId = "55555555-5555-4555-8555-555555555555";
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
       expect(sqlText).toContain("FROM analytics_bundle_generations");
-      expect(sqlText).toContain("project_id = $1::uuid");
+      expect(sqlText).toContain("project_id=ANY(debugbundle_project_origins($1::uuid))");
       expect(sqlText).toContain("status = $2");
       expect(sqlText).toContain("analysis_kind = $3");
       expect(sqlText).toContain("(created_at, id) < ($4::timestamptz, $5::uuid)");
@@ -328,7 +344,9 @@ describe("analytics bundle generation store", () => {
 
   it("lists organization generations with project metadata and a globally stable cursor", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
-      expect(sqlText).toContain("JOIN projects p ON p.id = abg.project_id");
+      expect(sqlText).toContain(
+        "JOIN projects p ON p.id = debugbundle_canonical_project(abg.project_id)"
+      );
       expect(sqlText).toContain("p.organization_id = $1::uuid");
       expect(sqlText).toContain("abg.analysis_spec #>> '{filters,service}' = $2");
       expect(sqlText).toContain("abg.analysis_spec #>> '{filters,environment}' = $3");
@@ -573,7 +591,13 @@ describe("analytics bundle generation store", () => {
 });
 
 function createTransactionalDb(queryMock: unknown): Queryable {
-  const query = queryMock as Queryable["query"];
+  const sourceQuery = queryMock as Queryable["query"];
+  const query = ((sql: string, params: unknown[]) =>
+    sql === "SELECT debugbundle_assert_project_scope_write($1::uuid)"
+      ? Promise.resolve({ rows: [] })
+      : sql.startsWith("SELECT debugbundle_project_origins")
+        ? Promise.resolve({ rows: [{ origin_ids: [PROJECT_ID] }] })
+        : sourceQuery(sql, params)) as Queryable["query"];
 
   return {
     query,

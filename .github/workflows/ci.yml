@@ -9,6 +9,20 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: debugbundle
+          POSTGRES_PASSWORD: debugbundle
+          POSTGRES_DB: debugbundle
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U debugbundle"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -42,6 +56,11 @@ jobs:
 
       - name: Test
         env:
+          PROJECT_SERVICE_DB_COVERAGE: isolated
+          DB_HOST: 127.0.0.1
+          DB_USER: debugbundle
+          DB_PASSWORD: debugbundle
+          DB_NAME: debugbundle
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.sha }}
         run: pnpm test

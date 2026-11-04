@@ -15,7 +15,7 @@ import {
   evaluateCaptureRules,
   getCaptureRuleSpecificityScore,
   isCaptureRuleActive,
-  type CaptureRule,
+  type CaptureRule
 } from "../../../packages/shared-types/src/capture-rules.ts";
 
 const baseRule: CaptureRule = {
@@ -29,8 +29,8 @@ const baseRule: CaptureRule = {
     event_types: ["frontend_exception"],
     browser_event_kind: "resource_error",
     resource_url: {
-      host: "analytics.example.com",
-    },
+      host: "analytics.example.com"
+    }
   },
   sample_rate: null,
   sample_event_class: null,
@@ -41,7 +41,7 @@ const baseRule: CaptureRule = {
   hit_count: 0,
   last_matched_at: null,
   created_at: "2026-05-26T10:00:00.000Z",
-  updated_at: "2026-05-26T10:00:00.000Z",
+  updated_at: "2026-05-26T10:00:00.000Z"
 };
 
 describe("capture rule schemas", () => {
@@ -61,13 +61,13 @@ describe("capture rule schemas", () => {
       browser_event_kind: "resource_error",
       resource_url: {
         host: "ANALYTICS.EXAMPLE.COM",
-        path_prefix: "/bundle.js",
-      },
+        path_prefix: "/bundle.js"
+      }
     });
 
     expect(parsed.resource_url).toEqual({
       host: "analytics.example.com",
-      path_prefix: "/bundle.js",
+      path_prefix: "/bundle.js"
     });
   });
 
@@ -78,7 +78,7 @@ describe("capture rule schemas", () => {
       browser_event_opaque: true,
       client_kind: "bot",
       bot_family: " Googlebot ",
-      message_equals: "Window error",
+      message_equals: "Window error"
     });
 
     expect(parsed).toEqual({
@@ -87,7 +87,7 @@ describe("capture rule schemas", () => {
       browser_event_opaque: true,
       client_kind: "bot",
       bot_family: "Googlebot",
-      message_equals: "Window error",
+      message_equals: "Window error"
     });
   });
 
@@ -124,21 +124,23 @@ describe("capture rule schemas", () => {
     expect(classifyCaptureRuleClientFromUserAgent(null)).toEqual({ client_kind: "unknown" });
     expect(classifyCaptureRuleClientFromUserAgent("Mozilla/5.0 Googlebot/2.1")).toEqual({
       client_kind: "bot",
-      bot_family: "Googlebot",
+      bot_family: "Googlebot"
     });
     expect(classifyCaptureRuleClientFromUserAgent("ExampleCrawler/1.0")).toEqual({
       client_kind: "bot",
-      bot_family: "OtherBot",
+      bot_family: "OtherBot"
     });
-    expect(classifyCaptureRuleClientFromUserAgent("Mozilla/5.0 Chrome/148.0.0.0 Safari/537.36")).toEqual({
-      client_kind: "human",
+    expect(
+      classifyCaptureRuleClientFromUserAgent("Mozilla/5.0 Chrome/148.0.0.0 Safari/537.36")
+    ).toEqual({
+      client_kind: "human"
     });
   });
 
   it("rejects matchers that only constrain event type", () => {
     expect(
       CaptureRuleMatcherSchema.safeParse({
-        event_types: ["frontend_exception"],
+        event_types: ["frontend_exception"]
       }).success
     ).toBe(false);
   });
@@ -148,7 +150,7 @@ describe("capture rule schemas", () => {
       CaptureRuleMatcherSchema.safeParse({
         browser_event_kind: "resource_error",
         event_types: ["frontend_exception"],
-        first_party: false,
+        first_party: false
       }).success
     ).toBe(false);
   });
@@ -161,7 +163,7 @@ describe("capture rule schemas", () => {
     const parsed = CaptureRuleSchema.parse({
       ...baseRule,
       project_id: "proj_123",
-      created_by_user_id: "usr_owner",
+      created_by_user_id: "usr_owner"
     });
 
     expect(parsed.project_id).toBe("proj_123");
@@ -173,7 +175,7 @@ describe("capture rule schemas", () => {
       CaptureRuleSchema.safeParse({
         ...baseRule,
         id: "00000000-0000-4000-8000-000000000102",
-        action: "sample",
+        action: "sample"
       }).success
     ).toBe(false);
 
@@ -182,7 +184,7 @@ describe("capture rule schemas", () => {
       id: "00000000-0000-4000-8000-000000000103",
       action: "sample",
       sample_rate: 0.25,
-      sample_event_class: "context",
+      sample_event_class: "context"
     });
 
     expect(parsed.sample_rate).toBe(0.25);
@@ -195,9 +197,9 @@ describe("capture rule schemas", () => {
       action: "sample",
       matcher: {
         event_types: ["request_event"],
-        request_url: { path_prefix: "/api/search" },
+        request_url: { path_prefix: "/api/search" }
       },
-      sample_rate: 0.25,
+      sample_rate: 0.25
     });
 
     expect(parsed.sample_event_class).toBe("preserve");
@@ -207,7 +209,7 @@ describe("capture rule schemas", () => {
     expect(
       CaptureRuleSchema.safeParse({
         ...baseRule,
-        sample_rate: 0.5,
+        sample_rate: 0.5
       }).success
     ).toBe(false);
   });
@@ -215,7 +217,7 @@ describe("capture rule schemas", () => {
   it("accepts partial rule updates when at least one field is present", () => {
     expect(
       CaptureRuleUpdateSchema.safeParse({
-        enabled: false,
+        enabled: false
       }).success
     ).toBe(true);
   });
@@ -223,7 +225,7 @@ describe("capture rule schemas", () => {
   it("requires sample update fields to be paired with action sample", () => {
     expect(
       CaptureRuleUpdateSchema.safeParse({
-        sample_rate: 0.25,
+        sample_rate: 0.25
       }).success
     ).toBe(false);
 
@@ -231,7 +233,7 @@ describe("capture rule schemas", () => {
       CaptureRuleUpdateSchema.safeParse({
         action: "sample",
         sample_rate: 0.25,
-        sample_event_class: "preserve",
+        sample_event_class: "preserve"
       }).success
     ).toBe(true);
   });
@@ -239,7 +241,7 @@ describe("capture rule schemas", () => {
   it("allows non-sample action updates without sample fields", () => {
     expect(
       CaptureRuleUpdateSchema.safeParse({
-        action: "drop",
+        action: "drop"
       }).success
     ).toBe(true);
   });
@@ -252,11 +254,11 @@ describe("capture rule schemas", () => {
     expect(
       CaptureRulesFileSchema.parse({
         version: 1,
-        rules: [baseRule],
+        rules: [baseRule]
       })
     ).toEqual({
       version: 1,
-      rules: [baseRule],
+      rules: [baseRule]
     });
   });
 });
@@ -267,7 +269,7 @@ describe("capture rule activity", () => {
       isCaptureRuleActive(
         {
           ...baseRule,
-          enabled: false,
+          enabled: false
         },
         "2026-05-26T10:00:00.000Z"
       )
@@ -279,7 +281,7 @@ describe("capture rule activity", () => {
       isCaptureRuleActive(
         {
           ...baseRule,
-          expires_at: "2026-05-25T10:00:00.000Z",
+          expires_at: "2026-05-25T10:00:00.000Z"
         },
         "2026-05-26T10:00:00.000Z"
       )
@@ -288,6 +290,27 @@ describe("capture rule activity", () => {
 });
 
 describe("capture rule matching", () => {
+  it("matches server-verified aliases of the same service while keeping unrelated names separate", () => {
+    const rule = { ...baseRule, matcher: { services: ["web"] } };
+    const context = {
+      project_id: baseRule.project_id,
+      event_id: "00000000-0000-4000-8000-000000000209",
+      event_type: "frontend_exception" as const,
+      runtime: "browser" as const,
+      service: "Site",
+      service_aliases: ["web", "Site"]
+    };
+    expect(evaluateCaptureRules([rule], context, "2026-05-26T10:00:00.000Z")?.rule_id).toBe(
+      baseRule.id
+    );
+    expect(
+      evaluateCaptureRules(
+        [rule],
+        { ...context, service_aliases: ["api", "Site"] },
+        "2026-05-26T10:00:00.000Z"
+      )
+    ).toBeNull();
+  });
   it("prefers the most specific matching rule", () => {
     const broaderRule: CaptureRule = {
       ...baseRule,
@@ -297,9 +320,9 @@ describe("capture rule matching", () => {
         event_types: ["frontend_exception"],
         browser_event_kind: "resource_error",
         resource_url: {
-          host_suffix: "example.com",
-        },
-      },
+          host_suffix: "example.com"
+        }
+      }
     };
 
     const result = evaluateCaptureRules(
@@ -316,8 +339,8 @@ describe("capture rule matching", () => {
         client_kind: "unknown",
         resource_url: {
           host: "analytics.example.com",
-          path: "/bundle.js",
-        },
+          path: "/bundle.js"
+        }
       },
       "2026-05-26T10:00:00.000Z"
     );
@@ -335,7 +358,7 @@ describe("capture rule matching", () => {
       id: "00000000-0000-4000-8000-000000000105",
       action: "sample",
       sample_rate: 0,
-      sample_event_class: "preserve",
+      sample_event_class: "preserve"
     };
 
     const result = evaluateCaptureRules(
@@ -352,8 +375,8 @@ describe("capture rule matching", () => {
         client_kind: "unknown",
         resource_url: {
           host: "analytics.example.com",
-          path: "/bundle.js",
-        },
+          path: "/bundle.js"
+        }
       },
       "2026-05-26T10:00:00.000Z"
     );
@@ -363,43 +386,46 @@ describe("capture rule matching", () => {
       action: "sample",
       outcome: "sampled_out",
       sample_rate: 0,
-      sample_event_class: "preserve",
+      sample_event_class: "preserve"
     });
   });
 
-  it.each([false, true])("supports exact fingerprint matching with a prior-version alias: %s", (legacyAlias) => {
-    const fingerprintRule: CaptureRule = {
-      ...baseRule,
-      id: "00000000-0000-4000-8000-000000000106",
-      matcher: {
-        event_types: ["frontend_exception"],
-        fingerprint: {
-          version: "v1",
-          value: "fp_browser_noise",
-        },
-      },
-    };
+  it.each([false, true])(
+    "supports exact fingerprint matching with a prior-version alias: %s",
+    (legacyAlias) => {
+      const fingerprintRule: CaptureRule = {
+        ...baseRule,
+        id: "00000000-0000-4000-8000-000000000106",
+        matcher: {
+          event_types: ["frontend_exception"],
+          fingerprint: {
+            version: "v1",
+            value: "fp_browser_noise"
+          }
+        }
+      };
 
-    const result = evaluateCaptureRules(
-      [fingerprintRule],
-      {
-        project_id: baseRule.project_id,
-        event_id: "00000000-0000-4000-8000-000000000203",
-        event_type: "frontend_exception",
-        runtime: "browser",
-        client_kind: "unknown",
-        fingerprint: {
-          version: legacyAlias ? "v2" : "v1",
-          value: legacyAlias ? "new_fingerprint" : "fp_browser_noise",
+      const result = evaluateCaptureRules(
+        [fingerprintRule],
+        {
+          project_id: baseRule.project_id,
+          event_id: "00000000-0000-4000-8000-000000000203",
+          event_type: "frontend_exception",
+          runtime: "browser",
+          client_kind: "unknown",
+          fingerprint: {
+            version: legacyAlias ? "v2" : "v1",
+            value: legacyAlias ? "new_fingerprint" : "fp_browser_noise"
+          },
+          fingerprint_aliases: legacyAlias ? [{ version: "v1", value: "fp_browser_noise" }] : []
         },
-        fingerprint_aliases: legacyAlias ? [{ version: "v1", value: "fp_browser_noise" }] : [],
-      },
-      "2026-05-26T10:00:00.000Z"
-    );
+        "2026-05-26T10:00:00.000Z"
+      );
 
-    expect(result?.rule_id).toBe(fingerprintRule.id);
-    expect(result?.outcome).toBe("demote");
-  });
+      expect(result?.rule_id).toBe(fingerprintRule.id);
+      expect(result?.outcome).toBe("demote");
+    }
+  );
 
   it("builds evaluation context from frontend resource exceptions", () => {
     const context = buildCaptureRuleEvaluationContext({
@@ -410,7 +436,7 @@ describe("capture rule matching", () => {
         service: {
           name: "web",
           environment: "production",
-          runtime: "browser",
+          runtime: "browser"
         },
         payload: {
           name: "ResourceLoadError",
@@ -427,10 +453,10 @@ describe("capture rule matching", () => {
               tag_name: "LINK",
               source_url: "https://analytics.example.com/tag.js?v=1",
               attributes: { rel: "modulepreload", as: "script", integrity_present: true }
-            },
-          },
-        },
-      },
+            }
+          }
+        }
+      }
     });
 
     expect(context).toEqual({
@@ -455,8 +481,8 @@ describe("capture rule matching", () => {
       client_kind: "unknown",
       resource_url: {
         host: "analytics.example.com",
-        path: "/tag.js",
-      },
+        path: "/tag.js"
+      }
     });
   });
 
@@ -490,8 +516,7 @@ describe("capture rule matching", () => {
     };
 
     expect(
-      evaluateCaptureRules([interruptionRule], matchingContext, "2026-05-26T10:00:00.000Z")
-        ?.rule_id
+      evaluateCaptureRules([interruptionRule], matchingContext, "2026-05-26T10:00:00.000Z")?.rule_id
     ).toBe(interruptionRule.id);
     expect(
       evaluateCaptureRules(
@@ -520,7 +545,7 @@ describe("capture rule matching", () => {
         service: {
           name: "web",
           environment: "production",
-          runtime: "browser",
+          runtime: "browser"
         },
         payload: {
           name: "ResourceLoadError",
@@ -528,17 +553,17 @@ describe("capture rule matching", () => {
           browser_event: {
             kind: "resource_error",
             target: {
-              source_url: "https://analytics.example.com/tag.js",
-            },
-          },
-        },
-      },
+              source_url: "https://analytics.example.com/tag.js"
+            }
+          }
+        }
+      }
     });
 
     expect(context.project_id).toBe("proj_123");
     expect(context.resource_url).toEqual({
       host: "analytics.example.com",
-      path: "/tag.js",
+      path: "/tag.js"
     });
   });
 
@@ -552,8 +577,8 @@ describe("capture rule matching", () => {
         browser_event_opaque: true,
         client_kind: "bot",
         bot_family: "Googlebot",
-        message_equals: "Window error",
-      },
+        message_equals: "Window error"
+      }
     };
 
     const context = buildCaptureRuleEvaluationContext({
@@ -564,21 +589,21 @@ describe("capture rule matching", () => {
         service: {
           name: "web",
           environment: "production",
-          runtime: "browser",
+          runtime: "browser"
         },
         payload: {
           name: "WindowError",
           message: "Window error",
           device: {
             user_agent:
-              "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/148.0.0.0 Mobile Safari/537.36 Googlebot/2.1",
+              "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/148.0.0.0 Mobile Safari/537.36 Googlebot/2.1"
           },
           browser_event: {
             kind: "window_error",
-            opaque: true,
-          },
-        },
-      },
+            opaque: true
+          }
+        }
+      }
     });
 
     expect(context).toEqual(
@@ -586,12 +611,12 @@ describe("capture rule matching", () => {
         browser_event_kind: "window_error",
         browser_event_opaque: true,
         client_kind: "bot",
-        bot_family: "Googlebot",
+        bot_family: "Googlebot"
       })
     );
-    expect(evaluateCaptureRules([opaqueBotRule], context, "2026-05-26T10:00:00.000Z")?.rule_id).toBe(
-      opaqueBotRule.id
-    );
+    expect(
+      evaluateCaptureRules([opaqueBotRule], context, "2026-05-26T10:00:00.000Z")?.rule_id
+    ).toBe(opaqueBotRule.id);
   });
 
   it("demotes event class when a demotion rule matched", () => {
@@ -603,8 +628,22 @@ describe("capture rule matching", () => {
           action: "demote",
           outcome: "demote",
           sample_rate: null,
-          sample_event_class: null,
-        },
+          sample_event_class: null
+        }
+      })
+    ).toBe("context_signal");
+  });
+  it("keeps admitted context samples out of incident grouping", () => {
+    expect(
+      applyCaptureRuleEventClass({
+        event_class: "incident_signal",
+        capture_rule: {
+          rule_id: baseRule.id,
+          action: "sample",
+          outcome: "sampled_in",
+          sample_rate: 0.5,
+          sample_event_class: "context"
+        }
       })
     ).toBe("context_signal");
   });
@@ -615,7 +654,9 @@ it("rejects blank browser predicates instead of silently broadening a compound r
     { browser_target_tag_name: " " },
     { browser_target_attributes: { rel: " ", as: "script" } }
   ]) {
-    expect(CaptureRuleMatcherSchema.safeParse({ services: ["web"], ...predicate }).success).toBe(false);
+    expect(CaptureRuleMatcherSchema.safeParse({ services: ["web"], ...predicate }).success).toBe(
+      false
+    );
   }
 });
 
@@ -624,12 +665,22 @@ it("keeps valid existing events ingestible when captured DOM strings exceed matc
     url: "https://app.example.com/assets/app.js",
     tag: "x".repeat(121),
     attributes: {
-      rel: "r".repeat(121), as: "a".repeat(121), type: "t".repeat(256),
-      media: "m".repeat(501), cross_origin: "c".repeat(121), defer: false
+      rel: "r".repeat(121),
+      as: "a".repeat(121),
+      type: "t".repeat(256),
+      media: "m".repeat(501),
+      cross_origin: "c".repeat(121),
+      defer: false
     }
   });
   const context = buildCaptureRuleEvaluationContext({ project_id: baseRule.project_id, event });
   expect(context.browser_target_tag_name).toBeUndefined();
   expect(context.browser_target_attributes).toEqual({ defer: false });
-  expect(evaluateCaptureRules([{ ...baseRule, matcher: { browser_target_attributes: { rel: "r".repeat(120) } } }], context, "2026-05-26T10:00:00.000Z")).toBeNull();
+  expect(
+    evaluateCaptureRules(
+      [{ ...baseRule, matcher: { browser_target_attributes: { rel: "r".repeat(120) } } }],
+      context,
+      "2026-05-26T10:00:00.000Z"
+    )
+  ).toBeNull();
 });

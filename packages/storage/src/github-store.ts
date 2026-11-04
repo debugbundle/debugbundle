@@ -1,3 +1,8 @@
+import { createGitHubManagementStore } from "./github-management-store.js";
+import {
+  mapMatchingGitHubDispatchRule,
+  mapGitHubDispatchDeliveryIntent
+} from "./github-records.js";
 import { randomUUID } from "node:crypto";
 
 import { getTierCapabilities } from "../../shared-types/src/index.js";
@@ -5,13 +10,10 @@ import { getTierCapabilities } from "../../shared-types/src/index.js";
 import type {
   DeliverGitHubDispatchJob,
   GitHubDispatchDeliveryIntent,
-  GitHubDispatchDeliveryRecord,
   GitHubDispatchRuleRecord,
-  GitHubInstallationRecord,
   GitHubStore,
   MarkGitHubDispatchDeliveryAttemptResult,
   MatchingGitHubDispatchRule,
-  ProjectGitHubRepoRecord,
   Queryable
 } from "./types.js";
 
@@ -24,693 +26,22 @@ const SEVERITY_RANK: Record<"low" | "medium" | "high" | "critical", number> = {
   critical: 4
 };
 
-function mapGitHubInstallationRow(row: GitHubInstallationRecord & Record<string, unknown>): GitHubInstallationRecord {
-  return {
-    id: row.id,
-    installation_id: Number(row.installation_id),
-    account_login: row.account_login,
-    account_type: row.account_type,
-    status: row.status,
-    created_at: row.created_at,
-    updated_at: row.updated_at
-  };
-}
-
-function mapProjectGitHubRepoRow(row: ProjectGitHubRepoRecord & Record<string, unknown>): ProjectGitHubRepoRecord {
-  return {
-    id: row.id,
-    project_id: row.project_id,
-    installation_id: row.installation_id,
-    repo_owner: row.repo_owner,
-    repo_name: row.repo_name,
-    default_branch: row.default_branch,
-    created_at: row.created_at,
-    updated_at: row.updated_at
-  };
-}
-
-function mapGitHubDispatchRuleRow(row: GitHubDispatchRuleRecord & Record<string, unknown>): GitHubDispatchRuleRecord {
-  return {
-    rule_id: row.rule_id,
-    project_id: row.project_id,
-    created_by_user_id: row.created_by_user_id,
-    name: row.name,
-    enabled: row.enabled,
-    event_types: Array.isArray(row.event_types) ? row.event_types.map((value) => String(value)) : [],
-    environments: Array.isArray(row.environments) ? row.environments.map((value) => String(value)) : [],
-    services: Array.isArray(row.services) ? row.services.map((value) => String(value)) : [],
-    severity_min: row.severity_min,
-    bundle_type: row.bundle_type,
-    incident_status: row.incident_status,
-    cooldown_seconds: Number(row.cooldown_seconds),
-    created_at: row.created_at,
-    updated_at: row.updated_at
-  };
-}
-
-function mapGitHubDispatchDeliveryRow(
-  row: GitHubDispatchDeliveryRecord & Record<string, unknown>
-): GitHubDispatchDeliveryRecord {
-  return {
-    delivery_id: row.delivery_id,
-    rule_id: row.rule_id,
-    rule_name: row.rule_name,
-    incident_id: row.incident_id,
-    improvement_id: row.improvement_id,
-    target_title: row.target_title,
-    status: row.status,
-    attempt_count: Number(row.attempt_count),
-    last_attempt_at: row.last_attempt_at,
-    last_error: row.last_error,
-    github_status_code: row.github_status_code === null ? null : Number(row.github_status_code),
-    created_at: row.created_at
-  };
-}
-
-function mapMatchingGitHubDispatchRule(row: MatchingGitHubDispatchRule & Record<string, unknown>): MatchingGitHubDispatchRule {
-  return {
-    rule_id: row.rule_id,
-    rule_name: row.rule_name,
-    installation_id: Number(row.installation_id),
-    repo_owner: row.repo_owner,
-    repo_name: row.repo_name,
-    default_branch: row.default_branch,
-    cooldown_seconds: Number(row.cooldown_seconds)
-  };
-}
-
-function mapGitHubDispatchDeliveryIntent(
-  row: GitHubDispatchDeliveryIntent & Record<string, unknown>
-): GitHubDispatchDeliveryIntent {
-  return {
-    delivery_id: row.delivery_id,
-    rule_id: row.rule_id,
-    project_id: row.project_id,
-    incident_id: row.incident_id,
-    improvement_id: row.improvement_id,
-    installation_id: Number(row.installation_id),
-    repo_owner: row.repo_owner,
-    repo_name: row.repo_name,
-    status: row.status,
-    attempt_count: Number(row.attempt_count),
-    next_attempt_at: row.next_attempt_at,
-    last_attempt_at: row.last_attempt_at,
-    last_error: row.last_error,
-    github_status_code: row.github_status_code === null ? null : Number(row.github_status_code),
-    dispatch_payload:
-      typeof row.dispatch_payload === "object" && row.dispatch_payload !== null
-        ? Object.fromEntries(Object.entries(row.dispatch_payload))
-        : {}
-  };
-}
-
 export function createPostgresGitHubStore(db: Queryable): GitHubStore {
   return {
-    async getGitHubInstallationForOrganization(input) {
-      const result = await db.query<GitHubInstallationRecord & Record<string, unknown>>(
-        `
-          SELECT
-            id,
-            installation_id,
-            account_login,
-            account_type,
-            status,
-            created_at::text AS created_at,
-            updated_at::text AS updated_at
-          FROM github_installations
-          WHERE organization_id = $1
-          LIMIT 1
-        `,
-        [input.organization_id]
-      );
-
-      const row = result.rows[0];
-      return row === undefined ? null : mapGitHubInstallationRow(row);
-    },
-
-    async upsertGitHubInstallationForOrganization(input) {
-      const recordIdResult = await db.query<{ id: string }>(
-        `
-          SELECT id
-          FROM github_installations
-          WHERE organization_id = $1 OR installation_id = $2
-          LIMIT 1
-        `,
-        [input.organization_id, input.installation_id]
-      );
-      const recordId = recordIdResult.rows[0]?.id ?? randomUUID();
-
-      const result = await db.query<GitHubInstallationRecord & Record<string, unknown>>(
-        `
-          INSERT INTO github_installations (
-            id,
-            organization_id,
-            installation_id,
-            account_login,
-            account_type,
-            status,
-            created_at,
-            updated_at
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, now(), now())
-          ON CONFLICT (organization_id)
-          DO UPDATE SET
-            installation_id = EXCLUDED.installation_id,
-            account_login = EXCLUDED.account_login,
-            account_type = EXCLUDED.account_type,
-            status = EXCLUDED.status,
-            updated_at = now()
-          RETURNING
-            id,
-            installation_id,
-            account_login,
-            account_type,
-            status,
-            created_at::text AS created_at,
-            updated_at::text AS updated_at
-        `,
-        [
-          recordId,
-          input.organization_id,
-          input.installation_id,
-          input.account_login,
-          input.account_type,
-          input.status
-        ]
-      );
-
-      return mapGitHubInstallationRow(result.rows[0]!);
-    },
-
-    async updateGitHubInstallationStatus(input) {
-      const result = await db.query<GitHubInstallationRecord & Record<string, unknown>>(
-        `
-          UPDATE github_installations
-          SET
-            status = $2,
-            account_login = COALESCE($3, account_login),
-            account_type = COALESCE($4, account_type),
-            updated_at = now()
-          WHERE installation_id = $1
-          RETURNING
-            id,
-            installation_id,
-            account_login,
-            account_type,
-            status,
-            created_at::text AS created_at,
-            updated_at::text AS updated_at
-        `,
-        [input.installation_id, input.status, input.account_login ?? null, input.account_type ?? null]
-      );
-
-      const row = result.rows[0];
-      return row === undefined ? null : mapGitHubInstallationRow(row);
-    },
-
-    async deleteGitHubInstallationForOrganization(input) {
-      const result = await db.query<{ id: string }>(
-        `
-          DELETE FROM github_installations
-          WHERE organization_id = $1
-          RETURNING id
-        `,
-        [input.organization_id]
-      );
-
-      return result.rows[0] !== undefined;
-    },
-
-    async getProjectGitHubRepoForOrganization(input) {
-      const result = await db.query<ProjectGitHubRepoRecord & Record<string, unknown>>(
-        `
-          SELECT
-            pgr.id,
-            pgr.project_id,
-            pgr.installation_id,
-            pgr.repo_owner,
-            pgr.repo_name,
-            pgr.default_branch,
-            pgr.created_at::text AS created_at,
-            pgr.updated_at::text AS updated_at
-          FROM project_github_repos pgr
-          JOIN projects p ON p.id = pgr.project_id
-          JOIN github_installations gi ON gi.id = pgr.installation_id
-          WHERE p.organization_id = $1
-            AND pgr.project_id = $2
-          LIMIT 1
-        `,
-        [input.organization_id, input.project_id]
-      );
-
-      const row = result.rows[0];
-      return row === undefined ? null : mapProjectGitHubRepoRow(row);
-    },
-
-    async upsertProjectGitHubRepoForOrganization(input) {
-      const projectResult = await db.query<{ id: string }>(
-        `
-          SELECT id
-          FROM projects
-          WHERE id = $1 AND organization_id = $2
-          LIMIT 1
-        `,
-        [input.project_id, input.organization_id]
-      );
-
-      if (projectResult.rows[0] === undefined) {
-        return null;
-      }
-
-      const existingResult = await db.query<{ id: string }>(
-        `
-          SELECT id
-          FROM project_github_repos
-          WHERE project_id = $1
-          LIMIT 1
-        `,
-        [input.project_id]
-      );
-      const recordId = existingResult.rows[0]?.id ?? randomUUID();
-
-      const result = await db.query<ProjectGitHubRepoRecord & Record<string, unknown>>(
-        `
-          INSERT INTO project_github_repos (
-            id,
-            project_id,
-            installation_id,
-            repo_owner,
-            repo_name,
-            default_branch,
-            created_at,
-            updated_at
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, now(), now())
-          ON CONFLICT (project_id)
-          DO UPDATE SET
-            installation_id = EXCLUDED.installation_id,
-            repo_owner = EXCLUDED.repo_owner,
-            repo_name = EXCLUDED.repo_name,
-            default_branch = EXCLUDED.default_branch,
-            updated_at = now()
-          RETURNING
-            id,
-            project_id,
-            installation_id,
-            repo_owner,
-            repo_name,
-            default_branch,
-            created_at::text AS created_at,
-            updated_at::text AS updated_at
-        `,
-        [
-          recordId,
-          input.project_id,
-          input.installation_id,
-          input.repo_owner,
-          input.repo_name,
-          input.default_branch
-        ]
-      );
-
-      return mapProjectGitHubRepoRow(result.rows[0]!);
-    },
-
-    async deleteProjectGitHubRepoForOrganization(input) {
-      await db.query(
-        `
-          DELETE FROM github_dispatch_rules gdr
-          USING projects p
-          WHERE gdr.project_id = p.id
-            AND p.organization_id = $1
-            AND gdr.project_id = $2
-        `,
-        [input.organization_id, input.project_id]
-      );
-
-      const result = await db.query<{ id: string }>(
-        `
-          DELETE FROM project_github_repos pgr
-          USING projects p
-          WHERE pgr.project_id = p.id
-            AND p.organization_id = $1
-            AND pgr.project_id = $2
-          RETURNING pgr.id
-        `,
-        [input.organization_id, input.project_id]
-      );
-
-      return result.rows[0] !== undefined;
-    },
-
-    async listProjectGitHubRulesForOrganization(input) {
-      const scopedProject = await db.query<{ id: string }>(
-        `
-          SELECT id
-          FROM projects
-          WHERE id = $1 AND organization_id = $2
-          LIMIT 1
-        `,
-        [input.project_id, input.organization_id]
-      );
-
-      if (scopedProject.rows[0] === undefined) {
-        return null;
-      }
-
-      const result = await db.query<GitHubDispatchRuleRecord & Record<string, unknown>>(
-        `
-          SELECT
-            id AS rule_id,
-            project_id,
-            created_by_user_id,
-            name,
-            enabled,
-            event_types,
-            COALESCE(environments, ARRAY[]::text[]) AS environments,
-            COALESCE(services, ARRAY[]::text[]) AS services,
-            severity_min,
-            bundle_type,
-            incident_status,
-            cooldown_seconds,
-            created_at::text AS created_at,
-            updated_at::text AS updated_at
-          FROM github_dispatch_rules
-          WHERE project_id = $1
-          ORDER BY created_at DESC, id DESC
-        `,
-        [input.project_id]
-      );
-
-      return result.rows.map(mapGitHubDispatchRuleRow);
-    },
-
-    async getProjectGitHubRuleForOrganization(input) {
-      const result = await db.query<GitHubDispatchRuleRecord & Record<string, unknown>>(
-        `
-          SELECT
-            gdr.id AS rule_id,
-            gdr.project_id,
-            gdr.created_by_user_id,
-            gdr.name,
-            gdr.enabled,
-            gdr.event_types,
-            COALESCE(gdr.environments, ARRAY[]::text[]) AS environments,
-            COALESCE(gdr.services, ARRAY[]::text[]) AS services,
-            gdr.severity_min,
-            gdr.bundle_type,
-            gdr.incident_status,
-            gdr.cooldown_seconds,
-            gdr.created_at::text AS created_at,
-            gdr.updated_at::text AS updated_at
-          FROM github_dispatch_rules gdr
-          JOIN projects p ON p.id = gdr.project_id
-          WHERE p.organization_id = $1
-            AND gdr.project_id = $2
-            AND gdr.id = $3
-          LIMIT 1
-        `,
-        [input.organization_id, input.project_id, input.rule_id]
-      );
-
-      const row = result.rows[0];
-      return row === undefined ? null : mapGitHubDispatchRuleRow(row);
-    },
-
-    async createProjectGitHubRuleForOrganization(input) {
-      const scopedProject = await db.query<{ id: string }>(
-        `
-          SELECT id
-          FROM projects
-          WHERE id = $1 AND organization_id = $2
-          LIMIT 1
-        `,
-        [input.project_id, input.organization_id]
-      );
-
-      if (scopedProject.rows[0] === undefined) {
-        return null;
-      }
-
-      const result = await db.query<GitHubDispatchRuleRecord & Record<string, unknown>>(
-        `
-          INSERT INTO github_dispatch_rules (
-            id,
-            project_id,
-            created_by_user_id,
-            name,
-            enabled,
-            event_types,
-            environments,
-            services,
-            severity_min,
-            bundle_type,
-            incident_status,
-            cooldown_seconds,
-            created_at,
-            updated_at
-          )
-          VALUES ($1, $2, $3::uuid, $4, $5, $6::text[], $7::text[], $8::text[], $9, $10, $11, $12, now(), now())
-          RETURNING
-            id AS rule_id,
-            project_id,
-            created_by_user_id,
-            name,
-            enabled,
-            event_types,
-            COALESCE(environments, ARRAY[]::text[]) AS environments,
-            COALESCE(services, ARRAY[]::text[]) AS services,
-            severity_min,
-            bundle_type,
-            incident_status,
-            cooldown_seconds,
-            created_at::text AS created_at,
-            updated_at::text AS updated_at
-        `,
-        [
-          randomUUID(),
-          input.project_id,
-          input.created_by_user_id,
-          input.name,
-          input.enabled,
-          input.event_types,
-          input.environments,
-          input.services,
-          input.severity_min,
-          input.bundle_type,
-          input.incident_status,
-          input.cooldown_seconds
-        ]
-      );
-
-      const row = result.rows[0];
-      return row === undefined ? null : mapGitHubDispatchRuleRow(row);
-    },
-
-    async updateProjectGitHubRuleForOrganization(input) {
-      const hasName = Object.prototype.hasOwnProperty.call(input, "name");
-      const hasEnabled = Object.prototype.hasOwnProperty.call(input, "enabled");
-      const hasEventTypes = Object.prototype.hasOwnProperty.call(input, "event_types");
-      const hasEnvironments = Object.prototype.hasOwnProperty.call(input, "environments");
-      const hasServices = Object.prototype.hasOwnProperty.call(input, "services");
-      const hasSeverityMin = Object.prototype.hasOwnProperty.call(input, "severity_min");
-      const hasBundleType = Object.prototype.hasOwnProperty.call(input, "bundle_type");
-      const hasIncidentStatus = Object.prototype.hasOwnProperty.call(input, "incident_status");
-      const hasCooldown = Object.prototype.hasOwnProperty.call(input, "cooldown_seconds");
-
-      const result = await db.query<GitHubDispatchRuleRecord & Record<string, unknown>>(
-        `
-          UPDATE github_dispatch_rules gdr
-          SET
-            name = CASE WHEN $4::boolean THEN $5 ELSE gdr.name END,
-            enabled = CASE WHEN $6::boolean THEN $7 ELSE gdr.enabled END,
-            event_types = CASE WHEN $8::boolean THEN $9::text[] ELSE gdr.event_types END,
-            environments = CASE WHEN $10::boolean THEN $11::text[] ELSE gdr.environments END,
-            services = CASE WHEN $12::boolean THEN $13::text[] ELSE gdr.services END,
-            severity_min = CASE WHEN $14::boolean THEN $15 ELSE gdr.severity_min END,
-            bundle_type = CASE WHEN $16::boolean THEN $17 ELSE gdr.bundle_type END,
-            incident_status = CASE WHEN $18::boolean THEN $19 ELSE gdr.incident_status END,
-            cooldown_seconds = CASE WHEN $20::boolean THEN $21 ELSE gdr.cooldown_seconds END,
-            updated_at = now()
-          FROM projects p
-          WHERE gdr.id = $1
-            AND gdr.project_id = $2
-            AND p.id = gdr.project_id
-            AND p.organization_id = $3
-            AND (
-              $22::uuid IS NULL
-              OR $23::text IN ('owner', 'admin')
-              OR gdr.created_by_user_id = $22::uuid
-            )
-          RETURNING
-            gdr.id AS rule_id,
-            gdr.project_id,
-            gdr.created_by_user_id,
-            gdr.name,
-            gdr.enabled,
-            gdr.event_types,
-            COALESCE(gdr.environments, ARRAY[]::text[]) AS environments,
-            COALESCE(gdr.services, ARRAY[]::text[]) AS services,
-            gdr.severity_min,
-            gdr.bundle_type,
-            gdr.incident_status,
-            gdr.cooldown_seconds,
-            gdr.created_at::text AS created_at,
-            gdr.updated_at::text AS updated_at
-        `,
-        [
-          input.rule_id,
-          input.project_id,
-          input.organization_id,
-          hasName,
-          hasName ? input.name ?? null : null,
-          hasEnabled,
-          hasEnabled ? input.enabled ?? null : null,
-          hasEventTypes,
-          hasEventTypes ? input.event_types ?? [] : [],
-          hasEnvironments,
-          hasEnvironments ? input.environments ?? [] : [],
-          hasServices,
-          hasServices ? input.services ?? [] : [],
-          hasSeverityMin,
-          hasSeverityMin ? input.severity_min ?? null : null,
-          hasBundleType,
-          hasBundleType ? input.bundle_type ?? null : null,
-          hasIncidentStatus,
-          hasIncidentStatus ? input.incident_status ?? null : null,
-          hasCooldown,
-          hasCooldown ? input.cooldown_seconds ?? null : null,
-          input.actor_user_id ?? null,
-          input.actor_role ?? null
-        ]
-      );
-
-      const row = result.rows[0];
-      return row === undefined ? null : mapGitHubDispatchRuleRow(row);
-    },
-
-    async deleteProjectGitHubRuleForOrganization(input) {
-      const result = await db.query<{ rule_id: string }>(
-        `
-          DELETE FROM github_dispatch_rules gdr
-          USING projects p
-          WHERE gdr.project_id = p.id
-            AND p.organization_id = $1
-            AND gdr.project_id = $2
-            AND gdr.id = $3
-            AND (
-              $4::uuid IS NULL
-              OR $5::text IN ('owner', 'admin')
-              OR gdr.created_by_user_id = $4::uuid
-            )
-          RETURNING gdr.id AS rule_id
-        `,
-        [
-          input.organization_id,
-          input.project_id,
-          input.rule_id,
-          input.actor_user_id ?? null,
-          input.actor_role ?? null
-        ]
-      );
-
-      return result.rows[0] !== undefined;
-    },
-
-    async listProjectGitHubDeliveriesForOrganization(input) {
-      const result = await db.query<GitHubDispatchDeliveryRecord & Record<string, unknown>>(
-        `
-          SELECT
-            gdd.id AS delivery_id,
-            gdd.rule_id,
-            gdd.rule_name,
-            gdd.incident_id,
-            gdd.improvement_opportunity_id AS improvement_id,
-            COALESCE(i.title, io.title) AS target_title,
-            gdd.status,
-            gdd.attempt_count,
-            gdd.last_attempt_at::text AS last_attempt_at,
-            gdd.last_error,
-            gdd.github_status_code,
-            gdd.created_at::text AS created_at
-          FROM github_dispatch_deliveries gdd
-          JOIN projects p ON p.id = gdd.project_id
-          LEFT JOIN incidents i ON i.id = gdd.incident_id
-          LEFT JOIN improvement_opportunities io ON io.id = gdd.improvement_opportunity_id
-          WHERE p.organization_id = $1
-            AND gdd.project_id = $2
-            AND ($3::text IS NULL OR gdd.status = $3)
-          ORDER BY gdd.created_at DESC, gdd.id DESC
-          LIMIT $4
-        `,
-        [input.organization_id, input.project_id, input.status ?? null, input.limit]
-      );
-
-      return result.rows.map(mapGitHubDispatchDeliveryRow);
-    },
-
-    async retryProjectGitHubDeliveryForOrganization(input) {
-      const result = await db.query<GitHubDispatchDeliveryRecord & Record<string, unknown>>(
-        `
-          UPDATE github_dispatch_deliveries gdd
-          SET
-            status = 'retrying',
-            next_attempt_at = now(),
-            last_error = NULL,
-            github_status_code = NULL,
-            updated_at = now()
-          FROM github_dispatch_rules gdr
-          JOIN projects p ON p.id = gdr.project_id
-          WHERE gdd.rule_id = gdr.id
-            AND p.id = gdd.project_id
-            AND p.organization_id = $1
-            AND gdd.project_id = $2
-            AND gdd.id = $3
-            AND gdd.status = 'failed'
-            AND (
-              $4::uuid IS NULL
-              OR $5::text IN ('owner', 'admin')
-              OR gdr.created_by_user_id = $4::uuid
-            )
-          RETURNING
-            gdd.id AS delivery_id,
-            gdd.rule_id,
-            gdd.rule_name,
-            gdd.incident_id,
-            gdd.improvement_opportunity_id AS improvement_id,
-            COALESCE(
-              (SELECT incidents.title FROM incidents WHERE incidents.id = gdd.incident_id),
-              (SELECT improvement_opportunities.title FROM improvement_opportunities WHERE improvement_opportunities.id = gdd.improvement_opportunity_id)
-            ) AS target_title,
-            gdd.status,
-            gdd.attempt_count,
-            gdd.last_attempt_at::text AS last_attempt_at,
-            gdd.last_error,
-            gdd.github_status_code,
-            gdd.created_at::text AS created_at
-        `,
-        [
-          input.organization_id,
-          input.project_id,
-          input.delivery_id,
-          input.actor_user_id ?? null,
-          input.actor_role ?? null
-        ]
-      );
-
-      const row = result.rows[0];
-      return row === undefined ? null : mapGitHubDispatchDeliveryRow(row);
-    },
-
+    ...createGitHubManagementStore(db),
     async listMatchingGitHubDispatchRules(input) {
-      const result = await db.query<MatchingGitHubDispatchRule & Record<string, unknown> & {
-        organization_plan: string;
-        environments: string[] | null;
-        services: string[] | null;
-        severity_min: GitHubDispatchRuleRecord["severity_min"];
-        bundle_type: GitHubDispatchRuleRecord["bundle_type"];
-        incident_status: GitHubDispatchRuleRecord["incident_status"];
-      }>(
+      const result = await db.query<
+        MatchingGitHubDispatchRule &
+          Record<string, unknown> & {
+            organization_plan: string;
+            environments: string[] | null;
+            services: string[] | null;
+            has_service_filter?: boolean;
+            severity_min: GitHubDispatchRuleRecord["severity_min"];
+            bundle_type: GitHubDispatchRuleRecord["bundle_type"];
+            incident_status: GitHubDispatchRuleRecord["incident_status"];
+          }
+      >(
         `
           SELECT
             gdr.id AS rule_id,
@@ -722,22 +53,33 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
             pgr.default_branch,
             gdr.cooldown_seconds,
             gdr.environments,
-            gdr.services,
+            debugbundle_rule_service_names(COALESCE(gdr.filter_project_id,gdr.project_id),$1,to_jsonb(gdr.services)) AS services,
+            (cardinality(gdr.services)>0) AS has_service_filter,
             gdr.severity_min,
             gdr.bundle_type,
             gdr.incident_status
           FROM github_dispatch_rules gdr
-          JOIN projects p ON p.id = gdr.project_id
+          JOIN projects p ON p.id = debugbundle_canonical_project(gdr.project_id)
           JOIN organizations o ON o.id = p.organization_id
-          JOIN project_github_repos pgr ON pgr.project_id = gdr.project_id
+          LEFT JOIN service_input_aliases ia ON ia.origin_project_id=$1::uuid AND ia.input_name=$3
+          LEFT JOIN service_definitions sd ON sd.id=ia.service_definition_id
+          JOIN LATERAL(SELECT repo.* FROM project_github_repos repo
+            JOIN projects repo_owner ON repo_owner.id=repo.project_id
+            WHERE repo_owner.organization_id=p.organization_id AND repo_owner.owner_user_id=p.owner_user_id AND
+              repo.project_id=ANY(debugbundle_project_origins(p.id)) AND
+              CASE WHEN gdr.scope_origin_ids IS NULL THEN repo.project_id=gdr.project_id
+                WHEN sd.repository_url IS NOT NULL THEN sd.repository_url='https://github.com/'||repo.repo_owner||'/'||repo.repo_name
+                ELSE repo.project_id=COALESCE(sd.repository_default_project_id,gdr.project_id) END
+            ORDER BY (repo.project_id=gdr.project_id) DESC,repo.id LIMIT 1) pgr ON true
           JOIN github_installations gi ON gi.id = pgr.installation_id
-          WHERE gdr.project_id = $1
+          WHERE gdr.project_id=ANY(debugbundle_project_origins(debugbundle_canonical_project($1::uuid)))
+            AND $1::uuid=ANY(COALESCE(gdr.scope_origin_ids,ARRAY[gdr.project_id]))
             AND gdr.enabled = true
-            AND gi.status = 'active'
+            AND gi.status = 'active' AND gi.organization_id=p.organization_id
             AND ($2 = ANY(gdr.event_types))
           ORDER BY gdr.created_at DESC, gdr.id DESC
         `,
-        [input.project_id, input.event_type]
+        [input.project_id, input.event_type, input.service_name]
       );
 
       return result.rows
@@ -746,15 +88,26 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
             return false;
           }
 
-          if (Array.isArray(row.environments) && row.environments.length > 0 && !row.environments.includes(input.environment)) {
+          if (
+            Array.isArray(row.environments) &&
+            row.environments.length > 0 &&
+            !row.environments.includes(input.environment)
+          ) {
             return false;
           }
 
-          if (Array.isArray(row.services) && row.services.length > 0 && !row.services.includes(input.service_name)) {
+          if (
+            Array.isArray(row.services) &&
+            row.services.length > 0 &&
+            !row.services.includes(input.service_name)
+          ) {
             return false;
           }
 
-          if (typeof row.severity_min === "string" && SEVERITY_RANK[input.severity] < SEVERITY_RANK[row.severity_min]) {
+          if (
+            typeof row.severity_min === "string" &&
+            SEVERITY_RANK[input.severity] < SEVERITY_RANK[row.severity_min]
+          ) {
             return false;
           }
 
@@ -796,7 +149,7 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
         `
           SELECT COUNT(*)::text AS count
           FROM github_dispatch_deliveries
-          WHERE project_id = $1
+          WHERE project_id=ANY(debugbundle_project_origins(debugbundle_canonical_project($1::uuid)))
             AND created_at >= $2::timestamptz
             AND status <> 'skipped'
         `,
@@ -863,7 +216,9 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
         ]
       );
 
-      return result.rows[0] === undefined ? { delivery_id: deliveryId, created: false } : { delivery_id: deliveryId, created: true };
+      return result.rows[0] === undefined
+        ? { delivery_id: deliveryId, created: false }
+        : { delivery_id: deliveryId, created: true };
     },
 
     async createSkippedGitHubDispatchDelivery(input) {
@@ -910,7 +265,9 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
         ]
       );
 
-      return result.rows[0] === undefined ? { delivery_id: deliveryId, created: false } : { delivery_id: deliveryId, created: true };
+      return result.rows[0] === undefined
+        ? { delivery_id: deliveryId, created: false }
+        : { delivery_id: deliveryId, created: true };
     },
 
     async claimDueGitHubDispatchDeliveries(limit) {
@@ -937,11 +294,16 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
         [limit]
       );
 
-      return result.rows.map((row) => ({ delivery_id: row.delivery_id, attempt: Number(row.attempt) }));
+      return result.rows.map((row) => ({
+        delivery_id: row.delivery_id,
+        attempt: Number(row.attempt)
+      }));
     },
 
     async getGitHubDispatchDeliveryIntent(deliveryId) {
-      const result = await db.query<GitHubDispatchDeliveryIntent & Record<string, unknown> & { organization_plan: string }>(
+      const result = await db.query<
+        GitHubDispatchDeliveryIntent & Record<string, unknown> & { organization_plan: string }
+      >(
         `
           SELECT
             gdd.id AS delivery_id,
@@ -979,7 +341,9 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
 
     async markGitHubDispatchDeliveryAttempt(input) {
       if (input.delivered) {
-        const result = await db.query<MarkGitHubDispatchDeliveryAttemptResult & Record<string, unknown>>(
+        const result = await db.query<
+          MarkGitHubDispatchDeliveryAttemptResult & Record<string, unknown>
+        >(
           `
             UPDATE github_dispatch_deliveries
             SET
@@ -1000,10 +364,15 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
       }
 
       const nextAttempt = input.attempt + 1;
-      const retryDelaySeconds = input.retry_after_seconds ?? GITHUB_DISPATCH_RETRY_DELAYS_SECONDS[input.attempt - 1] ?? null;
+      const retryDelaySeconds =
+        input.retry_after_seconds ??
+        GITHUB_DISPATCH_RETRY_DELAYS_SECONDS[input.attempt - 1] ??
+        null;
 
       if (retryDelaySeconds !== null) {
-        const result = await db.query<MarkGitHubDispatchDeliveryAttemptResult & Record<string, unknown>>(
+        const result = await db.query<
+          MarkGitHubDispatchDeliveryAttemptResult & Record<string, unknown>
+        >(
           `
             UPDATE github_dispatch_deliveries
             SET
@@ -1017,13 +386,21 @@ export function createPostgresGitHubStore(db: Queryable): GitHubStore {
             WHERE id = $1
             RETURNING status, ($2 + 1) AS next_attempt
           `,
-          [input.delivery_id, input.attempt, retryDelaySeconds, input.error_message, input.github_status_code]
+          [
+            input.delivery_id,
+            input.attempt,
+            retryDelaySeconds,
+            input.error_message,
+            input.github_status_code
+          ]
         );
 
         return result.rows[0] ?? { status: "retrying", next_attempt: nextAttempt };
       }
 
-      const result = await db.query<MarkGitHubDispatchDeliveryAttemptResult & Record<string, unknown>>(
+      const result = await db.query<
+        MarkGitHubDispatchDeliveryAttemptResult & Record<string, unknown>
+      >(
         `
           UPDATE github_dispatch_deliveries
           SET

@@ -189,6 +189,7 @@ export const GitHubDispatchRuleBodySchema = z
 
 export const UpdateGitHubDispatchRuleBodySchema = z
   .object({
+    project_scope: z.literal("current_project").optional(),
     name: z.string().min(1).max(200).optional(),
     event_types: z.array(GitHubDispatchEventTypeSchema).min(1).optional(),
     environments: z.array(z.string().min(1)).optional(),
@@ -366,6 +367,7 @@ export const CreateWebhookBodySchema = z
 
 export const UpdateWebhookBodySchema = z
   .object({
+    project_scope: z.literal("current_project").optional(),
     url: z.string().url().max(2000).optional(),
     events: z.array(WebhookEventTypeSchema).min(1).optional(),
     filters: WebhookFiltersSchema.optional(),
@@ -490,6 +492,7 @@ export const CreateAlertBodySchema = z.discriminatedUnion("channel", [
 ]);
 
 const BaseUpdateAlertBodySchema = {
+  project_scope: z.literal("current_project").optional(),
   service_id: z.string().guid().nullable().optional(),
   condition_type: AlertConditionTypeSchema.optional(),
   severity_min: z.enum(["low", "medium", "high", "critical"]).nullable().optional(),
@@ -611,7 +614,8 @@ export const ImprovementSnoozeBodySchema = z
 export const ServicesQuerySchema = z
   .object({
     project_id: z.string().guid(),
-    limit: z.coerce.number().int().min(1).max(100).default(100)
+    limit: z.coerce.number().int().min(1).max(100).default(100),
+    offset: z.coerce.number().int().min(0).max(100_000).optional()
   })
   .strict();
 
@@ -682,6 +686,9 @@ export const ProjectInviteParamsSchema = z
 
 export const ProbeActivateBodySchema = z
   .object({
+    sdk_project_id: z.string().guid().optional(),
+    sdk_token_id: z.string().guid().optional(),
+    sdk_service: z.string().min(1).max(200).optional(),
     label_pattern: z.string().min(1).max(200),
     service: z.string().min(1).max(200).default("*"),
     environment: z.string().min(1).max(200).default("*"),
@@ -777,7 +784,9 @@ export const AvailabilityCheckTestBodySchema = z
     message: "expected_status_range_invalid"
   });
 
-export const ProjectsQuerySchema = TokenListQuerySchema;
+export const ProjectsQuerySchema = TokenListQuerySchema.extend({
+  project_id: z.string().guid().optional()
+});
 
 export const BillingCheckoutBodySchema = z
   .object({

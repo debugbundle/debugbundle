@@ -1,99 +1,97 @@
 import { z } from "zod";
 import { ProjectColorTagSchema, type ProjectColorTag } from "../../shared-types/src/index.js";
 
-const ProjectColorTagResponseSchema = z.unknown().optional().transform((value, context): ProjectColorTag | null => {
-  if (value === undefined || value === null) {
-    return null;
-  }
+const ProjectColorTagResponseSchema = z
+  .unknown()
+  .optional()
+  .transform((value, context): ProjectColorTag | null => {
+    if (value === undefined || value === null) {
+      return null;
+    }
 
-  const parsed = ProjectColorTagSchema.safeParse(value);
-  if (!parsed.success) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Invalid project color tag"
-    });
-    return z.NEVER;
-  }
+    const parsed = ProjectColorTagSchema.safeParse(value);
+    if (!parsed.success) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Invalid project color tag"
+      });
+      return z.NEVER;
+    }
 
-  return parsed.data;
+    return parsed.data;
+  });
+
+export const ProjectMetricsSchema = z.object({
+  open_incidents: z.number().int().nonnegative().default(0),
+  regressed_incidents: z.number().int().nonnegative().default(0),
+  attention_incidents_today: z.number().int().nonnegative().default(0),
+  opened_incidents_today: z.number().int().nonnegative().default(0),
+  opened_incidents_month: z.number().int().nonnegative().default(0),
+  monthly_bundle_requests: z.number().int().nonnegative(),
+  monthly_raw_ingested_events: z.number().int().nonnegative(),
+  retained_bundles: z.number().int().nonnegative(),
+  monthly_alert_deliveries: z.number().int().nonnegative()
 });
 
-export const ProjectMetricsSchema = z
-  .object({
-    open_incidents: z.number().int().nonnegative().default(0),
-    regressed_incidents: z.number().int().nonnegative().default(0),
-    attention_incidents_today: z.number().int().nonnegative().default(0),
-    opened_incidents_today: z.number().int().nonnegative().default(0),
-    opened_incidents_month: z.number().int().nonnegative().default(0),
-    monthly_bundle_requests: z.number().int().nonnegative(),
-    monthly_raw_ingested_events: z.number().int().nonnegative(),
-    retained_bundles: z.number().int().nonnegative(),
-    monthly_alert_deliveries: z.number().int().nonnegative()
-  });
-
-export const ProjectRecordSchema = z
-  .object({
-    project_id: z.string(),
-    organization_id: z.string(),
-    owner_user_id: z.string(),
-    owner_email: z.string().email(),
-    relationship: z.enum(["owned", "shared"]),
-    sharing_state: z.enum(["private", "shared_by_you", "shared_with_you"]),
-    effective_role: z.enum(["owner", "admin", "member"]),
-    shared_access_suspended: z.boolean().optional(),
-    name: z.string(),
-    slug: z.string(),
-    environment_default: z.string(),
-    color_tag: ProjectColorTagResponseSchema,
-    organization_plan: z.enum(["free", "solo", "team"]),
-    metrics: ProjectMetricsSchema,
-    created_at: z.string(),
-    updated_at: z.string()
-  });
+export const ProjectRecordSchema = z.object({
+  project_id: z.string(),
+  canonical_project_id: z.string().guid().optional(),
+  organization_id: z.string(),
+  owner_user_id: z.string(),
+  owner_email: z.string().email(),
+  relationship: z.enum(["owned", "shared"]),
+  sharing_state: z.enum(["private", "shared_by_you", "shared_with_you"]),
+  effective_role: z.enum(["owner", "admin", "member"]),
+  shared_access_suspended: z.boolean().optional(),
+  name: z.string(),
+  slug: z.string(),
+  environment_default: z.string(),
+  color_tag: ProjectColorTagResponseSchema,
+  organization_plan: z.enum(["free", "solo", "team"]),
+  metrics: ProjectMetricsSchema,
+  created_at: z.string(),
+  updated_at: z.string()
+});
 
 type ParsedProjectRecord = z.infer<typeof ProjectRecordSchema>;
 export type ProjectRecord = Omit<ParsedProjectRecord, "color_tag"> & {
   color_tag: ProjectColorTag | null;
 };
 
-export const ProjectListResponseSchema = z
-  .object({
-    projects: z.array(ProjectRecordSchema)
-  });
+export const ProjectListResponseSchema = z.object({
+  projects: z.array(ProjectRecordSchema)
+});
 
-export const ProjectCreateResponseSchema = z
-  .object({
-    project: ProjectRecordSchema
-  });
+export const ProjectCreateResponseSchema = z.object({
+  project: ProjectRecordSchema
+});
 
-export const DeletedProjectRecordSchema = z
-  .object({
-    project_id: z.string(),
-    organization_id: z.string(),
-    owner_user_id: z.string(),
-    owner_email: z.string().email(),
-    relationship: z.enum(["owned", "shared"]),
-    sharing_state: z.enum(["private", "shared_by_you", "shared_with_you"]),
-    effective_role: z.enum(["owner", "admin", "member"]),
-    shared_access_suspended: z.boolean().optional(),
-    name: z.string(),
-    slug: z.string(),
-    environment_default: z.string(),
-    color_tag: ProjectColorTagResponseSchema,
-    organization_plan: z.enum(["free", "solo", "team"]),
-    created_at: z.string(),
-    updated_at: z.string()
-  });
+export const DeletedProjectRecordSchema = z.object({
+  project_id: z.string(),
+  organization_id: z.string(),
+  owner_user_id: z.string(),
+  owner_email: z.string().email(),
+  relationship: z.enum(["owned", "shared"]),
+  sharing_state: z.enum(["private", "shared_by_you", "shared_with_you"]),
+  effective_role: z.enum(["owner", "admin", "member"]),
+  shared_access_suspended: z.boolean().optional(),
+  name: z.string(),
+  slug: z.string(),
+  environment_default: z.string(),
+  color_tag: ProjectColorTagResponseSchema,
+  organization_plan: z.enum(["free", "solo", "team"]),
+  created_at: z.string(),
+  updated_at: z.string()
+});
 
 type ParsedDeletedProjectRecord = z.infer<typeof DeletedProjectRecordSchema>;
 export type DeletedProjectRecord = Omit<ParsedDeletedProjectRecord, "color_tag"> & {
   color_tag: ProjectColorTag | null;
 };
 
-export const ProjectDeleteResponseSchema = z
-  .object({
-    project: DeletedProjectRecordSchema
-  });
+export const ProjectDeleteResponseSchema = z.object({
+  project: DeletedProjectRecordSchema
+});
 
 export const ApiErrorResponseSchema = z
   .object({
@@ -179,7 +177,9 @@ async function expectProject(responsePromise: Promise<HttpResponse>): Promise<Pr
   return normalizeProjectRecord(parsed.data.project);
 }
 
-async function expectDeletedProject(responsePromise: Promise<HttpResponse>): Promise<DeletedProjectRecord> {
+async function expectDeletedProject(
+  responsePromise: Promise<HttpResponse>
+): Promise<DeletedProjectRecord> {
   const response = await responsePromise;
   if (response.status < 200 || response.status >= 300) {
     parseApiError(response.status, response.body);
@@ -194,7 +194,11 @@ async function expectDeletedProject(responsePromise: Promise<HttpResponse>): Pro
 }
 
 export function createProjectManagementApi(client: HttpClient): {
-  listProjects(input: { bearerToken: string; limit?: number }): Promise<ProjectRecord[]>;
+  listProjects(input: {
+    bearerToken: string;
+    limit?: number;
+    projectId?: string;
+  }): Promise<ProjectRecord[]>;
   createProject(input: {
     bearerToken: string;
     name: string;
@@ -214,7 +218,14 @@ export function createProjectManagementApi(client: HttpClient): {
 } {
   return {
     async listProjects(input) {
-      const query = input.limit === undefined ? "" : `?limit=${input.limit}`;
+      const parameters = new URLSearchParams();
+      if (input.limit !== undefined) parameters.set("limit", String(input.limit));
+      if (input.projectId !== undefined) {
+        if (!z.string().guid().safeParse(input.projectId).success)
+          throw new ProjectManagementApiError(400, "invalid_project_id");
+        parameters.set("project_id", input.projectId);
+      }
+      const query = parameters.size ? `?${parameters}` : "";
       return expectProjects(
         client.request({
           method: "GET",
@@ -233,7 +244,9 @@ export function createProjectManagementApi(client: HttpClient): {
           body: {
             name: input.name,
             slug: input.slug,
-            ...(input.environmentDefault === undefined ? {} : { environment_default: input.environmentDefault }),
+            ...(input.environmentDefault === undefined
+              ? {}
+              : { environment_default: input.environmentDefault }),
             ...(input.colorTag === undefined ? {} : { color_tag: input.colorTag })
           }
         })

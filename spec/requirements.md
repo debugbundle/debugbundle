@@ -361,7 +361,6 @@ Incident/improvement lifecycle writes with an unreadable success response, a tra
 **FR-CLI-09:** `doctor` checks: detected language/framework, backend SDK installed, browser SDK installed, project token found, required env vars present, ingestion API reachable, sample event sendable, redaction config present.
 Connected-mode doctor authentication probes must be bounded to one incident in the configured cloud project; invalid project scope fails before any network dispatch, and the report must not expose incident contents. Local-only diagnostics do not query cloud incidents.
 
-
 **FR-CLI-10:** `validate --fix` may safely: add missing config stubs, update example env files, write starter ignore/redaction config, add missing initialization snippets. Must never silently overwrite user code — all changes reported.
 
 **FR-CLI-11:** `debugbundle-ndjson` is the canonical structured interchange format for zero-install CLI log capture. Any runtime, script, sidecar, log shipper, or unsupported language may emit newline-delimited DebugBundle event records in this format for `debugbundle ingest` and `debugbundle watch`.
@@ -544,6 +543,14 @@ When a collaborator is removed from a project or leaves a shared project, DebugB
 **FR-EMAIL-08:** Optional daily incident email uses a saved local HH:mm and IANA timezone while other channels retain independent live delivery. Include new/reopened incidents matching enabled email rules and still unresolved at delivery; skip empty digests and unchanged repeats. Availability incidents bypass daily batching; explicit off/pause may silence them, with an opt-in health exception for pauses. Durable metadata-only queues recheck recipient policy, destination and retained membership, coalesce missed windows, fence claims and bound retries. DST sends once per local day, at the first occurrence of a repeated time or the first valid minute after a skipped time. Optional weekly reports respect off/pause; mandatory system email remains enabled.
 
 ### 1.14 Project Profile
+
+**FR-PJS-01:** A project represents one jointly investigated system and shared access/policy boundary. Logical services represent its applications/processes, with stable definition IDs, optional repository context and environment-specific instances. Preserve the existing public `service_id` meaning and every installed writer. A service repository/root overrides the project default; several services may share a repository. Local repository profiles describe their own subset without overwriting remote services. See `spec/project-service-consolidation.md`.
+
+**FR-PJS-02:** Owners may consolidate explicitly selected active projects in the same account with matching effective access and compatible settings. API, CLI and ordinary MCP expose side-effect-free preview, checked/idempotent apply, status, verification, resume and pre-cutover cancellation through shared domain services. Conflicts and unsupported sizes block apply with actionable codes. No Product/Group abstraction, Business-tier requirement, migration wizard, implicit policy reconciliation or force bypass.
+
+**FR-PJS-03:** Consolidation preserves IDs, immutable bytes/keys, grouping lineage, original scopes, origins, deduplication, usage claims, privacy/retention and integration exposure. Existing source and destination tokens never gain scopes; old reads remain origin-scoped and unsafe old management calls return a canonical-routing conflict. Atomic cutover fences concurrent writers; operation recovery distinguishes failure before commit from committed-but-unverified state. Keep a compatible rollback runtime before enabling merge.
+
+**FR-PJS-04:** Agent-assisted adoption uses a secret-free manifest, explicit authorised repository roots, reviewed diffs and compare-before-write checks. Preserve custom configuration, permissions and local evidence; reject symlink escapes and concurrent edits. Report server, repository and deployed-runtime completion separately. Consumer-product edits, release and live consolidation require their applicable separate authorisation.
 
 **FR-PROF-01:** `.debugbundle/profile.json` — structured architectural description (v1 schema: profile_version, project, services, infrastructure, critical_paths, repo, developer_workflows, debugbundle).
 

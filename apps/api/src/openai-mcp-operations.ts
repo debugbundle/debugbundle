@@ -1,4 +1,12 @@
 import { isObjectMissing } from "../../../packages/storage/src/object-store-errors.js";
+import {
+  projectEvidenceView,
+  projectImprovementView
+} from "../../../packages/storage/src/project-evidence-projection.js";
+import type {
+  IncidentRetrievalRecord,
+  ImprovementRetrievalRecord
+} from "../../../packages/storage/src/types.js";
 import { projectEvidenceSummary } from "../../../packages/mcp-core/src/evidence-summary.js";
 import type {
   OpenAiHostedOperations,
@@ -104,10 +112,10 @@ function decodeCursor(value: string | undefined): Record<string, unknown> | unde
   }
 }
 
-function decodeOffsetCursor(value: string | undefined): OffsetCursor {
+function decodeOffsetCursor(value: string | undefined, maximum = 1_000): OffsetCursor {
   const cursor = decodeCursor(value);
   const offset = cursor?.["offset"] ?? 0;
-  if (!Number.isInteger(offset) || typeof offset !== "number" || offset < 0 || offset > 1_000) {
+  if (!Number.isInteger(offset) || typeof offset !== "number" || offset < 0 || offset > maximum) {
     throw new Error("openai_mcp_invalid_cursor");
   }
   return { offset };
@@ -132,7 +140,7 @@ async function requireProjectAccess(
   dependencies: OpenAiHostedReadDependencies,
   principal: OpenAiMcpPrincipal,
   projectId: string
-): Promise<void> {
+): Promise<string[]> {
   const resolveAccess = dependencies.projectManagement.resolveProjectAccessForUser;
   if (resolveAccess === undefined) {
     throw new Error("openai_mcp_operation_unavailable:project_access");
@@ -148,6 +156,7 @@ async function requireProjectAccess(
   ) {
     throw new Error("openai_mcp_project_not_found");
   }
+  return access.origin_project_ids ?? [projectId];
 }
 
 async function readArtifact(
@@ -251,15 +260,59 @@ function record(value: unknown): Record<string, unknown> {
 export function createOpenAiHostedOperations(input: {
   dependencies: OpenAiHostedReadDependencies;
   dashboardBaseUrl: string;
+  /** Server-selected restricted credential scope, never a public tool argument. */
+  originProjectIds?: string[];
 }): OpenAiHostedOperations {
   const { dependencies, dashboardBaseUrl } = input;
+  async function permittedOrigins(
+    principal: OpenAiMcpPrincipal,
+    projectId: string
+  ): Promise<string[]> {
+    const origins = await requireProjectAccess(dependencies, principal, projectId);
+    return input.originProjectIds === undefined
+      ? origins
+      : origins.filter((id) => input.originProjectIds!.includes(id));
+  }
+  async function readIncident(
+    principal: OpenAiMcpPrincipal,
+    projectId: string,
+    incidentId: string
+  ): Promise<IncidentRetrievalRecord> {
+    const origins = await permittedOrigins(principal, projectId);
+    const incident = await dependencies.incidentRetrieval.getIncidentForOrganization({
+      organization_id: principal.organizationId,
+      user_id: principal.userId,
+      incident_id: incidentId,
+      project_id: projectId,
+      origin_project_ids: origins
+    });
+    if (incident === null || !origins.includes(incident.project_id))
+      throw new Error("openai_mcp_incident_not_found");
+    return incident;
+  }
+  async function readImprovement(
+    principal: OpenAiMcpPrincipal,
+    projectId: string,
+    improvementId: string
+  ): Promise<ImprovementRetrievalRecord> {
+    const origins = await permittedOrigins(principal, projectId);
+    const improvement = await dependencies.improvementManagement.getImprovementForOrganization({
+      organization_id: principal.organizationId,
+      user_id: principal.userId,
+      project_id: projectId,
+      improvement_id: improvementId,
+      origin_project_ids: origins
+    });
+    if (improvement === null || !origins.includes(improvement.project_id))
+      throw new Error("openai_mcp_improvement_not_found");
+    return improvement;
+  }
 
   return {
     ...createOpenAiAnalyticsOperations({
       analyticsMetrics: dependencies.analyticsMetrics,
       incidentRetrieval: dependencies.incidentRetrieval,
-      requireProjectAccess: (principal, projectId) =>
-        requireProjectAccess(dependencies, principal, projectId)
+      requireProjectAccess: permittedOrigins
     }),
     async list_projects({ principal, input: toolInput }) {
       const limit = inputInteger(toolInput, "limit", 25);
@@ -296,7 +349,7 @@ export function createOpenAiHostedOperations(input: {
       const projectId = inputString(toolInput, "projectId");
       await requireProjectAccess(dependencies, principal, projectId);
       const limit = inputInteger(toolInput, "limit", 25);
-      const cursor = decodeOffsetCursor(optionalString(toolInput, "cursor"));
+      const cursor = decodeOffsetCursor(optionalString(toolInput, "cursor"), 100_000);
       const listServices = dependencies.incidentRetrieval.listServicesForOrganization;
       if (listServices === undefined) {
         throw new Error("openai_mcp_operation_unavailable:list_services");
@@ -305,22 +358,24 @@ export function createOpenAiHostedOperations(input: {
         organization_id: principal.organizationId,
         user_id: principal.userId,
         project_id: projectId,
-        limit: Math.min(cursor.offset + limit + 1, 1_001)
+        limit: limit + 1,
+        offset: cursor.offset
       });
       if (services === null) {
         throw new Error("openai_mcp_project_not_found");
       }
-      const page = paginateOffset(services, cursor.offset, limit);
+      const page = paginateOffset(services, 0, limit);
       return {
         project_id: projectId,
         services: page.page.map((service) => mapService(record(service))),
-        next_cursor: page.nextCursor
+        next_cursor:
+          services.length > limit ? encodeCursor({ offset: cursor.offset + limit }) : null
       };
     },
 
     async list_incidents({ principal, input: toolInput }) {
       const projectId = inputString(toolInput, "projectId");
-      await requireProjectAccess(dependencies, principal, projectId);
+      const origins = await permittedOrigins(principal, projectId);
       const limit = inputInteger(toolInput, "limit", 25);
       const cursor = decodeCursor(optionalString(toolInput, "cursor"));
       const status = optionalString(toolInput, "status");
@@ -328,6 +383,7 @@ export function createOpenAiHostedOperations(input: {
         organization_id: principal.organizationId,
         user_id: principal.userId,
         project_id: projectId,
+        origin_project_ids: origins,
         limit: limit + 1,
         ...(optionalString(toolInput, "environment") === undefined
           ? {}
@@ -359,7 +415,11 @@ export function createOpenAiHostedOperations(input: {
       const last = page.at(-1);
       return {
         project_id: projectId,
-        incidents: page.map((incident) => mapIncident(record(incident), dashboardBaseUrl)),
+        incidents: page
+          .filter((incident) => origins.includes(incident.project_id))
+          .map((incident) =>
+            mapIncident(record(projectEvidenceView(incident, projectId)), dashboardBaseUrl)
+          ),
         next_cursor:
           hasMore && last !== undefined
             ? encodeCursor({
@@ -373,37 +433,23 @@ export function createOpenAiHostedOperations(input: {
     async get_incident({ principal, input: toolInput }) {
       const projectId = inputString(toolInput, "projectId");
       const incidentId = inputString(toolInput, "incidentId");
-      await requireProjectAccess(dependencies, principal, projectId);
-      const incident = await dependencies.incidentRetrieval.getIncidentForOrganization({
-        organization_id: principal.organizationId,
-        user_id: principal.userId,
-        incident_id: incidentId
-      });
-      if (incident === null || incident.project_id !== projectId) {
-        throw new Error("openai_mcp_incident_not_found");
-      }
-      return { incident: mapIncident(record(incident), dashboardBaseUrl) };
+      const incident = await readIncident(principal, projectId, incidentId);
+      return {
+        incident: mapIncident(record(projectEvidenceView(incident, projectId)), dashboardBaseUrl)
+      };
     },
 
     async get_incident_context({ principal, input: toolInput }) {
       const projectId = inputString(toolInput, "projectId");
       const incidentId = inputString(toolInput, "incidentId");
-      await requireProjectAccess(dependencies, principal, projectId);
-      const incident = await dependencies.incidentRetrieval.getIncidentForOrganization({
-        organization_id: principal.organizationId,
-        user_id: principal.userId,
-        incident_id: incidentId
-      });
-      if (incident === null || incident.project_id !== projectId) {
-        throw new Error("openai_mcp_incident_not_found");
-      }
+      const incident = await readIncident(principal, projectId, incidentId);
       const [bundle, reproduction] = await Promise.all([
-        readArtifact(dependencies, buildBundleObjectKey(projectId, incidentId)),
-        readArtifact(dependencies, buildReproductionObjectKey(projectId, incidentId))
+        readArtifact(dependencies, buildBundleObjectKey(incident.project_id, incidentId)),
+        readArtifact(dependencies, buildReproductionObjectKey(incident.project_id, incidentId))
       ]);
       const bundleBody = bundle.body ?? {};
       return {
-        incident: mapIncident(record(incident), dashboardBaseUrl),
+        incident: mapIncident(record(projectEvidenceView(incident, projectId)), dashboardBaseUrl),
         primary_signal: mapPrimarySignal(bundleBody),
         evidence_summary: projectEvidenceSummary(bundleBody),
         bundle_status: bundle.status,
@@ -423,16 +469,11 @@ export function createOpenAiHostedOperations(input: {
     async get_bundle({ principal, input: toolInput }) {
       const projectId = inputString(toolInput, "projectId");
       const incidentId = inputString(toolInput, "incidentId");
-      await requireProjectAccess(dependencies, principal, projectId);
-      const incident = await dependencies.incidentRetrieval.getIncidentForOrganization({
-        organization_id: principal.organizationId,
-        user_id: principal.userId,
-        incident_id: incidentId
-      });
-      if (incident === null || incident.project_id !== projectId) {
-        throw new Error("openai_mcp_incident_not_found");
-      }
-      const read = await readArtifact(dependencies, buildBundleObjectKey(projectId, incidentId));
+      const incident = await readIncident(principal, projectId, incidentId);
+      const read = await readArtifact(
+        dependencies,
+        buildBundleObjectKey(incident.project_id, incidentId)
+      );
       const artifact = read.body === null ? null : bundleArtifact(read.body);
       return artifactEnvelope({
         idKey: "incident_id",
@@ -451,18 +492,10 @@ export function createOpenAiHostedOperations(input: {
     async get_reproduction({ principal, input: toolInput }) {
       const projectId = inputString(toolInput, "projectId");
       const incidentId = inputString(toolInput, "incidentId");
-      await requireProjectAccess(dependencies, principal, projectId);
-      const incident = await dependencies.incidentRetrieval.getIncidentForOrganization({
-        organization_id: principal.organizationId,
-        user_id: principal.userId,
-        incident_id: incidentId
-      });
-      if (incident === null || incident.project_id !== projectId) {
-        throw new Error("openai_mcp_incident_not_found");
-      }
+      const incident = await readIncident(principal, projectId, incidentId);
       const read = await readArtifact(
         dependencies,
-        buildReproductionObjectKey(projectId, incidentId)
+        buildReproductionObjectKey(incident.project_id, incidentId)
       );
       const artifact = read.body === null ? null : mapReproduction(read.body);
       return artifactEnvelope({
@@ -487,7 +520,7 @@ export function createOpenAiHostedOperations(input: {
 
     async list_improvements({ principal, input: toolInput }) {
       const projectId = inputString(toolInput, "projectId");
-      await requireProjectAccess(dependencies, principal, projectId);
+      const origins = await permittedOrigins(principal, projectId);
       const limit = inputInteger(toolInput, "limit", 25);
       const cursor = decodeCursor(optionalString(toolInput, "cursor"));
       const status = optionalString(toolInput, "status");
@@ -496,6 +529,7 @@ export function createOpenAiHostedOperations(input: {
           organization_id: principal.organizationId,
           user_id: principal.userId,
           project_id: projectId,
+          origin_project_ids: origins,
           limit: limit + 1,
           ...(optionalString(toolInput, "environment") === undefined
             ? {}
@@ -525,7 +559,11 @@ export function createOpenAiHostedOperations(input: {
       const last = page.at(-1);
       return {
         project_id: projectId,
-        improvements: page.map((entry) => mapImprovement(record(entry), dashboardBaseUrl)),
+        improvements: page
+          .filter((entry) => origins.includes(entry.project_id))
+          .map((entry) =>
+            mapImprovement(record(projectImprovementView(entry, projectId)), dashboardBaseUrl)
+          ),
         next_cursor:
           hasMore && last !== undefined
             ? encodeCursor({
@@ -539,21 +577,16 @@ export function createOpenAiHostedOperations(input: {
     async get_improvement({ principal, input: toolInput }) {
       const projectId = inputString(toolInput, "projectId");
       const improvementId = inputString(toolInput, "improvementId");
-      await requireProjectAccess(dependencies, principal, projectId);
-      const improvement = await dependencies.improvementManagement.getImprovementForOrganization({
-        organization_id: principal.organizationId,
-        user_id: principal.userId,
-        improvement_id: improvementId
-      });
-      if (improvement === null || improvement.project_id !== projectId) {
-        throw new Error("openai_mcp_improvement_not_found");
-      }
+      const improvement = await readImprovement(principal, projectId, improvementId);
       const artifact = await readArtifact(
         dependencies,
-        buildImprovementBundleObjectKey(projectId, improvementId)
+        buildImprovementBundleObjectKey(improvement.project_id, improvementId)
       );
       return {
-        improvement: mapImprovement(record(improvement), dashboardBaseUrl),
+        improvement: mapImprovement(
+          record(projectImprovementView(improvement, projectId)),
+          dashboardBaseUrl
+        ),
         evidence_summary: [
           improvement.summary,
           ...(improvement.related_incident_ids.length > 0 &&
@@ -576,18 +609,10 @@ export function createOpenAiHostedOperations(input: {
     async get_improvement_bundle({ principal, input: toolInput }) {
       const projectId = inputString(toolInput, "projectId");
       const improvementId = inputString(toolInput, "improvementId");
-      await requireProjectAccess(dependencies, principal, projectId);
-      const improvement = await dependencies.improvementManagement.getImprovementForOrganization({
-        organization_id: principal.organizationId,
-        user_id: principal.userId,
-        improvement_id: improvementId
-      });
-      if (improvement === null || improvement.project_id !== projectId) {
-        throw new Error("openai_mcp_improvement_not_found");
-      }
+      const improvement = await readImprovement(principal, projectId, improvementId);
       const read = await readArtifact(
         dependencies,
-        buildImprovementBundleObjectKey(projectId, improvementId)
+        buildImprovementBundleObjectKey(improvement.project_id, improvementId)
       );
       const artifact = read.body === null ? null : improvementBundleArtifact(read.body);
       const envelope = artifactEnvelope({

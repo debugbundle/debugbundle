@@ -233,7 +233,10 @@ describe("analytics saved funnel store", () => {
 function createTransactionalDb(
   query: (sql: string, params: unknown[]) => Promise<{ rows: unknown[] }>
 ): Queryable {
-  const typedQuery = query as Queryable["query"];
+  const typedQuery = ((sql: string, params: unknown[]) =>
+    sql === "SELECT debugbundle_begin_project_rule_write($1::uuid)"
+      ? Promise.resolve({ rows: [] })
+      : query(sql, params)) as Queryable["query"];
   const tx: Queryable = { query: typedQuery };
   return {
     query: typedQuery,

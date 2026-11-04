@@ -1,7 +1,10 @@
 import { ProjectManagementApiError } from "../../../packages/project-management-client/src/index.js";
 import type { ProjectColorTag } from "../../../packages/shared-types/src/index.js";
 
-import { createAuthenticatedProjectManagementApi, runAuthenticatedCliCommand } from "./auth-context.js";
+import {
+  createAuthenticatedProjectManagementApi,
+  runAuthenticatedCliCommand
+} from "./auth-context.js";
 import type { CliCommandResult } from "./token-commands.js";
 
 interface ProjectLike {
@@ -45,20 +48,26 @@ export async function listProjectsCommand(
   input: {
     bearerToken: string;
     limit?: number;
+    projectId?: string;
     json?: boolean;
   },
   api: {
-    listProjects(input: { bearerToken: string; limit?: number }): Promise<ProjectLike[]>;
+    listProjects(input: {
+      bearerToken: string;
+      limit?: number;
+      projectId?: string;
+    }): Promise<ProjectLike[]>;
   }
 ): Promise<CliCommandResult> {
   try {
-    const requestInput: { bearerToken: string; limit?: number } = {
+    const requestInput: { bearerToken: string; limit?: number; projectId?: string } = {
       bearerToken: input.bearerToken
     };
     if (input.limit !== undefined) {
       requestInput.limit = input.limit;
     }
 
+    if (input.projectId !== undefined) requestInput.projectId = input.projectId;
     const projects = await api.listProjects(requestInput);
     return {
       exitCode: 0,
@@ -69,7 +78,10 @@ export async function listProjectsCommand(
           : projects.map(formatProject).join("\n")
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -114,10 +126,15 @@ export async function createProjectCommand(
     const project = await api.createProject(requestInput);
     return {
       exitCode: 0,
-      output: input.json ? JSON.stringify({ project }) : `Project created: ${formatProject(project)}`
+      output: input.json
+        ? JSON.stringify({ project })
+        : `Project created: ${formatProject(project)}`
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -170,10 +187,15 @@ export async function updateProjectCommand(
     const project = await api.updateProject(requestInput);
     return {
       exitCode: 0,
-      output: input.json ? JSON.stringify({ project }) : `Project updated: ${formatProject(project)}`
+      output: input.json
+        ? JSON.stringify({ project })
+        : `Project updated: ${formatProject(project)}`
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -195,27 +217,38 @@ export async function deleteProjectCommand(
 
     return {
       exitCode: 0,
-      output: input.json ? JSON.stringify({ project }) : `Project deleted: ${project.project_id} (${project.name})`
+      output: input.json
+        ? JSON.stringify({ project })
+        : `Project deleted: ${project.project_id} (${project.name})`
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
 export async function listProjectsWithAuthCommand(
-  input: { authFilePath?: string; limit?: number; json?: boolean },
+  input: { authFilePath?: string; limit?: number; projectId?: string; json?: boolean },
   dependencies?: Parameters<typeof createAuthenticatedProjectManagementApi>[1]
 ): Promise<CliCommandResult> {
   return runAuthenticatedCliCommand(input, {
     createApi: createAuthenticatedProjectManagementApi,
     dependencies,
     runCommand: (authState, api) => {
-      const commandInput: { bearerToken: string; limit?: number; json?: boolean } = {
+      const commandInput: {
+        bearerToken: string;
+        limit?: number;
+        projectId?: string;
+        json?: boolean;
+      } = {
         bearerToken: authState.bearer_token
       };
       if (input.limit !== undefined) {
         commandInput.limit = input.limit;
       }
+      if (input.projectId !== undefined) commandInput.projectId = input.projectId;
       if (input.json !== undefined) {
         commandInput.json = input.json;
       }

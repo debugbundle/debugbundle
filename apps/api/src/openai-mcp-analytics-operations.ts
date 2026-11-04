@@ -33,10 +33,7 @@ export type OpenAiAnalyticsReadDependencies = Pick<
   | "getIncidentImpact"
 >;
 
-type OpenAiAnalyticsOperations = Pick<
-  Required<OpenAiHostedOperations>,
-  OpenAiAnalyticsToolName
->;
+type OpenAiAnalyticsOperations = Pick<Required<OpenAiHostedOperations>, OpenAiAnalyticsToolName>;
 
 type JourneyPatternsRead = Awaited<ReturnType<AnalyticsMetricsStore["getJourneyPatterns"]>>;
 type JourneyPatternsProjection = {
@@ -74,7 +71,10 @@ function buildAnalyticsInput(
     throw new Error("openai_mcp_invalid_analytics_window");
   }
   const route = optionalString(toolInput, "route");
-  if (route !== undefined && (!route.startsWith("/") || route.includes("?") || route.includes("#"))) {
+  if (
+    route !== undefined &&
+    (!route.startsWith("/") || route.includes("?") || route.includes("#"))
+  ) {
     throw new Error("openai_mcp_invalid_analytics_route");
   }
   const to = now();
@@ -117,9 +117,7 @@ function stripJourneySamples(value: JourneyPatternsRead): JourneyPatternsProject
   };
 }
 
-function stripIncidentImpactPrivateState(
-  value: IncidentImpactRead
-): IncidentImpactProjection {
+function stripIncidentImpactPrivateState(value: IncidentImpactRead): IncidentImpactProjection {
   return {
     incident_id: value.incident_id,
     window: value.window,
@@ -143,7 +141,7 @@ export function createOpenAiAnalyticsOperations(input: {
     DefaultApiDependencies["incidentRetrieval"],
     "getIncidentForOrganization"
   >;
-  requireProjectAccess(principal: OpenAiMcpPrincipal, projectId: string): Promise<void>;
+  requireProjectAccess(principal: OpenAiMcpPrincipal, projectId: string): Promise<string[]>;
   now?: () => Date;
 }): OpenAiAnalyticsOperations {
   const now = input.now ?? (() => new Date());
@@ -151,10 +149,11 @@ export function createOpenAiAnalyticsOperations(input: {
   async function authorizedInput(
     principal: OpenAiMcpPrincipal,
     toolInput: Record<string, unknown>
-  ): Promise<AnalyticsUsageSummaryInput> {
+  ): Promise<AnalyticsUsageSummaryInput & { origin_project_ids: string[] }> {
     const metricsInput = buildAnalyticsInput(toolInput, now);
-    await input.requireProjectAccess(principal, metricsInput.project_id);
-    return metricsInput;
+    const origins = await input.requireProjectAccess(principal, metricsInput.project_id);
+    if (!origins.length) throw new Error("openai_mcp_project_not_found");
+    return { ...metricsInput, origin_project_ids: origins };
   }
 
   return {
@@ -191,9 +190,7 @@ export function createOpenAiAnalyticsOperations(input: {
       );
     },
     async list_funnel_metrics({ principal, input: toolInput }) {
-      return await input.analyticsMetrics.listFunnels(
-        await authorizedInput(principal, toolInput)
-      );
+      return await input.analyticsMetrics.listFunnels(await authorizedInput(principal, toolInput));
     },
     async get_funnel_analysis({ principal, input: toolInput }) {
       const metricsInput = await authorizedInput(principal, toolInput);
@@ -208,9 +205,11 @@ export function createOpenAiAnalyticsOperations(input: {
       const incident = await input.incidentRetrieval.getIncidentForOrganization({
         organization_id: principal.organizationId,
         user_id: principal.userId,
-        incident_id: incidentId
+        incident_id: incidentId,
+        project_id: metricsInput.project_id,
+        origin_project_ids: metricsInput.origin_project_ids
       });
-      if (incident === null || incident.project_id !== metricsInput.project_id) {
+      if (incident === null || !metricsInput.origin_project_ids.includes(incident.project_id)) {
         throw new Error("openai_mcp_incident_not_found");
       }
       const result = await input.analyticsMetrics.getIncidentImpact(

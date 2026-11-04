@@ -23,7 +23,10 @@ import {
   resolveApiDogfoodingConfig,
   type ApiDogfoodingSdk
 } from "./dogfooding.ts";
-import { SMALL_REQUEST_BODY_LIMIT_BYTES } from "./http-limits.ts";
+import {
+  SMALL_REQUEST_BODY_LIMIT_BYTES,
+  PROJECT_MERGE_REQUEST_BODY_LIMIT_BYTES
+} from "./http-limits.ts";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerAgentTokenRoutes } from "./routes/agent-tokens.js";
 import { registerAgentEvidenceRoutes } from "./routes/agent-evidence.js";
@@ -52,6 +55,9 @@ import { registerProjectRoutes } from "./routes/projects.js";
 import { registerProbeRoutes } from "./routes/probes.js";
 import { registerSystemEmailReviewRoutes } from "./routes/system-email-review.js";
 import { registerServicesRoutes } from "./routes/services.js";
+import { registerProjectServicesRoutes } from "./routes/project-services.js";
+import { registerProjectMergeRoutes } from "./routes/project-merges.js";
+import { registerProjectConsolidationErrors } from "./project-consolidation-http.js";
 import { registerSlackRoutes } from "./routes/slack.js";
 import {
   registerStripeWebhookRoute,
@@ -367,7 +373,12 @@ function parseContentLengthHeader(value: unknown): number | null {
 function registerApiContentLengthLimit(app: FastifyInstance, limitBytes: number): void {
   app.addHook("onRequest", async (request, reply) => {
     const declaredLength = parseContentLengthHeader(request.headers[CONTENT_LENGTH_HEADER]);
-    if (declaredLength === null || declaredLength <= limitBytes) {
+    const selectedLimit =
+      request.method === "POST" &&
+      ["/v1/project-merges", "/v1/project-merges/preview"].includes(getRequestPath(request.url))
+        ? PROJECT_MERGE_REQUEST_BODY_LIMIT_BYTES
+        : limitBytes;
+    if (declaredLength === null || declaredLength <= selectedLimit) {
       return;
     }
 
@@ -402,6 +413,7 @@ export function createApiServer(
       options.trustedProxyIps ?? dogfoodingEnv["API_TRUSTED_PROXY_IPS"]
     )
   });
+  registerProjectConsolidationErrors(app);
   const dogfoodingConfig = resolveApiDogfoodingConfig(dogfoodingEnv);
   const allowedOrigins = resolveAllowedCorsOrigins(dogfoodingEnv);
   const context = {
@@ -485,6 +497,8 @@ export function createApiServer(
   registerWeeklyReportChannelRoutes(app, dependencies);
   registerWebhookRoutes(app, dependencies);
   registerServicesRoutes(app, dependencies);
+  registerProjectServicesRoutes(app, dependencies);
+  registerProjectMergeRoutes(app, dependencies);
   registerIncidentRoutes(app, dependencies);
   registerImprovementRoutes(app, dependencies);
   registerIngestionRoutes(app, dependencies);

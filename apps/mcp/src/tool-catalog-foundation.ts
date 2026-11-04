@@ -38,7 +38,8 @@ export const MCP_TOOL_CATALOG_FOUNDATION = [
   {
     name: "doctor",
     group: "setup",
-    description: "Run DebugBundle environment diagnostics. Connected mode checks API health and saved member authentication with one incident request restricted to the connected project; incident contents are not returned.",
+    description:
+      "Run DebugBundle environment diagnostics. Connected mode checks API health and saved member authentication with one incident request restricted to the connected project; incident contents are not returned.",
     inputSchema: z.object({
       authFilePath: z.string().optional(),
       privacy: z.boolean().optional()
@@ -294,6 +295,7 @@ export const MCP_TOOL_CATALOG_FOUNDATION = [
     group: "github",
     description: "Update a GitHub dispatch automation rule.",
     inputSchema: z.object({
+      projectScope: z.literal("current_project").optional(),
       bearerToken: z.string(),
       projectId: z.string(),
       ruleId: z.string(),

@@ -6,7 +6,12 @@ import { ServicesQuerySchema } from "../schemas.js";
 
 export function registerServicesRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   app.get("/v1/services", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "retrieval-read");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "retrieval-read"
+    );
     if (member === null) {
       return;
     }
@@ -28,7 +33,8 @@ export function registerServicesRoutes(app: FastifyInstance, dependencies: ApiDe
       organization_id: member.organization_id,
       user_id: member.member_id,
       project_id: parsedQuery.data.project_id,
-      limit: parsedQuery.data.limit
+      limit: parsedQuery.data.limit,
+      ...(parsedQuery.data.offset === undefined ? {} : { offset: parsedQuery.data.offset })
     });
 
     if (services === null) {

@@ -1,4 +1,6 @@
 import { z } from "zod";
+export * from "./project-services.js";
+export * from "./project-consolidation.js";
 import { RuntimeMemoryStatsSchema } from "./event-envelope.js";
 import { BrowserResourceContextSchema } from "./browser-resource-context.js";
 import {

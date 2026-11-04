@@ -1,6 +1,26 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createProjectManagementApi, ProjectManagementApiError, type HttpClient } from "../../../packages/project-management-client/src/index.js";
+import {
+  createProjectManagementApi,
+  ProjectManagementApiError,
+  type HttpClient
+} from "../../../packages/project-management-client/src/index.js";
+
+it("requests an exact retained project view without widening the normal listing", async () => {
+  const request = vi
+    .fn<HttpClient["request"]>()
+    .mockResolvedValue({ status: 200, body: { projects: [] } });
+  const api = createProjectManagementApi({ request });
+  await api.listProjects({
+    bearerToken: "member",
+    projectId: "10000000-0000-4000-8000-000000000001"
+  });
+  expect(request).toHaveBeenCalledWith({
+    method: "GET",
+    path: "/v1/projects?project_id=10000000-0000-4000-8000-000000000001",
+    bearerToken: "member"
+  });
+});
 
 function projectFixture(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -60,7 +80,8 @@ describe("project-management api client", () => {
   });
 
   it("accepts additive fields in successful project payloads", async () => {
-    const request = vi.fn<HttpClient["request"]>()
+    const request = vi
+      .fn<HttpClient["request"]>()
       .mockResolvedValueOnce({
         status: 200,
         body: {
@@ -110,7 +131,9 @@ describe("project-management api client", () => {
         slug: "checkout"
       })
     ).resolves.toMatchObject({ project_id: "proj_1" });
-    await expect(api.deleteProject({ bearerToken: "dbundle_mem_x", projectId: "proj_2" })).resolves.toMatchObject({
+    await expect(
+      api.deleteProject({ bearerToken: "dbundle_mem_x", projectId: "proj_2" })
+    ).resolves.toMatchObject({
       project_id: "proj_2"
     });
   });
@@ -120,7 +143,8 @@ describe("project-management api client", () => {
     delete projectWithoutColorTag["color_tag"];
     const deletedProjectWithoutColorTag = deletedProjectFixture();
     delete deletedProjectWithoutColorTag["color_tag"];
-    const request = vi.fn<HttpClient["request"]>()
+    const request = vi
+      .fn<HttpClient["request"]>()
       .mockResolvedValueOnce({
         status: 200,
         body: {
@@ -152,7 +176,9 @@ describe("project-management api client", () => {
         slug: "checkout"
       })
     ).resolves.toMatchObject({ color_tag: null });
-    await expect(api.deleteProject({ bearerToken: "dbundle_mem_x", projectId: "proj_2" })).resolves.toMatchObject({
+    await expect(
+      api.deleteProject({ bearerToken: "dbundle_mem_x", projectId: "proj_2" })
+    ).resolves.toMatchObject({
       color_tag: null
     });
   });
@@ -211,9 +237,9 @@ describe("project-management api client", () => {
 
     const api = createProjectManagementApi({ request });
 
-    await expect(api.createProject({ bearerToken: "dbundle_mem_x", name: "Checkout", slug: "checkout" })).rejects.toEqual(
-      new ProjectManagementApiError(409, "project_slug_taken")
-    );
+    await expect(
+      api.createProject({ bearerToken: "dbundle_mem_x", name: "Checkout", slug: "checkout" })
+    ).rejects.toEqual(new ProjectManagementApiError(409, "project_slug_taken"));
   });
 
   it("throws invalid_response_shape when a success payload is malformed", async () => {

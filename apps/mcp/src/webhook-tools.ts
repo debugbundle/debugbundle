@@ -43,6 +43,7 @@ export function createWebhookMcpTools(api: {
     webhookId: string;
   }): Promise<unknown>;
   updateWebhook(input: {
+    projectScope?: "current_project";
     bearerToken: string;
     projectId: string;
     webhookId: string;
@@ -134,6 +135,7 @@ export function createWebhookMcpTools(api: {
         const requestInput: {
           bearerToken: string;
           projectId: string;
+          projectScope?: "current_project";
           webhookId: string;
           url?: string;
           events?: string[];
@@ -144,6 +146,9 @@ export function createWebhookMcpTools(api: {
           projectId: String(input["projectId"]),
           webhookId: String(input["webhookId"])
         };
+        if (input["projectScope"] === "current_project")
+          requestInput.projectScope = "current_project";
+
         if (typeof input["url"] === "string") {
           requestInput.url = input["url"];
         }

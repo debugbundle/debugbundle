@@ -254,13 +254,14 @@ export async function handleProjectCommand(
   }
 
   if (action === "list") {
-    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "limit"]);
+    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "limit", "project-id"]);
     ensureNoExtraPositionals(parsedArgv, 2);
 
     const input = appendCommonAuthOptions(
       parsedArgv,
       {} as {
         limit?: number;
+        projectId?: string;
         authFilePath?: string;
         json?: boolean;
       }
@@ -270,6 +271,8 @@ export async function handleProjectCommand(
       input.limit = limit;
     }
 
+    const projectId = readStringOption(parsedArgv, "project-id");
+    if (projectId !== undefined) input.projectId = projectId;
     return await (dependencies.listProjectsCommand ?? defaultListProjectsCommand)(input);
   }
 

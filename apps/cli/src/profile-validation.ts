@@ -20,56 +20,8 @@ type ValidateProfileDependencies = {
   stat?: StatReader;
 };
 
-const ServiceSchema = z.object({
-  name: z.string(),
-  kind: z.enum(["frontend", "backend", "worker"]),
-  runtime: z.string(),
-  framework: z.string(),
-  paths: z.array(z.string()),
-  owns_routes: z.array(z.string()),
-  depends_on: z.array(z.string())
-});
-
-export const ProfileSchema = z.object({
-  profile_version: z.literal("v1"),
-  project: z.object({
-    name: z.string(),
-    repo_url: z.string(),
-    primary_languages: z.array(z.string()),
-    package_managers: z.array(z.string()),
-    deployment_targets: z.array(z.string())
-  }),
-  services: z.array(ServiceSchema),
-  infrastructure: z.object({
-    databases: z.array(z.string()),
-    queues: z.array(z.string()),
-    object_storage: z.array(z.string()),
-    external_services: z.array(z.string())
-  }),
-  critical_paths: z.array(z.object({
-    name: z.string(),
-    owner_service: z.string(),
-    notes: z.string()
-  })),
-  repo: z.object({
-    root_paths: z.array(z.string()),
-    generated_paths: z.array(z.string()),
-    do_not_edit_paths: z.array(z.string())
-  }),
-  developer_workflows: z.object({
-    install: z.string(),
-    build: z.string(),
-    test: z.string(),
-    lint: z.string()
-  }),
-  debugbundle: z.object({
-    profile_owner: z.string(),
-    last_reviewed_at: z.string().datetime({ offset: true }),
-    validation_status: z.enum(["static-analysis-only", "agent-validated"]),
-    skill_path: z.string(),
-    notes: z.string()
-  })
-});
+export { ProfileSchema } from "../../../packages/shared-types/src/project-profile.js";
+import { ProfileSchema } from "../../../packages/shared-types/src/project-profile.js";
 
 async function pathExists(path: string, stat: StatReader): Promise<boolean> {
   try {
@@ -85,15 +37,20 @@ async function pathExists(path: string, stat: StatReader): Promise<boolean> {
 }
 
 export function profileIssueMessage(issue: z.ZodIssue, input: unknown): string {
-  const value = issue.path.reduce<unknown>((parent, key) =>
+  const value = issue.path.reduce<unknown>(
+    (parent, key) =>
       parent !== null && typeof parent === "object" && Object.hasOwn(parent, key)
-        ? (parent as Record<PropertyKey, unknown>)[key] : undefined, input);
+        ? (parent as Record<PropertyKey, unknown>)[key]
+        : undefined,
+    input
+  );
   // Profile diagnostics are CLI output; preserve their established wording
   // independently of the validation library's default error text.
   return issue.code === "invalid_type"
-      ? value === undefined ? "Required"
-        : `Expected ${issue.expected}, received ${value === null ? "null" : Array.isArray(value) ? "array" : typeof value}`
-      : issue.message;
+    ? value === undefined
+      ? "Required"
+      : `Expected ${issue.expected}, received ${value === null ? "null" : Array.isArray(value) ? "array" : typeof value}`
+    : issue.message;
 }
 
 function formatZodErrors(error: z.ZodError, input: unknown): ProfileValidationError[] {
@@ -105,8 +62,10 @@ function formatZodErrors(error: z.ZodError, input: unknown): ProfileValidationEr
       return {
         path,
         message,
-        suggestion: "Add service entries with name, kind, runtime, framework, paths, owns_routes, and depends_on.",
-        example: '[{"name":"api","kind":"backend","runtime":"Node.js","framework":"Fastify","paths":["apps/api"],"owns_routes":["POST /checkout"],"depends_on":["worker"]}]'
+        suggestion:
+          "Add service entries with name, kind, runtime, framework, paths, owns_routes, and depends_on.",
+        example:
+          '[{"name":"api","kind":"backend","runtime":"Node.js","framework":"Fastify","paths":["apps/api"],"owns_routes":["POST /checkout"],"depends_on":["worker"]}]'
       };
     }
 
@@ -114,8 +73,10 @@ function formatZodErrors(error: z.ZodError, input: unknown): ProfileValidationEr
       return {
         path,
         message,
-        suggestion: "Use object entries so each critical path records its owner_service and review notes.",
-        example: '[{"name":"checkout","owner_service":"api","notes":"Creates the order, charges the card, and enqueues fulfillment."}]'
+        suggestion:
+          "Use object entries so each critical path records its owner_service and review notes.",
+        example:
+          '[{"name":"checkout","owner_service":"api","notes":"Creates the order, charges the card, and enqueues fulfillment."}]'
       };
     }
 
@@ -123,8 +84,10 @@ function formatZodErrors(error: z.ZodError, input: unknown): ProfileValidationEr
       return {
         path,
         message,
-        suggestion: "Provide install, build, test, and lint as command strings so agents can run the standard repo workflows.",
-        example: '{"install":"pnpm install","build":"pnpm build","test":"pnpm test","lint":"pnpm lint"}'
+        suggestion:
+          "Provide install, build, test, and lint as command strings so agents can run the standard repo workflows.",
+        example:
+          '{"install":"pnpm install","build":"pnpm build","test":"pnpm test","lint":"pnpm lint"}'
       };
     }
 
@@ -142,7 +105,8 @@ export async function validateProfile(
   valid: boolean;
   errors: ProfileValidationError[];
 }> {
-  const readFile = dependencies.readFile ?? ((filePath: string) => readFileFromFs(filePath, "utf8"));
+  const readFile =
+    dependencies.readFile ?? ((filePath: string) => readFileFromFs(filePath, "utf8"));
   const stat = dependencies.stat ?? statFromFs;
   const profilePath = join(rootDirectory, PROFILE_FILE_PATH);
 

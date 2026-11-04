@@ -55,7 +55,7 @@ export async function deleteProjectMemberOwnedAutomation(
   await db.query(
     `
       DELETE FROM github_dispatch_rules
-      WHERE project_id = $1::uuid
+      WHERE project_id=ANY(debugbundle_project_origins($1::uuid))
         AND created_by_user_id = $2::uuid
     `,
     [input.project_id, input.user_id]
@@ -63,7 +63,7 @@ export async function deleteProjectMemberOwnedAutomation(
   await db.query(
     `
       DELETE FROM agent_webhooks
-      WHERE project_id = $1::uuid
+      WHERE project_id=ANY(debugbundle_project_origins($1::uuid))
         AND created_by_user_id = $2::uuid
     `,
     [input.project_id, input.user_id]
@@ -71,7 +71,7 @@ export async function deleteProjectMemberOwnedAutomation(
   await db.query(
     `
       DELETE FROM alert_rules
-      WHERE project_id = $1::uuid
+      WHERE project_id=ANY(debugbundle_project_origins($1::uuid))
         AND created_by_user_id = $2::uuid
     `,
     [input.project_id, input.user_id]

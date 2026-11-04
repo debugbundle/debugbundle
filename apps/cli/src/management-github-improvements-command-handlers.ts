@@ -150,6 +150,7 @@ export async function handleGithubCommand(
     }
 
     expectNoUnknownOptions(parsedArgv, [
+      "project-scope",
       "auth-file",
       "json",
       "project-id",
@@ -239,6 +240,7 @@ export async function handleGithubCommand(
         ruleId
       } as {
         projectId: string;
+        projectScope?: "current_project";
         ruleId: string;
         authFilePath?: string;
         json?: boolean;
@@ -253,6 +255,12 @@ export async function handleGithubCommand(
         enabled?: boolean;
       });
 
+      const projectScope = readStringOption(parsedArgv, "project-scope");
+      if (projectScope !== undefined) {
+        if (projectScope !== "current_project")
+          throw new CliInputError("Invalid value for --project-scope.");
+        input.projectScope = projectScope;
+      }
       const name = readStringOption(parsedArgv, "name");
       const eventTypes = readCsvOption(parsedArgv, "event");
       const environments = readCsvOption(parsedArgv, "environment");

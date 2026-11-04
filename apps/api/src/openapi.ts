@@ -7,6 +7,8 @@ import { SESSION_COOKIE_NAME, type JsonSchemaDocument, type SchemaSpec } from ".
 import { foundationOperations } from "./openapi-foundation.js";
 import { evidenceOperations } from "./openapi-evidence.js";
 import { projectsOperations } from "./openapi-projects.js";
+import { projectServicesOperations } from "./openapi-project-services.js";
+import { projectMergeOperations } from "./openapi-project-merges.js";
 import { configurationOperations } from "./openapi-configuration.js";
 import { notificationsOperations } from "./openapi-notifications.js";
 import { captureOperations } from "./openapi-capture.js";
@@ -68,6 +70,8 @@ export function buildPublicOpenApiSpec(): Record<string, unknown> {
     ...foundationOperations(),
     ...evidenceOperations(),
     ...projectsOperations(),
+    ...projectServicesOperations(),
+    ...projectMergeOperations(),
     ...configurationOperations(),
     ...notificationsOperations(),
     ...captureOperations(),

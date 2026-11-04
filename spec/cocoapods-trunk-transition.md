@@ -1,6 +1,6 @@
 # CocoaPods Trunk transition — next mobile release
 
-Recorded: 2026-11-02
+Recorded: 2026-11-02; provider schedule refreshed: 2026-11-04
 Status: release preparation required; migration not implemented or qualified.
 
 ## Trigger and scope
@@ -18,7 +18,7 @@ preserve installed consumers and the existing native SDK reuse boundary.
 ## Provider announcement
 
 The [official Trunk read-only plan](https://blog.cocoapods.org/CocoaPods-Specs-Repo/)
-announces a test window on **1–7 November 2026** and permanent read-only on
+announces a test window on **2–6 November 2026** and permanent read-only on
 **2 December 2026**. New pods and new versions will be rejected; existing specs
 remain available. CocoaPods clients, Git-based pods and independent specs repos
 are separate from Trunk publication. See also the

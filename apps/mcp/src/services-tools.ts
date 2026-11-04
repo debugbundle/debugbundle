@@ -11,18 +11,33 @@ function mapMcpError(error: unknown): never {
 }
 
 export function createServicesMcpTools(api: {
-  listServices(input: { bearerToken: string; projectId: string; limit?: number }): Promise<unknown[]>;
-}): Record<(typeof SERVICE_MCP_TOOL_NAMES)[number], (input: Record<string, unknown>) => Promise<unknown>> {
+  listServices(input: {
+    bearerToken: string;
+    projectId: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<unknown[]>;
+}): Record<
+  (typeof SERVICE_MCP_TOOL_NAMES)[number],
+  (input: Record<string, unknown>) => Promise<unknown>
+> {
   return {
     async list_services(input) {
       try {
-        const requestInput: { bearerToken: string; projectId: string; limit?: number } = {
+        const requestInput: {
+          bearerToken: string;
+          projectId: string;
+          limit?: number;
+          offset?: number;
+        } = {
           bearerToken: String(input["bearerToken"]),
           projectId: String(input["projectId"])
         };
         if (typeof input["limit"] === "number") {
           requestInput.limit = input["limit"];
         }
+
+        if (typeof input["offset"] === "number") requestInput.offset = input["offset"];
 
         return {
           services: await api.listServices(requestInput)

@@ -56,11 +56,12 @@ function hasBlockedAlertTarget(
   config: Record<string, unknown> | null | undefined
 ): boolean {
   if (config === null || config === undefined) return false;
-  const target = channel === "webhook"
-    ? config["target_url"]
-    : channel === "discord" || channel === "slack"
-      ? config["webhook_url"]
-      : undefined;
+  const target =
+    channel === "webhook"
+      ? config["target_url"]
+      : channel === "discord" || channel === "slack"
+        ? config["webhook_url"]
+        : undefined;
   if (typeof target !== "string") return false;
   try {
     assertAlertOutboundTarget(target);
@@ -165,10 +166,10 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
     };
     // Old strict v1 management clients cannot parse a new response field. They
     // retain their response/body shape; storage still provisions a signing key.
-    const signingSecret = parsedBody.data.channel === "webhook" &&
-      parsedBody.data.signing === "hmac_sha256_v1"
-      ? createAlertSigningSecret()
-      : null;
+    const signingSecret =
+      parsedBody.data.channel === "webhook" && parsedBody.data.signing === "hmac_sha256_v1"
+        ? createAlertSigningSecret()
+        : null;
     if (signingSecret !== null) alertInput.signing_secret = signingSecret;
 
     if (parsedBody.data.service_id !== undefined) {
@@ -273,6 +274,7 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
     }
 
     const updateInput: {
+      project_scope?: "current_project";
       organization_id: string;
       alert_id: string;
       project_id: string;
@@ -299,6 +301,8 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
       actor_user_id: auth.member.member_id,
       actor_role: auth.access.effective_role
     };
+
+    if (parsedBody.data.project_scope) updateInput.project_scope = parsedBody.data.project_scope;
 
     if (Object.prototype.hasOwnProperty.call(parsedBody.data, "service_id")) {
       const serviceId = parsedBody.data.service_id;
@@ -333,10 +337,10 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
         updateInput.config = config;
       }
     }
-    const rotatedSigningSecret = "rotate_signing_secret" in parsedBody.data &&
-      parsedBody.data.rotate_signing_secret === true
-      ? createAlertSigningSecret()
-      : null;
+    const rotatedSigningSecret =
+      "rotate_signing_secret" in parsedBody.data && parsedBody.data.rotate_signing_secret === true
+        ? createAlertSigningSecret()
+        : null;
     if (rotatedSigningSecret !== null) updateInput.signing_secret = rotatedSigningSecret;
     if (parsedBody.data.is_enabled !== undefined) {
       updateInput.is_enabled = parsedBody.data.is_enabled;
@@ -380,7 +384,8 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
     });
 
     return reply.status(200).send({
-      alert: rotatedSigningSecret === null ? alert : { ...alert, signing_secret: rotatedSigningSecret }
+      alert:
+        rotatedSigningSecret === null ? alert : { ...alert, signing_secret: rotatedSigningSecret }
     });
   });
 

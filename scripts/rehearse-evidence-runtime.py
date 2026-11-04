@@ -92,6 +92,9 @@ def build(directory):
         with (directory / f"build-{kind}.log").open("w") as log:
             print(f"Building local {kind} {entry['version']} image", flush=True)
             run(["docker", "build", "--file", context / "Dockerfile.hosted-runtime",
+                 # Historical evidence rehearsals must never label their older
+                 # source as capable of the newer project-service contract.
+                 "--build-arg", "PROJECT_SERVICE_RUNTIME_CONTRACT=" + ("" if kind == "predecessor" else "project-services-v1"),
                  "--label", f"com.debugbundle.candidate-source={entry['sha256']}",
                  "--tag", entry["tag"], context], stdout=log, stderr=subprocess.STDOUT)
         entry["image"] = json.loads(output(["docker", "image", "inspect", entry["tag"]]))[0]
@@ -217,17 +220,27 @@ def check(directory):
             # checks above assert the exact schema reason without weakening logging.
             assert role + "_startup_failed" in failed
         runtime("predecessor", "before-migration")
+        expected_ids = ["202610260001_add_typed_evidence_context"]
+        project_service_contract = manifest["contexts"]["candidate"]["image"]["Config"]["Labels"].get("com.debugbundle.project-service-contract") == "project-services-v1"
+        if project_service_contract:
+            expected_ids += ["202611030001_add_service_definitions", "202611030002_add_project_consolidation"]
         migrated = execute("candidate", "migrate-candidate", ["corepack", "pnpm", "db:migrate"])
-        assert "db_migrate_ok: applied=1;" in migrated
+        assert f"db_migrate_ok: applied={len(expected_ids)};" in migrated
         upgraded = json_snapshot(fixture("candidate", "snapshot"))
-        for key in ("owner", "organization", "project"):
+        for key in ("owner", "organization"):
             assert baseline[key] == upgraded[key], f"Existing {key} changed during migration"
+        # The additive server-evaluation flag must retain the predecessor's
+        # effective false default while every pre-existing project value stays.
+        projects = [{key: value for key, value in row.items() if key != "capture_rules_require_server"} for row in upgraded["project"]]
+        assert projects == baseline["project"], "Existing project changed during migration"
+        if project_service_contract:
+            assert all(row["capture_rules_require_server"] is False for row in upgraded["project"])
         policy = {key: value for key, value in upgraded["policies"][0].items() if key != "capture_diagnostic_context"}
         assert policy == baseline["policies"][0] and upgraded["policies"][0]["capture_diagnostic_context"] is None
         assert all(row in upgraded["columns"] for row in baseline["columns"]), "Predecessor column changed"
         assert all(row in upgraded["ledger"] for row in baseline["ledger"]), "Predecessor ledger changed"
         added = [row for row in upgraded["ledger"] if row not in baseline["ledger"]]
-        assert len(added) == 1 and added[0]["id"] == "202610260001_add_typed_evidence_context"
+        assert [row["id"] for row in added] == expected_ids
         again = execute("candidate", "migration-repeat", ["corepack", "pnpm", "db:migrate"])
         assert "db_migrate_ok: applied=0;" in again
         assert json_snapshot(fixture("candidate", "snapshot", "repeat-snapshot")) == upgraded
@@ -240,6 +253,7 @@ def check(directory):
         runtime("candidate", "forward-again")
         results["checks"].append("existing-data-schema-ledger-and-new-evidence-preserved")
         results["migration"] = added[0]
+        results["migrations"] = added
     finally:
         for name in reversed(owned.copy()):
             logs = subprocess.run(["docker", "logs", name], text=True, capture_output=True, check=True)

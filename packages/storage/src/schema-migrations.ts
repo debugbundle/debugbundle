@@ -1,4 +1,7 @@
 import { BILLING_PLAN_CHANGE_MIGRATION } from "./billing-plan-change-schema.js";
+import { SERVICE_DEFINITION_MIGRATION } from "./service-definition-schema.js";
+import { PROJECT_CONSOLIDATION_MIGRATION } from "./project-consolidation-schema.js";
+import { projectServiceSchemaAvailable } from "./project-service-schema-check.js";
 import { EVIDENCE_CONTEXT_MIGRATIONS } from "./evidence-context-schema.js";
 import { NOTIFICATION_SCHEMA_MIGRATIONS } from "./notification-schema.js";
 import { BILLING_CHECKOUT_MIGRATION } from "./billing-checkout-schema.js";
@@ -35,6 +38,8 @@ type StorageMigrationLedgerReconcileStatus =
 const STORAGE_MIGRATION_LEDGER_TABLE = "storage_migration_ledger";
 
 export const STORAGE_SCHEMA_MIGRATIONS: readonly StorageSchemaMigration[] = [
+  SERVICE_DEFINITION_MIGRATION,
+  PROJECT_CONSOLIDATION_MIGRATION,
   ...EVIDENCE_CONTEXT_MIGRATIONS,
   ...BASE_STORAGE_SCHEMA_MIGRATIONS,
   ...BROWSER_RECOVERY_MIGRATIONS,
@@ -280,4 +285,6 @@ export async function assertStorageSchemaMigrationsApplied(db: Queryable): Promi
   if (missing.length > 0) {
     throw new Error(`storage_schema_missing_migrations: ${missing.join(",")}`);
   }
+  if (!(await projectServiceSchemaAvailable(db)))
+    throw new Error("project_service_schema_incomplete");
 }

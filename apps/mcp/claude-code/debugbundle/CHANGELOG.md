@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.19.0] - 2026-11-04
+
+- Adopt MCP 1.19.0 for logical services and checked project consolidation. Preserve local authentication, existing scopes and the CLI-first workflow.
+
 ## [1.18.2] - 2026-11-03
 
 - Adopt published MCP 1.18.3 with the project-scoped, bounded doctor authentication probe. Preserve tool schemas, local auth and explicit mutation consent.

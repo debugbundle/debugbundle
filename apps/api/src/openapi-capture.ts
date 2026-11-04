@@ -26,7 +26,7 @@ export function captureOperations(): OperationSpec[] {
       method: "post",
       path: "/v1/projects/{id}/probes/activate",
       operationId: "activateProbes",
-      summary: "Activate remote probes",
+      summary: "Activate remote probes with preserved SDK identity or an explicit newer SDK issuer",
       tags: ["Probes"],
       security: memberBearerAuth,
       params: ProjectParamsSchema,
@@ -40,7 +40,11 @@ export function captureOperations(): OperationSpec[] {
           schema: apiError
         },
         "404": { description: "Project was not found.", schema: apiError },
-        "409": { description: "Concurrent activation limit reached.", schema: apiError },
+        "409": {
+          description:
+            "Combined activation limit, active merge or incompatible SDK wildcard scope.",
+          schema: apiError
+        },
         "429": {
           description: "Monthly remote activation quota exceeded.",
           schema: apiError,

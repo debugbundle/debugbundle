@@ -18,7 +18,7 @@ import {
   WebhookDeliveryRetryParamsSchema,
   WebhookParamsSchema,
   WebhookTestBodySchema,
-  WebhooksQuerySchema,
+  WebhooksQuerySchema
 } from "../schemas.js";
 
 function generateWebhookSigningSecret(): string {
@@ -226,6 +226,7 @@ export function registerWebhookRoutes(app: FastifyInstance, dependencies: ApiDep
     }
 
     const updateInput: {
+      project_scope?: "current_project";
       organization_id: string;
       webhook_id: string;
       project_id: string;
@@ -242,6 +243,8 @@ export function registerWebhookRoutes(app: FastifyInstance, dependencies: ApiDep
       actor_user_id: auth.member.member_id,
       actor_role: auth.access.effective_role
     };
+
+    if (parsedBody.data.project_scope) updateInput.project_scope = parsedBody.data.project_scope;
 
     if (parsedBody.data.url !== undefined) {
       updateInput.url = parsedBody.data.url;
@@ -393,7 +396,11 @@ export function registerWebhookRoutes(app: FastifyInstance, dependencies: ApiDep
         now: now.toISOString()
       });
       const allowance = billingSummary?.allowances.monthly_webhook_deliveries;
-      if (billingSummary !== null && allowance !== undefined && allowance.used + 1 > allowance.limit) {
+      if (
+        billingSummary !== null &&
+        allowance !== undefined &&
+        allowance.used + 1 > allowance.limit
+      ) {
         if (dependencies.operationalEmailDelivery !== undefined) {
           await queueAllowanceLimitReachedNotification({
             store: dependencies.operationalEmailDelivery,
@@ -458,7 +465,9 @@ export function registerWebhookRoutes(app: FastifyInstance, dependencies: ApiDep
     if (!parsedParams.success) {
       return reply.status(400).send({ error: "invalid_webhook_id" });
     }
-    const parsedQuery = WebhookDeliveriesQuerySchema.merge(ProjectScopedQuerySchema).safeParse(request.query);
+    const parsedQuery = WebhookDeliveriesQuerySchema.merge(ProjectScopedQuerySchema).safeParse(
+      request.query
+    );
     if (!parsedQuery.success) {
       return reply.status(400).send({ error: "invalid_query" });
     }
@@ -470,11 +479,12 @@ export function registerWebhookRoutes(app: FastifyInstance, dependencies: ApiDep
       return;
     }
 
-    const scopedDeliveries = await dependencies.webhookDelivery.listDeliveriesForWebhookInOrganization({
-      webhookId: parsedParams.data.id,
-      organizationId: auth.access.organization_id,
-      limit: parsedQuery.data.limit
-    });
+    const scopedDeliveries =
+      await dependencies.webhookDelivery.listDeliveriesForWebhookInOrganization({
+        webhookId: parsedParams.data.id,
+        organizationId: auth.access.organization_id,
+        limit: parsedQuery.data.limit
+      });
 
     if (scopedDeliveries === null) {
       return reply.status(404).send({ error: "webhook_not_found" });

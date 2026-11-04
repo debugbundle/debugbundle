@@ -161,6 +161,7 @@ export function createApiDependenciesFromEnv(
   });
 
   const dependencies = createApiDependencies({
+    projectMergesEnabled: env["PROJECT_MERGES_ENABLED"] === "true",
     db,
     queue,
     objectStore,

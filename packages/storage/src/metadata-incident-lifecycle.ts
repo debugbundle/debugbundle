@@ -29,7 +29,7 @@ export function createMetadataIncidentLifecycle(
                 regressed_at = NULL,
                 updated_at = now()
             FROM projects p
-            WHERE i.project_id = p.id
+            WHERE debugbundle_canonical_project(i.project_id) = p.id
               AND (
                 (
                   $5::uuid IS NULL
@@ -72,6 +72,8 @@ export function createMetadataIncidentLifecycle(
           SELECT
             updated.incident_id,
             updated.project_id,
+            CASE WHEN p.id<>updated.project_id THEN p.id END AS canonical_project_id,
+            sd.id AS service_definition_id,sd.name AS canonical_service_name,
             p.name AS project_name,
             p.color_tag AS project_color_tag,
             updated.service_id,
@@ -94,8 +96,9 @@ export function createMetadataIncidentLifecycle(
             primary_signal.event_class AS incident_reason_event_class,
             primary_signal.level AS incident_reason_level
           FROM updated
-          JOIN projects p ON p.id = updated.project_id
+          JOIN projects p ON p.id = debugbundle_canonical_project(updated.project_id)
           LEFT JOIN services s ON s.id = updated.service_id
+          LEFT JOIN service_definitions sd ON sd.id=s.service_definition_id
           LEFT JOIN LATERAL (
             SELECT ie.event_type, ie.event_class, ie.level
             FROM incident_events ie
@@ -129,7 +132,7 @@ export function createMetadataIncidentLifecycle(
             SELECT requested.incident_id, requested.input_order
             FROM requested
             JOIN incidents i ON i.id = requested.incident_id
-            JOIN projects p ON p.id = i.project_id
+            JOIN projects p ON p.id = debugbundle_canonical_project(i.project_id)
             WHERE (
               (
                 $5::uuid IS NULL
@@ -195,6 +198,8 @@ export function createMetadataIncidentLifecycle(
             updated.input_order,
             updated.incident_id,
             updated.project_id,
+            CASE WHEN p.id<>updated.project_id THEN p.id END AS canonical_project_id,
+            sd.id AS service_definition_id,sd.name AS canonical_service_name,
             p.name AS project_name,
             p.color_tag AS project_color_tag,
             updated.service_id,
@@ -217,8 +222,9 @@ export function createMetadataIncidentLifecycle(
             primary_signal.event_class AS incident_reason_event_class,
             primary_signal.level AS incident_reason_level
           FROM updated
-          JOIN projects p ON p.id = updated.project_id
+          JOIN projects p ON p.id = debugbundle_canonical_project(updated.project_id)
           LEFT JOIN services s ON s.id = updated.service_id
+          LEFT JOIN service_definitions sd ON sd.id=s.service_definition_id
           LEFT JOIN LATERAL (
             SELECT ie.event_type, ie.event_class, ie.level
             FROM incident_events ie
@@ -252,7 +258,7 @@ export function createMetadataIncidentLifecycle(
                 regressed_at = NULL,
                 updated_at = now()
             FROM projects p
-            WHERE i.project_id = p.id
+            WHERE debugbundle_canonical_project(i.project_id) = p.id
               AND (
                 (
                   $3::uuid IS NULL
@@ -295,6 +301,8 @@ export function createMetadataIncidentLifecycle(
           SELECT
             updated.incident_id,
             updated.project_id,
+            CASE WHEN p.id<>updated.project_id THEN p.id END AS canonical_project_id,
+            sd.id AS service_definition_id,sd.name AS canonical_service_name,
             p.name AS project_name,
             p.color_tag AS project_color_tag,
             updated.service_id,
@@ -317,8 +325,9 @@ export function createMetadataIncidentLifecycle(
             primary_signal.event_class AS incident_reason_event_class,
             primary_signal.level AS incident_reason_level
           FROM updated
-          JOIN projects p ON p.id = updated.project_id
+          JOIN projects p ON p.id = debugbundle_canonical_project(updated.project_id)
           LEFT JOIN services s ON s.id = updated.service_id
+          LEFT JOIN service_definitions sd ON sd.id=s.service_definition_id
           LEFT JOIN LATERAL (
             SELECT ie.event_type, ie.event_class, ie.level
             FROM incident_events ie
@@ -346,7 +355,7 @@ export function createMetadataIncidentLifecycle(
             SELECT requested.incident_id, requested.input_order
             FROM requested
             JOIN incidents i ON i.id = requested.incident_id
-            JOIN projects p ON p.id = i.project_id
+            JOIN projects p ON p.id = debugbundle_canonical_project(i.project_id)
             WHERE (
               (
                 $3::uuid IS NULL
@@ -405,6 +414,8 @@ export function createMetadataIncidentLifecycle(
             updated.input_order,
             updated.incident_id,
             updated.project_id,
+            CASE WHEN p.id<>updated.project_id THEN p.id END AS canonical_project_id,
+            sd.id AS service_definition_id,sd.name AS canonical_service_name,
             p.name AS project_name,
             p.color_tag AS project_color_tag,
             updated.service_id,
@@ -427,8 +438,9 @@ export function createMetadataIncidentLifecycle(
             primary_signal.event_class AS incident_reason_event_class,
             primary_signal.level AS incident_reason_level
           FROM updated
-          JOIN projects p ON p.id = updated.project_id
+          JOIN projects p ON p.id = debugbundle_canonical_project(updated.project_id)
           LEFT JOIN services s ON s.id = updated.service_id
+          LEFT JOIN service_definitions sd ON sd.id=s.service_definition_id
           LEFT JOIN LATERAL (
             SELECT ie.event_type, ie.event_class, ie.level
             FROM incident_events ie

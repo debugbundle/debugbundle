@@ -41,7 +41,9 @@ export function createMetadataAccess(
       const result = await db.query<ProjectAccessRecord & Record<string, unknown>>(
         `
           SELECT
-            p.id AS project_id,
+            $2::uuid AS project_id,
+            CASE WHEN p.id<>$2::uuid THEN p.id END AS canonical_project_id,
+            debugbundle_project_origins($2::uuid) AS origin_project_ids,
             p.name AS project_name,
             p.color_tag AS project_color_tag,
             p.organization_id,
@@ -80,7 +82,7 @@ export function createMetadataAccess(
           LEFT JOIN project_members pm
             ON pm.project_id = p.id
            AND pm.user_id = $1::uuid
-          WHERE p.id = $2::uuid
+          WHERE p.id = debugbundle_canonical_project($2::uuid)
             AND (p.owner_user_id = $1::uuid OR pm.user_id IS NOT NULL)
           LIMIT 1
         `,
@@ -103,7 +105,7 @@ export function createMetadataAccess(
           LEFT JOIN project_members actor_membership
             ON actor_membership.project_id = p.id
            AND actor_membership.user_id = $2::uuid
-          WHERE p.id = $1::uuid
+          WHERE p.id = debugbundle_canonical_project($1::uuid)
             AND (
               p.owner_user_id = $2::uuid
               OR actor_membership.user_id IS NOT NULL
@@ -129,7 +131,7 @@ export function createMetadataAccess(
             p.created_at::text AS created_at
           FROM projects p
           JOIN users owner_user ON owner_user.id = p.owner_user_id
-          WHERE p.id = $1::uuid
+          WHERE p.id = debugbundle_canonical_project($1::uuid)
 
           UNION ALL
 
@@ -142,7 +144,7 @@ export function createMetadataAccess(
             pm.created_at::text AS created_at
           FROM project_members pm
           JOIN users member_user ON member_user.id = pm.user_id
-          WHERE pm.project_id = $1::uuid
+          WHERE pm.project_id = debugbundle_canonical_project($1::uuid)
 
           ORDER BY membership_type ASC, created_at ASC, user_id ASC
         `,
@@ -167,7 +169,7 @@ export function createMetadataAccess(
           LEFT JOIN project_members actor_membership
             ON actor_membership.project_id = p.id
            AND actor_membership.user_id = $2::uuid
-          WHERE p.id = $1::uuid
+          WHERE p.id = debugbundle_canonical_project($1::uuid)
             AND (
               p.owner_user_id = $2::uuid
               OR actor_membership.role = 'admin'
@@ -194,7 +196,7 @@ export function createMetadataAccess(
             expires_at::text AS expires_at,
             created_at::text AS created_at
           FROM project_invites
-          WHERE project_id = $1::uuid
+          WHERE project_id = debugbundle_canonical_project($1::uuid)
             AND accepted_at IS NULL
             AND canceled_at IS NULL
             AND expires_at > $2::timestamptz

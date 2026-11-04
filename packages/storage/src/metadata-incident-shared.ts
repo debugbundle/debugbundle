@@ -35,17 +35,22 @@ export function collectDemotedIncidentEvents(
   }
 }
 
-export async function getOrCreateServiceId(
+async function getOrCreateServiceRow(
   db: Queryable,
   projectId: string,
   serviceName: string,
-  environment: string
-): Promise<string> {
-  const existing = await db.query<{ id: string }>(
+  environment: string,
+  includeInputName = false
+): Promise<{ id: string; name?: string }> {
+  const existing = await db.query<{ id: string; name?: string }>(
     `
-      SELECT id
+      SELECT ${includeInputName ? "id,name" : "id"}
       FROM services
-      WHERE project_id = $1 AND name = $2 AND environment = $3
+      WHERE project_id = $1 AND environment = $3
+        AND (name = $2 OR service_definition_id IN (
+          SELECT service_definition_id FROM service_input_aliases
+          WHERE origin_project_id=$1 AND input_name=$2
+        ))
       LIMIT 1
     `,
     [projectId, serviceName, environment]
@@ -53,16 +58,16 @@ export async function getOrCreateServiceId(
 
   const existingId = existing.rows[0]?.id;
   if (existingId !== undefined) {
-    return existingId;
+    return existing.rows[0]!;
   }
 
-  const inserted = await db.query<{ id: string }>(
+  const inserted = await db.query<{ id: string; name?: string }>(
     `
       INSERT INTO services (id, project_id, name, environment, created_at, updated_at)
       VALUES ($1, $2, $3, $4, now(), now())
       ON CONFLICT (project_id, name, environment)
       DO UPDATE SET updated_at = now()
-      RETURNING id
+      RETURNING ${includeInputName ? "id,name" : "id"}
     `,
     [randomUUID(), projectId, serviceName, environment]
   );
@@ -72,7 +77,29 @@ export async function getOrCreateServiceId(
     throw new Error("service_insert_failed");
   }
 
-  return insertedId;
+  return inserted.rows[0]!;
+}
+
+export async function getOrCreateServiceId(
+  db: Queryable,
+  projectId: string,
+  serviceName: string,
+  environment: string
+): Promise<string> {
+  return (await getOrCreateServiceRow(db, projectId, serviceName, environment)).id;
+}
+
+/** Grouping uses immutable input lineage. The existing database writer fence
+ * resolves unknown names after cutover or raises a retryable ownership conflict. */
+export async function getOrCreateServiceIdentity(
+  db: Queryable,
+  projectId: string,
+  serviceName: string,
+  environment: string
+): Promise<{ service_id: string; input_name: string }> {
+  const row = await getOrCreateServiceRow(db, projectId, serviceName, environment, true);
+  if (typeof row.name !== "string") throw new Error("service_lineage_missing");
+  return { service_id: row.id, input_name: row.name };
 }
 
 export async function upsertDeploymentFromEvent(input: {
@@ -208,6 +235,16 @@ export function mapIncidentRetrievalRow(row: IncidentRetrievalRow): IncidentRetr
   return {
     incident_id: row.incident_id,
     project_id: row.project_id,
+    ...(row.canonical_project_id == null ? {} : { canonical_project_id: row.canonical_project_id }),
+    ...(row.service_definition_id === undefined
+      ? {}
+      : { service_definition_id: row.service_definition_id }),
+    ...(row.canonical_service_name === undefined
+      ? {}
+      : { canonical_service_name: row.canonical_service_name }),
+    ...(row.project_view_service_name === undefined
+      ? {}
+      : { project_view_service_name: row.project_view_service_name }),
     project_name: row.project_name,
     project_color_tag: row.project_color_tag ?? null,
     service_id: row.service_id,

@@ -30,7 +30,7 @@ export function createPostgresCapturePolicyStore(db: Queryable): CapturePolicySt
                  capture_breadcrumbs, capture_probe_events, immediate_client_error_statuses,
                  immediate_client_error_path_rules, capture_diagnostic_context, updated_at
           FROM capture_policies
-          WHERE project_id = $1
+          WHERE project_id = debugbundle_canonical_project($1::uuid)
           LIMIT 1
         `,
         [projectId]

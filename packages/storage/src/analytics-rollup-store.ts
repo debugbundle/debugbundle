@@ -130,7 +130,12 @@ export function createPostgresAnalyticsRollupStore(db: Queryable): AnalyticsRoll
         const visitorSubjectHash = persistentVisitorHash ?? sessionSubjectHash;
         const visitorClassification =
           input.event.payload.kind === "session_start" && persistentVisitorHash !== null
-            ? await classifyAnalyticsVisitor(tx, input.project_id, persistentVisitorHash, input.event.occurred_at)
+            ? await classifyAnalyticsVisitor(
+                tx,
+                input.project_id,
+                persistentVisitorHash,
+                input.event.occurred_at
+              )
             : null;
         const sessionMetrics = input.event.payload.session;
         const isSessionSummary = input.event.payload.kind === "session_summary";
@@ -167,22 +172,24 @@ export function createPostgresAnalyticsRollupStore(db: Queryable): AnalyticsRoll
             rollupKey: "active",
             subjectHash: visitorSubjectHash
           });
-          const newVisitorSubject = visitorClassification === "new"
-            ? await recordAnalyticsUniqueRollupSubject(tx, {
-                ...scope,
-                rollupKind: "new_visitor",
-                rollupKey: "active",
-                subjectHash: visitorSubjectHash
-              })
-            : null;
-          const returningVisitorSubject = visitorClassification === "returning"
-            ? await recordAnalyticsUniqueRollupSubject(tx, {
-                ...scope,
-                rollupKind: "returning_visitor",
-                rollupKey: "active",
-                subjectHash: visitorSubjectHash
-              })
-            : null;
+          const newVisitorSubject =
+            visitorClassification === "new"
+              ? await recordAnalyticsUniqueRollupSubject(tx, {
+                  ...scope,
+                  rollupKind: "new_visitor",
+                  rollupKey: "active",
+                  subjectHash: visitorSubjectHash
+                })
+              : null;
+          const returningVisitorSubject =
+            visitorClassification === "returning"
+              ? await recordAnalyticsUniqueRollupSubject(tx, {
+                  ...scope,
+                  rollupKind: "returning_visitor",
+                  rollupKey: "active",
+                  subjectHash: visitorSubjectHash
+                })
+              : null;
           await upsertSessionRollup(tx, scope, {
             sessions: sessionSubject.inserted ? 1 : 0,
             activeVisitors: visitorSubject.inserted ? 1 : 0,
@@ -401,15 +408,16 @@ async function classifyAnalyticsVisitor(
 }
 
 function toDurationBucketCounts(durationMs: number): Record<string, number> {
-  const bucket = durationMs < 10_000
-    ? "under_10s"
-    : durationMs < 30_000
-      ? "10s_to_30s"
-      : durationMs < 60_000
-        ? "30s_to_60s"
-        : durationMs < 180_000
-          ? "1m_to_3m"
-          : "over_3m";
+  const bucket =
+    durationMs < 10_000
+      ? "under_10s"
+      : durationMs < 30_000
+        ? "10s_to_30s"
+        : durationMs < 60_000
+          ? "30s_to_60s"
+          : durationMs < 180_000
+            ? "1m_to_3m"
+            : "over_3m";
   return { [bucket]: 1 };
 }
 
@@ -481,7 +489,11 @@ async function resolveFunnelSignal(
 } | null> {
   const funnelKey = event.payload.signal?.funnel_key;
   const stepKey = event.payload.signal?.step_key;
-  if (event.payload.kind !== "funnel_step" || typeof funnelKey !== "string" || typeof stepKey !== "string") {
+  if (
+    event.payload.kind !== "funnel_step" ||
+    typeof funnelKey !== "string" ||
+    typeof stepKey !== "string"
+  ) {
     return null;
   }
 
@@ -492,7 +504,8 @@ async function resolveFunnelSignal(
         jsonb_array_length(definition.steps)::integer AS step_count
       FROM analytics_funnel_definitions definition
       CROSS JOIN LATERAL jsonb_array_elements(definition.steps) WITH ORDINALITY AS step(value, ordinality)
-      WHERE definition.project_id = $1::uuid
+      WHERE debugbundle_project_scope_contains(definition.project_id,$1::uuid)
+        AND $1::uuid=ANY(COALESCE(definition.scope_origin_ids,ARRAY[definition.project_id]))
         AND definition.funnel_key = $2
         AND definition.archived_at IS NULL
         AND step.value->>'step_key' = $3
@@ -510,7 +523,8 @@ async function resolveFunnelSignal(
 }
 
 function toNonNegativeInteger(value: unknown): number {
-  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
+  const parsed =
+    typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
   return Number.isFinite(parsed) ? Math.max(0, Math.trunc(parsed)) : 0;
 }
 

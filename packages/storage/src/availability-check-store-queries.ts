@@ -1,3 +1,4 @@
+import { ruleActorAllowedSql } from "./project-rule-access.js";
 import { buildPlanEligibilityCaseSql } from "./availability-check-store-helpers.js";
 
 function buildEligibilityCtes(organizationPredicate: string): string {
@@ -8,7 +9,7 @@ function buildEligibilityCtes(organizationPredicate: string): string {
       SELECT
         c.id AS check_id,
         ROW_NUMBER() OVER (
-          PARTITION BY c.project_id
+          PARTITION BY debugbundle_canonical_project(c.project_id)
           ORDER BY c.created_at ASC, c.id ASC
         ) AS project_check_rank
       FROM availability_checks c
@@ -19,14 +20,14 @@ function buildEligibilityCtes(organizationPredicate: string): string {
     monitored_project_first_checks AS (
       SELECT
         p.organization_id,
-        c.project_id,
+        debugbundle_canonical_project(c.project_id) AS project_id,
         MIN(c.created_at) AS first_enabled_check_at
       FROM availability_checks c
       JOIN projects p ON p.id = c.project_id
       WHERE c.deleted_at IS NULL
         AND c.enabled = true
         ${organizationPredicate}
-      GROUP BY p.organization_id, c.project_id
+      GROUP BY p.organization_id, debugbundle_canonical_project(c.project_id)
     ),
     monitored_project_ranks AS (
       SELECT
@@ -52,7 +53,7 @@ function buildEligibilityCtes(organizationPredicate: string): string {
       JOIN project_check_ranks project_ranks ON project_ranks.check_id = c.id
       JOIN monitored_project_ranks monitored_ranks
         ON monitored_ranks.organization_id = p.organization_id
-        AND monitored_ranks.project_id = c.project_id
+        AND monitored_ranks.project_id = debugbundle_canonical_project(c.project_id)
       WHERE c.deleted_at IS NULL
         AND c.enabled = true
         AND project_ranks.project_check_rank <= ${buildPlanEligibilityCaseSql("limit")}
@@ -67,7 +68,9 @@ export function buildAvailabilityChecksListQuery(
   organizationPredicate: string,
   checkPredicate: string,
   limitSql = "$3",
-  cursorSql = "$4"
+  cursorSql = "$4",
+  viewSql = "NULL",
+  actorPredicate = "true"
 ): string {
   return `
   WITH
@@ -75,7 +78,7 @@ export function buildAvailabilityChecksListQuery(
   ranked AS (
     SELECT
       c.id::text AS check_id,
-      c.project_id::text AS project_id,
+      ${viewSql === "NULL" ? "c.project_id" : viewSql}::text AS project_id,
       c.name,
       c.url,
       c.method,
@@ -86,7 +89,7 @@ export function buildAvailabilityChecksListQuery(
       c.failure_threshold,
       c.recovery_threshold,
       c.environment,
-      c.service_name,
+      ${viewSql === "NULL" ? "c.service_name" : `COALESCE((SELECT name FROM service_project_aliases WHERE project_id=${viewSql} AND service_definition_id=c.service_definition_id AND is_current),c.service_name)`} AS service_name,
       c.enabled,
       c.status AS base_status,
       c.consecutive_failures,
@@ -117,8 +120,8 @@ export function buildAvailabilityChecksListQuery(
     LEFT JOIN enabled_check_ranks enabled_ranks ON enabled_ranks.check_id = c.id
     LEFT JOIN monitored_project_ranks monitored_ranks
       ON monitored_ranks.organization_id = p.organization_id
-      AND monitored_ranks.project_id = c.project_id
-    WHERE ${checkPredicate}
+      AND monitored_ranks.project_id = debugbundle_canonical_project(c.project_id)
+    WHERE ${checkPredicate} AND ${actorPredicate}
       AND ${organizationPredicate}
       AND c.deleted_at IS NULL
   )
@@ -137,7 +140,11 @@ export function buildAvailabilityChecksListQuery(
 }
 export const LIST_AVAILABILITY_CHECKS_QUERY = buildAvailabilityChecksListQuery(
   "p.organization_id = $2::uuid",
-  "c.project_id = $1::uuid"
+  "c.project_id=ANY(debugbundle_project_origins($1::uuid))",
+  "$3",
+  "$4",
+  "$1::uuid",
+  ruleActorAllowedSql("p.id", "$5::uuid", "NULL::uuid")
 );
 
 export const CLAIM_DUE_AVAILABILITY_CHECKS_QUERY = `
@@ -186,7 +193,7 @@ export const CLAIM_DUE_AVAILABILITY_CHECKS_QUERY = `
     JOIN enabled_check_ranks enabled_ranks ON enabled_ranks.check_id = c.id
     JOIN monitored_project_ranks monitored_ranks
       ON monitored_ranks.organization_id = p.organization_id
-      AND monitored_ranks.project_id = c.project_id
+      AND monitored_ranks.project_id = debugbundle_canonical_project(c.project_id)
     WHERE c.deleted_at IS NULL
       AND c.enabled = true
       AND c.next_check_at <= $1::timestamptz

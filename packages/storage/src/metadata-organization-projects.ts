@@ -1,3 +1,4 @@
+import { prepareProjectNamespaceDeletion } from "./project-namespace-deletion.js";
 import { randomUUID } from "node:crypto";
 import { buildBillableIncidentEventsPredicateSql } from "./helpers.js";
 import { runInTransaction } from "./transaction.js";
@@ -232,7 +233,7 @@ export function createMetadataOrganizationProjects(
                 environment_default = COALESCE($5, environment_default),
                 color_tag = CASE WHEN $6::boolean THEN $7::text ELSE color_tag END,
                 updated_at = now()
-              WHERE organization_id = $1 AND id = $2
+              WHERE organization_id = $1 AND id = ANY($2::uuid[])
               RETURNING
                 id AS project_id,
                 organization_id,
@@ -322,11 +323,16 @@ export function createMetadataOrganizationProjects(
 
     async deleteProjectForOrganization(input): Promise<DeletedProjectRecord | null> {
       const deleteProject = async (queryable: Queryable): Promise<DeletedProjectRecord | null> => {
+        const origins = await prepareProjectNamespaceDeletion(queryable, {
+          project_id: input.project_id,
+          organization_id: input.organization_id
+        });
+        if (origins === null) return null;
         const result = await queryable.query<DeletedProjectRecord & Record<string, unknown>>(
           `
           WITH deleted_project AS (
             DELETE FROM projects
-            WHERE organization_id = $1 AND id = $2
+            WHERE organization_id = $1 AND id = ANY($2::uuid[])
             RETURNING
               id AS project_id,
               organization_id,
@@ -356,11 +362,15 @@ export function createMetadataOrganizationProjects(
           FROM deleted_project dp
           JOIN organizations o ON o.id = dp.organization_id
           JOIN users owner_user ON owner_user.id = dp.owner_user_id
+          WHERE dp.project_id=$3::uuid
         `,
-          [input.organization_id, input.project_id]
+          [input.organization_id, origins, input.project_id]
         );
 
-        const project = result.rows[0] === undefined ? null : mapDeletedProjectRow(result.rows[0]);
+        const project =
+          result.rows[0] === undefined
+            ? null
+            : { ...mapDeletedProjectRow(result.rows[0]), storage_origin_ids: origins };
         if (project !== null && accountAnalyticsStore !== undefined) {
           await recordProjectMetric(accountAnalyticsStore, queryable, {
             organization_id: project.organization_id,
@@ -372,10 +382,6 @@ export function createMetadataOrganizationProjects(
 
         return project;
       };
-
-      if (accountAnalyticsStore === undefined) {
-        return deleteProject(db);
-      }
 
       return runInTransaction(db, deleteProject);
     }

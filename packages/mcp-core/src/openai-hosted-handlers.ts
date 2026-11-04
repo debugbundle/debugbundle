@@ -6,6 +6,7 @@ import {
   type OpenAiToolName
 } from "./openai-contract.js";
 import { OpenAiMcpInsufficientScopeError } from "./openai-auth-challenge.js";
+import { analyticsOriginCoverageNote } from "./analytics-origin-coverage.js";
 
 export interface OpenAiMcpPrincipal {
   userId: string;
@@ -65,15 +66,15 @@ export function createOpenAiHostedToolHandlers(input: {
           throw new Error(`openai_mcp_operation_unavailable:${name}`);
         }
         const parsedInput = parseOpenAiToolInput(name, request.input);
-        const structuredContent = requireStructuredObject(
-          projectOpenAiToolOutput(
-            name,
-            await operation({ principal: request.principal, input: parsedInput })
-          )
-        );
+        const output = await operation({ principal: request.principal, input: parsedInput });
+        const coverageNote = analyticsOriginCoverageNote(name, output);
+        const structuredContent = requireStructuredObject(projectOpenAiToolOutput(name, output));
 
         return {
-          content: [{ type: "text", text: JSON.stringify(structuredContent) }],
+          content: [
+            { type: "text", text: JSON.stringify(structuredContent) },
+            ...(coverageNote === undefined ? [] : [{ type: "text" as const, text: coverageNote }])
+          ],
           structuredContent
         };
       }

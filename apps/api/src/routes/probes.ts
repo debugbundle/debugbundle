@@ -7,7 +7,11 @@ import {
 import { getTierCapabilities } from "../../../../packages/shared-types/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import { requireRateLimitedProjectAccess } from "../api-helpers.js";
-import { ProjectParamsSchema, ProbeActivateBodySchema, ProbeDeactivateBodySchema } from "../schemas.js";
+import {
+  ProjectParamsSchema,
+  ProbeActivateBodySchema,
+  ProbeDeactivateBodySchema
+} from "../schemas.js";
 
 function toRetryAfterSeconds(retryAfterMs: number): string {
   return String(Math.max(1, Math.ceil(retryAfterMs / 1_000)));
@@ -25,6 +29,7 @@ export function registerProbeRoutes(app: FastifyInstance, dependencies: ApiDepen
     }
     const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
       bucket: "management-write",
+      allowLegacyMutation: true,
       projectId: parsedParams.data.id
     });
     if (auth === null) {
@@ -54,7 +59,11 @@ export function registerProbeRoutes(app: FastifyInstance, dependencies: ApiDepen
       }
 
       const allowance = billingSummary?.allowances.monthly_remote_activations;
-      if (billingSummary !== null && allowance !== undefined && allowance.used + 1 > allowance.limit) {
+      if (
+        billingSummary !== null &&
+        allowance !== undefined &&
+        allowance.used + 1 > allowance.limit
+      ) {
         if (dependencies.operationalEmailDelivery !== undefined) {
           await queueAllowanceLimitReachedNotification({
             store: dependencies.operationalEmailDelivery,
@@ -83,16 +92,22 @@ export function registerProbeRoutes(app: FastifyInstance, dependencies: ApiDepen
 
     const nowMs = now.getTime();
     const triggerTtlSeconds = parsedBody.data.trigger_ttl_seconds ?? parsedBody.data.ttl_seconds;
-    const created = await dependencies.probeManagement.createProbeActivationForProjectInOrganization({
-      organization_id: auth.access.organization_id,
-      project_id: parsedParams.data.id,
-      created_by_member_id: auth.member.member_id,
-      label_pattern: parsedBody.data.label_pattern,
-      service: parsedBody.data.service,
-      environment: parsedBody.data.environment,
-      expires_at: new Date(nowMs + parsedBody.data.ttl_seconds * 1000).toISOString(),
-      trigger_expires_at: new Date(nowMs + triggerTtlSeconds * 1000).toISOString()
-    });
+    const created =
+      await dependencies.probeManagement.createProbeActivationForProjectInOrganization({
+        organization_id: auth.access.organization_id,
+        project_id: parsedParams.data.id,
+        created_by_member_id: auth.member.member_id,
+        label_pattern: parsedBody.data.label_pattern,
+        service: parsedBody.data.service,
+        ...(parsedBody.data.sdk_project_id
+          ? { sdk_project_id: parsedBody.data.sdk_project_id }
+          : {}),
+        ...(parsedBody.data.sdk_token_id ? { sdk_token_id: parsedBody.data.sdk_token_id } : {}),
+        ...(parsedBody.data.sdk_service ? { sdk_service: parsedBody.data.sdk_service } : {}),
+        environment: parsedBody.data.environment,
+        expires_at: new Date(nowMs + parsedBody.data.ttl_seconds * 1000).toISOString(),
+        trigger_expires_at: new Date(nowMs + triggerTtlSeconds * 1000).toISOString()
+      });
 
     if (created === null) {
       return reply.status(404).send({ error: "project_not_found" });
@@ -125,7 +140,20 @@ export function registerProbeRoutes(app: FastifyInstance, dependencies: ApiDepen
       });
     }
 
-    return reply.status(201).send({ activation: created.activation, trigger_token: created.trigger_token });
+    return reply.status(201).send({
+      activation: created.activation,
+      trigger_token: created.trigger_token,
+      ...((parsedBody.data.sdk_project_id ||
+        parsedBody.data.sdk_token_id ||
+        parsedBody.data.sdk_service) &&
+      created.runtime_project_id
+        ? {
+            runtime_project_id: created.runtime_project_id,
+            runtime_scope_origin_ids: created.runtime_scope_origin_ids,
+            runtime_service: created.runtime_service
+          }
+        : {})
+    });
   });
 
   app.get("/v1/projects/:id/probes", async (request, reply) => {
@@ -164,6 +192,7 @@ export function registerProbeRoutes(app: FastifyInstance, dependencies: ApiDepen
     }
     const auth = await requireRateLimitedProjectAccess(request, reply, dependencies, {
       bucket: "management-write",
+      allowLegacyMutation: true,
       projectId: parsedParams.data.id
     });
     if (auth === null) {
@@ -177,12 +206,14 @@ export function registerProbeRoutes(app: FastifyInstance, dependencies: ApiDepen
       return reply.status(400).send({ error: "invalid_payload" });
     }
 
-    const deactivated = await dependencies.probeManagement.deactivateProbeActivationForProjectInOrganization({
-      organization_id: auth.access.organization_id,
-      project_id: parsedParams.data.id,
-      activation_id: parsedBody.data.activation_id,
-      deactivated_at: new Date().toISOString()
-    });
+    const deactivated =
+      await dependencies.probeManagement.deactivateProbeActivationForProjectInOrganization({
+        organization_id: auth.access.organization_id,
+        project_id: parsedParams.data.id,
+        activation_id: parsedBody.data.activation_id,
+        actor_user_id: auth.member.member_id,
+        deactivated_at: new Date().toISOString()
+      });
 
     if (deactivated === null) {
       return reply.status(404).send({ error: "activation_not_found" });

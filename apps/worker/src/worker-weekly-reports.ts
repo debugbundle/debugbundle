@@ -98,7 +98,12 @@ export async function scheduleWeeklyReports(input: {
       window_start: string;
       window_end: string;
       channel: "email" | "slack";
-    }): Promise<{ delivery_id: string; created: boolean }>;
+    }): Promise<{
+      delivery_id: string;
+      created: boolean;
+      project_id?: string;
+      weekly_report_channel_id?: string;
+    }>;
   };
   batchSize: number;
   now?: Date;
@@ -147,8 +152,8 @@ export async function scheduleWeeklyReports(input: {
 
     const payload = {
       delivery_id: delivery.delivery_id,
-      weekly_report_channel_id: channel.channel_id,
-      project_id: channel.project_id,
+      weekly_report_channel_id: delivery.weekly_report_channel_id ?? channel.channel_id,
+      project_id: delivery.project_id ?? channel.project_id,
       window_start: weeklyWindow.window_start,
       window_end: weeklyWindow.window_end
     };

@@ -1,3 +1,7 @@
+import {
+  restoreStoragePredecessor,
+  PROJECT_SERVICE_MIGRATION_IDS
+} from "../helpers/storage-predecessor.js";
 import { randomUUID } from "node:crypto";
 
 import { afterAll, expect, it } from "vitest";
@@ -164,8 +168,7 @@ runIntegration("storage bootstrap integration", () => {
     await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
     await pool.query("CREATE SCHEMA public");
     const db = createQueryable(pool);
-    await bootstrapStorageSchema(db);
-    await migrateStorageSchema(db);
+    await restoreStoragePredecessor(pool);
     const projectId = randomUUID();
     await seedOwnedProject({
       pool,
@@ -184,7 +187,10 @@ runIntegration("storage bootstrap integration", () => {
     await expect(assertStorageSchemaMigrationsApplied(db)).rejects.toThrow(
       `storage_schema_missing_migrations: ${migrationId}`
     );
-    expect((await migrateStorageSchema(db)).applied).toEqual([migrationId]);
+    expect((await migrateStorageSchema(db)).applied).toEqual([
+      migrationId,
+      ...PROJECT_SERVICE_MIGRATION_IDS
+    ]);
     await expect(assertStorageSchemaMigrationsApplied(db)).resolves.toBeUndefined();
     const tables = await pool.query<{ name: string | null }>(
       "SELECT to_regclass('public.analytics_flow_definitions')::text AS name"
@@ -199,15 +205,17 @@ runIntegration("storage bootstrap integration", () => {
     await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
     await pool.query("CREATE SCHEMA public");
     const db = createQueryable(pool);
-    await bootstrapStorageSchema(db);
-    await migrateStorageSchema(db);
+    await restoreStoragePredecessor(pool);
     await pool.query("ALTER TABLE incident_events DROP COLUMN resource_route");
     const migrationId = "202609160001_add_browser_resource_routes";
     await pool.query("DELETE FROM storage_migration_ledger WHERE id = $1", [migrationId]);
     await expect(assertStorageSchemaMigrationsApplied(db)).rejects.toThrow(
       `storage_schema_missing_migrations: ${migrationId}`
     );
-    expect((await migrateStorageSchema(db)).applied).toEqual([migrationId]);
+    expect((await migrateStorageSchema(db)).applied).toEqual([
+      migrationId,
+      ...PROJECT_SERVICE_MIGRATION_IDS
+    ]);
     await expect(assertStorageSchemaMigrationsApplied(db)).resolves.toBeUndefined();
     expect(
       (
@@ -223,8 +231,7 @@ runIntegration("storage bootstrap integration", () => {
     await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
     await pool.query("CREATE SCHEMA public");
     const db = createQueryable(pool);
-    await bootstrapStorageSchema(db);
-    await migrateStorageSchema(db);
+    await restoreStoragePredecessor(pool);
 
     const projectId = randomUUID();
     await seedOwnedProject({
@@ -243,7 +250,10 @@ runIntegration("storage bootstrap integration", () => {
     await expect(assertStorageSchemaMigrationsApplied(db)).rejects.toThrow(
       `storage_schema_missing_migrations: ${migrationId}`
     );
-    expect((await migrateStorageSchema(db)).applied).toEqual([migrationId]);
+    expect((await migrateStorageSchema(db)).applied).toEqual([
+      migrationId,
+      ...PROJECT_SERVICE_MIGRATION_IDS
+    ]);
     await expect(assertStorageSchemaMigrationsApplied(db)).resolves.toBeUndefined();
     expect(
       (await pool.query("SELECT name FROM projects WHERE id = $1", [projectId])).rows[0]?.name
@@ -259,8 +269,7 @@ runIntegration("storage bootstrap integration", () => {
     await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
     await pool.query("CREATE SCHEMA public");
     const db = createQueryable(pool);
-    await bootstrapStorageSchema(db);
-    await migrateStorageSchema(db);
+    await restoreStoragePredecessor(pool);
     const projectId = randomUUID();
     const { ownerUserId } = await seedOwnedProject({
       pool,
@@ -285,7 +294,10 @@ runIntegration("storage bootstrap integration", () => {
     await expect(assertStorageSchemaMigrationsApplied(db)).rejects.toThrow(
       `storage_schema_missing_migrations: ${migrationId}`
     );
-    expect((await migrateStorageSchema(db)).applied).toEqual([migrationId]);
+    expect((await migrateStorageSchema(db)).applied).toEqual([
+      migrationId,
+      ...PROJECT_SERVICE_MIGRATION_IDS
+    ]);
     const existing = await pool.query<{ signing_secret: string | null }>(
       "SELECT signing_secret FROM alert_rules WHERE id = $1",
       [alertId]
@@ -298,8 +310,7 @@ runIntegration("storage bootstrap integration", () => {
     await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
     await pool.query("CREATE SCHEMA public");
     const db = createQueryable(pool);
-    await bootstrapStorageSchema(db);
-    await migrateStorageSchema(db);
+    await restoreStoragePredecessor(pool);
     const projectId = randomUUID();
     const { ownerUserId } = await seedOwnedProject({
       pool,
@@ -328,7 +339,10 @@ runIntegration("storage bootstrap integration", () => {
     await expect(assertStorageSchemaMigrationsApplied(db)).rejects.toThrow(
       `storage_schema_missing_migrations: ${migrationId}`
     );
-    expect((await migrateStorageSchema(db)).applied).toEqual([migrationId]);
+    expect((await migrateStorageSchema(db)).applied).toEqual([
+      migrationId,
+      ...PROJECT_SERVICE_MIGRATION_IDS
+    ]);
     expect(
       (await pool.query("SELECT webhook_payload_version FROM alert_rules WHERE id = $1", [legacy]))
         .rows
@@ -349,8 +363,7 @@ runIntegration("storage bootstrap integration", () => {
     await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
     await pool.query("CREATE SCHEMA public");
     const db = createQueryable(pool);
-    await bootstrapStorageSchema(db);
-    await migrateStorageSchema(db);
+    await restoreStoragePredecessor(pool);
     const projectId = randomUUID(),
       incidentId = randomUUID(),
       alertId = randomUUID(),
@@ -385,7 +398,10 @@ runIntegration("storage bootstrap integration", () => {
     await expect(assertStorageSchemaMigrationsApplied(db)).rejects.toThrow(
       `storage_schema_missing_migrations: ${migrationId}`
     );
-    expect((await migrateStorageSchema(db)).applied).toEqual([migrationId]);
+    expect((await migrateStorageSchema(db)).applied).toEqual([
+      migrationId,
+      ...PROJECT_SERVICE_MIGRATION_IDS
+    ]);
     expect(
       (
         await pool.query("SELECT status, evaluation_job_id FROM alert_deliveries WHERE id = $1", [
@@ -401,8 +417,7 @@ runIntegration("storage bootstrap integration", () => {
     await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
     await pool.query("CREATE SCHEMA public");
     const db = createQueryable(pool);
-    await bootstrapStorageSchema(db);
-    await migrateStorageSchema(db);
+    await restoreStoragePredecessor(pool);
     const projectId = randomUUID();
     await seedOwnedProject({
       pool,
@@ -420,7 +435,10 @@ runIntegration("storage bootstrap integration", () => {
     await expect(assertStorageSchemaMigrationsApplied(db)).rejects.toThrow(
       `storage_schema_missing_migrations: ${id}`
     );
-    expect((await migrateStorageSchema(db)).applied).toEqual([id]);
+    expect((await migrateStorageSchema(db)).applied).toEqual([
+      id,
+      ...PROJECT_SERVICE_MIGRATION_IDS
+    ]);
     await expect(assertStorageSchemaMigrationsApplied(db)).resolves.toBeUndefined();
     expect(
       (await pool.query("SELECT name FROM projects WHERE id = $1", [projectId])).rows[0].name
@@ -432,15 +450,17 @@ runIntegration("storage bootstrap integration", () => {
     await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
     await pool.query("CREATE SCHEMA public");
     const db = createQueryable(pool);
-    await bootstrapStorageSchema(db);
-    await migrateStorageSchema(db);
+    await restoreStoragePredecessor(pool);
     await pool.query("DROP TABLE agent_tokens");
     const migrationId = "202609200001_add_project_scoped_agent_tokens";
     await pool.query("DELETE FROM storage_migration_ledger WHERE id = $1", [migrationId]);
     await expect(assertStorageSchemaMigrationsApplied(db)).rejects.toThrow(
       `storage_schema_missing_migrations: ${migrationId}`
     );
-    expect((await migrateStorageSchema(db)).applied).toEqual([migrationId]);
+    expect((await migrateStorageSchema(db)).applied).toEqual([
+      migrationId,
+      ...PROJECT_SERVICE_MIGRATION_IDS
+    ]);
     await expect(assertStorageSchemaMigrationsApplied(db)).resolves.toBeUndefined();
     expect(
       (await pool.query("SELECT to_regclass('public.agent_tokens')::text AS table_name")).rows[0]
@@ -453,8 +473,7 @@ runIntegration("storage bootstrap integration", () => {
     await pool.query("CREATE SCHEMA public");
 
     const db = createQueryable(pool);
-    await bootstrapStorageSchema(db);
-    await migrateStorageSchema(db);
+    await restoreStoragePredecessor(pool);
     await pool.query("DROP INDEX analytics_journey_samples_project_correlation_seen_idx");
     await pool.query("ALTER TABLE analytics_journey_samples DROP COLUMN correlation_session_hash");
     await pool.query("DELETE FROM storage_migration_ledger WHERE id = $1", [
@@ -467,7 +486,8 @@ runIntegration("storage bootstrap integration", () => {
 
     const migrated = await migrateStorageSchema(db);
     expect(migrated.applied).toEqual([
-      "202607100002_add_analytics_journey_sample_correlation_hash"
+      "202607100002_add_analytics_journey_sample_correlation_hash",
+      ...PROJECT_SERVICE_MIGRATION_IDS
     ]);
 
     const columnResult = await pool.query<{ column_name: string }>(
@@ -501,8 +521,7 @@ runIntegration("storage bootstrap integration", () => {
     await pool.query("CREATE SCHEMA public");
 
     const db = createQueryable(pool);
-    await bootstrapStorageSchema(db);
-    await migrateStorageSchema(db);
+    await restoreStoragePredecessor(pool);
 
     const freeProjectId = randomUUID();
     const soloProjectId = randomUUID();
@@ -558,7 +577,8 @@ runIntegration("storage bootstrap integration", () => {
 
     expect(migrated.applied).toEqual([
       "202607130001_expand_default_saved_funnel_capacity",
-      "202607140001_enable_free_analytics_preview"
+      "202607140001_enable_free_analytics_preview",
+      ...PROJECT_SERVICE_MIGRATION_IDS
     ]);
     const settings = await pool.query<{
       project_id: string;
@@ -596,8 +616,7 @@ runIntegration("storage bootstrap integration", () => {
     await pool.query("CREATE SCHEMA public");
 
     const db = createQueryable(pool);
-    await bootstrapStorageSchema(db);
-    await migrateStorageSchema(db);
+    await restoreStoragePredecessor(pool);
 
     const freeProjectId = randomUUID();
     const soloProjectId = randomUUID();
@@ -637,7 +656,10 @@ runIntegration("storage bootstrap integration", () => {
 
     const migrated = await migrateStorageSchema(db);
 
-    expect(migrated.applied).toEqual(["202607140002_expand_custom_dimension_capacity"]);
+    expect(migrated.applied).toEqual([
+      "202607140002_expand_custom_dimension_capacity",
+      ...PROJECT_SERVICE_MIGRATION_IDS
+    ]);
     const settings = await pool.query<{
       project_id: string;
       max_custom_dimensions: number;
@@ -677,12 +699,10 @@ runIntegration("storage bootstrap integration", () => {
     await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
     await pool.query("CREATE SCHEMA public");
 
-    await bootstrapStorageSchema(createQueryable(pool));
+    await restoreStoragePredecessor(pool, false);
     await pool.query("ALTER TABLE organization_members DROP COLUMN suspended_at");
     await pool.query("ALTER TABLE organizations DROP COLUMN suspended_at");
 
-    const bootstrapBeforeMigration = await bootstrapStorageSchema(createQueryable(pool));
-    expect(bootstrapBeforeMigration).toEqual({ status: "already_bootstrapped" });
     await removeEvidenceSchemaFromLegacyFixture(pool);
 
     const migrated = await migrateStorageSchema(createQueryable(pool));
@@ -754,7 +774,7 @@ runIntegration("storage bootstrap integration", () => {
     await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
     await pool.query("CREATE SCHEMA public");
 
-    await bootstrapStorageSchema(createQueryable(pool));
+    await restoreStoragePredecessor(pool, false);
     await pool.query("DROP TABLE trial_lifecycle_events");
     await pool.query(
       "ALTER TABLE organizations DROP CONSTRAINT organizations_trial_started_requires_plan_check"
@@ -802,7 +822,7 @@ runIntegration("storage bootstrap integration", () => {
     await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
     await pool.query("CREATE SCHEMA public");
 
-    await bootstrapStorageSchema(createQueryable(pool));
+    await restoreStoragePredecessor(pool, false);
 
     await pool.query("ALTER TABLE incidents DROP COLUMN bundle_source_occurred_at");
     await pool.query("ALTER TABLE incidents DROP COLUMN bundle_trigger");

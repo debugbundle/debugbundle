@@ -1,13 +1,11 @@
-import { exportNotificationAccountData, deleteNotificationAccountData } from "./notification-account-data.js";
+import { exportNotificationAccountData } from "./notification-account-data.js";
 import type { AccountAnalyticsStore } from "./account-analytics-store.js";
-import { runInTransaction } from "./transaction.js";
+import { createAccountDeletionStore } from "./account-deletion-store.js";
 import type {
   AccountDataExportRecord,
-  AccountDeletionBlockedReason,
   AccountLifecycleStore,
-  DeletedAccountRecord,
   Queryable,
-  UserAvatarRecord,
+  UserAvatarRecord
 } from "./types.js";
 
 type JsonRow = {
@@ -17,7 +15,7 @@ type JsonRow = {
 async function queryJsonRows(
   db: Queryable,
   sql: string,
-  params: unknown[],
+  params: unknown[]
 ): Promise<Record<string, unknown>[]> {
   const result = await db.query<JsonRow>(sql, params);
   return result.rows.flatMap((row) => {
@@ -31,7 +29,7 @@ async function queryJsonRows(
 async function queryJsonRow(
   db: Queryable,
   sql: string,
-  params: unknown[],
+  params: unknown[]
 ): Promise<Record<string, unknown> | null> {
   const rows = await queryJsonRows(db, sql, params);
   return rows[0] ?? null;
@@ -42,7 +40,7 @@ async function queryProjectScopedRows(
   tableName: string,
   projectIds: string[],
   orderBySql: string,
-  selectSql = "*",
+  selectSql = "*"
 ): Promise<Record<string, unknown>[]> {
   if (projectIds.length === 0) {
     return [];
@@ -59,12 +57,8 @@ async function queryProjectScopedRows(
         ORDER BY ${orderBySql}
       ) t
     `,
-    [projectIds],
+    [projectIds]
   );
-}
-
-async function rollbackQuietly(db: Queryable): Promise<void> {
-  await db.query("ROLLBACK", []).catch(() => undefined);
 }
 
 function mapUserAvatarRow(row: Record<string, unknown>): UserAvatarRecord {
@@ -73,7 +67,7 @@ function mapUserAvatarRow(row: Record<string, unknown>): UserAvatarRecord {
     source: row["avatar_source"] === "github" ? "github" : "gravatar",
     object_key: String(row["avatar_object_key"]),
     content_type: String(row["avatar_content_type"]),
-    updated_at: String(row["avatar_updated_at"]),
+    updated_at: String(row["avatar_updated_at"])
   };
 }
 
@@ -85,9 +79,8 @@ export function createPostgresAccountStore(
   db: Queryable,
   options: PostgresAccountStoreOptions = {}
 ): AccountLifecycleStore {
-  const accountAnalyticsStore = options.accountAnalyticsStore;
-
   return {
+    ...createAccountDeletionStore(db, options.accountAnalyticsStore),
     async exportAccountForOrganization(input): Promise<AccountDataExportRecord | null> {
       const user = await queryJsonRow(
         db,
@@ -112,7 +105,7 @@ export function createPostgresAccountStore(
             LIMIT 1
           ) t
         `,
-        [input.user_id, input.organization_id],
+        [input.user_id, input.organization_id]
       );
 
       if (user === null) {
@@ -132,7 +125,7 @@ export function createPostgresAccountStore(
             LIMIT 1
           ) t
         `,
-        [input.organization_id],
+        [input.organization_id]
       );
 
       if (organization === null) {
@@ -156,7 +149,7 @@ export function createPostgresAccountStore(
             ORDER BY om.created_at ASC, om.user_id ASC
           ) t
         `,
-        [input.organization_id],
+        [input.organization_id]
       );
 
       const projectInvites = await queryJsonRows(
@@ -172,7 +165,7 @@ export function createPostgresAccountStore(
             ORDER BY created_at ASC, id ASC
           ) t
         `,
-        [input.organization_id],
+        [input.organization_id]
       );
 
       const memberTokens = await queryJsonRows(
@@ -187,7 +180,7 @@ export function createPostgresAccountStore(
             ORDER BY created_at ASC, id ASC
           ) t
         `,
-        [input.organization_id],
+        [input.organization_id]
       );
 
       const agentTokens = await queryJsonRows(
@@ -204,7 +197,7 @@ export function createPostgresAccountStore(
             ORDER BY created_at ASC, id ASC
           ) t
         `,
-        [input.organization_id],
+        [input.organization_id]
       );
 
       const projects = await queryJsonRows(
@@ -212,13 +205,29 @@ export function createPostgresAccountStore(
         `
           SELECT to_jsonb(t) AS data
           FROM (
-            SELECT projects.*, projects.id AS project_id
+            SELECT projects.*, projects.id AS project_id,
+              jsonb_build_object('schema','project-services-v1',
+                'canonical_project_id',debugbundle_canonical_project(projects.id),
+                'origin_project_ids',debugbundle_project_origins(projects.id),
+                'definitions',COALESCE((SELECT jsonb_agg(to_jsonb(d) ORDER BY d.id)
+                  FROM service_definitions d WHERE d.origin_project_id=projects.id),'[]'::jsonb),
+                'input_aliases',COALESCE((SELECT jsonb_agg(to_jsonb(a) ORDER BY a.input_name COLLATE "C")
+                  FROM service_input_aliases a WHERE a.origin_project_id=projects.id),'[]'::jsonb),
+                'view_aliases',COALESCE((SELECT jsonb_agg(to_jsonb(a) ORDER BY a.name COLLATE "C")
+                  FROM service_project_aliases a WHERE a.project_id=projects.id),'[]'::jsonb),
+                'binding',(SELECT to_jsonb(b) FROM project_legacy_bindings b WHERE b.legacy_project_id=projects.id),
+                'operations',COALESCE((SELECT jsonb_agg(jsonb_build_object('operation_id',op.id,
+                  'target_project_id',op.target_project_id,'actor_user_id',op.actor_user_id,'state',op.state,
+                  'request',op.request,'plan_digest',op.plan_digest,'receipt',op.receipt,'error_code',op.error_code,
+                  'created_at',op.created_at,'committed_at',op.committed_at,'verified_at',op.verified_at) ORDER BY op.id)
+                  FROM project_merge_operations op WHERE op.target_project_id=projects.id),'[]'::jsonb)
+              ) AS service_context
             FROM projects
             WHERE organization_id = $1
             ORDER BY created_at ASC, id ASC
           ) t
         `,
-        [input.organization_id],
+        [input.organization_id]
       );
 
       const projectIds = projects.flatMap((project) => {
@@ -231,75 +240,75 @@ export function createPostgresAccountStore(
         "project_members",
         projectIds,
         "created_at ASC, id ASC",
-        "project_members.*, project_members.id AS project_member_id",
+        "project_members.*, project_members.id AS project_member_id"
       );
       const projectTokens = await queryProjectScopedRows(
         db,
         "project_tokens",
         projectIds,
         "created_at ASC, id ASC",
-        "project_tokens.*, project_tokens.id AS token_id",
+        "project_tokens.*, project_tokens.id AS token_id"
       );
       const probeActivations = await queryProjectScopedRows(
         db,
         "probe_activations",
         projectIds,
         "created_at ASC, id ASC",
-        "probe_activations.*, probe_activations.id AS activation_id",
+        "probe_activations.*, probe_activations.id AS activation_id"
       );
       const capturePolicies = await queryProjectScopedRows(
         db,
         "capture_policies",
         projectIds,
-        "project_id ASC",
+        "project_id ASC"
       );
       const services = await queryProjectScopedRows(
         db,
         "services",
         projectIds,
         "created_at ASC, id ASC",
-        "services.*, services.id AS service_id",
+        "services.*, services.id AS service_id"
       );
       const deployments = await queryProjectScopedRows(
         db,
         "deployments",
         projectIds,
         "created_at ASC, id ASC",
-        "deployments.*, deployments.id AS deployment_id",
+        "deployments.*, deployments.id AS deployment_id"
       );
       const processedEvents = await queryProjectScopedRows(
         db,
         "processed_events",
         projectIds,
-        "processed_at ASC, event_id ASC",
+        "processed_at ASC, event_id ASC"
       );
       const improvementOpportunities = await queryProjectScopedRows(
         db,
         "improvement_opportunities",
         projectIds,
         "created_at ASC, id ASC",
-        "improvement_opportunities.*, improvement_opportunities.id AS improvement_opportunity_id",
+        "improvement_opportunities.*, improvement_opportunities.id AS improvement_opportunity_id"
       );
       const incidents = await queryProjectScopedRows(
         db,
         "incidents",
         projectIds,
         "created_at ASC, id ASC",
-        "incidents.*, incidents.id AS incident_id",
+        "incidents.*, incidents.id AS incident_id"
       );
       const bundleGenerations = await queryProjectScopedRows(
         db,
         "bundle_generations",
         projectIds,
         "created_at ASC, id ASC",
-        "bundle_generations.*, bundle_generations.id AS bundle_generation_id",
+        "bundle_generations.*, bundle_generations.id AS bundle_generation_id"
       );
       const alertRules = await queryProjectScopedRows(
         db,
         "alert_rules",
         projectIds,
         "created_at ASC, id ASC",
-        "alert_rules.*, alert_rules.id AS alert_id",
+        "alert_rules.*, alert_rules.id AS alert_id"
       );
       const slackDestinations = await queryJsonRows(
         db,
@@ -312,77 +321,77 @@ export function createPostgresAccountStore(
             ORDER BY created_at ASC, id ASC
           ) t
         `,
-        [input.organization_id],
+        [input.organization_id]
       );
       const alertDeliveries = await queryProjectScopedRows(
         db,
         "alert_deliveries",
         projectIds,
         "created_at ASC, id ASC",
-        "alert_deliveries.*, alert_deliveries.id AS delivery_id",
+        "alert_deliveries.*, alert_deliveries.id AS delivery_id"
       );
       const alertEmailDigests = await queryProjectScopedRows(
         db,
         "alert_email_digests",
         projectIds,
         "created_at ASC, id ASC",
-        "alert_email_digests.*, alert_email_digests.id AS digest_id",
+        "alert_email_digests.*, alert_email_digests.id AS digest_id"
       );
       const alertEmailDigestItems = await queryProjectScopedRows(
         db,
         "alert_email_digest_items",
         projectIds,
         "created_at ASC, id ASC",
-        "alert_email_digest_items.*, alert_email_digest_items.id AS digest_item_id",
+        "alert_email_digest_items.*, alert_email_digest_items.id AS digest_item_id"
       );
       const weeklyReportChannels = await queryProjectScopedRows(
         db,
         "weekly_report_channels",
         projectIds,
         "created_at ASC, id ASC",
-        "weekly_report_channels.*, weekly_report_channels.id AS weekly_report_channel_id",
+        "weekly_report_channels.*, weekly_report_channels.id AS weekly_report_channel_id"
       );
       const weeklyReportDeliveries = await queryProjectScopedRows(
         db,
         "weekly_report_deliveries",
         projectIds,
         "created_at ASC, id ASC",
-        "weekly_report_deliveries.*, weekly_report_deliveries.id AS delivery_id",
+        "weekly_report_deliveries.*, weekly_report_deliveries.id AS delivery_id"
       );
       const agentWebhooks = await queryProjectScopedRows(
         db,
         "agent_webhooks",
         projectIds,
         "created_at ASC, id ASC",
-        "agent_webhooks.*, agent_webhooks.id AS webhook_id",
+        "agent_webhooks.*, agent_webhooks.id AS webhook_id"
       );
       const webhookDeliveries = await queryProjectScopedRows(
         db,
         "webhook_deliveries",
         projectIds,
         "created_at ASC, id ASC",
-        "webhook_deliveries.*, webhook_deliveries.id AS delivery_id",
+        "webhook_deliveries.*, webhook_deliveries.id AS delivery_id"
       );
       const projectGitHubRepos = await queryProjectScopedRows(
         db,
         "project_github_repos",
         projectIds,
         "created_at ASC, id ASC",
-        "project_github_repos.*, project_github_repos.id AS project_github_repo_id",
+        "project_github_repos.*, project_github_repos.id AS project_github_repo_id"
       );
       const githubDispatchRules = await queryProjectScopedRows(
         db,
         "github_dispatch_rules",
         projectIds,
         "created_at ASC, id ASC",
-        "github_dispatch_rules.*, github_dispatch_rules.id AS rule_id",
+        "github_dispatch_rules.*, github_dispatch_rules.id AS rule_id"
       );
       const githubDispatchDeliveries = await queryProjectScopedRows(
         db,
         "github_dispatch_deliveries",
         projectIds,
         "created_at ASC, id ASC",
-        "github_dispatch_deliveries.*, github_dispatch_deliveries.id AS delivery_id",
+        "github_dispatch_deliveries.*, github_dispatch_deliveries.id AS delivery_id"
       );
 
       const incidentEvents =
@@ -402,7 +411,7 @@ export function createPostgresAccountStore(
                   ORDER BY incident_events.occurred_at ASC, incident_events.event_id ASC
                 ) t
               `,
-              [projectIds],
+              [projectIds]
             );
 
       const improvementOpportunityEvents =
@@ -423,7 +432,7 @@ export function createPostgresAccountStore(
                   ORDER BY improvement_opportunity_events.occurred_at ASC, improvement_opportunity_events.event_id ASC
                 ) t
               `,
-              [projectIds],
+              [projectIds]
             );
 
       const githubInstallations = await queryJsonRows(
@@ -437,7 +446,7 @@ export function createPostgresAccountStore(
             ORDER BY created_at ASC, id ASC
           ) t
         `,
-        [input.organization_id],
+        [input.organization_id]
       );
 
       const githubMarketplaceAccounts = await queryJsonRows(
@@ -451,7 +460,7 @@ export function createPostgresAccountStore(
             ORDER BY updated_at ASC, created_at ASC, id ASC
           ) t
         `,
-        [input.organization_id],
+        [input.organization_id]
       );
 
       const orgUsageCounters = await queryJsonRows(
@@ -465,7 +474,7 @@ export function createPostgresAccountStore(
             ORDER BY period_starts_at ASC
           ) t
         `,
-        [input.organization_id],
+        [input.organization_id]
       );
 
       const processedBillingEvents = await queryJsonRows(
@@ -479,7 +488,7 @@ export function createPostgresAccountStore(
             ORDER BY processed_at ASC, event_id ASC
           ) t
         `,
-        [input.organization_id],
+        [input.organization_id]
       );
 
       const processedGitHubMarketplaceEvents = await queryJsonRows(
@@ -495,7 +504,7 @@ export function createPostgresAccountStore(
             ORDER BY pgme.processed_at ASC, pgme.delivery_id ASC
           ) t
         `,
-        [input.organization_id],
+        [input.organization_id]
       );
 
       const planCleanupTasks = await queryProjectScopedRows(
@@ -503,7 +512,7 @@ export function createPostgresAccountStore(
         "plan_cleanup_tasks",
         projectIds,
         "created_at ASC, id ASC",
-        "plan_cleanup_tasks.*, plan_cleanup_tasks.id AS task_id",
+        "plan_cleanup_tasks.*, plan_cleanup_tasks.id AS task_id"
       );
 
       const operationalEmailDeliveries = await queryProjectScopedRows(
@@ -511,7 +520,7 @@ export function createPostgresAccountStore(
         "operational_email_deliveries",
         projectIds,
         "created_at ASC, id ASC",
-        "operational_email_deliveries.*, operational_email_deliveries.id AS delivery_id",
+        "operational_email_deliveries.*, operational_email_deliveries.id AS delivery_id"
       );
 
       const auditLogs = await queryJsonRows(
@@ -525,11 +534,11 @@ export function createPostgresAccountStore(
             ORDER BY occurred_at ASC, created_at ASC, id ASC
           ) t
         `,
-        [input.organization_id],
+        [input.organization_id]
       );
 
       return {
-        ...await exportNotificationAccountData(db, { ...input, projectIds }),
+        ...(await exportNotificationAccountData(db, { ...input, projectIds })),
         export_version: 1,
         exported_at: input.exported_at,
         user,
@@ -574,255 +583,11 @@ export function createPostgresAccountStore(
         artifacts: {
           raw_events: [],
           bundles: [],
-          reproductions: [],
-        },
-      };
-    },
-
-    async deleteAccountForOrganization(input): Promise<DeletedAccountRecord | AccountDeletionBlockedReason | null> {
-      const deleteAccount = async (
-        queryable: Queryable,
-      ): Promise<DeletedAccountRecord | AccountDeletionBlockedReason | null> => {
-        const membership = await queryable.query<{ role: string }>(
-          `
-            SELECT role
-            FROM organization_members
-            WHERE organization_id = $1
-              AND user_id = $2
-            LIMIT 1
-          `,
-            [input.organization_id, input.user_id],
-          );
-
-          if (membership.rows[0] === undefined) {
-            return null;
-          }
-
-          const blockingOwnership = await queryable.query<{ organization_id: string }>(
-          `
-            SELECT om.organization_id::text AS organization_id
-            FROM organization_members om
-            WHERE om.user_id = $2
-              AND om.organization_id <> $1
-              AND om.role = 'owner'
-              AND NOT EXISTS (
-                SELECT 1
-                FROM organization_members other
-                WHERE other.organization_id = om.organization_id
-                  AND other.user_id <> $2
-                  AND other.role = 'owner'
-              )
-            LIMIT 1
-          `,
-            [input.organization_id, input.user_id],
-          );
-
-          if (blockingOwnership.rows[0] !== undefined) {
-            return "other_owned_organizations_exist";
-          }
-
-          const blockingOwnedProject = await queryable.query<{ project_id: string }>(
-          `
-            SELECT p.id::text AS project_id
-            FROM projects p
-            WHERE p.owner_user_id = $2
-              AND p.organization_id <> $1
-            LIMIT 1
-          `,
-            [input.organization_id, input.user_id],
-          );
-
-          if (blockingOwnedProject.rows[0] !== undefined) {
-            return "other_owned_projects_exist";
-          }
-
-          const projectIdRows = await queryable.query<{ project_id: string }>(
-          `
-            SELECT id::text AS project_id
-            FROM projects
-            WHERE organization_id = $1
-            ORDER BY created_at ASC, id ASC
-          `,
-            [input.organization_id],
-          );
-          const deletedProjectIds = projectIdRows.rows.map((row) => row.project_id);
-
-          const deletionSummary = await queryable.query<{
-            project_count: number;
-            open_incident_count: number;
-            open_improvement_count: number;
-          }>(
-            `
-              SELECT
-                (
-                  SELECT COUNT(*)::int
-                  FROM projects
-                  WHERE organization_id = $1::uuid
-                ) AS project_count,
-                (
-                  SELECT COUNT(*)::int
-                  FROM incidents i
-                  JOIN projects p ON p.id = i.project_id
-                  WHERE p.organization_id = $1::uuid
-                    AND i.status <> 'resolved'
-                ) AS open_incident_count,
-                (
-                  SELECT COUNT(*)::int
-                  FROM improvement_opportunities io
-                  JOIN projects p ON p.id = io.project_id
-                  WHERE p.organization_id = $1::uuid
-                    AND io.status <> 'resolved'
-                ) AS open_improvement_count
-            `,
-            [input.organization_id],
-          );
-          const deletionSummaryRow = deletionSummary.rows[0] ?? {
-            project_count: 0,
-            open_incident_count: 0,
-            open_improvement_count: 0
-          };
-
-          const deletedOrgMemberTokens = await queryable.query<{ token_id: string }>(
-          `
-            DELETE FROM member_tokens
-            WHERE organization_id = $1
-            RETURNING id::text AS token_id
-          `,
-            [input.organization_id],
-          );
-
-          if (accountAnalyticsStore !== undefined) {
-            const analyticsTx = accountAnalyticsStore.withDb(queryable);
-            await analyticsTx.preserveBillingRetentionForDeletedOrganization({
-              organization_id: input.organization_id,
-              deleted_at: input.deleted_at
-            });
-            await analyticsTx.recordMetricDeltas({
-              organization_id: input.organization_id,
-              occurred_at: input.deleted_at,
-              source: "account_deleted",
-              dedupe_key: `account_deleted:${input.organization_id}`,
-              deltas: {
-                account_deleted: 1,
-                projects_existing_at_account_deletion: deletionSummaryRow.project_count,
-                open_incidents_existing_at_account_deletion: deletionSummaryRow.open_incident_count,
-                open_improvements_existing_at_account_deletion: deletionSummaryRow.open_improvement_count
-              }
-            });
-            await analyticsTx.markAccountDeleted({
-              organization_id: input.organization_id,
-              deleted_at: input.deleted_at
-            });
-          }
-
-          await queryable.query(
-          `
-            DELETE FROM processed_billing_events
-            WHERE organization_id = $1
-          `,
-            [input.organization_id],
-          );
-
-          await queryable.query(
-          `
-            DELETE FROM audit_logs
-            WHERE organization_id = $1
-          `,
-            [input.organization_id],
-          );
-
-          await queryable.query(
-          `
-            DELETE FROM projects
-            WHERE organization_id = $1
-          `,
-            [input.organization_id],
-          );
-
-          const deletedOrganization = await queryable.query<{ organization_id: string }>(
-          `
-            DELETE FROM organizations
-            WHERE id = $1
-            RETURNING id::text AS organization_id
-          `,
-            [input.organization_id],
-          );
-
-          if (deletedOrganization.rows[0] === undefined) {
-            return null;
-          }
-
-          let deletedMemberTokenCount = deletedOrgMemberTokens.rows.length;
-          await queryable.query(
-          `
-            DELETE FROM organization_members
-            WHERE user_id = $1
-          `,
-            [input.user_id],
-          );
-
-          const deletedUserMemberTokens = await queryable.query<{ token_id: string }>(
-          `
-            DELETE FROM member_tokens
-            WHERE user_id = $1
-            RETURNING id::text AS token_id
-          `,
-            [input.user_id],
-          );
-
-          deletedMemberTokenCount += deletedUserMemberTokens.rows.length;
-
-          await queryable.query(
-          `
-            DELETE FROM audit_logs
-            WHERE actor_user_id = $1
-               OR target_id = $1::text
-          `,
-            [input.user_id],
-          );
-
-          await deleteNotificationAccountData(queryable, input.user_id);
-
-          await queryable.query(
-          `
-            DELETE FROM users
-            WHERE id = $1
-          `,
-            [input.user_id],
-          );
-
-        return {
-          deleted_at: input.deleted_at,
-          organization_id: input.organization_id,
-          deleted_project_ids: deletedProjectIds,
-          user_deleted: true,
-          deleted_member_token_count: deletedMemberTokenCount,
-        };
-      };
-
-      if (accountAnalyticsStore === undefined) {
-        await db.query("BEGIN", []);
-        try {
-          const result = await deleteAccount(db);
-          if (
-            result === null ||
-            result === "other_owned_organizations_exist" ||
-            result === "other_owned_projects_exist"
-          ) {
-            await rollbackQuietly(db);
-            return result;
-          }
-
-          await db.query("COMMIT", []);
-          return result;
-        } catch (error) {
-          await rollbackQuietly(db);
-          throw error;
+          reproductions: []
         }
-      }
-
-      return runInTransaction(db, async (tx) => deleteAccount(tx));
+      };
     },
+
     async getUserAvatar(input): Promise<UserAvatarRecord | null> {
       const result = await db.query<Record<string, unknown>>(
         `
@@ -840,7 +605,7 @@ export function createPostgresAccountStore(
             AND avatar_updated_at IS NOT NULL
           LIMIT 1
         `,
-        [input.user_id],
+        [input.user_id]
       );
 
       const row = result.rows[0];
@@ -863,11 +628,11 @@ export function createPostgresAccountStore(
             avatar_content_type,
             avatar_updated_at::text AS avatar_updated_at
         `,
-        [input.user_id, input.source, input.object_key, input.content_type, input.updated_at],
+        [input.user_id, input.source, input.object_key, input.content_type, input.updated_at]
       );
 
       const row = result.rows[0];
       return row === undefined ? null : mapUserAvatarRow(row);
-    },
+    }
   };
 }

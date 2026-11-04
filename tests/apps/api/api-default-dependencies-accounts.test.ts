@@ -1,9 +1,59 @@
 import { describe, expect, it, vi } from "vitest";
-import { createPostgresAccountStoreMock } from "../../helpers/api-default-dependency-mocks.js";
+import {
+  createPostgresAccountStoreMock,
+  createPostgresMetadataStoreMock
+} from "../../helpers/api-default-dependency-mocks.js";
 import { gzipSync } from "node:zlib";
 import { createApiDependencies } from "../../../apps/api/src/default-dependencies.ts";
 
 describe("api-default-dependency-mocks accounts", () => {
+  it("cleans every retained object prefix and keeps namespace handoff fields out of public deletion responses", async () => {
+    const project = { project_id: "root", name: "System" },
+      result = { ...project, storage_origin_ids: ["root", "legacy"] };
+    const base = createPostgresMetadataStoreMock.getMockImplementation()!({});
+    createPostgresMetadataStoreMock.mockReturnValueOnce({
+      ...base,
+      deleteProjectForUser: vi.fn().mockResolvedValue(result),
+      deleteProjectForOrganization: vi.fn().mockResolvedValue(result)
+    });
+    const objectStore = {
+      putObject: vi.fn(),
+      getObject: vi.fn(),
+      deleteObjectsByPrefix: vi.fn().mockResolvedValue(undefined)
+    };
+    const deps = createApiDependencies({
+      objectStore,
+      queue: { enqueue: vi.fn() },
+      db: { query: vi.fn() }
+    });
+    expect(
+      await deps.projectManagement.deleteProjectForUser!({ user_id: "owner", project_id: "root" })
+    ).toEqual(project);
+    const prefixes = [
+      "raw-events",
+      "bundles",
+      "improvement-bundles",
+      "reproductions",
+      "analytics-events",
+      "analytics-journeys",
+      "analytics-bundles"
+    ];
+    expect(
+      objectStore.deleteObjectsByPrefix.mock.calls.map(([prefix]) => String(prefix)).sort()
+    ).toEqual(
+      ["root", "legacy"]
+        .flatMap((origin) => prefixes.map((prefix) => `${prefix}/${origin}/`))
+        .sort()
+    );
+    objectStore.deleteObjectsByPrefix.mockClear();
+    expect(
+      await deps.projectManagement.deleteProjectForOrganization({
+        organization_id: "org",
+        project_id: "root"
+      })
+    ).toEqual(project);
+    expect(objectStore.deleteObjectsByPrefix).toHaveBeenCalledTimes(14);
+  });
   it("should enrich account exports with stored artifacts and error fallbacks", async (): Promise<void> => {
     createPostgresAccountStoreMock.mockReturnValue({
       exportAccountForOrganization: vi.fn().mockResolvedValue({
@@ -171,17 +221,23 @@ describe("api-default-dependency-mocks accounts", () => {
       deleted_project_ids: ["proj_1", "proj_2"],
       user_deleted: true
     });
-    expect(objectStore.deleteObjectsByPrefix).toHaveBeenCalledTimes(8);
+    expect(objectStore.deleteObjectsByPrefix).toHaveBeenCalledTimes(14);
     expect(objectStore.deleteObjectsByPrefix.mock.calls).toEqual(
       expect.arrayContaining([
         ["raw-events/proj_1/"],
         ["bundles/proj_1/"],
         ["improvement-bundles/proj_1/"],
         ["reproductions/proj_1/"],
+        ["analytics-events/proj_1/"],
+        ["analytics-journeys/proj_1/"],
+        ["analytics-bundles/proj_1/"],
         ["raw-events/proj_2/"],
         ["bundles/proj_2/"],
         ["improvement-bundles/proj_2/"],
-        ["reproductions/proj_2/"]
+        ["reproductions/proj_2/"],
+        ["analytics-events/proj_2/"],
+        ["analytics-journeys/proj_2/"],
+        ["analytics-bundles/proj_2/"]
       ])
     );
     expect(objectStore.deleteObject).toHaveBeenCalledWith({

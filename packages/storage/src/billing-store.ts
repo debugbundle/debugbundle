@@ -463,7 +463,7 @@ export function createPostgresBillingStore(
         `
             SELECT COUNT(*)::int AS count
             FROM projects
-            WHERE organization_id = $1
+            WHERE organization_id = $1 AND debugbundle_canonical_project(id)=id
           `,
         [input.organization_id]
       ),

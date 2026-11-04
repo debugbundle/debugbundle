@@ -209,33 +209,40 @@ export async function getAdminAnalyticsAccessStatus(): Promise<AdminAnalyticsAcc
   );
 }
 
-export async function listProjects(): Promise<ProjectRecord[]> {
+export async function listProjects(projectId?: string): Promise<ProjectRecord[]> {
   const body = await readJson<{
     projects: Array<
       Omit<ProjectRecord, "metrics"> & { metrics?: Partial<ProjectRecord["metrics"]> }
     >;
   }>(
-    await fetch(`${API_BASE}/v1/projects`, {
-      credentials: "include"
-    })
+    await fetch(
+      `${API_BASE}/v1/projects${projectId === undefined ? "" : `?${new URLSearchParams({ project_id: projectId })}`}`,
+      {
+        credentials: "include"
+      }
+    )
   );
 
   return body.projects.map(normalizeProjectRecord);
 }
 
 export async function listServices(projectId: string, limit = 100): Promise<ServiceRecord[]> {
-  const searchParams = new URLSearchParams({
-    project_id: projectId,
-    limit: String(limit)
-  });
-
-  const body = await readJson<{ services: ServiceRecord[] }>(
-    await fetch(`${API_BASE}/v1/services?${searchParams.toString()}`, {
-      credentials: "include"
-    })
-  );
-
-  return body.services;
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100)
+    throw new Error("invalid_service_page_limit");
+  const services = new Map<string, ServiceRecord>();
+  for (let offset = 0; offset <= 100_000; offset += limit) {
+    const searchParams = new URLSearchParams({
+      project_id: projectId,
+      limit: String(limit),
+      offset: String(offset)
+    });
+    const body = await readJson<{ services: ServiceRecord[] }>(
+      await fetch(`${API_BASE}/v1/services?${searchParams}`, { credentials: "include" })
+    );
+    for (const service of body.services) services.set(service.service_id, service);
+    if (body.services.length < limit) return [...services.values()];
+  }
+  throw new Error("service_inventory_limit_exceeded");
 }
 
 export async function createProject(payload: {

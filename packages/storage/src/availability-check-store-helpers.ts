@@ -1,3 +1,4 @@
+import { ruleActorAllowedSql } from "./project-rule-access.js";
 import { getTierCapabilities, type TierName } from "../../shared-types/src/index.js";
 import type { Queryable } from "./migrations.js";
 import type {
@@ -218,14 +219,28 @@ export function availabilityCheckDayBucket(isoTimestamp: string): string {
   return isoTimestamp.slice(0, 10);
 }
 
+/** Capacity and configuration share one lock order: account, then the complete
+ * canonical origin fence. Callers check the current actor in the following read. */
+export async function lockAvailabilityConfiguration(
+  db: Queryable,
+  input: { organization_id: string; project_id: string }
+): Promise<void> {
+  await db.query("SELECT id FROM organizations WHERE id=$1::uuid FOR UPDATE", [
+    input.organization_id
+  ]);
+  await db.query("SELECT debugbundle_begin_project_rule_write($1::uuid)", [input.project_id]);
+}
+
 export async function projectExistsForAvailabilityChecks(
   db: Queryable,
   input: {
     organization_id: string;
     project_id: string;
     lock_project?: boolean;
+    actor_user_id?: string;
   }
 ): Promise<{ environment_default: string; organization_plan: TierName } | null> {
+  if (input.lock_project) await lockAvailabilityConfiguration(db, input);
   const result = await db.query<Record<string, unknown>>(
     `
       SELECT
@@ -233,12 +248,13 @@ export async function projectExistsForAvailabilityChecks(
         COALESCE(o.plan, 'free') AS organization_plan
       FROM projects p
       JOIN organizations o ON o.id = p.organization_id
-      WHERE p.id = $1::uuid
+      WHERE p.id = debugbundle_canonical_project($1::uuid)
         AND p.organization_id = $2::uuid
+        AND ${ruleActorAllowedSql("p.id", "$3::uuid", input.lock_project ? "p.owner_user_id" : "NULL::uuid")}
       LIMIT 1
-      ${input.lock_project === true ? "FOR UPDATE OF p, o" : ""}
+
     `,
-    [input.project_id, input.organization_id]
+    [input.project_id, input.organization_id, input.actor_user_id ?? null]
   );
 
   const row = result.rows[0];
@@ -266,9 +282,9 @@ export async function hasAvailabilityActivationCapacity(
     `
       SELECT
         COUNT(*) FILTER (WHERE c.enabled = true)::text AS active_check_count,
-        COUNT(DISTINCT c.project_id) FILTER (WHERE c.enabled = true)::text
+        COUNT(DISTINCT debugbundle_canonical_project(c.project_id)) FILTER (WHERE c.enabled = true)::text
           AS monitored_project_count,
-        COALESCE(BOOL_OR(c.enabled = true AND c.project_id = $2::uuid), false)
+        COALESCE(BOOL_OR(c.enabled = true AND debugbundle_canonical_project(c.project_id) = $2::uuid), false)
           AS project_is_monitored
       FROM availability_checks c
       JOIN projects p ON p.id = c.project_id

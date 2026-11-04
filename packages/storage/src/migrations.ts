@@ -8,6 +8,12 @@ export interface Queryable {
 }
 
 export const REQUIRED_API_TABLES = [
+  "service_input_aliases",
+  "service_project_aliases",
+  "project_merge_operations",
+  "project_merge_participants",
+  "project_legacy_bindings",
+  "service_definitions",
   "billing_subscription_operations",
   "billing_checkout_attempts",
   "notification_preferences",
@@ -97,6 +103,12 @@ export const REQUIRED_API_TABLES = [
 ] as const;
 
 export const REQUIRED_WORKER_TABLES = [
+  "service_input_aliases",
+  "service_project_aliases",
+  "project_merge_operations",
+  "project_merge_participants",
+  "project_legacy_bindings",
+  "service_definitions",
   "notification_preferences",
   "notification_daily_batches",
   "notification_daily_items",
@@ -174,6 +186,9 @@ function validateStorageBootstrapStatements(statements: readonly string[]): void
   }
 
   const sql = statements.join("\n");
+  // Dollar-quoted function bodies contain PL/pgSQL BEGIN blocks, not transaction
+  // statements. PostgreSQL functions cannot commit or roll back their caller.
+  const transactionSql = sql.replace(/\$\$[\s\S]*?\$\$/g, "");
   const forbiddenChecks: Array<{ pattern: RegExp; error: string }> = [
     {
       pattern: /\b(BEGIN|COMMIT|ROLLBACK)\b/i,
@@ -195,7 +210,11 @@ function validateStorageBootstrapStatements(statements: readonly string[]): void
   }
 
   for (const check of forbiddenChecks) {
-    if (check.pattern.test(sql)) {
+    if (
+      check.pattern.test(
+        check.error === "storage_bootstrap_contains_transaction_sql" ? transactionSql : sql
+      )
+    ) {
       throw new Error(check.error);
     }
   }

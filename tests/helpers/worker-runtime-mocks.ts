@@ -425,6 +425,10 @@ export function buildMigratedWorkerSchemaRows(sql: string): { rows: Record<strin
     return { rows: WORKER_TABLE_ROWS };
   }
 
+  if (sql.includes("AS project_service_schema_available")) {
+    return { rows: [{ project_service_schema_available: true }] };
+  }
+
   if (sql.includes("to_regclass")) {
     return { rows: [{ relation_name: "storage_migration_ledger" }] };
   }

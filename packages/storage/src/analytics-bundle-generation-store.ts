@@ -9,6 +9,8 @@ export type AnalyticsBundleGenerationStatus = "pending" | "running" | "completed
 
 export interface AnalyticsBundleGenerationRecord {
   generation_id: string;
+  /** Internal immutable analysis scope, populated on worker claims only. */
+  scope_origin_ids?: string[];
   project_id: string;
   opportunity_id: string | null;
   requested_by_user_id: string | null;
@@ -57,14 +59,22 @@ export interface AnalyticsBundleGenerationStore {
       cursor?: { created_at: string; generation_id: string } | undefined;
       limit: number;
     }
-  ): Promise<{ bundles: AnalyticsBundleGenerationRecord[]; next_cursor: string | null; total_pages?: number }>;
+  ): Promise<{
+    bundles: AnalyticsBundleGenerationRecord[];
+    next_cursor: string | null;
+    total_pages?: number;
+  }>;
   listAnalyticsBundleGenerationsForOrganization?(
     input: AnalyticsBundleGenerationListFilters & {
       organization_id: string;
       cursor?: { created_at: string; generation_id: string } | undefined;
       limit: number;
     }
-  ): Promise<{ bundles: AnalyticsBundleGenerationInventoryRecord[]; next_cursor: string | null; total_pages?: number }>;
+  ): Promise<{
+    bundles: AnalyticsBundleGenerationInventoryRecord[];
+    next_cursor: string | null;
+    total_pages?: number;
+  }>;
   getAnalyticsBundleGenerationForProject(input: {
     project_id: string;
     generation_id: string;
@@ -91,6 +101,7 @@ export interface AnalyticsBundleGenerationStore {
 }
 
 type AnalyticsBundleGenerationRow = {
+  scope_origin_ids?: string[];
   total_count?: unknown;
   generation_id: unknown;
   project_id: unknown;
@@ -119,11 +130,20 @@ export function createPostgresAnalyticsBundleGenerationStore(
   return {
     async reserveAnalyticsBundleGeneration(input) {
       return runInTransaction(db, async (tx) => {
+        await tx.query("SELECT debugbundle_assert_project_scope_write($1::uuid)", [
+          input.project_id
+        ]);
+        const origins = await tx.query<{ origin_ids: string[] }>(
+          "SELECT debugbundle_project_origins($1::uuid)::text[] AS origin_ids",
+          [input.project_id]
+        );
+        const analysisScope = origins.rows[0]?.origin_ids ?? [input.project_id];
         const analysisSpec = normalizeAnalysisSpec(input.analysis_spec);
         const inputFingerprint = buildAnalyticsBundleInputFingerprint({
           opportunity_id: input.opportunity_id ?? null,
           analysis_kind: input.analysis_kind,
-          analysis_spec: analysisSpec
+          analysis_spec: analysisSpec,
+          ...(analysisScope.length > 1 ? { scope_origin_ids: analysisScope } : {})
         });
         const generationId = randomUUID();
         const inserted = await tx.query<AnalyticsBundleGenerationRow>(
@@ -248,7 +268,7 @@ export function createPostgresAnalyticsBundleGenerationStore(
     async listAnalyticsBundleGenerationsForProject(input) {
       const limit = Math.min(Math.max(input.limit, 1), 100);
       const params: unknown[] = [input.project_id];
-      const where = ["project_id = $1::uuid"];
+      const where = ["project_id=ANY(debugbundle_project_origins($1::uuid))"];
 
       appendAnalyticsBundleGenerationFilters(params, where, input);
 
@@ -275,8 +295,12 @@ export function createPostgresAnalyticsBundleGenerationStore(
       return {
         bundles: rows,
         next_cursor,
-        ...(input.include_total === true && input.cursor === undefined && (result.rows.length === 0 || result.rows[0]?.total_count !== undefined)
-          ? { total_pages: Math.max(1, Math.ceil(Number(result.rows[0]?.total_count ?? 0) / limit)) }
+        ...(input.include_total === true &&
+        input.cursor === undefined &&
+        (result.rows.length === 0 || result.rows[0]?.total_count !== undefined)
+          ? {
+              total_pages: Math.max(1, Math.ceil(Number(result.rows[0]?.total_count ?? 0) / limit))
+            }
           : {})
       };
     },
@@ -297,7 +321,7 @@ export function createPostgresAnalyticsBundleGenerationStore(
             p.name AS project_name,
             p.color_tag AS project_color_tag
           FROM analytics_bundle_generations abg
-          JOIN projects p ON p.id = abg.project_id
+          JOIN projects p ON p.id = debugbundle_canonical_project(abg.project_id)
           WHERE ${where.join("\n            AND ")}
           ORDER BY abg.created_at DESC, abg.id DESC
           LIMIT $${params.length}
@@ -316,8 +340,12 @@ export function createPostgresAnalyticsBundleGenerationStore(
       return {
         bundles: rows,
         next_cursor,
-        ...(input.include_total === true && input.cursor === undefined && (result.rows.length === 0 || result.rows[0]?.total_count !== undefined)
-          ? { total_pages: Math.max(1, Math.ceil(Number(result.rows[0]?.total_count ?? 0) / limit)) }
+        ...(input.include_total === true &&
+        input.cursor === undefined &&
+        (result.rows.length === 0 || result.rows[0]?.total_count !== undefined)
+          ? {
+              total_pages: Math.max(1, Math.ceil(Number(result.rows[0]?.total_count ?? 0) / limit))
+            }
           : {})
       };
     },
@@ -327,7 +355,7 @@ export function createPostgresAnalyticsBundleGenerationStore(
         `
           SELECT ${analyticsBundleGenerationSelectColumns()}
           FROM analytics_bundle_generations
-          WHERE project_id = $1::uuid
+          WHERE project_id=ANY(debugbundle_project_origins($1::uuid))
             AND id = $2::uuid
           LIMIT 1
         `,
@@ -366,7 +394,7 @@ export function createPostgresAnalyticsBundleGenerationStore(
           object_key: record.object_key,
           failure_reason: null
         });
-        return record;
+        return { ...record, scope_origin_ids: row.scope_origin_ids ?? [record.project_id] };
       });
     },
 
@@ -406,7 +434,7 @@ export function createPostgresAnalyticsBundleGenerationStore(
           object_key: record.object_key,
           failure_reason: null
         });
-        return record;
+        return { ...record, scope_origin_ids: row.scope_origin_ids ?? [record.project_id] };
       });
     },
 
@@ -532,6 +560,7 @@ export function buildAnalyticsBundleInputFingerprint(input: {
   opportunity_id?: string | null | undefined;
   analysis_kind: AnalyticsBundleAnalysisKind;
   analysis_spec?: Record<string, unknown> | undefined;
+  scope_origin_ids?: string[];
 }): string {
   const digest = createHash("sha256")
     .update(
@@ -539,7 +568,8 @@ export function buildAnalyticsBundleInputFingerprint(input: {
         schema: "analytics_bundle_generation_input.v1",
         opportunity_id: input.opportunity_id ?? null,
         analysis_kind: input.analysis_kind,
-        analysis_spec: normalizeAnalysisSpec(input.analysis_spec)
+        analysis_spec: normalizeAnalysisSpec(input.analysis_spec),
+        ...(input.scope_origin_ids ? { scope_origin_ids: input.scope_origin_ids } : {})
       })
     )
     .digest("hex");
@@ -564,6 +594,7 @@ function analyticsBundleGenerationSelectColumns(tableAlias?: string): string {
     ${prefix}analysis_kind,
     ${prefix}analysis_spec,
     ${prefix}input_fingerprint,
+    ${prefix}scope_origin_ids,
     ${prefix}status,
     ${prefix}object_key,
     ${prefix}failure_reason,

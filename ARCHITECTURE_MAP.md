@@ -1,6 +1,5 @@
 Diagnostic request boundary (3 November 2026, released): `doctor-command.ts` validates connected project scope before dispatch and limits its member-auth probe to one incident in that project. CLI/MCP/OpenClaw share the path. Tool metadata discloses the health/auth reads; native emitted and normal public-installed checks cover project/limit/auth, invalid scope and all 139 tools. CLI 1.18.2 and MCP/OpenClaw 1.18.3 pass source, artifact and exact security/runtime acceptance. See `spec/openclaw-runtime-scope-remediation-20261103.md`.
 
-
 Earlier corrective server boundary (3 November 2026): CLI 1.18.1 and MCP
 1.18.2 are verified public artifacts from 74ed1e8b. Developer pin adoption
 preserves that implementation while advancing Codex/Claude/Gemini independently.
@@ -74,6 +73,78 @@ public API. No public consent UI or marketing copy is changed. The general reten
 durable continuation; million-visit load testing is deferred by the owner.
 
 # ARCHITECTURE MAP — DebugBundle
+
+Project/service consolidation is an authorised, unreleased candidate tracked in
+`spec/project-service-consolidation.md`. Storage `service-definition-schema.ts`
+owns additive logical-service DDL, predecessor-writer linking and the ordered
+forward migration. `project-merge-plan.ts` owns pure checked planning and stable
+configuration-bound digests; storage snapshots are trusted domain inputs, never
+client payloads. Existing `services.id` remains the public environment-instance
+identity. `service-input-alias-schema.ts` owns origin input aliases and retained
+project-view names. `project-merge-store.ts` owns durable reservations, leases,
+cutover receipts and read-only verification; apply remains default-disabled.
+API `routes/project-merges.ts`, the typed project-management client, CLI
+`project-merge-commands.ts` and ordinary MCP `project-merge-tools.ts` share that
+store. `project-read-scope.ts` constrains canonical,
+legacy and credential-bounded reads, while `project-evidence-projection.ts` maps
+metadata without changing original object paths. `project-ingestion-scope.ts`
+resolves service names before persistence; API ingestion completion accounts for
+each original namespace. Configuration/credential database guards serialize
+cutover and `project-service-schema-check.ts` makes readiness fail closed for
+missing/disabled scope fences. `project-adoption-manifest.ts` creates safe receipt
+snapshots; `packages/project-adoption` owns bounded local file planning/apply and
+preservation. Catalogue, retained-view pagination and downstream compatibility
+adapters are implemented. `make project-service-runtime` qualifies installed
+clients, SDK capture, worker restart, preserved S3 bytes and compatible API
+restart on disposable infrastructure. Local source and artifact checks pass;
+actual fleet, release and live consolidation qualification remain pending.
+See FR-PJS / AC-PJS and `spec/project-service-operations.md`.
+
+`project-rule-access.ts` shares the accepted origin predicate between immediate,
+short-digest and daily notification storage. `notification-daily-store.ts` keeps
+original item/accounting namespaces but resolves membership and preparation policy
+revisions through the canonical project.
+
+`service-observation-schema.ts` reserves exact diagnostic/analytics service names
+even before incident grouping creates an environment instance. Its forward
+backfill and writer triggers preserve historical nullable service attribution.
+Evidence-context and browser-recovery readers/locks resolve retained names only
+within one origin. Improvement persistence now separates the public store facade,
+types, shared helpers, canonical reads and original-namespace bundle metadata;
+`improvement-opportunity-recording.ts` retains historical event/fingerprint dedupe.
+`metadata-probes.ts` retains its public facade; `metadata-probe-read.ts` owns
+credential-bounded SDK directives and manager inventory, while
+`metadata-probe-write.ts` owns fenced admission/current membership and preserved
+SDK signing identity. `project-probe-schema.ts` owns activation snapshots, lineage,
+immutable scope and combined limits. `metadata-probe-signing.ts` selects exact
+deployed token/name context; auth primitives isolate broader snapshot keys.
+`project-rule-scope-schema.ts` and `project-automation-service-schema.ts` own saved
+rule snapshots and filter-name contexts. Webhook/GitHub management, worker delivery
+and record/type modules keep their original public facades.
+`project-weekly-report-schema.ts` and `project-weekly-report-convergence.ts` retain
+equivalent schedule identities and accepted delivery scopes. Weekly claim history
+is fenced, and the worker keeps original IDs when retrying accepted origin work.
+Notification/improvement policy reads use canonical ownership.
+`availability-check-management-store.ts`, `project-health-service.ts` and
+`project-health-schema.ts` own canonical management/original health execution
+lineage. Public status selection keeps original anchors/check IDs under ordered
+origin locks. `project-namespace-deletion.ts` owns complete-set deletion and its
+internal storage-origin handoff; `account-deletion-store.ts` keeps account cleanup
+transactional. Membership changes fence current roles and clean imported owned
+automation. Analytics metrics queries/read helpers preserve origin namespaces;
+`project-analytics-schema.ts` snapshots funnel and accepted generation scope.
+`project-merge-service-inventory.ts` bounds bytes before loading historical names.
+`routes/project-merges.ts`, `project-management-client/project-merges.ts` and the
+CLI/MCP merge adapters expose the shared checked engine. Server apply is disabled
+by default. `project-adoption-manifest.ts` snapshots secret-free service context;
+`packages/project-adoption` owns one-root file planning, hash guards, atomic
+replacement and conditional rollback. CLI adoption performs read-only server
+preflight. Shared profile/connection schemas retain the existing CLI export paths.
+Shared canonical text ordering makes plan hashes locale-independent. The GitHub
+matching reader resolves registered service repositories for new rules without
+rewriting accepted delivery destinations.
+SDK-family qualification is tracked in
+`spec/project-service-sdk-compatibility.md`; no SDK distribution has changed.
 
 CocoaPods distribution follow-up (2 November 2026):
 `sdks/debugbundle-swift/Package.swift` already owns native SPM products;
@@ -622,7 +693,7 @@ Health history ownership: `apps/web/src/pages/health-status-page-utils.ts` build
   - `analytics-saved-funnel-store.ts` — Postgres saved-funnel definition list/create/update/archive lifecycle over the existing production table; create locks the owning project before checking the lesser of its stored and current-tier active-definition limits, and archived keys can be safely reactivated without deleting historical funnel rollups
   - `availability-check-store.ts` / helpers / executor — hosted health-check CRUD, secure target validation, single and batched due-check claiming, execution recording, incident linkage, and 30-day result/rollup retention; `availability-check-store-queries.ts` shares deterministic read/claim eligibility and excludes per-project excess before allocating organization execution slots
   - `ingestion-analytics.ts` — shared ingestion-side aggregation helpers that translate accepted/rejected batch outcomes into account analytics metric deltas
-  - `improvement-opportunity-store.ts` — Postgres hosted improvement automation persistence (project execution settings lookup, deterministic warning-hotspot/slow-request/request-failure opportunity storage with below-threshold list suppression, incident-derived opportunity storage with `related_incident_ids`, auto-resolution when all related incidents are resolved, improvement-event sampling, improvement bundle generation reservation/failure tracking, retained-bundle-cap pruning for improvement/incident owners)
+  - `improvement-opportunity-store.ts` — Postgres hosted improvement automation facade and occurrence recording; public imports remain stable. Types/shared helpers live in `improvement-opportunity-types.ts` and `improvement-opportunity-shared.ts`, canonical scoped reads in `improvement-opportunity-read.ts`, and original-namespace artifact/generation ownership in `improvement-bundle-metadata.ts`.
   - `incident-improvement-counts.ts` — Read-only filtered counts for first-page incident and improvement list metadata, wired through API dependency composition; analytics inventory stores derive totals from their filtered page queries only for opted-in initial requests
   - `improvement-opportunity-recording.ts` — shared hosted-improvement recording helpers (fingerprinting plus generic opportunity upsert/event-sampling SQL reused by multiple deterministic rules)
   - `slack-destination-store.ts` — Postgres reusable Slack destination CRUD plus worker-side encrypted-secret lookup

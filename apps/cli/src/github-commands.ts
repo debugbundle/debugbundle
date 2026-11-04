@@ -448,6 +448,7 @@ export async function updateProjectGitHubRuleCommand(
   input: {
     bearerToken: string;
     projectId: string;
+    projectScope?: "current_project";
     ruleId: string;
     name?: string;
     eventTypes?: string[];
@@ -464,6 +465,7 @@ export async function updateProjectGitHubRuleCommand(
     updateProjectRule(input: {
       bearerToken: string;
       projectId: string;
+      projectScope?: "current_project";
       ruleId: string;
       name?: string;
       eventTypes?: string[];
@@ -482,6 +484,7 @@ export async function updateProjectGitHubRuleCommand(
       bearerToken: input.bearerToken,
       projectId: input.projectId,
       ruleId: input.ruleId,
+      ...(input.projectScope ? { projectScope: input.projectScope } : {}),
       ...(input.name === undefined ? {} : { name: input.name }),
       ...(input.eventTypes === undefined ? {} : { eventTypes: input.eventTypes }),
       ...(input.environments === undefined ? {} : { environments: input.environments }),
@@ -684,6 +687,7 @@ export async function updateProjectGitHubRuleWithAuthCommand(
   input: {
     authFilePath?: string;
     projectId: string;
+    projectScope?: "current_project";
     ruleId: string;
     name?: string;
     eventTypes?: string[];
@@ -707,6 +711,7 @@ export async function updateProjectGitHubRuleWithAuthCommand(
           bearerToken: authState.bearer_token,
           projectId: input.projectId,
           ruleId: input.ruleId,
+          ...(input.projectScope ? { projectScope: input.projectScope } : {}),
           ...(input.name === undefined ? {} : { name: input.name }),
           ...(input.eventTypes === undefined ? {} : { eventTypes: input.eventTypes }),
           ...(input.environments === undefined ? {} : { environments: input.environments }),

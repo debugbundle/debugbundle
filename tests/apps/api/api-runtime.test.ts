@@ -10,13 +10,19 @@ import { STORAGE_SCHEMA_MIGRATIONS } from "../../../packages/storage/src/schema-
 
 const API_TABLE_ROWS = REQUIRED_API_TABLES.map((table_name) => ({ table_name }));
 
-function buildMigratedApiSchemaDb(): Queryable {
+function buildMigratedApiSchemaDb(scopeGuardsAvailable = true): Queryable {
   return {
     query: async <Row extends Record<string, unknown>>(sql: string) => {
       await Promise.resolve();
 
       if (sql.includes("information_schema.tables")) {
         return { rows: API_TABLE_ROWS as unknown as Row[] };
+      }
+
+      if (sql.includes("AS project_service_schema_available")) {
+        return {
+          rows: [{ project_service_schema_available: scopeGuardsAvailable }] as unknown as Row[]
+        };
       }
 
       if (sql.includes("to_regclass")) {
@@ -102,6 +108,12 @@ describe("api runtime", () => {
 
   it("should pass schema guard when required tables exist", async (): Promise<void> => {
     await expect(assertDatabaseSchema(buildMigratedApiSchemaDb())).resolves.toBeUndefined();
+  });
+
+  it("rejects a current ledger and tables without enabled project scope guards", async () => {
+    await expect(assertDatabaseSchema(buildMigratedApiSchemaDb(false))).rejects.toThrow(
+      "project_service_schema_incomplete"
+    );
   });
 
   it("rejects a current ledger when publication tables are missing", async () => {

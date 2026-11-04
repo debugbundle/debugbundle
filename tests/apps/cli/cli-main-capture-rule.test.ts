@@ -3,6 +3,27 @@ import { describe, expect, it, vi } from "vitest";
 import { runCli } from "../../../apps/cli/src/main.js";
 
 describe("cli main capture-rule routing", () => {
+  it("requires an explicit current-project scope option to widen an existing rule", async () => {
+    const updateCaptureRuleCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "updated" });
+    const result = await runCli(
+      [
+        "capture-rule",
+        "update",
+        "rule",
+        "--project-id",
+        "root",
+        "--project-scope",
+        "current_project"
+      ],
+      { updateCaptureRuleCommand }
+    );
+    expect(result.exitCode).toBe(0);
+    expect(updateCaptureRuleCommand).toHaveBeenCalledWith({
+      projectId: "root",
+      ruleId: "rule",
+      update: { project_scope: "current_project" }
+    });
+  });
   it.each([
     { value: "null", expected: null },
     { value: "2026-11-07T12:00:00.000Z", expected: "2026-11-07T12:00:00.000Z" }

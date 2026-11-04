@@ -17,12 +17,19 @@ import {
   type CaptureRuleFingerprint,
   type CaptureRuleRuntime,
   type CaptureRuleSampleEventClass,
-  type CaptureRuleUrlMatcher,
+  type CaptureRuleUrlMatcher
 } from "./capture-rule-schemas.js";
 
 const CaptureRuleEvaluationUrlSchema = z.object({
-  host: z.string().min(1).transform((value) => value.toLowerCase()).optional(),
-  path: z.string().min(1).transform((value) => (value.startsWith("/") ? value : `/${value}`)),
+  host: z
+    .string()
+    .min(1)
+    .transform((value) => value.toLowerCase())
+    .optional(),
+  path: z
+    .string()
+    .min(1)
+    .transform((value) => (value.startsWith("/") ? value : `/${value}`))
 });
 
 export type CaptureRuleEvaluationUrl = z.infer<typeof CaptureRuleEvaluationUrlSchema>;
@@ -32,6 +39,7 @@ export const CaptureRuleEvaluationContextSchema = z.object({
   event_id: z.string().guid(),
   event_type: CaptureRuleEventTypeSchema,
   service: z.string().min(1).optional(),
+  service_aliases: z.array(z.string().min(1)).max(1000).optional(),
   environment: z.string().min(1).optional(),
   runtime: CaptureRuleRuntimeSchema,
   first_party: z.boolean().optional(),
@@ -61,7 +69,7 @@ export const CaptureRuleEvaluationContextSchema = z.object({
   status_code: z.number().int().min(0).max(599).optional(),
   fingerprint: CaptureRuleFingerprintSchema.optional(),
   // Server-derived prior versions keep installed exact-match rules effective.
-  fingerprint_aliases: z.array(CaptureRuleFingerprintSchema).max(2).optional(),
+  fingerprint_aliases: z.array(CaptureRuleFingerprintSchema).max(2).optional()
 });
 
 export type CaptureRuleEvaluationContext = z.infer<typeof CaptureRuleEvaluationContextSchema>;
@@ -119,7 +127,9 @@ function normalizeRoutePath(value: string | null | undefined): string | undefine
     return "/";
   }
 
-  return pathWithoutQueryOrFragment.startsWith("/") ? pathWithoutQueryOrFragment : `/${pathWithoutQueryOrFragment}`;
+  return pathWithoutQueryOrFragment.startsWith("/")
+    ? pathWithoutQueryOrFragment
+    : `/${pathWithoutQueryOrFragment}`;
 }
 
 function normalizeEvaluationUrl(value: string | null | undefined): {
@@ -135,7 +145,7 @@ function normalizeEvaluationUrl(value: string | null | undefined): {
   if (relativePath !== undefined && trimmed.startsWith("/")) {
     return {
       url: { path: relativePath },
-      first_party: true,
+      first_party: true
     };
   }
 
@@ -145,16 +155,16 @@ function normalizeEvaluationUrl(value: string | null | undefined): {
       return {
         url: {
           host: parsed.hostname.length > 0 ? parsed.hostname.toLowerCase() : undefined,
-          path: normalizeRoutePath(parsed.pathname) ?? "/",
+          path: normalizeRoutePath(parsed.pathname) ?? "/"
         },
-        first_party: false,
+        first_party: false
       };
     }
   } catch {
     if (relativePath !== undefined) {
       return {
         url: { path: relativePath },
-        first_party: true,
+        first_party: true
       };
     }
   }
@@ -187,7 +197,11 @@ function readBrowserTargetAttributes(
   if (value === undefined) return undefined;
   const attributes: CaptureRuleBrowserTargetAttributes = {};
   for (const [key, maxLength] of [
-    ["rel", 120], ["as", 120], ["type", 255], ["media", 500], ["cross_origin", 120]
+    ["rel", 120],
+    ["as", 120],
+    ["type", 255],
+    ["media", 500],
+    ["cross_origin", 120]
   ] as const) {
     const attribute = readBrowserTargetString(value[key], maxLength);
     if (attribute !== undefined) attributes[key] = attribute;
@@ -205,7 +219,10 @@ function readRecord(value: unknown): Record<string, unknown> | undefined {
     : undefined;
 }
 
-function readHeaderValue(headers: Record<string, unknown> | undefined, name: string): string | undefined {
+function readHeaderValue(
+  headers: Record<string, unknown> | undefined,
+  name: string
+): string | undefined {
   if (headers === undefined) {
     return undefined;
   }
@@ -244,10 +261,12 @@ export function classifyCaptureRuleClientFromUserAgent(userAgent: string | null 
     { family: "FacebookBot", markers: ["facebookexternalhit", "facebot"] },
     { family: "LinkedInBot", markers: ["linkedinbot"] },
     { family: "TwitterBot", markers: ["twitterbot"] },
-    { family: "Slackbot", markers: ["slackbot"] },
+    { family: "Slackbot", markers: ["slackbot"] }
   ];
 
-  const knownBot = knownBots.find((entry) => entry.markers.some((marker) => lower.includes(marker)));
+  const knownBot = knownBots.find((entry) =>
+    entry.markers.some((marker) => lower.includes(marker))
+  );
   if (knownBot !== undefined) {
     return { client_kind: "bot", bot_family: knownBot.family };
   }
@@ -279,6 +298,7 @@ function readEventUserAgent(event: CaptureRuleEvaluableEvent): string | undefine
 
 export function buildCaptureRuleEvaluationContext(input: {
   project_id: string;
+  service_aliases?: string[];
   event: CaptureRuleEvaluableEvent;
   fingerprint?: CaptureRuleFingerprint;
   fingerprint_aliases?: CaptureRuleFingerprint[];
@@ -288,11 +308,14 @@ export function buildCaptureRuleEvaluationContext(input: {
     event_id: input.event.event_id,
     event_type: input.event.event_type,
     service: input.event.service.name,
+    ...(input.service_aliases === undefined ? {} : { service_aliases: input.service_aliases }),
     environment: input.event.service.environment,
     runtime: normalizeRuntime(input.event.service.runtime),
     ...classifyCaptureRuleClientFromUserAgent(readEventUserAgent(input.event)),
     ...(input.fingerprint === undefined ? {} : { fingerprint: input.fingerprint }),
-    ...(input.fingerprint_aliases === undefined ? {} : { fingerprint_aliases: input.fingerprint_aliases }),
+    ...(input.fingerprint_aliases === undefined
+      ? {}
+      : { fingerprint_aliases: input.fingerprint_aliases })
   };
 
   switch (input.event.event_type) {
@@ -307,7 +330,7 @@ export function buildCaptureRuleEvaluationContext(input: {
         error_name: readString(input.event.payload["name"]),
         message: readString(input.event.payload["message"]),
         request_url: requestUrl.url,
-        status_code: readNumber(response?.["status_code"]),
+        status_code: readNumber(response?.["status_code"])
       });
     }
 
@@ -318,14 +341,14 @@ export function buildCaptureRuleEvaluationContext(input: {
         ...context,
         first_party: requestUrl.first_party ?? true,
         request_url: requestUrl.url,
-        status_code: readNumber(input.event.payload["response_status"]),
+        status_code: readNumber(input.event.payload["response_status"])
       });
     }
 
     case "log_event":
       return CaptureRuleEvaluationContextSchema.parse({
         ...context,
-        message: readString(input.event.payload["message"]),
+        message: readString(input.event.payload["message"])
       });
 
     case "frontend_exception": {
@@ -348,7 +371,9 @@ export function buildCaptureRuleEvaluationContext(input: {
 
       return CaptureRuleEvaluationContextSchema.parse({
         ...context,
-        ...(resourceLocation?.first_party == null ? {} : { first_party: resourceLocation.first_party }),
+        ...(resourceLocation?.first_party == null
+          ? {}
+          : { first_party: resourceLocation.first_party }),
         error_name: readString(input.event.payload["name"]),
         message: readString(input.event.payload["message"]),
         browser_event_kind:
@@ -358,20 +383,24 @@ export function buildCaptureRuleEvaluationContext(input: {
         ...(typeof browserEvent?.["opaque"] === "boolean"
           ? { browser_event_opaque: browserEvent["opaque"] }
           : {}),
-        ...(visibilityState === "visible" || visibilityState === "hidden" ||
-        visibilityState === "prerender" || visibilityState === "unloaded"
+        ...(visibilityState === "visible" ||
+        visibilityState === "hidden" ||
+        visibilityState === "prerender" ||
+        visibilityState === "unloaded"
           ? { browser_page_visibility_state: visibilityState }
           : {}),
         ...(readyState === "loading" || readyState === "interactive" || readyState === "complete"
           ? { browser_page_ready_state: readyState }
           : {}),
-        ...(targetTagName === undefined
-          ? {}
-          : { browser_target_tag_name: targetTagName }),
+        ...(targetTagName === undefined ? {} : { browser_target_tag_name: targetTagName }),
         ...(targetAttributes === undefined ? {} : { browser_target_attributes: targetAttributes }),
-        resource_url: resourceLocation === null ? resourceUrl.url : {
-          ...(resourceLocation.host === null ? {} : { host: resourceLocation.host }), path: resourceLocation.path
-        },
+        resource_url:
+          resourceLocation === null
+            ? resourceUrl.url
+            : {
+                ...(resourceLocation.host === null ? {} : { host: resourceLocation.host }),
+                path: resourceLocation.path
+              }
       });
     }
 
@@ -387,7 +416,7 @@ export function buildCaptureRuleEvaluationContext(input: {
         ...context,
         ...(requestUrl.first_party === undefined ? {} : { first_party: requestUrl.first_party }),
         request_url: requestUrl.url,
-        status_code: readNumber(data?.["status_code"]),
+        status_code: readNumber(data?.["status_code"])
       });
     }
 
@@ -408,7 +437,10 @@ export function applyCaptureRuleEventClass(input: {
     return "context_signal";
   }
 
-  if (input.capture_rule.action === "sample" && input.capture_rule.sample_event_class === "context") {
+  if (
+    input.capture_rule.action === "sample" &&
+    input.capture_rule.sample_event_class === "context"
+  ) {
     return "context_signal";
   }
 
@@ -431,7 +463,10 @@ function matchesUrlMatcher(
     return false;
   }
 
-  if (matcher.host_suffix !== undefined && (value.host === undefined || !value.host.endsWith(matcher.host_suffix))) {
+  if (
+    matcher.host_suffix !== undefined &&
+    (value.host === undefined || !value.host.endsWith(matcher.host_suffix))
+  ) {
     return false;
   }
 
@@ -461,7 +496,10 @@ function matchesStatusRange(
   return ranges.some((range) => statusCode >= range.start && statusCode <= range.end);
 }
 
-function matchesStatusCodes(statusCode: number | undefined, statusCodes: readonly number[] | undefined): boolean {
+function matchesStatusCodes(
+  statusCode: number | undefined,
+  statusCodes: readonly number[] | undefined
+): boolean {
   if (statusCodes === undefined) {
     return true;
   }
@@ -473,7 +511,10 @@ function matchesStatusCodes(statusCode: number | undefined, statusCodes: readonl
   return statusCodes.includes(statusCode);
 }
 
-export function matchesCaptureRule(rule: CaptureRule, contextInput: CaptureRuleEvaluationContext): boolean {
+export function matchesCaptureRule(
+  rule: CaptureRule,
+  contextInput: CaptureRuleEvaluationContext
+): boolean {
   const context = CaptureRuleEvaluationContextSchema.parse(contextInput);
   const matcher = rule.matcher;
 
@@ -481,7 +522,12 @@ export function matchesCaptureRule(rule: CaptureRule, contextInput: CaptureRuleE
     return false;
   }
 
-  if (matcher.services !== undefined && (context.service === undefined || !matcher.services.includes(context.service))) {
+  if (
+    matcher.services !== undefined &&
+    !matcher.services.some(
+      (service) => service === context.service || context.service_aliases?.includes(service)
+    )
+  ) {
     return false;
   }
 
@@ -514,33 +560,45 @@ export function matchesCaptureRule(rule: CaptureRule, contextInput: CaptureRuleE
     }
   }
 
-  if (matcher.browser_event_kind !== undefined && context.browser_event_kind !== matcher.browser_event_kind) {
+  if (
+    matcher.browser_event_kind !== undefined &&
+    context.browser_event_kind !== matcher.browser_event_kind
+  ) {
     return false;
   }
 
-  if (matcher.browser_event_opaque !== undefined && context.browser_event_opaque !== matcher.browser_event_opaque) {
+  if (
+    matcher.browser_event_opaque !== undefined &&
+    context.browser_event_opaque !== matcher.browser_event_opaque
+  ) {
     return false;
   }
 
   if (
     matcher.browser_page_visibility_state !== undefined &&
     context.browser_page_visibility_state !== matcher.browser_page_visibility_state
-  ) return false;
+  )
+    return false;
 
   if (
     matcher.browser_page_ready_state !== undefined &&
     context.browser_page_ready_state !== matcher.browser_page_ready_state
-  ) return false;
+  )
+    return false;
 
   if (
     matcher.browser_target_tag_name !== undefined &&
     context.browser_target_tag_name !== matcher.browser_target_tag_name
-  ) return false;
+  )
+    return false;
 
   if (matcher.browser_target_attributes !== undefined) {
     if (context.browser_target_attributes === undefined) return false;
     for (const [key, expected] of Object.entries(matcher.browser_target_attributes)) {
-      if (context.browser_target_attributes[key as keyof CaptureRuleBrowserTargetAttributes] !== expected) {
+      if (
+        context.browser_target_attributes[key as keyof CaptureRuleBrowserTargetAttributes] !==
+        expected
+      ) {
         return false;
       }
     }
@@ -571,8 +629,17 @@ export function matchesCaptureRule(rule: CaptureRule, contextInput: CaptureRuleE
   }
 
   if (matcher.fingerprint !== undefined) {
-    const fingerprints = [...(context.fingerprint === undefined ? [] : [context.fingerprint]), ...(context.fingerprint_aliases ?? [])];
-    if (!fingerprints.some(candidate => candidate.version === matcher.fingerprint!.version && candidate.value === matcher.fingerprint!.value)) {
+    const fingerprints = [
+      ...(context.fingerprint === undefined ? [] : [context.fingerprint]),
+      ...(context.fingerprint_aliases ?? [])
+    ];
+    if (
+      !fingerprints.some(
+        (candidate) =>
+          candidate.version === matcher.fingerprint!.version &&
+          candidate.value === matcher.fingerprint!.value
+      )
+    ) {
       return false;
     }
   }
@@ -605,7 +672,10 @@ export function getCaptureRuleSpecificityScore(rule: CaptureRule): number {
   if (matcher.request_url?.host !== undefined) {
     score += 250;
   }
-  if (matcher.resource_url?.path_equals !== undefined || matcher.request_url?.path_equals !== undefined) {
+  if (
+    matcher.resource_url?.path_equals !== undefined ||
+    matcher.request_url?.path_equals !== undefined
+  ) {
     score += 200;
   }
   if (matcher.status_codes !== undefined) {
@@ -623,10 +693,16 @@ export function getCaptureRuleSpecificityScore(rule: CaptureRule): number {
   if (matcher.browser_target_attributes !== undefined) {
     score += 75 + Object.keys(matcher.browser_target_attributes).length * 5;
   }
-  if (matcher.resource_url?.host_suffix !== undefined || matcher.request_url?.host_suffix !== undefined) {
+  if (
+    matcher.resource_url?.host_suffix !== undefined ||
+    matcher.request_url?.host_suffix !== undefined
+  ) {
     score += 90;
   }
-  if (matcher.resource_url?.path_prefix !== undefined || matcher.request_url?.path_prefix !== undefined) {
+  if (
+    matcher.resource_url?.path_prefix !== undefined ||
+    matcher.request_url?.path_prefix !== undefined
+  ) {
     score += 80;
   }
   if (matcher.error_name !== undefined) {
@@ -664,9 +740,7 @@ export function getCaptureRuleSpecificityScore(rule: CaptureRule): number {
 }
 
 /** New browser DOM predicates are evaluated by hosted ingestion until every installed SDK supports them. */
-export function captureRuleRequiresServerEvaluation(
-  rule: Pick<CaptureRule, "matcher">
-): boolean {
+export function captureRuleRequiresServerEvaluation(rule: Pick<CaptureRule, "matcher">): boolean {
   const matcher = rule.matcher;
   return (
     matcher.browser_page_visibility_state !== undefined ||
@@ -677,7 +751,8 @@ export function captureRuleRequiresServerEvaluation(
 }
 
 function compareCaptureRules(left: CaptureRule, right: CaptureRule): number {
-  const specificityDifference = getCaptureRuleSpecificityScore(right) - getCaptureRuleSpecificityScore(left);
+  const specificityDifference =
+    getCaptureRuleSpecificityScore(right) - getCaptureRuleSpecificityScore(left);
   if (specificityDifference !== 0) {
     return specificityDifference;
   }
@@ -724,7 +799,9 @@ export function evaluateCaptureRules(
   now: string
 ): CaptureRuleEvaluationResult | null {
   const context = CaptureRuleEvaluationContextSchema.parse(contextInput);
-  const activeRules = rules.filter((rule) => isCaptureRuleActive(rule, now)).sort(compareCaptureRules);
+  const activeRules = rules
+    .filter((rule) => isCaptureRuleActive(rule, now))
+    .sort(compareCaptureRules);
 
   for (const rule of activeRules) {
     if (!matchesCaptureRule(rule, context)) {
@@ -737,7 +814,7 @@ export function evaluateCaptureRules(
         action: "demote",
         outcome: "demote",
         sample_rate: null,
-        sample_event_class: null,
+        sample_event_class: null
       };
     }
 
@@ -747,7 +824,7 @@ export function evaluateCaptureRules(
         action: "drop",
         outcome: "drop",
         sample_rate: null,
-        sample_event_class: null,
+        sample_event_class: null
       };
     }
 
@@ -755,7 +832,7 @@ export function evaluateCaptureRules(
       project_id: context.project_id,
       rule_id: rule.id,
       event_id: context.event_id,
-      sample_rate: rule.sample_rate ?? 0,
+      sample_rate: rule.sample_rate ?? 0
     });
 
     return {
@@ -763,7 +840,7 @@ export function evaluateCaptureRules(
       action: "sample",
       outcome: sampledIn ? "sampled_in" : "sampled_out",
       sample_rate: rule.sample_rate,
-      sample_event_class: rule.sample_event_class,
+      sample_event_class: rule.sample_event_class
     };
   }
 

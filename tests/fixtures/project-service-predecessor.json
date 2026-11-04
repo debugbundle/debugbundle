@@ -1,0 +1,559 @@
+{
+  "source_revision": "0ef64a60e3f93db4026ec293f8ff4de1e25bfddf",
+  "bootstrap": [
+    "\n    CREATE TABLE users (\n      id uuid PRIMARY KEY,\n      email text NOT NULL UNIQUE,\n      accepted_terms_at timestamptz,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      email_verified_at timestamptz,\n      avatar_source text,\n      avatar_object_key text,\n      avatar_content_type text,\n      avatar_updated_at timestamptz\n    )\n  ",
+    "\n    CREATE TABLE organizations (\n      id uuid PRIMARY KEY,\n      name text NOT NULL,\n      slug text NOT NULL UNIQUE,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      suspended_at timestamptz,\n      plan text NOT NULL DEFAULT 'free',\n      stripe_customer_id text,\n      additional_capacity_units integer NOT NULL DEFAULT 0,\n      stripe_subscription_id text,\n      billing_state text,\n      billing_period_ends_at timestamptz,\n      last_billing_sync_at timestamptz,\n      last_billing_event_id text,\n      billing_period_starts_at timestamptz,\n      trial_plan text CHECK (trial_plan IN ('solo', 'team') OR trial_plan IS NULL),\n      trial_started_at timestamptz,\n      trial_ends_at timestamptz,\n      trial_used_at timestamptz,\n      trial_converted_at timestamptz,\n      trial_expired_at timestamptz,\n      CONSTRAINT organizations_trial_window_check CHECK (\n        trial_started_at IS NULL\n        OR trial_ends_at IS NULL\n        OR trial_ends_at > trial_started_at\n      ),\n      CONSTRAINT organizations_trial_started_requires_plan_check CHECK (\n        trial_started_at IS NULL\n        OR trial_plan IS NOT NULL\n      )\n    )\n  ",
+    "\n    CREATE UNIQUE INDEX organizations_stripe_customer_id_key\n    ON organizations (stripe_customer_id)\n    WHERE stripe_customer_id IS NOT NULL\n  ",
+    "\n    CREATE TABLE projects (\n      id uuid PRIMARY KEY,\n      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,\n      owner_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n      name text NOT NULL,\n      slug text NOT NULL,\n      environment_default text NOT NULL DEFAULT 'production',\n      color_tag text\n        CHECK (color_tag IN ('red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal', 'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose', 'slate') OR color_tag IS NULL),\n      automated_improvement_bundles_enabled boolean NOT NULL DEFAULT true,\n      improvement_bundle_sensitivity text NOT NULL DEFAULT 'high_confidence'\n        CHECK (improvement_bundle_sensitivity IN ('high_confidence', 'balanced', 'verbose')),\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      plan text NOT NULL DEFAULT 'free'\n    )\n  ",
+    "\n    CREATE UNIQUE INDEX projects_organization_id_slug_key\n    ON projects (organization_id, slug)\n  ",
+    "\n    CREATE TABLE services (\n      id uuid PRIMARY KEY,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      name text NOT NULL,\n      runtime text,\n      framework text,\n      environment text NOT NULL DEFAULT 'production',\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      UNIQUE (project_id, name, environment)\n    )\n  ",
+    "\n    CREATE TABLE project_tokens (\n      id uuid PRIMARY KEY,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      token_hash text UNIQUE NOT NULL,\n      label text NOT NULL,\n      allowed_origins jsonb NOT NULL DEFAULT '[]'::jsonb,\n      last_used_at timestamptz,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      revoked_at timestamptz,\n      expires_at timestamptz\n    )\n  ",
+    "\n    CREATE TABLE member_tokens (\n      id uuid PRIMARY KEY,\n      user_id uuid NOT NULL,\n      organization_id uuid NOT NULL,\n      token_hash text UNIQUE NOT NULL,\n      label text NOT NULL,\n      last_used_at timestamptz,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      revoked_at timestamptz,\n      expires_at timestamptz\n    )\n  ",
+    "\n    CREATE INDEX member_tokens_org_idx\n    ON member_tokens (organization_id)\n  ",
+    "\n    CREATE TABLE audit_logs (\n      id uuid PRIMARY KEY,\n      organization_id uuid,\n      actor_user_id uuid,\n      actor_type text NOT NULL,\n      action text NOT NULL,\n      target_type text NOT NULL,\n      target_id text,\n      status text NOT NULL,\n      ip_address text,\n      metadata jsonb NOT NULL DEFAULT '{}'::jsonb,\n      occurred_at timestamptz NOT NULL,\n      created_at timestamptz NOT NULL DEFAULT now()\n    )\n  ",
+    "\n    CREATE INDEX audit_logs_organization_occurred_at_idx\n    ON audit_logs (organization_id, occurred_at DESC, created_at DESC)\n  ",
+    "\n    CREATE INDEX audit_logs_action_occurred_at_idx\n    ON audit_logs (action, occurred_at DESC, created_at DESC)\n  ",
+    "\n    CREATE TABLE organization_members (\n      id uuid PRIMARY KEY,\n      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,\n      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n      role text NOT NULL DEFAULT 'member',\n      suspended_at timestamptz,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      UNIQUE (organization_id, user_id)\n    )\n  ",
+    "\n    CREATE INDEX organization_members_org_idx\n    ON organization_members (organization_id)\n  ",
+    "\n    CREATE INDEX organization_members_user_idx\n    ON organization_members (user_id)\n  ",
+    "\n    CREATE TABLE sessions (\n      id uuid PRIMARY KEY,\n      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,\n      session_token_hash text UNIQUE NOT NULL,\n      auth_method text CHECK (auth_method IS NULL OR auth_method IN ('email_code', 'github_oauth')),\n      created_at timestamptz NOT NULL DEFAULT now(),\n      expires_at timestamptz NOT NULL,\n      revoked_at timestamptz\n    )\n  ",
+    "\n    CREATE INDEX sessions_token_hash_idx\n    ON sessions (session_token_hash)\n  ",
+    "\n    CREATE INDEX sessions_user_org_idx\n    ON sessions (user_id, organization_id)\n  ",
+    "\n    CREATE TABLE email_auth_challenges (\n      id uuid PRIMARY KEY,\n      email text NOT NULL,\n      code_hash text NOT NULL,\n      accepted_terms_at timestamptz,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      expires_at timestamptz NOT NULL,\n      used_at timestamptz\n    )\n  ",
+    "\n    CREATE INDEX email_auth_challenges_email_idx\n    ON email_auth_challenges (lower(email), created_at DESC)\n  ",
+    "\n    CREATE INDEX email_auth_challenges_code_hash_idx\n    ON email_auth_challenges (code_hash)\n  ",
+    "\n    CREATE TABLE account_deletion_challenges (\n      id uuid PRIMARY KEY,\n      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,\n      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n      email text NOT NULL,\n      code_hash text NOT NULL,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      expires_at timestamptz NOT NULL,\n      used_at timestamptz\n    )\n  ",
+    "\n    CREATE INDEX account_deletion_challenges_scope_idx\n    ON account_deletion_challenges (organization_id, user_id, lower(email), created_at DESC)\n  ",
+    "\n    CREATE INDEX account_deletion_challenges_code_hash_idx\n    ON account_deletion_challenges (code_hash)\n  ",
+    "\n    CREATE TABLE github_device_authorizations (\n      id uuid PRIMARY KEY,\n      device_code text NOT NULL UNIQUE,\n      user_code text NOT NULL,\n      verification_uri text NOT NULL,\n      interval_seconds integer NOT NULL,\n      expires_at timestamptz NOT NULL,\n      accepted_terms_at timestamptz,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      completed_at timestamptz,\n      claimed_at timestamptz,\n      terminal_error text,\n      user_id uuid REFERENCES users(id) ON DELETE SET NULL,\n      organization_id uuid REFERENCES organizations(id) ON DELETE SET NULL\n    )\n  ",
+    "\n    CREATE INDEX github_device_authorizations_user_code_idx\n    ON github_device_authorizations (user_code, created_at DESC)\n  ",
+    "\n    CREATE INDEX github_device_authorizations_expires_at_idx\n    ON github_device_authorizations (expires_at)\n  ",
+    "\n    CREATE TABLE project_members (\n      id uuid PRIMARY KEY,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n      role text NOT NULL,\n      invited_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      UNIQUE (project_id, user_id)\n    )\n  ",
+    "\n    CREATE INDEX project_members_project_id_idx\n    ON project_members (project_id, created_at DESC)\n  ",
+    "\n    CREATE INDEX project_members_user_id_idx\n    ON project_members (user_id, created_at DESC)\n  ",
+    "\n    CREATE TABLE agent_tokens (\n      id uuid PRIMARY KEY,\n      token_hash text NOT NULL UNIQUE,\n      issuer_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      label text NOT NULL CHECK (length(label) BETWEEN 1 AND 120),\n      scope text NOT NULL CHECK (scope = 'incident:read-minimized'),\n      policy_version text NOT NULL CHECK (policy_version = 'telemetry-privacy-v1'),\n      created_at timestamptz NOT NULL DEFAULT now(),\n      expires_at timestamptz NOT NULL,\n      revoked_at timestamptz,\n      CHECK (expires_at > created_at AND expires_at <= created_at + interval '90 days')\n    )\n  ",
+    "\n    CREATE INDEX agent_tokens_project_idx\n    ON agent_tokens (project_id, created_at DESC)\n  ",
+    "\n    CREATE TABLE project_invites (\n      id uuid PRIMARY KEY,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      email text NOT NULL,\n      role text NOT NULL,\n      invited_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,\n      invite_token_hash text NOT NULL,\n      accepted_at timestamptz,\n      canceled_at timestamptz,\n      expires_at timestamptz NOT NULL,\n      created_at timestamptz NOT NULL DEFAULT now()\n    )\n  ",
+    "\n    CREATE INDEX project_invites_project_id_idx\n    ON project_invites (project_id, created_at DESC)\n  ",
+    "\n    CREATE UNIQUE INDEX project_invites_pending_project_email_key\n    ON project_invites (project_id, lower(email))\n    WHERE accepted_at IS NULL AND canceled_at IS NULL\n  ",
+    "\n    CREATE UNIQUE INDEX project_invites_invite_token_hash_key\n    ON project_invites (invite_token_hash)\n  ",
+    "\n    CREATE TABLE oauth_identities (\n      id uuid PRIMARY KEY,\n      provider text NOT NULL,\n      provider_user_id text NOT NULL,\n      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      UNIQUE (provider, provider_user_id)\n    )\n  ",
+    "\n    CREATE INDEX oauth_identities_user_id_idx\n    ON oauth_identities (user_id, provider)\n  ",
+    "\n    CREATE TABLE probe_activations (\n      id uuid PRIMARY KEY,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      created_by_member_id uuid NOT NULL,\n      label_pattern text NOT NULL,\n      service text NOT NULL DEFAULT '*',\n      environment text NOT NULL DEFAULT '*',\n      trigger_expires_at timestamptz NOT NULL,\n      expires_at timestamptz NOT NULL,\n      deactivated_at timestamptz,\n      created_at timestamptz NOT NULL DEFAULT now()\n    )\n  ",
+    "\n    CREATE INDEX probe_activations_project_active_idx\n    ON probe_activations (project_id, expires_at DESC)\n    WHERE deactivated_at IS NULL\n  ",
+    "\n    CREATE TABLE capture_policies (\n      project_id uuid PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,\n      preset text NOT NULL DEFAULT 'minimal',\n      capture_logs text,\n      capture_request_events text,\n      capture_breadcrumbs text,\n      capture_probe_events text,\n      capture_diagnostic_context boolean,\n      immediate_client_error_statuses jsonb,\n      immediate_client_error_path_rules jsonb,\n      updated_at timestamptz NOT NULL DEFAULT now()\n    )\n  ",
+    "\n    CREATE TABLE capture_rules (\n      id uuid PRIMARY KEY,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      name text NOT NULL,\n      description text,\n      enabled boolean NOT NULL DEFAULT true,\n      action text NOT NULL,\n      matcher jsonb NOT NULL,\n      sample_rate double precision,\n      sample_event_class text,\n      created_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,\n      created_from_incident_id text,\n      created_from_event_id text,\n      expires_at timestamptz,\n      hit_count bigint NOT NULL DEFAULT 0,\n      last_matched_at timestamptz,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now()\n    )\n  ",
+    "\n    CREATE INDEX capture_rules_project_enabled_idx\n    ON capture_rules (project_id, enabled)\n  ",
+    "\n    CREATE INDEX capture_rules_project_updated_idx\n    ON capture_rules (project_id, updated_at DESC)\n  ",
+    "\n    CREATE TABLE deployments (\n      id uuid PRIMARY KEY,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      service_id uuid REFERENCES services(id) ON DELETE SET NULL,\n      environment text NOT NULL,\n      source_event_id uuid UNIQUE NOT NULL,\n      commit_sha text,\n      version text,\n      branch text,\n      deployed_at timestamptz NOT NULL,\n      metadata jsonb NOT NULL DEFAULT '{}'::jsonb,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now()\n    )\n  ",
+    "\n    CREATE INDEX deployments_project_service_env_deployed_idx\n    ON deployments (project_id, service_id, environment, deployed_at DESC)\n  ",
+    "\n    CREATE TABLE incidents (\n      id uuid PRIMARY KEY,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      service_id uuid REFERENCES services(id) ON DELETE SET NULL,\n      environment text NOT NULL DEFAULT 'production',\n      fingerprint text NOT NULL,\n      fingerprint_version text NOT NULL DEFAULT 'v1',\n      title text NOT NULL,\n      severity text NOT NULL,\n      status text NOT NULL DEFAULT 'open',\n      first_seen_at timestamptz NOT NULL,\n      last_seen_at timestamptz NOT NULL,\n      occurrence_count integer NOT NULL DEFAULT 1,\n      matched_fields text[],\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      regressed_at timestamptz,\n      spike_detected_at timestamptz,\n      frequency_occurrences_1m integer,\n      frequency_occurrences_5m integer,\n      frequency_occurrences_1h integer,\n      frequency_occurrences_24h integer,\n      frequency_baseline_1h_per_5m double precision,\n      frequency_spike_ratio_5m_to_1h double precision,\n      frequency_has_sufficient_baseline boolean,\n      frequency_is_spiking boolean,\n      frequency_snapshot_at timestamptz,\n      latest_deployment_id uuid REFERENCES deployments(id) ON DELETE SET NULL,\n      bundle_generation_number integer NOT NULL DEFAULT 0,\n      bundle_created_at timestamptz,\n      bundle_updated_at timestamptz,\n      bundle_source_event_id uuid,\n      bundle_source_occurred_at timestamptz,\n      bundle_trigger text,\n      bundle_failure_reason text,\n      resolved_at timestamptz,\n      resolved_by_member_id uuid REFERENCES users(id) ON DELETE SET NULL,\n      UNIQUE (project_id, environment, service_id, fingerprint)\n    )\n  ",
+    "\n    CREATE TABLE processed_events (\n      event_id uuid PRIMARY KEY,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      event_type text NOT NULL,\n      fingerprint text NOT NULL,\n      normalized_message text NOT NULL,\n      processed_at timestamptz NOT NULL DEFAULT now()\n    )\n  ",
+    "\n    CREATE TABLE improvement_opportunities (\n      id uuid PRIMARY KEY,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      service_id uuid REFERENCES services(id) ON DELETE SET NULL,\n      service_name text NOT NULL,\n      environment text NOT NULL DEFAULT 'production',\n      kind text NOT NULL,\n      status text NOT NULL DEFAULT 'open',\n      severity text NOT NULL,\n      confidence numeric NOT NULL,\n      fingerprint text NOT NULL,\n      title text NOT NULL,\n      summary text NOT NULL,\n      occurrence_count integer NOT NULL DEFAULT 1,\n      evidence jsonb NOT NULL,\n      first_detected_at timestamptz NOT NULL,\n      last_detected_at timestamptz NOT NULL,\n      last_source_event_id uuid,\n      related_incident_ids uuid[] NOT NULL DEFAULT '{}',\n      bundle_generation_number integer NOT NULL DEFAULT 0,\n      bundle_created_at timestamptz,\n      bundle_updated_at timestamptz,\n      bundle_source_event_id uuid,\n      bundle_failure_reason text,\n      resolved_at timestamptz,\n      resolved_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,\n      snoozed_until timestamptz,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      UNIQUE (project_id, fingerprint)\n    )\n  ",
+    "\n    CREATE INDEX improvement_opportunities_project_status_detected_idx\n    ON improvement_opportunities (project_id, status, last_detected_at DESC)\n  ",
+    "\n    CREATE INDEX improvement_opportunities_project_kind_detected_idx\n    ON improvement_opportunities (project_id, kind, last_detected_at DESC)\n  ",
+    "\n    CREATE INDEX improvement_opportunities_project_service_env_idx\n    ON improvement_opportunities (project_id, service_id, environment)\n  ",
+    "\n    CREATE TABLE improvement_opportunity_events (\n      improvement_opportunity_id uuid NOT NULL REFERENCES improvement_opportunities(id) ON DELETE CASCADE,\n      event_id uuid NOT NULL,\n      event_type text NOT NULL,\n      occurred_at timestamptz NOT NULL,\n      PRIMARY KEY (improvement_opportunity_id, event_id)\n    )\n  ",
+    "\n    CREATE INDEX improvement_opportunity_events_detected_idx\n    ON improvement_opportunity_events (improvement_opportunity_id, occurred_at DESC, event_id DESC)\n  ",
+    "\n    CREATE TABLE bundle_generations (\n      id uuid PRIMARY KEY,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      incident_id uuid REFERENCES incidents(id) ON DELETE CASCADE,\n      improvement_opportunity_id uuid REFERENCES improvement_opportunities(id) ON DELETE CASCADE,\n      bundle_type text NOT NULL,\n      generation_number integer NOT NULL,\n      source_event_id uuid NOT NULL,\n      source_occurred_at timestamptz NOT NULL,\n      trigger text NOT NULL,\n      created_at timestamptz NOT NULL,\n      updated_at timestamptz NOT NULL,\n      CHECK (\n        (incident_id IS NOT NULL AND improvement_opportunity_id IS NULL AND bundle_type = 'failure')\n        OR (incident_id IS NULL AND improvement_opportunity_id IS NOT NULL AND bundle_type = 'improvement')\n      )\n    )\n  ",
+    "\n    CREATE UNIQUE INDEX bundle_generations_incident_source_idx\n    ON bundle_generations (incident_id, source_event_id)\n    WHERE incident_id IS NOT NULL\n  ",
+    "\n    CREATE UNIQUE INDEX bundle_generations_improvement_source_idx\n    ON bundle_generations (improvement_opportunity_id, source_event_id)\n    WHERE improvement_opportunity_id IS NOT NULL\n  ",
+    "\n    CREATE INDEX bundle_generations_project_created_idx\n    ON bundle_generations (project_id, created_at DESC, bundle_type)\n  ",
+    "\n    CREATE INDEX bundle_generations_incident_generation_idx\n    ON bundle_generations (incident_id, generation_number DESC)\n  ",
+    "\n    CREATE INDEX bundle_generations_improvement_generation_idx\n    ON bundle_generations (improvement_opportunity_id, generation_number DESC)\n    WHERE improvement_opportunity_id IS NOT NULL\n  ",
+    "\n    CREATE TABLE incident_events (\n      incident_id uuid NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,\n      event_id uuid NOT NULL,\n      event_type text NOT NULL,\n      event_class text NOT NULL DEFAULT 'context_signal',\n      occurred_at timestamptz NOT NULL,\n      is_sampled boolean NOT NULL DEFAULT false,\n      level text,\n      resource_route text,\n      retain_first boolean NOT NULL DEFAULT false,\n      retain_latest boolean NOT NULL DEFAULT false,\n      retain_after_deploy boolean NOT NULL DEFAULT false,\n      retain_highest_severity boolean NOT NULL DEFAULT false,\n      retain_deploy_metadata boolean NOT NULL DEFAULT false,\n      severity_rank integer NOT NULL DEFAULT 0,\n      PRIMARY KEY (incident_id, event_id)\n    )\n  ",
+    "\n    CREATE INDEX incident_events_incident_occurred_event_idx\n    ON incident_events (incident_id, occurred_at DESC, event_id DESC)\n  ",
+    "\n    CREATE INDEX incident_events_incident_level_occurred_event_idx\n    ON incident_events (incident_id, level, occurred_at DESC, event_id DESC)\n  ",
+    "\n    CREATE INDEX incident_events_incident_sampled_idx\n    ON incident_events (incident_id, is_sampled, occurred_at ASC, event_id ASC)\n  ",
+    "\n    CREATE TABLE weekly_report_channels (\n      id uuid PRIMARY KEY,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      channel text NOT NULL,\n      config jsonb NOT NULL DEFAULT '{}'::jsonb,\n      schedule_day_of_week text NOT NULL,\n      schedule_hour_of_day integer NOT NULL,\n      schedule_timezone text NOT NULL,\n      is_enabled boolean NOT NULL DEFAULT true,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now()\n    )\n  ",
+    "\n    CREATE INDEX weekly_report_channels_project_created_idx\n    ON weekly_report_channels (project_id, created_at ASC)\n  ",
+    "\n    CREATE UNIQUE INDEX weekly_report_channels_project_email_unique_idx\n    ON weekly_report_channels (project_id)\n    WHERE channel = 'email'\n  ",
+    "\n    CREATE TABLE weekly_report_deliveries (\n      id uuid PRIMARY KEY,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      weekly_report_channel_id uuid REFERENCES weekly_report_channels(id) ON DELETE CASCADE,\n      window_start timestamptz NOT NULL,\n      window_end timestamptz NOT NULL,\n      channel text NOT NULL,\n      status text NOT NULL,\n      last_error text,\n      delivered_at timestamptz,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now()\n    )\n  ",
+    "\n    CREATE INDEX weekly_report_deliveries_project_window_idx\n    ON weekly_report_deliveries (project_id, window_end DESC, channel)\n  ",
+    "\n    CREATE UNIQUE INDEX weekly_report_deliveries_channel_window_idx\n    ON weekly_report_deliveries (weekly_report_channel_id, window_start, window_end)\n    WHERE weekly_report_channel_id IS NOT NULL\n  ",
+    "\n    CREATE INDEX weekly_report_deliveries_channel_idx\n    ON weekly_report_deliveries (weekly_report_channel_id, window_end DESC)\n  ",
+    "\n    CREATE TABLE alert_rules (\n      id uuid PRIMARY KEY,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      created_by_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n      service_id uuid REFERENCES services(id) ON DELETE CASCADE,\n      channel text NOT NULL,\n      condition_type text NOT NULL,\n      severity_min text,\n      severity_lifecycle_scope text,\n      cooldown_seconds integer NOT NULL DEFAULT 0,\n      config jsonb NOT NULL DEFAULT '{}'::jsonb,\n      signing_secret text,\n      webhook_payload_version smallint NOT NULL DEFAULT 0 CHECK (webhook_payload_version IN (0, 1)),\n      is_enabled boolean NOT NULL DEFAULT true,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      CONSTRAINT alert_rules_severity_lifecycle_scope_check CHECK (\n        severity_lifecycle_scope IS NULL\n        OR (\n          condition_type = 'severity_threshold'\n          AND severity_lifecycle_scope IN ('new_incident', 'incident_regressed', 'both')\n        )\n      )\n    )\n  ",
+    "\n    CREATE INDEX alert_rules_project_enabled_idx\n    ON alert_rules (project_id, is_enabled)\n  ",
+    "\n    CREATE TABLE slack_destinations (\n      id uuid PRIMARY KEY,\n      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,\n      slack_team_id text NOT NULL,\n      slack_team_name text,\n      slack_channel_id text NOT NULL,\n      slack_channel_name text,\n      webhook_url_ciphertext text NOT NULL,\n      installed_by_member_id uuid REFERENCES users(id) ON DELETE SET NULL,\n      is_active boolean NOT NULL DEFAULT true,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      UNIQUE (organization_id, slack_team_id, slack_channel_id)\n    )\n  ",
+    "\n    CREATE INDEX slack_destinations_org_active_idx\n    ON slack_destinations (organization_id, is_active, created_at)\n  ",
+    "\n    CREATE TABLE alert_deliveries (\n      id uuid PRIMARY KEY,\n      alert_id uuid NOT NULL REFERENCES alert_rules(id) ON DELETE CASCADE,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      incident_id uuid NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,\n      condition_type text NOT NULL,\n      dedupe_key text NOT NULL,\n      notification_key text NOT NULL DEFAULT '',\n      coalescing_key text,\n      evaluation_job_id text,\n      channel text NOT NULL,\n      status text NOT NULL,\n      payload jsonb NOT NULL,\n      last_error text,\n      delivered_at timestamptz,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      UNIQUE (alert_id, incident_id, dedupe_key)\n    )\n  ",
+    "\n    CREATE INDEX alert_deliveries_project_status_idx\n    ON alert_deliveries (project_id, status, created_at DESC)\n  ",
+    "\n    CREATE INDEX alert_deliveries_alert_notification_idx\n    ON alert_deliveries (alert_id, notification_key, created_at DESC)\n  ",
+    "\n    CREATE TABLE alert_delivery_members (\n      id uuid PRIMARY KEY,\n      delivery_id uuid NOT NULL REFERENCES alert_deliveries(id) ON DELETE CASCADE,\n      incident_id uuid NOT NULL,\n      condition_type text NOT NULL,\n      dedupe_key text NOT NULL,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      UNIQUE (delivery_id, incident_id, condition_type, dedupe_key)\n    )\n  ",
+    "\n    CREATE INDEX alert_delivery_members_delivery_created_idx\n    ON alert_delivery_members (delivery_id, created_at ASC, id ASC)\n  ",
+    "\n    CREATE TABLE alert_email_digests (\n      id uuid PRIMARY KEY,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      recipient text NOT NULL,\n      status text NOT NULL,\n      next_attempt_at timestamptz,\n      claimed_at timestamptz,\n      last_error text,\n      delivered_at timestamptz,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now()\n    )\n  ",
+    "\n    CREATE UNIQUE INDEX alert_email_digests_project_recipient_pending_idx\n    ON alert_email_digests (project_id, recipient)\n    WHERE status = 'pending' AND claimed_at IS NULL\n  ",
+    "\n    CREATE INDEX alert_email_digests_status_next_attempt_idx\n    ON alert_email_digests (status, next_attempt_at)\n  ",
+    "\n    CREATE TABLE alert_email_digest_items (\n      id uuid PRIMARY KEY,\n      digest_id uuid NOT NULL REFERENCES alert_email_digests(id) ON DELETE CASCADE,\n      alert_id uuid NOT NULL REFERENCES alert_rules(id) ON DELETE CASCADE,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      incident_id uuid NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,\n      condition_type text NOT NULL,\n      dedupe_key text NOT NULL,\n      notification_key text NOT NULL DEFAULT '',\n      payload jsonb NOT NULL,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      UNIQUE (alert_id, incident_id, dedupe_key)\n    )\n  ",
+    "\n    CREATE INDEX alert_email_digest_items_digest_created_idx\n    ON alert_email_digest_items (digest_id, created_at ASC)\n  ",
+    "\n    CREATE INDEX alert_email_digest_items_alert_notification_idx\n    ON alert_email_digest_items (alert_id, notification_key, created_at DESC)\n  ",
+    "\n    CREATE TABLE agent_webhooks (\n      id uuid PRIMARY KEY,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      created_by_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n      url text NOT NULL,\n      secret_hash text NOT NULL,\n      events text[] NOT NULL,\n      filters jsonb NOT NULL DEFAULT '{}'::jsonb,\n      is_enabled boolean NOT NULL DEFAULT true,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now()\n    )\n  ",
+    "\n    CREATE INDEX agent_webhooks_project_enabled_idx\n    ON agent_webhooks (project_id, is_enabled)\n  ",
+    "\n    CREATE TABLE webhook_deliveries (\n      id uuid PRIMARY KEY,\n      webhook_id uuid REFERENCES agent_webhooks(id) ON DELETE CASCADE,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      incident_id uuid REFERENCES incidents(id) ON DELETE CASCADE,\n      event_type text NOT NULL,\n      target_url text NOT NULL,\n      signing_secret text NOT NULL,\n      status text NOT NULL DEFAULT 'pending',\n      attempt_count integer NOT NULL DEFAULT 0,\n      occurred_at timestamptz NOT NULL,\n      next_attempt_at timestamptz,\n      last_response_code integer,\n      last_attempted_at timestamptz,\n      last_error text,\n      payload jsonb NOT NULL,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now()\n    )\n  ",
+    "\n    CREATE INDEX webhook_deliveries_status_next_attempt_idx\n    ON webhook_deliveries (status, next_attempt_at)\n  ",
+    "\n    CREATE TABLE processed_billing_events (\n      event_id text PRIMARY KEY,\n      event_type text NOT NULL,\n      organization_id uuid,\n      processed_at timestamptz NOT NULL DEFAULT now()\n    )\n  ",
+    "\n    CREATE TABLE processed_github_marketplace_events (\n      delivery_id text PRIMARY KEY,\n      event_name text NOT NULL,\n      marketplace_account_id bigint,\n      action text,\n      processed_at timestamptz NOT NULL DEFAULT now()\n    )\n  ",
+    "\n    CREATE INDEX processed_github_marketplace_events_account_idx\n    ON processed_github_marketplace_events (marketplace_account_id, processed_at DESC)\n  ",
+    "\n    CREATE TABLE github_installations (\n      id uuid PRIMARY KEY,\n      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,\n      installation_id bigint NOT NULL UNIQUE,\n      account_login text NOT NULL,\n      account_type text NOT NULL CHECK (account_type IN ('Organization', 'User')),\n      status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'removed')),\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      UNIQUE (organization_id)\n    )\n  ",
+    "\n    CREATE INDEX github_installations_status_idx\n    ON github_installations (status)\n  ",
+    "\n    CREATE TABLE github_marketplace_accounts (\n      id uuid PRIMARY KEY,\n      organization_id uuid REFERENCES organizations(id) ON DELETE SET NULL,\n      marketplace_account_id bigint NOT NULL UNIQUE,\n      marketplace_account_login text NOT NULL,\n      marketplace_account_type text NOT NULL CHECK (marketplace_account_type IN ('Organization', 'User')),\n      marketplace_account_node_id text,\n      marketplace_listing_plan_id bigint NOT NULL,\n      marketplace_listing_plan_name text NOT NULL,\n      marketplace_plan_price_model text,\n      billing_cycle text CHECK (billing_cycle IN ('monthly', 'yearly')),\n      unit_count integer,\n      on_free_trial boolean NOT NULL DEFAULT false,\n      free_trial_ends_on timestamptz,\n      next_billing_date timestamptz,\n      effective_date timestamptz NOT NULL,\n      installation_id bigint,\n      marketplace_purchase_status text NOT NULL\n        CHECK (marketplace_purchase_status IN ('purchased', 'cancelled', 'pending_change', 'pending_change_cancelled', 'changed')),\n      last_event_id text NOT NULL,\n      last_event_action text NOT NULL,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now()\n    )\n  ",
+    "\n    CREATE INDEX github_marketplace_accounts_org_idx\n    ON github_marketplace_accounts (organization_id, updated_at DESC)\n  ",
+    "\n    CREATE UNIQUE INDEX github_marketplace_accounts_installation_idx\n    ON github_marketplace_accounts (installation_id)\n    WHERE installation_id IS NOT NULL\n  ",
+    "\n    CREATE TABLE project_github_repos (\n      id uuid PRIMARY KEY,\n      project_id uuid NOT NULL UNIQUE REFERENCES projects(id) ON DELETE CASCADE,\n      installation_id uuid NOT NULL REFERENCES github_installations(id) ON DELETE CASCADE,\n      repo_owner text NOT NULL,\n      repo_name text NOT NULL,\n      default_branch text NOT NULL DEFAULT 'main',\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now()\n    )\n  ",
+    "\n    CREATE TABLE github_dispatch_rules (\n      id uuid PRIMARY KEY,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      created_by_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n      name text NOT NULL,\n      enabled boolean NOT NULL DEFAULT true,\n      event_types text[] NOT NULL,\n      environments text[],\n      services text[],\n      severity_min text CHECK (severity_min IN ('low', 'medium', 'high', 'critical')),\n      bundle_type text CHECK (bundle_type IN ('failure', 'improvement')),\n      incident_status text NOT NULL DEFAULT 'new_or_reopened'\n        CHECK (incident_status IN ('new_only', 'reopened_only', 'new_or_reopened')),\n      cooldown_seconds integer NOT NULL DEFAULT 300,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now()\n    )\n  ",
+    "\n    CREATE INDEX github_dispatch_rules_project_enabled_idx\n    ON github_dispatch_rules (project_id, enabled)\n  ",
+    "\n    CREATE TABLE github_dispatch_deliveries (\n      id uuid PRIMARY KEY,\n      rule_id uuid NOT NULL,\n      rule_name text NOT NULL,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      incident_id uuid REFERENCES incidents(id) ON DELETE CASCADE,\n      improvement_opportunity_id uuid REFERENCES improvement_opportunities(id) ON DELETE CASCADE,\n      target_fingerprint text NOT NULL,\n      installation_id bigint NOT NULL,\n      repo_owner text NOT NULL,\n      repo_name text NOT NULL,\n      status text NOT NULL DEFAULT 'pending'\n        CHECK (status IN ('pending', 'retrying', 'delivered', 'failed', 'skipped')),\n      attempt_count integer NOT NULL DEFAULT 0,\n      next_attempt_at timestamptz,\n      last_attempt_at timestamptz,\n      last_error text,\n      github_status_code integer,\n      dispatch_payload jsonb NOT NULL DEFAULT '{}'::jsonb,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      dedupe_key text NOT NULL,\n      CHECK (\n        (incident_id IS NOT NULL AND improvement_opportunity_id IS NULL)\n        OR (incident_id IS NULL AND improvement_opportunity_id IS NOT NULL)\n      )\n    )\n  ",
+    "\n    CREATE INDEX github_dispatch_deliveries_status_next_attempt_idx\n    ON github_dispatch_deliveries (status, next_attempt_at)\n  ",
+    "\n    CREATE UNIQUE INDEX github_dispatch_deliveries_rule_dedupe_key_idx\n    ON github_dispatch_deliveries (rule_id, target_fingerprint, dedupe_key)\n  ",
+    "\n    CREATE TABLE org_usage_counters (\n      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,\n      period_starts_at timestamptz NOT NULL,\n      raw_ingested_events integer NOT NULL DEFAULT 0,\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      PRIMARY KEY (organization_id, period_starts_at)\n    )\n  ",
+    "\n    CREATE TABLE project_usage_counters (\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      period_starts_at timestamptz NOT NULL,\n      raw_ingested_events integer NOT NULL DEFAULT 0,\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      PRIMARY KEY (project_id, period_starts_at)\n    )\n  ",
+    "\n    CREATE TABLE account_analytics_accounts (\n      analytics_account_id uuid PRIMARY KEY,\n      organization_id uuid UNIQUE,\n      organization_id_hash text NOT NULL UNIQUE,\n      created_at timestamptz NOT NULL,\n      first_seen_at timestamptz NOT NULL,\n      metrics_collection_started_at timestamptz NOT NULL,\n      backfilled_from_retained_rows_at timestamptz,\n      deleted_at timestamptz,\n      initial_plan text,\n      latest_known_plan text,\n      latest_capacity_units integer,\n      account_deleted boolean NOT NULL DEFAULT false,\n      metrics_schema_version integer NOT NULL DEFAULT 1,\n      updated_at timestamptz NOT NULL DEFAULT now()\n    )\n  ",
+    "\n    CREATE TABLE account_metric_periods (\n      analytics_account_id uuid NOT NULL REFERENCES account_analytics_accounts(analytics_account_id),\n      period_grain text NOT NULL CHECK (period_grain IN ('day', 'month', 'year', 'lifetime')),\n      period_starts_at timestamptz NOT NULL,\n      metric_key text NOT NULL,\n      metric_value bigint NOT NULL DEFAULT 0,\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      PRIMARY KEY (analytics_account_id, period_grain, period_starts_at, metric_key)\n    )\n  ",
+    "\n    CREATE INDEX account_metric_periods_grain_period_metric_idx\n    ON account_metric_periods (period_grain, period_starts_at, metric_key)\n  ",
+    "\n    CREATE INDEX account_metric_periods_account_grain_period_idx\n    ON account_metric_periods (analytics_account_id, period_grain, period_starts_at)\n  ",
+    "\n    CREATE TABLE account_metric_events (\n      dedupe_key_hash text PRIMARY KEY,\n      analytics_account_id uuid NOT NULL REFERENCES account_analytics_accounts(analytics_account_id),\n      metric_source text NOT NULL,\n      occurred_at timestamptz NOT NULL,\n      recorded_at timestamptz NOT NULL DEFAULT now(),\n      metric_deltas jsonb NOT NULL\n    )\n  ",
+    "\n    CREATE TABLE ingestion_rejection_diagnostic_periods (\n      analytics_account_id uuid NOT NULL REFERENCES account_analytics_accounts(analytics_account_id),\n      period_starts_at timestamptz NOT NULL,\n      rejection_reason text NOT NULL,\n      project_id_text text NOT NULL DEFAULT '',\n      service_name text NOT NULL DEFAULT '',\n      service_environment text NOT NULL DEFAULT '',\n      service_runtime text NOT NULL DEFAULT '',\n      sdk_name text NOT NULL DEFAULT '',\n      sdk_version text NOT NULL DEFAULT '',\n      event_type text NOT NULL DEFAULT '',\n      validation_code text NOT NULL DEFAULT '',\n      validation_path text NOT NULL DEFAULT '',\n      occurrences bigint NOT NULL DEFAULT 0,\n      first_seen_at timestamptz NOT NULL,\n      last_seen_at timestamptz NOT NULL,\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      PRIMARY KEY (\n        analytics_account_id,\n        period_starts_at,\n        rejection_reason,\n        project_id_text,\n        service_name,\n        service_environment,\n        service_runtime,\n        sdk_name,\n        sdk_version,\n        event_type,\n        validation_code,\n        validation_path\n      )\n    )\n  ",
+    "\n    CREATE INDEX ingestion_rejection_diagnostic_periods_reason_period_idx\n    ON ingestion_rejection_diagnostic_periods (rejection_reason, period_starts_at, last_seen_at DESC)\n  ",
+    "\n    CREATE TABLE account_payment_retention_records (\n      id uuid PRIMARY KEY,\n      analytics_account_id uuid NOT NULL REFERENCES account_analytics_accounts(analytics_account_id),\n      organization_id_hash text NOT NULL,\n      provider text NOT NULL,\n      plan text,\n      billing_state text,\n      stripe_customer_id text,\n      stripe_subscription_id text,\n      billing_period_starts_at timestamptz,\n      billing_period_ends_at timestamptz,\n      additional_capacity_units integer,\n      last_billing_event_id text,\n      account_deleted_at timestamptz NOT NULL,\n      recorded_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      UNIQUE (analytics_account_id, provider)\n    )\n  ",
+    "\n    CREATE INDEX account_payment_retention_records_provider_idx\n    ON account_payment_retention_records (provider, account_deleted_at DESC)\n  ",
+    "\n    CREATE TABLE account_payment_provider_events (\n      provider_event_key text PRIMARY KEY,\n      analytics_account_id uuid NOT NULL REFERENCES account_analytics_accounts(analytics_account_id),\n      organization_id_hash text NOT NULL,\n      provider text NOT NULL,\n      provider_event_id text NOT NULL,\n      provider_event_type text NOT NULL,\n      processed_at timestamptz NOT NULL,\n      account_deleted_at timestamptz NOT NULL,\n      recorded_at timestamptz NOT NULL DEFAULT now()\n    )\n  ",
+    "\n    CREATE UNIQUE INDEX account_payment_provider_events_provider_event_key\n    ON account_payment_provider_events (provider, provider_event_id)\n  ",
+    "\n    CREATE TABLE operational_email_deliveries (\n      id uuid PRIMARY KEY,\n      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,\n      project_id uuid REFERENCES projects(id) ON DELETE CASCADE,\n      kind text NOT NULL\n        CHECK (kind IN (\n          'webhook_auto_disabled',\n          'allowance_warning_80',\n          'allowance_limit_reached',\n          'retention_rotation_notice',\n          'trial_started',\n          'trial_ending_soon',\n          'trial_expired',\n          'trial_converted',\n          'billing_lifecycle'\n        )),\n      dedupe_key text NOT NULL,\n      payload jsonb NOT NULL DEFAULT '{}'::jsonb,\n      status text NOT NULL DEFAULT 'pending'\n        CHECK (status IN ('pending', 'retrying', 'delivered', 'failed')),\n      attempt_count integer NOT NULL DEFAULT 0,\n      next_attempt_at timestamptz,\n      last_error text,\n      delivered_at timestamptz,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      UNIQUE (organization_id, kind, dedupe_key)\n    )\n  ",
+    "\n    CREATE INDEX operational_email_deliveries_status_next_attempt_idx\n    ON operational_email_deliveries (status, next_attempt_at, created_at)\n  ",
+    "\n    CREATE TABLE trial_lifecycle_events (\n      id uuid PRIMARY KEY,\n      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,\n      event_type text NOT NULL,\n      dedupe_key text NOT NULL,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      UNIQUE (organization_id, event_type, dedupe_key)\n    )\n  ",
+    "\n    CREATE INDEX trial_lifecycle_events_org_event_created_idx\n    ON trial_lifecycle_events (organization_id, event_type, created_at DESC)\n  ",
+    "\n    CREATE TABLE plan_cleanup_tasks (\n      id uuid PRIMARY KEY,\n      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      cleanup_type text NOT NULL\n        CHECK (cleanup_type IN ('delete_improvement_bundle_objects')),\n      attempt_count integer NOT NULL DEFAULT 0,\n      last_error text,\n      next_attempt_at timestamptz NOT NULL DEFAULT now(),\n      completed_at timestamptz,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      UNIQUE (project_id, cleanup_type)\n    )\n  ",
+    "\n    CREATE INDEX plan_cleanup_tasks_pending_idx\n    ON plan_cleanup_tasks (completed_at, next_attempt_at, created_at)\n  ",
+    "CREATE TABLE evidence_ingestion_receipts (\n    project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n    event_id uuid NOT NULL, occurred_at timestamptz NOT NULL, received_at timestamptz NOT NULL,\n    payload_hash text NOT NULL CHECK (length(payload_hash) = 64),\n    is_diagnostic boolean NOT NULL, expires_at timestamptz NOT NULL,\n    PRIMARY KEY (project_id,event_id)\n  )",
+    "CREATE INDEX evidence_ingestion_receipt_expiry_idx ON evidence_ingestion_receipts (expires_at,project_id,event_id)",
+    "CREATE TABLE evidence_context_events (\n    event_id uuid PRIMARY KEY,\n    project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n    service_name text NOT NULL, environment text NOT NULL,\n    kind text NOT NULL CHECK (kind IN ('failure', 'resource_observation', 'recovery')),\n    occurred_at timestamptz NOT NULL, received_at timestamptz NOT NULL,\n    failure_hash text NOT NULL CHECK (length(failure_hash) = 64),\n    scope_kind text NOT NULL CHECK (scope_kind IN ('page', 'operation')),\n    scope_hash text NOT NULL CHECK (length(scope_hash) = 64),\n    session_hash text, trace_hash text, attempt_hash text,\n    expires_at timestamptz NOT NULL,\n    is_retained boolean NOT NULL DEFAULT true,\n    CHECK (scope_kind <> 'page' OR session_hash IS NOT NULL)\n  )",
+    "CREATE INDEX evidence_context_scope_idx ON evidence_context_events (project_id, service_name, environment, failure_hash, scope_kind, scope_hash, occurred_at, event_id)",
+    "CREATE INDEX evidence_context_expiry_idx ON evidence_context_events (expires_at, event_id)",
+    "CREATE INDEX alert_deliveries_coalescing_idx ON alert_deliveries (alert_id, coalescing_key, created_at) WHERE coalescing_key IS NOT NULL",
+    "CREATE TABLE browser_recovery_events (\n    event_id uuid PRIMARY KEY,\n    project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n    service_name text NOT NULL,\n    environment text NOT NULL,\n    kind text NOT NULL CHECK (kind IN ('resource', 'recovery')),\n    occurred_at timestamptz NOT NULL,\n    session_hash text,\n    trace_hash text,\n    expires_at timestamptz NOT NULL DEFAULT now() + interval '7 days',\n    CHECK (session_hash IS NOT NULL OR trace_hash IS NOT NULL)\n  )",
+    "CREATE INDEX browser_recovery_events_scope_idx ON browser_recovery_events (project_id, service_name, environment, kind, occurred_at)",
+    "CREATE INDEX browser_recovery_events_expiry_idx ON browser_recovery_events (expires_at)",
+    "\n    CREATE TABLE oauth_authorization_grants (\n      id uuid PRIMARY KEY,\n      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,\n      client_id text NOT NULL,\n      resource text NOT NULL CHECK (resource = 'https://mcp.debugbundle.com'),\n      scopes text[] NOT NULL CHECK (array_length(scopes, 1) > 0),\n      provider_grant_id_hash text NOT NULL UNIQUE,\n      consented_at timestamptz NOT NULL,\n      expires_at timestamptz NOT NULL,\n      revoked_at timestamptz,\n      revocation_reason text,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now()\n    )\n  ",
+    "CREATE INDEX oauth_authorization_grants_active_lookup_idx ON oauth_authorization_grants (user_id, organization_id, client_id, resource)",
+    "CREATE INDEX oauth_authorization_grants_expires_idx ON oauth_authorization_grants (expires_at, id)",
+    "CREATE INDEX oauth_authorization_grants_revoked_idx ON oauth_authorization_grants (revoked_at, id)",
+    "\n    CREATE TABLE oauth_authorization_codes (\n      id uuid PRIMARY KEY,\n      grant_id uuid NOT NULL REFERENCES oauth_authorization_grants(id) ON DELETE CASCADE,\n      user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,\n      code_hash text NOT NULL UNIQUE,\n      client_id text NOT NULL,\n      redirect_uri text NOT NULL,\n      resource text NOT NULL CHECK (resource = 'https://mcp.debugbundle.com'),\n      scopes text[] NOT NULL CHECK (array_length(scopes, 1) > 0),\n      code_challenge text NOT NULL,\n      code_challenge_method text NOT NULL CHECK (code_challenge_method = 'S256'),\n      issued_at timestamptz NOT NULL DEFAULT now(),\n      expires_at timestamptz NOT NULL,\n      consumed_at timestamptz\n    )\n  ",
+    "CREATE INDEX oauth_authorization_codes_expires_idx ON oauth_authorization_codes (expires_at, id)",
+    "CREATE INDEX oauth_authorization_codes_consumed_idx ON oauth_authorization_codes (consumed_at, id)",
+    "\n    CREATE TABLE oauth_refresh_tokens (\n      id uuid PRIMARY KEY,\n      grant_id uuid NOT NULL REFERENCES oauth_authorization_grants(id) ON DELETE CASCADE,\n      family_id uuid NOT NULL,\n      parent_token_id uuid REFERENCES oauth_refresh_tokens(id) ON DELETE SET NULL,\n      replacement_token_id uuid REFERENCES oauth_refresh_tokens(id) ON DELETE SET NULL,\n      token_hash text NOT NULL UNIQUE,\n      client_id text NOT NULL,\n      resource text NOT NULL CHECK (resource = 'https://mcp.debugbundle.com'),\n      scopes text[] NOT NULL CHECK (array_length(scopes, 1) > 0),\n      issued_at timestamptz NOT NULL DEFAULT now(),\n      expires_at timestamptz NOT NULL,\n      used_at timestamptz,\n      revoked_at timestamptz,\n      revocation_reason text,\n      reuse_detected_at timestamptz\n    )\n  ",
+    "CREATE INDEX oauth_refresh_tokens_family_idx ON oauth_refresh_tokens (grant_id, family_id, issued_at DESC)",
+    "CREATE INDEX oauth_refresh_tokens_expires_idx ON oauth_refresh_tokens (expires_at, id)",
+    "CREATE INDEX oauth_refresh_tokens_revoked_idx ON oauth_refresh_tokens (revoked_at, id)",
+    "CREATE UNIQUE INDEX oauth_refresh_tokens_one_current_family_idx ON oauth_refresh_tokens (family_id) WHERE used_at IS NULL AND revoked_at IS NULL",
+    "\n    CREATE TABLE oauth_provider_artifacts (\n      model text NOT NULL,\n      provider_id_hash text NOT NULL,\n      payload jsonb NOT NULL,\n      grant_id_hash text,\n      session_uid_hash text,\n      user_code_hash text,\n      expires_at timestamptz NOT NULL,\n      consumed_at timestamptz,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      PRIMARY KEY (model, provider_id_hash)\n    )\n  ",
+    "CREATE INDEX oauth_provider_artifacts_grant_idx ON oauth_provider_artifacts (grant_id_hash, expires_at) WHERE grant_id_hash IS NOT NULL",
+    "CREATE UNIQUE INDEX oauth_provider_artifacts_session_uid_idx ON oauth_provider_artifacts (session_uid_hash) WHERE session_uid_hash IS NOT NULL",
+    "CREATE UNIQUE INDEX oauth_provider_artifacts_user_code_idx ON oauth_provider_artifacts (user_code_hash) WHERE user_code_hash IS NOT NULL",
+    "CREATE INDEX oauth_provider_artifacts_expires_idx ON oauth_provider_artifacts (expires_at, model, provider_id_hash)",
+    "\n    CREATE TABLE availability_checks (\n      id uuid PRIMARY KEY,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      created_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,\n      name text NOT NULL,\n      url text NOT NULL,\n      method text NOT NULL CHECK (method IN ('GET', 'HEAD')),\n      expected_status_min integer NOT NULL DEFAULT 200 CHECK (expected_status_min BETWEEN 100 AND 599),\n      expected_status_max integer NOT NULL DEFAULT 399 CHECK (expected_status_max BETWEEN 100 AND 599),\n      timeout_ms integer NOT NULL DEFAULT 2500 CHECK (timeout_ms BETWEEN 500 AND 5000),\n      interval_seconds integer NOT NULL CHECK (interval_seconds >= 30),\n      failure_threshold integer NOT NULL DEFAULT 3 CHECK (failure_threshold BETWEEN 1 AND 10),\n      recovery_threshold integer NOT NULL DEFAULT 2 CHECK (recovery_threshold BETWEEN 1 AND 10),\n      environment text NOT NULL DEFAULT 'production',\n      service_name text,\n      enabled boolean NOT NULL DEFAULT true,\n      status text NOT NULL DEFAULT 'unknown' CHECK (status IN ('unknown', 'passing', 'failing')),\n      consecutive_failures integer NOT NULL DEFAULT 0,\n      consecutive_successes integer NOT NULL DEFAULT 0,\n      linked_incident_id uuid REFERENCES incidents(id) ON DELETE SET NULL,\n      last_checked_at timestamptz,\n      next_check_at timestamptz,\n      claimed_at timestamptz,\n      last_result_status text CHECK (\n        last_result_status IS NULL OR last_result_status IN (\n          'success',\n          'http_status_mismatch',\n          'timeout',\n          'dns_error',\n          'tls_error',\n          'connection_error',\n          'redirect_blocked',\n          'security_blocked',\n          'internal_error'\n        )\n      ),\n      last_result_http_status integer,\n      last_result_error_kind text,\n      last_result_error_message text,\n      last_result_duration_ms integer,\n      deleted_at timestamptz,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now()\n    )\n  ",
+    "\n    CREATE INDEX availability_checks_project_created_idx\n    ON availability_checks (project_id, created_at DESC)\n  ",
+    "\n    CREATE INDEX availability_checks_due_idx\n    ON availability_checks (next_check_at, project_id)\n  ",
+    "\n    CREATE INDEX availability_checks_claimed_idx\n    ON availability_checks (claimed_at)\n  ",
+    "\n    CREATE TABLE availability_check_results (\n      id uuid PRIMARY KEY,\n      check_id uuid NOT NULL REFERENCES availability_checks(id) ON DELETE CASCADE,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      started_at timestamptz NOT NULL,\n      completed_at timestamptz NOT NULL,\n      duration_ms integer NOT NULL,\n      status text NOT NULL CHECK (\n        status IN (\n          'success',\n          'http_status_mismatch',\n          'timeout',\n          'dns_error',\n          'tls_error',\n          'connection_error',\n          'redirect_blocked',\n          'security_blocked',\n          'internal_error'\n        )\n      ),\n      http_status integer,\n      error_kind text,\n      error_message text,\n      redirect_count integer NOT NULL DEFAULT 0,\n      checked_url_host text NOT NULL,\n      checked_url_path text NOT NULL,\n      final_url text NOT NULL,\n      created_at timestamptz NOT NULL DEFAULT now()\n    )\n  ",
+    "\n    CREATE INDEX availability_check_results_check_started_idx\n    ON availability_check_results (check_id, started_at DESC)\n  ",
+    "\n    CREATE INDEX availability_check_results_project_started_idx\n    ON availability_check_results (project_id, started_at DESC)\n  ",
+    "\n    CREATE TABLE availability_check_daily_rollups (\n      id uuid PRIMARY KEY,\n      check_id uuid NOT NULL REFERENCES availability_checks(id) ON DELETE CASCADE,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      day date NOT NULL,\n      state text NOT NULL CHECK (state IN ('unknown', 'operational', 'degraded', 'down', 'paused')),\n      total_checks integer NOT NULL DEFAULT 0,\n      successful_checks integer NOT NULL DEFAULT 0,\n      failed_checks integer NOT NULL DEFAULT 0,\n      degraded_checks integer NOT NULL DEFAULT 0,\n      avg_duration_ms integer,\n      first_checked_at timestamptz,\n      last_checked_at timestamptz,\n      downtime_seconds integer NOT NULL DEFAULT 0,\n      incident_ids uuid[] NOT NULL DEFAULT '{}'::uuid[],\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      UNIQUE (check_id, day)\n    )\n  ",
+    "\n    CREATE INDEX availability_check_daily_rollups_project_day_idx\n    ON availability_check_daily_rollups (project_id, day DESC)\n  ",
+    "\n    CREATE TABLE project_analytics_settings (\n      project_id uuid PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,\n      enabled boolean NOT NULL DEFAULT false,\n      privacy_mode text NOT NULL DEFAULT 'strict'\n        CHECK (privacy_mode IN ('strict', 'standard', 'custom')),\n      consent_required boolean NOT NULL DEFAULT false,\n      capture_page_views boolean NOT NULL DEFAULT true,\n      capture_route_changes boolean NOT NULL DEFAULT true,\n      capture_actions boolean NOT NULL DEFAULT false,\n      capture_friction_signals boolean NOT NULL DEFAULT true,\n      journey_sample_rate numeric NOT NULL DEFAULT 0\n        CHECK (journey_sample_rate >= 0 AND journey_sample_rate <= 1),\n      raw_retention_days integer NOT NULL DEFAULT 1 CHECK (raw_retention_days BETWEEN 1 AND 30),\n      sample_retention_days integer NOT NULL DEFAULT 7 CHECK (sample_retention_days BETWEEN 1 AND 365),\n      hourly_retention_days integer NOT NULL DEFAULT 30 CHECK (hourly_retention_days BETWEEN 1 AND 365),\n      aggregate_retention_months integer NOT NULL DEFAULT 12\n        CHECK (aggregate_retention_months BETWEEN 1 AND 120),\n      max_saved_funnels integer NOT NULL DEFAULT 10 CHECK (max_saved_funnels BETWEEN 0 AND 100),\n      max_custom_dimensions integer NOT NULL DEFAULT 3 CHECK (max_custom_dimensions BETWEEN 0 AND 20),\n      approved_custom_dimensions jsonb NOT NULL DEFAULT '[]'::jsonb\n        CHECK (\n          jsonb_typeof(approved_custom_dimensions) = 'array'\n          AND jsonb_array_length(approved_custom_dimensions) <= max_custom_dimensions\n        ),\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now()\n    )\n  ",
+    "\n    CREATE TABLE analytics_ingestion_ledger (\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      event_id uuid NOT NULL,\n      occurred_at timestamptz NOT NULL,\n      accepted_at timestamptz NOT NULL DEFAULT now(),\n      dedupe_key text NOT NULL,\n      raw_deleted_at timestamptz,\n      PRIMARY KEY (project_id, event_id),\n      UNIQUE (project_id, dedupe_key)\n    )\n  ",
+    "\n    CREATE INDEX analytics_ingestion_ledger_project_occurred_idx\n    ON analytics_ingestion_ledger (project_id, occurred_at DESC)\n  ",
+    "\n    CREATE TABLE analytics_usage_counters (\n      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,\n      period_starts_at timestamptz NOT NULL,\n      analytics_events integer NOT NULL DEFAULT 0,\n      analytics_sessions integer NOT NULL DEFAULT 0,\n      analytics_journey_samples integer NOT NULL DEFAULT 0,\n      analytics_bundle_generations integer NOT NULL DEFAULT 0,\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      PRIMARY KEY (organization_id, period_starts_at)\n    )\n  ",
+    "\n    CREATE TABLE analytics_usage_claims (\n      organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,\n      period_starts_at timestamptz NOT NULL,\n      claim_key text NOT NULL,\n      metric text NOT NULL CHECK (\n        metric IN (\n          'analytics_events',\n          'analytics_sessions',\n          'analytics_journey_samples',\n          'analytics_bundle_generations'\n        )\n      ),\n      created_at timestamptz NOT NULL DEFAULT now(),\n      PRIMARY KEY (organization_id, period_starts_at, claim_key)\n    )\n  ",
+    "\n    CREATE INDEX analytics_usage_claims_period_idx\n    ON analytics_usage_claims (period_starts_at, organization_id)\n  ",
+    "\n    CREATE TABLE analytics_rollup_uniques (\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      rollup_kind text NOT NULL\n        CHECK (\n          rollup_kind IN (\n            'session',\n            'visitor',\n            'new_visitor',\n            'returning_visitor',\n            'route_session',\n            'incident_route_session',\n            'transition_session',\n            'action_session',\n            'funnel_step_session',\n            'funnel_completion_session'\n          )\n        ),\n      service text NOT NULL DEFAULT '',\n      environment text NOT NULL DEFAULT 'production',\n      bucket_start timestamptz NOT NULL,\n      bucket_granularity text NOT NULL CHECK (bucket_granularity IN ('hour', 'day')),\n      rollup_key text NOT NULL,\n      dimension_hash text NOT NULL,\n      subject_hash text NOT NULL,\n      trace_id_hash text,\n      deploy_id text,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      PRIMARY KEY (\n        project_id,\n        rollup_kind,\n        service,\n        environment,\n        bucket_start,\n        bucket_granularity,\n        rollup_key,\n        subject_hash\n      )\n    )\n  ",
+    "\n    CREATE TABLE analytics_visitor_first_seen (\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      visitor_hash text NOT NULL,\n      first_seen_at timestamptz NOT NULL,\n      last_seen_at timestamptz NOT NULL,\n      PRIMARY KEY (project_id, visitor_hash)\n    )\n  ",
+    "\n    CREATE INDEX analytics_visitor_first_seen_project_last_seen_idx\n    ON analytics_visitor_first_seen (project_id, last_seen_at DESC)\n  ",
+    "\n    CREATE INDEX analytics_rollup_uniques_project_bucket_idx\n    ON analytics_rollup_uniques (project_id, bucket_granularity, bucket_start DESC)\n  ",
+    "\n    CREATE INDEX analytics_rollup_uniques_project_trace_bucket_idx\n    ON analytics_rollup_uniques (project_id, trace_id_hash, bucket_start DESC)\n    WHERE trace_id_hash IS NOT NULL\n  ",
+    "\n    CREATE TABLE analytics_incident_correlations (\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      incident_id uuid NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,\n      event_id uuid NOT NULL,\n      service text NOT NULL DEFAULT '',\n      environment text NOT NULL DEFAULT 'production',\n      occurred_at timestamptz NOT NULL,\n      session_id_hash text,\n      trace_id_hash text,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      PRIMARY KEY (incident_id, event_id),\n      CHECK (session_id_hash IS NOT NULL OR trace_id_hash IS NOT NULL)\n    )\n  ",
+    "\n    CREATE INDEX analytics_incident_correlations_project_session_idx\n    ON analytics_incident_correlations (project_id, session_id_hash, occurred_at DESC)\n    WHERE session_id_hash IS NOT NULL\n  ",
+    "\n    CREATE INDEX analytics_incident_correlations_project_trace_idx\n    ON analytics_incident_correlations (project_id, trace_id_hash, occurred_at DESC)\n    WHERE trace_id_hash IS NOT NULL\n  ",
+    "\n    CREATE TABLE analytics_incident_session_links (\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      incident_id uuid NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,\n      service text NOT NULL DEFAULT '',\n      environment text NOT NULL DEFAULT 'production',\n      bucket_start timestamptz NOT NULL,\n      bucket_granularity text NOT NULL CHECK (bucket_granularity IN ('hour', 'day')),\n      route_key text NOT NULL,\n      dimension_hash text NOT NULL,\n      subject_hash text NOT NULL,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      PRIMARY KEY (\n        incident_id,\n        service,\n        environment,\n        bucket_start,\n        bucket_granularity,\n        route_key,\n        dimension_hash,\n        subject_hash\n      )\n    )\n  ",
+    "\n    CREATE INDEX analytics_incident_session_links_incident_bucket_idx\n    ON analytics_incident_session_links (incident_id, bucket_granularity, bucket_start DESC)\n  ",
+    "\n    CREATE TABLE analytics_session_rollups (\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      service text NOT NULL DEFAULT '',\n      environment text NOT NULL DEFAULT 'production',\n      bucket_start timestamptz NOT NULL,\n      bucket_granularity text NOT NULL CHECK (bucket_granularity IN ('hour', 'day')),\n      dimension_hash text NOT NULL,\n      dimensions jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(dimensions) = 'object'),\n      device_type text NOT NULL DEFAULT 'unknown',\n      browser_family text,\n      os_family text,\n      language text,\n      country_code text,\n      auth_state text NOT NULL DEFAULT 'unknown',\n      sessions bigint NOT NULL DEFAULT 0 CHECK (sessions >= 0),\n      active_visitors bigint NOT NULL DEFAULT 0 CHECK (active_visitors >= 0),\n      new_visitors bigint NOT NULL DEFAULT 0 CHECK (new_visitors >= 0),\n      returning_visitors bigint NOT NULL DEFAULT 0 CHECK (returning_visitors >= 0),\n      bounces bigint NOT NULL DEFAULT 0 CHECK (bounces >= 0),\n      exits bigint NOT NULL DEFAULT 0 CHECK (exits >= 0),\n      total_duration_ms bigint NOT NULL DEFAULT 0 CHECK (total_duration_ms >= 0),\n      total_pageviews bigint NOT NULL DEFAULT 0 CHECK (total_pageviews >= 0),\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      PRIMARY KEY (\n        project_id,\n        service,\n        environment,\n        bucket_start,\n        bucket_granularity,\n        dimension_hash\n      )\n    )\n  ",
+    "\n    CREATE INDEX analytics_session_rollups_project_bucket_idx\n    ON analytics_session_rollups (project_id, bucket_granularity, bucket_start DESC)\n  ",
+    "\n    CREATE INDEX analytics_session_rollups_project_device_idx\n    ON analytics_session_rollups (project_id, bucket_start DESC, device_type)\n  ",
+    "\n    CREATE TABLE analytics_route_rollups (\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      service text NOT NULL DEFAULT '',\n      environment text NOT NULL DEFAULT 'production',\n      bucket_start timestamptz NOT NULL,\n      bucket_granularity text NOT NULL CHECK (bucket_granularity IN ('hour', 'day')),\n      route_key text NOT NULL,\n      dimension_hash text NOT NULL,\n      dimensions jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(dimensions) = 'object'),\n      device_type text NOT NULL DEFAULT 'unknown',\n      browser_family text,\n      os_family text,\n      language text,\n      country_code text,\n      auth_state text NOT NULL DEFAULT 'unknown',\n      pageviews bigint NOT NULL DEFAULT 0 CHECK (pageviews >= 0),\n      unique_sessions bigint NOT NULL DEFAULT 0 CHECK (unique_sessions >= 0),\n      entrances bigint NOT NULL DEFAULT 0 CHECK (entrances >= 0),\n      exits bigint NOT NULL DEFAULT 0 CHECK (exits >= 0),\n      bounces bigint NOT NULL DEFAULT 0 CHECK (bounces >= 0),\n      duration_bucket_counts jsonb NOT NULL DEFAULT '{}'::jsonb\n        CHECK (jsonb_typeof(duration_bucket_counts) = 'object'),\n      linked_incident_sessions bigint NOT NULL DEFAULT 0 CHECK (linked_incident_sessions >= 0),\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      PRIMARY KEY (\n        project_id,\n        service,\n        environment,\n        bucket_start,\n        bucket_granularity,\n        route_key,\n        dimension_hash\n      )\n    )\n  ",
+    "\n    CREATE INDEX analytics_route_rollups_project_route_bucket_idx\n    ON analytics_route_rollups (project_id, route_key, bucket_granularity, bucket_start DESC)\n  ",
+    "\n    CREATE TABLE analytics_action_rollups (\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      service text NOT NULL DEFAULT '',\n      environment text NOT NULL DEFAULT 'production',\n      bucket_start timestamptz NOT NULL,\n      bucket_granularity text NOT NULL CHECK (bucket_granularity IN ('hour', 'day')),\n      action_key text NOT NULL,\n      route_key text NOT NULL DEFAULT '',\n      dimension_hash text NOT NULL,\n      dimensions jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(dimensions) = 'object'),\n      device_type text NOT NULL DEFAULT 'unknown',\n      browser_family text,\n      os_family text,\n      language text,\n      country_code text,\n      auth_state text NOT NULL DEFAULT 'unknown',\n      event_count bigint NOT NULL DEFAULT 0 CHECK (event_count >= 0),\n      unique_sessions bigint NOT NULL DEFAULT 0 CHECK (unique_sessions >= 0),\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      PRIMARY KEY (\n        project_id,\n        service,\n        environment,\n        bucket_start,\n        bucket_granularity,\n        action_key,\n        route_key,\n        dimension_hash\n      )\n    )\n  ",
+    "\n    CREATE INDEX analytics_action_rollups_project_action_bucket_idx\n    ON analytics_action_rollups (project_id, action_key, bucket_granularity, bucket_start DESC)\n  ",
+    "\n    CREATE TABLE analytics_funnel_definitions (\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      funnel_key text NOT NULL,\n      display_name text NOT NULL,\n      steps jsonb NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(steps) = 'array'),\n      created_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      archived_at timestamptz,\n      PRIMARY KEY (project_id, funnel_key)\n    )\n  ",
+    "\n    CREATE INDEX analytics_funnel_definitions_project_active_idx\n    ON analytics_funnel_definitions (project_id, archived_at, updated_at DESC)\n  ",
+    "\n    CREATE TABLE analytics_funnel_rollups (\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      service text NOT NULL DEFAULT '',\n      environment text NOT NULL DEFAULT 'production',\n      bucket_start timestamptz NOT NULL,\n      bucket_granularity text NOT NULL CHECK (bucket_granularity IN ('hour', 'day')),\n      funnel_key text NOT NULL,\n      step_key text NOT NULL,\n      step_order integer NOT NULL DEFAULT 0 CHECK (step_order >= 0),\n      dimension_hash text NOT NULL,\n      dimensions jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(dimensions) = 'object'),\n      device_type text NOT NULL DEFAULT 'unknown',\n      browser_family text,\n      os_family text,\n      language text,\n      country_code text,\n      auth_state text NOT NULL DEFAULT 'unknown',\n      sessions_entered bigint NOT NULL DEFAULT 0 CHECK (sessions_entered >= 0),\n      sessions_completed bigint NOT NULL DEFAULT 0 CHECK (sessions_completed >= 0),\n      dropoffs bigint NOT NULL DEFAULT 0 CHECK (dropoffs >= 0),\n      duration_bucket_counts jsonb NOT NULL DEFAULT '{}'::jsonb\n        CHECK (jsonb_typeof(duration_bucket_counts) = 'object'),\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      PRIMARY KEY (\n        project_id,\n        service,\n        environment,\n        bucket_start,\n        bucket_granularity,\n        funnel_key,\n        step_key,\n        dimension_hash\n      )\n    )\n  ",
+    "\n    CREATE INDEX analytics_funnel_rollups_project_funnel_bucket_idx\n    ON analytics_funnel_rollups (project_id, funnel_key, bucket_granularity, bucket_start DESC)\n  ",
+    "\n    CREATE TABLE analytics_transition_rollups (\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      service text NOT NULL DEFAULT '',\n      environment text NOT NULL DEFAULT 'production',\n      bucket_start timestamptz NOT NULL,\n      bucket_granularity text NOT NULL CHECK (bucket_granularity IN ('hour', 'day')),\n      from_route_key text NOT NULL,\n      to_route_key text NOT NULL,\n      dimension_hash text NOT NULL,\n      dimensions jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(dimensions) = 'object'),\n      device_type text NOT NULL DEFAULT 'unknown',\n      browser_family text,\n      os_family text,\n      language text,\n      country_code text,\n      auth_state text NOT NULL DEFAULT 'unknown',\n      transition_count bigint NOT NULL DEFAULT 0 CHECK (transition_count >= 0),\n      unique_sessions bigint NOT NULL DEFAULT 0 CHECK (unique_sessions >= 0),\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      PRIMARY KEY (\n        project_id,\n        service,\n        environment,\n        bucket_start,\n        bucket_granularity,\n        from_route_key,\n        to_route_key,\n        dimension_hash\n      )\n    )\n  ",
+    "\n    CREATE INDEX analytics_transition_rollups_project_routes_bucket_idx\n    ON analytics_transition_rollups (\n      project_id,\n      from_route_key,\n      to_route_key,\n      bucket_granularity,\n      bucket_start DESC\n    )\n  ",
+    "\n    CREATE TABLE analytics_journey_samples (\n      id uuid PRIMARY KEY,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      service text NOT NULL DEFAULT '',\n      environment text NOT NULL DEFAULT 'production',\n      session_id_hash text NOT NULL,\n      correlation_session_hash text,\n      visitor_id_hash text,\n      analysis_tags text[] NOT NULL DEFAULT '{}'::text[],\n      first_seen_at timestamptz NOT NULL,\n      last_seen_at timestamptz NOT NULL,\n      dimensions_summary jsonb NOT NULL DEFAULT '{}'::jsonb\n        CHECK (jsonb_typeof(dimensions_summary) = 'object'),\n      s3_object_key text NOT NULL,\n      has_artifact boolean NOT NULL DEFAULT false,\n      expires_at timestamptz NOT NULL,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      UNIQUE (project_id, s3_object_key)\n    )\n  ",
+    "\n    CREATE INDEX analytics_journey_samples_project_expires_idx\n    ON analytics_journey_samples (project_id, expires_at)\n  ",
+    "\n    CREATE INDEX analytics_journey_samples_project_correlation_seen_idx\n    ON analytics_journey_samples (\n      project_id,\n      correlation_session_hash,\n      service,\n      environment,\n      last_seen_at DESC,\n      id DESC\n    )\n    WHERE correlation_session_hash IS NOT NULL AND has_artifact = true\n  ",
+    "\n    CREATE INDEX analytics_journey_samples_project_seen_idx\n    ON analytics_journey_samples (project_id, last_seen_at DESC)\n  ",
+    "\n    CREATE TABLE analytics_opportunities (\n      id uuid PRIMARY KEY,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      service text,\n      environment text,\n      kind text NOT NULL CHECK (kind IN ('usage_summary', 'route_health', 'funnel_dropoff', 'journey_friction', 'feature_usage', 'incident_impact', 'deploy_comparison', 'conversion_path')),\n      status text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'resolved', 'snoozed')),\n      severity text NOT NULL CHECK (severity IN ('low', 'medium', 'high')),\n      confidence numeric NOT NULL CHECK (confidence >= 0 AND confidence <= 1),\n      fingerprint text NOT NULL,\n      title text NOT NULL,\n      summary text NOT NULL,\n      evidence jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(evidence) = 'object'),\n      related_incident_ids uuid[] NOT NULL DEFAULT '{}'::uuid[],\n      related_deploy_ids text[] NOT NULL DEFAULT '{}'::text[],\n      first_detected_at timestamptz NOT NULL,\n      last_detected_at timestamptz NOT NULL,\n      resolved_at timestamptz,\n      snoozed_until timestamptz,\n      bundle_status text NOT NULL DEFAULT 'not_requested'\n        CHECK (bundle_status IN ('not_requested', 'pending', 'running', 'completed', 'failed')),\n      bundle_object_key text,\n      bundle_failure_reason text,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      UNIQUE (project_id, fingerprint)\n    )\n  ",
+    "\n    CREATE INDEX analytics_opportunities_project_status_detected_idx\n    ON analytics_opportunities (project_id, status, last_detected_at DESC)\n  ",
+    "\n    CREATE INDEX analytics_opportunities_project_kind_detected_idx\n    ON analytics_opportunities (project_id, kind, last_detected_at DESC)\n  ",
+    "\n    CREATE TABLE analytics_bundle_generations (\n      id uuid PRIMARY KEY,\n      project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n      opportunity_id uuid REFERENCES analytics_opportunities(id) ON DELETE SET NULL,\n      requested_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,\n      analysis_kind text NOT NULL CHECK (analysis_kind IN ('usage_summary', 'route_health', 'funnel_dropoff', 'journey_friction', 'feature_usage', 'incident_impact', 'deploy_comparison', 'conversion_path')),\n      analysis_spec jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(analysis_spec) = 'object'),\n      input_fingerprint text NOT NULL,\n      status text NOT NULL DEFAULT 'pending'\n        CHECK (status IN ('pending', 'running', 'completed', 'failed')),\n      object_key text,\n      failure_reason text,\n      created_at timestamptz NOT NULL DEFAULT now(),\n      claimed_at timestamptz,\n      completed_at timestamptz,\n      updated_at timestamptz NOT NULL DEFAULT now(),\n      UNIQUE (project_id, input_fingerprint)\n    )\n  ",
+    "\n    CREATE INDEX analytics_bundle_generations_status_created_idx\n    ON analytics_bundle_generations (status, created_at)\n  ",
+    "\n    CREATE INDEX analytics_bundle_generations_project_created_idx\n    ON analytics_bundle_generations (project_id, created_at DESC)\n  ",
+    "CREATE TABLE worker_jobs (\n    id text PRIMARY KEY,\n    job_name text NOT NULL,\n    project_id uuid REFERENCES projects(id) ON DELETE CASCADE,\n    payload jsonb,\n    depends_on text REFERENCES worker_jobs(id) ON DELETE RESTRICT,\n    status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'running', 'completed', 'failed', 'skipped')),\n    attempts integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),\n    operator_retries integer NOT NULL DEFAULT 0 CHECK (operator_retries >= 0),\n    available_at timestamptz NOT NULL DEFAULT now(),\n    lease_token uuid,\n    lease_expires_at timestamptz,\n    last_error_code text,\n    created_at timestamptz NOT NULL DEFAULT now(),\n    updated_at timestamptz NOT NULL DEFAULT now(),\n    expires_at timestamptz NOT NULL DEFAULT now() + interval '7 days',\n    CHECK ((status = 'running') = (lease_token IS NOT NULL AND lease_expires_at IS NOT NULL)),\n    CHECK (payload IS NULL OR jsonb_typeof(payload) = 'object')\n  )",
+    "CREATE INDEX worker_jobs_pending_idx ON worker_jobs(job_name, available_at, created_at, id) WHERE status = 'pending'",
+    "CREATE INDEX worker_jobs_running_idx ON worker_jobs(lease_expires_at) WHERE status = 'running'",
+    "CREATE INDEX worker_jobs_expiry_idx ON worker_jobs(expires_at)",
+    "CREATE INDEX worker_jobs_project_idx ON worker_jobs(project_id)",
+    "CREATE INDEX worker_jobs_dependency_idx ON worker_jobs(depends_on) WHERE depends_on IS NOT NULL",
+    "CREATE INDEX worker_jobs_status_idx ON worker_jobs(status, created_at) WHERE status IN ('pending', 'running', 'failed')",
+    "CREATE TABLE analytics_flow_definitions (\n    id uuid PRIMARY KEY, project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n    flow_key text NOT NULL, version integer NOT NULL DEFAULT 1, definition jsonb NOT NULL,\n    archived_at timestamptz, created_at timestamptz NOT NULL, updated_at timestamptz NOT NULL,\n    UNIQUE(project_id, flow_key)\n  )",
+    "CREATE TABLE analytics_flow_runs (\n    id uuid PRIMARY KEY, flow_id uuid NOT NULL REFERENCES analytics_flow_definitions(id) ON DELETE CASCADE,\n    version integer NOT NULL, context_hash text NOT NULL UNIQUE, origin text NOT NULL,\n    start_index integer NOT NULL, last_index integer NOT NULL,\n    source text NOT NULL DEFAULT 'unknown', campaign text NOT NULL DEFAULT '',\n    started_at timestamptz NOT NULL, last_step_at timestamptz NOT NULL, expires_at timestamptz NOT NULL,\n    CHECK (start_index BETWEEN 0 AND 7 AND last_index BETWEEN start_index AND 7),\n    CHECK (expires_at > started_at AND expires_at <= started_at + interval '24 hours')\n  )",
+    "CREATE INDEX analytics_flow_runs_expiry_idx ON analytics_flow_runs(expires_at, id)",
+    "CREATE TABLE analytics_flow_handoffs (\n    id uuid PRIMARY KEY, run_id uuid NOT NULL REFERENCES analytics_flow_runs(id) ON DELETE CASCADE,\n    token_hash text NOT NULL UNIQUE, step_index integer NOT NULL, expires_at timestamptz NOT NULL,\n    redeemed_context_hash text, UNIQUE(run_id, step_index)\n  )",
+    "CREATE INDEX analytics_flow_handoffs_expiry_idx ON analytics_flow_handoffs(expires_at, id)",
+    "CREATE TABLE analytics_flow_rollups (\n    flow_id uuid NOT NULL REFERENCES analytics_flow_definitions(id) ON DELETE CASCADE,\n    version integer NOT NULL, cohort_date date NOT NULL, step_index integer NOT NULL,\n    source text NOT NULL, campaign text NOT NULL, reached bigint NOT NULL DEFAULT 0,\n    unlinked bigint NOT NULL DEFAULT 0, elapsed_ms double precision NOT NULL DEFAULT 0,\n    elapsed_count bigint NOT NULL DEFAULT 0,\n    PRIMARY KEY(flow_id, version, cohort_date, step_index, source, campaign)\n  )",
+    "CREATE INDEX analytics_flow_rollups_expiry_idx ON analytics_flow_rollups(cohort_date, flow_id)",
+    "CREATE TABLE public_status_pages (\n    id uuid PRIMARY KEY, anchor_project_id uuid NOT NULL UNIQUE REFERENCES projects(id) ON DELETE CASCADE,\n    owner_user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,\n    organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,\n    public_id text NOT NULL UNIQUE CHECK (public_id ~ '^[a-f0-9]{24}$'),\n    title text NOT NULL CHECK (length(title) BETWEEN 1 AND 120), enabled boolean NOT NULL DEFAULT false,\n    created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()\n  )",
+    "CREATE TABLE public_status_page_projects (\n    page_id uuid NOT NULL REFERENCES public_status_pages(id) ON DELETE CASCADE,\n    project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n    position integer NOT NULL CHECK (position BETWEEN 0 AND 49), PRIMARY KEY(page_id, project_id)\n  )",
+    "CREATE TABLE public_status_page_checks (\n    page_id uuid NOT NULL, project_id uuid NOT NULL, check_id uuid NOT NULL REFERENCES availability_checks(id) ON DELETE CASCADE,\n    PRIMARY KEY(page_id, check_id), FOREIGN KEY(page_id, project_id) REFERENCES public_status_page_projects(page_id, project_id) ON DELETE CASCADE\n  )",
+    "CREATE INDEX public_status_page_projects_project_idx ON public_status_page_projects(project_id)",
+    "CREATE INDEX public_status_page_checks_check_idx ON public_status_page_checks(check_id)",
+    "CREATE TABLE notification_preferences (\n    id uuid PRIMARY KEY,\n    user_id uuid REFERENCES users(id) ON DELETE CASCADE,\n    organization_id uuid REFERENCES organizations(id) ON DELETE CASCADE,\n    project_id uuid REFERENCES projects(id) ON DELETE CASCADE,\n    preferences jsonb NOT NULL,\n    updated_at timestamptz NOT NULL DEFAULT now(),\n    CHECK ((user_id IS NULL) <> (organization_id IS NULL)),\n    UNIQUE NULLS NOT DISTINCT(user_id, organization_id, project_id)\n  )",
+    "CREATE TABLE notification_daily_batches (\n    id uuid PRIMARY KEY, recipient text NOT NULL,\n    schedule_time text NOT NULL, schedule_timezone text NOT NULL, due_at timestamptz NOT NULL,\n    status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','delivered','suppressed','failed')),\n    claim_token uuid, claimed_until timestamptz, attempts integer NOT NULL DEFAULT 0,\n    next_attempt_at timestamptz NOT NULL, last_error text, delivered_at timestamptz,\n    created_at timestamptz NOT NULL DEFAULT now(),\n    UNIQUE(recipient, schedule_time, schedule_timezone, due_at)\n  )",
+    "CREATE INDEX notification_daily_due_idx ON notification_daily_batches(next_attempt_at)\n    WHERE status = 'pending'",
+    "CREATE TABLE notification_daily_items (\n    id uuid PRIMARY KEY, batch_id uuid NOT NULL REFERENCES notification_daily_batches(id) ON DELETE CASCADE,\n    project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n    alert_id uuid NOT NULL REFERENCES alert_rules(id) ON DELETE CASCADE,\n    incident_id uuid NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,\n    recipient_user_id uuid REFERENCES users(id) ON DELETE CASCADE,\n    episode_at timestamptz NOT NULL, occurred_at timestamptz NOT NULL, billable boolean NOT NULL DEFAULT true,\n    notification_key text NOT NULL DEFAULT '',\n    created_at timestamptz NOT NULL DEFAULT now(),\n    UNIQUE(alert_id, incident_id, episode_at)\n  )",
+    "CREATE INDEX notification_daily_items_batch_idx ON notification_daily_items(batch_id, incident_id)",
+    "CREATE INDEX notification_daily_items_cooldown_idx ON notification_daily_items(alert_id, notification_key, created_at)",
+    "CREATE INDEX notification_daily_items_incident_idx ON notification_daily_items(incident_id, episode_at)",
+    "CREATE INDEX notification_daily_items_project_idx ON notification_daily_items(project_id, batch_id)",
+    "CREATE INDEX notification_daily_items_user_idx ON notification_daily_items(recipient_user_id) WHERE recipient_user_id IS NOT NULL",
+    "CREATE INDEX notification_daily_retention_idx ON notification_daily_batches(created_at)",
+    "CREATE INDEX notification_preferences_organization_idx ON notification_preferences(organization_id, project_id) WHERE organization_id IS NOT NULL",
+    "CREATE INDEX notification_preferences_project_idx ON notification_preferences(project_id) WHERE project_id IS NOT NULL",
+    "CREATE TABLE notification_daily_allowance_usage (\n    batch_id uuid NOT NULL,\n    project_id uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,\n    billable boolean NOT NULL,\n    created_at timestamptz NOT NULL DEFAULT now(),\n    PRIMARY KEY(batch_id, project_id)\n  )",
+    "CREATE INDEX notification_daily_allowance_project_idx ON notification_daily_allowance_usage(project_id, created_at)",
+    "CREATE TABLE billing_checkout_attempts (\n    organization_id uuid PRIMARY KEY REFERENCES organizations(id) ON DELETE CASCADE,\n    id uuid NOT NULL UNIQUE,\n    target_plan text NOT NULL CHECK (target_plan IN ('solo','team')),\n    parameters jsonb NOT NULL CHECK (jsonb_typeof(parameters) = 'object'),\n    stripe_session_id text UNIQUE,\n    created_at timestamptz NOT NULL DEFAULT now()\n  )",
+    "CREATE TABLE billing_subscription_operations (\n    organization_id uuid PRIMARY KEY REFERENCES organizations(id) ON DELETE CASCADE,\n    id uuid NOT NULL UNIQUE,\n    subscription_id text NOT NULL,\n    customer_id text NOT NULL,\n    kind text NOT NULL CHECK (kind IN ('upgrade','capacity_increase','capacity_schedule','capacity_cancel','plan_schedule','plan_cancel')),\n    intent jsonb NOT NULL CHECK (jsonb_typeof(intent) = 'object'),\n    parameters jsonb CHECK (jsonb_typeof(parameters) = 'object'),\n    resource_id text,\n    created_at timestamptz NOT NULL DEFAULT now(),\n    completed_at timestamptz\n  )"
+  ],
+  "migrations": [
+    {
+      "id": "202605050001_add_auth_suspension_columns",
+      "description": "Add organization and membership suspension timestamps used by auth gates.",
+      "checksum": "da8428f2dd5a386fa67216a5eacbddd477f33c8f89a5abb67e2e16d7b071c4bd"
+    },
+    {
+      "id": "202605120001_add_github_device_authorizations",
+      "description": "Add persisted GitHub CLI bootstrap state for device-flow login.",
+      "checksum": "e9259e6a51111eeba22fa455b6efc778d22061fb5d2eefd19762084fccd58c90"
+    },
+    {
+      "id": "202605130001_allow_synthetic_webhook_test_deliveries_without_incident_fk",
+      "description": "Allow webhook test deliveries to persist without requiring a backing incidents row.",
+      "checksum": "523f69dbc4da1c191cbad65e36a88b220a98d1a6978e2fa1fcf612eb05772b23"
+    },
+    {
+      "id": "202605130002_add_slack_destinations",
+      "description": "Add reusable encrypted Slack alert destinations scoped to organizations.",
+      "checksum": "034950ce34c351093758b8db4a6c37293525987337cb1302d82146b04022ac50"
+    },
+    {
+      "id": "202605140001_add_capture_policy_immediate_client_error_statuses",
+      "description": "Add nullable immediate client error status overrides to capture policies.",
+      "checksum": "bd898d15960cd7799963e07b4c67db448aa4ca54c5c595349b7caca1471e094b"
+    },
+    {
+      "id": "202605150001_add_user_avatar_columns",
+      "description": "Add cached user avatar metadata for GitHub and Gravatar profile images.",
+      "checksum": "98fa808114abf982c53be7e77fa62ec536c5ec4ab081ab2809c78a881255bd0f"
+    },
+    {
+      "id": "202605170001_add_alert_email_digest_queue",
+      "description": "Add queued email alert digests and digest items for fixed-window alert batching.",
+      "checksum": "162dd119806545ac6951b1eb622668f70fd3b0f1d8f2320f796dc640f06eb514"
+    },
+    {
+      "id": "202605180001_add_skipped_github_dispatch_status",
+      "description": "Allow GitHub dispatch delivery history to record rate-limited skips without retrying them.",
+      "checksum": "39518631255a2b4d693b64a38f4a05849ce2e71c461dab734f66468bd83e64c9"
+    },
+    {
+      "id": "202605180002_add_project_improvement_settings",
+      "description": "Add project-level automated improvement settings columns.",
+      "checksum": "35859978ee4e6b108e20bad4fab90fe5b51f6d5a72037631c111d702f51a7b1b"
+    },
+    {
+      "id": "202605180003_add_improvement_opportunities_and_bundle_generation_shape",
+      "description": "Add hosted improvement opportunity storage and allow bundle generations to reference improvements directly.",
+      "checksum": "078249a303728d0b064bfbcdc3979a557a921f6347db8a904f1a154ccd78400c"
+    },
+    {
+      "id": "202605180004_add_operational_email_deliveries",
+      "description": "Add durable operational email delivery queue with retries and dedupe.",
+      "checksum": "1f5933daa03f5f773944ad2d49738686dd2f37619573be1909572e1f7f6d78b3"
+    },
+    {
+      "id": "202605180005_add_github_improvement_dispatch_targets",
+      "description": "Allow GitHub dispatch deliveries to target either incidents or hosted improvements.",
+      "checksum": "be92e786f928db473cd74a99d808153ac980cd3f812de60a88c8de02d3b9fb50"
+    },
+    {
+      "id": "202605180006_add_missing_bundle_and_creator_columns",
+      "description": "Backfill creator ownership columns and incident bundle tracking columns that existed only in bootstrap schema.",
+      "checksum": "e808f2da55dbae52b2a3560b82bc9407f7913b9f6c76b19b9c2a3a13bf19e604"
+    },
+    {
+      "id": "202605200001_limit_weekly_report_email_channel_per_project",
+      "description": "Keep weekly email reports singular per project.",
+      "checksum": "8dc490d91252cb1ace9b917eb9d7834a827d841756547d1aa70b50a87954eb6f"
+    },
+    {
+      "id": "202605220001_add_project_token_allowed_origins",
+      "description": "Add optional browser-origin allowlists to project ingestion tokens.",
+      "checksum": "2a1d7e55c9a23d736ad266c72840c68518a994f0782b851516d5279d313c30be"
+    },
+    {
+      "id": "202605260001_fix_weekly_report_delivery_conflict_index",
+      "description": "Ensure weekly report delivery dedupe rows and partial unique index exist for conflict claims.",
+      "checksum": "97d8fd174eb4dd858c101d4dfbda01da8fbe00dabba67fbef052e97ec6b01bf3"
+    },
+    {
+      "id": "202605260001_set_high_confidence_as_project_improvement_default",
+      "description": "Make high-confidence the default hosted improvement sensitivity for new projects.",
+      "checksum": "77a8ecdf2e2f4ada9a01f236eb7992dd164e9e753e862351b28eee4ea3373bf9"
+    },
+    {
+      "id": "202605260002_add_capture_rules",
+      "description": "Add persisted project capture rules for dynamic demote/sample/drop handling.",
+      "checksum": "fa8aa48a3a2008be57d3266a5f270e58a18139410c1ffd8d8fb50a3a17b84676"
+    },
+    {
+      "id": "202606020001_add_github_marketplace_tracking",
+      "description": "Add GitHub Marketplace purchase tracking tables and webhook idempotency ledger.",
+      "checksum": "12094890d5e46cabffa3d8442e1ccfcc978c34e3e4b289b41510dcdf0799b6c1"
+    },
+    {
+      "id": "202606030001_add_alert_notification_cooldowns_and_rule_window",
+      "description": "Add configurable alert cooldown windows and notification keys for cross-incident suppression.",
+      "checksum": "ce3df814f1e47459d2e80945af351127a11f49286fa3903b3e85e8ed415e3405"
+    },
+    {
+      "id": "202606040001_add_no_card_trial_billing_state",
+      "description": "Add organization no-card trial metadata and the lifecycle event ledger.",
+      "checksum": "a71061accff949e78a4e43a3bb580dc1b28d718229348bce68279145c3b4a85a"
+    },
+    {
+      "id": "202606040002_expand_operational_emails_for_trial_lifecycle",
+      "description": "Allow operational email deliveries without a project and add no-card trial email kinds.",
+      "checksum": "44915ef341b8849bbfb83595826f99c5cfe818544dd95f4af31fc5405988224b"
+    },
+    {
+      "id": "202606050001_preserve_github_dispatch_history_when_rules_are_deleted",
+      "description": "Snapshot GitHub rule names onto deliveries and decouple delivery history from live rule rows.",
+      "checksum": "cba0a44699a7131c521ec6f716272929404c647aed1a10ee2e8c4ff55d06ce13"
+    },
+    {
+      "id": "202606050002_add_durable_plan_cleanup_tasks",
+      "description": "Persist retryable external cleanup tasks for side effects that cannot be completed transactionally.",
+      "checksum": "875318a837bd3a11adf8844b2d3225cfdbed0de94006d05c98cb343aebacd614"
+    },
+    {
+      "id": "202606080001_add_capture_policy_client_error_path_rules",
+      "description": "Add path-scoped client error incident promotion rules to capture policies.",
+      "checksum": "50eb22e554725b7dbb88c70755bfbc1297c97e07573c7fd3c6108eb5e377b483"
+    },
+    {
+      "id": "202606100001_add_project_usage_counters",
+      "description": "Add durable project-level raw ingestion counters for project dashboard metrics.",
+      "checksum": "c734467b34b1fc5ed39ae40e4ed475da6ff41b5806a4448857921718a98b0ff3"
+    },
+    {
+      "id": "202606100002_add_account_deletion_challenges",
+      "description": "Add scoped OTP challenges for account deletion confirmation.",
+      "checksum": "ce1038d36c446a42fac8ba73a14116fe448415174b12419d75b1ebbe34401a89"
+    },
+    {
+      "id": "202606100003_add_account_analytics_and_payment_retention",
+      "description": "Add deletion-safe account analytics and payment retention ledgers.",
+      "checksum": "7e606dd0615f43a61d531b2f3fee74a09bb5df69f7011fbc8796a3d69df46e43"
+    },
+    {
+      "id": "202606120001_add_session_auth_method",
+      "description": "Track the auth method used to create each browser session.",
+      "checksum": "6b9164f2c233416d97d1dc98780f154e5dcc315bcea905096b37ef640b6abc1c"
+    },
+    {
+      "id": "202606130001_retire_expired_project_invites",
+      "description": "Retire already-expired project invites so re-inviting the same email is unblocked.",
+      "checksum": "a51610659ad6e209123924f6c9bce44bb9d8d789f923fdfef7d829c5c7df9321"
+    },
+    {
+      "id": "202606140001_add_ingestion_rejection_diagnostics",
+      "description": "Track sanitized ingestion rejection diagnostics for operator breakdowns.",
+      "checksum": "7fadbb62e5ed6e76c2bfc7c2270b4471ba6eaec8a609aed625c3adf4a28343eb"
+    },
+    {
+      "id": "202606150001_add_availability_checks",
+      "description": "Add project-scoped availability checks, result history, and daily rollups.",
+      "checksum": "d9cc2ec31e59f273bf2edb7f8d43c8335a73e4dac35bb794eeae6bf5b06b7d4c"
+    },
+    {
+      "id": "202606170001_add_project_color_tags",
+      "description": "Add optional project color tags for project metadata and retrieval surfaces.",
+      "checksum": "4e06fd02ec2d91a5af96c36a984e18a293e56f16ce882f0d3ac38ce6891467ec"
+    },
+    {
+      "id": "202606180001_lower_availability_check_timeout_default",
+      "description": "Lower the database default timeout for newly inserted availability checks while preserving existing rows and the explicit 5000ms maximum.",
+      "checksum": "e17e30764fc414c2e4a05efc3a34a9c84d294664965c0dd8eb8f8e4bf03bd473"
+    },
+    {
+      "id": "202606260001_add_alert_severity_lifecycle_scope",
+      "description": "Add lifecycle scope for severity-threshold alert rules so new incidents and regressions can notify independently.",
+      "checksum": "efc5693edc5706eb4d3ade87d29491631c23bc101a69cdb26d1f6546bf518725"
+    },
+    {
+      "id": "202607070001_add_analyticsbundle_storage",
+      "description": "Add aggregate-first AnalyticsBundle settings, rollups, journey samples, opportunities, and generation metadata.",
+      "checksum": "8c4b01f9e2cf59bbd87a3666a663ea386a61e0f18d1d40dad217c5861a13ccb7"
+    },
+    {
+      "id": "202607080001_add_analytics_transition_unique_subjects",
+      "description": "Allow analytics transition rollups to track exact unique sessions in the aggregate unique-subject ledger.",
+      "checksum": "2ccc6e6121811f93e992dd69219aca0a7db50964186f98c7d6a67324ecbad826"
+    },
+    {
+      "id": "202607090001_add_analytics_usage_counters",
+      "description": "Add durable organization-scoped analytics allowance counters for event, session, and AnalyticsBundle generation quota enforcement.",
+      "checksum": "78d8203e8547a7573e6d0244544af2e0550a6e4c687ff57d877ec56820c5578e"
+    },
+    {
+      "id": "202607090002_add_analytics_journey_sample_usage_counter",
+      "description": "Add durable retained journey sample allowance accounting to analytics usage counters.",
+      "checksum": "0366cd1117844bd9f2d236128342a2f015e3a486b9c587eccfc08d94973c005d"
+    },
+    {
+      "id": "202607090003_add_analytics_journey_sample_artifact_visibility",
+      "description": "Track whether retained journey sample metadata has a completed artifact before public reads expose it.",
+      "checksum": "08eb34f36410c791eb164e536c912ad0d5b2c1c000cfdd7995ca9f454e25d408"
+    },
+    {
+      "id": "202607100001_add_analytics_incident_correlation",
+      "description": "Add privacy-safe, idempotent analytics session correlation for incident impact and deploy-aware rollups.",
+      "checksum": "d64add97e40609c6c1645f4821f891c5bb7740d026ab1d1eaac58401d9a39106"
+    },
+    {
+      "id": "202607100002_add_analytics_journey_sample_correlation_hash",
+      "description": "Store a project-scoped session subject hash on retained journey samples so incident-impact replay selection can require an exact affected-session match.",
+      "checksum": "684433d9d025f30cf3a1d4a509f2e594286f58855019df2aa2a23392cd3876dc"
+    },
+    {
+      "id": "202607130001_expand_default_saved_funnel_capacity",
+      "description": "Replace the provisional three-funnel default with the current Solo and Team tier capacities.",
+      "checksum": "0a6e3f6852063939a9292e2a8aeadd50d19b9551f00523137dff84e3f01c7f65"
+    },
+    {
+      "id": "202607140001_enable_free_analytics_preview",
+      "description": "Expand existing Free project analytics settings to the included preview funnel capacity.",
+      "checksum": "ac234e8076675759c88ded1a0d4367aaff2e1af16965ec16480940fef3b98dcd"
+    },
+    {
+      "id": "202607140002_expand_custom_dimension_capacity",
+      "description": "Expand existing zero custom-dimension settings to the current hosted tier capacities.",
+      "checksum": "a7ac6c3ebf8772a66d6d9342968df1d4fe811110abb94d6b7c4975e689aa19e7"
+    },
+    {
+      "id": "202607160001_complete_analytics_session_metrics",
+      "description": "Track exact active and returning visitors, populate session outcomes, and prevent cross-dimension unique overcounting.",
+      "checksum": "2ffd5fc1c38ca4e9e76f61617b4ae6281e1fe1cd4e3d9e560f478472390049ac"
+    },
+    {
+      "id": "202607160002_add_analytics_hourly_retention",
+      "description": "Add explicit bounded hourly-rollup retention with hosted tier defaults.",
+      "checksum": "5f8d000ca0146d6848fdd871686324c5a7cc54abe630b8d75ca11711d4d061a9"
+    },
+    {
+      "id": "202608300001_add_openai_oauth_records",
+      "description": "Add bounded OAuth credentials and durable oidc-provider adapter records for hosted MCP.",
+      "checksum": "cd206162512dd642e8478825ea94527aabae91dce99d9b35f8e12aa9efa6fd51"
+    },
+    {
+      "id": "202609130001_add_durable_worker_jobs",
+      "description": "Persist worker handoffs, bounded retries, and fenced processing leases",
+      "checksum": "7af3febc4c30c12315191342efe3dbe106a4c758c5b75d8a8aa70bc5c5707ab5"
+    },
+    {
+      "id": "202609160001_add_browser_resource_routes",
+      "description": "Retain sanitized browser resource routes independently of raw event sampling.",
+      "checksum": "5dd0f8eae5e8b3ce1129e30590914636cb7970ac7afce682a8ff137e7d3a23fe"
+    },
+    {
+      "id": "202609200001_add_project_scoped_agent_tokens",
+      "description": "Add separately prefixed, expiring single-project agent credentials without widening member tokens.",
+      "checksum": "a1dfaa1f77a139e0029d0cbd24efd4cb0ea8175272f063293b111eb309a01f2a"
+    },
+    {
+      "id": "202609220001_add_browser_recovery_context",
+      "description": "Index browser recovery context and separate burst suppression from alert cooldown identity",
+      "checksum": "6527e76c357a97f93dc67d167903bb858adf3ca33511df4c863c14131c9991c6"
+    },
+    {
+      "id": "202609240001_add_alert_delivery_members",
+      "description": "Retain incident identities represented by one coherent alert delivery.",
+      "checksum": "9acb28a65f7199c2529ea63f7b33ced51dd0e75efe079a752f68f9004030ea64"
+    },
+    {
+      "id": "202609240002_add_alert_webhook_signing_secret",
+      "description": "Store custom alert-webhook signing secrets separately from readable rule config.",
+      "checksum": "7574725e02a2178a59e308f65965fd8fa69b3110277616e9847908d9830ea4ec"
+    },
+    {
+      "id": "202609250001_add_alert_evaluation_owner",
+      "description": "Bind direct alert retries to the durable evaluation job that created the intent.",
+      "checksum": "1edc483b01372840deb6095df8d6e75bfc0d28ea2c4adae57fbd6d87bef063df"
+    },
+    {
+      "id": "202609250002_version_alert_webhook_payloads",
+      "description": "Preserve legacy custom webhook bodies while enforcing signatures for every delivery.",
+      "checksum": "b82dde8816a1c1a493f2dfbdeeb6ed0dfb72d08a59a215280adac46b3c1741bd"
+    },
+    {
+      "id": "202610030001_add_public_analytics_flows",
+      "description": "Add customer project flow definitions, bounded continuity and aggregate reports.",
+      "checksum": "75f75659bff0498009e0d210bca5848cf753850ea314bfde247a0a431715b722"
+    },
+    {
+      "id": "202610080001_add_public_status_pages",
+      "description": "Add opt-in, explicitly selected public availability pages.",
+      "checksum": "178d76996c160d95b47aa9c852e1b6f3c57703435e54b174605a28972ccab1da"
+    },
+    {
+      "id": "202610180001_add_notification_preferences",
+      "description": "Add scoped notification policies and durable daily incident digest references.",
+      "checksum": "9bb6c3b38bb244584cc2c24bd83cd0ce20c065814fb81431a751cf6ad463551d"
+    },
+    {
+      "id": "202610220001_add_billing_checkout_attempts",
+      "description": "Coordinate one durable, idempotent hosted checkout per organisation.",
+      "checksum": "89619f785d0bf01f688204ee1027896f08a450be2d0d112966ad1d16bf0e1afe"
+    },
+    {
+      "id": "202610220002_add_billing_subscription_operations",
+      "description": "Serialize durable subscription upgrades and capacity mutations",
+      "checksum": "73d954e1c3729be94e7a6782bc957f6ff23a6a6d9ae37c667c6871b4d482fecd"
+    },
+    {
+      "id": "202610220003_add_billing_lifecycle_notifications",
+      "description": "Queue billing lifecycle notifications atomically with webhook state",
+      "checksum": "c59d30ee469823436ce8b232763229e75e8c38f3a35374431a6d3b315850b98c"
+    },
+    {
+      "id": "202610220004_add_billing_plan_change_operations",
+      "description": "Allow durable same-subscription plan schedules and their cancellation",
+      "checksum": "1bd22e9fdf73f65fc3dddc7a03cc1dd52bcdb5ec284b66ffc524005cf11c3bc9"
+    },
+    {
+      "id": "202610260001_add_typed_evidence_context",
+      "description": "Index scoped diagnostic context with immutable receipts and bounded retention; add independent context policy override",
+      "checksum": "589c0380e15f817a7555fcce1182885cda5d9edd677298ca21278a785ee2cb17"
+    }
+  ]
+}

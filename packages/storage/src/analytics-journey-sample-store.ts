@@ -14,7 +14,9 @@ export interface AnalyticsJourneySamplesCursor {
 
 export interface AnalyticsJourneySampleStore {
   reserveAnalyticsJourneySample(input: AnalyticsJourneySampleRecord): Promise<"created" | "exists">;
-  recordAnalyticsJourneySample(input: AnalyticsJourneySampleRecord): Promise<AnalyticsJourneySampleRecord>;
+  recordAnalyticsJourneySample(
+    input: AnalyticsJourneySampleRecord
+  ): Promise<AnalyticsJourneySampleRecord>;
   deleteAnalyticsJourneySampleForProject(input: {
     project_id: string;
     sample_id: string;
@@ -30,6 +32,7 @@ export interface AnalyticsJourneySampleStore {
   }): Promise<{ samples: AnalyticsJourneySampleRecord[]; next_cursor: string | null }>;
   getAnalyticsJourneySampleForProject(input: {
     project_id: string;
+    origin_project_ids?: string[];
     sample_id: string;
     now: string;
   }): Promise<AnalyticsJourneySampleRecord | null>;
@@ -60,7 +63,9 @@ export function buildAnalyticsJourneySamplesCursor(input: {
   return `${input.last_seen_at}|${input.sample_id}`;
 }
 
-export function createPostgresAnalyticsJourneySampleStore(db: Queryable): AnalyticsJourneySampleStore {
+export function createPostgresAnalyticsJourneySampleStore(
+  db: Queryable
+): AnalyticsJourneySampleStore {
   function toIsoString(value: string): string {
     const timestamp = new Date(value);
     if (Number.isNaN(timestamp.getTime())) {
@@ -99,11 +104,15 @@ export function createPostgresAnalyticsJourneySampleStore(db: Queryable): Analyt
     now: string;
   }): Promise<{ samples: AnalyticsJourneySampleRecord[]; next_cursor: string | null }> {
     const params: unknown[] = [input.project_id, input.now];
-    const where = ["project_id = $1::uuid", "expires_at > $2::timestamptz", "has_artifact = true"];
+    const where = [
+      "project_id=ANY(debugbundle_project_origins($1::uuid))",
+      "expires_at > $2::timestamptz",
+      "has_artifact = true"
+    ];
 
     if (input.service !== undefined) {
       params.push(input.service);
-      where.push(`service = $${params.length}`);
+      where.push(`debugbundle_service_matches($1::uuid,project_id,service,$${params.length})`);
     }
     if (input.environment !== undefined) {
       params.push(input.environment);
@@ -115,7 +124,9 @@ export function createPostgresAnalyticsJourneySampleStore(db: Queryable): Analyt
     }
     if (input.cursor !== undefined) {
       params.push(input.cursor.last_seen_at, input.cursor.sample_id);
-      where.push(`(last_seen_at, id) < ($${params.length - 1}::timestamptz, $${params.length}::uuid)`);
+      where.push(
+        `(last_seen_at, id) < ($${params.length - 1}::timestamptz, $${params.length}::uuid)`
+      );
     }
 
     params.push(input.limit + 1);
@@ -152,12 +163,13 @@ export function createPostgresAnalyticsJourneySampleStore(db: Queryable): Analyt
 
     return {
       samples: visible,
-      next_cursor: overflow === undefined || lastVisible === undefined
-        ? null
-        : buildAnalyticsJourneySamplesCursor({
-            last_seen_at: lastVisible.last_seen_at,
-            sample_id: lastVisible.sample_id
-          })
+      next_cursor:
+        overflow === undefined || lastVisible === undefined
+          ? null
+          : buildAnalyticsJourneySamplesCursor({
+              last_seen_at: lastVisible.last_seen_at,
+              sample_id: lastVisible.sample_id
+            })
     };
   }
 
@@ -358,12 +370,13 @@ export function createPostgresAnalyticsJourneySampleStore(db: Queryable): Analyt
             expires_at::text AS expires_at,
             created_at::text AS created_at
           FROM analytics_journey_samples
-          WHERE project_id = $1::uuid
+          WHERE project_id=ANY(debugbundle_project_origins($1::uuid))
+            AND ($4::uuid[] IS NULL OR project_id=ANY($4::uuid[]))
             AND id = $2::uuid
             AND expires_at > $3::timestamptz
             AND has_artifact = true
         `,
-        [input.project_id, input.sample_id, input.now]
+        [input.project_id, input.sample_id, input.now, input.origin_project_ids ?? null]
       );
 
       return result.rows[0] === undefined ? null : toRecord(result.rows[0]);

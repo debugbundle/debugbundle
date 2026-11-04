@@ -65,11 +65,18 @@ function projectAnalyticsRead<T>(value: unknown, schema: z.ZodType<T>): T | null
   return parsed.success ? parsed.data : null;
 }
 
-function sendProjectedAnalyticsRead<T>(reply: FastifyReply, value: unknown, schema: z.ZodType<T>): FastifyReply {
+function sendProjectedAnalyticsRead<T>(
+  reply: FastifyReply,
+  value: unknown,
+  schema: z.ZodType<T>
+): FastifyReply {
   const projected = projectAnalyticsRead(value, schema);
   return projected === null
     ? reply.status(503).send({ error: "privacy_projection_unavailable" })
-    : reply.header("x-debugbundle-privacy-policy", "telemetry-privacy-v1").status(200).send(projected);
+    : reply
+        .header("x-debugbundle-privacy-policy", "telemetry-privacy-v1")
+        .status(200)
+        .send(projected);
 }
 
 export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
@@ -99,7 +106,9 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
         : { bundle_status: parsedQuery.data.bundle_status }),
       ...(parsedQuery.data.from === undefined ? {} : { from: parsedQuery.data.from }),
       ...(parsedQuery.data.to === undefined ? {} : { to: parsedQuery.data.to }),
-      ...(parsedQuery.data.include_total === "true" && parsedCursor === null ? { include_total: true } : {}),
+      ...(parsedQuery.data.include_total === "true" && parsedCursor === null
+        ? { include_total: true }
+        : {}),
       ...(parsedCursor === null ? {} : { cursor: parsedCursor }),
       limit: parsedQuery.data.limit
     };
@@ -118,11 +127,17 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
     }
 
     // Older installed clients reject unknown response keys; totals are explicitly requested.
-    return sendProjectedAnalyticsRead(reply, {
-      opportunities: opportunities.opportunities,
-      next_cursor: opportunities.next_cursor,
-      ...(filters.include_total && opportunities.total_pages !== undefined ? { total_pages: opportunities.total_pages } : {})
-    }, AnalyticsOpportunitiesListResponseSchema);
+    return sendProjectedAnalyticsRead(
+      reply,
+      {
+        opportunities: opportunities.opportunities,
+        next_cursor: opportunities.next_cursor,
+        ...(filters.include_total && opportunities.total_pages !== undefined
+          ? { total_pages: opportunities.total_pages }
+          : {})
+      },
+      AnalyticsOpportunitiesListResponseSchema
+    );
   });
 
   app.get("/v1/analytics/opportunities/:id", async (request, reply) => {
@@ -221,12 +236,15 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
     }
 
     if (bundleRequest.analysis_kind === "incident_impact") {
+      const origins = auth.access.origin_project_ids ?? [bundleRequest.project_id];
       const incident = await dependencies.incidentRetrieval.getIncidentForOrganization({
         organization_id: auth.access.organization_id,
         incident_id: bundleRequest.incident_id!,
-        user_id: auth.member.member_id
+        user_id: auth.member.member_id,
+        project_id: bundleRequest.project_id,
+        origin_project_ids: origins
       });
-      if (incident === null || incident.project_id !== bundleRequest.project_id) {
+      if (incident === null || !origins.includes(incident.project_id)) {
         return reply.status(404).send({ error: "incident_not_found" });
       }
       range = resolveIncidentImpactTimeRange(bundleRequest, incident);
@@ -321,7 +339,9 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
         : { environment: parsedQuery.data.environment }),
       ...(parsedQuery.data.from === undefined ? {} : { from: parsedQuery.data.from }),
       ...(parsedQuery.data.to === undefined ? {} : { to: parsedQuery.data.to }),
-      ...(parsedQuery.data.include_total === "true" && parsedCursor === null ? { include_total: true } : {}),
+      ...(parsedQuery.data.include_total === "true" && parsedCursor === null
+        ? { include_total: true }
+        : {}),
       ...(parsedCursor === null ? {} : { cursor: parsedCursor }),
       limit: parsedQuery.data.limit
     };
@@ -342,12 +362,17 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
     const projected = sanitizeTelemetry({
       bundles: generations.bundles.map(toAnalyticsBundleGenerationListRecord),
       next_cursor: generations.next_cursor,
-      ...(filters.include_total && generations.total_pages !== undefined ? { total_pages: generations.total_pages } : {})
+      ...(filters.include_total && generations.total_pages !== undefined
+        ? { total_pages: generations.total_pages }
+        : {})
     });
     if (!projected.ok) return reply.status(503).send({ error: "privacy_projection_unavailable" });
     const response = AnalyticsBundleGenerationsListResponseSchema.safeParse(projected.value);
     return response.success
-      ? reply.header("x-debugbundle-privacy-policy", "telemetry-privacy-v1").status(200).send(response.data)
+      ? reply
+          .header("x-debugbundle-privacy-policy", "telemetry-privacy-v1")
+          .status(200)
+          .send(response.data)
       : reply.status(503).send({ error: "privacy_projection_unavailable" });
   });
 

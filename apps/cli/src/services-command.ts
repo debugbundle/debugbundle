@@ -1,8 +1,5 @@
 import { RetrievalApiError } from "../../../packages/retrieval-client/src/index.js";
-import {
-  createAuthenticatedRetrievalApi,
-  runAuthenticatedCliCommand
-} from "./auth-context.js";
+import { createAuthenticatedRetrievalApi, runAuthenticatedCliCommand } from "./auth-context.js";
 import type { CliCommandResult } from "./token-commands.js";
 
 interface ServiceLike {
@@ -40,7 +37,10 @@ function formatServiceTable(services: ServiceLike[]): string {
   }
 
   return services
-    .map((service) => `${service.name} | ${service.environment} | ${service.runtime ?? "unknown"} | ${service.framework ?? "unknown"}`)
+    .map(
+      (service) =>
+        `${service.name} | ${service.environment} | ${service.runtime ?? "unknown"} | ${service.framework ?? "unknown"}`
+    )
     .join("\n");
 }
 
@@ -49,14 +49,25 @@ export async function listServicesCommand(
     bearerToken: string;
     projectId: string;
     limit?: number;
+    offset?: number;
     json?: boolean;
   },
   api: {
-    listServices(input: { bearerToken: string; projectId: string; limit?: number }): Promise<ServiceLike[]>;
+    listServices(input: {
+      bearerToken: string;
+      projectId: string;
+      limit?: number;
+      offset?: number;
+    }): Promise<ServiceLike[]>;
   }
 ): Promise<CliCommandResult> {
   try {
-    const requestInput: { bearerToken: string; projectId: string; limit?: number } = {
+    const requestInput: {
+      bearerToken: string;
+      projectId: string;
+      limit?: number;
+      offset?: number;
+    } = {
       bearerToken: input.bearerToken,
       projectId: input.projectId
     };
@@ -64,6 +75,8 @@ export async function listServicesCommand(
     if (input.limit !== undefined) {
       requestInput.limit = input.limit;
     }
+
+    if (input.offset !== undefined) requestInput.offset = input.offset;
 
     const services = await api.listServices(requestInput);
     if (input.json) {
@@ -78,7 +91,10 @@ export async function listServicesCommand(
       output: formatServiceTable(services)
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -87,6 +103,7 @@ export async function listServicesWithAuthCommand(
     authFilePath?: string;
     projectId: string;
     limit?: number;
+    offset?: number;
     json?: boolean;
   },
   dependencies?: Parameters<typeof createAuthenticatedRetrievalApi>[1]
@@ -95,7 +112,13 @@ export async function listServicesWithAuthCommand(
     createApi: createAuthenticatedRetrievalApi,
     dependencies,
     runCommand: (authState, api) => {
-      const commandInput: { bearerToken: string; projectId: string; limit?: number; json?: boolean } = {
+      const commandInput: {
+        bearerToken: string;
+        projectId: string;
+        limit?: number;
+        offset?: number;
+        json?: boolean;
+      } = {
         bearerToken: authState.bearer_token,
         projectId: input.projectId
       };
@@ -103,6 +126,7 @@ export async function listServicesWithAuthCommand(
       if (input.limit !== undefined) {
         commandInput.limit = input.limit;
       }
+      if (input.offset !== undefined) commandInput.offset = input.offset;
       if (input.json !== undefined) {
         commandInput.json = input.json;
       }

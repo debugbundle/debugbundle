@@ -40,12 +40,28 @@ describe("analytics opportunity store", () => {
   it("skips totals for legacy calls and cursor pages, and counts empty opted-in pages", async () => {
     const query = vi.fn().mockResolvedValue({ rows: [] });
     const store = createPostgresAnalyticsOpportunityStore({ query: query as Queryable["query"] });
-    for (const extra of [{}, { include_total: true, cursor: { last_detected_at: "2026-07-07T00:00:00.000Z", opportunity_id: OPPORTUNITY_ID } }]) {
-      const result = await store.listAnalyticsOpportunitiesForProject({ organization_id: ORGANIZATION_ID, project_id: PROJECT_ID, limit: 10, ...extra });
+    for (const extra of [
+      {},
+      {
+        include_total: true,
+        cursor: { last_detected_at: "2026-07-07T00:00:00.000Z", opportunity_id: OPPORTUNITY_ID }
+      }
+    ]) {
+      const result = await store.listAnalyticsOpportunitiesForProject({
+        organization_id: ORGANIZATION_ID,
+        project_id: PROJECT_ID,
+        limit: 10,
+        ...extra
+      });
       expect(result).not.toHaveProperty("total_pages");
       expect(query.mock.lastCall?.[0]).not.toContain("COUNT(*) OVER()");
     }
-    const empty = await store.listAnalyticsOpportunitiesForProject({ organization_id: ORGANIZATION_ID, project_id: PROJECT_ID, limit: 10, include_total: true });
+    const empty = await store.listAnalyticsOpportunitiesForProject({
+      organization_id: ORGANIZATION_ID,
+      project_id: PROJECT_ID,
+      limit: 10,
+      include_total: true
+    });
     expect(empty.total_pages).toBe(1);
     expect(query.mock.lastCall?.[0]).toContain("COUNT(*) OVER()");
   });
@@ -72,7 +88,9 @@ describe("analytics opportunity store", () => {
       expect(sqlText).toContain("ao.status = 'open'");
       expect(sqlText).toContain("ao.snoozed_until <= now()");
       expect(sqlText).toContain("ao.kind = $3");
-      expect(sqlText).toContain("ao.service = $4");
+      expect(sqlText).toContain(
+        "debugbundle_service_matches($2::uuid,ao.project_id,ao.service,$4)"
+      );
       expect(sqlText).toContain("ao.environment = $5");
       expect(sqlText).toContain("ao.severity = $6");
       expect(sqlText).toContain("COALESCE(bg.status, ao.bundle_status) = $7");
@@ -97,7 +115,9 @@ describe("analytics opportunity store", () => {
       return { rows: [opportunityRow] };
     });
 
-    const store = createPostgresAnalyticsOpportunityStore({ query: queryMock as Queryable["query"] });
+    const store = createPostgresAnalyticsOpportunityStore({
+      query: queryMock as Queryable["query"]
+    });
 
     await expect(
       store.listAnalyticsOpportunitiesForProject({
@@ -118,32 +138,34 @@ describe("analytics opportunity store", () => {
         limit: 1
       })
     ).resolves.toEqual({
-      opportunities: [{
-        opportunity_id: OPPORTUNITY_ID,
-        project_id: PROJECT_ID,
-        project_name: "Marketing site",
-        project_color_tag: "blue",
-        service: "web",
-        environment: "production",
-        kind: "funnel_dropoff",
-        status: "open",
-        severity: "medium",
-        confidence: 0.82,
-        title: "Checkout dropoff increased",
-        summary: "Payment-step exits increased for mobile sessions.",
-        evidence: { sessions: 120 },
-        related_incident_ids: ["44444444-4444-4444-8444-444444444444"],
-        related_deploy_ids: ["deploy-123"],
-        first_detected_at: "2026-07-01T00:00:00.000Z",
-        last_detected_at: "2026-07-07T00:00:00.000Z",
-        resolved_at: null,
-        snoozed_until: null,
-        bundle_generation_id: "55555555-5555-4555-8555-555555555555",
-        bundle_status: "completed",
-        bundle_created_at: "2026-07-07T00:01:00.000Z",
-        bundle_updated_at: "2026-07-07T00:02:00.000Z",
-        bundle_failure_reason: null
-      }],
+      opportunities: [
+        {
+          opportunity_id: OPPORTUNITY_ID,
+          project_id: PROJECT_ID,
+          project_name: "Marketing site",
+          project_color_tag: "blue",
+          service: "web",
+          environment: "production",
+          kind: "funnel_dropoff",
+          status: "open",
+          severity: "medium",
+          confidence: 0.82,
+          title: "Checkout dropoff increased",
+          summary: "Payment-step exits increased for mobile sessions.",
+          evidence: { sessions: 120 },
+          related_incident_ids: ["44444444-4444-4444-8444-444444444444"],
+          related_deploy_ids: ["deploy-123"],
+          first_detected_at: "2026-07-01T00:00:00.000Z",
+          last_detected_at: "2026-07-07T00:00:00.000Z",
+          resolved_at: null,
+          snoozed_until: null,
+          bundle_generation_id: "55555555-5555-4555-8555-555555555555",
+          bundle_status: "completed",
+          bundle_created_at: "2026-07-07T00:01:00.000Z",
+          bundle_updated_at: "2026-07-07T00:02:00.000Z",
+          bundle_failure_reason: null
+        }
+      ],
       next_cursor: null
     });
   });
@@ -153,15 +175,13 @@ describe("analytics opportunity store", () => {
       expect(sqlText).toContain("ao.status = 'snoozed'");
       expect(sqlText).toContain("ao.snoozed_until IS NULL");
       expect(sqlText).toContain("ao.snoozed_until > now()");
-      expect(params).toEqual([
-        ORGANIZATION_ID,
-        PROJECT_ID,
-        11
-      ]);
+      expect(params).toEqual([ORGANIZATION_ID, PROJECT_ID, 11]);
 
       return { rows: [] };
     });
-    const store = createPostgresAnalyticsOpportunityStore({ query: queryMock as Queryable["query"] });
+    const store = createPostgresAnalyticsOpportunityStore({
+      query: queryMock as Queryable["query"]
+    });
 
     await expect(
       store.listAnalyticsOpportunitiesForProject({
@@ -176,18 +196,15 @@ describe("analytics opportunity store", () => {
   it("lists organization opportunities with a globally stable cursor", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
       expect(sqlText).toContain("p.organization_id = $1::uuid");
-      expect(sqlText).not.toContain("ao.project_id = $2::uuid");
+      expect(sqlText).not.toContain("ao.project_id=ANY(debugbundle_project_origins($2::uuid))");
       expect(sqlText).toContain("ao.last_detected_at < $2::timestamptz");
       expect(sqlText).toContain("ORDER BY ao.last_detected_at DESC, ao.id::text DESC");
-      expect(params).toEqual([
-        ORGANIZATION_ID,
-        "2026-07-07T00:00:00.000Z",
-        OPPORTUNITY_ID,
-        2
-      ]);
+      expect(params).toEqual([ORGANIZATION_ID, "2026-07-07T00:00:00.000Z", OPPORTUNITY_ID, 2]);
       return { rows: [opportunityRow] };
     });
-    const store = createPostgresAnalyticsOpportunityStore({ query: queryMock as Queryable["query"] });
+    const store = createPostgresAnalyticsOpportunityStore({
+      query: queryMock as Queryable["query"]
+    });
 
     await expect(
       store.listAnalyticsOpportunitiesForOrganization({
@@ -211,7 +228,9 @@ describe("analytics opportunity store", () => {
       last_detected_at: "2026-07-06T00:00:00.000Z"
     };
     const queryMock = vi.fn().mockResolvedValue({ rows: [opportunityRow, overflowRow] });
-    const store = createPostgresAnalyticsOpportunityStore({ query: queryMock as Queryable["query"] });
+    const store = createPostgresAnalyticsOpportunityStore({
+      query: queryMock as Queryable["query"]
+    });
 
     await expect(
       store.listAnalyticsOpportunitiesForProject({
@@ -227,10 +246,13 @@ describe("analytics opportunity store", () => {
   });
 
   it("gets one project analytics opportunity or null", async (): Promise<void> => {
-    const queryMock = vi.fn()
+    const queryMock = vi
+      .fn()
       .mockResolvedValueOnce({ rows: [opportunityRow] })
       .mockResolvedValueOnce({ rows: [] });
-    const store = createPostgresAnalyticsOpportunityStore({ query: queryMock as Queryable["query"] });
+    const store = createPostgresAnalyticsOpportunityStore({
+      query: queryMock as Queryable["query"]
+    });
 
     await expect(
       store.getAnalyticsOpportunityForProject({

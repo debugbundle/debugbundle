@@ -507,6 +507,9 @@ export const ProjectUpdateResponseSchema = z
 export const ProbeActivationSchema = z
   .object({
     activation_id: z.string().guid(),
+    origin_project_id: z.string().guid().optional(),
+    service_definition_id: z.string().guid().nullable().optional(),
+    scope_origin_ids: z.array(z.string().guid()).max(1000).optional(),
     label_pattern: z.string(),
     service: z.string(),
     environment: z.string(),
@@ -517,7 +520,10 @@ export const ProbeActivationSchema = z
 export const ProbeActivationResponseSchema = z
   .object({
     activation: ProbeActivationSchema,
-    trigger_token: z.string()
+    trigger_token: z.string(),
+    runtime_project_id: z.string().guid().optional(),
+    runtime_scope_origin_ids: z.array(z.string().guid()).optional(),
+    runtime_service: z.string().optional()
   })
   .strict();
 export const ProbeActivationListResponseSchema = z

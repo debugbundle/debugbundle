@@ -22,19 +22,20 @@ export function createPostgresAnalyticsOpportunitySchedulerStore(
 
       const result = await db.query<{ project_id: string }>(
         `
-          SELECT settings.project_id::text AS project_id
-          FROM project_analytics_settings settings
+          SELECT origin.id::text AS project_id
+          FROM projects origin JOIN project_analytics_settings settings
+            ON settings.project_id=debugbundle_canonical_project(origin.id)
           WHERE settings.enabled = true
-            AND ($1::uuid IS NULL OR settings.project_id > $1::uuid)
+            AND ($1::uuid IS NULL OR origin.id > $1::uuid)
             AND EXISTS (
               SELECT 1
               FROM analytics_session_rollups rollup
-              WHERE rollup.project_id = settings.project_id
+              WHERE rollup.project_id = origin.id
                 AND rollup.bucket_granularity = 'day'
                 AND rollup.bucket_start >= $2::timestamptz
                 AND rollup.bucket_start < $3::timestamptz
             )
-          ORDER BY settings.project_id ASC
+          ORDER BY origin.id ASC
           LIMIT $4
         `,
         [input.cursor, window.from, window.to, input.limit]
@@ -47,9 +48,7 @@ export function createPostgresAnalyticsOpportunitySchedulerStore(
   };
 }
 
-function buildOpportunityEvaluationWindow(
-  occurredAt: string
-): { from: string; to: string } | null {
+function buildOpportunityEvaluationWindow(occurredAt: string): { from: string; to: string } | null {
   const parsed = Date.parse(occurredAt);
   if (Number.isNaN(parsed)) {
     return null;

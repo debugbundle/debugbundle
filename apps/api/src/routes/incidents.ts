@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
+import { projectEvidenceView } from "../../../../packages/storage/src/project-evidence-projection.js";
 
 import { sanitizeTelemetry } from "../../../../packages/redaction/src/index.js";
 
@@ -19,7 +20,12 @@ import {
   requireRateLimitedMemberAuth,
   serializeCursorTimestamp
 } from "../api-helpers.js";
-import { BulkIncidentMutationBodySchema, IncidentParamsSchema, IncidentsQuerySchema, LogsQuerySchema } from "../schemas.js";
+import {
+  BulkIncidentMutationBodySchema,
+  IncidentParamsSchema,
+  IncidentsQuerySchema,
+  LogsQuerySchema
+} from "../schemas.js";
 
 function sendSafeIncidentResponse(reply: FastifyReply, value: unknown): FastifyReply {
   const result = sanitizeTelemetry(value, { maxTotalBytes: 512 * 1024 });
@@ -44,10 +50,11 @@ async function readBundleArtifactForIncident(input: {
       : { status: "ready", body };
   } catch (error) {
     if (isObjectNotFoundError(error)) {
-      const failureReason = await input.dependencies.incidentRetrieval.getBundleFailureReasonForOrganization?.({
-        organization_id: input.organizationId,
-        incident_id: input.incidentId
-      });
+      const failureReason =
+        await input.dependencies.incidentRetrieval.getBundleFailureReasonForOrganization?.({
+          organization_id: input.organizationId,
+          incident_id: input.incidentId
+        });
 
       if (failureReason === "monthly_quota_exceeded") {
         return {
@@ -175,7 +182,12 @@ async function resolveBulkIncidentOrganizationGroups(input: {
 
 export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   app.get("/v1/incidents", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "retrieval-read");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "retrieval-read"
+    );
     if (member === null) {
       return;
     }
@@ -237,24 +249,38 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
       incidentsRequest.cursor = parsedCursor;
     }
 
-    const incidents = await dependencies.incidentRetrieval.listIncidentsForOrganization(incidentsRequest);
-    const totalCount = parsedCursor === null
-      ? await dependencies.incidentRetrieval.countIncidentsForOrganization?.(incidentsRequest)
-      : undefined;
+    const incidents =
+      await dependencies.incidentRetrieval.listIncidentsForOrganization(incidentsRequest);
+    const totalCount =
+      parsedCursor === null
+        ? await dependencies.incidentRetrieval.countIncidentsForOrganization?.(incidentsRequest)
+        : undefined;
 
-    const nextCursorRecord = incidents.length >= parsedQuery.data.limit ? incidents.at(-1) : undefined;
+    const nextCursorRecord =
+      incidents.length >= parsedQuery.data.limit ? incidents.at(-1) : undefined;
     const nextCursor =
-      nextCursorRecord === undefined ? null : `${serializeCursorTimestamp(nextCursorRecord.last_seen_at)}|${nextCursorRecord.incident_id}`;
+      nextCursorRecord === undefined
+        ? null
+        : `${serializeCursorTimestamp(nextCursorRecord.last_seen_at)}|${nextCursorRecord.incident_id}`;
 
     return sendSafeIncidentResponse(reply, {
-      incidents,
+      incidents: incidents.map((incident) =>
+        projectEvidenceView(incident, parsedQuery.data.project_id)
+      ),
       next_cursor: nextCursor,
-      ...(totalCount === undefined ? {} : { total_pages: Math.max(1, Math.ceil(totalCount / parsedQuery.data.limit)) })
+      ...(totalCount === undefined
+        ? {}
+        : { total_pages: Math.max(1, Math.ceil(totalCount / parsedQuery.data.limit)) })
     });
   });
 
   app.post("/v1/incidents/resolve", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "retrieval-write");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "retrieval-write"
+    );
     if (member === null) {
       return;
     }
@@ -306,12 +332,19 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
     }
 
     return sendSafeIncidentResponse(reply, {
-      incidents: incidentIds.map((incidentId) => incidentsById.get(incidentId)!)
+      incidents: incidentIds.map((incidentId) =>
+        projectEvidenceView(incidentsById.get(incidentId)!)
+      )
     });
   });
 
   app.post("/v1/incidents/reopen", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "retrieval-write");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "retrieval-write"
+    );
     if (member === null) {
       return;
     }
@@ -360,12 +393,19 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
     }
 
     return sendSafeIncidentResponse(reply, {
-      incidents: incidentIds.map((incidentId) => incidentsById.get(incidentId)!)
+      incidents: incidentIds.map((incidentId) =>
+        projectEvidenceView(incidentsById.get(incidentId)!)
+      )
     });
   });
 
   app.get("/v1/incidents/:id", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "retrieval-read");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "retrieval-read"
+    );
     if (member === null) {
       return;
     }
@@ -390,12 +430,17 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
     }
 
     return sendSafeIncidentResponse(reply, {
-      incident
+      incident: projectEvidenceView(incident)
     });
   });
 
   app.get("/v1/incidents/:id/context", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "retrieval-read");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "retrieval-read"
+    );
     if (member === null) {
       return;
     }
@@ -446,9 +491,10 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
       })
     ]);
 
-    return sendSafeIncidentResponse(reply,
+    return sendSafeIncidentResponse(
+      reply,
       buildIncidentContextRecord({
-        incident,
+        incident: projectEvidenceView(incident),
         bundle,
         reproduction,
         logs: {
@@ -460,7 +506,12 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
   });
 
   app.post("/v1/incidents/:id/resolve", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "retrieval-write");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "retrieval-write"
+    );
     if (member === null) {
       return;
     }
@@ -512,12 +563,17 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
     }
 
     return sendSafeIncidentResponse(reply, {
-      incident
+      incident: projectEvidenceView(incident)
     });
   });
 
   app.post("/v1/incidents/:id/reopen", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "retrieval-write");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "retrieval-write"
+    );
     if (member === null) {
       return;
     }
@@ -567,12 +623,17 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
     }
 
     return sendSafeIncidentResponse(reply, {
-      incident
+      incident: projectEvidenceView(incident)
     });
   });
 
   app.get("/v1/incidents/:id/bundle", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "retrieval-read");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "retrieval-read"
+    );
     if (member === null) {
       return;
     }
@@ -610,10 +671,11 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
       compressed = await dependencies.objectStoreReader.getObject({ key });
     } catch (error) {
       if (isObjectNotFoundError(error)) {
-        const failureReason = await dependencies.incidentRetrieval.getBundleFailureReasonForOrganization?.({
-          organization_id: projectOrganizationId,
-          incident_id: parsedParams.data.id
-        });
+        const failureReason =
+          await dependencies.incidentRetrieval.getBundleFailureReasonForOrganization?.({
+            organization_id: projectOrganizationId,
+            incident_id: parsedParams.data.id
+          });
 
         // Non-retryable: quota exceeded is a billing-level block.
         if (failureReason === "monthly_quota_exceeded") {
@@ -653,7 +715,10 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
     try {
       const parsedBundle = readSanitizedArtifact(compressed);
       if (parsedBundle === null) throw new Error("bundle_artifact_invalid");
-      return reply.header("x-debugbundle-privacy-policy", TELEMETRY_PRIVACY_POLICY_VERSION).status(200).send(parsedBundle);
+      return reply
+        .header("x-debugbundle-privacy-policy", TELEMETRY_PRIVACY_POLICY_VERSION)
+        .status(200)
+        .send(parsedBundle);
     } catch {
       return reply.status(200).send({
         status: "failed",
@@ -663,7 +728,12 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
   });
 
   app.get("/v1/incidents/:id/reproduction", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "retrieval-read");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "retrieval-read"
+    );
     if (member === null) {
       return;
     }
@@ -693,7 +763,10 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
       const body = await dependencies.objectStoreReader.getObject({ key });
       const parsedReproduction = readSanitizedArtifact(body);
       if (parsedReproduction === null) throw new Error("reproduction_artifact_unavailable");
-      return reply.header("x-debugbundle-privacy-policy", TELEMETRY_PRIVACY_POLICY_VERSION).status(200).send(parsedReproduction);
+      return reply
+        .header("x-debugbundle-privacy-policy", TELEMETRY_PRIVACY_POLICY_VERSION)
+        .status(200)
+        .send(parsedReproduction);
     } catch (error) {
       if (isObjectNotFoundError(error)) {
         return reply.status(200).send({
@@ -708,7 +781,12 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
   });
 
   app.get("/v1/logs", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "retrieval-read");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "retrieval-read"
+    );
     if (member === null) {
       return;
     }
@@ -752,7 +830,9 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
 
     const nextCursorRecord = logs.length >= parsedQuery.data.limit ? logs.at(-1) : undefined;
     const nextCursor =
-      nextCursorRecord === undefined ? null : `${serializeCursorTimestamp(nextCursorRecord.occurred_at)}|${nextCursorRecord.event_id}`;
+      nextCursorRecord === undefined
+        ? null
+        : `${serializeCursorTimestamp(nextCursorRecord.occurred_at)}|${nextCursorRecord.event_id}`;
 
     return sendSafeIncidentResponse(reply, {
       logs,

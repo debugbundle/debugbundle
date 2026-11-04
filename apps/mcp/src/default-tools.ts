@@ -8,6 +8,10 @@ import { createAlertApi } from "../../../packages/alert-client/src/index.js";
 import { createBillingApi } from "../../../packages/billing-client/src/index.js";
 import { createGitHubManagementApi } from "../../../packages/github-client/src/index.js";
 import { createProjectManagementApi } from "../../../packages/project-management-client/src/index.js";
+import { createProjectServicesApi } from "../../../packages/project-management-client/src/project-services.js";
+import { createProjectMergesApi } from "../../../packages/project-management-client/src/project-merges.js";
+import { createProjectMergeMcpTools } from "./project-merge-tools.js";
+import { createServiceDefinitionMcpTools } from "./service-definition-tools.js";
 import { createRetrievalApi } from "../../../packages/retrieval-client/src/index.js";
 import { createSlackApi } from "../../../packages/slack-client/src/index.js";
 import { createTokenManagementApi } from "../../../packages/token-management/src/index.js";
@@ -187,6 +191,8 @@ export async function createDefaultMcpTools(
       ...createWeeklyReportMcpTools(createWeeklyReportApi(httpClient)),
       ...createAlertMcpTools(createAlertApi(httpClient)),
       ...createProjectMcpTools(createProjectManagementApi(httpClient)),
+      ...createServiceDefinitionMcpTools(createProjectServicesApi(httpClient)),
+      ...createProjectMergeMcpTools(createProjectMergesApi(httpClient)),
       ...createAnalyticsMetricsMcpTools({
         ...createAnalyticsMetricsApi(httpClient),
         ...createAnalyticsBundleApi(httpClient),
