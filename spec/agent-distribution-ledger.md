@@ -10,7 +10,7 @@ and share the one-project-per-system guidance. Native public installation,
 The actual Gemini release ZIP matches SHA-256
 `2b5c0ffb6f382c86288791c92b68a559472d82c822dcbc06f8c85e2591b271ec`.
 See [the release receipt](project-guidance-release-20261105.md), including the
-separate portable-skill antivirus gate. These developer packages are published;
+separate ClawHub antivirus gates. These developer packages are published;
 OpenAI 1.0.3 remains a sealed local candidate under its separate portal process.
 
 ## Project/service release — 4 November 2026

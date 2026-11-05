@@ -1,4 +1,4 @@
-# Installation guidance release — published; final acceptance pending
+# Installation guidance release — published; external acceptance blocked
 
 5 November 2026. CLI/MCP/OpenClaw and the portable skill 1.19.4, Codex 1.5.1,
 Claude Code 1.19.4, Gemini 1.4.4 and site 1.7.2 are public. One project per system
@@ -8,8 +8,8 @@ The install prompt is 236 words; the shared project/service section is four bull
 
 Marketplace reviews exposed cloud-cache and retained-local artifact traversal;
 1.19.4 fixes both with validated IDs/paths and guarded filesystem operations.
-Exact client source CI passes 5,174 tests/111 shards, including 103 Postgres cases,
-coverage and runtime gates. Normal public native Codex/Claude/Gemini/OpenClaw
+Exact client source CI passes 5,174 tests. Corrected main passes 5,175 tests
+across 111 shards, including 103 Postgres cases; coverage and runtime gates pass. Normal public native Codex/Claude/Gemini/OpenClaw
 installs, authentication, evidence, updates and removal pass. PR #12 is merged.
 
 The site is live from core `46337a46` / site `cb8d67d1`. Live verification caught
@@ -18,12 +18,14 @@ six assets and llms.txt now match CDN/origin bytes; API/App/Site health checks a
 all eight alarms pass. No API/worker, SDK, credential or consumer change occurred.
 OpenAI 1.0.3 remains a sealed local candidate with separate portal handling.
 
-OpenClaw's exact final review and antivirus pass. The portable skill's final
-review/moderation pass but antivirus is missing; an exact owner rescan is running.
-The corrected generator's main CI remains pending. The merged release branch
-is deleted locally/remotely; both unmerged branches and the detached worktree remain.
-Known ClawHub discovery remains 5/7, qualified separately. See
-`spec/project-guidance-release-20261105.md` for immutable identities and evidence.
+Both exact ClawHub final reviews are clean, but current responses omit antivirus
+results for both distributions. The skill's supported owner rescan succeeded and
+wrote back results without antivirus; the plugin's earlier clean 62-engine report
+is retained, with unchanged artifact bytes. The repo verifier correctly fails
+closed. Known discovery remains 5/7, qualified separately. Corrected-source main
+CI and runtime checks pass. The merged release branch is deleted locally/remotely;
+both unmerged branches and the detached worktree remain. See
+`spec/project-guidance-release-20261105.md` for identities, evidence and the blocker.
 
 # Owner's three-project consolidation — server merge completed
 

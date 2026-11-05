@@ -18,8 +18,9 @@ boundaries in the clients. The actual hosted llms.txt generator was corrected
 and redeployed after a live mismatch was caught. No server-merge data, SDK,
 credential, API/worker deployment or consumer installation changed. Exact client
 source CI, normal public native installs and post-deploy health checks pass.
-The merged release branch is removed locally/remotely. The portable skill's
-mandatory antivirus result and final source CI remain open; see [the current release receipt](project-guidance-release-20261105.md).
+The merged release branch is removed locally/remotely. Corrected-source main CI passes
+5,175 tests. Current ClawHub antivirus acceptance remains open; see
+[the current release receipt](project-guidance-release-20261105.md).
 OpenAI portal submission remains separate. The successful server merge below
 and its original evidence/limits are unchanged.
 

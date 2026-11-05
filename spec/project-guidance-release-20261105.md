@@ -10,16 +10,16 @@ The install prompt is 236 words; shared project/service guidance is four bullets
 
 ## Published inventory
 
-| Surface                      | Version | Published source / acceptance                                                                          |
-| ---------------------------- | ------- | ------------------------------------------------------------------------------------------------------ |
-| CLI / MCP                    | 1.19.4  | npm `gitHead` `61555f74048a40eddb8d46b187ef7c62d5f764d6`; both release workflows pass                  |
-| OpenClaw plugin              | 1.19.4  | ClawHub final review and antivirus clean; normal public installation passes                            |
-| Portable skill               | 1.19.4  | Published; byte-identical normal installation passes; final review/moderation clean; antivirus pending |
-| Codex developer plugin       | 1.5.1   | Public core marketplace at merge `e77cca52`; pins MCP 1.19.4; native public checks pass                |
-| Claude Code developer plugin | 1.19.4  | Same public core source/pin; native public checks pass                                                 |
-| Gemini CLI extension         | 1.4.4   | Standalone main/tag `b6b2fc208b2b0339c6b3d855fd3d9db5a7b9f0ad`; public upgrade passes                  |
-| Public site/docs             | 1.7.2   | Site `cb8d67d1d43a01b2630422a1ba57855ec3862034`; live production checks pass                           |
-| OpenAI combined plugin       | 1.0.3   | Sealed local candidate only; portal submission remains separate                                        |
+| Surface                      | Version | Published source / acceptance                                                                                     |
+| ---------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------- |
+| CLI / MCP                    | 1.19.4  | npm `gitHead` `61555f74048a40eddb8d46b187ef7c62d5f764d6`; both release workflows pass                             |
+| OpenClaw plugin              | 1.19.4  | Final review clean; earlier antivirus clean; latest response omits antivirus; normal public installation passes   |
+| Portable skill               | 1.19.4  | Published; byte-identical normal installation passes; final review/moderation clean; rescan still omits antivirus |
+| Codex developer plugin       | 1.5.1   | Public core marketplace at merge `e77cca52`; pins MCP 1.19.4; native public checks pass                           |
+| Claude Code developer plugin | 1.19.4  | Same public core source/pin; native public checks pass                                                            |
+| Gemini CLI extension         | 1.4.4   | Standalone main/tag `b6b2fc208b2b0339c6b3d855fd3d9db5a7b9f0ad`; public upgrade passes                             |
+| Public site/docs             | 1.7.2   | Site `cb8d67d1d43a01b2630422a1ba57855ec3862034`; live production checks pass                                      |
+| OpenAI combined plugin       | 1.0.3   | Sealed local candidate only; portal submission remains separate                                                   |
 
 Official Registry `com.debugbundle/mcp` 1.19.4 is published and exact readback
 passes. Both npm latest tags and provenance match the qualified immutable source;
@@ -99,21 +99,35 @@ contract is unchanged. No new glossary term is introduced.
 
 ## Remaining acceptance and repository cleanup
 
-The portable skill's antivirus result is still missing. Overall/final review and
-moderation are clean, but the provider's generic `decision: pass` does not satisfy
-our explicit antivirus gate. Raw public metadata and the stored report ZIP independently confirm the omission.
-One supported owner rescan of exact skill 1.19.4 is running; neither missing evidence nor accepted publication is a security pass.
-OpenClaw's final review is benign/high-confidence and its antivirus is clean
-(62 undetected, zero malicious/suspicious). Broad ClawHub discovery remains the
-separately tracked 5/7 baseline; Smithery publishing is retired.
+Current ClawHub verification is blocked by missing antivirus evidence for both
+exact 1.19.4 distributions. Skill overall/final review and moderation remain clean.
+The supported owner rescan `w17cbvhecbzm753r3ntb47btr58hnh9v` succeeded, wrote
+back its results and matched archive hash `a8ae36122d205dda2c324ec6ce0d9bd5e6412f2d5acbd2043ffbaf1d5fe56e35`,
+but its JSON/report ZIP still contain no VirusTotal result. Raw API and CLI agree.
+The generic provider success/decision does not satisfy the required antivirus gate.
 
-The generator-correction main CI is in progress. Earlier merged-main CI completed
-all shards but its 1 ms OpenAI timeout-monitor test observed the generic failure
-category; no test expectation or hosted runtime was changed to hide that result.
-The qualified client source CI above is independently green.
+The plugin's earlier exact-version report recorded clean antivirus results from
+62 engines (zero malicious/suspicious). Fresh CLI 0.22/0.25 responses now omit
+that field despite identical archive hash `3eb9041776aecf1f782ffe57651e0ac363dd171556491bc7095e70bd83693df3`
+and identical artifact metadata; its final review remains clean/benign. Both the
+earlier clean evidence and latest omission are retained. Nothing is locally
+suppressed. The refreshed repo verifier fails closed for both distributions under
+[release governance](../rules/release-governance.md). Publication and normal
+installation remain separate verified facts, not substitutes for the missing gate.
+Broad ClawHub discovery remains the separately tracked 5/7 baseline; Smithery
+publishing is retired.
+
+Corrected-source main [CI 41952136765](https://github.com/debugbundle/debugbundle/actions/runs/41952136765)
+passes all jobs: 5,175 tests/111 shards (103 Postgres cases), lint, types,
+coverage, changed-source checks and build. Runtime workflow 41952136827 passes.
+Earlier merged-main CI had one 1 ms timeout-monitor category failure; the current
+full suite passes with that test unchanged. Final record/provenance commits alter
+only documentation and the local OpenAI source manifest; product code remains
+identical to this qualified source.
 
 Core, site, Gemini and cloud are on main with clean, synced tracked trees.
 The merged `release/project-guidance-20261105` branch was deleted locally and
 from origin after exact-head/ancestry checks. Unmerged `feature/muse-connector`,
 the ahead-one parked `update/analytics` commit and the detached Muse worktree
-are preserved. Final CI and portable-skill antivirus acceptance remain open. Local raw receipts: `.tmp/project-guidance-release-20261105/v1194/`.
+are preserved. Current ClawHub antivirus acceptance remains open.
+Local raw receipts: `.tmp/project-guidance-release-20261105/v1194/`.
