@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { APP_PRODUCTION, APP_ORIGIN, APP_DEFINITION, globalScope } from "./helpers/alert-scopes.js";
 import { parseRequestBody } from "./helpers/request-body.js";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
@@ -19,6 +20,20 @@ afterEach(() => {
   resetBrowserSessionClientState();
 });
 function mockAlert(alert: ReturnType<typeof createAlert>, availableServices = false) {
+  alert = {
+    ...alert,
+    scope: {
+      ...globalScope(),
+      service_filter: alert.service_id
+        ? {
+            service_id: alert.service_id,
+            service_definition_id: APP_DEFINITION,
+            name: "API",
+            environment: "production"
+          }
+        : null
+    }
+  };
   let saved: Record<string, unknown> | undefined;
   vi.stubGlobal(
     "fetch",
@@ -33,8 +48,8 @@ function mockAlert(alert: ReturnType<typeof createAlert>, availableServices = fa
           services: availableServices
             ? [
                 {
-                  service_id: "svc_123",
-                  project_id: "proj_123",
+                  service_id: APP_PRODUCTION,
+                  project_id: APP_ORIGIN,
                   name: "API",
                   runtime: "node",
                   framework: null,
@@ -88,7 +103,7 @@ it("exposes digest settings, service scope and enabled state in the shared edito
     createAlert({
       alert_id: "alert_123",
       config: { to: "owner@example.com", aggregation_window_seconds: 30 },
-      service_id: "svc_123",
+      service_id: APP_PRODUCTION,
       is_enabled: false,
       cooldown_seconds: 60
     })
@@ -96,14 +111,14 @@ it("exposes digest settings, service scope and enabled state in the shared edito
   const user = userEvent.setup();
   render(<App initialEntries={["/projects/proj_123/alerts"]} />);
   await user.click(await screen.findByRole("button", { name: /^edit$/i }));
-  expect(screen.getByLabelText(/service scope/i)).toHaveTextContent("svc_123");
+  expect(screen.getByLabelText(/service scope/i)).toHaveTextContent("API (production)");
   expect(screen.getByRole("switch", { name: /^enabled$/i })).not.toBeChecked();
   await user.clear(screen.getByLabelText(/digest window/i));
   await user.type(screen.getByLabelText(/digest window/i), "45");
   await user.click(screen.getByRole("button", { name: /save changes/i }));
   await waitFor(() =>
     expect(saved()).toMatchObject({
-      service_id: "svc_123",
+      service_id: APP_PRODUCTION,
       is_enabled: false,
       config: { to: "owner@example.com", aggregation_window_seconds: 45 }
     })
@@ -134,7 +149,7 @@ it("clears service scope and enables an existing email alert without losing reci
   const saved = mockAlert(
     createAlert({
       alert_id: "alert_123",
-      service_id: "svc_123",
+      service_id: APP_PRODUCTION,
       is_enabled: false,
       config: { to: "owner@example.com", aggregation_window_seconds: 30 }
     })
@@ -165,12 +180,12 @@ it("selects an available service and project cooldown scope for an immediate cha
   const user = userEvent.setup();
   render(<App initialEntries={["/projects/proj_123/alerts"]} />);
   await user.click(await screen.findByRole("button", { name: /^edit$/i }));
-  await chooseSelectOption(user, "Service scope", "API");
+  await chooseSelectOption(user, "Service scope", "API (production)");
   await chooseSelectOption(user, "Cooldown scope", "Project");
   await user.click(screen.getByRole("button", { name: /save changes/i }));
   await waitFor(() =>
     expect(saved()).toMatchObject({
-      service_id: "svc_123",
+      service_id: APP_PRODUCTION,
       config: { target_url: "https://example.com/alerts", cooldown_scope: "project" }
     })
   );

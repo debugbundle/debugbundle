@@ -200,7 +200,12 @@ sets on creation. Older NULL snapshots mean the original project only. Ordinary
 updates preserve scope; optional `project_scope: "current_project"` explicitly
 snapshots the current closure. API, CLI `--project-scope current_project` and
 ordinary MCP `projectScope` expose the same update. Later merges never widen the
-saved set. Scoped rule tables have a combined 5,000-row supported ceiling, checked
+saved set.
+Alert-list scope metadata is explicitly opt-in (`include_scope=true`); default
+responses remain compatible with strict installed clients. The descriptor keeps
+the saved allowed origin/service set separate from the selected service instance
+and environment, resolves names in the requested view, bounds service labels with
+an exact total, and returns unavailable rather than leaking another retained view. Scoped rule tables have a combined 5,000-row supported ceiling, checked
 before merge and under the root write fence afterwards.
 
 Canonical CRUD can edit retained original rows without moving their IDs, origin,

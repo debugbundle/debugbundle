@@ -1,3 +1,11 @@
+Alert-scope follow-up (release authorised, in progress): `alert-scope-projection.ts` adds an
+opt-in read descriptor separating accepted origin coverage from a service filter.
+Default alert response shapes and delivery behavior remain compatible. Shared
+scope validation and API/CLI/MCP read options are local. The approved dashboard
+Scope column and editor reuse that projection, preserve unavailable filters and
+keep confirmed saves independent of metadata refreshes. See
+`spec/alert-rule-scope-display.md` for local verification and release status.
+
 Corrective release (3 November 2026) is complete: CLI 1.18.2 and MCP/OpenClaw/
 skill 1.18.3 preserve connected project scope across incident lists, pagination
 and the bounded doctor authentication probe. Invalid scope fails before dispatch.
@@ -850,12 +858,10 @@ explicit preset rebuild; valid legacy records remain compatible. Local summary
 formatting lives in `apps/cli/src/local-processing-summary.ts`; functional trace
 regressions and reusable processing fixtures are separate from general CLI cases.
 
-
 Cloud artifact safety: CLI/MCP/OpenClaw share incident-ID validation in
 `packages/retrieval-client` and the CLI cloud cache reuses
 `packages/agent-setup/src/files.ts` for symlink checks, bounded reads and guarded
 atomic writes. URL dispatch and cache side effects reject unsafe IDs first.
-
 
 Retained local artifact boundaries live in `apps/cli/src/local-artifact-paths.ts`.
 Retrieval, processing/rebuilds and cleanup validate canonical bundle/reproduction

@@ -1,16 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createApiServer } from "../../../apps/api/src/server.ts";
-import { mockedObject, type MockedMethods } from "../../helpers/vitest.ts";
-
-type ApiServerDependencies = Parameters<typeof createApiServer>[0];
-type AuthRateLimiterDependency = MockedMethods<NonNullable<ApiServerDependencies["authRateLimiter"]>>;
-type AuditLoggingDependency = MockedMethods<NonNullable<ApiServerDependencies["auditLogging"]>>;
-type MemberAuthDependency = MockedMethods<ApiServerDependencies["memberAuth"]>;
-type AlertManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["alertManagement"]>>;
-type BillingManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["billingManagement"]>>;
-type SlackManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["slackManagement"]>>;
-type ProjectManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["projectManagement"]>>;
+import {
+  createServer,
+  defaultProjectAccess,
+  type ApiServerDependencies
+} from "../../helpers/alert-api.ts";
+import { mockedObject } from "../../helpers/vitest.ts";
 
 describe("alert outbound target validation", () => {
   it.each([
@@ -55,286 +50,7 @@ describe("alert outbound target validation", () => {
   });
 });
 
-const defaultProjectAccess = {
-  project_id: "00000000-0000-4000-8000-000000000001",
-  organization_id: "org_123",
-  owner_user_id: "usr_owner",
-  owner_email: "owner@example.com",
-  relationship: "owned",
-  effective_role: "owner",
-  organization_plan: "team"
-} as const;
-
-function createServer(overrides: {
-  authRateLimiter?: Partial<AuthRateLimiterDependency>;
-  auditLogging?: AuditLoggingDependency | undefined;
-  memberAuth?: MemberAuthDependency | undefined;
-  projectManagement?: ProjectManagementDependency | undefined;
-  alertManagement?: AlertManagementDependency | undefined;
-  billingManagement?: BillingManagementDependency | undefined;
-  slackManagement?: SlackManagementDependency | undefined;
-} = {}): ReturnType<typeof createApiServer> {
-  const hasAlertManagementOverride = Object.prototype.hasOwnProperty.call(overrides, "alertManagement");
-  const hasSlackManagementOverride = Object.prototype.hasOwnProperty.call(overrides, "slackManagement");
-
-  return createApiServer({
-    ingestionPersistence: {
-      persistAndEnqueue: vi.fn()
-    },
-    ingestionMetadata: {
-      resolveProjectByTokenHash: vi.fn()
-    },
-    ...(overrides.authRateLimiter === undefined
-      ? {}
-      : {
-          authRateLimiter: {
-            claimRequest: overrides.authRateLimiter.claimRequest ?? vi.fn().mockResolvedValue({
-              allowed: true,
-              limit: 100,
-              remaining: 99,
-              retry_after_ms: 0
-            })
-          }
-        }),
-    memberAuth:
-      overrides.memberAuth ??
-      mockedObject<ApiServerDependencies["memberAuth"]>({
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue({ member_id: "usr_123", organization_id: "org_123" })
-      }),
-    projectManagement:
-      overrides.projectManagement ??
-      mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>({
-        resolveProjectAccessForUser: vi.fn().mockResolvedValue(defaultProjectAccess),
-        listProjectsForUser: vi.fn().mockResolvedValue([]),
-        createProjectForUser: vi.fn().mockResolvedValue(null),
-        updateProjectForUser: vi.fn().mockResolvedValue(null),
-        deleteProjectForUser: vi.fn().mockResolvedValue(null)
-      }),
-    tokenManagement: mockedObject<ApiServerDependencies["tokenManagement"]>({
-      listProjectTokensForOrganization: vi.fn().mockResolvedValue([]),
-      createProjectTokenForOrganization: vi.fn().mockResolvedValue(null),
-      revokeProjectTokenForOrganization: vi.fn().mockResolvedValue(null),
-      listMemberTokensForOrganization: vi.fn().mockResolvedValue([]),
-      createMemberTokenForOrganization: vi.fn().mockResolvedValue(null),
-      revokeMemberTokenForOrganization: vi.fn().mockResolvedValue(null)
-    }),
-    incidentRetrieval: {
-      listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
-      getIncidentForOrganization: vi.fn().mockResolvedValue(null),
-      listIncidentLogsForOrganization: vi.fn().mockResolvedValue([]),
-      listServicesForOrganization: vi.fn().mockResolvedValue([])
-    },
-    objectStoreReader: {
-      getObject: vi.fn()
-    },
-    webhookDelivery: {
-      listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue({ deliveries: [] })
-    },
-    ...(overrides.auditLogging === undefined ? {} : { auditLogging: overrides.auditLogging }),
-    ...(overrides.billingManagement === undefined ? {} : { billingManagement: overrides.billingManagement }),
-    alertManagement:
-      hasAlertManagementOverride
-        ? overrides.alertManagement
-        :
-      mockedObject<NonNullable<ApiServerDependencies["alertManagement"]>>({
-        listAlertsForOrganization: vi.fn().mockResolvedValue([]),
-        createAlertForOrganization: vi.fn().mockResolvedValue(null),
-        updateAlertForOrganization: vi.fn().mockResolvedValue(null),
-        deleteAlertForOrganization: vi.fn().mockResolvedValue(null)
-      }),
-    slackManagement:
-      hasSlackManagementOverride
-        ? overrides.slackManagement
-        : mockedObject<NonNullable<ApiServerDependencies["slackManagement"]>>({
-            listSlackDestinationsForProjectInOrganization: vi.fn().mockResolvedValue([]),
-            getSlackDestinationForOrganization: vi.fn().mockResolvedValue(null),
-            upsertSlackDestinationForOrganization: vi.fn().mockResolvedValue({
-              slack_destination_id: "sd_123"
-            }),
-            deleteSlackDestinationForProjectInOrganization: vi.fn().mockResolvedValue(null)
-          })
-  });
-}
-
 describe("api alert routes", () => {
-  it("should reject unauthenticated alert requests and missing alert management dependencies", async (): Promise<void> => {
-    const unauthenticatedApp = createServer({
-      memberAuth: {
-        resolveMemberByTokenHash: vi.fn().mockResolvedValue(null)
-      }
-    });
-    const missingDepsApp = createServer({
-      alertManagement: undefined
-    });
-
-    const unauthenticated = await unauthenticatedApp.inject({
-      method: "GET",
-      url: "/v1/alerts?project_id=00000000-0000-4000-8000-000000000001"
-    });
-    const missingDeps = await missingDepsApp.inject({
-      method: "GET",
-      url: "/v1/alerts?project_id=00000000-0000-4000-8000-000000000001",
-      headers: {
-        authorization: "Bearer dbundle_mem_test"
-      }
-    });
-
-    expect(unauthenticated.statusCode).toBe(401);
-    expect(unauthenticated.json()).toEqual({ error: "invalid_member_token" });
-    expect(missingDeps.statusCode).toBe(404);
-    expect(missingDeps.json()).toEqual({ error: "project_not_found" });
-  });
-
-  it("should validate alert list query", async (): Promise<void> => {
-    const app = createServer();
-
-    const missingProject = await app.inject({
-      method: "GET",
-      url: "/v1/alerts",
-      headers: {
-        authorization: "Bearer dbundle_mem_test"
-      }
-    });
-    const badProject = await app.inject({
-      method: "GET",
-      url: "/v1/alerts?project_id=not-a-uuid",
-      headers: {
-        authorization: "Bearer dbundle_mem_test"
-      }
-    });
-
-    expect(missingProject.statusCode).toBe(400);
-    expect(missingProject.json()).toEqual({ error: "invalid_query" });
-    expect(badProject.statusCode).toBe(400);
-    expect(badProject.json()).toEqual({ error: "invalid_query" });
-  });
-
-  it("should list alerts scoped to member organization", async (): Promise<void> => {
-    const alertManagement = {
-      listAlertsForOrganization: vi.fn().mockResolvedValue([
-        {
-          alert_id: "22222222-2222-4222-8222-222222222222",
-          project_id: "00000000-0000-4000-8000-000000000001",
-          created_by_user_id: "usr_123",
-          service_id: null,
-          channel: "email",
-          condition_type: "new_incident",
-          severity_min: null,
-          severity_lifecycle_scope: null,
-          cooldown_seconds: 0,
-          config: { to: "owner@example.com" },
-          is_enabled: true,
-          created_at: "2026-03-15T00:00:00.000Z",
-          updated_at: "2026-03-15T00:00:00.000Z"
-        }
-      ]),
-      createAlertForOrganization: vi.fn().mockResolvedValue(null),
-      updateAlertForOrganization: vi.fn().mockResolvedValue(null),
-      deleteAlertForOrganization: vi.fn().mockResolvedValue(null)
-    };
-    const app = createServer({ alertManagement });
-
-    const response = await app.inject({
-      method: "GET",
-      url: "/v1/alerts?project_id=00000000-0000-4000-8000-000000000001&limit=10",
-      headers: {
-        authorization: "Bearer dbundle_mem_test"
-      }
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({
-      alerts: [
-        {
-          alert_id: "22222222-2222-4222-8222-222222222222",
-          project_id: "00000000-0000-4000-8000-000000000001",
-          created_by_user_id: "usr_123",
-          service_id: null,
-          channel: "email",
-          condition_type: "new_incident",
-          severity_min: null,
-          severity_lifecycle_scope: null,
-          cooldown_seconds: 0,
-          config: { to: "owner@example.com" },
-          is_enabled: true,
-          created_at: "2026-03-15T00:00:00.000Z",
-          updated_at: "2026-03-15T00:00:00.000Z"
-        }
-      ]
-    });
-    expect(alertManagement.listAlertsForOrganization).toHaveBeenCalledWith({
-      organization_id: "org_123",
-      project_id: "00000000-0000-4000-8000-000000000001",
-      limit: 10
-    });
-  });
-
-  it("should list alerts for collaborators using the shared project's organization", async (): Promise<void> => {
-    const projectManagement = mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>({
-      resolveProjectAccessForUser: vi.fn().mockResolvedValue({
-        ...defaultProjectAccess,
-        organization_id: "org_shared",
-        relationship: "shared",
-        effective_role: "member"
-      }),
-      listProjectsForUser: vi.fn().mockResolvedValue([]),
-      createProjectForUser: vi.fn().mockResolvedValue(null),
-      updateProjectForUser: vi.fn().mockResolvedValue(null),
-      deleteProjectForUser: vi.fn().mockResolvedValue(null)
-    });
-    const alertManagement = {
-      listAlertsForOrganization: vi.fn().mockResolvedValue([]),
-      createAlertForOrganization: vi.fn().mockResolvedValue(null),
-      updateAlertForOrganization: vi.fn().mockResolvedValue(null),
-      deleteAlertForOrganization: vi.fn().mockResolvedValue(null)
-    };
-    const app = createServer({ projectManagement, alertManagement });
-
-    const response = await app.inject({
-      method: "GET",
-      url: "/v1/alerts?project_id=00000000-0000-4000-8000-000000000001&limit=10",
-      headers: {
-        authorization: "Bearer dbundle_mem_test"
-      }
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(alertManagement.listAlertsForOrganization).toHaveBeenCalledWith({
-      organization_id: "org_shared",
-      project_id: "00000000-0000-4000-8000-000000000001",
-      limit: 10
-    });
-  });
-
-  it("should rate limit alert reads per member", async (): Promise<void> => {
-    const claimRequest = vi.fn().mockResolvedValue({
-      allowed: false,
-      limit: 100,
-      remaining: 0,
-      retry_after_ms: 12_000
-    });
-    const app = createServer({ authRateLimiter: { claimRequest } });
-
-    const response = await app.inject({
-      method: "GET",
-      url: "/v1/alerts?project_id=00000000-0000-4000-8000-000000000001&limit=10",
-      headers: {
-        authorization: "Bearer dbundle_mem_test"
-      }
-    });
-
-    expect(response.statusCode).toBe(429);
-    expect(response.json()).toEqual({ error: "rate_limited" });
-    expect(response.headers["retry-after"]).toBe("12");
-    expect(claimRequest).toHaveBeenCalledWith(
-      expect.objectContaining({
-        bucket: "management-read",
-        subject: "member:usr_123",
-        limit: 200
-      })
-    );
-  });
-
   it("should create alert scoped to member organization", async (): Promise<void> => {
     const alertManagement = {
       listAlertsForOrganization: vi.fn().mockResolvedValue([]),
@@ -416,16 +132,31 @@ describe("api alert routes", () => {
     };
     const app = createServer({ alertManagement });
     const headers = { authorization: "Bearer dbundle_mem_test" };
-    const legacy = await app.inject({ method: "POST", url: "/v1/alerts", headers, payload: {
-      project_id: alert.project_id, channel: "webhook", condition_type: "new_incident",
-      config: alert.config
-    } });
+    const legacy = await app.inject({
+      method: "POST",
+      url: "/v1/alerts",
+      headers,
+      payload: {
+        project_id: alert.project_id,
+        channel: "webhook",
+        condition_type: "new_incident",
+        config: alert.config
+      }
+    });
     expect(legacy.statusCode).toBe(201);
     expect(legacy.json().alert).not.toHaveProperty("signing_secret");
-    const created = await app.inject({ method: "POST", url: "/v1/alerts", headers, payload: {
-      project_id: alert.project_id, channel: "webhook", condition_type: "new_incident",
-      config: alert.config, signing: "hmac_sha256_v1"
-    } });
+    const created = await app.inject({
+      method: "POST",
+      url: "/v1/alerts",
+      headers,
+      payload: {
+        project_id: alert.project_id,
+        channel: "webhook",
+        condition_type: "new_incident",
+        config: alert.config,
+        signing: "hmac_sha256_v1"
+      }
+    });
     const firstSecret = created.json().alert.signing_secret as string;
     expect(created.statusCode).toBe(201);
     expect(firstSecret).toMatch(/^dbundle_asec_[A-Za-z0-9_-]{43}$/);
@@ -433,7 +164,9 @@ describe("api alert routes", () => {
       expect.objectContaining({ signing_secret: firstSecret })
     );
 
-    const rotated = await app.inject({ method: "PATCH", headers,
+    const rotated = await app.inject({
+      method: "PATCH",
+      headers,
       url: `/v1/alerts/${alert.alert_id}?project_id=${alert.project_id}`,
       payload: { channel: "webhook", rotate_signing_secret: true }
     });
@@ -445,8 +178,11 @@ describe("api alert routes", () => {
       expect.objectContaining({ signing_secret: nextSecret })
     );
 
-    const listed = await app.inject({ method: "GET", headers,
-      url: `/v1/alerts?project_id=${alert.project_id}` });
+    const listed = await app.inject({
+      method: "GET",
+      headers,
+      url: `/v1/alerts?project_id=${alert.project_id}`
+    });
     expect(listed.json().alerts[0]).not.toHaveProperty("signing_secret");
     await app.close();
   });
@@ -614,7 +350,9 @@ describe("api alert routes", () => {
           created_at: "2026-05-13T10:00:00.000Z",
           updated_at: "2026-05-13T10:00:00.000Z"
         }),
-        upsertSlackDestinationForOrganization: vi.fn().mockResolvedValue({ slack_destination_id: "sd_123" }),
+        upsertSlackDestinationForOrganization: vi
+          .fn()
+          .mockResolvedValue({ slack_destination_id: "sd_123" }),
         deleteSlackDestinationForProjectInOrganization: vi.fn().mockResolvedValue(null)
       })
     });

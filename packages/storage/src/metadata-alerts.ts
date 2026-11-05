@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { ruleActorAllowedSql } from "./project-rule-access.js";
+import { alertScopeProjectionSql } from "./alert-scope-projection.js";
 import {
   defaultSeverityLifecycleScopeForCondition,
   normalizeSeverityLifecycleScopeForCondition
@@ -44,6 +45,7 @@ export function createMetadataAlerts(
       }
 
       const result = await db.query<{
+        scope?: AlertRuleRecord["scope"];
         alert_id: string;
         project_id: string;
         created_by_user_id: string;
@@ -73,6 +75,7 @@ export function createMetadataAlerts(
             is_enabled,
             created_at::text AS created_at,
             updated_at::text AS updated_at
+            ${input.include_scope === true ? `,${alertScopeProjectionSql("alert_rules", "$1")} AS scope` : ""}
           FROM alert_rules
           WHERE project_id=ANY(debugbundle_project_origins($1::uuid))
           ORDER BY created_at DESC, id DESC

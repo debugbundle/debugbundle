@@ -1,75 +1,219 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { AlertApiError, createAlertApi, type HttpClient } from "../../../packages/alert-client/src/index.js";
+import {
+  AlertApiError,
+  createAlertApi,
+  type HttpClient
+} from "../../../packages/alert-client/src/index.js";
 
 describe("alert api client", () => {
+  it("falls back once when an older server rejects the scope query option", async () => {
+    const request = vi
+      .fn<HttpClient["request"]>()
+      .mockResolvedValueOnce({ status: 400, body: { error: "invalid_query" } })
+      .mockResolvedValueOnce({ status: 200, body: { alerts: [] } });
+    const api = createAlertApi({ request });
+    await expect(
+      api.listAlerts({ bearerToken: "member", projectId: "project", includeScope: true })
+    ).resolves.toEqual([]);
+    expect(request).toHaveBeenLastCalledWith({
+      method: "GET",
+      path: "/v1/alerts?project_id=project",
+      bearerToken: "member"
+    });
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([401, 403, 500])("does not retry denied or failed scope reads (%s)", async (status) => {
+    const request = vi
+      .fn<HttpClient["request"]>()
+      .mockResolvedValue({ status, body: { error: "unavailable" } });
+    await expect(
+      createAlertApi({ request }).listAlerts({
+        bearerToken: "member",
+        projectId: "project",
+        includeScope: true
+      })
+    ).rejects.toBeInstanceOf(AlertApiError);
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("requests and validates opt-in alert scope while accepting older servers", async () => {
+    const alert = {
+      alert_id: "al_scope",
+      project_id: "proj_1",
+      created_by_user_id: "owner",
+      service_id: null,
+      channel: "email",
+      condition_type: "new_incident",
+      severity_min: null,
+      severity_lifecycle_scope: null,
+      cooldown_seconds: 0,
+      config: { to: "owner@example.test" },
+      is_enabled: true,
+      created_at: "2026-11-05T00:00:00Z",
+      updated_at: "2026-11-05T00:00:00Z"
+    };
+    const scope = {
+      origin_project_ids: ["00000000-0000-4000-8000-000000000001"],
+      covers_current_project: false,
+      services: [{ service_definition_id: "00000000-0000-4000-8000-000000000002", name: "Site" }],
+      service_count: 1,
+      service_filter: null
+    };
+    const request = vi
+      .fn<HttpClient["request"]>()
+      .mockResolvedValueOnce({ status: 200, body: { alerts: [{ ...alert, scope }] } })
+      .mockResolvedValueOnce({ status: 200, body: { alerts: [alert] } });
+    const api = createAlertApi({ request });
+    const result = await api.listAlerts({
+      bearerToken: "member",
+      projectId: "proj_1",
+      includeScope: true
+    });
+    expect(result[0]?.scope).toEqual(scope);
+    expect(request).toHaveBeenNthCalledWith(1, {
+      method: "GET",
+      path: "/v1/alerts?project_id=proj_1&include_scope=true",
+      bearerToken: "member"
+    });
+    expect(
+      (await api.listAlerts({ bearerToken: "member", projectId: "proj_1", includeScope: true }))[0]
+        ?.scope
+    ).toBeUndefined();
+  });
+
   it("accepts a one-time signing secret and forwards explicit webhook rotation", async () => {
     const alert = {
-      alert_id: "al_1", project_id: "proj_1", created_by_user_id: "usr_1",
-      service_id: null, channel: "webhook", condition_type: "new_incident",
-      severity_min: null, severity_lifecycle_scope: null, cooldown_seconds: 0,
-      config: { target_url: "https://hooks.example.test/alert" }, is_enabled: true,
-      created_at: "2026-09-24T00:00:00Z", updated_at: "2026-09-24T00:00:00Z",
+      alert_id: "al_1",
+      project_id: "proj_1",
+      created_by_user_id: "usr_1",
+      service_id: null,
+      channel: "webhook",
+      condition_type: "new_incident",
+      severity_min: null,
+      severity_lifecycle_scope: null,
+      cooldown_seconds: 0,
+      config: { target_url: "https://hooks.example.test/alert" },
+      is_enabled: true,
+      created_at: "2026-09-24T00:00:00Z",
+      updated_at: "2026-09-24T00:00:00Z",
       signing_secret: "dbundle_asec_one-time"
     };
-    const request = vi.fn<HttpClient["request"]>()
+    const request = vi
+      .fn<HttpClient["request"]>()
       .mockResolvedValueOnce({ status: 201, body: { alert } })
       .mockResolvedValueOnce({ status: 200, body: { alert } });
     const api = createAlertApi({ request });
-    const created = await api.createAlert({ bearerToken: "member", projectId: "proj_1",
-      channel: "webhook", conditionType: "new_incident", config: alert.config });
+    const created = await api.createAlert({
+      bearerToken: "member",
+      projectId: "proj_1",
+      channel: "webhook",
+      conditionType: "new_incident",
+      config: alert.config
+    });
     expect(created.signing_secret).toBe(alert.signing_secret);
-    expect(request).toHaveBeenNthCalledWith(1, expect.objectContaining({
-      body: { project_id: "proj_1", channel: "webhook", condition_type: "new_incident",
-        config: alert.config, signing: "hmac_sha256_v1" }
-    }));
-    const rotated = await api.updateAlert({ bearerToken: "member", projectId: "proj_1",
-      alertId: "al_1", channel: "webhook", rotateSigningSecret: true });
+    expect(request).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        body: {
+          project_id: "proj_1",
+          channel: "webhook",
+          condition_type: "new_incident",
+          config: alert.config,
+          signing: "hmac_sha256_v1"
+        }
+      })
+    );
+    const rotated = await api.updateAlert({
+      bearerToken: "member",
+      projectId: "proj_1",
+      alertId: "al_1",
+      channel: "webhook",
+      rotateSigningSecret: true
+    });
     expect(rotated.signing_secret).toBe(alert.signing_secret);
-    expect(request).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      body: { channel: "webhook", rotate_signing_secret: true }
-    }));
-    const unsafeList = createAlertApi({ request: vi.fn().mockResolvedValue({
-      status: 200, body: { alerts: [alert] }
-    }) });
-    await expect(unsafeList.listAlerts({ bearerToken: "member", projectId: "proj_1" }))
-      .rejects.toMatchObject({ code: "invalid_response_shape" });
+    expect(request).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        body: { channel: "webhook", rotate_signing_secret: true }
+      })
+    );
+    const unsafeList = createAlertApi({
+      request: vi.fn().mockResolvedValue({
+        status: 200,
+        body: { alerts: [alert] }
+      })
+    });
+    await expect(
+      unsafeList.listAlerts({ bearerToken: "member", projectId: "proj_1" })
+    ).rejects.toMatchObject({ code: "invalid_response_shape" });
   });
   it("validates paginated alert-group metadata and detail without accepting extra sensitive fields", async () => {
     const group = {
       group_id: "00000000-0000-4000-8000-000000000001",
-      kind: "direct", project_id: "00000000-0000-4000-8000-000000000002",
+      kind: "direct",
+      project_id: "00000000-0000-4000-8000-000000000002",
       alert_id: "00000000-0000-4000-8000-000000000003",
       root_incident_id: "00000000-0000-4000-8000-000000000004",
-      channel: "slack", status: "delivered", member_count: 2,
-      created_at: "2026-09-24T10:00:00Z", delivered_at: "2026-09-24T10:00:01Z"
+      channel: "slack",
+      status: "delivered",
+      member_count: 2,
+      created_at: "2026-09-24T10:00:00Z",
+      delivered_at: "2026-09-24T10:00:01Z"
     };
-    const request = vi.fn<HttpClient["request"]>()
+    const request = vi
+      .fn<HttpClient["request"]>()
       .mockResolvedValueOnce({ status: 200, body: { groups: [group], next_cursor: "next" } })
-      .mockResolvedValueOnce({ status: 200, body: {
-        group, members: [{ incident_id: group.root_incident_id, condition_type: "new_incident", created_at: group.created_at }],
-        next_cursor: null
-      } });
+      .mockResolvedValueOnce({
+        status: 200,
+        body: {
+          group,
+          members: [
+            {
+              incident_id: group.root_incident_id,
+              condition_type: "new_incident",
+              created_at: group.created_at
+            }
+          ],
+          next_cursor: null
+        }
+      });
     const api = createAlertApi({ request });
-    const list = await api.listAlertGroups({ bearerToken: "dbundle_mem_x", projectId: group.project_id, limit: 1 });
+    const list = await api.listAlertGroups({
+      bearerToken: "dbundle_mem_x",
+      projectId: group.project_id,
+      limit: 1
+    });
     expect(list.groups).toEqual([group]);
     expect(request).toHaveBeenNthCalledWith(1, {
-      method: "GET", path: `/v1/alert-groups?project_id=${group.project_id}&limit=1`, bearerToken: "dbundle_mem_x"
+      method: "GET",
+      path: `/v1/alert-groups?project_id=${group.project_id}&limit=1`,
+      bearerToken: "dbundle_mem_x"
     });
     const detail = await api.getAlertGroup({
-      bearerToken: "dbundle_mem_x", projectId: group.project_id, kind: "direct", groupId: group.group_id, cursor: "next"
+      bearerToken: "dbundle_mem_x",
+      projectId: group.project_id,
+      kind: "direct",
+      groupId: group.group_id,
+      cursor: "next"
     });
     expect(detail.members).toHaveLength(1);
     expect(request).toHaveBeenNthCalledWith(2, {
-      method: "GET", path: `/v1/alert-groups/direct/${group.group_id}?project_id=${group.project_id}&cursor=next`,
+      method: "GET",
+      path: `/v1/alert-groups/direct/${group.group_id}?project_id=${group.project_id}&cursor=next`,
       bearerToken: "dbundle_mem_x"
     });
 
-    const unsafe = createAlertApi({ request: vi.fn().mockResolvedValue({
-      status: 200, body: { groups: [{ ...group, payload: { secret: "do-not-return" } }], next_cursor: null }
-    }) });
-    await expect(unsafe.listAlertGroups({ bearerToken: "dbundle_mem_x", projectId: group.project_id }))
-      .rejects.toMatchObject({ code: "invalid_response_shape" });
+    const unsafe = createAlertApi({
+      request: vi.fn().mockResolvedValue({
+        status: 200,
+        body: { groups: [{ ...group, payload: { secret: "do-not-return" } }], next_cursor: null }
+      })
+    });
+    await expect(
+      unsafe.listAlertGroups({ bearerToken: "dbundle_mem_x", projectId: group.project_id })
+    ).rejects.toMatchObject({ code: "invalid_response_shape" });
   });
   it("calls list alerts route with required project query and optional limit", async () => {
     const request = vi.fn<HttpClient["request"]>().mockResolvedValue({
@@ -309,12 +453,16 @@ describe("alert api client", () => {
     const apiShape = createAlertApi({ request: requestShape });
     const apiMalformedError = createAlertApi({ request: requestMalformedError });
 
-    await expect(apiError.deleteAlert({ bearerToken: "dbundle_mem_x", projectId: "proj_1", alertId: "al_missing" })).rejects.toEqual(
-      new AlertApiError(404, "alert_not_found")
-    );
-    await expect(apiShape.listAlerts({ bearerToken: "dbundle_mem_x", projectId: "proj_1" })).rejects.toEqual(
-      new AlertApiError(200, "invalid_response_shape")
-    );
+    await expect(
+      apiError.deleteAlert({
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        alertId: "al_missing"
+      })
+    ).rejects.toEqual(new AlertApiError(404, "alert_not_found"));
+    await expect(
+      apiShape.listAlerts({ bearerToken: "dbundle_mem_x", projectId: "proj_1" })
+    ).rejects.toEqual(new AlertApiError(200, "invalid_response_shape"));
     await expect(
       apiMalformedError.createAlert({
         bearerToken: "dbundle_mem_x",
@@ -381,7 +529,9 @@ describe("alert api client", () => {
       });
     const api = createAlertApi({ request });
 
-    await expect(api.listAlerts({ bearerToken: "dbundle_mem_x", projectId: "proj_1" })).resolves.toEqual([]);
+    await expect(
+      api.listAlerts({ bearerToken: "dbundle_mem_x", projectId: "proj_1" })
+    ).resolves.toEqual([]);
     await expect(
       api.createAlert({
         bearerToken: "dbundle_mem_x",

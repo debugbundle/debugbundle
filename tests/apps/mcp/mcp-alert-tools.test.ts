@@ -4,6 +4,23 @@ import { AlertApiError } from "../../../packages/alert-client/src/index.js";
 import { ALERT_MCP_TOOL_NAMES, createAlertMcpTools } from "../../../apps/mcp/src/alert-tools.js";
 
 describe("mcp alert tools", () => {
+  it("forwards the opt-in scope read without introducing a new tool or mutation", async () => {
+    const listAlerts = vi.fn().mockResolvedValue([]);
+    const tools = createAlertMcpTools({
+      listAlerts,
+      listAlertGroups: vi.fn(),
+      getAlertGroup: vi.fn(),
+      createAlert: vi.fn(),
+      updateAlert: vi.fn(),
+      deleteAlert: vi.fn()
+    });
+    await tools.list_alerts({ bearerToken: "member", projectId: "project", includeScope: true });
+    expect(listAlerts).toHaveBeenCalledWith({
+      bearerToken: "member",
+      projectId: "project",
+      includeScope: true
+    });
+  });
   it("declares alert tool parity", () => {
     expect(ALERT_MCP_TOOL_NAMES).toEqual([
       "list_alerts",

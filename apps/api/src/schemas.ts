@@ -387,6 +387,10 @@ export const WebhookTestBodySchema = z
 export const AlertsQuerySchema = z
   .object({
     project_id: z.string().guid(),
+    include_scope: z
+      .enum(["true", "false"])
+      .transform((value) => value === "true")
+      .optional(),
     limit: z.coerce.number().int().min(1).max(100).default(20)
   })
   .strict();

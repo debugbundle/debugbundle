@@ -12,6 +12,7 @@ import {
   jsonResponse,
   requestUrl
 } from "./web-test-helpers.js";
+import { globalScope } from "./helpers/alert-scopes.js";
 import { openSelect, chooseSelectOption } from "./helpers/management-ui.js";
 
 afterEach(() => {
@@ -37,7 +38,10 @@ describe("alert editing", () => {
         });
       }
 
-      if (url.endsWith("/v1/alerts?project_id=proj_123&limit=20") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/alerts?project_id=proj_123&limit=20&include_scope=true") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           alerts: []
         });
@@ -129,7 +133,10 @@ describe("alert editing", () => {
         });
       }
 
-      if (url.endsWith("/v1/alerts?project_id=proj_123&limit=20") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/alerts?project_id=proj_123&limit=20&include_scope=true") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           alerts: []
         });
@@ -206,11 +213,15 @@ describe("alert editing", () => {
         });
       }
 
-      if (url.endsWith("/v1/alerts?project_id=proj_123&limit=20") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/alerts?project_id=proj_123&limit=20&include_scope=true") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           alerts: [
             createAlert({
               alert_id: "alert_123",
+              scope: globalScope(),
               config: { to: "owner@example.com" },
               cooldown_seconds: 86400
             })
@@ -306,7 +317,10 @@ describe("alert editing", () => {
         });
       }
 
-      if (url.endsWith("/v1/alerts?project_id=proj_123&limit=20") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/alerts?project_id=proj_123&limit=20&include_scope=true") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           alerts: []
         });
@@ -376,7 +390,10 @@ describe("alert editing", () => {
         });
       }
 
-      if (url.endsWith("/v1/alerts?project_id=proj_123&limit=20") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/alerts?project_id=proj_123&limit=20&include_scope=true") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           alerts: []
         });
@@ -455,7 +472,10 @@ describe("alert editing", () => {
         });
       }
 
-      if (url.endsWith("/v1/alerts?project_id=proj_123&limit=20") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/alerts?project_id=proj_123&limit=20&include_scope=true") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           alerts: []
         });

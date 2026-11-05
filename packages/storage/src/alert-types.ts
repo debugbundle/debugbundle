@@ -4,6 +4,7 @@ import type {
 } from "./alert-lifecycle.js";
 import type { DeliverAlertEmailDigestJob } from "./queue-types.js";
 import type { EventClass, EventEnvelope } from "../../shared-types/src/index.js";
+import type { AlertScope } from "../../shared-types/src/alert-scope.js";
 
 export type AlertChannel = "email" | "slack" | "discord" | "webhook";
 
@@ -15,6 +16,7 @@ export type AlertConditionType =
   | "regression_after_deploy";
 
 export interface AlertRuleRecord extends Record<string, unknown> {
+  scope?: AlertScope | null;
   alert_id: string;
   project_id: string;
   created_by_user_id: string;
@@ -42,6 +44,7 @@ export interface DeleteAlertResult {
 
 export interface AlertManagementStore {
   listAlertsForOrganization(input: {
+    include_scope?: boolean;
     organization_id: string;
     project_id: string;
     limit: number;

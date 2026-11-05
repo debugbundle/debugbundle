@@ -1455,6 +1455,21 @@ Mapped requirements: FR-BIL-10, FR-BIL-07 and FR-BIL-03.
 - **When** creating, listing, or deleting alert rules via API or CLI
 - **Then** the operations succeed and the rules take effect immediately
 
+### AC-ALT-SCOPE: Accurate retained alert coverage
+
+Mapped requirements: FR-ALT-03 / FR-PJS-03. Opt-in API, CLI and ordinary MCP reads
+separate saved origin coverage from the selected service/environment filter. Cover
+retained target/source rules, new global rules, legacy NULL snapshots, renamed
+services, incomplete/empty catalogues, bounded lists with exact totals and reads
+through retained views. Default responses satisfy strict predecessor schemas;
+older-server fallback is bounded and access denials are never retried. Management
+reads and normal edits do not change matching, destinations, cooldowns or history.
+The approved dashboard correction must show effective coverage in the table and
+allowed scope in the editor, offer eligible services only, preserve the filter
+when scope is unavailable, and keep confirmed writes successful when refresh fails.
+Overlapping list/save/delete requests must preserve accepted writes, finish loading
+the requested list limit, and expose an incomplete-list error until a read succeeds.
+
 ### AC-ALT-05: Member Alert Ownership
 
 - **Given** a shared project where one member created an alert rule

@@ -19,7 +19,12 @@ function mapMcpError(error: unknown): never {
 }
 
 export function createAlertMcpTools(api: {
-  listAlerts(input: { bearerToken: string; projectId: string; limit?: number }): Promise<unknown[]>;
+  listAlerts(input: {
+    bearerToken: string;
+    projectId: string;
+    limit?: number;
+    includeScope?: boolean;
+  }): Promise<unknown[]>;
   listAlertGroups(input: {
     bearerToken: string;
     projectId: string;
@@ -69,7 +74,12 @@ export function createAlertMcpTools(api: {
   return {
     async list_alerts(input) {
       try {
-        const requestInput: { bearerToken: string; projectId: string; limit?: number } = {
+        const requestInput: {
+          bearerToken: string;
+          projectId: string;
+          limit?: number;
+          includeScope?: boolean;
+        } = {
           bearerToken: String(input["bearerToken"]),
           projectId: String(input["projectId"])
         };
@@ -77,6 +87,8 @@ export function createAlertMcpTools(api: {
           requestInput.limit = input["limit"];
         }
 
+        if (typeof input["includeScope"] === "boolean")
+          requestInput.includeScope = input["includeScope"];
         return { alerts: await api.listAlerts(requestInput) };
       } catch (error) {
         mapMcpError(error);

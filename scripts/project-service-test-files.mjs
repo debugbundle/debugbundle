@@ -1,6 +1,7 @@
 // Only these database-only rehearsals run in the unit qualification container.
 // General integration tests also require Redis/S3 and retain their separate lane.
 export const PROJECT_SERVICE_TEST_FILES = [
+  "tests/integration/alert-scope-projection.integration.test.ts",
   "tests/integration/project-merge-interfaces.integration.test.ts",
   "tests/integration/project-services.integration.test.ts",
   "tests/integration/project-origin-scopes.integration.test.ts",

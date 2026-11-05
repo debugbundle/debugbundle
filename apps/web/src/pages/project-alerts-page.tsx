@@ -1,3 +1,5 @@
+import { AlertRulesTable } from "../components/system/alert-rules-table.js";
+import { getAlertScope, reconcileAlertScopeRead } from "../lib/alert-scope.js";
 import { PendingButton } from "../components/system/pending-button.js";
 import { BoundedListLimit } from "../components/system/bounded-list-limit.js";
 import {
@@ -5,12 +7,6 @@ import {
   STANDARD_ALERT_CHANNEL_OPTIONS,
   ALERT_SEVERITY_LIFECYCLE_DEFAULT,
   SECONDS_PER_DAY,
-  formatAlertChannelWithDestination,
-  canManageAlertRule,
-  formatAlertCondition,
-  formatSeverityLifecycleScopeForAlert,
-  formatSeverity,
-  formatAlertCooldown,
   buildAlertRulePayload,
   getDefaultCooldownDays,
   getDestinationLabel,
@@ -22,7 +18,7 @@ import { AlertDeliveryFields } from "../components/system/alert-delivery-fields.
 import { AlertRuleFields } from "../components/system/alert-rule-fields.js";
 import { durationFromSeconds } from "../lib/duration-form.js";
 import { PlaintextTokenReveal } from "../components/system/plaintext-token-reveal.js";
-import { BellRingIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { BellRingIcon, PlusIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useOutletContext, useSearchParams } from "react-router-dom";
 import { getTierCapabilities } from "../../../../packages/shared-types/src/index.js";
@@ -31,20 +27,7 @@ import { CalloutCard } from "../components/system/callout-card.js";
 import { ConnectedSlackDestinationField } from "../components/system/connected-slack-destination-field.js";
 import { ProjectResourceEmptyState } from "../components/system/project-resource-empty-state.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger
-} from "../components/ui/alert-dialog.js";
-import { Badge } from "../components/ui/badge.js";
 import { Button } from "../components/ui/button.js";
-import { TableActionButton } from "../components/system/table-action-button.js";
 import {
   Card,
   CardContent,
@@ -57,14 +40,6 @@ import { Field, FieldDescription, FieldLabel } from "../components/ui/field.js";
 import { Input } from "../components/ui/input.js";
 
 import { Skeleton } from "../components/ui/skeleton.js";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from "../components/ui/table.js";
 import {
   createProjectAlert,
   deleteAlert,
@@ -99,8 +74,12 @@ export function ProjectAlertsPage(): JSX.Element {
   const [alerts, setAlerts] = useState<AlertRecord[] | null>(null);
   const [alertsError, setAlertsError] = useState(false);
   const [alertLimit, setAlertLimit] = useState(20);
+  const currentAlertLimit = useRef(alertLimit);
   const [alertsRevision, setAlertsRevision] = useState(0);
   const projectGeneration = useRef(0);
+  const alertsReadGeneration = useRef(0);
+  const alertsLoaded = useRef(false);
+  const deletedAlertIds = useRef(new Set<string>());
   const showAlertsLoading = useDelayedVisibility(alerts === null && !alertsError);
   const [slackDestinations, setSlackDestinations] = useState<SlackDestinationRecord[]>([]);
   const [slackDestinationsLoaded, setSlackDestinationsLoaded] = useState(false);
@@ -137,14 +116,23 @@ export function ProjectAlertsPage(): JSX.Element {
   const channelOptions = slackEnabled ? TEAM_ALERT_CHANNEL_OPTIONS : STANDARD_ALERT_CHANNEL_OPTIONS;
   useEffect(() => {
     let active = true;
+    alertsReadGeneration.current += 1;
+    currentAlertLimit.current = alertLimit;
+    alertsLoaded.current = false;
+    deletedAlertIds.current = new Set();
     setAlerts(null);
     setAlertsError(false);
-    void listProjectAlerts(projectId, alertLimit).then(
+    void listProjectAlerts(projectId, alertLimit, { includeScope: true }).then(
       (records) => {
-        if (active) setAlerts(records);
+        if (!active || alertsLoaded.current) return;
+        alertsLoaded.current = true;
+        setAlerts((current) =>
+          reconcileAlertScopeRead(current, records, true, deletedAlertIds.current)
+        );
+        setAlertsError(false);
       },
       () => {
-        if (active) setAlertsError(true);
+        if (active && !alertsLoaded.current) setAlertsError(true);
       }
     );
     return () => {
@@ -168,6 +156,30 @@ export function ProjectAlertsPage(): JSX.Element {
   }, [projectId]);
 
   const resolvedProjectId = projectId;
+
+  async function refreshAlertScopes(): Promise<void> {
+    const generation = projectGeneration.current;
+    const readGeneration = ++alertsReadGeneration.current;
+    try {
+      const records = await listProjectAlerts(projectId, currentAlertLimit.current, {
+        includeScope: true
+      });
+      if (
+        generation !== projectGeneration.current ||
+        readGeneration !== alertsReadGeneration.current
+      )
+        return;
+      const includeMissing = !alertsLoaded.current;
+      alertsLoaded.current = true;
+      setAlerts((current) =>
+        reconcileAlertScopeRead(current, records, includeMissing, deletedAlertIds.current)
+      );
+      setAlertsError(false);
+    } catch {
+      // The mutation already succeeded. Keep its result and unavailable scope;
+      // never retry the write or report a failed save because this read failed.
+    }
+  }
 
   async function refreshSlackDestinations(
     nextPreferredDestinationId: string | null = preferredSlackDestinationId
@@ -453,7 +465,8 @@ export function ProjectAlertsPage(): JSX.Element {
       if (generation !== projectGeneration.current) return;
       setSigningSecret(signing_secret ?? null);
 
-      setAlerts((current) => [...(current ?? []), created]);
+      setAlerts((current) => [...(current ?? []), { ...created, scope: null }]);
+      void refreshAlertScopes();
       resetAlertForm();
       setIsCreateOpen(false);
       showSuccessToast("Alert rule created successfully.");
@@ -478,23 +491,26 @@ export function ProjectAlertsPage(): JSX.Element {
     }
 
     const generation = projectGeneration.current;
+    const payload: Parameters<typeof updateProjectAlert>[2] = {
+      ...draft,
+      ...(channel === "webhook" && signingRequested ? { rotate_signing_secret: true as const } : {})
+    };
+    const editingAlert = alerts?.find((alert) => alert.alert_id === editingAlertId);
+    if (!editingAlert || getAlertScope(editingAlert) === null) delete payload.service_id;
     try {
       setIsSaving(true);
       const { signing_secret, ...updated } = await updateProjectAlert(
         editingAlertId,
         resolvedProjectId,
-        {
-          ...draft,
-          ...(channel === "webhook" && signingRequested
-            ? { rotate_signing_secret: true as const }
-            : {})
-        }
+        payload
       );
       if (generation !== projectGeneration.current) return;
       setSigningSecret(signing_secret ?? null);
-      setAlerts((current) =>
-        (current ?? []).map((alert) => (alert.alert_id === updated.alert_id ? updated : alert))
-      );
+      setAlerts((current) => [
+        ...(current ?? []).filter((alert) => alert.alert_id !== updated.alert_id),
+        { ...updated, scope: null }
+      ]);
+      void refreshAlertScopes();
       setIsCreateOpen(false);
       setEditingAlertId(null);
       showSuccessToast("Alert rule updated successfully.");
@@ -506,12 +522,16 @@ export function ProjectAlertsPage(): JSX.Element {
   }
 
   async function handleDeleteAlert(alertId: string): Promise<void> {
+    const generation = projectGeneration.current;
     try {
       await deleteAlert(alertId, resolvedProjectId);
+      if (generation !== projectGeneration.current) return;
+      alertsReadGeneration.current += 1;
+      deletedAlertIds.current.add(alertId);
       setAlerts((current) => (current ?? []).filter((a) => a.alert_id !== alertId));
       showSuccessToast("Alert rule deleted successfully.");
     } catch {
-      showErrorToast("Could not delete alert rule.");
+      if (generation === projectGeneration.current) showErrorToast("Could not delete alert rule.");
     }
   }
 
@@ -590,7 +610,8 @@ export function ProjectAlertsPage(): JSX.Element {
             }
             size="lg"
             footer={
-              <PendingButton pending={isSaving}
+              <PendingButton
+                pending={isSaving}
                 type="submit"
                 disabled={
                   isSaving ||
@@ -640,6 +661,7 @@ export function ProjectAlertsPage(): JSX.Element {
                   signingRequested={signingRequested}
                   setSigningRequested={setSigningRequested}
                   editingAlertId={editingAlertId}
+                  editingAlert={alerts?.find((alert) => alert.alert_id === editingAlertId) ?? null}
                   channel={channel}
                 />
               }
@@ -689,8 +711,9 @@ export function ProjectAlertsPage(): JSX.Element {
                   Retry alert rules
                 </Button>
               </div>
-            ) : alerts === null ? (
-              showAlertsLoading ? (
+            ) : null}
+            {alerts === null ? (
+              showAlertsLoading && !alertsError ? (
                 <div className="space-y-3">
                   <Skeleton className="h-12 w-full" />
                   <Skeleton className="h-12 w-full" />
@@ -705,74 +728,14 @@ export function ProjectAlertsPage(): JSX.Element {
                 onAction={() => setIsCreateOpen(true)}
               />
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Channel</TableHead>
-                    <TableHead>Condition</TableHead>
-                    <TableHead>Notify on</TableHead>
-                    <TableHead>Minimum severity</TableHead>
-                    <TableHead>Cooldown</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {alerts.map((alert) => (
-                    <TableRow key={alert.alert_id}>
-                      <TableCell className="font-medium">
-                        {formatAlertChannelWithDestination(alert, slackDestinations)}
-                      </TableCell>
-                      <TableCell>{formatAlertCondition(alert.condition_type)}</TableCell>
-                      <TableCell>{formatSeverityLifecycleScopeForAlert(alert)}</TableCell>
-                      <TableCell>
-                        {alert.severity_min === null ? "Any" : formatSeverity(alert.severity_min)}
-                      </TableCell>
-                      <TableCell>{formatAlertCooldown(alert.cooldown_seconds)}</TableCell>
-                      <TableCell>
-                        <Badge variant={alert.is_enabled ? "success" : "secondary"}>
-                          {alert.is_enabled ? "enabled" : "disabled"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {canManageAlertRule(alert, session?.user_id, effectiveRole) ? (
-                          <div className="flex items-center justify-end gap-1">
-                            <TableActionButton
-                              label="Edit"
-                              icon={PencilIcon}
-                              onClick={() => openEditAlertDialog(alert)}
-                            />
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <TableActionButton label="Delete" icon={Trash2Icon} />
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete alert rule</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This will permanently remove this alert rule. Incident lifecycle
-                                    events will no longer be delivered through this channel.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => void handleDeleteAlert(alert.alert_id)}
-                                  >
-                                    Delete alert
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <AlertRulesTable
+                alerts={alerts}
+                slackDestinations={slackDestinations}
+                userId={session?.user_id}
+                effectiveRole={effectiveRole}
+                onEdit={openEditAlertDialog}
+                onDelete={handleDeleteAlert}
+              />
             )}
           </CardContent>
         </Card>

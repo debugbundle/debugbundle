@@ -4,7 +4,8 @@ import type {
   CapturePolicyRecord,
   CapturePolicyUpdate,
   CaptureRuleUpdate,
-  EventEnvelope
+  EventEnvelope,
+  AlertScope
 } from "../../../packages/shared-types/src/index.js";
 import type {
   AccountDeletionChallengeService,
@@ -232,7 +233,9 @@ export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagement
           organization_id: string;
           project_id: string;
           limit: number;
+          include_scope?: boolean;
         }): Promise<Array<{
+          scope?: AlertScope | null;
           alert_id: string;
           project_id: string;
           created_by_user_id: string;

@@ -1,4 +1,6 @@
 import { API_BASE, buildBrowserSessionHeaders, readJson } from "./api-client.js";
+import { shouldRetryWithoutAlertScope } from "../../../../packages/alert-client/src/index.js";
+import { AlertScopeSchema } from "../../../../packages/shared-types/src/alert-scope.js";
 import type {
   AlertChannel,
   AlertConditionType,
@@ -6,19 +8,39 @@ import type {
   AlertRecord
 } from "./api-types.js";
 
-export async function listProjectAlerts(projectId: string, limit = 20): Promise<AlertRecord[]> {
+export async function listProjectAlerts(
+  projectId: string,
+  limit = 20,
+  options: { includeScope?: boolean } = {}
+): Promise<AlertRecord[]> {
   const searchParams = new URLSearchParams({
     project_id: projectId,
     limit: String(limit)
   });
 
-  const body = await readJson<{ alerts: AlertRecord[] }>(
-    await fetch(`${API_BASE}/v1/alerts?${searchParams.toString()}`, {
-      credentials: "include"
-    })
-  );
+  if (options.includeScope === true) searchParams.set("include_scope", "true");
+  let response = await fetch(`${API_BASE}/v1/alerts?${searchParams.toString()}`, {
+    credentials: "include"
+  });
+  if (options.includeScope === true && response.status === 400) {
+    const error: unknown = await response
+      .clone()
+      .json()
+      .catch(() => null);
+    if (shouldRetryWithoutAlertScope(response.status, error)) {
+      searchParams.delete("include_scope");
+      response = await fetch(`${API_BASE}/v1/alerts?${searchParams.toString()}`, {
+        credentials: "include"
+      });
+    }
+  }
+  const body = await readJson<{ alerts: AlertRecord[] }>(response);
 
-  return body.alerts;
+  return body.alerts.map((alert) => {
+    if (alert.scope === undefined) return alert;
+    const scope = AlertScopeSchema.safeParse(alert.scope);
+    return { ...alert, scope: scope.success ? scope.data : null };
+  });
 }
 
 export async function createProjectAlert(payload: {

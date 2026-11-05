@@ -109,7 +109,7 @@ export const CLI_USAGE_LINES = [
   "  debugbundle token member list [--limit <n>] [--auth-file <path>] [--json]",
   "  debugbundle token member create --label <label> [--auth-file <path>] [--json]",
   "  debugbundle token member revoke <token-id> [--auth-file <path>] [--json]",
-  "  debugbundle alert list --project-id <id> [--limit <n>] [--auth-file <path>] [--json]",
+  "  debugbundle alert list --project-id <id> [--limit <n>] [--include-scope <true|false>] [--auth-file <path>] [--json]",
   "  debugbundle alert groups --project-id <id> [--limit <n>] [--cursor <cursor>] [--auth-file <path>] [--json]",
   "  debugbundle alert group <direct|email_digest> <group-id> --project-id <id> [--limit <n>] [--cursor <cursor>] [--auth-file <path>] [--json]",
   "  debugbundle alert create --project-id <id> --channel <channel> --condition <condition> [--service-id <id>] [--severity-min <level>] [--severity-lifecycle-scope <new_incident|incident_regressed|both>] [--cooldown <seconds>] --config-json <json> [--is-enabled <true|false>] [--auth-file <path>] [--json]",

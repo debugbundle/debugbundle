@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { listServices, type ServiceRecord } from "../../lib/api.js";
+import { listServices, type AlertRecord, type ServiceRecord } from "../../lib/api.js";
+import { getAlertScope } from "../../lib/alert-scope.js";
+import { AlertScopeSummary } from "./alert-scope-summary.js";
 import { Field, FieldDescription, FieldLabel } from "../ui/field.js";
 import { Input } from "../ui/input.js";
 import {
@@ -26,10 +28,12 @@ export function AlertDeliveryFields({
   signingRequested,
   setSigningRequested,
   editingAlertId,
+  editingAlert,
   channel
 }: {
   projectId: string;
   editingAlertId: string | null;
+  editingAlert: AlertRecord | null;
   serviceId: string;
   setServiceId: (value: string) => void;
   enabled: boolean;
@@ -44,13 +48,18 @@ export function AlertDeliveryFields({
 }): JSX.Element {
   const [services, setServices] = useState<ServiceRecord[]>([]);
   const [servicesError, setServicesError] = useState(false);
+  const [servicesLoaded, setServicesLoaded] = useState(false);
   useEffect(() => {
     let active = true;
     setServices([]);
     setServicesError(false);
+    setServicesLoaded(false);
     void listServices(projectId).then(
       (records) => {
-        if (active) setServices(records);
+        if (active) {
+          setServices(records);
+          setServicesLoaded(true);
+        }
       },
       () => {
         if (active) setServicesError(true);
@@ -60,31 +69,68 @@ export function AlertDeliveryFields({
       active = false;
     };
   }, [projectId]);
+  const scope = editingAlert ? getAlertScope(editingAlert) : null;
+  const scopeUnavailable = editingAlertId !== null && scope === null;
+  const eligibleServices =
+    scope === null
+      ? services
+      : services.filter((service) => scope.origin_project_ids.includes(service.project_id));
+  const serviceDisabled = scopeUnavailable || !servicesLoaded || servicesError;
+  const selectedService = scope?.service_filter;
+  const unfilteredLabel = scopeUnavailable
+    ? "Scope unavailable"
+    : scope && !scope.covers_current_project
+      ? "All services in this scope"
+      : "All services";
   return (
     <>
-      <Field>
+      <Field data-disabled={serviceDisabled}>
         <FieldLabel htmlFor="project-alert-service">Service scope</FieldLabel>
         <Select
+          disabled={serviceDisabled}
           value={serviceId || "__all__"}
           onValueChange={(value) => setServiceId(value === "__all__" ? "" : value)}
         >
-          <SelectTrigger id="project-alert-service" className="w-full">
+          <SelectTrigger
+            id="project-alert-service"
+            className="w-full"
+            aria-describedby="project-alert-service-description"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              <SelectItem value="__all__">All services</SelectItem>
-              {serviceId && !services.some((service) => service.service_id === serviceId) ? (
-                <SelectItem value={serviceId}>{serviceId}</SelectItem>
+              <SelectItem value="__all__">{unfilteredLabel}</SelectItem>
+              {serviceId &&
+              !eligibleServices.some((service) => service.service_id === serviceId) ? (
+                <SelectItem value={serviceId}>
+                  {selectedService
+                    ? `${selectedService.name} (${selectedService.environment})`
+                    : "Current service filter (preserved)"}
+                </SelectItem>
               ) : null}
-              {services.map((service) => (
+              {eligibleServices.map((service) => (
                 <SelectItem key={service.service_id} value={service.service_id}>
-                  {service.name}
+                  {service.name} ({service.environment})
                 </SelectItem>
               ))}
             </SelectGroup>
           </SelectContent>
         </Select>
+        <FieldDescription id="project-alert-service-description">
+          Rule scope:{" "}
+          {editingAlertId === null ? (
+            "All services"
+          ) : editingAlert ? (
+            <AlertScopeSummary alert={editingAlert} mode="allowed" />
+          ) : (
+            "Scope unavailable"
+          )}
+          .
+          {scopeUnavailable
+            ? " The current service filter is preserved when saving other fields."
+            : null}
+        </FieldDescription>
         {servicesError ? (
           <FieldDescription>
             Could not load services. The current scope is preserved.
