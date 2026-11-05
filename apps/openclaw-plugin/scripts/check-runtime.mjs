@@ -86,6 +86,21 @@ try {
     new URL(requests[2].url, "http://127.0.0.1").searchParams.get("cursor"),
     "fixture-page-2"
   );
+  // Exercise the emitted (and installed) artifact, including URL-fragment payloads
+  // that previously reached the filesystem through an unrestricted incident ID.
+  for (const toolName of ["debugbundle_get_bundle", "debugbundle_get_reproduction"]) {
+    for (const incidentId of ["inc#../../../../../escape", "../escape", "a%2fb"]) {
+      await assert.rejects(
+        tools.get(toolName).execute("fixture-unsafe-id", {
+          source: "cloud",
+          bearerToken: "synthetic-member-token",
+          incidentId
+        }),
+        /invalid_incident_id/u
+      );
+    }
+  }
+  assert.equal(requests.length, 3, "unsafe incident IDs must fail before HTTP or cache writes");
   const approval = hooks.get("before_tool_call")({ toolName: "debugbundle_resolve_incident" });
   assert.equal(approval.requireApproval.timeoutBehavior, "deny");
   assert.deepEqual(approval.requireApproval.allowedDecisions, ["allow-once", "deny"]);

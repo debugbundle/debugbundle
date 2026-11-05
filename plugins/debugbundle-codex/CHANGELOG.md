@@ -2,7 +2,7 @@
 
 ## [1.5.1] - 2026-11-05
 
-- Default installation guidance to one project per system across repositories, preserve existing connections and adopt MCP 1.19.2.
+- Default installation guidance to one project per system across repositories, preserve existing connections and adopt MCP 1.19.3.
 
 ## [1.5.0] - 2026-11-04
 

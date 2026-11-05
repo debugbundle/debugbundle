@@ -4124,3 +4124,14 @@ the previous scope; later merges never silently expand an old rule. CLI update
 commands accept `--project-scope current_project`; ordinary MCP update tools use
 `projectScope: "current_project"`. Existing response keys, rule IDs, signing
 secrets, destination associations and delivery namespaces remain unchanged.
+
+
+## Cloud artifact cache safety
+
+CLI, MCP and OpenClaw validate incident IDs before cloud incident URL dispatch
+and before any cache side effect. IDs contain 1–255 ASCII letters, digits, dots,
+underscores or hyphens, beginning with a letter or digit. Invalid input returns
+`invalid_incident_id` without a request. Existing UUID and opaque IDs are retained.
+Cloud caches reject symbolic links, use bounded reads and guarded atomic writes,
+and retain unknown files during expiry pruning. A confirmed remote lifecycle
+mutation remains successful when optional cache synchronization fails.

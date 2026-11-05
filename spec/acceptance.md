@@ -704,6 +704,16 @@ Native logger level/silent/processor filtering runs before SDK capture; enabled-
 - Doctor/validate expose additive selected-agent status and explain project-declared portable plugins without implying a live plugin or MCP check. CLI help, generated references, setup/plugin docs and installed-package Node-matrix tests cover the workflow.
 - Muse Code supports explicit selection and interactive detection from `.muse` evidence without inferring Muse solely from shared `AGENTS.md`. Its first existing `AGENTS.md`, `CLAUDE.md`, `.agents/AGENTS.md`, or `.claude/CLAUDE.md` is respected; fresh setup creates `AGENTS.md`. Shared owned blocks remain while another selected agent uses them, upgrade together, and restore original user bytes when the last owner is removed. Conflicting native skill discovery is reported without silently changing user settings.
 
+### AC-CLI-CACHE: Cloud artifact cache boundaries
+
+Mapped requirements: FR-CLI-17, FR-PROF-05; SEC-13/14.
+Unsafe incident IDs, including fragment-plus-traversal payloads, fail before HTTP
+or cache access through CLI, MCP and emitted/installed OpenClaw. Symlinked cache
+directories and artifact leaves fail closed without modifying outside files.
+Valid UUID/opaque IDs retain bundle, reproduction, lifecycle and retention behavior;
+unknown cache files remain untouched. Confirmed remote mutations retain success
+with an optional-cache warning if local synchronization fails.
+
 ### AC-CLI-01: Incident Listing
 
 - **Given** an authenticated CLI session

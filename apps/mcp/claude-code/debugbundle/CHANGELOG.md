@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.19.3] - 2026-11-05
+
+- Default installation guidance to one project per system across repositories and preserve existing connections. Adopt MCP 1.19.3 with validated incident IDs and guarded cloud caches.
+
 ## [1.19.1] - 2026-11-04
 
 - Adopt MCP 1.19.1: keep local trace correlation within its project and environment, and reject mixed retained caches until an explicit rebuild. Preserve authentication, tool schemas and valid existing local stores.

@@ -30,6 +30,16 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## Earlier independently published client releases
 
+### CLI/MCP/OpenClaw 1.19.3 — 2026-11-05
+
+- Fix cloud artifact cache path traversal: validate incident IDs before requests
+  and cache side effects, reject symbolic links and use bounded reads and atomic
+  compare-before-replace writes. Preserve UUIDs, opaque IDs, tool schemas and
+  confirmed remote mutation outcomes. This supersedes 1.19.2 and earlier clients.
+- Qualify unsafe IDs in the emitted and normally installed OpenClaw artifact.
+  Align developer integrations with the corrected MCP package, including Gemini 1.4.3.
+
+
 ### CLI/MCP/OpenClaw 1.19.2 — 2026-11-05
 
 - Default installation guidance to one project per system across service repositories. Preserve existing connections and policy boundaries; explain name-based connect and keep project merging explicit.

@@ -17,7 +17,12 @@ words. Previous main CI and CLI-runtime runs also finished successfully.
 
 The owner authorised commit/push and the full affected release train. Current
 release evidence is in `spec/project-guidance-release-20261105.md`; publication
-and public-install acceptance are in progress.
+and public-install acceptance are in progress. Final OpenClaw 1.19.2 review
+confirmed cloud-cache path traversal; promotion stopped before merge/site deploy.
+The corrective 1.19.3 clients validate IDs before requests or cache side effects
+and reuse guarded filesystem helpers. Twenty regressions failed before the fix;
+focused retrieval/cache/integration tests pass. Gemini 1.4.3 and developer pins
+adopt the corrective MCP package. No hosted API/worker, SDK or consumer change.
 
 # Owner's three-project consolidation — server merge completed
 

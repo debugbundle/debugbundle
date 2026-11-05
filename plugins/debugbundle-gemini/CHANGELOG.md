@@ -1,5 +1,9 @@
 # DebugBundle for Gemini CLI changelog
 
+## [1.4.3] - 2026-11-05
+
+- Adopt MCP 1.19.3: reject unsafe incident IDs before HTTP requests and protect cloud artifact caches from traversal and symbolic links. Preserve existing UUID and opaque IDs, local authentication and tool schemas.
+
 ## [1.4.2] - 2026-11-05
 
 - Default installation guidance to one project per system across repositories, preserve existing connections and adopt MCP 1.19.2.

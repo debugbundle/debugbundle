@@ -1,5 +1,13 @@
 # @debugbundle/openclaw-plugin
 
+## Cloud cache safety in 1.19.3
+
+Upgrade to 1.19.3 for incident-ID validation before cloud requests and cache writes.
+Unsafe IDs return `invalid_incident_id`; UUIDs and existing opaque IDs remain supported.
+Cloud cache reads, writes and retention reject symbolic links; writes use guarded
+atomic replacement. This corrects a path traversal present in earlier clients.
+
+
 ## Installation guidance in 1.19.2
 
 Prefer one project per system across service repositories, reuse existing connections, and keep separate projects for different access or privacy policies. Inspect existing projects before first-time connect; name matching does not infer system membership.

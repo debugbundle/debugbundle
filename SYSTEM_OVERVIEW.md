@@ -849,3 +849,9 @@ MCP/OpenClaw readers reject mixed retained incident source events until an
 explicit preset rebuild; valid legacy records remain compatible. Local summary
 formatting lives in `apps/cli/src/local-processing-summary.ts`; functional trace
 regressions and reusable processing fixtures are separate from general CLI cases.
+
+
+Cloud artifact safety: CLI/MCP/OpenClaw share incident-ID validation in
+`packages/retrieval-client` and the CLI cloud cache reuses
+`packages/agent-setup/src/files.ts` for symlink checks, bounded reads and guarded
+atomic writes. URL dispatch and cache side effects reject unsafe IDs first.

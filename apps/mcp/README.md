@@ -1,6 +1,14 @@
 # @debugbundle/mcp
 
-## Installation guidance in 1.19.2
+## Cloud cache safety in 1.19.3
+
+Upgrade to 1.19.3 for incident-ID validation before cloud requests and cache writes.
+Unsafe IDs return `invalid_incident_id`; UUIDs and existing opaque IDs remain supported.
+Cloud cache reads, writes and retention reject symbolic links; writes use guarded
+atomic replacement. This corrects a path traversal present in earlier clients.
+
+
+## Installation guidance in 1.19.3
 
 Prefer one project per system across service repositories, reuse existing connections, and keep separate projects for different access or privacy policies. Inspect existing projects before first-time connect; name matching does not infer system membership.
 
@@ -87,7 +95,7 @@ Use `npx -y @debugbundle/mcp` in clients that require noninteractive package exe
 | Claude Desktop local MCP      | local MCP server config                                                    | uses local machine auth/config                       |
 | Claude Code plugin            | `/plugin marketplace add debugbundle/debugbundle`                          | installs bundled MCP config and DebugBundle skill    |
 | Codex developer plugin        | `codex plugin add debugbundle-codex@debugbundle`                           | repository marketplace; local MCP and workflow skill |
-| Codex direct MCP              | `codex mcp add debugbundle -- npx -y @debugbundle/mcp@1.19.2 --local-auth` | app, CLI, and IDE on the same host                   |
+| Codex direct MCP              | `codex mcp add debugbundle -- npx -y @debugbundle/mcp@1.19.3 --local-auth` | app, CLI, and IDE on the same host                   |
 | Cursor                        | MCP config with `npx @debugbundle/mcp`                                     | stdio transport                                      |
 | VS Code / GitHub MCP Registry | `com.debugbundle/mcp`                                                      | official registry metadata                           |
 | OpenClaw / ClawHub            | DebugBundle skill plus MCP config                                          | use the published skill for workflow guidance        |
