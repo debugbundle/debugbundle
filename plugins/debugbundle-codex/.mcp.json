@@ -2,7 +2,7 @@
   "mcpServers": {
     "debugbundle": {
       "command": "npx",
-      "args": ["-y", "@debugbundle/mcp@1.19.3", "--local-auth"]
+      "args": ["-y", "@debugbundle/mcp@1.19.4", "--local-auth"]
     }
   }
 }

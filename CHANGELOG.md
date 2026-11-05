@@ -30,6 +30,18 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## Earlier independently published client releases
 
+### CLI/MCP/OpenClaw 1.19.4 — 2026-11-05
+
+- Constrain retained local bundle/reproduction metadata to the intended artifact
+  directories before reads, rebuilds or cleanup. Reject absolute/traversing paths
+  and symbolic links, preserve invalid retained state for review, and use guarded
+  file reads and atomic local state/processing writes without lowering the existing
+  state-size allowance. This supersedes 1.19.3 and earlier clients.
+- Reject unsafe improvement/project route IDs before HTTP dispatch as well.
+- Extend emitted/installed plugin regressions to malicious local metadata and links;
+  align the distribution ledger and developer pins, including Gemini 1.4.4.
+
+
 ### CLI/MCP/OpenClaw 1.19.3 — 2026-11-05
 
 - Fix cloud artifact cache path traversal: validate incident IDs before requests

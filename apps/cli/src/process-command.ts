@@ -23,12 +23,12 @@ import {
 import { createHash } from "node:crypto";
 import {
   mkdir as mkdirFromFs,
-  readFile as readFileFromFs,
   readdir as readdirFromFs,
-  stat as statFromFs,
-  writeFile as writeFileFromFs
+  stat as statFromFs
 } from "node:fs/promises";
 import { join } from "node:path";
+import { safePath } from "../../../packages/agent-setup/src/files.js";
+import { readWorkspaceFile, writeWorkspaceFile } from "./local-artifact-paths.js";
 
 import {
   FINGERPRINT_VERSION,
@@ -451,21 +451,28 @@ export async function processCommand(
   dependencies: ProcessCommandDependencies = {}
 ): Promise<CliCommandResult> {
   const cwd = dependencies.cwd ?? (() => process.cwd());
+  const rootDirectory = cwd();
   const mkdir = dependencies.mkdir ?? mkdirFromFs;
-  const readFile =
-    dependencies.readFile ?? ((filePath: string) => readFileFromFs(filePath, "utf8"));
+  const readFile: FileReader = (filePath: string) =>
+    readWorkspaceFile(rootDirectory, filePath, dependencies.readFile);
   const readdir = dependencies.readdir ?? readdirFromFs;
   const stat = dependencies.stat ?? statFromFs;
-  const writeFile =
-    dependencies.writeFile ??
-    ((filePath: string, content: string) => writeFileFromFs(filePath, content, "utf8"));
-  const rootDirectory = cwd();
+  const writeFile: FileWriter = (filePath: string, content: string) =>
+    writeWorkspaceFile(rootDirectory, filePath, content, dependencies.writeFile);
   const eventsDirectoryPath = join(rootDirectory, LOCAL_EVENTS_DIRECTORY_PATH);
   const statePath = join(rootDirectory, LOCAL_STATE_FILE_PATH);
   const bundleDirectoryPath = join(rootDirectory, LOCAL_BUNDLE_DIRECTORY_PATH);
   const reproductionDirectoryPath = join(rootDirectory, LOCAL_REPRODUCTION_DIRECTORY_PATH);
   const capturePreset = input.preset ?? "minimal";
 
+  for (const path of [
+    ".debugbundle/local",
+    LOCAL_STATE_FILE_PATH,
+    LOCAL_EVENTS_DIRECTORY_PATH,
+    LOCAL_BUNDLE_DIRECTORY_PATH,
+    LOCAL_REPRODUCTION_DIRECTORY_PATH
+  ])
+    await safePath(rootDirectory, path);
   await mkdir(join(rootDirectory, ".debugbundle", "local"), { recursive: true });
   await mkdir(bundleDirectoryPath, { recursive: true });
   await mkdir(reproductionDirectoryPath, { recursive: true });

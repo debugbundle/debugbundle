@@ -24,6 +24,16 @@ and reuse guarded filesystem helpers. Twenty regressions failed before the fix;
 focused retrieval/cache/integration tests pass. Gemini 1.4.3 and developer pins
 adopt the corrective MCP package. No hosted API/worker, SDK or consumer change.
 
+
+Refreshed ClawHub 1.19.3 review confirmed a second pre-existing boundary issue:
+retained local metadata could redirect default artifact reads outside the project.
+The new 1.19.4 candidate constrains these paths across retrieval/rebuild/cleanup,
+rejects symbolic links, preserves invalid state and retains large-file compatibility.
+Seven local path regressions and the stale distribution-ledger contract failed
+before correction; local artifact/state/processing checks now pass. The source CI
+failure was the missed ledger pin, not a behavioral test failure. Full qualification
+and exact-version external acceptance remain in progress; the release branch stays.
+
 # Owner's three-project consolidation — server merge completed
 
 4 November 2026. The owner approved the narrow activation/merge. Cloud `b0daa141`

@@ -855,3 +855,9 @@ Cloud artifact safety: CLI/MCP/OpenClaw share incident-ID validation in
 `packages/retrieval-client` and the CLI cloud cache reuses
 `packages/agent-setup/src/files.ts` for symlink checks, bounded reads and guarded
 atomic writes. URL dispatch and cache side effects reject unsafe IDs first.
+
+
+Retained local artifact boundaries live in `apps/cli/src/local-artifact-paths.ts`.
+Retrieval, processing/rebuilds and cleanup validate canonical bundle/reproduction
+metadata and reject symbolic links. Local state/event IO reuses managed file
+helpers with allocation bounded to the opened file and atomic state/processing writes.

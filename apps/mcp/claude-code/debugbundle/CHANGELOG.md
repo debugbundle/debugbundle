@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.19.4] - 2026-11-05
+
+- Adopt MCP 1.19.4: constrain retained local artifact paths, reject symlinks across reads/rebuilds/cleanup and preserve existing valid local stores and authentication.
+
 ## [1.19.3] - 2026-11-05
 
 - Default installation guidance to one project per system across repositories and preserve existing connections. Adopt MCP 1.19.3 with validated incident IDs and guarded cloud caches.

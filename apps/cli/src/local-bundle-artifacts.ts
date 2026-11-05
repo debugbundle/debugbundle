@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { resolveLocalArtifactPath } from "./local-artifact-paths.js";
 import { buildBundle } from "../../../packages/bundle-engine/src/index.js";
 import {
   associateDiagnosticEvidence,
@@ -71,12 +71,20 @@ function localBundle(input: LocalArtifactsInput): BundleV1 {
   });
 }
 export async function writeLocalBundleArtifacts(input: LocalArtifactsInput): Promise<void> {
+  const bundlePath = await resolveLocalArtifactPath(
+    input.rootDirectory,
+    input.incident.bundle_path,
+    "bundle"
+  );
+  const reproductionPath = await resolveLocalArtifactPath(
+    input.rootDirectory,
+    input.incident.reproduction_path,
+    "reproduction"
+  );
   let previous: BundleV1 | null = null;
   if (input.readFile) {
     try {
-      previous = BundleV1Schema.parse(
-        JSON.parse(await input.readFile(join(input.rootDirectory, input.incident.bundle_path)))
-      );
+      previous = BundleV1Schema.parse(JSON.parse(await input.readFile(bundlePath)));
     } catch {
       /* First generation or unavailable artifact. */
     }
@@ -91,14 +99,8 @@ export async function writeLocalBundleArtifacts(input: LocalArtifactsInput): Pro
     JSON.stringify({ ...bundle, metadata: previous.metadata }) === JSON.stringify(previous)
   )
     return;
-  await input.writeFile(
-    join(input.rootDirectory, input.incident.bundle_path),
-    `${JSON.stringify(bundle, null, 2)}\n`
-  );
-  await input.writeFile(
-    join(input.rootDirectory, input.incident.reproduction_path),
-    `${JSON.stringify(bundle.reproduction, null, 2)}\n`
-  );
+  await input.writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
+  await input.writeFile(reproductionPath, `${JSON.stringify(bundle.reproduction, null, 2)}\n`);
 }
 
 /** A context-only rebuild changes artifacts, never occurrence history or status. */
@@ -106,6 +108,12 @@ export async function rebuildLocalDiagnosticArtifacts(
   input: Omit<LocalArtifactsInput, "trigger"> & { readFile(path: string): Promise<string> }
 ): Promise<LocalIncidentState> {
   const { incident } = input;
+  const bundlePath = await resolveLocalArtifactPath(
+    input.rootDirectory,
+    incident.bundle_path,
+    "bundle"
+  );
+  await resolveLocalArtifactPath(input.rootDirectory, incident.reproduction_path, "reproduction");
   const primary =
     incident.source_events.find((event) => event.event_id === incident.source_event_id) ?? null;
   const association = associateDiagnosticEvidence({
@@ -115,9 +123,7 @@ export async function rebuildLocalDiagnosticArtifacts(
   });
   let previous: BundleV1 | null = null;
   try {
-    previous = BundleV1Schema.parse(
-      JSON.parse(await input.readFile(join(input.rootDirectory, incident.bundle_path)))
-    );
+    previous = BundleV1Schema.parse(JSON.parse(await input.readFile(bundlePath)));
   } catch {
     /* Rebuild only from retained evidence. */
   }

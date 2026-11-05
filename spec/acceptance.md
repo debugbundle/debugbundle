@@ -714,6 +714,15 @@ Valid UUID/opaque IDs retain bundle, reproduction, lifecycle and retention behav
 unknown cache files remain untouched. Confirmed remote mutations retain success
 with an optional-cache warning if local synchronization fails.
 
+### AC-CLI-LOCAL-ARTIFACT: Retained local artifact boundaries
+
+Mapped requirements: FR-CLI-18, FR-PROF-05; SEC-13/14.
+Retained absolute, parent-traversing, wrong-directory and symlinked artifact paths
+fail before unrelated file reads/writes/deletion through CLI/MCP and emitted or
+installed OpenClaw. State and ancestor links are rejected, invalid metadata stays
+unchanged during failed reads/rebuilds/cleanup, and valid large retained state
+continues to work. Normal local evidence, lifecycle, rebuild and retention tests pass.
+
 ### AC-CLI-01: Incident Listing
 
 - **Given** an authenticated CLI session

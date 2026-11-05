@@ -1,9 +1,10 @@
-import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { cleanCommand } from "../../../apps/cli/src/clean-command.js";
 import { RetrievalApiError } from "../../../packages/retrieval-client/src/index.js";
 import { cacheCloudBundleArtifact } from "../../../apps/cli/src/cloud-artifact-cache.js";
 import {
@@ -22,7 +23,9 @@ import {
 async function createLocalStoreRoot(): Promise<string> {
   const rootDirectory = await mkdtemp(join(tmpdir(), "debugbundle-local-retrieval-"));
   await mkdir(join(rootDirectory, ".debugbundle", "local"), { recursive: true });
-  await mkdir(join(rootDirectory, ".debugbundle", "bundles", "local", "reproductions"), { recursive: true });
+  await mkdir(join(rootDirectory, ".debugbundle", "bundles", "local", "reproductions"), {
+    recursive: true
+  });
   return rootDirectory;
 }
 
@@ -87,28 +90,133 @@ function createState(): LocalState {
 }
 
 describe("local retrieval store", () => {
+  it("preserves large retained state while reading and atomically updating it", async () => {
+    const root = await createLocalStoreRoot();
+    const state = { ...createState(), retained_extension: "x".repeat(2 * 1024 * 1024) };
+    await writeLocalState(state, { cwd: () => root });
+    expect((await readLocalState({ cwd: () => root })).incidents["inc_recent"]?.incident_id).toBe(
+      "inc_recent"
+    );
+    await writeLocalState(state, { cwd: () => root });
+    expect(JSON.parse(await readFile(join(root, ".debugbundle/local/state.json"), "utf8"))).toEqual(
+      state
+    );
+  });
+  it("rejects a linked state file for reads and lifecycle writes", async () => {
+    const root = await createLocalStoreRoot();
+    const outside = join(root, "private-state.json");
+    const original = JSON.stringify(createState());
+    await writeFile(outside, original);
+    await symlink(outside, join(root, ".debugbundle/local/state.json"));
+    await expect(readLocalState({ cwd: () => root })).rejects.toMatchObject({
+      code: "invalid_local_state"
+    });
+    await expect(
+      resolveLocalIncident({ incidentId: "inc_recent" }, { cwd: () => root })
+    ).rejects.toMatchObject({ code: "invalid_local_state" });
+    expect(await readFile(outside, "utf8")).toBe(original);
+  });
+  it("rejects a linked artifact directory before reads or cleanup", async () => {
+    const root = await createLocalStoreRoot();
+    const state = createState();
+    const bytes = JSON.stringify(state);
+    await writeFile(join(root, ".debugbundle/local/state.json"), bytes);
+    const outside = join(root, "private-artifacts");
+    await mkdir(outside);
+    const marker = join(outside, "inc_recent.bundle.json");
+    await writeFile(marker, '{"marker":"preserved"}');
+    await rm(join(root, ".debugbundle/bundles/local"), { recursive: true });
+    await symlink(outside, join(root, ".debugbundle/bundles/local"));
+    await expect(
+      getLocalBundle({ incidentId: "inc_recent" }, { cwd: () => root })
+    ).rejects.toMatchObject({ code: "invalid_local_artifact_path" });
+    await expect(cleanCommand({ json: true }, { cwd: () => root })).rejects.toThrow(
+      /symbolic link/
+    );
+    expect(await readFile(marker, "utf8")).toBe('{"marker":"preserved"}');
+    expect(await readFile(join(root, ".debugbundle/local/state.json"), "utf8")).toBe(bytes);
+  });
+
+  it.each([
+    "../outside.json",
+    "/tmp/outside.json",
+    "private.json",
+    ".debugbundle/bundles/local/../private.json",
+    ".debugbundle/bundles/local/reproductions/../inc_recent.bundle.json"
+  ])("rejects retained artifact path %s before unrelated file reads", async (path) => {
+    const root = await createLocalStoreRoot();
+    const state = createState();
+    state.incidents["inc_recent"]!.bundle_path = path;
+    await writeFile(join(root, ".debugbundle/local/state.json"), JSON.stringify(state));
+    await expect(
+      getLocalBundle({ incidentId: "inc_recent" }, { cwd: () => root })
+    ).rejects.toMatchObject({ code: "invalid_local_artifact_path" });
+    expect(JSON.parse(await readFile(join(root, ".debugbundle/local/state.json"), "utf8"))).toEqual(
+      state
+    );
+  });
+  it.each(["bundle", "reproduction"])("rejects symlinked local %s files", async (kind) => {
+    const root = await createLocalStoreRoot();
+    const state = createState();
+    await writeFile(join(root, ".debugbundle/local/state.json"), JSON.stringify(state));
+    const marker = join(root, "private.json");
+    await writeFile(marker, JSON.stringify({ private_marker: "unrelated" }));
+    const path =
+      kind === "bundle"
+        ? state.incidents["inc_recent"]!.bundle_path
+        : state.incidents["inc_recent"]!.reproduction_path;
+    await symlink(marker, join(root, path));
+    const read = kind === "bundle" ? getLocalBundle : getLocalReproduction;
+    await expect(read({ incidentId: "inc_recent" }, { cwd: () => root })).rejects.toMatchObject({
+      code: "invalid_local_artifact_path"
+    });
+    expect(await readFile(marker, "utf8")).toBe(JSON.stringify({ private_marker: "unrelated" }));
+  });
+
   it("projects retained local and newly cached cloud evidence without rewriting historical files", async () => {
     const rootDirectory = await createLocalStoreRoot();
     const state = createState();
     state.incidents["inc_recent"]!.title = "Authorization: Bearer SYNTHETIC_TITLE_SECRET";
     await writeLocalState(state, { cwd: () => rootDirectory });
-    const localPath = join(rootDirectory, ".debugbundle", "bundles", "local", "inc_recent.bundle.json");
-    await writeFile(localPath, JSON.stringify({ message: "password=SYNTHETIC_BUNDLE_SECRET", route: "/checkout" }), "utf8");
+    const localPath = join(
+      rootDirectory,
+      ".debugbundle",
+      "bundles",
+      "local",
+      "inc_recent.bundle.json"
+    );
+    await writeFile(
+      localPath,
+      JSON.stringify({ message: "password=SYNTHETIC_BUNDLE_SECRET", route: "/checkout" }),
+      "utf8"
+    );
 
-    expect((await getLocalIncident({ incidentId: "inc_recent" }, { cwd: () => rootDirectory })).title)
-      .toBe("Authorization: [REDACTED]");
-    expect((await listLocalIncidents({}, { cwd: () => rootDirectory })).incidents[0]?.title)
-      .toBe("Authorization: [REDACTED]");
-    expect(await getLocalBundle({ incidentId: "inc_recent" }, { cwd: () => rootDirectory }))
-      .toEqual({ message: "password=[REDACTED]", route: "/checkout" });
+    expect(
+      (await getLocalIncident({ incidentId: "inc_recent" }, { cwd: () => rootDirectory })).title
+    ).toBe("Authorization: [REDACTED]");
+    expect((await listLocalIncidents({}, { cwd: () => rootDirectory })).incidents[0]?.title).toBe(
+      "Authorization: [REDACTED]"
+    );
+    expect(
+      await getLocalBundle({ incidentId: "inc_recent" }, { cwd: () => rootDirectory })
+    ).toEqual({ message: "password=[REDACTED]", route: "/checkout" });
     expect(await readFile(localPath, "utf8")).toContain("SYNTHETIC_BUNDLE_SECRET");
 
     const cached = await cacheCloudBundleArtifact(
-      { incidentId: "inc_recent", bundle: { message: "token=SYNTHETIC_CACHE_SECRET", route: "/checkout" } },
+      {
+        incidentId: "inc_recent",
+        bundle: { message: "token=SYNTHETIC_CACHE_SECRET", route: "/checkout" }
+      },
       { cwd: () => rootDirectory }
     );
     expect(cached).toEqual({ message: "token=[REDACTED]", route: "/checkout", source: "cloud" });
-    const cachePath = join(rootDirectory, ".debugbundle", "bundles", "cloud", "inc_recent.bundle.json");
+    const cachePath = join(
+      rootDirectory,
+      ".debugbundle",
+      "bundles",
+      "cloud",
+      "inc_recent.bundle.json"
+    );
     expect(await readFile(cachePath, "utf8")).not.toContain("SYNTHETIC_CACHE_SECRET");
   });
   it("returns null when the connection config is missing and parses connected mode when present", async () => {
@@ -122,7 +230,9 @@ describe("local retrieval store", () => {
       "utf8"
     );
 
-    await expect(readLocalConnectionConfig({ cwd: () => rootDirectory })).resolves.toEqual({ mode: "connected" });
+    await expect(readLocalConnectionConfig({ cwd: () => rootDirectory })).resolves.toEqual({
+      mode: "connected"
+    });
   });
 
   it("lists incidents with filters, pagination, and local incident lifecycle updates", async () => {
@@ -182,7 +292,9 @@ describe("local retrieval store", () => {
       { cwd: () => rootDirectory }
     );
 
-    expect(firstSeenFiltered.incidents.map((incident) => incident.incident_id)).toEqual(["inc_recent"]);
+    expect(firstSeenFiltered.incidents.map((incident) => incident.incident_id)).toEqual([
+      "inc_recent"
+    ]);
 
     const attentionFiltered = await listLocalIncidents(
       {
@@ -191,13 +303,21 @@ describe("local retrieval store", () => {
       { cwd: () => rootDirectory }
     );
 
-    expect(attentionFiltered.incidents.map((incident) => incident.incident_id)).toEqual(["inc_recent"]);
+    expect(attentionFiltered.incidents.map((incident) => incident.incident_id)).toEqual([
+      "inc_recent"
+    ]);
 
-    const resolvedIncident = await resolveLocalIncident({ incidentId: "inc_recent" }, { cwd: () => rootDirectory });
+    const resolvedIncident = await resolveLocalIncident(
+      { incidentId: "inc_recent" },
+      { cwd: () => rootDirectory }
+    );
     expect(resolvedIncident.status).toBe("resolved");
     expect(typeof resolvedIncident.resolved_at).toBe("string");
 
-    const reopenedIncident = await reopenLocalIncident({ incidentId: "inc_recent" }, { cwd: () => rootDirectory });
+    const reopenedIncident = await reopenLocalIncident(
+      { incidentId: "inc_recent" },
+      { cwd: () => rootDirectory }
+    );
     expect(reopenedIncident.status).toBe("open");
     expect(reopenedIncident.resolved_at).toBeNull();
   });
@@ -206,25 +326,53 @@ describe("local retrieval store", () => {
     const rootDirectory = await createLocalStoreRoot();
     await writeLocalState(createState(), { cwd: () => rootDirectory });
 
-    await writeFile(join(rootDirectory, ".debugbundle", "local", "state.json"), "{not-json}\n", "utf8");
+    await writeFile(
+      join(rootDirectory, ".debugbundle", "local", "state.json"),
+      "{not-json}\n",
+      "utf8"
+    );
 
     await expect(readLocalState({ cwd: () => rootDirectory })).rejects.toEqual(
-      expect.objectContaining<Partial<RetrievalApiError>>({ status: 400, code: "invalid_local_state" })
+      expect.objectContaining<Partial<RetrievalApiError>>({
+        status: 400,
+        code: "invalid_local_state"
+      })
     );
 
     await writeLocalState(createState(), { cwd: () => rootDirectory });
-    await writeFile(join(rootDirectory, ".debugbundle", "bundles", "local", "inc_recent.bundle.json"), "{bad", "utf8");
     await writeFile(
-      join(rootDirectory, ".debugbundle", "bundles", "local", "reproductions", "inc_recent.reproduction.json"),
+      join(rootDirectory, ".debugbundle", "bundles", "local", "inc_recent.bundle.json"),
+      "{bad",
+      "utf8"
+    );
+    await writeFile(
+      join(
+        rootDirectory,
+        ".debugbundle",
+        "bundles",
+        "local",
+        "reproductions",
+        "inc_recent.reproduction.json"
+      ),
       "{bad",
       "utf8"
     );
 
-    await expect(getLocalBundle({ incidentId: "inc_recent" }, { cwd: () => rootDirectory })).rejects.toEqual(
-      expect.objectContaining<Partial<RetrievalApiError>>({ status: 400, code: "invalid_local_bundle_artifact" })
+    await expect(
+      getLocalBundle({ incidentId: "inc_recent" }, { cwd: () => rootDirectory })
+    ).rejects.toEqual(
+      expect.objectContaining<Partial<RetrievalApiError>>({
+        status: 400,
+        code: "invalid_local_bundle_artifact"
+      })
     );
-    await expect(getLocalReproduction({ incidentId: "inc_recent" }, { cwd: () => rootDirectory })).rejects.toEqual(
-      expect.objectContaining<Partial<RetrievalApiError>>({ status: 400, code: "invalid_local_reproduction_artifact" })
+    await expect(
+      getLocalReproduction({ incidentId: "inc_recent" }, { cwd: () => rootDirectory })
+    ).rejects.toEqual(
+      expect.objectContaining<Partial<RetrievalApiError>>({
+        status: 400,
+        code: "invalid_local_reproduction_artifact"
+      })
     );
   });
 });

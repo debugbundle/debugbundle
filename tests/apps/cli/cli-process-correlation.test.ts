@@ -33,6 +33,29 @@ const backend = () =>
   });
 
 describe("local trace correlation scope", () => {
+  it.each(["bundle_path", "reproduction_path"])(
+    "refuses unsafe retained %s without rewriting state",
+    async (field) => {
+      const root = await createProcessFixtureRepository();
+      try {
+        await writeEventBatch(root, "001.events.json", [backend()]);
+        await processCommand({ json: true }, { cwd: () => root });
+        const path = join(root, ".debugbundle/local/state.json");
+        const state = JSON.parse(await readFile(path, "utf8"));
+        Object.values(state.incidents as Record<string, Record<string, unknown>>)[0]![field] =
+          "../unrelated.json";
+        const bytes = JSON.stringify(state);
+        await writeFile(path, bytes);
+        await expect(processCommand({ json: true }, { cwd: () => root })).rejects.toMatchObject({
+          code: "invalid_local_artifact_path"
+        });
+        expect(await readFile(path, "utf8")).toBe(bytes);
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    }
+  );
+
   it.each([null, {}, [{}]])("refuses malformed retained evidence: %j", async (sourceEvents) => {
     const root = await createProcessFixtureRepository();
     try {

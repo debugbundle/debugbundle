@@ -5,6 +5,8 @@ import {
   parseLocalDiagnosticState,
   type LocalDiagnosticState
 } from "./local-diagnostic-context.js";
+import { validateLocalArtifactPath } from "./local-artifact-paths.js";
+
 type Severity = "low" | "medium" | "high" | "critical";
 const EVENT_TYPE_SET = new Set<string>(EventTypeValues);
 function isEventType(value: unknown): value is EventEnvelope["event_type"] {
@@ -48,6 +50,11 @@ function parseIncidentState(candidate: unknown): LocalIncidentState | null {
   if (!isRecord(candidate)) {
     return null;
   }
+
+  if (typeof candidate["bundle_path"] === "string")
+    validateLocalArtifactPath(candidate["bundle_path"], "bundle");
+  if (typeof candidate["reproduction_path"] === "string")
+    validateLocalArtifactPath(candidate["reproduction_path"], "reproduction");
 
   if (
     candidate["source"] !== "local" ||
@@ -148,8 +155,11 @@ function parseIncidentState(candidate: unknown): LocalIncidentState | null {
   const occurrenceCount = candidate["occurrence_count"];
   const sourceEventId = candidate["source_event_id"] as string;
   const sourceOccurredAt = candidate["source_occurred_at"] as string;
-  const bundlePath = candidate["bundle_path"] as string;
-  const reproductionPath = candidate["reproduction_path"] as string;
+  const bundlePath = validateLocalArtifactPath(candidate["bundle_path"], "bundle");
+  const reproductionPath = validateLocalArtifactPath(
+    candidate["reproduction_path"],
+    "reproduction"
+  );
   const generationNumber = candidate["generation_number"];
   const normalizedSourceEventTypes = [...sourceEventTypes].sort();
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -101,6 +101,16 @@ try {
     }
   }
   assert.equal(requests.length, 3, "unsafe incident IDs must fail before HTTP or cache writes");
+  for (const toolName of ["debugbundle_get_improvement", "debugbundle_resolve_improvement"]) {
+    await assert.rejects(
+      tools.get(toolName).execute("fixture-unsafe-resource", {
+        bearerToken: "synthetic-member-token",
+        improvementId: "imp#../../projects/other/leave"
+      }),
+      /invalid_improvement_id/u
+    );
+  }
+  assert.equal(requests.length, 3, "unsafe resource IDs must not redirect a request");
   const approval = hooks.get("before_tool_call")({ toolName: "debugbundle_resolve_incident" });
   assert.equal(approval.requireApproval.timeoutBehavior, "deny");
   assert.deepEqual(approval.requireApproval.allowedDecisions, ["allow-once", "deny"]);
@@ -174,6 +184,39 @@ try {
     assert.equal(JSON.parse(result.content[0].text).status, "healthy", result.content[0].text);
   });
   assert.equal(requests.length, 5, "local verification must not make a cloud request");
+  const statePath = join(root, ".debugbundle/local/state.json");
+  const stateBytes = await readFile(statePath, "utf8");
+  const retained = JSON.parse(stateBytes);
+  const [incidentId, incident] = Object.entries(retained.incidents)[0];
+  const marker = join(root, "private-runtime.json");
+  await writeFile(marker, '{"private_marker":"unrelated"}');
+  for (const [toolName, field] of [
+    ["debugbundle_get_bundle", "bundle_path"],
+    ["debugbundle_get_reproduction", "reproduction_path"]
+  ]) {
+    for (const path of [marker, "../private-runtime.json", "private-runtime.json"]) {
+      const changed = structuredClone(retained);
+      changed.incidents[incidentId][field] = path;
+      await writeFile(statePath, JSON.stringify(changed));
+      await assert.rejects(
+        tools.get(toolName).execute("fixture-unsafe-local-path", { source: "local", incidentId }),
+        /invalid_local_artifact_path/u
+      );
+    }
+  }
+  await writeFile(statePath, stateBytes);
+  const artifactPath = join(root, incident.bundle_path);
+  await rm(artifactPath);
+  await symlink(marker, artifactPath);
+  await assert.rejects(
+    tools
+      .get("debugbundle_get_bundle")
+      .execute("fixture-linked-local", { source: "local", incidentId }),
+    /invalid_local_artifact_path/u
+  );
+  assert.equal(await readFile(marker, "utf8"), '{"private_marker":"unrelated"}');
+  assert.equal(requests.length, 5, "unsafe local metadata must make no cloud request");
+
   console.log(
     `OpenClaw native ESM runtime passed on ${process.version}: ${tools.size} tools, compressed scoped pagination/doctor, approval and fail-closed checks.`
   );
