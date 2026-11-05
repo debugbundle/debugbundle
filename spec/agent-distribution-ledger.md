@@ -1,5 +1,13 @@
 # Agent distribution ledger
 
+## Alert-scope pin review — 5 November 2026
+
+MCP/CLI 1.20.0 add an optional alert-scope read. Codex 1.5.1, Claude Code
+1.19.4 and Gemini 1.4.4 retain their verified MCP 1.19.4 pins: existing calls and
+installation workflows remain compatible, so no developer-package republish is
+required for this additive capability. The portable skill and OpenClaw plugin
+are published at 1.20.0. See [release evidence](alert-scope-release-20261105.md).
+
 ## Installation-guidance patch — 5 November 2026
 
 Codex 1.5.1 and Claude Code 1.19.4 are public from core merge `e77cca52`;

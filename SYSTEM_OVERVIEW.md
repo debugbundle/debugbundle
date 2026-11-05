@@ -1,10 +1,9 @@
-Alert-scope follow-up (release authorised, in progress): `alert-scope-projection.ts` adds an
+Alert-scope correction is live in core 1.22.0: `alert-scope-projection.ts` adds an
 opt-in read descriptor separating accepted origin coverage from a service filter.
-Default alert response shapes and delivery behavior remain compatible. Shared
-scope validation and API/CLI/MCP read options are local. The approved dashboard
-Scope column and editor reuse that projection, preserve unavailable filters and
-keep confirmed saves independent of metadata refreshes. See
-`spec/alert-rule-scope-display.md` for local verification and release status.
+Default response shapes and delivery matching stay compatible. The approved
+Scope column/editor and credential action alignment are deployed. Live scope,
+legacy-client, protected-state and served-byte checks pass. Exact ClawHub 1.20.0
+antivirus acceptance remains open; see `spec/alert-scope-release-20261105.md`.
 
 Corrective release (3 November 2026) is complete: CLI 1.18.2 and MCP/OpenClaw/
 skill 1.18.3 preserve connected project scope across incident lists, pagination

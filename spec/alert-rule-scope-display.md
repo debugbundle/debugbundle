@@ -1,7 +1,8 @@
 # Alert rule scope display correction
 
-Status: final local audit passed; no commit, push, publication, production
-configuration change or deployment. The user approved the UI proposal and withheld release permission.
+Status: deployed in core 1.22.0 with CLI/MCP 1.20.0 after explicit owner release
+approval. See [production release evidence](alert-scope-release-20261105.md) and
+the remaining marketplace antivirus acceptance gate.
 
 FR-ALT-03 / FR-PJS-03 / AC-PJS-02: retained automation scopes must be readable and
 editable without implying broader coverage. The live read-only investigation
@@ -102,8 +103,7 @@ approved primitives and keep the page near the 800-line target. Dashboard behavi
 failed inventory and failed/stale save-refresh cases pass. The pre-ship audit is
 recorded with the verification receipts.
 
-No commit, push or release occurred.
-Raw receipts: `.tmp/alert-scope-fix-20261105/`.
+The local implementation/audit preceded release approval. Its raw receipts: `.tmp/alert-scope-fix-20261105/`.
 
 ## Final release-readiness audit
 
@@ -116,5 +116,5 @@ pass scope/default/fallback checks on Node 22/24/26; the shared package export p
 
 No code blocker remains. ClawHub's existing 1.19.4 final reviews are clean, but a
 fresh read still lacks required antivirus evidence. Its marketplace acceptance
-gate remains open. Release versioning, exact-source CI and production verification
-remain pending explicit release approval; these local checks do not claim deployment.
+gate remained open at audit time. The separately authorised release and production
+verification are now recorded in the release evidence; antivirus acceptance is still open.

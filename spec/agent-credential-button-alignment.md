@@ -1,6 +1,7 @@
 # Agent credential action alignment
 
-Status: explicitly approved, implemented and verified locally. No commit, push or release.
+Status: explicitly approved and deployed in core 1.22.0. See
+[release evidence](alert-scope-release-20261105.md).
 
 Use the existing card-header action pattern, as in Project details and Analytics
 overview. Move the existing Create agent credential button from CardContent to
@@ -20,5 +21,6 @@ static/build checks. No browser inspection or credential creation is required.
 Verification: all five existing credential-management tests pass after the move;
 full typecheck, focused lint/format and candidate builds pass. The change reuses
 CardAction and PlusIcon without changing handlers or credential permissions.
-No browser or production action was performed. Receipts:
+Local qualification used no browser or credential creation. The approved layout
+is now deployed; handlers and credential permissions are unchanged. Local receipts:
 `.tmp/agent-credential-button-*-20261105.log`.

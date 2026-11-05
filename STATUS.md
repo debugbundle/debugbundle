@@ -1,42 +1,31 @@
-# Alert scope release — authorised, in progress
+# Alert scope release — live; marketplace security acceptance open
 
-The owner authorised release to production and repository/branch cleanup.
-Prepared versions: core 1.22.0; CLI/MCP/OpenClaw/skill 1.20.0; shared-types 3.2.0;
-site 1.7.3. Redaction, SDKs and existing developer-package pins stay independently
-versioned. See `spec/alert-scope-release-20261105.md` for gates and live evidence.
+Core **1.22.0** and site **1.7.3** are live from qualified core `795f3f1e` /
+site `00749bc0`. CLI/MCP/OpenClaw/portable skill **1.20.0** and shared-types
+**3.2.0** are published. Redaction 2.7.0 and the reviewed developer-package pins
+retain their independent versions. See [release evidence](spec/alert-scope-release-20261105.md).
 
-# Alert scope display correction — final audit passed locally
+The dashboard shows saved coverage and eligible service choices; confirmed saves
+and deletes survive overlapping reads. The approved credential action alignment
+is deployed. Live canonical/retained-view reads pass; all five alert rows, nine
+credential/scope records, five service identities and 66 migrations retain their
+fingerprints. The older CLI still parses unchanged default responses. Both runtime
+containers are healthy with zero restarts/OOM; rollback images are retained.
+Seven served resources match origin bytes/cache policy. All three saved checks
+ran after cutover and pass; all eight alarms are OK, with no new active incident.
 
-The owner approved the correction and UI proposal, and withheld release permission.
-The dashboard now shows each rule's effective coverage and explains its saved
-scope in the editor. Eligible service choices preserve that boundary. Unavailable
-metadata preserves existing filters; failed/stale reads cannot undo confirmed saves.
-API/CLI/MCP expose the same opt-in read; default wire shapes stay compatible.
+Local qualification covers 5,250 cases; public source/main CI passes 5,235 cases
+with 15 expected private-site skips, separately covered by local/site checks.
+Package, native-client, public OpenClaw installation and artifact parity checks pass.
+No SDK, consumer product, alert policy, credential change or synthetic canary.
 
-Qualified: 5,250 tests in 653 files/112 coverage chunks, including 110 isolated
-PostgreSQL cases. Changed-source coverage, types, focused lint/format, candidate
-builds and the documentation build pass. One existing quote-sensitive discovery
-assertion was corrected and its complete coverage chunk rechecked successfully.
-No database migration, alert-policy or dependency change is needed.
+ClawHub's exact 1.20.0 skill/plugin final reviews are clean and public source bytes
+match. Required antivirus results remain absent for both, so strict marketplace
+acceptance stays open. Broad discovery and retired Smithery remain separate limits.
 
-The final audit fixed overlapping list/save/delete handling and a stale list-limit
-refresh. Five new regressions pass; all 790 dashboard tests were requalified and
-coverage passes for all 24 changed source files. Packed CLI/MCP checks pass on
-Node 22/24/26, including older-server fallback; the packed shared schema imports
-correctly. Existing scopes, credentials and delivery behaviour remain preserved.
-
-Code is ready for release approval. The full marketplace train is not all-clear:
-a fresh read of ClawHub 1.19.4 still omits required antivirus evidence, so its
-acceptance gate remains open. Final release versions, exact-source CI, publication
-and post-deployment checks belong to the separately authorised release.
-
-No commit, push, production setting, notification test or release occurred.
-See `spec/alert-rule-scope-display.md` and `.tmp/alert-scope-fix-20261105/`.
-
-Approved follow-up: the agent credential creation action now uses the standard
-card-header position and plus icon. Its five existing management tests, full
-typecheck, focused lint/format and updated candidate builds pass. This layout-only
-follow-up remains local and unreleased; see `spec/agent-credential-button-alignment.md`.
+Core/site/cloud are on main. Unused branches and the detached Muse worktree were
+cleared after preserving commits and 28 local files in `.local-repos/branch-archives/`.
+Raw release receipts: `.tmp/alert-scope-release-20261105/`.
 
 # Installation guidance release — published; external acceptance blocked
 

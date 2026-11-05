@@ -74,15 +74,15 @@ durable continuation; million-visit load testing is deferred by the owner.
 
 # ARCHITECTURE MAP — DebugBundle
 
-Local alert-scope correction: storage `alert-scope-projection.ts` resolves bounded
+Alert-scope correction (core 1.22.0, deployed): storage `alert-scope-projection.ts` resolves bounded
 accepted origin/service metadata in the requested view. `shared-types/alert-scope.ts`
 validates the descriptor; the existing alert API, typed client, CLI and ordinary
 MCP opt in without changing default response shapes or delivery matching. Web
 `alert-scope.ts` and `AlertScopeSummary` share table/editor labels; `AlertRulesTable`
 uses the existing table/actions. `AlertDeliveryFields` restricts instance choices
 to the accepted origins. Browser scope refreshes attach matching metadata only
-and never replace confirmed write fields. Local status is in
-`spec/alert-rule-scope-display.md`.
+and never replace confirmed write fields. Production evidence and the remaining
+marketplace gate are in `spec/alert-scope-release-20261105.md`.
 
 Project/service consolidation shipped in core 1.21.0 and clients 1.19.1, tracked in
 `spec/project-service-consolidation.md`. Storage `service-definition-schema.ts`
