@@ -1,5 +1,26 @@
 # @debugbundle/cli
 
+## Local artifact safety in 1.19.4
+
+Retained bundle and reproduction paths must stay in their canonical local artifact
+directories. Unsafe metadata returns `invalid_local_artifact_path` without reading,
+rewriting or deleting unrelated files. Symlinked files/directories fail closed.
+Normal local stores and their existing size allowance are preserved; local state
+and processing writes use guarded atomic replacement. This supersedes earlier clients.
+
+
+## Cloud cache safety in 1.19.3
+
+Upgrade to 1.19.3 for incident-ID validation before cloud requests and cache writes.
+Unsafe IDs return `invalid_incident_id`; UUIDs and existing opaque IDs remain supported.
+Cloud cache reads, writes and retention reject symbolic links; writes use guarded
+atomic replacement. This corrects a path traversal present in earlier clients.
+
+
+## Installation guidance in 1.19.2
+
+Prefer one project per system across service repositories, reuse existing connections, and keep separate projects for different access or privacy policies. Inspect existing projects before first-time connect; name matching does not infer system membership.
+
 ## Local correlation safety in 1.19.1
 
 Trace correlation crosses services only within the same project and environment.

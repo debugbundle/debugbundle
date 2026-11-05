@@ -1,3 +1,39 @@
+# Installation guidance follow-up — release authorised, in progress
+
+5 November 2026. FR-PJS-01 / AC-PJS-03 now explicitly default installation to one
+project per system across service repositories. The generated CLI skill and all
+five distributed skill sources agree. The site's shared install prompt, setup,
+connection, quickstart, API/CLI guides and llms.txt state the same default, preserve
+existing connections and explain current name-based `connect`. Stale upcoming/
+release-candidate wording is removed. Existing policy boundaries and explicit
+merge approval remain intact. No runtime selection or schema behavior changed.
+
+Red reproduced one guidance-contract failure and two site failures. Green:
+10 guidance tests, 44 site tests plus eight audit-helper tests, core/site types,
+focused lint/format, and the 143-page site build pass. Seven exported HTML entry
+points, the connection anchor and exported llms.txt carry the corrected guidance.
+The install prompt is 236 words; project/service guidance is four bullets/232
+words. Previous main CI and CLI-runtime runs also finished successfully.
+
+The owner authorised commit/push and the full affected release train. Current
+release evidence is in `spec/project-guidance-release-20261105.md`; publication
+and public-install acceptance are in progress. Final OpenClaw 1.19.2 review
+confirmed cloud-cache path traversal; promotion stopped before merge/site deploy.
+The corrective 1.19.3 clients validate IDs before requests or cache side effects
+and reuse guarded filesystem helpers. Twenty regressions failed before the fix;
+focused retrieval/cache/integration tests pass. Gemini 1.4.3 and developer pins
+adopt the corrective MCP package. No hosted API/worker, SDK or consumer change.
+
+
+Refreshed ClawHub 1.19.3 review confirmed a second pre-existing boundary issue:
+retained local metadata could redirect default artifact reads outside the project.
+The new 1.19.4 candidate constrains these paths across retrieval/rebuild/cleanup,
+rejects symbolic links, preserves invalid state and retains large-file compatibility.
+Seven local path regressions and the stale distribution-ledger contract failed
+before correction; local artifact/state/processing checks now pass. The source CI
+failure was the missed ledger pin, not a behavioral test failure. Full qualification
+and exact-version external acceptance remain in progress; the release branch stays.
+
 # Owner's three-project consolidation — server merge completed
 
 4 November 2026. The owner approved the narrow activation/merge. Cloud `b0daa141`

@@ -23,11 +23,11 @@ metadata:
         description: Optional DebugBundle API base URL for self-hosted or non-production environments.
     install:
       - kind: node
-        package: "@debugbundle/mcp@1.19.1"
+        package: "@debugbundle/mcp@1.19.4"
         bins:
           - debugbundle-mcp
       - kind: node
-        package: "@debugbundle/cli@1.19.1"
+        package: "@debugbundle/cli@1.19.4"
         bins:
           - debugbundle
     skillKey: debugbundle
@@ -51,7 +51,7 @@ For deterministic local source-code, UI, layout, copy, calculation, refactor, or
 
 ### Project and service scope
 
-- A project is the system investigated together; services are its applications/processes, with their repository context and environments. Site, App and API can belong to one project without another grouping layer. Inspect the complete service-definition catalogue before choosing a repository; keep environment-specific service_id distinct from service_definition_id.
+- Prefer one project per system; services are its applications/processes (Site, App, API, Worker), even across repositories. Reuse the system's existing project; preserve an existing connection and SDK input names. Keep separate projects when access or privacy policies require separation. Before first-time connect, inspect existing projects: connect matches the profile name, not system membership. Inspect the complete service-definition catalogue for repository context; distinguish environment-specific service_id from logical service_definition_id.
 - For authorised consolidation, use project merge preview, review blockers and suggested_service_mappings, then preview explicit mappings. Apply the checked plan_digest with a stable idempotency_key. After a timeout, get status by that key before retrying; use verify/resume for a committed but unverified result. Access/settings conflicts require ordinary authorised reconciliation; there is no force flag.
 - Use the receipt's secret-free adoption manifest and one explicit authorised workspace root. The local adopt preview/apply commands preserve existing SDK tokens and runtime input names; application, relay, CI and deployment edits remain language-aware repository work. Receipt metadata is a snapshot: inspect the current catalogue and run repository checks before declaring local adoption complete. DebugBundle approval does not authorise another product's edits, SDK updates, deployment or canary.
 - Report server consolidation, local configuration, repository checks and deployed-runtime verification separately. For retained project links, project list --project-id resolves the original view with current canonical access. Analytics unique counts remain scoped by origin; retain the returned coverage explanation.

@@ -111,6 +111,12 @@ assets during the first compatible API/worker stage; the default complete rollou
 publishes the aligned app/site after client qualification.
 See FR-PJS / AC-PJS and `spec/project-service-operations.md`.
 
+Setup guidance is owned by CLI `agent-interface-guidance.ts` and embedded through
+`local-scaffold.ts`; the sync script keeps five skill sources aligned. The site's
+`agent-install-prompt.ts` shares its prompt across installation entry points.
+The 5 November clarification of project reuse is authorised for release;
+`connect-command.ts` still matches a slugified profile name.
+
 `project-rule-access.ts` shares the accepted origin predicate between immediate,
 short-digest and daily notification storage. `notification-daily-store.ts` keeps
 original item/accounting namespaces but resolves membership and preparation policy
@@ -1149,3 +1155,15 @@ MCP/OpenClaw readers reject mixed retained incident source events until an
 explicit preset rebuild; valid legacy records remain compatible. Local summary
 formatting lives in `apps/cli/src/local-processing-summary.ts`; functional trace
 regressions and reusable processing fixtures are separate from general CLI cases.
+
+
+Cloud artifact safety: CLI/MCP/OpenClaw share incident-ID validation in
+`packages/retrieval-client` and the CLI cloud cache reuses
+`packages/agent-setup/src/files.ts` for symlink checks, bounded reads and guarded
+atomic writes. URL dispatch and cache side effects reject unsafe IDs first.
+
+
+Retained local artifact boundaries live in `apps/cli/src/local-artifact-paths.ts`.
+Retrieval, processing/rebuilds and cleanup validate canonical bundle/reproduction
+metadata and reject symbolic links. Local state/event IO reuses managed file
+helpers with allocation bounded to the opened file and atomic state/processing writes.

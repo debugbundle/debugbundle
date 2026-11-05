@@ -30,6 +30,33 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## Earlier independently published client releases
 
+### CLI/MCP/OpenClaw 1.19.4 — 2026-11-05
+
+- Constrain retained local bundle/reproduction metadata to the intended artifact
+  directories before reads, rebuilds or cleanup. Reject absolute/traversing paths
+  and symbolic links, preserve invalid retained state for review, and use guarded
+  file reads and atomic local state/processing writes without lowering the existing
+  state-size allowance. This supersedes 1.19.3 and earlier clients.
+- Reject unsafe improvement/project route IDs before HTTP dispatch as well.
+- Extend emitted/installed plugin regressions to malicious local metadata and links;
+  align the distribution ledger and developer pins, including Gemini 1.4.4.
+
+
+### CLI/MCP/OpenClaw 1.19.3 — 2026-11-05
+
+- Fix cloud artifact cache path traversal: validate incident IDs before requests
+  and cache side effects, reject symbolic links and use bounded reads and atomic
+  compare-before-replace writes. Preserve UUIDs, opaque IDs, tool schemas and
+  confirmed remote mutation outcomes. This supersedes 1.19.2 and earlier clients.
+- Qualify unsafe IDs in the emitted and normally installed OpenClaw artifact.
+  Align developer integrations with the corrected MCP package, including Gemini 1.4.3.
+
+
+### CLI/MCP/OpenClaw 1.19.2 — 2026-11-05
+
+- Default installation guidance to one project per system across service repositories. Preserve existing connections and policy boundaries; explain name-based connect and keep project merging explicit.
+- Align Codex 1.5.1, Claude Code 1.19.2 and Gemini CLI 1.4.2 with MCP 1.19.2. Prepare the independent OpenAI 1.0.3 skill candidate without changing its hosted read-only contract.
+
 ### CLI 1.18.2 and MCP/OpenClaw 1.18.3 — 2026-11-03
 
 - Restrict the connected `doctor` authentication probe to its configured project

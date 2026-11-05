@@ -1,12 +1,8 @@
-import {
-  mkdir as mkdirFromFs,
-  readFile as readFileFromFs,
-  readdir as readdirFromFs,
-  rm as rmFromFs,
-  stat as statFromFs,
-  writeFile as writeFileFromFs
-} from "node:fs/promises";
-import { join } from "node:path";
+import { readdir as readdirFromFs, rm as rmFromFs, lstat as statFromFs } from "node:fs/promises";
+import { basename, dirname, join, relative } from "node:path";
+
+import { readManaged, safePath, writeManaged } from "../../../packages/agent-setup/src/files.js";
+import { parseIncidentId } from "../../../packages/retrieval-client/src/index.js";
 
 import { sanitizeTelemetry } from "../../../packages/redaction/src/index.js";
 import { isRecord, isMissingPathError } from "./cli-fs-helpers.js";
@@ -44,6 +40,7 @@ export async function cacheCloudBundleArtifact(
   input: { incidentId: string; bundle: unknown },
   dependencies?: CloudArtifactCacheDependencies
 ): Promise<unknown> {
+  parseIncidentId(input.incidentId);
   await pruneExpiredCloudArtifacts(dependencies);
 
   const bundle = safeCachedArtifact(attachSourceToPayload(input.bundle, "cloud"));
@@ -62,6 +59,7 @@ export async function cacheCloudReproductionArtifact(
   input: { incidentId: string; reproduction: unknown },
   dependencies?: CloudArtifactCacheDependencies
 ): Promise<unknown> {
+  parseIncidentId(input.incidentId);
   await pruneExpiredCloudArtifacts(dependencies);
 
   const reproduction = safeCachedArtifact(attachSourceToPayload(input.reproduction, "cloud"));
@@ -86,16 +84,25 @@ export async function syncCloudIncidentCacheStatus(
   },
   dependencies?: CloudArtifactCacheDependencies
 ): Promise<void> {
+  parseIncidentId(input.incidentId);
   await pruneExpiredCloudArtifacts(dependencies);
 
   await Promise.all([
     updateCachedArtifactStatus(
-      join(getWorkspaceRoot(dependencies), CLOUD_BUNDLE_DIRECTORY_PATH, `${input.incidentId}.bundle.json`),
+      join(
+        getWorkspaceRoot(dependencies),
+        CLOUD_BUNDLE_DIRECTORY_PATH,
+        `${input.incidentId}.bundle.json`
+      ),
       input,
       dependencies
     ),
     updateCachedArtifactStatus(
-      join(getWorkspaceRoot(dependencies), CLOUD_REPRODUCTION_DIRECTORY_PATH, `${input.incidentId}.reproduction.json`),
+      join(
+        getWorkspaceRoot(dependencies),
+        CLOUD_REPRODUCTION_DIRECTORY_PATH,
+        `${input.incidentId}.reproduction.json`
+      ),
       input,
       dependencies
     )
@@ -109,13 +116,19 @@ export async function syncCloudIncidentMutationCache(
   dependencies?: CloudArtifactCacheDependencies
 ): Promise<void> {
   try {
-    await syncCloudIncidentCacheStatus({
-      incidentId: String(incident["incident_id"]),
-      incident: {
-        ...(typeof incident["status"] === "string" ? { status: incident["status"] } : {}),
-        resolved_at: incident["status"] === "resolved" && typeof incident["resolved_at"] === "string" ? incident["resolved_at"] : null
-      }
-    }, dependencies);
+    await syncCloudIncidentCacheStatus(
+      {
+        incidentId: String(incident["incident_id"]),
+        incident: {
+          ...(typeof incident["status"] === "string" ? { status: incident["status"] } : {}),
+          resolved_at:
+            incident["status"] === "resolved" && typeof incident["resolved_at"] === "string"
+              ? incident["resolved_at"]
+              : null
+        }
+      },
+      dependencies
+    );
   } catch {
     incident["cache_warning"] = "cloud_cache_update_unavailable";
   }
@@ -125,7 +138,9 @@ function getWorkspaceRoot(dependencies?: CloudArtifactCacheDependencies): string
   return (dependencies?.cwd ?? process.cwd)();
 }
 
-async function pruneExpiredCloudArtifacts(dependencies?: CloudArtifactCacheDependencies): Promise<void> {
+async function pruneExpiredCloudArtifacts(
+  dependencies?: CloudArtifactCacheDependencies
+): Promise<void> {
   await pruneCloudArtifactCache({ olderThanMs: CLOUD_CACHE_RETENTION_MS }, dependencies);
 }
 
@@ -135,7 +150,12 @@ export async function pruneCloudArtifactCache(
 ): Promise<{ removed: number; retained: number }> {
   const now = (dependencies?.now ?? (() => new Date()))().getTime();
   const [bundleDirectoryCounts, reproductionDirectoryCounts] = await Promise.all([
-    pruneExpiredArtifactsInDirectory(join(getWorkspaceRoot(dependencies), CLOUD_BUNDLE_DIRECTORY_PATH), now, input.olderThanMs, dependencies),
+    pruneExpiredArtifactsInDirectory(
+      join(getWorkspaceRoot(dependencies), CLOUD_BUNDLE_DIRECTORY_PATH),
+      now,
+      input.olderThanMs,
+      dependencies
+    ),
     pruneExpiredArtifactsInDirectory(
       join(getWorkspaceRoot(dependencies), CLOUD_REPRODUCTION_DIRECTORY_PATH),
       now,
@@ -156,6 +176,7 @@ async function pruneExpiredArtifactsInDirectory(
   olderThanMs: number,
   dependencies?: CloudArtifactCacheDependencies
 ): Promise<{ removed: number; retained: number }> {
+  await checkedCachePath(directoryPath, dependencies);
   const readdir = dependencies?.readdir ?? readdirFromFs;
   const rm = dependencies?.rm ?? rmFromFs;
   const stat = dependencies?.stat ?? statFromFs;
@@ -177,7 +198,11 @@ async function pruneExpiredArtifactsInDirectory(
         return { removed: 0, retained: 0 };
       }
 
-      const filePath = join(directoryPath, fileName);
+      // Only cache-owned artifacts are retention candidates; leave unknown files alone.
+      if (!/^[A-Za-z0-9][A-Za-z0-9._-]*\.(bundle|reproduction)\.json$/.test(fileName)) {
+        return { removed: 0, retained: 0 };
+      }
+      const filePath = await checkedCachePath(join(directoryPath, fileName), dependencies);
       let fileStats: { atimeMs: number; mtimeMs: number };
 
       try {
@@ -190,11 +215,14 @@ async function pruneExpiredArtifactsInDirectory(
         throw error;
       }
 
-      const lastAccessedAt = Number.isFinite(fileStats.atimeMs) ? fileStats.atimeMs : fileStats.mtimeMs;
+      const lastAccessedAt = Number.isFinite(fileStats.atimeMs)
+        ? fileStats.atimeMs
+        : fileStats.mtimeMs;
       if (now - lastAccessedAt <= olderThanMs) {
         return { removed: 0, retained: 1 };
       }
 
+      await checkedCachePath(filePath, dependencies);
       await rm(filePath, { force: true });
       return { removed: 1, retained: 0 };
     })
@@ -220,12 +248,17 @@ async function updateCachedArtifactStatus(
   },
   dependencies?: CloudArtifactCacheDependencies
 ): Promise<void> {
-  const readFile = dependencies?.readFile ?? readFileFromFs;
-  const writeFile = dependencies?.writeFile ?? writeFileFromFs;
-
+  await checkedCachePath(filePath, dependencies);
+  let raw: string | undefined;
   let payload: unknown;
   try {
-    const raw = await readFile(filePath, "utf8");
+    raw = dependencies?.readFile
+      ? await dependencies.readFile(filePath, "utf8")
+      : await readManaged(
+          getWorkspaceRoot(dependencies),
+          relative(getWorkspaceRoot(dependencies), filePath)
+        );
+    if (raw === undefined) return;
     if (Buffer.byteLength(raw, "utf8") > 512 * 1024) return;
     payload = JSON.parse(raw);
   } catch (error) {
@@ -237,7 +270,12 @@ async function updateCachedArtifactStatus(
   }
 
   const nextPayload = applyIncidentStatusToPayload(payload, input.incidentId, input.incident);
-  await writeFile(filePath, `${JSON.stringify(safeCachedArtifact(attachSourceToPayload(nextPayload, "cloud")), null, 2)}\n`, "utf8");
+  await writeCachedFile(
+    filePath,
+    `${JSON.stringify(safeCachedArtifact(attachSourceToPayload(nextPayload, "cloud")), null, 2)}\n`,
+    raw,
+    dependencies
+  );
 }
 
 function applyIncidentStatusToPayload(
@@ -253,18 +291,26 @@ function applyIncidentStatusToPayload(
   }
 
   const nextPayload: Record<string, unknown> = { ...payload };
-  const matchesIncident = typeof payload["incident_id"] !== "string" || payload["incident_id"] === incidentId;
+  const matchesIncident =
+    typeof payload["incident_id"] !== "string" || payload["incident_id"] === incidentId;
 
   if (matchesIncident && Object.hasOwn(payload, "status") && incident.status !== undefined) {
     nextPayload["status"] = incident.status;
   }
 
-  if (matchesIncident && (Object.hasOwn(payload, "resolved_at") || incident.resolved_at !== undefined)) {
+  if (
+    matchesIncident &&
+    (Object.hasOwn(payload, "resolved_at") || incident.resolved_at !== undefined)
+  ) {
     nextPayload["resolved_at"] = incident.resolved_at ?? null;
   }
 
   if (isRecord(payload["incident"])) {
-    nextPayload["incident"] = applyIncidentStatusToPayload(payload["incident"], incidentId, incident);
+    nextPayload["incident"] = applyIncidentStatusToPayload(
+      payload["incident"],
+      incidentId,
+      incident
+    );
   }
 
   return nextPayload;
@@ -276,9 +322,37 @@ async function persistCloudArtifact(
   payload: unknown,
   dependencies?: CloudArtifactCacheDependencies
 ): Promise<void> {
-  const mkdir = dependencies?.mkdir ?? mkdirFromFs;
-  const writeFile = dependencies?.writeFile ?? writeFileFromFs;
+  if (basename(fileName) !== fileName || fileName.includes("\\"))
+    throw new Error("Invalid cache filename.");
+  const filePath = await checkedCachePath(join(directoryPath, fileName), dependencies);
+  const root = getWorkspaceRoot(dependencies);
+  const previous = await readManaged(root, relative(root, filePath));
+  await writeCachedFile(filePath, `${JSON.stringify(payload, null, 2)}\n`, previous, dependencies);
+}
 
-  await mkdir(directoryPath, { recursive: true });
-  await writeFile(join(directoryPath, fileName), `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+// Reuse the setup boundary's symlink checks, bounded no-follow reads and atomic
+// compare-before-replace writes. Cache paths remain relative to the workspace.
+async function checkedCachePath(
+  filePath: string,
+  dependencies?: CloudArtifactCacheDependencies
+): Promise<string> {
+  const root = getWorkspaceRoot(dependencies);
+  return safePath(root, relative(root, filePath));
+}
+
+async function writeCachedFile(
+  filePath: string,
+  contents: string,
+  expected: string | undefined,
+  dependencies?: CloudArtifactCacheDependencies
+): Promise<void> {
+  await checkedCachePath(filePath, dependencies);
+  if (dependencies?.writeFile) {
+    await dependencies.mkdir?.(dirname(filePath), { recursive: true });
+    await checkedCachePath(filePath, dependencies);
+    await dependencies.writeFile(filePath, contents, "utf8");
+    return;
+  }
+  const root = getWorkspaceRoot(dependencies);
+  await writeManaged(root, relative(root, filePath), contents, expected);
 }

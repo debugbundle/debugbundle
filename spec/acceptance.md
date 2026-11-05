@@ -704,6 +704,25 @@ Native logger level/silent/processor filtering runs before SDK capture; enabled-
 - Doctor/validate expose additive selected-agent status and explain project-declared portable plugins without implying a live plugin or MCP check. CLI help, generated references, setup/plugin docs and installed-package Node-matrix tests cover the workflow.
 - Muse Code supports explicit selection and interactive detection from `.muse` evidence without inferring Muse solely from shared `AGENTS.md`. Its first existing `AGENTS.md`, `CLAUDE.md`, `.agents/AGENTS.md`, or `.claude/CLAUDE.md` is respected; fresh setup creates `AGENTS.md`. Shared owned blocks remain while another selected agent uses them, upgrade together, and restore original user bytes when the last owner is removed. Conflicting native skill discovery is reported without silently changing user settings.
 
+### AC-CLI-CACHE: Cloud artifact cache boundaries
+
+Mapped requirements: FR-CLI-17, FR-PROF-05; SEC-13/14.
+Unsafe incident IDs, including fragment-plus-traversal payloads, fail before HTTP
+or cache access through CLI, MCP and emitted/installed OpenClaw. Symlinked cache
+directories and artifact leaves fail closed without modifying outside files.
+Valid UUID/opaque IDs retain bundle, reproduction, lifecycle and retention behavior;
+unknown cache files remain untouched. Confirmed remote mutations retain success
+with an optional-cache warning if local synchronization fails.
+
+### AC-CLI-LOCAL-ARTIFACT: Retained local artifact boundaries
+
+Mapped requirements: FR-CLI-18, FR-PROF-05; SEC-13/14.
+Retained absolute, parent-traversing, wrong-directory and symlinked artifact paths
+fail before unrelated file reads/writes/deletion through CLI/MCP and emitted or
+installed OpenClaw. State and ancestor links are rejected, invalid metadata stays
+unchanged during failed reads/rebuilds/cleanup, and valid large retained state
+continues to work. Normal local evidence, lifecycle, rebuild and retention tests pass.
+
 ### AC-CLI-01: Incident Listing
 
 - **Given** an authenticated CLI session
@@ -1551,7 +1570,7 @@ Mapped requirements: FR-PJS-02/03. Execute the complete acceptance matrix in `pr
 
 ### AC-PJS-03: Safe agent adoption
 
-Mapped requirement: FR-PJS-04. Explicit roots, secret-free manifest/diff, repeated adoption, monorepo and separate repositories, custom profile/cache preservation, stale files, symlink escape and unavailable repositories are covered. A fixture agent discovers all services without widening an explicit filter. Keep local, release, live consolidation, consumer changes and deployed-runtime evidence distinct.
+Mapped requirements: FR-PJS-01/04. Explicit roots, secret-free manifest/diff, repeated adoption, monorepo and separate repositories, custom profile/cache preservation, stale files, symlink escape and unavailable repositories are covered. A fixture agent discovers all services without widening an explicit filter. Generated/distributed skills and the installation prompt default to reusing the system's project across repositories, preserve existing connections, explain name-based `connect`, and keep policy-separated projects and local-only setup distinct. Keep local, release, live consolidation, consumer changes and deployed-runtime evidence distinct.
 
 ### AC-PROF-01: Static Profile Detection
 

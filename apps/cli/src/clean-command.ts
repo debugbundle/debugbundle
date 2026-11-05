@@ -1,9 +1,25 @@
-import { mkdir as mkdirFromFs, readdir as readdirFromFs, rm as rmFromFs, stat as statFromFs } from "node:fs/promises";
+import {
+  mkdir as mkdirFromFs,
+  readdir as readdirFromFs,
+  rm as rmFromFs,
+  stat as statFromFs
+} from "node:fs/promises";
 import { join } from "node:path";
+import { safePath } from "../../../packages/agent-setup/src/files.js";
+import { resolveLocalArtifactPath } from "./local-artifact-paths.js";
 
-import { isMissingPathError, resolveWorkspacePath } from "./cli-fs-helpers.js";
-import { readLocalState, writeLocalState, type LocalIncidentRecord, type LocalRetrievalStoreDependencies, type LocalState } from "./local-retrieval-store.js";
-import { pruneCloudArtifactCache, type CloudArtifactCacheDependencies } from "./cloud-artifact-cache.js";
+import { isMissingPathError } from "./cli-fs-helpers.js";
+import {
+  readLocalState,
+  writeLocalState,
+  type LocalIncidentRecord,
+  type LocalRetrievalStoreDependencies,
+  type LocalState
+} from "./local-retrieval-store.js";
+import {
+  pruneCloudArtifactCache,
+  type CloudArtifactCacheDependencies
+} from "./cloud-artifact-cache.js";
 import type { CliCommandResult } from "./token-commands.js";
 
 type DirectoryReader = (path: string) => Promise<string[]>;
@@ -84,7 +100,9 @@ async function cleanProcessedEventFiles(
 
   let eventFileNames: string[];
   try {
-    eventFileNames = (await readdir(eventsDirectoryPath)).filter((fileName) => fileName.endsWith(".events.json")).sort();
+    eventFileNames = (await readdir(eventsDirectoryPath))
+      .filter((fileName) => fileName.endsWith(".events.json"))
+      .sort();
   } catch (error) {
     if (isMissingPathError(error)) {
       return { removed: 0, retained: 0 };
@@ -129,7 +147,9 @@ async function cleanRelaySpoolFiles(
 
   let spoolFileNames: string[];
   try {
-    spoolFileNames = (await readdir(spoolDirectoryPath)).filter((fileName) => fileName.endsWith(".events.json")).sort();
+    spoolFileNames = (await readdir(spoolDirectoryPath))
+      .filter((fileName) => fileName.endsWith(".events.json"))
+      .sort();
   } catch (error) {
     if (isMissingPathError(error)) {
       return { removed: 0, retained: 0 };
@@ -177,7 +197,10 @@ async function cleanRelaySpoolFiles(
   return { removed, retained };
 }
 
-function sortLocalIncidentRemovalPriority(left: LocalIncidentRecord, right: LocalIncidentRecord): number {
+function sortLocalIncidentRemovalPriority(
+  left: LocalIncidentRecord,
+  right: LocalIncidentRecord
+): number {
   if (left.status !== right.status) {
     return left.status === "resolved" ? -1 : 1;
   }
@@ -213,8 +236,13 @@ async function applyLocalIncidentRetention(
 
   for (const incident of incidentsToRemove) {
     delete nextIncidents[incident.incident_id];
-    await rm(resolveWorkspacePath(rootDirectory, incident.bundle_path), { force: true });
-    await rm(resolveWorkspacePath(rootDirectory, incident.reproduction_path), { force: true });
+    await rm(await resolveLocalArtifactPath(rootDirectory, incident.bundle_path, "bundle"), {
+      force: true
+    });
+    await rm(
+      await resolveLocalArtifactPath(rootDirectory, incident.reproduction_path, "reproduction"),
+      { force: true }
+    );
   }
 
   await writeLocalState(
@@ -235,12 +263,18 @@ async function countLocalIncidents(dependencies: CleanCommandDependencies): Prom
   return Object.keys((await readLocalState(dependencies)).incidents).length;
 }
 
-async function countDirectoryFiles(directoryPath: string, dependencies: CleanCommandDependencies, extension: string): Promise<number> {
+async function countDirectoryFiles(
+  directoryPath: string,
+  dependencies: CleanCommandDependencies,
+  extension: string
+): Promise<number> {
   const readdir = dependencies.readdir ?? readdirFromFs;
   const rootDirectory = (dependencies.cwd ?? process.cwd)();
 
   try {
-    return (await readdir(join(rootDirectory, directoryPath))).filter((fileName) => fileName.endsWith(extension)).length;
+    return (await readdir(join(rootDirectory, directoryPath))).filter((fileName) =>
+      fileName.endsWith(extension)
+    ).length;
   } catch (error) {
     if (isMissingPathError(error)) {
       return 0;
@@ -252,9 +286,8 @@ async function countDirectoryFiles(directoryPath: string, dependencies: CleanCom
 
 async function countCloudArtifactFiles(dependencies: CleanCommandDependencies): Promise<number> {
   return (
-    await countDirectoryFiles(CLOUD_BUNDLE_DIRECTORY_PATH, dependencies, ".json")
-  ) + (
-    await countDirectoryFiles(CLOUD_REPRODUCTION_DIRECTORY_PATH, dependencies, ".json")
+    (await countDirectoryFiles(CLOUD_BUNDLE_DIRECTORY_PATH, dependencies, ".json")) +
+    (await countDirectoryFiles(CLOUD_REPRODUCTION_DIRECTORY_PATH, dependencies, ".json"))
   );
 }
 
@@ -262,9 +295,7 @@ async function countRelaySpoolEventFiles(dependencies: CleanCommandDependencies)
   return countDirectoryFiles(LOCAL_RELAY_SPOOL_DIRECTORY_PATH, dependencies, ".events.json");
 }
 
-async function resetRuntimeData(
-  dependencies: CleanCommandDependencies
-): Promise<{
+async function resetRuntimeData(dependencies: CleanCommandDependencies): Promise<{
   processedEvents: { removed: number; retained: number };
   relaySpool: { removed: number; retained: number };
   cloudCache: { removed: number; retained: number };
@@ -273,7 +304,12 @@ async function resetRuntimeData(
   const mkdir = dependencies.mkdir ?? mkdirFromFs;
   const rm = dependencies.rm ?? rmFromFs;
   const rootDirectory = (dependencies.cwd ?? process.cwd)();
-  const [processedEventFilesRemoved, relaySpoolFilesRemoved, cloudCacheFilesRemoved, localIncidentCount] = await Promise.all([
+  const [
+    processedEventFilesRemoved,
+    relaySpoolFilesRemoved,
+    cloudCacheFilesRemoved,
+    localIncidentCount
+  ] = await Promise.all([
     countProcessedAndUnprocessedEventFiles(dependencies),
     countRelaySpoolEventFiles(dependencies),
     countCloudArtifactFiles(dependencies),
@@ -324,13 +360,28 @@ export async function cleanCommand(
     };
   }
 
-  const bundleRetentionMs = input.olderThan === undefined ? DEFAULT_CLOUD_CACHE_RETENTION_MS : parseOlderThan(input.olderThan);
+  const bundleRetentionMs =
+    input.olderThan === undefined
+      ? DEFAULT_CLOUD_CACHE_RETENTION_MS
+      : parseOlderThan(input.olderThan);
   if (input.olderThan !== undefined && bundleRetentionMs === null) {
     return {
       exitCode: 4,
       output: "Invalid value for --older-than."
     };
   }
+
+  const root = (dependencies.cwd ?? process.cwd)();
+  for (const path of [
+    ".debugbundle/local/state.json",
+    LOCAL_EVENTS_DIRECTORY_PATH,
+    LOCAL_RELAY_SPOOL_DIRECTORY_PATH,
+    LOCAL_BUNDLE_DIRECTORY_PATH,
+    LOCAL_REPRODUCTION_DIRECTORY_PATH,
+    CLOUD_BUNDLE_DIRECTORY_PATH,
+    CLOUD_REPRODUCTION_DIRECTORY_PATH
+  ])
+    await safePath(root, path);
 
   const hasEventsFlag = input.events === true;
   const hasBundlesFlag = input.bundles === true;
@@ -362,11 +413,17 @@ export async function cleanCommand(
   }
 
   const processedEvents = runEventsCleanup
-    ? await cleanProcessedEventFiles({ removeAllProcessed: input.events === true, now }, dependencies)
+    ? await cleanProcessedEventFiles(
+        { removeAllProcessed: input.events === true, now },
+        dependencies
+      )
     : { removed: 0, retained: await countProcessedAndUnprocessedEventFiles(dependencies) };
   const relaySpool = await cleanRelaySpoolFiles({ now }, dependencies);
   const cloudCache = runBundleCleanup
-    ? await pruneCloudArtifactCache({ olderThanMs: bundleRetentionMs ?? DEFAULT_CLOUD_CACHE_RETENTION_MS }, { ...dependencies, now: () => now })
+    ? await pruneCloudArtifactCache(
+        { olderThanMs: bundleRetentionMs ?? DEFAULT_CLOUD_CACHE_RETENTION_MS },
+        { ...dependencies, now: () => now }
+      )
     : await countCloudArtifactCache(dependencies);
   const localIncidents = runLocalIncidentCleanup
     ? await applyLocalIncidentRetention(dependencies)
@@ -390,12 +447,16 @@ export async function cleanCommand(
   };
 }
 
-async function countProcessedAndUnprocessedEventFiles(dependencies: CleanCommandDependencies): Promise<number> {
+async function countProcessedAndUnprocessedEventFiles(
+  dependencies: CleanCommandDependencies
+): Promise<number> {
   const readdir = dependencies.readdir ?? readdirFromFs;
   const rootDirectory = (dependencies.cwd ?? process.cwd)();
 
   try {
-    return (await readdir(join(rootDirectory, LOCAL_EVENTS_DIRECTORY_PATH))).filter((fileName) => fileName.endsWith(".events.json")).length;
+    return (await readdir(join(rootDirectory, LOCAL_EVENTS_DIRECTORY_PATH))).filter((fileName) =>
+      fileName.endsWith(".events.json")
+    ).length;
   } catch (error) {
     if (isMissingPathError(error)) {
       return 0;
@@ -408,5 +469,8 @@ async function countProcessedAndUnprocessedEventFiles(dependencies: CleanCommand
 async function countCloudArtifactCache(
   dependencies: CleanCommandDependencies
 ): Promise<{ removed: number; retained: number }> {
-  return pruneCloudArtifactCache({ olderThanMs: Number.MAX_SAFE_INTEGER }, { ...dependencies, now: () => new Date(0) });
+  return pruneCloudArtifactCache(
+    { olderThanMs: Number.MAX_SAFE_INTEGER },
+    { ...dependencies, now: () => new Date(0) }
+  );
 }

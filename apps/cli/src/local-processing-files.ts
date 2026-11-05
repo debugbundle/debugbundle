@@ -36,8 +36,11 @@ export async function readState(
 
   try {
     return parseState(await readFile(statePath));
-  } catch {
-    return null;
+  } catch (error) {
+    // Corrupt JSON retains the existing retained-event rebuild behavior. Filesystem
+    // safety/read failures must never be mistaken for an empty store.
+    if (error instanceof SyntaxError) return null;
+    throw error;
   }
 }
 

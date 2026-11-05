@@ -33,7 +33,7 @@ export const reviewerFixturePath = join(
 export const dataMapPath = join(repoRoot, "contracts", "openai-plugin-v1-data-map.md");
 export const releaseManifestPath = join(openAiRoot, "release-manifest.json");
 
-const expectedVersion = "1.0.2";
+const expectedVersion = "1.0.3";
 // Skill and package-authentication patches retain the independently frozen MCP wire contract.
 const expectedContractVersion = "1.0.0";
 const expectedResource = "https://mcp.debugbundle.com";

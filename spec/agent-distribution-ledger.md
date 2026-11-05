@@ -1,5 +1,11 @@
 # Agent distribution ledger
 
+## Installation-guidance patch — 5 November 2026
+
+Release authorised: Codex 1.5.1, Claude Code 1.19.4 and Gemini CLI 1.4.4 adopt
+MCP 1.19.4 and the clarified one-project-per-system guidance. Publication and
+public native-client checks are in progress; see `project-guidance-release-20261105.md`.
+
 ## Project/service release — 4 November 2026
 
 Codex 1.5.0, Claude Code 1.19.1 and Gemini CLI 1.4.1 are public and pin verified
@@ -11,15 +17,15 @@ Gemini's real public 1.4.0-to-1.4.1 update also passes. Its ZIP SHA-256 is
 See [the final release receipt](project-service-release-20261104.md). Historical
 identities below remain prior-release evidence, not current candidate versions.
 
-## Current published package inventory
+## Current release candidate inventory
 
 This is the maintained inventory for first-party developer agent packages that bundle the local DebugBundle MCP server and a workflow skill. It complements the [MCP ecosystem release manifest](../apps/mcp/ecosystem-release-manifest.json), which tracks the npm server, MCP Registry, Smithery, ClawHub, OpenClaw, and downstream discovery. That pipeline does not publish Codex, Claude Code, or Gemini CLI packages. The hosted, read-only [OpenAI plugin](../apps/mcp/openai/release-manifest.json) has its own release gate.
 
 | Host        | Package version | MCP pin  | Maintained source                                                           | Public channel                                                                                                  | Release and update route                                                                                                                                                                                                            |
 | ----------- | --------------- | -------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Codex       | `1.5.0`         | `1.19.1` | [`plugins/debugbundle-codex/`](../plugins/debugbundle-codex/)               | core Git marketplace in [`debugbundle/debugbundle`](https://github.com/debugbundle/debugbundle)                 | Publish the reviewed plugin and [catalog](../.agents/plugins/marketplace.json) on core `main`; verify a public Git marketplace install and upgrade.                                                                                 |
-| Claude Code | `1.19.1`        | `1.19.1` | [`apps/mcp/claude-code/debugbundle/`](../apps/mcp/claude-code/debugbundle/) | core Git marketplace in [`debugbundle/debugbundle`](https://github.com/debugbundle/debugbundle)                 | Publish the reviewed plugin and [catalog](../.claude-plugin/marketplace.json) on core `main`; verify a public marketplace install and update.                                                                                       |
-| Gemini CLI  | `1.4.1`         | `1.19.1` | [`plugins/debugbundle-gemini/`](../plugins/debugbundle-gemini/)             | standalone Git repository [`debugbundle/debugbundle-gemini`](https://github.com/debugbundle/debugbundle-gemini) | Copy the validated package to public `main`, tag the version, publish a GitHub Release with the validated ZIP, run `make gemini-extension-verify-public`, verify a fresh Git install/update, and check gallery indexing separately. |
+| Codex       | `1.5.1`         | `1.19.4` | [`plugins/debugbundle-codex/`](../plugins/debugbundle-codex/)               | core Git marketplace in [`debugbundle/debugbundle`](https://github.com/debugbundle/debugbundle)                 | Publish the reviewed plugin and [catalog](../.agents/plugins/marketplace.json) on core `main`; verify a public Git marketplace install and upgrade.                                                                                 |
+| Claude Code | `1.19.4`        | `1.19.4` | [`apps/mcp/claude-code/debugbundle/`](../apps/mcp/claude-code/debugbundle/) | core Git marketplace in [`debugbundle/debugbundle`](https://github.com/debugbundle/debugbundle)                 | Publish the reviewed plugin and [catalog](../.claude-plugin/marketplace.json) on core `main`; verify a public marketplace install and update.                                                                                       |
+| Gemini CLI  | `1.4.4`         | `1.19.4` | [`plugins/debugbundle-gemini/`](../plugins/debugbundle-gemini/)             | standalone Git repository [`debugbundle/debugbundle-gemini`](https://github.com/debugbundle/debugbundle-gemini) | Copy the validated package to public `main`, tag the version, publish a GitHub Release with the validated ZIP, run `make gemini-extension-verify-public`, verify a fresh Git install/update, and check gallery indexing separately. |
 
 ## Earlier release evidence
 

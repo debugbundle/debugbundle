@@ -1,4 +1,3 @@
-import { readFile as readFileFromFs, writeFile as writeFileToFs } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 
@@ -10,7 +9,14 @@ import {
   deriveIncidentReasonFromSourceEventTypes,
   type IncidentReason
 } from "../../../packages/storage/src/incident-reason.js";
-import { isRecord, resolveWorkspacePath } from "./cli-fs-helpers.js";
+import { isRecord } from "./cli-fs-helpers.js";
+
+import {
+  readWorkspaceFile,
+  writeWorkspaceFile,
+  resolveLocalArtifactPath,
+  validateLocalArtifactPath
+} from "./local-artifact-paths.js";
 
 type FileReader = (path: string, encoding: BufferEncoding) => Promise<string>;
 type FileWriter = (path: string, contents: string, encoding: BufferEncoding) => Promise<void>;
@@ -77,8 +83,17 @@ async function readLocalArtifact(
   path: string,
   dependencies?: LocalRetrievalStoreDependencies
 ): Promise<unknown> {
-  const readFile = dependencies?.readFile ?? readFileFromFs;
-  const raw = await readFile(path, "utf8");
+  const reader = dependencies?.readFile;
+  const raw = await readWorkspaceFile(
+    getWorkspaceRoot(dependencies),
+    path,
+    reader ? (file) => reader(file, "utf8") : undefined,
+    MAX_ARTIFACT_BYTES
+  ).catch((error: unknown) => {
+    if (error instanceof Error && /oversized/i.test(error.message))
+      throw createReadError(503, "privacy_projection_unavailable");
+    throw error;
+  });
   if (Buffer.byteLength(raw, "utf8") > MAX_ARTIFACT_BYTES) {
     throw createReadError(503, "privacy_projection_unavailable");
   }
@@ -102,9 +117,15 @@ async function readJsonFile(
   path: string,
   dependencies?: LocalRetrievalStoreDependencies
 ): Promise<unknown> {
-  const readFile = dependencies?.readFile ?? readFileFromFs;
+  const reader = dependencies?.readFile;
   try {
-    return JSON.parse(await readFile(path, "utf8"));
+    return JSON.parse(
+      await readWorkspaceFile(
+        getWorkspaceRoot(dependencies),
+        path,
+        reader ? (file) => reader(file, "utf8") : undefined
+      )
+    );
   } catch (error) {
     if (isRecord(error) && error["code"] === "ENOENT") {
       throw error;
@@ -195,6 +216,9 @@ function parseLocalIncident(candidate: unknown): LocalIncidentRecord {
   ) {
     throw createReadError(400, "invalid_local_state");
   }
+
+  validateLocalArtifactPath(candidate["bundle_path"], "bundle");
+  validateLocalArtifactPath(candidate["reproduction_path"], "reproduction");
 
   const serviceRuntime = candidate["service_runtime"];
   const serviceFramework = candidate["service_framework"];
@@ -352,8 +376,14 @@ export async function writeLocalState(
   dependencies?: LocalRetrievalStoreDependencies
 ): Promise<void> {
   const rootDirectory = getWorkspaceRoot(dependencies);
-  const writeFile = dependencies?.writeFile ?? writeFileToFs;
-  await writeFile(getStateFilePath(rootDirectory), `${JSON.stringify(state, null, 2)}\n`, "utf8");
+  parseLocalState(state);
+  const writer = dependencies?.writeFile;
+  await writeWorkspaceFile(
+    rootDirectory,
+    getStateFilePath(rootDirectory),
+    `${JSON.stringify(state, null, 2)}\n`,
+    writer ? (path, contents) => writer(path, contents, "utf8") : undefined
+  );
 }
 
 async function updateLocalIncidentStatus(
@@ -471,7 +501,7 @@ export async function getLocalBundle(
   if (incident === undefined) throw createReadError(404, "incident_not_found");
   try {
     return await readLocalArtifact(
-      resolveWorkspacePath(rootDirectory, incident.bundle_path),
+      await resolveLocalArtifactPath(rootDirectory, incident.bundle_path, "bundle"),
       dependencies
     );
   } catch (error) {
@@ -496,7 +526,7 @@ export async function getLocalReproduction(
   if (incident === undefined) throw createReadError(404, "incident_not_found");
   try {
     return await readLocalArtifact(
-      resolveWorkspacePath(rootDirectory, incident.reproduction_path),
+      await resolveLocalArtifactPath(rootDirectory, incident.reproduction_path, "reproduction"),
       dependencies
     );
   } catch (error) {

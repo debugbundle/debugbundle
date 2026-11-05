@@ -1,4 +1,9 @@
-# DebugBundle 1.0.2
+# DebugBundle 1.0.3
+
+- Clarify one project per system across service repositories, preserving existing connections and access/privacy boundaries.
+- Keep the twenty-three read-only hosted tools and OAuth contract unchanged; portal review/publication remain separate.
+
+## 1.0.2
 
 Portal-package authentication correction.
 

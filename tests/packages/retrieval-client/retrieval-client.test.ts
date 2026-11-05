@@ -7,6 +7,34 @@ import {
 } from "../../../packages/retrieval-client/src/index.js";
 
 describe("retrieval api client", () => {
+  it.each([
+    "getIncident",
+    "getIncidentContext",
+    "getBundle",
+    "getReproduction",
+    "resolveIncident",
+    "reopenIncident"
+  ] as const)(
+    "%s rejects incident IDs containing route or fragment syntax before dispatch",
+    async (operation) => {
+      const request = vi.fn<HttpClient["request"]>().mockResolvedValue({ status: 200, body: {} });
+      const api = createRetrievalApi({ request });
+      for (const incidentId of [
+        "inc#../../../../../escape",
+        "../inc",
+        "inc/other",
+        "inc?query",
+        "..",
+        "a".repeat(256)
+      ]) {
+        await expect(
+          api[operation]({ bearerToken: "synthetic-member", incidentId })
+        ).rejects.toMatchObject({ status: 400, code: "invalid_incident_id" });
+      }
+      expect(request).not.toHaveBeenCalled();
+    }
+  );
+
   it("calls incidents list route with optional limit", async () => {
     const request = vi.fn<HttpClient["request"]>().mockResolvedValue({
       status: 200,

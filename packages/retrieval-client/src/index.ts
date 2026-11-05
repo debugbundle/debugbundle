@@ -309,6 +309,21 @@ export class RetrievalApiError extends Error {
   }
 }
 
+// IDs cross both URL path and local cache boundaries. Keep opaque legacy IDs,
+// but never accept separators, URL syntax, encoded traversal or control bytes.
+const ResourceIdSchema = z
+  .string()
+  .max(255)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/);
+function parseResourceId(value: unknown, code: string): string {
+  const parsed = ResourceIdSchema.safeParse(value);
+  if (!parsed.success) throw new RetrievalApiError(400, code);
+  return parsed.data;
+}
+export function parseIncidentId(value: unknown): string {
+  return parseResourceId(value, "invalid_incident_id");
+}
+
 function parseApiError(status: number, body: unknown): never {
   const parsed = ApiErrorResponseSchema.safeParse(body);
   if (!parsed.success) {
@@ -514,7 +529,7 @@ export function createRetrievalApi(client: HttpClient): {
       const parsed = await expectParsed(
         client.request({
           method: "GET",
-          path: `/v1/incidents/${input.incidentId}`,
+          path: `/v1/incidents/${encodeURIComponent(parseIncidentId(input.incidentId))}`,
           bearerToken: input.bearerToken
         }),
         IncidentResponseSchema
@@ -526,7 +541,7 @@ export function createRetrievalApi(client: HttpClient): {
       const parsed = await expectParsed(
         client.request({
           method: "GET",
-          path: `/v1/incidents/${input.incidentId}/context`,
+          path: `/v1/incidents/${encodeURIComponent(parseIncidentId(input.incidentId))}/context`,
           bearerToken: input.bearerToken
         }),
         IncidentContextSchema
@@ -538,7 +553,7 @@ export function createRetrievalApi(client: HttpClient): {
       const parsed = await expectMutation(
         client.request({
           method: "POST",
-          path: `/v1/incidents/${input.incidentId}/resolve`,
+          path: `/v1/incidents/${encodeURIComponent(parseIncidentId(input.incidentId))}/resolve`,
           bearerToken: input.bearerToken
         }),
         IncidentResponseSchema
@@ -565,7 +580,7 @@ export function createRetrievalApi(client: HttpClient): {
       const parsed = await expectMutation(
         client.request({
           method: "POST",
-          path: `/v1/incidents/${input.incidentId}/reopen`,
+          path: `/v1/incidents/${encodeURIComponent(parseIncidentId(input.incidentId))}/reopen`,
           bearerToken: input.bearerToken
         }),
         IncidentResponseSchema
@@ -592,7 +607,7 @@ export function createRetrievalApi(client: HttpClient): {
       const bundle = await expectParsed(
         client.request({
           method: "GET",
-          path: `/v1/incidents/${input.incidentId}/bundle`,
+          path: `/v1/incidents/${encodeURIComponent(parseIncidentId(input.incidentId))}/bundle`,
           bearerToken: input.bearerToken
         }),
         BundleResponseSchema
@@ -630,7 +645,7 @@ export function createRetrievalApi(client: HttpClient): {
       const reproduction = await expectParsed(
         client.request({
           method: "GET",
-          path: `/v1/incidents/${input.incidentId}/reproduction`,
+          path: `/v1/incidents/${encodeURIComponent(parseIncidentId(input.incidentId))}/reproduction`,
           bearerToken: input.bearerToken
         }),
         ReproductionResponseSchema
@@ -699,7 +714,7 @@ export function createRetrievalApi(client: HttpClient): {
       const parsed = await expectParsed(
         client.request({
           method: "GET",
-          path: `/v1/improvements/${input.improvementId}`,
+          path: `/v1/improvements/${encodeURIComponent(parseResourceId(input.improvementId, "invalid_improvement_id"))}`,
           bearerToken: input.bearerToken
         }),
         ImprovementResponseSchema
@@ -711,7 +726,7 @@ export function createRetrievalApi(client: HttpClient): {
       const parsed = await expectMutation(
         client.request({
           method: "POST",
-          path: `/v1/improvements/${input.improvementId}/resolve`,
+          path: `/v1/improvements/${encodeURIComponent(parseResourceId(input.improvementId, "invalid_improvement_id"))}/resolve`,
           bearerToken: input.bearerToken
         }),
         ImprovementResponseSchema
@@ -723,7 +738,7 @@ export function createRetrievalApi(client: HttpClient): {
       const parsed = await expectMutation(
         client.request({
           method: "POST",
-          path: `/v1/improvements/${input.improvementId}/reopen`,
+          path: `/v1/improvements/${encodeURIComponent(parseResourceId(input.improvementId, "invalid_improvement_id"))}/reopen`,
           bearerToken: input.bearerToken
         }),
         ImprovementResponseSchema
@@ -735,7 +750,7 @@ export function createRetrievalApi(client: HttpClient): {
       const parsed = await expectMutation(
         client.request({
           method: "POST",
-          path: `/v1/improvements/${input.improvementId}/snooze`,
+          path: `/v1/improvements/${encodeURIComponent(parseResourceId(input.improvementId, "invalid_improvement_id"))}/snooze`,
           bearerToken: input.bearerToken,
           body: { snoozed_until: input.snoozedUntil }
         }),
@@ -748,7 +763,7 @@ export function createRetrievalApi(client: HttpClient): {
       return await expectParsed(
         client.request({
           method: "GET",
-          path: `/v1/projects/${input.projectId}/improvements/${input.improvementId}/bundle`,
+          path: `/v1/projects/${encodeURIComponent(parseResourceId(input.projectId, "invalid_project_id"))}/improvements/${encodeURIComponent(parseResourceId(input.improvementId, "invalid_improvement_id"))}/bundle`,
           bearerToken: input.bearerToken
         }),
         z.union([

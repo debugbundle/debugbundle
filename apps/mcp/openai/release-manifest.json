@@ -1,9 +1,9 @@
 {
   "schema_version": "1.0.0",
-  "plugin_version": "1.0.2",
+  "plugin_version": "1.0.3",
   "evidence_state": "local_connection_ready",
   "source": {
-    "commit": "9799a4e30cd528079a03c3fbd3fb2231b0fe9004",
+    "commit": "cec46142a02019395c25470aac894e3a5c846681",
     "tree_clean": true,
     "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
@@ -15,18 +15,18 @@
   },
   "registered_connection_id": "plugin_asdk_app_6a99ba6c1e7881919091a592738692c6",
   "package": {
-    "archive_file": "debugbundle-openai-plugin-1.0.2.zip",
-    "archive_sha256": "731f1576d5ea907f14fb49a79e4a38395e9a38fddab16259f14df73f69d24702",
-    "archive_bytes": 67677,
+    "archive_file": "debugbundle-openai-plugin-1.0.3.zip",
+    "archive_sha256": "b1bc7ee5dd3b64f46f627018a88d3bfd1afe6efc4edac5221ccd4d59a7028ede",
+    "archive_bytes": 69491,
     "files": {
       "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
-      "README.md": "1e85f3366864a0bce60be8be55e8d33b5c35b37675e52e6c5d73ec791e7240e0",
+      "README.md": "244a6804968f43872ae3731166b2a7f9e5b7cde8fb2107839f5e89751a348a72",
       "assets/icon-512.png": "a05a29674a75a945b1a378c73c27322c9b1f14456329bec1fc1d986453696e30",
-      "skills/debugbundle/SKILL.md": "c1b8405390bc0b7d16157eec05472f251e9ccc51288ebb8511c27a83d7b73b05",
+      "skills/debugbundle/SKILL.md": "827cedffbe998e7fb3f692581eb6e0ba2d2908fdd895e5c932f832d5339d6ba1",
       "skills/debugbundle/references/cli-handoff.md": "0327b8f03ff1d59b572fe732dfec3f6b962baec881b6a5b1c2fa848d525ca40c",
       "skills/debugbundle/references/privacy-and-safety.md": "436983b21e6570654ff18c148c1099b64f5e051353b02ac7b002b91430ce9682",
       "skills/debugbundle/references/tools.md": "d294c7b6827baa6f8df4680434ea672f25c8a82c45e8f57ecc204fe2341fd240",
-      ".codex-plugin/plugin.json": "4c30323e13a5328591de8e8ffd31f1ee9c323f4dfde746845f97714835eba066",
+      ".codex-plugin/plugin.json": "379a58b3c60bd452024e625590e0258671dd1c26f18389791774b460dc7e23cf",
       ".mcp.json": "dab0558beb39ddbc88856d401f0caa9e135c74de8db5d123c6f881ed62b97bb4"
     }
   },
@@ -40,10 +40,10 @@
       "portal-review.json": "250ff288f4892e7c5294d45ff57260b044dfda6d9f62873905144d35928d1b6f",
       "post-launch-article-draft.md": "6ce0f34a4ce8261eb4a0f10e0f3c5fcc89de9677ffdcd988075ed296d97db7cd",
       "registration-diagnostics.md": "33c395f732d4cdaf1b082c5131cd09ed1fd626c3e926cf68c62afe158cc8d531",
-      "release-notes.md": "0c9e4014497417008a0bda652f4f883f724e8b2002d3f525858585ac06c52cfa",
+      "release-notes.md": "44fcd9f82d2da9022919a247e9291992a07a0006c5a18b81f9f5e8c471959e7b",
       "review-checklist.md": "eba6ef8ee5167edf6f44409aba7c136e11805278d665209ac296bfea3bd6c49a",
-      "starter-prompts.json": "b5d6dba8150a473e1658f3815e93b8cb2ca7b54108d80ed1b9a3b15ca135e01c",
-      "test-cases.json": "91e7f69c79658848f4ad3fa3b5cff869263e8ea83af2b249b8e93a08fddc523c",
+      "starter-prompts.json": "e9cb6d42aff8f62c1515bb6615378d921fbe948735912c80e7c1a6a84a6d7060",
+      "test-cases.json": "add13c89ff77c701c809274e3c7075b101d62b183e0bb21945c1b6fe47f07d53",
       "tool-scan.json": "ff38eb57f13fc704659de6e039c2cdcc1dddc2472a6341132cd0defbe4b8fc48"
     }
   },

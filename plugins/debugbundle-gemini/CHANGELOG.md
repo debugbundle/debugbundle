@@ -1,5 +1,17 @@
 # DebugBundle for Gemini CLI changelog
 
+## [1.4.4] - 2026-11-05
+
+- Adopt MCP 1.19.4: constrain retained local artifact paths, reject symlinks across reads/rebuilds/cleanup and preserve existing valid local stores and authentication.
+
+## [1.4.3] - 2026-11-05
+
+- Adopt MCP 1.19.3: reject unsafe incident IDs before HTTP requests and protect cloud artifact caches from traversal and symbolic links. Preserve existing UUID and opaque IDs, local authentication and tool schemas.
+
+## [1.4.2] - 2026-11-05
+
+- Default installation guidance to one project per system across repositories, preserve existing connections and adopt MCP 1.19.2.
+
 ## [1.4.1] - 2026-11-04
 
 - Adopt MCP 1.19.1: keep local trace correlation within its project and environment, and reject mixed retained caches until an explicit rebuild. Preserve authentication, tool schemas and valid existing local stores.

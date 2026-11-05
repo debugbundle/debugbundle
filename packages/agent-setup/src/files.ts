@@ -30,11 +30,15 @@ export async function safePath(root: string, file: string, allowLeafLink = false
   return target;
 }
 
-export async function readManaged(root: string, file: string): Promise<string | undefined> {
+export async function readManaged(
+  root: string,
+  file: string,
+  maxBytes = 1024 * 1024
+): Promise<string | undefined> {
   const path = await safePath(root, file);
   try {
     const initial = await lstat(path);
-    if (!initial.isFile() || initial.size > 1024 * 1024)
+    if (!initial.isFile() || initial.size > maxBytes)
       throw new Error(`Invalid or oversized managed file: ${file}`);
     // O_NONBLOCK also avoids a hang if a regular file is replaced by a FIFO after lstat.
     const handle = await open(
@@ -43,17 +47,18 @@ export async function readManaged(root: string, file: string): Promise<string | 
     );
     try {
       const info = await handle.stat();
-      if (!info.isFile() || info.size > 1024 * 1024)
+      if (!info.isFile() || info.size > maxBytes)
         throw new Error(`Invalid or oversized managed file: ${file}`);
-      // Bounded even if another process grows the file after stat.
-      const buffer = Buffer.alloc(1024 * 1024 + 1);
+      // Bound allocation to the opened file, even for large retained local state.
+      const limit = Math.min(maxBytes, info.size);
+      const buffer = Buffer.alloc(limit + 1);
       let total = 0;
       while (total < buffer.length) {
         const { bytesRead } = await handle.read(buffer, total, buffer.length - total, total);
         if (bytesRead === 0) break;
         total += bytesRead;
       }
-      if (total > 1024 * 1024) throw new Error(`Oversized managed file: ${file}`);
+      if (total > limit) throw new Error(`Oversized or growing managed file: ${file}`);
       try {
         return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(
           buffer.subarray(0, total)
@@ -75,7 +80,8 @@ export async function writeManaged(
   root: string,
   file: string,
   value: string,
-  expected: string | undefined
+  expected: string | undefined,
+  maxBytes = 1024 * 1024
 ): Promise<void> {
   const path = await safePath(root, file);
   await mkdir(dirname(path), { recursive: true });
@@ -96,7 +102,7 @@ export async function writeManaged(
     await handle.writeFile(value, "utf8");
     if (previousMode !== undefined) await handle.chmod(previousMode);
     await handle.close();
-    if ((await readManaged(root, file)) !== expected)
+    if ((await readManaged(root, file, maxBytes)) !== expected)
       throw new Error(`File changed during setup: ${file}`);
     await safePath(root, file);
     await rename(temporary, path);

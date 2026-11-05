@@ -198,6 +198,11 @@ The unpublished transport candidate's final audit covers Swift ACK arithmetic sa
 
 ## Project/service consolidation — released core 1.21.0 / clients 1.19.1
 
+The 5 November setup-guidance follow-up is authorised for release: prefer one project
+per system across service repositories, preserve existing connections, and
+explain name-based `connect`. It changes the canonical/distributed skills and
+site installation guides, not runtime selection. Publication is in progress.
+
 Checked merge preview/apply/status/verify/resume/cancel are available through
 API, CLI and ordinary MCP, with server apply disabled by default. The receipt's
 secret-free adoption manifest supports one-root CLI preview/apply and ordinary
@@ -844,3 +849,15 @@ MCP/OpenClaw readers reject mixed retained incident source events until an
 explicit preset rebuild; valid legacy records remain compatible. Local summary
 formatting lives in `apps/cli/src/local-processing-summary.ts`; functional trace
 regressions and reusable processing fixtures are separate from general CLI cases.
+
+
+Cloud artifact safety: CLI/MCP/OpenClaw share incident-ID validation in
+`packages/retrieval-client` and the CLI cloud cache reuses
+`packages/agent-setup/src/files.ts` for symlink checks, bounded reads and guarded
+atomic writes. URL dispatch and cache side effects reject unsafe IDs first.
+
+
+Retained local artifact boundaries live in `apps/cli/src/local-artifact-paths.ts`.
+Retrieval, processing/rebuilds and cleanup validate canonical bundle/reproduction
+metadata and reject symbolic links. Local state/event IO reuses managed file
+helpers with allocation bounded to the opened file and atomic state/processing writes.
