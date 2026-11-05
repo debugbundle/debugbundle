@@ -1,141 +1,119 @@
 # Project/service installation guidance release — 5 November 2026
 
-The owner authorised commit/push, the affected DebugBundle release train and
-production publication. FR-PJS-01 / AC-PJS-03: prefer one project per system
-across service repositories, preserve existing connections and policy boundaries,
-and explain name-based connect without implicit consolidation.
+The owner authorised commit/push, publication of the affected DebugBundle
+packages/site, production verification and cleanup of merged branches.
+FR-PJS-01 / AC-PJS-03 now default installation to one project per system across
+service repositories, preserving existing connections and access/privacy boundaries.
+`connect` remains name-based; the guide explains binding a known project ID.
+The install prompt is 236 words; shared project/service guidance is four bullets,
+232 words. No consumer product was changed.
 
-## Release inventory
+## Published inventory
 
-| Surface                          | Patch  | State                                                             |
-| -------------------------------- | ------ | ----------------------------------------------------------------- |
-| CLI / MCP                        | 1.19.4 | Candidate; includes cloud and retained-local path fixes           |
-| OpenClaw plugin / portable skill | 1.19.4 | Candidate; fresh exact-version gates required                     |
-| Codex developer plugin           | 1.5.1  | Candidate, pins published MCP 1.19.4                              |
-| Claude Code developer plugin     | 1.19.4 | Candidate, pins published MCP 1.19.4                              |
-| Gemini CLI extension             | 1.4.4  | Candidate; prior 1.4.3 publication remains immutable              |
-| Public site/docs                 | 1.7.2  | Candidate; local tests/types/build pass                           |
-| OpenAI combined plugin           | 1.0.3  | Independent sealed local package; portal process remains separate |
+| Surface                      | Version | Published source / acceptance                                                                          |
+| ---------------------------- | ------- | ------------------------------------------------------------------------------------------------------ |
+| CLI / MCP                    | 1.19.4  | npm `gitHead` `61555f74048a40eddb8d46b187ef7c62d5f764d6`; both release workflows pass                  |
+| OpenClaw plugin              | 1.19.4  | ClawHub final review and antivirus clean; normal public installation passes                            |
+| Portable skill               | 1.19.4  | Published; byte-identical normal installation passes; final review/moderation clean; antivirus pending |
+| Codex developer plugin       | 1.5.1   | Public core marketplace at merge `e77cca52`; pins MCP 1.19.4; native public checks pass                |
+| Claude Code developer plugin | 1.19.4  | Same public core source/pin; native public checks pass                                                 |
+| Gemini CLI extension         | 1.4.4   | Standalone main/tag `b6b2fc208b2b0339c6b3d855fd3d9db5a7b9f0ad`; public upgrade passes                  |
+| Public site/docs             | 1.7.2   | Site `cb8d67d1d43a01b2630422a1ba57855ec3862034`; live production checks pass                           |
+| OpenAI combined plugin       | 1.0.3   | Sealed local candidate only; portal submission remains separate                                        |
 
-Core API/worker 1.21.0, SDK runtime releases, migrations, credentials and the
-completed owner-project merge retain their verified deployed identities. Site
-publication uses the dedicated hosted-site workflow. No consumer change is part
-of this release. Smithery publishing is retired; Registry and both exact ClawHub
-security gates remain required. External directory discovery is qualified
-separately from publication, scans and normal public installation.
+Official Registry `com.debugbundle/mcp` 1.19.4 is published and exact readback
+passes. Both npm latest tags and provenance match the qualified immutable source;
+four installed packages have verified registry signatures and attestations.
+CLI [41946266798](https://github.com/debugbundle/debugbundle/actions/runs/41946266798)
+and MCP [41946271830](https://github.com/debugbundle/debugbundle/actions/runs/41946271830)
+pass supported Node 22/24/26 variants, packaged/native and public-client checks.
+Actual published CLI checks preserve local-only setup and reject unsafe cloud/local
+inputs before unintended IO, preserving unrelated files and retained state.
 
-## Qualification
+Codex 0.153.1, Claude Code 2.1.277, Gemini CLI 0.61.0 and OpenClaw 2026.10.10
+pass normal public installation, 149-tool discovery, authentication/access denial,
+local evidence, settings and removal checks. Public update/reinstall checks also
+pass; Gemini upgrades the actual public 1.4.3 installation to 1.4.4. The supported
+OpenClaw minimum 2026.6.9 remains independently qualified. No public install uses
+a force or security override. All five Gemini files/main/tag match core; the
+actual downloaded release ZIP matches SHA-256
+`2b5c0ffb6f382c86288791c92b68a559472d82c822dcbc06f8c85e2591b271ec`.
 
-Before release preparation, all 10 guidance contracts, 44 site tests and eight
-audit-helper tests passed. Core/site typechecks, focused lint/format, the 143-page
-site export, seven exported HTML entry points, the connection anchor and llms.txt
-pass. The final install prompt is 236 words; shared project/service guidance is
-four bullets/232 words. Previous pushed-main CI and CLI-runtime workflows passed.
+## Security corrections and source qualification
 
-Release-version checks, immutable source commits, publication receipts, native
-public installs and production site verification are recorded below as completed.
-Local receipts: `.tmp/project-guidance-release-20261105/`.
+Marketplace final reviews found two pre-existing artifact boundary defects during
+this train. A crafted incident ID could escape the cloud-cache path in 1.19.2;
+a later refreshed review of 1.19.3 found retained local metadata could select
+unrelated JSON. Earlier clean interim reviews did not override the findings.
+Published versions/tags remain immutable; 1.19.4 supersedes the affected clients.
+Raw findings remain in the local release evidence directory.
 
-## Corrective security patch
+FR-CLI-17/18 and AC-CLI-CACHE/LOCAL-ARTIFACT now enforce safe opaque URL IDs,
+canonical local artifact paths, symlink rejection, guarded bounded reads and
+atomic writes across retrieval, rebuilds and cleanup. Invalid retained state and
+unrelated files survive; large stores retain the native read ceiling. Confirmed
+remote mutations keep their outcome if optional caching fails. Regression cases
+first reproduced both flaws; emitted/installed plugin checks cover malicious
+cloud IDs, resource IDs, local metadata and symlink paths with no unexpected HTTP.
 
-The 1.19.2 npm packages, Registry entry, portable skill and Gemini 1.4.2 were
-published and qualified; the OpenClaw plugin's final security review identified
-an actual cloud-cache path traversal. Promotion and production-site publication
-paused before merging the release branch. Published versions remain immutable.
+Exact-source [CI 41946273828](https://github.com/debugbundle/debugbundle/actions/runs/41946273828)
+passes 5,174 tests across 111 shards, including 103 actual Postgres cases.
+Coverage: lines 87.78%, functions 90.12%, branches 78.63%, statements 86.82%;
+the changed-source gate passes. CLI runtime CI passes. The only initial Gemini
+job failures were pre-publication npm ETARGET; those jobs passed after publication.
+PR [#12](https://github.com/debugbundle/debugbundle/pull/12) merged normally at
+`e77cca52f4a68787c2dc12179fe62c1de895cb5e`, with a tree identical to qualified
+source `61555f74`.
 
-A crafted fragment-bearing incident ID could bypass the intended HTTP path and
-escape the cache filename. FR-CLI-17 / AC-CLI-CACHE closes this boundary across
-CLI/MCP/OpenClaw. Twenty regression cases failed before the fix; 65 focused
-retrieval/cache/lifecycle/retention tests passed afterward. The patch also rejects
-symlinked directories/leaves and uses existing bounded no-follow reads and atomic
-compare-before-replace writes. Native emitted/installed plugin checks now include
-malicious IDs. CLI/MCP/OpenClaw 1.19.3 supersedes the affected earlier clients;
-Gemini 1.4.3 and the unpromoted developer integrations adopt the corrected MCP.
-No SDK, consumer product, credential, database or hosted API/worker change is needed.
+## Production site and retained runtime
 
-## Prior 1.19.3 publication evidence — superseded
+Site source CI 41947204200 and release 41947207635 pass. The first site deployment
+exposed an actual generation mismatch: core's `scripts/public-site-artifacts.ts`
+overrode the corrected site-vendored llms.txt with stale interface priorities and
+omitted the one-project default. An active contract reproduced the failure;
+the corrected generator's 5,488 bytes now match the approved site copy exactly.
+Eleven active routing cases and six explicit machine-readable cases pass, with
+types/lint/format. The generated-output regression is included in normal CI.
 
-- Corrective source `63cd6303f27a9ae7e3a2ba92e67ed6ac738e7c63` contains code
-  `32b6a8d1` plus the source-bound OpenAI manifest. CLI
-  [41940235540](https://github.com/debugbundle/debugbundle/actions/runs/41940235540),
-  MCP [41940239118](https://github.com/debugbundle/debugbundle/actions/runs/41940239118)
-  and CLI-runtime
-  [41940243606](https://github.com/debugbundle/debugbundle/actions/runs/41940243606)
-  pass all their supported runtime, native and public-consumer gates.
-- At that publication, both npm `latest` tags were 1.19.3 with that exact `gitHead`; SRI and attestation
-  URLs are retained locally. All four installed packages have verified Registry
-  signatures and attestations. The actual public CLI emits the corrected skill,
-  keeps fresh setup local-only and rejects six unsafe bundle/reproduction inputs
-  before HTTP/cache access using its existing exit-4 validation output.
-- Official Registry `com.debugbundle/mcp` 1.19.3 is published and exact readback
-  succeeds. ClawHub accepted both 1.19.3 submissions. Both overall/final reviews are
-  clean/benign, and skill moderation is clean. Antivirus completion remains
-  pending. Normal public skill installation matches source bytes; normal
-  OpenClaw 2026.10.10 installation loads all 149 tools, matches the reviewed
-  emitted entry, and passes scoped/auth/pagination/doctor/local checks and
-  malicious-ID rejection. Neither remote install uses a force or scan override. Published 1.19.2
-  artifacts are immutable and are superseded by the correction.
-- Gemini [1.4.3](https://github.com/debugbundle/debugbundle-gemini/releases/tag/v1.4.3)
-  main/tag `91fe4f5643240dfbab8553ac113a05839a6bc3dd` and all five public files
-  match core; the actual downloaded release ZIP is byte-identical. Archive SHA-256:
-  `b54f734dcf6e173a12a4e7aa46ddbfa4d3c4c08ec524e962ec398f2393938323`.
-  A normal retained public 1.4.2 → 1.4.3 update passes 149-tool discovery,
-  auth/access denial, local evidence, project-skill setup, settings and removal.
-- Site source `78fdb97229f342023a3eeddea77d5d9e08959f60` passes
-  [source CI 41941111211](https://github.com/debugbundle/site/actions/runs/41941111211)
-  and [release 41941466599](https://github.com/debugbundle/site/actions/runs/41941466599).
-  The dedicated site deployment follows public core marketplace promotion.
-- Read-only production CLI checks independently verify operation
-  `f38fb964-4cce-4eca-9a73-e3528998b253` true/no failures, canonical DebugBundle
-  and all five retained services. Saved API/App/Site checks pass HTTP 200 with no
-  consecutive failures; all eight CloudWatch alarms are OK across their two
-  configured regions. Four served App resources are byte-identical and API
-  readiness returns 200. No canary or repository adoption was performed.
+Corrected site deployment
+[41952378142](https://github.com/debugbundle/debugbundle-cloud/actions/runs/41952378142)
+passes from cloud `cb11cfb084bf8c7e81dc94a31f1d38668700aabb`, product
+`46337a46a97dc07b146903de49860b587773058f` and site `cb8d67d1`. Ten live guide
+pages, six assets and llms.txt pass content assertions, CDN/S3 byte comparison
+and applicable cache checks. The connection anchor and current MCP pins are live.
 
-Pre-ship review confirms invalid IDs fail before URL/cache use, safe opaque IDs
-remain valid, symlinked cache paths fail closed, retention preserves unknown files,
-and confirmed remote mutation outcomes survive optional cache failure. Adjacent
-improvement reads do not persist artifacts via their IDs. No schema migration,
-SDK change or new glossary term is needed. Full-source CI and final external
-acceptance remain in progress; initial native Gemini jobs failed only because
-MCP 1.19.3 was not public yet and will be rerun once the running source job ends.
+After deployment, the saved API/App/Site checks pass HTTP 200 with zero consecutive
+failures (02:04:54 UTC); all eight production alarms are OK. Four served App
+resources are byte-identical to the baseline and API `/ready` returns 200.
+Read-only merge verification remains true/no failures for operation
+`f38fb964-4cce-4eca-9a73-e3528998b253`; canonical DebugBundle and five retained
+services are unchanged. Core API/worker 1.21.0, its active/previous stable images,
+66 migrations, original histories, tokens and scopes remain as recorded in
+[the consolidation receipt](project-service-live-20261104.md).
 
-## Second security correction — retained local artifacts
+The guidance/client changes require no API/worker rollout, schema migration,
+SDK release, credential change, repository adoption or synthetic production event.
+App/Site SDK analytics opt-in remains separate from API/Worker instrumentation;
+the shared project analytics policy is unchanged. The hosted OpenAI 23-tool
+contract is unchanged. No new glossary term is introduced.
 
-A refreshed final review of 1.19.3 changed to suspicious after its isolated local
-read probe: retained `bundle_path`/`reproduction_path` could select unrelated JSON
-outside the intended directories. The earlier clean review and antivirus/public
-install proof do not override this later concrete finding. Complete findings remain
-in `.tmp/project-guidance-release-20261105/1193-final-local-read-finding.json`.
+## Remaining acceptance and repository cleanup
 
-FR-CLI-18 / AC-CLI-LOCAL-ARTIFACT adds canonical path validation across local
-retrieval, rebuilds and cleanup, symlink rejection and guarded state/event IO.
-Invalid retained state is preserved, and existing large stores retain their size
-allowance. Seven initial path regressions failed before the fix, with further
-state/parent-link, large-store and rebuild cases added. CLI/MCP/OpenClaw 1.19.4 and
-Gemini 1.4.4 supersede earlier clients. No hosted API/worker, SDK, database,
-credential, consumer or production event change is involved.
+The portable skill's antivirus result is still missing. Overall/final review and
+moderation are clean, but the provider's generic `decision: pass` does not satisfy
+our explicit antivirus gate. Raw public metadata and the stored report ZIP independently confirm the omission.
+One supported owner rescan of exact skill 1.19.4 is running; neither missing evidence nor accepted publication is a security pass.
+OpenClaw's final review is benign/high-confidence and its antivirus is clean
+(62 undetected, zero malicious/suspicious). Broad ClawHub discovery remains the
+separately tracked 5/7 baseline; Smithery publishing is retired.
 
-Local qualification now passes 1,106 cases across 149 affected files, all 84 Gemini/agent-setup contracts, types/lint/format and emitted/installed OpenClaw checks. Six further retrieval-route regressions failed before applying the same identifier validation to improvement/project URL components; all 54 focused retrieval/local/ledger cases then pass. Site 1.7.2 and Gemini 1.4.4 are fresh immutable patches; earlier tags stay intact.
+The generator-correction main CI is in progress. Earlier merged-main CI completed
+all shards but its 1 ms OpenAI timeout-monitor test observed the generic failure
+category; no test expectation or hosted runtime was changed to hide that result.
+The qualified client source CI above is independently green.
 
-Full source CI 41940243633 completed all 111 shards; its only source test failure
-was the stale distribution-ledger pin, now corrected. Native Gemini jobs had only
-the earlier pre-publication npm ETARGET. The corrected candidate must pass the
-full suite and fresh external gates before this release is complete.
-
-## Hosted artifact generator correction
-
-Exact-source 1.19.4 CI passes 5,174 cases across 111 shards (including 103 actual
-Postgres cases), coverage and changed-source checks. Public native Codex 1.5.1,
-Claude Code 1.19.4, Gemini 1.4.4 and OpenClaw 1.19.4 checks pass. Core PR #12 merged
-normally at `e77cca52`, with a tree identical to qualified source `61555f74`.
-Site 1.7.2 source `cb8d67d1` passed source/release workflows and deployment
-41949806320; all guide-page/asset checks and production endpoint/alarms pass.
-
-The live llms.txt assertion then exposed the real hosted build path: core's
-`public-site-artifacts.ts` overwrote the corrected site-vendored copy. Its older
-MCP-first text contradicted the routing contract and omitted one-project guidance.
-An active generated-output contract reproduced the failure; correcting the core
-template and setup link makes production generation reproduce the approved copy.
-This changes the site generator only; published client artifacts remain immutable.
-A follow-up site rollout with the corrected core ref is required before closure.
+Core, site, Gemini and cloud are on main with clean, synced tracked trees.
+The merged `release/project-guidance-20261105` branch was deleted locally and
+from origin after exact-head/ancestry checks. Unmerged `feature/muse-connector`,
+the ahead-one parked `update/analytics` commit and the detached Muse worktree
+are preserved. Final CI and portable-skill antivirus acceptance remain open. Local raw receipts: `.tmp/project-guidance-release-20261105/v1194/`.

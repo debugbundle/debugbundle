@@ -5,33 +5,23 @@ activation and merge after clarification of the existing analytics model.
 
 ## Installation guidance follow-up — 5 November
 
-Locally verified; the owner subsequently authorised the release train. The default is now explicit: reuse one
-project per system across service repositories, preserving existing connections
-and separating projects for different access/privacy policies. Canonical CLI
-guidance and all five distributed skill sources agree. The site install prompt,
-six setup/API/CLI guides and llms.txt match; stale upcoming/release-candidate
-wording is removed. The connection guide explains current name-based selection
-and how to bind a known project ID without creating another project.
+The owner authorised and published the installation follow-up: CLI/MCP/OpenClaw
+and skill 1.19.4, Codex 1.5.1, Claude Code 1.19.4, Gemini 1.4.4 and site 1.7.2.
+The default is one project per system across service repositories, preserving
+existing connections and separate access/privacy policies. Current name-based
+`connect` and binding a known project ID are explicit. Generated skills, live
+setup/API/CLI guides, the shared install prompt and llms.txt agree. The prompt is
+236 words; the shared project/service section is four bullets/232 words.
 
-The install prompt is 236 words (34 added); the shared project/service section
-remains four bullets, 232 words. No CLI selection behavior, runtime, schema,
-credential, project data or consumer installation changed.
-
-Validation: one core and two site regressions first failed as expected; then all
-10 guidance tests, 44 site tests and eight audit-helper tests passed. Core/site
-typechecks, focused lint/format, whitespace checks and the 143-page static build
-pass. Seven exported HTML entry points, the new connection anchor and exported
-llms.txt contain the final guidance. Prior pushed-main CI and CLI runtime checks
-are both successful. The pre-ship review found no changed runtime trust boundary
-or schema path; specs/contracts/overview/map match and no new glossary term is
-needed.
-
-Release scope is this guidance-only core/site diff: commit/push, publish the site
-and affected CLI/MCP/agent distributions through their existing channels, then
-verify published guidance. Installed caches are never edited directly. The
-OpenAI portal submission remains a separate existing process. This follow-up has
-entered the authorised release train; see `project-guidance-release-20261105.md`.
-The successful server merge below is unchanged.
+Publication qualification also fixed pre-existing cloud/local artifact path
+boundaries in the clients. The actual hosted llms.txt generator was corrected
+and redeployed after a live mismatch was caught. No server-merge data, SDK,
+credential, API/worker deployment or consumer installation changed. Exact client
+source CI, normal public native installs and post-deploy health checks pass.
+The merged release branch is removed locally/remotely. The portable skill's
+mandatory antivirus result and final source CI remain open; see [the current release receipt](project-guidance-release-20261105.md).
+OpenAI portal submission remains separate. The successful server merge below
+and its original evidence/limits are unchanged.
 
 ## Final receipt
 

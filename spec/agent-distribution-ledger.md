@@ -2,9 +2,16 @@
 
 ## Installation-guidance patch — 5 November 2026
 
-Release authorised: Codex 1.5.1, Claude Code 1.19.4 and Gemini CLI 1.4.4 adopt
-MCP 1.19.4 and the clarified one-project-per-system guidance. Publication and
-public native-client checks are in progress; see `project-guidance-release-20261105.md`.
+Codex 1.5.1 and Claude Code 1.19.4 are public from core merge `e77cca52`;
+Gemini CLI 1.4.4 is public from standalone main/tag
+`b6b2fc208b2b0339c6b3d855fd3d9db5a7b9f0ad`. All pin published MCP 1.19.4
+and share the one-project-per-system guidance. Native public installation,
+149-tool discovery, authentication, local evidence, updates and removal pass.
+The actual Gemini release ZIP matches SHA-256
+`2b5c0ffb6f382c86288791c92b68a559472d82c822dcbc06f8c85e2591b271ec`.
+See [the release receipt](project-guidance-release-20261105.md), including the
+separate portable-skill antivirus gate. These developer packages are published;
+OpenAI 1.0.3 remains a sealed local candidate under its separate portal process.
 
 ## Project/service release — 4 November 2026
 
@@ -17,7 +24,7 @@ Gemini's real public 1.4.0-to-1.4.1 update also passes. Its ZIP SHA-256 is
 See [the final release receipt](project-service-release-20261104.md). Historical
 identities below remain prior-release evidence, not current candidate versions.
 
-## Current release candidate inventory
+## Current published inventory
 
 This is the maintained inventory for first-party developer agent packages that bundle the local DebugBundle MCP server and a workflow skill. It complements the [MCP ecosystem release manifest](../apps/mcp/ecosystem-release-manifest.json), which tracks the npm server, MCP Registry, Smithery, ClawHub, OpenClaw, and downstream discovery. That pipeline does not publish Codex, Claude Code, or Gemini CLI packages. The hosted, read-only [OpenAI plugin](../apps/mcp/openai/release-manifest.json) has its own release gate.
 

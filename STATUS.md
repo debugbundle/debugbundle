@@ -1,50 +1,29 @@
-# Hosted machine-readable guidance correction — in progress
+# Installation guidance release — published; final acceptance pending
 
-5 November 2026. Exact-source CLI/MCP/OpenClaw 1.19.4 passes 5,174 tests across
-111 shards, all package/public-client gates and the normal public Codex/Claude/
-Gemini/OpenClaw installs. Site 1.7.2 deployed successfully; ten guide pages and
-six assets match origin bytes. Live llms.txt verification caught a production
-build template overwriting the corrected vendored text with older interface
-priorities and no one-project default. The core generator is corrected and an
-active cross-agent regression first failed, then passed; regenerate before build.
-A corrected exact-ref site rollout and the portable skill's antivirus completion
-remain required. App/API checks and all eight alarms pass; no consumer change.
+5 November 2026. CLI/MCP/OpenClaw and the portable skill 1.19.4, Codex 1.5.1,
+Claude Code 1.19.4, Gemini 1.4.4 and site 1.7.2 are public. One project per system
+is the default across service repositories; existing connections and access/privacy
+boundaries stay explicit. Generated skills, install prompts and live guides agree.
+The install prompt is 236 words; the shared project/service section is four bullets.
 
-# Installation guidance follow-up — release authorised, in progress
+Marketplace reviews exposed cloud-cache and retained-local artifact traversal;
+1.19.4 fixes both with validated IDs/paths and guarded filesystem operations.
+Exact client source CI passes 5,174 tests/111 shards, including 103 Postgres cases,
+coverage and runtime gates. Normal public native Codex/Claude/Gemini/OpenClaw
+installs, authentication, evidence, updates and removal pass. PR #12 is merged.
 
-5 November 2026. FR-PJS-01 / AC-PJS-03 now explicitly default installation to one
-project per system across service repositories. The generated CLI skill and all
-five distributed skill sources agree. The site's shared install prompt, setup,
-connection, quickstart, API/CLI guides and llms.txt state the same default, preserve
-existing connections and explain current name-based `connect`. Stale upcoming/
-release-candidate wording is removed. Existing policy boundaries and explicit
-merge approval remain intact. No runtime selection or schema behavior changed.
+The site is live from core `46337a46` / site `cb8d67d1`. Live verification caught
+and corrected the core generator overwriting approved llms.txt. Ten guide pages,
+six assets and llms.txt now match CDN/origin bytes; API/App/Site health checks and
+all eight alarms pass. No API/worker, SDK, credential or consumer change occurred.
+OpenAI 1.0.3 remains a sealed local candidate with separate portal handling.
 
-Red reproduced one guidance-contract failure and two site failures. Green:
-10 guidance tests, 44 site tests plus eight audit-helper tests, core/site types,
-focused lint/format, and the 143-page site build pass. Seven exported HTML entry
-points, the connection anchor and exported llms.txt carry the corrected guidance.
-The install prompt is 236 words; project/service guidance is four bullets/232
-words. Previous main CI and CLI-runtime runs also finished successfully.
-
-The owner authorised commit/push and the full affected release train. Current
-release evidence is in `spec/project-guidance-release-20261105.md`; publication
-and public-install acceptance are in progress. Final OpenClaw 1.19.2 review
-confirmed cloud-cache path traversal; promotion stopped before merge/site deploy.
-The corrective 1.19.3 clients validate IDs before requests or cache side effects
-and reuse guarded filesystem helpers. Twenty regressions failed before the fix;
-focused retrieval/cache/integration tests pass. Gemini 1.4.3 and developer pins
-adopt the corrective MCP package. No hosted API/worker, SDK or consumer change.
-
-
-Refreshed ClawHub 1.19.3 review confirmed a second pre-existing boundary issue:
-retained local metadata could redirect default artifact reads outside the project.
-The new 1.19.4 candidate constrains these paths across retrieval/rebuild/cleanup,
-rejects symbolic links, preserves invalid state and retains large-file compatibility.
-Seven local path regressions and the stale distribution-ledger contract failed
-before correction; local artifact/state/processing checks now pass. The source CI
-failure was the missed ledger pin, not a behavioral test failure. Full qualification
-and exact-version external acceptance remain in progress; the release branch stays.
+OpenClaw's exact final review and antivirus pass. The portable skill's final
+review/moderation pass but antivirus is missing; an exact owner rescan is running.
+The corrected generator's main CI remains pending. The merged release branch
+is deleted locally/remotely; both unmerged branches and the detached worktree remain.
+Known ClawHub discovery remains 5/7, qualified separately. See
+`spec/project-guidance-release-20261105.md` for immutable identities and evidence.
 
 # Owner's three-project consolidation — server merge completed
 
