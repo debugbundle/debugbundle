@@ -21,19 +21,78 @@ const AlertCreateOutputSchema = z
   .strict();
 
 describe("cli alert commands", () => {
+  it("keeps opted-in scope reads on the saved member connection", async () => {
+    const request = vi.fn().mockResolvedValue({ status: 200, body: { alerts: [] } });
+    const createHttpClient = vi.fn().mockReturnValue({ request });
+    const result = await listAlertsWithAuthCommand(
+      { projectId: "project", includeScope: true, json: true },
+      {
+        readAuthState: vi.fn().mockResolvedValue({
+          base_url: "https://selfhost.debugbundle.test",
+          bearer_token: "dbundle_mem_saved"
+        }),
+        createHttpClient
+      }
+    );
+    expect(result.exitCode).toBe(0);
+    expect(request).toHaveBeenCalledWith({
+      method: "GET",
+      path: "/v1/alerts?project_id=project&include_scope=true",
+      bearerToken: "dbundle_mem_saved"
+    });
+  });
+  it("forwards the read-only scope option and preserves scope in JSON", async () => {
+    const scope = {
+      covers_current_project: false,
+      origin_project_ids: ["00000000-0000-4000-8000-000000000001"],
+      services: [],
+      service_count: 0,
+      service_filter: null
+    };
+    const listAlerts = vi.fn().mockResolvedValue([{ alert_id: "rule", scope }]);
+    const result = await listAlertsCommand(
+      { bearerToken: "member", projectId: "project", includeScope: true, json: true },
+      { listAlerts }
+    );
+    expect(listAlerts).toHaveBeenCalledWith({
+      bearerToken: "member",
+      projectId: "project",
+      includeScope: true
+    });
+    expect(JSON.parse(result.output).alerts[0].scope).toEqual(scope);
+  });
   it("shows a custom webhook secret once and forwards explicit rotation", async () => {
     const alert = { alert_id: "al_1", signing_secret: "dbundle_asec_one-time" };
-    const created = await createAlertCommand({ bearerToken: "member", projectId: "proj_1",
-      channel: "webhook", conditionType: "new_incident",
-      config: { target_url: "https://hooks.example.test/alert" } }, {
-      createAlert: vi.fn().mockResolvedValue(alert)
-    });
+    const created = await createAlertCommand(
+      {
+        bearerToken: "member",
+        projectId: "proj_1",
+        channel: "webhook",
+        conditionType: "new_incident",
+        config: { target_url: "https://hooks.example.test/alert" }
+      },
+      {
+        createAlert: vi.fn().mockResolvedValue(alert)
+      }
+    );
     expect(created.output).toContain("Signing secret (shown once): dbundle_asec_one-time");
 
-    const updateAlert = vi.fn().mockResolvedValue({ ...alert, signing_secret: "dbundle_asec_rotated" });
-    const rotated = await updateAlertCommand({ bearerToken: "member", projectId: "proj_1",
-      alertId: "al_1", channel: "webhook", rotateSigningSecret: true }, { updateAlert });
-    expect(updateAlert).toHaveBeenCalledWith(expect.objectContaining({ rotateSigningSecret: true }));
+    const updateAlert = vi
+      .fn()
+      .mockResolvedValue({ ...alert, signing_secret: "dbundle_asec_rotated" });
+    const rotated = await updateAlertCommand(
+      {
+        bearerToken: "member",
+        projectId: "proj_1",
+        alertId: "al_1",
+        channel: "webhook",
+        rotateSigningSecret: true
+      },
+      { updateAlert }
+    );
+    expect(updateAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ rotateSigningSecret: true })
+    );
     expect(rotated.output).toContain("Signing secret (shown once): dbundle_asec_rotated");
   });
   it("renders alert list output in human mode", async () => {
@@ -63,7 +122,9 @@ describe("cli alert commands", () => {
     );
 
     expect(result.exitCode).toBe(0);
-    expect(result.output).toContain("al_1 | enabled | severity_threshold | email | cooldown=0s | project=proj_1");
+    expect(result.output).toContain(
+      "al_1 | enabled | severity_threshold | email | cooldown=0s | project=proj_1"
+    );
   });
 
   it("loads stored auth state and forwards it into alert creation", async () => {
@@ -156,7 +217,9 @@ describe("cli alert commands", () => {
         projectId: "proj_1"
       },
       {
-        readAuthState: vi.fn().mockRejectedValue(new CliAuthStateError("auth_state_missing", "Not logged in."))
+        readAuthState: vi
+          .fn()
+          .mockRejectedValue(new CliAuthStateError("auth_state_missing", "Not logged in."))
       }
     );
 
@@ -345,7 +408,9 @@ describe("cli alert commands", () => {
 
     expect(emptyList.output).toBe("No alerts found.");
     expect(JSON.parse(jsonList.output)).toEqual({ alerts: [{ alert_id: "al_2" }] });
-    expect(AlertCreateOutputSchema.parse(JSON.parse(created.output)).alert.service_id).toBe("svc_1");
+    expect(AlertCreateOutputSchema.parse(JSON.parse(created.output)).alert.service_id).toBe(
+      "svc_1"
+    );
     expect(updated.output).toContain("Alert updated: al_2");
     expect(JSON.parse(wrapperList.output)).toEqual({ alerts: [] });
   });

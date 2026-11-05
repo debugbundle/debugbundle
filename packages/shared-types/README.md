@@ -2,6 +2,11 @@
 
 Shared DebugBundle schemas, types, and constants.
 
+Version 3.2 adds `AlertScopeSchema`, `AlertScope` and
+`ALERT_SCOPE_SERVICE_LIMIT` for opt-in alert-list coverage metadata. Saved origin
+coverage and the selected service/environment filter are separate; missing
+metadata does not imply project-wide coverage. Event and bundle contracts are unchanged.
+
 This package is the low-level contract layer used by the DebugBundle SDKs and core services. Most consumers should install `@debugbundle/sdk-node` or `@debugbundle/sdk-browser` instead of depending on this package directly.
 
 ## Upgrading to 3.0

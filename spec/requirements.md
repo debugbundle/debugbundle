@@ -322,7 +322,7 @@ Project list/detail metrics must include `attention_incidents_today`, counting i
 
 **FR-ALT-02:** Alert conditions: new incident, incident regressed, error spike (FR-GRP-03), severity threshold, regression after deploy (FR-GRP-04).
 
-**FR-ALT-03:** Configurable via API, CLI, and MCP.
+**FR-ALT-03:** Configurable via API, CLI, and MCP. An opt-in alert-list scope descriptor exposes accepted origin coverage independently of the selected service/environment filter, with bounded current-view service names and an exact total. Default response shapes remain compatible with installed strict clients; missing scope is unavailable, never implicitly project-wide.
 
 **FR-ALT-04:** Severity-threshold alert rules must be able to notify for new incidents, incident regressions, or both. New severity-threshold alert rules default to both lifecycle events. Delivery dedupe must suppress reprocessing of the same lifecycle transition without permanently suppressing a later regression of the same incident; configured cooldown remains the independent cross-transition suppression control.
 

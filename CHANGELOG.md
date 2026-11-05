@@ -6,6 +6,16 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.22.0] - 2026-11-05
+
+### Fixed
+
+- Align the agent credential creation button with existing card-header actions.
+- Show retained alert coverage accurately in the dashboard and restrict service
+  selection to the saved scope. Add opt-in scope reads through API, CLI and MCP
+  while preserving existing response shapes, filters and delivery behaviour.
+  Preserve confirmed saves/deletes and complete rule lists during overlapping reads.
+
 ## [1.21.0] - 2026-11-04
 
 ### Fixed

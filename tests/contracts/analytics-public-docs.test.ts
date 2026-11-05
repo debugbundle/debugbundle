@@ -15,7 +15,10 @@ function readDoc(relativePath: string): string {
 }
 
 // Private-site CI runs these integration checks with an explicit site checkout.
-const describeSiteDocs = process.env["DEBUGBUNDLE_SITE_ROOT"] !== undefined || existsSync(docsRoot) ? describe : describe.skip;
+const describeSiteDocs =
+  process.env["DEBUGBUNDLE_SITE_ROOT"] !== undefined || existsSync(docsRoot)
+    ? describe
+    : describe.skip;
 
 describeSiteDocs("public site AnalyticsBundle documentation", () => {
   it("ships every AnalyticsBundle page required by the documentation contract", () => {
@@ -168,7 +171,9 @@ describeSiteDocs("public site AnalyticsBundle documentation", () => {
     );
     const quickstart = readDoc("quickstart.mdx");
 
-    expect(homepage).toContain("Use opt-in analytics to understand affected journeys and friction.");
+    expect(homepage).toContain(
+      "Use opt-in analytics to understand affected journeys and friction."
+    );
     expect(homepage).toContain("href: '/docs/analytics/'");
     expect(homepage).toContain("promptId: 'product-analytics-workflow'");
     expect(prompts).toContain("'product-analytics-workflow'");
@@ -250,10 +255,10 @@ describeSiteDocs("public site AnalyticsBundle documentation", () => {
     );
     expect(contentSource).toContain("'[ServerCog][Self-Hosting](/docs/analytics/self-hosting)'");
     expect(contentSource).not.toMatch(/'---AnalyticsBundle---',\s*'analytics',/);
-    expect(artifactSource).toContain("'/docs/analytics/'");
-    expect(artifactSource).toContain("'/docs/analytics/privacy/'");
-    expect(artifactSource).toContain("'/docs/cli/analytics/'");
-    expect(artifactSource).toContain("'/docs/api/analytics/'");
+    expect(artifactSource).toMatch(/["']\/docs\/analytics\/["']/);
+    expect(artifactSource).toMatch(/["']\/docs\/analytics\/privacy\/["']/);
+    expect(artifactSource).toMatch(/["']\/docs\/cli\/analytics\/["']/);
+    expect(artifactSource).toMatch(/["']\/docs\/api\/analytics\/["']/);
   });
 
   it("documents agent-native analytics workflows across MCP and generated skill guidance", () => {
@@ -280,9 +285,9 @@ describeSiteDocs("public site AnalyticsBundle documentation", () => {
 describe("generated analytics discovery contract", () => {
   it("publishes the complete current Apache license without private site source", async () => {
     const artifacts = await buildMachineReadableArtifacts();
-    expect(artifacts.find((artifact) => artifact.routePath === "/licenses/apache-2.0.txt")?.content).toBe(
-      readFileSync(join(process.cwd(), "LICENSE"), "utf8")
-    );
+    expect(
+      artifacts.find((artifact) => artifact.routePath === "/licenses/apache-2.0.txt")?.content
+    ).toBe(readFileSync(join(process.cwd(), "LICENSE"), "utf8"));
   });
   it("publishes capability-first positioning and AnalyticsBundle links in the generated agent discovery artifact", async () => {
     const artifacts = await buildMachineReadableArtifacts();
@@ -291,9 +296,7 @@ describe("generated analytics discovery contract", () => {
     expect(llms?.content).toContain(
       "runtime error reporting, crash reporting, incident response, endpoint health checks, and product analytics"
     );
-    expect(llms?.content).toContain(
-      "- [AnalyticsBundle](https://debugbundle.com/docs/analytics/)"
-    );
+    expect(llms?.content).toContain("- [AnalyticsBundle](https://debugbundle.com/docs/analytics/)");
     expect(llms?.content).toContain(
       "- [AnalyticsBundle privacy](https://debugbundle.com/docs/analytics/privacy/)"
     );
@@ -307,5 +310,4 @@ describe("generated analytics discovery contract", () => {
       "- [AnalyticsBundle API](https://debugbundle.com/docs/api/analytics/)"
     );
   });
-
 });

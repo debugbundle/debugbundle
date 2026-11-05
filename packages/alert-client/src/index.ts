@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AlertScopeSchema } from "../../shared-types/src/alert-scope.js";
 
 export const AlertChannelSchema = z.enum(["email", "slack", "discord", "webhook"]);
 export const AlertConditionTypeSchema = z.enum([
@@ -29,7 +30,8 @@ export const AlertSchema = z
     signing_secret: z.string().optional(),
     is_enabled: z.boolean(),
     created_at: z.string(),
-    updated_at: z.string()
+    updated_at: z.string(),
+    scope: AlertScopeSchema.nullable().optional()
   })
   .strict();
 
@@ -129,6 +131,11 @@ function parseApiError(status: number, body: unknown): never {
   throw new AlertApiError(status, parsed.data.error);
 }
 
+export function shouldRetryWithoutAlertScope(status: number, body: unknown): boolean {
+  const error = ApiErrorResponseSchema.safeParse(body);
+  return status === 400 && error.success && error.data.error === "invalid_query";
+}
+
 function buildQuery(input: Record<string, string | number | undefined>): string {
   const params = new URLSearchParams();
 
@@ -175,6 +182,7 @@ export function createAlertApi(client: HttpClient): {
     bearerToken: string;
     projectId: string;
     limit?: number;
+    includeScope?: boolean;
   }): Promise<AlertRecord[]>;
   listAlertGroups(input: {
     bearerToken: string;
@@ -225,13 +233,25 @@ export function createAlertApi(client: HttpClient): {
 } {
   return {
     async listAlerts(input) {
-      return expectAlertList(
-        client.request({
+      const query = { project_id: input.projectId, limit: input.limit };
+      let response = await client.request({
+        method: "GET",
+        path: `/v1/alerts${buildQuery({ ...query, ...(input.includeScope === true ? { include_scope: "true" } : {}) })}`,
+        bearerToken: input.bearerToken
+      });
+      // Strict predecessor servers reject the new query key. Retry only this
+      // bounded read, never authorization failures, and leave scope unavailable.
+      if (
+        input.includeScope === true &&
+        shouldRetryWithoutAlertScope(response.status, response.body)
+      ) {
+        response = await client.request({
           method: "GET",
-          path: `/v1/alerts${buildQuery({ project_id: input.projectId, limit: input.limit })}`,
+          path: `/v1/alerts${buildQuery(query)}`,
           bearerToken: input.bearerToken
-        })
-      );
+        });
+      }
+      return expectAlertList(Promise.resolve(response));
     },
 
     async listAlertGroups(input) {

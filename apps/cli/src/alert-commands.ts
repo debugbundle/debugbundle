@@ -46,6 +46,7 @@ export async function listAlertsCommand(
     bearerToken: string;
     projectId: string;
     limit?: number;
+    includeScope?: boolean;
     json?: boolean;
   },
   api: {
@@ -53,11 +54,17 @@ export async function listAlertsCommand(
       bearerToken: string;
       projectId: string;
       limit?: number;
+      includeScope?: boolean;
     }): Promise<AlertRecord[]>;
   }
 ): Promise<CliCommandResult> {
   try {
-    const requestInput: { bearerToken: string; projectId: string; limit?: number } = {
+    const requestInput: {
+      bearerToken: string;
+      projectId: string;
+      limit?: number;
+      includeScope?: boolean;
+    } = {
       bearerToken: input.bearerToken,
       projectId: input.projectId
     };
@@ -65,6 +72,7 @@ export async function listAlertsCommand(
       requestInput.limit = input.limit;
     }
 
+    if (input.includeScope !== undefined) requestInput.includeScope = input.includeScope;
     const alerts = await api.listAlerts(requestInput);
     return {
       exitCode: 0,
@@ -79,7 +87,13 @@ export async function listAlertsCommand(
 }
 
 export async function listAlertsWithAuthCommand(
-  input: { authFilePath?: string; projectId: string; limit?: number; json?: boolean },
+  input: {
+    authFilePath?: string;
+    projectId: string;
+    limit?: number;
+    includeScope?: boolean;
+    json?: boolean;
+  },
   dependencies?: Parameters<typeof createAuthenticatedAlertApi>[1]
 ): Promise<CliCommandResult> {
   return runAuthenticatedCliCommand(input, {
@@ -90,6 +104,7 @@ export async function listAlertsWithAuthCommand(
         bearerToken: string;
         projectId: string;
         limit?: number;
+        includeScope?: boolean;
         json?: boolean;
       } = {
         bearerToken: authState.bearer_token,
@@ -98,6 +113,7 @@ export async function listAlertsWithAuthCommand(
       if (input.limit !== undefined) {
         commandInput.limit = input.limit;
       }
+      if (input.includeScope !== undefined) commandInput.includeScope = input.includeScope;
       if (input.json !== undefined) {
         commandInput.json = input.json;
       }

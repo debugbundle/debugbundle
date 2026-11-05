@@ -184,6 +184,7 @@ export type AlertConditionType =
 export type AlertSeverityLifecycleScope = "new_incident" | "incident_regressed" | "both";
 
 export interface AlertRecord {
+  scope?: import("../../../packages/shared-types/src/alert-scope.js").AlertScope | null;
   alert_id: string;
   project_id: string;
   created_by_user_id: string;
@@ -323,7 +324,9 @@ export function createSession(overrides: Partial<SessionRecord> = {}): SessionRe
   };
 }
 
-export function createMemberTokenRecord(overrides: Partial<MemberTokenRecord> = {}): MemberTokenRecord {
+export function createMemberTokenRecord(
+  overrides: Partial<MemberTokenRecord> = {}
+): MemberTokenRecord {
   return {
     token_id: "tok_123",
     user_id: "usr_123",
@@ -338,7 +341,9 @@ export function createMemberTokenRecord(overrides: Partial<MemberTokenRecord> = 
 }
 
 export function createProject(
-  overrides: Partial<Omit<ProjectRecord, "metrics">> & { metrics?: Partial<ProjectRecord["metrics"]> } = {}
+  overrides: Partial<Omit<ProjectRecord, "metrics">> & {
+    metrics?: Partial<ProjectRecord["metrics"]>;
+  } = {}
 ): ProjectRecord {
   const defaultMetrics: ProjectRecord["metrics"] = {
     open_incidents: 3,
@@ -375,7 +380,9 @@ export function createProject(
   };
 }
 
-export function createProjectToken(overrides: Partial<ProjectTokenRecord> = {}): ProjectTokenRecord {
+export function createProjectToken(
+  overrides: Partial<ProjectTokenRecord> = {}
+): ProjectTokenRecord {
   return {
     token_id: "proj_tok_123",
     project_id: "proj_123",
@@ -415,7 +422,9 @@ export function createIncident(overrides: Partial<IncidentRecord> = {}): Inciden
   };
 }
 
-export function createProjectMember(overrides: Partial<ProjectMemberRecord> = {}): ProjectMemberRecord {
+export function createProjectMember(
+  overrides: Partial<ProjectMemberRecord> = {}
+): ProjectMemberRecord {
   return {
     user_id: "usr_123",
     email: "owen@example.com",
@@ -427,7 +436,9 @@ export function createProjectMember(overrides: Partial<ProjectMemberRecord> = {}
   };
 }
 
-export function createProjectInvite(overrides: Partial<ProjectInviteRecord> = {}): ProjectInviteRecord {
+export function createProjectInvite(
+  overrides: Partial<ProjectInviteRecord> = {}
+): ProjectInviteRecord {
   return {
     invite_id: "pinv_123",
     project_id: "proj_123",
@@ -442,7 +453,9 @@ export function createProjectInvite(overrides: Partial<ProjectInviteRecord> = {}
   };
 }
 
-export function createBillingSummary(overrides: Partial<BillingSummaryRecord> = {}): BillingSummaryRecord {
+export function createBillingSummary(
+  overrides: Partial<BillingSummaryRecord> = {}
+): BillingSummaryRecord {
   const plan = overrides.plan ?? "free";
   const capabilities = getTierCapabilities(plan);
   const capacityUnits = overrides.capacity_units ?? {
@@ -537,7 +550,9 @@ export function createWebhook(overrides: Partial<WebhookRecord> = {}): WebhookRe
   };
 }
 
-export function createGitHubInstallation(overrides: Partial<GitHubInstallationRecord> = {}): GitHubInstallationRecord {
+export function createGitHubInstallation(
+  overrides: Partial<GitHubInstallationRecord> = {}
+): GitHubInstallationRecord {
   return {
     id: "ghi_123",
     installation_id: 123,
@@ -608,7 +623,9 @@ export function createGitHubDispatchDelivery(
   };
 }
 
-export function createGitHubRepository(overrides: Partial<GitHubRepositoryRecord> = {}): GitHubRepositoryRecord {
+export function createGitHubRepository(
+  overrides: Partial<GitHubRepositoryRecord> = {}
+): GitHubRepositoryRecord {
   return {
     id: 1,
     owner: "debugbundle",

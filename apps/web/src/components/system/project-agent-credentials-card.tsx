@@ -1,5 +1,6 @@
 import { PendingButton } from "./pending-button.js";
 import { useEffect, useRef, useState } from "react";
+import { PlusIcon } from "lucide-react";
 import { z } from "zod";
 import {
   createAgentCredential,
@@ -14,7 +15,14 @@ import { PlaintextTokenReveal } from "./plaintext-token-reveal.js";
 import { ResourceDeleteDialog } from "./resource-delete-dialog.js";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../ui/card.js";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardAction
+} from "../ui/card.js";
 import { Dialog } from "../ui/dialog.js";
 import { Field, FieldGroup, FieldDescription, FieldLabel } from "../ui/field.js";
 import { Input } from "../ui/input.js";
@@ -128,6 +136,21 @@ export function ProjectAgentCredentialsCard({ projectId }: { projectId: string }
   return (
     <Card>
       <CardHeader>
+        <CardAction>
+          <Button
+            type="button"
+            disabled={pending || loading}
+            onClick={() => {
+              setLabel("");
+              setExpiry("");
+              setError(null);
+              setOpen(true);
+            }}
+          >
+            <PlusIcon data-icon="inline-start" />
+            Create agent credential
+          </Button>
+        </CardAction>
         <CardTitle>Agent credentials</CardTitle>
         <CardDescription>
           Restricted incident evidence for this project. These credentials cannot ingest events or
@@ -135,18 +158,6 @@ export function ProjectAgentCredentialsCard({ projectId }: { projectId: string }
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <Button
-          type="button"
-          disabled={pending || loading}
-          onClick={() => {
-            setLabel("");
-            setExpiry("");
-            setError(null);
-            setOpen(true);
-          }}
-        >
-          Create agent credential
-        </Button>
         {secret === null ? null : (
           <>
             <PlaintextTokenReveal
@@ -221,7 +232,8 @@ export function ProjectAgentCredentialsCard({ projectId }: { projectId: string }
             description="Creation is available only when enabled by this server. Credentials expire after 30 days by default and at most 90 days."
             onSubmit={(event) => void create(event)}
             footer={
-              <PendingButton pending={pending}
+              <PendingButton
+                pending={pending}
                 type="submit"
                 disabled={pending || invalidExpiry || label.trim().length === 0}
               >

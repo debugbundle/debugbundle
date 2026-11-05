@@ -1,3 +1,43 @@
+# Alert scope release — authorised, in progress
+
+The owner authorised release to production and repository/branch cleanup.
+Prepared versions: core 1.22.0; CLI/MCP/OpenClaw/skill 1.20.0; shared-types 3.2.0;
+site 1.7.3. Redaction, SDKs and existing developer-package pins stay independently
+versioned. See `spec/alert-scope-release-20261105.md` for gates and live evidence.
+
+# Alert scope display correction — final audit passed locally
+
+The owner approved the correction and UI proposal, and withheld release permission.
+The dashboard now shows each rule's effective coverage and explains its saved
+scope in the editor. Eligible service choices preserve that boundary. Unavailable
+metadata preserves existing filters; failed/stale reads cannot undo confirmed saves.
+API/CLI/MCP expose the same opt-in read; default wire shapes stay compatible.
+
+Qualified: 5,250 tests in 653 files/112 coverage chunks, including 110 isolated
+PostgreSQL cases. Changed-source coverage, types, focused lint/format, candidate
+builds and the documentation build pass. One existing quote-sensitive discovery
+assertion was corrected and its complete coverage chunk rechecked successfully.
+No database migration, alert-policy or dependency change is needed.
+
+The final audit fixed overlapping list/save/delete handling and a stale list-limit
+refresh. Five new regressions pass; all 790 dashboard tests were requalified and
+coverage passes for all 24 changed source files. Packed CLI/MCP checks pass on
+Node 22/24/26, including older-server fallback; the packed shared schema imports
+correctly. Existing scopes, credentials and delivery behaviour remain preserved.
+
+Code is ready for release approval. The full marketplace train is not all-clear:
+a fresh read of ClawHub 1.19.4 still omits required antivirus evidence, so its
+acceptance gate remains open. Final release versions, exact-source CI, publication
+and post-deployment checks belong to the separately authorised release.
+
+No commit, push, production setting, notification test or release occurred.
+See `spec/alert-rule-scope-display.md` and `.tmp/alert-scope-fix-20261105/`.
+
+Approved follow-up: the agent credential creation action now uses the standard
+card-header position and plus icon. Its five existing management tests, full
+typecheck, focused lint/format and updated candidate builds pass. This layout-only
+follow-up remains local and unreleased; see `spec/agent-credential-button-alignment.md`.
+
 # Installation guidance release — published; external acceptance blocked
 
 5 November 2026. CLI/MCP/OpenClaw and the portable skill 1.19.4, Codex 1.5.1,

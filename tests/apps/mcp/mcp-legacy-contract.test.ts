@@ -45,6 +45,15 @@ function addOptionalProjectInputs(name: string, schema: unknown): void {
     update_github_dispatch_rule: { projectScope: scope },
     update_webhook: { projectScope: scope },
     update_alert: { projectScope: scope },
+    // FR-ALT-03 / AC-ALT-SCOPE: opt-in read metadata leaves every old call and
+    // default response unchanged. Keep the frozen fixture itself intact.
+    list_alerts: {
+      includeScope: {
+        type: "boolean",
+        description:
+          "Include saved origin/service scope and the selected service/environment filter."
+      }
+    },
     list_projects: { projectId: uuid },
     activate_probe: {
       sdkProjectId: uuid,

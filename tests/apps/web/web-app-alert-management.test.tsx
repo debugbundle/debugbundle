@@ -42,7 +42,10 @@ describe("alert management", () => {
         });
       }
 
-      if (url.endsWith("/v1/alerts?project_id=proj_123&limit=20") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/alerts?project_id=proj_123&limit=20&include_scope=true") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           alerts: [
             createAlert(),
@@ -90,7 +93,10 @@ describe("alert management", () => {
         });
       }
 
-      if (url.endsWith("/v1/alerts?project_id=proj_123&limit=20") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/alerts?project_id=proj_123&limit=20&include_scope=true") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           alerts: [createAlert()]
         });
@@ -141,7 +147,10 @@ describe("alert management", () => {
         });
       }
 
-      if (url.endsWith("/v1/alerts?project_id=proj_123&limit=20") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/alerts?project_id=proj_123&limit=20&include_scope=true") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           alerts: []
         });
@@ -234,7 +243,10 @@ describe("alert management", () => {
         });
       }
 
-      if (url.endsWith("/v1/alerts?project_id=proj_123&limit=20") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/alerts?project_id=proj_123&limit=20&include_scope=true") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           alerts: []
         });
@@ -271,7 +283,10 @@ describe("alert management", () => {
         });
       }
 
-      if (url.endsWith("/v1/alerts?project_id=proj_123&limit=20") && init?.method === undefined) {
+      if (
+        url.endsWith("/v1/alerts?project_id=proj_123&limit=20&include_scope=true") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, {
           alerts: [createAlert()]
         });

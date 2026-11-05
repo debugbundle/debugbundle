@@ -199,7 +199,11 @@ export const MCP_TOOL_CATALOG_OPERATIONS = [
     inputSchema: z.object({
       bearerToken: z.string(),
       projectId: z.string(),
-      limit: z.number().optional()
+      limit: z.number().optional(),
+      includeScope: z
+        .boolean()
+        .optional()
+        .describe("Include saved origin/service scope and the selected service/environment filter.")
     })
   },
   {

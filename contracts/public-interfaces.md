@@ -1628,7 +1628,25 @@ See `spec/notification-preferences.md` for inheritance, daily scheduling, suppre
 | GET    | `/v1/alert-groups`             | Browser Session or Member Token | List direct alert deliveries and email digest groups |
 | GET    | `/v1/alert-groups/{kind}/{id}` | Browser Session or Member Token | Inspect a group's incident members                   |
 
-**Query params (list alerts):** `project_id` (required UUID), `limit` (optional, integer 1-100, default 20)
+**Query params (list alerts):** `project_id` (required UUID), `limit` (optional, integer 1-100, default 20), `include_scope` (optional `true`/`false`, default `false`).
+
+**Opt-in rule scope:** `include_scope=true` adds nullable `scope` to each returned
+rule. Default list responses and create/update bodies keep their existing shapes
+for installed strict clients. The descriptor contains the saved `origin_project_ids`,
+`covers_current_project`, up to 100 allowed logical `services` (definition ID and
+current-view name), their full `service_count`, and a nullable `service_filter`
+(instance ID, definition ID, current-view name and environment). The allowed
+origin set is distinct from the selected service filter. Only an unfiltered rule
+covering the current view means all services. Missing/null scope means unavailable;
+a retained view cannot expose another origin through this descriptor.
+
+CLI `alert list --include-scope true --json`, typed-client `includeScope` and
+ordinary MCP `list_alerts.includeScope` request this same read projection. New
+clients may retry once without the option when a strict predecessor returns
+`400 invalid_query`; they never infer scope from the legacy response and never
+retry an access denial. Reads never widen scope. Mutation success is independent
+of a subsequent dashboard scope refresh; existing `project_scope` remains the
+separate explicit API/CLI/MCP widening option.
 
 **Alert group inspection:** Both routes require `project_id` (UUID) and accept `limit` (1–100, default 50) plus an opaque `cursor` returned as `next_cursor`. The detail path `kind` is `direct` or `email_digest`; `id` is a UUID from the list response. The list returns `{ groups, next_cursor }`; detail returns `{ group, members, next_cursor }`. Group fields are `group_id`, `kind`, `project_id`, nullable `alert_id` and `root_incident_id`, `channel`, `status`, `member_count`, `created_at`, and nullable `delivered_at`. Member fields are `incident_id`, `condition_type`, and `created_at`. The endpoints exclude recipient addresses, webhook URLs, stored payloads, raw log text, and provider errors. An unknown or cross-project group returns `404 group_not_found`; an invalid cursor returns `400 invalid_cursor`. Direct deliveries created before the membership migration show their root incident as a legacy single-member fallback. Member pages are ordered by creation time and UUID; each next cursor advances after the last returned row.
 
@@ -1739,7 +1757,7 @@ When updating channel-specific `config`, include the `channel` in the same reque
 }
 ```
 
-Current API implementation scope (Phase 10 alert CRUD slice):
+Current alert CRUD behavior:
 
 - `GET /v1/alerts` returns `200 { alerts: AlertRule[] }` for callers authorized on the target project.
 - `POST /v1/alerts` returns `201 { alert: AlertRule }`.
@@ -3209,7 +3227,7 @@ Analytics CLI commands are hosted/self-host API-backed commands. They require me
 ### 2.5 Alert Commands
 
 ```
-debugbundle alert list --project-id <id> [--limit <n>] [--auth-file <path>] [--json]
+debugbundle alert list --project-id <id> [--limit <n>] [--include-scope <true|false>] [--auth-file <path>] [--json]
 debugbundle alert groups --project-id <id> [--limit <n>] [--cursor <cursor>] [--auth-file <path>] [--json]
 debugbundle alert group <direct|email_digest> <group-id> --project-id <id> [--limit <n>] [--cursor <cursor>] [--auth-file <path>] [--json]
 debugbundle alert create --project-id <id> --channel <channel> --condition <condition> [--service-id <id>] [--severity-min <level>] [--cooldown <seconds>] --config-json <json> [--is-enabled <true|false>] [--auth-file <path>] [--json]
@@ -4125,7 +4143,6 @@ commands accept `--project-scope current_project`; ordinary MCP update tools use
 `projectScope: "current_project"`. Existing response keys, rule IDs, signing
 secrets, destination associations and delivery namespaces remain unchanged.
 
-
 ## Cloud artifact cache safety
 
 CLI, MCP and OpenClaw validate incident IDs before cloud incident URL dispatch
@@ -4136,7 +4153,6 @@ likewise return `invalid_improvement_id` / `invalid_project_id` before HTTP disp
 Cloud caches reject symbolic links, use bounded reads and guarded atomic writes,
 and retain unknown files during expiry pruning. A confirmed remote lifecycle
 mutation remains successful when optional cache synchronization fails.
-
 
 ## Retained local artifact safety
 

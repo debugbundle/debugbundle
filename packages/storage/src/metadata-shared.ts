@@ -3,6 +3,7 @@ import type { AccountAnalyticsStore } from "./account-analytics-store.js";
 import type { AlertRuleRecord, Queryable } from "./types.js";
 
 export function mapAlertRuleRow(row: {
+  scope?: AlertRuleRecord["scope"];
   alert_id: string;
   project_id: string;
   created_by_user_id: string;
@@ -18,6 +19,7 @@ export function mapAlertRuleRow(row: {
   updated_at: string;
 }): AlertRuleRecord {
   return {
+    ...(row.scope === undefined ? {} : { scope: row.scope }),
     alert_id: row.alert_id,
     project_id: row.project_id,
     created_by_user_id: row.created_by_user_id,

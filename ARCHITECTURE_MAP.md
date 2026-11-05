@@ -74,6 +74,16 @@ durable continuation; million-visit load testing is deferred by the owner.
 
 # ARCHITECTURE MAP — DebugBundle
 
+Local alert-scope correction: storage `alert-scope-projection.ts` resolves bounded
+accepted origin/service metadata in the requested view. `shared-types/alert-scope.ts`
+validates the descriptor; the existing alert API, typed client, CLI and ordinary
+MCP opt in without changing default response shapes or delivery matching. Web
+`alert-scope.ts` and `AlertScopeSummary` share table/editor labels; `AlertRulesTable`
+uses the existing table/actions. `AlertDeliveryFields` restricts instance choices
+to the accepted origins. Browser scope refreshes attach matching metadata only
+and never replace confirmed write fields. Local status is in
+`spec/alert-rule-scope-display.md`.
+
 Project/service consolidation shipped in core 1.21.0 and clients 1.19.1, tracked in
 `spec/project-service-consolidation.md`. Storage `service-definition-schema.ts`
 owns additive logical-service DDL, predecessor-writer linking and the ordered
@@ -1156,12 +1166,10 @@ explicit preset rebuild; valid legacy records remain compatible. Local summary
 formatting lives in `apps/cli/src/local-processing-summary.ts`; functional trace
 regressions and reusable processing fixtures are separate from general CLI cases.
 
-
 Cloud artifact safety: CLI/MCP/OpenClaw share incident-ID validation in
 `packages/retrieval-client` and the CLI cloud cache reuses
 `packages/agent-setup/src/files.ts` for symlink checks, bounded reads and guarded
 atomic writes. URL dispatch and cache side effects reject unsafe IDs first.
-
 
 Retained local artifact boundaries live in `apps/cli/src/local-artifact-paths.ts`.
 Retrieval, processing/rebuilds and cleanup validate canonical bundle/reproduction

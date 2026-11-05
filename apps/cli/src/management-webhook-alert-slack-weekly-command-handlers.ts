@@ -76,7 +76,13 @@ export async function handleAlertCommand(
   }
 
   if (action === "list") {
-    expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "project-id", "limit"]);
+    expectNoUnknownOptions(parsedArgv, [
+      "auth-file",
+      "json",
+      "project-id",
+      "limit",
+      "include-scope"
+    ]);
     ensureNoExtraPositionals(parsedArgv, 2);
 
     const projectId = readStringOption(parsedArgv, "project-id");
@@ -86,12 +92,20 @@ export async function handleAlertCommand(
 
     const input = appendCommonAuthOptions(parsedArgv, {
       projectId
-    } as { projectId: string; limit?: number; authFilePath?: string; json?: boolean });
+    } as {
+      projectId: string;
+      limit?: number;
+      includeScope?: boolean;
+      authFilePath?: string;
+      json?: boolean;
+    });
     const limit = readLimitOption(parsedArgv);
     if (limit !== undefined) {
       input.limit = limit;
     }
 
+    const includeScope = readBooleanStringOption(parsedArgv, "include-scope");
+    if (includeScope !== undefined) input.includeScope = includeScope;
     return await (dependencies.listAlertsCommand ?? defaultListAlertsCommand)(input);
   }
 

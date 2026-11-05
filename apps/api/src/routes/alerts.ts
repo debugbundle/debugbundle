@@ -96,14 +96,24 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
     const alerts = await dependencies.alertManagement.listAlertsForOrganization({
       organization_id: auth.access.organization_id,
       project_id: parsedQuery.data.project_id,
-      limit: parsedQuery.data.limit
+      limit: parsedQuery.data.limit,
+      ...(parsedQuery.data.include_scope === true ? { include_scope: true } : {})
     });
 
     if (alerts === null) {
       return reply.status(404).send({ error: "project_not_found" });
     }
 
-    return reply.status(200).send({ alerts });
+    // Installed strict clients must opt in before a new response field appears.
+    const records =
+      parsedQuery.data.include_scope === true
+        ? alerts
+        : alerts.map((alert) => {
+            const record = { ...alert };
+            delete record.scope;
+            return record;
+          });
+    return reply.status(200).send({ alerts: records });
   });
 
   app.post("/v1/alerts", async (request, reply) => {

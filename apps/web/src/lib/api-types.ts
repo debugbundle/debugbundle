@@ -577,6 +577,7 @@ export type AlertConditionType =
 export type AlertSeverityLifecycleScope = "new_incident" | "incident_regressed" | "both";
 
 export interface AlertRecord {
+  scope?: import("../../../../packages/shared-types/src/alert-scope.js").AlertScope | null;
   alert_id: string;
   project_id: string;
   created_by_user_id: string;

@@ -2,6 +2,45 @@ import { describe, expect, it, vi } from "vitest";
 import { createPostgresMetadataStore } from "../../../packages/storage/src/index.js";
 
 describe("postgres metadata alerts", () => {
+  it("returns requested scope metadata without changing the legacy alert shape", async () => {
+    const scope = {
+      origin_project_ids: ["00000000-0000-4000-8000-000000000001"],
+      covers_current_project: false,
+      services: [{ service_definition_id: "00000000-0000-4000-8000-000000000002", name: "Site" }],
+      service_count: 1,
+      service_filter: null
+    };
+    const row = {
+      alert_id: "alt_scope",
+      project_id: scope.origin_project_ids[0],
+      created_by_user_id: "owner",
+      service_id: null,
+      channel: "email",
+      condition_type: "new_incident",
+      severity_min: null,
+      severity_lifecycle_scope: null,
+      cooldown_seconds: 0,
+      config: { to: "owner@example.test" },
+      is_enabled: true,
+      created_at: "2026-11-05T00:00:00Z",
+      updated_at: "2026-11-05T00:00:00Z",
+      scope
+    };
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ id: "canonical" }] })
+      .mockResolvedValueOnce({ rows: [row] });
+    const store = createPostgresMetadataStore({ query });
+    const result = await store.listAlertsForOrganization({
+      organization_id: "org",
+      project_id: "canonical",
+      limit: 20,
+      include_scope: true
+    });
+    expect(result?.[0]?.scope).toEqual(scope);
+    expect(query.mock.calls[1]?.[0]).toContain("service_definitions");
+  });
+
   it("should list alerts for an in-scope project", async (): Promise<void> => {
     const query = vi
       .fn()
