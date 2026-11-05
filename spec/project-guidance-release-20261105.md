@@ -122,3 +122,20 @@ Full source CI 41940243633 completed all 111 shards; its only source test failur
 was the stale distribution-ledger pin, now corrected. Native Gemini jobs had only
 the earlier pre-publication npm ETARGET. The corrected candidate must pass the
 full suite and fresh external gates before this release is complete.
+
+## Hosted artifact generator correction
+
+Exact-source 1.19.4 CI passes 5,174 cases across 111 shards (including 103 actual
+Postgres cases), coverage and changed-source checks. Public native Codex 1.5.1,
+Claude Code 1.19.4, Gemini 1.4.4 and OpenClaw 1.19.4 checks pass. Core PR #12 merged
+normally at `e77cca52`, with a tree identical to qualified source `61555f74`.
+Site 1.7.2 source `cb8d67d1` passed source/release workflows and deployment
+41949806320; all guide-page/asset checks and production endpoint/alarms pass.
+
+The live llms.txt assertion then exposed the real hosted build path: core's
+`public-site-artifacts.ts` overwrote the corrected site-vendored copy. Its older
+MCP-first text contradicted the routing contract and omitted one-project guidance.
+An active generated-output contract reproduced the failure; correcting the core
+template and setup link makes production generation reproduce the approved copy.
+This changes the site generator only; published client artifacts remain immutable.
+A follow-up site rollout with the corrected core ref is required before closure.

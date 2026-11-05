@@ -113,3 +113,23 @@ describe("agent-independent interface routing", () => {
     expect(distributions.length).toBeGreaterThanOrEqual(4);
   });
 });
+
+it("keeps generated machine-readable setup guidance scoped to one project per system and prioritises the CLI", async () => {
+  const { buildMachineReadableArtifacts } = await import("../../scripts/public-site-artifacts.ts");
+  const artifact = (await buildMachineReadableArtifacts()).find(
+    (value) => value.routePath === "/llms.txt"
+  );
+  expect(artifact?.content).toContain(
+    "Prefer the CLI when available; use MCP when selected by the user or the CLI is unavailable."
+  );
+  expect(artifact?.content).toContain(
+    "Prefer one project per system, with services across repositories."
+  );
+  expect(artifact?.content).toContain(
+    "separate projects when access or privacy policies require it"
+  );
+  expect(artifact?.content).toContain(
+    "https://debugbundle.com/docs/project-setup/projects-and-services/"
+  );
+  expect(artifact?.content).not.toContain("Prefer MCP tools when the environment exposes");
+});

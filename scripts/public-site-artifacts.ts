@@ -1,21 +1,23 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-import { z } from 'zod';
-import { toInputJsonSchema } from '../packages/shared-types/src/json-schema.js';
+import { z } from "zod";
+import { toInputJsonSchema } from "../packages/shared-types/src/json-schema.js";
 
-
-import { buildPublicOpenApiSpec } from '../apps/api/src/openapi.js';
-import { ProfileSchema } from '../apps/cli/src/profile-validation.js';
-import { CLI_USAGE_LINES } from '../apps/cli/src/usage.js';
-import { MCP_TOOL_CATALOG } from '../apps/mcp/src/tool-catalog.js';
-import { BundleV1Schema } from '../packages/shared-types/src/index.js';
-import { WebhookEventPayloadSchema, WebhookEventTypeSchema } from '../packages/webhook-client/src/index.js';
+import { buildPublicOpenApiSpec } from "../apps/api/src/openapi.js";
+import { ProfileSchema } from "../apps/cli/src/profile-validation.js";
+import { CLI_USAGE_LINES } from "../apps/cli/src/usage.js";
+import { MCP_TOOL_CATALOG } from "../apps/mcp/src/tool-catalog.js";
+import { BundleV1Schema } from "../packages/shared-types/src/index.js";
+import {
+  WebhookEventPayloadSchema,
+  WebhookEventTypeSchema
+} from "../packages/webhook-client/src/index.js";
 
 type MachineReadableArtifact = {
   routePath: string;
-  contentType: 'application/json' | 'text/plain';
+  contentType: "application/json" | "text/plain";
   content: string;
 };
 
@@ -87,37 +89,37 @@ type ReferenceData = {
   errorReference: ErrorCodeReference;
 };
 
-const workspaceRoot = fileURLToPath(new URL('..', import.meta.url));
-const publicDirectory = join(workspaceRoot, 'site', 'public');
+const workspaceRoot = fileURLToPath(new URL("..", import.meta.url));
+const publicDirectory = join(workspaceRoot, "site", "public");
 const currentScriptPath = fileURLToPath(import.meta.url);
 
 const publicSiteConfig = {
-  domain: 'https://debugbundle.com',
-  appUrl: 'https://app.debugbundle.com',
-  docsHome: '/docs/',
+  domain: "https://debugbundle.com",
+  appUrl: "https://app.debugbundle.com",
+  docsHome: "/docs/"
 } as const;
 
 const securityLabelMap: Record<string, string> = {
-  browserSession: 'Browser session',
-  memberBearerToken: 'Member bearer token',
-  projectBearerToken: 'Project bearer token',
+  browserSession: "Browser session",
+  memberBearerToken: "Member bearer token",
+  projectBearerToken: "Project bearer token"
 };
 
 const mcpGroupLabels: Record<string, string> = {
-  alerts: 'Alerts',
-  analyze: 'Analyze',
-  health_checks: 'Health Checks',
-  projects: 'Projects',
-  retrieval: 'Retrieval',
-  services: 'Services',
-  setup: 'Setup',
-  tokens: 'Tokens',
-  webhooks: 'Webhooks',
-  weekly_reports: 'Weekly reports',
+  alerts: "Alerts",
+  analyze: "Analyze",
+  health_checks: "Health Checks",
+  projects: "Projects",
+  retrieval: "Retrieval",
+  services: "Services",
+  setup: "Setup",
+  tokens: "Tokens",
+  webhooks: "Webhooks",
+  weekly_reports: "Weekly reports"
 };
 
 function ensureTrailingNewline(content: string): string {
-  return content.endsWith('\n') ? content : `${content}\n`;
+  return content.endsWith("\n") ? content : `${content}\n`;
 }
 
 function withPublicSchemaMetadata(input: {
@@ -127,9 +129,9 @@ function withPublicSchemaMetadata(input: {
 }): JsonSchemaDocument {
   return {
     ...input.document,
-    $schema: 'https://json-schema.org/draft/2020-12/schema#',
+    $schema: "https://json-schema.org/draft/2020-12/schema#",
     $id: `https://debugbundle.com${input.routePath}`,
-    title: input.title,
+    title: input.title
   };
 }
 
@@ -145,42 +147,46 @@ function toPublicJsonSchema(input: {
   return withPublicSchemaMetadata({
     routePath: input.routePath,
     title: input.title,
-    document: toEmbeddedJsonSchema(input.schema),
+    document: toEmbeddedJsonSchema(input.schema)
   });
 }
 
 function toSchemaDefinitionName(toolName: string): string {
-  return `${toolName.replace(/[^a-zA-Z0-9]+/g, '_')}Arguments`;
+  return `${toolName.replace(/[^a-zA-Z0-9]+/g, "_")}Arguments`;
 }
 
 function buildMcpToolInvocationSchema(): JsonSchemaDocument {
   const definitions = Object.fromEntries(
-    MCP_TOOL_CATALOG.map((tool) => [toSchemaDefinitionName(tool.name), toEmbeddedJsonSchema(tool.inputSchema)]),
+    MCP_TOOL_CATALOG.map((tool) => [
+      toSchemaDefinitionName(tool.name),
+      toEmbeddedJsonSchema(tool.inputSchema)
+    ])
   );
 
   return withPublicSchemaMetadata({
-    routePath: '/schemas/mcp-tools.json',
-    title: 'DebugBundle MCP Tool Invocation Schema',
+    routePath: "/schemas/mcp-tools.json",
+    title: "DebugBundle MCP Tool Invocation Schema",
     document: {
-      description: 'Source-backed invocation schema for the MCP tools currently implemented in DebugBundle.',
-      type: 'object',
+      description:
+        "Source-backed invocation schema for the MCP tools currently implemented in DebugBundle.",
+      type: "object",
       oneOf: MCP_TOOL_CATALOG.map((tool) => ({
-        type: 'object',
+        type: "object",
         additionalProperties: false,
-        required: ['name', 'arguments'],
+        required: ["name", "arguments"],
         properties: {
           name: {
-            type: 'string',
+            type: "string",
             const: tool.name,
-            description: tool.description,
+            description: tool.description
           },
           arguments: {
-            $ref: `#/$defs/${toSchemaDefinitionName(tool.name)}`,
-          },
-        },
+            $ref: `#/$defs/${toSchemaDefinitionName(tool.name)}`
+          }
+        }
       })),
-      $defs: definitions,
-    },
+      $defs: definitions
+    }
   });
 }
 
@@ -195,153 +201,158 @@ function toMarkdownLink(label: string, href: string): string {
 function buildLlmsTxt(): string {
   return ensureTrailingNewline(
     [
-      '# DebugBundle',
-      '',
-      'DebugBundle provides runtime error reporting, crash reporting, incident response, endpoint health checks, and product analytics for humans and AI agents. It turns runtime failures and customer-facing product signals into deterministic evidence; it is not a generic infrastructure-monitoring platform.',
-      '',
-      `- ${toMarkdownLink('Primary documentation', toAbsoluteUrl(publicSiteConfig.docsHome))}`,
-      `- ${toMarkdownLink('DebugBundle app', publicSiteConfig.appUrl)}`,
-      '',
-      '## Start here',
-      `- ${toMarkdownLink('What is DebugBundle', toAbsoluteUrl('/docs/what-is-debugbundle/'))}`,
-      `- ${toMarkdownLink('Quickstart', toAbsoluteUrl('/docs/quickstart/'))}`,
-      `- ${toMarkdownLink('Installation', toAbsoluteUrl('/docs/installation/'))}`,
-      `- ${toMarkdownLink('How it works', toAbsoluteUrl('/docs/how-it-works/'))}`,
-      `- ${toMarkdownLink('Core concepts', toAbsoluteUrl('/docs/core-concepts/'))}`,
-      '',
-      '## Setup paths',
-      `- ${toMarkdownLink('Local-only mode', toAbsoluteUrl('/docs/project-setup/local-only/'))}`,
-      `- ${toMarkdownLink('Connect to Cloud', toAbsoluteUrl('/docs/project-setup/connect-to-cloud/'))}`,
-      `- ${toMarkdownLink('Project setup', toAbsoluteUrl('/docs/project-setup/'))}`,
-      `- ${toMarkdownLink('Profile configuration', toAbsoluteUrl('/docs/project-setup/profile/'))}`,
-      '',
-      '## Capture and integration docs',
-      `- ${toMarkdownLink('SDK overview', toAbsoluteUrl('/docs/sdks/'))}`,
-      `- ${toMarkdownLink('Node.js SDK', toAbsoluteUrl('/docs/sdks/node/'))}`,
-      `- ${toMarkdownLink('Browser SDK', toAbsoluteUrl('/docs/sdks/browser/'))}`,
-      `- ${toMarkdownLink('Browser relay', toAbsoluteUrl('/docs/sdks/browser-relay/'))}`,
-      `- ${toMarkdownLink('Python SDK', toAbsoluteUrl('/docs/sdks/python/'))}`,
-      `- ${toMarkdownLink('PHP SDK', toAbsoluteUrl('/docs/sdks/php/'))}`,
-      `- ${toMarkdownLink('Java SDK', toAbsoluteUrl('/docs/sdks/java/'))}`,
-      `- ${toMarkdownLink('.NET SDK', toAbsoluteUrl('/docs/sdks/dotnet/'))}`,
-      `- ${toMarkdownLink('Go SDK', toAbsoluteUrl('/docs/sdks/go/'))}`,
-      `- ${toMarkdownLink('Ruby SDK', toAbsoluteUrl('/docs/sdks/ruby/'))}`,
-      `- ${toMarkdownLink('Android SDK', toAbsoluteUrl('/docs/sdks/android/'))}`,
-      `- ${toMarkdownLink('iOS SDK', toAbsoluteUrl('/docs/sdks/swift/'))}`,
-      `- ${toMarkdownLink('React Native SDK', toAbsoluteUrl('/docs/sdks/react-native/'))}`,
-      `- ${toMarkdownLink('Universal SDK interface', toAbsoluteUrl('/docs/sdks/universal-interface/'))}`,
-      `- ${toMarkdownLink('WordPress integration', toAbsoluteUrl('/docs/integrations/wordpress/'))}`,
-      `- ${toMarkdownLink('Log ingestion', toAbsoluteUrl('/docs/cli/log-ingestion/'))}`,
-      '',
-      '## Interfaces',
-      `- ${toMarkdownLink('CLI overview', toAbsoluteUrl('/docs/cli/'))}`,
-      `- ${toMarkdownLink('CLI local workflow', toAbsoluteUrl('/docs/cli/local-workflow/'))}`,
-      `- ${toMarkdownLink('CLI cloud workflow', toAbsoluteUrl('/docs/cli/cloud-workflow/'))}`,
-      `- ${toMarkdownLink('API overview', toAbsoluteUrl('/docs/api/'))}`,
-      `- ${toMarkdownLink('MCP overview', toAbsoluteUrl('/docs/mcp/'))}`,
-      `- ${toMarkdownLink('OpenAI Plugin candidate', toAbsoluteUrl('/docs/mcp/openai-plugin/'))}`,
-      `- ${toMarkdownLink('MCP tools', toAbsoluteUrl('/docs/mcp/tools/'))}`,
-      `- ${toMarkdownLink('AnalyticsBundle', toAbsoluteUrl('/docs/analytics/'))}`,
-      `- ${toMarkdownLink('AnalyticsBundle privacy', toAbsoluteUrl('/docs/analytics/privacy/'))}`,
-      `- ${toMarkdownLink('Self-hosted AnalyticsBundle', toAbsoluteUrl('/docs/analytics/self-hosting/'))}`,
-      `- ${toMarkdownLink('AnalyticsBundle CLI', toAbsoluteUrl('/docs/cli/analytics/'))}`,
-      `- ${toMarkdownLink('AnalyticsBundle API', toAbsoluteUrl('/docs/api/analytics/'))}`,
-      '',
-      '## Bundles, automation, and operations',
-      `- ${toMarkdownLink('Bundles', toAbsoluteUrl('/docs/bundles/'))}`,
-      `- ${toMarkdownLink('Improvement bundles', toAbsoluteUrl('/docs/bundles/improvement-bundles/'))}`,
-      `- ${toMarkdownLink('Incidents', toAbsoluteUrl('/docs/incidents/'))}`,
-      `- ${toMarkdownLink('Reproduction artifacts', toAbsoluteUrl('/docs/incidents/reproduction/'))}`,
-      `- ${toMarkdownLink('Availability checks', toAbsoluteUrl('/docs/availability-checks/'))}`,
-      `- ${toMarkdownLink('Probes', toAbsoluteUrl('/docs/probes/'))}`,
-      `- ${toMarkdownLink('Webhooks', toAbsoluteUrl('/docs/webhooks/'))}`,
-      `- ${toMarkdownLink('Webhook events', toAbsoluteUrl('/docs/webhooks/events/'))}`,
-      `- ${toMarkdownLink('Alerts', toAbsoluteUrl('/docs/alerts/'))}`,
-      `- ${toMarkdownLink('GitHub automation', toAbsoluteUrl('/docs/agent-workflows/automation-recipes/'))}`,
-      `- ${toMarkdownLink('Agent workflows', toAbsoluteUrl('/docs/agent-workflows/'))}`,
-      `- ${toMarkdownLink('Agent skill file', toAbsoluteUrl('/docs/agent-workflows/skill-file/'))}`,
-      '',
-      '## Generated reference',
-      `- ${toMarkdownLink('Reference index', toAbsoluteUrl('/docs/v1/reference/'))}`,
-      `- ${toMarkdownLink('API endpoints', toAbsoluteUrl('/docs/v1/reference/api-endpoints/'))}`,
-      `- ${toMarkdownLink('CLI commands', toAbsoluteUrl('/docs/v1/reference/cli-commands/'))}`,
-      `- ${toMarkdownLink('MCP tools reference', toAbsoluteUrl('/docs/v1/reference/mcp-tools/'))}`,
-      `- ${toMarkdownLink('Webhook events reference', toAbsoluteUrl('/docs/v1/reference/webhook-events/'))}`,
-      `- ${toMarkdownLink('Bundle schema reference', toAbsoluteUrl('/docs/v1/reference/bundle-schema/'))}`,
-      `- ${toMarkdownLink('Profile schema reference', toAbsoluteUrl('/docs/v1/reference/profile-schema/'))}`,
-      `- ${toMarkdownLink('Error codes', toAbsoluteUrl('/docs/v1/reference/error-codes/'))}`,
-      '',
-      '## Machine-readable artifacts',
-      `- ${toMarkdownLink('OpenAPI', toAbsoluteUrl('/openapi.json'))}`,
-      `- ${toMarkdownLink('Bundle schema', toAbsoluteUrl('/schemas/bundle.json'))}`,
-      `- ${toMarkdownLink('Profile schema', toAbsoluteUrl('/schemas/profile.json'))}`,
-      `- ${toMarkdownLink('Webhook events schema', toAbsoluteUrl('/schemas/webhook-events.json'))}`,
-      `- ${toMarkdownLink('MCP tools schema', toAbsoluteUrl('/schemas/mcp-tools.json'))}`,
-      '',
-      '## Examples',
-      `- ${toMarkdownLink('Failure bundle example', toAbsoluteUrl('/examples/bundle.failure.json'))}`,
-      `- ${toMarkdownLink('Improvement bundle example', toAbsoluteUrl('/examples/bundle.improvement.json'))}`,
-      '',
-      '## Agent guidance',
-      '- Prefer MCP tools when the environment exposes the DebugBundle MCP server.',
-      '- Prefer the CLI for local-only projects or repositories with a .debugbundle directory.',
-      '- Use the API and generated reference pages for custom automation.',
-      '- Use the browser relay path when adding browser capture to projects with a backend.',
-    ].join('\n'),
+      "# DebugBundle",
+      "",
+      "DebugBundle provides runtime error reporting, crash reporting, incident response, endpoint health checks, and product analytics for humans and AI agents. It turns runtime failures and customer-facing product signals into deterministic evidence; it is not a generic infrastructure-monitoring platform.",
+      "",
+      `- ${toMarkdownLink("Primary documentation", toAbsoluteUrl(publicSiteConfig.docsHome))}`,
+      `- ${toMarkdownLink("DebugBundle app", publicSiteConfig.appUrl)}`,
+      "",
+      "## Start here",
+      `- ${toMarkdownLink("What is DebugBundle", toAbsoluteUrl("/docs/what-is-debugbundle/"))}`,
+      `- ${toMarkdownLink("Quickstart", toAbsoluteUrl("/docs/quickstart/"))}`,
+      `- ${toMarkdownLink("Installation", toAbsoluteUrl("/docs/installation/"))}`,
+      `- ${toMarkdownLink("How it works", toAbsoluteUrl("/docs/how-it-works/"))}`,
+      `- ${toMarkdownLink("Core concepts", toAbsoluteUrl("/docs/core-concepts/"))}`,
+      "",
+      "## Setup paths",
+      `- ${toMarkdownLink("Local-only mode", toAbsoluteUrl("/docs/project-setup/local-only/"))}`,
+      `- ${toMarkdownLink("Connect to Cloud", toAbsoluteUrl("/docs/project-setup/connect-to-cloud/"))}`,
+      `- ${toMarkdownLink("Project setup", toAbsoluteUrl("/docs/project-setup/"))}`,
+      `- ${toMarkdownLink("Projects and services", toAbsoluteUrl("/docs/project-setup/projects-and-services/"))}`,
+      `- ${toMarkdownLink("Profile configuration", toAbsoluteUrl("/docs/project-setup/profile/"))}`,
+      "",
+      "## Capture and integration docs",
+      `- ${toMarkdownLink("SDK overview", toAbsoluteUrl("/docs/sdks/"))}`,
+      `- ${toMarkdownLink("Node.js SDK", toAbsoluteUrl("/docs/sdks/node/"))}`,
+      `- ${toMarkdownLink("Browser SDK", toAbsoluteUrl("/docs/sdks/browser/"))}`,
+      `- ${toMarkdownLink("Browser relay", toAbsoluteUrl("/docs/sdks/browser-relay/"))}`,
+      `- ${toMarkdownLink("Python SDK", toAbsoluteUrl("/docs/sdks/python/"))}`,
+      `- ${toMarkdownLink("PHP SDK", toAbsoluteUrl("/docs/sdks/php/"))}`,
+      `- ${toMarkdownLink("Java SDK", toAbsoluteUrl("/docs/sdks/java/"))}`,
+      `- ${toMarkdownLink(".NET SDK", toAbsoluteUrl("/docs/sdks/dotnet/"))}`,
+      `- ${toMarkdownLink("Go SDK", toAbsoluteUrl("/docs/sdks/go/"))}`,
+      `- ${toMarkdownLink("Ruby SDK", toAbsoluteUrl("/docs/sdks/ruby/"))}`,
+      `- ${toMarkdownLink("Android SDK", toAbsoluteUrl("/docs/sdks/android/"))}`,
+      `- ${toMarkdownLink("iOS SDK", toAbsoluteUrl("/docs/sdks/swift/"))}`,
+      `- ${toMarkdownLink("React Native SDK", toAbsoluteUrl("/docs/sdks/react-native/"))}`,
+      `- ${toMarkdownLink("Universal SDK interface", toAbsoluteUrl("/docs/sdks/universal-interface/"))}`,
+      `- ${toMarkdownLink("WordPress integration", toAbsoluteUrl("/docs/integrations/wordpress/"))}`,
+      `- ${toMarkdownLink("Log ingestion", toAbsoluteUrl("/docs/cli/log-ingestion/"))}`,
+      "",
+      "## Interfaces",
+      `- ${toMarkdownLink("CLI overview", toAbsoluteUrl("/docs/cli/"))}`,
+      `- ${toMarkdownLink("CLI local workflow", toAbsoluteUrl("/docs/cli/local-workflow/"))}`,
+      `- ${toMarkdownLink("CLI cloud workflow", toAbsoluteUrl("/docs/cli/cloud-workflow/"))}`,
+      `- ${toMarkdownLink("API overview", toAbsoluteUrl("/docs/api/"))}`,
+      `- ${toMarkdownLink("MCP overview", toAbsoluteUrl("/docs/mcp/"))}`,
+      `- ${toMarkdownLink("OpenAI Plugin candidate", toAbsoluteUrl("/docs/mcp/openai-plugin/"))}`,
+      `- ${toMarkdownLink("MCP tools", toAbsoluteUrl("/docs/mcp/tools/"))}`,
+      `- ${toMarkdownLink("AnalyticsBundle", toAbsoluteUrl("/docs/analytics/"))}`,
+      `- ${toMarkdownLink("AnalyticsBundle privacy", toAbsoluteUrl("/docs/analytics/privacy/"))}`,
+      `- ${toMarkdownLink("Self-hosted AnalyticsBundle", toAbsoluteUrl("/docs/analytics/self-hosting/"))}`,
+      `- ${toMarkdownLink("AnalyticsBundle CLI", toAbsoluteUrl("/docs/cli/analytics/"))}`,
+      `- ${toMarkdownLink("AnalyticsBundle API", toAbsoluteUrl("/docs/api/analytics/"))}`,
+      "",
+      "## Bundles, automation, and operations",
+      `- ${toMarkdownLink("Bundles", toAbsoluteUrl("/docs/bundles/"))}`,
+      `- ${toMarkdownLink("Improvement bundles", toAbsoluteUrl("/docs/bundles/improvement-bundles/"))}`,
+      `- ${toMarkdownLink("Incidents", toAbsoluteUrl("/docs/incidents/"))}`,
+      `- ${toMarkdownLink("Reproduction artifacts", toAbsoluteUrl("/docs/incidents/reproduction/"))}`,
+      `- ${toMarkdownLink("Availability checks", toAbsoluteUrl("/docs/availability-checks/"))}`,
+      `- ${toMarkdownLink("Probes", toAbsoluteUrl("/docs/probes/"))}`,
+      `- ${toMarkdownLink("Webhooks", toAbsoluteUrl("/docs/webhooks/"))}`,
+      `- ${toMarkdownLink("Webhook events", toAbsoluteUrl("/docs/webhooks/events/"))}`,
+      `- ${toMarkdownLink("Alerts", toAbsoluteUrl("/docs/alerts/"))}`,
+      `- ${toMarkdownLink("GitHub automation", toAbsoluteUrl("/docs/agent-workflows/automation-recipes/"))}`,
+      `- ${toMarkdownLink("Agent workflows", toAbsoluteUrl("/docs/agent-workflows/"))}`,
+      `- ${toMarkdownLink("Agent skill file", toAbsoluteUrl("/docs/agent-workflows/skill-file/"))}`,
+      "",
+      "## Generated reference",
+      `- ${toMarkdownLink("Reference index", toAbsoluteUrl("/docs/v1/reference/"))}`,
+      `- ${toMarkdownLink("API endpoints", toAbsoluteUrl("/docs/v1/reference/api-endpoints/"))}`,
+      `- ${toMarkdownLink("CLI commands", toAbsoluteUrl("/docs/v1/reference/cli-commands/"))}`,
+      `- ${toMarkdownLink("MCP tools reference", toAbsoluteUrl("/docs/v1/reference/mcp-tools/"))}`,
+      `- ${toMarkdownLink("Webhook events reference", toAbsoluteUrl("/docs/v1/reference/webhook-events/"))}`,
+      `- ${toMarkdownLink("Bundle schema reference", toAbsoluteUrl("/docs/v1/reference/bundle-schema/"))}`,
+      `- ${toMarkdownLink("Profile schema reference", toAbsoluteUrl("/docs/v1/reference/profile-schema/"))}`,
+      `- ${toMarkdownLink("Error codes", toAbsoluteUrl("/docs/v1/reference/error-codes/"))}`,
+      "",
+      "## Machine-readable artifacts",
+      `- ${toMarkdownLink("OpenAPI", toAbsoluteUrl("/openapi.json"))}`,
+      `- ${toMarkdownLink("Bundle schema", toAbsoluteUrl("/schemas/bundle.json"))}`,
+      `- ${toMarkdownLink("Profile schema", toAbsoluteUrl("/schemas/profile.json"))}`,
+      `- ${toMarkdownLink("Webhook events schema", toAbsoluteUrl("/schemas/webhook-events.json"))}`,
+      `- ${toMarkdownLink("MCP tools schema", toAbsoluteUrl("/schemas/mcp-tools.json"))}`,
+      "",
+      "## Examples",
+      `- ${toMarkdownLink("Failure bundle example", toAbsoluteUrl("/examples/bundle.failure.json"))}`,
+      `- ${toMarkdownLink("Improvement bundle example", toAbsoluteUrl("/examples/bundle.improvement.json"))}`,
+      "",
+      "## Agent guidance",
+      "- Prefer the CLI when available; use MCP when selected by the user or the CLI is unavailable.",
+      "- Prefer one project per system, with services across repositories. Reuse existing connections/projects; separate projects when access or privacy policies require it. Merge existing projects only with approval.",
+      "- Use the API and generated reference pages for custom automation.",
+      "- Use the browser relay path when adding browser capture to projects with a backend."
+    ].join("\n")
   );
 }
 
 async function readExampleBundle(fileName: string): Promise<string> {
-  return readFile(join(workspaceRoot, 'examples', fileName), 'utf8');
+  return readFile(join(workspaceRoot, "examples", fileName), "utf8");
 }
 
 function toTitleCase(value: string): string {
   return value
-    .split('_')
+    .split("_")
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-    .join(' ');
+    .join(" ");
 }
 
 function sortMethods(left: string, right: string): number {
-  const order = ['get', 'post', 'patch', 'delete'];
+  const order = ["get", "post", "patch", "delete"];
   return order.indexOf(left) - order.indexOf(right);
 }
 
 function getCommandPathFromUsage(usage: string): string {
-  const tokens = usage.replace(/^debugbundle\s+/, '').split(/\s+/);
+  const tokens = usage.replace(/^debugbundle\s+/, "").split(/\s+/);
   const commandTokens: string[] = [];
 
   for (const token of tokens) {
-    if (token.startsWith('<') || token.startsWith('[') || token.startsWith('--')) {
+    if (token.startsWith("<") || token.startsWith("[") || token.startsWith("--")) {
       break;
     }
     commandTokens.push(token);
   }
 
-  return commandTokens.join(' ');
+  return commandTokens.join(" ");
 }
 
 function buildApiReferenceEntries(): ApiReferenceEntry[] {
   const document = buildPublicOpenApiSpec() as OpenApiDocument;
   const entries: ApiReferenceEntry[] = [];
 
-  for (const [path, methods] of Object.entries(document.paths ?? {}).sort(([left], [right]) => left.localeCompare(right))) {
-    for (const [method, operation] of Object.entries(methods).sort(([left], [right]) => sortMethods(left, right))) {
+  for (const [path, methods] of Object.entries(document.paths ?? {}).sort(([left], [right]) =>
+    left.localeCompare(right)
+  )) {
+    for (const [method, operation] of Object.entries(methods).sort(([left], [right]) =>
+      sortMethods(left, right)
+    )) {
       const auth = Array.from(
         new Set(
           (operation.security ?? [])
             .flatMap((requirement) => Object.keys(requirement))
-            .map((key) => securityLabelMap[key] ?? toTitleCase(key)),
-        ),
+            .map((key) => securityLabelMap[key] ?? toTitleCase(key))
+        )
       );
 
       entries.push({
         method: method.toUpperCase(),
         path,
         operationId: operation.operationId ?? `${method}:${path}`,
-        summary: operation.summary ?? operation.operationId ?? 'Undocumented operation',
+        summary: operation.summary ?? operation.operationId ?? "Undocumented operation",
         tags: operation.tags ?? [],
-        auth: auth.length > 0 ? auth : ['Public'],
+        auth: auth.length > 0 ? auth : ["Public"]
       });
     }
   }
@@ -350,14 +361,14 @@ function buildApiReferenceEntries(): ApiReferenceEntry[] {
 }
 
 function buildCliReferenceEntries(): CliReferenceEntry[] {
-  return CLI_USAGE_LINES.filter((line) => line.startsWith('  debugbundle ')).map((line) => {
+  return CLI_USAGE_LINES.filter((line) => line.startsWith("  debugbundle ")).map((line) => {
     const usage = line.trim();
     const commandPath = getCommandPathFromUsage(usage);
 
     return {
       commandPath,
       usage,
-      group: commandPath.split(' ')[0] ?? 'general',
+      group: commandPath.split(" ")[0] ?? "general"
     };
   });
 }
@@ -379,7 +390,7 @@ function buildMcpToolReferenceGroups(): McpToolReferenceGroup[] {
       name: tool.name,
       description: tool.description,
       requiredArguments,
-      optionalArguments: argumentNames.filter((key) => !requiredArguments.includes(key)),
+      optionalArguments: argumentNames.filter((key) => !requiredArguments.includes(key))
     });
     groups.set(tool.group, currentTools);
   }
@@ -387,45 +398,45 @@ function buildMcpToolReferenceGroups(): McpToolReferenceGroup[] {
   return Array.from(groups.entries()).map(([group, tools]) => ({
     group,
     label: mcpGroupLabels[group] ?? toTitleCase(group),
-    tools: tools.sort((left, right) => left.name.localeCompare(right.name)),
+    tools: tools.sort((left, right) => left.name.localeCompare(right.name))
   }));
 }
 
-function buildWebhookReference(): ReferenceData['webhookReference'] {
+function buildWebhookReference(): ReferenceData["webhookReference"] {
   return {
     eventTypes: [...WebhookEventTypeSchema.options],
-    schemaPath: '/schemas/webhook-events.json',
-    overviewPath: '/docs/v1/webhooks/',
+    schemaPath: "/schemas/webhook-events.json",
+    overviewPath: "/docs/v1/webhooks/"
   };
 }
 
 function buildSchemaReferenceLinks(): SchemaReferenceLink[] {
   return [
     {
-      title: 'Bundle schema',
-      href: '/schemas/bundle.json',
-      description: 'The published JSON Schema for bundle artifacts.',
+      title: "Bundle schema",
+      href: "/schemas/bundle.json",
+      description: "The published JSON Schema for bundle artifacts."
     },
     {
-      title: 'Profile schema',
-      href: '/schemas/profile.json',
-      description: 'The published JSON Schema for repository profile files.',
+      title: "Profile schema",
+      href: "/schemas/profile.json",
+      description: "The published JSON Schema for repository profile files."
     },
     {
-      title: 'Failure bundle example',
-      href: '/examples/bundle.failure.json',
-      description: 'A schema-valid failure bundle example artifact.',
+      title: "Failure bundle example",
+      href: "/examples/bundle.failure.json",
+      description: "A schema-valid failure bundle example artifact."
     },
     {
-      title: 'Improvement bundle example',
-      href: '/examples/bundle.improvement.json',
-      description: 'A schema-valid improvement bundle example artifact.',
-    },
+      title: "Improvement bundle example",
+      href: "/examples/bundle.improvement.json",
+      description: "A schema-valid improvement bundle example artifact."
+    }
   ];
 }
 
 async function buildErrorCodeReference(): Promise<ErrorCodeReference> {
-  const contract = await readFile(join(workspaceRoot, 'contracts', 'public-interfaces.md'), 'utf8');
+  const contract = await readFile(join(workspaceRoot, "contracts", "public-interfaces.md"), "utf8");
   const codes = new Map<string, Set<string>>();
   const errorCodePattern = /`(\d{3}) \{ "error": "([^"]+)" \}`/g;
   let match = errorCodePattern.exec(contract);
@@ -447,108 +458,112 @@ async function buildErrorCodeReference(): Promise<ErrorCodeReference> {
     codes: Array.from(codes.entries())
       .map(([code, statusCodes]) => ({ code, statusCodes: Array.from(statusCodes).sort() }))
       .sort((left, right) => left.code.localeCompare(right.code)),
-    categories: categoriesMatch?.[1] ? categoriesMatch[1].split(',').map((value) => value.trim()) : [],
+    categories: categoriesMatch?.[1]
+      ? categoriesMatch[1].split(",").map((value) => value.trim())
+      : []
   };
 }
 
 export async function buildMachineReadableArtifacts(): Promise<MachineReadableArtifact[]> {
   const [failureBundle, improvementBundle, license] = await Promise.all([
-    readExampleBundle('bundle.failure.json'),
-    readExampleBundle('bundle.improvement.json'),
-    readFile(join(workspaceRoot, 'LICENSE'), 'utf8'),
+    readExampleBundle("bundle.failure.json"),
+    readExampleBundle("bundle.improvement.json"),
+    readFile(join(workspaceRoot, "LICENSE"), "utf8")
   ]);
 
   return [
     {
-      routePath: '/licenses/apache-2.0.txt',
-      contentType: 'text/plain',
-      content: license,
+      routePath: "/licenses/apache-2.0.txt",
+      contentType: "text/plain",
+      content: license
     },
     {
-      routePath: '/llms.txt',
-      contentType: 'text/plain',
-      content: buildLlmsTxt(),
+      routePath: "/llms.txt",
+      contentType: "text/plain",
+      content: buildLlmsTxt()
     },
     {
-      routePath: '/openapi.json',
-      contentType: 'application/json',
-      content: ensureTrailingNewline(JSON.stringify(buildPublicOpenApiSpec(), null, 2)),
+      routePath: "/openapi.json",
+      contentType: "application/json",
+      content: ensureTrailingNewline(JSON.stringify(buildPublicOpenApiSpec(), null, 2))
     },
     {
-      routePath: '/schemas/bundle.json',
-      contentType: 'application/json',
+      routePath: "/schemas/bundle.json",
+      contentType: "application/json",
       content: ensureTrailingNewline(
         JSON.stringify(
           toPublicJsonSchema({
-            routePath: '/schemas/bundle.json',
-            title: 'DebugBundle Bundle v1 Schema',
-            schema: BundleV1Schema,
+            routePath: "/schemas/bundle.json",
+            title: "DebugBundle Bundle v1 Schema",
+            schema: BundleV1Schema
           }),
           null,
-          2,
-        ),
-      ),
+          2
+        )
+      )
     },
     {
-      routePath: '/schemas/profile.json',
-      contentType: 'application/json',
+      routePath: "/schemas/profile.json",
+      contentType: "application/json",
       content: ensureTrailingNewline(
         JSON.stringify(
           toPublicJsonSchema({
-            routePath: '/schemas/profile.json',
-            title: 'DebugBundle Repository Profile Schema',
-            schema: ProfileSchema,
+            routePath: "/schemas/profile.json",
+            title: "DebugBundle Repository Profile Schema",
+            schema: ProfileSchema
           }),
           null,
-          2,
-        ),
-      ),
+          2
+        )
+      )
     },
     {
-      routePath: '/schemas/webhook-events.json',
-      contentType: 'application/json',
+      routePath: "/schemas/webhook-events.json",
+      contentType: "application/json",
       content: ensureTrailingNewline(
         JSON.stringify(
           toPublicJsonSchema({
-            routePath: '/schemas/webhook-events.json',
-            title: 'DebugBundle Webhook Event Payload Schema',
-            schema: WebhookEventPayloadSchema,
+            routePath: "/schemas/webhook-events.json",
+            title: "DebugBundle Webhook Event Payload Schema",
+            schema: WebhookEventPayloadSchema
           }),
           null,
-          2,
-        ),
-      ),
+          2
+        )
+      )
     },
     {
-      routePath: '/schemas/mcp-tools.json',
-      contentType: 'application/json',
-      content: ensureTrailingNewline(JSON.stringify(buildMcpToolInvocationSchema(), null, 2)),
+      routePath: "/schemas/mcp-tools.json",
+      contentType: "application/json",
+      content: ensureTrailingNewline(JSON.stringify(buildMcpToolInvocationSchema(), null, 2))
     },
     {
-      routePath: '/examples/bundle.failure.json',
-      contentType: 'application/json',
-      content: ensureTrailingNewline(failureBundle),
+      routePath: "/examples/bundle.failure.json",
+      contentType: "application/json",
+      content: ensureTrailingNewline(failureBundle)
     },
     {
-      routePath: '/examples/bundle.improvement.json',
-      contentType: 'application/json',
-      content: ensureTrailingNewline(improvementBundle),
-    },
+      routePath: "/examples/bundle.improvement.json",
+      contentType: "application/json",
+      content: ensureTrailingNewline(improvementBundle)
+    }
   ];
 }
 
-export async function writeMachineReadableArtifacts(outputDirectory: string = publicDirectory): Promise<void> {
+export async function writeMachineReadableArtifacts(
+  outputDirectory: string = publicDirectory
+): Promise<void> {
   const artifacts = await buildMachineReadableArtifacts();
 
   for (const artifact of artifacts) {
-    const outputPath = join(outputDirectory, artifact.routePath.replace(/^\//, ''));
+    const outputPath = join(outputDirectory, artifact.routePath.replace(/^\//, ""));
     await mkdir(dirname(outputPath), { recursive: true });
-    await writeFile(outputPath, artifact.content, 'utf8');
+    await writeFile(outputPath, artifact.content, "utf8");
   }
 }
 
 async function readWorkspacePackageVersion(): Promise<string> {
-  const raw = await readFile(join(workspaceRoot, 'package.json'), 'utf8');
+  const raw = await readFile(join(workspaceRoot, "package.json"), "utf8");
   const parsed = z.object({ version: z.string().min(1) }).parse(JSON.parse(raw));
   return parsed.version;
 }
@@ -556,21 +571,23 @@ async function readWorkspacePackageVersion(): Promise<string> {
 export async function buildReferenceData(): Promise<ReferenceData> {
   return {
     release: {
-      coreVersion: await readWorkspacePackageVersion(),
+      coreVersion: await readWorkspacePackageVersion()
     },
     apiEntries: buildApiReferenceEntries(),
     cliEntries: buildCliReferenceEntries(),
     mcpGroups: buildMcpToolReferenceGroups(),
     webhookReference: buildWebhookReference(),
     schemaLinks: buildSchemaReferenceLinks(),
-    errorReference: await buildErrorCodeReference(),
+    errorReference: await buildErrorCodeReference()
   };
 }
 
-export async function writeReferenceData(outputPath: string = join(publicDirectory, 'reference-data.json')): Promise<void> {
+export async function writeReferenceData(
+  outputPath: string = join(publicDirectory, "reference-data.json")
+): Promise<void> {
   const data = await buildReferenceData();
   await mkdir(dirname(outputPath), { recursive: true });
-  await writeFile(outputPath, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+  await writeFile(outputPath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
 }
 
 async function main(): Promise<void> {

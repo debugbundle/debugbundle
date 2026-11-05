@@ -1,3 +1,15 @@
+# Hosted machine-readable guidance correction — in progress
+
+5 November 2026. Exact-source CLI/MCP/OpenClaw 1.19.4 passes 5,174 tests across
+111 shards, all package/public-client gates and the normal public Codex/Claude/
+Gemini/OpenClaw installs. Site 1.7.2 deployed successfully; ten guide pages and
+six assets match origin bytes. Live llms.txt verification caught a production
+build template overwriting the corrected vendored text with older interface
+priorities and no one-project default. The core generator is corrected and an
+active cross-agent regression first failed, then passed; regenerate before build.
+A corrected exact-ref site rollout and the portable skill's antivirus completion
+remain required. App/API checks and all eight alarms pass; no consumer change.
+
 # Installation guidance follow-up — release authorised, in progress
 
 5 November 2026. FR-PJS-01 / AC-PJS-03 now explicitly default installation to one

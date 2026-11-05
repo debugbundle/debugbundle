@@ -861,3 +861,5 @@ Retained local artifact boundaries live in `apps/cli/src/local-artifact-paths.ts
 Retrieval, processing/rebuilds and cleanup validate canonical bundle/reproduction
 metadata and reject symbolic links. Local state/event IO reuses managed file
 helpers with allocation bounded to the opened file and atomic state/processing writes.
+
+Hosted `llms.txt` is rendered by the core `scripts/public-site-artifacts.ts` generator before site export. Its CLI-first, one-project-per-system policy is covered by the active agent-interface contract; editing only the vendored site file is insufficient.

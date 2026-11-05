@@ -1,6 +1,6 @@
 # Agent interface routing contract
 
-Applies to FR-MCP-16 and AC-MCP-CLI-HANDOFF. This is a cross-agent contract for the canonical generated project skill and all DebugBundle plugin/portable skills, including Codex, Claude Code, Gemini CLI, the OpenAI plugin, and ClawHub/Smithery/OpenClaw. Future Muse or other agent plugins must implement the same policy before release; agent-aware setup support alone does not imply a dedicated plugin exists.
+Applies to FR-MCP-16 and AC-MCP-CLI-HANDOFF. This is a cross-agent contract for hosted generated `llms.txt`, the canonical generated project skill and all DebugBundle plugin/portable skills, including Codex, Claude Code, Gemini CLI, the OpenAI plugin, and ClawHub/Smithery/OpenClaw. Future Muse or other agent plugins must implement the same policy before release; agent-aware setup support alone does not imply a dedicated plugin exists.
 
 ## Primary interface and fallbacks
 
