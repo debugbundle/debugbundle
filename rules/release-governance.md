@@ -202,14 +202,15 @@ Every standalone SDK repository must adopt the same release-hardening pattern be
 
 ### CocoaPods Trunk Transition — Mobile Release Preflight
 
-Before planning the next release, review the pending
+Before planning an affected release, review the current
 [CocoaPods transition checklist](../spec/cocoapods-trunk-transition.md).
 The provider announces read-only testing on 2–6 November 2026 and permanent
 read-only on 2 December 2026; refresh the schedule before an affected release.
-Existing specs remain available. Swift already supports SPM, but React Native's
-native Swift dependency still resolves through CocoaPods Trunk.
+Existing specs remain available. Swift supports SPM and Git-tag pods; React
+Native retains compatible Trunk installs and offers the supported Git native
+source through bare Podfiles and its Expo config plugin.
 
-For the next Swift/React Native release, qualify a native installation source
+For each Swift/React Native release, qualify the exact native installation source
 independent of new Trunk writes and adapt release automation without weakening
 tests or published-consumer gates. Never report a denied Trunk publication as a
 successful publication. Record the supported channel and exact artifact evidence

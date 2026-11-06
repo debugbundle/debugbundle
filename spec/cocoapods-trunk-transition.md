@@ -1,7 +1,8 @@
-# CocoaPods Trunk transition — next mobile release
+# CocoaPods distribution — qualified Git transition
 
 Recorded: 2026-11-02; provider schedule refreshed: 2026-11-06
-Status: release preparation required; migration not implemented or qualified.
+Status: complete for Swift 3.1.2 and React Native 3.1.1. Public SPM, Git-pod,
+bare RN and Expo runtime gates pass; Trunk remains an explicitly separate channel.
 
 ## Trigger and scope
 
@@ -55,11 +56,11 @@ Complete transition preparation before the next affected mobile SDK release,
 targeting completion before the announced permanent freeze. Keep each item open
 until its implementation and evidence exist.
 
-- [ ] **Refresh the candidate inventory.** Record the release date, exact Swift/RN
+- [x] **Refresh the candidate inventory.** Record the release date, exact Swift/RN
       versions, native dependency floors, provider schedule and supported install
       modes. Determine whether the candidate needs a Swift version absent from
       Trunk. Existing published versions and immutable tags must remain intact.
-- [ ] **Qualify an installation path independent of new Trunk writes.** Start by
+- [x] **Qualify an installation path independent of new Trunk writes.** Start by
       evaluating a consumer Podfile declaration for `DebugBundle` from an immutable
       Swift Git release tag or commit. CocoaPods documents
       [Git-tag/commit dependencies](https://guides.cocoapods.org/using/the-podfile.html).
@@ -69,13 +70,13 @@ until its implementation and evidence exist.
       evaluate an [independent specs repository](https://guides.cocoapods.org/making/private-cocoapods.html)
       and record the selected approach. Do not fork Swift internals into RN or
       assume a native-app SPM snippet solves RN autolinking.
-- [ ] **Adapt Swift release automation.** Separate supported-channel success from
+- [x] **Adapt Swift release automation.** Separate supported-channel success from
       Trunk publication. SPM/tag delivery must not depend on a new Trunk write
       during read-only periods. Retain tests, coverage, iOS deployment-target and
       simulator checks, podspec validation, and clean public-artifact delivery
       checks. Explicitly report the frozen Trunk channel; do not hide unexpected
       publisher errors with unconditional success or remove verification gates.
-- [ ] **Qualify the exact consumer artifacts.** Use clean consumers without cached
+- [x] **Qualify the exact consumer artifacts.** Use clean consumers without cached
       DebugBundle pods or unpublished sibling SDK checkouts. Verify SPM native
       installation and the chosen pod path, then bare RN and supported Expo
       development-build/prebuild installation, compilation and actual event
@@ -83,13 +84,13 @@ until its implementation and evidence exist.
       native version constraints. An existing Trunk-only version is insufficient
       proof of the new path. Preserve legacy installation compatibility checks
       and the independent Android gates.
-- [ ] **Update matching documentation and release order.** Coordinate Swift/RN
+- [x] **Update matching documentation and release order.** Coordinate Swift/RN
       READMEs, migration notes, install/config-plugin instructions where applicable,
       `site/content/docs/sdks/swift.mdx`, `site/content/docs/sdks/react-native.mdx`,
       the SDK plans, package standards and release governance. Publish the native
       artifact to the selected supported source and verify it before publishing a
       dependent RN release. Existing consumers must have clear upgrade steps.
-- [ ] **Record closure.** Replace the pending status in this document and
+- [x] **Record closure.** Replace the pending status in this document and
       `STATUS.md` only after exact source/artifact identities, clean-install and
       runtime results, supported channels and remaining limitations are recorded
       in tracked release evidence. Retain a link from the release rules so future
@@ -106,13 +107,18 @@ separate product-specific consent.
 The owner authorised the full DebugBundle release train. Swift 3.1.2 retains SPM
 and adds clean Git-tag pod consumers; its release automation separates supported
 Git distribution from an explicitly selected Trunk publishing job. React Native
-3.1.1 requires Swift >=3.1.2 and Android 3.1.1. Bare apps declare the immutable
+3.1.1 retains Swift >=3.1.1 compatibility and requires Android 3.1.1. The selected Git native path uses Swift 3.1.2. Bare apps declare the immutable
 Swift Git source inside their Podfile target; the packaged Expo plugin inserts it
 idempotently and preserves explicit consumer sources. An advanced manual-source
 option retains consumer ownership. Native sources are not copied into the wrapper.
 
-Local Swift source-artifact SPM/pod delivery and RN helper/type/coverage checks pass.
-Public SPM/Git-pod and bare/Expo runtime qualification remain open until their
-workflow receipts exist. Track closure and exact public source identities in
+Swift public SPM/Git-pod consumers pass at source
+`439c156ff05a772d8092316cc5029f18ad0555c6` (release 42224083049). RN
+source `28de60bd4ce0520be875b6565a709afdfaa8fb39` passes all shared CI,
+public Android/Swift native build and runtime, and Expo prebuild/runtime checks
+(release 42239861849). Its npm 3.1.1 registry smoke passes, and the downloaded
+artifact integrity/native files match the reviewed source. RN remains a native
+pod wrapper; its SPM test harness is not production SPM support. Exact identities,
+consumer guidance and remaining physical-device limitations are recorded in
 [multiline-exception-release-20261106.md](multiline-exception-release-20261106.md).
 Existing Trunk installations remain supported; no consumer product is updated.

@@ -189,7 +189,7 @@ For every SDK or SDK-evidence change, evaluate all maintained SDKs, framework ad
 
 ### CocoaPods Trunk Transition
 
-Before planning the next release, read [the CocoaPods transition checklist](spec/cocoapods-trunk-transition.md). The announced Trunk read-only test is 1–7 November 2026, with permanent read-only on 2 December 2026; refresh the provider schedule at release preparation. Apply the pending distribution and clean-consumer gates to Swift/React Native releases, preserve existing installs, and do not treat React Native's test-only `Package.swift` as production SPM support. Independent releases remain separately scoped; the migration is not yet implemented or qualified.
+Before planning an affected release, read [the CocoaPods distribution checklist](spec/cocoapods-trunk-transition.md) and refresh the provider schedule. The refreshed announcement is 2–6 November 2026 testing and permanent read-only on 2 December 2026. Swift 3.1.2 and React Native 3.1.1 qualify immutable Git-pod distribution with public SPM, bare RN and Expo runtime checks; retain those exact-artifact gates for future releases. Preserve existing Trunk installations and the supported native floor. Trunk publication remains a separately selected channel. React Native's test-only `Package.swift` is not production SPM support. Independent releases and consumer adoption remain separately scoped.
 
 ### Bundle Determinism
 Given the same normalized events, the bundle generator must produce byte-identical output. No random IDs, no wall-clock timestamps in bundle generation.

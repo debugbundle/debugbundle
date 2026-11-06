@@ -1,6 +1,9 @@
 # Multiline exception capture — final local release audit
 
-6 November 2026. Local qualification complete; combined publication is not yet
+Historical pre-release checkpoint; subsequent authorised publication/deployment
+is tracked in [the release record](multiline-exception-release-20261106.md).
+
+6 November 2026. Local qualification complete; combined publication was not yet
 green because the release gates below remain open. This record does not authorise a
 commit, push, publication, deployment, consumer upgrade or incident mutation.
 The [investigation and twelve-surface audit](multiline-exception-capture.md)

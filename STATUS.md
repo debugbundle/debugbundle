@@ -1,46 +1,34 @@
-# Multiline patch release — authorised train in progress
+# Multiline patch release — released and verified
 
-6 November 2026. Core 1.22.1, JS 3.2.1, backend/mobile patch versions and site
-1.7.4 are being released under the owner's explicit authority. Published JS
-registry consumers pass; DebugBundle root/web/site pins now use those artifacts.
-Python/PHP publication gates pass. Remaining SDK/native/public, exact-source core
-CI and hosted rollout gates are tracked in
+6 November 2026. Core 1.22.1 is live from `8daab4ac`; hosted classifier bytes,
+Node 3.2.1, readiness, protected data and retained rollback are verified. App
+assets from the same revision serve Browser 3.2.1 with CDN/origin parity. Java
+3.1.1 was published after hosted verification; the actual Maven Central JAR passes
+the six-occurrence redirected-stderr regression in a clean consumer. All other
+independent SDK patches and WordPress.org 2.1.1 pass their published-artifact gates.
+React Native 3.1.1 public bare/Expo runtime and registry gates pass. Canonical core
+1.22.1/site 1.7.4 releases and both hosted asset deployments pass. All 31 served
+resource readbacks match origin; API/worker are healthy with zero restarts and
+eight alarms OK. Protected fingerprints and the previous rollback pair remain intact. See the immutable provenance and limitations in
 [the release record](spec/multiline-exception-release-20261106.md).
 
-Swift 3.1.2 and RN 3.1.1 implement immutable Git CocoaPods resolution with Expo
-prebuild support. Public SPM/Git-pod, bare RN and Expo runtime proof must complete
-before those gates close. Java publication is held until the hosted classifier
-is deployed and verified. Existing consumer products and WordPress installations
-are outside the authorised changes.
+The [twelve-surface audit](spec/multiline-exception-capture.md) and
+[pre-release local qualification](spec/multiline-exception-release-audit-20261106.md)
+record the diagnosis and regressions. Full core CI passes 5,253 cases and 61
+integration tests; Java 217, Node/Browser 611, Python 403, PHP 210, WordPress 93,
+Ruby 338, .NET 195, Swift 169 and RN 134 tests pass with the documented runtime,
+coverage and installed-artifact gates. Synthetic ingestion retains 114 records
+as two groups of three genuine failures with no frame incidents.
 
-# Multiline exception capture — local audit complete; release gates open
+Swift 3.1.2 public SPM/Git-pod and RN bare/Expo native runtime consumers pass.
+The CocoaPods transition checklist is complete for these exact releases; existing
+Trunk compatibility is retained and new Trunk publication was not selected.
+Consumer products and existing WordPress installations remain unchanged; no
+incident state or notification policy is changed.
 
-6 November 2026. Core and all twelve maintained SDK surfaces have been audited;
-the local corrections remain uncommitted and unpublished. See the
-[diagnosis and SDK audit](spec/multiline-exception-capture.md) and
-[final qualification record](spec/multiline-exception-release-audit-20261106.md).
+# Alert scope release — 5 November checkpoint; marketplace acceptance open
 
-Full core CI passes 5,253 tests, lint/types/build and coverage, plus 61 isolated
-integration tests. Final Java verification passes 217 tests and installed smokes
-on Java 17/21/25/26/27, including Spring Boot 4.1.1. Node/Browser pass 611 tests
-and packed consumers on Node 24/26. Python 403, PHP 210, WordPress 93, Ruby 338,
-.NET 195, Swift's 169-test simulator run and React Native's 128-test JS suite pass;
-Go/Android and the native wrappers pass their recorded coverage/artifact gates.
-The final audit corrected stream boundaries, bounded orphan draining/admission,
-rejected-capture identity receipts, repeated native records, attachment rollback
-and host accessor/equality safety. The synthetic hosted path retains 114 records
-as two groups of three failures, with no independent stack-frame incidents.
-
-Release remains separately authorised: choose new versions and immutable source
-identities, rebuild final artifacts, and deploy the hosted classifier before Java
-adoption. Swift/React Native still have the explicit open CocoaPods transition
-and clean final-native consumer gates; local path-pod/wrapper success does not
-close them. Independent core/SDK releases can be qualified separately. No consumer
-application, production setting, incident state or notification policy changed.
-
-# Alert scope release — live; marketplace security acceptance open
-
-Core **1.22.0** and site **1.7.3** are live from qualified core `795f3f1e` /
+At that checkpoint, core **1.22.0** and site **1.7.3** were live from qualified core `795f3f1e` /
 site `00749bc0`. CLI/MCP/OpenClaw/portable skill **1.20.0** and shared-types
 **3.2.0** are published. Redaction 2.7.0 and the reviewed developer-package pins
 retain their independent versions. See [release evidence](spec/alert-scope-release-20261105.md).
@@ -283,7 +271,9 @@ choosing/releasing new immutable patch versions. ClawHub security re-review and
 exact published installation/runtime acceptance remain release gates. Detailed evidence:
 `spec/openclaw-runtime-scope-remediation-20261103.md`.
 
-# Next mobile release — CocoaPods Trunk transition pending, 2 November 2026
+# Historical mobile handoff — 2 November 2026
+
+Superseded by the authorised 6 November implementation and release record above.
 
 The owner requested a durable handoff for the next release. The
 [transition checklist](spec/cocoapods-trunk-transition.md) records the announced

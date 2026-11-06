@@ -1,17 +1,20 @@
-Authorised multiline release (6 November): patch-version capture corrections and
-DebugBundle-owned dogfooding are being released in dependency order. Swift/RN
-select immutable Git CocoaPods sources, with Expo prebuild support and public
-native consumers gating publication. Current source, publication and deployment
-identities: `spec/multiline-exception-release-20261106.md`.
+Multiline exception release (6 November 2026): core 1.22.1 is live from
+`8daab4acf3ca36c0c425aab455959c1bb7ae9a0d`. Java stderr assembly belongs to
+the Java SDK; legacy continuation classification belongs to
+`packages/event-normalizer`. Native exception routing and scoped duplicate
+receipts belong to each SDK. Grouping, bundle schemas and notification delivery
+retain their contracts. The hosted classifier was verified before Java 3.1.1
+publication. DebugBundle API/worker and app/site now consume Node/Browser 3.2.1;
+site 1.7.4 and canonical core/SDK releases are live and verified.
 
-Unreleased multiline exception correction: Java stderr assembly belongs to the Java SDK;
-legacy continuation classification belongs to `packages/event-normalizer`. Native logger
-exception routing and scoped duplicate receipts belong to each SDK. Grouping, bundle
-schemas and notification delivery remain unchanged. Evidence, audit and adoption limits:
-`spec/multiline-exception-capture.md`. No deployment or publication has occurred.
-Final local qualification and release gates are recorded in
-`spec/multiline-exception-release-audit-20261106.md`; deploy the hosted classifier
-before Java adoption so bounded ERROR-level orphan summaries stay contextual.
+Swift 3.1.2 supports SPM and immutable Git CocoaPods sources. RN's Expo plugin
+selects that Git source while preserving explicit consumer declarations and the
+Swift >=3.1.1 floor; RN's Package.swift remains a test harness. RN 3.1.1 passes
+public bare/Expo native delivery and npm registry gates. The Trunk-independent
+distribution checklist is complete for these exact releases.
+Exact release, runtime, rollback and adoption evidence:
+`spec/multiline-exception-release-20261106.md`. Diagnosis and twelve-surface audit:
+`spec/multiline-exception-capture.md`. Consumer products remain unchanged.
 
 Alert-scope correction is live in core 1.22.0: `alert-scope-projection.ts` adds an
 opt-in read descriptor separating accepted origin coverage from a service filter.
@@ -80,13 +83,13 @@ durable continuation; million-visit load testing is deferred by the owner.
 
 # SYSTEM OVERVIEW — DebugBundle
 
-CocoaPods release follow-up (2 November 2026): read
-`spec/cocoapods-trunk-transition.md` before planning the next release. Announced
-Trunk read-only dates are 1–7 November testing and 2 December 2026 permanent.
-Native Swift already supports SPM; RN's pod dependency still needs a qualified
-path independent of new Trunk writes. Swift automation and consumer/docs gates
-remain pending. This handoff changes no SDK runtime or distribution; independent
-package releases remain separately scoped.
+CocoaPods distribution (6 November 2026): read
+`spec/cocoapods-trunk-transition.md` before affected releases. The refreshed
+provider schedule announces 2–6 November read-only testing and permanent
+read-only on 2 December. Swift supports SPM and Git-tag pods; Trunk publication
+is an explicitly separate channel. RN public bare/Expo runtime checks qualify its
+new Git integration. Existing Trunk installations remain compatible. No consumer
+installation is changed by publishing these distributions.
 
 Mobile/WordPress evidence candidate (unpublished): Android's
 canonical bridge and installed Maven artifacts preserve permitted identities and

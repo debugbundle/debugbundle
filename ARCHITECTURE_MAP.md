@@ -1,17 +1,20 @@
-Authorised multiline release (6 November): patch-version capture corrections and
-DebugBundle-owned dogfooding are being released in dependency order. Swift/RN
-select immutable Git CocoaPods sources, with Expo prebuild support and public
-native consumers gating publication. Current source, publication and deployment
-identities: `spec/multiline-exception-release-20261106.md`.
+Multiline exception release (6 November 2026): core 1.22.1 is live from
+`8daab4acf3ca36c0c425aab455959c1bb7ae9a0d`. Java stderr assembly belongs to
+the Java SDK; legacy continuation classification belongs to
+`packages/event-normalizer`. Native exception routing and scoped duplicate
+receipts belong to each SDK. Grouping, bundle schemas and notification delivery
+retain their contracts. The hosted classifier was verified before Java 3.1.1
+publication. DebugBundle API/worker and app/site now consume Node/Browser 3.2.1;
+site 1.7.4 and canonical core/SDK releases are live and verified.
 
-Unreleased multiline exception correction: Java stderr assembly belongs to the Java SDK;
-legacy continuation classification belongs to `packages/event-normalizer`. Native logger
-exception routing and scoped duplicate receipts belong to each SDK. Grouping, bundle
-schemas and notification delivery remain unchanged. Evidence, audit and adoption limits:
-`spec/multiline-exception-capture.md`. No deployment or publication has occurred.
-Final local qualification and release gates are recorded in
-`spec/multiline-exception-release-audit-20261106.md`; the hosted classifier owns
-context classification of the Java SDK's bounded orphan-summary marker.
+Swift 3.1.2 supports SPM and immutable Git CocoaPods sources. RN's Expo plugin
+selects that Git source while preserving explicit consumer declarations and the
+Swift >=3.1.1 floor; RN's Package.swift remains a test harness. RN 3.1.1 passes
+public bare/Expo native delivery and npm registry gates. The Trunk-independent
+distribution checklist is complete for these exact releases.
+Exact release, runtime, rollback and adoption evidence:
+`spec/multiline-exception-release-20261106.md`. Diagnosis and twelve-surface audit:
+`spec/multiline-exception-capture.md`. Consumer products remain unchanged.
 
 Diagnostic request boundary (3 November 2026, released): `doctor-command.ts` validates connected project scope before dispatch and limits its member-auth probe to one incident in that project. CLI/MCP/OpenClaw share the path. Tool metadata discloses the health/auth reads; native emitted and normal public-installed checks cover project/limit/auth, invalid scope and all 139 tools. CLI 1.18.2 and MCP/OpenClaw 1.18.3 pass source, artifact and exact security/runtime acceptance. See `spec/openclaw-runtime-scope-remediation-20261103.md`.
 
@@ -188,14 +191,13 @@ rewriting accepted delivery destinations.
 SDK-family qualification is tracked in
 `spec/project-service-sdk-compatibility.md`; no SDK distribution has changed.
 
-CocoaPods distribution follow-up (2 November 2026):
-`sdks/debugbundle-swift/Package.swift` already owns native SPM products;
-`sdks/debugbundle-swift/.github/workflows/publish-cocoapods.yml` still writes to
-Trunk. RN's `DebugBundleReactNative.podspec` resolves the native Swift pod through
-the public catalogue; its `Package.swift` is a stubbed test harness. The
-pending `spec/cocoapods-trunk-transition.md` checklist owns the next mobile
-release's installation, automation, documentation and consumer-proof requirements.
-No implementation boundary has changed in this handoff.
+CocoaPods distribution (6 November 2026): Swift's `Package.swift` owns native
+SPM products, and immutable Git-tag pods provide an independent installation
+source. `publish-cocoapods.yml` treats Trunk as a separately selected channel.
+RN's packaged `native-pod.js` and Expo plugin insert the Git pod declaration
+without replacing an explicit consumer source; the wrapper reuses Swift and
+Android SDKs. RN's `Package.swift` remains a stubbed test harness.
+`spec/cocoapods-trunk-transition.md` owns the exact public-consumer release gates.
 
 React Native candidate boundaries (29 October, unpublished): `safe-error-fields.ts`
 shares accessor-free primitive error reads between redaction and

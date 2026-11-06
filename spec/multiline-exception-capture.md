@@ -193,8 +193,10 @@ fingerprint. Existing exact capture rules should be reviewed during adoption.
 
 
 Release preparation should deploy the compatible shared classifier before asking
-operators to upgrade SDKs, then publish independently qualified SDK patches. There
-are no version bumps, commits, pushes or publications in this working change.
+operators to upgrade SDKs, then publish independently qualified SDK patches. The
+initial local correction left version changes and publication to a separate
+authorisation; the subsequent authorised release is recorded in
+`multiline-exception-release-20261106.md`.
 Rebuild WordPress with the fixed PHP artifact; qualify React Native with its declared
 native dependency floors. Read `cocoapods-trunk-transition.md` and refresh the official
 provider schedule before Swift/RN release preparation; the existing RN test-only SPM
