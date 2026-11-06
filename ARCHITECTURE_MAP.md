@@ -1,3 +1,18 @@
+Authorised multiline release (6 November): patch-version capture corrections and
+DebugBundle-owned dogfooding are being released in dependency order. Swift/RN
+select immutable Git CocoaPods sources, with Expo prebuild support and public
+native consumers gating publication. Current source, publication and deployment
+identities: `spec/multiline-exception-release-20261106.md`.
+
+Unreleased multiline exception correction: Java stderr assembly belongs to the Java SDK;
+legacy continuation classification belongs to `packages/event-normalizer`. Native logger
+exception routing and scoped duplicate receipts belong to each SDK. Grouping, bundle
+schemas and notification delivery remain unchanged. Evidence, audit and adoption limits:
+`spec/multiline-exception-capture.md`. No deployment or publication has occurred.
+Final local qualification and release gates are recorded in
+`spec/multiline-exception-release-audit-20261106.md`; the hosted classifier owns
+context classification of the Java SDK's bounded orphan-summary marker.
+
 Diagnostic request boundary (3 November 2026, released): `doctor-command.ts` validates connected project scope before dispatch and limits its member-auth probe to one incident in that project. CLI/MCP/OpenClaw share the path. Tool metadata discloses the health/auth reads; native emitted and normal public-installed checks cover project/limit/auth, invalid scope and all 139 tools. CLI 1.18.2 and MCP/OpenClaw 1.18.3 pass source, artifact and exact security/runtime acceptance. See `spec/openclaw-runtime-scope-remediation-20261103.md`.
 
 Earlier corrective server boundary (3 November 2026): CLI 1.18.1 and MCP

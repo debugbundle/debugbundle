@@ -204,7 +204,7 @@ Every standalone SDK repository must adopt the same release-hardening pattern be
 
 Before planning the next release, review the pending
 [CocoaPods transition checklist](../spec/cocoapods-trunk-transition.md).
-The provider announces read-only testing on 1–7 November 2026 and permanent
+The provider announces read-only testing on 2–6 November 2026 and permanent
 read-only on 2 December 2026; refresh the schedule before an affected release.
 Existing specs remain available. Swift already supports SPM, but React Native's
 native Swift dependency still resolves through CocoaPods Trunk.
@@ -213,8 +213,10 @@ For the next Swift/React Native release, qualify a native installation source
 independent of new Trunk writes and adapt release automation without weakening
 tests or published-consumer gates. Never report a denied Trunk publication as a
 successful publication. Record the supported channel and exact artifact evidence
-before publishing a dependent RN release. The transition remains unimplemented;
-unrelated package releases are not blocked by this mobile-distribution follow-up.
+before publishing a dependent RN release. Swift 3.1.2 and React Native 3.1.1 select immutable Git-tag CocoaPods resolution;
+public SPM, Git-pod, bare RN and Expo runtime checks gate publication. See the
+current release evidence before declaring qualification complete. Independent
+package releases remain separately qualified.
 
 ### V1 Release Train Order
 

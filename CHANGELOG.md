@@ -6,6 +6,14 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.22.1] - 2026-11-06
+
+### Fixed
+
+- Keep module/classloader/version-prefixed Java stderr continuation lines as stored context instead of independent generic incidents and alerts. Coordinate SDK native logger evidence corrections; see `spec/multiline-exception-capture.md`. No historical incident mutation or fingerprint algorithm change.
+
+- Adopt published Node/Browser 3.2.1 in DebugBundle dogfooding after registry qualification. Keep independent client and shared package versions unchanged.
+
 ## [1.22.0] - 2026-11-05
 
 ### Fixed

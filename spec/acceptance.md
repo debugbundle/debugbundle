@@ -2976,3 +2976,7 @@ Mapped requirements: FR-BIL-09, FR-BIL-08, NFR security/reliability and INV-5.
 - The already applied final phase does not strand later upgrades/capacity changes: release only an owned schedule with no remaining future phase, inside the next durable mutation.
 - Forward migration 202610220004 expands the operation kind constraint without altering existing reservation rows or preceding checksums. Readiness fails until recorded; bootstrap creates the final empty schema without ALTER-based evolution.
 - Provider validation uses an explicit Docker target, a test-only credential and expected-account/balance verification, labelled newly created fixtures and scoped cleanup. Hosted browser challenge completion and the application return journey remain separate evidence.
+
+### AC-SDK-MULTILINE: Native logger continuity and amplification
+
+Synthetic JBoss LoggingOutputStream/LogManager output for six ExecutionException/NPE failures must retain complete bounded cause/application evidence as six exceptions. GET/POST remain two groups of three; 108 legacy module-prefixed frame records stay stored context and create no frame incidents or alert evaluations. Verify independent threads/requests, late/orphan lines, redaction, bounded saturation and unavailable transport. Native logging adapters preserve one exception per accepted error record and ordinary log filtering. See `multiline-exception-capture.md` for runtime-specific limits and qualification.

@@ -1,3 +1,43 @@
+# Multiline patch release — authorised train in progress
+
+6 November 2026. Core 1.22.1, JS 3.2.1, backend/mobile patch versions and site
+1.7.4 are being released under the owner's explicit authority. Published JS
+registry consumers pass; DebugBundle root/web/site pins now use those artifacts.
+Python/PHP publication gates pass. Remaining SDK/native/public, exact-source core
+CI and hosted rollout gates are tracked in
+[the release record](spec/multiline-exception-release-20261106.md).
+
+Swift 3.1.2 and RN 3.1.1 implement immutable Git CocoaPods resolution with Expo
+prebuild support. Public SPM/Git-pod, bare RN and Expo runtime proof must complete
+before those gates close. Java publication is held until the hosted classifier
+is deployed and verified. Existing consumer products and WordPress installations
+are outside the authorised changes.
+
+# Multiline exception capture — local audit complete; release gates open
+
+6 November 2026. Core and all twelve maintained SDK surfaces have been audited;
+the local corrections remain uncommitted and unpublished. See the
+[diagnosis and SDK audit](spec/multiline-exception-capture.md) and
+[final qualification record](spec/multiline-exception-release-audit-20261106.md).
+
+Full core CI passes 5,253 tests, lint/types/build and coverage, plus 61 isolated
+integration tests. Final Java verification passes 217 tests and installed smokes
+on Java 17/21/25/26/27, including Spring Boot 4.1.1. Node/Browser pass 611 tests
+and packed consumers on Node 24/26. Python 403, PHP 210, WordPress 93, Ruby 338,
+.NET 195, Swift's 169-test simulator run and React Native's 128-test JS suite pass;
+Go/Android and the native wrappers pass their recorded coverage/artifact gates.
+The final audit corrected stream boundaries, bounded orphan draining/admission,
+rejected-capture identity receipts, repeated native records, attachment rollback
+and host accessor/equality safety. The synthetic hosted path retains 114 records
+as two groups of three failures, with no independent stack-frame incidents.
+
+Release remains separately authorised: choose new versions and immutable source
+identities, rebuild final artifacts, and deploy the hosted classifier before Java
+adoption. Swift/React Native still have the explicit open CocoaPods transition
+and clean final-native consumer gates; local path-pod/wrapper success does not
+close them. Independent core/SDK releases can be qualified separately. No consumer
+application, production setting, incident state or notification policy changed.
+
 # Alert scope release — live; marketplace security acceptance open
 
 Core **1.22.0** and site **1.7.3** are live from qualified core `795f3f1e` /

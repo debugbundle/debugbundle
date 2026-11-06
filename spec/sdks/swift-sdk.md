@@ -716,3 +716,12 @@ Quality gates:
 - Whether background delivery should use background URLSession only, `BGTaskScheduler`, or both.
 - Whether Swift 5.9 source compatibility is worth preserving once Xcode 26.x becomes the dominant release lane.
 - Whether release docs should recommend per-platform project tokens or a shared project token across Android and iOS apps.
+
+### Immutable native distribution (6 November 2026)
+
+Swift 3.1.2 / RN 3.1.1 select a public Swift Git tag for CocoaPods resolution
+independent of Trunk writes. SPM remains the full-product native path. Bare RN
+Podfiles declare the Git source; Expo prebuild adds it through the packaged
+plugin, preserving explicit sources. Public SPM/Git-pod and bare/Expo runtime
+checks gate publication. Trunk is a separately selected channel; see
+`spec/cocoapods-trunk-transition.md` and the current release evidence.

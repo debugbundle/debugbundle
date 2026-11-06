@@ -1,3 +1,18 @@
+Authorised multiline release (6 November): patch-version capture corrections and
+DebugBundle-owned dogfooding are being released in dependency order. Swift/RN
+select immutable Git CocoaPods sources, with Expo prebuild support and public
+native consumers gating publication. Current source, publication and deployment
+identities: `spec/multiline-exception-release-20261106.md`.
+
+Unreleased multiline exception correction: Java stderr assembly belongs to the Java SDK;
+legacy continuation classification belongs to `packages/event-normalizer`. Native logger
+exception routing and scoped duplicate receipts belong to each SDK. Grouping, bundle
+schemas and notification delivery remain unchanged. Evidence, audit and adoption limits:
+`spec/multiline-exception-capture.md`. No deployment or publication has occurred.
+Final local qualification and release gates are recorded in
+`spec/multiline-exception-release-audit-20261106.md`; deploy the hosted classifier
+before Java adoption so bounded ERROR-level orphan summaries stay contextual.
+
 Alert-scope correction is live in core 1.22.0: `alert-scope-projection.ts` adds an
 opt-in read descriptor separating accepted origin coverage from a service filter.
 Default response shapes and delivery matching stay compatible. The approved

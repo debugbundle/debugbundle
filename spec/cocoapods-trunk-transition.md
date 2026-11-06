@@ -1,6 +1,6 @@
 # CocoaPods Trunk transition — next mobile release
 
-Recorded: 2026-11-02; provider schedule refreshed: 2026-11-04
+Recorded: 2026-11-02; provider schedule refreshed: 2026-11-06
 Status: release preparation required; migration not implemented or qualified.
 
 ## Trigger and scope
@@ -97,8 +97,22 @@ until its implementation and evidence exist.
 
 ## Boundaries
 
-This handoff changes guidance only. It does not implement a Git/specs-repo install
-path, alter SDK dependencies or workflows, publish a final pod, or establish new
-runtime acceptance. Future implementation and publication follow the normal
-release authorisation and compatibility rules. Consumer-product migrations need
+The original handoff was guidance only. The authorised implementation and public
+qualification progress are recorded below. Consumer-product migrations need
 separate product-specific consent.
+
+## 6 November implementation and qualification
+
+The owner authorised the full DebugBundle release train. Swift 3.1.2 retains SPM
+and adds clean Git-tag pod consumers; its release automation separates supported
+Git distribution from an explicitly selected Trunk publishing job. React Native
+3.1.1 requires Swift >=3.1.2 and Android 3.1.1. Bare apps declare the immutable
+Swift Git source inside their Podfile target; the packaged Expo plugin inserts it
+idempotently and preserves explicit consumer sources. An advanced manual-source
+option retains consumer ownership. Native sources are not copied into the wrapper.
+
+Local Swift source-artifact SPM/pod delivery and RN helper/type/coverage checks pass.
+Public SPM/Git-pod and bare/Expo runtime qualification remain open until their
+workflow receipts exist. Track closure and exact public source identities in
+[multiline-exception-release-20261106.md](multiline-exception-release-20261106.md).
+Existing Trunk installations remain supported; no consumer product is updated.

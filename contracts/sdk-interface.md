@@ -1561,3 +1561,7 @@ and forwarding preserves existing partial-ACK semantics within the original
 five-second whole-batch deadline. The plugin migration guide documents explicit
 failure/attempt associations and all five observation states. No response code
 or attempt completion is inferred to mean application recovery.
+
+### Multiline and native logger evidence correction
+
+Recognised JVM redirected stderr continuations, including module/classloader/version prefixes, belong to bounded exception context rather than independent incidents. Preserve redaction before retention and represent truncation/uncertain attribution honestly. Native error-level logging adapters should submit one exception with log context when they retain the actual exception object; ordinary logs and native filtering remain intact. Pair cross-adapter reports only using native identity within an owned scope, never text/time similarity. Record receipts only after queue admission; preserve uncertain or rejected captures and repeated same-path records. Deferred hooks must not let a discarded first report suppress another. Bounded Java orphan summaries retain ERROR policy admission with an explicit `java_stack_continuation_context` marker and worker context classification. Runtime limits, per-SDK applicability and release adoption are recorded in [the audit](../spec/multiline-exception-capture.md).

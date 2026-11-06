@@ -900,3 +900,12 @@ Quality gates:
 - Whether Axios helper ships in V1 or remains documented composition over fetch/XHR capture.
 - Whether Expo Router receives a first-class helper in V1 or only guidance built on route-name capture APIs.
 - Whether JS source-map release metadata should be included in V1 config for future symbolication without shipping upload tooling yet.
+
+### Immutable native distribution (6 November 2026)
+
+Swift 3.1.2 / RN 3.1.1 select a public Swift Git tag for CocoaPods resolution
+independent of Trunk writes. SPM remains the full-product native path. Bare RN
+Podfiles declare the Git source; Expo prebuild adds it through the packaged
+plugin, preserving explicit sources. Public SPM/Git-pod and bare/Expo runtime
+checks gate publication. Trunk is a separately selected channel; see
+`spec/cocoapods-trunk-transition.md` and the current release evidence.

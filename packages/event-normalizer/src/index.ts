@@ -738,7 +738,20 @@ function isJavaStackContinuation(payload?: Record<string, unknown>): boolean {
   if (!isJavaRedirectedStderrLogger((attributes as Record<string, unknown>)["logger"]))
     return false;
   if ("throwable" in attributes && attributes.throwable !== null) return false;
-  return /^\s*(?:at\s+[\w.$/]+\([^\r\n]*\)|\.\.\.\s+\d+\s+more|(?:Caused by|Suppressed):\s+[\w.$/]+(?:Exception|Error|Throwable)(?::[^\r\n]*|\s|$))\s*$/.test(
+  const fields = attributes as Record<string, unknown>;
+  if (
+    fields["java_stack_continuation_context"] === true &&
+    /^\d+ orphan Java stack continuation lines observed$/.test(message) &&
+    typeof fields["unmatched_count"] === "number" &&
+    fields["unmatched_count"] > 0 &&
+    Array.isArray(fields["stack_continuations"]) &&
+    fields["stack_continuations"].length <= 16 &&
+    fields["stack_continuations"].every(
+      (line: unknown) => typeof line === "string" && line.length <= 1024
+    )
+  )
+    return true;
+  return /^\s*(?:at\s+[^\s()]{1,1024}\([^\r\n()]{1,4096}\)|\.\.\.\s+\d+\s+more|(?:Caused by|Suppressed):\s+[\w.$/]{1,512}(?::[^\r\n]*)?|\[CIRCULAR REFERENCE:\s+[^\r\n]{1,4096}\])\s*$/.test(
     message
   );
 }
