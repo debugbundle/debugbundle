@@ -305,7 +305,10 @@ describe("OpenAI plugin release automation", () => {
       expect(result.manifest.runtime.api_image_digest).toMatch(/^sha256:[0-9a-f]{64}$/u);
       expect(result.manifest.manual_gates).not.toContain("immutable_api_image_deployment_digest");
     }
-    expect(result.manifest.contract.tools_in_scan_order).toHaveLength(23);
+    expect(result.manifest.contract.tools_in_scan_order).toHaveLength(25);
+    expect(result.manifest.contract.tools_in_scan_order).toEqual(
+      expect.arrayContaining(["list_reports", "get_report_content"])
+    );
     expect(
       Object.values(result.manifest.automation_boundary).every((value) => value === false)
     ).toBe(true);

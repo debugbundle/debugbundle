@@ -119,3 +119,15 @@ inferred from hosting or package preparation.
   advisories. The default-off backend bridge can proceed independently of the
   unpublished Gemini pin; that separate native client gate must pass after MCP
   publication before public catalog promotion.
+
+- Final public-core CI exposed three release-integration expectations rather than
+  runtime failures: the developer inventory still listed old versions, private
+  pricing integration assumed an ignored companion checkout existed, and the
+  OpenAI archive test retained the pre-report 23-tool count. Reconcile the ledger,
+  use the established explicit-site-checkout guard and run pricing parity in
+  private site CI, and require all 25 tools including the two saved-report reads.
+  The final complete CI rerun remains required before launch activation.
+- Real Stripe test-mode Business monthly and annual subscriptions with two extra
+  capacity units pass exact paid totals, base-only ten-percent coupon validation,
+  complete cash receipts and referral-benefit projections through production
+  adapters. All recorded test fixtures cleaned up with zero errors; no live charges.
