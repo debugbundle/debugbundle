@@ -1,7 +1,8 @@
 # Business and UI release — 9 November 2026
 
-Status: authorised; audit and exact-candidate preparation in progress. Nothing has
-been committed, published, deployed or activated by this release run yet.
+Status: authorised; package publication and exact-candidate qualification in progress.
+Core candidate is committed on `release/business-20261109`; no hosted runtime or
+public asset rollout has occurred, and Business activation switches remain off.
 
 The owner explicitly authorised the final cross-repository audit, production
 rollout, Stripe pricing/configuration completion, appropriate version upgrades and
@@ -85,3 +86,36 @@ inferred from hosting or package preparation.
 - Fresh package/native/browser/production acceptance, final versions/source SHAs,
   backup/migration proof, provider configuration, publications and live rollout
   receipts remain to be completed and recorded below.
+
+## Release-time findings and gates
+
+- Core candidate `d9326b8e` and source-evidence commit `ead399d7` are on the
+  isolated release branch; PR #14 runs full CI. Developer-plugin native Gemini
+  checks require the prepared MCP version to exist and will be rerun after its
+  published-artifact gates. The main CI unit/build job remains independent.
+- Shared types 3.3.0 / redaction 2.7.1 published with registry-consumer checks.
+  The JS SDK 3.2.2 patch adopts redaction 2.7.1 while retaining its existing
+  shared-types 3.0.0 contract; the root test dependency must use the same redactor.
+- Live-provider audit found Stripe omits coupon `applies_to` without expansion.
+  The regression reproduced the failure; the narrow explicit expansion passes
+  all 143 referral/checkout checks. The real 10-percent once coupon is verified
+  against only the Business base product, excluding capacity. Secrets are staged
+  and all four feature switches are explicitly off for the bridge rollout.
+- Ruby's separate frozen compatibility locks retained an old path-gem identity;
+  update only that identity/checksum metadata. The published gem's framework
+  matrix passed; no third-party version changes or replacement publication.
+- Old and new API rehearsal passes against one forward-migrated isolated DB,
+  including credential compatibility and application rollback.
+- Fresh site tests/types/static build pass. Headless Chromium and WebKit review
+  passes the 320–1440px matrix with no page overflow or browser errors.
+- Managed PostgreSQL is private, healthy and continuously recoverable. Snapshot `debugbundle-db-pre-business-20261109` is verified available before
+  production migration. Existing tokens/alerts/services receive aggregate hash
+  baselines, without exposing row contents or credentials.
+
+- Final runtime dependency adoption is registry-backed: shared-types 3.3.0,
+  redaction 2.7.1 and Node/Browser 3.2.2. Candidate build passes. Report resource
+  checks retain serial PDF generation and pass their existing budgets; all eleven
+  companion privacy corpora match. The post-adoption audit has no high/critical
+  advisories. The default-off backend bridge can proceed independently of the
+  unpublished Gemini pin; that separate native client gate must pass after MCP
+  publication before public catalog promotion.

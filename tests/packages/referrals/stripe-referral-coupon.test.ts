@@ -11,7 +11,12 @@ function fixture() {
     duration: "once",
     applies_to: { products: ["prod_business"] }
   };
-  const retrieveCoupon = vi.fn().mockImplementation(async () => coupon);
+  // Stripe omits product restrictions unless the retrieval explicitly expands them.
+  const retrieveCoupon = vi
+    .fn()
+    .mockImplementation(async (_id: string, params: { expand?: string[] }) =>
+      params.expand?.includes("applies_to") ? coupon : { ...coupon, applies_to: undefined }
+    );
   const retrievePrice = vi.fn().mockImplementation(async (id: string) => ({
     id,
     active: true,
@@ -37,7 +42,7 @@ it("accepts only a verified ten percent once coupon restricted to configured Bus
   ).toBe("coupon_referral");
   expect(f.retrieveCoupon).toHaveBeenCalledWith(
     "coupon_referral",
-    {},
+    { expand: ["applies_to"] },
     expect.objectContaining({ timeout: 8000, maxNetworkRetries: 0 })
   );
 });

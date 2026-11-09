@@ -45,7 +45,7 @@ export async function readVerifiedStripeReferralCoupon(
       throw new Error("invalid_business_catalogue");
     const next = createStripeReferralReadBudget();
     const [rawCoupon, prices] = await Promise.all([
-      provider.client.coupons.retrieve(couponId, {}, next()),
+      provider.client.coupons.retrieve(couponId, { expand: ["applies_to"] }, next()),
       Promise.all(
         configured.map(async ([priceId, mapping]) => {
           const price = PriceSchema.parse(
