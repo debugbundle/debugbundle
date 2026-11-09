@@ -1,14 +1,18 @@
-# Business/UI release — authorised, in progress
+# Business/UI release - live, external acceptance partial
 
-The owner authorised the complete DebugBundle release train on 9 November.
-[The release record](spec/business-release-20261109.md) owns current scope,
-version/order decisions, audit findings and rollout evidence. Initial source/ref
-inventories and live runtime/Stripe baselines are in `.tmp/release-20261109/`.
-All pending core/site/cloud and eleven SDK repositories are included; no consumer
-product or installation is authorised for modification. Package publication and the
-default-off backend bridge are complete. Final feature activation and public assets
-remain pending the complete CI coverage gate; migration/backup protection and
-exact source/package verification are already recorded.
+9 November: core 1.23.0 and site 1.8.0 are deployed from the exact tested refs.
+Business sales, Smart Reports and referrals are enabled with the unchanged $1
+monthly account report budget. All affected SDK/shared/CLI/MCP and developer plugin
+packages are published and qualified through their supported installation paths.
+Core CI passes 6,228 tests and changed-file coverage for 438 source files; site CI,
+protected-data/migration checks, rollback retention, public assets and live pricing
+checks pass. The three superseded Stripe prices are archived safely.
+
+ClawHub publication is accepted but strict antivirus/discovery acceptance remains
+partial. OpenAI 1.1.0 is an independently prepared candidate awaiting its separate
+portal/review process. The owner's authenticated account, checkout and report/inbox
+acceptance remain distinct. See [the release record](spec/business-release-20261109.md).
+No consumer application or installation was changed.
 
 # Reports tier gate and sidebar — ready locally
 

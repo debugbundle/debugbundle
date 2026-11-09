@@ -1,13 +1,15 @@
 # Agent distribution ledger
 
-## Business release candidate - 9 November 2026
+## Business release - 9 November 2026
 
-Codex 1.6.0, Claude Code 1.21.0 and Gemini 1.5.0 are prepared on the
-release branch with MCP 1.21.0. Publish MCP and verify its exact registry
-artifact before promoting these packages to their public default branches.
-Gemini 1.5.0 is public at `fbec2285e02330af752ad91ccf91980c054cc3c9`;
-its deterministic ZIP and native Node 22/24/26 checks pass. Codex and Claude
-become publicly installable when this reviewed source reaches core `main`.
+Codex 1.6.0 and Claude Code 1.21.0 are public from core
+`7917ec35bc8058bafbdbde0760f2d956ff062597`, pinning published MCP 1.21.0.
+Fresh public Git marketplace installs pass 192-tool discovery, local evidence,
+authentication boundaries, update/reinstallation and removal. Gemini 1.5.0 is
+public from standalone `fbec2285e02330af752ad91ccf91980c054cc3c9`; its exact
+release ZIP and native Node 22/24/26 checks pass. External gallery indexing and
+ClawHub antivirus/discovery acceptance remain separate; see the
+[release record](business-release-20261109.md).
 
 ## Alert-scope pin review — 5 November 2026
 

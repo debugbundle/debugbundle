@@ -1,10 +1,11 @@
 # Business and UI release — 9 November 2026
 
-Status: package publications complete; final activation and public assets pending.
-The Business-aware backend bridge is live and healthy with all four activation
-switches off. The core release remains on `release/business-20261109` pending the
-complete CI coverage gate; the public dashboard and website remain on their prior
-release. This record distinguishes those stages from a completed launch.
+Status: hosted launch verified; external distribution acceptance remains partial.
+Core 1.23.0 and site 1.8.0 are live from the exact qualified source refs below.
+Business sales, Smart Reports, AI and referral enrolment are enabled, with the $1
+monthly account budget. ClawHub's strict antivirus/discovery gate and the separate
+OpenAI portal process remain incomplete; this is not a claim that every external
+channel is fully accepted.
 
 The owner explicitly authorised the final cross-repository audit, production
 rollout, Stripe pricing/configuration completion, appropriate version upgrades and
@@ -184,3 +185,46 @@ added without changing runtime behaviour or weakening coverage policy. All 37 fo
 checks pass, including preserved activation drafts on lost entitlement; the two shared
 components have 100% line/statement/function coverage. A new full
 CI result is required before public core promotion and activation.
+
+## Final hosted launch
+
+- Core [`7917ec35`](https://github.com/debugbundle/debugbundle/commit/7917ec35bc8058bafbdbde0760f2d956ff062597)
+  passes [complete CI](https://github.com/debugbundle/debugbundle/actions/runs/42639614356):
+  6,228 tests in 128 groups, full build and all native Gemini jobs. Changed-file
+  coverage passes for 438 source files; merged lines 88.10%, functions 89.69%,
+  statements 86.74%. The source was fast-forwarded to public main; PR #14 is merged.
+- Site `b9f4ce7304d239ede2b4919948dd0f41e3fcbd69` passes
+  [matching CI](https://github.com/debugbundle/site/actions/runs/42634786317),
+  including pricing/documentation parity against the promoted public core.
+- [Final hosted workflow](https://github.com/debugbundle/debugbundle-cloud/actions/runs/42646934459)
+  succeeds from cloud `81602ab40f23120229127c94395f21004cd9b85e`. Runtime and public
+  assets use the exact core/site refs above. MCP routing and project-merge settings
+  were preserved. All four Business activation switches are on.
+- Independent runtime inspection verifies core 1.23.0 / Node SDK 3.2.2, immutable
+  image revisions, healthy API/worker with zero restarts/OOM, the approved twelve
+  price references, restricted referral coupon, provider-secret presence and the
+  unchanged 1,000,000,000 nano-USD monthly report budget. No secret is in this record.
+- Retention leaves exactly the active release and the verified `c4111cc6` bridge,
+  including both immutable API/worker image pairs with `business-tier-v2`. Final
+  protected hashes and all 86 migration entries match the post-bridge baseline.
+- CDN/origin byte and cache-policy checks cover the app build ID, Browser 3.2.2,
+  homepage scripts, all twelve SDK guides, canonical price catalogue, pricing,
+  terms and report/referral documentation. Local billing simulator code is absent
+  from the production entry bundle. Live headless desktop/tablet/mobile checks
+  cover annual defaults, whole-dollar prices, comparison/terms anchors, keyboard
+  interaction, FAQs, light/dark themes and overflow.
+- Fresh Stripe dependency checks permit archival of only the three superseded
+  prices. All twelve current prices remain active; product defaults point to the
+  approved monthly prices. No live customer, subscription, invoice or payment was
+  created, cancelled, refunded or charged by this release.
+- Public Codex 1.6.0 and Claude Code 1.21.0 installation, 192-tool discovery,
+  authentication boundaries, local retrieval, update/removal checks pass. Gemini
+  1.5.0 public source/archive/native checks pass. No model/customer API call is part
+  of those installed-client tests.
+
+Runtime/build provenance is separate from the following documentation-only source
+and OpenAI manifest reconciliation. The OpenAI 1.1.0 candidate records the verified
+live API image digest but has no inferred portal rescan, store approval or publication.
+Actual report generation/email inbox acceptance, real customer checkout and the
+owner's authenticated visual checks remain distinct from the completed automated
+and read-only production checks. No consumer product was changed.
