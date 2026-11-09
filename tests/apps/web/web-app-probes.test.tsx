@@ -235,3 +235,28 @@ it.each([
     expect(screen.getByRole("tab", { name: /probes/i })).toBeVisible();
   }
 );
+
+it("preserves a probe activation draft when entitlement is lost before submission", async () => {
+  const user = userEvent.setup();
+  const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = requestUrl(input);
+    if (url.endsWith("/v1/auth/session"))
+      return jsonResponse(200, { session: createSession({ organization_plan: "solo" }) });
+    if (url.endsWith("/v1/projects"))
+      return jsonResponse(200, { projects: [createProject({ organization_plan: "solo" })] });
+    if (url.endsWith("/v1/projects/proj_123/probes")) return jsonResponse(200, { activations: [] });
+    if (url.endsWith("/v1/projects/proj_123/probes/activate") && init?.method === "POST")
+      return jsonResponse(403, { error: "upgrade_required" });
+    return jsonResponse(404, { error: "not_found" });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  render(<App initialEntries={["/projects/proj_123/probes"]} />);
+  await user.click(await screen.findByRole("button", { name: /activate probe/i }));
+  await user.type(await screen.findByLabelText(/label pattern/i), "checkout.*");
+  await user.click(screen.getByRole("button", { name: /^activate probe$/i }));
+  expect(
+    await screen.findByText("Upgrade to a paid plan before activating remote probes.")
+  ).toBeVisible();
+  expect(screen.getByLabelText(/label pattern/i)).toHaveValue("checkout.*");
+  expect(screen.queryByRole("region", { name: /probe trigger token/i })).not.toBeInTheDocument();
+});

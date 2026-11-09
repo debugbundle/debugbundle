@@ -179,6 +179,8 @@ are distinguished from new runtime failures; neither was suppressed or resolved.
 Final full CI at `19bffd8d` passed all 128 test groups and merged overall coverage
 (lines 88.08%, functions 89.67%, statements 86.72%). Its changed-file gate correctly
 identified three uncovered UI paths: lazy local billing preview, privacy-safe saved
-recipient labels and probe-list error guidance. Focused regression coverage is
-added without changing runtime behaviour or weakening coverage policy. A new full
+recipient labels and probe activation and list error guidance. Focused regression coverage is
+added without changing runtime behaviour or weakening coverage policy. All 37 focused
+checks pass, including preserved activation drafts on lost entitlement; the two shared
+components have 100% line/statement/function coverage. A new full
 CI result is required before public core promotion and activation.
