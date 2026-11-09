@@ -1,3 +1,4 @@
+import type { ProjectReadScope } from "./project-read-scope.js";
 import type { BundleBuildContextStore } from "./bundle-types.js";
 export type {
   BundleBuildContext,
@@ -16,7 +17,9 @@ import type {
   EventEnvelope,
   ImmediateClientErrorPathRule,
   ProjectColorTag,
-  TierName
+  TierName,
+  MemberTokenPolicy,
+  OrganizationRole
 } from "../../shared-types/src/index.js";
 import type {
   AlertManagementStore,
@@ -186,10 +189,13 @@ export interface ProbeActivationCreateRecord {
 }
 
 export interface ResolveMemberResult {
+  credential_kind?: "browser_session" | "member_token";
+  token_id?: string;
+  token_policy?: MemberTokenPolicy;
   member_id: string;
   organization_id: string;
   email?: string;
-  role?: "owner" | "member";
+  role?: OrganizationRole;
   revoked_at?: string | null;
   expires_at?: string | null;
 }
@@ -202,7 +208,7 @@ export interface ProjectRecord {
   owner_email: string;
   relationship: "owned" | "shared";
   sharing_state: "private" | "shared_by_you" | "shared_with_you";
-  effective_role: "owner" | "admin" | "member";
+  effective_role: "owner" | "admin" | "member" | "viewer";
   shared_access_suspended?: boolean;
   name: string;
   slug: string;
@@ -239,7 +245,7 @@ export interface ProjectAccessRecord {
   owner_email: string;
   relationship: "owned" | "shared";
   sharing_state: "private" | "shared_by_you" | "shared_with_you";
-  effective_role: "owner" | "admin" | "member";
+  effective_role: "owner" | "admin" | "member" | "viewer";
   shared_access_suspended: boolean;
   organization_plan: TierName;
 }
@@ -313,7 +319,7 @@ export type AccountDeletionBlockedReason =
 export interface ProjectMemberRecord {
   user_id: string;
   email: string;
-  role: "owner" | "admin" | "member";
+  role: "owner" | "admin" | "member" | "viewer";
   membership_type: "owner" | "collaborator";
   created_at: string;
   avatar_object_key?: string | null;
@@ -323,7 +329,7 @@ export interface ProjectInviteRecord {
   invite_id: string;
   project_id: string;
   email: string;
-  role: "admin" | "member";
+  role: "admin" | "member" | "viewer";
   invited_by_user_id: string;
   accepted_at: string | null;
   canceled_at: string | null;
@@ -438,6 +444,7 @@ export interface ProjectTokenRecord {
 }
 
 export interface MemberTokenRecord {
+  scope?: MemberTokenPolicy;
   token_id: string;
   user_id: string;
   organization_id: string;
@@ -628,7 +635,7 @@ export interface ImprovementRetrievalRecord extends Record<string, unknown> {
   bundle_failure_reason: string | null;
 }
 
-export interface ResolveIncidentForOrganizationInput {
+export interface ResolveIncidentForOrganizationInput extends ProjectReadScope {
   organization_id: string;
   incident_id: string;
   user_id?: string;
@@ -636,7 +643,7 @@ export interface ResolveIncidentForOrganizationInput {
   resolved_at: string;
 }
 
-export interface ResolveIncidentsForOrganizationInput {
+export interface ResolveIncidentsForOrganizationInput extends ProjectReadScope {
   organization_id: string;
   incident_ids: string[];
   user_id?: string;
@@ -644,19 +651,19 @@ export interface ResolveIncidentsForOrganizationInput {
   resolved_at: string;
 }
 
-export interface ReopenIncidentForOrganizationInput {
+export interface ReopenIncidentForOrganizationInput extends ProjectReadScope {
   organization_id: string;
   incident_id: string;
   user_id?: string;
 }
 
-export interface ReopenIncidentsForOrganizationInput {
+export interface ReopenIncidentsForOrganizationInput extends ProjectReadScope {
   organization_id: string;
   incident_ids: string[];
   user_id?: string;
 }
 
-export interface ResolveImprovementForOrganizationInput {
+export interface ResolveImprovementForOrganizationInput extends ProjectReadScope {
   organization_id: string;
   improvement_id: string;
   user_id?: string;
@@ -664,13 +671,13 @@ export interface ResolveImprovementForOrganizationInput {
   resolved_at: string;
 }
 
-export interface ReopenImprovementForOrganizationInput {
+export interface ReopenImprovementForOrganizationInput extends ProjectReadScope {
   organization_id: string;
   improvement_id: string;
   user_id?: string;
 }
 
-export interface SnoozeImprovementForOrganizationInput {
+export interface SnoozeImprovementForOrganizationInput extends ProjectReadScope {
   organization_id: string;
   improvement_id: string;
   user_id?: string;
@@ -731,6 +738,7 @@ export interface MetadataStore {
   resolveProjectAccessForUser?(input: {
     user_id: string;
     project_id: string;
+    include_organization_grants?: boolean;
   }): Promise<ProjectAccessRecord | null>;
   listIncidentsForOrganization(input: {
     organization_id: string;
@@ -766,21 +774,25 @@ export interface MetadataStore {
   reopenIncidentsForOrganization(
     input: ReopenIncidentsForOrganizationInput
   ): Promise<IncidentRetrievalRecord[]>;
-  listServicesForOrganization?(input: {
-    organization_id: string;
-    user_id?: string;
-    project_id: string;
-    limit: number;
-    offset?: number;
-  }): Promise<ServiceRetrievalRecord[] | null>;
-  listIncidentLogsForOrganization(input: {
-    organization_id: string;
-    user_id?: string;
-    incident_id: string;
-    limit: number;
-    level?: string;
-    cursor?: IncidentLogsCursor;
-  }): Promise<IncidentLogRecord[]>;
+  listServicesForOrganization?(
+    input: {
+      organization_id: string;
+      user_id?: string;
+      project_id: string;
+      limit: number;
+      offset?: number;
+    } & ProjectReadScope
+  ): Promise<ServiceRetrievalRecord[] | null>;
+  listIncidentLogsForOrganization(
+    input: {
+      organization_id: string;
+      user_id?: string;
+      incident_id: string;
+      limit: number;
+      level?: string;
+      cursor?: IncidentLogsCursor;
+    } & ProjectReadScope
+  ): Promise<IncidentLogRecord[]>;
   getBundleFailureReasonForOrganization?(input: {
     organization_id: string;
     incident_id: string;

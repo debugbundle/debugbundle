@@ -1,3 +1,4 @@
+import { projectActorAllowedSql } from "./project-read-scope.js";
 import type { Queryable } from "./types.js";
 import { appendProjectReadScope, appendServiceDefinitionFilter } from "./project-read-scope.js";
 import type { ImprovementOpportunityStore } from "./improvement-opportunity-types.js";
@@ -25,13 +26,7 @@ export function createImprovementOpportunityRead(
           OR (
             $2::uuid IS NOT NULL
             AND (
-              p.owner_user_id = $2::uuid
-              OR EXISTS (
-                SELECT 1
-                FROM project_members pm
-                WHERE pm.project_id = p.id
-                  AND pm.user_id = $2::uuid
-              )
+              ${projectActorAllowedSql("p.id", "$2::uuid", input)}
             )
           )
         )`,
@@ -181,13 +176,7 @@ export function createImprovementOpportunityRead(
               OR (
                 $3::uuid IS NOT NULL
                 AND (
-                  p.owner_user_id = $3::uuid
-                  OR EXISTS (
-                    SELECT 1
-                    FROM project_members pm
-                    WHERE pm.project_id = p.id
-                      AND pm.user_id = $3::uuid
-                  )
+                  ${projectActorAllowedSql("p.id", "$3::uuid", input)}
                 )
               )
             )

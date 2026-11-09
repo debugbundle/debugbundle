@@ -1,3 +1,6 @@
+export * from "./access-control.js";
+export * from "./organization.js";
+export * from "./billing-catalog.js";
 import { z } from "zod";
 export * from "./project-services.js";
 export * from "./project-consolidation.js";
@@ -406,6 +409,7 @@ export {
   TIER_CAPABILITIES,
   getTierCapabilities,
   isSelfHostMode,
+  hasBusinessEntitlement,
   type TierName,
   type TierCapabilities
 } from "./tier-capabilities.js";
@@ -552,3 +556,12 @@ export * from "./analytics-query.js";
 
 export * from "./public-status.js";
 export * from "./alert-scope.js";
+export * from "./billing-offers.js";
+
+export {
+  BUSINESS_SMART_REPORT_RUNS_PER_MONTH,
+  BUSINESS_SMART_REPORT_DEFINITIONS,
+  MAX_SMART_REPORT_PROJECTS,
+  MAX_SMART_REPORT_RECIPIENTS,
+  MAX_SMART_REPORT_ORIGINS
+} from "./smart-report-limits.js";

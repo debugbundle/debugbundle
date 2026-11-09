@@ -1,0 +1,70 @@
+{
+  "list_member_tokens": {
+    "includeScope": {
+      "type": "boolean"
+    }
+  },
+  "create_member_token": {
+    "expiresAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "scope": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "const": "projects"
+            },
+            "project_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "minItems": 1,
+              "maxItems": 100
+            },
+            "permissions": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["project:read", "project:write", "project:admin", "organization:admin"]
+              },
+              "minItems": 1,
+              "maxItems": 4
+            }
+          },
+          "required": ["mode", "project_ids", "permissions"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "const": "organization"
+            },
+            "organization_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "permissions": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["project:read", "project:write", "project:admin", "organization:admin"]
+              },
+              "minItems": 1,
+              "maxItems": 4
+            }
+          },
+          "required": ["mode", "organization_id", "permissions"],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

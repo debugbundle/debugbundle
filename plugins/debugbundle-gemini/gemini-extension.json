@@ -1,11 +1,11 @@
 {
   "name": "debugbundle-gemini",
-  "version": "1.4.4",
+  "version": "1.5.0",
   "description": "Investigate runtime errors, incidents, health checks, debug bundles, and product analytics with DebugBundle in Gemini CLI.",
   "mcpServers": {
     "debugbundle": {
       "command": "npx",
-      "args": ["-y", "@debugbundle/mcp@1.19.4", "--local-auth"],
+      "args": ["-y", "@debugbundle/mcp@1.21.0", "--local-auth"],
       "cwd": "${workspacePath}"
     }
   }

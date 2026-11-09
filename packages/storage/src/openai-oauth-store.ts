@@ -2,9 +2,9 @@ import { randomUUID } from "node:crypto";
 
 import {
   OPENAI_HOSTED_MCP_SCOPES,
-  OPENAI_OIDC_SCOPES,
-  type OpenAiGrantStatusInput
-} from "../../auth/src/index.js";
+  OPENAI_OIDC_SCOPES
+} from "../../auth/src/openai-oauth-constants.js";
+import type { OpenAiGrantStatusInput } from "../../auth/src/openai-access-token-verifier.js";
 
 import { hashOpenAiOidcProviderLookup } from "./openai-oidc-provider-adapter.js";
 import type { Queryable } from "./types.js";
@@ -172,32 +172,7 @@ export function createPostgresOpenAiOAuthStore(
           };
     },
 
-    async isGrantActive(input) {
-      const scopes = normalizeScopes(input.scopes);
-      const result = await db.query<{ active: boolean } & Record<string, unknown>>(
-        `
-          SELECT true AS active
-          FROM oauth_authorization_grants g
-          JOIN organization_members om
-            ON om.organization_id = g.organization_id
-           AND om.user_id = g.user_id
-          JOIN organizations o ON o.id = g.organization_id
-          WHERE g.id = $1
-            AND g.user_id = $2
-            AND g.organization_id = $3
-            AND g.client_id = $4
-            AND g.resource = $5
-            AND g.scopes @> $6::text[]
-            AND g.revoked_at IS NULL
-            AND g.expires_at > now()
-            AND om.suspended_at IS NULL
-            AND o.suspended_at IS NULL
-          LIMIT 1
-        `,
-        [input.grantId, input.userId, input.organizationId, input.clientId, input.resource, scopes]
-      );
-      return result.rows[0]?.active === true;
-    },
+    isGrantActive: (input) => isOpenAiOAuthGrantActive(db, input),
 
     async listConnectionsForUser(input) {
       const result = await db.query<
@@ -402,4 +377,34 @@ export function createPostgresOpenAiOAuthStore(
       };
     }
   };
+}
+
+export async function isOpenAiOAuthGrantActive(
+  db: Queryable,
+  input: OpenAiGrantStatusInput
+): Promise<boolean> {
+  const scopes = normalizeScopes(input.scopes);
+  const result = await db.query<{ active: boolean } & Record<string, unknown>>(
+    `
+          SELECT true AS active
+          FROM oauth_authorization_grants g
+          JOIN organization_members om
+            ON om.organization_id = g.organization_id
+           AND om.user_id = g.user_id
+          JOIN organizations o ON o.id = g.organization_id
+          WHERE g.id = $1
+            AND g.user_id = $2
+            AND g.organization_id = $3
+            AND g.client_id = $4
+            AND g.resource = $5
+            AND g.scopes @> $6::text[]
+            AND g.revoked_at IS NULL
+            AND g.expires_at > now()
+            AND om.suspended_at IS NULL
+            AND o.suspended_at IS NULL
+          LIMIT 1
+        `,
+    [input.grantId, input.userId, input.organizationId, input.clientId, input.resource, scopes]
+  );
+  return result.rows[0]?.active === true;
 }

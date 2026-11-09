@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.6.0] - 2026-11-09
+
+- Adopt MCP 1.21.0 with organisation access, billing/referrals and Smart Report automation while preserving local-auth and existing incident workflows.
+
 ## [1.5.1] - 2026-11-05
 
 - Default installation guidance to one project per system across repositories, preserve existing connections and adopt MCP 1.19.4.

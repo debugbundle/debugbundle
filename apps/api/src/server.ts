@@ -1,4 +1,7 @@
+import { registerReferralRoutes } from "./routes/referrals.js";
 import { registerNotificationPreferencesRoutes } from "./routes/notification-preferences.js";
+import { registerOrganizationRoutes } from "./routes/organizations.js";
+import { registerMemberTokenRouteGuard } from "./member-token-route-guard.js";
 import { registerPublicStatusRoutes } from "./routes/public-status.js";
 import { registerAnalyticsFlowRoutes } from "./routes/analytics-flows.js";
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
@@ -434,6 +437,7 @@ export function createApiServer(
   registerApiContentLengthLimit(app, SMALL_REQUEST_BODY_LIMIT_BYTES);
   registerApiRequestTimeout(app, requestTimeoutMs);
   registerApiCsrfProtection(app);
+  registerMemberTokenRouteGuard(app, dependencies);
 
   debugBundleRelayPlugin(
     app,
@@ -485,6 +489,13 @@ export function createApiServer(
   registerSystemEmailReviewRoutes(app, dependencies, dogfoodingEnv);
   registerSlackRoutes(app, dependencies);
   registerTokenRoutes(app, dependencies);
+  registerOrganizationRoutes(app, dependencies);
+  registerReferralRoutes(app, dependencies);
+  registerReportDefinitionRoutes(app, dependencies);
+  registerReportRunRoutes(app, dependencies);
+  registerReportContentRoutes(app, dependencies);
+  registerReportPdfRoutes(app, dependencies);
+  registerReportDeliveryRoutes(app, dependencies);
   registerAlertRoutes(app, dependencies);
   registerAlertGroupRoutes(app, dependencies);
   registerAnalyticsRoutes(app, dependencies);
@@ -545,3 +556,8 @@ export function createApiServer(
 
   return app;
 }
+import { registerReportDefinitionRoutes } from "./routes/report-definitions.js";
+import { registerReportRunRoutes } from "./routes/report-runs.js";
+import { registerReportContentRoutes } from "./routes/report-content.js";
+import { registerReportPdfRoutes } from "./routes/report-pdf.js";
+import { registerReportDeliveryRoutes } from "./routes/report-delivery.js";

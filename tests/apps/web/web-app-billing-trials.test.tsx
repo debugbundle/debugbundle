@@ -67,76 +67,87 @@ describe("web app - billing trial flows", () => {
     expect(screen.getByRole("button", { name: /manage capacity/i })).toBeDisabled();
   });
 
-  it("starts the requested free trial from billing and refreshes the page state", async () => {
-    vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-06-04T00:00:00.000Z"));
-    const user = userEvent.setup();
-    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = requestUrl(input);
+  it.each(["team", "business"] as const)(
+    "starts the requested free trial from billing and refreshes the page state (%s)",
+    async (trialPlan) => {
+      vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-06-04T00:00:00.000Z"));
+      const user = userEvent.setup();
+      const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = requestUrl(input);
 
-      if (url.endsWith("/v1/auth/session")) {
-        return jsonResponse(200, {
-          session: createSession({ organization_plan: "free" })
-        });
-      }
+        if (url.endsWith("/v1/auth/session")) {
+          return jsonResponse(200, {
+            session: createSession({ organization_plan: "free" })
+          });
+        }
 
-      if (url.endsWith("/v1/billing") && init?.method === undefined) {
-        return jsonResponse(200, {
-          billing: createBillingSummary({
-            plan: "free",
-            billing_state: null,
-            trial: {
-              available: true,
-              active: false,
-              plan: null,
-              started_at: null,
-              ends_at: null,
-              used_at: null,
-              converted_at: null,
-              expired_at: null,
-              days_remaining: null
-            }
-          })
-        });
-      }
+        if (url.endsWith("/v1/billing") && init?.method === undefined) {
+          return jsonResponse(200, {
+            billing: createBillingSummary({
+              plan: "free",
+              billing_state: null,
+              trial: {
+                available: true,
+                active: false,
+                plan: null,
+                started_at: null,
+                ends_at: null,
+                used_at: null,
+                converted_at: null,
+                expired_at: null,
+                days_remaining: null
+              }
+            })
+          });
+        }
 
-      if (url.endsWith("/v1/billing/trial/start") && init?.method === "POST") {
-        expect(init.credentials).toBe("include");
-        expect(init.body).toBe(JSON.stringify({ target_plan: "team" }));
+        if (url.endsWith("/v1/billing/trial/start") && init?.method === "POST") {
+          expect(init.credentials).toBe("include");
+          expect(init.body).toBe(JSON.stringify({ target_plan: trialPlan }));
 
-        return jsonResponse(200, {
-          billing: createBillingSummary({
-            plan: "team",
-            billing_state: "trialing",
-            trial: {
-              available: false,
-              active: true,
-              plan: "team",
-              started_at: "2026-06-04T00:00:00.000Z",
-              ends_at: "2026-07-04T00:00:00.000Z",
-              used_at: "2026-06-04T00:00:00.000Z",
-              converted_at: null,
-              expired_at: null,
-              days_remaining: 30
-            }
-          })
-        });
-      }
+          return jsonResponse(200, {
+            billing: createBillingSummary({
+              plan: trialPlan,
+              billing_state: "trialing",
+              trial: {
+                available: false,
+                active: true,
+                plan: trialPlan,
+                started_at: "2026-06-04T00:00:00.000Z",
+                ends_at: "2026-07-04T00:00:00.000Z",
+                used_at: "2026-06-04T00:00:00.000Z",
+                converted_at: null,
+                expired_at: null,
+                days_remaining: 30
+              }
+            })
+          });
+        }
 
-      return jsonResponse(404, { error: "not_found" });
-    });
+        return jsonResponse(404, { error: "not_found" });
+      });
 
-    vi.stubGlobal("fetch", fetchMock);
+      vi.stubGlobal("fetch", fetchMock);
 
-    render(<App initialEntries={["/billing?trial=team"]} />);
+      render(<App initialEntries={[`/billing?trial=${trialPlan}`]} />);
 
-    expect(await screen.findByText(/team trial ready to start/i)).toBeInTheDocument();
-    expect(screen.queryByText(/paid subscriptions unlock/i)).toBeNull();
-    await user.click(screen.getByRole("button", { name: /start team trial/i }));
+      expect(
+        await screen.findByText(new RegExp(`${trialPlan} trial ready to start`, "i"))
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/paid subscriptions unlock/i)).toBeNull();
+      await user.click(
+        screen.getByRole("button", { name: new RegExp(`start ${trialPlan} trial`, "i") })
+      );
 
-    expect(await screen.findByText(/team trial started successfully/i)).toBeInTheDocument();
-    expect(await screen.findByText(/30 days left in your team trial/i)).toBeInTheDocument();
-    expect(screen.getByText(/paid subscriptions unlock on/i)).toBeInTheDocument();
-  });
+      expect(
+        await screen.findByText(new RegExp(`${trialPlan} trial started successfully`, "i"))
+      ).toBeInTheDocument();
+      expect(
+        await screen.findByText(new RegExp(`30 days left in your ${trialPlan} trial`, "i"))
+      ).toBeInTheDocument();
+      expect(screen.getByText(/paid subscriptions unlock on/i)).toBeInTheDocument();
+    }
+  );
 
   it("shows paid conversion only when the requested free trial was already used", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {

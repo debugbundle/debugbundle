@@ -1,3 +1,4 @@
+import { memberReadScope } from "../member-access-scope.js";
 import type { FastifyInstance } from "fastify";
 
 import type { ApiDependencies } from "../api-types.js";
@@ -31,6 +32,7 @@ export function registerServicesRoutes(app: FastifyInstance, dependencies: ApiDe
 
     const services = await dependencies.incidentRetrieval.listServicesForOrganization({
       organization_id: member.organization_id,
+      ...memberReadScope(member),
       user_id: member.member_id,
       project_id: parsedQuery.data.project_id,
       limit: parsedQuery.data.limit,

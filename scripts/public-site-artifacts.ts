@@ -11,6 +11,11 @@ import { CLI_USAGE_LINES } from "../apps/cli/src/usage.js";
 import { MCP_TOOL_CATALOG } from "../apps/mcp/src/tool-catalog.js";
 import { BundleV1Schema } from "../packages/shared-types/src/index.js";
 import {
+  getBillingCatalogPrice,
+  type PaidTierName
+} from "../packages/shared-types/src/billing-catalog.js";
+import { TIER_CAPABILITIES } from "../packages/shared-types/src/tier-capabilities.js";
+import {
   WebhookEventPayloadSchema,
   WebhookEventTypeSchema
 } from "../packages/webhook-client/src/index.js";
@@ -473,6 +478,11 @@ export async function buildMachineReadableArtifacts(): Promise<MachineReadableAr
 
   return [
     {
+      routePath: "/pricing-catalog.json",
+      contentType: "application/json",
+      content: ensureTrailingNewline(JSON.stringify(buildPublicPricingCatalog(), null, 2))
+    },
+    {
       routePath: "/licenses/apache-2.0.txt",
       contentType: "text/plain",
       content: license
@@ -548,6 +558,34 @@ export async function buildMachineReadableArtifacts(): Promise<MachineReadableAr
       content: ensureTrailingNewline(improvementBundle)
     }
   ];
+}
+
+/** Vendored by the standalone site so pricing and comparison limits share domain values. */
+export function buildPublicPricingCatalog(): Record<string, unknown> {
+  const prices = (tier: PaidTierName, kind: "plan" | "extra_capacity"): Record<string, string> => {
+    const dollars = (interval: "month" | "year"): string => {
+      const minor = getBillingCatalogPrice(tier, interval, kind).amount_minor;
+      return minor % 100 === 0 ? String(minor / 100) : (minor / 100).toFixed(2);
+    };
+    return { monthlyUsd: dollars("month"), yearlyUsd: dollars("year") };
+  };
+  return {
+    pricing: {
+      currency: "USD",
+      plans: {
+        free: { monthlyUsd: "0" },
+        solo: prices("solo", "plan"),
+        team: prices("team", "plan"),
+        business: prices("business", "plan")
+      },
+      extraCapacity: {
+        solo: prices("solo", "extra_capacity"),
+        team: prices("team", "extra_capacity"),
+        business: prices("business", "extra_capacity")
+      }
+    },
+    capabilities: TIER_CAPABILITIES
+  };
 }
 
 export async function writeMachineReadableArtifacts(

@@ -115,7 +115,10 @@ export async function readProjectMergeSnapshot(
     );
     const invites = await db.query<{ pending: boolean }>(
       `SELECT EXISTS(SELECT 1 FROM project_invites
-      WHERE project_id=$1 AND accepted_at IS NULL AND canceled_at IS NULL AND expires_at>now()) AS pending`,
+      WHERE project_id=$1 AND accepted_at IS NULL AND canceled_at IS NULL AND expires_at>now())
+      OR EXISTS(SELECT 1 FROM organization_invites invite JOIN projects p ON p.organization_id=invite.organization_id
+        WHERE p.id=$1 AND $1=ANY(invite.project_ids) AND invite.accepted_at IS NULL
+          AND invite.canceled_at IS NULL AND invite.expires_at>now()) AS pending`,
       [project.project_id]
     );
     const active = await db.query<{ operation_id: string }>(

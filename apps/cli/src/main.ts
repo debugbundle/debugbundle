@@ -1,3 +1,8 @@
+import { handleReferralCommand, type referralsWithAuthCommand } from "./referral-commands.js";
+import {
+  handleOrganizationCommand,
+  type organizationWithAuthCommand
+} from "./organization-commands.js";
 import { handleNotificationCommand, notificationWithAuthCommand } from "./notification-commands.js";
 import { parseAgents } from "../../../packages/agent-setup/src/index.js";
 import { analyzeCommand as defaultAnalyzeCommand } from "./analyze-command.js";
@@ -86,6 +91,10 @@ export type CliDependencies = ManagementCommandDependencies &
     projectAdoptionCommand?: typeof projectAdoptionWithAuthCommand;
     serviceDefinitionCommand?: typeof serviceDefinitionWithAuthCommand;
     notificationCommand?: typeof notificationWithAuthCommand;
+    organizationCommand?: typeof organizationWithAuthCommand;
+    referralsCommand?: typeof referralsWithAuthCommand;
+    reportsCommand?: typeof reportsWithAuthCommand;
+    reportRunsCommand?: typeof reportRunsWithAuthCommand;
     agentReadCommand?: typeof defaultAgentReadCommand;
     analyzeCommand?: typeof defaultAnalyzeCommand;
     cleanCommand?: typeof defaultCleanCommand;
@@ -819,6 +828,18 @@ export async function runCli(
       return await handleTokenCommand(parsedArgv, dependencies);
     }
 
+    if (command === "organization")
+      return await handleOrganizationCommand(parsedArgv, dependencies.organizationCommand);
+
+    if (command === "referrals")
+      return await handleReferralCommand(parsedArgv, dependencies.referralsCommand);
+
+    if (command === "reports")
+      return await handleReportCommand(parsedArgv, dependencies.reportsCommand);
+
+    if (command === "report-runs")
+      return await handleReportRunCommand(parsedArgv, dependencies.reportRunsCommand);
+
     if (command === "billing") {
       return await handleBillingCommand(parsedArgv, dependencies);
     }
@@ -923,3 +944,5 @@ export async function main(dependencies: MainDependencies = {}): Promise<void> {
 
   setExitCode(result.exitCode);
 }
+import { handleReportCommand, type reportsWithAuthCommand } from "./report-commands.js";
+import { handleReportRunCommand, type reportRunsWithAuthCommand } from "./report-run-commands.js";

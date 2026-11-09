@@ -31,11 +31,32 @@ export const reviewerFixturePath = join(
   "reviewer-tenant.json"
 );
 export const dataMapPath = join(repoRoot, "contracts", "openai-plugin-v1-data-map.md");
+export const reportContractFixturePath = join(
+  repoRoot,
+  "tests",
+  "fixtures",
+  "openai-plugin-reports",
+  "tool-contracts.json"
+);
+export const reportSchemaPath = join(
+  repoRoot,
+  "packages/mcp-core/src/contracts/report-schemas.json"
+);
 export const releaseManifestPath = join(openAiRoot, "release-manifest.json");
 
-const expectedVersion = "1.0.3";
-// Skill and package-authentication patches retain the independently frozen MCP wire contract.
-const expectedContractVersion = "1.0.0";
+const expectedVersion = "1.1.0";
+// The original twenty-three declarations remain frozen; saved reports are additive.
+const expectedContractVersion = "1.1.0";
+export function readOpenAiPluginContract() {
+  const base = readJson(contractFixturePath),
+    reports = readJson(reportContractFixturePath);
+  return {
+    ...base,
+    contract_version: reports.contract_version,
+    scopes: [...base.scopes, reports.scope],
+    tools: [...base.tools, ...reports.tools]
+  };
+}
 const expectedResource = "https://mcp.debugbundle.com";
 const expectedEndpoint = `${expectedResource}/mcp`;
 const expectedIssuer = "https://api.debugbundle.com";
@@ -489,14 +510,21 @@ export function validateOpenAiPluginSource({ requireConnection = false } = {}) {
   const manifest = validateManifest(failures);
   const connectionId = validateConnection(manifest, requireConnection, failures, manualGates);
 
-  const contract = readJson(contractFixturePath);
+  const contract = readOpenAiPluginContract();
+  if (
+    stableJson(readJson(reportContractFixturePath)) !==
+    stableJson(
+      readJson(join(repoRoot, "packages/mcp-core/src/contracts/report-tool-contracts.json"))
+    )
+  )
+    failures.push("contract:saved_reports_metadata_drift");
   if (
     contract.contract_version !== expectedContractVersion ||
     contract.product_shape !== "skill_plus_remote_mcp" ||
     contract.resource !== expectedResource ||
     contract.endpoint !== expectedEndpoint ||
     contract.issuer !== expectedIssuer ||
-    contract.tools.length !== 23
+    contract.tools.length !== 25
   ) {
     failures.push("contract:product_shape_drift");
   }
@@ -676,6 +704,12 @@ export function collectReleaseInputs() {
       "tests/fixtures/openai-plugin-v1/tool-contracts.json": sha256File(contractFixturePath),
       "tests/fixtures/openai-plugin-v1/schemas.json": sha256File(schemaFixturePath),
       "tests/fixtures/openai-plugin-v1/reviewer-tenant.json": sha256File(reviewerFixturePath),
+      "tests/fixtures/openai-plugin-reports/tool-contracts.json":
+        sha256File(reportContractFixturePath),
+      "packages/mcp-core/src/openai-report-contract.ts": sha256File(
+        join(repoRoot, "packages/mcp-core/src/openai-report-contract.ts")
+      ),
+      "packages/mcp-core/src/contracts/report-schemas.json": sha256File(reportSchemaPath),
       "contracts/openai-plugin-v1-data-map.md": sha256File(dataMapPath)
     }
   };

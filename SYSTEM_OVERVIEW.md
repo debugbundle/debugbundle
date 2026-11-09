@@ -1,3 +1,61 @@
+Local tier review uses `make dev-tier` (inspect) or `TIER=free|solo|team|business`
+against the checkout-owned Compose Postgres socket. It refuses provider-linked,
+trial and pending-billing accounts; explicit administrative Free stays selected.
+The tool adds no API bypass and preserves normal local downgrade/retention rules.
+
+Business extension source is implemented under `spec/business-tier.md`
+(FR-BUS-01–08 / AC-BUS-01–10). Original qualification is recorded in
+`spec/business-tier-qualification-20261108.md`; the authorised follow-up launch
+audit is tracked in `spec/business-launch-review-20261108.md` and STATUS.md.
+Business sales, new Smart Report generation and email egress default off. The
+approved rounded Stripe catalogue and next-release price references are configured
+(see `spec/pricing-refresh-20261108.md`); deployment and programme activation remain
+separate. Public prices/comparison live at `/pricing/`; `/docs/pricing/` is the
+Plans and capacity guide, linking to current prices while explaining usage.
+
+Fixed organisation/project roles and scoped member tokens use current actual
+principals and frozen origin grants. One organisation lock protects unique-person
+admission, invitations and accepted ownership transfer. SDK-only endpoints retain
+project-token authentication. Private UI and API/CLI/ordinary MCP call the same
+domain services; restricted agent catalogues and the original twenty-three OpenAI declarations remain
+unchanged. The owner-approved follow-up adds explicit OAuth-consented saved-report
+reads and Business to the existing one-time thirty-day trial; current qualification
+is tracked in STATUS.md.
+
+The fixed USD monthly/yearly catalogue preserves existing monthly identifiers.
+Annual paid terms contain anchored monthly allowance windows. Full-offer checkout,
+owner-confirmed quotes, payment-pending changes, renewal scheduling and matching
+capacity share durable billing reservations. Accepted ownership transfer queues
+verified current-owner contact synchronisation without replacing provider identity.
+
+Business-only referral accounting uses verified collected base cash, immutable
+receipt facts, reversal/availability holds and manually recorded payout references.
+The first eligible Business base invoice receives the configured 10% benefit;
+recovery is confined to an exact eligible draft invoice. Early/deleted customer
+bindings and protected personal finance exports never infer another identity.
+
+Smart Reports retain bounded consented facts/context, fair durable run admission,
+a shared monthly quota/budget and one conservative paid attempt. The existing
+worker has an independent serial PDF/generation/email lane with shared clients.
+One canonical private report supplies HTML, cached bounded PDF and email overview.
+Current whole-scope authority is checked at generation and egress. Receipt-backed
+email distinguishes acceptance from uncertainty and never blindly resends.
+Disabling generation preserves archive reads and exact-key cleanup. Account export
+is paged and private; explicit deletion removes report content while preserving
+required financial obligations. Numeric history has its own bounded retention.
+
+All twenty candidate schema changes are ordered additive forward migrations,
+with exact readiness checks before dependent runtime. Trial history stops at the
+database deadline; late conversion restarts coverage. Self-hosted organisation
+features retain the same explicit role/suspension/legacy-token boundaries. Hosted compatibility guards
+require Business-aware API/worker images and a compatible retained rollback pair
+before sales activation. The synthetic model decision and capped spend are in
+`evals/smart-reports/results-20261107.md`; publication, runtime and provider acceptance
+remain separate from local qualification. Existing debugging and weekly digests
+retain their established contracts. Public Smart Report setup prompts share the existing
+agent-workflow catalogue and contextual guide cards; they preserve explicit scope,
+schedule and evidence-consent controls before report configuration.
+
 Multiline exception release (6 November 2026): core 1.22.1 is live from
 `8daab4acf3ca36c0c425aab455959c1bb7ae9a0d`. Java stderr assembly belongs to
 the Java SDK; legacy continuation classification belongs to
@@ -192,11 +250,18 @@ in-memory simulation; the real API, worker and database remain independent.
 The preview populates the primary dashboard/project pages, including token/member,
 webhook/probe, billing/capacity and analytics flow/funnel/journey/artifact views.
 Public status settings/options/preview and publication are also simulated in
-memory with valid project/check UUIDs and loopback-only share links. The mock
+memory with valid workspace/project/check UUIDs and loopback-only share links. The mock
 uses the production aggregate projection; reads never execute health checks.
 `make dev-mock-off` restores normal API routing. Mock mode is loopback-only,
 development-only, absent from production builds and disables frontend telemetry.
 See README's populated UI preview and FR-WEB-10 / AC-WEB-10.
+
+Billing's local preview controls switch synthetic Free/Solo/Team/Business,
+monthly/yearly and paid/complimentary/trial fixtures. Normal offer dialogs use the
+shared catalogue and transition classifier; checkout stays on loopback and applies
+only on simulated confirmation. Renewal/cancellation controls affect mock memory.
+The private Vite endpoint and lazy controls are absent from production builds.
+Complimentary accounts retain billing restrictions and may open the pricing page.
 
 > Context-compression file for agent session recovery.
 > If this file conflicts with `/spec/*`, `/contracts/*`, or `/rules/*`, those win.
@@ -560,7 +625,7 @@ packages/
       lib/theme.tsx          — Light/dark/system theme state and DOM synchronization
       components/ui/         — shadcn-based UI primitives used across the app
       pages/settings-page.tsx — Account settings page with auth-method-aware password management, explicit Gravatar import, account export, and destructive account deletion controls gated by an exact confirmation phrase plus email OTP
-      components/system/     — App shell, page headers, callout cards, theme toggle, reusable user-avatar primitive, reusable plaintext secret reveal, and billing display primitives
+      components/system/     — App shell, page headers, callout cards, shared wrapping title/badge rows, theme toggle, reusable user-avatar primitive, reusable plaintext secret reveal, and billing display primitives
 
 packages/
   storage/       — Storage adapters and domain persistence
@@ -744,24 +809,27 @@ Automatic SDK error/log hooks respect caller suppression: PHP's current non-fata
 
 ## Pricing
 
-See `/spec/product.md` section 13 for the finalized pricing source of truth. Three tiers: **Free → Solo → Team**.
+See `/spec/product.md` section 13 for the finalized pricing source of truth. Four tiers: **Free → Solo → Team → Business**. Enterprise is a contact card only. See `spec/business-tier.md` for the approved extension.
 
 Event billing uses the event class model: Free meters only `incident_signal` events (Class A — exceptions, qualifying logs, and immediate request failures), paid tiers meter `incident_signal` + `context_signal` (Class A + B), and `operational_signal` (Class C) is excluded from billing across all tiers. Each project has a capture policy (preset: `minimal`/`balanced`/`investigative`) that controls what the SDK captures and the ingestion API accepts, plus project-scoped capture rules that can manually `demote`, `sample`, or `drop` known noisy patterns after they appear in real incidents. Capture rules are managed through API, CLI, MCP, and web project settings; incident-derived suggestions report matching existing rules and create-from-suggestion is idempotent so repeated applies return the existing rule instead of duplicating it. The capture policy still defines the default request-failure behavior, including `immediate_client_error_statuses` for status-wide `4xx` promotion and `immediate_client_error_path_rules` for narrow status+path+method promotion. All current tiers default to `balanced`, which treats 408/423/424/425/429 request failures as immediate incident signals; `investigative` additionally defaults the client-error incident override to `401/403/409/422`. Unpromoted `4xx` responses such as generic 404s remain non-incident telemetry/context when captured.
 
-|                      | Free                                                  | Solo ($4.99/mo)                                         | Team ($19/mo)                                            |
-| -------------------- | ----------------------------------------------------- | ------------------------------------------------------- | -------------------------------------------------------- |
-| Projects             | Unlimited                                             | Unlimited (+$0.99/capacity unit)                        | Unlimited (+$1.99/capacity unit)                         |
-| Members              | 1 (owner only)                                        | 1 (solo only)                                           | 5                                                        |
-| Bundle retention     | 7 days                                                | 30 days                                                 | 90 days                                                  |
-| Raw event retention  | 7 days                                                | 14 days                                                 | 30 days                                                  |
-| Bundle types         | Failure + local analysis                              | Failure + Improvement (cloud)                           | Failure + Improvement (cloud)                            |
-| Improvement engine   | Local (user's LLM via skill-layer)                    | Cloud (automated) + local analysis                      | Cloud (automated) + local analysis                       |
-| Probes               | Always-on (ring buffer + error-flush)                 | Always-on + remote activation                           | Always-on + remote activation                            |
-| Hosted health checks | 1/project, 3 monitored projects, 3 active, 5m minimum | 3/project, 10 monitored projects, 30 active, 1m minimum | 10/project, 10 monitored projects, 50 active, 1m minimum |
-| Shared dashboards    | —                                                     | —                                                       | ✅                                                       |
-| GitHub automation    | —                                                     | ✅ (3 rules/project, 7d history)                        | ✅ (20 rules/project, 30d history)                       |
-| Member invites       | —                                                     | —                                                       | ✅                                                       |
-| Slack integration    | —                                                     | —                                                       | ✅                                                       |
+|                                                           | Free          | Solo         | Team         | Business     |
+| --------------------------------------------------------- | ------------- | ------------ | ------------ | ------------ |
+| Monthly/yearly USD, pretax                                | $0            | $5 / $48     | $19 / $192   | $59 / $588   |
+| Included capacity units                                   | Fixed preview | 3            | 15           | 30           |
+| Extra unit monthly/yearly USD                             | —             | $1 / $10     | $3 / $30     | $3 / $30     |
+| Projects                                                  | Unlimited     | Unlimited    | Unlimited    | Unlimited    |
+| People/account                                            | 1             | 1            | 1,000        | 1,000        |
+| Bundle/raw retention                                      | 7 / 7 days    | 30 / 14 days | 90 / 30 days | 90 / 30 days |
+| Health checks/project; monitored projects; active/account | 1; 3; 3       | 3; 10; 30    | 5; 10; 30    | 10; 10; 50   |
+| Minimum health interval                                   | 5 minutes     | 1 minute     | 1 minute     | 1 minute     |
+| Shared dashboards, Slack, priority support                | —             | —            | Yes          | Yes          |
+| Organisation grants and Smart Reports                     | —             | —            | —            | Yes          |
+
+Capacity increases only its established allowance buckets. Annual subscriptions
+retain monthly allowance windows. Project-level permissions, SDK safety, local
+analysis, cloud improvements, remote probes and GitHub automation retain the
+contracts in `spec/product.md`; Business inherits Team automation capabilities.
 
 ---
 
@@ -886,3 +954,62 @@ metadata and reject symbolic links. Local state/event IO reuses managed file
 helpers with allocation bounded to the opened file and atomic state/processing writes.
 
 Hosted `llms.txt` is rendered by the core `scripts/public-site-artifacts.ts` generator before site export. Its CLI-first, one-project-per-system policy is covered by the active agent-interface contract; editing only the vendored site file is insufficient.
+
+Referral finance uses `referral-ledger-schema.ts` / `referral-ledger-store.ts` for immutable canonical receipts, frozen service anchors, cumulative target deltas and manual payout claims. `packages/referrals/src/referral-finance.ts` separates verified personal partner reads from configured DebugBundle operators, using the existing `BILLING_ADMIN_OVERRIDE_EMAILS` allowlist. The optional API factory is `default-referrals.ts`; absent/invalid dedicated configuration disables referrals independently of authentication and debugging. New enrolment defaults off while retained finance reads stay available with the stable secret.
+
+Referral routes share the validated `packages/referral-client` with CLI and ordinary MCP, including explicit external-payment recording confirmation. The browser uses its session/CSRF context; `/settings/referrals` provides versioned joining, public link/code, earnings and paginated minimal histories, while `/settings/referrals/payouts` is operator-only. Billing's code form includes an expected-workspace guard. Provider cash/line/refund/dispute adapters and the retained reconciliation outbox are now connected to an independent worker lane. Checkout binds the first eligible Business base-invoice discount and exact draft-invoice recovery. Early/deleted customer binding and bounded personal account export are implemented; combined qualification is in progress. These local changes do not activate the programme.
+
+Financial handoffs use `referral-reconciliation-schema.ts` / `referral-reconciliation-store.ts` (candidate forward migration `202611070008_add_referral_reconciliation_outbox`). The signed webhook saves minimal resource/customer identity and a durable job together, before billing dedupe; failed handoffs request provider redelivery after ordinary entitlement reconciliation. The same event can fill its original customer binding after Checkout links the customer. No provider read runs in that transaction. `stripe-receipt-snapshot.ts` validates complete original invoice lines, allocated captured cash, linked credit-note/refund identities and dispute outcomes. It keeps unknown allocations held and waits for the triggering adjustment to appear in provider lists. Settlement currency does not change USD commission.
+
+`referral-receipt-processor.ts` runs one financial job per pass in its own lane using existing worker claims. Bounded provider reads precede a fenced transaction committing the canonical ledger, retained event completion and job completion together. Expired/exhausted execution jobs cannot erase the retained financial intent; the outbox can dispatch a fresh attempt. Pending known events hold the relevant customer's positive earnings, and unknown scope conservatively holds all positive payouts until verified binding. Source identity survives account deletion. The shared Stripe factory now lives in `packages/billing/src/stripe-config.ts`; the API path re-exports it, and the worker can read the same price map without requiring a webhook secret. No provider/account configuration has changed.
+
+Smart Report facts are separate from the existing weekly digest. `packages/smart-reports/src/report-period.ts` defines complete UTC days, Monday–Sunday weeks, calendar months and honest adjacent comparisons. `contracts/smart-report-facts.md` records source units, scope, coverage and sampling rules. `report-lifecycle-schema.ts` (candidate forward migration `202611070009_add_report_lifecycle_facts`) appends numeric incident/improvement transitions in the same transaction as each actual status/severity change. It retains no captured text and has no cascading incident FK: routine source pruning cannot erase a recorded resolution or invent one. Explicit project/account deletion removes its dependent facts. Original project/service IDs preserve merge-origin boundaries.
+
+`report-lifecycle-store.ts` reads only accepted explicit origins, distinguishes resolution events from distinct resolved entities, and marks periods before the collection watermark or twelve-month cutoff incomplete. Separate bounded retained-history backfill deduplicates known source timestamps without claiming complete transition history or historical severity. Numeric cleanup uses the existing retention runner, UTC calendar-month cutoffs and bounded continuation. Report-enabled bounded text, availability/analytics coverage, complete fact selection, durable generation, rendering and receipt-backed delivery are implemented. The capped synthetic Luna/Terra evaluation is recorded in evals/smart-reports/results-20261107.md; production/provider activation remains separate.
+
+Report collection uses `storage/report-collector-store.ts` and the additive
+`report-collector-schema.ts` forward migration. The existing serial report lane
+runs at most one SQL-only batch every five seconds while reporting is enabled,
+resumes saved bounded cursors and checks the saved creator and frozen origins.
+Initial numeric backfill gives way to five-minute bounded redacted summary
+refreshes. This lane holds no locks over provider or object-storage work.
+
+`storage/report-health-store.ts` records numeric observed recovery inside the
+existing health executor's result transaction after a threshold-backed real
+failing-to-passing transition. Its additive schema and bounded period reader feed
+canonical report health evidence without URLs or raw retention extensions.
+
+`storage/report-allowance-store.ts` and `smart-reports/report-allowance.ts` own
+anchored monthly generation usage and bounded current-schedule forecasts. API,
+CLI, ordinary MCP and the reusable Reports allowance Card share the same reader.
+`billing/business-sales-policy.ts` separately gates fresh Business admission;
+API composition requires an explicit launch switch and configured reporting/AI,
+while existing paid subscription and reconciliation readers retain access.
+
+`storage/referral-benefit-store.ts` and its additive forward schema retain the
+identity-fenced first eligible customer invoice reservation. The pure decision
+lives in `referrals/customer-benefit.ts`; read-only provider coupon validation is
+in `referrals/stripe-referral-coupon.ts`. Current Owner/attribution checks and
+provider/customer identity fences apply before reservation. Checkout preserves
+its exact coupon/attribution request. Verified finalisation facts consume the
+benefit independently of collected cash. `referral-benefit-reconciliation.ts`
+prepares a persisted exact-draft intent after a zero/trial bill;
+`referrals/stripe-benefit-recovery.ts` validates and updates only that invoice
+outside locks. Lost acknowledgements read back/replay the same invoice. Missing
+finalised discounts remain held for reconciliation. No provider programme is
+activated by these local changes.
+
+`storage/business-account-export.ts` adds fixed, bounded pages to the existing
+browser-Owner account export. It reuses current report scope readers, exposes
+only closed delivery/financial projections and keeps canonical report downloads
+on their authenticated paths. Numeric pages preserve origin identity and current
+retention. Default export data and artifact handling remain intact with an added
+section manifest. Report-history and export cursors preserve database timestamp
+precision so adjacent records cannot be skipped within a millisecond.
+
+The private cloud companion verifies `business-tier-v1` image labels before
+hosted migration/startup and protects the selected previous stable API/worker.
+A sales-disabled bridge precedes a second verified image rollout and separately
+authorised Business activation. Environment-only activation checks the retained
+rollback pair; legacy source rollouts cannot replace a Business-aware runtime.
+The helper is read-only and performs no deployment or provider mutation itself.

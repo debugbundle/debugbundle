@@ -1,3 +1,4 @@
+import type { MemberTokenPolicy } from "../../shared-types/src/index.js";
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 import {
@@ -14,6 +15,8 @@ export const SESSION_COOKIE_NAME = "dbundle_session";
 export const GITHUB_OAUTH_STATE_COOKIE_NAME = "dbundle_github_oauth_state";
 export const GITHUB_APP_INSTALL_STATE_COOKIE_NAME = "dbundle_github_app_install_state";
 export const PROJECT_INVITE_TOKEN_PREFIX = "dbundle_invite_";
+export const ORGANIZATION_INVITE_TOKEN_PREFIX = "dbundle_org_invite_";
+export const OWNERSHIP_TRANSFER_TOKEN_PREFIX = "dbundle_org_transfer_";
 
 type Argon2Algorithm = NonNullable<Argon2Options["algorithm"]>;
 
@@ -50,6 +53,8 @@ export interface MemberTokenContext {
   organization_id: string;
   revoked_at?: string | null;
   expires_at?: string | null;
+  token_id?: string;
+  token_policy?: MemberTokenPolicy;
 }
 
 export interface AgentTokenContext {
@@ -70,7 +75,7 @@ export interface WebSessionRecord {
   email: string;
   email_verified_at: string | null;
   organization_id: string;
-  role: "owner" | "member";
+  role: "owner" | "admin" | "member";
   created_at: string;
   expires_at: string;
   revoked_at: string | null;
@@ -101,7 +106,7 @@ export interface WebUserAccount {
   email: string;
   email_verified_at: string | null;
   organization_id: string;
-  role: "owner" | "member";
+  role: "owner" | "admin" | "member";
 }
 
 export interface GitHubUserAccountResult extends WebUserAccount {
@@ -148,7 +153,7 @@ export interface ConsumeEmailAuthChallengeInput {
 export interface ProjectInviteMembership {
   project_id: string;
   user_id: string;
-  role: "owner" | "admin" | "member";
+  role: "owner" | "admin" | "member" | "viewer";
   membership_type?: "owner" | "collaborator";
 }
 
@@ -169,10 +174,22 @@ export type AcceptProjectInviteStoreResult =
       membership: ProjectInviteMembership;
     }
   | {
-      kind: "invalid_token" | "email_mismatch" | "shared_access_suspended";
+      kind:
+        | "invalid_token"
+        | "email_mismatch"
+        | "shared_access_suspended"
+        | "collaborator_limit_reached";
     };
 
 export interface AuthEmailSender {
+  sendOrganizationAccessEmail?(input: {
+    email: string;
+    token: string;
+    kind: "invite" | "ownership_transfer";
+    organization_name: string;
+    sender_name: string;
+    access_summary?: string;
+  }): Promise<void>;
   sendEmailAuthCode(input: {
     email: string;
     code: string;
@@ -330,6 +347,15 @@ export function generateEmailAuthCode(): { plaintext: string; hash: string } {
 export function generateProjectInviteToken(_inviteId: string): { plaintext: string; hash: string } {
   void _inviteId;
   return generateOpaqueToken(PROJECT_INVITE_TOKEN_PREFIX);
+}
+
+export function generateOrganizationAccessToken(kind: "invite" | "ownership_transfer"): {
+  plaintext: string;
+  hash: string;
+} {
+  return generateOpaqueToken(
+    kind === "invite" ? ORGANIZATION_INVITE_TOKEN_PREFIX : OWNERSHIP_TRANSFER_TOKEN_PREFIX
+  );
 }
 
 export async function hashPassword(password: string): Promise<string> {

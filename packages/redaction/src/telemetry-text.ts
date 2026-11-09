@@ -1,17 +1,26 @@
 import { DEFAULT_SENSITIVE_KEYS, isSensitiveKey } from "./keys.js";
 
 const REDACTED = "[REDACTED]";
-const BUILTIN_LABELS = [...DEFAULT_SENSITIVE_KEYS, "client_secret", "x_api_key",
-  "accessToken", "refreshToken", "privateKey", "clientSecret"];
+const BUILTIN_LABELS = [
+  ...DEFAULT_SENSITIVE_KEYS,
+  "client_secret",
+  "x_api_key",
+  "accessToken",
+  "refreshToken",
+  "privateKey",
+  "clientSecret"
+];
 const ASSIGNMENT = new RegExp(
   `\\b(${BUILTIN_LABELS.join("|")})\\b(["']?\\s*[:=]\\s*)(?:"[^"]*"|'[^']*'|[^\\s&,;]+)`,
   "gi"
 );
 const HEADER = /\b(Authorization|Proxy-Authorization|Cookie|Set-Cookie)\s*:\s*[^\r\n]*/gi;
-const PEM = /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/gi;
+const PEM =
+  /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/gi;
 const PEM_COMPLETE = new RegExp(PEM.source, "i");
 const PEM_START = /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/i;
-const DEBUGBUNDLE_TOKEN = /\bdbundle_(?:proj|mem|probe|agent)_[A-Za-z0-9_-]+\b/g;
+const DEBUGBUNDLE_TOKEN =
+  /\bdbundle_(?:proj|mem|probe|agent|invite|org_invite|org_transfer)_[A-Za-z0-9_-]+\b/g;
 const BEARER = /\b(Bearer|Basic)\s+[A-Za-z0-9._~+\/-]{6,}/gi;
 const URL_TEXT = /\bhttps?:\/\/[^\s<>"']+/gi;
 // Do not treat numeric substrings inside UUIDs, hashes, or identifier slugs as cards.
@@ -44,7 +53,12 @@ function scrubUrl(raw: string, keys: readonly string[]): string {
     const nextQuery = new URLSearchParams();
     for (const [key, value] of url.searchParams) {
       if (key.length > 128 || scrubCredentialText(key, keys, false) !== key) continue;
-      nextQuery.append(key, isSensitiveKey(key, keys) || scrubCredentialText(value, keys, false) !== value ? REDACTED : value);
+      nextQuery.append(
+        key,
+        isSensitiveKey(key, keys) || scrubCredentialText(value, keys, false) !== value
+          ? REDACTED
+          : value
+      );
     }
     url.search = nextQuery.toString();
     url.hash = "";
@@ -56,7 +70,11 @@ function scrubUrl(raw: string, keys: readonly string[]): string {
 }
 
 /** Bounded caller input only. Returns stable replacement text, never the matching secret. */
-export function scrubCredentialText(input: string, additionalKeys: readonly string[], scanUrls = true): string {
+export function scrubCredentialText(
+  input: string,
+  additionalKeys: readonly string[],
+  scanUrls = true
+): string {
   const keys = [...DEFAULT_SENSITIVE_KEYS, ...additionalKeys];
   if (PEM_START.test(input) && !PEM_COMPLETE.test(input)) return REDACTED;
   let output = input;
@@ -73,11 +91,14 @@ export function scrubCredentialText(input: string, additionalKeys: readonly stri
   if (additionalKeys.length > 0) {
     for (const key of additionalKeys) {
       const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const named = new RegExp(`\\b(${escaped})\\b(["']?\\s*[:=]\\s*)(?:"[^"]*"|'[^']*'|[^\\s&,;]+)`, "gi");
+      const named = new RegExp(
+        `\\b(${escaped})\\b(["']?\\s*[:=]\\s*)(?:"[^"]*"|'[^']*'|[^\\s&,;]+)`,
+        "gi"
+      );
       output = output.replace(named, "$1$2[REDACTED]");
     }
   }
-  output = output.replace(CARD, (candidate) => isValidCard(candidate) ? REDACTED : candidate);
+  output = output.replace(CARD, (candidate) => (isValidCard(candidate) ? REDACTED : candidate));
   if (!scanUrls) return output;
   return output.replace(URL_TEXT, (matched) => {
     const trailing = matched.match(/[).,;]+$/)?.[0] ?? "";

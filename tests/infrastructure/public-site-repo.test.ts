@@ -6,7 +6,10 @@ import { describe, expect, it } from "vitest";
 
 const repoRoot = process.cwd();
 const siteRoot = process.env["DEBUGBUNDLE_SITE_ROOT"] ?? join(repoRoot, "site");
-const describePublicSiteRepo = process.env["DEBUGBUNDLE_SITE_ROOT"] !== undefined || existsSync(join(siteRoot, "package.json")) ? describe : describe.skip;
+const describePublicSiteRepo =
+  process.env["DEBUGBUNDLE_SITE_ROOT"] !== undefined || existsSync(join(siteRoot, "package.json"))
+    ? describe
+    : describe.skip;
 
 describePublicSiteRepo("private website repository", () => {
   it("keeps website implementation private and published documentation reusable", () => {
@@ -178,7 +181,11 @@ describePublicSiteRepo("private website repository", () => {
   }, 20_000);
 
   it("keeps the pricing page trial CTAs and no-card capacity messaging aligned with the hosted app flow", () => {
-    const pricing = readFileSync(join(siteRoot, "app", "(site)", "pricing", "page.tsx"), "utf8");
+    const pricing = [
+      readFileSync(join(siteRoot, "app", "(site)", "pricing", "page.tsx"), "utf8"),
+      readFileSync(join(siteRoot, "src", "pricing-plans.ts"), "utf8"),
+      readFileSync(join(siteRoot, "src", "components", "pricing-plans.tsx"), "utf8")
+    ].join("\n");
 
     expect(pricing).toContain("https://app.debugbundle.com/signup");
     expect(pricing).toContain("https://app.debugbundle.com/signup?trial=solo");

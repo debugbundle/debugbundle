@@ -113,7 +113,7 @@ describe("github setup", () => {
 
     expect(await screen.findByText(/setup at a glance/i)).toBeInTheDocument();
     const probesDescription = await screen.findByText(
-      /^always-on probe buffers still work in the sdk, but remote probe activation requires solo or team\.$/i
+      /^always-on probe buffers still work in the sdk, but remote probe activation requires a paid plan\.$/i
     );
     const probesBlock = probesDescription.closest("div.rounded-lg");
     expect(probesBlock).not.toBeNull();
@@ -521,9 +521,7 @@ describe("github setup", () => {
 
     render(<App initialEntries={["/projects/proj_123/github"]} />);
 
-    expect(
-      await screen.findByText(/upgrade to solo or team to connect github automation/i)
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/upgrade to connect github automation/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /open billing/i })).toHaveAttribute("href", "/billing");
   });
 

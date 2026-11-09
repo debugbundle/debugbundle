@@ -1,3 +1,4 @@
+import { restoreStoragePredecessor } from "../helpers/storage-predecessor.js";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { createBillingManagement } from "../../apps/api/src/billing-management.js";
@@ -247,7 +248,11 @@ runIntegration("billing checkout coordination on PostgreSQL", () => {
           checkout: { sessions: { create } }
         },
         soloPriceId: "price_solo",
-        teamPriceId: "price_team"
+        teamPriceId: "price_team",
+        priceMap: new Map([
+          ["price_solo", { plan: "solo", type: "plan" }],
+          ["price_team", { plan: "team", type: "plan" }]
+        ])
       } as unknown as StripeConfig;
       const service = createBillingManagement({
         db,
@@ -633,15 +638,13 @@ runIntegration("billing checkout coordination on PostgreSQL", () => {
     await expect(assertStorageSchemaMigrationsApplied(db)).resolves.toBeUndefined();
     expect((await migrateStorageSchema(db)).applied).toEqual([]);
   });
-  it("upgrades an installed pre-ledger predecessor while preserving its paid account snapshot", async () => {
+  it("upgrades the immutable installed predecessor while preserving its paid account snapshot", async () => {
+    await restoreStoragePredecessor(pool);
     const id = await org();
     await pool.query(
       "UPDATE organizations SET plan='solo',billing_state='active',stripe_subscription_id='sub_preserved' WHERE id=$1",
       [id]
     );
-    await pool.query("DROP TABLE billing_checkout_attempts");
-    await pool.query("DROP TABLE billing_subscription_operations");
-    await pool.query("DROP TABLE storage_migration_ledger");
     await migrateStorageSchema(db);
     expect(
       (

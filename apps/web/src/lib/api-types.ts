@@ -1,15 +1,20 @@
-import type { ProjectColorTag } from "../../../../packages/shared-types/src/index.js";
+import type {
+  ProjectColorTag,
+  MemberTokenPolicy
+} from "../../../../packages/shared-types/src/index.js";
 
 export * from "./api-analytics-types.js";
 
 export interface SessionRecord {
+  /** Server-reported entitlement hint; never used as an authority assertion. */
+  self_hosted?: boolean;
   session_id: string;
   user_id: string;
   email: string;
   email_verified_at: string | null;
   organization_id: string;
-  organization_plan: "free" | "solo" | "team";
-  role: "owner" | "member";
+  organization_plan: "free" | "solo" | "team" | "business";
+  role: "owner" | "admin" | "member";
   created_at: string;
   expires_at: string;
   revoked_at: string | null;
@@ -179,6 +184,7 @@ export interface MemberTokenRecord {
   last_used_at: string | null;
   revoked_at: string | null;
   expires_at: string | null;
+  scope?: MemberTokenPolicy;
 }
 
 export interface CreatedMemberToken extends MemberTokenRecord {
@@ -192,13 +198,13 @@ export interface ProjectRecord {
   owner_email?: string;
   relationship?: "owned" | "shared";
   sharing_state?: "private" | "shared_by_you" | "shared_with_you";
-  effective_role?: "owner" | "admin" | "member";
+  effective_role?: "owner" | "admin" | "member" | "viewer";
   shared_access_suspended?: boolean;
   name: string;
   slug: string;
   environment_default: string;
   color_tag: ProjectColorTag | null;
-  organization_plan: "free" | "solo" | "team";
+  organization_plan: "free" | "solo" | "team" | "business";
   metrics: {
     open_incidents: number;
     regressed_incidents: number;
@@ -221,13 +227,13 @@ export interface DeletedProjectRecord {
   owner_email?: string;
   relationship?: "owned" | "shared";
   sharing_state?: "private" | "shared_by_you" | "shared_with_you";
-  effective_role?: "owner" | "admin" | "member";
+  effective_role?: "owner" | "admin" | "member" | "viewer";
   shared_access_suspended?: boolean;
   name: string;
   slug: string;
   environment_default: string;
   color_tag: ProjectColorTag | null;
-  organization_plan: "free" | "solo" | "team";
+  organization_plan: "free" | "solo" | "team" | "business";
   created_at: string;
   updated_at: string;
 }
@@ -302,7 +308,7 @@ export interface AvailabilityCheckRecord {
   enabled: boolean;
   status: AvailabilityCheckHealthStatus;
   paused_reason: string | null;
-  organization_plan: "free" | "solo" | "team";
+  organization_plan: "free" | "solo" | "team" | "business";
   consecutive_failures: number;
   consecutive_successes: number;
   linked_incident_id: string | null;
@@ -521,7 +527,7 @@ export type BillingState =
   | "trial_expired"
   | null;
 
-export type BillingTrialPlan = "solo" | "team";
+export type BillingTrialPlan = "solo" | "team" | "business";
 
 export interface BillingTrialSummary {
   available: boolean;
@@ -536,7 +542,7 @@ export interface BillingTrialSummary {
 }
 
 export interface BillingSummaryRecord {
-  plan: "free" | "solo" | "team";
+  plan: "free" | "solo" | "team" | "business";
   billing_state: BillingState;
   stripe_customer_id: string | null;
   active_projects: number;
@@ -731,7 +737,8 @@ export type OpenAiProductScope =
   | "debugbundle:artifacts:read"
   | "debugbundle:improvements:read"
   | "debugbundle:analytics:read"
-  | "debugbundle:health:read";
+  | "debugbundle:health:read"
+  | "debugbundle:reports:read";
 
 export interface OpenAiConsentInteractionRecord {
   interaction_id: string;

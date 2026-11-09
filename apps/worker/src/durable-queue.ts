@@ -27,7 +27,8 @@ function skippedReason(result: unknown): string | undefined {
       "monthly_quota_exceeded",
       "incident_missing",
       "invalid_event",
-      "bundle_generation_disabled"
+      "bundle_generation_disabled",
+      "initiator_access_revoked"
     ].includes(reason)
     ? reason
     : undefined;
@@ -59,6 +60,11 @@ export function createDurableWorkerQueue(
     if (
       !claim &&
       ![
+        "sync-billing-contact",
+        "reconcile-referral-receipts",
+        "generate-smart-report",
+        "render-smart-report-pdf",
+        "deliver-smart-report-email",
         "evaluate-event-improvement",
         "evaluate-incident-improvement",
         "publish-incident-lifecycle",

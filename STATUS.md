@@ -1,3 +1,354 @@
+# Business/UI release — authorised, in progress
+
+The owner authorised the complete DebugBundle release train on 9 November.
+[The release record](spec/business-release-20261109.md) owns current scope,
+version/order decisions, audit findings and rollout evidence. Initial source/ref
+inventories and live runtime/Stripe baselines are in `.tmp/release-20261109/`.
+All pending core/site/cloud and eleven SDK repositories are included; no consumer
+product or installation is authorised for modification. No release publication,
+deployment or activation has happened in this run yet. A compatible backend-first
+checkpoint, migration/backup protection and exact source/package gates precede
+feature activation and public assets.
+
+# Reports tier gate and sidebar — ready locally
+
+9 November: hosted Free/Solo/Team Reports now reuse the Improvements-style shared
+upgrade callout and Open billing action. Empty Business-only inventories stay hidden;
+authorised saved definitions/history remain visible. Self-hosted access and genuine
+archive retry errors remain intact. Plan/context changes invalidate stale list data.
+Projects now sits immediately after Improvements in the shared sidebar.
+
+The local report lists return contract-valid empty inventories. Browser testing
+also found an old non-UUID workspace fixture; all mock records now derive their
+workspace identity from the same valid fixture. Real report-client tests cover the
+read boundary rather than only testing direct handler output. No production
+validation, API authorization or financial logic changed.
+
+The plan dialog now explains returning to Free through Manage subscription,
+preserving configuration while normal data limits/retention continue. The billing
+guide's outdated original-tier retention promise is corrected against current
+retention SQL. Cancellation timing remains provider-confirmed; no new paid pause
+mode or Free checkout SKU was introduced.
+
+129 focused tests, 72 site checks, types/lint/format and both builds pass. Sixteen
+actual local browser cases cover all tiers, both themes and mobile/desktop, shared
+callout styling, sidebar order and the Free explanation; final screenshots were
+inspected. No page errors, unexpected HTTP failures, external browser requests or
+horizontal overflow occurred. Local 5291/5292 previews are refreshed; the simulator
+is on paid Team/monthly with zero extra units. Latest dashboard/site archives and
+source receipt: `.tmp/reports-tier-gate/manifest.json`. No real account, database,
+provider configuration or hosted runtime changed; no deployment occurred.
+
+# Local billing UX preview — ready
+
+9 November: `make dev-mock` now exposes **Local billing preview** on Billing, with
+Free/Solo/Team/Business, monthly/yearly, paid/complimentary and day-1/day-8 trial
+fixtures. The normal offer dialog supports all paid transitions, local checkout
+confirmation, retained units, scheduled changes and simulated renewal/cancellation
+to Free. Exact stale/expired confirmations fail. Complimentary plans have a compact
+View plans link; closing the ordinary plan dialog restores keyboard focus through
+the shared DialogTrigger. Production billing permissions and provider logic remain
+unchanged.
+
+The frontend is currently in isolated mock mode at `http://localhost:5291/billing`,
+on paid Team/monthly with zero extra units. Refresh to load it. Apply preview resets
+only fixture memory; `make dev-mock-off` restores the real local account/API.
+No real database, account, provider credential, subscription, payment or email was
+changed. Production output excludes the simulator import, controls and private path.
+
+139 focused checks and a separate 73-test billing UI regression run pass (overlapping
+coverage), along with types/lint/format and the candidate build. Twelve final
+headless checks exercise actual Vite responses on desktop/mobile, light/dark,
+conversion, upgrade, scheduling/cancellation, renewal, Free, complimentary states
+and keyboard return. No page errors, unexpected HTTP failures, overflow or external
+browser requests occurred; final screenshots were inspected. Latest dashboard
+archive/source receipt: `.tmp/billing-preview/manifest.json`. The public-site archive
+remains `.tmp/referral-refund-terms/public-site.tar.gz`. Provider-hosted payment,
+tax, authentication and portal acceptance remain separate; no deployment occurred.
+
+# Referral customer refund terms — ready locally
+
+9 November: referred Business base subscription payments are excluded from
+discretionary/goodwill refunds unless expressly agreed in writing. Mandatory legal
+rights and remedies remain unaffected; commissions cannot be deducted from a
+legally required customer refund. The dated customer terms and referral guide now
+explain this policy. Partner terms/version, financial calculations, holds and
+refund reversals are unchanged; no automated rejection or provider action was added.
+
+All 65 site tests, types and static build pass. Generated HTML and local 5292
+terms/guide readback pass, including existing referral anchors and the new refund
+link. The latest site archive/receipt is under `.tmp/referral-refund-terms/`,
+superseding `.tmp/report-card-gap/public-site.tar.gz`. Dashboard artifacts and
+hosted runtime are unchanged. This policy does not eliminate chargeback/fraud
+exposure; no publication or deployment occurred.
+
+# Report provider credential — configured; activation unchanged
+
+9 November: the owner-approved temporary provider credential is configured in
+protected local server settings, the encrypted hosted deployment secret and the
+protected live environment file. The local API and worker were reloaded and both
+contain the matching key. Report generation/AI remain disabled and the USD 1 per
+organisation monthly budget remains unchanged. The web environment has no report
+key. Existing quiet-period behaviour is unchanged; no paid provider call was made.
+
+The live API/worker containers and images were preserved and readiness passed.
+Their process environment will load the staged key during the separately approved
+release; this setup did not deploy code or activate Business/reporting. Source
+provider configuration remained unchanged. Metadata-only receipts and protected
+pre-change backups are recorded under `.tmp/report-api-key-configuration/` and in
+the private cloud operator runbook. Dashboard/site artifacts are unchanged.
+
+# Local tier testing — ready
+
+`make dev-tier` inspects local workspace tiers; add `TIER=free|solo|team|business`
+to switch, and `ORG=uuid` when several workspaces exist. Refresh the dashboard
+after switching. The command tests base allowances (zero extra capacity), verifies
+the checkout-owned local Docker/Postgres socket and refuses linked provider
+identities, trials and pending billing. Explicit administrative Free no longer
+reverts to the operator's initial Team default. Normal local downgrade/retention
+rules and Business report review requirements remain effective.
+
+The owner's local workspace is on Business. A private pre-change backup is under
+`.tmp/dev-tier/`; protected row counts and membership checksum match afterwards.
+Actual billing and project reads agree on Business, with 30 included units and
+zero extra capacity. Sixty distinct tier-tool/auth/billing checks pass, plus real
+SQL all-tier/refusal tests in a disposable socket-only Postgres. Root types and
+changed-file lint/format pass; the local API was restarted and is ready. No provider
+call, new API route, schema change or deployment occurred. Existing final-source
+runtime release preparation remains required; dashboard/site artifacts are unchanged.
+
+# Business dashboard follow-up — ready for local owner tests
+
+The workspace switcher is hidden for a single organisation and uses the existing
+large sidebar/menu spacing when needed. Reports empty states now use standard
+cards/icons and permission-aware actions. Referral HTTP errors retain domain codes,
+with separate unavailable and retryable states. Local referral enrolment is enabled
+in private ignored configuration, with a stable secret and the correct port 3003;
+production defaults/settings remain unchanged.
+The remaining localhost URL validation failure is corrected across referral config,
+link construction and client responses. The local API was restarted and its actual
+partner/earnings/attribution reads now pass; enrolment and local share-link browser
+checks pass. The correction has 181 API/domain/client/interface tests and a rebuilt
+dashboard. Receipts are under `.tmp/referral-local-url-fix/`.
+
+[The follow-up record](spec/business-ui-followup-20261108.md) retains targeted,
+862-test dashboard/configuration and headless desktop/mobile evidence. The latest
+dashboard archive is `.tmp/report-agent-workflows/dashboard.tar.gz`. Earlier runtime
+snapshots are historical after these UI changes and need a fresh final-source
+build before release. No production release or provider billing action occurred.
+
+Referral presentation follow-up: both `/terms/#referrals` and the existing
+`#referral-programme` destination scroll to the programme terms. The consent label
+uses inline text without a trailing dot, and docs place Referrals under Help beside
+Billing. All 62 site checks and nine referral UI tests pass, with types/lint/format,
+rebuilt site/dashboard and eleven headless checks covering desktop/mobile anchors,
+no-JavaScript navigation, consent-link isolation and keyboard interaction. Local
+5291/5292 previews serve the fixes. Evidence and both updated archives are under
+`.tmp/referral-presentation-fix/`; no consent or financial write was performed.
+
+Payout consistency follow-up: the shared header now shows Referrals → Payouts with
+the standard parent link. Partner balances and shared client/payment history use
+the existing Card/Empty icon, title and description pattern. Empty first pages hide
+pagination; empty later pages retain Previous. All 36 referral/Reports/project-header
+tests, types/lint/format and the candidate build pass. Four headless desktop/mobile,
+light/dark scenarios cover operator/partner empties, keyboard parent navigation and
+the operator-access boundary. Evidence and the updated dashboard receipt are under
+`.tmp/referral-payout-ui-fix/`; public-site artifacts are unchanged.
+
+Reports UI refinement (9 November): Create report uses the Projects-style shared
+header action and plus icon, including the standard primary empty-state action.
+Create, settings and saved-report pages have parent breadcrumbs. New schedules
+detect the browser timezone, while saved/manual values survive edits and toggling.
+The shared form pairs inputs at desktop widths and stacks them on tablet/mobile;
+privacy/consent span the form. All 41 report/referral/project checks, root types,
+changed-file lint/format and the candidate build pass. Eight headless scenarios
+cover four widths in light/dark, keyboard navigation, saved timezone preservation
+and clipped-control checks. Local Vite serves the final source; evidence and the
+updated dashboard archive are under `.tmp/reports-ui-refinement/`. No report,
+generation, notification or provider write was submitted during review.
+
+New-report defaults (9 November): the form now preselects automatic Monthly
+generation at 09:00 in the device timezone and the current verified account as
+email recipient. The control is labelled Generate reports automatically with a
+plain-language explanation. Projects, source consent and Save remain explicit;
+no default report is provisioned on Business activation. Saved manual/scheduled
+reports and empty recipient lists are preserved; API defaults are unchanged.
+All 20 report tests, 62 site checks, types/lint/format and both builds pass. Eight
+headless desktop/mobile cases cover verified/unverified new accounts and saved
+manual/scheduled reports, including opt-out. Local 5291/5292 previews were read
+back. The latest dashboard/site archives and receipt are under
+`.tmp/report-form-defaults/`; no report, provider or delivery write occurred.
+
+Tier-copy/referral follow-up (9 November): general paid-feature wording no longer
+lists only Solo/Team. Current guides include Business where relevant and retain
+real tier distinctions. Billing hides customer referral code entry on established
+paid/internal plans while preserving Free and active trials. All 152 focused
+checks, 62 site checks, types/lint/format, builds and nine headless cases pass.
+Local previews were read back; its dashboard/site archives and source
+receipt are under `.tmp/tier-copy-referral-visibility/`. No provider or account
+mutation occurred; final-source runtime preparation remains required.
+
+Homepage Reports follow-up (9 November): a compact full-width Smart Reports row
+now sits below the six investigation cards, with Business availability, the agreed
+benefit copy and a link to the guide. It reuses the shared surface card with an
+optional responsive row layout. All 62 site checks, types/build and six headless
+light/dark mobile/tablet/desktop cases pass, including keyboard navigation. The
+5292 preview is refreshed; `.tmp/homepage-smart-reports/manifest.json` records the
+latest site artifact. Dashboard artifacts and production remain unchanged.
+
+Report wording and agent setup follow-up (9 November): feature copy now says
+email overviews and downloadable PDFs; the dashboard uses Open report in new tab.
+The homepage row matches the existing card typography/icon/padding and shares
+Set up DebugBundle's button style. Its title-row agent action opens the generic
+Smart Reports setup prompt, with all three cadence choices and monthly recommended.
+All prompt descriptions use standard 20px line height and bounded scrolling.
+One shared prompt card appears in Optional Agent-Assisted Workflows and each of
+the five feature guides. Explicit scope/consent, verified recipients, read-first
+configuration, digest preservation and retry/delivery boundaries remain intact.
+
+All 65 site checks, 20 report checks, types/lint/format, builds and eight final
+headless cases pass, including 42 copy/focus-return workflows and computed-style
+comparisons. Final screenshots were inspected. A hidden-label containing-block
+fix keeps the mobile pricing page within the viewport while retaining table scroll.
+Local previews are refreshed; `.tmp/report-agent-workflows/manifest.json` records
+the latest dashboard/site artifacts and supersedes the preceding UI receipts.
+No provider/account/report write or production deployment occurred.
+
+Homepage report-card consistency follow-up (9 November): the visible card gap is
+16px across mobile/tablet/desktop, title/body spacing matches the neighbouring
+cards, and the report surface no longer highlights its border on hover. The title
+and Explore action both open the guide; the agent control remains independent.
+All 65 site checks, types/build and six light/dark headless cases pass. Final
+screenshots were inspected. `.tmp/report-card-consistency/manifest.json` records
+the refreshed local preview and latest site archive; dashboard, credentials and
+hosted runtime are unchanged.
+
+Smart Reports internal spacing is explicitly 10px per the owner’s final adjustment.
+The 16px outer gap and links remain intact. Site checks/types/build and mobile/desktop
+computed-style checks pass; the refreshed site receipt is `.tmp/report-card-gap/manifest.json`.
+
+# Rounded pricing — prepared and verified; release pending
+
+8 November 2026. Solo is $5/month or $48/year, Team $19/$192 and Business $59/$588.
+Annual cards show exactly $4/$16/$49 per month. Extra units are Solo $1/$10 and
+Team/Business $3/$30 (month/year). Source, docs/terms, local previews, twelve live
+and test Stripe prices and twelve hosted price-reference secrets agree.
+[The pricing qualification](spec/pricing-refresh-20261108.md) records tests,
+provider receipts, exact new artifacts and the three old prices retained until
+hosted checkout cutover. No deployment, customer billing or activation change.
+
+The subsequent docs/UI refinement centres the pricing introduction, makes Compare
+plan details a same-page anchor, and turns `/docs/pricing/` into Plans and capacity
+without duplicated prices. Site tests/types/build, documentation contracts, old
+anchors and headless desktop/tablet/mobile checks pass. The latest site archive
+is `.tmp/report-card-gap/public-site.tar.gz`; no runtime/provider change.
+The approved Enterprise section now sits after the tier cards and before the
+comparison table. The rebuilt local preview, site tests/types and three-viewport
+headless checks pass; its exact artifact receipt is retained alongside the archive.
+Same-page CTA links now use native fragment navigation so repeated clicks scroll
+again. First/repeated clicks and keyboard activation pass at three viewport sizes
+on both `/pricing` and `/pricing/`, including after changing billing interval.
+
+This follow-up supersedes earlier price amounts and runtime/site artifact hashes
+below; prior broad Business audit results remain historical evidence.
+
+# Business launch audit — complete locally; owner tests next
+
+8 November 2026. The authorised A–J audit and Business trial / explicitly
+consented ChatGPT saved-report follow-ups are complete. Findings, fixes, exact
+candidate identities and release boundaries are in
+[the launch review](spec/business-launch-review-20261108.md).
+
+- Fixed requested-scope OAuth consent, trial-deadline report history, late-conversion
+  coverage and self-hosted organisation/report entitlements without broadening legacy tokens.
+- Pricing uses the shared catalogue, simple cards, grouped comparison/extra units,
+  collapsible FAQs and annual-by-default monthly equivalents with annual totals.
+  Headless desktop/tablet/mobile, light/dark and keyboard checks pass; dashboard
+  People, invitations, Reports, Referrals and annual Billing were also inspected.
+- All 128 coverage groups / 6,134 checks pass, plus 32 focused UI checks. The
+  unchanged coverage gate passes for 423 changed source files. Full lint, final
+  root types and focused style/behaviour checks pass; the CLI split preserves all
+  25 routing cases and brings changed source/test files below the hard size limit.
+- All 85 integration files pass (559 checks, one optional fixture skip); the
+  installed Browser SDK lane then passes both cases. Site has 48 passing tests,
+  a verified export, and current docs/pricing at http://localhost:5292/docs.
+- The local database upgraded from 83 to 86 forward migrations with a backup and
+  unchanged protected rows. API is ready. All 66 historical migrations remain
+  unchanged. The v2 local runtime image, offline PDF fonts, provider/plugin contract
+  tests and 45 private cloud deployment/rollback checks pass.
+- Exact local CLI/MCP/OpenClaw/dashboard/site/OpenAI archives and runtime source
+  hashes are retained in `.tmp/business-audit/final-artifacts/manifest.json`.
+
+No commit, publish, deployment, production/provider mutation, real notification,
+additional paid model evaluation or consumer change occurred. Local account tier
+and activation settings are unchanged. Owner tests, provider setup/test journeys,
+ChatGPT rescan/reviewer acceptance and authorised deployment/activation remain
+open. Initial implementation qualification below is historical and superseded by
+this audit where the candidate identity or migration count differs.
+
+# Business tier — implemented and locally qualified
+
+8 November 2026. The owner-approved single phase A–J is complete locally.
+The durable contract is [spec/business-tier.md](spec/business-tier.md); exact
+candidate identity, acceptance review, receipts and release boundaries are in
+[the qualification record](spec/business-tier-qualification-20261108.md).
+No paid Solo/Team grandfathering or customer-transition programme was added.
+
+| Slice | Status | Result |
+| --- | --- | --- |
+| A: contracts/design/fixtures | Complete locally | Fixed scope, prices, roles, Business-only referrals and report privacy/quotas; approved existing UI system. |
+| B: analytics/catalogue/allowances | Complete locally | Conservative analytics limits, monthly/yearly catalogue, anchored monthly annual allowances and deterministic health pausing. |
+| C: authorisation/scoped tokens | Complete locally | Actual actor and frozen-origin checks, legacy token/SDK isolation, queued authority fences and twelve-surface credential privacy qualification. |
+| D: organisation administration | Complete locally | Unique-person admission, invitations, suspension/removal, fixed grants, workspace switching and accepted ownership transfer. |
+| E: monthly/yearly billing | Complete locally | Full-offer reservations/quotes, matching capacity, payment-pending entitlements, renewal changes and current-owner billing contact sync. |
+| F: Business referrals | Complete locally | First eligible base-invoice discount, collected-cash commission, holds/reversals, protected exports and manual external-reference payout records. |
+| G: report facts/history | Complete locally | Bounded consented lifecycle/health/analytics/context, coverage, privacy/retention, paged export and deletion. |
+| H: report runs/AI | Complete locally | Fenced fair claims, shared 40-run allowance/budget, one paid attempt, retained archives and visible allowance forecast. |
+| I: HTML/PDF/email/UI | Complete locally | Canonical private HTML/PDF/email, bounded PDF child, receipt-backed delivery, whole-scope authority and ordinary API/CLI/MCP/dashboard parity. |
+| J: integrated qualification | Complete locally | Regression, coverage, migration, resource, SDK candidate, build, security and documentation checks; exact local artifacts retained. |
+
+All 128 functional/coverage groups pass 6,072 checks. The initial changed-source
+gate found fifteen gaps; 93 focused behaviour checks and fourteen fresh database
+checks pass, and merged evidence passes the unchanged policy for all 402 changed
+source files. Final root types, lint/style and the nine-case organisation/keyboard
+recheck pass. All 84 integration files were exercised; the final two failures pass
+the nine-case export/installed-runtime recheck. One existing optional installed
+Browser-flow fixture remains skipped. Site tests/types/static build/404 pass;
+44 private cloud workflow/image/rollback/context tests pass. Core audit has zero
+high/critical findings under existing policy. No changed source/test file reaches
+the 1,000-line limit.
+
+All 66 historical migrations are unchanged. Seventeen ordered additive migrations
+bring the candidate to 83; populated predecessor, checksum, missing-schema readiness
+and migration-before-code checks pass. The rebuilt local runtime image and offline
+font checks pass. Compiled CLI/MCP/OpenClaw/dashboard and public-site archives,
+source hashes and image identity are retained in the qualification record.
+
+Maximum local report proof: ten projects, 140 metrics, 100 sources and three
+serial real PDFs; ingestion p95 is 19.07 ms for predecessor source, 12.14 ms current
+and 13.33 ms under PDF pressure, below 200 ms. Blocked simulated AI leaves normal
+work progressing with a one-connection pool. Node/Browser, staged WordPress,
+Swift/SPM/CocoaPods and RN Android/bare/Expo iOS candidate checks pass without
+changing consumer products or dependency floors. These are local qualification
+claims, not hosted full-capacity or published-package acceptance.
+
+The approved synthetic model evaluation cost USD 0.31524845 across 127 paid
+attempts, with zero uncertain holds. Terra passes all nine factual gates and
+improves mean quality from 3.225/4 to 3.8/4; forty bounded attempts reserve at most
+USD 0.99/month. Temporary Afipal key copies were removed; no Afipal source,
+settings, data or deployment changed. Broader infrastructure/full-exhaustion cost
+certification remains explicitly owner-deferred.
+
+[Local docs](http://localhost:5292/docs) and
+[pricing](http://localhost:5292/pricing/) serve the current export, including new
+pricing, reports and referral guides. The `/docs` redirect retains port 5292.
+
+No commit, push, publication, deployment, production/provider mutation or real
+notification occurred. Sales, new Smart Report generation and email egress remain
+default-off. An authorised release still needs versioned publication where
+applicable, provider setup/test journeys, migration-first deployment with a
+Business-aware retained rollback, live headroom and owner/provider acceptance.
+
 # Multiline patch release — released and verified
 
 6 November 2026. Core 1.22.1 is live from `8daab4ac`; hosted classifier bytes,
@@ -1014,3 +1365,17 @@ a second merge. Suppressed claims never reopen. Channel deletion now preserves
 delivery history via SET NULL instead of cascading claim records. Verify the
 surviving schedule's disable/delete effect on retained jobs, final type/lint and
 worker scheduler retry-identity tests, then finish the remaining downstream audit.
+
+7 November financial continuation: settlement-currency handling preserves USD cash, explicit reconciliation holds prevent positive payout, and the canonical reader waits until provider lists include its triggering adjustment. Financial capture is independent of entitlement transactions, retried before billing dedupe, with fixed safe errors and no provider reads under database locks. The same retained source survives ordinary worker expiry and account deletion; source/ledger/job completion is fenced and atomic. Root typecheck, financial lint and formatting pass in `.tmp/business-implementation/referral-outbox-final-check.log`. Smart Report model evaluation remains authorised at no more than $1 total, unspent; Owen has explicitly authorised temporary use of the Afipal project key for this specific comparison; key discovery is read-only and no paid call has run.
+
+7 November report definition continuation: candidate forward migration 010 and the shared definition store are implemented locally. Twenty-one real Postgres tests pass across source lifecycle, whole-scope access, idempotent/concurrent creation, versioning, plan-loss Owner review, verified recipients, legacy weekly overlap, retained deletion and forward/readiness checks (`report-definition-safety-rerun.log`). API/client/CLI/ordinary MCP adapters and OpenAPI contracts are being qualified; UI, source collection, generation, model evaluation and delivery are still in progress. No paid model call has run. The approved temporary evaluation key reference is available read-only; the key has not been copied into DebugBundle.
+
+Smart Report initial paid comparison completed with the explicitly authorised temporary Afipal key and synthetic fixtures only: 16 calls, USD 0.03180089 conservative computed cost, zero uncertain reservations. Neither candidate passed every gate; the original failures remain recorded in `evals/smart-reports/results-20261107.md` and the local budget/outcome ledger. The temporary key file was removed. A same-budget comparison of clearer references and server-derived daily rates is being prepared; no model is activated or selected yet.
+
+Report evaluation decision: corrected fixture review qualifies Terra as the integration candidate (agent label-hidden score 3.8/4 versus Luna 3.225/4; material improvement 0.575; eight Terra cases accepted). Fixed worst-case cost is USD 0.946 for forty monthly runs. Total approved trial cost is USD 0.17692312 conservatively, zero uncertain holds; all temporary key files are removed. See `evals/smart-reports/results-20261107.md`. Actual source-payload bounds, production budget/admission and all remaining report/delivery gates are still in progress; this does not activate or ship Smart Reports.
+
+7 November invoice-benefit continuation: Owen approved 10% off the first eligible Business base invoice, preserving same-invoice retries and leaving trial/zero bills pending. Checkout freezes its verified base-only coupon with attribution/attempt atomically; identity reuse and newly recorded paid history are rechecked. Verified finalisation facts now feed the receipt worker. Zero/trial recovery is scoped to the first eligible draft invoice with a persisted request and stable provider idempotency key; it does not change subscription billing or create/charge/refund/void invoices. A finalised bill missing its promised discount is held for explicit reconciliation. All 47 current referral PostgreSQL cases pass. Root typecheck/lint pass; one test-format issue was corrected and focused unit rerun is pending. No actual provider call or live configuration change.
+
+7 November export/lifecycle continuation: the browser-Owner account export now adds fixed, bounded report definition/run/delivery/numeric-history and personal referral-finance sections. The legacy attachment gains a manifest; report content keeps its current authenticated JSON/HTML/PDF readers. No model receipt, worker lease, private object key, provider message ID or protected identity hash is exported. Real PostgreSQL tests caught and now protect microsecond pagination, original-origin filtering, twelve-month retention, per-recipient delivery uniqueness, actual account deletion and retained financial markers. Export/API/legacy-account regressions pass 27 cases; export/lifecycle/content SQL qualification passes all 27 cases across the main run plus its corrected delivery fixture rerun (26 earlier + eight final export cases). Root types/lint/style pass. All 83 migrations from the immutable installed predecessor plus retention/ownership preservation pass three real PostgreSQL cases; historical 66 migrations are unchanged. Next: finish the Business-aware rollback activation bridge, public site/catalogue/terms and final ecosystem/resource/regression qualification. No live activation, provider write, deployment, notification or distribution has been performed.
+
+9 November local app UI refinement (owner-approved, not deployed): section badges now follow titles in a shared wrapping row across callouts, analytics details and email previews (FR-WEB-06/09). Legacy token replacement is a row action with explicit manual-handover guidance, preserving scoped defaults and verification gates (FR-WEB-03, FR-BUS-03). Validation: 113 affected app tests, root typecheck, scoped lint/format and the Docker app build pass. Isolated Chromium and WebKit checks cover Settings, Reports, Billing and token creation at 320/375/768/1440 px in both themes; headings and dialogs remain within the viewport and no real API writes were allowed. A WebKit browser crash in the shared-browser test run did not recur in fresh per-case browsers. No backend, schema, token data or deployment changes.

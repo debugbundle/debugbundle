@@ -2,6 +2,21 @@
   "policy": "telemetry-privacy-v1",
   "cases": [
     {
+      "id": "project_invitation_token_text",
+      "input": { "message": "Invitation dbundle_invite_SYNTHETIC_SECRET retry" },
+      "expected": { "message": "Invitation [REDACTED] retry" }
+    },
+    {
+      "id": "organization_invitation_token_text",
+      "input": { "context": { "detail": "Invitation dbundle_org_invite_SYNTHETIC_SECRET retry" } },
+      "expected": { "context": { "detail": "Invitation [REDACTED] retry" } }
+    },
+    {
+      "id": "organization_ownership_token_text",
+      "input": { "message": "Accept dbundle_org_transfer_SYNTHETIC_SECRET retry" },
+      "expected": { "message": "Accept [REDACTED] retry" }
+    },
+    {
       "id": "nested_sensitive_key",
       "input": {
         "context": {

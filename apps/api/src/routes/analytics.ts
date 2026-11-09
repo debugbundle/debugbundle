@@ -25,6 +25,7 @@ import {
   toRetryAfterSeconds
 } from "../analytics-quota.js";
 import { requireRateLimitedProjectAccess } from "../api-helpers.js";
+import { memberJobInitiator } from "../member-access-scope.js";
 import {
   AnalyticsBundleCreateBodySchema,
   AnalyticsBundleParamsSchema,
@@ -300,11 +301,13 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
 
     let generation: AnalyticsBundleGeneration;
     try {
+      const initiator = memberJobInitiator(auth.member);
       generation = await dependencies.analyticsBundles.requestAnalyticsBundleGenerationForProject({
         organization_id: auth.access.organization_id,
         project_id: bundleRequest.project_id,
         opportunity_id: bundleRequest.opportunity_id ?? null,
         requested_by_user_id: auth.member.member_id,
+        ...(initiator === undefined ? {} : { initiating_authority: initiator }),
         analysis_kind: bundleRequest.analysis_kind,
         analysis_spec: analysisSpec
       });

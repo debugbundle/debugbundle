@@ -28,6 +28,7 @@ export default defineConfig(({ command, mode }) => {
   return {
     define: {
       __DEBUGBUNDLE_APP_BUILD_ID__: JSON.stringify(appBuildId),
+      "import.meta.env.VITE_DEBUGBUNDLE_DEV_MOCK": JSON.stringify(String(mock)),
       ...(mock
         ? {
             "import.meta.env.VITE_API_URL": JSON.stringify(""),

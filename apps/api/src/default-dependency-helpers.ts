@@ -5,6 +5,7 @@ import {
   renderAccountDeletionOtpEmail,
   renderEmailAuthCodeEmail,
   renderProjectInviteEmail,
+  renderOrganizationAccessEmail,
   type EmailMessage,
   type EmailTransport
 } from "../../../packages/email/src/index.js";
@@ -29,7 +30,9 @@ export interface BillingEmailContact {
 
 export interface BillingEmailService {
   managementUrl?: string;
-  getBillingContactForOrganization(input: { organization_id: string }): Promise<BillingEmailContact | null>;
+  getBillingContactForOrganization(input: {
+    organization_id: string;
+  }): Promise<BillingEmailContact | null>;
   send(message: EmailMessage): Promise<void>;
 }
 
@@ -37,7 +40,10 @@ export function stripTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");
 }
 
-export function readNonEmptyEnv(env: Record<string, string | undefined>, key: string): string | undefined {
+export function readNonEmptyEnv(
+  env: Record<string, string | undefined>,
+  key: string
+): string | undefined {
   const value = env[key];
   if (value === undefined) {
     return undefined;
@@ -47,13 +53,20 @@ export function readNonEmptyEnv(env: Record<string, string | undefined>, key: st
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
-export function resolveEmailAssetBaseUrl(env: Record<string, string | undefined>): string | undefined {
-  return readNonEmptyEnv(env, "EMAIL_ASSET_BASE_URL")
-    ?? readNonEmptyEnv(env, "APP_BASE_URL")
-    ?? readNonEmptyEnv(env, "PUBLIC_SITE_URL");
+export function resolveEmailAssetBaseUrl(
+  env: Record<string, string | undefined>
+): string | undefined {
+  return (
+    readNonEmptyEnv(env, "EMAIL_ASSET_BASE_URL") ??
+    readNonEmptyEnv(env, "APP_BASE_URL") ??
+    readNonEmptyEnv(env, "PUBLIC_SITE_URL")
+  );
 }
 
-export function readCsvEnv(env: Record<string, string | undefined>, key: string): string[] | undefined {
+export function readCsvEnv(
+  env: Record<string, string | undefined>,
+  key: string
+): string[] | undefined {
   const value = readNonEmptyEnv(env, key);
   if (value === undefined) {
     return undefined;
@@ -78,20 +91,22 @@ export function getBooleanField(record: Record<string, unknown>, field: string):
 
 async function readStoredJsonArtifact(
   objectStoreReader: Pick<ObjectStoreReader, "getObject">,
-  key: string,
+  key: string
 ): Promise<{ key: string; content: unknown }> {
   try {
     const compressed = await objectStoreReader.getObject({ key });
 
     return {
       key,
-      content: readSanitizedArtifact(compressed) ?? { error: "artifact_invalid" },
+      content: readSanitizedArtifact(compressed) ?? { error: "artifact_invalid" }
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {
       key,
-      content: { error: message === "s3_object_not_found" ? "artifact_not_found" : "artifact_unavailable" },
+      content: {
+        error: message === "s3_object_not_found" ? "artifact_not_found" : "artifact_unavailable"
+      }
     };
   }
 }
@@ -103,32 +118,34 @@ export async function buildAccountExportArtifacts(
     incident_events: Record<string, unknown>[];
     improvement_opportunities: Record<string, unknown>[];
     improvement_opportunity_events: Record<string, unknown>[];
-  },
+  }
 ): Promise<{
   raw_events: Array<{ key: string; content: unknown }>;
   bundles: Array<{ key: string; content: unknown }>;
   reproductions: Array<{ key: string; content: unknown }>;
 }> {
-  const rawEventRefs = new Set(exportData.incident_events.flatMap((record) => {
-    if (!getBooleanField(record, "is_sampled")) {
-      return [];
-    }
+  const rawEventRefs = new Set(
+    exportData.incident_events.flatMap((record) => {
+      if (!getBooleanField(record, "is_sampled")) {
+        return [];
+      }
 
-    const projectId = getStringField(record, "project_id");
-    const eventId = getStringField(record, "event_id");
-    const occurredAt = getStringField(record, "occurred_at");
-    if (projectId === null || eventId === null || occurredAt === null) {
-      return [];
-    }
+      const projectId = getStringField(record, "project_id");
+      const eventId = getStringField(record, "event_id");
+      const occurredAt = getStringField(record, "occurred_at");
+      if (projectId === null || eventId === null || occurredAt === null) {
+        return [];
+      }
 
-    return [
-      buildRawEventObjectKey({
-        projectId,
-        eventId,
-        occurredAt: new Date(occurredAt),
-      }),
-    ];
-  }));
+      return [
+        buildRawEventObjectKey({
+          projectId,
+          eventId,
+          occurredAt: new Date(occurredAt)
+        })
+      ];
+    })
+  );
 
   for (const record of exportData.improvement_opportunity_events) {
     const projectId = getStringField(record, "project_id");
@@ -142,8 +159,8 @@ export async function buildAccountExportArtifacts(
       buildRawEventObjectKey({
         projectId,
         eventId,
-        occurredAt: new Date(occurredAt),
-      }),
+        occurredAt: new Date(occurredAt)
+      })
     );
   }
 
@@ -157,8 +174,8 @@ export async function buildAccountExportArtifacts(
     return [
       {
         bundleKey: buildBundleObjectKey(projectId, incidentId),
-        reproductionKey: buildReproductionObjectKey(projectId, incidentId),
-      },
+        reproductionKey: buildReproductionObjectKey(projectId, incidentId)
+      }
     ];
   });
 
@@ -173,19 +190,23 @@ export async function buildAccountExportArtifacts(
     return [buildImprovementBundleObjectKey(projectId, opportunityId)];
   });
 
-  const raw_events = await Promise.all([...rawEventRefs].map((key) => readStoredJsonArtifact(objectStoreReader, key)));
+  const raw_events = await Promise.all(
+    [...rawEventRefs].map((key) => readStoredJsonArtifact(objectStoreReader, key))
+  );
   const bundles = await Promise.all([
     ...incidentRefs.map((record) => readStoredJsonArtifact(objectStoreReader, record.bundleKey)),
-    ...improvementBundleRefs.map((key) => readStoredJsonArtifact(objectStoreReader, key)),
+    ...improvementBundleRefs.map((key) => readStoredJsonArtifact(objectStoreReader, key))
   ]);
   const reproductions = await Promise.all(
-    incidentRefs.map((record) => readStoredJsonArtifact(objectStoreReader, record.reproductionKey)),
+    incidentRefs.map((record) => readStoredJsonArtifact(objectStoreReader, record.reproductionKey))
   );
 
   return { raw_events, bundles, reproductions };
 }
 
-export function createGithubOAuthConfigFromEnv(env: Record<string, string | undefined>): GitHubOAuthConfig | undefined {
+export function createGithubOAuthConfigFromEnv(
+  env: Record<string, string | undefined>
+): GitHubOAuthConfig | undefined {
   const appBaseUrl = readNonEmptyEnv(env, "APP_BASE_URL");
   const githubClientId = readNonEmptyEnv(env, "GITHUB_CLIENT_ID");
   const githubClientSecret = readNonEmptyEnv(env, "GITHUB_CLIENT_SECRET");
@@ -283,23 +304,31 @@ export function normalizeEmailForConfig(email: string): string {
   return email.trim().toLowerCase();
 }
 
-export function readBillingAdminEmailsFromEnv(env: Record<string, string | undefined>): string[] | undefined {
+export function readBillingAdminEmailsFromEnv(
+  env: Record<string, string | undefined>
+): string[] | undefined {
   const emails = readCsvEnv(env, "BILLING_ADMIN_OVERRIDE_EMAILS");
   if (emails === undefined) {
     return undefined;
   }
 
-  const normalized = [...new Set(emails.map(normalizeEmailForConfig).filter((email) => email.length > 0))];
+  const normalized = [
+    ...new Set(emails.map(normalizeEmailForConfig).filter((email) => email.length > 0))
+  ];
   return normalized.length > 0 ? normalized : undefined;
 }
 
-export function readAdminAnalyticsEmailsFromEnv(env: Record<string, string | undefined>): string[] | undefined {
+export function readAdminAnalyticsEmailsFromEnv(
+  env: Record<string, string | undefined>
+): string[] | undefined {
   const emails = readCsvEnv(env, "ADMIN_ANALYTICS_ACCESS_EMAILS");
   if (emails === undefined) {
     return undefined;
   }
 
-  const normalized = [...new Set(emails.map(normalizeEmailForConfig).filter((email) => email.length > 0))];
+  const normalized = [
+    ...new Set(emails.map(normalizeEmailForConfig).filter((email) => email.length > 0))
+  ];
   return normalized.length > 0 ? normalized : undefined;
 }
 
@@ -355,6 +384,24 @@ export function createAuthEmailSender(input: {
         text: rendered.text,
         html: rendered.html
       });
+    },
+    async sendOrganizationAccessEmail({
+      email,
+      token,
+      kind,
+      organization_name,
+      sender_name,
+      access_summary
+    }): Promise<void> {
+      const rendered = renderOrganizationAccessEmail({
+        kind,
+        organizationName: organization_name,
+        senderName: sender_name,
+        acceptUrl: `${baseUrl}/organizations/accept?kind=${kind}&token=${encodeURIComponent(token)}`,
+        ...(access_summary === undefined ? {} : { accessSummary: access_summary }),
+        brandMarkUrl
+      });
+      await input.emailTransport.send({ to: [email], ...rendered });
     }
   };
 }
@@ -368,7 +415,9 @@ export function createBillingEmailService(input: {
 
   return {
     managementUrl,
-    async getBillingContactForOrganization(request: { organization_id: string }): Promise<BillingEmailContact | null> {
+    async getBillingContactForOrganization(request: {
+      organization_id: string;
+    }): Promise<BillingEmailContact | null> {
       const result = await input.db.query<{
         organization_name: string;
         recipient_email: string;

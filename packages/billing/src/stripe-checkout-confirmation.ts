@@ -1,4 +1,5 @@
 import type Stripe from "stripe";
+import { stripeAllowanceSnapshot } from "./stripe-allowance-snapshot.js";
 import type { BillingSyncStore, Queryable } from "../../storage/src/index.js";
 import {
   deriveBillingState,
@@ -119,6 +120,7 @@ export async function confirmStripeCheckout(input: {
       stripe_subscription_id: subscription.id,
       billing_period_starts_at: period.starts_at,
       billing_period_ends_at: period.ends_at,
+      ...stripeAllowanceSnapshot(subscription, provider.priceMap, period.starts_at),
       last_billing_sync_at: input.now,
       last_billing_event_id: `checkout_session:${session.id}`,
       expected_revision: row.revision,

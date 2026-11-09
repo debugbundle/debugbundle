@@ -51,12 +51,23 @@ describe("web app — incident table interactions", () => {
 
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
+      if (url.includes("/v1/projects?") && url.includes(`project_id=${incident.project_id}`)) {
+        return jsonResponse(200, {
+          projects: [
+            { ...createProject({ project_id: incident.project_id }), effective_role: "owner" }
+          ]
+        });
+      }
 
       if (url.endsWith("/v1/auth/session")) {
         return jsonResponse(200, { session: createSession() });
       }
 
-      if (url.includes("/v1/incidents?") && url.includes("status=active") && init?.method === undefined) {
+      if (
+        url.includes("/v1/incidents?") &&
+        url.includes("status=active") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { incidents: [incident], next_cursor: null });
       }
 
@@ -85,7 +96,10 @@ describe("web app — incident table interactions", () => {
     await user.click(row as HTMLTableRowElement);
 
     expect(await screen.findByRole("button", { name: /mark resolved/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /back to incidents/i })).toHaveAttribute("href", "/incidents");
+    expect(screen.getByRole("link", { name: /back to incidents/i })).toHaveAttribute(
+      "href",
+      "/incidents"
+    );
   });
 
   it("creates a capture rule from an incident suggestion on the detail page", async () => {
@@ -100,6 +114,13 @@ describe("web app — incident table interactions", () => {
 
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
+      if (url.includes("/v1/projects?") && url.includes(`project_id=${incident.project_id}`)) {
+        return jsonResponse(200, {
+          projects: [
+            { ...createProject({ project_id: incident.project_id }), effective_role: "owner" }
+          ]
+        });
+      }
 
       if (url.endsWith("/v1/auth/session")) {
         return jsonResponse(200, { session: createSession() });
@@ -117,7 +138,10 @@ describe("web app — incident table interactions", () => {
         return jsonResponse(200, { status: "pending" });
       }
 
-      if (url.endsWith(`/v1/incidents/${incident.incident_id}/capture-rule-suggestion`) && init?.method === "POST") {
+      if (
+        url.endsWith(`/v1/incidents/${incident.incident_id}/capture-rule-suggestion`) &&
+        init?.method === "POST"
+      ) {
         return jsonResponse(200, {
           bundle_status: "ready",
           suggestions: [
@@ -152,7 +176,10 @@ describe("web app — incident table interactions", () => {
         });
       }
 
-      if (url.endsWith(`/v1/incidents/${incident.incident_id}/capture-rules`) && init?.method === "POST") {
+      if (
+        url.endsWith(`/v1/incidents/${incident.incident_id}/capture-rules`) &&
+        init?.method === "POST"
+      ) {
         expect(init.body).toBe(JSON.stringify({ suggestion_id: "primary_resource_host_demote" }));
         captureRuleCreated = true;
         return jsonResponse(201, {
@@ -192,7 +219,9 @@ describe("web app — incident table interactions", () => {
     await screen.findByRole("button", { name: /mark resolved/i });
     await user.click(screen.getByRole("button", { name: /reduce noise/i }));
 
-    expect(await screen.findByText(/demote resource errors from analytics\.example\.com/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/demote resource errors from analytics\.example\.com/i)
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /keep as context/i }));
 
@@ -200,14 +229,17 @@ describe("web app — incident table interactions", () => {
       expect(
         fetchMock.mock.calls.some(
           ([input, init]) =>
-            requestUrl(input).endsWith(`/v1/incidents/${incident.incident_id}/capture-rules`) && init?.method === "POST"
+            requestUrl(input).endsWith(`/v1/incidents/${incident.incident_id}/capture-rules`) &&
+            init?.method === "POST"
         )
       ).toBe(true);
     });
 
     expect(await screen.findByRole("button", { name: /^rule exists$/i })).toBeInTheDocument();
 
-    await user.click(screen.getAllByRole("button", { name: /^close$/i }).at(-1) as HTMLButtonElement);
+    await user.click(
+      screen.getAllByRole("button", { name: /^close$/i }).at(-1) as HTMLButtonElement
+    );
     await user.click(screen.getByRole("button", { name: /reduce noise/i }));
 
     expect(await screen.findByRole("button", { name: /^rule exists$/i })).toBeInTheDocument();
@@ -251,18 +283,25 @@ describe("web app — incident table interactions", () => {
       if (url.includes("/v1/incidents?") && init?.method === undefined) {
         const request = new URL(url, "https://app.debugbundle.test");
         const status = request.searchParams.get("status");
-        const incidents = status === null
-          ? incidentState
-          : status === "active"
-            ? incidentState.filter((incident) => incident.status === "open" || incident.status === "regressed")
-            : incidentState.filter((incident) => incident.status === status);
+        const incidents =
+          status === null
+            ? incidentState
+            : status === "active"
+              ? incidentState.filter(
+                  (incident) => incident.status === "open" || incident.status === "regressed"
+                )
+              : incidentState.filter((incident) => incident.status === status);
         return jsonResponse(200, { incidents, next_cursor: null });
       }
 
       if (url.endsWith("/v1/incidents/resolve") && init?.method === "POST") {
-        expect(init.body).toBe(JSON.stringify({ incident_ids: ["inc_workspace_open", "inc_workspace_regressed"] }));
+        expect(init.body).toBe(
+          JSON.stringify({ incident_ids: ["inc_workspace_open", "inc_workspace_regressed"] })
+        );
         const incidents = incidentState.filter(
-          (incident) => incident.incident_id === "inc_workspace_open" || incident.incident_id === "inc_workspace_regressed"
+          (incident) =>
+            incident.incident_id === "inc_workspace_open" ||
+            incident.incident_id === "inc_workspace_regressed"
         );
         for (const incident of incidents) {
           incident.status = "resolved";
@@ -290,7 +329,8 @@ describe("web app — incident table interactions", () => {
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.filter(
-          ([input, init]) => requestUrl(input).endsWith("/v1/incidents/resolve") && init?.method === "POST"
+          ([input, init]) =>
+            requestUrl(input).endsWith("/v1/incidents/resolve") && init?.method === "POST"
         )
       ).toHaveLength(1);
     });
@@ -326,11 +366,14 @@ describe("web app — incident table interactions", () => {
       if (url.includes("/v1/incidents?") && init?.method === undefined) {
         const request = new URL(url, "https://app.debugbundle.test");
         const status = request.searchParams.get("status");
-        const incidents = status === null
-          ? incidentState
-          : status === "active"
-            ? incidentState.filter((incident) => incident.status === "open" || incident.status === "regressed")
-            : incidentState.filter((incident) => incident.status === status);
+        const incidents =
+          status === null
+            ? incidentState
+            : status === "active"
+              ? incidentState.filter(
+                  (incident) => incident.status === "open" || incident.status === "regressed"
+                )
+              : incidentState.filter((incident) => incident.status === status);
         return jsonResponse(200, { incidents, next_cursor: null });
       }
 
@@ -361,11 +404,11 @@ describe("web app — incident table interactions", () => {
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.filter(
-          ([input, init]) => requestUrl(input).endsWith("/v1/incidents/resolve") && init?.method === "POST"
+          ([input, init]) =>
+            requestUrl(input).endsWith("/v1/incidents/resolve") && init?.method === "POST"
         )
       ).toHaveLength(1);
     });
-
   });
 
   it("opens the project incident detail route when users click anywhere on the row", async () => {
@@ -388,7 +431,12 @@ describe("web app — incident table interactions", () => {
         return jsonResponse(200, { projects: [project] });
       }
 
-      if (url.includes("/v1/incidents?") && url.includes(`project_id=${project.project_id}`) && url.includes("status=active") && init?.method === undefined) {
+      if (
+        url.includes("/v1/incidents?") &&
+        url.includes(`project_id=${project.project_id}`) &&
+        url.includes("status=active") &&
+        init?.method === undefined
+      ) {
         return jsonResponse(200, { incidents: [incident], next_cursor: null });
       }
 
@@ -459,21 +507,32 @@ describe("web app — incident table interactions", () => {
         return jsonResponse(200, { projects: [project] });
       }
 
-      if (url.includes("/v1/incidents?") && url.includes(`project_id=${project.project_id}`) && init?.method === undefined) {
+      if (
+        url.includes("/v1/incidents?") &&
+        url.includes(`project_id=${project.project_id}`) &&
+        init?.method === undefined
+      ) {
         const request = new URL(url, "https://app.debugbundle.test");
         const status = request.searchParams.get("status");
-        const incidents = status === null
-          ? incidentState
-          : status === "active"
-            ? incidentState.filter((incident) => incident.status === "open" || incident.status === "regressed")
-            : incidentState.filter((incident) => incident.status === status);
+        const incidents =
+          status === null
+            ? incidentState
+            : status === "active"
+              ? incidentState.filter(
+                  (incident) => incident.status === "open" || incident.status === "regressed"
+                )
+              : incidentState.filter((incident) => incident.status === status);
         return jsonResponse(200, { incidents, next_cursor: null });
       }
 
       if (url.endsWith("/v1/incidents/resolve") && init?.method === "POST") {
-        expect(init.body).toBe(JSON.stringify({ incident_ids: ["inc_project_open", "inc_project_regressed"] }));
+        expect(init.body).toBe(
+          JSON.stringify({ incident_ids: ["inc_project_open", "inc_project_regressed"] })
+        );
         const incidents = incidentState.filter(
-          (incident) => incident.incident_id === "inc_project_open" || incident.incident_id === "inc_project_regressed"
+          (incident) =>
+            incident.incident_id === "inc_project_open" ||
+            incident.incident_id === "inc_project_regressed"
         );
         for (const incident of incidents) {
           incident.status = "resolved";
@@ -501,7 +560,8 @@ describe("web app — incident table interactions", () => {
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.filter(
-          ([input, init]) => requestUrl(input).endsWith("/v1/incidents/resolve") && init?.method === "POST"
+          ([input, init]) =>
+            requestUrl(input).endsWith("/v1/incidents/resolve") && init?.method === "POST"
         )
       ).toHaveLength(1);
     });

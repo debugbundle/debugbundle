@@ -7,6 +7,7 @@ import process from "node:process";
 
 const root = process.cwd();
 const sdkRoot = path.join(root, "sdks", "debugbundle-js");
+const redactionOnly = process.argv.includes("--redaction-only");
 const packageVersion = JSON.parse(
   await readFile(path.join(root, "packages", "redaction", "package.json"), "utf8")
 ).version;
@@ -56,20 +57,43 @@ try {
   // installation may replace either package while source checks are running.
   await symlink(path.join(root, "node_modules"), path.join(sharedPrepared, "node_modules"));
   const targets = links.map((link) => ({ link, target: prepared }));
-  for (const directory of [sdkRoot, path.join(sdkRoot, "packages/sdk-node")]) {
-    targets.push({
-      link: path.join(directory, "node_modules/zod"),
-      target: path.join(root, "node_modules/zod")
-    });
+  if (redactionOnly) {
+    // A redaction-only patch does not adopt unrelated newer shared schemas.
+    // Qualify the SDK's exact existing dependency floor instead.
+    for (const directory of [
+      sdkRoot,
+      ...["sdk-node", "sdk-browser"].map((name) => path.join(sdkRoot, "packages", name))
+    ]) {
+      const manifest = JSON.parse(await readFile(path.join(directory, "package.json"), "utf8"));
+      const installed = JSON.parse(
+        await readFile(
+          path.join(directory, "node_modules/@debugbundle/shared-types/package.json"),
+          "utf8"
+        )
+      );
+      if (
+        installed.version !==
+        (manifest.dependencies ?? manifest.devDependencies)["@debugbundle/shared-types"]
+      )
+        throw new Error("installed_sdk_shared_types_floor_mismatch");
+    }
   }
-  for (const directory of [
-    sdkRoot,
-    ...["sdk-node", "sdk-browser"].map((name) => path.join(sdkRoot, "packages", name))
-  ]) {
-    targets.push({
-      link: path.join(directory, "node_modules", "@debugbundle", "shared-types"),
-      target: sharedPrepared
-    });
+  if (!redactionOnly) {
+    for (const directory of [sdkRoot, path.join(sdkRoot, "packages/sdk-node")]) {
+      targets.push({
+        link: path.join(directory, "node_modules/zod"),
+        target: path.join(root, "node_modules/zod")
+      });
+    }
+    for (const directory of [
+      sdkRoot,
+      ...["sdk-node", "sdk-browser"].map((name) => path.join(sdkRoot, "packages", name))
+    ]) {
+      targets.push({
+        link: path.join(directory, "node_modules", "@debugbundle", "shared-types"),
+        target: sharedPrepared
+      });
+    }
   }
   for (const { link, target } of targets) {
     const existing = await lstat(link).catch(() => null);
@@ -118,12 +142,7 @@ try {
           PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN: "false",
           CI: "true",
           DEBUGBUNDLE_SMOKE_REDACTION_TARBALL: tarball,
-          DEBUGBUNDLE_SMOKE_SHARED_TYPES_TARBALL: path.join(
-            root,
-            ".tmp",
-            "apache-packages",
-            `debugbundle-shared-types-${JSON.parse(await readFile(path.join(root, "packages", "shared-types", "package.json"), "utf8")).version}.tgz`
-          )
+          ...(!redactionOnly ? { DEBUGBUNDLE_SMOKE_SHARED_TYPES_TARBALL: sharedTarball } : {})
         },
         stdio: "inherit"
       }

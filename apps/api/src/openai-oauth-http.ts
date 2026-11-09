@@ -3,6 +3,7 @@ import { PassThrough } from "node:stream";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type Provider from "oidc-provider";
 import { z } from "zod";
+import { OPENAI_HOSTED_MCP_SCOPES } from "../../../packages/auth/src/openai-oauth-constants.js";
 import type { OpenAiOAuthStore } from "../../../packages/storage/src/index.js";
 
 import type { OpenAiConsentAuthorization, OpenAiConsentSession } from "./openai-consent-access.js";
@@ -42,18 +43,7 @@ const ReviewerAccessBodySchema = z.object({ credential: z.string().min(32).max(5
 const ConsentDecisionBodySchema = z
   .object({
     decision: z.enum(["allow", "deny"]),
-    product_scopes: z
-      .array(
-        z.enum([
-          "debugbundle:projects:read",
-          "debugbundle:incidents:read",
-          "debugbundle:artifacts:read",
-          "debugbundle:improvements:read",
-          "debugbundle:analytics:read",
-          "debugbundle:health:read"
-        ])
-      )
-      .max(6)
+    product_scopes: z.array(z.enum(OPENAI_HOSTED_MCP_SCOPES)).max(OPENAI_HOSTED_MCP_SCOPES.length)
   })
   .strict();
 const InteractionParamsSchema = z

@@ -5,8 +5,42 @@ import { describe, expect, it, vi } from "vitest";
 import { processNextBuildImprovementBundleJob } from "../../../apps/worker/src/improvement-bundle-processor.js";
 import { buildImprovementBundleObjectKey } from "../../../packages/storage/src/index.js";
 import { createEventEnvelope } from "../../../packages/shared-types/src/index.js";
+import { mockedObject } from "../../helpers/vitest.js";
+import type { ImprovementOpportunityStore } from "../../../packages/storage/src/index.js";
 
 describe("worker improvement bundle retry processor", () => {
+  it("releases a revoked request without reading improvement settings or event data", async () => {
+    const read = vi.fn(),
+      getObject = vi.fn(),
+      releaseLease = vi.fn();
+    expect(
+      await processNextBuildImprovementBundleJob({
+        queue: {
+          dequeue: vi.fn().mockResolvedValue({
+            project_id: "11111111-1111-4111-8111-111111111111",
+            opportunity_id: "22222222-2222-4222-8222-222222222222",
+            initiating_authority: {
+              version: 1,
+              kind: "browser_session",
+              user_id: "33333333-3333-4333-8333-333333333333"
+            },
+            scope_origin_ids: ["11111111-1111-4111-8111-111111111111"]
+          }),
+          releaseLease
+        },
+        dependencies: {
+          improvementOpportunityStore: mockedObject<ImprovementOpportunityStore>({
+            getImprovementExecutionSettings: read
+          }),
+          objectStore: { getObject },
+          projectJobAuthorization: { isAuthorized: vi.fn().mockResolvedValue(false) }
+        }
+      })
+    ).toEqual({ processed: true, reason: "initiator_access_revoked" });
+    expect(read).not.toHaveBeenCalled();
+    expect(getObject).not.toHaveBeenCalled();
+    expect(releaseLease).toHaveBeenCalledOnce();
+  });
   it("rebuilds a hosted improvement bundle from a queued retry job", async () => {
     const putObject = vi.fn().mockResolvedValue(undefined);
     const releaseLease = vi.fn().mockResolvedValue(undefined);
@@ -103,7 +137,9 @@ describe("worker improvement bundle retry processor", () => {
           pruneRetainedBundleOwnersForProject: vi.fn().mockResolvedValue([])
         },
         objectStore: {
-          getObject: vi.fn().mockResolvedValue(gzipSync(Buffer.from(JSON.stringify(sourceEvent), "utf8"))),
+          getObject: vi
+            .fn()
+            .mockResolvedValue(gzipSync(Buffer.from(JSON.stringify(sourceEvent), "utf8"))),
           putObject
         }
       }

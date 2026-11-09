@@ -57,6 +57,76 @@ function setup() {
 }
 
 describe("authoritative capacity schedule projection", () => {
+  it("adds Business capacity at the base interval and reduces only at annual renewal", () => {
+    const f = setup();
+    f.provider.priceMap.set("business_year", {
+      plan: "business",
+      type: "plan",
+      interval: "year",
+      currency: "usd"
+    });
+    f.provider.priceMap.set("business_extra_year", {
+      plan: "business",
+      type: "extra_capacity",
+      interval: "year",
+      currency: "usd"
+    });
+    const subscription = structuredClone(f.subscription) as unknown as Stripe.Subscription;
+    subscription.items.data = [
+      {
+        id: "si_base",
+        quantity: 1,
+        price: {
+          id: "business_year",
+          currency: "usd",
+          recurring: { interval: "year", interval_count: 1 }
+        },
+        current_period_start: 1769817600,
+        current_period_end: 1801353600
+      }
+    ] as Stripe.SubscriptionItem[];
+    expect(
+      buildSubscriptionItemsForQuantity({
+        subscription,
+        stripeConfig: f.provider,
+        targetAdditionalPurchased: 99,
+        plan: "business"
+      })
+    ).toEqual([
+      { id: "si_base", quantity: 1 },
+      { price: "business_extra_year", quantity: 99 }
+    ]);
+    subscription.items.data.push({
+      id: "si_extra",
+      quantity: 99,
+      price: {
+        id: "business_extra_year",
+        currency: "usd",
+        recurring: { interval: "year", interval_count: 1 }
+      },
+      current_period_start: 1769817600,
+      current_period_end: 1801353600
+    } as Stripe.SubscriptionItem);
+    const phases = buildSchedulePhasesForReduction({
+      subscription,
+      schedule: null,
+      stripeConfig: f.provider,
+      summary: {
+        capacity_units: { additional_purchased: 99 },
+        usage_window: { ends_at: "2026-02-28T00:00:00Z" }
+      } as never,
+      targetAdditionalPurchased: 2,
+      plan: "business"
+    });
+    expect(phases[1]).toMatchObject({
+      start_date: 1801353600,
+      duration: { interval: "year", interval_count: 1 },
+      items: [
+        { price: "business_year", quantity: 1 },
+        { price: "business_extra_year", quantity: 2 }
+      ]
+    });
+  });
   it("does not schedule a charge change from cached periods when Stripe has no current period", () => {
     const f = setup();
     expect(() =>

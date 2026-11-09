@@ -23,7 +23,7 @@ export interface CreateWebhookTestDeliveryInput {
   webhook_id: string;
   event_type: WebhookEventType;
   actor_user_id?: string;
-  actor_role?: "owner" | "admin" | "member";
+  actor_role?: "owner" | "admin" | "member" | "viewer";
 }
 
 export interface CreateWebhookTestDeliveryResult {
@@ -109,7 +109,7 @@ export interface WebhookDeliveryStore {
     webhook_id: string;
     project_id?: string;
     actor_user_id?: string;
-    actor_role?: "owner" | "admin" | "member";
+    actor_role?: "owner" | "admin" | "member" | "viewer";
     url?: string;
     events?: WebhookEventType[];
     filters?: WebhookFilters;
@@ -120,7 +120,7 @@ export interface WebhookDeliveryStore {
     webhook_id: string;
     project_id?: string;
     actor_user_id?: string;
-    actor_role?: "owner" | "admin" | "member";
+    actor_role?: "owner" | "admin" | "member" | "viewer";
   }): Promise<DeleteWebhookResult | null>;
   listMatchingWebhooks(input: MatchingWebhookInput): Promise<MatchingWebhook[]>;
   createDeliveryIntent(input: CreateWebhookDeliveryIntentInput): Promise<{ delivery_id: string }>;
@@ -169,6 +169,6 @@ export interface WebhookDeliveryStore {
     webhook_id: string;
     delivery_id: string;
     actor_user_id?: string;
-    actor_role?: "owner" | "admin" | "member";
+    actor_role?: "owner" | "admin" | "member" | "viewer";
   }): Promise<{ delivery_id: string; event_type: WebhookEventType } | null>;
 }

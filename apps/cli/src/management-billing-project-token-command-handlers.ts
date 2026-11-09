@@ -1,4 +1,5 @@
 import { handleBillingPlanChange } from "./billing-plan-change-command.js";
+import { handleBillingOfferChange } from "./billing-offer-change-command.js";
 import {
   cancelBillingCapacityReductionWithAuthCommand as defaultCancelBillingCapacityReductionCommand,
   getBillingSummaryWithAuthCommand as defaultGetBillingSummaryCommand,
@@ -23,6 +24,7 @@ import {
 } from "./project-commands.js";
 import {
   PROJECT_COLOR_TAG_VALUES,
+  MemberTokenScopeDeclarationSchema,
   type ProjectColorTag
 } from "../../../packages/shared-types/src/index.js";
 import {
@@ -72,6 +74,7 @@ export async function handleBillingCommand(
   const action = requirePositional(parsedArgv, 1, "action");
 
   if (action === "plan-change") return handleBillingPlanChange(parsedArgv);
+  if (action === "offer-change") return handleBillingOfferChange(parsedArgv);
 
   if (action === "get") {
     expectNoUnknownOptions(parsedArgv, ["auth-file", "json"]);
@@ -92,7 +95,7 @@ export async function handleBillingCommand(
     ensureNoExtraPositionals(parsedArgv, 3);
 
     const targetPlan = readStringOption(parsedArgv, "plan");
-    if (targetPlan !== "solo" && targetPlan !== "team") {
+    if (targetPlan !== "solo" && targetPlan !== "team" && targetPlan !== "business") {
       throw new CliInputError("Missing required option --plan.");
     }
 
@@ -492,13 +495,14 @@ export async function handleTokenCommand(
 
   if (scope === "member") {
     if (action === "list") {
-      expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "limit"]);
+      expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "limit", "include-scope"]);
       ensureNoExtraPositionals(parsedArgv, 3);
 
       const input = appendCommonAuthOptions(
         parsedArgv,
         {} as {
           limit?: number;
+          includeScope?: boolean;
           authFilePath?: string;
           json?: boolean;
         }
@@ -508,11 +512,19 @@ export async function handleTokenCommand(
         input.limit = limit;
       }
 
+      const includeScope = readBooleanOption(parsedArgv, "include-scope");
+      if (includeScope !== undefined) input.includeScope = includeScope;
       return await (dependencies.listMemberTokensCommand ?? defaultListMemberTokensCommand)(input);
     }
 
     if (action === "create") {
-      expectNoUnknownOptions(parsedArgv, ["auth-file", "json", "label"]);
+      expectNoUnknownOptions(parsedArgv, [
+        "auth-file",
+        "json",
+        "label",
+        "scope-json",
+        "expires-at"
+      ]);
       ensureNoExtraPositionals(parsedArgv, 3);
 
       const label = readStringOption(parsedArgv, "label");
@@ -520,8 +532,22 @@ export async function handleTokenCommand(
         throw new CliInputError("Missing required option --label.");
       }
 
+      const scopeJson = readStringOption(parsedArgv, "scope-json");
+      let declaration;
+      if (scopeJson !== undefined) {
+        try {
+          declaration = MemberTokenScopeDeclarationSchema.parse(JSON.parse(scopeJson));
+        } catch {
+          throw new CliInputError("Invalid --scope-json declaration.");
+        }
+      }
+      const expiresAt = readStringOption(parsedArgv, "expires-at");
       return await (dependencies.createMemberTokenCommand ?? defaultCreateMemberTokenCommand)(
-        appendCommonAuthOptions(parsedArgv, { label })
+        appendCommonAuthOptions(parsedArgv, {
+          label,
+          ...(declaration === undefined ? {} : { scope: declaration }),
+          ...(expiresAt === undefined ? {} : { expiresAt })
+        })
       );
     }
 

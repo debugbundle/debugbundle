@@ -1,4 +1,6 @@
 import { notificationPreferencesOperations } from "./openapi-notification-preferences.js";
+import { organizationOperations } from "./openapi-organizations.js";
+import { referralOperations } from "./openapi-referrals.js";
 import { publicStatusOperations } from "./openapi-public-status.js";
 import { agentOperations } from "./openapi-agent.js";
 import { z } from "zod";
@@ -70,6 +72,13 @@ export function buildPublicOpenApiSpec(): Record<string, unknown> {
     ...foundationOperations(),
     ...evidenceOperations(),
     ...projectsOperations(),
+    ...organizationOperations(),
+    ...referralOperations(),
+    ...reportDefinitionOperations(),
+    ...reportRunOperations(),
+    ...reportContentOperations(),
+    ...reportPdfOperations(),
+    ...reportDeliveryOperations(),
     ...projectServicesOperations(),
     ...projectMergeOperations(),
     ...configurationOperations(),
@@ -127,7 +136,7 @@ export function buildPublicOpenApiSpec(): Record<string, unknown> {
               ? {}
               : {
                   content: {
-                    "application/json": {
+                    [response.mediaType ?? "application/json"]: {
                       schema: resolveSchemaSpec(response.schema, components)
                     }
                   }
@@ -182,3 +191,8 @@ export function buildPublicOpenApiSpec(): Record<string, unknown> {
     }
   };
 }
+import { reportDefinitionOperations } from "./openapi-report-definitions.js";
+import { reportRunOperations } from "./openapi-report-runs.js";
+import { reportContentOperations } from "./openapi-report-content.js";
+import { reportPdfOperations } from "./openapi-report-pdf.js";
+import { reportDeliveryOperations } from "./openapi-report-delivery.js";

@@ -1,6 +1,7 @@
 import { ruleActorAllowedSql } from "./project-rule-access.js";
 import { runInTransaction } from "./transaction.js";
 import { randomUUID } from "node:crypto";
+import { MemberTokenPolicySchema } from "../../shared-types/src/index.js";
 import type {
   MemberTokenRecord,
   PostgresMetadataStore,
@@ -148,6 +149,7 @@ export function createMetadataTokens(
             user_id,
             organization_id,
             label,
+            ${input.include_scope ? "scope_policy AS scope," : ""}
             created_at::text AS created_at,
             last_used_at::text AS last_used_at,
             revoked_at::text AS revoked_at,
@@ -162,25 +164,46 @@ export function createMetadataTokens(
         [input.organization_id, input.user_id, input.limit]
       );
 
-      return result.rows;
+      return result.rows.map((row) => {
+        if (row.scope == null) {
+          const legacy = { ...row };
+          delete legacy.scope;
+          return legacy;
+        }
+        return { ...row, scope: MemberTokenPolicySchema.parse(row.scope) };
+      });
     },
 
     async createMemberTokenForOrganization(input): Promise<MemberTokenRecord> {
+      const scoped = input.scope !== undefined;
+      const params: unknown[] = [
+        randomUUID(),
+        input.user_id,
+        input.organization_id,
+        input.token_hash,
+        input.label
+      ];
+      if (scoped)
+        params.push(
+          JSON.stringify(MemberTokenPolicySchema.parse(input.scope)),
+          input.expires_at ?? null
+        );
       const result = await db.query<MemberTokenRecord & Record<string, unknown>>(
         `
-          INSERT INTO member_tokens (id, user_id, organization_id, token_hash, label, created_at)
-          VALUES ($1, $2, $3, $4, $5, now())
+          INSERT INTO member_tokens (id, user_id, organization_id, token_hash, label, created_at${scoped ? ",scope_policy,expires_at" : ""})
+          VALUES ($1, $2, $3, $4, $5, now()${scoped ? ",$6::jsonb,$7::timestamptz" : ""})
           RETURNING
             id AS token_id,
             user_id,
             organization_id,
             label,
+            ${scoped ? "scope_policy AS scope," : ""}
             created_at::text AS created_at,
             last_used_at::text AS last_used_at,
             revoked_at::text AS revoked_at,
             expires_at::text AS expires_at
         `,
-        [randomUUID(), input.user_id, input.organization_id, input.token_hash, input.label]
+        params
       );
 
       const created = result.rows[0];

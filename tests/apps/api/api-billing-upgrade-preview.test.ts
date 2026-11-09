@@ -2,17 +2,19 @@ import { expect, it, vi } from "vitest";
 import { createApiServer } from "../../../apps/api/src/server.js";
 import { SESSION_COOKIE_NAME, buildCsrfToken } from "../../../packages/auth/src/index.js";
 
-it.each([
-  "owner",
-  "member",
-  "unverified",
-  "missing_session",
-  "missing_csrf",
-  "malformed",
-  "unconfigured",
-  "provider_failure",
-  "conflict"
-])("protects upgrade previews for %s requests", async (scenario) => {
+it.each(
+  [
+    "owner",
+    "member",
+    "unverified",
+    "missing_session",
+    "missing_csrf",
+    "malformed",
+    "unconfigured",
+    "provider_failure",
+    "conflict"
+  ].flatMap((scenario) => ["monthly", "offer"].map((kind) => ({ scenario, kind })))
+)("protects $kind upgrade previews for $scenario requests", async ({ scenario, kind }) => {
   const previewUpgrade = vi.fn(async () =>
     scenario === "provider_failure"
       ? "billing_service_error"
@@ -37,7 +39,8 @@ it.each([
             }
       )
     },
-    billingManagement: scenario === "unconfigured" ? {} : { previewUpgrade },
+    billingManagement:
+      scenario === "unconfigured" ? {} : { previewUpgrade, previewOfferUpgrade: previewUpgrade },
     tokenManagement: {},
     incidentRetrieval: {},
     objectStoreReader: {},
@@ -46,11 +49,16 @@ it.each([
   try {
     const response = await app.inject({
       method: "POST",
-      url: "/v1/billing/upgrade/preview",
+      url: kind === "offer" ? "/v1/billing/offers/upgrade-preview" : "/v1/billing/upgrade/preview",
       cookies: { [SESSION_COOKIE_NAME]: "synthetic_session" },
       headers:
         scenario === "missing_csrf" ? {} : { "x-csrf-token": buildCsrfToken("synthetic_session") },
-      payload: scenario === "malformed" ? { organization_id: "org_other" } : {}
+      payload:
+        scenario === "malformed"
+          ? { organization_id: "org_other" }
+          : kind === "offer"
+            ? { target_plan: "business", interval: "year" }
+            : {}
     });
     expect(response.statusCode).toBe(
       ["unconfigured", "provider_failure"].includes(scenario)
@@ -66,7 +74,12 @@ it.each([
                 : 403
     );
     if (scenario === "owner") {
-      expect(previewUpgrade).toHaveBeenCalledExactlyOnceWith({ organization_id: "org_test" });
+      expect(previewUpgrade).toHaveBeenCalledExactlyOnceWith({
+        organization_id: "org_test",
+        ...(kind === "offer"
+          ? { actor_user_id: "user_test", target_plan: "business", interval: "year" }
+          : {})
+      });
       expect(response.headers["cache-control"]).toBe("no-store");
     } else if (!["provider_failure", "conflict"].includes(scenario))
       expect(previewUpgrade).not.toHaveBeenCalled();

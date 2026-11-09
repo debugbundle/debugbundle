@@ -6,8 +6,7 @@ import { describe, expect, it } from "vitest";
 const readWorkspaceFile = (path: string): string => readFileSync(join(process.cwd(), path), "utf8");
 
 describe("Solo pricing contract", () => {
-  it("publishes $4.99 as the only Solo base price", () => {
-    const retiredSoloPrice = ["$2", "99"].join(".");
+  it("publishes $5 as the only Solo base price", () => {
     const pricingSources = [
       readWorkspaceFile("spec/product.md"),
       readWorkspaceFile("spec/billing.md"),
@@ -15,8 +14,8 @@ describe("Solo pricing contract", () => {
     ];
 
     for (const source of pricingSources) {
-      expect(source).toContain("$4.99");
-      expect(source).not.toContain(retiredSoloPrice);
+      expect(source).toContain("$5");
+      expect(source).not.toMatch(/Solo(?:\s+(?:plan|base|price|tier))?[\s:–—-]*\$2\.99\b/iu);
     }
   });
 

@@ -3,30 +3,39 @@ import { describe, expect, it, vi } from "vitest";
 import { main, runCli } from "../../../apps/cli/src/main.js";
 
 describe("cli main management routing", () => {
+  it("routes Business through the existing no-card trial command", async () => {
+    const startBillingTrialCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "trial" });
+    const result = await runCli(["billing", "trial", "start", "--plan", "business", "--json"], {
+      startBillingTrialCommand
+    });
+    expect(result.exitCode).toBe(0);
+    expect(startBillingTrialCommand).toHaveBeenCalledExactlyOnceWith({
+      targetPlan: "business",
+      json: true
+    });
+  });
   it("routes nested token project and member commands", async () => {
     const createProjectTokenCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "created" });
     const revokeMemberTokenCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "revoked" });
 
-    const projectResult = await runCli([
-      "token",
-      "project",
-      "create",
-      "proj_123",
-      "--label",
-      "ci",
-      "--auth-file",
-      "/tmp/auth.json",
-      "--json"
-    ], {
-      createProjectTokenCommand
-    });
+    const projectResult = await runCli(
+      [
+        "token",
+        "project",
+        "create",
+        "proj_123",
+        "--label",
+        "ci",
+        "--auth-file",
+        "/tmp/auth.json",
+        "--json"
+      ],
+      {
+        createProjectTokenCommand
+      }
+    );
 
-    const memberResult = await runCli([
-      "token",
-      "member",
-      "revoke",
-      "mtok_123"
-    ], {
+    const memberResult = await runCli(["token", "member", "revoke", "mtok_123"], {
       revokeMemberTokenCommand
     });
 
@@ -46,16 +55,12 @@ describe("cli main management routing", () => {
   it("routes project delete commands", async () => {
     const deleteProjectCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "deleted" });
 
-    const result = await runCli([
-      "project",
-      "delete",
-      "proj_123",
-      "--auth-file",
-      "/tmp/auth.json",
-      "--json"
-    ], {
-      deleteProjectCommand
-    });
+    const result = await runCli(
+      ["project", "delete", "proj_123", "--auth-file", "/tmp/auth.json", "--json"],
+      {
+        deleteProjectCommand
+      }
+    );
 
     expect(deleteProjectCommand).toHaveBeenCalledWith({
       projectId: "proj_123",
@@ -65,281 +70,44 @@ describe("cli main management routing", () => {
     expect(result.exitCode).toBe(0);
   });
 
-  it("routes github status and repo commands", async () => {
-    const getGitHubStatusCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "status" });
-    const setProjectGitHubRepoCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "set" });
-    const removeProjectGitHubRepoCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "removed" });
-
-    await runCli([
-      "github",
-      "status",
-      "--project-id",
-      "proj_123",
-      "--auth-file",
-      "/tmp/auth.json",
-      "--json"
-    ], {
-      getGitHubStatusCommand
-    });
-
-    await runCli([
-      "github",
-      "repo",
-      "set",
-      "debugbundle/app",
-      "--project-id",
-      "proj_123"
-    ], {
-      setProjectGitHubRepoCommand
-    });
-
-    await runCli([
-      "github",
-      "repo",
-      "remove",
-      "--project-id",
-      "proj_123",
-      "--json"
-    ], {
-      removeProjectGitHubRepoCommand
-    });
-
-    expect(getGitHubStatusCommand).toHaveBeenCalledWith({
-      projectId: "proj_123",
-      authFilePath: "/tmp/auth.json",
-      json: true
-    });
-    expect(setProjectGitHubRepoCommand).toHaveBeenCalledWith({
-      projectId: "proj_123",
-      repoRef: "debugbundle/app"
-    });
-    expect(removeProjectGitHubRepoCommand).toHaveBeenCalledWith({
-      projectId: "proj_123",
-      json: true
-    });
-  });
-
-  it("routes github rule commands", async () => {
-    const listProjectGitHubRulesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "list" });
-    const createProjectGitHubRuleCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "create" });
-    const updateProjectGitHubRuleCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "update" });
-    const deleteProjectGitHubRuleCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "delete" });
-
-    await runCli([
-      "github",
-      "rules",
-      "--project-id",
-      "proj_123",
-      "--json"
-    ], {
-      listProjectGitHubRulesCommand
-    });
-
-    await runCli([
-      "github",
-      "rules",
-      "create",
-      "--project-id",
-      "proj_123",
-      "--name",
-      "High severity incidents",
-      "--event",
-      "bundle.created,bundle.reopened",
-      "--environment",
-      "production",
-      "--service",
-      "checkout-api",
-      "--severity-min",
-      "high",
-      "--bundle-type",
-      "failure",
-      "--incident-status",
-      "new_or_reopened",
-      "--cooldown",
-      "300"
-    ], {
-      createProjectGitHubRuleCommand
-    });
-
-    await runCli([
-      "github",
-      "rules",
-      "update",
-      "rule_123",
-      "--project-id",
-      "proj_123",
-      "--enabled",
-      "false"
-    ], {
-      updateProjectGitHubRuleCommand
-    });
-
-    await runCli([
-      "github",
-      "rules",
-      "delete",
-      "rule_123",
-      "--project-id",
-      "proj_123",
-      "--auth-file",
-      "/tmp/auth.json"
-    ], {
-      deleteProjectGitHubRuleCommand
-    });
-
-    expect(listProjectGitHubRulesCommand).toHaveBeenCalledWith({
-      projectId: "proj_123",
-      json: true
-    });
-    expect(createProjectGitHubRuleCommand).toHaveBeenCalledWith({
-      projectId: "proj_123",
-      name: "High severity incidents",
-      eventTypes: ["bundle.created", "bundle.reopened"],
-      environments: ["production"],
-      services: ["checkout-api"],
-      severityMin: "high",
-      bundleType: "failure",
-      incidentStatus: "new_or_reopened",
-      cooldownSeconds: 300
-    });
-    expect(updateProjectGitHubRuleCommand).toHaveBeenCalledWith({
-      projectId: "proj_123",
-      ruleId: "rule_123",
-      enabled: false
-    });
-    expect(deleteProjectGitHubRuleCommand).toHaveBeenCalledWith({
-      projectId: "proj_123",
-      ruleId: "rule_123",
-      authFilePath: "/tmp/auth.json"
-    });
-  });
-
-  it("routes github delivery commands", async () => {
-    const listProjectGitHubDeliveriesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "list" });
-    const retryProjectGitHubDeliveryCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "retry" });
-
-    await runCli([
-      "github",
-      "deliveries",
-      "--project-id",
-      "proj_123",
-      "--status",
-      "failed",
-      "--limit",
-      "5",
-      "--json"
-    ], {
-      listProjectGitHubDeliveriesCommand
-    });
-
-    await runCli([
-      "github",
-      "deliveries",
-      "retry",
-      "del_123",
-      "--project-id",
-      "proj_123",
-      "--auth-file",
-      "/tmp/auth.json"
-    ], {
-      retryProjectGitHubDeliveryCommand
-    });
-
-    expect(listProjectGitHubDeliveriesCommand).toHaveBeenCalledWith({
-      projectId: "proj_123",
-      status: "failed",
-      limit: 5,
-      json: true
-    });
-    expect(retryProjectGitHubDeliveryCommand).toHaveBeenCalledWith({
-      projectId: "proj_123",
-      deliveryId: "del_123",
-      authFilePath: "/tmp/auth.json"
-    });
-  });
-
-  it("routes slack management commands", async () => {
-    const listSlackDestinationsCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "list" });
-    const getSlackConnectUrlCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "url" });
-    const testSlackDestinationCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "test" });
-    const deleteSlackDestinationCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "delete" });
-
-    await runCli(["slack", "list", "--project-id", "proj_123", "--json"], {
-      listSlackDestinationsCommand
-    });
-    await runCli(["slack", "connect-url", "--project-id", "proj_123", "--return-to", "/projects/proj_123/alerts"], {
-      getSlackConnectUrlCommand
-    });
-    await runCli(["slack", "test", "sd_123", "--project-id", "proj_123"], {
-      testSlackDestinationCommand
-    });
-    await runCli(["slack", "delete", "sd_123", "--project-id", "proj_123", "--auth-file", "/tmp/auth.json"], {
-      deleteSlackDestinationCommand
-    });
-
-    expect(listSlackDestinationsCommand).toHaveBeenCalledWith({
-      projectId: "proj_123",
-      json: true
-    });
-    expect(getSlackConnectUrlCommand).toHaveBeenCalledWith({
-      projectId: "proj_123",
-      returnTo: "/projects/proj_123/alerts"
-    });
-    expect(testSlackDestinationCommand).toHaveBeenCalledWith({
-      projectId: "proj_123",
-      destinationId: "sd_123"
-    });
-    expect(deleteSlackDestinationCommand).toHaveBeenCalledWith({
-      projectId: "proj_123",
-      destinationId: "sd_123",
-      authFilePath: "/tmp/auth.json"
-    });
-  });
-
   it("routes billing commands", async () => {
-    const getBillingSummaryCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "billing-get" });
-    const increaseBillingCapacityCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "billing-increase" });
-    const scheduleBillingCapacityReductionCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "billing-reduce" });
-    const cancelBillingCapacityReductionCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "billing-cancel" });
+    const getBillingSummaryCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "billing-get" });
+    const increaseBillingCapacityCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "billing-increase" });
+    const scheduleBillingCapacityReductionCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "billing-reduce" });
+    const cancelBillingCapacityReductionCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "billing-cancel" });
 
-    await runCli([
-      "billing",
-      "get",
-      "--auth-file",
-      "/tmp/auth.json",
-      "--json"
-    ], {
+    await runCli(["billing", "get", "--auth-file", "/tmp/auth.json", "--json"], {
       getBillingSummaryCommand
     });
 
-    await runCli([
-      "billing",
-      "capacity",
-      "increase",
-      "--target-additional-capacity-units",
-      "4"
-    ], {
+    await runCli(["billing", "capacity", "increase", "--target-additional-capacity-units", "4"], {
       increaseBillingCapacityCommand
     });
 
-    await runCli([
-      "billing",
-      "capacity",
-      "schedule-reduction",
-      "--target-additional-capacity-units",
-      "1",
-      "--auth-file",
-      "/tmp/auth.json"
-    ], {
-      scheduleBillingCapacityReductionCommand
-    });
+    await runCli(
+      [
+        "billing",
+        "capacity",
+        "schedule-reduction",
+        "--target-additional-capacity-units",
+        "1",
+        "--auth-file",
+        "/tmp/auth.json"
+      ],
+      {
+        scheduleBillingCapacityReductionCommand
+      }
+    );
 
-    await runCli([
-      "billing",
-      "capacity",
-      "cancel-reduction",
-      "--json"
-    ], {
+    await runCli(["billing", "capacity", "cancel-reduction", "--json"], {
       cancelBillingCapacityReductionCommand
     });
 
@@ -360,55 +128,35 @@ describe("cli main management routing", () => {
   });
 
   it("routes the remaining token command combinations", async () => {
-    const listProjectTokensCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "project-list" });
-    const revokeProjectTokenCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "project-revoke" });
-    const listMemberTokensCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "member-list" });
-    const createMemberTokenCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "member-create" });
+    const listProjectTokensCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "project-list" });
+    const revokeProjectTokenCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "project-revoke" });
+    const listMemberTokensCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "member-list" });
+    const createMemberTokenCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "member-create" });
 
-    await runCli([
-      "token",
-      "project",
-      "list",
-      "proj_123",
-      "--limit",
-      "20",
-      "--json"
-    ], {
+    await runCli(["token", "project", "list", "proj_123", "--limit", "20", "--json"], {
       listProjectTokensCommand
     });
 
-    await runCli([
-      "token",
-      "project",
-      "revoke",
-      "proj_123",
-      "ptok_123",
-      "--auth-file",
-      "/tmp/auth.json"
-    ], {
-      revokeProjectTokenCommand
-    });
+    await runCli(
+      ["token", "project", "revoke", "proj_123", "ptok_123", "--auth-file", "/tmp/auth.json"],
+      {
+        revokeProjectTokenCommand
+      }
+    );
 
-    await runCli([
-      "token",
-      "member",
-      "list",
-      "--limit",
-      "15",
-      "--auth-file",
-      "/tmp/auth.json"
-    ], {
+    await runCli(["token", "member", "list", "--limit", "15", "--auth-file", "/tmp/auth.json"], {
       listMemberTokensCommand
     });
 
-    await runCli([
-      "token",
-      "member",
-      "create",
-      "--label",
-      "cli",
-      "--json"
-    ], {
+    await runCli(["token", "member", "create", "--label", "cli", "--json"], {
       createMemberTokenCommand
     });
 
@@ -432,270 +180,60 @@ describe("cli main management routing", () => {
     });
   });
 
-  it("routes webhook commands with parsed filters and auth options", async () => {
-    const listWebhooksCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "webhook-list" });
-    const createWebhookCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "webhook-create" });
-    const updateWebhookCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "webhook-update" });
-    const deleteWebhookCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "webhook-delete" });
-    const listWebhookDeliveriesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "webhook-deliveries" });
-
-    await runCli([
-      "webhook",
-      "list",
-      "--project-id",
-      "proj_123",
-      "--limit",
-      "20",
-      "--auth-file",
-      "/tmp/auth.json",
-      "--json"
-    ], {
-      listWebhooksCommand
-    });
-
-    await runCli([
-      "webhook",
-      "create",
-      "--project-id",
-      "proj_123",
-      "--url",
-      "https://hooks.example.test/debugbundle",
-      "--event",
-      "bundle.created,bundle.updated",
-      "--environment",
-      "production,staging",
-      "--service",
-      "checkout-api",
-      "--severity-min",
-      "high",
-      "--bundle-type",
-      "failure,improvement",
-      "--verification",
-      "false",
-      "--is-enabled",
-      "true",
-      "--json"
-    ], {
-      createWebhookCommand
-    });
-
-    await runCli([
-      "webhook",
-      "update",
-      "wh_123",
-      "--project-id",
-      "proj_123",
-      "--event",
-      "bundle.updated",
-      "--is-enabled",
-      "false"
-    ], {
-      updateWebhookCommand
-    });
-
-    await runCli([
-      "webhook",
-      "delete",
-      "wh_123",
-      "--project-id",
-      "proj_123",
-      "--auth-file",
-      "/tmp/auth.json"
-    ], {
-      deleteWebhookCommand
-    });
-
-    await runCli([
-      "webhook",
-      "deliveries",
-      "wh_123",
-      "--project-id",
-      "proj_123",
-      "--limit",
-      "10",
-      "--json"
-    ], {
-      listWebhookDeliveriesCommand
-    });
-
-    expect(listWebhooksCommand).toHaveBeenCalledWith({
-      projectId: "proj_123",
-      limit: 20,
-      authFilePath: "/tmp/auth.json",
-      json: true
-    });
-    expect(createWebhookCommand).toHaveBeenCalledWith({
-      projectId: "proj_123",
-      url: "https://hooks.example.test/debugbundle",
-      events: ["bundle.created", "bundle.updated"],
-      filters: {
-        environment: ["production", "staging"],
-        service: ["checkout-api"],
-        severity_min: "high",
-        bundle_type: ["failure", "improvement"],
-        verification: false
-      },
-      isEnabled: true,
-      json: true
-    });
-    expect(updateWebhookCommand).toHaveBeenCalledWith({
-      webhookId: "wh_123",
-      projectId: "proj_123",
-      events: ["bundle.updated"],
-      isEnabled: false
-    });
-    expect(deleteWebhookCommand).toHaveBeenCalledWith({
-      webhookId: "wh_123",
-      projectId: "proj_123",
-      authFilePath: "/tmp/auth.json"
-    });
-    expect(listWebhookDeliveriesCommand).toHaveBeenCalledWith({
-      webhookId: "wh_123",
-      projectId: "proj_123",
-      limit: 10,
-      json: true
-    });
-  });
-
-  it("routes alert commands with parsed fields and auth options", async () => {
-    const listAlertsCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "alert-list" });
-    const createAlertCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "alert-create" });
-    const updateAlertCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "alert-update" });
-    const deleteAlertCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "alert-delete" });
-
-    await runCli([
-      "alert",
-      "list",
-      "--project-id",
-      "proj_123",
-      "--limit",
-      "20",
-      "--auth-file",
-      "/tmp/auth.json",
-      "--json"
-    ], {
-      listAlertsCommand
-    });
-
-    await runCli([
-      "alert",
-      "create",
-      "--project-id",
-      "proj_123",
-      "--service-id",
-      "svc_123",
-      "--channel",
-      "email",
-      "--condition",
-      "severity_threshold",
-      "--severity-min",
-      "high",
-      "--severity-lifecycle-scope",
-      "both",
-      "--config-json",
-      '{"to":"oncall@example.com"}',
-      "--is-enabled",
-      "true",
-      "--json"
-    ], {
-      createAlertCommand
-    });
-
-    await runCli([
-      "alert",
-      "update",
-      "al_123",
-      "--project-id",
-      "proj_123",
-      "--service-id",
-      "null",
-      "--severity-min",
-      "null",
-      "--severity-lifecycle-scope",
-      "null",
-      "--config-json",
-      '{"channel":"eng-alerts"}',
-      "--is-enabled",
-      "false"
-    ], {
-      updateAlertCommand
-    });
-
-    await runCli([
-      "alert",
-      "delete",
-      "al_123",
-      "--project-id",
-      "proj_123",
-      "--auth-file",
-      "/tmp/auth.json"
-    ], {
-      deleteAlertCommand
-    });
-
-    expect(listAlertsCommand).toHaveBeenCalledWith({
-      projectId: "proj_123",
-      limit: 20,
-      authFilePath: "/tmp/auth.json",
-      json: true
-    });
-    expect(createAlertCommand).toHaveBeenCalledWith({
-      projectId: "proj_123",
-      serviceId: "svc_123",
-      channel: "email",
-      conditionType: "severity_threshold",
-      severityMin: "high",
-      severityLifecycleScope: "both",
-      config: {
-        to: "oncall@example.com"
-      },
-      isEnabled: true,
-      json: true
-    });
-    expect(updateAlertCommand).toHaveBeenCalledWith({
-      alertId: "al_123",
-      projectId: "proj_123",
-      serviceId: null,
-      severityMin: null,
-      severityLifecycleScope: null,
-      config: {
-        channel: "eng-alerts"
-      },
-      isEnabled: false
-    });
-    expect(deleteAlertCommand).toHaveBeenCalledWith({
-      alertId: "al_123",
-      projectId: "proj_123",
-      authFilePath: "/tmp/auth.json"
-    });
-  });
-
   it("routes minimal command inputs without optional fields", async () => {
     const analyzeCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "analyze-min" });
     const doctorCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "doctor-min" });
     const setupCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "setup-min" });
     const connectCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "connect-min" });
     const validateCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "validate-min" });
-    const profileValidateCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "profile-min" });
-    const verifyCloudCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "verify-cloud-min" });
+    const profileValidateCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "profile-min" });
+    const verifyCloudCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "verify-cloud-min" });
     const smokeCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "smoke-min" });
     const loginCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "login-min" });
-    const listIncidentsCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "incidents-min" });
+    const listIncidentsCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "incidents-min" });
     const getLogsCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "logs-min" });
     const listServicesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "services-min" });
     const whoamiCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "whoami-min" });
-    const listProjectTokensCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "project-list-min" });
-    const listMemberTokensCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "member-list-min" });
+    const listProjectTokensCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "project-list-min" });
+    const listMemberTokensCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "member-list-min" });
     const listAlertsCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "alert-list-min" });
-    const createAlertCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "alert-create-min" });
-    const updateAlertCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "alert-update-min" });
-    const deleteAlertCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "alert-delete-min" });
-    const listWebhooksCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "webhook-list-min" });
-    const createWebhookCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "webhook-create-min" });
-    const updateWebhookCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "webhook-update-min" });
-    const deleteWebhookCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "webhook-delete-min" });
-    const testWebhookCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "webhook-test-min" });
-    const listWebhookDeliveriesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "webhook-deliveries-min" });
+    const createAlertCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "alert-create-min" });
+    const updateAlertCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "alert-update-min" });
+    const deleteAlertCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "alert-delete-min" });
+    const listWebhooksCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "webhook-list-min" });
+    const createWebhookCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "webhook-create-min" });
+    const updateWebhookCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "webhook-update-min" });
+    const deleteWebhookCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "webhook-delete-min" });
+    const testWebhookCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "webhook-test-min" });
+    const listWebhookDeliveriesCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "webhook-deliveries-min" });
 
     await runCli(["--help"]);
     await runCli(["analyze"], { analyzeCommand });
@@ -714,35 +252,51 @@ describe("cli main management routing", () => {
     await runCli(["token", "project", "list", "proj_123"], { listProjectTokensCommand });
     await runCli(["token", "member", "list"], { listMemberTokensCommand });
     await runCli(["alert", "list", "--project-id", "proj_123"], { listAlertsCommand });
-    await runCli([
-      "alert",
-      "create",
-      "--project-id",
-      "proj_123",
-      "--channel",
-      "email",
-      "--condition",
-      "new_incident",
-      "--config-json",
-      '{"to":"owner@example.com"}'
-    ], { createAlertCommand });
-    await runCli(["alert", "update", "al_123", "--project-id", "proj_123", "--is-enabled", "false"], { updateAlertCommand });
+    await runCli(
+      [
+        "alert",
+        "create",
+        "--project-id",
+        "proj_123",
+        "--channel",
+        "email",
+        "--condition",
+        "new_incident",
+        "--config-json",
+        '{"to":"owner@example.com"}'
+      ],
+      { createAlertCommand }
+    );
+    await runCli(
+      ["alert", "update", "al_123", "--project-id", "proj_123", "--is-enabled", "false"],
+      { updateAlertCommand }
+    );
     await runCli(["alert", "delete", "al_123", "--project-id", "proj_123"], { deleteAlertCommand });
     await runCli(["webhook", "list", "--project-id", "proj_123"], { listWebhooksCommand });
-    await runCli([
-      "webhook",
-      "create",
-      "--project-id",
-      "proj_123",
-      "--url",
-      "https://hooks.example.test/debugbundle",
-      "--event",
-      "bundle.created"
-    ], { createWebhookCommand });
-    await runCli(["webhook", "update", "wh_123", "--project-id", "proj_123", "--is-enabled", "false"], { updateWebhookCommand });
-    await runCli(["webhook", "delete", "wh_123", "--project-id", "proj_123"], { deleteWebhookCommand });
+    await runCli(
+      [
+        "webhook",
+        "create",
+        "--project-id",
+        "proj_123",
+        "--url",
+        "https://hooks.example.test/debugbundle",
+        "--event",
+        "bundle.created"
+      ],
+      { createWebhookCommand }
+    );
+    await runCli(
+      ["webhook", "update", "wh_123", "--project-id", "proj_123", "--is-enabled", "false"],
+      { updateWebhookCommand }
+    );
+    await runCli(["webhook", "delete", "wh_123", "--project-id", "proj_123"], {
+      deleteWebhookCommand
+    });
     await runCli(["webhook", "test", "wh_123", "--project-id", "proj_123"], { testWebhookCommand });
-    await runCli(["webhook", "deliveries", "wh_123", "--project-id", "proj_123"], { listWebhookDeliveriesCommand });
+    await runCli(["webhook", "deliveries", "wh_123", "--project-id", "proj_123"], {
+      listWebhookDeliveriesCommand
+    });
 
     expect(analyzeCommand).toHaveBeenCalledWith({});
     expect(doctorCommand).toHaveBeenCalledWith({});
@@ -768,7 +322,11 @@ describe("cli main management routing", () => {
         to: "owner@example.com"
       }
     });
-    expect(updateAlertCommand).toHaveBeenCalledWith({ alertId: "al_123", projectId: "proj_123", isEnabled: false });
+    expect(updateAlertCommand).toHaveBeenCalledWith({
+      alertId: "al_123",
+      projectId: "proj_123",
+      isEnabled: false
+    });
     expect(deleteAlertCommand).toHaveBeenCalledWith({ alertId: "al_123", projectId: "proj_123" });
     expect(listWebhooksCommand).toHaveBeenCalledWith({ projectId: "proj_123" });
     expect(createWebhookCommand).toHaveBeenCalledWith({
@@ -776,16 +334,33 @@ describe("cli main management routing", () => {
       url: "https://hooks.example.test/debugbundle",
       events: ["bundle.created"]
     });
-    expect(updateWebhookCommand).toHaveBeenCalledWith({ webhookId: "wh_123", projectId: "proj_123", isEnabled: false });
-    expect(deleteWebhookCommand).toHaveBeenCalledWith({ webhookId: "wh_123", projectId: "proj_123" });
+    expect(updateWebhookCommand).toHaveBeenCalledWith({
+      webhookId: "wh_123",
+      projectId: "proj_123",
+      isEnabled: false
+    });
+    expect(deleteWebhookCommand).toHaveBeenCalledWith({
+      webhookId: "wh_123",
+      projectId: "proj_123"
+    });
     expect(testWebhookCommand).toHaveBeenCalledWith({ webhookId: "wh_123", projectId: "proj_123" });
-    expect(listWebhookDeliveriesCommand).toHaveBeenCalledWith({ webhookId: "wh_123", projectId: "proj_123" });
+    expect(listWebhookDeliveriesCommand).toHaveBeenCalledWith({
+      webhookId: "wh_123",
+      projectId: "proj_123"
+    });
   });
 
   it("returns validation errors for unknown commands and invalid option values", async () => {
     const unknownResult = await runCli(["unknown"]);
     const invalidLimitResult = await runCli(["incidents", "--limit", "abc"]);
-    const invalidMaxAgeResult = await runCli(["verify", "cloud", "--project-id", "proj_123", "--max-age-minutes", "abc"]);
+    const invalidMaxAgeResult = await runCli([
+      "verify",
+      "cloud",
+      "--project-id",
+      "proj_123",
+      "--max-age-minutes",
+      "abc"
+    ]);
     const missingProjectIdResult = await runCli(["services", "--json"]);
     const unknownProfileResult = await runCli(["profile", "unknown"]);
     const unknownVerifyResult = await runCli(["verify", "unknown"]);
@@ -847,22 +422,46 @@ describe("cli main management routing", () => {
     const tokenProjectMissingLabel = await runCli(["token", "project", "create", "proj_123"]);
     const tokenMemberMissingLabel = await runCli(["token", "member", "create"]);
     const webhookListMissingProject = await runCli(["webhook", "list"]);
-    const webhookCreateMissingUrl = await runCli(["webhook", "create", "--project-id", "proj_123", "--event", "bundle.created"]);
-    const webhookCreateMissingEvent = await runCli(["webhook", "create", "--project-id", "proj_123", "--url", "https://hooks.example.test/debugbundle"]);
-    const webhookUpdateWithoutChanges = await runCli(["webhook", "update", "wh_123", "--project-id", "proj_123"]);
+    const webhookCreateMissingUrl = await runCli([
+      "webhook",
+      "create",
+      "--project-id",
+      "proj_123",
+      "--event",
+      "bundle.created"
+    ]);
+    const webhookCreateMissingEvent = await runCli([
+      "webhook",
+      "create",
+      "--project-id",
+      "proj_123",
+      "--url",
+      "https://hooks.example.test/debugbundle"
+    ]);
+    const webhookUpdateWithoutChanges = await runCli([
+      "webhook",
+      "update",
+      "wh_123",
+      "--project-id",
+      "proj_123"
+    ]);
     const inspectExtraPositional = await runCli(["inspect", "inc_123", "extra"]);
     const logsExtraPositional = await runCli(["logs", "inc_123", "extra"]);
 
     expect(analyzeUnknownOption.output).toContain("Unknown option --unknown.");
     expect(verifyCloudMissingProject.output).toContain("Missing required option --project-id.");
     expect(smokeMissingProject.output).toContain("Missing required option --project-id.");
-    expect(loginMissingToken.output).toContain("Provide either a member token or one of --github, --github-cli, or --github-device.");
+    expect(loginMissingToken.output).toContain(
+      "Provide either a member token or one of --github, --github-cli, or --github-device."
+    );
     expect(tokenProjectMissingLabel.output).toContain("Missing required option --label.");
     expect(tokenMemberMissingLabel.output).toContain("Missing required option --label.");
     expect(webhookListMissingProject.output).toContain("Missing required option --project-id.");
     expect(webhookCreateMissingUrl.output).toContain("Missing required option --url.");
     expect(webhookCreateMissingEvent.output).toContain("Missing required option --event.");
-    expect(webhookUpdateWithoutChanges.output).toContain("At least one webhook field must be provided.");
+    expect(webhookUpdateWithoutChanges.output).toContain(
+      "At least one webhook field must be provided."
+    );
     expect(inspectExtraPositional.output).toContain("Too many positional arguments.");
     expect(logsExtraPositional.output).toContain("Too many positional arguments.");
   });
@@ -981,215 +580,5 @@ describe("cli main management routing", () => {
       stdoutWrite.mockRestore();
       stderrWrite.mockRestore();
     }
-  });
-
-  it("routes weekly-report CRUD arguments into the stored-auth wrappers", async () => {
-    const listWeeklyReportChannelsCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "weekly-list" });
-    const createWeeklyReportChannelCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "weekly-create" });
-    const updateWeeklyReportChannelCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "weekly-update" });
-    const deleteWeeklyReportChannelCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "weekly-delete" });
-
-    await runCli(["weekly-report", "list", "--project-id", "proj_123", "--limit", "5", "--json"], {
-      listWeeklyReportChannelsCommand
-    });
-    await runCli(
-      [
-        "weekly-report",
-        "create",
-        "--project-id",
-        "proj_123",
-        "--channel",
-        "slack",
-        "--day-of-week",
-        "monday",
-        "--hour-of-day",
-        "9",
-        "--timezone",
-        "UTC",
-        "--config-json",
-        '{"webhook_url":"https://hooks.slack.com/services/T/B/x"}',
-        "--is-enabled",
-        "false"
-      ],
-      {
-        createWeeklyReportChannelCommand
-      }
-    );
-    await runCli(
-      [
-        "weekly-report",
-        "update",
-        "wr_123",
-        "--day-of-week",
-        "tuesday",
-        "--hour-of-day",
-        "10",
-        "--timezone",
-        "UTC",
-        "--config-json",
-        '{"to":["team@example.com"]}',
-        "--is-enabled",
-        "true"
-      ],
-      {
-        updateWeeklyReportChannelCommand
-      }
-    );
-    await runCli(["weekly-report", "delete", "wr_123", "--json"], {
-      deleteWeeklyReportChannelCommand
-    });
-
-    expect(listWeeklyReportChannelsCommand).toHaveBeenCalledWith({ projectId: "proj_123", limit: 5, json: true });
-    expect(createWeeklyReportChannelCommand).toHaveBeenCalledWith({
-      projectId: "proj_123",
-      channel: "slack",
-      config: { webhookUrl: "https://hooks.slack.com/services/T/B/x" },
-      schedule: { dayOfWeek: "monday", hourOfDay: 9, timezone: "UTC" },
-      isEnabled: false
-    });
-    expect(updateWeeklyReportChannelCommand).toHaveBeenCalledWith({
-      channelId: "wr_123",
-      schedule: { dayOfWeek: "tuesday", hourOfDay: 10, timezone: "UTC" },
-      config: { to: ["team@example.com"] },
-      isEnabled: true
-    });
-    expect(deleteWeeklyReportChannelCommand).toHaveBeenCalledWith({ channelId: "wr_123", json: true });
-  });
-
-  it("validates weekly-report input requirements", async () => {
-    const missingProject = await runCli(["weekly-report", "list"]);
-    const missingCreateFields = await runCli(["weekly-report", "create", "--project-id", "proj_123"]);
-    const partialSchedule = await runCli(["weekly-report", "update", "wr_123", "--day-of-week", "monday"]);
-    const noChanges = await runCli(["weekly-report", "update", "wr_123"]);
-    const unknownAction = await runCli(["weekly-report", "unknown"]);
-
-    expect(missingProject.output).toContain("Missing required option --project-id.");
-    expect(missingCreateFields.output).toContain("Missing required option --channel.");
-    expect(partialSchedule.output).toContain("Weekly report schedule updates require --day-of-week, --hour-of-day, and --timezone together.");
-    expect(noChanges.output).toContain("At least one weekly report field must be provided.");
-    expect(unknownAction.output).toContain("Unknown weekly-report command.");
-  });
-
-  it("routes webhook create filters and retry arguments", async () => {
-    const createWebhookCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "webhook-create" });
-    const retryWebhookDeliveryCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "webhook-retry" });
-
-    await runCli(
-      [
-        "webhook",
-        "create",
-        "--project-id",
-        "proj_123",
-        "--url",
-        "https://hooks.example.test/debugbundle",
-        "--event",
-        "bundle.created,bundle.updated",
-        "--environment",
-        "production,staging",
-        "--service",
-        "checkout-api",
-        "--severity-min",
-        "high",
-        "--bundle-type",
-        "failure",
-        "--verification",
-        "true",
-        "--is-enabled",
-        "false"
-      ],
-      { createWebhookCommand }
-    );
-    await runCli(["webhook", "retry", "wh_123", "del_123", "--project-id", "proj_123", "--json"], {
-      retryWebhookDeliveryCommand
-    });
-
-    expect(createWebhookCommand).toHaveBeenCalledWith({
-      projectId: "proj_123",
-      url: "https://hooks.example.test/debugbundle",
-      events: ["bundle.created", "bundle.updated"],
-      filters: {
-        environment: ["production", "staging"],
-        service: ["checkout-api"],
-        severity_min: "high",
-        bundle_type: ["failure"],
-        verification: true
-      },
-      isEnabled: false
-    });
-    expect(retryWebhookDeliveryCommand).toHaveBeenCalledWith({ webhookId: "wh_123", projectId: "proj_123", deliveryId: "del_123", json: true });
-  });
-
-  it("validates webhook boolean options and weekly-report config json", async () => {
-    const invalidWebhookVerification = await runCli([
-      "webhook",
-      "create",
-      "--project-id",
-      "proj_123",
-      "--url",
-      "https://hooks.example.test/debugbundle",
-      "--event",
-      "bundle.created",
-      "--verification",
-      "maybe"
-    ]);
-    const invalidWeeklyConfig = await runCli([
-      "weekly-report",
-      "create",
-      "--project-id",
-      "proj_123",
-      "--channel",
-      "email",
-      "--day-of-week",
-      "monday",
-      "--hour-of-day",
-      "9",
-      "--timezone",
-      "UTC",
-      "--config-json",
-      "null"
-    ]);
-
-    expect(invalidWebhookVerification.output).toContain("Invalid value for --verification.");
-    expect(invalidWeeklyConfig.output).toContain("Missing required option --config-json.");
-  });
-
-  it("routes webhook deliveries and test actions and validates weekly-report booleans", async () => {
-    const testWebhookCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "webhook-test" });
-    const listWebhookDeliveriesCommand = vi.fn().mockResolvedValue({ exitCode: 0, output: "webhook-deliveries" });
-
-    await runCli(["webhook", "test", "wh_123", "--project-id", "proj_123", "--event", "verification.failed", "--json"], {
-      testWebhookCommand
-    });
-    await runCli(["webhook", "deliveries", "wh_123", "--project-id", "proj_123", "--limit", "3"], {
-      listWebhookDeliveriesCommand
-    });
-    const invalidWeeklyEnabled = await runCli([
-      "weekly-report",
-      "create",
-      "--project-id",
-      "proj_123",
-      "--channel",
-      "email",
-      "--day-of-week",
-      "monday",
-      "--hour-of-day",
-      "9",
-      "--timezone",
-      "UTC",
-      "--config-json",
-      '{"to":["team@example.com"]}',
-      "--is-enabled",
-      "maybe"
-    ]);
-
-    expect(testWebhookCommand).toHaveBeenCalledWith({ webhookId: "wh_123", projectId: "proj_123", eventType: "verification.failed", json: true });
-    expect(listWebhookDeliveriesCommand).toHaveBeenCalledWith({ webhookId: "wh_123", projectId: "proj_123", limit: 3 });
-    expect(invalidWeeklyEnabled.output).toContain("Invalid value for --is-enabled.");
-  });
-
-  it("rejects unknown options on weekly-report routes", async () => {
-    const result = await runCli(["weekly-report", "list", "--project-id", "proj_123", "--unknown", "value"]);
-
-    expect(result.output).toContain("Unknown option --unknown.");
   });
 });

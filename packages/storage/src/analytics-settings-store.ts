@@ -61,7 +61,7 @@ export function createPostgresAnalyticsSettingsStore(db: Queryable): AnalyticsSe
           COALESCE(settings.sample_retention_days, 7) AS sample_retention_days,
           COALESCE(
             settings.hourly_retention_days,
-            CASE organizations.plan WHEN 'team' THEN 90 WHEN 'solo' THEN 30 ELSE 7 END
+            CASE organizations.plan WHEN 'business' THEN 90 WHEN 'team' THEN 90 WHEN 'solo' THEN 30 ELSE 7 END
           ) AS hourly_retention_days,
           COALESCE(settings.aggregate_retention_months, 12) AS aggregate_retention_months,
           settings.max_saved_funnels,
@@ -220,7 +220,7 @@ function parseAnalyticsSettingsRow(row: AnalyticsSettingsRow): AnalyticsSettings
 }
 
 function parseTierName(value: unknown): TierName {
-  return value === "solo" || value === "team" ? value : "free";
+  return value === "solo" || value === "team" || value === "business" ? value : "free";
 }
 
 function toNumber(value: unknown): number {

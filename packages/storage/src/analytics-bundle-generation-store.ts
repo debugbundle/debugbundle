@@ -1,13 +1,21 @@
+import { appendActorProjectReadScope, type ProjectActorReadScope } from "./project-read-scope.js";
 import { createHash, randomUUID } from "node:crypto";
 
 import type { AnalyticsBundleAnalysisKind } from "../../shared-types/src/index.js";
 import { buildAnalyticsBundleObjectKey } from "./helpers.js";
 import { runInTransaction } from "./transaction.js";
 import type { Queryable } from "./types.js";
+import {
+  ProjectJobInitiatorSchema,
+  isProjectJobInitiatorAuthorized,
+  type ProjectJobInitiator
+} from "./project-job-authorization.js";
 
 export type AnalyticsBundleGenerationStatus = "pending" | "running" | "completed" | "failed";
 
 export interface AnalyticsBundleGenerationRecord {
+  /** Private execution authority, never included in public generation DTOs. */
+  initiating_authority?: unknown;
   generation_id: string;
   /** Internal immutable analysis scope, populated on worker claims only. */
   scope_origin_ids?: string[];
@@ -32,6 +40,7 @@ export interface AnalyticsBundleGenerationInventoryRecord extends AnalyticsBundl
 }
 
 export interface ReserveAnalyticsBundleGenerationInput {
+  initiating_authority?: ProjectJobInitiator;
   project_id: string;
   opportunity_id?: string | null;
   requested_by_user_id?: string | null;
@@ -39,7 +48,7 @@ export interface ReserveAnalyticsBundleGenerationInput {
   analysis_spec?: Record<string, unknown> | undefined;
 }
 
-export interface AnalyticsBundleGenerationListFilters {
+export interface AnalyticsBundleGenerationListFilters extends ProjectActorReadScope {
   include_total?: boolean | undefined;
   status?: AnalyticsBundleGenerationStatus | undefined;
   analysis_kind?: AnalyticsBundleAnalysisKind | undefined;
@@ -50,6 +59,10 @@ export interface AnalyticsBundleGenerationListFilters {
 }
 
 export interface AnalyticsBundleGenerationStore {
+  isAnalyticsBundleGenerationAuthorized?(input: {
+    project_id: string;
+    generation_id: string;
+  }): Promise<boolean>;
   reserveAnalyticsBundleGeneration(
     input: ReserveAnalyticsBundleGenerationInput
   ): Promise<AnalyticsBundleGenerationRecord>;
@@ -93,6 +106,7 @@ export interface AnalyticsBundleGenerationStore {
     completed_at: string;
   }): Promise<AnalyticsBundleGenerationRecord | null>;
   markAnalyticsBundleGenerationFailed(input: {
+    object_write_attempted?: boolean;
     project_id: string;
     generation_id: string;
     failed_at: string;
@@ -101,6 +115,7 @@ export interface AnalyticsBundleGenerationStore {
 }
 
 type AnalyticsBundleGenerationRow = {
+  initiating_authority?: unknown;
   scope_origin_ids?: string[];
   total_count?: unknown;
   generation_id: unknown;
@@ -128,7 +143,16 @@ export function createPostgresAnalyticsBundleGenerationStore(
   db: Queryable
 ): AnalyticsBundleGenerationStore {
   return {
+    async isAnalyticsBundleGenerationAuthorized(input) {
+      return analyticsGenerationAuthority(db, input);
+    },
     async reserveAnalyticsBundleGeneration(input) {
+      const initiator =
+        input.initiating_authority === undefined
+          ? null
+          : ProjectJobInitiatorSchema.parse(input.initiating_authority);
+      if (initiator !== null && initiator.user_id !== input.requested_by_user_id)
+        throw new Error("analytics_job_initiator_mismatch");
       return runInTransaction(db, async (tx) => {
         await tx.query("SELECT debugbundle_assert_project_scope_write($1::uuid)", [
           input.project_id
@@ -153,6 +177,7 @@ export function createPostgresAnalyticsBundleGenerationStore(
               project_id,
               opportunity_id,
               requested_by_user_id,
+              initiating_authority,
               analysis_kind,
               analysis_spec,
               input_fingerprint,
@@ -164,6 +189,7 @@ export function createPostgresAnalyticsBundleGenerationStore(
               $2::uuid,
               $3::uuid,
               $4::uuid,
+              $8::jsonb,
               $5,
               $6::jsonb,
               $7,
@@ -180,7 +206,8 @@ export function createPostgresAnalyticsBundleGenerationStore(
             input.requested_by_user_id ?? null,
             input.analysis_kind,
             JSON.stringify(analysisSpec),
-            inputFingerprint
+            inputFingerprint,
+            initiator === null ? null : JSON.stringify(initiator)
           ]
         );
         const insertedRow = inserted.rows[0];
@@ -215,6 +242,7 @@ export function createPostgresAnalyticsBundleGenerationStore(
               UPDATE analytics_bundle_generations
               SET
                 requested_by_user_id = $2::uuid,
+                initiating_authority = $5::jsonb,
                 opportunity_id = $3::uuid,
                 analysis_spec = $4::jsonb,
                 status = 'pending',
@@ -231,7 +259,8 @@ export function createPostgresAnalyticsBundleGenerationStore(
               existingRow.generation_id,
               input.requested_by_user_id ?? null,
               input.opportunity_id ?? null,
-              JSON.stringify(analysisSpec)
+              JSON.stringify(analysisSpec),
+              initiator === null ? null : JSON.stringify(initiator)
             ]
           );
           const retriedRow = retried.rows[0];
@@ -309,6 +338,7 @@ export function createPostgresAnalyticsBundleGenerationStore(
       const limit = Math.min(Math.max(input.limit, 1), 100);
       const params: unknown[] = [input.organization_id];
       const where = ["p.organization_id = $1::uuid"];
+      appendActorProjectReadScope(params, where, input, "abg.project_id", "p.id");
 
       appendAnalyticsBundleGenerationFilters(params, where, input, "abg");
 
@@ -440,6 +470,7 @@ export function createPostgresAnalyticsBundleGenerationStore(
 
     async markAnalyticsBundleGenerationCompleted(input) {
       return runInTransaction(db, async (tx) => {
+        if (!(await analyticsGenerationAuthority(tx, input))) return null;
         const objectKey = buildAnalyticsBundleObjectKey(input.project_id, input.generation_id);
         const completed = await tx.query<AnalyticsBundleGenerationRow>(
           `
@@ -480,13 +511,21 @@ export function createPostgresAnalyticsBundleGenerationStore(
             SET
               status = 'failed',
               failure_reason = $3,
+              object_key = CASE WHEN $5::boolean THEN $6 ELSE object_key END,
               completed_at = NULL,
               updated_at = $4::timestamptz
             WHERE project_id = $1::uuid
               AND id = $2::uuid
             RETURNING ${analyticsBundleGenerationSelectColumns()}
           `,
-          [input.project_id, input.generation_id, input.reason, input.failed_at]
+          [
+            input.project_id,
+            input.generation_id,
+            input.reason,
+            input.failed_at,
+            input.object_write_attempted ?? false,
+            buildAnalyticsBundleObjectKey(input.project_id, input.generation_id)
+          ]
         );
         const row = failed.rows[0];
         if (row === undefined) {
@@ -504,6 +543,24 @@ export function createPostgresAnalyticsBundleGenerationStore(
       });
     }
   };
+}
+
+async function analyticsGenerationAuthority(
+  db: Queryable,
+  input: { project_id: string; generation_id: string }
+): Promise<boolean> {
+  const result = await db.query<{ initiating_authority: unknown; scope_origin_ids: string[] }>(
+    "SELECT initiating_authority,COALESCE(scope_origin_ids,ARRAY[project_id])::text[] AS scope_origin_ids FROM analytics_bundle_generations WHERE project_id=$1::uuid AND id=$2::uuid",
+    [input.project_id, input.generation_id]
+  );
+  const row = result.rows[0];
+  if (row === undefined) return false;
+  if (row.initiating_authority == null) return true;
+  return isProjectJobInitiatorAuthorized(db, {
+    project_id: input.project_id,
+    origin_project_ids: row.scope_origin_ids,
+    initiator: row.initiating_authority
+  });
 }
 
 function appendAnalyticsBundleGenerationFilters(
@@ -595,6 +652,7 @@ function analyticsBundleGenerationSelectColumns(tableAlias?: string): string {
     ${prefix}analysis_spec,
     ${prefix}input_fingerprint,
     ${prefix}scope_origin_ids,
+    ${prefix}initiating_authority,
     ${prefix}status,
     ${prefix}object_key,
     ${prefix}failure_reason,
@@ -636,6 +694,7 @@ function mapAnalyticsBundleGenerationRow(
   row: AnalyticsBundleGenerationRow
 ): AnalyticsBundleGenerationRecord {
   return {
+    ...(row.initiating_authority == null ? {} : { initiating_authority: row.initiating_authority }),
     generation_id: toNonEmptyString(row.generation_id, "00000000-0000-0000-0000-000000000000"),
     project_id: toNonEmptyString(row.project_id, "00000000-0000-0000-0000-000000000000"),
     opportunity_id: toNullableString(row.opportunity_id),

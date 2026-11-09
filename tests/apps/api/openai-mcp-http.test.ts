@@ -175,7 +175,8 @@ describe("OpenAI hosted MCP HTTP boundary", () => {
         "debugbundle:artifacts:read",
         "debugbundle:improvements:read",
         "debugbundle:analytics:read",
-        "debugbundle:health:read"
+        "debugbundle:health:read",
+        "debugbundle:reports:read"
       ],
       resource_documentation: "https://debugbundle.com/docs/mcp/openai-plugin"
     });
@@ -186,6 +187,62 @@ describe("OpenAI hosted MCP HTTP boundary", () => {
       headers: { ...CANONICAL_HEADERS, host: "api.debugbundle.test" }
     });
     expect(wrongHost.statusCode).toBe(421);
+  });
+
+  it("accepts explicitly consented report grants and bounds content reads with the artifact budget", async () => {
+    const app = Fastify();
+    apps.push(app);
+    const content = vi.fn();
+    const claimRequest = vi.fn(async (input: { bucket?: string }) => ({
+      allowed: input.bucket !== "openai-mcp-artifact-grant",
+      retry_after_ms: 1_000
+    }));
+    registerOpenAiMcpHttpRoutes(app, {
+      expectedHost: "mcp.debugbundle.test",
+      verifier: {
+        verifyAccessToken: vi.fn(async () => ({
+          ...AUTH,
+          scopes: [...AUTH.scopes, "debugbundle:reports:read"]
+        }))
+      },
+      operations: { get_report_content: content },
+      rateLimiter: {
+        claimRequest,
+        acquireConcurrency: vi.fn(async () => ({
+          acquired: true,
+          lease_id: "lease",
+          retry_after_ms: 0
+        })),
+        releaseConcurrency: vi.fn(async () => undefined)
+      }
+    });
+    const response = await app.inject({
+      method: "POST",
+      url: "/mcp",
+      headers: {
+        ...CANONICAL_HEADERS,
+        authorization: "Bearer report-token",
+        accept: "application/json, text/event-stream"
+      },
+      payload: {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: {
+          name: "get_report_content",
+          arguments: { reportId: "00000000-0000-4000-8000-000000000001" }
+        }
+      }
+    });
+    expect(response.statusCode).toBe(429);
+    expect(response.headers["retry-after"]).toBe("1");
+    expect(claimRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ bucket: "openai-mcp-artifact-user", limit: 20 })
+    );
+    expect(claimRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ bucket: "openai-mcp-artifact-grant", limit: 20 })
+    );
+    expect(content).not.toHaveBeenCalled();
   });
 
   it("returns an RFC 9728 challenge before processing unauthenticated MCP input", async () => {

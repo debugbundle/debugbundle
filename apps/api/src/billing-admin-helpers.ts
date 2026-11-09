@@ -20,7 +20,10 @@ export async function ensureBillingAdminDefaultPlan(input: {
   now: string;
   dependencies: Pick<ApiDependencies, "billingAdmin" | "billingManagement">;
 }): Promise<BillingAdminDefaultPlanResult | undefined> {
-  if (!isBillingAdminOperator(input.dependencies, input.email) || input.dependencies.billingManagement === undefined) {
+  if (
+    !isBillingAdminOperator(input.dependencies, input.email) ||
+    input.dependencies.billingManagement === undefined
+  ) {
     return undefined;
   }
 
@@ -35,7 +38,8 @@ export async function ensureBillingAdminDefaultPlan(input: {
     };
   }
 
-  if (billing.plan !== "free") {
+  // An explicit override takes precedence over the operator's initial Team default.
+  if (billing.plan !== "free" || billing.billing_state === "admin_override") {
     return {
       billing,
       default_applied: false

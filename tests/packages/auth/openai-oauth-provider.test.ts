@@ -31,7 +31,8 @@ describe("OpenAI OAuth/OIDC provider profile", () => {
         "debugbundle:artifacts:read",
         "debugbundle:improvements:read",
         "debugbundle:analytics:read",
-        "debugbundle:health:read"
+        "debugbundle:health:read",
+        "debugbundle:reports:read"
       ],
       resource_documentation: "https://debugbundle.com/docs/mcp/openai-plugin"
     });
@@ -80,10 +81,7 @@ describe("OpenAI OAuth/OIDC provider profile", () => {
     expect(configuration.formats).toEqual({ AccessToken: "jwt" });
     expect(configuration.scopes).toEqual(OPENAI_OIDC_SCOPES);
     expect(
-      configuration.features.resourceIndicators.getResourceServerInfo(
-        {},
-        OPENAI_MCP_RESOURCE
-      )
+      configuration.features.resourceIndicators.getResourceServerInfo({}, OPENAI_MCP_RESOURCE)
     ).toMatchObject({ scope: OPENAI_HOSTED_MCP_SCOPES.join(" ") });
     expect(configuration.routes.authorization).toBe("/oauth/authorize");
     const policy = configuration.interactions.policy;
@@ -94,9 +92,7 @@ describe("OpenAI OAuth/OIDC provider profile", () => {
     for (const reason of ["op_scopes_missing", "op_claims_missing", "rs_scopes_missing"]) {
       const check = policy[0]?.checks.find((candidate) => candidate.reason === reason);
       expect(check).toBeDefined();
-      await expect(
-        Promise.resolve().then(() => check?.check({ oidc: {} }))
-      ).resolves.toBe(true);
+      await expect(Promise.resolve().then(() => check?.check({ oidc: {} }))).resolves.toBe(true);
       await expect(
         Promise.resolve().then(() =>
           check?.check({

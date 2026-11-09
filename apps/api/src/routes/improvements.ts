@@ -1,3 +1,5 @@
+import { memberReadScope, memberJobRequest } from "../member-access-scope.js";
+import type { ProjectJobInitiator } from "../../../../packages/storage/src/project-job-authorization.js";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { projectImprovementView } from "../../../../packages/storage/src/project-evidence-projection.js";
 
@@ -27,6 +29,7 @@ function sendSafeImprovement(reply: FastifyReply, value: unknown): FastifyReply 
 }
 
 async function buildBundlePendingOrFailureState(input: {
+  initiating_authority?: ProjectJobInitiator;
   dependencies: ApiDependencies;
   organizationId: string;
   projectId: string;
@@ -67,6 +70,9 @@ async function buildBundlePendingOrFailureState(input: {
     if (input.dependencies.improvementBundleRegeneration !== undefined) {
       const regenerationQueued =
         await input.dependencies.improvementBundleRegeneration.requestRegeneration({
+          ...(input.initiating_authority === undefined
+            ? {}
+            : { initiating_authority: input.initiating_authority }),
           organization_id: input.organizationId,
           project_id: input.projectId,
           opportunity_id: input.opportunityId
@@ -135,6 +141,7 @@ export function registerImprovementRoutes(
 
     const improvementsRequest = {
       organization_id: member.organization_id,
+      ...memberReadScope(member),
       user_id: member.member_id,
       ...(parsedQuery.data.project_id === undefined
         ? {}
@@ -199,6 +206,7 @@ export function registerImprovementRoutes(
     const improvement = await dependencies.improvementManagement.getImprovementForOrganization({
       organization_id: member.organization_id,
       improvement_id: parsedParams.data.id,
+      ...memberReadScope(member),
       user_id: member.member_id
     });
 
@@ -232,6 +240,7 @@ export function registerImprovementRoutes(
     const improvement = await dependencies.improvementManagement.resolveImprovementForOrganization({
       organization_id: member.organization_id,
       improvement_id: parsedParams.data.id,
+      ...memberReadScope(member),
       user_id: member.member_id,
       resolved_by_member_id: member.member_id,
       resolved_at: new Date().toISOString()
@@ -267,6 +276,7 @@ export function registerImprovementRoutes(
     const improvement = await dependencies.improvementManagement.reopenImprovementForOrganization({
       organization_id: member.organization_id,
       improvement_id: parsedParams.data.id,
+      ...memberReadScope(member),
       user_id: member.member_id
     });
 
@@ -309,6 +319,7 @@ export function registerImprovementRoutes(
     const improvement = await dependencies.improvementManagement.snoozeImprovementForOrganization({
       organization_id: member.organization_id,
       improvement_id: parsedParams.data.id,
+      ...memberReadScope(member),
       user_id: member.member_id,
       snoozed_until: parsedBody.data.snoozed_until
     });
@@ -370,6 +381,7 @@ export function registerImprovementRoutes(
       if (isObjectNotFoundError(error)) {
         return reply.status(200).send(
           await buildBundlePendingOrFailureState({
+            ...memberJobRequest(auth.member),
             dependencies,
             organizationId: auth.access.organization_id,
             projectId: improvement.project_id,

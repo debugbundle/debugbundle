@@ -7,7 +7,7 @@ import {
 import { WORKER_JOB_SCHEMA_MIGRATIONS } from "../../packages/storage/src/worker-job-schema.js";
 import {
   restoreStoragePredecessor,
-  PROJECT_SERVICE_MIGRATION_IDS
+  POST_PREDECESSOR_MIGRATION_IDS
 } from "../helpers/storage-predecessor.js";
 import {
   removeEvidenceSchemaFromLegacyFixture,
@@ -53,7 +53,7 @@ runIntegration("worker job forward migration", () => {
       if (ledger)
         expect(migrated.applied).toEqual([
           WORKER_JOB_SCHEMA_MIGRATIONS[0]!.id,
-          ...PROJECT_SERVICE_MIGRATION_IDS
+          ...POST_PREDECESSOR_MIGRATION_IDS
         ]);
       else expect(migrated.applied).toContain(WORKER_JOB_SCHEMA_MIGRATIONS[0]!.id);
       await expect(assertStorageSchemaMigrationsApplied(db)).resolves.toBeUndefined();

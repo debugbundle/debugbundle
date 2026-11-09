@@ -1,6 +1,12 @@
+import { resolveBillingUsageWindow } from "./billing-allowance-window.js";
 import { randomUUID } from "node:crypto";
 
-import { getTierCapabilities, type TierName } from "../../shared-types/src/index.js";
+import {
+  getTierCapabilities,
+  normalizeTierName,
+  type BillingInterval,
+  type TierName
+} from "../../shared-types/src/index.js";
 
 import type { AccountAnalyticsStore } from "./account-analytics-store.js";
 import { buildBillableIncidentEventsPredicateSql } from "./helpers.js";
@@ -35,7 +41,7 @@ export type BillingState =
   | "trial_expired"
   | null;
 
-export type BillingTrialPlan = Exclude<TierName, "free">;
+export type BillingTrialPlan = "solo" | "team" | "business";
 
 export interface BillingTrialSummary {
   available: boolean;
@@ -161,13 +167,7 @@ async function recordBillingMetricDeltas(
   await accountAnalyticsStore.withDb(tx).recordMetricDeltas(input);
 }
 
-function normalizePlan(plan: string | null | undefined): TierName {
-  if (plan === "solo" || plan === "team") {
-    return plan;
-  }
-
-  return "free";
-}
+const normalizePlan = normalizeTierName;
 
 function normalizeBillingState(value: string | null | undefined): BillingState {
   switch (value) {
@@ -186,42 +186,11 @@ function normalizeBillingState(value: string | null | undefined): BillingState {
 }
 
 function normalizeTrialPlan(value: string | null | undefined): BillingTrialPlan | null {
-  if (value === "solo" || value === "team") {
+  if (value === "solo" || value === "team" || value === "business") {
     return value;
   }
 
   return null;
-}
-
-function buildUsageWindow(now: Date): { starts_at: string; ends_at: string } {
-  const startsAt = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const endsAt = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-
-  return {
-    starts_at: startsAt.toISOString(),
-    ends_at: endsAt.toISOString()
-  };
-}
-
-function resolveUsageWindow(input: {
-  now: Date;
-  plan: TierName;
-  billing_period_starts_at: string | null;
-  billing_period_ends_at: string | null;
-}): { starts_at: string; ends_at: string } {
-  if (
-    input.plan !== "free" &&
-    input.billing_period_starts_at !== null &&
-    input.billing_period_ends_at !== null &&
-    input.billing_period_starts_at < input.billing_period_ends_at
-  ) {
-    return {
-      starts_at: input.billing_period_starts_at,
-      ends_at: input.billing_period_ends_at
-    };
-  }
-
-  return buildUsageWindow(input.now);
 }
 
 function buildTrialSummary(input: {
@@ -392,6 +361,8 @@ export function createPostgresBillingStore(
       additional_capacity_units: number | null;
       billing_period_starts_at: string | null;
       billing_period_ends_at: string | null;
+      billing_interval?: BillingInterval | null;
+      billing_allowance_anchor_at?: string | null;
       trial_plan: string | null;
       trial_started_at: string | null;
       trial_ends_at: string | null;
@@ -408,6 +379,8 @@ export function createPostgresBillingStore(
             COALESCE((to_jsonb(organizations) ->> 'additional_capacity_units')::int, 0)::int AS additional_capacity_units,
             to_jsonb(organizations) ->> 'billing_period_starts_at' AS billing_period_starts_at,
             to_jsonb(organizations) ->> 'billing_period_ends_at' AS billing_period_ends_at,
+            to_jsonb(organizations) ->> 'billing_interval' AS billing_interval,
+            to_jsonb(organizations) ->> 'billing_allowance_anchor_at' AS billing_allowance_anchor_at,
             to_jsonb(organizations) ->> 'trial_plan' AS trial_plan,
             to_jsonb(organizations) ->> 'trial_started_at' AS trial_started_at,
             to_jsonb(organizations) ->> 'trial_ends_at' AS trial_ends_at,
@@ -433,11 +406,13 @@ export function createPostgresBillingStore(
     const billingPeriodEndsAt = organization.billing_period_ends_at ?? null;
     const now = new Date(input.now);
     const capabilities = getTierCapabilities(plan);
-    const usageWindow = resolveUsageWindow({
+    const usageWindow = resolveBillingUsageWindow({
       now,
       plan,
       billing_period_starts_at: billingPeriodStartsAt,
-      billing_period_ends_at: billingPeriodEndsAt
+      billing_period_ends_at: billingPeriodEndsAt,
+      billing_interval: organization.billing_interval === "year" ? "year" : "month",
+      billing_allowance_anchor_at: organization.billing_allowance_anchor_at ?? null
     });
     const additionalPurchased = Math.max(0, organization.additional_capacity_units ?? 0);
     const totalCapacityUnits = capabilities.included_capacity_units + additionalPurchased;
@@ -455,6 +430,7 @@ export function createPostgresBillingStore(
       alertDeliveriesTablePresent,
       alertEmailDigestsTablePresent,
       dailyNotificationsTablePresent,
+      reportEmailsTablePresent,
       webhookDeliveriesTablePresent,
       usageCountersTablePresent
     ] = await Promise.all([
@@ -518,11 +494,12 @@ export function createPostgresBillingStore(
       tableExists(db, "alert_deliveries"),
       tableExists(db, "alert_email_digests"),
       tableExists(db, "notification_daily_allowance_usage"),
+      tableExists(db, "report_email_deliveries"),
       tableExists(db, "webhook_deliveries"),
       tableExists(db, "org_usage_counters")
     ]);
 
-    const monthlyAlertDeliveries =
+    const legacyMonthlyAlertDeliveries =
       alertDeliveriesTablePresent || alertEmailDigestsTablePresent || dailyNotificationsTablePresent
         ? await readCount(
             db,
@@ -557,6 +534,16 @@ export function createPostgresBillingStore(
             [input.organization_id, usageWindow.starts_at, usageWindow.ends_at]
           )
         : 0;
+
+    const monthlyReportEmails = reportEmailsTablePresent
+      ? await readCount(
+          db,
+          `SELECT COUNT(*)::int AS count FROM report_email_deliveries WHERE organization_id=$1
+        AND allowance_state IN ('held','charged') AND allowance_window_starts_at=$2::timestamptz AND allowance_window_ends_at=$3::timestamptz`,
+          [input.organization_id, usageWindow.starts_at, usageWindow.ends_at]
+        )
+      : 0;
+    const monthlyAlertDeliveries = legacyMonthlyAlertDeliveries + monthlyReportEmails;
 
     const monthlyWebhookDeliveries = webhookDeliveriesTablePresent
       ? await readCount(
@@ -760,6 +747,8 @@ export function createPostgresBillingStore(
               stripe_customer_id = NULL,
               stripe_subscription_id = NULL,
               billing_state = 'trialing',
+              billing_interval = NULL,
+              billing_allowance_anchor_at = $3::timestamptz,
               billing_period_starts_at = $3::timestamptz,
               billing_period_ends_at = $4::timestamptz,
               trial_plan = $2,
@@ -858,6 +847,7 @@ export function createPostgresBillingStore(
         ).cleanupOrganizationForPlan({
           organization_id: input.organization_id,
           plan: "free",
+          previous_plan: previousPlan,
           now: input.now
         });
 

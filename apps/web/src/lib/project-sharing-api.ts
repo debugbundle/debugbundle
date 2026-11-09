@@ -3,7 +3,7 @@ import { buildApiUrl, buildBrowserSessionHeaders } from "./api.js";
 export interface ProjectMemberRecord {
   user_id: string;
   email: string;
-  role: "owner" | "admin" | "member";
+  role: "owner" | "admin" | "member" | "viewer";
   membership_type: "owner" | "collaborator";
   created_at: string;
   avatar_url: string | null;
@@ -13,7 +13,7 @@ export interface ProjectInviteRecord {
   invite_id: string;
   project_id: string;
   email: string;
-  role: "admin" | "member";
+  role: "admin" | "member" | "viewer";
   invited_by_user_id: string;
   accepted_at: string | null;
   canceled_at: string | null;
@@ -24,7 +24,7 @@ export interface ProjectInviteRecord {
 export interface AcceptedProjectInviteRecord {
   project_id: string;
   user_id: string;
-  role: "owner" | "admin" | "member";
+  role: "owner" | "admin" | "member" | "viewer";
   membership_type?: "owner" | "collaborator";
 }
 
@@ -64,7 +64,7 @@ export async function listProjectInvites(projectId: string): Promise<ProjectInvi
 
 export async function inviteProjectMember(
   projectId: string,
-  payload: { email: string; role: "admin" | "member" }
+  payload: { email: string; role: "admin" | "member" | "viewer" }
 ): Promise<ProjectInviteRecord> {
   const body = await readProjectSharingJson<{ invite: ProjectInviteRecord }>(
     await fetch(buildApiUrl(`/v1/projects/${projectId}/invite`), {
@@ -81,7 +81,7 @@ export async function inviteProjectMember(
 export async function updateProjectMemberRole(
   projectId: string,
   userId: string,
-  role: "admin" | "member"
+  role: "admin" | "member" | "viewer"
 ): Promise<ProjectMemberRecord> {
   const body = await readProjectSharingJson<{ member: ProjectMemberRecord }>(
     await fetch(buildApiUrl(`/v1/projects/${projectId}/members/${userId}`), {

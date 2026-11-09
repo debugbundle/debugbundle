@@ -1,7 +1,7 @@
 # Billing
 
 Version: v1
-Last updated: 2026-10-22 (local safety candidate)
+Last updated: 2026-11-07 (Business/annual local implementation candidate; see STATUS.md)
 
 ---
 
@@ -10,8 +10,9 @@ Last updated: 2026-10-22 (local safety candidate)
 This file is the source-of-truth design for the complete DebugBundle billing system.
 
 It covers:
+
 - Stripe product catalog and what must be configured in the Stripe Dashboard
-- how no-card Solo and Team trials behave before Stripe checkout begins
+- how no-card Solo, Team and Business trials behave before Stripe checkout begins
 - how organizations become paying customers (checkout flow)
 - how customers manage their subscriptions (customer portal)
 - how Stripe billing state syncs back to DebugBundle (webhook sync)
@@ -34,40 +35,56 @@ DebugBundle requires the following Stripe products:
 
 **Plan subscriptions (one per paid tier):**
 
-| Product | Description | Billing |
-|---------|-------------|---------|
-| Solo Plan | DebugBundle Solo — 3 included capacity units, solo developer tier | $4.99/month recurring, excl. VAT/taxes |
-| Team Plan | DebugBundle Team — 15 included capacity units, collaboration tier | $19/month recurring, excl. VAT/taxes |
+| Product       | Description                                                                                      | Billing                              |
+| ------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------ |
+| Solo Plan     | DebugBundle Solo — 3 included capacity units, solo developer tier                                | $5/month recurring, excl. VAT/taxes  |
+| Team Plan     | DebugBundle Team — 15 included capacity units, collaboration tier                                | $19/month recurring, excl. VAT/taxes |
+| Business Plan | DebugBundle Business — 30 included capacity units, organisation administration and Smart Reports | $59/month recurring, excl. VAT/taxes |
 
 **Extra capacity add-ons (one per paid tier):**
 
-| Product | Description | Billing |
-|---------|-------------|---------|
-| Solo Extra Capacity | Additional capacity unit for Solo plan | $0.99/month recurring, quantity-based, excl. VAT/taxes |
-| Team Extra Capacity | Additional capacity unit for Team plan | $1.99/month recurring, quantity-based, excl. VAT/taxes |
+| Product                 | Description                                | Billing                                             |
+| ----------------------- | ------------------------------------------ | --------------------------------------------------- |
+| Solo Extra Capacity     | Additional capacity unit for Solo plan     | $1/month recurring, quantity-based, excl. VAT/taxes |
+| Team Extra Capacity     | Additional capacity unit for Team plan     | $3/month recurring, quantity-based, excl. VAT/taxes |
+| Business Extra Capacity | Additional capacity unit for Business plan | $3/month recurring, quantity-based, excl. VAT/taxes |
 
 ### 2.2 Price Configuration
 
-Each product must have a single default monthly-recurring Price in Stripe.
+Each product has separate monthly and annual recurring Prices. Annual base prices
+are Solo $48, Team $192 and Business $588; annual extra-unit prices are $10,
+$30 and $30 respectively. Base and capacity items must match tier, currency
+and interval. An annual payment funds twelve monthly allowances, not a single
+annual allowance. Retain the configured existing monthly identifiers for reads
+and existing subscribed items; a retained Team $1.99 item is not silently repriced.
 
 All paid prices are denominated in USD and exclude VAT or other applicable taxes. Taxes are calculated and applied at checkout. Stripe Prices must use `tax_behavior: exclusive` so Checkout can apply the correct tax for the customer.
 
 Extra-capacity prices must have `usage_type: licensed` and allow quantity > 1 so customers can purchase multiple capacity units in one subscription item.
 
-Annual billing is explicitly deferred to post-V1. Do not create annual prices yet.
+Missing optional annual/Business configuration disables that offer without
+breaking existing monthly billing or self-hosted startup. New catalogue prices
+are checked against the provider amount, USD currency, exclusive tax treatment,
+licensed usage and one month/year interval before a fresh purchase. Inconsistent
+subscription items fail closed rather than inventing an entitlement.
 
 ### 2.3 Environment Configuration
 
 The API must be configured with:
 
-| Variable | Purpose |
-|----------|---------|
-| `STRIPE_SECRET_KEY` | Server-side Stripe API calls (Checkout Session creation, webhook verification, subscription reads) |
-| `STRIPE_WEBHOOK_SECRET` | Webhook endpoint signature verification secret |
-| `STRIPE_SOLO_PRICE_ID` | Price ID for Solo plan subscription |
-| `STRIPE_TEAM_PRICE_ID` | Price ID for Team plan subscription |
-| `STRIPE_SOLO_EXTRA_CAPACITY_PRICE_ID` | Price ID for Solo extra capacity |
-| `STRIPE_TEAM_EXTRA_CAPACITY_PRICE_ID` | Price ID for Team extra capacity |
+| Variable                                                     | Purpose                                                                                            |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `STRIPE_SECRET_KEY`                                          | Server-side Stripe API calls (Checkout Session creation, webhook verification, subscription reads) |
+| `STRIPE_WEBHOOK_SECRET`                                      | Webhook endpoint signature verification secret                                                     |
+| `STRIPE_SOLO_PRICE_ID`                                       | Price ID for Solo plan subscription                                                                |
+| `STRIPE_TEAM_PRICE_ID`                                       | Price ID for Team plan subscription                                                                |
+| `STRIPE_SOLO_EXTRA_CAPACITY_PRICE_ID`                        | Price ID for Solo extra capacity                                                                   |
+| `STRIPE_TEAM_EXTRA_CAPACITY_PRICE_ID`                        | Price ID for Team extra capacity                                                                   |
+| `STRIPE_TEAM_EXTRA_CAPACITY_CURRENT_PRICE_ID`                | Optional new $3 monthly Team capacity Price; keep the prior variable readable for retained items   |
+| `STRIPE_BUSINESS_PRICE_ID`                                   | Optional Business monthly base Price                                                               |
+| `STRIPE_BUSINESS_EXTRA_CAPACITY_PRICE_ID`                    | Optional Business monthly capacity Price                                                           |
+| `STRIPE_{SOLO,TEAM,BUSINESS}_ANNUAL_PRICE_ID`                | Optional annual base Price for each paid tier                                                      |
+| `STRIPE_{SOLO,TEAM,BUSINESS}_EXTRA_CAPACITY_ANNUAL_PRICE_ID` | Optional annual capacity Price for each paid tier                                                  |
 
 Hosted production deploys must source these values from `debugbundle-cloud` GitHub Actions secrets and merge them into the runtime env during deploy rather than relying on one manually maintained host-only `.env`.
 
@@ -100,27 +117,30 @@ Before checkout: the organization has no Stripe customer. After checkout: the or
 
 The `organizations` table stores the effective entitlement snapshot:
 
-| Field | Purpose |
-|-------|---------|
-| `plan` | Current effective plan: `free`, `solo`, `team` |
-| `stripe_customer_id` | Stripe Customer ID (set after first checkout) |
-| `stripe_subscription_id` | Stripe Subscription ID (set after first checkout, updated on changes) |
-| `additional_capacity_units` | Currently valid purchased extra capacity count (set-based, not incremental) |
-| `billing_state` | Effective billing lifecycle state: `active`, `past_due`, `canceled`, `unpaid`, `incomplete`, `admin_override`, `trialing`, `trial_expired` |
-| `billing_period_starts_at` | Current billing period start (for usage-window display and metering alignment) |
-| `billing_period_ends_at` | Current billing period end (for UI display and renewal timing) |
-| `last_billing_sync_at` | Timestamp of last successful webhook-driven entitlement sync |
-| `last_billing_event_id` | Stripe event ID from last processed webhook (idempotency reference) |
-| `trial_plan` | Selected no-card trial plan: `solo`, `team`, or `null` |
-| `trial_started_at` | Timestamp when the no-card trial began |
-| `trial_ends_at` | Timestamp when the no-card trial ends |
-| `trial_used_at` | One-time eligibility ledger timestamp; set on first trial start and never cleared |
-| `trial_converted_at` | Timestamp when a prior no-card trial converted to paid entitlements |
-| `trial_expired_at` | Timestamp when an unconverted no-card trial was downgraded back to Free |
+| Field                         | Purpose                                                                                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `plan`                        | Current effective plan: `free`, `solo`, `team`, `business`                                                                                 |
+| `billing_interval`            | Explicit `month`/`year`; nullable for retained monthly records                                                                             |
+| `billing_allowance_anchor_at` | Original UTC monthly allowance anchor, preserved across same-subscription changes and renewals                                             |
+| `stripe_customer_id`          | Stripe Customer ID (set after first checkout)                                                                                              |
+| `stripe_subscription_id`      | Stripe Subscription ID (set after first checkout, updated on changes)                                                                      |
+| `additional_capacity_units`   | Currently valid purchased extra capacity count (set-based, not incremental)                                                                |
+| `billing_state`               | Effective billing lifecycle state: `active`, `past_due`, `canceled`, `unpaid`, `incomplete`, `admin_override`, `trialing`, `trial_expired` |
+| `billing_period_starts_at`    | Current billing period start (for usage-window display and metering alignment)                                                             |
+| `billing_period_ends_at`      | Current billing period end (for UI display and renewal timing)                                                                             |
+| `last_billing_sync_at`        | Timestamp of last successful webhook-driven entitlement sync                                                                               |
+| `last_billing_event_id`       | Stripe event ID from last processed webhook (idempotency reference)                                                                        |
+| `trial_plan`                  | Selected no-card trial plan: `solo`, `team`, `business`, or `null`                                                                         |
+| `trial_started_at`            | Timestamp when the no-card trial began                                                                                                     |
+| `trial_ends_at`               | Timestamp when the no-card trial ends                                                                                                      |
+| `trial_used_at`               | One-time eligibility ledger timestamp; set on first trial start and never cleared                                                          |
+| `trial_converted_at`          | Timestamp when a prior no-card trial converted to paid entitlements                                                                        |
+| `trial_expired_at`            | Timestamp when an unconverted no-card trial was downgraded back to Free                                                                    |
 
 ### 3.3 Free Organizations
 
 Organizations on the `free` plan have:
+
 - `stripe_customer_id`: null
 - `stripe_subscription_id`: null
 - `additional_capacity_units`: 0
@@ -131,9 +151,10 @@ If a no-card trial already expired, the organization still returns to `plan = "f
 
 ### 3.4 No-Card Trial State
 
-DebugBundle supports one 30-day no-card trial per organization account for `solo` or `team`.
+DebugBundle supports one 30-day no-card trial per organization account for `solo`, `team` or `business`.
 
 Effective no-card trial entitlement:
+
 - `plan` = selected trial plan
 - `billing_state` = `trialing`
 - `stripe_customer_id` = null
@@ -143,28 +164,32 @@ Effective no-card trial entitlement:
 - `billing_period_ends_at` = `trial_ends_at`
 
 Eligibility and lifecycle rules:
+
 - Every new organization starts from the Free baseline.
 - `trial_used_at IS NULL` means the organization is still eligible.
 - Expiry and conversion never clear `trial_used_at`.
-- Solo trial can convert to paid Solo or Team.
-- Team trial can convert to paid Team only.
+- Solo trial can convert to paid Solo, Team or Business.
+- Team trial can convert to paid Team or Business.
+- Business trial and conversion use the same seven-day wait and one-time trial history. No trial reset is added. Business admission requires the default-off launch/report readiness gate.
 - Active no-card trials cannot buy extra capacity; capacity routes must reject them with `409 trial_conversion_required`.
 - Any downgrade to a lower-capability tier must suspend setup for features that no longer belong to that tier; route-level `upgrade_required` checks are not enough.
 - Team to Solo pauses Team-only collaboration and Slack setup while preserving the saved setup for later reactivation.
-- Solo or Team to Free pauses remote probes, GitHub automation setup, Slack setup, collaborators/invites, and hosted improvement opportunities/settings while preserving the saved setup for later reactivation.
+- Business to a lower tier also pauses inherited organisation grants. Direct project collaboration retains its existing tier rules. Re-upgrading does not resume inherited grants until explicit Owner review.
+- Solo, Team or Business to Free pauses remote probes, GitHub automation setup, Slack setup, collaborators/invites, and hosted improvement opportunities/settings while preserving the saved setup for later reactivation.
 - Free downgrades must not delete hosted improvement bundle objects solely because of the downgrade. Existing hosted improvement artifacts remain subject to normal retained-bundle caps and retention, and retrieval/generation paths must enforce the current tier.
 
 ---
 
 ## 4. Checkout Flow
 
-Before Stripe checkout begins, eligible Free organizations may start a 30-day no-card Solo or Team trial from pricing, billing, API, CLI, or MCP. The temporary first-purchase restriction unlocks Checkout after seven full 24-hour days from the trial start, so conversion remains possible before trial expiry. Direct Free-to-paid cannot bypass this wait. Previously paid organisations retain their resubscription path.
+Before Stripe checkout begins, eligible Free organizations may start a 30-day no-card Solo, Team or Business trial from pricing, billing, API, CLI, or MCP. The temporary first-purchase restriction unlocks Checkout after seven full 24-hour days from the trial start, so conversion remains possible before trial expiry. Direct Free-to-paid cannot bypass this wait. Previously paid organisations retain their resubscription path.
 
 ### 4.1 Production Checkout State
 
 The production implementation creates Stripe Checkout and portal sessions dynamically whenever the Stripe SDK is fully configured with secret and price-id env vars.
 
 Static fallback URLs still exist as a development scaffold when Stripe credentials are intentionally absent:
+
 - `STRIPE_SOLO_CHECKOUT_URL` → static Payment Link or Checkout URL for Solo
 - `STRIPE_TEAM_CHECKOUT_URL` → static Payment Link or Checkout URL for Team
 - `STRIPE_CUSTOMER_PORTAL_URL` → static portal link
@@ -177,23 +202,24 @@ The checkout route must create a Stripe Checkout Session dynamically using the S
 
 **Required Checkout Session parameters:**
 
-| Parameter | Value |
-|-----------|-------|
-| `mode` | `subscription` |
-| `customer` | Existing `stripe_customer_id` if organization already has one, otherwise omit (Stripe creates new customer) |
-| `client_reference_id` | `organization_id` (critical for webhook linking) |
-| `metadata.organization_id` | `organization_id` (backup for webhook linking) |
-| `line_items` | Plan price with quantity 1 |
-| `success_url` | Redirect URL after successful payment (web app billing page with success indicator) |
-| `cancel_url` | Redirect URL if customer cancels checkout (web app billing page) |
-| `subscription_data.metadata.organization_id` | `organization_id` (persists on subscription for all future webhooks) |
-| `allow_promotion_codes` | `true` (enable promo codes from day one) |
+| Parameter                                    | Value                                                                                                       |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `mode`                                       | `subscription`                                                                                              |
+| `customer`                                   | Existing `stripe_customer_id` if organization already has one, otherwise omit (Stripe creates new customer) |
+| `client_reference_id`                        | `organization_id` (critical for webhook linking)                                                            |
+| `metadata.organization_id`                   | `organization_id` (backup for webhook linking)                                                              |
+| `line_items`                                 | Plan price with quantity 1                                                                                  |
+| `success_url`                                | Redirect URL after successful payment (web app billing page with success indicator)                         |
+| `cancel_url`                                 | Redirect URL if customer cancels checkout (web app billing page)                                            |
+| `subscription_data.metadata.organization_id` | `organization_id` (persists on subscription for all future webhooks)                                        |
+| `allow_promotion_codes`                      | `true` (enable promo codes from day one)                                                                    |
 
 **Extra capacity add-on:** Extra capacity units are managed directly inside the DebugBundle billing page after subscription creation. Increasing capacity updates the Stripe subscription immediately. Reducing capacity creates or updates a Stripe subscription schedule so the lower quantity only takes effect at the next renewal boundary. Paid organizations can hold up to 99 purchased extra capacity units. These units expand shared allowance capacity only; they do not gate project creation.
 
 Checkout validation must also enforce trial conversion rules:
-- Active Solo trial: allow paid Solo or Team checkout.
-- Active Team trial: allow paid Team checkout only.
+
+- Active Solo trial: allow paid Solo, Team or Business checkout.
+- Active Team trial: allow paid Team or Business checkout.
 - Active no-card trials are not required to expire first, but the first paid purchase must wait seven full days from the immutable trial start.
 
 ### First-purchase restriction
@@ -209,6 +235,14 @@ Paid plan management and provider-confirmed payment/webhook reconciliation conti
 Browser read failures retain loaded billing data and the pending Checkout return/session. The existing warning callout and retry button expose recovery; retry reads/reconciles the same session and never creates another Checkout. The checkout-sync hook ignores late responses and preserves the existing billing revision fence. Network errors do not prove payment failure, payment success or a missing subscription.
 
 `billing_checkout_attempts` holds one organization-scoped attempt, fixed Stripe request parameters and its eventual session ID. A short organization row lock serializes reservations; no provider call holds that transaction. Persist the reservation before any Stripe call. Retrying must reuse the request and `billing-checkout:<attempt-id>` key. Return the same open session; completed/uncertain attempts remain reserved. Only a Stripe-confirmed expired session, or a completed session whose exact linked subscription is confirmed `canceled`/`incomplete_expired`, can be retired with an attempt/session compare-and-set. The cached internal `canceled` state alone is insufficient: paused subscriptions must not start another purchase. A different plan while the reservation is open returns `409 checkout_in_progress`; a saved session can still be checked for expiry and then replaced with the requested plan. An unsaved different-plan attempt remains reserved. A pending reservation that cannot be reconciled needs operator review, not a new charge attempt.
+
+The complete selected offer includes tier, interval, configured Price IDs and
+initial extra-unit quantity (0–99). The exact saved line items must match before
+creating or returning an open session. A changed interval/quantity/Price cannot
+replay an unsaved request with different terms. Annual extra-unit reductions use
+the paid annual renewal boundary, independently of the monthly allowance reset.
+Provider snapshots persist both clocks; monthly allowance anchors do not drift
+after February or reset on a same-subscription upgrade.
 
 New sessions set `expires_at` to reservation time plus one hour and request `payment_method_options.card.request_three_d_secure = any`. This asks the issuer for supported authentication; it does not guarantee a challenge, liability shift or rejection of unsupported cards. Hosted Checkout/Radar protections remain necessary. No CVC/AVS rules, live catalog, customer, subscription or refund settings are changed by this patch.
 
@@ -274,6 +308,7 @@ The existing `POST /v1/billing/portal` route must be updated to:
 ### 4.5 Portal Capabilities
 
 The Stripe Customer Portal must be configured to allow:
+
 - Subscription cancellation
 - Payment method updates
 - Invoice history viewing
@@ -306,6 +341,7 @@ DebugBundle persists a derived entitlement snapshot on the organization record s
 The product must never use incremental arithmetic like "checkout succeeded, add one capacity unit" for recurring-billing entitlement management.
 
 Instead, the product must continuously derive:
+
 - current paid plan
 - current extra capacity quantity
 - current billing health / entitlement eligibility
@@ -323,18 +359,19 @@ Bad: `additional_capacity_units = additional_capacity_units + 1`
 
 The billing sync implementation must process at minimum:
 
-| Event | Purpose |
-|-------|---------|
-| `checkout.session.completed` | Initial bridge from checkout to organization — attach `stripe_customer_id` and `stripe_subscription_id` |
-| `customer.subscription.created` | Initial subscription entitlement creation |
-| `customer.subscription.updated` | Quantity changes, plan changes, status changes, scheduled cancellation |
-| `customer.subscription.deleted` | Final entitlement removal |
-| `invoice.paid` | Successful renewal — confirm continued service, clear payment-failure state |
-| `invoice.payment_failed` | Failed recurring payment — trigger dunning notifications |
+| Event                           | Purpose                                                                                                 |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `checkout.session.completed`    | Initial bridge from checkout to organization — attach `stripe_customer_id` and `stripe_subscription_id` |
+| `customer.subscription.created` | Initial subscription entitlement creation                                                               |
+| `customer.subscription.updated` | Quantity changes, plan changes, status changes, scheduled cancellation                                  |
+| `customer.subscription.deleted` | Final entitlement removal                                                                               |
+| `invoice.paid`                  | Successful renewal — confirm continued service, clear payment-failure state                             |
+| `invoice.payment_failed`        | Failed recurring payment — trigger dunning notifications                                                |
 
 ### 5.4 Why Each Event Matters
 
 **`checkout.session.completed`**
+
 - First event received for a new customer
 - Contains `client_reference_id` (organization_id) for initial linking
 - Contains the subscription ID and customer ID to persist
@@ -342,23 +379,28 @@ The billing sync implementation must process at minimum:
 - Must trigger the initial entitlement recompute
 
 **`customer.subscription.created`**
+
 - Confirms the subscription is live
 - Sets initial plan and capacity quantities
 
 **`customer.subscription.updated`**
+
 - Handles all mid-lifecycle changes: quantity changes, plan upgrades/downgrades, status transitions
 - This is the primary entitlement recompute trigger
 
 **`customer.subscription.deleted`**
+
 - Subscription fully removed — revert to free plan, zero extra capacity units
 - Must trigger downgrade confirmation email
 
 **`invoice.paid`**
+
 - Confirms successful billing for a renewal cycle
 - Drives renewal-success email notification
 - Clears any previous payment-failure state
 
 **`invoice.payment_failed`**
+
 - Signals failed recurring payment
 - Drives payment-failure notification email
 - Starts dunning flow (payment failure → reminder → eventual downgrade)
@@ -368,6 +410,7 @@ The billing sync implementation must process at minimum:
 The API must expose: `POST /v1/billing/stripe-webhook`
 
 This route must:
+
 1. Read the raw request body (not JSON-parsed — Stripe signature verification requires raw bytes)
 2. Verify the Stripe webhook signature using `STRIPE_WEBHOOK_SECRET`
 3. Parse the verified event
@@ -394,11 +437,11 @@ The handler should store processed Stripe event IDs in a `processed_billing_even
 
 Different event types carry organization context differently:
 
-| Event | Resolution Path |
-|-------|----------------|
-| `checkout.session.completed` | `client_reference_id` → `organization_id`, or `metadata.organization_id` |
-| `customer.subscription.*` | Subscription `metadata.organization_id`, or lookup via `stripe_customer_id` on organizations table |
-| `invoice.*` | `customer` field → lookup via `stripe_customer_id` on organizations table |
+| Event                        | Resolution Path                                                                                    |
+| ---------------------------- | -------------------------------------------------------------------------------------------------- |
+| `checkout.session.completed` | `client_reference_id` → `organization_id`, or `metadata.organization_id`                           |
+| `customer.subscription.*`    | Subscription `metadata.organization_id`, or lookup via `stripe_customer_id` on organizations table |
+| `invoice.*`                  | `customer` field → lookup via `stripe_customer_id` on organizations table                          |
 
 The handler must support both paths and fail gracefully if resolution fails (log warning, return 200 to Stripe to prevent retry storms, but do not apply state changes).
 
@@ -435,23 +478,27 @@ If a subscription falls out of an entitlement-eligible state, paid capacity unit
 ### 6.4 Entitlement Eligibility Mapping
 
 **Entitlement-eligible subscription states** (keep paid entitlements active):
+
 - `active`
 - `trialing`
 
 Stripe `trialing` here refers to Stripe-managed subscription state, not DebugBundle's internal no-card trial. Internal no-card trials are represented by `billing_state = 'trialing'` together with `stripe_customer_id = null`.
 
 **Non-eligible subscription states** (remove paid entitlements):
+
 - `canceled`
 - `incomplete_expired`
 - `unpaid`
 
 **Grace-policy states** (require explicit product decision):
+
 - `past_due` — keep entitlements active but notify owner, start dunning flow
 - `incomplete` — initial payment not yet confirmed, keep limited grace
 
 ### 6.5 Grace Period Policy (V1)
 
 For V1:
+
 - `past_due`: keep all entitlements active for the Stripe default retry window (typically ~3 weeks across multiple retry attempts). Send payment-failure and reminder emails during this window. If the subscription transitions to `unpaid` or `canceled` after retries, then revoke entitlements.
 - `incomplete`: keep base plan access, but treat extra capacity as pending until payment succeeds. If payment fails and transitions to `incomplete_expired`, revert to free.
 
@@ -462,6 +509,7 @@ For V1:
 ### 7.1 Recompute Inputs
 
 On every relevant Stripe webhook event, derive from the subscription object:
+
 - current subscription status
 - current plan price → internal plan name mapping
 - current quantity on the extra-capacity subscription item (0 if no extra-capacity item)
@@ -471,6 +519,7 @@ On every relevant Stripe webhook event, derive from the subscription object:
 ### 7.2 Recompute Outputs
 
 Write to the organization record:
+
 - `plan` — mapped from subscription plan price
 - `additional_capacity_units` — quantity from extra-capacity subscription item
 - `billing_state` — derived from subscription status
@@ -489,6 +538,7 @@ Write to the organization record:
 ### 7.4 Subscription Deletion / Cancellation
 
 When a subscription is deleted:
+
 - `plan` → `"free"`
 - `additional_capacity_units` → `0`
 - `billing_state` → `"canceled"`
@@ -508,6 +558,7 @@ When ordering is ambiguous, prefer fetching the current subscription state from 
 For support remediation, development, and manual backfills, a minimal internal admin override must exist.
 
 Requirements:
+
 - Explicit audit logging
 - Explicit operator scope (admin/support role, not regular users)
 - Absolute capacity quantity input, not increment/decrement
@@ -517,6 +568,7 @@ Requirements:
 For V1, this can be a CLI command or internal API endpoint. It does not need a UI.
 
 Implementation:
+
 - Configure runtime operator emails with `BILLING_ADMIN_OVERRIDE_EMAILS` as a comma-separated list.
 - In the hosted deploy workflow, the private `HOSTED_BILLING_ADMIN_OVERRIDE_EMAILS` secret should render into runtime `BILLING_ADMIN_OVERRIDE_EMAILS`.
 - `POST /v1/admin/billing/override` accepts optional `organization_id` (defaults to the operator's own organization), absolute `plan`, absolute `additional_capacity_units`, and `reason`.
@@ -525,6 +577,10 @@ Implementation:
 - Admin overrides do not reset no-card trial eligibility and must not clear `trial_used_at`.
 - When an allowlisted operator signs into their own free organization, DebugBundle should automatically seed that organization to an internally managed Team plan with zero additional capacity units so operator accounts do not need a manual bootstrap override.
 - The Billing page treats paid plans with no `stripe_customer_id` as internally managed, suppresses Stripe checkout/portal actions, and keeps the existing capacity-management controls available with immediate internal updates.
+- Internally managed accounts may open the read-only pricing page with **View plans**.
+  This does not remove their grant or initiate paid conversion. The development-only
+  billing simulator described in CONTRIBUTING.md reviews paid flows without changing
+  this production restriction or using Stripe.
 - Review access may additionally bootstrap a reviewer-owned free organization to an internally managed Team plan through a secret-gated browser bootstrap route. The route must only mint a short-lived review cookie, the actual plan upgrade must still happen server-side through the same admin override primitive, and the cookie must be cleared after session resolution.
 
 ---
@@ -548,6 +604,7 @@ If the system cannot safely determine effective entitlement state, it must not i
 ### 9.4 Organization Resolution Failure
 
 If a webhook event cannot be mapped to an organization:
+
 - Log a structured warning with the Stripe event ID and customer ID
 - Return `200` to Stripe (prevent retry storm for permanently unresolvable events)
 - Do not apply any state changes
@@ -555,6 +612,7 @@ If a webhook event cannot be mapped to an organization:
 ### 9.5 Observability
 
 Billing sync and no-card trial lifecycle must be observable with:
+
 - Structured logs for every processed event (event type, organization ID, resulting state)
 - Structured logs for failures (resolution misses, Stripe API errors)
 - Structured logs for trial lifecycle actions (start, reminder queued, expired, converted, skipped)
@@ -570,6 +628,7 @@ The billing system must emit customer-facing emails for important transitions.
 See `/spec/system-emails.md` for the canonical email inventory, templates, and trigger rules.
 
 At minimum, billing webhook processing must trigger:
+
 - No-card trial started
 - No-card trial ending soon (7 days)
 - No-card trial ending soon (1 day)
@@ -591,6 +650,7 @@ At minimum, billing webhook processing must trigger:
 ### 11.1 NPM Package
 
 The `stripe` npm package must be added to the API app for:
+
 - Checkout Session creation
 - Billing Portal Session creation
 - Webhook signature verification
@@ -599,6 +659,7 @@ The `stripe` npm package must be added to the API app for:
 ### 11.2 Database Migration
 
 A migration must add the new billing columns to organizations:
+
 - `stripe_subscription_id` (text, nullable)
 - `billing_state` (text, nullable)
 - `billing_period_starts_at` (timestamptz, nullable)
@@ -613,6 +674,7 @@ A migration must add the new billing columns to organizations:
 - `trial_expired_at` (timestamptz, nullable)
 
 A `trial_lifecycle_events` table must exist for worker-side reminder/expiry/conversion dedupe:
+
 - `id` (uuid, primary key)
 - `organization_id` (uuid, not null)
 - `event_type` (text, not null)
@@ -620,10 +682,12 @@ A `trial_lifecycle_events` table must exist for worker-side reminder/expiry/conv
 - `created_at` (timestamptz, not null, default now())
 
 `operational_email_deliveries` must support organization-scoped lifecycle mail:
+
 - `project_id` nullable for trial lifecycle emails
 - `kind` includes `trial_started`, `trial_ending_soon`, `trial_expired`, and `trial_converted`
 
 A `plan_cleanup_tasks` table exists as a reserved compatibility surface for external cleanup side effects that cannot be completed transactionally. The current preserve-and-suspend downgrade flow does not emit or process hosted-improvement object deletion tasks:
+
 - `id` (uuid, primary key)
 - `organization_id` (uuid, not null)
 - `project_id` (uuid, not null)
@@ -636,6 +700,7 @@ A `plan_cleanup_tasks` table exists as a reserved compatibility surface for exte
 - `updated_at` (timestamptz, not null, default now())
 
 A `processed_billing_events` table must be created:
+
 - `event_id` (text, primary key) — Stripe event ID
 - `event_type` (text, not null)
 - `organization_id` (uuid, nullable) — resolved organization
@@ -644,6 +709,7 @@ A `processed_billing_events` table must be created:
 Note: `stripe_customer_id` and `additional_capacity_units` already exist on organizations.
 
 Deploy/runtime rule:
+
 - ordered forward migrations must run before API or worker code that reads trial fields or schedules trial lifecycle work
 - readiness/startup checks must fail closed when required trial migrations are missing
 
@@ -652,18 +718,21 @@ Deploy/runtime rule:
 ## 12. Implementation Sequence
 
 ### Phase A: Foundation (must be done first)
+
 1. Add `stripe` npm dependency to `apps/api`
 2. Database migration for new organization columns + `processed_billing_events` table + no-card trial metadata + `trial_lifecycle_events`
 3. Price-to-plan mapping configuration module
 4. Stripe client factory (reads `STRIPE_SECRET_KEY`, creates typed Stripe client)
 
 ### Phase B: Checkout & Portal (replaces static URLs)
+
 1. Replace `createCheckoutLink` with dynamic Checkout Session creation
 2. Replace `createPortalLink` with dynamic Portal Session creation
 3. Update billing routes to use new dynamic session creation
 4. Remove legacy static URL env vars from billing-links.ts
 
 ### Phase C: Webhook Sync
+
 1. Webhook route with raw body parsing and signature verification
 2. Organization resolution from event metadata
 3. Idempotency check (processed_billing_events table)
@@ -671,12 +740,14 @@ Deploy/runtime rule:
 5. Set-based organization update
 
 ### Phase D: Emails & Notifications
+
 1. Billing email templates (purchase confirmation, renewal, failure, no-card trial lifecycle, etc.)
 2. Durable worker scheduling for no-card trial reminders, expiry, and conversion email queueing
 3. Email trigger integration in webhook event handlers
 4. Dunning flow (payment failure → reminder timing)
 
 ### Phase E: Testing & Hardening
+
 1. Unit tests for entitlement recompute logic
 2. Unit tests for organization resolution
 3. Unit tests for idempotency
@@ -720,6 +791,7 @@ Deploy/runtime rule:
 ### 13.4 Email Tests
 
 Billing webhook processing triggers the correct lifecycle emails for:
+
 - First purchase confirmation
 - Renewal success
 - Payment failure
@@ -740,7 +812,6 @@ Billing webhook processing triggers the correct lifecycle emails for:
 ### Current-period selection correction
 
 Webhook and checkout-return synchronization share `stripe-billing-period.ts`. Read current subscription-item periods first (Clover), then legacy top-level subscription fields, then valid non-proration invoice lines and invoice envelope fields. Do not override the result with an `invoice.paid` envelope: an initial invoice can have equal top-level start/end. Retrieve the current subscription and preserve the same real month in either webhook order. This corrects future snapshots; existing malformed periods need an explicit, scoped reconciliation after a verified release, with no payment replay.
-
 
 ---
 
@@ -778,7 +849,6 @@ Focused API tests cover uncertain responses with identical idempotency, both ini
 
 First review the exact local paid-plan candidate and independently verify the hosted authentication/invoice-return journey in an authorised test environment. Reconcile legacy open checkouts through a separately authorised Stripe interface. Review the exact source diff and all four migrations, preserve a verified backup and previous immutable runtime, then apply the migrations before dependent activation. Activate the notification-compatible worker and retire incompatible workers before enabling the new API producer; preserve compatible processing during rollback. Configure only independently verified immediate proxy addresses after checking the listener and header-overwrite boundary. Independently read back deployed provenance, readiness, billing periods and provider delivery; reconcile the known malformed snapshot without replaying a payment. Leave the additive table in place if rolling application code back. No part of this paragraph is permission to execute it.
 
-
 ### Scheduled paid plan changes (FR-BIL-09)
 
 `GET /v1/billing/plan-change` returns `{pending_change:null|{schedule_id,target_plan,effective_at,additional_capacity_units}}`. `POST /v1/billing/plan-change/preview` with `{}` returns a signed ten-minute quote containing zero due now, estimated recurring total/tax/currency, effective date and retained units. `POST /v1/billing/plan-change` requires `{confirmation_token}`. `DELETE /v1/billing/plan-change` requires the exact `{schedule_id}`. All require an owner; browser access requires verified email and writes require CSRF. Existing management rate limits apply. These separate responses preserve older strict billing-summary clients.
@@ -804,3 +874,5 @@ The full 100-shard release unit suite passes 4,636 tests, plus 25 disposable Pos
 The existing private image rollout migrates before candidate startup, but promotes API traffic before activating the candidate worker. A first release that produces `billing_lifecycle` messages requires either a prior compatible-worker bridge release or reviewed worker-first orchestration with compatible-worker rollback. Do not execute the unchanged one-step rollout for this candidate. The chosen release sequence deploys the core 1.18.1 compatibility worker before the core 1.19.0 API producer and retains the bridge for rollback. Hosted image installation uses the frozen reviewed lockfile; explicit immediate-proxy trust is configured only after separate boundary approval. Actual deployment evidence belongs in STATUS.md and the release checkpoint.
 
 Hosted core 1.19.0 is deployed after the independently verified 1.18.1 compatibility bridge. Production readback confirms the exact source/version, healthy API and processing worker, all 63 migration checksums, new billing tables/notification constraint, approved immediate-proxy trust, exact served SPA and retained bridge images. Existing readiness monitoring passes with no new or changed incidents in the scoped API project. No production payment canary or manual customer notice was used. This does not establish containment or validate individual customers. Eight historic malformed billing periods remain unrepaired; their separate proposal preserves counters and requires fresh provider/row/usage checks plus explicit owner consent. Existing hosted links, CAPTCHA and automated billing monitoring remain follow-ups. The revised browser harness incorporating the seven-day fixture has not been rerun; prior hosted test evidence predates that policy.
+
+Business trials use the same bounded report allowance and AI budget over one thirty-day billing window. Calendar boundaries cannot reset that window. Report generation and email check the database trial deadline before external work, including before lifecycle cleanup. Expiry preserves authorised archives and financial obligations, and cannot create a commission without verified collected cash. See FR-BUS-07 / AC-BUS-09.

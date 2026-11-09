@@ -44,6 +44,38 @@ describe("worker operational email processor", () => {
       );
     }
   );
+  it("delivers trial conversion to paid Business without inventing a Business trial", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const mark = vi.fn().mockResolvedValue({ status: "delivered", next_attempt: null });
+    await processNextDeliverOperationalEmailJob({
+      appBaseUrl: "https://app.example.test",
+      operationalEmailDeliveryStore: {
+        claimDueOperationalEmailDeliveries: vi
+          .fn()
+          .mockResolvedValue([{ delivery_id: "conversion", attempt: 1 }]),
+        getOperationalEmailDelivery: vi.fn().mockResolvedValue({
+          delivery_id: "conversion",
+          organization_id: "org_test",
+          project_id: null,
+          kind: "trial_converted",
+          payload: { trial_plan: "team", paid_plan: "business" },
+          created_at: "2026-11-07T00:00:00Z"
+        }),
+        resolveOperationalEmailRecipientContext: vi.fn().mockResolvedValue({
+          organization_name: "Business account",
+          recipient_email: "owner@example.test"
+        }),
+        markOperationalEmailDeliveryAttempt: mark
+      },
+      emailTransport: { send }
+    });
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: expect.stringContaining("team trial to the paid business plan")
+      })
+    );
+    expect(mark).toHaveBeenCalledWith(expect.objectContaining({ delivered: true }));
+  });
   it("records delivery metrics for sent allowance warning emails", async (): Promise<void> => {
     const recordMetricDeltas = vi.fn().mockResolvedValue("recorded");
     const send = vi.fn().mockResolvedValue(undefined);

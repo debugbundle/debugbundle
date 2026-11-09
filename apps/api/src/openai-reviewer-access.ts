@@ -4,7 +4,6 @@ import type Provider from "oidc-provider";
 
 import {
   OPENAI_CIMD_CLIENT_ID,
-  OPENAI_HOSTED_MCP_SCOPES,
   OPENAI_MCP_RESOURCE,
   OPENAI_OIDC_SCOPES,
   OPENAI_REFRESH_TOKEN_TTL_SECONDS,
@@ -77,7 +76,7 @@ export function createOpenAiReviewerAuthorization(input: {
         clientId: OPENAI_CIMD_CLIENT_ID
       });
       grant.addOIDCScope(OPENAI_OIDC_SCOPES.join(" "));
-      grant.addResourceScope(OPENAI_MCP_RESOURCE, OPENAI_HOSTED_MCP_SCOPES.join(" "));
+      grant.addResourceScope(OPENAI_MCP_RESOURCE, interaction.productScopes.join(" "));
       const providerGrantId = await grant.save();
       const grantId = await input.oauthStore.createGrant({
         providerGrantId,
@@ -85,7 +84,7 @@ export function createOpenAiReviewerAuthorization(input: {
         organizationId: input.organizationId,
         clientId: OPENAI_CIMD_CLIENT_ID,
         resource: OPENAI_MCP_RESOURCE,
-        scopes: [...OPENAI_OIDC_SCOPES, ...OPENAI_HOSTED_MCP_SCOPES],
+        scopes: [...OPENAI_OIDC_SCOPES, ...interaction.productScopes],
         consentedAt: now.toISOString(),
         expiresAt: new Date(now.getTime() + OPENAI_REFRESH_TOKEN_TTL_SECONDS * 1_000).toISOString()
       });

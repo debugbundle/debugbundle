@@ -1,6 +1,8 @@
 import { preservedItemSettings, preservedPhaseSettings } from "./stripe-schedule-safety.js";
 import type Stripe from "stripe";
 import { resolveStripeSubscriptionBillingPeriod } from "./stripe-billing-period.js";
+import { findStripeCatalogPrice } from "./stripe-price-catalog.js";
+import { isPaidTier } from "../../shared-types/src/index.js";
 
 import { getTierCapabilities, type TierName } from "../../shared-types/src/index.js";
 import type {
@@ -268,10 +270,7 @@ export function buildSubscriptionItemsForQuantity(input: {
   targetAdditionalPurchased: number;
   plan: TierName;
 }): Array<Stripe.SubscriptionUpdateParams.Item> {
-  const extraCapacityPriceId =
-    input.plan === "team"
-      ? input.stripeConfig.teamExtraCapacityPriceId
-      : input.stripeConfig.soloExtraCapacityPriceId;
+  const extraCapacityPriceId = capacityPriceForSubscription(input);
   const items: Array<Stripe.SubscriptionUpdateParams.Item> = [];
   let hasExtraCapacityItem = false;
 
@@ -302,6 +301,7 @@ export function buildSubscriptionItemsForQuantity(input: {
   }
 
   if (!hasExtraCapacityItem && input.targetAdditionalPurchased > 0) {
+    if (!extraCapacityPriceId) throw new Error("billing_capacity_price_unavailable");
     items.push({
       price: extraCapacityPriceId,
       quantity: input.targetAdditionalPurchased
@@ -309,6 +309,31 @@ export function buildSubscriptionItemsForQuantity(input: {
   }
 
   return items;
+}
+
+function capacityPriceForSubscription(input: {
+  subscription: Stripe.Subscription;
+  stripeConfig: StripeConfig;
+  plan: TierName;
+}): string | null {
+  if (!isPaidTier(input.plan)) return null;
+  const base = input.subscription.items.data.find(
+    (item) => input.stripeConfig.priceMap.get(item.price.id)?.type === "plan"
+  );
+  const interval =
+    (base === undefined ? undefined : input.stripeConfig.priceMap.get(base.price.id)?.interval) ??
+    base?.price.recurring?.interval ??
+    "month";
+  if (interval !== "month" && interval !== "year") return null;
+  if (interval === "month" && input.plan !== "business")
+    return input.plan === "team"
+      ? input.stripeConfig.teamExtraCapacityPriceId
+      : input.stripeConfig.soloExtraCapacityPriceId;
+  return findStripeCatalogPrice(
+    input.stripeConfig.priceMap,
+    { plan: input.plan, interval, currency: "usd" },
+    "extra_capacity"
+  );
 }
 
 export function buildSchedulePhasesForReduction(input: {
@@ -326,10 +351,7 @@ export function buildSchedulePhasesForReduction(input: {
   const buildPhaseItems = (
     targetAdditionalPurchased: number
   ): Array<Stripe.SubscriptionScheduleUpdateParams.Phase.Item> => {
-    const extraCapacityPriceId =
-      input.plan === "team"
-        ? input.stripeConfig.teamExtraCapacityPriceId
-        : input.stripeConfig.soloExtraCapacityPriceId;
+    const extraCapacityPriceId = capacityPriceForSubscription(input);
     const items: Array<Stripe.SubscriptionScheduleUpdateParams.Phase.Item> = [];
     let hasExtraCapacityItem = false;
 
@@ -359,6 +381,7 @@ export function buildSchedulePhasesForReduction(input: {
     }
 
     if (!hasExtraCapacityItem && targetAdditionalPurchased > 0) {
+      if (!extraCapacityPriceId) throw new Error("billing_capacity_price_unavailable");
       items.push({
         price: extraCapacityPriceId,
         quantity: targetAdditionalPurchased

@@ -30,7 +30,7 @@ export const TEAM_ALERT_CHANNEL_OPTIONS: AlertChannelOption[] = [
 
 export const STANDARD_ALERT_CHANNEL_OPTIONS: AlertChannelOption[] = [
   { value: "email", label: ALERT_CHANNEL_LABELS["email"] },
-  { value: "slack", label: `${ALERT_CHANNEL_LABELS["slack"]} (Team tier only)`, disabled: true },
+  { value: "slack", label: `${ALERT_CHANNEL_LABELS["slack"]} (Team or Business)`, disabled: true },
   { value: "discord", label: ALERT_CHANNEL_LABELS["discord"] },
   { value: "webhook", label: ALERT_CHANNEL_LABELS["webhook"] }
 ];
@@ -119,7 +119,7 @@ export function formatAlertChannelWithDestination(
 export function canManageAlertRule(
   alert: AlertRecord,
   userId: string | undefined,
-  effectiveRole: "owner" | "admin" | "member"
+  effectiveRole: "owner" | "admin" | "member" | "viewer"
 ): boolean {
   return (
     effectiveRole === "owner" ||
@@ -216,7 +216,7 @@ export function describeAlertChannel(channel: AlertChannel): string {
   }
 
   if (channel === "slack") {
-    return "Deliver matched alert notifications into a connected Slack channel. Team tier owners can connect channels directly from this dialog.";
+    return "Deliver matched alert notifications into a connected Slack channel. Workspace owners can connect channels directly from this dialog.";
   }
 
   if (channel === "discord") {

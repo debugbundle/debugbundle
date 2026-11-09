@@ -289,7 +289,7 @@ export function registerAlertRoutes(app: FastifyInstance, dependencies: ApiDepen
       alert_id: string;
       project_id: string;
       actor_user_id: string;
-      actor_role: "owner" | "admin" | "member";
+      actor_role: "owner" | "admin" | "member" | "viewer";
       service_id?: string | null;
       channel?: "email" | "slack" | "discord" | "webhook";
       condition_type?:

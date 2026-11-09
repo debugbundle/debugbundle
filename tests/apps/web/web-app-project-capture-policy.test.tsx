@@ -7,6 +7,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "../../../apps/web/src/app.tsx";
 import { resetBrowserSessionClientState } from "../../../apps/web/src/lib/api.ts";
 import { createProject, createSession, jsonResponse, requestUrl } from "./web-test-helpers.js";
+import {
+  buildDraft,
+  buildDefaultPolicyResponse,
+  buildUpdatePayload,
+  getClientErrorCustomValidationError
+} from "../../../apps/web/src/lib/capture-policy-draft.js";
 
 afterEach(() => {
   resetBrowserSessionClientState();
@@ -48,6 +54,57 @@ async function openCapturePolicySettings(): Promise<void> {
 }
 
 describe("web app — project capture policy settings", () => {
+  it("preserves explicit overrides and normalises valid custom status codes", () => {
+    const response = buildDefaultPolicyResponse("business");
+    for (const [statuses, mode] of [
+      [null, "preset_default"],
+      [[], "none"],
+      [[401, 403, 409, 422], "recommended"],
+      [[429, 418], "custom"]
+    ] as const) {
+      const draft = buildDraft({
+        ...response,
+        overrides: {
+          ...response.overrides,
+          immediate_client_error_statuses: statuses === null ? null : [...statuses]
+        }
+      });
+      expect(draft.client_error_incident_mode).toBe(mode);
+    }
+    const draft = {
+      ...buildDraft(response),
+      client_error_incident_mode: "custom" as const,
+      client_error_custom_input: "429, 418, 429, 400"
+    };
+    expect(getClientErrorCustomValidationError(draft)).toBeNull();
+    expect(buildUpdatePayload(draft).immediate_client_error_statuses).toEqual([400, 418, 429]);
+  });
+  it.each([
+    "401x",
+    "401.5",
+    "399",
+    "500",
+    Array.from({ length: 13 }, (_, index) => 400 + index).join(",")
+  ])("rejects an invalid or excessive custom status selection: %s", (value) => {
+    const draft = {
+      ...buildDraft(buildDefaultPolicyResponse("business")),
+      client_error_incident_mode: "custom" as const,
+      client_error_custom_input: value
+    };
+    expect(getClientErrorCustomValidationError(draft)).toMatch(/4xx|no more than 12/);
+  });
+  it("does not accept whitespace or comma-only custom client-error statuses as an empty capture policy", () => {
+    const draft = buildDraft(buildDefaultPolicyResponse("business"));
+    for (const value of ["   ", ", , ,"]) {
+      expect(
+        getClientErrorCustomValidationError({
+          ...draft,
+          client_error_incident_mode: "custom",
+          client_error_custom_input: value
+        })
+      ).toBe("Enter at least one 4xx status code.");
+    }
+  });
   it("lets owners update capture policy from the project settings page", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
@@ -90,18 +147,20 @@ describe("web app — project capture policy settings", () => {
 
       if (url.endsWith("/v1/projects/proj_123/capture-policy") && init?.method === "PATCH") {
         expect(init.credentials).toBe("include");
-        expect(init.body).toBe(JSON.stringify({
-          preset: "investigative",
-          capture_logs: null,
-          capture_request_events: "filtered",
-          capture_breadcrumbs: null,
-          capture_probe_events: null,
-          immediate_client_error_statuses: [401, 403, 409, 422],
-          immediate_client_error_path_rules: [
-            { status_code: 404, path_pattern: "/checkout/*", methods: ["GET", "POST"] },
-            { status_code: 422, path_pattern: "/signup", methods: [] }
-          ]
-        }));
+        expect(init.body).toBe(
+          JSON.stringify({
+            preset: "investigative",
+            capture_logs: null,
+            capture_request_events: "filtered",
+            capture_breadcrumbs: null,
+            capture_probe_events: null,
+            immediate_client_error_statuses: [401, 403, 409, 422],
+            immediate_client_error_path_rules: [
+              { status_code: 404, path_pattern: "/checkout/*", methods: ["GET", "POST"] },
+              { status_code: 422, path_pattern: "/signup", methods: [] }
+            ]
+          })
+        );
 
         return jsonResponse(200, {
           access_mode: "manage",
@@ -139,11 +198,20 @@ describe("web app — project capture policy settings", () => {
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
     await openCapturePolicySettings();
 
-    const capturePolicyHeading = await screen.findByRole("heading", { name: /capture policy/i, level: 3 });
-    const projectDetailsHeading = await screen.findByRole("heading", { name: /project details/i, level: 3 });
+    const capturePolicyHeading = await screen.findByRole("heading", {
+      name: /capture policy/i,
+      level: 3
+    });
+    const projectDetailsHeading = await screen.findByRole("heading", {
+      name: /project details/i,
+      level: 3
+    });
 
     expect(capturePolicyHeading).toBeInTheDocument();
-    expect(capturePolicyHeading.compareDocumentPosition(projectDetailsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      capturePolicyHeading.compareDocumentPosition(projectDetailsHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
 
     const presetSelect = await findSelectTrigger(/^preset$/i);
     const requestEventsSelect = await findSelectTrigger(/^request events$/i);
@@ -158,12 +226,18 @@ describe("web app — project capture policy settings", () => {
     });
 
     await openSelect(/^client error incidents$/i);
-    expect(await screen.findByRole("option", { name: /^use preset default \(none\)$/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("option", { name: /^use preset default \(none\)$/i })
+    ).toBeInTheDocument();
     fireEvent.keyDown(document.body, { key: "Escape", code: "Escape" });
 
     await chooseSelectOption(user, /^preset$/i, /^investigative$/i);
     await chooseSelectOption(user, /^request events$/i, /^filtered request events$/i);
-    await chooseSelectOption(user, /^client error incidents$/i, /^recommended for interactive apps$/i);
+    await chooseSelectOption(
+      user,
+      /^client error incidents$/i,
+      /^recommended for interactive apps$/i
+    );
     fireEvent.change(screen.getByLabelText(/^path rules$/i), {
       target: {
         value: "404=/checkout//*@post,get,post\n422=/signup"
@@ -179,7 +253,9 @@ describe("web app — project capture policy settings", () => {
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.some(
-          ([input, init]) => requestUrl(input).endsWith("/v1/projects/proj_123/capture-policy") && init?.method === "PATCH"
+          ([input, init]) =>
+            requestUrl(input).endsWith("/v1/projects/proj_123/capture-policy") &&
+            init?.method === "PATCH"
         )
       ).toBe(true);
     });
@@ -240,7 +316,9 @@ describe("web app — project capture policy settings", () => {
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
     await openCapturePolicySettings();
 
-    const saveButton = expectButton(await screen.findByRole("button", { name: /save capture policy/i }));
+    const saveButton = expectButton(
+      await screen.findByRole("button", { name: /save capture policy/i })
+    );
     const pathRulesInput = await screen.findByLabelText(/^path rules$/i);
 
     fireEvent.change(pathRulesInput, { target: { value: "404=checkout" } });
@@ -276,7 +354,13 @@ describe("web app — project capture policy settings", () => {
 
       if (url.endsWith("/v1/projects") && init?.method === undefined) {
         return jsonResponse(200, {
-          projects: [createProject({ relationship: "shared", effective_role: "member", organization_plan: "free" })]
+          projects: [
+            createProject({
+              relationship: "shared",
+              effective_role: "member",
+              organization_plan: "free"
+            })
+          ]
         });
       }
 
@@ -309,8 +393,12 @@ describe("web app — project capture policy settings", () => {
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
     await openCapturePolicySettings();
 
-    expect(await screen.findByRole("heading", { name: /capture policy/i, level: 3 })).toBeInTheDocument();
-    expect(screen.getByText(/only project owners and admins can change capture settings/i)).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /capture policy/i, level: 3 })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/only project owners and admins can change capture settings/i)
+    ).toBeInTheDocument();
 
     expect(screen.queryByLabelText(/^preset$/i)).toBeNull();
     expect(screen.queryByLabelText(/^request events$/i)).toBeNull();
@@ -332,7 +420,13 @@ describe("web app — project capture policy settings", () => {
 
       if (url.endsWith("/v1/projects") && init?.method === undefined) {
         return jsonResponse(200, {
-          projects: [createProject({ relationship: "shared", effective_role: "admin", organization_plan: "team" })]
+          projects: [
+            createProject({
+              relationship: "shared",
+              effective_role: "admin",
+              organization_plan: "team"
+            })
+          ]
         });
       }
 
@@ -359,15 +453,17 @@ describe("web app — project capture policy settings", () => {
 
       if (url.endsWith("/v1/projects/proj_123/capture-policy") && init?.method === "PATCH") {
         expect(init.credentials).toBe("include");
-        expect(init.body).toBe(JSON.stringify({
-          preset: "balanced",
-          capture_logs: null,
-          capture_request_events: "all",
-          capture_breadcrumbs: null,
-          capture_probe_events: null,
-          immediate_client_error_statuses: null,
-          immediate_client_error_path_rules: null
-        }));
+        expect(init.body).toBe(
+          JSON.stringify({
+            preset: "balanced",
+            capture_logs: null,
+            capture_request_events: "all",
+            capture_breadcrumbs: null,
+            capture_probe_events: null,
+            immediate_client_error_statuses: null,
+            immediate_client_error_path_rules: null
+          })
+        );
 
         return jsonResponse(200, {
           access_mode: "manage",
@@ -398,7 +494,9 @@ describe("web app — project capture policy settings", () => {
     await openCapturePolicySettings();
 
     const requestSelect = await findSelectTrigger(/^request events$/i);
-    const saveButton = expectButton(await screen.findByRole("button", { name: /save capture policy/i }));
+    const saveButton = expectButton(
+      await screen.findByRole("button", { name: /save capture policy/i })
+    );
 
     expect(requestSelect).toBeEnabled();
     expect(saveButton).toBeDisabled();
@@ -415,7 +513,8 @@ describe("web app — project capture policy settings", () => {
       expect(
         fetchMock.mock.calls.some(
           ([input, requestInit]) =>
-            requestUrl(input).endsWith("/v1/projects/proj_123/capture-policy") && requestInit?.method === "PATCH"
+            requestUrl(input).endsWith("/v1/projects/proj_123/capture-policy") &&
+            requestInit?.method === "PATCH"
         )
       ).toBe(true);
     });
@@ -466,15 +565,17 @@ describe("web app — project capture policy settings", () => {
       }
 
       if (url.endsWith("/v1/projects/proj_123/capture-policy") && init?.method === "PATCH") {
-        expect(init.body).toBe(JSON.stringify({
-          preset: "investigative",
-          capture_logs: null,
-          capture_request_events: null,
-          capture_breadcrumbs: null,
-          capture_probe_events: null,
-          immediate_client_error_statuses: [],
-          immediate_client_error_path_rules: null
-        }));
+        expect(init.body).toBe(
+          JSON.stringify({
+            preset: "investigative",
+            capture_logs: null,
+            capture_request_events: null,
+            capture_breadcrumbs: null,
+            capture_probe_events: null,
+            immediate_client_error_statuses: [],
+            immediate_client_error_path_rules: null
+          })
+        );
 
         savedImmediateClientErrorStatuses = [];
 
@@ -524,7 +625,9 @@ describe("web app — project capture policy settings", () => {
     render(<App initialEntries={["/projects/proj_123/settings"]} />);
 
     const reloadedClientErrorSelect = expectSelectTrigger(
-      await screen.findAllByLabelText(/^client error incidents$/i).then((elements) => elements.at(-1)!)
+      await screen
+        .findAllByLabelText(/^client error incidents$/i)
+        .then((elements) => elements.at(-1)!)
     );
     await waitFor(() => {
       expect(reloadedClientErrorSelect).toHaveTextContent(/^none$/i);

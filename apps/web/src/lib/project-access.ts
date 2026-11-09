@@ -2,7 +2,7 @@ import type { ProjectRecord } from "./api.js";
 
 export type ProjectRelationship = "owned" | "shared";
 export type ProjectSharingState = "private" | "shared_by_you" | "shared_with_you";
-export type ProjectEffectiveRole = "owner" | "admin" | "member";
+export type ProjectEffectiveRole = "owner" | "admin" | "member" | "viewer";
 
 export type AccessibleProjectRecord = ProjectRecord & {
   owner_user_id?: string;
@@ -35,7 +35,9 @@ export function getProjectSharingState(project: ProjectRecord): ProjectSharingSt
   return getProjectRelationship(project) === "shared" ? "shared_with_you" : "private";
 }
 
-export function getProjectEffectiveRole(project: ProjectRecord | null | undefined): ProjectEffectiveRole {
+export function getProjectEffectiveRole(
+  project: ProjectRecord | null | undefined
+): ProjectEffectiveRole {
   if (project === null || project === undefined) {
     return "owner";
   }
@@ -48,7 +50,10 @@ export function isSharedProjectAccessSuspended(project: ProjectRecord | null | u
     return false;
   }
 
-  return getProjectRelationship(project) === "shared" && asAccessibleProject(project).shared_access_suspended === true;
+  return (
+    getProjectRelationship(project) === "shared" &&
+    asAccessibleProject(project).shared_access_suspended === true
+  );
 }
 
 export function getProjectOwnerEmail(project: ProjectRecord): string | null {

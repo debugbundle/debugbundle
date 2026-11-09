@@ -22,19 +22,20 @@ describe("improvement store", () => {
     const listSql = String(query.mock.calls[0]?.[0] ?? "");
     expect(listSql).toContain("$2::uuid IS NULL");
     expect(listSql).toContain("$2::uuid IS NOT NULL");
-    expect(listSql).toContain("FROM project_members pm");
+    expect(listSql).toContain(
+      "debugbundle_project_actor_role(p.id,$2::uuid,false,false) IS NOT NULL"
+    );
 
-    expect(query).toHaveBeenNthCalledWith(1, expect.stringContaining("FROM project_members pm"), [
-      "org_collaborator",
-      "usr_collaborator",
-      "proj_shared",
-      20
-    ]);
-    expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining("FROM project_members pm"), [
-      "org_collaborator",
-      "imp_shared",
-      "usr_collaborator"
-    ]);
+    expect(query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining("debugbundle_project_actor_role(p.id,$2::uuid,false,false)"),
+      ["org_collaborator", "usr_collaborator", "proj_shared", 20]
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("debugbundle_project_actor_role(p.id,$3::uuid,false,false)"),
+      ["org_collaborator", "imp_shared", "usr_collaborator"]
+    );
   });
 
   it("returns null when improvement execution settings are missing", async () => {

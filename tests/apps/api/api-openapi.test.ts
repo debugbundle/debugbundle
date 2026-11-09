@@ -3,6 +3,98 @@ import { describe, expect, it } from "vitest";
 import { buildPublicOpenApiSpec } from "../../../apps/api/src/openapi.ts";
 
 describe("api openapi spec", () => {
+  it("documents private report content with its actual HTML media type and authenticated source redirects", () => {
+    const document = buildPublicOpenApiSpec() as {
+      paths: Record<
+        string,
+        Record<
+          string,
+          {
+            responses: Record<
+              string,
+              { content?: Record<string, unknown>; headers?: Record<string, unknown> }
+            >;
+          }
+        >
+      >;
+    };
+    const base = "/v1/organizations/{organizationId}/reports/{runId}";
+    expect(document.paths[`${base}/document`]?.["get"]?.responses["200"]?.content).toHaveProperty(
+      "application/json"
+    );
+    expect(document.paths[`${base}/html`]?.["get"]?.responses["200"]?.content).toHaveProperty(
+      "text/html"
+    );
+    expect(document.paths[`${base}/pdf`]).toHaveProperty("post");
+    expect(document.paths[`${base}/pdf`]?.["get"]?.responses["200"]?.content).toHaveProperty(
+      "application/json"
+    );
+    expect(document.paths[`${base}/pdf/file`]?.["get"]?.responses["200"]?.content).toHaveProperty(
+      "application/pdf"
+    );
+    expect(document.paths[`${base}/pdf/file`]?.["get"]?.responses).toHaveProperty("409");
+    expect(document.paths[`${base}/deliveries`]?.["get"]?.responses["200"]?.content).toHaveProperty(
+      "application/json"
+    );
+    expect(
+      document.paths[`${base}/sources/{reference}`]?.["get"]?.responses["303"]?.headers
+    ).toHaveProperty("Location");
+  });
+  it("documents versioned Smart Report definitions without exposing credential metadata", () => {
+    const document = buildPublicOpenApiSpec() as {
+      paths: Record<string, Record<string, unknown>>;
+      components: {
+        schemas: Record<string, { required?: string[]; properties?: Record<string, unknown> }>;
+      };
+    };
+    const path = "/v1/organizations/{organizationId}/report-definitions";
+    expect(document.paths[path]).toHaveProperty("post");
+    expect(document.paths[`${path}/{definitionId}`]).toHaveProperty("patch");
+    expect(document.paths[`${path}/{definitionId}`]).toHaveProperty("delete");
+    expect(document.components.schemas["CreateReportDefinitionRequest"]?.required).toEqual(
+      expect.arrayContaining(["request_id", "definition"])
+    );
+    expect(document.components.schemas["ReplaceReportDefinition"]?.required).toContain(
+      "expected_version"
+    );
+    expect(document.components.schemas["DeleteReportDefinition"]?.required).toContain(
+      "expected_version"
+    );
+    expect(JSON.stringify(document.components.schemas["ReportDefinitionResponse"])).not.toContain(
+      "initiating_authority"
+    );
+  });
+  it("documents personal referral finances separately from operator-only payout recording", () => {
+    const document = buildPublicOpenApiSpec() as {
+      paths: Record<string, Record<string, { security?: unknown; requestBody?: unknown }>>;
+      components: {
+        schemas: Record<string, { properties?: Record<string, unknown>; required?: string[] }>;
+      };
+    };
+    for (const path of [
+      "/v1/referrals/earnings",
+      "/v1/referrals/payouts",
+      "/v1/referrals/operator/balances",
+      "/v1/referrals/operator/payouts"
+    ])
+      expect(document.paths[path]?.["get"]?.security).toEqual([
+        { browserSession: [] },
+        { memberBearerToken: [] }
+      ]);
+    expect(document.paths["/v1/referrals/operator/payouts/claim"]).toHaveProperty("post");
+    expect(document.paths["/v1/referrals/operator/payouts/{id}/uncertain"]).toHaveProperty("post");
+    expect(document.paths["/v1/referrals/operator/payouts/{id}/paid"]).toHaveProperty("post");
+    const body = document.components.schemas["ReferralPayoutPaidBody"];
+    expect(body?.required).toEqual(
+      expect.arrayContaining(["external_reference", "confirmed_external_payment"])
+    );
+    expect(body?.properties).toHaveProperty("confirmed_external_payment", {
+      type: "boolean",
+      const: true
+    });
+    expect(body?.properties).not.toHaveProperty("operator_user_id");
+    expect(body?.properties).not.toHaveProperty("amount_minor");
+  });
   it("documents only the five agent reads with distinct agent authentication", () => {
     const document = buildPublicOpenApiSpec() as {
       paths: Record<string, Record<string, { security?: unknown; responses?: unknown }>>;

@@ -1,3 +1,4 @@
+import { appendActorProjectReadScope, type ProjectActorReadScope } from "./project-read-scope.js";
 import {
   AnalyticsOpportunitiesListResponseSchema,
   AnalyticsOpportunityResponseSchema,
@@ -16,7 +17,7 @@ export type AnalyticsOpportunitiesCursor = {
   opportunity_id: string;
 };
 
-export interface AnalyticsOpportunityListFilters {
+export interface AnalyticsOpportunityListFilters extends ProjectActorReadScope {
   include_total?: boolean | undefined;
   status?: AnalyticsOpportunityStatus | undefined;
   kind?: AnalyticsBundleAnalysisKind | undefined;
@@ -223,21 +224,26 @@ function buildAnalyticsOpportunitySelect(includeTotal = false): string {
   `;
 }
 
-function buildAnalyticsOpportunityWhere(input: {
-  organization_id: string;
-  project_id?: string | undefined;
-  status?: AnalyticsOpportunityStatus | undefined;
-  kind?: AnalyticsBundleAnalysisKind | undefined;
-  service?: string | undefined;
-  environment?: string | undefined;
-  severity?: AnalyticsBundleSeverity | undefined;
-  bundle_status?: AnalyticsOpportunityBundleStatus | undefined;
-  from?: string | undefined;
-  to?: string | undefined;
-  cursor?: AnalyticsOpportunitiesCursor | undefined;
-}): { sql: string; params: unknown[] } {
+function buildAnalyticsOpportunityWhere(
+  input: ProjectActorReadScope & {
+    organization_id: string;
+    project_id?: string | undefined;
+    status?: AnalyticsOpportunityStatus | undefined;
+    kind?: AnalyticsBundleAnalysisKind | undefined;
+    service?: string | undefined;
+    environment?: string | undefined;
+    severity?: AnalyticsBundleSeverity | undefined;
+    bundle_status?: AnalyticsOpportunityBundleStatus | undefined;
+    from?: string | undefined;
+    to?: string | undefined;
+    cursor?: AnalyticsOpportunitiesCursor | undefined;
+  }
+): { sql: string; params: unknown[] } {
   const conditions = ["p.organization_id = $1::uuid"];
   const params: unknown[] = [input.organization_id];
+  const actorScope = { ...input };
+  delete actorScope.project_id;
+  appendActorProjectReadScope(params, conditions, actorScope, "ao.project_id", "p.id");
 
   if (input.project_id !== undefined) {
     params.push(input.project_id);

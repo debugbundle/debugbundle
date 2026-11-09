@@ -91,6 +91,56 @@ describe("OpenAI browser consent authorization", () => {
     });
   });
 
+  it("accepts report-only consent without expanding it to legacy product scopes", async () => {
+    const fixture = createFixture();
+    const details = interaction("login");
+    (details["params"] as Record<string, unknown>)["scope"] =
+      "openid email debugbundle:reports:read";
+    fixture.provider.interactionDetails.mockResolvedValue(details);
+    await expect(
+      fixture.authorization.describe({
+        request: {} as IncomingMessage,
+        response: {} as ServerResponse,
+        session: session()
+      })
+    ).resolves.toMatchObject({ product_scopes: ["debugbundle:reports:read"] });
+    await fixture.authorization.complete({
+      interactionId: "interaction_123",
+      request: {} as IncomingMessage,
+      response: {} as ServerResponse,
+      session: session(),
+      decision: "allow",
+      productScopes: ["debugbundle:reports:read"]
+    });
+    expect(fixture.addResourceScope).toHaveBeenCalledWith(
+      "https://mcp.debugbundle.com",
+      "debugbundle:reports:read"
+    );
+    expect(fixture.oauthStore.createGrant).toHaveBeenCalledWith(
+      expect.objectContaining({ scopes: ["openid", "email", "debugbundle:reports:read"] })
+    );
+  });
+
+  it.each([
+    "openid email debugbundle:reports:read debugbundle:reports:read",
+    "openid email debugbundle:admin",
+    "openid debugbundle:reports:read",
+    "openid email"
+  ])("rejects invalid requested scopes: %s", async (scope) => {
+    const fixture = createFixture();
+    const details = interaction("login");
+    (details["params"] as Record<string, unknown>)["scope"] = scope;
+    fixture.provider.interactionDetails.mockResolvedValue(details);
+    await expect(
+      fixture.authorization.describe({
+        request: {} as IncomingMessage,
+        response: {} as ServerResponse,
+        session: session()
+      })
+    ).rejects.toThrow("openai_authorization_interaction_invalid");
+    expect(fixture.oauthStore.createGrant).not.toHaveBeenCalled();
+  });
+
   it("finishes login and scoped consent in one explicit allow decision", async () => {
     const fixture = createFixture("login");
 

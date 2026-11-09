@@ -190,6 +190,8 @@ describe("availability check execution storage", () => {
           rows: [
             {
               ...buildClaimedRow({
+                project_id: "11111111-1111-4111-8111-111111111111",
+                check_id: "22222222-2222-4222-8222-222222222222",
                 prior_status: "failing",
                 consecutive_failures: 1,
                 consecutive_successes: 1,
@@ -202,12 +204,13 @@ describe("availability check execution storage", () => {
         },
         { rows: [] },
         { rows: [] },
+        { rows: [] },
         { rows: [] }
       ]) as never
     );
     await expect(
       recoveryStore.recordCheckExecution({
-        check_id: "chk_1",
+        check_id: "22222222-2222-4222-8222-222222222222",
         scheduled_for: "2026-06-15T10:00:00.000Z",
         claimed_at: "2026-06-15T10:00:00.000Z",
         started_at: "2026-06-15T10:00:00.000Z",

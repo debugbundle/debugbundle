@@ -15,7 +15,7 @@ import {
   TokenListQuerySchema
 } from "../schemas.js";
 
-function isProjectManager(role: "owner" | "admin" | "member"): boolean {
+function isProjectManager(role: "owner" | "admin" | "member" | "viewer"): boolean {
   return role === "owner" || role === "admin";
 }
 

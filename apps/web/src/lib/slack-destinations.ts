@@ -15,7 +15,7 @@ export function getSlackDestinationErrorMessage(error: unknown, action: "test" |
     return "Slack asked us to slow down. Wait a moment and try again.";
   }
   if (code === "upgrade_required") {
-    return "Slack connected destinations are available on the Team plan.";
+    return "Connected Slack channels require Team or Business.";
   }
   if (code === "forbidden") {
     return "Only organization owners can manage connected Slack channels.";
@@ -37,7 +37,9 @@ export function resolveSlackDestinationSelection(
   preferredDestinationId: string | null
 ): string | null {
   if (typeof preferredDestinationId === "string") {
-    const matchingDestination = destinations.find((destination) => destination.slack_destination_id === preferredDestinationId);
+    const matchingDestination = destinations.find(
+      (destination) => destination.slack_destination_id === preferredDestinationId
+    );
     if (matchingDestination !== undefined) {
       return matchingDestination.slack_destination_id;
     }

@@ -69,7 +69,7 @@ function createTokenManagementDependency() {
     listProjectTokensForOrganization: async () => [],
     createProjectTokenForOrganization: async () => ({
       token_id: "ptok_perf",
-      project_id: "proj_perf",
+      project_id: "550e8400-e29b-41d4-a716-446655440000",
       label: "perf",
       allowed_origins: [],
       token_preview: "dbundle_proj_perf",
@@ -98,7 +98,7 @@ function createTokenManagementDependency() {
 
 function createIncidentFixture() {
   return {
-    incident_id: "inc_perf",
+    incident_id: "10000000-0000-4000-8000-000000000001",
     project_id: "550e8400-e29b-41d4-a716-446655440000",
     project_name: "Main App",
     project_color_tag: null,
@@ -123,8 +123,8 @@ function createIncidentFixture() {
 
 function createBundleInput(): BuildBundleInput {
   const incident = {
-    incident_id: "inc_perf",
-    project_id: "proj_perf",
+    incident_id: "10000000-0000-4000-8000-000000000001",
+    project_id: "550e8400-e29b-41d4-a716-446655440000",
     service_id: "svc_perf",
     service_name: "checkout-api",
     service_runtime: "node",
@@ -293,11 +293,13 @@ function createIngestionBenchmarkApp() {
 
   const app = createApiServer({
     ingestionPersistence: {
-      persistAndEnqueue: async () => ({ object_key: "raw-events/proj_perf/event.json.gz" })
+      persistAndEnqueue: async () => ({
+        object_key: "raw-events/550e8400-e29b-41d4-a716-446655440000/event.json.gz"
+      })
     },
     ingestionMetadata: {
       resolveProjectByTokenHash: async () => ({
-        project_id: "proj_perf",
+        project_id: "550e8400-e29b-41d4-a716-446655440000",
         organization_id: "org_perf",
         organization_plan: "solo" as const
       })
@@ -414,7 +416,9 @@ function createRetrievalBenchmarkApp(bundleGzip: Buffer) {
 
   const app = createApiServer({
     ingestionPersistence: {
-      persistAndEnqueue: async () => ({ object_key: "raw-events/proj_perf/event.json.gz" })
+      persistAndEnqueue: async () => ({
+        object_key: "raw-events/550e8400-e29b-41d4-a716-446655440000/event.json.gz"
+      })
     },
     ingestionMetadata: {
       resolveProjectByTokenHash: async () => null
@@ -476,7 +480,7 @@ function createRetrievalBenchmarkApp(bundleGzip: Buffer) {
     getIncident: async () => {
       const response = await app.inject({
         method: "GET",
-        url: "/v1/incidents/inc_perf",
+        url: "/v1/incidents/10000000-0000-4000-8000-000000000001",
         headers: {
           authorization: "Bearer dbundle_mem_perf"
         }
@@ -488,7 +492,7 @@ function createRetrievalBenchmarkApp(bundleGzip: Buffer) {
     getBundle: async () => {
       const response = await app.inject({
         method: "GET",
-        url: "/v1/incidents/inc_perf/bundle",
+        url: "/v1/incidents/10000000-0000-4000-8000-000000000001/bundle",
         headers: {
           authorization: "Bearer dbundle_mem_perf"
         }

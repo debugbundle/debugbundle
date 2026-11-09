@@ -28,6 +28,7 @@ import { ApiRequestError } from "../lib/api-client.js";
 import { showErrorToast, showSuccessToast } from "../lib/notify.js";
 import { useDelayedVisibility } from "../lib/use-delayed-visibility.js";
 import { cn } from "../lib/utils.js";
+import { useProjectMutationAccess } from "../lib/use-project-mutation-access.js";
 import { formatDate, severityVariantMap, statusVariantMap } from "./improvements-page.js";
 
 const ARTIFACT_POLL_INTERVAL_MS = 2_000;
@@ -38,6 +39,7 @@ export function ImprovementDetailPage(): JSX.Element {
   const [error, setError] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
   const showLoading = useDelayedVisibility(improvement === undefined);
+  const { canMutate } = useProjectMutationAccess(improvement?.project_id);
   const backDestination =
     projectId === undefined ? "/improvements" : `/projects/${projectId}/improvements`;
   const backLabel =
@@ -110,34 +112,8 @@ export function ImprovementDetailPage(): JSX.Element {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {improvement.status === "resolved" ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isMutating}
-                  onClick={() => {
-                    const requestGeneration = generation.current;
-                    setIsMutating(true);
-                    void (async () => {
-                      try {
-                        const reopened = await reopenImprovement(improvement.improvement_id);
-                        if (generation.current !== requestGeneration) return;
-                        setImprovement(reopened);
-                        showSuccessToast("Improvement reopened successfully.");
-                      } catch (error) {
-                        if (generation.current !== requestGeneration) return;
-                        showErrorToast(getImprovementMutationErrorMessage("reopen", error));
-                      } finally {
-                        if (generation.current === requestGeneration) setIsMutating(false);
-                      }
-                    })();
-                  }}
-                >
-                  {isMutating ? "Reopening..." : "Reopen"}
-                </Button>
-              ) : (
-                <>
+              {canMutate ? (
+                improvement.status === "resolved" ? (
                   <Button
                     type="button"
                     variant="outline"
@@ -148,62 +124,90 @@ export function ImprovementDetailPage(): JSX.Element {
                       setIsMutating(true);
                       void (async () => {
                         try {
-                          const snoozedUntil = new Date(
-                            Date.now() + 7 * 24 * 60 * 60 * 1000
-                          ).toISOString();
-                          const snoozed = await snoozeImprovement(
-                            improvement.improvement_id,
-                            snoozedUntil
-                          );
+                          const reopened = await reopenImprovement(improvement.improvement_id);
                           if (generation.current !== requestGeneration) return;
-                          setImprovement(snoozed);
-                          showSuccessToast("Improvement snoozed for 7 days.");
+                          setImprovement(reopened);
+                          showSuccessToast("Improvement reopened successfully.");
                         } catch (error) {
                           if (generation.current !== requestGeneration) return;
-                          showErrorToast(getImprovementMutationErrorMessage("snooze", error));
+                          showErrorToast(getImprovementMutationErrorMessage("reopen", error));
                         } finally {
                           if (generation.current === requestGeneration) setIsMutating(false);
                         }
                       })();
                     }}
                   >
-                    {isMutating ? "Snoozing..." : "Snooze 7 days"}
+                    {isMutating ? "Reopening..." : "Reopen"}
                   </Button>
-                  <ImprovementSnoozeDialog
-                    key={improvementId}
-                    improvementId={improvement.improvement_id}
-                    disabled={isMutating}
-                    onPendingChange={setIsMutating}
-                    onSnoozed={setImprovement}
-                    errorMessage={(error) => getImprovementMutationErrorMessage("snooze", error)}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={isMutating}
-                    onClick={() => {
-                      const requestGeneration = generation.current;
-                      setIsMutating(true);
-                      void (async () => {
-                        try {
-                          const resolved = await resolveImprovement(improvement.improvement_id);
-                          if (generation.current !== requestGeneration) return;
-                          setImprovement(resolved);
-                          showSuccessToast("Improvement resolved successfully.");
-                        } catch (error) {
-                          if (generation.current !== requestGeneration) return;
-                          showErrorToast(getImprovementMutationErrorMessage("resolve", error));
-                        } finally {
-                          if (generation.current === requestGeneration) setIsMutating(false);
-                        }
-                      })();
-                    }}
-                  >
-                    {isMutating ? "Resolving..." : "Mark resolved"}
-                  </Button>
-                </>
-              )}
+                ) : (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isMutating}
+                      onClick={() => {
+                        const requestGeneration = generation.current;
+                        setIsMutating(true);
+                        void (async () => {
+                          try {
+                            const snoozedUntil = new Date(
+                              Date.now() + 7 * 24 * 60 * 60 * 1000
+                            ).toISOString();
+                            const snoozed = await snoozeImprovement(
+                              improvement.improvement_id,
+                              snoozedUntil
+                            );
+                            if (generation.current !== requestGeneration) return;
+                            setImprovement(snoozed);
+                            showSuccessToast("Improvement snoozed for 7 days.");
+                          } catch (error) {
+                            if (generation.current !== requestGeneration) return;
+                            showErrorToast(getImprovementMutationErrorMessage("snooze", error));
+                          } finally {
+                            if (generation.current === requestGeneration) setIsMutating(false);
+                          }
+                        })();
+                      }}
+                    >
+                      {isMutating ? "Snoozing..." : "Snooze 7 days"}
+                    </Button>
+                    <ImprovementSnoozeDialog
+                      key={improvementId}
+                      improvementId={improvement.improvement_id}
+                      disabled={isMutating}
+                      onPendingChange={setIsMutating}
+                      onSnoozed={setImprovement}
+                      errorMessage={(error) => getImprovementMutationErrorMessage("snooze", error)}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isMutating}
+                      onClick={() => {
+                        const requestGeneration = generation.current;
+                        setIsMutating(true);
+                        void (async () => {
+                          try {
+                            const resolved = await resolveImprovement(improvement.improvement_id);
+                            if (generation.current !== requestGeneration) return;
+                            setImprovement(resolved);
+                            showSuccessToast("Improvement resolved successfully.");
+                          } catch (error) {
+                            if (generation.current !== requestGeneration) return;
+                            showErrorToast(getImprovementMutationErrorMessage("resolve", error));
+                          } finally {
+                            if (generation.current === requestGeneration) setIsMutating(false);
+                          }
+                        })();
+                      }}
+                    >
+                      {isMutating ? "Resolving..." : "Mark resolved"}
+                    </Button>
+                  </>
+                )
+              ) : null}
               <Badge variant={severityVariantMap[improvement.severity]}>
                 {improvement.severity}
               </Badge>

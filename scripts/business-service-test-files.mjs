@@ -1,0 +1,33 @@
+// Database-only Business, access, billing and report rehearsals.
+// General Redis/object-store integration remains a separate qualification lane.
+export const BUSINESS_SERVICE_TEST_FILES = [
+  "tests/integration/analytics-job-authorization.integration.test.ts",
+  "tests/integration/billing-checkout-safety.integration.test.ts",
+  "tests/integration/business-billing-migration.integration.test.ts",
+  "tests/integration/business-trial.integration.test.ts",
+  "tests/integration/organization-management.integration.test.ts",
+  "tests/integration/organization-project-access.integration.test.ts",
+  "tests/integration/referral-attribution.integration.test.ts",
+  "tests/integration/referral-benefit.integration.test.ts",
+  "tests/integration/referral-ledger.integration.test.ts",
+  "tests/integration/referral-reconciliation.integration.test.ts",
+  "tests/integration/report-account-export.integration.test.ts",
+  "tests/integration/report-allowance.integration.test.ts",
+  "tests/integration/report-analytics.integration.test.ts",
+  "tests/integration/report-authorization.integration.test.ts",
+  "tests/integration/report-availability.integration.test.ts",
+  "tests/integration/report-collector.integration.test.ts",
+  "tests/integration/report-content.integration.test.ts",
+  "tests/integration/report-definition.integration.test.ts",
+  "tests/integration/report-email.integration.test.ts",
+  "tests/integration/report-facts.integration.test.ts",
+  "tests/integration/report-generation.integration.test.ts",
+  "tests/integration/report-health.integration.test.ts",
+  "tests/integration/report-lifecycle.integration.test.ts",
+  "tests/integration/report-pdf.integration.test.ts",
+  "tests/integration/report-project-privacy.integration.test.ts",
+  "tests/integration/report-resources.integration.test.ts",
+  "tests/integration/report-run-admission.integration.test.ts",
+  "tests/integration/report-scheduler.integration.test.ts",
+  "tests/integration/report-source-text.integration.test.ts"
+];

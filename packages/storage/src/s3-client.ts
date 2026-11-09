@@ -1,4 +1,13 @@
-import { DeleteObjectCommand, DeleteObjectsCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  DeleteObjectCommand,
+  DeleteObjectsCommand,
+  GetObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client
+} from "@aws-sdk/client-s3";
+import { readBoundedS3Object } from "./s3-bounded-read.js";
+import { z } from "zod";
 
 import type {
   CreateS3ObjectStoreClientInput,
@@ -6,7 +15,7 @@ import type {
   ObjectStorePrefixDeleter,
   ObjectStorePutInput,
   ObjectStoreReadInput,
-  ObjectStoreReader,
+  ObjectStoreReader
 } from "./types.js";
 
 function toNodeBuffer(body: unknown): Promise<Buffer> {
@@ -39,25 +48,33 @@ export function createS3ObjectStoreClient(
 
   return {
     async putObject(request: ObjectStorePutInput): Promise<void> {
-      await s3.send(
-        new PutObjectCommand({
-          Bucket: input.bucket,
-          Key: request.key,
-          Body: request.body,
-          ContentType: request.contentType,
-          ContentEncoding: request.contentEncoding
-        })
-      );
+      const signal =
+        request.timeoutMs === undefined
+          ? undefined
+          : AbortSignal.timeout(z.number().int().min(100).max(60000).parse(request.timeoutMs));
+      const command = new PutObjectCommand({
+        Bucket: input.bucket,
+        Key: request.key,
+        Body: request.body,
+        ContentType: request.contentType,
+        ContentEncoding: request.contentEncoding
+      });
+      if (signal === undefined) await s3.send(command);
+      else await s3.send(command, { abortSignal: signal });
     },
 
     async deleteObject(request): Promise<void> {
+      const signal =
+        request.timeoutMs === undefined
+          ? undefined
+          : AbortSignal.timeout(z.number().int().min(100).max(60000).parse(request.timeoutMs));
       try {
-        await s3.send(
-          new DeleteObjectCommand({
-            Bucket: input.bucket,
-            Key: request.key
-          })
-        );
+        const command = new DeleteObjectCommand({
+          Bucket: input.bucket,
+          Key: request.key
+        });
+        if (signal === undefined) await s3.send(command);
+        else await s3.send(command, { abortSignal: signal });
       } catch (error) {
         const errorName =
           typeof error === "object" && error !== null && "name" in error ? String(error.name) : "";
@@ -108,11 +125,21 @@ export function createS3ObjectStoreClient(
           );
         }
 
-        continuationToken = listResult.IsTruncated === true ? listResult.NextContinuationToken : undefined;
+        continuationToken =
+          listResult.IsTruncated === true ? listResult.NextContinuationToken : undefined;
       } while (continuationToken !== undefined);
     },
 
     async getObject(request: ObjectStoreReadInput): Promise<Buffer> {
+      if (request.maxBytes !== undefined || request.timeoutMs !== undefined) {
+        if (request.maxBytes === undefined) throw new Error("s3_read_bounds_required");
+        return readBoundedS3Object(s3, {
+          bucket: input.bucket,
+          key: request.key,
+          maxBytes: request.maxBytes,
+          timeoutMs: request.timeoutMs
+        });
+      }
       let response;
       try {
         response = await s3.send(

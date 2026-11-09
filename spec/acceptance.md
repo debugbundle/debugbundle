@@ -449,9 +449,9 @@ Native logger level/silent/processor filtering runs before SDK capture; enabled-
 - **Then** existing checks remain readable through API, CLI, MCP, and web
 - **And** out-of-policy checks show paused state and stop executing
 - **And** create/update attempts that violate current tier limits return explicit limit errors
-- **And** saved-check caps per project are 1 on Free, 3 on Solo, and 10 on Team
-- **And** monitored-project caps per organization are 3 on Free and 10 on Solo and Team
-- **And** active-check caps per organization are 3 on Free, 30 on Solo, and 50 on Team
+- **And** saved-check caps per project are 1 on Free, 3 on Solo, 5 on Team, and 10 on Business
+- **And** monitored-project caps per organization are 3 on Free and 10 on paid plans
+- **And** active-check caps per organization are 3 on Free, 30 on Solo and Team, and 50 on Business
 - **And** checks paused by the per-project saved-check cap do not consume organization execution slots or pause otherwise eligible checks in other monitored projects
 - **Given** an existing Team check whose persisted interval is `30` seconds
 - **When** the Team minimum becomes `60` seconds
@@ -1200,9 +1200,9 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **Then** the request is rejected with a verification-required error
 - **And** after completing email verification, member token creation succeeds
 
-### AC-AUTH-04: Member Token Full Access
+### AC-AUTH-04: Legacy Member Token Credential Issuance
 
-- **Given** a valid member token (email was verified before or during its creation)
+- **Given** a valid legacy-policy member token (email was verified before or during its creation)
 - **When** the token bearer creates a project token via API
 - **Then** the project token is created successfully (no additional email verification required)
 
@@ -1240,7 +1240,7 @@ If CLI says something is healthy and MCP says something different, that is a pro
 
 - **Given** the same verified user identity
 - **When** the user calls a member-authorized route once through the web session and once through a member token
-- **Then** both requests resolve to the same authorization outcome
+- **Then** both requests use the same live authorization policy, with any token restrictions intersecting the user rights
 - **And** both execute the same underlying domain behavior
 
 ### AC-AUTH-06a: Token Last-Used Metadata
@@ -1375,13 +1375,13 @@ If CLI says something is healthy and MCP says something different, that is a pro
 - **And** non-reservation counters use no conservative under-admission margin, so concurrent contention may produce a small visible overage but must not strand advertised capacity
 - **And** limit-reached notifications are not queued with usage below the defined limit
 
-### AC-BILL-04: Solo Launch Price Is Canonical
+### AC-BILL-04: Solo Price Is Canonical
 
-- **Given** the pre-public-launch Stripe catalog and DebugBundle pricing surfaces
+- **Given** the approved current Stripe catalog and DebugBundle pricing surfaces
 - **When** a new customer starts paid Solo checkout
-- **Then** the checkout uses the single active `$4.99/month` Solo plan Price configured by `STRIPE_SOLO_PRICE_ID`
-- **And** no alternate Solo base price is advertised or retained as an active launch Price
-- **And** Solo extra capacity remains `$0.99/unit/month`
+- **Then** the checkout uses the single active `$5/month` Solo plan Price configured by `STRIPE_SOLO_PRICE_ID`
+- **And** the annual offer uses `$48/year`, and no superseded price is advertised for new purchases
+- **And** Solo extra capacity is `$1/unit/month` or `$10/unit/year`
 - **And** Team remains `$19/month`
 - **And** all advertised paid prices state that they exclude VAT or other applicable taxes, which are calculated and applied at checkout
 - **And** every paid catalog Price uses `tax_behavior: exclusive`
@@ -1783,7 +1783,7 @@ Mapped requirements: FR-PJS-01/04. Explicit roots, secret-free manifest/diff, re
 
 - **Given** a Free-tier user running local analysis
 - **Then** analysis uses only local bundles and the user’s own agent/LLM
-- **And** Solo and Team projects with automated improvements enabled receive deterministic cloud-generated improvement bundles only when bundle-producing telemetry crosses configured thresholds and dedupe gates
+- **And** Projects on paid plans with automated improvements enabled receive deterministic cloud-generated improvement bundles only when bundle-producing telemetry crosses configured thresholds and dedupe gates
 - **And** below-threshold request/log candidates remain internal counting state and do not appear in default hosted improvement lists
 - **And** incident-derived improvement opportunities link to related incident bundles instead of creating duplicate improvement bundle artifacts
 - **And** resolving all incidents linked by an incident-derived opportunity automatically resolves that opportunity
@@ -2444,7 +2444,7 @@ Mapped requirements: FR-PJS-01/04. Explicit roots, secret-free manifest/diff, re
 
 ### AC-ANL-07: Controlled Custom Dimensions
 
-- **Given** a project has approved custom dimensions within its fixed tier cap of 1 on Free, 3 on Solo, 8 on Team, or 20 on self-host
+- **Given** a project has approved custom dimensions within its fixed tier cap of 1 on Free, 3 on Solo, 8 on Team and Business, or 20 on self-host
 - **When** the browser SDK sends analytics events with those fields plus unapproved or sensitive fields
 - **Then** approved low-cardinality fields are retained for aggregation
 - **And** unapproved, sensitive, overlong, or high-cardinality fields are rejected, dropped, or redacted before aggregation
@@ -2549,8 +2549,23 @@ Mapped requirements: FR-PJS-01/04. Explicit roots, secret-free manifest/diff, re
 - **And** Slack weekly report Edit/Delete text actions share the ghost variant
 - **And** enabled off-state switches provide at least 3:1 track contrast against their surrounding surface in both themes, remain distinguishable from disabled controls, and preserve keyboard operation and accessible state
 - **And** the analytics-disabled settings action sits at the right of its callout title row and wraps accessibly on narrow screens
+- **And** section status/category badges follow the heading inline to its right, wrapping below it when needed without clipping or horizontal page overflow in either theme
+- **And** legacy member tokens offer `Create replacement` in the row's Actions column; opening it prepares the scoped creation form without changing either token, and explains that the existing token remains active until separately revoked after updating the CLI or MCP connection
 
 ### AC-WEB-10: Local Mock Preview
+
+- Billing controls switch all four tiers, both paid intervals and paid,
+  complimentary, locked-trial and mature-trial states in memory. Session/project
+  plan projections agree with the selected fixture; paid terms and monthly
+  allowance windows remain distinct.
+- All paid tier/interval combinations use the normal offer dialog. Preview never
+  changes access; exact confirmed upgrades complete through loopback checkout,
+  scheduled changes retain current access until simulated renewal, and cancellation
+  returns to Free at renewal. Extra capacity and feature-loss disclosures remain
+  visible. Invalid, expired and stale quotes fail; an exact schedule can be cancelled.
+  Closing the ordinary plan-change dialog returns keyboard focus to its trigger.
+- Production builds contain neither scenario controls nor the private mock route;
+  existing development/loopback/origin/body-size isolation checks continue to pass.
 
 - **Given** installed local dependencies and Docker
 - **When** the owner runs `make dev-mock` and opens `http://localhost:5291/dashboard`
@@ -2563,6 +2578,20 @@ Mapped requirements: FR-PJS-01/04. Explicit roots, secret-free manifest/diff, re
 - **And** a restart resets mock data, and `make dev-mock-off` restores real API routing
 - **And** foreign hosts/origins and malformed or oversized JSON are rejected; unsupported API paths cannot reach a real backend
 - **And** builds and production preview mode never install the mock middleware or enable telemetry through mock mode
+
+### AC-DEV-01: Local tier inspection and switching
+
+- `make dev-tier` inspects without changing data. Free/Solo/Team/Business switches
+  use only the verified checkout-owned local Compose Postgres socket.
+- Invalid inputs, remote Docker targets, foreign checkouts, ambiguous organisations,
+  provider-linked identities, trials and pending billing work fail before mutation.
+- An explicit Free override survives operator session refresh. Ordinary operator
+  Team defaults and existing billing/authentication checks retain their behaviour.
+- Base capacity becomes zero extra units; the command does not reset usage or
+  delete history. Normal retention still applies to real local data, and database
+  downgrade guards pause Business report definitions without auto-resume.
+- Real SQL tests use an isolated disposable database and confirm all four tiers,
+  exact organisation targeting and rollback on refusal. No provider call occurs.
 
 ### AC-WEB-11: Pending Submissions and Project Notification Disclosure
 
@@ -2584,10 +2613,10 @@ Mapped requirements: FR-PJS-01/04. Explicit roots, secret-free manifest/diff, re
 - **Given** a project owner or admin opens project analytics settings
 - **When** they configure analytics
 - **Then** they can enable/disable analytics, choose privacy mode, require consent, configure sampling/retention, define saved funnels, and manage controlled custom dimensions within the current tier cap
-- **And** projects without a deliberately stored saved-funnel override receive the current fixed tier capacity of 1 on Free, 10 on Solo, or 50 on Team without requiring a user-managed numeric limit
+- **And** projects without a deliberately stored saved-funnel override receive the current fixed tier capacity of 1 on Free, 10 on Solo, or 50 on Team and Business without requiring a user-managed numeric limit
 - **And** Free projects can opt into the bounded hosted preview without beginning a paid trial, while analytics capture remains disabled until explicitly enabled for both the project and browser SDK
 - **And** purchased capacity units increase monthly analytics event, session, retained-journey-sample, and generated-bundle allowances without multiplying saved funnels or custom dimensions
-- **And** controlled custom-dimension caps are fixed at 1 on Free, 3 on Solo, 8 on Team, and 20 on self-host
+- **And** controlled custom-dimension caps are fixed at 1 on Free, 3 on Solo, 8 on Team and Business, and 20 on self-host
 - **And** plain project members can view permitted analytics state but cannot mutate analytics settings
 
 ### AC-ANL-18: Analytics Retention
@@ -2731,7 +2760,7 @@ Mapped requirements: FR-PJS-01/04. Explicit roots, secret-free manifest/diff, re
 
 ### AC-GHA-01: GitHub App Installation
 
-- **Given** a Solo or Team organization owner in the project's GitHub tab
+- **Given** an organization owner on a paid plan in the project's GitHub tab
 - **When** the owner clicks "Connect GitHub" and completes the GitHub App installation flow
 - **Then** a `github_installations` record is created with status `active`
 - **And** the available repositories are listed for selection
@@ -2836,7 +2865,7 @@ Mapped requirements: FR-PJS-01/04. Explicit roots, secret-free manifest/diff, re
 
 ### AC-GHA-15: Shared Project Plan Gating
 
-- **Given** a shared project owned by a Solo or Team account
+- **Given** a shared project owned by a paid account
 - **And** the acting collaborator's own personal account plan is Free
 - **When** the collaborator opens that shared project's GitHub automation surface
 - **Then** GitHub automation remains available for the shared project
@@ -2980,3 +3009,7 @@ Mapped requirements: FR-BIL-09, FR-BIL-08, NFR security/reliability and INV-5.
 ### AC-SDK-MULTILINE: Native logger continuity and amplification
 
 Synthetic JBoss LoggingOutputStream/LogManager output for six ExecutionException/NPE failures must retain complete bounded cause/application evidence as six exceptions. GET/POST remain two groups of three; 108 legacy module-prefixed frame records stay stored context and create no frame incidents or alert evaluations. Verify independent threads/requests, late/orphan lines, redaction, bounded saturation and unavailable transport. Native logging adapters preserve one exception per accepted error record and ordinary log filtering. See `multiline-exception-capture.md` for runtime-specific limits and qualification.
+
+## Business tier acceptance
+
+[AC-BUS-01–10](business-tier.md#acceptance) are required for the Business extension: catalogue/reset boundaries, access/token isolation and races, Business-only financial lifecycle, historical report correctness, secure delivery and forward migration readiness. Existing legacy monthly/digest/SDK fixtures remain regression gates.

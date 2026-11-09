@@ -42,7 +42,9 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
       last_billing_sync_at timestamptz,
       last_billing_event_id text,
       billing_period_starts_at timestamptz,
-      trial_plan text CHECK (trial_plan IN ('solo', 'team') OR trial_plan IS NULL),
+      billing_interval text CHECK (billing_interval IN ('month','year')),
+      billing_allowance_anchor_at timestamptz,
+      trial_plan text CHECK (trial_plan IN ('solo', 'team', 'business') OR trial_plan IS NULL),
       trial_started_at timestamptz,
       trial_ends_at timestamptz,
       trial_used_at timestamptz,
@@ -134,7 +136,8 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
       last_used_at timestamptz,
       created_at timestamptz NOT NULL DEFAULT now(),
       revoked_at timestamptz,
-      expires_at timestamptz
+      expires_at timestamptz,
+      scope_policy jsonb CHECK (scope_policy IS NULL OR (jsonb_typeof(scope_policy)='object' AND scope_policy->>'version'='1'))
     )
   `,
   `
@@ -171,6 +174,9 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
       organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
       user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       role text NOT NULL DEFAULT 'member',
+      project_access text NOT NULL DEFAULT 'selected' CHECK (project_access IN ('selected','all')),
+      default_project_role text NOT NULL DEFAULT 'member' CHECK (default_project_role IN ('member','viewer')),
+      grants_paused_at timestamptz,
       suspended_at timestamptz,
       created_at timestamptz NOT NULL DEFAULT now(),
       UNIQUE (organization_id, user_id)

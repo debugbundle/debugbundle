@@ -524,7 +524,7 @@ export function ProjectGitHubPage(): JSX.Element {
               </CalloutCard>
             ) : (
               <PlanUpgradeCallout
-                title="Upgrade to Solo or Team to connect GitHub automation"
+                title="Upgrade to connect GitHub automation"
                 description="GitHub automation is available on paid plans. Upgrade before connecting a repository, creating dispatch rules, or retrying failed deliveries from this project."
               />
             )
@@ -534,7 +534,7 @@ export function ProjectGitHubPage(): JSX.Element {
                 <CalloutCard
                   eyebrow="Automation paused"
                   title="GitHub automation is paused while this project is on Free"
-                  description="The connected installation, repository assignment, and dispatch rules are preserved. They will resume after the owner upgrades back to Solo or Team."
+                  description="The connected installation, repository assignment, and dispatch rules are preserved. They will resume after the owner returns to a paid plan."
                   tone="warning"
                 />
               ) : null}
@@ -835,7 +835,7 @@ export function ProjectGitHubPage(): JSX.Element {
 function canManageGitHubRule(
   rule: GitHubDispatchRuleRecord,
   userId: string | undefined,
-  effectiveRole: "owner" | "admin" | "member"
+  effectiveRole: "owner" | "admin" | "member" | "viewer"
 ): boolean {
   return (
     effectiveRole === "owner" ||
@@ -848,7 +848,7 @@ function canRetryGitHubDelivery(
   delivery: GitHubDispatchDeliveryRecord,
   rules: GitHubDispatchRuleRecord[],
   userId: string | undefined,
-  effectiveRole: "owner" | "admin" | "member"
+  effectiveRole: "owner" | "admin" | "member" | "viewer"
 ): boolean {
   const rule = rules.find((entry) => entry.rule_id === delivery.rule_id);
   return rule !== undefined && canManageGitHubRule(rule, userId, effectiveRole);

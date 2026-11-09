@@ -40,7 +40,11 @@ export function countsTowardMonthlyIngestAllowance(
     return false;
   }
 
-  if (organizationPlan === "solo" || organizationPlan === "team") {
+  if (
+    organizationPlan === "solo" ||
+    organizationPlan === "team" ||
+    organizationPlan === "business"
+  ) {
     return true;
   }
 

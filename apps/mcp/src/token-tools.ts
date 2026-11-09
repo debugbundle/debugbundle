@@ -1,3 +1,7 @@
+import {
+  MemberTokenScopeDeclarationSchema,
+  type MemberTokenScopeDeclaration
+} from "../../../packages/shared-types/src/index.js";
 import { TokenManagementApiError } from "../../../packages/token-management/src/index.js";
 
 export const TOKEN_MCP_TOOL_NAMES = [
@@ -21,34 +25,89 @@ function mapMcpError(error: unknown): never {
 }
 
 export function createTokenMcpTools(api: {
-  listProjectTokens(input: { bearerToken: string; projectId: string; limit?: number }): Promise<unknown[]>;
-  createProjectToken(input: { bearerToken: string; projectId: string; label: string; allowedOrigins?: string[] }): Promise<unknown>;
-  revokeProjectToken(input: { bearerToken: string; projectId: string; tokenId: string }): Promise<unknown>;
-  listMemberTokens(input: { bearerToken: string; limit?: number }): Promise<unknown[]>;
-  createMemberToken(input: { bearerToken: string; label: string }): Promise<unknown>;
+  listProjectTokens(input: {
+    bearerToken: string;
+    projectId: string;
+    limit?: number;
+  }): Promise<unknown[]>;
+  createProjectToken(input: {
+    bearerToken: string;
+    projectId: string;
+    label: string;
+    allowedOrigins?: string[];
+  }): Promise<unknown>;
+  revokeProjectToken(input: {
+    bearerToken: string;
+    projectId: string;
+    tokenId: string;
+  }): Promise<unknown>;
+  listMemberTokens(input: {
+    bearerToken: string;
+    limit?: number;
+    includeScope?: boolean;
+  }): Promise<unknown[]>;
+  createMemberToken(input: {
+    bearerToken: string;
+    label: string;
+    scope?: MemberTokenScopeDeclaration;
+    expiresAt?: string;
+  }): Promise<unknown>;
   revokeMemberToken(input: { bearerToken: string; tokenId: string }): Promise<unknown>;
   listAgentTokens(input: { bearerToken: string; projectId: string }): Promise<unknown[]>;
-  createAgentToken(input: { bearerToken: string; projectId: string; label: string; expiresAt?: string }): Promise<unknown>;
-  revokeAgentToken(input: { bearerToken: string; projectId: string; tokenId: string }): Promise<unknown>;
-}): Record<(typeof TOKEN_MCP_TOOL_NAMES)[number], (input: Record<string, unknown>) => Promise<unknown>> {
+  createAgentToken(input: {
+    bearerToken: string;
+    projectId: string;
+    label: string;
+    expiresAt?: string;
+  }): Promise<unknown>;
+  revokeAgentToken(input: {
+    bearerToken: string;
+    projectId: string;
+    tokenId: string;
+  }): Promise<unknown>;
+}): Record<
+  (typeof TOKEN_MCP_TOOL_NAMES)[number],
+  (input: Record<string, unknown>) => Promise<unknown>
+> {
   return {
     async list_agent_tokens(input) {
       try {
-        return { tokens: await api.listAgentTokens({ bearerToken: String(input["bearerToken"]), projectId: String(input["projectId"]) }) };
-      } catch (error) { mapMcpError(error); }
+        return {
+          tokens: await api.listAgentTokens({
+            bearerToken: String(input["bearerToken"]),
+            projectId: String(input["projectId"])
+          })
+        };
+      } catch (error) {
+        mapMcpError(error);
+      }
     },
     async create_agent_token(input) {
       try {
-        return { token: await api.createAgentToken({ bearerToken: String(input["bearerToken"]),
-          projectId: String(input["projectId"]), label: String(input["label"]),
-          ...(typeof input["expiresAt"] === "string" ? { expiresAt: input["expiresAt"] } : {}) }) };
-      } catch (error) { mapMcpError(error); }
+        return {
+          token: await api.createAgentToken({
+            bearerToken: String(input["bearerToken"]),
+            projectId: String(input["projectId"]),
+            label: String(input["label"]),
+            ...(typeof input["expiresAt"] === "string" ? { expiresAt: input["expiresAt"] } : {})
+          })
+        };
+      } catch (error) {
+        mapMcpError(error);
+      }
     },
     async revoke_agent_token(input) {
       try {
-        return { token: await api.revokeAgentToken({ bearerToken: String(input["bearerToken"]),
-          projectId: String(input["projectId"]), tokenId: String(input["tokenId"]) }) };
-      } catch (error) { mapMcpError(error); }
+        return {
+          token: await api.revokeAgentToken({
+            bearerToken: String(input["bearerToken"]),
+            projectId: String(input["projectId"]),
+            tokenId: String(input["tokenId"])
+          })
+        };
+      } catch (error) {
+        mapMcpError(error);
+      }
     },
     async list_project_tokens(input) {
       try {
@@ -103,7 +162,7 @@ export function createTokenMcpTools(api: {
 
     async list_member_tokens(input) {
       try {
-        const requestInput: { bearerToken: string; limit?: number } = {
+        const requestInput: { bearerToken: string; limit?: number; includeScope?: boolean } = {
           bearerToken: String(input["bearerToken"])
         };
         if (typeof input["limit"] === "number") {
@@ -111,7 +170,12 @@ export function createTokenMcpTools(api: {
         }
 
         return {
-          tokens: await api.listMemberTokens(requestInput)
+          tokens: await api.listMemberTokens({
+            ...requestInput,
+            ...(typeof input["includeScope"] === "boolean"
+              ? { includeScope: input["includeScope"] }
+              : {})
+          })
         };
       } catch (error) {
         mapMcpError(error);
@@ -123,7 +187,11 @@ export function createTokenMcpTools(api: {
         return {
           token: await api.createMemberToken({
             bearerToken: String(input["bearerToken"]),
-            label: String(input["label"])
+            label: String(input["label"]),
+            ...(input["scope"] === undefined
+              ? {}
+              : { scope: MemberTokenScopeDeclarationSchema.parse(input["scope"]) }),
+            ...(typeof input["expiresAt"] === "string" ? { expiresAt: input["expiresAt"] } : {})
           })
         };
       } catch (error) {

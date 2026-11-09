@@ -2,6 +2,7 @@
 // External consumers continue importing from this file unchanged.
 
 export * from "./types.js";
+export * from "./organization-management-store.js";
 export {
   createServiceDefinitionStore,
   ServiceDefinitionError,
@@ -273,3 +274,13 @@ export {
   PublicStatusError,
   type PublicStatusPageStore
 } from "./public-status-store.js";
+export { createReportDefinitionStore } from "./report-definition-store.js";
+export {
+  createReportAvailabilityStore,
+  type ReportAvailabilityStore
+} from "./report-availability-store.js";
+export type { ReportDefinitionStore } from "./report-definition-store.js";
+export {
+  createReportSourceTextStore,
+  type ReportSourceTextStore
+} from "./report-source-text-store.js";

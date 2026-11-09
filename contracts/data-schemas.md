@@ -1642,7 +1642,7 @@ all canonical origins and is protected by the project write fence.
 | capture_probe_events   | text        |                            |
 | updated_at             | timestamptz | NOT NULL DEFAULT now()     |
 
-One row per project. Created on project creation with tier-appropriate defaults (Free: `minimal`, Solo/Team: `balanced`). Nullable override columns (`capture_logs`, etc.) mean "inherit from preset"; non-null means explicit override.
+One row per project. Created on project creation with the `balanced` preset on known hosted plans. The SQL default remains `minimal` as a compatibility fallback. Nullable override columns (`capture_logs`, etc.) mean "inherit from preset"; non-null means explicit override.
 
 **Preset defaults:**
 
@@ -1763,7 +1763,7 @@ Delivery statuses: `pending` → `delivered` or `retrying` → `delivered` or `f
 
 Analytics storage is aggregate-first. Raw analytics events are short-lived object-storage inputs, not long-term Postgres event rows. Rollups are precomputed counters and summaries keyed by project, time bucket, granularity, route/action/funnel keys, and bounded dimensions; they are the query model for normal analytics reads and must not preserve per-visit raw payloads.
 
-Retention cleanup removes raw analytics objects according to `raw_retention_days`, retained journey samples according to `sample_retention_days`/`expires_at`, hourly aggregate rows according to `hourly_retention_days`, and daily aggregate rows plus generated AnalyticsBundle artifacts/metadata according to `aggregate_retention_months`. Hourly defaults/caps are 7 days on Free, 30 on Solo, 90 on Team, and up to 365 on self-host. In-window rollups remain the normal query model for analytics metrics.
+Retention cleanup removes raw analytics objects according to `raw_retention_days`, retained journey samples according to `sample_retention_days`/`expires_at`, hourly aggregate rows according to `hourly_retention_days`, and daily aggregate rows plus generated AnalyticsBundle artifacts/metadata according to `aggregate_retention_months`. Hourly defaults/caps are 7 days on Free, 30 on Solo, 90 on Team and Business, and up to 365 on self-host. In-window rollups remain the normal query model for analytics metrics.
 
 Required table concepts for the AnalyticsBundle implementation:
 
@@ -2141,3 +2141,102 @@ The API and worker require this migration in readiness checks. Existing deployme
 Billing lifecycle notifications use the existing operational_email_deliveries outbox with kind billing_lifecycle and validated subject/text/html payload. Forward migration 202610220003 expands the kind constraint; API/worker readiness requires its ledger/checksum. Notification inserts share the webhook state/event transaction. Checkout reconciliation uses the PostgreSQL row revision for compare-and-swap; no business identifier is derived from that revision.
 
 First-purchase wait (local candidate): no new billing-summary fields or database shape are introduced. Existing `trial_started_at` is the immutable elapsed-time anchor. The locked Checkout claim checks an organisation-scoped processed `invoice.paid` receipt for previous paid history, rather than treating a customer ID, incomplete subscription or conversion timestamp alone as proof. Retain these billing receipts for resubscription; blocked Checkout reservations are not deleted or age-rotated. The four existing forward billing migrations and readiness gates remain required.
+
+## Business extension contract
+
+The approved [Business contract](../spec/business-tier.md) governs additive tier/interval, organisation access, member-token scope, referral and report data/interfaces. Implementations use shared domain services and ordered forward migrations before runtime activation. Legacy monthly request/response defaults, project tokens, artifact schemas and restricted MCP/OAuth profiles remain supported. New interval-aware responses never place annual totals in monthly-specific fields. Business-only referral operations distinguish partner, customer owner and DebugBundle operator authority.
+
+### Referral partner and customer attribution
+
+FR-BUS-04 / AC-BUS-04 use the additive referral migration and
+[referral accounting contract](referral-accounting.md).
+`referral_partners` records a user-bound public code, status, accepted terms and
+fixed 5,000-basis-point commission rate. `referral_attributions` links a partner
+to a customer organisation and records link/manual source plus its reserved
+checkout attempt. `billing_customer_history` retains verified first-cash receipt
+identity for new-customer eligibility. These are account/financial records and
+never project grants.
+
+Live user/organisation foreign keys clear on deletion; necessary opaque customer
+IDs, keyed identity hashes, terms and obligations remain protected. No raw email
+or provider payload is stored in these records. Partner projections omit private
+customer identity, invoice and project data. Schema readiness and migration
+attestation fail closed when the required financial structure is incomplete.
+
+### Referral commission and payout ledger
+
+Forward migration `202611070007_add_referral_commission_ledger` adds retained financial records independent of live project/account deletion:
+
+- `referral_commission_periods`: attribution-keyed, frozen first collection identity/service start and eligible/ineligible status.
+- `referral_receipt_snapshots`: immutable, bounded canonical financial facts, provider customer identity, protected owner hash, observation timestamp and unique canonical digest.
+- `referral_invoice_balances`: current cumulative invoice target and dispute hold, referencing the canonical snapshot.
+- `referral_commission_ledger`: immutable signed USD minor-unit deltas and availability timestamps.
+- `referral_payout_batches`: immutable claimed amount/beneficiary, operator identities, claimed/uncertain/paid state and unique stable external payment reference. Paid records cannot be edited or deleted.
+- `referral_payout_entries`: immutable, unique assignment of a ledger entry to one manual payout batch.
+
+No financial row cascades with a deleted project or human identity. Deleting a partner identity clears the live user FK while retaining its purpose-separated protected identity hash. Project consolidation preserves these account-level records unchanged. See [referral accounting](referral-accounting.md) for cash verification, rounding, hold, authority and deletion/export boundaries.
+
+### Smart Report recipient delivery receipts
+
+Forward migration `202611070014_add_report_email_delivery` adds nullable `report_runs.email_scheduled_at` and `report_email_deliveries`. A unique run/recipient pair coalesces scheduling. Each live delivery uses a real `deliver-smart-report-email` job with a committed internal attempt identity before provider I/O. The receipt binds the frozen ready-document hash, status/reason, notification allowance window/hold, minimal acceptance identity and timestamps. No email address, report body, provider request or credential is stored in this table.
+
+Organisation deletion cascades; run, user and job deletion clear their optional references. Minimal accepted/uncertain receipts and their usage survive ordinary report deletion. Before-delete and privacy/status triggers stop unsent jobs, cancel queued sends and preserve possible in-flight acceptance as uncertain. Known acceptance can settle the same committed attempt after deletion or lease loss without restoring content or creating another send. Expiry cannot erase a charge from a still-current allowance window.
+
+API/worker readiness requires the new table, column, indexes and enabled guard functions. The current bootstrap creates the column directly in the empty-schema table; the forward migration performs the additive `ALTER` for installed schemas. Required migrations run before dependent runtime activation. No destructive migration, legacy data rewrite or real provider action is part of this change.
+
+## Periodic report collection
+
+Forward migration `202611070015_add_report_collection_progress` adds one cascading
+progress row per definition. A worker pass visits at most one due definition and
+250 retained numeric rows (hard maximum 500), using persisted lifecycle origin/ID
+or availability day/check cursors. After the initial backfill, redacted bounded
+source summaries refresh every five minutes; existing numeric capture triggers
+continue independently. Definition-version changes restart the safe idempotent
+backfill. Progress and facts commit together, and failed batches roll back to a
+savepoint with a one-minute retry delay. Least recently processed definitions
+progress first. Only enabled, unsuspended Business definitions qualify; the saved
+creator's current whole-scope authority is checked before and after each batch.
+Revocation pauses collection without substituting the account Owner. Disabling
+`SMART_REPORTS_ENABLED` also stops this periodic collector. All work is local SQL;
+no database locks span object storage, model or email calls. Existing retention
+cleanup still expires source text and numeric facts while reporting is disabled.
+Readiness requires the forward table/index before dependent API/worker startup;
+bootstrap remains for empty databases only. The progress row has no source text
+or credentials and is removed with its definition.
+
+## Observed health recovery evidence
+
+Forward migration `202611070016_add_report_health_recovery_facts` stores only
+original project/check/result IDs and observed/recorded times for actual
+failing-to-passing health executor transitions. A successful result must satisfy
+the existing configured recovery threshold. An internal monitor error, manual
+check edit, absence of failures or improved aggregate totals cannot create this
+evidence. The fact commits with the existing check result/state transaction only
+for an enabled, unsuspended Business report scope. It is idempotent by original
+project/result and contains no endpoint name, URL, error or response body.
+
+Generation selects at most ten period-bounded recovery observations per selected
+project view, then includes at most one within its existing ten-evidence budget.
+The canonical source/evidence type is `health`, status/event `observed_recovery`.
+It has no reusable source text. Recovery is an observation, never proof of a
+causal fix. Whole-scope report authorisation remains required. Numeric evidence
+survives routine raw-result/check pruning for at most twelve UTC calendar months;
+project/account deletion cascades. Existing bounded availability retention also
+prunes these facts, including while reporting is disabled. Authenticated source
+navigation opens the project's health view only while the exact successful raw
+result and undeleted check remain retained; otherwise the canonical report marks
+the source unavailable. Raw check results still expire after thirty days.
+Readiness requires the forward table and indexes before dependent runtime starts.
+
+## Referral customer invoice benefit
+
+Forward candidate `202611070017_add_referral_invoice_benefit` adds
+`referral_invoice_benefits` with primary identity hash, unique attribution and
+eligible invoice, original organisation UUID, coupon ID, nullable checkout
+attempt/customer/subscription bindings and timestamps. It retains eligibility
+through account deletion without plaintext identity or payment details. Once the
+eligible invoice is frozen, the enabled update guard forbids changing that invoice,
+coupon or provider binding. Runtime readiness verifies this shape, index and
+enabled trigger. The new table has an explicit unchanged-account consolidation
+disposition. See [referral accounting](referral-accounting.md) for the approved
+first-eligible-invoice benefit and pending provider integration.

@@ -1,3 +1,4 @@
+import type { StripeBillingProvider } from "../../../packages/billing/src/stripe-subscription.js";
 import { describe, expect, it, vi } from "vitest";
 import {
   createPostgresAuthStoreMock,
@@ -736,4 +737,49 @@ describe("api-default-dependency-mocks core", () => {
     expect(metadataStore.getBundleSourceForOrganization).not.toHaveBeenCalled();
     expect(enqueue).not.toHaveBeenCalled();
   });
+});
+
+it("keeps new Business enrolment closed without configured reports even if the catalogue launch flag is set", async () => {
+  const retrieve = vi.fn(),
+    create = vi.fn();
+  const stripeConfig = {
+    businessSalesEnabled: true,
+    client: { prices: { retrieve }, checkout: { sessions: { create } } },
+    webhookSecret: "test",
+    priceMap: new Map(),
+    soloPriceId: "solo",
+    teamPriceId: "team",
+    soloExtraCapacityPriceId: "solo_extra",
+    teamExtraCapacityPriceId: "team_extra"
+  } as unknown as StripeBillingProvider;
+  const deps = createApiDependencies({
+    objectStore: { putObject: vi.fn(), getObject: vi.fn(), deleteObjectsByPrefix: vi.fn() },
+    queue: { enqueue: vi.fn() },
+    db: {
+      query: vi.fn().mockResolvedValue({
+        rows: [
+          {
+            primary_owner_user_id: "owner",
+            plan: "free",
+            stripe_customer_id: null,
+            stripe_subscription_id: null,
+            billing_state: null
+          }
+        ]
+      })
+    },
+    stripeConfig
+  });
+  expect(
+    await deps.billingManagement.createCheckoutLink({
+      organization_id: "org",
+      billing_email: "owner@example.test",
+      current_plan: "free",
+      target_plan: "business",
+      interval: "month",
+      actor_user_id: "owner"
+    })
+  ).toBe("checkout_not_allowed");
+  expect(retrieve).not.toHaveBeenCalled();
+  expect(create).not.toHaveBeenCalled();
 });

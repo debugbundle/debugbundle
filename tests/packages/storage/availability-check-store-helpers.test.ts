@@ -55,16 +55,19 @@ describe("availability check store helpers", () => {
   it("normalizes plan names and returns tier-specific availability limits", () => {
     expect(normalizeAvailabilityCheckPlan("solo")).toBe("solo");
     expect(normalizeAvailabilityCheckPlan("team")).toBe("team");
+    expect(normalizeAvailabilityCheckPlan("business")).toBe("business");
     expect(normalizeAvailabilityCheckPlan("enterprise")).toBe("free");
     expect(getPlanCheckLimit("free")).toBe(1);
     expect(getPlanCheckLimit("solo")).toBe(3);
-    expect(getPlanCheckLimit("team")).toBe(10);
+    expect(getPlanCheckLimit("team")).toBe(5);
+    expect(getPlanCheckLimit("business")).toBe(10);
     expect(getPlanMonitoredProjectLimit("free")).toBe(3);
     expect(getPlanMonitoredProjectLimit("solo")).toBe(10);
     expect(getPlanMonitoredProjectLimit("team")).toBe(10);
     expect(getPlanActiveCheckLimit("free")).toBe(3);
     expect(getPlanActiveCheckLimit("solo")).toBe(30);
-    expect(getPlanActiveCheckLimit("team")).toBe(50);
+    expect(getPlanActiveCheckLimit("team")).toBe(30);
+    expect(getPlanActiveCheckLimit("business")).toBe(50);
     expect(getPlanMinIntervalSeconds("free")).toBe(300);
     expect(getPlanMinIntervalSeconds("solo")).toBe(60);
     expect(getPlanMinIntervalSeconds("team")).toBe(60);
@@ -76,7 +79,12 @@ describe("availability check store helpers", () => {
   });
 
   it("builds plan eligibility SQL for check counts and intervals", () => {
-    expect(buildPlanEligibilityCaseSql("limit")).toContain("WHEN 'team' THEN 10");
+    expect(buildPlanEligibilityCaseSql("limit")).toContain("WHEN 'team' THEN 5");
+    expect(buildPlanEligibilityCaseSql("limit")).toContain("WHEN 'business' THEN 10");
+    expect(buildPlanEligibilityCaseSql("active_checks")).toContain("WHEN 'team' THEN 30");
+    expect(buildPlanEligibilityCaseSql("active_checks")).toContain("WHEN 'business' THEN 50");
+    expect(buildPlanEligibilityCaseSql("monitored_projects")).toContain("WHEN 'business' THEN 10");
+    expect(buildPlanEligibilityCaseSql("interval")).toContain("WHEN 'business' THEN 60");
     expect(buildPlanEligibilityCaseSql("limit")).toContain("ELSE 1");
     expect(buildPlanEligibilityCaseSql("monitored_projects")).toContain("WHEN 'team' THEN 10");
     expect(buildPlanEligibilityCaseSql("active_checks")).toContain("WHEN 'solo' THEN 30");

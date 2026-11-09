@@ -6,6 +6,7 @@ Production debugging bundles for AI agents, with runtime error reporting and inc
 ![CLI](https://img.shields.io/npm/v/%40debugbundle%2Fcli?label=cli&color=blue)
 ![MCP](https://img.shields.io/npm/v/%40debugbundle%2Fmcp?label=mcp&color=blue)
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
+[![Community](https://img.shields.io/badge/community-GitHub-blue)](https://github.com/debugbundle/debugbundle/issues)
 
 DebugBundle provides runtime error reporting, crash reporting, incident response, endpoint health checks, and product analytics for humans and AI agents. It captures runtime failures, groups them into incidents, and publishes deterministic debug bundles. Its monitoring scope is customer-facing runtime behavior and endpoint health, not generic infrastructure metrics.
 
@@ -22,25 +23,6 @@ Key properties:
 - **Local-first setup:** start without a cloud account by writing events to `.debugbundle/local/events/`, then connect to DebugBundle Cloud when ready.
 - **Safe SDKs:** SDK failures are swallowed internally, sensitive fields are redacted before transport, and duplicate storms are suppressed locally.
 - **Self-hostable core:** Compose-based stack for the web app, API, worker, Postgres, Redis, and S3-compatible object storage.
-
-## Public status pages
-
-Project owners can publish a status page from **Project → Health → Public status page**. The button sits immediately left of **Create health check** and opens the shared settings modal. Choose a title and checks using searchable multi-select dropdowns; optionally add projects you own in the same account through **Other projects**. Turn on **Enable public page** to save and publish the initial settings immediately, then copy the stable link from its read-only input using the copy icon on the right. Paste it into your website. For an existing page, the switch saves visibility immediately; other title/project/check edits need **Save status settings**. New checks remain private; turning off the switch removes public access when the automatic save succeeds. **Preview status page** opens the saved public view in a dialog. Closing settings discards unsaved edits; reopening loads the saved configuration.
-
-Public pages follow the device light/dark setting, including changes while open, independently of your dashboard theme preference. They reuse Health Status rows and 30-day availability history with a small clickable logo above the underlined Powered by DebugBundle attribution. Daily tooltips update on every adjacent block across the shared health views. Project/check names are public; endpoint URLs, errors, service/environment labels, incidents and account data remain private. API/CLI/MCP provide the same management operations. See [the status-page contract](spec/public-status-pages.md) and [self-host deployment](deploy/selfhost/README.md).
-
-For local end-to-end verification, use the normal Docker stack (`make dev`), which initializes empty databases and migrates installed ones without resetting data. `make dev-mock` also simulates status settings, selection, preview, publish/unpublish and local anonymous pages for UI review. Restore real API routing with `make dev-mock-off` to verify persistence, authorization and migrations against the real stack. Follow the [local verification checklist](spec/public-status-pages.md#owner-local-verification).
-
-## AnalyticsBundle
-
-AnalyticsBundle extends debugging from incident evidence to product-usage evidence without turning DebugBundle into a long-term raw-event store. It is opt-in browser analytics for the questions a human or agent needs to improve a product: visits and active users, routes and funnels, device/browser/OS/language segments, feature use, friction markers, incident impact, and bounded structured journey replay.
-
-- **Ask directly:** API, CLI, and MCP expose aggregate metrics, journey patterns, opportunities, and generated AnalyticsBundles through the same project-authorized surface.
-- **Generate by analysis unit:** bundles describe a usage, funnel, route, friction, conversion, deploy, or incident-impact question. DebugBundle does not create one AnalyticsBundle per visit.
-- **Keep evidence explainable:** a generated bundle includes aggregate metrics, linked incidents/deploys, privacy-safe journey timelines, and deterministic journey-selection rank/basis for agent review.
-- **Stay privacy- and cost-conscious:** raw analytics inputs and retained journey samples expire; long-lived usage is aggregate rollups. Debug capture remains independent when analytics is disabled, unavailable, sampled out, quota-limited, or unhealthy.
-
-See the repository [public interface contract](contracts/public-interfaces.md#12b-analyticsbundle-and-product-analytics) for API/CLI/MCP parity and the [self-host guide](deploy/selfhost/README.md#analyticsbundle-operations) for retention and upgrade behavior.
 
 ## Quick Start
 
@@ -225,7 +207,7 @@ Rails, Rack, Sidekiq, Ruby Logger, Semantic Logger, local file transport, remote
 <dependency>
   <groupId>com.debugbundle</groupId>
   <artifactId>debugbundle-spring-boot-starter</artifactId>
-  <version>0.1.0</version>
+  <version>3.1.1</version>
 </dependency>
 ```
 
@@ -285,19 +267,35 @@ Automation can use the HTTP API directly or the MCP server for agent workflows:
 
 Marketplace-managed MCP clients can run `npx @debugbundle/mcp` and provide `DEBUGBUNDLE_MEMBER_TOKEN` in the MCP server environment. The official MCP Registry name is `com.debugbundle/mcp`; project tokens are SDK write-only ingestion credentials and must not be used for MCP retrieval or management.
 
-The separate OpenAI Plugin `1.0.0` production candidate combines a tailored skill with an OAuth-protected twenty-three-tool read-only remote projection plus the owner-approved existing-app consent, synthetic-reviewer, and Settings revocation surfaces. Its nine analytics tools expose bounded aggregate usage, route, device, acquisition, action, funnel, journey-pattern, and incident-impact metrics while excluding individual journeys, custom dimensions, analytics bundles/opportunities, and mutations. It is active at the permanent `https://mcp.debugbundle.com/mcp` origin for owner-approved Developer Mode validation, preserves the stdio/OpenClaw surface, and is not submitted, published, or publicly installable.
+A separate OpenAI Plugin candidate pairs a debugging skill with an OAuth-protected, read-only remote MCP connection. It is available for owner-approved Developer Mode validation and is not yet publicly installable. See the [OpenAI Plugin guide](https://debugbundle.com/docs/mcp/openai-plugin) for candidate capabilities and validation status.
 
-For local visual review without a real provider interaction, run `make dev-openai-plugin-preview` and open <http://localhost:5291/__dev/openai-plugin>. The opt-in development route uses the production UI components with deterministic synthetic data and provides every consent/reviewer/Settings state, all 64 scope subsets, and 390 px, 768 px, and 1280 px iframe viewports. Its actions stay in browser memory and never call OAuth, reviewer, grant, or revocation APIs. The route is absent from production builds, and preview evidence does not replace manual accessibility, MCP Inspector, outside-network reviewer, ChatGPT Developer Mode, deployed, submission, or publication validation.
+## AnalyticsBundle
+
+AnalyticsBundle extends debugging from incident evidence to product-usage evidence without turning DebugBundle into a long-term raw-event store. It is opt-in browser analytics for the questions a human or agent needs to improve a product: visits and active users, routes and funnels, device/browser/OS/language segments, feature use, friction markers, incident impact, and bounded structured journey replay.
+
+- **Ask directly:** API, CLI, and MCP expose aggregate metrics, journey patterns, opportunities, and generated AnalyticsBundles through the same project-authorized surface.
+- **Generate by analysis unit:** bundles describe a usage, funnel, route, friction, conversion, deploy, or incident-impact question. DebugBundle does not create one AnalyticsBundle per visit.
+- **Keep evidence explainable:** a generated bundle includes aggregate metrics, linked incidents/deploys, privacy-safe journey timelines, and deterministic journey-selection rank/basis for agent review.
+- **Stay privacy- and cost-conscious:** raw analytics inputs and retained journey samples expire; long-lived usage is aggregate rollups. Debug capture remains independent when analytics is disabled, unavailable, sampled out, quota-limited, or unhealthy.
+
+See the repository [public interface contract](contracts/public-interfaces.md#12b-analyticsbundle-and-product-analytics) for API/CLI/MCP parity and the [self-host guide](deploy/selfhost/README.md#analyticsbundle-operations) for retention and upgrade behavior.
+
+## Public status pages
+
+Project owners can publish selected health checks and their 30-day availability history on a public status page. Checks stay private until explicitly selected and published; endpoint URLs, errors, incidents, and account data remain private. See the [status-page guide](https://debugbundle.com/docs/availability-checks/#share-a-public-status-page) for setup and the [status-page contract](spec/public-status-pages.md) for API/CLI/MCP behavior and local verification.
 
 ## Repository Layout
 
+Main areas of the workspace:
+
 ```text
 apps/
-  api/       Fastify ingestion and retrieval API
-  worker/    BullMQ processing worker for normalization, grouping, bundles, alerts, and webhooks
-  cli/       @debugbundle/cli command-line interface
-  mcp/       @debugbundle/mcp server for agent workflows
-  web/       React/Vite app for interactive project and incident management
+  api/              Fastify ingestion and retrieval API
+  worker/           Durable processing for events, bundles, analytics, reports, and notifications
+  cli/              @debugbundle/cli command-line interface
+  mcp/              @debugbundle/mcp server for agent workflows
+  openclaw-plugin/   OpenClaw integration
+  web/              React/Vite app for interactive project and incident management
 packages/
   auth/              Auth, sessions, token generation, token hashing
   bundle-engine/     Deterministic bundle assembly
@@ -308,22 +306,16 @@ packages/
   shared-types/      Zod schemas, TypeScript types, bundle/event contracts
   storage/           Postgres, Redis, S3-compatible storage adapters and migrations
 sdks/
-  debugbundle-js/         Local clone of the JS SDK repo
-  debugbundle-python/     Local clone of the Python SDK repo
-  debugbundle-php/        Local clone of the PHP SDK repo
-  debugbundle-java/       Local clone of the Java SDK repo
-  debugbundle-go/         Local clone of the Go SDK repo
-  debugbundle-wordpress/  Local clone of the WordPress plugin repo
-  debugbundle-ruby/       Local clone of the Ruby SDK repo
+  Local clones of the standalone SDK repositories listed in sdks.json
 site/
   Public docs, marketing, reference, and blog site clone
 ```
 
-The SDKs are standalone repositories under the `debugbundle` GitHub organization. This core repository owns the product services, shared contracts, CLI/MCP surfaces, and core-owned shared JS packages.
+The SDKs are standalone repositories under the `debugbundle` GitHub organization; [sdks.json](sdks.json) lists every maintained SDK repository. This core repository owns the product services, shared contracts, CLI/MCP surfaces, and core-owned shared JS packages.
 
 ## Local Development
 
-Use the Make targets so routine commands run in Docker-scoped environments.
+Use the Make targets so routine commands run in Docker-scoped environments. Before starting, copy `.env.example` to `.env` if you do not already have one, and replace `DEBUGBUNDLE_PROBE_TRIGGER_SECRET` and `ANALYTICS_HASH_SECRET` with separate random secrets. Optional local overrides go in `.env.local`.
 
 ```bash
 make install
@@ -352,7 +344,28 @@ make build
 make ci
 ```
 
-`make dev` requires `DEBUGBUNDLE_PROBE_TRIGGER_SECRET` and `ANALYTICS_HASH_SECRET` in `.env`. Start from `.env.example`, then keep local-only overrides in `.env.local` when needed.
+### Switch local tiers
+
+With the normal local stack running, use these commands and refresh the dashboard:
+
+```bash
+make dev-tier                 # Show local workspaces and current tiers
+make dev-tier TIER=business   # Also accepts free, solo or team
+```
+
+If you have several local workspaces, add `ORG=<organisation UUID>` from the
+inspection output. This tests the real local API and base-tier allowances, setting
+local extra capacity to zero. It only uses this checkout's local Compose Postgres
+socket and refuses Stripe-linked accounts, trials and pending billing operations.
+It makes no provider calls or usage-counter resets. Run `make dev-mock-off` first
+if you are using the synthetic preview; reload after each tier change.
+
+Normal retention and downgrade rules apply to the real local test data. Switching
+away from Business pauses saved Smart Report schedules, which require Owner
+review/resume after returning. Sharing permissions,
+report consent and report/AI/email feature flags remain separately controlled.
+The command does not simulate Checkout or prove payment flows. `make dev-tier-check`
+tests its SQL guards in a disposable database.
 
 ### Populated UI preview
 
@@ -401,9 +414,11 @@ cp .env.example .env
 docker compose up -d
 ```
 
-The self-host stack includes the web app, API, worker, PostgreSQL, Redis, and LocalStack S3. See [Self-Hosting](https://debugbundle.com/docs/self-hosting) and [deploy/selfhost/README.md](deploy/selfhost/README.md).
+The self-host stack includes the web app, API, worker, PostgreSQL, Redis, and LocalStack S3. See [Self-Hosting](https://debugbundle.com/docs/self-hosting), [deploy/selfhost/README.md](deploy/selfhost/README.md), and the [Compose configuration](deploy/selfhost/docker-compose.yml).
 
 ## Documentation
+
+For bugs and feature requests, use [GitHub issues](https://github.com/debugbundle/debugbundle/issues). For account or billing help, [contact DebugBundle](https://debugbundle.com/contact).
 
 - Public docs: <https://debugbundle.com/docs>
 - Quickstart: <https://debugbundle.com/docs/quickstart>
@@ -424,14 +439,7 @@ The canonical public product release is the root `debugbundle` repository tag an
 - `mcp-v*` for `@debugbundle/mcp`
 - `shared-js-v*` for `@debugbundle/shared-types` and `@debugbundle/redaction`
 
-Standalone SDK repositories publish and version their own release surfaces independently:
-
-- `debugbundle-js` for `@debugbundle/sdk-node` and `@debugbundle/sdk-browser`
-- `debugbundle-python` for `debugbundle-python`
-- `debugbundle-php` for `debugbundle/sdk-php`
-- `debugbundle-java` for Maven artifacts
-- `debugbundle-go` for Go modules
-- `debugbundle-wordpress` for the WordPress plugin
+Standalone SDK repositories publish and version their own release surfaces independently. See [sdks.json](sdks.json) for the complete repository list and the [release governance guide](rules/release-governance.md) for publication requirements.
 
 The v1 release train publishes dependency roots before dependent wrappers:
 
@@ -465,17 +473,3 @@ See [SECURITY.md](SECURITY.md) for scope and response expectations.
 ## License
 
 DebugBundle core, SDKs, and executable developer tools use [Apache-2.0](LICENSE). Service-required exceptions are limited to the WordPress plugin (GPL-2.0-or-later) and portable ClawHub/Smithery instruction skill (MIT-0). See the [licensing policy](spec/licensing.md).
-
-### Shared shadcn styles
-
-The web app vendors the unchanged shadcn 4.1.2 Tailwind stylesheet in
-`apps/web/src/styles/shadcn.css`, including its upstream MIT license. This preserves
-the current component animations and data variants without installing the component
-generator and its unused vulnerable glob-parser dependency in the app. Existing
-shadcn components and `components.json` remain the source of the UI. Inspect component docs with `make ui-component-docs UI_COMPONENTS='dialog input-group'` and preview registry changes with `make ui-component-add UI_COMPONENTS=input-group UI_COMPONENT_FLAGS='--dry-run'`. Review existing component differences before applying changes; preserve local primitives and shared utilities. Run the
-component generator separately through its package runner when needed, and review
-any generated dependency/import changes against the dependency audit before adoption.
-
-`make audit` checks the installed dependency graph for high and critical advisories;
-core CI and core publication enforce the same threshold. Dependency refreshes use
-bounded vulnerable-version overrides and preserve independently published SDK pins.

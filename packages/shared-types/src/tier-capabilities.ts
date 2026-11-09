@@ -1,3 +1,10 @@
+import {
+  BUSINESS_SMART_REPORT_RUNS_PER_MONTH,
+  BUSINESS_SMART_REPORT_DEFINITIONS,
+  MAX_SMART_REPORT_PROJECTS,
+  MAX_SMART_REPORT_RECIPIENTS
+} from "./smart-report-limits.js";
+
 /**
  * Tier capabilities — single source of truth for plan-gated features and limits.
  *
@@ -11,8 +18,53 @@
 
 export const MAX_BILLING_ADDITIONAL_CAPACITY_UNITS = 99;
 
+const NO_SMART_REPORT_CAPABILITIES = {
+  smart_reports: false,
+  monthly_smart_report_generations: 0,
+  max_smart_report_definitions: 0,
+  max_smart_report_projects: 0,
+  max_smart_report_recipients: 0
+} as const;
+
+const TEAM_CAPABILITIES = {
+  ...NO_SMART_REPORT_CAPABILITIES,
+  remote_probes: true,
+  github_automation: true,
+  slack_integration: true,
+  cloud_improvement_bundles: true,
+  analytics_bundle: true,
+  shared_dashboards: true,
+  member_invites: true,
+  included_capacity_units: 15,
+  max_members: 1_000,
+  ingestion_rate_per_min: 10_000,
+  retrieval_rate_per_min: 500,
+  bundle_retention_days: 90,
+  raw_event_retention_days: 30,
+  // Per-unit allowance (multiply by included and purchased capacity units)
+  monthly_bundle_requests: 1_000,
+  monthly_raw_ingested_events: 10_000,
+  retained_bundle_cap: 400,
+  monthly_remote_activations: 50,
+  monthly_alert_deliveries: 300,
+  monthly_webhook_deliveries: 1_000,
+  monthly_analytics_events: 25_000,
+  monthly_analytics_sessions: 5_000,
+  monthly_analytics_journey_samples: 1_000,
+  monthly_analytics_bundle_generations: 100,
+  max_analytics_saved_funnels: 50,
+  max_analytics_custom_dimensions: 8,
+  analytics_hourly_retention_days: 90,
+  availability_checks_per_project: 5,
+  availability_monitored_projects_per_organization: 10,
+  availability_active_checks_per_organization: 30,
+  availability_check_min_interval_seconds: 60,
+  availability_check_recommended_failure_threshold: 2
+} as const;
+
 export const TIER_CAPABILITIES = {
   free: {
+    ...NO_SMART_REPORT_CAPABILITIES,
     remote_probes: false,
     github_automation: false,
     slack_integration: false,
@@ -47,6 +99,7 @@ export const TIER_CAPABILITIES = {
     availability_check_recommended_failure_threshold: 3
   },
   solo: {
+    ...NO_SMART_REPORT_CAPABILITIES,
     remote_probes: true,
     github_automation: true,
     slack_integration: false,
@@ -80,39 +133,17 @@ export const TIER_CAPABILITIES = {
     availability_check_min_interval_seconds: 60,
     availability_check_recommended_failure_threshold: 3
   },
-  team: {
-    remote_probes: true,
-    github_automation: true,
-    slack_integration: true,
-    cloud_improvement_bundles: true,
-    analytics_bundle: true,
-    shared_dashboards: true,
-    member_invites: true,
-    included_capacity_units: 15,
-    max_members: 1_000,
-    ingestion_rate_per_min: 10_000,
-    retrieval_rate_per_min: 500,
-    bundle_retention_days: 90,
-    raw_event_retention_days: 30,
-    // Per-unit allowance (multiply by included and purchased capacity units)
-    monthly_bundle_requests: 1_000,
-    monthly_raw_ingested_events: 10_000,
-    retained_bundle_cap: 400,
-    monthly_remote_activations: 50,
-    monthly_alert_deliveries: 300,
-    monthly_webhook_deliveries: 1_000,
-    monthly_analytics_events: 250_000,
-    monthly_analytics_sessions: 50_000,
-    monthly_analytics_journey_samples: 10_000,
-    monthly_analytics_bundle_generations: 100,
-    max_analytics_saved_funnels: 50,
-    max_analytics_custom_dimensions: 8,
-    analytics_hourly_retention_days: 90,
+  team: TEAM_CAPABILITIES,
+  business: {
+    ...TEAM_CAPABILITIES,
+    smart_reports: true,
+    monthly_smart_report_generations: BUSINESS_SMART_REPORT_RUNS_PER_MONTH,
+    max_smart_report_definitions: BUSINESS_SMART_REPORT_DEFINITIONS,
+    max_smart_report_projects: MAX_SMART_REPORT_PROJECTS,
+    max_smart_report_recipients: MAX_SMART_REPORT_RECIPIENTS,
+    included_capacity_units: 30,
     availability_checks_per_project: 10,
-    availability_monitored_projects_per_organization: 10,
-    availability_active_checks_per_organization: 50,
-    availability_check_min_interval_seconds: 60,
-    availability_check_recommended_failure_threshold: 2
+    availability_active_checks_per_organization: 50
   }
 } as const;
 
@@ -120,6 +151,11 @@ export type TierName = keyof typeof TIER_CAPABILITIES;
 
 /** Structural type for tier capabilities — widened from const literals for extensibility. */
 export interface TierCapabilities {
+  readonly smart_reports: boolean;
+  readonly monthly_smart_report_generations: number;
+  readonly max_smart_report_definitions: number;
+  readonly max_smart_report_projects: number;
+  readonly max_smart_report_recipients: number;
   readonly remote_probes: boolean;
   readonly github_automation: boolean;
   readonly slack_integration: boolean;
@@ -159,6 +195,11 @@ export interface TierCapabilities {
  * Auth and security remain fully enforced — only billing/quota gates are bypassed.
  */
 const SELFHOST_CAPABILITIES: TierCapabilities = {
+  smart_reports: true,
+  monthly_smart_report_generations: 1_000_000,
+  max_smart_report_definitions: 100,
+  max_smart_report_projects: MAX_SMART_REPORT_PROJECTS,
+  max_smart_report_recipients: MAX_SMART_REPORT_RECIPIENTS,
   remote_probes: true,
   github_automation: true,
   slack_integration: true,
@@ -202,8 +243,13 @@ export function getTierCapabilities(plan: string | undefined): TierCapabilities 
   if (isSelfHostMode()) {
     return SELFHOST_CAPABILITIES;
   }
-  if (plan !== undefined && plan in TIER_CAPABILITIES) {
+  if (plan !== undefined && Object.hasOwn(TIER_CAPABILITIES, plan)) {
     return TIER_CAPABILITIES[plan as TierName];
   }
   return TIER_CAPABILITIES.free;
+}
+
+/** Business product features are unlocked on self-host; roles and scope still apply. */
+export function hasBusinessEntitlement(plan: string | undefined, selfHosted = false): boolean {
+  return plan === "business" || selfHosted;
 }

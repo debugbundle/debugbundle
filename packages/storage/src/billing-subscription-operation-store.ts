@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { isCurrentBillingOwner } from "./billing-owner.js";
 import { runInTransaction } from "./transaction.js";
 import type { Queryable } from "./types.js";
 
@@ -28,13 +29,15 @@ export interface BillingSubscriptionOperationStore {
     kind: BillingSubscriptionOperationKind;
     intent: Record<string, unknown>;
     expected_operation_id?: string | null;
+    expected_owner_user_id?: string;
   }): Promise<
     BillingSubscriptionOperation | "billing_change_in_progress" | "no_active_subscription"
   >;
   prepare(
     organizationId: string,
     attemptId: string,
-    parameters: Record<string, unknown>
+    parameters: Record<string, unknown>,
+    expectedOwnerUserId?: string
   ): Promise<BillingSubscriptionOperation | null>;
   saveResource(organizationId: string, attemptId: string, resourceId: string): Promise<boolean>;
   complete(organizationId: string, attemptId: string): Promise<boolean>;
@@ -86,6 +89,11 @@ export function createPostgresBillingSubscriptionOperationStore(
           org.billing_state === "canceled"
         )
           return "no_active_subscription";
+        if (
+          input.expected_owner_user_id !== undefined &&
+          !(await isCurrentBillingOwner(tx, input.organization_id, input.expected_owner_user_id))
+        )
+          return "no_active_subscription";
         const current = (
           await tx.query<BillingSubscriptionOperation & Record<string, unknown>>(
             `SELECT ${fields} FROM billing_subscription_operations op WHERE organization_id=$1`,
@@ -129,18 +137,23 @@ export function createPostgresBillingSubscriptionOperationStore(
           )
         ).rows[0]!;
       }),
-    async prepare(organizationId, attemptId, parameters) {
-      return (
+    async prepare(organizationId, attemptId, parameters, expectedOwnerUserId) {
+      const persist = async (connection: Queryable): Promise<BillingSubscriptionOperation | null> =>
         (
-          await db.query<BillingSubscriptionOperation & Record<string, unknown>>(
+          await connection.query<BillingSubscriptionOperation & Record<string, unknown>>(
             `UPDATE billing_subscription_operations AS op SET parameters=COALESCE(op.parameters,$3::jsonb)
          FROM organizations org WHERE op.organization_id=$1 AND op.id=$2 AND op.completed_at IS NULL
          AND org.id=op.organization_id AND org.suspended_at IS NULL AND org.stripe_subscription_id=op.subscription_id
          RETURNING ${fields}`,
             [organizationId, attemptId, JSON.stringify(parameters)]
           )
-        ).rows[0] ?? null
-      );
+        ).rows[0] ?? null;
+      if (expectedOwnerUserId === undefined) return persist(db);
+      return runInTransaction(db, async (tx) => {
+        await tx.query("SELECT id FROM organizations WHERE id=$1 FOR UPDATE", [organizationId]);
+        if (!(await isCurrentBillingOwner(tx, organizationId, expectedOwnerUserId))) return null;
+        return persist(tx);
+      });
     },
     async saveResource(organizationId, attemptId, resourceId) {
       return (

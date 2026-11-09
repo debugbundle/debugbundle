@@ -36,6 +36,7 @@ export function buildProjectDayWindow(nowIso: string): { starts_at: string; ends
 
 export function buildMonthlyRawIngestedEventsMetricSelect(input: {
   projectIdSql: string;
+  originIdsSql?: string;
   startsAtSql: string;
   endsAtSql: string;
   billableIncidentEventsPredicate: string;
@@ -51,12 +52,13 @@ export function buildMonthlyRawIngestedEventsMetricSelect(input: {
           AND ie.occurred_at<${input.endsAtSql}::timestamptz
       ), COALESCE((SELECT puc.raw_ingested_events FROM project_usage_counters puc
           WHERE puc.project_id=origin.origin_id AND puc.period_starts_at=${input.startsAtSql}::timestamptz),0)
-    )),0)::int FROM unnest(debugbundle_project_origins(${input.projectIdSql})) origin(origin_id)
+    )),0)::int FROM unnest(${input.originIdsSql ?? `debugbundle_project_origins(${input.projectIdSql})`}) origin(origin_id)
   `;
 }
 
 export function buildProjectMetricsJsonSql(input: {
   projectIdSql: string;
+  originIdsSql?: string;
   monthStartsAtSql: string;
   monthEndsAtSql: string;
   dayStartsAtSql: string;
@@ -69,26 +71,26 @@ export function buildProjectMetricsJsonSql(input: {
       'open_incidents', (
         SELECT COUNT(*)::int
         FROM incidents i
-        WHERE i.project_id = ANY(debugbundle_project_origins(${input.projectIdSql}))
+        WHERE i.project_id = ANY(${input.originIdsSql ?? `debugbundle_project_origins(${input.projectIdSql})`})
           AND i.status = 'open'
       ),
       'regressed_incidents', (
         SELECT COUNT(*)::int
         FROM incidents i
-        WHERE i.project_id = ANY(debugbundle_project_origins(${input.projectIdSql}))
+        WHERE i.project_id = ANY(${input.originIdsSql ?? `debugbundle_project_origins(${input.projectIdSql})`})
           AND i.status = 'regressed'
       ),
       'opened_incidents_today', (
         SELECT COUNT(*)::int
         FROM incidents i
-        WHERE i.project_id = ANY(debugbundle_project_origins(${input.projectIdSql}))
+        WHERE i.project_id = ANY(${input.originIdsSql ?? `debugbundle_project_origins(${input.projectIdSql})`})
           AND i.first_seen_at >= ${input.dayStartsAtSql}::timestamptz
           AND i.first_seen_at < ${input.dayEndsAtSql}::timestamptz
       ),
       'attention_incidents_today', (
         SELECT COUNT(*)::int
         FROM incidents i
-        WHERE i.project_id = ANY(debugbundle_project_origins(${input.projectIdSql}))
+        WHERE i.project_id = ANY(${input.originIdsSql ?? `debugbundle_project_origins(${input.projectIdSql})`})
           AND (
             (
               i.first_seen_at >= ${input.dayStartsAtSql}::timestamptz
@@ -104,20 +106,21 @@ export function buildProjectMetricsJsonSql(input: {
       'opened_incidents_month', (
         SELECT COUNT(*)::int
         FROM incidents i
-        WHERE i.project_id = ANY(debugbundle_project_origins(${input.projectIdSql}))
+        WHERE i.project_id = ANY(${input.originIdsSql ?? `debugbundle_project_origins(${input.projectIdSql})`})
           AND i.first_seen_at >= ${input.monthStartsAtSql}::timestamptz
           AND i.first_seen_at < ${input.monthEndsAtSql}::timestamptz
       ),
       'monthly_bundle_requests', (
         SELECT COUNT(*)::int
         FROM bundle_generations bg
-        WHERE bg.project_id = ANY(debugbundle_project_origins(${input.projectIdSql}))
+        WHERE bg.project_id = ANY(${input.originIdsSql ?? `debugbundle_project_origins(${input.projectIdSql})`})
           AND bg.created_at >= ${input.monthStartsAtSql}::timestamptz
           AND bg.created_at < ${input.monthEndsAtSql}::timestamptz
       ),
       'monthly_raw_ingested_events', (
         ${buildMonthlyRawIngestedEventsMetricSelect({
           projectIdSql: input.projectIdSql,
+          ...(input.originIdsSql === undefined ? {} : { originIdsSql: input.originIdsSql }),
           startsAtSql: input.monthStartsAtSql,
           endsAtSql: input.monthEndsAtSql,
           billableIncidentEventsPredicate: input.billableIncidentEventsPredicate
@@ -126,7 +129,7 @@ export function buildProjectMetricsJsonSql(input: {
       'retained_bundles', (
         SELECT COUNT(DISTINCT bg.incident_id)::int
         FROM bundle_generations bg
-        WHERE bg.project_id = ANY(debugbundle_project_origins(${input.projectIdSql}))
+        WHERE bg.project_id = ANY(${input.originIdsSql ?? `debugbundle_project_origins(${input.projectIdSql})`})
       ),
       'monthly_alert_deliveries', ${input.alertDeliveriesSelect}
     )
@@ -169,6 +172,7 @@ export async function alertEmailDigestsTableExists(db: Queryable): Promise<boole
 
 export function buildAlertDeliveriesCountSelect(input: {
   hasAlertDeliveries: boolean;
+  originIdsSql?: string;
   hasAlertEmailDigests: boolean;
 }): string {
   const parts: string[] = [];
@@ -177,7 +181,7 @@ export function buildAlertDeliveriesCountSelect(input: {
     parts.push(`
       SELECT ad.created_at
       FROM alert_deliveries ad
-      WHERE ad.project_id = ANY(debugbundle_project_origins(p.id))
+      WHERE ad.project_id = ANY(${input.originIdsSql ?? "debugbundle_project_origins(p.id)"})
         AND ad.created_at >= $2::timestamptz
         AND ad.created_at < $3::timestamptz
     `);
@@ -187,7 +191,7 @@ export function buildAlertDeliveriesCountSelect(input: {
     parts.push(`
       SELECT dig.created_at
       FROM alert_email_digests dig
-      WHERE dig.project_id = ANY(debugbundle_project_origins(p.id))
+      WHERE dig.project_id = ANY(${input.originIdsSql ?? "debugbundle_project_origins(p.id)"})
         AND dig.created_at >= $2::timestamptz
         AND dig.created_at < $3::timestamptz
     `);

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { RuntimeLogger } from "../../../packages/runtime-logger/src/index.js";
+import type { ProjectJobAuthorization } from "../../../packages/storage/src/project-job-authorization.js";
 import { fingerprint } from "../../../packages/event-normalizer/src/index.js";
 import { type BuildBundleInput } from "../../../packages/bundle-engine/src/index.js";
 import type {
@@ -184,6 +185,7 @@ export interface GroupIncidentWorkerDependencies {
 }
 
 export interface BuildBundleWorkerDependencies {
+  projectJobAuthorization?: ProjectJobAuthorization;
   queue: WorkerQueue;
   logger?: Pick<RuntimeLogger, "error">;
   env?: Record<string, string | undefined>;
@@ -214,6 +216,7 @@ export interface BuildBundleWorkerDependencies {
 }
 
 export interface BuildReproductionWorkerDependencies extends WorkerAccountAnalyticsDependencies {
+  projectJobAuthorization?: ProjectJobAuthorization;
   queue: WorkerQueue;
   objectStore: ObjectStoreClient & ObjectStoreReader;
 }

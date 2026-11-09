@@ -1,6 +1,6 @@
 import {
   restoreStoragePredecessor,
-  PROJECT_SERVICE_MIGRATION_IDS
+  POST_PREDECESSOR_MIGRATION_IDS
 } from "../helpers/storage-predecessor.js";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, expect, it } from "vitest";
@@ -217,7 +217,7 @@ runIntegration("typed evidence migration and scoped context index", () => {
       const result = await migrateStorageSchema({
         query: (sql, params) => client.query(sql, params)
       });
-      expect(result.applied).toEqual([id, ...PROJECT_SERVICE_MIGRATION_IDS]);
+      expect(result.applied).toEqual([id, ...POST_PREDECESSOR_MIGRATION_IDS]);
       expect(
         (await migrateStorageSchema({ query: (sql, params) => client.query(sql, params) })).applied
       ).toEqual([]);

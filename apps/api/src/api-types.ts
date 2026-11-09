@@ -1,3 +1,12 @@
+import type { ReportAllowanceStore } from "../../../packages/storage/src/report-allowance-store.js";
+import type { ReferralManagement } from "../../../packages/referrals/src/referral-management.js";
+import type { ReportRunAdmissionStore } from "../../../packages/storage/src/report-run-admission.js";
+import type { ReportRunManagementStore } from "../../../packages/storage/src/report-run-management.js";
+import type { ReportContentStore } from "../../../packages/storage/src/report-content-store.js";
+import type { ReportPdfStore } from "../../../packages/storage/src/report-pdf-store.js";
+import type { ReportEmailStore } from "../../../packages/storage/src/report-email-store.js";
+import type { OrganizationManagementStore } from "../../../packages/storage/src/organization-management-types.js";
+import type { ProjectJobInitiator } from "../../../packages/storage/src/project-job-authorization.js";
 import type {
   CaptureRule,
   CaptureRuleCreate,
@@ -120,6 +129,17 @@ export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagement
     | Pick<AccountDeletionChallengeService, "requestDeletionOtp" | "verifyDeletionOtp">
     | undefined;
   inviteEmails?: Pick<AuthEmailSender, "sendProjectInviteEmail">;
+  organizationManagement?: OrganizationManagementStore;
+  referrals?: ReferralManagement;
+  reportDefinitions?: ReportDefinitionStore;
+  reportAllowance?: ReportAllowanceStore;
+  reportGenerationEnabled?: boolean;
+  reportContent?: ReportContentStore;
+  reportPdf?: ReportPdfStore;
+  reportEmail?: Pick<ReportEmailStore, "list">;
+  reportDashboardBaseUrl?: string;
+  reportRuns?: { admission: ReportRunAdmissionStore; management: ReportRunManagementStore };
+  organizationEmails?: { send: NonNullable<AuthEmailSender["sendOrganizationAccessEmail"]> };
   billingEmails?: {
     getBillingContactForOrganization(input: { organization_id: string }): Promise<{
       organizationName: string;
@@ -215,6 +235,7 @@ export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagement
   objectStoreWriter?: Pick<ObjectStoreClient, "putObject">;
   bundleRegeneration?: {
     requestRegeneration(input: {
+      initiating_authority?: ProjectJobInitiator;
       organization_id: string;
       project_id: string;
       incident_id: string;
@@ -222,6 +243,7 @@ export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagement
   };
   improvementBundleRegeneration?: {
     requestRegeneration(input: {
+      initiating_authority?: ProjectJobInitiator;
       organization_id: string;
       project_id: string;
       opportunity_id: string;
@@ -283,7 +305,7 @@ export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagement
           alert_id: string;
           project_id?: string;
           actor_user_id?: string;
-          actor_role?: "owner" | "admin" | "member";
+          actor_role?: "owner" | "admin" | "member" | "viewer";
           service_id?: string | null;
           channel?: AlertChannel;
           condition_type?: AlertConditionType;
@@ -312,7 +334,7 @@ export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagement
           alert_id: string;
           project_id?: string;
           actor_user_id?: string;
-          actor_role?: "owner" | "admin" | "member";
+          actor_role?: "owner" | "admin" | "member" | "viewer";
         }): Promise<{ alert_id: string } | null>;
       }
     | undefined;
@@ -366,7 +388,7 @@ export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagement
           webhook_id: string;
           event_type: WebhookEventType;
           actor_user_id?: string;
-          actor_role?: "owner" | "admin" | "member";
+          actor_role?: "owner" | "admin" | "member" | "viewer";
         }): Promise<{ delivery_id: string; event_type: WebhookEventType } | null>;
       }
     | undefined;
@@ -517,3 +539,4 @@ export interface ApiServerContext {
   apiVersion: string;
   readinessCheck?: () => Promise<void>;
 }
+import type { ReportDefinitionStore } from "../../../packages/storage/src/report-definition-store.js";

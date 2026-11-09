@@ -177,28 +177,35 @@ runIntegration("health check ownership and original runtime namespaces", () => {
       service_definition_id: f.request.service_mappings[0]!.service_definition_id
     });
   });
-  it("enforces combined saved-check admission without silently pausing preserved checks", async () => {
-    const f = await fixture();
-    for (let index = 0; index < 10; index++)
-      expect(typeof (await f.create(index % 2 ? f.target : f.source, null))).toBe("object");
-    await f.consolidate();
-    const list = await health.listChecksForProjectInOrganization({
-      organization_id: f.organizationId,
-      project_id: f.target,
-      limit: 100
-    });
-    expect(list).toHaveLength(10);
-    expect(list?.every((c) => c.paused_reason === null)).toBe(true);
-    expect(await f.create(f.target, "Site")).toBe("limit_reached");
-    expect(
-      (
-        await pool.query(
-          "SELECT count(*)::int AS count FROM availability_checks WHERE project_id=ANY($1::uuid[])",
-          [[f.target, f.source]]
-        )
-      ).rows[0]?.count
-    ).toBe(10);
-  });
+  it.each([
+    { plan: "team", limit: 5 },
+    { plan: "business", limit: 10 }
+  ])(
+    "enforces $plan combined saved-check admission without silently pausing preserved checks",
+    async ({ plan, limit }) => {
+      const f = await fixture();
+      await pool.query("UPDATE organizations SET plan=$2 WHERE id=$1", [f.organizationId, plan]);
+      for (let index = 0; index < limit; index++)
+        expect(typeof (await f.create(index % 2 ? f.target : f.source, null))).toBe("object");
+      await f.consolidate();
+      const list = await health.listChecksForProjectInOrganization({
+        organization_id: f.organizationId,
+        project_id: f.target,
+        limit: 100
+      });
+      expect(list).toHaveLength(limit);
+      expect(list?.every((c) => c.paused_reason === null)).toBe(true);
+      expect(await f.create(f.target, "Site")).toBe("limit_reached");
+      expect(
+        (
+          await pool.query(
+            "SELECT count(*)::int AS count FROM availability_checks WHERE project_id=ANY($1::uuid[])",
+            [[f.target, f.source]]
+          )
+        ).rows[0]?.count
+      ).toBe(limit);
+    }
+  );
   it("rechecks a collaborator's canonical role and revocation across retained health reads and writes", async () => {
     const f = await fixture(),
       member = await seedExternalProjectCollaborator(pool, [f.target, f.source]);

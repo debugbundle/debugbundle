@@ -321,6 +321,11 @@ describe("client error status helpers", () => {
 });
 
 describe("getDefaultPreset", () => {
+  it("uses the existing balanced capture policy for Business and rejects prototype names", () => {
+    expect(getDefaultPreset("business")).toBe("balanced");
+    expect(getDefaultPreset("__proto__")).toBe("minimal");
+    expect(getDefaultPreset("constructor")).toBe("minimal");
+  });
   it("returns balanced for free tier", () => {
     expect(getDefaultPreset("free")).toBe("balanced");
   });

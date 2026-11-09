@@ -1,3 +1,4 @@
+import { projectActorAllowedSql, projectReadScopeSql } from "./project-read-scope.js";
 import type { ImprovementBundleSensitivity } from "../../shared-types/src/index.js";
 import { getTierCapabilities } from "../../shared-types/src/index.js";
 import type { AccountMetricKey } from "./account-analytics-store.js";
@@ -369,6 +370,14 @@ export function createPostgresImprovementOpportunityStore(
     ...createImprovementOpportunityRead(db),
 
     async resolveImprovementForOrganization(input) {
+      const params: unknown[] = [
+        input.organization_id,
+        input.improvement_id,
+        input.resolved_at,
+        input.resolved_by_member_id,
+        input.user_id ?? null
+      ];
+      const scopeSql = projectReadScopeSql(params, input, "io.project_id");
       const resolveImprovement = (
         queryable: Queryable
       ): Promise<QueryResult<ImprovementRetrievalRow>> =>
@@ -392,16 +401,11 @@ export function createPostgresImprovementOpportunityStore(
                   OR (
                     $5::uuid IS NOT NULL
                     AND (
-                      p.owner_user_id = $5::uuid
-                      OR EXISTS (
-                        SELECT 1
-                        FROM project_members pm
-                        WHERE pm.project_id = p.id
-                          AND pm.user_id = $5::uuid
-                      )
+                      ${projectActorAllowedSql("p.id", "$5::uuid", input, true)}
                     )
                   )
                 )
+                ${scopeSql}
                 AND io.id = $2::uuid
                 AND io.status <> 'resolved'
               RETURNING io.*
@@ -442,13 +446,7 @@ export function createPostgresImprovementOpportunityStore(
             LEFT JOIN services s ON s.id = updated.service_id
             LEFT JOIN service_definitions sd ON sd.id=s.service_definition_id
           `,
-          [
-            input.organization_id,
-            input.improvement_id,
-            input.resolved_at,
-            input.resolved_by_member_id,
-            input.user_id ?? null
-          ]
+          params
         );
 
       if (accountAnalyticsStore === undefined) {
@@ -539,6 +537,12 @@ export function createPostgresImprovementOpportunityStore(
     },
 
     async reopenImprovementForOrganization(input) {
+      const params: unknown[] = [
+        input.organization_id,
+        input.improvement_id,
+        input.user_id ?? null
+      ];
+      const scopeSql = projectReadScopeSql(params, input, "io.project_id");
       const reopenImprovement = (
         queryable: Queryable
       ): Promise<QueryResult<ImprovementRetrievalRow>> =>
@@ -562,16 +566,11 @@ export function createPostgresImprovementOpportunityStore(
                   OR (
                     $3::uuid IS NOT NULL
                     AND (
-                      p.owner_user_id = $3::uuid
-                      OR EXISTS (
-                        SELECT 1
-                        FROM project_members pm
-                        WHERE pm.project_id = p.id
-                          AND pm.user_id = $3::uuid
-                      )
+                      ${projectActorAllowedSql("p.id", "$3::uuid", input, true)}
                     )
                   )
                 )
+                ${scopeSql}
                 AND io.id = $2::uuid
                 AND io.status <> 'open'
               RETURNING io.*
@@ -612,7 +611,7 @@ export function createPostgresImprovementOpportunityStore(
             LEFT JOIN services s ON s.id = updated.service_id
             LEFT JOIN service_definitions sd ON sd.id=s.service_definition_id
           `,
-          [input.organization_id, input.improvement_id, input.user_id ?? null]
+          params
         );
 
       if (accountAnalyticsStore === undefined) {
@@ -640,6 +639,13 @@ export function createPostgresImprovementOpportunityStore(
     },
 
     async snoozeImprovementForOrganization(input) {
+      const params: unknown[] = [
+        input.organization_id,
+        input.improvement_id,
+        input.snoozed_until,
+        input.user_id ?? null
+      ];
+      const scopeSql = projectReadScopeSql(params, input, "io.project_id");
       const snoozeImprovement = (
         queryable: Queryable
       ): Promise<QueryResult<ImprovementRetrievalRow>> =>
@@ -663,16 +669,11 @@ export function createPostgresImprovementOpportunityStore(
                   OR (
                     $4::uuid IS NOT NULL
                     AND (
-                      p.owner_user_id = $4::uuid
-                      OR EXISTS (
-                        SELECT 1
-                        FROM project_members pm
-                        WHERE pm.project_id = p.id
-                          AND pm.user_id = $4::uuid
-                      )
+                      ${projectActorAllowedSql("p.id", "$4::uuid", input, true)}
                     )
                   )
                 )
+                ${scopeSql}
                 AND io.id = $2::uuid
                 AND (io.status <> 'snoozed' OR io.snoozed_until IS DISTINCT FROM $3::timestamptz)
               RETURNING io.*
@@ -713,7 +714,7 @@ export function createPostgresImprovementOpportunityStore(
             LEFT JOIN services s ON s.id = updated.service_id
             LEFT JOIN service_definitions sd ON sd.id=s.service_definition_id
           `,
-          [input.organization_id, input.improvement_id, input.snoozed_until, input.user_id ?? null]
+          params
         );
 
       if (accountAnalyticsStore === undefined) {

@@ -231,7 +231,7 @@ export function registerWebhookRoutes(app: FastifyInstance, dependencies: ApiDep
       webhook_id: string;
       project_id: string;
       actor_user_id: string;
-      actor_role: "owner" | "admin" | "member";
+      actor_role: "owner" | "admin" | "member" | "viewer";
       url?: string;
       events?: WebhookEventType[];
       filters?: WebhookFilters;

@@ -1,11 +1,20 @@
 import { isDeepStrictEqual } from "node:util";
+import {
+  OPENAI_REPORT_TOOL_NAMES,
+  OPENAI_REPORT_TOOL_CATALOG,
+  isOpenAiReportTool,
+  openAiReportSchemas,
+  parseOpenAiReportInput,
+  projectOpenAiReportOutput,
+  validateOpenAiReportOutput
+} from "./openai-report-contract.js";
 
 import { redact, sanitizeTelemetry, type JsonValue } from "../../redaction/src/index.js";
 
 import schemaContract from "./contracts/schemas.json" with { type: "json" };
 import toolContracts from "./contracts/tool-contracts.json" with { type: "json" };
 
-export const OPENAI_TOOL_NAMES = [
+export const OPENAI_V1_TOOL_NAMES = [
   "list_projects",
   "list_services",
   "list_incidents",
@@ -30,6 +39,7 @@ export const OPENAI_TOOL_NAMES = [
   "list_health_check_results",
   "list_health_check_daily_rollups"
 ] as const;
+export const OPENAI_TOOL_NAMES = [...OPENAI_V1_TOOL_NAMES, ...OPENAI_REPORT_TOOL_NAMES] as const;
 
 export type OpenAiToolName = (typeof OPENAI_TOOL_NAMES)[number];
 export type OpenAiToolCatalogEntry = (typeof toolContracts.tools)[number];
@@ -77,7 +87,10 @@ function deepFreeze<T>(value: T): Readonly<T> {
 }
 
 export const OPENAI_SCHEMA_CONTRACT = deepFreeze(schemaContract);
-export const OPENAI_TOOL_CATALOG = deepFreeze(toolContracts.tools);
+export const OPENAI_TOOL_CATALOG = deepFreeze([
+  ...toolContracts.tools,
+  ...OPENAI_REPORT_TOOL_CATALOG
+]);
 
 function requireTool(name: string): OpenAiToolCatalogEntry {
   if (!toolNames.has(name)) {
@@ -191,6 +204,13 @@ export function getOpenAiToolSchemas(name: string): {
   inputSchema: Readonly<Record<string, unknown>>;
   outputSchema: Readonly<Record<string, unknown>>;
 } {
+  if (isOpenAiReportTool(name)) {
+    const reportSchemas = openAiReportSchemas(name);
+    return {
+      inputSchema: materializeAdvertisedSchema(reportSchemas.inputSchema),
+      outputSchema: materializeAdvertisedSchema(reportSchemas.outputSchema)
+    };
+  }
   const cached = advertisedSchemaCache.get(name);
   if (cached !== undefined) {
     return cached;
@@ -413,6 +433,7 @@ export function sanitizeHealthCheckUrl(rawUrl: string): string {
 }
 
 export function parseOpenAiToolInput(name: string, value: unknown): Record<string, unknown> {
+  if (isOpenAiReportTool(name)) return parseOpenAiReportInput(name, value);
   const tool = requireTool(name);
   try {
     const parsed = projectSchemaValue(readSchemaReference(tool.input_schema_ref), value, "input");
@@ -426,6 +447,7 @@ export function parseOpenAiToolInput(name: string, value: unknown): Record<strin
 }
 
 export function projectOpenAiToolOutput(name: string, value: unknown): unknown {
+  if (isOpenAiReportTool(name)) return projectOpenAiReportOutput(name, value);
   const tool = requireTool(name);
   const redacted = redact(value as JsonValue).redacted;
   const normalized = normalizeHealthUrls(redacted);
@@ -441,10 +463,15 @@ export function projectOpenAiToolOutput(name: string, value: unknown): unknown {
   if (!sanitized.ok) {
     throw new Error(`openai_mcp_output_redaction_failed:${name}`);
   }
-  return validateSchemaValue(readSchemaReference(tool.output_schema_ref), sanitized.value, "output");
+  return validateSchemaValue(
+    readSchemaReference(tool.output_schema_ref),
+    sanitized.value,
+    "output"
+  );
 }
 
 export function validateOpenAiToolOutput(name: string, value: unknown): unknown {
+  if (isOpenAiReportTool(name)) return validateOpenAiReportOutput(name, value);
   const tool = requireTool(name);
   return validateSchemaValue(readSchemaReference(tool.output_schema_ref), value, "output");
 }

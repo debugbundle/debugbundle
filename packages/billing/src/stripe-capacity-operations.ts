@@ -10,6 +10,7 @@ import {
 import type Stripe from "stripe";
 import { reconcileStripeSubscriptionOperation } from "./stripe-operation-reconciliation.js";
 import { z } from "zod";
+import { validateStripePurchasePrices } from "./stripe-price-catalog.js";
 import type { BillingSummaryRecord } from "../../storage/src/index.js";
 import type { BillingSubscriptionOperationStore } from "../../storage/src/billing-subscription-operation-store.js";
 import {
@@ -42,7 +43,7 @@ const ParametersSchema = z.object({
   resourceId: z.string().nullable(),
   body: z.record(z.string(), z.unknown()),
   result: z.object({
-    plan: z.enum(["free", "solo", "team"]),
+    plan: z.enum(["free", "solo", "team", "business"]),
     additionalPurchased: z.number().int().nonnegative(),
     pendingReduction: z
       .object({
@@ -223,6 +224,18 @@ export async function runStripeCapacityOperation(input: {
         parameters.result.pendingReduction.effective_at = new Date(
           effectiveAt * 1000
         ).toISOString();
+      }
+      if (kind === "capacity_increase") {
+        const body = parameters.body as Stripe.SubscriptionUpdateParams;
+        if (
+          !(await validateStripePurchasePrices(
+            provider,
+            (body.items ?? []).flatMap((item) => (item.price ? [item.price] : []))
+          ))
+        ) {
+          await store.abandonUnprepared(organizationId, operation.id);
+          return "billing_not_configured";
+        }
       }
       const prepared = await store.prepare(organizationId, operation.id, parameters);
       if (!prepared) return "billing_not_configured";

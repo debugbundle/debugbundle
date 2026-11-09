@@ -5,7 +5,10 @@ import {
 import type Stripe from "stripe";
 import { z } from "zod";
 import { readUpgradeAmounts, verifyUpgradeQuote } from "./stripe-upgrade-quote.js";
-import type { BillingSubscriptionOperationStore } from "../../storage/src/billing-subscription-operation-store.js";
+import type {
+  BillingSubscriptionOperation,
+  BillingSubscriptionOperationStore
+} from "../../storage/src/billing-subscription-operation-store.js";
 
 export const BILLING_PROVIDER_REQUEST_OPTIONS = { timeout: 8_000, maxNetworkRetries: 0 } as const;
 // Stripe can prune idempotency keys after 24h. Stop earlier, retaining the
@@ -159,7 +162,7 @@ export async function createStripeSubscriptionUpgradeLink(input: {
     });
     if (operation === "billing_change_in_progress") return "checkout_in_progress";
     if (operation === "no_active_subscription") return "checkout_not_allowed";
-    let subscription = await provider.client.subscriptions.retrieve(
+    const subscription = await provider.client.subscriptions.retrieve(
       operation.subscription_id,
       { expand: ["items.data.price", "latest_invoice"] },
       BILLING_PROVIDER_REQUEST_OPTIONS
@@ -247,6 +250,53 @@ export async function createStripeSubscriptionUpgradeLink(input: {
       if (!prepared) return "billing_service_error";
       operation = prepared;
     }
+    return await applyStripeSubscriptionUpgradePayment({
+      provider,
+      store,
+      organizationId,
+      appBaseUrl,
+      operation,
+      subscription,
+      now
+    });
+  } catch {
+    // Prepared requests retain their exact command and identity on uncertainty.
+    return "billing_service_error";
+  }
+}
+
+/** Both quote contracts share the existing reserved, same-subscription payment path. */
+export async function applyStripeSubscriptionUpgradePayment(input: {
+  expectedOwnerUserId?: string;
+  provider: StripeUpgradeProvider;
+  store: BillingSubscriptionOperationStore;
+  organizationId: string;
+  appBaseUrl: string;
+  operation: BillingSubscriptionOperation;
+  subscription: Stripe.Subscription;
+  now?: number;
+}): Promise<SubscriptionUpgradeLinkResult> {
+  const { provider, store, organizationId, appBaseUrl, operation } = input;
+  let { subscription } = input;
+  try {
+    if (
+      !operation.resource_id &&
+      !canReplayBillingOperation(operation.created_at, input.now ?? Date.now())
+    )
+      return "checkout_in_progress";
+    const expected = UpgradeParametersSchema.safeParse(operation.parameters);
+    const matchesItems = (): boolean =>
+      expected.success &&
+      !subscription.items.has_more &&
+      subscription.items.data.length === expected.data.items.length &&
+      expected.data.items.every((item) =>
+        subscription.items.data.some(
+          (current) =>
+            current.id === item.id &&
+            current.price.id === item.price &&
+            current.quantity === item.quantity
+        )
+      );
     let invoice: Stripe.Invoice | null;
     if (operation.resource_id) {
       invoice = await provider.client.invoices.retrieve(
@@ -255,10 +305,18 @@ export async function createStripeSubscriptionUpgradeLink(input: {
         BILLING_PROVIDER_REQUEST_OPTIONS
       );
     } else {
-      if (!canReplayBillingOperation(operation.created_at, input.now ?? Date.now()))
+      if (!expected.success) return "billing_service_error";
+      if (
+        input.expectedOwnerUserId !== undefined &&
+        !(await store.prepare(
+          organizationId,
+          operation.id,
+          operation.parameters!,
+          input.expectedOwnerUserId
+        ))
+      )
         return "checkout_in_progress";
-      const { release_schedule_id: releaseScheduleId, ...parameters } =
-        UpgradeParametersSchema.parse(operation.parameters);
+      const { release_schedule_id: releaseScheduleId, ...parameters } = expected.data;
       if (
         releaseScheduleId &&
         !(await releaseCompletedManagedSchedule({
@@ -303,16 +361,12 @@ export async function createStripeSubscriptionUpgradeLink(input: {
       invoice.status === "paid" &&
       subscription.status === "active" &&
       !subscription.pending_update &&
-      planItems(subscription, provider, "team")
+      matchesItems()
     ) {
       if (!(await store.complete(organizationId, operation.id))) return "billing_service_error";
       return { url: `${appBaseUrl}/billing?checkout=success` };
     }
-    if (
-      invoice.status === "void" &&
-      !subscription.pending_update &&
-      planItems(subscription, provider, "solo")
-    ) {
+    if (invoice.status === "void" && !subscription.pending_update && !matchesItems()) {
       await store.retireVoidedPayment(organizationId, operation.id, invoice.id);
       return "checkout_in_progress";
     }

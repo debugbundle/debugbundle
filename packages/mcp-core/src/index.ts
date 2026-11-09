@@ -2,6 +2,7 @@ export {
   OPENAI_SCHEMA_CONTRACT,
   OPENAI_TOOL_CATALOG,
   OPENAI_TOOL_NAMES,
+  OPENAI_V1_TOOL_NAMES,
   getOpenAiToolSchemas,
   parseOpenAiToolInput,
   projectOpenAiToolOutput,

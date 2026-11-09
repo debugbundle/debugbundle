@@ -131,6 +131,34 @@ describe("api SDK config", () => {
     });
   });
 
+  it("keeps the installed SDK config shape and capture defaults for Business", async () => {
+    const configurations: unknown[] = [];
+    for (const plan of ["team", "business"] as const) {
+      const app = createServer({
+        ingestionMetadata: {
+          resolveProjectByTokenHash: vi.fn().mockResolvedValue({
+            project_id: "proj_123",
+            organization_plan: plan
+          })
+        }
+      });
+      try {
+        const response = await app.inject({
+          method: "GET",
+          url: "/v1/sdk/config",
+          headers: { authorization: "Bearer dbundle_proj_test" }
+        });
+        expect(response.statusCode).toBe(200);
+        configurations.push(response.json());
+      } finally {
+        await app.close();
+      }
+    }
+    expect(configurations[1]).toEqual(configurations[0]);
+    expect(configurations[1]).toMatchObject({ capture_policy: { preset: "balanced" } });
+    expect(configurations[1]).not.toHaveProperty("organization_plan");
+  });
+
   it("should return restrictive project analytics capture settings to opted-in Free browser SDKs", async (): Promise<void> => {
     const analyticsSettingsManagement = {
       getAnalyticsSettingsForProject: vi.fn().mockResolvedValue({

@@ -8,6 +8,9 @@ import { buildDeterministicZip } from "./deterministic-zip.mjs";
 import { readOpenAiPluginSourceState } from "./openai-plugin-source-state.mjs";
 import {
   collectReleaseInputs,
+  readOpenAiPluginContract,
+  reportContractFixturePath,
+  reportSchemaPath,
   contractFixturePath,
   dataMapPath,
   openAiPluginConstants,
@@ -73,7 +76,14 @@ function packetArchiveEntries(manifestBytes) {
     path: `submission/${entry.relativePath}`,
     bytes: entry.bytes
   }));
-  for (const path of [contractFixturePath, schemaFixturePath, reviewerFixturePath, dataMapPath]) {
+  for (const path of [
+    contractFixturePath,
+    schemaFixturePath,
+    reportContractFixturePath,
+    reportSchemaPath,
+    reviewerFixturePath,
+    dataMapPath
+  ]) {
     entries.push({
       path: relative(repoRoot, path).split("/").join("/"),
       bytes: readFileSync(path)
@@ -93,6 +103,7 @@ function manualGates(validation, apiImageDigest) {
     "portal_cimd_connection",
     "portal_domain_verification",
     "portal_current_tool_scan",
+    "saved_report_scope_connection_rescan_and_reviewer_evidence",
     "owner_submission_approval",
     "openai_review_and_approval",
     "separate_owner_publication_approval",
@@ -107,7 +118,7 @@ function manualGates(validation, apiImageDigest) {
 }
 
 function buildManifest(validation, pluginArchive, apiImageDigest, recordedCommit) {
-  const contract = readJson(contractFixturePath);
+  const contract = readOpenAiPluginContract();
   const inputs = collectReleaseInputs();
   const state = readOpenAiPluginSourceState({
     repoRoot,
@@ -136,6 +147,13 @@ function buildManifest(validation, pluginArchive, apiImageDigest, recordedCommit
     submission: { files: inputs.submission },
     contract: {
       tools_in_scan_order: contract.tools.map((tool) => tool.name),
+      combined_tool_contract_sha256: sha256Bytes(Buffer.from(stableJson(contract))),
+      report_tool_contract_sha256:
+        inputs.contracts["tests/fixtures/openai-plugin-reports/tool-contracts.json"],
+      report_schema_source_sha256:
+        inputs.contracts["packages/mcp-core/src/openai-report-contract.ts"],
+      report_wire_schema_sha256:
+        inputs.contracts["packages/mcp-core/src/contracts/report-schemas.json"],
       tool_contract_sha256: inputs.contracts["tests/fixtures/openai-plugin-v1/tool-contracts.json"],
       schemas_sha256: inputs.contracts["tests/fixtures/openai-plugin-v1/schemas.json"],
       data_map_sha256: inputs.contracts["contracts/openai-plugin-v1-data-map.md"],

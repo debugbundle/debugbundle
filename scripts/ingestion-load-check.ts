@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { performance } from "node:perf_hooks";
 
 import { hashToken } from "../packages/auth/src/index.js";
@@ -131,7 +132,7 @@ function buildPlan(totalRequests: number): RequestPlan[] {
   );
 }
 
-async function main(): Promise<void> {
+export async function runIngestionLoadCheck(): Promise<void> {
   const persistAndEnqueue = async () => ({ object_key: "raw-events/proj_load/event.json.gz" });
   let persistedCount = 0;
 
@@ -465,8 +466,9 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : "unknown_ingestion_load_error";
-  console.error(`ingestion_load_check_failed:${message}`);
-  process.exitCode = 1;
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)
+  runIngestionLoadCheck().catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : "unknown_ingestion_load_error";
+    console.error(`ingestion_load_check_failed:${message}`);
+    process.exitCode = 1;
+  });

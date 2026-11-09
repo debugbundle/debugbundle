@@ -50,7 +50,7 @@ export interface WebSessionAuthStore {
     email: string;
     email_verified_at: string | null;
     organization_id: string;
-    role: "owner" | "member";
+    role: "owner" | "admin" | "member";
     created_user: boolean;
   }>;
 }
@@ -105,7 +105,8 @@ export type AcceptInviteResult =
         | "invalid_session"
         | "invalid_token"
         | "invite_email_mismatch"
-        | "shared_access_suspended";
+        | "shared_access_suspended"
+        | "collaborator_limit_reached";
     };
 
 export type BeginGitHubAuthResult =
@@ -530,6 +531,8 @@ export function createWebSessionAuthService(
         email: session.email,
         accepted_at: now.toISOString()
       });
+      if (accepted.kind === "collaborator_limit_reached")
+        return { ok: false, error: "collaborator_limit_reached" };
       if (accepted.kind === "invalid_token") {
         return {
           ok: false,

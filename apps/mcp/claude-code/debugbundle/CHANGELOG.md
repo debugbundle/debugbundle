@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.21.0] - 2026-11-09
+
+- Adopt MCP 1.21.0 with organisation access, billing/referrals and Smart Report automation while preserving local-auth and existing incident workflows.
+
 ## [1.19.4] - 2026-11-05
 
 - Adopt MCP 1.19.4: constrain retained local artifact paths, reject symlinks across reads/rebuilds/cleanup and preserve existing valid local stores and authentication.

@@ -15,7 +15,10 @@ function normalizeOrigin(currentLocation: URL | Location): string {
   return `${currentLocation.protocol}//${currentLocation.host}`;
 }
 
-function normalizeExternalUrl(value: string | undefined, currentLocation: URL | Location): string | null {
+function normalizeExternalUrl(
+  value: string | undefined,
+  currentLocation: URL | Location
+): string | null {
   const trimmed = value?.trim();
   if (trimmed === undefined || trimmed.length === 0) {
     return null;
@@ -37,7 +40,10 @@ export function resolveDocumentationUrl(
   env: WebExternalLinksEnv = import.meta.env,
   currentLocation: URL | Location = window.location
 ): string {
-  const explicitDocumentationUrl = normalizeExternalUrl(env.VITE_DOCUMENTATION_URL, currentLocation);
+  const explicitDocumentationUrl = normalizeExternalUrl(
+    env.VITE_DOCUMENTATION_URL,
+    currentLocation
+  );
   if (explicitDocumentationUrl !== null) {
     return explicitDocumentationUrl;
   }
@@ -47,4 +53,11 @@ export function resolveDocumentationUrl(
   }
 
   return HOSTED_DOCUMENTATION_URL;
+}
+
+export function resolvePricingUrl(
+  env: WebExternalLinksEnv = import.meta.env,
+  currentLocation: URL | Location = window.location
+): string {
+  return new URL("/pricing/", resolveDocumentationUrl(env, currentLocation)).href;
 }

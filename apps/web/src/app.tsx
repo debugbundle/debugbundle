@@ -17,6 +17,13 @@ import {
 import { Toaster } from "sonner";
 
 import { AppSidebar } from "./components/system/app-sidebar.js";
+import { OrganizationPeoplePage } from "./pages/organization-people-page.js";
+import { ReferralsPage } from "./pages/referrals-page.js";
+import { ReportsPage } from "./pages/reports-page.js";
+import { ReportPage } from "./pages/report-page.js";
+import { ReportEditorPage } from "./pages/report-editor-page.js";
+import { ReferralPayoutsPage } from "./pages/referral-payouts-page.js";
+import { OrganizationAcceptPage } from "./pages/organization-accept-page.js";
 import { createProjectRoutes } from "./app-project-routes.js";
 import { AppUpdateNotifier } from "./components/system/app-update-notifier.js";
 import { AuthLayout } from "./components/system/auth-layout.js";
@@ -82,7 +89,7 @@ interface AppProps {
 }
 
 type AuthStep = "request" | "verify";
-type RequestedTrialPlan = "solo" | "team";
+type RequestedTrialPlan = "solo" | "team" | "business";
 
 interface AuthFieldErrors {
   email?: string;
@@ -95,7 +102,7 @@ interface AuthRequestError {
 }
 
 function parseRequestedTrialPlan(value: string | null): RequestedTrialPlan | null {
-  return value === "solo" || value === "team" ? value : null;
+  return value === "solo" || value === "team" || value === "business" ? value : null;
 }
 
 function readStoredSignupTrialPlan(): RequestedTrialPlan | null {
@@ -120,7 +127,7 @@ function writeStoredSignupTrialPlan(plan: RequestedTrialPlan | null): void {
 }
 
 function formatRequestedTrialPlanName(plan: RequestedTrialPlan): string {
-  return plan === "solo" ? "Solo" : "Team";
+  return plan === "solo" ? "Solo" : plan === "team" ? "Team" : "Business";
 }
 
 function validateEmailAddress(value: string): string | undefined {
@@ -181,6 +188,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/invite" element={<ProjectInvitePage />} />
+            <Route path="/organizations/accept" element={<OrganizationAcceptPage />} />
             <Route path="/auth/github/callback" element={<GithubAuthCallbackPage />} />
             <Route path="/oauth/consent" element={<OpenAiConsentPage />} />
             <Route path="/oauth/reviewer" element={<OpenAiReviewerPage />} />
@@ -202,6 +210,16 @@ export function App({ initialEntries }: AppProps): JSX.Element {
               <Route path="/organization" element={<Navigate replace to="/projects" />} />
               {createProjectRoutes()}
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/settings/people" element={<OrganizationPeoplePage />} />
+              <Route path="/reports" element={<ReportsPage />} />
+              <Route path="/reports/definitions/new" element={<ReportEditorPage />} />
+              <Route
+                path="/reports/definitions/:definitionId/edit"
+                element={<ReportEditorPage />}
+              />
+              <Route path="/reports/:organizationId/:runId" element={<ReportPage />} />
+              <Route path="/settings/referrals" element={<ReferralsPage />} />
+              <Route path="/settings/referrals/payouts" element={<ReferralPayoutsPage />} />
               <Route path="/member-tokens" element={<MemberTokensPage />} />
             </Route>
             <Route path="*" element={<RootRedirect />} />
@@ -217,6 +235,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/invite" element={<ProjectInvitePage />} />
+            <Route path="/organizations/accept" element={<OrganizationAcceptPage />} />
             <Route path="/auth/github/callback" element={<GithubAuthCallbackPage />} />
             <Route path="/oauth/consent" element={<OpenAiConsentPage />} />
             <Route path="/oauth/reviewer" element={<OpenAiReviewerPage />} />
@@ -238,6 +257,16 @@ export function App({ initialEntries }: AppProps): JSX.Element {
               <Route path="/organization" element={<Navigate replace to="/projects" />} />
               {createProjectRoutes()}
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/settings/people" element={<OrganizationPeoplePage />} />
+              <Route path="/reports" element={<ReportsPage />} />
+              <Route path="/reports/definitions/new" element={<ReportEditorPage />} />
+              <Route
+                path="/reports/definitions/:definitionId/edit"
+                element={<ReportEditorPage />}
+              />
+              <Route path="/reports/:organizationId/:runId" element={<ReportPage />} />
+              <Route path="/settings/referrals" element={<ReferralsPage />} />
+              <Route path="/settings/referrals/payouts" element={<ReferralPayoutsPage />} />
               <Route path="/member-tokens" element={<MemberTokensPage />} />
             </Route>
             <Route path="*" element={<RootRedirect />} />
@@ -351,7 +380,11 @@ function ProtectedLayout(): JSX.Element {
   }
 
   return (
-    <ProtectedShell session={session} setSession={setSession}>
+    <ProtectedShell
+      key={`${session.user_id}:${session.organization_id}`}
+      session={session}
+      setSession={setSession}
+    >
       <Outlet />
     </ProtectedShell>
   );
@@ -465,7 +498,11 @@ function appendAuthPath(
   if (options.nextPath !== "/dashboard") {
     searchParams.set("next", options.nextPath);
   }
-  if (options.trialPlan === "solo" || options.trialPlan === "team") {
+  if (
+    options.trialPlan === "solo" ||
+    options.trialPlan === "team" ||
+    options.trialPlan === "business"
+  ) {
     searchParams.set("trial", options.trialPlan);
   }
 

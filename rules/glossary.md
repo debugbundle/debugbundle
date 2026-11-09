@@ -370,3 +370,18 @@ Joining frontend and backend evidence by trace ID within the same project and
 environment. A trace can cross services; its reuse cannot combine projects or
 environments. Mixed retained local source evidence is refused until an explicit
 rebuild from preserved event files.
+
+## Business, referrals and Smart Reports
+
+- **Organisation grant:** A fixed Owner/Admin/Member relationship. A Business grant may explicitly include current and future projects; suspension denies access from every grant.
+- **Project Viewer:** A read-only project role. Credential permissions can narrow the holder's current authority, never expand it.
+- **Monthly allowance window:** The shared usage period, including a monthly sub-window inside an annual paid term. Capacity purchases and upgrades do not reset consumed usage.
+- **First eligible referral invoice:** The first finalised, positive Business base invoice carrying the verified referral benefit. A retry of that invoice keeps its discount; trial/zero invoices do not consume it and a later invoice does not receive another benefit.
+- **Collected base cash:** Verified, allocated payment for eligible Business base service, excluding tax, capacity and non-cash credit. Referral commission follows this cash and the paid-service period, with refund/dispute reversals and availability holds.
+- **Canonical Smart Report:** One immutable, private structured report. HTML, PDF and email overview use its same facts and analysis; formatting retries do not generate more AI analysis.
+- **Whole report scope:** Every frozen project and original origin selected for that report. Reading or delivering the report requires current authority for the entire scope; AI prose is never made shareable by filtering out projects afterward.
+- **Factual-only report:** A canonical report containing authoritative observations and explicit analysis unavailability when optional AI cannot safely complete.
+- **Uncertain delivery:** A provider request whose acceptance cannot be established. It retains a conservative receipt and is not blindly resent.
+
+- **Saved-report consent:** Explicit OAuth permission `debugbundle:reports:read` to list and read existing whole-scope Smart Reports. It does not authorise report generation, delivery or editing and is not added to an older connection automatically.
+- **Trial report window:** One allowance/budget window spanning the existing thirty-day Business trial. Calendar month changes do not reset it; new collection, generation and delivery stop at the database expiry deadline.

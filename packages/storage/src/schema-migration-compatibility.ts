@@ -1,4 +1,8 @@
-import { REQUIRED_API_TABLES, REQUIRED_WORKER_TABLES, type Queryable } from "./migrations.js";
+import {
+  INSTALLED_API_BASELINE_TABLES,
+  INSTALLED_WORKER_BASELINE_TABLES,
+  type Queryable
+} from "./migrations.js";
 import { projectServiceSchemaAvailable } from "./project-service-schema-check.js";
 
 const CURRENT_SCHEMA_SENTINEL_COLUMNS = [
@@ -67,7 +71,9 @@ export const LEGACY_PLAN_CLEANUP_TASKS_MIGRATION_CHECKSUM =
   "29ef315ff519db45c371a289981d99a0e297e8386e21f4c64eff46ddc522a3a9";
 
 async function listRequiredStorageTables(db: Queryable): Promise<Set<string>> {
-  const requiredTables = Array.from(new Set([...REQUIRED_API_TABLES, ...REQUIRED_WORKER_TABLES]));
+  const requiredTables = Array.from(
+    new Set([...INSTALLED_API_BASELINE_TABLES, ...INSTALLED_WORKER_BASELINE_TABLES])
+  );
   const rows = await db.query<{ table_name: string }>(
     `
       SELECT table_name
@@ -104,7 +110,10 @@ async function listCurrentSchemaSentinelColumns(db: Queryable): Promise<Set<stri
 
 export async function isCurrentStorageSchemaBaseline(db: Queryable): Promise<boolean> {
   const requiredTables = await listRequiredStorageTables(db);
-  const expectedRequiredTables = new Set([...REQUIRED_API_TABLES, ...REQUIRED_WORKER_TABLES]);
+  const expectedRequiredTables = new Set([
+    ...INSTALLED_API_BASELINE_TABLES,
+    ...INSTALLED_WORKER_BASELINE_TABLES
+  ]);
 
   for (const tableName of expectedRequiredTables) {
     if (!requiredTables.has(tableName)) {

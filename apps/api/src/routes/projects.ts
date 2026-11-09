@@ -1,3 +1,4 @@
+import { memberReadScope } from "../member-access-scope.js";
 import type { FastifyInstance } from "fastify";
 import { rejectConsolidatedProjectWrite } from "../project-consolidation-http.js";
 
@@ -32,6 +33,7 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
     }
 
     const projects = await projectManagement.listProjectsForUser({
+      ...memberReadScope(member),
       user_id: member.member_id,
       now: new Date().toISOString(),
       limit: parsedQuery.data.limit,
@@ -57,7 +59,10 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
     if (projectManagement === undefined || projectManagement.createProjectForUser === undefined) {
       return reply.status(404).send({ error: "projects_not_available" });
     }
-    if (member.role !== "owner") {
+    if (
+      member.role !== "owner" &&
+      !(member.role === "admin" && memberReadScope(member).include_organization_grants === true)
+    ) {
       return reply.status(403).send({ error: "forbidden" });
     }
 
@@ -67,6 +72,7 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
     }
 
     const project = await projectManagement.createProjectForUser({
+      ...memberReadScope(member),
       user_id: member.member_id,
       organization_id: member.organization_id,
       name: parsedBody.data.name,
@@ -113,6 +119,7 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
     }
 
     const access = await projectManagement.resolveProjectAccessForUser({
+      ...memberReadScope(member),
       user_id: member.member_id,
       project_id: parsedParams.data.id
     });
@@ -128,6 +135,7 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
     if (rejectConsolidatedProjectWrite(reply, access)) return;
 
     const project = await projectManagement.updateProjectForUser({
+      ...memberReadScope(member),
       user_id: member.member_id,
       project_id: parsedParams.data.id,
       ...(parsedBody.data.name === undefined ? {} : { name: parsedBody.data.name }),
@@ -174,6 +182,7 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
     }
 
     const access = await projectManagement.resolveProjectAccessForUser({
+      ...memberReadScope(member),
       user_id: member.member_id,
       project_id: parsedParams.data.id
     });
@@ -189,6 +198,7 @@ export function registerProjectRoutes(app: FastifyInstance, dependencies: ApiDep
     if (rejectConsolidatedProjectWrite(reply, access)) return;
 
     const project = await projectManagement.deleteProjectForUser({
+      ...memberReadScope(member),
       user_id: member.member_id,
       project_id: parsedParams.data.id
     });

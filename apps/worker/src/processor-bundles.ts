@@ -1,4 +1,5 @@
 import { gunzipSync, gzipSync } from "node:zlib";
+import { isProjectJobRequestAuthorized } from "./project-job-authorization.js";
 import { collectDiagnosticContext } from "./processor-evidence-context.js";
 import { buildBundle } from "../../../packages/bundle-engine/src/index.js";
 import { buildReproduction } from "../../../packages/repro-engine/src/index.js";
@@ -79,6 +80,8 @@ export async function processNextBuildBundleJob(
   }
 
   try {
+    if (!(await isProjectJobRequestAuthorized(dependencies.projectJobAuthorization, job)))
+      return { processed: true, reason: "initiator_access_revoked" };
     const incident = await dependencies.incidentStore.getBundleBuildContext({
       project_id: job.project_id,
       incident_id: job.incident_id
@@ -177,8 +180,13 @@ export async function processNextBuildBundleJob(
       environment: incident.environment,
       // The bundle describes one primary occurrence. Query its bounded context
       // directly so older retained failures cannot exhaust the candidate limit.
-      failures: incidentEnvelopes.filter((item) => item.eventClass === "incident_signal" &&
-        item.eventId === (primaryOverride?.id ?? bundleMetadata.source_event_id)).map((item) => item.envelope)
+      failures: incidentEnvelopes
+        .filter(
+          (item) =>
+            item.eventClass === "incident_signal" &&
+            item.eventId === (primaryOverride?.id ?? bundleMetadata.source_event_id)
+        )
+        .map((item) => item.envelope)
     });
     const workloadDeploy =
       incident.service_id === null
@@ -217,6 +225,8 @@ export async function processNextBuildBundleJob(
     const body = gzipSync(Buffer.from(JSON.stringify(bundle), "utf8"));
     const key = buildBundleObjectKey(job.project_id, job.incident_id);
 
+    if (!(await isProjectJobRequestAuthorized(dependencies.projectJobAuthorization, job)))
+      return { processed: true, reason: "initiator_access_revoked" };
     await dependencies.objectStore.putObject({
       key,
       body,
@@ -320,6 +330,12 @@ export async function processNextBuildBundleJob(
     }
 
     const reproductionJob: BuildReproductionJob = {
+      ...(job.initiating_authority === undefined
+        ? {}
+        : {
+            initiating_authority: job.initiating_authority,
+            scope_origin_ids: job.scope_origin_ids ?? []
+          }),
       project_id: job.project_id,
       incident_id: job.incident_id,
       bundle_key: key,
@@ -376,6 +392,8 @@ export async function processNextBuildReproductionJob(
   if (job === null) {
     return { processed: false, reason: "no_jobs" };
   }
+  if (!(await isProjectJobRequestAuthorized(dependencies.projectJobAuthorization, job)))
+    return { processed: true, reason: "initiator_access_revoked" };
 
   let compressedBundle: Buffer;
   try {
@@ -412,6 +430,8 @@ export async function processNextBuildReproductionJob(
   const reproduction = buildReproduction(bundle);
   const body = gzipSync(Buffer.from(JSON.stringify(reproduction), "utf8"));
 
+  if (!(await isProjectJobRequestAuthorized(dependencies.projectJobAuthorization, job)))
+    return { processed: true, reason: "initiator_access_revoked" };
   try {
     await dependencies.objectStore.putObject({
       key: buildReproductionObjectKey(job.project_id, job.incident_id),

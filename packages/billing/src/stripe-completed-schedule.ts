@@ -29,7 +29,7 @@ export function isCompletedManagedSchedule(
     !schedule.current_phase ||
     id(schedule.subscription) !== subscription.id ||
     schedule.metadata?.["organization_id"] !== organizationId ||
-    !["capacity_reduction", "plan_downgrade"].includes(
+    !["capacity_reduction", "plan_downgrade", "offer_change"].includes(
       schedule.metadata["debugbundle_change"] ?? ""
     ) ||
     schedule.phases.length < 2

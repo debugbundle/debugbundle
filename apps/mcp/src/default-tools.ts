@@ -1,5 +1,9 @@
 import { createNotificationApi } from "../../../packages/alert-client/src/notification-preferences.js";
 import { createNotificationMcpTools } from "./notification-tools.js";
+import { createOrganizationMcpTools } from "./organization-tools.js";
+import { createOrganizationApi } from "../../../packages/organization-client/src/index.js";
+import { createReferralApi } from "../../../packages/referral-client/src/index.js";
+import { createReferralMcpTools } from "./referral-tools.js";
 import { createPublicStatusApi } from "../../cli/src/public-status-commands.js";
 import { createPublicStatusMcpTools } from "./public-status-tools.js";
 import { createAnalyticsFlowApi } from "../../cli/src/analytics-flow-commands.js";
@@ -186,6 +190,12 @@ export async function createDefaultMcpTools(
       ...createImprovementMcpTools(retrievalApi),
       ...createServicesMcpTools(retrievalApi),
       ...createTokenMcpTools(createTokenManagementApi(httpClient)),
+      ...createOrganizationMcpTools(createOrganizationApi(httpClient)),
+      ...createReferralMcpTools(createReferralApi(httpClient)),
+      ...createReportMcpTools(createReportApi(httpClient)),
+      ...createReportRunMcpTools(createReportRunApi(httpClient), { source_base_url: baseUrl }),
+      ...createReportPdfMcpTools(createReportPdfApi(httpClient), { apiBaseUrl: baseUrl }),
+      ...createReportDeliveryMcpTools(createReportDeliveryApi(httpClient)),
       ...createWebhookMcpTools(createWebhookApi(httpClient)),
       ...createSlackMcpTools(createSlackApi(httpClient)),
       ...createWeeklyReportMcpTools(createWeeklyReportApi(httpClient)),
@@ -218,3 +228,13 @@ export async function createDefaultMcpTools(
 }
 
 export type { ToolHandler, ToolRegistry };
+import { createReportMcpTools } from "./report-tools.js";
+import {
+  createReportApi,
+  createReportRunApi,
+  createReportPdfApi,
+  createReportDeliveryApi
+} from "../../../packages/report-client/src/index.js";
+import { createReportRunMcpTools } from "./report-run-tools.js";
+import { createReportPdfMcpTools } from "./report-pdf-tools.js";
+import { createReportDeliveryMcpTools } from "./report-delivery-tools.js";

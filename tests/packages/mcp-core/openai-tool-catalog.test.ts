@@ -25,7 +25,11 @@ describe("OpenAI MCP tool catalog", () => {
       ).then((value) => JSON.parse(value) as unknown)
     ]);
 
-    expect(OPENAI_TOOL_CATALOG).toEqual(contracts.tools);
+    expect(OPENAI_TOOL_CATALOG.slice(0, 23)).toEqual(contracts.tools);
+    expect(OPENAI_TOOL_CATALOG.slice(23).map((tool) => tool.name)).toEqual([
+      "list_reports",
+      "get_report_content"
+    ]);
     const current = structuredClone(OPENAI_SCHEMA_CONTRACT) as {
       $defs: Record<string, { properties?: Record<string, unknown>; required?: string[] }>;
     };
@@ -83,8 +87,11 @@ describe("OpenAI MCP tool catalog", () => {
         destructiveHint: false
       });
       expect(tool.securitySchemes).toHaveLength(1);
-      expect(tool.input_schema_ref).toMatch(/^schemas\.json#\/\$defs\//);
-      expect(tool.output_schema_ref).toMatch(/^schemas\.json#\/\$defs\//);
+      const prefix = ["list_reports", "get_report_content"].includes(tool.name)
+        ? "report-schemas.json#/$defs/"
+        : "schemas.json#/$defs/";
+      expect(tool.input_schema_ref.startsWith(prefix)).toBe(true);
+      expect(tool.output_schema_ref.startsWith(prefix)).toBe(true);
     }
   });
 });

@@ -48,7 +48,7 @@ export function parseOpenAiAuthorizationInteraction(
     .split(" ")
     .filter((scope) => scope.length > 0);
   const requestedScopeSet = new Set(requestedScopes);
-  const expectedScopes = [...OPENAI_OIDC_SCOPES, ...OPENAI_HOSTED_MCP_SCOPES];
+  const expectedScopes: readonly string[] = [...OPENAI_OIDC_SCOPES, ...OPENAI_HOSTED_MCP_SCOPES];
 
   if (
     (promptName !== "login" && promptName !== "consent") ||
@@ -59,8 +59,10 @@ export function parseOpenAiAuthorizationInteraction(
     stringValue(params["code_challenge"]).length < 43 ||
     resources.length !== 1 ||
     resources[0] !== OPENAI_MCP_RESOURCE ||
-    requestedScopeSet.size !== expectedScopes.length ||
-    expectedScopes.some((scope) => !requestedScopeSet.has(scope))
+    requestedScopeSet.size !== requestedScopes.length ||
+    OPENAI_OIDC_SCOPES.some((scope) => !requestedScopeSet.has(scope)) ||
+    requestedScopes.some((scope) => !expectedScopes.includes(scope)) ||
+    !OPENAI_HOSTED_MCP_SCOPES.some((scope) => requestedScopeSet.has(scope))
   ) {
     throw new Error("openai_authorization_interaction_invalid");
   }
@@ -76,7 +78,7 @@ export function parseOpenAiAuthorizationInteraction(
   return {
     uid: stringValue(details["uid"]),
     promptName,
-    productScopes: [...OPENAI_HOSTED_MCP_SCOPES],
+    productScopes: OPENAI_HOSTED_MCP_SCOPES.filter((scope) => requestedScopeSet.has(scope)),
     ...(sessionAccountId === undefined ? {} : { sessionAccountId }),
     ...(providerGrantId === undefined ? {} : { providerGrantId })
   };

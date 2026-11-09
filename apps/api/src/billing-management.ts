@@ -1,4 +1,13 @@
 import { createStripePlanChangeService } from "../../../packages/billing/src/stripe-plan-change.js";
+import { createStripeOfferChangeService } from "../../../packages/billing/src/stripe-offer-change.js";
+import type { BillingOfferChangeManagement } from "../../../packages/billing-client/src/offer-change-client.js";
+import { billingOwnerIdSql } from "../../../packages/storage/src/billing-owner.js";
+import {
+  createStripeOfferUpgradeLink,
+  previewStripeOfferUpgrade,
+  type StripeOfferUpgradePreviewResult
+} from "../../../packages/billing/src/stripe-offer-upgrade.js";
+import type { PaidTierName, BillingInterval } from "../../../packages/shared-types/src/index.js";
 import type { BillingPlanChangeManagement } from "../../../packages/billing-client/src/plan-change.js";
 import { confirmStripeCheckout } from "../../../packages/billing/src/stripe-checkout-confirmation.js";
 import type { CapacityPaymentRequired } from "../../../packages/billing/src/stripe-capacity-payment.js";
@@ -47,8 +56,10 @@ import { deriveBillingState, type StripeConfig } from "./stripe-config.js";
 const BILLING_SUMMARY_STRIPE_PROJECTION_TIMEOUT_MS = 2_500;
 const NO_CARD_TRIAL_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 
-export function normalizeBillingPlan(plan: string | null | undefined): "free" | "solo" | "team" {
-  if (plan === "solo" || plan === "team") {
+export function normalizeBillingPlan(
+  plan: string | null | undefined
+): "free" | "solo" | "team" | "business" {
+  if (plan === "solo" || plan === "team" || plan === "business") {
     return plan;
   }
 
@@ -56,7 +67,8 @@ export function normalizeBillingPlan(plan: string | null | undefined): "free" | 
 }
 
 interface OrganizationBillingState {
-  plan: "free" | "solo" | "team";
+  primary_owner_user_id: string | null;
+  plan: "free" | "solo" | "team" | "business";
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
   billing_state: string | null;
@@ -72,8 +84,10 @@ interface CreateBillingManagementInput {
   appBaseUrl?: string;
 }
 
-function planRank(plan: "free" | "solo" | "team"): number {
+function planRank(plan: "free" | "solo" | "team" | "business"): number {
   switch (plan) {
+    case "business":
+      return 3;
     case "team":
       return 2;
     case "solo":
@@ -111,6 +125,7 @@ async function getOrganizationBillingState(
   organizationId: string
 ): Promise<OrganizationBillingState | null> {
   const result = await db.query<{
+    primary_owner_user_id: string | null;
     plan: string;
     stripe_customer_id: string | null;
     stripe_subscription_id: string | null;
@@ -118,6 +133,7 @@ async function getOrganizationBillingState(
   }>(
     `
       SELECT
+        ${billingOwnerIdSql()} AS primary_owner_user_id,
         COALESCE(plan, 'free') AS plan,
         stripe_customer_id,
         billing_state,
@@ -135,6 +151,7 @@ async function getOrganizationBillingState(
   }
 
   return {
+    primary_owner_user_id: row.primary_owner_user_id ?? null,
     plan: normalizeBillingPlan(row.plan),
     stripe_customer_id: row.stripe_customer_id ?? null,
     stripe_subscription_id: row.stripe_subscription_id ?? null,
@@ -164,19 +181,32 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
     }): Promise<void>;
     startTrial(input: {
       organization_id: string;
-      target_plan: "solo" | "team";
+      target_plan: "solo" | "team" | "business";
       now: string;
     }): Promise<BillingSummaryRecord | "billing_not_found" | "trial_unavailable">;
     getPlanChange?: BillingPlanChangeManagement["getPlanChange"];
+    getOfferChange?: BillingOfferChangeManagement["getOfferChange"];
+    previewOfferChange?: BillingOfferChangeManagement["previewOfferChange"];
+    scheduleOfferChange?: BillingOfferChangeManagement["scheduleOfferChange"];
+    cancelOfferChange?: BillingOfferChangeManagement["cancelOfferChange"];
     previewPlanChange?: BillingPlanChangeManagement["previewPlanChange"];
     schedulePlanChange?: BillingPlanChangeManagement["schedulePlanChange"];
     cancelPlanChange?: BillingPlanChangeManagement["cancelPlanChange"];
     previewUpgrade?(input: { organization_id: string }): Promise<UpgradePreviewResult>;
+    previewOfferUpgrade?(input: {
+      organization_id: string;
+      actor_user_id: string;
+      target_plan: PaidTierName;
+      interval: BillingInterval;
+    }): Promise<StripeOfferUpgradePreviewResult>;
     createCheckoutLink(input: {
       organization_id: string;
       billing_email: string;
-      current_plan: "free" | "solo" | "team";
-      target_plan: "solo" | "team";
+      current_plan: "free" | "solo" | "team" | "business";
+      target_plan: PaidTierName;
+      interval?: BillingInterval;
+      additional_capacity_units?: number;
+      actor_user_id?: string;
       confirmation_token?: string;
     }): Promise<CheckoutLinkResult>;
     confirmCheckoutSession(input: {
@@ -193,7 +223,7 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
     >;
     createPortalLink(input: {
       organization_id: string;
-      current_plan: "solo" | "team";
+      current_plan: "solo" | "team" | "business";
     }): Promise<{ url: string } | null>;
     increaseCapacity(input: {
       organization_id: string;
@@ -216,7 +246,7 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
   }): Promise<BillingSummaryRecord | null>;
   overrideOrganizationBilling(input: {
     organization_id: string;
-    plan: "free" | "solo" | "team";
+    plan: "free" | "solo" | "team" | "business";
     additional_capacity_units: number;
     now: string;
   }): Promise<BillingSummaryRecord | "billing_not_found">;
@@ -234,6 +264,28 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
       provider: input.stripeConfig,
       store: subscriptionOperationStore,
       organizationId,
+      subscriptionId: organization.stripe_subscription_id,
+      customerId: organization.stripe_customer_id
+    });
+  }
+
+  async function offerChangeService(
+    organizationId: string,
+    actorUserId: string
+  ): Promise<ReturnType<typeof createStripeOfferChangeService> | null> {
+    if (!input.stripeConfig) return null;
+    const organization = await getOrganizationBillingState(input.db, organizationId);
+    if (
+      !organization?.stripe_subscription_id ||
+      !organization.stripe_customer_id ||
+      organization.primary_owner_user_id !== actorUserId
+    )
+      return null;
+    return createStripeOfferChangeService({
+      provider: input.stripeConfig,
+      store: subscriptionOperationStore,
+      organizationId,
+      actorUserId,
       subscriptionId: organization.stripe_subscription_id,
       customerId: organization.stripe_customer_id
     });
@@ -345,7 +397,7 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
 
   async function overrideOrganizationBilling(inputValue: {
     organization_id: string;
-    plan: "free" | "solo" | "team";
+    plan: "free" | "solo" | "team" | "business";
     additional_capacity_units: number;
     now: string;
   }): Promise<BillingSummaryRecord | "billing_not_found"> {
@@ -405,6 +457,7 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
       ).cleanupOrganizationForPlan({
         organization_id: inputValue.organization_id,
         plan: targetPlan,
+        previous_plan: previousPlan,
         now: inputValue.now
       });
 
@@ -463,15 +516,43 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
         input.billingStore.incrementOrgUsageCounter(inputValue),
       incrementProjectUsageCounter: (inputValue) =>
         input.billingStore.incrementProjectUsageCounter(inputValue),
-      startTrial: (trialInput) =>
-        input.billingStore.startTrialForOrganization({
+      startTrial: (trialInput) => {
+        if (
+          trialInput.target_plan === "business" &&
+          input.stripeConfig?.businessSalesEnabled !== true
+        )
+          return Promise.resolve("trial_unavailable" as const);
+        return input.billingStore.startTrialForOrganization({
           organization_id: trialInput.organization_id,
           target_plan: trialInput.target_plan,
           started_at: trialInput.now,
           ends_at: new Date(
             new Date(trialInput.now).getTime() + NO_CARD_TRIAL_DURATION_MS
           ).toISOString()
-        }),
+        });
+      },
+      getOfferChange: async ({ organization_id, actor_user_id }) => {
+        const organization = await getOrganizationBillingState(input.db, organization_id);
+        if (!organization || organization.primary_owner_user_id !== actor_user_id)
+          return "no_active_subscription";
+        if (!organization.stripe_subscription_id)
+          return { pending_change: null, subscription: null };
+        return (
+          (await offerChangeService(organization_id, actor_user_id))?.getStatus() ??
+          (input.stripeConfig ? "no_active_subscription" : "billing_not_configured")
+        );
+      },
+      previewOfferChange: async ({ organization_id, actor_user_id, target_plan, interval }) =>
+        (await offerChangeService(organization_id, actor_user_id))?.preview({
+          target_plan,
+          interval
+        }) ?? (input.stripeConfig ? "no_active_subscription" : "billing_not_configured"),
+      scheduleOfferChange: async ({ organization_id, actor_user_id, confirmation_token }) =>
+        (await offerChangeService(organization_id, actor_user_id))?.schedule(confirmation_token) ??
+        (input.stripeConfig ? "no_active_subscription" : "billing_not_configured"),
+      cancelOfferChange: async ({ organization_id, actor_user_id, schedule_id }) =>
+        (await offerChangeService(organization_id, actor_user_id))?.cancel(schedule_id) ??
+        (input.stripeConfig ? "no_active_subscription" : "billing_not_configured"),
       getPlanChange: async ({ organization_id }) =>
         (await planChangeService(organization_id))?.getStatus() ?? "no_active_subscription",
       previewPlanChange: async ({ organization_id }) =>
@@ -494,6 +575,28 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
           customerId: organization.stripe_customer_id
         });
       },
+      previewOfferUpgrade: async (offerInput) => {
+        if (!input.stripeConfig) return "billing_service_error";
+        const organization = await getOrganizationBillingState(
+          input.db,
+          offerInput.organization_id
+        );
+        if (
+          !organization?.stripe_subscription_id ||
+          !organization.stripe_customer_id ||
+          organization.primary_owner_user_id !== offerInput.actor_user_id
+        )
+          return "checkout_not_allowed";
+        return previewStripeOfferUpgrade({
+          provider: input.stripeConfig,
+          store: subscriptionOperationStore,
+          organizationId: offerInput.organization_id,
+          subscriptionId: organization.stripe_subscription_id,
+          customerId: organization.stripe_customer_id,
+          actorUserId: offerInput.actor_user_id,
+          target: { target_plan: offerInput.target_plan, interval: offerInput.interval }
+        });
+      },
       createCheckoutLink: async (checkoutInput) => {
         if (input.stripeConfig !== undefined) {
           try {
@@ -501,6 +604,38 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
               input.db,
               checkoutInput.organization_id
             );
+            if (checkoutInput.interval !== undefined || checkoutInput.target_plan === "business") {
+              if (
+                !checkoutInput.actor_user_id ||
+                organization?.primary_owner_user_id !== checkoutInput.actor_user_id
+              )
+                return "checkout_not_allowed";
+              if (
+                organization.stripe_subscription_id &&
+                organization.billing_state !== "canceled"
+              ) {
+                if (
+                  !organization.stripe_customer_id ||
+                  checkoutInput.additional_capacity_units !== undefined
+                )
+                  return "checkout_not_allowed";
+                if (!checkoutInput.confirmation_token) return "upgrade_confirmation_required";
+                return createStripeOfferUpgradeLink({
+                  provider: input.stripeConfig,
+                  store: subscriptionOperationStore,
+                  organizationId: checkoutInput.organization_id,
+                  subscriptionId: organization.stripe_subscription_id,
+                  customerId: organization.stripe_customer_id,
+                  actorUserId: checkoutInput.actor_user_id,
+                  target: {
+                    target_plan: checkoutInput.target_plan,
+                    interval: checkoutInput.interval ?? "month"
+                  },
+                  appBaseUrl,
+                  confirmationToken: checkoutInput.confirmation_token
+                });
+              }
+            }
             if (
               organization?.stripe_subscription_id &&
               checkoutInput.current_plan === "solo" &&
@@ -537,6 +672,9 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
               appBaseUrl,
               input: {
                 ...checkoutInput,
+                ...(checkoutInput.actor_user_id === undefined
+                  ? {}
+                  : { expected_owner_user_id: checkoutInput.actor_user_id }),
                 ...(endedSubscriptionId === undefined
                   ? {}
                   : { confirmed_ended_subscription_id: endedSubscriptionId })
@@ -547,6 +685,8 @@ export function createBillingManagement(input: CreateBillingManagementInput): {
           }
         }
 
+        if (checkoutInput.interval !== undefined || checkoutInput.target_plan === "business")
+          return null;
         const url = input.billingLinks.createCheckoutUrl({
           target_plan: checkoutInput.target_plan
         });

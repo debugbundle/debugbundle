@@ -17,11 +17,10 @@ import type { AccountAnalyticsStore } from "./account-analytics-store.js";
 import { runInTransaction } from "./transaction.js";
 import type { Queryable } from "./types.js";
 
-type PostgresAuthStore =
-  & WebSessionAuthStore
-  & EmailAuthChallengeStore
-  & AccountDeletionChallengeStore
-  & GitHubCliAuthStore;
+type PostgresAuthStore = WebSessionAuthStore &
+  EmailAuthChallengeStore &
+  AccountDeletionChallengeStore &
+  GitHubCliAuthStore;
 
 type PostgresAuthStoreOptions = {
   accountAnalyticsStore?: AccountAnalyticsStore;
@@ -33,7 +32,7 @@ function mapUserAccountRow(row: Record<string, unknown>): WebUserAccount {
     email: String(row["email"]),
     email_verified_at: (row["email_verified_at"] as string | null) ?? null,
     organization_id: String(row["organization_id"]),
-    role: row["role"] === "owner" ? "owner" : "member"
+    role: row["role"] === "owner" ? "owner" : row["role"] === "admin" ? "admin" : "member"
   };
 }
 
@@ -46,7 +45,7 @@ function mapSessionRow(row: Record<string, unknown>): WebSessionRecord {
     email: String(row["email"]),
     email_verified_at: (row["email_verified_at"] as string | null) ?? null,
     organization_id: String(row["organization_id"]),
-    role: row["role"] === "owner" ? "owner" : "member",
+    role: row["role"] === "owner" ? "owner" : row["role"] === "admin" ? "admin" : "member",
     created_at: String(row["created_at"]),
     expires_at: String(row["expires_at"]),
     revoked_at: (row["revoked_at"] as string | null) ?? null,
@@ -73,7 +72,9 @@ function mapIssuedMemberTokenRow(row: Record<string, unknown>): IssuedMemberToke
   };
 }
 
-function mapGitHubDeviceAuthorizationRow(row: Record<string, unknown>): GitHubDeviceAuthorizationRecord {
+function mapGitHubDeviceAuthorizationRow(
+  row: Record<string, unknown>
+): GitHubDeviceAuthorizationRecord {
   return {
     request_id: String(row["request_id"]),
     device_code: String(row["device_code"]),
@@ -442,13 +443,14 @@ export function createPostgresAuthStore(
           const userId = randomUUID();
           const organizationId = randomUUID();
           const membershipId = randomUUID();
-          const slugBase = input.email
-            .trim()
-            .toLowerCase()
-            .split("@")[0]
-            ?.replace(/[^a-z0-9]+/g, "-")
-            .replace(/^-+|-+$/g, "")
-            .slice(0, 40) || "workspace";
+          const slugBase =
+            input.email
+              .trim()
+              .toLowerCase()
+              .split("@")[0]
+              ?.replace(/[^a-z0-9]+/g, "-")
+              .replace(/^-+|-+$/g, "")
+              .slice(0, 40) || "workspace";
 
           const createdAccountResult = await queryable.query<Record<string, unknown>>(
             `
@@ -528,7 +530,8 @@ export function createPostgresAuthStore(
           [randomUUID(), input.github_user_id, account["user_id"], input.verified_at]
         );
 
-        const role: "owner" | "member" = account["role"] === "owner" ? "owner" : "member";
+        const role: "owner" | "admin" | "member" =
+          account["role"] === "owner" ? "owner" : account["role"] === "admin" ? "admin" : "member";
         return {
           user_id: String(account["user_id"]),
           email: String(account["email"]),
@@ -783,7 +786,14 @@ export function createPostgresAuthStore(
             revoked_at::text AS revoked_at,
             expires_at::text AS expires_at
         `,
-        [input.token_id, input.user_id, input.organization_id, input.token_hash, input.label, input.created_at]
+        [
+          input.token_id,
+          input.user_id,
+          input.organization_id,
+          input.token_hash,
+          input.label,
+          input.created_at
+        ]
       );
 
       const row = result.rows[0];
@@ -812,7 +822,14 @@ export function createPostgresAuthStore(
             expires_at::text AS expires_at,
             used_at::text AS used_at
         `,
-        [randomUUID(), input.email, input.code_hash, input.accepted_terms_at, input.replaced_at, input.expires_at]
+        [
+          randomUUID(),
+          input.email,
+          input.code_hash,
+          input.accepted_terms_at,
+          input.replaced_at,
+          input.expires_at
+        ]
       );
 
       const row = result.rows[0];
@@ -901,13 +918,7 @@ export function createPostgresAuthStore(
             AND expires_at > $5::timestamptz
           RETURNING email
         `,
-        [
-          input.organization_id,
-          input.user_id,
-          input.email,
-          input.code_hash,
-          input.used_at
-        ]
+        [input.organization_id, input.user_id, input.email, input.code_hash, input.used_at]
       );
 
       const row = result.rows[0];

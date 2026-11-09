@@ -14,7 +14,7 @@ import type {
 } from "./availability-check-store-types.js";
 
 export function normalizeAvailabilityCheckPlan(plan: unknown): TierName {
-  return plan === "solo" || plan === "team" ? plan : "free";
+  return plan === "solo" || plan === "team" || plan === "business" ? plan : "free";
 }
 
 export function getPlanCheckLimit(plan: TierName): number {
@@ -47,18 +47,24 @@ export function getEffectiveAvailabilityCheckIntervalSeconds(
 const TIER_CAPABILITIES_SQL = {
   free_limit: getTierCapabilities("free").availability_checks_per_project,
   solo_limit: getTierCapabilities("solo").availability_checks_per_project,
+  business_limit: getTierCapabilities("business").availability_checks_per_project,
   team_limit: getTierCapabilities("team").availability_checks_per_project,
   free_monitored_projects:
     getTierCapabilities("free").availability_monitored_projects_per_organization,
   solo_monitored_projects:
     getTierCapabilities("solo").availability_monitored_projects_per_organization,
+  business_monitored_projects:
+    getTierCapabilities("business").availability_monitored_projects_per_organization,
   team_monitored_projects:
     getTierCapabilities("team").availability_monitored_projects_per_organization,
   free_active_checks: getTierCapabilities("free").availability_active_checks_per_organization,
   solo_active_checks: getTierCapabilities("solo").availability_active_checks_per_organization,
+  business_active_checks:
+    getTierCapabilities("business").availability_active_checks_per_organization,
   team_active_checks: getTierCapabilities("team").availability_active_checks_per_organization,
   free_interval: getTierCapabilities("free").availability_check_min_interval_seconds,
   solo_interval: getTierCapabilities("solo").availability_check_min_interval_seconds,
+  business_interval: getTierCapabilities("business").availability_check_min_interval_seconds,
   team_interval: getTierCapabilities("team").availability_check_min_interval_seconds
 } as const;
 
@@ -70,6 +76,7 @@ export function buildPlanEligibilityCaseSql(
       CASE COALESCE(o.plan, 'free')
         WHEN 'solo' THEN ${TIER_CAPABILITIES_SQL.solo_limit}
         WHEN 'team' THEN ${TIER_CAPABILITIES_SQL.team_limit}
+        WHEN 'business' THEN ${TIER_CAPABILITIES_SQL.business_limit}
         ELSE ${TIER_CAPABILITIES_SQL.free_limit}
       END
     `;
@@ -80,6 +87,7 @@ export function buildPlanEligibilityCaseSql(
       CASE COALESCE(o.plan, 'free')
         WHEN 'solo' THEN ${TIER_CAPABILITIES_SQL.solo_monitored_projects}
         WHEN 'team' THEN ${TIER_CAPABILITIES_SQL.team_monitored_projects}
+        WHEN 'business' THEN ${TIER_CAPABILITIES_SQL.business_monitored_projects}
         ELSE ${TIER_CAPABILITIES_SQL.free_monitored_projects}
       END
     `;
@@ -90,6 +98,7 @@ export function buildPlanEligibilityCaseSql(
       CASE COALESCE(o.plan, 'free')
         WHEN 'solo' THEN ${TIER_CAPABILITIES_SQL.solo_active_checks}
         WHEN 'team' THEN ${TIER_CAPABILITIES_SQL.team_active_checks}
+        WHEN 'business' THEN ${TIER_CAPABILITIES_SQL.business_active_checks}
         ELSE ${TIER_CAPABILITIES_SQL.free_active_checks}
       END
     `;
@@ -99,6 +108,7 @@ export function buildPlanEligibilityCaseSql(
     CASE COALESCE(o.plan, 'free')
       WHEN 'solo' THEN ${TIER_CAPABILITIES_SQL.solo_interval}
       WHEN 'team' THEN ${TIER_CAPABILITIES_SQL.team_interval}
+        WHEN 'business' THEN ${TIER_CAPABILITIES_SQL.business_interval}
       ELSE ${TIER_CAPABILITIES_SQL.free_interval}
     END
   `;

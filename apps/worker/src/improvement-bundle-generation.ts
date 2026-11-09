@@ -1,4 +1,6 @@
 import { gzipSync } from "node:zlib";
+import { isProjectJobRequestAuthorized } from "./project-job-authorization.js";
+import type { ProjectJobRequestAuthority } from "../../../packages/storage/src/project-job-authorization.js";
 import type {
   ObjectStoreClient,
   RetainedBundleOwnerReference
@@ -22,6 +24,7 @@ import {
 } from "./improvement-bundle-shared.js";
 
 export async function generateRecordedHostedImprovementBundle(input: {
+  execution_authority?: ProjectJobRequestAuthority & { project_id: string };
   project_id: string;
   event_id: string;
   event_type?: "log_event" | "request_event";
@@ -29,7 +32,7 @@ export async function generateRecordedHostedImprovementBundle(input: {
   recorded: RecordedImprovementCandidate;
   thresholds: ImprovementRuleThresholds;
   dependencies: ImprovementBundleWorkerDependencies;
-}): Promise<void> {
+}): Promise<void | "initiator_access_revoked"> {
   if (input.dependencies.improvementOpportunityStore === undefined) {
     return;
   }
@@ -142,6 +145,14 @@ export async function generateRecordedHostedImprovementBundle(input: {
     const projectLink = bundle.links.project;
 
     const key = buildImprovementBundleObjectKey(context.project_id, context.opportunity_id);
+    if (
+      input.execution_authority !== undefined &&
+      !(await isProjectJobRequestAuthorized(
+        input.dependencies.projectJobAuthorization,
+        input.execution_authority
+      ))
+    )
+      return "initiator_access_revoked";
     await input.dependencies.objectStore.putObject?.({
       key,
       body: gzipSync(Buffer.from(JSON.stringify(bundle), "utf8")),
@@ -239,6 +250,14 @@ export async function generateRecordedHostedImprovementBundle(input: {
       }
     }
 
+    if (
+      input.execution_authority !== undefined &&
+      !(await isProjectJobRequestAuthorized(
+        input.dependencies.projectJobAuthorization,
+        input.execution_authority
+      ))
+    )
+      return "initiator_access_revoked";
     await publishImprovementBundleCreated({
       project_id: context.project_id,
       opportunity_id: context.opportunity_id,

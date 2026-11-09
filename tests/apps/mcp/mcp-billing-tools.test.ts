@@ -44,6 +44,7 @@ const billingFixture = {
 describe("mcp billing tools", () => {
   it("declares billing tool parity", () => {
     expect(BILLING_MCP_TOOL_NAMES).toEqual([
+      "billing_offer_change",
       "billing_plan_change",
       "get_billing_summary",
       "start_trial",
@@ -51,6 +52,40 @@ describe("mcp billing tools", () => {
       "schedule_capacity_reduction",
       "cancel_capacity_reduction"
     ]);
+  });
+
+  it("shares explicit interval-aware renewal requests and rejects incomplete selections", async () => {
+    const offerChange = vi.fn().mockResolvedValue({ subscription: null, pending_change: null });
+    const tools = createBillingMcpTools({
+      offerChange,
+      getBillingSummary: vi.fn(),
+      startTrial: vi.fn(),
+      increaseCapacity: vi.fn(),
+      scheduleCapacityReduction: vi.fn(),
+      cancelCapacityReduction: vi.fn()
+    });
+    await expect(
+      tools.billing_offer_change({
+        action: "preview",
+        bearerToken: "owner",
+        targetPlan: "business",
+        interval: "year"
+      })
+    ).resolves.toEqual({ subscription: null, pending_change: null });
+    expect(offerChange).toHaveBeenCalledExactlyOnceWith({
+      action: "preview",
+      bearerToken: "owner",
+      targetPlan: "business",
+      interval: "year"
+    });
+    await expect(
+      tools.billing_offer_change({
+        action: "preview",
+        bearerToken: "owner",
+        targetPlan: "business"
+      })
+    ).rejects.toThrow("invalid_arguments");
+    expect(offerChange).toHaveBeenCalledTimes(1);
   });
 
   it("returns billing payloads for all operations", async () => {
@@ -92,6 +127,21 @@ describe("mcp billing tools", () => {
     await expect(
       tools.cancel_capacity_reduction({ bearerToken: "dbundle_mem_x" })
     ).resolves.toEqual({ billing: billingFixture });
+  });
+  it("passes Business trial selection without adding a second trial mechanism", async () => {
+    const startTrial = vi.fn().mockResolvedValue(billingFixture);
+    const tools = createBillingMcpTools({
+      getBillingSummary: vi.fn(),
+      startTrial,
+      increaseCapacity: vi.fn(),
+      scheduleCapacityReduction: vi.fn(),
+      cancelCapacityReduction: vi.fn()
+    });
+    await tools.start_trial({ bearerToken: "owner", targetPlan: "business" });
+    expect(startTrial).toHaveBeenCalledExactlyOnceWith({
+      bearerToken: "owner",
+      targetPlan: "business"
+    });
   });
 
   it("maps billing api, invalid input, and unknown errors to mcp tool errors", async () => {

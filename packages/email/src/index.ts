@@ -1,4 +1,3 @@
-import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
 import {
   buildEmailBrandMarkUrl,
   escapeHtml,
@@ -61,23 +60,13 @@ export type {
   WebhookAutoDisabledEmailInput
 } from "./operational-emails.js";
 
-export class EmailDeliveryError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "EmailDeliveryError";
-  }
-}
-
-export interface EmailMessage {
-  to: string[];
-  subject: string;
-  text: string;
-  html: string;
-}
-
-export interface EmailTransport {
-  send(message: EmailMessage): Promise<void>;
-}
+export { EmailDeliveryError, type EmailMessage, type EmailTransport } from "./email-types.js";
+export {
+  createSesEmailTransport,
+  createSesReportEmailTransport,
+  ReportEmailTransportError,
+  type ReportEmailTransport
+} from "./ses-transport.js";
 
 export interface WeeklyReportProjectInput {
   projectId: string;
@@ -167,7 +156,9 @@ function formatTopSpikesText(input: WeeklyReportProjectInput["topSpikingIncident
     .join("\n");
 }
 
-function normalizeWeeklyReportInput(input: WeeklyReportEmailInput | LegacyWeeklyReportEmailInput): WeeklyReportEmailInput {
+function normalizeWeeklyReportInput(
+  input: WeeklyReportEmailInput | LegacyWeeklyReportEmailInput
+): WeeklyReportEmailInput {
   if ("projects" in input) {
     return input;
   }
@@ -217,7 +208,10 @@ function formatWeeklyReportLead(projects: WeeklyReportProjectInput[]): string {
   }
 
   const opened = projects.reduce((total, project) => total + project.newIncidents, 0);
-  const openedResolved = projects.reduce((total, project) => total + project.openedIncidentsResolved, 0);
+  const openedResolved = projects.reduce(
+    (total, project) => total + project.openedIncidentsResolved,
+    0
+  );
   const resolved = projects.reduce((total, project) => total + project.resolvedIncidents, 0);
 
   if (opened === 0) {
@@ -360,7 +354,9 @@ export function renderAccountDeletionOtpEmail(input: {
       "",
       "If you did not request account deletion, do not share this code.",
       "",
-      ...(input.settingsUrl === undefined ? [] : [`Return to ${input.settingsUrl} to enter the code.`])
+      ...(input.settingsUrl === undefined
+        ? []
+        : [`Return to ${input.settingsUrl} to enter the code.`])
     ].join("\n"),
     html: renderEmailLayout({
       brandMarkUrl: input.brandMarkUrl ?? buildEmailBrandMarkUrl(input.settingsUrl),
@@ -420,7 +416,9 @@ export function renderProjectInviteEmail(input: {
   };
 }
 
-export function renderWeeklyReportEmail(input: WeeklyReportEmailInput | LegacyWeeklyReportEmailInput): { subject: string; text: string; html: string } {
+export function renderWeeklyReportEmail(
+  input: WeeklyReportEmailInput | LegacyWeeklyReportEmailInput
+): { subject: string; text: string; html: string } {
   const normalized = normalizeWeeklyReportInput(input);
   const projectCount = normalized.projects.length;
   const primaryProject = normalized.projects[0];
@@ -447,7 +445,9 @@ export function renderWeeklyReportEmail(input: WeeklyReportEmailInput | LegacyWe
       formatTopSpikesText(project.topSpikingIncidents),
       ""
     ])
-  ].join("\n").trimEnd();
+  ]
+    .join("\n")
+    .trimEnd();
   const html = renderEmailLayout({
     brandMarkUrl: normalized.brandMarkUrl,
     eyebrow: "Weekly report",
@@ -460,27 +460,32 @@ export function renderWeeklyReportEmail(input: WeeklyReportEmailInput | LegacyWe
         { label: "Projects", valueHtml: projectCount.toString() }
       ]),
       ...normalized.projects.map((project) =>
-        renderEmailPanel([
-          renderEmailSubheading(project.projectName),
-          renderEmailParagraph(escapeHtml(formatIncidentOutcome(project))),
-          renderEmailKeyValueList([
-            { label: "Project", valueHtml: escapeHtml(project.projectName) },
-            { label: "Failure bundles", valueHtml: project.bundleCounts.failure.toString() },
-            { label: "Improvement bundles", valueHtml: project.bundleCounts.improvement.toString() },
-            { label: "New incidents", valueHtml: project.newIncidents.toString() },
-            { label: "Resolved incidents", valueHtml: project.resolvedIncidents.toString() },
-            { label: "Regressions", valueHtml: project.regressions.toString() }
-          ]),
-          renderEmailSubheading("Top spiking incidents"),
-          project.topSpikingIncidents.length === 0
-            ? renderEmailParagraph("None")
-            : renderEmailOrderedList(
-                project.topSpikingIncidents.map(
-                  (incident) =>
-                    `<strong>${escapeHtml(incident.title)}</strong> (${incident.occurrence_count} occurrences, spike at ${escapeHtml(formatEmailDate(incident.spike_detected_at))})`
+        renderEmailPanel(
+          [
+            renderEmailSubheading(project.projectName),
+            renderEmailParagraph(escapeHtml(formatIncidentOutcome(project))),
+            renderEmailKeyValueList([
+              { label: "Project", valueHtml: escapeHtml(project.projectName) },
+              { label: "Failure bundles", valueHtml: project.bundleCounts.failure.toString() },
+              {
+                label: "Improvement bundles",
+                valueHtml: project.bundleCounts.improvement.toString()
+              },
+              { label: "New incidents", valueHtml: project.newIncidents.toString() },
+              { label: "Resolved incidents", valueHtml: project.resolvedIncidents.toString() },
+              { label: "Regressions", valueHtml: project.regressions.toString() }
+            ]),
+            renderEmailSubheading("Top spiking incidents"),
+            project.topSpikingIncidents.length === 0
+              ? renderEmailParagraph("None")
+              : renderEmailOrderedList(
+                  project.topSpikingIncidents.map(
+                    (incident) =>
+                      `<strong>${escapeHtml(incident.title)}</strong> (${incident.occurrence_count} occurrences, spike at ${escapeHtml(formatEmailDate(incident.spike_detected_at))})`
+                  )
                 )
-              )
-        ].join(""))
+          ].join("")
+        )
       )
     ].join("")
   });
@@ -488,15 +493,22 @@ export function renderWeeklyReportEmail(input: WeeklyReportEmailInput | LegacyWe
   return { subject, text, html };
 }
 
-export function renderAlertSlackMessage(input: AlertEmailInput): { text: string; blocks: Array<Record<string, unknown>> } {
+export function renderAlertSlackMessage(input: AlertEmailInput): {
+  text: string;
+  blocks: Array<Record<string, unknown>>;
+} {
   const headline = formatAlertHeadline(input.conditionType);
   const intro = formatAlertIntro(input.conditionType);
   const conditionLabel = formatAlertConditionLabel(input.conditionType);
   const severityLabel = titleCase(input.severity);
   const titleCharacters = Array.from(input.summary?.replace(/\s+/g, " ").trim() ?? "");
-  const incidentTitle = titleCharacters.length > MAX_SLACK_INCIDENT_TITLE_LENGTH
-    ? `${titleCharacters.slice(0, MAX_SLACK_INCIDENT_TITLE_LENGTH - 1).join("").trimEnd()}…`
-    : titleCharacters.join("");
+  const incidentTitle =
+    titleCharacters.length > MAX_SLACK_INCIDENT_TITLE_LENGTH
+      ? `${titleCharacters
+          .slice(0, MAX_SLACK_INCIDENT_TITLE_LENGTH - 1)
+          .join("")
+          .trimEnd()}…`
+      : titleCharacters.join("");
   const escapedIncidentTitle = escapeSlackMrkdwn(incidentTitle);
   const titleLine = incidentTitle.length === 0 ? "" : `*Incident:* ${escapedIncidentTitle}\n`;
   const linkParts = [
@@ -511,14 +523,20 @@ export function renderAlertSlackMessage(input: AlertEmailInput): { text: string;
   const text = [
     `[DebugBundle Alert] ${headline}${incidentTitle.length === 0 ? "" : `: ${escapedIncidentTitle}`}`,
     `Alert: ${conditionLabel}`,
-    ...(input.projectName === undefined || input.projectName === null ? [] : [`Project: ${input.projectName}`]),
+    ...(input.projectName === undefined || input.projectName === null
+      ? []
+      : [`Project: ${input.projectName}`]),
     `Service: ${input.serviceName}`,
     `Environment: ${input.environment}`,
     `Severity: ${severityLabel}`,
     `Incident ID: ${input.incidentId}`,
     `Detected at: ${input.occurredAt}`,
-    ...(input.incidentUrl === undefined || input.incidentUrl === null ? [] : [`Open incident: ${input.incidentUrl}`]),
-    ...(input.bundleUrl === undefined || input.bundleUrl === null ? [] : [`View bundle: ${input.bundleUrl}`])
+    ...(input.incidentUrl === undefined || input.incidentUrl === null
+      ? []
+      : [`Open incident: ${input.incidentUrl}`]),
+    ...(input.bundleUrl === undefined || input.bundleUrl === null
+      ? []
+      : [`View bundle: ${input.bundleUrl}`])
   ].join("\n");
 
   const detailFields = [
@@ -589,7 +607,11 @@ export function renderAlertSlackMessage(input: AlertEmailInput): { text: string;
   };
 }
 
-export function renderAlertEmail(input: AlertEmailInput): { subject: string; text: string; html: string } {
+export function renderAlertEmail(input: AlertEmailInput): {
+  subject: string;
+  text: string;
+  html: string;
+} {
   const subject = formatAlertSubject(input.conditionType);
   const conditionLabel = formatAlertConditionLabel(input.conditionType);
   const severityLabel = titleCase(input.severity);
@@ -598,17 +620,24 @@ export function renderAlertEmail(input: AlertEmailInput): { subject: string; tex
     formatAlertIntro(input.conditionType),
     "",
     `Alert: ${conditionLabel}`,
-    ...(input.projectName === undefined || input.projectName === null ? [] : [`Project: ${input.projectName}`]),
+    ...(input.projectName === undefined || input.projectName === null
+      ? []
+      : [`Project: ${input.projectName}`]),
     `Service: ${input.serviceName}`,
     `Environment: ${input.environment}`,
     `Severity: ${severityLabel}`,
     `Incident ID: ${input.incidentId}`,
     `Detected at: ${detectedAt}`,
-    ...(input.incidentUrl === undefined || input.incidentUrl === null ? [] : ["", `Open incident: ${input.incidentUrl}`]),
-    ...(input.bundleUrl === undefined || input.bundleUrl === null ? [``, "Use the incident ID above to inspect the bundle in DebugBundle."] : ["", `View bundle: ${input.bundleUrl}`])
+    ...(input.incidentUrl === undefined || input.incidentUrl === null
+      ? []
+      : ["", `Open incident: ${input.incidentUrl}`]),
+    ...(input.bundleUrl === undefined || input.bundleUrl === null
+      ? [``, "Use the incident ID above to inspect the bundle in DebugBundle."]
+      : ["", `View bundle: ${input.bundleUrl}`])
   ].join("\n");
   const html = renderEmailLayout({
-    brandMarkUrl: input.brandMarkUrl ?? buildEmailBrandMarkUrl(input.incidentUrl ?? input.bundleUrl),
+    brandMarkUrl:
+      input.brandMarkUrl ?? buildEmailBrandMarkUrl(input.incidentUrl ?? input.bundleUrl),
     eyebrow: "Alert",
     title: formatAlertHeadline(input.conditionType),
     intro: formatAlertIntro(input.conditionType),
@@ -645,7 +674,11 @@ export function renderAlertEmail(input: AlertEmailInput): { subject: string; tex
           ]),
       ...(input.bundleUrl === undefined || input.bundleUrl === null
         ? [renderEmailParagraph("Use the incident ID above to inspect the bundle in DebugBundle.")]
-        : [renderEmailParagraph(renderEmailTextLink({ label: "View bundle JSON", url: input.bundleUrl }))])
+        : [
+            renderEmailParagraph(
+              renderEmailTextLink({ label: "View bundle JSON", url: input.bundleUrl })
+            )
+          ])
     ].join("")
   });
 
@@ -667,8 +700,9 @@ export function renderAlertDigestEmail(input: {
 
   for (const alert of input.alerts.slice(0, 25)) {
     const existing = groupedAlerts.get(alert.incidentId);
-    const conditionLabels = [...new Set((alert.conditionTypes ?? [alert.conditionType])
-      .map(formatAlertConditionLabel))];
+    const conditionLabels = [
+      ...new Set((alert.conditionTypes ?? [alert.conditionType]).map(formatAlertConditionLabel))
+    ];
 
     if (existing === undefined) {
       groupedAlerts.set(alert.incidentId, {
@@ -679,16 +713,16 @@ export function renderAlertDigestEmail(input: {
     }
 
     for (const conditionLabel of conditionLabels) {
-      if (!existing.conditionLabels.includes(conditionLabel)) existing.conditionLabels.push(conditionLabel);
+      if (!existing.conditionLabels.includes(conditionLabel))
+        existing.conditionLabels.push(conditionLabel);
     }
   }
 
   const alerts = Array.from(groupedAlerts.values());
   const incidentCount = Math.max(alerts.length, input.totalIncidentCount ?? alerts.length);
   const omittedCount = incidentCount - alerts.length;
-  const omittedText = omittedCount > 0
-    ? `${omittedCount} more incidents are available in DebugBundle.`
-    : null;
+  const omittedText =
+    omittedCount > 0 ? `${omittedCount} more incidents are available in DebugBundle.` : null;
   const subject =
     incidentCount === 1
       ? "[DebugBundle Alerts] 1 incident matched your alerts"
@@ -698,28 +732,41 @@ export function renderAlertDigestEmail(input: {
     incidentCount === 1
       ? "DebugBundle batched 1 incident into this alert digest."
       : `DebugBundle batched ${incidentCount} incidents into this alert digest.`,
-    ...(omittedText === null ? [] : [omittedText,
-      ...(input.allIncidentsUrl === undefined ? [] : [`Review all incidents: ${input.allIncidentsUrl}`])]),
+    ...(omittedText === null
+      ? []
+      : [
+          omittedText,
+          ...(input.allIncidentsUrl === undefined
+            ? []
+            : [`Review all incidents: ${input.allIncidentsUrl}`])
+        ]),
     "",
     ...alerts.flatMap((alert, index) => [
       `${index + 1}. ${alert.summary ?? "Alert triggered"}`,
       `   Incident ID: ${alert.incidentId}`,
-      ...(alert.projectName === undefined || alert.projectName === null ? [] : [`   Project: ${alert.projectName}`]),
+      ...(alert.projectName === undefined || alert.projectName === null
+        ? []
+        : [`   Project: ${alert.projectName}`]),
       `   Alerts: ${alert.conditionLabels.join(", ")}`,
       `   Service: ${alert.serviceName}`,
       `   Environment: ${alert.environment}`,
       `   Severity: ${titleCase(alert.severity)}`,
       `   Detected at: ${formatEmailDate(alert.occurredAt)}`,
-      ...(alert.incidentUrl === undefined || alert.incidentUrl === null ? [] : [`   Open incident: ${alert.incidentUrl}`]),
-      ...(alert.bundleUrl === undefined || alert.bundleUrl === null ? [] : [`   View bundle: ${alert.bundleUrl}`]),
+      ...(alert.incidentUrl === undefined || alert.incidentUrl === null
+        ? []
+        : [`   Open incident: ${alert.incidentUrl}`]),
+      ...(alert.bundleUrl === undefined || alert.bundleUrl === null
+        ? []
+        : [`   View bundle: ${alert.bundleUrl}`]),
       ""
     ])
-  ].join("\n").trimEnd();
+  ]
+    .join("\n")
+    .trimEnd();
 
   const html = renderEmailLayout({
     brandMarkUrl:
-      input.brandMarkUrl ??
-      buildEmailBrandMarkUrl(alerts[0]?.incidentUrl ?? alerts[0]?.bundleUrl),
+      input.brandMarkUrl ?? buildEmailBrandMarkUrl(alerts[0]?.incidentUrl ?? alerts[0]?.bundleUrl),
     eyebrow: "Alert digest",
     title: "DebugBundle alert digest",
     intro:
@@ -728,10 +775,15 @@ export function renderAlertDigestEmail(input: {
         : `DebugBundle batched ${incidentCount} incidents into this alert digest.`,
     preheader: formatAlertDigestPreheader(alerts, incidentCount),
     bodyHtml: [
-      ...(omittedText === null ? [] : [renderEmailParagraph(
-        input.allIncidentsUrl === undefined ? omittedText
-          : `${escapeHtml(omittedText)} ${renderEmailTextLink({ label: "Review all incidents", url: input.allIncidentsUrl })}`
-      )]),
+      ...(omittedText === null
+        ? []
+        : [
+            renderEmailParagraph(
+              input.allIncidentsUrl === undefined
+                ? omittedText
+                : `${escapeHtml(omittedText)} ${renderEmailTextLink({ label: "Review all incidents", url: input.allIncidentsUrl })}`
+            )
+          ]),
       ...alerts.map((alert, index) =>
         renderEmailPanel(
           [
@@ -760,7 +812,11 @@ export function renderAlertDigestEmail(input: {
                 ]),
             ...(alert.bundleUrl === undefined || alert.bundleUrl === null
               ? []
-              : [renderEmailParagraph(renderEmailTextLink({ label: "View bundle JSON", url: alert.bundleUrl }))])
+              : [
+                  renderEmailParagraph(
+                    renderEmailTextLink({ label: "View bundle JSON", url: alert.bundleUrl })
+                  )
+                ])
           ].join("")
         )
       )
@@ -780,88 +836,6 @@ export function renderDailyIncidentDigestEmail(
   };
 }
 
-export function createSesEmailTransport(input: {
-  region: string;
-  fromEmail: string;
-  timeoutMs: number;
-  accessKeyId?: string;
-  secretAccessKey?: string;
-  sessionToken?: string;
-  endpoint?: string;
-}): EmailTransport {
-  const client = new SESv2Client({
-    region: input.region,
-    ...(input.endpoint === undefined ? {} : { endpoint: input.endpoint }),
-    ...(input.accessKeyId === undefined || input.secretAccessKey === undefined
-      ? {}
-      : {
-          credentials: {
-            accessKeyId: input.accessKeyId,
-            secretAccessKey: input.secretAccessKey,
-            ...(input.sessionToken === undefined ? {} : { sessionToken: input.sessionToken })
-          }
-        })
-  });
-
-  return {
-    async send(message: EmailMessage): Promise<void> {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), input.timeoutMs);
-
-      try {
-        await client.send(
-          new SendEmailCommand({
-            FromEmailAddress: input.fromEmail,
-            Destination: {
-              ToAddresses: message.to
-            },
-            Content: {
-              Simple: {
-                Subject: {
-                  Data: message.subject,
-                  Charset: "UTF-8"
-                },
-                Body: {
-                  Text: {
-                    Data: message.text,
-                    Charset: "UTF-8"
-                  },
-                  Html: {
-                    Data: message.html,
-                    Charset: "UTF-8"
-                  }
-                }
-              }
-            }
-          }),
-          {
-            abortSignal: controller.signal
-          }
-        );
-      } catch (error) {
-        if (error instanceof EmailDeliveryError) {
-          throw error;
-        }
-
-        if (error instanceof Error && error.name === "AbortError") {
-          throw new EmailDeliveryError("email_timeout");
-        }
-
-        const httpStatus =
-          typeof error === "object" && error !== null && "$metadata" in error
-            ? ((error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode ?? null)
-            : null;
-        if (typeof httpStatus === "number") {
-          throw new EmailDeliveryError(`email_http_error_${httpStatus}`);
-        }
-
-        const messageText = error instanceof Error ? error.message : String(error);
-        throw new EmailDeliveryError(`email_transport_error:${messageText}`);
-      } finally {
-        clearTimeout(timeout);
-      }
-    }
-  };
-}
-
 export { buildEmailBrandMarkUrl } from "./email-layout.js";
+export { renderOrganizationAccessEmail } from "./organization-emails.js";
+export { renderSmartReportEmail } from "./smart-report-email.js";

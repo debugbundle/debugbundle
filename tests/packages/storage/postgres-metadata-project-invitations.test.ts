@@ -4,8 +4,19 @@ import { describe, expect, it, vi } from "vitest";
 import { createPostgresMetadataStore as createRawMetadataStore } from "../../../packages/storage/src/index.js";
 import { createPgError } from "../../helpers/fake-pg-error.ts";
 
-const createPostgresMetadataStore = (db: Parameters<typeof createRawMetadataStore>[0]) =>
-  createRawMetadataStore(configurationFixtureDb(db.query));
+const createPostgresMetadataStore = (db: Parameters<typeof createRawMetadataStore>[0]) => {
+  const fixture = configurationFixtureDb(db.query);
+  const query = fixture.query;
+  // These sequential fixtures exercise invite outcomes. Real transaction tests
+  // independently exercise cross-project admission and organisation locking.
+  fixture.query = ((sql: string, params: unknown[]) =>
+    sql.startsWith("/* organization invitation lock */")
+      ? Promise.resolve({ rows: [] })
+      : sql.startsWith("/* acceptance admission */")
+        ? Promise.resolve({ rows: [{ people: 2 }] })
+        : query(sql, params)) as typeof query;
+  return createRawMetadataStore(fixture);
+};
 
 describe("postgres metadata project invitations", () => {
   it("covers invite creation outcomes", async (): Promise<void> => {
@@ -24,7 +35,7 @@ describe("postgres metadata project invitations", () => {
           rows: [{ owner_plan: "team", actor_role: "admin", actor_membership_type: "collaborator" }]
         })
         .mockResolvedValueOnce({
-          rows: [{ collaborator_count: "1000" }]
+          rows: [{ collaborator_count: "1001" }]
         })
     });
     const memberExistsStore = createPostgresMetadataStore({

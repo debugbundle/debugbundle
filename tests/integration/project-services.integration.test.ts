@@ -14,6 +14,7 @@ import { createProjectServicesApi } from "../../packages/project-management-clie
 import { createApiServer } from "../../apps/api/src/server.js";
 import { createBaseDependencies } from "../helpers/api-capture-rule-ingestion.js";
 import {
+  STORAGE_SCHEMA_MIGRATIONS,
   migrateStorageSchema,
   assertStorageSchemaMigrationsApplied
 } from "../../packages/storage/src/schema-migrations.js";
@@ -487,10 +488,16 @@ runIntegration("logical services on fresh and populated databases", () => {
       /storage_schema_missing_migrations/
     );
     const result = await migrateStorageSchema(db);
-    expect(result.applied).toEqual([
+    const installedIds = new Set(predecessor.migrations.map((migration) => migration.id));
+    expect(result.applied.slice(0, 2)).toEqual([
       "202611030001_add_service_definitions",
       "202611030002_add_project_consolidation"
     ]);
+    expect(result.applied).toEqual(
+      STORAGE_SCHEMA_MIGRATIONS.filter((migration) => !installedIds.has(migration.id)).map(
+        (migration) => migration.id
+      )
+    );
     const rows = (
       await pool.query("SELECT id,service_definition_id FROM services WHERE id=$1", [serviceId])
     ).rows;

@@ -1,6 +1,6 @@
 import {
   restoreStoragePredecessor,
-  PROJECT_SERVICE_MIGRATION_IDS
+  POST_PREDECESSOR_MIGRATION_IDS
 } from "../helpers/storage-predecessor.js";
 import { randomUUID } from "node:crypto";
 
@@ -189,7 +189,7 @@ runIntegration("storage bootstrap integration", () => {
     );
     expect((await migrateStorageSchema(db)).applied).toEqual([
       migrationId,
-      ...PROJECT_SERVICE_MIGRATION_IDS
+      ...POST_PREDECESSOR_MIGRATION_IDS
     ]);
     await expect(assertStorageSchemaMigrationsApplied(db)).resolves.toBeUndefined();
     const tables = await pool.query<{ name: string | null }>(
@@ -214,7 +214,7 @@ runIntegration("storage bootstrap integration", () => {
     );
     expect((await migrateStorageSchema(db)).applied).toEqual([
       migrationId,
-      ...PROJECT_SERVICE_MIGRATION_IDS
+      ...POST_PREDECESSOR_MIGRATION_IDS
     ]);
     await expect(assertStorageSchemaMigrationsApplied(db)).resolves.toBeUndefined();
     expect(
@@ -252,7 +252,7 @@ runIntegration("storage bootstrap integration", () => {
     );
     expect((await migrateStorageSchema(db)).applied).toEqual([
       migrationId,
-      ...PROJECT_SERVICE_MIGRATION_IDS
+      ...POST_PREDECESSOR_MIGRATION_IDS
     ]);
     await expect(assertStorageSchemaMigrationsApplied(db)).resolves.toBeUndefined();
     expect(
@@ -296,7 +296,7 @@ runIntegration("storage bootstrap integration", () => {
     );
     expect((await migrateStorageSchema(db)).applied).toEqual([
       migrationId,
-      ...PROJECT_SERVICE_MIGRATION_IDS
+      ...POST_PREDECESSOR_MIGRATION_IDS
     ]);
     const existing = await pool.query<{ signing_secret: string | null }>(
       "SELECT signing_secret FROM alert_rules WHERE id = $1",
@@ -341,7 +341,7 @@ runIntegration("storage bootstrap integration", () => {
     );
     expect((await migrateStorageSchema(db)).applied).toEqual([
       migrationId,
-      ...PROJECT_SERVICE_MIGRATION_IDS
+      ...POST_PREDECESSOR_MIGRATION_IDS
     ]);
     expect(
       (await pool.query("SELECT webhook_payload_version FROM alert_rules WHERE id = $1", [legacy]))
@@ -400,7 +400,7 @@ runIntegration("storage bootstrap integration", () => {
     );
     expect((await migrateStorageSchema(db)).applied).toEqual([
       migrationId,
-      ...PROJECT_SERVICE_MIGRATION_IDS
+      ...POST_PREDECESSOR_MIGRATION_IDS
     ]);
     expect(
       (
@@ -437,7 +437,7 @@ runIntegration("storage bootstrap integration", () => {
     );
     expect((await migrateStorageSchema(db)).applied).toEqual([
       id,
-      ...PROJECT_SERVICE_MIGRATION_IDS
+      ...POST_PREDECESSOR_MIGRATION_IDS
     ]);
     await expect(assertStorageSchemaMigrationsApplied(db)).resolves.toBeUndefined();
     expect(
@@ -459,7 +459,7 @@ runIntegration("storage bootstrap integration", () => {
     );
     expect((await migrateStorageSchema(db)).applied).toEqual([
       migrationId,
-      ...PROJECT_SERVICE_MIGRATION_IDS
+      ...POST_PREDECESSOR_MIGRATION_IDS
     ]);
     await expect(assertStorageSchemaMigrationsApplied(db)).resolves.toBeUndefined();
     expect(
@@ -487,7 +487,7 @@ runIntegration("storage bootstrap integration", () => {
     const migrated = await migrateStorageSchema(db);
     expect(migrated.applied).toEqual([
       "202607100002_add_analytics_journey_sample_correlation_hash",
-      ...PROJECT_SERVICE_MIGRATION_IDS
+      ...POST_PREDECESSOR_MIGRATION_IDS
     ]);
 
     const columnResult = await pool.query<{ column_name: string }>(
@@ -578,7 +578,7 @@ runIntegration("storage bootstrap integration", () => {
     expect(migrated.applied).toEqual([
       "202607130001_expand_default_saved_funnel_capacity",
       "202607140001_enable_free_analytics_preview",
-      ...PROJECT_SERVICE_MIGRATION_IDS
+      ...POST_PREDECESSOR_MIGRATION_IDS
     ]);
     const settings = await pool.query<{
       project_id: string;
@@ -658,7 +658,7 @@ runIntegration("storage bootstrap integration", () => {
 
     expect(migrated.applied).toEqual([
       "202607140002_expand_custom_dimension_capacity",
-      ...PROJECT_SERVICE_MIGRATION_IDS
+      ...POST_PREDECESSOR_MIGRATION_IDS
     ]);
     const settings = await pool.query<{
       project_id: string;

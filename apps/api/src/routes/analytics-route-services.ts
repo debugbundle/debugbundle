@@ -1,3 +1,5 @@
+import { memberReadScope } from "../member-access-scope.js";
+import type { ProjectActorReadScope } from "../../../../packages/storage/src/project-read-scope.js";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
@@ -49,7 +51,7 @@ export function toAnalyticsBundleGenerationListRecord(
     analysis_spec: generation.analysis_spec,
     input_fingerprint: generation.input_fingerprint,
     status: generation.status,
-    has_artifact: generation.object_key !== null,
+    has_artifact: generation.status === "completed" && generation.object_key !== null,
     failure_reason: generation.failure_reason,
     created_at: generation.created_at,
     claimed_at: generation.claimed_at,
@@ -116,14 +118,14 @@ export async function listOrganizationAnalyticsOpportunities(
 ): Promise<Awaited<
   ReturnType<AnalyticsOpportunitiesDependency["listAnalyticsOpportunitiesForOrganization"]>
 > | null> {
-  const organizationId = await requireAnalyticsOrganizationReadAccess(request, reply, dependencies);
-  if (organizationId === null) return null;
+  const principal = await requireAnalyticsOrganizationReadAccess(request, reply, dependencies);
+  if (principal === null) return null;
   if (dependencies.analyticsOpportunities === undefined) {
     await reply.status(404).send({ error: "analytics_opportunities_not_available" });
     return null;
   }
   return dependencies.analyticsOpportunities.listAnalyticsOpportunitiesForOrganization({
-    organization_id: organizationId,
+    ...principal,
     ...filters
   });
 }
@@ -178,14 +180,14 @@ export async function listOrganizationAnalyticsBundles(
 ): Promise<Awaited<
   ReturnType<AnalyticsBundlesDependency["listAnalyticsBundleGenerationsForOrganization"]>
 > | null> {
-  const organizationId = await requireAnalyticsOrganizationReadAccess(request, reply, dependencies);
-  if (organizationId === null) return null;
+  const principal = await requireAnalyticsOrganizationReadAccess(request, reply, dependencies);
+  if (principal === null) return null;
   if (dependencies.analyticsBundles === undefined) {
     await reply.status(404).send({ error: "analytics_bundles_not_available" });
     return null;
   }
   return dependencies.analyticsBundles.listAnalyticsBundleGenerationsForOrganization({
-    organization_id: organizationId,
+    ...principal,
     ...filters
   });
 }
@@ -482,9 +484,15 @@ async function requireAnalyticsOrganizationReadAccess(
   request: FastifyRequest,
   reply: FastifyReply,
   dependencies: ApiDependencies
-): Promise<string | null> {
+): Promise<({ organization_id: string } & ProjectActorReadScope) | null> {
   const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "retrieval-read");
-  return member?.organization_id ?? null;
+  if (member === null) return null;
+  return {
+    organization_id: member.organization_id,
+    ...(member.credential_kind === "browser_session" || member.token_policy !== undefined
+      ? { ...memberReadScope(member), user_id: member.member_id }
+      : {})
+  };
 }
 
 function uniqueStrings(values: string[]): string[] {

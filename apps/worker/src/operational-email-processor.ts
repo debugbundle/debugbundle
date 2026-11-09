@@ -10,6 +10,7 @@ import {
   renderWebhookAutoDisabledEmail,
   type EmailTransport
 } from "../../../packages/email/src/index.js";
+import { isPaidTier } from "../../../packages/shared-types/src/index.js";
 import { BillingLifecycleEmailPayloadSchema } from "../../../packages/billing/src/billing-email-payload.js";
 import type { RuntimeLogger } from "../../../packages/runtime-logger/src/index.js";
 import {
@@ -60,24 +61,24 @@ type WebhookAutoDisabledNotificationPayload = {
 } & Record<string, unknown>;
 
 type TrialStartedNotificationPayload = {
-  trial_plan: "solo" | "team";
+  trial_plan: "solo" | "team" | "business";
   trial_ends_at: string;
 } & Record<string, unknown>;
 
 type TrialEndingSoonNotificationPayload = {
-  trial_plan: "solo" | "team";
+  trial_plan: "solo" | "team" | "business";
   trial_ends_at: string;
   days_remaining: number;
 } & Record<string, unknown>;
 
 type TrialExpiredNotificationPayload = {
-  trial_plan: "solo" | "team";
+  trial_plan: "solo" | "team" | "business";
   trial_ended_at: string;
 } & Record<string, unknown>;
 
 type TrialConvertedNotificationPayload = {
-  trial_plan: "solo" | "team";
-  paid_plan: "solo" | "team";
+  trial_plan: "solo" | "team" | "business";
+  paid_plan: "solo" | "team" | "business";
 } & Record<string, unknown>;
 
 function isAllowanceMeter(value: string): value is Parameters<typeof getAllowanceMeterLabel>[0] {
@@ -220,7 +221,9 @@ export async function processNextDeliverOperationalEmailJob(
       case "trial_started": {
         const payload = delivery.payload as TrialStartedNotificationPayload;
         if (
-          (payload.trial_plan !== "solo" && payload.trial_plan !== "team") ||
+          (payload.trial_plan !== "solo" &&
+            payload.trial_plan !== "team" &&
+            payload.trial_plan !== "business") ||
           typeof payload.trial_ends_at !== "string" ||
           billingUrl === undefined
         ) {
@@ -239,7 +242,9 @@ export async function processNextDeliverOperationalEmailJob(
       case "trial_ending_soon": {
         const payload = delivery.payload as TrialEndingSoonNotificationPayload;
         if (
-          (payload.trial_plan !== "solo" && payload.trial_plan !== "team") ||
+          (payload.trial_plan !== "solo" &&
+            payload.trial_plan !== "team" &&
+            payload.trial_plan !== "business") ||
           typeof payload.trial_ends_at !== "string" ||
           typeof payload.days_remaining !== "number" ||
           billingUrl === undefined
@@ -260,7 +265,9 @@ export async function processNextDeliverOperationalEmailJob(
       case "trial_expired": {
         const payload = delivery.payload as TrialExpiredNotificationPayload;
         if (
-          (payload.trial_plan !== "solo" && payload.trial_plan !== "team") ||
+          (payload.trial_plan !== "solo" &&
+            payload.trial_plan !== "team" &&
+            payload.trial_plan !== "business") ||
           typeof payload.trial_ended_at !== "string" ||
           billingUrl === undefined
         ) {
@@ -283,8 +290,10 @@ export async function processNextDeliverOperationalEmailJob(
       case "trial_converted": {
         const payload = delivery.payload as TrialConvertedNotificationPayload;
         if (
-          (payload.trial_plan !== "solo" && payload.trial_plan !== "team") ||
-          (payload.paid_plan !== "solo" && payload.paid_plan !== "team") ||
+          (payload.trial_plan !== "solo" &&
+            payload.trial_plan !== "team" &&
+            payload.trial_plan !== "business") ||
+          !isPaidTier(payload.paid_plan) ||
           billingUrl === undefined
         ) {
           throw new Error("operational_email_invalid_trial_converted_payload");

@@ -1,14 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createBillingManagement } from "../../../apps/api/src/billing-management.js";
 
-const { factory, service, operationStore, upgradePreview } = vi.hoisted(() => ({
+const { factory, offerFactory, service, operationStore, upgradePreview } = vi.hoisted(() => ({
   factory: vi.fn(),
+  offerFactory: vi.fn(),
   service: { getStatus: vi.fn(), preview: vi.fn(), schedule: vi.fn(), cancel: vi.fn() },
   operationStore: { get: vi.fn() },
   upgradePreview: vi.fn()
 }));
 vi.mock("../../../packages/billing/src/stripe-plan-change.js", () => ({
   createStripePlanChangeService: factory
+}));
+vi.mock("../../../packages/billing/src/stripe-offer-change.js", () => ({
+  createStripeOfferChangeService: offerFactory
 }));
 vi.mock("../../../packages/storage/src/billing-subscription-operation-store.js", () => ({
   createPostgresBillingSubscriptionOperationStore: () => operationStore
@@ -20,6 +24,7 @@ vi.mock("../../../packages/billing/src/stripe-upgrade-preview.js", () => ({
 describe("billing plan-change management composition", () => {
   beforeEach(() => {
     factory.mockReturnValue(service);
+    offerFactory.mockReturnValue(service);
     service.getStatus.mockResolvedValue({ pending_change: null });
     service.preview.mockResolvedValue("quote_result");
     service.schedule.mockResolvedValue("scheduled_result");
@@ -38,6 +43,48 @@ describe("billing plan-change management composition", () => {
     });
     return { billingManagement, query, provider };
   }
+
+  it("binds interval-aware changes to the actual stored Owner and never calls a provider for another actor", async () => {
+    const { billingManagement: billing, provider } = fixture(true, [
+      {
+        plan: "business",
+        primary_owner_user_id: "owner",
+        stripe_customer_id: "cus_test",
+        stripe_subscription_id: "sub_test"
+      }
+    ]);
+    const scope = { organization_id: "org_test", actor_user_id: "owner" };
+    expect(await billing.getOfferChange!(scope)).toEqual({ pending_change: null });
+    expect(
+      await billing.previewOfferChange!({ ...scope, target_plan: "team", interval: "year" })
+    ).toBe("quote_result");
+    expect(
+      await billing.scheduleOfferChange!({ ...scope, confirmation_token: "owner-bound-quote" })
+    ).toBe("scheduled_result");
+    expect(await billing.cancelOfferChange!({ ...scope, schedule_id: "owned_schedule" })).toBe(
+      "cancelled_result"
+    );
+    expect(offerFactory).toHaveBeenCalledTimes(4);
+    expect(offerFactory).toHaveBeenLastCalledWith({
+      provider,
+      store: operationStore,
+      organizationId: "org_test",
+      actorUserId: "owner",
+      subscriptionId: "sub_test",
+      customerId: "cus_test"
+    });
+    expect(service.preview).toHaveBeenCalledWith({ target_plan: "team", interval: "year" });
+    expect(service.schedule).toHaveBeenCalledWith("owner-bound-quote");
+    expect(
+      await billing.previewOfferChange!({
+        ...scope,
+        actor_user_id: "former-owner",
+        target_plan: "team",
+        interval: "year"
+      })
+    ).toBe("no_active_subscription");
+    expect(offerFactory).toHaveBeenCalledTimes(4);
+  });
 
   it.each([
     { configured: false, rows: [] },

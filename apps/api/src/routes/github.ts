@@ -709,7 +709,7 @@ export function registerGitHubRoutes(app: FastifyInstance, dependencies: ApiDepe
       project_id: string;
       rule_id: string;
       actor_user_id: string;
-      actor_role: "owner" | "admin" | "member";
+      actor_role: "owner" | "admin" | "member" | "viewer";
       name?: string;
       enabled?: boolean;
       event_types?: string[];

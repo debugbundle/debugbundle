@@ -12,7 +12,9 @@ const statements = [
 ];
 
 export const BILLING_CHECKOUT_BOOTSTRAP_STATEMENTS = statements.map((statement) =>
-  statement.replace("CREATE TABLE IF NOT EXISTS", "CREATE TABLE")
+  statement
+    .replace("CREATE TABLE IF NOT EXISTS", "CREATE TABLE")
+    .replace("'solo','team'", "'solo','team','business'")
 );
 export const BILLING_CHECKOUT_MIGRATION = defineStorageSchemaMigration({
   id: "202610220001_add_billing_checkout_attempts",

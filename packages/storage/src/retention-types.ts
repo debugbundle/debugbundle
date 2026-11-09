@@ -38,6 +38,10 @@ export interface RetentionExpiredIncidentReference {
 }
 
 export interface RetentionStore {
+  pruneExpiredReportAvailability?(input: { now: string; limit: number }): Promise<number>;
+  pruneExpiredReportSourceText?(input: { now: string; limit: number }): Promise<number>;
+  pruneExpiredReportLifecycleFacts?(input: { now: string; limit: number }): Promise<number>;
+  pruneExpiredOrganizationCredentials?(input: { now: string; limit: number }): Promise<number>;
   listExpiredDiagnosticRawEvents?(input: {
     now: string;
     limit: number;

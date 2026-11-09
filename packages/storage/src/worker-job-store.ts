@@ -1,10 +1,16 @@
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Queryable } from "./types.js";
+import { PROJECT_JOB_AUTHORITY_PROTOCOL } from "./project-job-authorization.js";
 
 export const WORKER_JOB_PROTOCOL = "postgres-v1";
 
 export const WorkerJobNameSchema = z.enum([
+  "sync-billing-contact",
+  "reconcile-referral-receipts",
+  "generate-smart-report",
+  "render-smart-report-pdf",
+  "deliver-smart-report-email",
   "normalize-events",
   "aggregate-analytics-events",
   "group-incident",
@@ -81,8 +87,12 @@ export function createWorkerJobStore(db: Queryable): WorkerJobStore {
       );
       return id;
     },
-    async claim(name: string): Promise<WorkerJobClaim | null> {
+    async claim(name: string, onlyId?: string): Promise<WorkerJobClaim | null> {
       const jobName = WorkerJobNameSchema.parse(name);
+      if (onlyId !== undefined)
+        z.string()
+          .regex(/^[a-f0-9]{64}$/)
+          .parse(onlyId);
       const token = randomUUID();
       const result = await db.query<{
         id: string;
@@ -90,16 +100,22 @@ export function createWorkerJobStore(db: Queryable): WorkerJobStore {
         attempts: number;
       }>(
         `
-        WITH candidate AS (
-          SELECT id FROM worker_jobs
-          WHERE job_name = $1 AND attempts < $3 AND expires_at > now()
+        WITH authority AS MATERIALIZED (SELECT set_config('debugbundle.worker_job_authority','${PROJECT_JOB_AUTHORITY_PROTOCOL}',true)), candidate AS (
+          SELECT id FROM worker_jobs CROSS JOIN authority
+          WHERE job_name = $1 AND attempts < $3 AND expires_at > now()${onlyId === undefined ? "" : " AND id=$5"}
             AND (depends_on IS NULL OR EXISTS (SELECT 1 FROM worker_jobs parent WHERE parent.id = worker_jobs.depends_on AND parent.status = 'completed'))
             AND ((status = 'pending' AND available_at <= now()) OR (status = 'running' AND lease_expires_at <= now()))
           ORDER BY available_at, created_at, id FOR UPDATE SKIP LOCKED LIMIT 1
         ) UPDATE worker_jobs j SET status = 'running', attempts = attempts + 1,
           lease_token = $2, lease_expires_at = now() + $4 * interval '1 second', updated_at = now()
           FROM candidate c WHERE j.id = c.id RETURNING j.id, j.payload, j.attempts`,
-        [jobName, token, MAX_ATTEMPTS, WORKER_JOB_LEASE_SECONDS]
+        [
+          jobName,
+          token,
+          MAX_ATTEMPTS,
+          WORKER_JOB_LEASE_SECONDS,
+          ...(onlyId === undefined ? [] : [onlyId])
+        ]
       );
       const row = result.rows[0];
       return row === undefined
@@ -129,7 +145,9 @@ export function createWorkerJobStore(db: Queryable): WorkerJobStore {
                 "monthly_quota_exceeded",
                 "incident_missing",
                 "invalid_event",
-                "bundle_generation_disabled"
+                "bundle_generation_disabled",
+                "initiator_access_revoked",
+                "report_generation_failed"
               ])
               .parse(skippedReason);
       const result = await db.query(
@@ -236,7 +254,7 @@ export function createWorkerJobStore(db: Queryable): WorkerJobStore {
 
 export interface WorkerJobStore {
   enqueue(name: string, input: unknown, options?: WorkerJobOptions): Promise<string>;
-  claim(name: string): Promise<WorkerJobClaim | null>;
+  claim(name: string, onlyId?: string): Promise<WorkerJobClaim | null>;
   lock(claim: WorkerJobClaim): Promise<void>;
   renew(claim: WorkerJobClaim): Promise<void>;
   complete(claim: WorkerJobClaim, skippedReason?: string): Promise<void>;

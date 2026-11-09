@@ -172,9 +172,9 @@ New security-relevant routes or actions must add audit logging in the same chang
 
 ## 6. Trust Boundaries
 
-### SEC-25: Owner-Only Route Authorization
+### SEC-25: Privileged Route Authorization
 
-Every route that performs destructive or privileged operations (project deletion, member removal, role changes, billing mutations) must enforce owner-only authorization via `requireOwnerMemberAuth()` or equivalent. New privileged routes must include an explicit authorization test proving non-owner rejection.
+Project deletion, billing, ownership transfer and destructive account actions require owner authorization. Project Admin retains existing project-local collaborator/automation management. Business organisation delegation and Viewer restrictions follow the fixed action matrix in FR-BUS-02; Org Admin cannot administer Owner/peer Org Admins. All other privileged actions require their explicit action permission, not merely readable project access. Browser/session and member-token checks use the same domain policy with token restrictions intersected. Every new privileged action requires allowed and denied actor tests; no blanket relaxation of owner-only boundaries.
 
 ### SEC-26: Relay Credential Rejection
 
@@ -228,7 +228,6 @@ Every rule above must be enforced by at least one of:
 - **Code review** — as a complementary check, never the sole enforcement.
 
 When adding a new API route, SDK feature, or storage surface, review this list and confirm which SEC-\* rules apply to the change. If a rule applies, the enforcement mechanism must be present before the change ships.
-
 
 ### Runtime logger payload boundary
 

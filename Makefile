@@ -8,6 +8,7 @@ AWS := AWS_PAGER="" aws --profile "$(AWS_PROFILE)" --region "$(AWS_REGION)" --no
 DOCKER_COMPOSE ?= docker compose$(if $(wildcard .env), --env-file .env,)$(if $(wildcard .env.local), --env-file .env.local,)
 
 NODE_IMAGE ?= node:24-alpine
+TYPECHECK_NODE_OPTIONS ?= --max-old-space-size=4096
 WORKDIR := /workspace
 COMPOSE_PROJECT ?= debugbundle
 COMPOSE_NETWORK ?= $(COMPOSE_PROJECT)_default
@@ -94,6 +95,7 @@ help:
 	@echo "  make dev             Start everything (infra + API + worker + web) and open http://localhost:5291"
 	@echo "  make dev-mock        Show synthetic UI data at http://localhost:5291/dashboard"
 	@echo "  make dev-mock-off    Restore the web frontend to the real local API"
+	@echo "  make dev-tier        Inspect local tiers; TIER=free|solo|team|business switches the base tier"
 	@echo "  make dev-openai-plugin-preview Start dev with the local synthetic OpenAI UI review route"
 	@echo "  make dev-public      Start the public-site dev server at http://localhost:5292"
 	@echo "  make public-site-artifacts Refresh generated public API/reference artifacts"
@@ -183,7 +185,7 @@ audit:
 
 .PHONY: typecheck
 typecheck:
-	$(NODE_RUN) "corepack enable && corepack pnpm typecheck"
+	$(NODE_RUN) "corepack enable && NODE_OPTIONS=$(TYPECHECK_NODE_OPTIONS) corepack pnpm typecheck"
 
 .PHONY: web-check
 web-check:
@@ -196,6 +198,10 @@ compose-check:
 .PHONY: perf-check
 perf-check:
 	$(NODE_RUN) "corepack enable && $(PNPM_INSTALL_RELAXED) && node --import tsx scripts/perf-check.ts"
+
+.PHONY: smart-report-resource-check
+smart-report-resource-check:
+	$(NODE_RUN) "apk add --no-cache git >/dev/null && node --import tsx scripts/check-smart-report-resources.mjs"
 
 .PHONY: load-check
 load-check:
@@ -231,6 +237,10 @@ GEMINI_SMOKE_VERSION ?= 0.61.0
 GEMINI_SMOKE_NODE_IMAGE ?= node:24-bookworm
 gemini-extension-smoke:
 	docker run --rm -v "$(PWD):/source:ro" -e GEMINI_SMOKE_VERSION="$(GEMINI_SMOKE_VERSION)" $(GEMINI_SMOKE_NODE_IMAGE) node /source/scripts/smoke-gemini-extension.mjs
+
+.PHONY: openclaw-plugin-prepare
+openclaw-plugin-prepare:
+	$(NODE_RUN) "corepack enable && corepack pnpm --dir apps/openclaw-plugin build && corepack pnpm --dir apps/openclaw-plugin plugin:build"
 
 .PHONY: openclaw-plugin-check
 openclaw-plugin-check:
@@ -309,6 +319,10 @@ privacy-js-candidate-check: license-prepare-shared
 	$(NODE_RUN) 'node scripts/prepare-js-sdk-candidate-lock.mjs --check'
 	docker run --rm -v "$(PWD):$(WORKDIR)" --tmpfs "$(WORKDIR)/sdks/debugbundle-js/.tmp" -w "$(WORKDIR)" $(JS_CANDIDATE_NODE_IMAGE) sh -lc 'if ! command -v corepack >/dev/null 2>&1; then npm install --global corepack@0.34.1 >/dev/null; fi && corepack enable && node scripts/test-js-sdk-with-local-redaction.mjs --candidate && mkdir -p .tmp/sdk-js-candidate && cp sdks/debugbundle-js/.tmp/npm-packages/*.tgz .tmp/sdk-js-candidate/'
 
+.PHONY: privacy-js-redaction-candidate-check
+privacy-js-redaction-candidate-check: license-prepare-shared
+	docker run --rm -v "$(PWD):$(WORKDIR)" --tmpfs "$(WORKDIR)/sdks/debugbundle-js/.tmp" -w "$(WORKDIR)" $(JS_CANDIDATE_NODE_IMAGE) sh -lc 'corepack enable && node scripts/test-js-sdk-with-local-redaction.mjs --candidate --redaction-only && mkdir -p .tmp/sdk-js-candidate && cp sdks/debugbundle-js/.tmp/npm-packages/*.tgz .tmp/sdk-js-candidate/'
+
 .PHONY: js-candidate-lock
 js-candidate-lock: license-prepare-shared
 	$(NODE_RUN) 'node scripts/prepare-js-sdk-candidate-lock.mjs $(LOCK_ARGS)'
@@ -319,8 +333,9 @@ js-candidate-audit:
 
 .PHONY: privacy-js-local-smoke
 JS_SMOKE_NODE_IMAGE ?= node:26-alpine
+JS_SMOKE_ARGS ?=
 privacy-js-local-smoke: license-prepare-shared
-	docker run --rm -t -v "$(PWD):$(WORKDIR)" --tmpfs "$(WORKDIR)/sdks/debugbundle-js/.tmp" -w "$(WORKDIR)" $(JS_SMOKE_NODE_IMAGE) sh -lc 'npm install --global corepack@0.34.1 >/dev/null && corepack enable && node scripts/test-js-sdk-with-local-redaction.mjs --consumer && mkdir -p .tmp/sdk-js-installed && cp sdks/debugbundle-js/.tmp/npm-packages/*.tgz .tmp/sdk-js-installed/'
+	docker run --rm -t -v "$(PWD):$(WORKDIR)" --tmpfs "$(WORKDIR)/sdks/debugbundle-js/.tmp" -w "$(WORKDIR)" $(JS_SMOKE_NODE_IMAGE) sh -lc 'npm install --global corepack@0.34.1 >/dev/null && corepack enable && node scripts/test-js-sdk-with-local-redaction.mjs --consumer $(JS_SMOKE_ARGS) && mkdir -p .tmp/sdk-js-installed && cp sdks/debugbundle-js/.tmp/npm-packages/*.tgz .tmp/sdk-js-installed/'
 
 .PHONY: incident-recovery-check
 incident-recovery-check:
@@ -340,6 +355,11 @@ project-service-test:
 project-service-format:
 	test -n "$(FORMAT_FILES)"
 	$(NODE_RUN) "node_modules/.bin/prettier --write $(FORMAT_FILES)"
+
+.PHONY: format-check-focused
+format-check-focused:
+	test -n "$(FORMAT_FILES)"
+	$(NODE_RUN) "node_modules/.bin/prettier --check $(FORMAT_FILES)"
 
 project-service-check:
 	test -n "$(LINT_FILES)"
@@ -361,20 +381,24 @@ test-billing-checkout-integration:
 	sh scripts/test-billing-checkout-integration.sh
 
 # Use the already installed, lockfile-pinned tools without fetching Corepack.
-.PHONY: billing-safety-check billing-safety-format billing-safety-test
+.PHONY: billing-safety-check billing-safety-format billing-safety-format-check billing-safety-test
 billing-safety-test:
 	test -n "$(TEST_FILES)"
-	$(NODE_RUN) "node_modules/.bin/vitest run $(TEST_FILES)"
+	$(NODE_RUN) "corepack enable && node_modules/.bin/vitest run $(TEST_FILES)"
 
 # Full-suite infrastructure fixtures create disposable Git repositories. Keep
 # that tool inside this temporary container and reuse the installed JS packages.
 .PHONY: billing-safety-unit-test
 billing-safety-unit-test:
-	$(NODE_RUN) "apk add --no-cache git >/dev/null && node_modules/.bin/vitest run --maxWorkers=4 --reporter=dot"
+	$(NODE_RUN) "apk add --no-cache git >/dev/null && corepack enable && node_modules/.bin/vitest run --maxWorkers=4 --reporter=dot"
 
 billing-safety-check:
 	test -n "$(LINT_FILES)" && test -n "$(TEST_FILES)"
-	$(NODE_RUN) "node_modules/.bin/tsc --noEmit -p tsconfig.json && node_modules/.bin/eslint $(LINT_FILES) && node_modules/.bin/prettier --check $(LINT_FILES) && node_modules/.bin/vitest run $(TEST_FILES)"
+	$(NODE_RUN) "corepack enable && NODE_OPTIONS=$(TYPECHECK_NODE_OPTIONS) node_modules/.bin/tsc --noEmit -p tsconfig.json && node_modules/.bin/eslint $(LINT_FILES) && node_modules/.bin/prettier --check $(LINT_FILES) && node_modules/.bin/vitest run $(TEST_FILES)"
+
+billing-safety-format-check:
+	test -n "$(FORMAT_FILES)"
+	$(NODE_RUN) "node_modules/.bin/prettier --check $(FORMAT_FILES)"
 
 billing-safety-format:
 	test -n "$(FORMAT_FILES)"
@@ -444,6 +468,11 @@ test-all:
 test-all-quick:
 	$(NODE_RUN) "apk add --no-cache git >/dev/null && corepack enable && corepack pnpm vitest run"
 	$(MAKE) test-integration
+
+BUSINESS_CANDIDATE_DIR ?= .tmp/business-implementation/artifacts
+.PHONY: business-candidate-pack
+business-candidate-pack:
+	$(NODE_RUN) 'test ! -e "$(BUSINESS_CANDIDATE_DIR)" && mkdir -p "$(BUSINESS_CANDIDATE_DIR)" && npm pack ./apps/cli --ignore-scripts --pack-destination "$(BUSINESS_CANDIDATE_DIR)" && npm pack ./apps/mcp --ignore-scripts --pack-destination "$(BUSINESS_CANDIDATE_DIR)" && npm pack ./apps/openclaw-plugin --ignore-scripts --pack-destination "$(BUSINESS_CANDIDATE_DIR)" && tar -czf "$(BUSINESS_CANDIDATE_DIR)"/dashboard.tar.gz -C apps/web/dist . && tar -czf "$(BUSINESS_CANDIDATE_DIR)"/public-site.tar.gz -C site/out .'
 
 .PHONY: candidate-build
 candidate-build:
@@ -549,6 +578,10 @@ release-mcp-ecosystem:
 	node scripts/release-mcp-ecosystem.mjs run $(if $(VERSION),--version $(VERSION),) $(if $(TARGETS),--targets $(TARGETS),)
 
 .PHONY: openai-plugin-validate
+.PHONY: openai-report-schema-generate
+openai-report-schema-generate:
+	$(NODE_RUN) "node --import tsx scripts/generate-openai-report-schemas.ts"
+
 openai-plugin-validate:
 	$(NODE_RUN) "node scripts/validate-openai-plugin.mjs && node scripts/release-openai-plugin.mjs validate"
 
@@ -664,6 +697,17 @@ dev-mock:
 dev-mock-off:
 	DEBUGBUNDLE_DEV_MOCK=false $(DOCKER_COMPOSE) --profile dev up -d --no-deps --force-recreate web
 
+# Export values as data instead of interpolating operator input into shell code.
+.PHONY: dev-tier
+dev-tier: export DEV_TIER = $(if $(TIER),$(TIER),status)
+dev-tier: export DEV_TIER_ORG = $(ORG)
+dev-tier:
+	@sh scripts/dev-tier.sh
+
+.PHONY: dev-tier-check
+dev-tier-check:
+	@sh scripts/test-dev-tier.sh
+
 .PHONY: backend-restart
 backend-restart: ensure-probe-trigger-secret install
 	$(DOCKER_COMPOSE) --profile dev up -d --force-recreate api worker
@@ -746,6 +790,26 @@ license-docs-check:
 public-site-artifacts:
 	$(NODE_RUN) 'corepack enable && corepack pnpm public-site:artifacts'
 
+# Owner-authorised visual checks of public pricing in an isolated browser.
+BUSINESS_BROWSER_MODE ?= pricing
+.PHONY: business-dashboard-review
+business-dashboard-review:
+	$(NODE_RUN) "node_modules/.bin/tsx scripts/business-ui-fixtures.ts"
+	docker run --rm --shm-size=1g \
+		-v "$(CURDIR)/scripts/business-dashboard-review.mjs:/review.mjs:ro" \
+		-v "$(CURDIR)/apps/web/dist:/app:ro" \
+		-v "$(CURDIR)/.tmp/business-audit/browser:/evidence" \
+		mcr.microsoft.com/playwright:v1.63.0-noble sh -lc 'npm install --prefix /tmp/browser --ignore-scripts --no-audit --no-fund playwright@1.63.0 >/dev/null && node /review.mjs'
+.PHONY: business-browser-review
+business-browser-review:
+	mkdir -p .tmp/business-audit/browser
+	docker run --rm --shm-size=1g \
+		-v "$(CURDIR)/scripts/business-browser-review.mjs:/review.mjs:ro" \
+		-v "$(CURDIR)/site/out:/site:ro" \
+		-v "$(CURDIR)/.tmp/business-audit/browser:/evidence" \
+		-e REVIEW_MODE="$(BUSINESS_BROWSER_MODE)" \
+		mcr.microsoft.com/playwright:v1.63.0-noble sh -lc 'npm install --prefix /tmp/browser --ignore-scripts --no-audit --no-fund playwright@1.63.0 >/dev/null && node /review.mjs'
+
 .PHONY: evidence-fixtures
 evidence-fixtures:
 	$(NODE_RUN) 'SDK_FIXTURE_TARGETS="$(SDK_FIXTURE_TARGETS)" corepack pnpm exec tsx scripts/sync-evidence-fixtures.ts $(FIXTURE_ARGS)'
@@ -786,3 +850,55 @@ billing-stripe-hosted-test:
 .PHONY: billing-stripe-browser-test
 billing-stripe-browser-test:
 	sh scripts/test-billing-stripe-browser.sh
+
+.PHONY: business-billing-test business-billing-integration
+business-billing-test:
+	$(MAKE) test-focused TEST_FILES="tests/packages/shared-types/billing-catalog.test.ts tests/packages/shared-types/tier-capabilities.test.ts tests/packages/storage/billing-allowance-window.test.ts tests/packages/storage/billing-store.test.ts tests/packages/storage/schema-migrations.test.ts"
+
+# This disposable project has its own ports/volumes and cannot adopt retained services.
+business-billing-integration:
+	$(MAKE) test-integration INTEGRATION_PROJECT=debugbundle-business-test INTEGRATION_CONTAINER_PREFIX=debugbundle-business-test INTEGRATION_POSTGRES_PORT=25432 INTEGRATION_REDIS_PORT=26379 INTEGRATION_LOCALSTACK_PORT=24566 INTEGRATION_API_PORT=23000 INTEGRATION_WEB_PORT=25291 INTEGRATION_TEST_FILES="tests/integration/business-billing-migration.integration.test.ts tests/integration/retention-cleanup.integration.test.ts"
+
+.PHONY: business-access-integration
+business-access-integration:
+	$(MAKE) test-integration INTEGRATION_PROJECT=debugbundle-access-test INTEGRATION_CONTAINER_PREFIX=debugbundle-access-test INTEGRATION_POSTGRES_PORT=25433 INTEGRATION_REDIS_PORT=26380 INTEGRATION_LOCALSTACK_PORT=24567 INTEGRATION_API_PORT=23001 INTEGRATION_WEB_PORT=25292 INTEGRATION_TEST_FILES="tests/integration/organization-project-access.integration.test.ts tests/integration/analytics-job-authorization.integration.test.ts"
+
+.PHONY: business-organization-integration
+business-organization-integration:
+	$(MAKE) test-integration INTEGRATION_PROJECT=debugbundle-org-test INTEGRATION_CONTAINER_PREFIX=debugbundle-org-test INTEGRATION_POSTGRES_PORT=25434 INTEGRATION_REDIS_PORT=26381 INTEGRATION_LOCALSTACK_PORT=24568 INTEGRATION_API_PORT=23002 INTEGRATION_WEB_PORT=25293 INTEGRATION_TEST_FILES="tests/integration/organization-management.integration.test.ts"
+
+.PHONY: business-health-integration
+business-health-integration:
+	$(MAKE) test-integration INTEGRATION_PROJECT=debugbundle-health-test INTEGRATION_CONTAINER_PREFIX=debugbundle-health-test INTEGRATION_POSTGRES_PORT=25435 INTEGRATION_REDIS_PORT=26382 INTEGRATION_LOCALSTACK_PORT=24569 INTEGRATION_API_PORT=23003 INTEGRATION_WEB_PORT=25294 INTEGRATION_TEST_FILES="tests/integration/availability-checks.integration.test.ts"
+
+.PHONY: business-referral-integration
+business-referral-integration:
+	$(MAKE) test-integration INTEGRATION_PROJECT=debugbundle-referral-test INTEGRATION_CONTAINER_PREFIX=debugbundle-referral-test INTEGRATION_POSTGRES_PORT=25436 INTEGRATION_REDIS_PORT=26383 INTEGRATION_LOCALSTACK_PORT=24570 INTEGRATION_API_PORT=23004 INTEGRATION_WEB_PORT=25295 INTEGRATION_TEST_FILES="tests/integration/referral-attribution.integration.test.ts tests/integration/referral-ledger.integration.test.ts"
+
+.PHONY: smart-report-integration
+smart-report-integration:
+	$(MAKE) test-integration INTEGRATION_PROJECT=debugbundle-report-test INTEGRATION_CONTAINER_PREFIX=debugbundle-report-test INTEGRATION_POSTGRES_PORT=25437 INTEGRATION_REDIS_PORT=26384 INTEGRATION_LOCALSTACK_PORT=24571 INTEGRATION_API_PORT=23005 INTEGRATION_WEB_PORT=25296 INTEGRATION_TEST_FILES="$(wildcard tests/integration/report-*.integration.test.ts)"
+
+.PHONY: smart-report-model-evaluate
+.PHONY: smart-report-pdf-dependency-info
+smart-report-pdf-dependency-info:
+	$(NODE_RUN) "corepack enable && corepack pnpm view pdfkit@0.20.2 version && corepack pnpm view @types/pdfkit version && corepack pnpm view fontkit@2.0.4 version && corepack pnpm view @types/fontkit version"
+
+.PHONY: smart-report-pdf-install
+smart-report-pdf-install:
+	$(NODE_RUN) "corepack enable && corepack pnpm add --workspace-root --save-exact pdfkit@0.20.2 fontkit@2.0.4 && corepack pnpm add --workspace-root --save-dev --save-exact @types/pdfkit@0.17.7 @types/fontkit@2.0.9"
+
+.PHONY: smart-report-pdf-fonts smart-report-pdf-font-check
+smart-report-pdf-fonts:
+	$(NODE_RUN) "node scripts/prepare-report-fonts.mjs --download"
+
+smart-report-pdf-font-check:
+	$(NODE_RUN) "node scripts/prepare-report-fonts.mjs"
+
+.PHONY: smart-report-pdf-test
+smart-report-pdf-test:
+	$(NODE_RUN) "apk add --no-cache poppler-utils >/dev/null && REPORT_PDF_TEXT_CHECK_REQUIRED=true node_modules/.bin/vitest run tests/packages/smart-reports/report-pdf.test.ts tests/packages/smart-reports/report-pdf-child.test.ts tests/packages/smart-reports/report-html.test.ts"
+
+smart-report-model-evaluate:
+	test -n "$(REPORT_EVAL_KEY_FILE)"
+	docker run --rm -v "$(PWD):/workspace" -v "$(REPORT_EVAL_KEY_FILE):/run/report-evaluation-key:ro" -w /workspace $(NODE_IMAGE) sh -lc 'node_modules/.bin/tsx scripts/evaluate-smart-reports.ts /run/report-evaluation-key'

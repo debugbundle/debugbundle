@@ -1,5 +1,9 @@
 import type { RuntimeLogger } from "../../runtime-logger/src/index.js";
-import { getTierCapabilities, type TierName } from "../../shared-types/src/index.js";
+import {
+  getTierCapabilities,
+  type BillingInterval,
+  type TierName
+} from "../../shared-types/src/index.js";
 import {
   buildEmailBrandMarkUrl,
   renderCapacityQuantityChangeEmail,
@@ -41,6 +45,7 @@ export interface RecomputedEntitlements {
   extraCapacityQuantity: number;
   billingPeriodStartsAt: string | null;
   billingPeriodEndsAt: string | null;
+  billingInterval?: BillingInterval | undefined;
   totalCapacityUnits: number;
 }
 
@@ -189,6 +194,7 @@ export async function sendBillingChangeConfirmations(
             previousPlan: previous.plan,
             newPlan: entitlements.effectivePlan,
             extraCapacity: entitlements.extraCapacityQuantity,
+            billingInterval: entitlements.billingInterval,
             brandMarkUrl: resolveBillingEmailBrandMarkUrl()
           }),
         logger
@@ -206,6 +212,7 @@ export async function sendBillingChangeConfirmations(
             previousCapacity: previous.additionalCapacityUnits,
             newCapacity: entitlements.extraCapacityQuantity,
             totalCapacityUnits: entitlements.totalCapacityUnits,
+            billingInterval: entitlements.billingInterval,
             brandMarkUrl: resolveBillingEmailBrandMarkUrl()
           }),
         logger

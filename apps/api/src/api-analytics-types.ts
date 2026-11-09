@@ -1,3 +1,5 @@
+import type { ProjectActorReadScope } from "../../../packages/storage/src/project-read-scope.js";
+import type { ProjectJobInitiator } from "../../../packages/storage/src/project-job-authorization.js";
 import type { AnalyticsFlowStore } from "../../../packages/storage/src/analytics-flow-store.js";
 import type {
   AnalyticsSettings,
@@ -144,20 +146,22 @@ export interface ApiAnalyticsDependencies {
           cursor?: { last_detected_at: string; opportunity_id: string } | undefined;
           limit: number;
         }): Promise<AnalyticsOpportunitiesListResponse>;
-        listAnalyticsOpportunitiesForOrganization(input: {
-          organization_id: string;
-          status?: AnalyticsOpportunityStatus | undefined;
-          kind?: AnalyticsBundleAnalysisKind | undefined;
-          service?: string | undefined;
-          environment?: string | undefined;
-          severity?: AnalyticsBundleSeverity | undefined;
-          bundle_status?: AnalyticsOpportunityBundleStatus | undefined;
-          from?: string | undefined;
-          to?: string | undefined;
-          include_total?: boolean | undefined;
-          cursor?: { last_detected_at: string; opportunity_id: string } | undefined;
-          limit: number;
-        }): Promise<AnalyticsOpportunitiesListResponse>;
+        listAnalyticsOpportunitiesForOrganization(
+          input: ProjectActorReadScope & {
+            organization_id: string;
+            status?: AnalyticsOpportunityStatus | undefined;
+            kind?: AnalyticsBundleAnalysisKind | undefined;
+            service?: string | undefined;
+            environment?: string | undefined;
+            severity?: AnalyticsBundleSeverity | undefined;
+            bundle_status?: AnalyticsOpportunityBundleStatus | undefined;
+            from?: string | undefined;
+            to?: string | undefined;
+            include_total?: boolean | undefined;
+            cursor?: { last_detected_at: string; opportunity_id: string } | undefined;
+            limit: number;
+          }
+        ): Promise<AnalyticsOpportunitiesListResponse>;
         getAnalyticsOpportunityForProject(input: {
           organization_id: string;
           project_id: string;
@@ -191,24 +195,31 @@ export interface ApiAnalyticsDependencies {
           include_total?: boolean | undefined;
           cursor?: { created_at: string; generation_id: string } | undefined;
           limit: number;
-        }): Promise<{ bundles: AnalyticsBundleGenerationRecord[]; next_cursor: string | null; total_pages?: number }>;
-        listAnalyticsBundleGenerationsForOrganization(input: {
-          organization_id: string;
-          status?: AnalyticsBundleGenerationStatus | undefined;
-          analysis_kind?: AnalyticsBundleAnalysisKind | undefined;
-          service?: string | undefined;
-          environment?: string | undefined;
-          from?: string | undefined;
-          to?: string | undefined;
-          include_total?: boolean | undefined;
-          cursor?: { created_at: string; generation_id: string } | undefined;
-          limit: number;
         }): Promise<{
+          bundles: AnalyticsBundleGenerationRecord[];
+          next_cursor: string | null;
+          total_pages?: number;
+        }>;
+        listAnalyticsBundleGenerationsForOrganization(
+          input: ProjectActorReadScope & {
+            organization_id: string;
+            status?: AnalyticsBundleGenerationStatus | undefined;
+            analysis_kind?: AnalyticsBundleAnalysisKind | undefined;
+            service?: string | undefined;
+            environment?: string | undefined;
+            from?: string | undefined;
+            to?: string | undefined;
+            include_total?: boolean | undefined;
+            cursor?: { created_at: string; generation_id: string } | undefined;
+            limit: number;
+          }
+        ): Promise<{
           bundles: AnalyticsBundleGenerationInventoryRecord[];
           next_cursor: string | null;
           total_pages?: number;
         }>;
         requestAnalyticsBundleGenerationForProject(input: {
+          initiating_authority?: ProjectJobInitiator;
           organization_id: string;
           project_id: string;
           opportunity_id?: string | null | undefined;

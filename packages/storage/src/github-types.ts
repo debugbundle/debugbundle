@@ -201,7 +201,7 @@ export interface GitHubStore {
     project_id: string;
     rule_id: string;
     actor_user_id?: string;
-    actor_role?: "owner" | "admin" | "member";
+    actor_role?: "owner" | "admin" | "member" | "viewer";
     name?: string;
     enabled?: boolean;
     event_types?: string[];
@@ -217,7 +217,7 @@ export interface GitHubStore {
     project_id: string;
     rule_id: string;
     actor_user_id?: string;
-    actor_role?: "owner" | "admin" | "member";
+    actor_role?: "owner" | "admin" | "member" | "viewer";
   }): Promise<boolean>;
   listProjectGitHubDeliveriesForOrganization(input: {
     organization_id: string;
@@ -230,7 +230,7 @@ export interface GitHubStore {
     project_id: string;
     delivery_id: string;
     actor_user_id?: string;
-    actor_role?: "owner" | "admin" | "member";
+    actor_role?: "owner" | "admin" | "member" | "viewer";
   }): Promise<GitHubDispatchDeliveryRecord | null>;
   listMatchingGitHubDispatchRules(input: {
     project_id: string;

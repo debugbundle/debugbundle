@@ -90,7 +90,7 @@ describe("GitHub organization installation disconnect parity", () => {
       descriptor.inputSchema.safeParse({ bearerToken: "member", projectId: "proj" }).success
     ).toBe(false);
     expect(AGENT_READ_MCP_TOOL_CATALOG).toHaveLength(5);
-    expect(OPENAI_TOOL_NAMES).toHaveLength(23);
+    expect(OPENAI_TOOL_NAMES).toHaveLength(25);
     expect(AGENT_READ_MCP_TOOL_CATALOG.map((entry) => entry.name)).not.toContain(
       "disconnect_github_installation"
     );

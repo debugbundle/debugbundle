@@ -11,6 +11,7 @@ import {
 } from "../../../../packages/auth/src/index.js";
 import { importUserAvatarFromUrl } from "../../../../packages/storage/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
+import { captureSignupReferral } from "../referral-signup.js";
 import { hashAuditIdentifier, recordAuditLog } from "../audit-logging.js";
 import { SMALL_REQUEST_BODY_LIMIT_BYTES } from "../http-limits.js";
 import {
@@ -30,8 +31,8 @@ interface BrowserAuthSession {
   email: string;
   email_verified_at: string | null;
   organization_id: string;
-  organization_plan: "free" | "solo" | "team";
-  role: "owner" | "member";
+  organization_plan: "free" | "solo" | "team" | "business";
+  role: "owner" | "admin" | "member";
   created_at: string;
   expires_at: string;
   revoked_at: string | null;
@@ -52,12 +53,18 @@ interface BrowserAuthRouteHelpers {
       organization_id: string;
       user_id: string;
       email: string;
-      role: "owner" | "member";
+      role: "owner" | "admin" | "member";
       actor_type: "browser_session";
       ip_address: string;
     },
-    dependencies: Pick<ApiDependencies, "auditLogging" | "billingAdmin" | "billingManagement" | "projectManagement">
-  ): Promise<{ organization_plan: "free" | "solo" | "team"; clear_review_cookie: boolean }>;
+    dependencies: Pick<
+      ApiDependencies,
+      "auditLogging" | "billingAdmin" | "billingManagement" | "projectManagement"
+    >
+  ): Promise<{
+    organization_plan: "free" | "solo" | "team" | "business";
+    clear_review_cookie: boolean;
+  }>;
   buildSessionResponse(
     sessionToken: string,
     session: BrowserAuthSession,
@@ -90,7 +97,7 @@ function readGithubOauthStateSecret(): string | null {
 }
 
 function buildGithubSignupTrialCookie(
-  trialPlan: "solo" | "team",
+  trialPlan: "solo" | "team" | "business",
   expiresAt: string,
   options: { secure: boolean | undefined }
 ): string | null {
@@ -114,7 +121,9 @@ function buildClearedGithubSignupTrialCookie(options: { secure: boolean | undefi
   return `${GITHUB_SIGNUP_TRIAL_COOKIE_NAME}=; ${buildLaxHttpOnlyCookieAttributes(options)}; Expires=${new Date(0).toUTCString()}; Max-Age=0`;
 }
 
-function readGithubSignupTrialPlan(cookieHeader: string | undefined): "solo" | "team" | null {
+function readGithubSignupTrialPlan(
+  cookieHeader: string | undefined
+): "solo" | "team" | "business" | null {
   const secret = readGithubOauthStateSecret();
   if (secret === null) {
     return null;
@@ -132,7 +141,9 @@ function readGithubSignupTrialPlan(cookieHeader: string | undefined): "solo" | "
 
   const payload = cookieValue.slice(0, delimiterIndex);
   const signature = cookieValue.slice(delimiterIndex + 1);
-  const expectedSignature = createHmac("sha256", secret).update(payload, "utf8").digest("base64url");
+  const expectedSignature = createHmac("sha256", secret)
+    .update(payload, "utf8")
+    .digest("base64url");
   if (signature !== expectedSignature) {
     return null;
   }
@@ -143,7 +154,9 @@ function readGithubSignupTrialPlan(cookieHeader: string | undefined): "solo" | "
       trial_plan?: string;
     };
     if (
-      (parsed.trial_plan !== "solo" && parsed.trial_plan !== "team") ||
+      (parsed.trial_plan !== "solo" &&
+        parsed.trial_plan !== "team" &&
+        parsed.trial_plan !== "business") ||
       typeof parsed.expires_at !== "string" ||
       Number.isNaN(Date.parse(parsed.expires_at)) ||
       Date.parse(parsed.expires_at) <= Date.now()
@@ -163,7 +176,7 @@ async function startRequestedSignupTrial(
   input: {
     organization_id: string;
     user_id: string;
-    target_plan: "solo" | "team";
+    target_plan: "solo" | "team" | "business";
     source: "email_code" | "github_oauth";
   }
 ): Promise<void> {
@@ -238,175 +251,191 @@ export function registerBrowserAuthRoutes(
   dependencies: ApiDependencies,
   helpers: BrowserAuthRouteHelpers
 ): void {
-  app.post("/v1/auth/request-code", { bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES }, async (request, reply) => {
-    if (!(await helpers.enforceAuthRateLimit(request, reply, dependencies))) {
-      return;
-    }
-
-    if (dependencies.webAuth === undefined) {
-      return reply.status(503).send({
-        error: "auth_not_configured"
-      });
-    }
-
-    const parsedBody = RequestEmailCodeBodySchema.safeParse(request.body);
-    if (!parsedBody.success) {
-      return reply.status(400).send({
-        error: "invalid_payload"
-      });
-    }
-
-    const now = new Date();
-    const acceptedTermsAt = now.toISOString();
-
-    const requested = await dependencies.webAuth.requestEmailCode({
-      email: parsedBody.data.email,
-      accepted_terms_at: acceptedTermsAt,
-      now
-    });
-
-    await recordAuditLog(dependencies.auditLogging, {
-      organization_id: null,
-      actor_user_id: null,
-      actor_type: "anonymous",
-      action: "auth.email_code.request",
-      target_type: "email_auth",
-      target_id: null,
-      status: "success",
-      ip_address: request.ip,
-      metadata: {
-        email_hash: hashAuditIdentifier(parsedBody.data.email),
-        code_sent: requested.code_sent,
-        accepted_terms_at: acceptedTermsAt,
-        acceptance_source: "clickwrap"
+  app.post(
+    "/v1/auth/request-code",
+    { bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES },
+    async (request, reply) => {
+      if (!(await helpers.enforceAuthRateLimit(request, reply, dependencies))) {
+        return;
       }
-    });
 
-    return reply.status(200).send({ success: true });
-  });
+      if (dependencies.webAuth === undefined) {
+        return reply.status(503).send({
+          error: "auth_not_configured"
+        });
+      }
 
-  app.post("/v1/auth/verify-code", { bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES }, async (request, reply) => {
-    if (!(await helpers.enforceAuthRateLimit(request, reply, dependencies))) {
-      return;
-    }
+      const parsedBody = RequestEmailCodeBodySchema.safeParse(request.body);
+      if (!parsedBody.success) {
+        return reply.status(400).send({
+          error: "invalid_payload"
+        });
+      }
 
-    if (dependencies.webAuth === undefined) {
-      return reply.status(503).send({
-        error: "auth_not_configured"
+      const now = new Date();
+      const acceptedTermsAt = now.toISOString();
+
+      const requested = await dependencies.webAuth.requestEmailCode({
+        email: parsedBody.data.email,
+        accepted_terms_at: acceptedTermsAt,
+        now
       });
-    }
 
-    const parsedBody = VerifyEmailCodeBodySchema.safeParse(request.body);
-    if (!parsedBody.success) {
-      return reply.status(400).send({
-        error: "invalid_payload"
-      });
-    }
-
-    const login = await dependencies.webAuth.verifyEmailCode({
-      email: parsedBody.data.email,
-      code: parsedBody.data.code,
-      now: new Date()
-    });
-
-    if (!login.ok) {
       await recordAuditLog(dependencies.auditLogging, {
         organization_id: null,
         actor_user_id: null,
         actor_type: "anonymous",
-        action: "auth.email_code.verify",
-        target_type: "session",
+        action: "auth.email_code.request",
+        target_type: "email_auth",
         target_id: null,
-        status: "failure",
-        ip_address: request.ip,
-        metadata: {
-          email_hash: hashAuditIdentifier(parsedBody.data.email),
-          reason: login.error
-        }
-      });
-
-      return reply.status(login.error === "account_suspended" ? 403 : 400).send({
-        error: login.error === "account_suspended" ? "account_suspended" : "invalid_code"
-      });
-    }
-
-    if (login.created_user) {
-      await recordAuditLog(dependencies.auditLogging, {
-        organization_id: login.session.organization_id,
-        actor_user_id: login.session.user_id,
-        actor_type: "anonymous",
-        action: "auth.signup",
-        target_type: "user",
-        target_id: login.session.user_id,
         status: "success",
         ip_address: request.ip,
         metadata: {
           email_hash: hashAuditIdentifier(parsedBody.data.email),
-          created_user: true,
-          authentication_method: "email_code",
+          code_sent: requested.code_sent,
+          accepted_terms_at: acceptedTermsAt,
           acceptance_source: "clickwrap"
         }
       });
 
-      if (parsedBody.data.requested_trial_plan !== undefined) {
-        await startRequestedSignupTrial(request, dependencies, {
-          organization_id: login.session.organization_id,
-          user_id: login.session.user_id,
-          target_plan: parsedBody.data.requested_trial_plan,
-          source: "email_code"
+      return reply.status(200).send({ success: true });
+    }
+  );
+
+  app.post(
+    "/v1/auth/verify-code",
+    { bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES },
+    async (request, reply) => {
+      if (!(await helpers.enforceAuthRateLimit(request, reply, dependencies))) {
+        return;
+      }
+
+      if (dependencies.webAuth === undefined) {
+        return reply.status(503).send({
+          error: "auth_not_configured"
         });
       }
-    }
 
-    await recordAuditLog(dependencies.auditLogging, {
-      organization_id: login.session.organization_id,
-      actor_user_id: login.session.user_id,
-      actor_type: "anonymous",
-      action: "auth.login",
-      target_type: "session",
-      target_id: login.session.session_id,
-      status: "success",
-      ip_address: request.ip,
-      metadata: {
-        authentication_method: "email_code"
+      const parsedBody = VerifyEmailCodeBodySchema.safeParse(request.body);
+      if (!parsedBody.success) {
+        return reply.status(400).send({
+          error: "invalid_payload"
+        });
       }
-    });
 
-    const plan = await helpers.resolveOrganizationPlanForRequest(
-      request,
-      {
+      const login = await dependencies.webAuth.verifyEmailCode({
+        email: parsedBody.data.email,
+        code: parsedBody.data.code,
+        now: new Date()
+      });
+
+      if (!login.ok) {
+        await recordAuditLog(dependencies.auditLogging, {
+          organization_id: null,
+          actor_user_id: null,
+          actor_type: "anonymous",
+          action: "auth.email_code.verify",
+          target_type: "session",
+          target_id: null,
+          status: "failure",
+          ip_address: request.ip,
+          metadata: {
+            email_hash: hashAuditIdentifier(parsedBody.data.email),
+            reason: login.error
+          }
+        });
+
+        return reply.status(login.error === "account_suspended" ? 403 : 400).send({
+          error: login.error === "account_suspended" ? "account_suspended" : "invalid_code"
+        });
+      }
+
+      const referralCookie = await captureSignupReferral(dependencies.referrals, {
         organization_id: login.session.organization_id,
-        user_id: login.session.user_id,
-        email: login.session.email,
-        role: login.session.role,
-        actor_type: "browser_session",
-        ip_address: request.ip
-      },
-      dependencies
-    );
+        actor_user_id: login.session.user_id,
+        created_user: login.created_user,
+        cookie_header: request.headers.cookie
+      });
+      if (login.created_user) {
+        await recordAuditLog(dependencies.auditLogging, {
+          organization_id: login.session.organization_id,
+          actor_user_id: login.session.user_id,
+          actor_type: "anonymous",
+          action: "auth.signup",
+          target_type: "user",
+          target_id: login.session.user_id,
+          status: "success",
+          ip_address: request.ip,
+          metadata: {
+            email_hash: hashAuditIdentifier(parsedBody.data.email),
+            created_user: true,
+            authentication_method: "email_code",
+            acceptance_source: "clickwrap"
+          }
+        });
 
-    reply.header(
-      "Set-Cookie",
-      buildSessionCookie(login.session_token, login.session.expires_at, {
-        secure: helpers.shouldUseSecureCookies()
-      })
-    );
-    if (plan.clear_review_cookie) {
-      helpers.appendSetCookieHeader(
-        reply,
-        helpers.buildClearedReviewGrantCookie({
+        if (parsedBody.data.requested_trial_plan !== undefined) {
+          await startRequestedSignupTrial(request, dependencies, {
+            organization_id: login.session.organization_id,
+            user_id: login.session.user_id,
+            target_plan: parsedBody.data.requested_trial_plan,
+            source: "email_code"
+          });
+        }
+      }
+
+      await recordAuditLog(dependencies.auditLogging, {
+        organization_id: login.session.organization_id,
+        actor_user_id: login.session.user_id,
+        actor_type: "anonymous",
+        action: "auth.login",
+        target_type: "session",
+        target_id: login.session.session_id,
+        status: "success",
+        ip_address: request.ip,
+        metadata: {
+          authentication_method: "email_code"
+        }
+      });
+
+      const plan = await helpers.resolveOrganizationPlanForRequest(
+        request,
+        {
+          organization_id: login.session.organization_id,
+          user_id: login.session.user_id,
+          email: login.session.email,
+          role: login.session.role,
+          actor_type: "browser_session",
+          ip_address: request.ip
+        },
+        dependencies
+      );
+
+      reply.header(
+        "Set-Cookie",
+        buildSessionCookie(login.session_token, login.session.expires_at, {
           secure: helpers.shouldUseSecureCookies()
         })
       );
-    }
+      if (plan.clear_review_cookie) {
+        helpers.appendSetCookieHeader(
+          reply,
+          helpers.buildClearedReviewGrantCookie({
+            secure: helpers.shouldUseSecureCookies()
+          })
+        );
+      }
 
-    return reply.status(200).send(
-      helpers.buildSessionResponse(login.session_token, {
-        ...login.session,
-        organization_plan: plan.organization_plan
-      })
-    );
-  });
+      if (referralCookie !== null) helpers.appendSetCookieHeader(reply, referralCookie);
+
+      return reply.status(200).send(
+        helpers.buildSessionResponse(login.session_token, {
+          ...login.session,
+          organization_plan: plan.organization_plan
+        })
+      );
+    }
+  );
 
   app.get("/v1/auth/github/start", async (request, reply) => {
     if (dependencies.webAuth === undefined) {
@@ -486,7 +515,10 @@ export function registerBrowserAuthRoutes(
       });
     }
 
-    const stateCookieValue = readCookieValue(request.headers.cookie, GITHUB_OAUTH_STATE_COOKIE_NAME);
+    const stateCookieValue = readCookieValue(
+      request.headers.cookie,
+      GITHUB_OAUTH_STATE_COOKIE_NAME
+    );
     const completed = await dependencies.webAuth.completeGithubAuth({
       code: parsedQuery.data.code,
       state: parsedQuery.data.state,
@@ -508,6 +540,12 @@ export function registerBrowserAuthRoutes(
       return reply.redirect(completed.redirect_url);
     }
 
+    const referralCookie = await captureSignupReferral(dependencies.referrals, {
+      organization_id: completed.session.organization_id,
+      actor_user_id: completed.session.user_id,
+      created_user: completed.created_user,
+      cookie_header: request.headers.cookie
+    });
     if (completed.created_user) {
       await recordAuditLog(dependencies.auditLogging, {
         organization_id: completed.session.organization_id,
@@ -561,6 +599,7 @@ export function registerBrowserAuthRoutes(
       buildClearedGithubOauthStateCookie({ secure: helpers.shouldUseSecureCookies() }),
       buildClearedGithubSignupTrialCookie({ secure: helpers.shouldUseSecureCookies() })
     ]);
+    if (referralCookie !== null) helpers.appendSetCookieHeader(reply, referralCookie);
 
     if (
       typeof completed.avatar_url === "string" &&

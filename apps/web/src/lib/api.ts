@@ -171,9 +171,9 @@ export async function sendSystemEmailPreview(
   return body;
 }
 
-export async function listMemberTokens(): Promise<MemberTokenRecord[]> {
+export async function listMemberTokens(includeScope = false): Promise<MemberTokenRecord[]> {
   const body = await readJson<{ tokens: MemberTokenRecord[] }>(
-    await fetch(`${API_BASE}/v1/member/tokens`, {
+    await fetch(`${API_BASE}/v1/member/tokens${includeScope ? "?include_scope=true" : ""}`, {
       credentials: "include"
     })
   );
@@ -670,7 +670,11 @@ export async function deactivateProjectProbeActivation(
   return body.deactivated;
 }
 
-export async function createMemberToken(payload: { label: string }): Promise<CreatedMemberToken> {
+export async function createMemberToken(payload: {
+  label: string;
+  scope?: import("../../../../packages/shared-types/src/index.js").MemberTokenScopeDeclaration;
+  expires_at?: string;
+}): Promise<CreatedMemberToken> {
   const body = await readJson<{ token: CreatedMemberToken }>(
     await fetch(`${API_BASE}/v1/member/tokens`, {
       method: "POST",

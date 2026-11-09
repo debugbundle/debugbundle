@@ -1,6 +1,6 @@
 {
   "name": "debugbundle",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "Investigate production incidents and aggregate product analytics with read-only DebugBundle evidence.",
   "author": {
     "name": "DebugBundle",

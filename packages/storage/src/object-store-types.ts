@@ -3,10 +3,12 @@ export interface ObjectStorePutInput {
   body: Buffer;
   contentType: string;
   contentEncoding?: string;
+  timeoutMs?: number;
 }
 
 export interface ObjectStoreDeleteInput {
   key: string;
+  timeoutMs?: number;
 }
 
 export interface ObjectStoreClient {
@@ -20,6 +22,9 @@ export interface ObjectStorePrefixDeleter {
 
 export interface ObjectStoreReadInput {
   key: string;
+  /** Opt-in bounds for report/context reads; omitted options preserve existing reads. */
+  maxBytes?: number;
+  timeoutMs?: number;
 }
 
 export interface ObjectStoreReader {

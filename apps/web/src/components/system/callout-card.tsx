@@ -3,6 +3,7 @@ import type { HTMLAttributes, ReactNode } from "react";
 import { cn } from "../../lib/utils.js";
 import { Badge } from "../ui/badge.js";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card.js";
+import { TitleBadgeRow } from "./title-badge-row.js";
 
 type CalloutTone = "info" | "neutral" | "success" | "warning" | "destructive";
 
@@ -37,28 +38,28 @@ export function CalloutCard({
   return (
     <Card data-tone={tone} className={cn(toneMap[tone], className)} {...props}>
       <CardHeader>
-        <Badge
-          variant={
-            tone === "destructive"
-              ? "destructive"
-              : tone === "warning"
-                ? "warning"
-                : tone === "success"
-                  ? "success"
-                  : tone === "neutral"
-                    ? "outline"
-                    : "default"
+        <TitleBadgeRow
+          title={<CardTitle>{title}</CardTitle>}
+          titleAccessory={titleAccessory}
+          actions={titleAction}
+          badges={
+            <Badge
+              variant={
+                tone === "destructive"
+                  ? "destructive"
+                  : tone === "warning"
+                    ? "warning"
+                    : tone === "success"
+                      ? "success"
+                      : tone === "neutral"
+                        ? "outline"
+                        : "default"
+              }
+            >
+              {eyebrow}
+            </Badge>
           }
-        >
-          {eyebrow}
-        </Badge>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <CardTitle>{title}</CardTitle>
-            {titleAccessory}
-          </div>
-          {titleAction === undefined ? null : <div className="ml-auto">{titleAction}</div>}
-        </div>
+        />
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <p className="text-sm text-muted-foreground">{description}</p>

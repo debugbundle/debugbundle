@@ -3,6 +3,11 @@ import {
   type PlanChangeRequest,
   type PlanChangeResponse
 } from "./plan-change-client.js";
+import {
+  createOfferChangeClient,
+  type OfferChangeRequest,
+  type OfferChangeResponse
+} from "./offer-change-client.js";
 import { z } from "zod";
 
 export const BillingUsageMetricSchema = z
@@ -25,7 +30,7 @@ export const BillingStateSchema = z
   ])
   .nullable();
 
-export const BillingTrialPlanSchema = z.enum(["solo", "team"]);
+export const BillingTrialPlanSchema = z.enum(["solo", "team", "business"]);
 
 export const BillingTrialSummarySchema = z
   .object({
@@ -43,7 +48,7 @@ export const BillingTrialSummarySchema = z
 
 export const BillingSummarySchema = z
   .object({
-    plan: z.enum(["free", "solo", "team"]),
+    plan: z.enum(["free", "solo", "team", "business"]),
     billing_state: BillingStateSchema,
     stripe_customer_id: z.string().nullable(),
     active_projects: z.number().int().nonnegative(),
@@ -175,6 +180,7 @@ async function expectCapacity(
 }
 
 export function createBillingApi(client: HttpClient): {
+  offerChange(input: OfferChangeRequest): Promise<OfferChangeResponse>;
   planChange(input: PlanChangeRequest): Promise<PlanChangeResponse>;
   getBillingSummary(input: { bearerToken: string }): Promise<z.infer<typeof BillingSummarySchema>>;
   startTrial(input: {
@@ -194,6 +200,7 @@ export function createBillingApi(client: HttpClient): {
   }): Promise<z.infer<typeof BillingSummarySchema>>;
 } {
   return {
+    offerChange: createOfferChangeClient(client, parseApiError),
     planChange: createPlanChangeClient(client, parseApiError),
     async getBillingSummary(input) {
       return expectBilling(

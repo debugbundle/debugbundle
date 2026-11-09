@@ -8,6 +8,7 @@ import type {
 } from "../../../packages/storage/src/index.js";
 import type { IncidentLifecycleGitHubDispatchPublisher } from "./processor.js";
 import { type WorkerAccountAnalyticsDependencies } from "./account-analytics.js";
+import type { ProjectJobAuthorization } from "../../../packages/storage/src/project-job-authorization.js";
 
 export type ImprovementWebhookStore = Pick<
   WebhookDeliveryStore,
@@ -15,6 +16,7 @@ export type ImprovementWebhookStore = Pick<
 >;
 
 export interface ImprovementBundleWorkerDependencies extends WorkerAccountAnalyticsDependencies {
+  projectJobAuthorization?: ProjectJobAuthorization;
   scheduleBuild?: (
     job: import("../../../packages/storage/src/improvement-bundle-jobs.js").BuildImprovementBundleJob
   ) => Promise<void>;

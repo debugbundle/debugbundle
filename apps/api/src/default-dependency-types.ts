@@ -5,6 +5,7 @@ import type {
   GitHubOAuthConfig,
   WebSessionAuthService
 } from "../../../packages/auth/src/index.js";
+import type { ReportRuntimeConfiguration } from "../../../packages/smart-reports/src/report-runtime-config.js";
 import type {
   IncidentFrequencyCounter,
   IngestionRateLimiter,
@@ -35,6 +36,7 @@ import type { GitHubAppClient } from "./github-app.js";
 import type { StripeConfig } from "./stripe-config.js";
 import type { BillingEmailService } from "./default-dependency-helpers.js";
 import type { createBillingManagement } from "./billing-management.js";
+import type { ReferralConfig } from "./default-referrals.js";
 
 export interface CreateApiDependenciesInput {
   projectMergesEnabled?: boolean;
@@ -52,6 +54,8 @@ export interface CreateApiDependenciesInput {
   githubOAuth?: GitHubOAuthConfig;
   githubAppClient?: GitHubAppClient;
   stripeConfig?: StripeConfig;
+  referralConfig?: ReferralConfig;
+  smartReportConfig?: ReportRuntimeConfiguration;
   appBaseUrl?: string;
   publicStatusBaseUrl?: string;
   publicStatusTrustProxy?: boolean;

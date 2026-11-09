@@ -18,6 +18,18 @@ const ALL_REQUIRED_TABLES = Array.from(
 );
 
 describe("storage schema migrations", () => {
+  it("requires the Business billing foundation without rewriting installed history", () => {
+    const migration = STORAGE_SCHEMA_MIGRATIONS.find(
+      (entry) => entry.id === "202611070001_add_business_billing_foundation"
+    );
+    expect(migration).toBeDefined();
+    const sql = migration!.statements.join("\n");
+    expect(sql).toContain("billing_interval");
+    expect(sql).toContain("billing_allowance_anchor_at");
+    expect(sql).toContain("'solo','team','business'");
+    expect(sql).toContain("CREATE OR REPLACE FUNCTION debugbundle_rule_actor_allowed");
+    expect(sql).not.toMatch(/DELETE FROM|TRUNCATE|DROP TABLE|UPDATE organizations/);
+  });
   it("requires public flow tables and bounded hashed continuity before runtime use", () => {
     const migration = STORAGE_SCHEMA_MIGRATIONS.find(
       (entry) => entry.id === "202610030001_add_public_analytics_flows"
@@ -402,6 +414,34 @@ describe("storage schema migrations", () => {
         rows: [{ definition: "CHECK includes plan_schedule and plan_cancel" }]
       })
       .mockResolvedValueOnce({ rows: [{ project_service_schema_available: true }] })
+      .mockResolvedValueOnce({ rows: [{ available: true }] })
+      .mockResolvedValueOnce({ rows: [{ available: true }] })
+      .mockResolvedValueOnce({ rows: [{ available: true }] })
+      .mockResolvedValueOnce({ rows: [{ available: true }] })
+      .mockResolvedValueOnce({ rows: [{ available: true }] })
+      // The current bootstrap also contains the validated referral and report structures.
+      .mockResolvedValueOnce({ rows: [{ available: true }] })
+      .mockResolvedValueOnce({ rows: [{ available: true }] })
+      .mockResolvedValueOnce({ rows: [{ available: true }] })
+      .mockResolvedValueOnce({ rows: [{ available: true }] })
+      .mockResolvedValueOnce({ rows: [{ available: true }] })
+      .mockResolvedValueOnce({ rows: [{ available: true }] })
+      .mockResolvedValueOnce({ rows: [{ available: true }] })
+      .mockResolvedValueOnce({ rows: [{ available: true }] })
+      // Current bootstrap includes the immutable customer invoice-benefit marker.
+      .mockResolvedValueOnce({ rows: [{ available: true }] })
+      // Current bootstrap includes numeric observed health recoveries.
+      .mockResolvedValueOnce({ rows: [{ available: true }] })
+      // Current bootstrap includes bounded report collection progress.
+      .mockResolvedValueOnce({ rows: [{ available: true }] })
+      // Current bootstrap includes the email receipt guards and required column.
+      .mockResolvedValueOnce({ rows: [{ available: true }] })
+      // Current bootstrap validates Business in the existing trial-plan constraint.
+      .mockResolvedValueOnce({ rows: [{ available: true }] })
+      // Self-hosted inherited grants retain the explicit authority switch.
+      .mockResolvedValueOnce({ rows: [{ available: true }] })
+      // Numeric history enforces the trial deadline before lifecycle cleanup.
+      .mockResolvedValueOnce({ rows: [{ available: true }] })
       .mockResolvedValue({ rows: [] });
 
     const result = await migrateStorageSchema({ query } as Queryable);

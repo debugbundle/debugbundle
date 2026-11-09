@@ -5,19 +5,30 @@ import { SESSION_COOKIE_NAME, buildCsrfToken } from "../../../packages/auth/src/
 import { mockedObject, type MockedMethods } from "../../helpers/vitest.ts";
 
 type ApiServerDependencies = Parameters<typeof createApiServer>[0];
-type AuthRateLimiterDependency = MockedMethods<NonNullable<ApiServerDependencies["authRateLimiter"]>>;
+type AuthRateLimiterDependency = MockedMethods<
+  NonNullable<ApiServerDependencies["authRateLimiter"]>
+>;
 type MemberAuthDependency = MockedMethods<ApiServerDependencies["memberAuth"]>;
 type WebAuthDependency = MockedMethods<NonNullable<ApiServerDependencies["webAuth"]>>;
-type ProjectManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["projectManagement"]>>;
+type ProjectManagementDependency = MockedMethods<
+  NonNullable<ApiServerDependencies["projectManagement"]>
+>;
 
-function createServer(overrides: {
-  authRateLimiter?: Partial<AuthRateLimiterDependency>;
-  memberAuth?: MemberAuthDependency | undefined;
-  webAuth?: Partial<WebAuthDependency> | undefined;
-  projectManagement?: Partial<ProjectManagementDependency> | undefined;
-} = {}): ReturnType<typeof createApiServer> {
-  const hasProjectManagementOverride = Object.prototype.hasOwnProperty.call(overrides, "projectManagement");
-  const defaultProjectManagement = mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>({
+function createServer(
+  overrides: {
+    authRateLimiter?: Partial<AuthRateLimiterDependency>;
+    memberAuth?: MemberAuthDependency | undefined;
+    webAuth?: Partial<WebAuthDependency> | undefined;
+    projectManagement?: Partial<ProjectManagementDependency> | undefined;
+  } = {}
+): ReturnType<typeof createApiServer> {
+  const hasProjectManagementOverride = Object.prototype.hasOwnProperty.call(
+    overrides,
+    "projectManagement"
+  );
+  const defaultProjectManagement = mockedObject<
+    NonNullable<ApiServerDependencies["projectManagement"]>
+  >({
     listProjectsForUser: vi.fn().mockResolvedValue([]),
     createProjectForUser: vi.fn().mockResolvedValue(null),
     resolveProjectAccessForUser: vi.fn().mockResolvedValue({
@@ -38,12 +49,14 @@ function createServer(overrides: {
       ? {}
       : {
           authRateLimiter: {
-            claimRequest: overrides.authRateLimiter.claimRequest ?? vi.fn().mockResolvedValue({
-              allowed: true,
-              limit: 30,
-              remaining: 29,
-              retry_after_ms: 0
-            })
+            claimRequest:
+              overrides.authRateLimiter.claimRequest ??
+              vi.fn().mockResolvedValue({
+                allowed: true,
+                limit: 30,
+                remaining: 29,
+                retry_after_ms: 0
+              })
           }
         }),
     memberAuth:
@@ -87,15 +100,14 @@ function createServer(overrides: {
     webhookDelivery: {
       listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue({ deliveries: [] })
     },
-    projectManagement:
-      hasProjectManagementOverride
-        ? overrides.projectManagement === undefined
-          ? undefined
-          : mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>({
-              ...defaultProjectManagement,
-              ...overrides.projectManagement
-            })
-        : defaultProjectManagement
+    projectManagement: hasProjectManagementOverride
+      ? overrides.projectManagement === undefined
+        ? undefined
+        : mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>({
+            ...defaultProjectManagement,
+            ...overrides.projectManagement
+          })
+      : defaultProjectManagement
   });
 }
 
@@ -487,7 +499,8 @@ describe("api project routes", () => {
       slug: "main-app",
       environment_default: "staging",
       color_tag: null,
-      weekly_report_timezone: "Europe/Ljubljana"
+      weekly_report_timezone: "Europe/Ljubljana",
+      include_organization_grants: true
     });
   });
 
@@ -606,8 +619,7 @@ describe("api project routes", () => {
           updated_at: "2026-03-18T00:00:00.000Z"
         })
         .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce("slug_taken")
-        ,
+        .mockResolvedValueOnce("slug_taken"),
       deleteProjectForUser: vi.fn().mockResolvedValue(null)
     };
     const app = createServer({ projectManagement });

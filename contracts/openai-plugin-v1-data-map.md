@@ -324,16 +324,20 @@ The storage adapter's `s3_object_not_found` is `missing`, not a generation failu
 
 `primary_signal.browser_context` is optional and contains only the following fields. It applies to a matching frontend exception observed no later than bundle capture. `primary_signal.route_template` may fall back to that exception's sanitized route/page path (numeric, UUID and high-cardinality path segments become `{param}`). The response still omits raw frontend context and the rest of the stack.
 
-| Source | Output under `primary_signal.browser_context` | Transformation and maximum | Category |
-| --- | --- | --- | --- |
-| Browser event kind | `kind` | `window_error`, `resource_error`, or null | ARTIFACT |
-| Browser opacity flag | `opaque` | Boolean or null | ARTIFACT |
-| Browser file location | `source_file` | HTTP(S)/relative path only, 1024 chars or null; no origin/userinfo/query/fragment | ARTIFACT |
-| Browser coordinates | `line`, `column` | Positive safe integers or null | ARTIFACT |
-| Resource element | `resource_type` | Redacted tag name, 32 chars or null; no element text/attributes | ARTIFACT |
-| Resource URL | `resource_host`, `resource_path` | Host up to 253 chars and path up to 1024 chars or null; no userinfo/query/fragment | ARTIFACT |
-| Page readiness | `ready_state` | `loading`, `interactive`, `complete`, or null | ARTIFACT |
-| Page visibility | `visibility_state` | `visible`, `hidden`, `prerender`, `unloaded`, or null | ARTIFACT |
-| Evidence classification | `evidence_status` | `details_available`, `resource_load_failure`, `browser_details_withheld`, or `context_missing` | CONTROL |
+| Source                  | Output under `primary_signal.browser_context` | Transformation and maximum                                                                     | Category |
+| ----------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------- | -------- |
+| Browser event kind      | `kind`                                        | `window_error`, `resource_error`, or null                                                      | ARTIFACT |
+| Browser opacity flag    | `opaque`                                      | Boolean or null                                                                                | ARTIFACT |
+| Browser file location   | `source_file`                                 | HTTP(S)/relative path only, 1024 chars or null; no origin/userinfo/query/fragment              | ARTIFACT |
+| Browser coordinates     | `line`, `column`                              | Positive safe integers or null                                                                 | ARTIFACT |
+| Resource element        | `resource_type`                               | Redacted tag name, 32 chars or null; no element text/attributes                                | ARTIFACT |
+| Resource URL            | `resource_host`, `resource_path`              | Host up to 253 chars and path up to 1024 chars or null; no userinfo/query/fragment             | ARTIFACT |
+| Page readiness          | `ready_state`                                 | `loading`, `interactive`, `complete`, or null                                                  | ARTIFACT |
+| Page visibility         | `visibility_state`                            | `visible`, `hidden`, `prerender`, `unloaded`, or null                                          | ARTIFACT |
+| Evidence classification | `evidence_status`                             | `details_available`, `resource_load_failure`, `browser_details_withheld`, or `context_missing` | CONTROL  |
 
 Projection inspects at most the last 50 stored frontend exceptions, chooses the latest matching primary message, and rejects invalid/future timestamps. It does not expose raw DOM, breadcrumbs, arbitrary attributes, referrer, stack strings or request bodies. Genuine browser-muted `Script error.` details remain unavailable. Improvement `evidence_summary` also explains intentional related-incident coverage or stored build-error metadata without regenerating any artifact.
+
+## Additive saved-report contract (local 1.1 candidate)
+
+The original twenty-three v1 declarations/fixtures remain unchanged. The local 1.1 candidate additionally exposes `list_reports` and `get_report_content` under new explicit `debugbundle:reports:read` consent. Saved canonical report content includes bounded redacted incident/improvement/health context, aggregate facts, recorded resolutions, model narrative and priorities. Current access to every included project is mandatory; old grants gain no report scope. Internal hashes, actor/recipient identities, storage keys and signed links remain excluded. See [the report-read contract](chatgpt-saved-reports.md). The original production tool scan is historical evidence for the original twenty-three tools; the new readers require fresh provider/connection acceptance after an authorised release.

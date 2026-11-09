@@ -1,4 +1,7 @@
+import { businessSalesReady } from "../../../packages/billing/src/business-sales-policy.js";
+import { createReportAllowanceStore } from "../../../packages/storage/src/report-allowance-store.js";
 import { createCaptureRuleManagement } from "../../../packages/storage/src/capture-rule-management.js";
+import { createPostgresOrganizationManagementStore } from "../../../packages/storage/src/organization-management-store.js";
 import { createNotificationPreferencesStore } from "../../../packages/storage/src/notification-preferences-store.js";
 import { createServiceDefinitionStore } from "../../../packages/storage/src/service-definition-store.js";
 import { createProjectMergeStore } from "../../../packages/storage/src/project-merge-store.js";
@@ -55,6 +58,7 @@ import {
   type WebhookEventType
 } from "../../../packages/storage/src/index.js";
 import { createBillingManagement } from "./billing-management.js";
+import { createDefaultReferrals } from "./default-referrals.js";
 import { createDefaultAnalyticsDependencies } from "./default-analytics-dependencies.js";
 import { createOpenAiHostedReadDependencies } from "./openai-mcp-dependencies.js";
 import { resolveCredentialServiceScopes } from "../../../packages/storage/src/project-ingestion-scope.js";
@@ -174,7 +178,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
       webhook_id: string;
       event_type: WebhookEventType;
       actor_user_id?: string;
-      actor_role?: "owner" | "admin" | "member";
+      actor_role?: "owner" | "admin" | "member" | "viewer";
     }) => {
       const delivery = await webhookDelivery.createTestDeliveryForOrganization(request);
       if (delivery === null) {
@@ -249,9 +253,20 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
       : new Set(
           input.billingAdminEmails.map(normalizeEmailForConfig).filter((email) => email.length > 0)
         );
+  const billingStripeConfig =
+    input.stripeConfig === undefined
+      ? undefined
+      : {
+          ...input.stripeConfig,
+          businessSalesEnabled: businessSalesReady({
+            launch: input.stripeConfig.businessSalesEnabled === true,
+            reports: input.smartReportConfig?.enabled === true,
+            ai: Boolean(input.smartReportConfig?.model && input.smartReportConfig.profile)
+          })
+        };
   const billingManagementServices = createBillingManagement({
     db: input.db,
-    ...(input.stripeConfig === undefined ? {} : { stripeConfig: input.stripeConfig }),
+    ...(billingStripeConfig === undefined ? {} : { stripeConfig: billingStripeConfig }),
     billingStore,
     billingSyncStore,
     ...(accountAnalyticsStore === undefined ? {} : { accountAnalyticsStore }),
@@ -259,6 +274,12 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
     ...(input.appBaseUrl === undefined ? {} : { appBaseUrl: input.appBaseUrl })
   });
   const { billingManagement } = billingManagementServices;
+  const referrals = createDefaultReferrals({
+    db: input.db,
+    ...(input.billingAdminEmails === undefined ? {} : { operatorEmails: input.billingAdminEmails }),
+    ...(input.referralConfig === undefined ? {} : { config: input.referralConfig }),
+    ...(input.stripeConfig === undefined ? {} : { stripeConfig: input.stripeConfig })
+  });
   const inviteEmails =
     authEmails === undefined
       ? undefined
@@ -269,7 +290,28 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
         };
 
   return {
+    ...(referrals === undefined ? {} : { referrals }),
     notificationPreferences: createNotificationPreferencesStore(input.db),
+    organizationManagement: createPostgresOrganizationManagementStore(input.db),
+    reportGenerationEnabled: input.smartReportConfig?.enabled === true,
+    reportDefinitions: createReportDefinitionStore(input.db),
+    reportAllowance: createReportAllowanceStore(input.db),
+    reportContent: createReportContentStore(input.db, input.objectStore),
+    reportPdf: createReportPdfStore(input.db, input.objectStore),
+    reportEmail: createReportEmailStore(input.db, input.objectStore),
+    reportDashboardBaseUrl: input.appBaseUrl ?? "https://app.debugbundle.com",
+    reportRuns: {
+      admission: createReportRunAdmissionStore(input.db, {
+        profile: input.smartReportConfig?.profile ?? null,
+        ...(input.smartReportConfig === undefined
+          ? {}
+          : { monthly_budget_nano_usd: input.smartReportConfig.monthly_budget_nano_usd })
+      }),
+      management: createReportRunManagementStore(input.db)
+    },
+    ...(authEmails?.sendOrganizationAccessEmail === undefined
+      ? {}
+      : { organizationEmails: { send: authEmails.sendOrganizationAccessEmail.bind(authEmails) } }),
     serviceDefinitions: createServiceDefinitionStore(input.db),
     projectMerges: createProjectMergeStore(input.db, {
       enabled: input.projectMergesEnabled === true
@@ -378,6 +420,8 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
       }
     },
     accountManagement: {
+      exportBusinessAccountSection: (exportInput) =>
+        createBusinessAccountExportStore(input.db).read(exportInput),
       exportAccountForOrganization: async (exportInput: {
         organization_id: string;
         user_id: string;
@@ -390,6 +434,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
 
         return {
           ...result,
+          business_data_exports: businessAccountExportManifest(),
           artifacts: await buildAccountExportArtifacts(input.objectStore, result)
         };
       },
@@ -663,6 +708,7 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
         input.objectStore.putObject(request)
     },
     ...createDefaultRegenerationDependencies({
+      db: input.db,
       queue: input.queue,
       metadataStore,
       improvementOpportunityStore
@@ -694,3 +740,13 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
       : {})
   };
 }
+import { createReportDefinitionStore } from "../../../packages/storage/src/report-definition-store.js";
+import { createReportRunAdmissionStore } from "../../../packages/storage/src/report-run-admission.js";
+import { createReportRunManagementStore } from "../../../packages/storage/src/report-run-management.js";
+import { createReportContentStore } from "../../../packages/storage/src/report-content-store.js";
+import { createReportPdfStore } from "../../../packages/storage/src/report-pdf-store.js";
+import { createReportEmailStore } from "../../../packages/storage/src/report-email-store.js";
+import {
+  createBusinessAccountExportStore,
+  businessAccountExportManifest
+} from "../../../packages/storage/src/business-account-export.js";

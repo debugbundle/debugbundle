@@ -1,3 +1,6 @@
+import { memberReadScope, memberJobRequest } from "../member-access-scope.js";
+import type { ProjectJobInitiator } from "../../../../packages/storage/src/project-job-authorization.js";
+import { tokenAllowsProject } from "../../../../packages/auth/src/project-authorization.js";
 import { randomUUID } from "node:crypto";
 
 import type { FastifyInstance } from "fastify";
@@ -95,6 +98,7 @@ function annotateCaptureRuleSuggestions(input: {
 }
 
 async function readBundleForCaptureRuleSuggestions(input: {
+  initiating_authority?: ProjectJobInitiator;
   dependencies: ApiDependencies;
   organizationId: string;
   incidentId: string;
@@ -138,6 +142,9 @@ async function readBundleForCaptureRuleSuggestions(input: {
 
       if (input.dependencies.bundleRegeneration !== undefined) {
         const regenerationQueued = await input.dependencies.bundleRegeneration.requestRegeneration({
+          ...(input.initiating_authority === undefined
+            ? {}
+            : { initiating_authority: input.initiating_authority }),
           organization_id: input.organizationId,
           project_id: input.projectId,
           incident_id: input.incidentId
@@ -300,6 +307,7 @@ export function registerCaptureRuleRoutes(
 
     const incident = await dependencies.incidentRetrieval.getIncidentForOrganization({
       organization_id: member.organization_id,
+      ...memberReadScope(member),
       user_id: member.member_id,
       incident_id: parsedParams.data.id
     });
@@ -308,6 +316,7 @@ export function registerCaptureRuleRoutes(
     }
 
     const access = await dependencies.projectManagement?.resolveProjectAccessForUser?.({
+      ...memberReadScope(member),
       user_id: member.member_id,
       project_id: incident.project_id
     });
@@ -319,7 +328,20 @@ export function registerCaptureRuleRoutes(
         ? "manage"
         : "preview";
 
+    if (
+      member.token_policy !== undefined &&
+      (access == null ||
+        !tokenAllowsProject(member.token_policy, {
+          project_id: incident.project_id,
+          organization_id: access.organization_id,
+          origin_project_ids: access.origin_project_ids ?? [incident.project_id],
+          action: "read"
+        }))
+    )
+      return reply.status(404).send({ error: "incident_not_found" });
+
     const bundle = await readBundleForCaptureRuleSuggestions({
+      ...memberJobRequest(member),
       dependencies,
       organizationId: access?.organization_id ?? member.organization_id,
       incidentId: incident.incident_id,
@@ -406,6 +428,7 @@ export function registerCaptureRuleRoutes(
 
     const incident = await dependencies.incidentRetrieval.getIncidentForOrganization({
       organization_id: member.organization_id,
+      ...memberReadScope(member),
       user_id: member.member_id,
       incident_id: parsedParams.data.id
     });
@@ -418,12 +441,23 @@ export function registerCaptureRuleRoutes(
     }
 
     const access = await dependencies.projectManagement.resolveProjectAccessForUser({
+      ...memberReadScope(member),
       user_id: member.member_id,
       project_id: incident.project_id
     });
     if (access === null) {
       return reply.status(404).send({ error: "project_not_found" });
     }
+    if (
+      member.token_policy !== undefined &&
+      !tokenAllowsProject(member.token_policy, {
+        project_id: incident.project_id,
+        organization_id: access.organization_id,
+        origin_project_ids: access.origin_project_ids ?? [incident.project_id],
+        action: "manage_settings"
+      })
+    )
+      return reply.status(404).send({ error: "incident_not_found" });
     if (isSharedProjectAccessSuspended(access)) {
       return reply.status(403).send({ error: "shared_access_suspended" });
     }
@@ -435,6 +469,7 @@ export function registerCaptureRuleRoutes(
     }
 
     const bundle = await readBundleForCaptureRuleSuggestions({
+      ...memberJobRequest(member),
       dependencies,
       organizationId: access.organization_id,
       incidentId: incident.incident_id,

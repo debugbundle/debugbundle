@@ -138,7 +138,11 @@ describe("local preview management data", () => {
         slug: "fresh-mock",
         environment_default: "production"
       }).body
-    ).toHaveProperty("project.organization_id", "org_123");
+    ).toHaveProperty(
+      "project.organization_id",
+      (api.handle("GET", "/v1/auth/session").body as { session: { organization_id: string } })
+        .session.organization_id
+    );
   });
   it.each([
     ["/v1/webhooks?project_id=00000000-0000-4000-8000-000000000001&limit=20", "webhooks"],

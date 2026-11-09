@@ -224,12 +224,12 @@ All paid prices are denominated in USD and exclude VAT or other applicable taxes
 - Hosted health checks: 1 saved check per project, up to 3 monitored projects and 3 active checks, 5-minute minimum interval
 - No remote probe activation
 
-### Solo Plan ($4.99/month)
+### Solo Plan ($5/month or $48/year)
 
 - For independent developers and agent-driven projects.
 - Unlimited projects, 1 member (solo only)
 - 3 included capacity units
-- Extra capacity units: +$0.99/unit/month
+- Extra capacity units: +$1/unit/month or $10/unit/year
 - 30-day bundle retention, 14-day raw event retention
 - Remote probe activation included
 - Hosted health checks: 3 saved checks per project, up to 10 monitored projects and 30 active checks, 1-minute minimum interval
@@ -237,20 +237,31 @@ All paid prices are denominated in USD and exclude VAT or other applicable taxes
 - Local/manual improvement bundles plus hosted automated improvement bundles
 - Included and purchased capacity units expand the shared allowance bucket
 
-### Team Plan ($19/month)
+### Team Plan ($19/month or $192/year)
 
-- Unlimited projects and members
+- Unlimited projects; up to 1,000 unique account members, without per-seat charges
 - 15 included capacity units
-- Extra capacity units: +$1.99/unit/month
+- Extra capacity units: +$3/unit/month or $30/unit/year
 - 90-day bundle retention, 30-day raw event retention
 - Shared dashboards, project collaborator invites, Slack integration, priority support
 - Hosted automated improvement bundles with higher allowance and retention
-- Hosted health checks: 10 saved checks per project, up to 10 monitored projects and 50 active checks, 1-minute minimum interval; 2 consecutive failures recommended by default
+- Hosted health checks: 5 saved checks per project, up to 10 monitored projects and 30 active checks, 1-minute minimum interval; 2 consecutive failures recommended by default
 - Higher operational limits and higher allowance per included or purchased capacity unit
 
-### Enterprise (post-V1)
+### Business Plan ($59/month or $588/year)
 
-- Unlimited projects, SSO, SCIM, fine-grained RBAC, custom contracts
+- 30 included capacity units; extra capacity $3/unit/month or $30/unit/year
+- Team debug/automation per-unit allowances, 90-day bundles and 30-day raw retention
+- 1,000 unique people/account; fixed organisation administration and selected/all-project access
+- Smart Reports: 40 generations/month, HTML/PDF/email; priority support
+- Hosted health checks: 10/project, 10 monitored projects, 50 active, 60-second minimum
+- Business-only referral discounts/commissions under FR-BUS-04
+- Team/Business analytics per unit/month: 25,000 events, 5,000 sessions, 1,000 journey samples
+- Full approved behaviour and acceptance: [Business contract](business-tier.md)
+
+### Enterprise
+
+- Contact us pricing card only; negotiate scope when a real request arrives
 
 ### Pricing Philosophy
 

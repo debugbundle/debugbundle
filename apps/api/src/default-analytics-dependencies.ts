@@ -154,12 +154,18 @@ export function createDefaultAnalyticsDependencies(input: {
           project_id: request.project_id,
           opportunity_id: request.opportunity_id ?? null,
           requested_by_user_id: request.requested_by_user_id,
+          ...(request.initiating_authority === undefined
+            ? {}
+            : { initiating_authority: request.initiating_authority }),
           analysis_kind: request.analysis_kind,
           analysis_spec: request.analysis_spec
         });
 
         if (generation.status === "pending" || generation.status === "running") {
           await input.queue.enqueue("build-analytics-bundle", {
+            ...(generation.initiating_authority === undefined
+              ? {}
+              : { initiating_authority: generation.initiating_authority }),
             project_id: generation.project_id,
             generation_id: generation.generation_id,
             requested_at: new Date().toISOString(),

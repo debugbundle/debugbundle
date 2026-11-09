@@ -1,3 +1,5 @@
+import { isSelfHostMode } from "../../shared-types/src/tier-capabilities.js";
+import { projectActorRoleSql } from "./project-read-scope.js";
 import { prepareProjectNamespaceDeletion } from "./project-namespace-deletion.js";
 import { randomUUID } from "node:crypto";
 import { buildBillableIncidentEventsPredicateSql } from "./helpers.js";
@@ -45,17 +47,13 @@ export function createMetadataUserProjects(
                 created_at,
                 updated_at
               )
-              VALUES (
-                $1::uuid,
-                $2::uuid,
-                $3::uuid,
-                $4,
-                $5,
-                $6,
-                $7,
-                now(),
-                now()
-            )
+              SELECT $1::uuid,o.id,
+                (SELECT om.user_id FROM organization_members om WHERE om.organization_id=o.id AND om.role='owner' ORDER BY om.created_at,om.id LIMIT 1),
+                $4,$5,$6,$7,now(),now()
+              FROM organizations o WHERE o.id=$2::uuid AND o.suspended_at IS NULL AND EXISTS(
+                SELECT 1 FROM organization_members actor WHERE actor.organization_id=o.id AND actor.user_id=$3::uuid
+                  AND actor.suspended_at IS NULL AND (actor.role='owner' OR
+                    (actor.role='admin' AND (o.plan='business' OR ${isSelfHostMode() ? "true" : "false"}) AND actor.grants_paused_at IS NULL AND ${input.include_organization_grants === true ? "true" : "false"})))
               RETURNING
                 id AS project_id,
                 organization_id,
@@ -100,9 +98,9 @@ export function createMetadataUserProjects(
               cp.organization_id,
               cp.owner_user_id,
               owner_user.email AS owner_email,
-              'owned' AS relationship,
-              'private' AS sharing_state,
-              'owner' AS effective_role,
+              CASE WHEN cp.owner_user_id=$3::uuid THEN 'owned' ELSE 'shared' END AS relationship,
+              CASE WHEN cp.owner_user_id=$3::uuid THEN 'private' ELSE 'shared_with_you' END AS sharing_state,
+              CASE WHEN cp.owner_user_id=$3::uuid THEN 'owner' ELSE 'admin' END AS effective_role,
               cp.name,
               cp.slug,
               cp.environment_default,
@@ -227,15 +225,7 @@ export function createMetadataUserProjects(
                 color_tag = CASE WHEN $6::boolean THEN $7::text ELSE color_tag END,
                 updated_at = now()
               WHERE id = $2::uuid
-                AND (
-                  owner_user_id = $1::uuid
-                  OR EXISTS (
-                    SELECT 1
-                    FROM project_members pm
-                    WHERE pm.project_id = projects.id
-                      AND pm.user_id = $1::uuid
-                  )
-                )
+                AND ${projectActorRoleSql("projects.id", "$1::uuid", input)} IN ('owner','admin')
               RETURNING
                 id AS project_id,
                 organization_id,
@@ -274,16 +264,7 @@ export function createMetadataUserProjects(
                   THEN 'shared_by_you'
                 ELSE 'private'
               END AS sharing_state,
-              CASE
-                WHEN up.owner_user_id = $1::uuid THEN 'owner'
-                ELSE (
-                  SELECT pm.role
-                  FROM project_members pm
-                  WHERE pm.project_id = up.project_id
-                    AND pm.user_id = $1::uuid
-                  LIMIT 1
-                )
-              END AS effective_role,
+              ${projectActorRoleSql("up.project_id", "$1::uuid", input)} AS effective_role,
               up.name,
               up.slug,
               up.environment_default,

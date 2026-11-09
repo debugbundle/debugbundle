@@ -1,3 +1,4 @@
+import { memberReadScope } from "../member-access-scope.js";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
@@ -40,9 +41,14 @@ export function registerProjectServicesRoutes(
           return reply.status(503).send({ error: "service_definitions_unavailable" });
         const params = paramsSchema.safeParse(request.params);
         if (!params.success) return reply.status(400).send({ error: "invalid_service_scope" });
-        const scope = { project_id: params.data.id, user_id: member.member_id };
+        const scope = {
+          project_id: params.data.id,
+          ...memberReadScope(member),
+          user_id: member.member_id
+        };
         const access = write
           ? await dependencies.projectManagement?.resolveProjectAccessForUser?.({
+              ...memberReadScope(member),
               user_id: member.member_id,
               project_id: scope.project_id
             })

@@ -90,7 +90,7 @@ export const SYSTEM_EMAIL_REVIEW_ENTRIES: readonly SystemEmailReviewEntry[] = [
     title: "No-card trial started",
     category: "billing",
     recipient: "Organization owner billing contact",
-    trigger: "A free organization successfully starts a 30-day no-card Solo or Team trial",
+    trigger: "An eligible account starts a 30-day no-card trial",
     requiredInV1: true,
     implementationStatus: "implemented",
     get preview() {
@@ -108,7 +108,8 @@ export const SYSTEM_EMAIL_REVIEW_ENTRIES: readonly SystemEmailReviewEntry[] = [
     title: "No-card trial ending soon (7-day reminder)",
     category: "billing",
     recipient: "Organization owner billing contact",
-    trigger: "Worker-owned lifecycle scheduling reaches the 7-day reminder window before trial expiry",
+    trigger:
+      "Worker-owned lifecycle scheduling reaches the 7-day reminder window before trial expiry",
     requiredInV1: true,
     implementationStatus: "implemented",
     get preview() {
@@ -127,7 +128,8 @@ export const SYSTEM_EMAIL_REVIEW_ENTRIES: readonly SystemEmailReviewEntry[] = [
     title: "No-card trial ending soon (1-day reminder)",
     category: "billing",
     recipient: "Organization owner billing contact",
-    trigger: "Worker-owned lifecycle scheduling reaches the 1-day reminder window before trial expiry",
+    trigger:
+      "Worker-owned lifecycle scheduling reaches the 1-day reminder window before trial expiry",
     requiredInV1: true,
     implementationStatus: "implemented",
     get preview() {
@@ -253,7 +255,8 @@ export const SYSTEM_EMAIL_REVIEW_ENTRIES: readonly SystemEmailReviewEntry[] = [
     title: "Entitlement downgrade warning",
     category: "billing",
     recipient: "Organization owner billing contact",
-    trigger: "System is about to remove paid capacity after unresolved billing failure or cancellation",
+    trigger:
+      "System is about to remove paid capacity after unresolved billing failure or cancellation",
     requiredInV1: true,
     implementationStatus: "implemented",
     get preview() {
@@ -290,7 +293,7 @@ export const SYSTEM_EMAIL_REVIEW_ENTRIES: readonly SystemEmailReviewEntry[] = [
     title: "Plan change confirmation",
     category: "billing",
     recipient: "Organization owner billing contact",
-    trigger: "Plan changed between free, solo, or team",
+    trigger: "Account plan changed",
     requiredInV1: true,
     implementationStatus: "implemented",
     get preview() {
@@ -378,7 +381,8 @@ export const SYSTEM_EMAIL_REVIEW_ENTRIES: readonly SystemEmailReviewEntry[] = [
         meterLabel: "Lifecycle webhook deliveries",
         used: 750,
         limit: 750,
-        currentBehavior: "new lifecycle webhook deliveries and synthetic test deliveries are suppressed until the usage window resets",
+        currentBehavior:
+          "new lifecycle webhook deliveries and synthetic test deliveries are suppressed until the usage window resets",
         usageWindowEndsAt: "2026-06-01T00:00:00.000Z",
         billingUrl: SAMPLE_PORTAL_URL,
         brandMarkUrl: SAMPLE_EMAIL_BRAND_MARK_URL
@@ -492,7 +496,8 @@ export const SYSTEM_EMAIL_REVIEW_ENTRIES: readonly SystemEmailReviewEntry[] = [
     trigger: "Saved daily local time and time zone, when new unresolved incidents are available",
     requiredInV1: false,
     implementationStatus: "implemented",
-    notes: "Example: 09:00 Europe/Ljubljana, with one unresolved incident from each of two projects. Set Email delivery to Daily digest in account or project Notifications to configure the schedule. Health-check outage emails bypass daily batching.",
+    notes:
+      "Example: 09:00 Europe/Ljubljana, with one unresolved incident from each of two projects. Set Email delivery to Daily digest in account or project Notifications to configure the schedule. Health-check outage emails bypass daily batching.",
     get preview() {
       return renderDailyIncidentDigestEmail({
         brandMarkUrl: SAMPLE_EMAIL_BRAND_MARK_URL,

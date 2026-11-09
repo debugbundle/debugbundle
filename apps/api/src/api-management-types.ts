@@ -1,4 +1,8 @@
+import type { MemberTokenPolicy } from "../../../packages/shared-types/src/index.js";
+import type { PaidTierName, BillingInterval } from "../../../packages/shared-types/src/index.js";
+import type { StripeOfferUpgradePreviewResult } from "../../../packages/billing/src/stripe-offer-upgrade.js";
 import type { BillingPlanChangeManagement } from "../../../packages/billing-client/src/plan-change.js";
+import type { BillingOfferChangeManagement } from "../../../packages/billing-client/src/offer-change-client.js";
 import type { CapacityPaymentRequired } from "../../../packages/billing/src/stripe-capacity-payment.js";
 import type { UpgradePreviewResult } from "../../../packages/billing/src/stripe-upgrade-preview.js";
 import type { CapacityOperationError } from "../../../packages/billing/src/stripe-capacity-operations.js";
@@ -64,12 +68,15 @@ export interface ApiManagementDependencies {
       organization_id: string;
       user_id: string;
       limit: number;
+      include_scope?: boolean;
     }): Promise<MemberTokenRecord[]>;
     createMemberTokenForOrganization(input: {
       organization_id: string;
       user_id: string;
       label: string;
       token_hash: string;
+      scope?: MemberTokenPolicy;
+      expires_at?: string;
     }): Promise<MemberTokenRecord>;
     revokeMemberTokenForOrganization(input: {
       organization_id: string;
@@ -83,12 +90,16 @@ export interface ApiManagementDependencies {
         resolveProjectAccessForUser?(input: {
           user_id: string;
           project_id: string;
+          include_organization_grants?: boolean;
         }): Promise<ProjectAccessRecord | null>;
         listProjectsForUser?(input: {
           user_id: string;
           now: string;
           limit: number;
           project_id?: string;
+          include_organization_grants?: boolean;
+          origin_project_ids?: string[];
+          organization_scope_id?: string;
         }): Promise<ProjectRecord[]>;
         createProjectForUser?(input: {
           user_id: string;
@@ -98,6 +109,7 @@ export interface ApiManagementDependencies {
           environment_default: string;
           color_tag?: ProjectColorTag | null;
           weekly_report_timezone: string;
+          include_organization_grants?: boolean;
         }): Promise<ProjectRecord | null>;
         updateProjectForUser?(input: {
           user_id: string;
@@ -106,6 +118,7 @@ export interface ApiManagementDependencies {
           slug?: string;
           environment_default?: string;
           color_tag?: ProjectColorTag | null;
+          include_organization_grants?: boolean;
         }): Promise<ProjectRecord | "slug_taken" | null>;
         deleteProjectForUser?(input: {
           user_id: string;
@@ -140,6 +153,9 @@ export interface ApiManagementDependencies {
     | undefined;
   accountManagement?:
     | {
+        exportBusinessAccountSection?(
+          input: BusinessAccountExportInput
+        ): Promise<BusinessAccountExportPage | null>;
         exportAccountForOrganization(input: {
           organization_id: string;
           user_id: string;
@@ -182,19 +198,32 @@ export interface ApiManagementDependencies {
         }): Promise<void>;
         startTrial?(input: {
           organization_id: string;
-          target_plan: "solo" | "team";
+          target_plan: "solo" | "team" | "business";
           now: string;
         }): Promise<BillingSummaryRecord | "billing_not_found" | "trial_unavailable">;
         getPlanChange?: BillingPlanChangeManagement["getPlanChange"];
+        getOfferChange?: BillingOfferChangeManagement["getOfferChange"];
+        previewOfferChange?: BillingOfferChangeManagement["previewOfferChange"];
+        scheduleOfferChange?: BillingOfferChangeManagement["scheduleOfferChange"];
+        cancelOfferChange?: BillingOfferChangeManagement["cancelOfferChange"];
         previewPlanChange?: BillingPlanChangeManagement["previewPlanChange"];
         schedulePlanChange?: BillingPlanChangeManagement["schedulePlanChange"];
         cancelPlanChange?: BillingPlanChangeManagement["cancelPlanChange"];
         previewUpgrade?(input: { organization_id: string }): Promise<UpgradePreviewResult>;
+        previewOfferUpgrade?(input: {
+          organization_id: string;
+          actor_user_id: string;
+          target_plan: PaidTierName;
+          interval: BillingInterval;
+        }): Promise<StripeOfferUpgradePreviewResult>;
         createCheckoutLink(input: {
           organization_id: string;
           billing_email: string;
-          current_plan: "free" | "solo" | "team";
-          target_plan: "solo" | "team";
+          current_plan: "free" | "solo" | "team" | "business";
+          target_plan: PaidTierName;
+          interval?: BillingInterval;
+          additional_capacity_units?: number;
+          actor_user_id?: string;
           confirmation_token?: string;
         }): Promise<CheckoutLinkResult>;
         confirmCheckoutSession?(input: {
@@ -211,7 +240,7 @@ export interface ApiManagementDependencies {
         >;
         createPortalLink(input: {
           organization_id: string;
-          current_plan: "solo" | "team";
+          current_plan: "solo" | "team" | "business";
         }): Promise<{ url: string } | null>;
         increaseCapacity?(input: {
           organization_id: string;
@@ -337,7 +366,7 @@ export interface ApiManagementDependencies {
         isOperatorAllowed(input: { email: string }): boolean;
         overrideOrganizationBilling(input: {
           organization_id: string;
-          plan: "free" | "solo" | "team";
+          plan: "free" | "solo" | "team" | "business";
           additional_capacity_units: number;
           now: string;
         }): Promise<BillingSummaryRecord | "billing_not_found">;
@@ -348,36 +377,42 @@ export interface ApiManagementDependencies {
         listMembersForProject?(input: {
           project_id: string;
           user_id: string;
+          include_organization_grants?: boolean;
         }): Promise<{ owner_plan: string; members: ProjectMemberRecord[] } | null>;
         listPendingInvitesForProject?(input: {
           project_id: string;
           user_id: string;
           now: string;
+          include_organization_grants?: boolean;
         }): Promise<ProjectInviteRecord[] | null>;
         createInviteForProject?(input: {
           project_id: string;
           user_id: string;
           email: string;
-          role: "admin" | "member";
+          role: "admin" | "member" | "viewer";
           invited_by_user_id: string;
           invite_token_hash: string;
           expires_at: string;
+          include_organization_grants?: boolean;
         }): Promise<CreateProjectInviteResult | null>;
         cancelInviteForProject?(input: {
           project_id: string;
           user_id: string;
           invite_id: string;
+          include_organization_grants?: boolean;
         }): Promise<ProjectInviteRecord | null>;
         updateProjectMemberRole?(input: {
           project_id: string;
           actor_user_id: string;
           user_id: string;
-          role: "admin" | "member";
+          role: "admin" | "member" | "viewer";
+          include_organization_grants?: boolean;
         }): Promise<UpdateProjectMemberRoleResult | null>;
         removeProjectMember?(input: {
           project_id: string;
           actor_user_id: string;
           user_id: string;
+          include_organization_grants?: boolean;
         }): Promise<RemoveProjectMemberResult | null>;
         leaveProjectMembership?(input: {
           project_id: string;
@@ -485,7 +520,7 @@ export interface ApiManagementDependencies {
           project_id: string;
           delivery_id: string;
           actor_user_id?: string;
-          actor_role?: "owner" | "admin" | "member";
+          actor_role?: "owner" | "admin" | "member" | "viewer";
         }): Promise<
           | GitHubDispatchDeliveryRecord
           | "delivery_not_found"
@@ -525,7 +560,7 @@ export interface ApiManagementDependencies {
           project_id: string;
           rule_id: string;
           actor_user_id?: string;
-          actor_role?: "owner" | "admin" | "member";
+          actor_role?: "owner" | "admin" | "member" | "viewer";
           name?: string;
           enabled?: boolean;
           event_types?: string[];
@@ -541,7 +576,7 @@ export interface ApiManagementDependencies {
           project_id: string;
           rule_id: string;
           actor_user_id?: string;
-          actor_role?: "owner" | "admin" | "member";
+          actor_role?: "owner" | "admin" | "member" | "viewer";
         }): Promise<boolean>;
         setProjectRepoForOrganization(input: {
           organization_id: string;
@@ -605,3 +640,7 @@ export interface ApiManagementDependencies {
       }
     | undefined;
 }
+import type {
+  BusinessAccountExportInput,
+  BusinessAccountExportPage
+} from "../../../packages/storage/src/business-account-export.js";

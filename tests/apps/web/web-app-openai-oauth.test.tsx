@@ -91,6 +91,9 @@ describe("web app - OpenAI OAuth", () => {
     expect(screen.getByRole("checkbox", { name: /see projects available/i })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: /read incident summaries/i })).toBeChecked();
     expect(
+      screen.queryByRole("checkbox", { name: /read saved smart reports/i })
+    ).not.toBeInTheDocument();
+    expect(
       screen.getByText(/incident severity, status, timing, and bounded context/i)
     ).toBeInTheDocument();
     expect(screen.queryByText(/fingerprints/i)).not.toBeInTheDocument();
@@ -233,6 +236,43 @@ describe("web app - OpenAI OAuth", () => {
       ).toBe(true);
     });
     expect(handoff).toHaveBeenCalledWith("https://api.debugbundle.com/oauth/authorize/resume");
+  });
+
+  it("offers saved-report access only when requested and allows it to be declined", async () => {
+    const user = userEvent.setup();
+    const handoff = vi
+      .spyOn(openAiOauthApi, "continueOpenAiAuthorization")
+      .mockImplementation(() => undefined);
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+      if (url.endsWith("/v1/auth/session")) return jsonResponse(200, { session: createSession() });
+      if (url.endsWith("/oauth/interaction/interaction_123")) {
+        if (init?.method === "POST") {
+          expect(JSON.parse(init.body as string)).toEqual({
+            decision: "allow",
+            product_scopes: INTERACTION.product_scopes
+          });
+          return jsonResponse(200, {
+            continue_url: "https://api.debugbundle.com/oauth/authorize/resume"
+          });
+        }
+        return jsonResponse(200, {
+          interaction: {
+            ...INTERACTION,
+            product_scopes: [...INTERACTION.product_scopes, "debugbundle:reports:read"]
+          }
+        });
+      }
+      return jsonResponse(404, { error: "not_found" });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App initialEntries={["/oauth/consent?interaction=interaction_123"]} />);
+    const reportScope = await screen.findByRole("checkbox", { name: /read saved smart reports/i });
+    expect(reportScope).toBeChecked();
+    expect(screen.getByText(/no report generation or email/i)).toBeInTheDocument();
+    await user.click(reportScope);
+    await user.click(screen.getByRole("button", { name: /allow access/i }));
+    await waitFor(() => expect(handoff).toHaveBeenCalledOnce());
   });
 
   it("explains identity-only access when every product scope is removed", async () => {

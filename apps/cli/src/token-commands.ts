@@ -1,3 +1,4 @@
+import type { MemberTokenScopeDeclaration } from "../../../packages/shared-types/src/index.js";
 import { TokenManagementApiError } from "../../../packages/token-management/src/index.js";
 import {
   createAuthenticatedTokenManagementApi,
@@ -25,8 +26,13 @@ export interface CliCommandResult {
 }
 
 export async function agentTokenWithAuthCommand(input: {
-  authFilePath?: string; projectId: string; action: "list" | "create" | "revoke";
-  label?: string; expiresAt?: string; tokenId?: string; json?: boolean;
+  authFilePath?: string;
+  projectId: string;
+  action: "list" | "create" | "revoke";
+  label?: string;
+  expiresAt?: string;
+  tokenId?: string;
+  json?: boolean;
 }): Promise<CliCommandResult> {
   return runAuthenticatedCliCommand(input, {
     createApi: createAuthenticatedTokenManagementApi,
@@ -37,21 +43,47 @@ export async function agentTokenWithAuthCommand(input: {
         const projectId = input.projectId;
         if (input.action === "list") {
           const tokens = await api.listAgentTokens({ bearerToken, projectId });
-          return { exitCode: 0, output: input.json ? JSON.stringify({ tokens }) : formatTokenTable(tokens) };
+          return {
+            exitCode: 0,
+            output: input.json ? JSON.stringify({ tokens }) : formatTokenTable(tokens)
+          };
         }
         if (input.action === "create" && input.label !== undefined) {
-          const token = await api.createAgentToken({ bearerToken, projectId, label: input.label,
-            ...(input.expiresAt === undefined ? {} : { expiresAt: input.expiresAt }) });
-          return { exitCode: 0, output: input.json ? JSON.stringify({ token }) :
-            `Agent credential created: ${token.token_id}\nExpires: ${token.expires_at}\nPlaintext (shown once): ${token.plaintext ?? "<none>"}` };
+          const token = await api.createAgentToken({
+            bearerToken,
+            projectId,
+            label: input.label,
+            ...(input.expiresAt === undefined ? {} : { expiresAt: input.expiresAt })
+          });
+          return {
+            exitCode: 0,
+            output: input.json
+              ? JSON.stringify({ token })
+              : `Agent credential created: ${token.token_id}\nExpires: ${token.expires_at}\nPlaintext (shown once): ${token.plaintext ?? "<none>"}`
+          };
         }
         if (input.action === "revoke" && input.tokenId !== undefined) {
-          const token = await api.revokeAgentToken({ bearerToken, projectId, tokenId: input.tokenId });
-          return { exitCode: 0, output: input.json ? JSON.stringify({ token }) : `Agent credential revoked: ${token.token_id}` };
+          const token = await api.revokeAgentToken({
+            bearerToken,
+            projectId,
+            tokenId: input.tokenId
+          });
+          return {
+            exitCode: 0,
+            output: input.json
+              ? JSON.stringify({ token })
+              : `Agent credential revoked: ${token.token_id}`
+          };
         }
         return { exitCode: 4, output: "Invalid agent token command." };
       } catch (error) {
-        return { exitCode: mapErrorToExitCode(error), output: error instanceof TokenManagementApiError ? error.message : "Agent credential operation failed." };
+        return {
+          exitCode: mapErrorToExitCode(error),
+          output:
+            error instanceof TokenManagementApiError
+              ? error.message
+              : "Agent credential operation failed."
+        };
       }
     }
   });
@@ -77,13 +109,18 @@ function mapErrorToExitCode(error: unknown): number {
   return 1;
 }
 
-function formatTokenTable(tokens: Array<{ token_id: string; label: string; revoked_at: string | null }>): string {
+function formatTokenTable(
+  tokens: Array<{ token_id: string; label: string; revoked_at: string | null }>
+): string {
   if (tokens.length === 0) {
     return "No tokens found.";
   }
 
   return tokens
-    .map((token) => `${token.token_id} | ${token.label} | ${token.revoked_at === null ? "active" : "revoked"}`)
+    .map(
+      (token) =>
+        `${token.token_id} | ${token.label} | ${token.revoked_at === null ? "active" : "revoked"}`
+    )
     .join("\n");
 }
 
@@ -116,7 +153,11 @@ export async function listProjectTokensCommand(
     json?: boolean;
   },
   api: {
-    listProjectTokens(input: { bearerToken: string; projectId: string; limit?: number }): Promise<ProjectTokenLike[]>;
+    listProjectTokens(input: {
+      bearerToken: string;
+      projectId: string;
+      limit?: number;
+    }): Promise<ProjectTokenLike[]>;
   }
 ): Promise<CliCommandResult> {
   try {
@@ -139,7 +180,10 @@ export async function listProjectTokensCommand(
       output: formatProjectTokenTable(tokens)
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -151,7 +195,12 @@ export async function listProjectTokensWithAuthCommand(
     createApi: createAuthenticatedTokenManagementApi,
     dependencies,
     runCommand: (authState, api) => {
-      const commandInput: { bearerToken: string; projectId: string; limit?: number; json?: boolean } = {
+      const commandInput: {
+        bearerToken: string;
+        projectId: string;
+        limit?: number;
+        json?: boolean;
+      } = {
         bearerToken: authState.bearer_token,
         projectId: input.projectId
       };
@@ -179,11 +228,21 @@ export async function createProjectTokenCommand(
     json?: boolean;
   },
   api: {
-    createProjectToken(input: { bearerToken: string; projectId: string; label: string; allowedOrigins?: string[] }): Promise<ProjectTokenLike>;
+    createProjectToken(input: {
+      bearerToken: string;
+      projectId: string;
+      label: string;
+      allowedOrigins?: string[];
+    }): Promise<ProjectTokenLike>;
   }
 ): Promise<CliCommandResult> {
   try {
-    const requestInput: { bearerToken: string; projectId: string; label: string; allowedOrigins?: string[] } = {
+    const requestInput: {
+      bearerToken: string;
+      projectId: string;
+      label: string;
+      allowedOrigins?: string[];
+    } = {
       bearerToken: input.bearerToken,
       projectId: input.projectId,
       label: input.label
@@ -202,19 +261,34 @@ export async function createProjectTokenCommand(
       output: `Project token created: ${token.token_id}\nAllowed origins: ${formatAllowedOrigins(token.allowed_origins)}\nPlaintext: ${token.plaintext ?? "<none>"}`
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
 export async function createProjectTokenWithAuthCommand(
-  input: { authFilePath?: string; projectId: string; label: string; allowedOrigins?: string[]; json?: boolean },
+  input: {
+    authFilePath?: string;
+    projectId: string;
+    label: string;
+    allowedOrigins?: string[];
+    json?: boolean;
+  },
   dependencies?: Parameters<typeof createAuthenticatedTokenManagementApi>[1]
 ): Promise<CliCommandResult> {
   return runAuthenticatedCliCommand(input, {
     createApi: createAuthenticatedTokenManagementApi,
     dependencies,
     runCommand: (authState, api) => {
-      const commandInput: { bearerToken: string; projectId: string; label: string; allowedOrigins?: string[]; json?: boolean } = {
+      const commandInput: {
+        bearerToken: string;
+        projectId: string;
+        label: string;
+        allowedOrigins?: string[];
+        json?: boolean;
+      } = {
         bearerToken: authState.bearer_token,
         projectId: input.projectId,
         label: input.label
@@ -242,7 +316,11 @@ export async function revokeProjectTokenCommand(
     json?: boolean;
   },
   api: {
-    revokeProjectToken(input: { bearerToken: string; projectId: string; tokenId: string }): Promise<ProjectTokenLike>;
+    revokeProjectToken(input: {
+      bearerToken: string;
+      projectId: string;
+      tokenId: string;
+    }): Promise<ProjectTokenLike>;
   }
 ): Promise<CliCommandResult> {
   try {
@@ -260,7 +338,10 @@ export async function revokeProjectTokenCommand(
       output: `Project token revoked: ${token.token_id}`
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
@@ -272,7 +353,12 @@ export async function revokeProjectTokenWithAuthCommand(
     createApi: createAuthenticatedTokenManagementApi,
     dependencies,
     runCommand: (authState, api) => {
-      const commandInput: { bearerToken: string; projectId: string; tokenId: string; json?: boolean } = {
+      const commandInput: {
+        bearerToken: string;
+        projectId: string;
+        tokenId: string;
+        json?: boolean;
+      } = {
         bearerToken: authState.bearer_token,
         projectId: input.projectId,
         tokenId: input.tokenId
@@ -293,14 +379,19 @@ export async function listMemberTokensCommand(
   input: {
     bearerToken: string;
     limit?: number;
+    includeScope?: boolean;
     json?: boolean;
   },
   api: {
-    listMemberTokens(input: { bearerToken: string; limit?: number }): Promise<MemberTokenLike[]>;
+    listMemberTokens(input: {
+      bearerToken: string;
+      limit?: number;
+      includeScope?: boolean;
+    }): Promise<MemberTokenLike[]>;
   }
 ): Promise<CliCommandResult> {
   try {
-    const requestInput: { bearerToken: string; limit?: number } = {
+    const requestInput: { bearerToken: string; limit?: number; includeScope?: boolean } = {
       bearerToken: input.bearerToken
     };
 
@@ -308,6 +399,7 @@ export async function listMemberTokensCommand(
       requestInput.limit = input.limit;
     }
 
+    if (input.includeScope !== undefined) requestInput.includeScope = input.includeScope;
     const tokens = await api.listMemberTokens(requestInput);
     if (input.json) {
       return { exitCode: 0, output: JSON.stringify({ tokens }) };
@@ -318,19 +410,27 @@ export async function listMemberTokensCommand(
       output: formatTokenTable(tokens)
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
 export async function listMemberTokensWithAuthCommand(
-  input: { authFilePath?: string; limit?: number; json?: boolean },
+  input: { authFilePath?: string; limit?: number; includeScope?: boolean; json?: boolean },
   dependencies?: Parameters<typeof createAuthenticatedTokenManagementApi>[1]
 ): Promise<CliCommandResult> {
   return runAuthenticatedCliCommand(input, {
     createApi: createAuthenticatedTokenManagementApi,
     dependencies,
     runCommand: (authState, api) => {
-      const commandInput: { bearerToken: string; limit?: number; json?: boolean } = {
+      const commandInput: {
+        bearerToken: string;
+        limit?: number;
+        includeScope?: boolean;
+        json?: boolean;
+      } = {
         bearerToken: authState.bearer_token
       };
 
@@ -341,6 +441,7 @@ export async function listMemberTokensWithAuthCommand(
         commandInput.json = input.json;
       }
 
+      if (input.includeScope !== undefined) commandInput.includeScope = input.includeScope;
       return listMemberTokensCommand(commandInput, {
         listMemberTokens: (requestInput) => api.listMemberTokens(requestInput)
       });
@@ -352,16 +453,25 @@ export async function createMemberTokenCommand(
   input: {
     bearerToken: string;
     label: string;
+    scope?: MemberTokenScopeDeclaration;
+    expiresAt?: string;
     json?: boolean;
   },
   api: {
-    createMemberToken(input: { bearerToken: string; label: string }): Promise<MemberTokenLike>;
+    createMemberToken(input: {
+      bearerToken: string;
+      label: string;
+      scope?: MemberTokenScopeDeclaration;
+      expiresAt?: string;
+    }): Promise<MemberTokenLike>;
   }
 ): Promise<CliCommandResult> {
   try {
     const token = await api.createMemberToken({
       bearerToken: input.bearerToken,
-      label: input.label
+      label: input.label,
+      ...(input.scope === undefined ? {} : { scope: input.scope }),
+      ...(input.expiresAt === undefined ? {} : { expiresAt: input.expiresAt })
     });
     if (input.json) {
       return { exitCode: 0, output: JSON.stringify({ token }) };
@@ -372,21 +482,38 @@ export async function createMemberTokenCommand(
       output: `Member token created: ${token.token_id}\nPlaintext: ${token.plaintext ?? "<none>"}`
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 
 export async function createMemberTokenWithAuthCommand(
-  input: { authFilePath?: string; label: string; json?: boolean },
+  input: {
+    authFilePath?: string;
+    label: string;
+    scope?: MemberTokenScopeDeclaration;
+    expiresAt?: string;
+    json?: boolean;
+  },
   dependencies?: Parameters<typeof createAuthenticatedTokenManagementApi>[1]
 ): Promise<CliCommandResult> {
   return runAuthenticatedCliCommand(input, {
     createApi: createAuthenticatedTokenManagementApi,
     dependencies,
     runCommand: (authState, api) => {
-      const commandInput: { bearerToken: string; label: string; json?: boolean } = {
+      const commandInput: {
+        bearerToken: string;
+        label: string;
+        scope?: MemberTokenScopeDeclaration;
+        expiresAt?: string;
+        json?: boolean;
+      } = {
         bearerToken: authState.bearer_token,
-        label: input.label
+        label: input.label,
+        ...(input.scope === undefined ? {} : { scope: input.scope }),
+        ...(input.expiresAt === undefined ? {} : { expiresAt: input.expiresAt })
       };
 
       if (input.json !== undefined) {
@@ -424,7 +551,10 @@ export async function revokeMemberTokenCommand(
       output: `Member token revoked: ${token.token_id}`
     };
   } catch (error) {
-    return { exitCode: mapErrorToExitCode(error), output: error instanceof Error ? error.message : String(error) };
+    return {
+      exitCode: mapErrorToExitCode(error),
+      output: error instanceof Error ? error.message : String(error)
+    };
   }
 }
 

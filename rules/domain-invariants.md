@@ -115,6 +115,7 @@ Data must be deleted when it reaches its retention limit. Retention values are d
 - Free plan: `bundle_retention_days: 7`, `raw_event_retention_days: 7`
 - Solo plan: `bundle_retention_days: 30`, `raw_event_retention_days: 14`
 - Team plan: `bundle_retention_days: 90`, `raw_event_retention_days: 30`
+- Business plan: `bundle_retention_days: 90`, `raw_event_retention_days: 30`
 
 Retention cleanup must run as a scheduled worker job. No data may persist beyond the plan's retention window + a grace period (maximum 24 hours cleanup lag).
 

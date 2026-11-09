@@ -7,7 +7,7 @@ import { createAuthenticatedBillingApi, runAuthenticatedCliCommand } from "./aut
 import type { CliCommandResult } from "./token-commands.js";
 
 interface BillingSummaryLike {
-  plan: "free" | "solo" | "team";
+  plan: "free" | "solo" | "team" | "business";
   billing_state:
     | "active"
     | "past_due"
@@ -44,7 +44,7 @@ interface BillingSummaryLike {
   trial: {
     available: boolean;
     active: boolean;
-    plan: "solo" | "team" | null;
+    plan: "solo" | "team" | "business" | null;
     started_at: string | null;
     ends_at: string | null;
     used_at: string | null;
@@ -173,13 +173,13 @@ export async function getBillingSummaryCommand(
 export async function startBillingTrialCommand(
   input: {
     bearerToken: string;
-    targetPlan: "solo" | "team";
+    targetPlan: "solo" | "team" | "business";
     json?: boolean;
   },
   api: {
     startTrial(input: {
       bearerToken: string;
-      targetPlan: "solo" | "team";
+      targetPlan: "solo" | "team" | "business";
     }): Promise<BillingSummaryLike>;
   }
 ): Promise<CliCommandResult> {
@@ -331,7 +331,7 @@ export async function increaseBillingCapacityWithAuthCommand(
 }
 
 export async function startBillingTrialWithAuthCommand(
-  input: { authFilePath?: string; targetPlan: "solo" | "team"; json?: boolean },
+  input: { authFilePath?: string; targetPlan: "solo" | "team" | "business"; json?: boolean },
   dependencies?: Parameters<typeof createAuthenticatedBillingApi>[1]
 ): Promise<CliCommandResult> {
   return runAuthenticatedCliCommand(input, {

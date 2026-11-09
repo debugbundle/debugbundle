@@ -1,120 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createApiServer } from "../../../apps/api/src/server.ts";
 import { SESSION_COOKIE_NAME, buildCsrfToken } from "../../../packages/auth/src/index.js";
-import { mockedObject, type MockedMethods } from "../../helpers/vitest.ts";
+import { mockedObject } from "../../helpers/vitest.ts";
 
-type ApiServerDependencies = Parameters<typeof createApiServer>[0];
-type AuthRateLimiterDependency = MockedMethods<
-  NonNullable<ApiServerDependencies["authRateLimiter"]>
->;
-type AuditLoggingDependency = MockedMethods<NonNullable<ApiServerDependencies["auditLogging"]>>;
-type MemberAuthDependency = MockedMethods<ApiServerDependencies["memberAuth"]>;
-type WebAuthDependency = MockedMethods<NonNullable<ApiServerDependencies["webAuth"]>>;
-type TokenManagementDependency = MockedMethods<ApiServerDependencies["tokenManagement"]>;
-type ProjectManagementDependency = MockedMethods<
-  NonNullable<ApiServerDependencies["projectManagement"]>
->;
-
-const defaultProjectAccess = {
-  project_id: "00000000-0000-4000-8000-000000000001",
-  organization_id: "org_123",
-  owner_user_id: "usr_owner",
-  owner_email: "owner@example.com",
-  relationship: "owned",
-  effective_role: "owner",
-  organization_plan: "team"
-} as const;
-
-function createServer(
-  overrides: {
-    authRateLimiter?: Partial<AuthRateLimiterDependency>;
-    auditLogging?: Partial<AuditLoggingDependency>;
-    memberAuth?: MemberAuthDependency;
-    webAuth?: Partial<WebAuthDependency>;
-    projectManagement?: ProjectManagementDependency;
-    tokenManagement?: TokenManagementDependency;
-  } = {}
-): ReturnType<typeof createApiServer> {
-  return createApiServer({
-    ingestionPersistence: {
-      persistAndEnqueue: vi.fn()
-    },
-    ingestionMetadata: {
-      resolveProjectByTokenHash: vi.fn()
-    },
-    ...(overrides.authRateLimiter === undefined
-      ? {}
-      : {
-          authRateLimiter: {
-            claimRequest:
-              overrides.authRateLimiter.claimRequest ??
-              vi.fn().mockResolvedValue({
-                allowed: true,
-                limit: 100,
-                remaining: 99,
-                retry_after_ms: 0
-              })
-          }
-        }),
-    memberAuth:
-      overrides.memberAuth ??
-      mockedObject<ApiServerDependencies["memberAuth"]>({
-        resolveMemberByTokenHash: vi
-          .fn()
-          .mockResolvedValue({ member_id: "usr_123", organization_id: "org_123" })
-      }),
-    projectManagement:
-      overrides.projectManagement ??
-      mockedObject<NonNullable<ApiServerDependencies["projectManagement"]>>({
-        resolveProjectAccessForUser: vi.fn().mockResolvedValue(defaultProjectAccess),
-        listProjectsForUser: vi.fn().mockResolvedValue([]),
-        createProjectForUser: vi.fn().mockResolvedValue(null),
-        updateProjectForUser: vi.fn().mockResolvedValue(null),
-        deleteProjectForUser: vi.fn().mockResolvedValue(null)
-      }),
-    webAuth: mockedObject<NonNullable<ApiServerDependencies["webAuth"]>>({
-      requestEmailCode: vi.fn(),
-      verifyEmailCode: vi.fn(),
-      beginGithubAuth: vi.fn(),
-      completeGithubAuth: vi.fn(),
-      acceptInviteForSession: vi.fn(),
-      resolveSessionByToken: vi.fn().mockResolvedValue(null),
-      revokeSessionByToken: vi.fn().mockResolvedValue(false),
-      ...overrides.webAuth
-    }),
-    tokenManagement:
-      overrides.tokenManagement ??
-      mockedObject<ApiServerDependencies["tokenManagement"]>({
-        listProjectTokensForOrganization: vi.fn().mockResolvedValue([]),
-        createProjectTokenForOrganization: vi.fn().mockResolvedValue(null),
-        revokeProjectTokenForOrganization: vi.fn().mockResolvedValue(null),
-        listMemberTokensForOrganization: vi.fn().mockResolvedValue([]),
-        createMemberTokenForOrganization: vi.fn().mockResolvedValue(null),
-        revokeMemberTokenForOrganization: vi.fn().mockResolvedValue(null)
-      }),
-    incidentRetrieval: {
-      listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
-      getIncidentForOrganization: vi.fn().mockResolvedValue(null),
-      listIncidentLogsForOrganization: vi.fn().mockResolvedValue([])
-    },
-    objectStoreReader: {
-      getObject: vi.fn()
-    },
-    webhookDelivery: {
-      listDeliveriesForWebhookInOrganization: vi.fn().mockResolvedValue({ deliveries: [] }),
-      retryDeliveryForOrganization: vi.fn().mockResolvedValue(null)
-    },
-    ...(overrides.auditLogging === undefined
-      ? {}
-      : {
-          auditLogging: {
-            createAuditLog:
-              overrides.auditLogging.createAuditLog ?? vi.fn().mockResolvedValue(undefined)
-          }
-        })
-  });
-}
+import {
+  createTokenApiServer as createServer,
+  defaultProjectAccess,
+  type ApiServerDependencies
+} from "../../helpers/api-tokens.js";
 
 describe("api token management routes", () => {
   it("should validate project token list request params and query", async (): Promise<void> => {

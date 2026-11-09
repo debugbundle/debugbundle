@@ -167,6 +167,19 @@ describe("worker runtime", () => {
 
     await expect(assertWorkerSchema(db)).resolves.toBeUndefined();
   });
+  it("fails closed when required report storage proof is missing even with generation disabled", async () => {
+    await expect(
+      assertWorkerSchema({
+        query: vi
+          .fn()
+          .mockImplementation(async (sql: string) =>
+            sql.includes("AS available") && sql.includes("report_artifact_objects")
+              ? { rows: [{ available: false }] }
+              : buildMigratedWorkerSchemaRows(sql)
+          )
+      })
+    ).rejects.toThrow("report_run_schema_incomplete");
+  });
 
   it("should fail schema guard with missing processed_events table", async (): Promise<void> => {
     const db = {

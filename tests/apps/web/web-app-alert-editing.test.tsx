@@ -495,7 +495,7 @@ describe("alert editing", () => {
 
     expect(channelOptions.map((option) => option.textContent)).toEqual([
       "Email",
-      "Slack (Team tier only)",
+      "Slack (Team or Business)",
       "Discord",
       "Alert webhook"
     ]);

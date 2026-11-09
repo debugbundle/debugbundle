@@ -1,4 +1,9 @@
 import { billingPlanChangeOperations } from "./openapi-billing-plan-change.js";
+import { billingOfferOperations } from "./openapi-billing-offers.js";
+import {
+  BillingOfferSelectionSchema,
+  BillingOfferQuoteSchema
+} from "../../../packages/shared-types/src/index.js";
 import {
   z,
   AccountDeleteBodySchema,
@@ -43,6 +48,7 @@ import {
 export function foundationOperations(): OperationSpec[] {
   return [
     ...billingPlanChangeOperations(),
+    ...billingOfferOperations(),
     {
       method: "get",
       path: "/health",
@@ -268,11 +274,35 @@ export function foundationOperations(): OperationSpec[] {
       method: "get",
       path: "/v1/account/export",
       operationId: "exportAccount",
-      summary: "Export retained organization account data",
+      summary: "Export retained organization account data; optional bounded Business section pages",
       tags: ["Account"],
       security: browserSessionAuth,
+      query: BusinessAccountExportQuerySchema.partial(),
       responses: {
-        "200": { description: "Account export JSON attachment.", schema: accountExportResponse },
+        "200": {
+          description:
+            "Account export JSON attachment, or a section page with items/as_of/next_cursor. Follow the cursor with the same section. Canonical report downloads remain authenticated.",
+          schema: {
+            oneOf: [
+              accountExportResponse,
+              component(
+                "BusinessAccountExportPage",
+                z
+                  .object({
+                    section: BusinessAccountExportQuerySchema.shape.section,
+                    as_of: z.string().datetime(),
+                    items: z.array(z.record(z.string(), z.unknown())).max(100),
+                    next_cursor: z.string().nullable()
+                  })
+                  .strict()
+              )
+            ]
+          }
+        },
+        "400": {
+          description: "Invalid section, page limit or section-bound cursor.",
+          schema: apiError
+        },
         "401": { description: "Browser session is missing or invalid.", schema: apiError },
         "403": { description: "Owner access is required.", schema: apiError },
         "404": { description: "Account export was not available.", schema: apiError },
@@ -412,6 +442,41 @@ export function foundationOperations(): OperationSpec[] {
       }
     },
 
+    {
+      method: "post",
+      path: "/v1/billing/offers/upgrade-preview",
+      operationId: "previewBillingOfferUpgrade",
+      summary: "Preview a same-interval paid tier increase with explicit recurring terms",
+      tags: ["Billing"],
+      security: browserSessionAuth,
+      requestBody: component("BillingOfferSelection", BillingOfferSelectionSchema),
+      responses: {
+        "200": {
+          description:
+            "An actor-bound ten-minute quote or an existing unpaid invoice. No payment mutation.",
+          schema: component(
+            "BillingOfferUpgradePreview",
+            z.union([
+              z.object({ quote: BillingOfferQuoteSchema }).strict(),
+              z.object({ payment_url: z.string().url() }).strict()
+            ])
+          )
+        },
+        "400": { description: "Invalid offer selection.", schema: apiError },
+        "401": { description: "Invalid browser session.", schema: apiError },
+        "403": {
+          description:
+            "Verified browser Owner and CSRF required; bearer credentials cannot purchase.",
+          schema: apiError
+        },
+        "409": {
+          description: "Unsupported offer or unresolved billing operation.",
+          schema: apiError
+        },
+        "429": { description: "Rate limit reached.", schema: apiError },
+        "503": { description: "Billing provider unavailable or not configured.", schema: apiError }
+      }
+    },
     {
       method: "post",
       path: "/v1/billing/checkout",
@@ -563,3 +628,4 @@ export function foundationOperations(): OperationSpec[] {
     }
   ];
 }
+import { BusinessAccountExportQuerySchema } from "../../../packages/storage/src/business-account-export.js";

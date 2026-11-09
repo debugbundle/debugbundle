@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  MemberTokenPolicySchema,
+  type MemberTokenScopeDeclaration
+} from "../../shared-types/src/index.js";
 
 export const ProjectTokenSchema = z
   .object({
@@ -20,6 +24,7 @@ export const MemberTokenSchema = z
     user_id: z.string(),
     organization_id: z.string(),
     label: z.string(),
+    scope: MemberTokenPolicySchema.optional(),
     created_at: z.string(),
     last_used_at: z.string().nullable(),
     revoked_at: z.string().nullable(),
@@ -28,13 +33,21 @@ export const MemberTokenSchema = z
   })
   .strict();
 
-export const AgentTokenSchema = z.object({
-  token_id: z.string(), issuer_user_id: z.string(), organization_id: z.string(),
-  project_id: z.string(), label: z.string(),
-  scope: z.literal("incident:read-minimized"), policy_version: z.literal("telemetry-privacy-v1"),
-  created_at: z.string(), expires_at: z.string(), revoked_at: z.string().nullable(),
-  plaintext: z.string().optional()
-}).strict();
+export const AgentTokenSchema = z
+  .object({
+    token_id: z.string(),
+    issuer_user_id: z.string(),
+    organization_id: z.string(),
+    project_id: z.string(),
+    label: z.string(),
+    scope: z.literal("incident:read-minimized"),
+    policy_version: z.literal("telemetry-privacy-v1"),
+    created_at: z.string(),
+    expires_at: z.string(),
+    revoked_at: z.string().nullable(),
+    plaintext: z.string().optional()
+  })
+  .strict();
 
 export const TokenListResponseSchema = z
   .object({
@@ -90,7 +103,9 @@ function parseApiError(status: number, body: unknown): never {
   throw new TokenManagementApiError(status, parsed.data.error);
 }
 
-async function expectTokenList(responsePromise: Promise<HttpResponse>): Promise<Array<z.infer<typeof ProjectTokenSchema> | z.infer<typeof MemberTokenSchema>>> {
+async function expectTokenList(
+  responsePromise: Promise<HttpResponse>
+): Promise<Array<z.infer<typeof ProjectTokenSchema> | z.infer<typeof MemberTokenSchema>>> {
   const response = await responsePromise;
   if (response.status < 200 || response.status >= 300) {
     parseApiError(response.status, response.body);
@@ -104,7 +119,9 @@ async function expectTokenList(responsePromise: Promise<HttpResponse>): Promise<
   return parsed.data.tokens;
 }
 
-async function expectToken(responsePromise: Promise<HttpResponse>): Promise<z.infer<typeof ProjectTokenSchema> | z.infer<typeof MemberTokenSchema>> {
+async function expectToken(
+  responsePromise: Promise<HttpResponse>
+): Promise<z.infer<typeof ProjectTokenSchema> | z.infer<typeof MemberTokenSchema>> {
   const response = await responsePromise;
   if (response.status < 200 || response.status >= 300) {
     parseApiError(response.status, response.body);
@@ -119,38 +136,98 @@ async function expectToken(responsePromise: Promise<HttpResponse>): Promise<z.in
 }
 
 export function createTokenManagementApi(client: HttpClient): {
-  listAgentTokens(input: { bearerToken: string; projectId: string }): Promise<Array<z.infer<typeof AgentTokenSchema>>>;
-  createAgentToken(input: { bearerToken: string; projectId: string; label: string; expiresAt?: string }): Promise<z.infer<typeof AgentTokenSchema>>;
-  revokeAgentToken(input: { bearerToken: string; projectId: string; tokenId: string }): Promise<z.infer<typeof AgentTokenSchema>>;
-  listProjectTokens(input: { bearerToken: string; projectId: string; limit?: number }): Promise<Array<z.infer<typeof ProjectTokenSchema>>>;
-  createProjectToken(input: { bearerToken: string; projectId: string; label: string; allowedOrigins?: string[] }): Promise<z.infer<typeof ProjectTokenSchema>>;
-  revokeProjectToken(input: { bearerToken: string; projectId: string; tokenId: string }): Promise<z.infer<typeof ProjectTokenSchema>>;
-  listMemberTokens(input: { bearerToken: string; limit?: number }): Promise<Array<z.infer<typeof MemberTokenSchema>>>;
-  createMemberToken(input: { bearerToken: string; label: string }): Promise<z.infer<typeof MemberTokenSchema>>;
-  revokeMemberToken(input: { bearerToken: string; tokenId: string }): Promise<z.infer<typeof MemberTokenSchema>>;
+  listAgentTokens(input: {
+    bearerToken: string;
+    projectId: string;
+  }): Promise<Array<z.infer<typeof AgentTokenSchema>>>;
+  createAgentToken(input: {
+    bearerToken: string;
+    projectId: string;
+    label: string;
+    expiresAt?: string;
+  }): Promise<z.infer<typeof AgentTokenSchema>>;
+  revokeAgentToken(input: {
+    bearerToken: string;
+    projectId: string;
+    tokenId: string;
+  }): Promise<z.infer<typeof AgentTokenSchema>>;
+  listProjectTokens(input: {
+    bearerToken: string;
+    projectId: string;
+    limit?: number;
+  }): Promise<Array<z.infer<typeof ProjectTokenSchema>>>;
+  createProjectToken(input: {
+    bearerToken: string;
+    projectId: string;
+    label: string;
+    allowedOrigins?: string[];
+  }): Promise<z.infer<typeof ProjectTokenSchema>>;
+  revokeProjectToken(input: {
+    bearerToken: string;
+    projectId: string;
+    tokenId: string;
+  }): Promise<z.infer<typeof ProjectTokenSchema>>;
+  listMemberTokens(input: {
+    bearerToken: string;
+    limit?: number;
+    includeScope?: boolean;
+  }): Promise<Array<z.infer<typeof MemberTokenSchema>>>;
+  createMemberToken(input: {
+    bearerToken: string;
+    label: string;
+    scope?: MemberTokenScopeDeclaration;
+    expiresAt?: string;
+  }): Promise<z.infer<typeof MemberTokenSchema>>;
+  revokeMemberToken(input: {
+    bearerToken: string;
+    tokenId: string;
+  }): Promise<z.infer<typeof MemberTokenSchema>>;
 } {
   return {
     async listAgentTokens(input) {
-      const response = await client.request({ method: "GET", path: `/v1/projects/${encodeURIComponent(input.projectId)}/agent-tokens`, bearerToken: input.bearerToken });
-      if (response.status < 200 || response.status >= 300) parseApiError(response.status, response.body);
-      const parsed = z.object({ tokens: z.array(AgentTokenSchema) }).strict().safeParse(response.body);
-      if (!parsed.success) throw new TokenManagementApiError(response.status, "invalid_response_shape");
+      const response = await client.request({
+        method: "GET",
+        path: `/v1/projects/${encodeURIComponent(input.projectId)}/agent-tokens`,
+        bearerToken: input.bearerToken
+      });
+      if (response.status < 200 || response.status >= 300)
+        parseApiError(response.status, response.body);
+      const parsed = z
+        .object({ tokens: z.array(AgentTokenSchema) })
+        .strict()
+        .safeParse(response.body);
+      if (!parsed.success)
+        throw new TokenManagementApiError(response.status, "invalid_response_shape");
       return parsed.data.tokens;
     },
     async createAgentToken(input) {
-      const response = await client.request({ method: "POST", path: `/v1/projects/${encodeURIComponent(input.projectId)}/agent-tokens`,
-        bearerToken: input.bearerToken, body: { label: input.label, ...(input.expiresAt === undefined ? {} : { expires_at: input.expiresAt }) } });
-      if (response.status < 200 || response.status >= 300) parseApiError(response.status, response.body);
+      const response = await client.request({
+        method: "POST",
+        path: `/v1/projects/${encodeURIComponent(input.projectId)}/agent-tokens`,
+        bearerToken: input.bearerToken,
+        body: {
+          label: input.label,
+          ...(input.expiresAt === undefined ? {} : { expires_at: input.expiresAt })
+        }
+      });
+      if (response.status < 200 || response.status >= 300)
+        parseApiError(response.status, response.body);
       const parsed = z.object({ token: AgentTokenSchema }).strict().safeParse(response.body);
-      if (!parsed.success) throw new TokenManagementApiError(response.status, "invalid_response_shape");
+      if (!parsed.success)
+        throw new TokenManagementApiError(response.status, "invalid_response_shape");
       return parsed.data.token;
     },
     async revokeAgentToken(input) {
-      const response = await client.request({ method: "POST", path: `/v1/projects/${encodeURIComponent(input.projectId)}/agent-tokens/${encodeURIComponent(input.tokenId)}/revoke`,
-        bearerToken: input.bearerToken });
-      if (response.status < 200 || response.status >= 300) parseApiError(response.status, response.body);
+      const response = await client.request({
+        method: "POST",
+        path: `/v1/projects/${encodeURIComponent(input.projectId)}/agent-tokens/${encodeURIComponent(input.tokenId)}/revoke`,
+        bearerToken: input.bearerToken
+      });
+      if (response.status < 200 || response.status >= 300)
+        parseApiError(response.status, response.body);
       const parsed = z.object({ token: AgentTokenSchema }).strict().safeParse(response.body);
-      if (!parsed.success) throw new TokenManagementApiError(response.status, "invalid_response_shape");
+      if (!parsed.success)
+        throw new TokenManagementApiError(response.status, "invalid_response_shape");
       return parsed.data.token;
     },
     async listProjectTokens(input) {
@@ -195,7 +272,10 @@ export function createTokenManagementApi(client: HttpClient): {
     },
 
     async listMemberTokens(input) {
-      const query = input.limit === undefined ? "" : `?limit=${input.limit}`;
+      const params = new URLSearchParams();
+      if (input.limit !== undefined) params.set("limit", String(input.limit));
+      if (input.includeScope === true) params.set("include_scope", "true");
+      const query = params.size === 0 ? "" : `?${params.toString()}`;
       const tokens = await expectTokenList(
         client.request({
           method: "GET",
@@ -214,7 +294,9 @@ export function createTokenManagementApi(client: HttpClient): {
           path: "/v1/member/tokens",
           bearerToken: input.bearerToken,
           body: {
-            label: input.label
+            label: input.label,
+            ...(input.scope === undefined ? {} : { scope: input.scope }),
+            ...(input.expiresAt === undefined ? {} : { expires_at: input.expiresAt })
           }
         })
       );

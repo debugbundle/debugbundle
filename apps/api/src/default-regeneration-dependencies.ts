@@ -8,10 +8,13 @@ import {
 } from "../../../packages/storage/src/index.js";
 
 import type { ApiDependencies } from "./api-types.js";
+import { captureProjectJobAuthority } from "../../../packages/storage/src/project-job-authorization.js";
+import type { Queryable } from "../../../packages/storage/src/types.js";
 
 const BUNDLE_REGENERATION_LEASE_TTL_SECONDS = 30;
 
 export function createDefaultRegenerationDependencies(input: {
+  db?: Queryable;
   queue: QueueClient;
   metadataStore: ReturnType<typeof createPostgresMetadataStore>;
   improvementOpportunityStore: ReturnType<typeof createPostgresImprovementOpportunityStore>;
@@ -22,6 +25,16 @@ export function createDefaultRegenerationDependencies(input: {
   return {
     bundleRegeneration: {
       async requestRegeneration(regenerationInput) {
+        const authority =
+          regenerationInput.initiating_authority === undefined
+            ? {}
+            : input.db === undefined
+              ? null
+              : await captureProjectJobAuthority(input.db, {
+                  project_id: regenerationInput.project_id,
+                  initiator: regenerationInput.initiating_authority
+                });
+        if (authority === null) return false;
         const queueWithLease = input.queue as QueueClient &
           Partial<Pick<RedisQueueClient, "acquireLease" | "releaseLease">>;
         const leaseKey = buildBundleRegenerationLeaseKey(regenerationInput.incident_id);
@@ -52,6 +65,7 @@ export function createDefaultRegenerationDependencies(input: {
             reason: null
           });
           await input.queue.enqueue("build-bundle", {
+            ...authority,
             project_id: regenerationInput.project_id,
             incident_id: regenerationInput.incident_id,
             event_id: source.event_id,
@@ -68,6 +82,16 @@ export function createDefaultRegenerationDependencies(input: {
     },
     improvementBundleRegeneration: {
       async requestRegeneration(regenerationInput) {
+        const authority =
+          regenerationInput.initiating_authority === undefined
+            ? {}
+            : input.db === undefined
+              ? null
+              : await captureProjectJobAuthority(input.db, {
+                  project_id: regenerationInput.project_id,
+                  initiator: regenerationInput.initiating_authority
+                });
+        if (authority === null) return false;
         const queueWithLease = input.queue as QueueClient &
           Partial<Pick<RedisQueueClient, "acquireLease" | "releaseLease">> & {
             enqueue(
@@ -125,6 +149,7 @@ export function createDefaultRegenerationDependencies(input: {
 
         try {
           await queueWithLease.enqueue("build-improvement-bundle", {
+            ...authority,
             project_id: regenerationInput.project_id,
             opportunity_id: regenerationInput.opportunity_id,
             event_id: source.event_id,

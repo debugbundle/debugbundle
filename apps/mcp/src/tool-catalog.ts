@@ -3,6 +3,11 @@ import {
   NOTIFICATION_MCP_TOOL_CATALOG
 } from "./notification-tools.js";
 import {
+  ORGANIZATION_MCP_TOOL_NAMES,
+  ORGANIZATION_MCP_TOOL_CATALOG
+} from "./organization-tools.js";
+import { REFERRAL_MCP_TOOL_NAMES, REFERRAL_MCP_TOOL_CATALOG } from "./referral-tools.js";
+import {
   PUBLIC_STATUS_MCP_TOOL_NAMES,
   PUBLIC_STATUS_MCP_TOOL_CATALOG
 } from "./public-status-tools.js";
@@ -50,6 +55,12 @@ import { WEBHOOK_MCP_TOOL_NAMES } from "./webhook-tools.js";
 import { WEEKLY_REPORT_MCP_TOOL_NAMES } from "./weekly-report-tools.js";
 
 type McpToolName =
+  | (typeof REPORT_DELIVERY_MCP_TOOL_NAMES)[number]
+  | (typeof REPORT_PDF_MCP_TOOL_NAMES)[number]
+  | (typeof REPORT_RUN_MCP_TOOL_NAMES)[number]
+  | (typeof REPORT_MCP_TOOL_NAMES)[number]
+  | (typeof REFERRAL_MCP_TOOL_NAMES)[number]
+  | (typeof ORGANIZATION_MCP_TOOL_NAMES)[number]
   | (typeof PROJECT_MERGE_MCP_TOOL_NAMES)[number]
   | (typeof SERVICE_DEFINITION_MCP_TOOL_NAMES)[number]
   | (typeof NOTIFICATION_MCP_TOOL_NAMES)[number]
@@ -79,6 +90,9 @@ type McpToolName =
   | (typeof WEEKLY_REPORT_MCP_TOOL_NAMES)[number];
 
 type McpToolGroup =
+  | "reports"
+  | "referrals"
+  | "organizations"
   | "notifications"
   | "public_status"
   | "analytics_flows"
@@ -121,6 +135,12 @@ import { MCP_TOOL_CATALOG_FOUNDATION } from "./tool-catalog-foundation.js";
 import { MCP_TOOL_CATALOG_OPERATIONS } from "./tool-catalog-operations.js";
 
 export const MCP_TOOL_CATALOG = [
+  ...REPORT_DELIVERY_MCP_TOOL_CATALOG,
+  ...REPORT_PDF_MCP_TOOL_CATALOG,
+  ...REPORT_MCP_TOOL_CATALOG,
+  ...REPORT_RUN_MCP_TOOL_CATALOG,
+  ...REFERRAL_MCP_TOOL_CATALOG,
+  ...ORGANIZATION_MCP_TOOL_CATALOG,
   ...PROJECT_MERGE_MCP_TOOL_CATALOG,
   ...SERVICE_DEFINITION_MCP_TOOL_CATALOG,
   ...NOTIFICATION_MCP_TOOL_CATALOG,
@@ -206,6 +226,22 @@ export const MCP_TOOL_CATALOG = [
   ...PROBE_MCP_TOOL_CATALOG,
   ...HEALTH_CHECK_MCP_TOOL_CATALOG,
   {
+    name: "billing_offer_change",
+    group: "billing",
+    description:
+      "Read current paid interval/prices or preview, schedule and cancel a tier/interval change at renewal. Retains purchased capacity. Show the exact recurring total, effective date and feature loss, then obtain explicit user confirmation before schedule and send that confirmationToken. Cancel only the exact scheduleId from status. Immediate paid upgrades and purchases require the verified browser billing flow.",
+    inputSchema: z
+      .object({
+        bearerToken: z.string(),
+        action: z.enum(["status", "preview", "schedule", "cancel"]),
+        targetPlan: z.enum(["solo", "team", "business"]).optional(),
+        interval: z.enum(["month", "year"]).optional(),
+        confirmationToken: z.string().max(8192).optional(),
+        scheduleId: z.string().max(255).optional()
+      })
+      .strict()
+  },
+  {
     name: "billing_plan_change",
     group: "billing",
     description:
@@ -231,7 +267,7 @@ export const MCP_TOOL_CATALOG = [
     description: "Start an eligible no-card trial for the organization.",
     inputSchema: z.object({
       bearerToken: z.string(),
-      targetPlan: z.enum(["solo", "team"])
+      targetPlan: z.enum(["solo", "team", "business"])
     })
   },
   {
@@ -277,3 +313,10 @@ export const MCP_TOOL_CATALOG = [
 export const MCP_TOOL_NAMES = MCP_TOOL_CATALOG.map((tool) => tool.name);
 
 export type { McpToolCatalogEntry, McpToolGroup, McpToolName };
+import { REPORT_MCP_TOOL_NAMES, REPORT_MCP_TOOL_CATALOG } from "./report-tools.js";
+import { REPORT_RUN_MCP_TOOL_NAMES, REPORT_RUN_MCP_TOOL_CATALOG } from "./report-run-tools.js";
+import { REPORT_PDF_MCP_TOOL_NAMES, REPORT_PDF_MCP_TOOL_CATALOG } from "./report-pdf-tools.js";
+import {
+  REPORT_DELIVERY_MCP_TOOL_NAMES,
+  REPORT_DELIVERY_MCP_TOOL_CATALOG
+} from "./report-delivery-tools.js";

@@ -6,10 +6,18 @@ import { mockedObject, type MockedMethods } from "../../helpers/vitest.ts";
 type ApiServerDependencies = Parameters<typeof createApiServer>[0];
 type AuditLoggingDependency = MockedMethods<NonNullable<ApiServerDependencies["auditLogging"]>>;
 type WebAuthDependency = MockedMethods<NonNullable<ApiServerDependencies["webAuth"]>>;
-type BillingManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["billingManagement"]>>;
+type BillingManagementDependency = MockedMethods<
+  NonNullable<ApiServerDependencies["billingManagement"]>
+>;
 
 function buildBillingSummary(
-  overrides: Partial<Awaited<ReturnType<NonNullable<ApiServerDependencies["billingManagement"]>["getBillingSummaryForOrganization"]>>> = {}
+  overrides: Partial<
+    Awaited<
+      ReturnType<
+        NonNullable<ApiServerDependencies["billingManagement"]>["getBillingSummaryForOrganization"]
+      >
+    >
+  > = {}
 ) {
   return {
     plan: "free" as const,
@@ -49,11 +57,13 @@ function buildBillingSummary(
   };
 }
 
-function createServer(overrides: {
-  auditLogging?: Partial<AuditLoggingDependency>;
-  webAuth?: Partial<WebAuthDependency>;
-  billingManagement?: Partial<BillingManagementDependency>;
-} = {}): ReturnType<typeof createApiServer> {
+function createServer(
+  overrides: {
+    auditLogging?: Partial<AuditLoggingDependency>;
+    webAuth?: Partial<WebAuthDependency>;
+    billingManagement?: Partial<BillingManagementDependency>;
+  } = {}
+): ReturnType<typeof createApiServer> {
   const auditLogging = mockedObject<NonNullable<ApiServerDependencies["auditLogging"]>>({
     createAuditLog: overrides.auditLogging?.createAuditLog ?? vi.fn().mockResolvedValue(undefined)
   });
@@ -139,77 +149,80 @@ function createServer(overrides: {
 }
 
 describe("api auth trial signup routes", () => {
-  it("starts the requested no-card trial for a newly created email signup", async (): Promise<void> => {
-    const createAuditLog = vi.fn().mockResolvedValue(undefined);
-    const trialSummary = buildBillingSummary({
-      plan: "team",
-      billing_state: "trialing",
-      trial: {
-        available: false,
-        active: true,
-        plan: "team",
-        started_at: "2026-06-04T00:00:00.000Z",
-        ends_at: "2026-07-04T00:00:00.000Z",
-        used_at: "2026-06-04T00:00:00.000Z",
-        converted_at: null,
-        expired_at: null,
-        days_remaining: 30
-      }
-    });
-    const startTrial = vi.fn().mockResolvedValue(trialSummary);
-    const app = createServer({
-      auditLogging: { createAuditLog },
-      webAuth: {
-        verifyEmailCode: vi.fn().mockResolvedValue({
-          ok: true,
-          created_user: true,
-          session_token: "session-secret",
-          session: {
-            session_id: "ses_123",
-            user_id: "usr_123",
-            email: "owner@example.com",
-            email_verified_at: "2026-06-04T00:00:00.000Z",
-            organization_id: "org_123",
-            role: "owner",
-            created_at: "2026-06-04T00:00:00.000Z",
-            expires_at: "2026-06-04T04:00:00.000Z",
-            revoked_at: null,
-            has_email_auth: true,
-            has_github_oauth: false
-          }
-        })
-      },
-      billingManagement: {
-        startTrial,
-        getBillingSummaryForOrganization: vi.fn().mockResolvedValue(trialSummary)
-      }
-    });
+  it.each(["team", "business"] as const)(
+    "starts the requested no-card trial for a newly created email signup (%s)",
+    async (trialPlan): Promise<void> => {
+      const createAuditLog = vi.fn().mockResolvedValue(undefined);
+      const trialSummary = buildBillingSummary({
+        plan: trialPlan,
+        billing_state: "trialing",
+        trial: {
+          available: false,
+          active: true,
+          plan: trialPlan,
+          started_at: "2026-06-04T00:00:00.000Z",
+          ends_at: "2026-07-04T00:00:00.000Z",
+          used_at: "2026-06-04T00:00:00.000Z",
+          converted_at: null,
+          expired_at: null,
+          days_remaining: 30
+        }
+      });
+      const startTrial = vi.fn().mockResolvedValue(trialSummary);
+      const app = createServer({
+        auditLogging: { createAuditLog },
+        webAuth: {
+          verifyEmailCode: vi.fn().mockResolvedValue({
+            ok: true,
+            created_user: true,
+            session_token: "session-secret",
+            session: {
+              session_id: "ses_123",
+              user_id: "usr_123",
+              email: "owner@example.com",
+              email_verified_at: "2026-06-04T00:00:00.000Z",
+              organization_id: "org_123",
+              role: "owner",
+              created_at: "2026-06-04T00:00:00.000Z",
+              expires_at: "2026-06-04T04:00:00.000Z",
+              revoked_at: null,
+              has_email_auth: true,
+              has_github_oauth: false
+            }
+          })
+        },
+        billingManagement: {
+          startTrial,
+          getBillingSummaryForOrganization: vi.fn().mockResolvedValue(trialSummary)
+        }
+      });
 
-    const response = await app.inject({
-      method: "POST",
-      url: "/v1/auth/verify-code",
-      payload: {
-        email: "owner@example.com",
-        code: "123456",
-        requested_trial_plan: "team"
-      }
-    });
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/auth/verify-code",
+        payload: {
+          email: "owner@example.com",
+          code: "123456",
+          requested_trial_plan: trialPlan
+        }
+      });
 
-    expect(response.statusCode).toBe(200);
-    expect(response.json().session.organization_plan).toBe("team");
-    expect(startTrial).toHaveBeenCalledWith({
-      organization_id: "org_123",
-      target_plan: "team",
-      now: expect.any(String)
-    });
-    expect(createAuditLog).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: "billing.trial.start",
+      expect(response.statusCode).toBe(200);
+      expect(response.json().session.organization_plan).toBe(trialPlan);
+      expect(startTrial).toHaveBeenCalledWith({
         organization_id: "org_123",
-        status: "success"
-      })
-    );
-  });
+        target_plan: trialPlan,
+        now: expect.any(String)
+      });
+      expect(createAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: "billing.trial.start",
+          organization_id: "org_123",
+          status: "success"
+        })
+      );
+    }
+  );
 
   it("does not start a trial when an existing account logs in with a trial intent", async (): Promise<void> => {
     const createAuditLog = vi.fn().mockResolvedValue(undefined);
@@ -236,106 +249,108 @@ describe("api auth trial signup routes", () => {
     expect(response.json().session.organization_plan).toBe("free");
     expect(startTrial).not.toHaveBeenCalled();
     expect(
-      createAuditLog.mock.calls.some(
-        ([entry]) => entry.action === "billing.trial.start"
-      )
+      createAuditLog.mock.calls.some(([entry]) => entry.action === "billing.trial.start")
     ).toBe(false);
   });
 
-  it("preserves GitHub signup trial intent through a signed callback cookie", async (): Promise<void> => {
-    const previousSecret = process.env["GITHUB_OAUTH_STATE_SECRET"];
-    process.env["GITHUB_OAUTH_STATE_SECRET"] = "test-github-oauth-state-secret";
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-06-04T00:00:00.000Z"));
+  it.each(["team", "business"] as const)(
+    "preserves %s GitHub signup trial intent through a signed callback cookie",
+    async (trialPlan): Promise<void> => {
+      const previousSecret = process.env["GITHUB_OAUTH_STATE_SECRET"];
+      process.env["GITHUB_OAUTH_STATE_SECRET"] = "test-github-oauth-state-secret";
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-06-04T00:00:00.000Z"));
 
-    try {
-      const trialSummary = buildBillingSummary({
-        plan: "team",
-        billing_state: "trialing",
-        trial: {
-          available: false,
-          active: true,
-          plan: "team",
-          started_at: "2026-06-04T00:00:00.000Z",
-          ends_at: "2026-07-04T00:00:00.000Z",
-          used_at: "2026-06-04T00:00:00.000Z",
-          converted_at: null,
-          expired_at: null,
-          days_remaining: 30
-        }
-      });
-      const startTrial = vi.fn().mockResolvedValue(trialSummary);
-      const completeGithubAuth = vi.fn().mockResolvedValue({
-        ok: true,
-        created_user: true,
-        session_token: "session-secret",
-        accepted_terms_at: "2026-06-04T00:00:00.000Z",
-        redirect_url: "http://localhost:5291/auth/github/callback",
-        session: {
-          session_id: "ses_123",
-          user_id: "usr_123",
-          email: "owner@example.com",
-          email_verified_at: "2026-06-04T00:00:00.000Z",
+      try {
+        const trialSummary = buildBillingSummary({
+          plan: trialPlan,
+          billing_state: "trialing",
+          trial: {
+            available: false,
+            active: true,
+            plan: trialPlan,
+            started_at: "2026-06-04T00:00:00.000Z",
+            ends_at: "2026-07-04T00:00:00.000Z",
+            used_at: "2026-06-04T00:00:00.000Z",
+            converted_at: null,
+            expired_at: null,
+            days_remaining: 30
+          }
+        });
+        const startTrial = vi.fn().mockResolvedValue(trialSummary);
+        const completeGithubAuth = vi.fn().mockResolvedValue({
+          ok: true,
+          created_user: true,
+          session_token: "session-secret",
+          accepted_terms_at: "2026-06-04T00:00:00.000Z",
+          redirect_url: "http://localhost:5291/auth/github/callback",
+          session: {
+            session_id: "ses_123",
+            user_id: "usr_123",
+            email: "owner@example.com",
+            email_verified_at: "2026-06-04T00:00:00.000Z",
+            organization_id: "org_123",
+            role: "owner",
+            created_at: "2026-06-04T00:00:00.000Z",
+            expires_at: "2026-06-04T04:00:00.000Z",
+            revoked_at: null,
+            has_email_auth: false,
+            has_github_oauth: true
+          }
+        });
+        const app = createServer({
+          webAuth: {
+            beginGithubAuth: vi.fn().mockResolvedValue({
+              ok: true,
+              authorization_url:
+                "https://github.example.test/login/oauth/authorize?state=oauth-state",
+              state: "oauth-state",
+              expires_at: "2026-07-01T00:10:00.000Z"
+            }),
+            completeGithubAuth
+          },
+          billingManagement: {
+            startTrial,
+            getBillingSummaryForOrganization: vi.fn().mockResolvedValue(trialSummary)
+          }
+        });
+
+        const start = await app.inject({
+          method: "GET",
+          url: `/v1/auth/github/start?trial=${trialPlan}`
+        });
+        const setCookie = Array.isArray(start.headers["set-cookie"])
+          ? start.headers["set-cookie"].join("; ")
+          : String(start.headers["set-cookie"]);
+        const stateCookie = /dbundle_github_oauth_state=([^;]+)/.exec(setCookie)?.[0];
+        const trialCookie = /dbundle_github_signup_trial=([^;]+)/.exec(setCookie)?.[0];
+
+        expect(start.statusCode).toBe(302);
+        expect(trialCookie).toBeDefined();
+
+        const callback = await app.inject({
+          method: "GET",
+          url: "/v1/auth/github/callback?code=oauth-code&state=oauth-state",
+          headers: {
+            cookie: `${stateCookie}; ${trialCookie}`
+          }
+        });
+
+        expect(callback.statusCode).toBe(302);
+        expect(startTrial).toHaveBeenCalledWith({
           organization_id: "org_123",
-          role: "owner",
-          created_at: "2026-06-04T00:00:00.000Z",
-          expires_at: "2026-06-04T04:00:00.000Z",
-          revoked_at: null,
-          has_email_auth: false,
-          has_github_oauth: true
+          target_plan: trialPlan,
+          now: expect.any(String)
+        });
+        expect(String(callback.headers["set-cookie"])).toContain("dbundle_github_signup_trial=;");
+      } finally {
+        if (previousSecret === undefined) {
+          delete process.env["GITHUB_OAUTH_STATE_SECRET"];
+        } else {
+          process.env["GITHUB_OAUTH_STATE_SECRET"] = previousSecret;
         }
-      });
-      const app = createServer({
-        webAuth: {
-          beginGithubAuth: vi.fn().mockResolvedValue({
-            ok: true,
-            authorization_url: "https://github.example.test/login/oauth/authorize?state=oauth-state",
-            state: "oauth-state",
-            expires_at: "2026-07-01T00:10:00.000Z"
-          }),
-          completeGithubAuth
-        },
-        billingManagement: {
-          startTrial,
-          getBillingSummaryForOrganization: vi.fn().mockResolvedValue(trialSummary)
-        }
-      });
-
-      const start = await app.inject({
-        method: "GET",
-        url: "/v1/auth/github/start?trial=team"
-      });
-      const setCookie = Array.isArray(start.headers["set-cookie"])
-        ? start.headers["set-cookie"].join("; ")
-        : String(start.headers["set-cookie"]);
-      const stateCookie = /dbundle_github_oauth_state=([^;]+)/.exec(setCookie)?.[0];
-      const trialCookie = /dbundle_github_signup_trial=([^;]+)/.exec(setCookie)?.[0];
-
-      expect(start.statusCode).toBe(302);
-      expect(trialCookie).toBeDefined();
-
-      const callback = await app.inject({
-        method: "GET",
-        url: "/v1/auth/github/callback?code=oauth-code&state=oauth-state",
-        headers: {
-          cookie: `${stateCookie}; ${trialCookie}`
-        }
-      });
-
-      expect(callback.statusCode).toBe(302);
-      expect(startTrial).toHaveBeenCalledWith({
-        organization_id: "org_123",
-        target_plan: "team",
-        now: expect.any(String)
-      });
-      expect(String(callback.headers["set-cookie"])).toContain("dbundle_github_signup_trial=;");
-    } finally {
-      if (previousSecret === undefined) {
-        delete process.env["GITHUB_OAUTH_STATE_SECRET"];
-      } else {
-        process.env["GITHUB_OAUTH_STATE_SECRET"] = previousSecret;
+        vi.useRealTimers();
       }
-      vi.useRealTimers();
     }
-  });
+  );
 });

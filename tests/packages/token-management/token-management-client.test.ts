@@ -1,8 +1,51 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createTokenManagementApi, TokenManagementApiError, type HttpClient } from "../../../packages/token-management/src/index.js";
+import {
+  createTokenManagementApi,
+  TokenManagementApiError,
+  type HttpClient
+} from "../../../packages/token-management/src/index.js";
 
 describe("token-management api client", () => {
+  it("opts into scope metadata without changing legacy response requests", async () => {
+    const request = vi
+      .fn<HttpClient["request"]>()
+      .mockResolvedValue({ status: 200, body: { tokens: [] } });
+    await createTokenManagementApi({ request }).listMemberTokens({
+      bearerToken: "member",
+      includeScope: true,
+      limit: 5
+    });
+    expect(request).toHaveBeenCalledWith({
+      method: "GET",
+      path: "/v1/member/tokens?limit=5&include_scope=true",
+      bearerToken: "member"
+    });
+  });
+  it("forwards a scope declaration and expiry to the shared issuance boundary", async () => {
+    const request = vi
+      .fn<HttpClient["request"]>()
+      .mockResolvedValue({ status: 403, body: { error: "interactive_verification_required" } });
+    const scope = {
+      mode: "projects" as const,
+      project_ids: ["11111111-1111-4111-8111-111111111111"],
+      permissions: ["project:read" as const]
+    };
+    await expect(
+      createTokenManagementApi({ request }).createMemberToken({
+        bearerToken: "member",
+        label: "read",
+        scope,
+        expiresAt: "2026-12-01T00:00:00.000Z"
+      })
+    ).rejects.toMatchObject({ code: "interactive_verification_required" });
+    expect(request).toHaveBeenCalledWith({
+      method: "POST",
+      path: "/v1/member/tokens",
+      bearerToken: "member",
+      body: { label: "read", scope, expires_at: "2026-12-01T00:00:00.000Z" }
+    });
+  });
   it("calls project token list route with query", async () => {
     const request = vi.fn<HttpClient["request"]>().mockResolvedValue({
       status: 200,
@@ -22,7 +65,11 @@ describe("token-management api client", () => {
     });
 
     const api = createTokenManagementApi({ request });
-    const tokens = await api.listProjectTokens({ bearerToken: "dbundle_mem_x", projectId: "proj_1", limit: 5 });
+    const tokens = await api.listProjectTokens({
+      bearerToken: "dbundle_mem_x",
+      projectId: "proj_1",
+      limit: 5
+    });
 
     expect(tokens).toHaveLength(1);
     expect(request).toHaveBeenCalledWith({
@@ -118,7 +165,11 @@ describe("token-management api client", () => {
       label: "ci",
       allowedOrigins: ["https://static.example.com"]
     });
-    const revoked = await api.revokeProjectToken({ bearerToken: "dbundle_mem_x", projectId: "proj_1", tokenId: "ptok_1" });
+    const revoked = await api.revokeProjectToken({
+      bearerToken: "dbundle_mem_x",
+      projectId: "proj_1",
+      tokenId: "ptok_1"
+    });
 
     expect(created.token_id).toBe("ptok_1");
     expect(revoked.revoked_at).toBe("2024-01-01T01:00:00.000Z");
@@ -175,7 +226,10 @@ describe("token-management api client", () => {
 
     const api = createTokenManagementApi({ request });
     const created = await api.createMemberToken({ bearerToken: "dbundle_mem_x", label: "cli" });
-    const revoked = await api.revokeMemberToken({ bearerToken: "dbundle_mem_x", tokenId: "mtok_1" });
+    const revoked = await api.revokeMemberToken({
+      bearerToken: "dbundle_mem_x",
+      tokenId: "mtok_1"
+    });
 
     expect(created.token_id).toBe("mtok_1");
     expect(revoked.revoked_at).toBe("2024-01-01T01:00:00.000Z");
@@ -203,9 +257,9 @@ describe("token-management api client", () => {
     });
 
     const api = createTokenManagementApi({ request });
-    await expect(api.createMemberToken({ bearerToken: "dbundle_mem_x", label: "ci" })).rejects.toEqual(
-      new TokenManagementApiError(500, "unknown_error")
-    );
+    await expect(
+      api.createMemberToken({ bearerToken: "dbundle_mem_x", label: "ci" })
+    ).rejects.toEqual(new TokenManagementApiError(500, "unknown_error"));
   });
 
   it("throws invalid_response_shape for malformed success payloads", async () => {
@@ -225,11 +279,15 @@ describe("token-management api client", () => {
     const apiList = createTokenManagementApi({ request: requestList });
     const apiCreate = createTokenManagementApi({ request: requestCreate });
 
-    await expect(apiList.listProjectTokens({ bearerToken: "dbundle_mem_x", projectId: "proj_1" })).rejects.toEqual(
-      new TokenManagementApiError(200, "invalid_response_shape")
-    );
-    await expect(apiCreate.createProjectToken({ bearerToken: "dbundle_mem_x", projectId: "proj_1", label: "ci" })).rejects.toEqual(
-      new TokenManagementApiError(201, "invalid_response_shape")
-    );
+    await expect(
+      apiList.listProjectTokens({ bearerToken: "dbundle_mem_x", projectId: "proj_1" })
+    ).rejects.toEqual(new TokenManagementApiError(200, "invalid_response_shape"));
+    await expect(
+      apiCreate.createProjectToken({
+        bearerToken: "dbundle_mem_x",
+        projectId: "proj_1",
+        label: "ci"
+      })
+    ).rejects.toEqual(new TokenManagementApiError(201, "invalid_response_shape"));
   });
 });

@@ -25,7 +25,7 @@ export async function getBillingSummary(): Promise<BillingSummaryRecord> {
 }
 
 export async function startBillingTrial(
-  targetPlan: "solo" | "team"
+  targetPlan: "solo" | "team" | "business"
 ): Promise<BillingSummaryRecord> {
   const body = await readJson<BillingSummaryResponse>(
     await fetch(`${API_BASE}/v1/billing/trial/start`, {
@@ -40,7 +40,7 @@ export async function startBillingTrial(
 }
 
 export async function startBillingCheckout(
-  targetPlan: "solo" | "team",
+  targetPlan: "solo" | "team" | "business",
   confirmationToken?: string
 ): Promise<string> {
   const body = await readJson<{ url: string }>(
@@ -127,21 +127,4 @@ export async function cancelBillingCapacityReduction(): Promise<BillingSummaryRe
   );
 
   return normalizeBillingSummary(body.billing);
-}
-
-export type { BillingUpgradeQuote } from "../../../../packages/billing/src/stripe-upgrade-quote.js";
-export async function previewBillingUpgrade(): Promise<
-  | {
-      quote: import("../../../../packages/billing/src/stripe-upgrade-quote.js").BillingUpgradeQuote;
-    }
-  | { payment_url: string }
-> {
-  return readJson(
-    await fetch(`${API_BASE}/v1/billing/upgrade/preview`, {
-      method: "POST",
-      credentials: "include",
-      headers: buildBrowserSessionHeaders(true),
-      body: "{}"
-    })
-  );
 }

@@ -244,143 +244,149 @@ describe("OpenAI OAuth HTTP boundary", () => {
     expect(response.headers.location).toMatch(/^\/oauth\/interaction\/[A-Za-z0-9_-]+$/);
   });
 
-  it("starts a fresh authorization after an existing provider grant is revoked", async () => {
-    const pair = await generateKeyPair("RS256", { extractable: true });
-    const privateJwk = await exportJWK(pair.privateKey);
-    const memory = createInMemoryProviderAdapter();
-    const authorizationProvider = createOpenAiOidcProvider({
-      adapter: memory.Adapter,
-      cimdCache: {
-        getOpenAiCimdResponse: vi.fn(async () => undefined),
-        setOpenAiCimdResponse: vi.fn(async () => undefined)
-      },
-      jwks: { keys: [{ ...privateJwk, kid: "provider-key", alg: "RS256", use: "sig" }] },
-      cookieKeys: [
-        "new-cookie-key-at-least-thirty-two-bytes",
-        "old-cookie-key-at-least-thirty-two-bytes"
-      ],
-      findVerifiedAccount: vi.fn(async () => ({
-        userId: "11111111-1111-4111-8111-111111111111",
-        email: "member@example.test",
-        emailVerified: true
-      })),
-      claimClientAssertionJti: vi.fn(async () => true),
-      resolveGrantClaims: vi.fn(),
-      fetchImpl: vi.fn(
-        async () =>
-          new Response(
-            JSON.stringify({
-              client_id: "https://chatgpt.com/oauth/client.json",
-              redirect_uris: ["https://chatgpt.com/connector_platform_oauth_redirect"],
-              token_endpoint_auth_method: "private_key_jwt",
-              grant_types: ["authorization_code", "refresh_token"],
-              response_types: ["code"],
-              client_name: "ChatGPT",
-              token_endpoint_auth_signing_alg: "RS256",
-              jwks_uri: "https://chatgpt.com/oauth/jwks.json"
-            }),
-            { status: 200, headers: { "content-type": "application/json" } }
-          )
-      ) as typeof fetch
-    });
-    let providerGrantId = "";
-    const consentAccess = createOpenAiConsentAuthorization({
-      provider: authorizationProvider,
-      oauthStore: {
-        createGrant: vi.fn(async (input: { providerGrantId: string }) => {
-          providerGrantId = input.providerGrantId;
-          memory.activateGrant(input.providerGrantId);
-          return "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-        }),
-        revokeGrant: vi.fn(async () => undefined),
-        revokeGrantByProviderId: vi.fn(async () => true)
-      },
-      resolveOrganizationName: vi.fn(async () => "Acme Engineering"),
-      reviewerAccessAvailable: true
-    });
-    const app = Fastify();
-    apps.push(app);
-    registerOpenAiOAuthHttpRoutes(
-      app,
-      {
-        expectedHost: "api.debugbundle.com",
-        provider: authorizationProvider,
-        consentAccess,
-        consentUiBaseUrl: "https://app.debugbundle.com"
-      },
-      {
-        resolveBrowserSession: vi.fn(async () => ({
+  it.each([false, true])(
+    "starts a fresh authorization after an existing provider grant is revoked (reports requested: %s)",
+    async (includeReports) => {
+      const pair = await generateKeyPair("RS256", { extractable: true });
+      const privateJwk = await exportJWK(pair.privateKey);
+      const memory = createInMemoryProviderAdapter();
+      const authorizationProvider = createOpenAiOidcProvider({
+        adapter: memory.Adapter,
+        cimdCache: {
+          getOpenAiCimdResponse: vi.fn(async () => undefined),
+          setOpenAiCimdResponse: vi.fn(async () => undefined)
+        },
+        jwks: { keys: [{ ...privateJwk, kid: "provider-key", alg: "RS256", use: "sig" }] },
+        cookieKeys: [
+          "new-cookie-key-at-least-thirty-two-bytes",
+          "old-cookie-key-at-least-thirty-two-bytes"
+        ],
+        findVerifiedAccount: vi.fn(async () => ({
           userId: "11111111-1111-4111-8111-111111111111",
-          organizationId: "22222222-2222-4222-8222-222222222222",
+          email: "member@example.test",
           emailVerified: true
-        }))
-      }
-    );
-    const authorizationQuery = new URLSearchParams({
-      client_id: "https://chatgpt.com/oauth/client.json",
-      response_type: "code",
-      redirect_uri: "https://chatgpt.com/connector_platform_oauth_redirect",
-      scope:
-        "openid email debugbundle:projects:read debugbundle:incidents:read debugbundle:artifacts:read debugbundle:improvements:read debugbundle:analytics:read debugbundle:health:read",
-      resource: "https://mcp.debugbundle.com",
-      code_challenge: "a".repeat(43),
-      code_challenge_method: "S256",
-      state: "public-regression-state"
-    });
-    const jar = new Map<string, string>();
-    const firstAuthorization = await app.inject({
-      method: "GET",
-      url: `/oauth/authorize?${authorizationQuery.toString()}`,
-      headers: CANONICAL_HEADERS
-    });
-    expect(firstAuthorization.statusCode).toBe(303);
-    retainResponseCookies(jar, firstAuthorization.headers["set-cookie"]);
-    const interactionPath = firstAuthorization.headers.location;
-    expect(interactionPath).toMatch(/^\/oauth\/interaction\/[A-Za-z0-9_-]+$/);
-    const interactionId = interactionPath?.split("/").at(-1);
-    expect(interactionId).toBeDefined();
+        })),
+        claimClientAssertionJti: vi.fn(async () => true),
+        resolveGrantClaims: vi.fn(),
+        fetchImpl: vi.fn(
+          async () =>
+            new Response(
+              JSON.stringify({
+                client_id: "https://chatgpt.com/oauth/client.json",
+                redirect_uris: ["https://chatgpt.com/connector_platform_oauth_redirect"],
+                token_endpoint_auth_method: "private_key_jwt",
+                grant_types: ["authorization_code", "refresh_token"],
+                response_types: ["code"],
+                client_name: "ChatGPT",
+                token_endpoint_auth_signing_alg: "RS256",
+                jwks_uri: "https://chatgpt.com/oauth/jwks.json"
+              }),
+              { status: 200, headers: { "content-type": "application/json" } }
+            )
+        ) as typeof fetch
+      });
+      let providerGrantId = "";
+      const consentAccess = createOpenAiConsentAuthorization({
+        provider: authorizationProvider,
+        oauthStore: {
+          createGrant: vi.fn(async (input: { providerGrantId: string }) => {
+            providerGrantId = input.providerGrantId;
+            memory.activateGrant(input.providerGrantId);
+            return "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+          }),
+          revokeGrant: vi.fn(async () => undefined),
+          revokeGrantByProviderId: vi.fn(async () => true)
+        },
+        resolveOrganizationName: vi.fn(async () => "Acme Engineering"),
+        reviewerAccessAvailable: true
+      });
+      const app = Fastify();
+      apps.push(app);
+      registerOpenAiOAuthHttpRoutes(
+        app,
+        {
+          expectedHost: "api.debugbundle.com",
+          provider: authorizationProvider,
+          consentAccess,
+          consentUiBaseUrl: "https://app.debugbundle.com"
+        },
+        {
+          resolveBrowserSession: vi.fn(async () => ({
+            userId: "11111111-1111-4111-8111-111111111111",
+            organizationId: "22222222-2222-4222-8222-222222222222",
+            emailVerified: true
+          }))
+        }
+      );
+      const requestedProductScopes = [
+        "debugbundle:projects:read",
+        "debugbundle:incidents:read",
+        "debugbundle:artifacts:read",
+        "debugbundle:improvements:read",
+        "debugbundle:analytics:read",
+        "debugbundle:health:read",
+        ...(includeReports ? ["debugbundle:reports:read"] : [])
+      ];
+      const authorizationQuery = new URLSearchParams({
+        client_id: "https://chatgpt.com/oauth/client.json",
+        response_type: "code",
+        redirect_uri: "https://chatgpt.com/connector_platform_oauth_redirect",
+        scope: ["openid", "email", ...requestedProductScopes].join(" "),
+        resource: "https://mcp.debugbundle.com",
+        code_challenge: "a".repeat(43),
+        code_challenge_method: "S256",
+        state: "public-regression-state"
+      });
+      const jar = new Map<string, string>();
+      const firstAuthorization = await app.inject({
+        method: "GET",
+        url: `/oauth/authorize?${authorizationQuery.toString()}`,
+        headers: CANONICAL_HEADERS
+      });
+      expect(firstAuthorization.statusCode).toBe(303);
+      retainResponseCookies(jar, firstAuthorization.headers["set-cookie"]);
+      const interactionPath = firstAuthorization.headers.location;
+      expect(interactionPath).toMatch(/^\/oauth\/interaction\/[A-Za-z0-9_-]+$/);
+      const interactionId = interactionPath?.split("/").at(-1);
+      expect(interactionId).toBeDefined();
 
-    const decision = await app.inject({
-      method: "POST",
-      url: interactionPath!,
-      headers: {
-        ...CANONICAL_HEADERS,
-        cookie: `${requestCookies(jar)}; dbundle_session=local-test-session`
-      },
-      payload: {
-        decision: "allow",
-        product_scopes: [
-          "debugbundle:projects:read",
-          "debugbundle:incidents:read",
-          "debugbundle:artifacts:read",
-          "debugbundle:improvements:read",
-          "debugbundle:analytics:read",
-          "debugbundle:health:read"
-        ]
-      }
-    });
-    expect(decision.statusCode).toBe(200);
-    retainResponseCookies(jar, decision.headers["set-cookie"]);
-    const continueUrl = new URL(decision.json<{ continue_url: string }>().continue_url);
-    const completed = await app.inject({
-      method: "GET",
-      url: `${continueUrl.pathname}${continueUrl.search}`,
-      headers: { ...CANONICAL_HEADERS, cookie: requestCookies(jar) }
-    });
-    expect(completed.statusCode).toBe(303);
-    retainResponseCookies(jar, completed.headers["set-cookie"]);
-    expect(providerGrantId).not.toBe("");
-    memory.revokeNormalizedGrantKeepingLegacyProviderArtifact(providerGrantId);
+      const decision = await app.inject({
+        method: "POST",
+        url: interactionPath!,
+        headers: {
+          ...CANONICAL_HEADERS,
+          cookie: `${requestCookies(jar)}; dbundle_session=local-test-session`
+        },
+        payload: {
+          decision: "allow",
+          product_scopes: requestedProductScopes
+        }
+      });
+      expect(decision.statusCode).toBe(200);
+      retainResponseCookies(jar, decision.headers["set-cookie"]);
+      const continueUrl = new URL(decision.json<{ continue_url: string }>().continue_url);
+      const completed = await app.inject({
+        method: "GET",
+        url: `${continueUrl.pathname}${continueUrl.search}`,
+        headers: { ...CANONICAL_HEADERS, cookie: requestCookies(jar) }
+      });
+      expect(completed.statusCode).toBe(303);
+      retainResponseCookies(jar, completed.headers["set-cookie"]);
+      expect(providerGrantId).not.toBe("");
+      memory.revokeNormalizedGrantKeepingLegacyProviderArtifact(providerGrantId);
 
-    const secondAuthorization = await app.inject({
-      method: "GET",
-      url: `/oauth/authorize?${authorizationQuery.toString()}`,
-      headers: { ...CANONICAL_HEADERS, cookie: requestCookies(jar) }
-    });
+      const secondAuthorization = await app.inject({
+        method: "GET",
+        url: `/oauth/authorize?${authorizationQuery.toString()}`,
+        headers: { ...CANONICAL_HEADERS, cookie: requestCookies(jar) }
+      });
 
-    expect(secondAuthorization.statusCode).toBe(303);
-    expect(secondAuthorization.headers.location).toMatch(/^\/oauth\/interaction\/[A-Za-z0-9_-]+$/);
-  });
+      expect(secondAuthorization.statusCode).toBe(303);
+      expect(secondAuthorization.headers.location).toMatch(
+        /^\/oauth\/interaction\/[A-Za-z0-9_-]+$/
+      );
+    }
+  );
 
   it("redirects browser interactions to the approved UI and keeps JSON decisions on the API origin", async () => {
     const describeInteraction = vi.fn(async () => ({
@@ -591,7 +597,8 @@ describe("OpenAI OAuth HTTP boundary", () => {
       authorization_response_iss_parameter_supported: true,
       client_id_metadata_document_supported: true,
       token_endpoint_auth_methods_supported: ["private_key_jwt"],
-      code_challenge_methods_supported: ["S256"]
+      code_challenge_methods_supported: ["S256"],
+      scopes_supported: ["openid", "email"]
     });
   });
 

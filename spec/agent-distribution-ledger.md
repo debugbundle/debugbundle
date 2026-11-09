@@ -1,5 +1,13 @@
 # Agent distribution ledger
 
+## Business release candidate - 9 November 2026
+
+Codex 1.6.0, Claude Code 1.21.0 and Gemini 1.5.0 are prepared on the
+release branch with MCP 1.21.0. Publish MCP and verify its exact registry
+artifact before promoting these packages to their public default branches.
+The current published inventory below remains historical until verification.
+
+
 ## Alert-scope pin review — 5 November 2026
 
 MCP/CLI 1.20.0 add an optional alert-scope read. Codex 1.5.1, Claude Code

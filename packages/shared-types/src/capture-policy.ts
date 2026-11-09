@@ -281,7 +281,8 @@ export const PRESET_DEFAULTS: Record<CapturePreset, Omit<ResolvedCapturePolicy, 
 export const DEFAULT_PRESET_BY_TIER: Record<string, CapturePreset> = {
   free: "balanced",
   solo: "balanced",
-  team: "balanced"
+  team: "balanced",
+  business: "balanced"
 };
 
 /**
@@ -337,7 +338,7 @@ export function getCapturePolicyOverrides(record: CapturePolicyRecord): CaptureP
  * Get the default preset for a plan string. Unknown plans fall back to "minimal".
  */
 export function getDefaultPreset(plan: string | undefined): CapturePreset {
-  if (plan !== undefined && plan in DEFAULT_PRESET_BY_TIER) {
+  if (plan !== undefined && Object.prototype.hasOwnProperty.call(DEFAULT_PRESET_BY_TIER, plan)) {
     return DEFAULT_PRESET_BY_TIER[plan]!;
   }
   return "minimal";

@@ -19,6 +19,8 @@ function buildMigratedApiSchemaDb(scopeGuardsAvailable = true): Queryable {
         return { rows: API_TABLE_ROWS as unknown as Row[] };
       }
 
+      if (sql.includes("AS available"))
+        return { rows: [{ available: scopeGuardsAvailable }] as unknown as Row[] };
       if (sql.includes("AS project_service_schema_available")) {
         return {
           rows: [{ project_service_schema_available: scopeGuardsAvailable }] as unknown as Row[]

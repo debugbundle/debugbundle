@@ -37,7 +37,8 @@ const OPENAI_ALLOWED_SCOPES = new Set([
   "debugbundle:artifacts:read",
   "debugbundle:improvements:read",
   "debugbundle:analytics:read",
-  "debugbundle:health:read"
+  "debugbundle:health:read",
+  "debugbundle:reports:read"
 ]);
 
 export interface OpenAiAccessTokenVerifier {
@@ -451,7 +452,8 @@ export function registerOpenAiMcpHttpRoutes(
       toolName === "get_incident_context" ||
       toolName === "get_bundle" ||
       toolName === "get_reproduction" ||
-      toolName === "get_improvement_bundle";
+      toolName === "get_improvement_bundle" ||
+      toolName === "get_report_content";
     try {
       const claims = [
         {

@@ -1,3 +1,7 @@
+# Local 1.1.0 candidate — saved reports
+
+Adds `list_reports` and `get_report_content` behind explicit `debugbundle:reports:read` consent. The original twenty-three declarations remain unchanged. New reads enforce the linked organisation, live grant and whole frozen report scope, with no generation or delivery. This candidate is local and unpublished; registered connection rescan and review remain release gates.
+
 # DebugBundle 1.0.3
 
 - Clarify one project per system across service repositories, preserving existing connections and access/privacy boundaries.

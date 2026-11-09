@@ -6,19 +6,26 @@ import {
   getProjectImprovementSettings,
   updateProjectImprovementSettings,
   type ImprovementBundleSensitivity,
-  type ProjectImprovementSettingsResponse,
+  type ProjectImprovementSettingsResponse
 } from "../../lib/api.js";
 import { showErrorToast, showSuccessToast } from "../../lib/notify.js";
 import { HostedImprovementsUpgradeCallout } from "./hosted-improvements-upgrade-callout.js";
 import { Button } from "../ui/button.js";
 import { CollapsibleCard } from "../ui/collapsible-card.js";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "../ui/field.js";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../ui/select.js";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "../ui/select.js";
 import { Switch } from "../ui/switch.js";
 
 interface ProjectImprovementSettingsCardProps {
   projectId: string;
-  organizationPlan: "free" | "solo" | "team";
+  organizationPlan: "free" | "solo" | "team" | "business";
   canEdit: boolean;
 }
 
@@ -37,17 +44,20 @@ const sensitivityOptions: Array<{
   {
     value: "high_confidence",
     label: "High confidence only",
-    description: "Generate fewer bundles and preserve quota for only the strongest recurring signals."
+    description:
+      "Generate fewer bundles and preserve quota for only the strongest recurring signals."
   },
   {
     value: "balanced",
     label: "Balanced",
-    description: "Catch meaningful recurring issues without turning normal variance into queue noise."
+    description:
+      "Catch meaningful recurring issues without turning normal variance into queue noise."
   },
   {
     value: "verbose",
     label: "Verbose",
-    description: "Generate more hardening opportunities during active tuning, rollout validation, or cleanup work."
+    description:
+      "Generate more hardening opportunities during active tuning, rollout validation, or cleanup work."
   }
 ];
 
@@ -177,115 +187,140 @@ export function ProjectImprovementSettingsCard({
       description="Generate automated hosted hardening signals for this project."
       contentClassName="flex flex-col gap-6"
     >
-        {settingsDraft.cloud_automation_available ? null : <HostedImprovementsUpgradeCallout scope="project" />}
+      {settingsDraft.cloud_automation_available ? null : (
+        <HostedImprovementsUpgradeCallout scope="project" />
+      )}
 
-        {errorMessage === null ? null : (
-          <div className="rounded-lg border border-destructive/25 bg-destructive/5 p-3 text-sm text-destructive">{errorMessage}</div>
-        )}
+      {errorMessage === null ? null : (
+        <div className="rounded-lg border border-destructive/25 bg-destructive/5 p-3 text-sm text-destructive">
+          {errorMessage}
+        </div>
+      )}
 
-        <form className="flex flex-col gap-6" onSubmit={(event) => void handleSave(event)}>
-          {showManageControls ? (
-            <FieldGroup>
-              <Field orientation="horizontal" className="items-center justify-between gap-4">
-                <div className="flex flex-1 flex-col gap-1">
-                  <FieldLabel id="project-improvement-bundles-enabled-label" htmlFor="project-improvement-bundles-enabled">Enabled</FieldLabel>
-                  <FieldDescription>
-                    Create improvement bundles from recurring project signals.
-                  </FieldDescription>
-                </div>
-                <Switch
-                  id="project-improvement-bundles-enabled"
-                  aria-labelledby="project-improvement-bundles-enabled-label"
-                  checked={settingsDraft.automated_improvement_bundles_enabled}
-                  disabled={isDisabled}
-                  onCheckedChange={(checked) => {
+      <form className="flex flex-col gap-6" onSubmit={(event) => void handleSave(event)}>
+        {showManageControls ? (
+          <FieldGroup>
+            <Field orientation="horizontal" className="items-center justify-between gap-4">
+              <div className="flex flex-1 flex-col gap-1">
+                <FieldLabel
+                  id="project-improvement-bundles-enabled-label"
+                  htmlFor="project-improvement-bundles-enabled"
+                >
+                  Enabled
+                </FieldLabel>
+                <FieldDescription>
+                  Create improvement bundles from recurring project signals.
+                </FieldDescription>
+              </div>
+              <Switch
+                id="project-improvement-bundles-enabled"
+                aria-labelledby="project-improvement-bundles-enabled-label"
+                checked={settingsDraft.automated_improvement_bundles_enabled}
+                disabled={isDisabled}
+                onCheckedChange={(checked) => {
+                  setDraft((current) => ({
+                    ...(current ?? settingsDraft),
+                    automated_improvement_bundles_enabled: checked
+                  }));
+                }}
+              />
+            </Field>
+
+            {settingsDraft.automated_improvement_bundles_enabled ? (
+              <Field>
+                <FieldLabel
+                  id="project-improvement-sensitivity-label"
+                  htmlFor="project-improvement-sensitivity"
+                >
+                  Sensitivity
+                </FieldLabel>
+                <FieldDescription>
+                  Choose how aggressively hosted signals should become improvement bundles.
+                </FieldDescription>
+                <Select
+                  value={settingsDraft.improvement_bundle_sensitivity}
+                  onValueChange={(value) => {
                     setDraft((current) => ({
                       ...(current ?? settingsDraft),
-                      automated_improvement_bundles_enabled: checked
+                      improvement_bundle_sensitivity: value as ImprovementBundleSensitivity
                     }));
                   }}
-                />
-              </Field>
-
-              {settingsDraft.automated_improvement_bundles_enabled ? (
-                <Field>
-                  <FieldLabel id="project-improvement-sensitivity-label" htmlFor="project-improvement-sensitivity">
-                    Sensitivity
-                  </FieldLabel>
-                  <FieldDescription>
-                    Choose how aggressively hosted signals should become improvement bundles.
-                  </FieldDescription>
-                  <Select
-                    value={settingsDraft.improvement_bundle_sensitivity}
-                    onValueChange={(value) => {
-                      setDraft((current) => ({
-                        ...(current ?? settingsDraft),
-                        improvement_bundle_sensitivity: value as ImprovementBundleSensitivity
-                      }));
-                    }}
-                    disabled={isDisabled}
+                  disabled={isDisabled}
+                >
+                  <SelectTrigger
+                    id="project-improvement-sensitivity"
+                    aria-labelledby="project-improvement-sensitivity-label project-improvement-sensitivity"
+                    className="w-full"
                   >
-                    <SelectTrigger
-                      id="project-improvement-sensitivity"
-                      aria-labelledby="project-improvement-sensitivity-label project-improvement-sensitivity"
-                      className="w-full"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent position="popper">
-                      <SelectGroup>
-                        {sensitivityOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  <FieldDescription>
-                    {sensitivityOptions.find((option) => option.value === settingsDraft.improvement_bundle_sensitivity)?.description}
-                  </FieldDescription>
-                </Field>
-              ) : null}
-            </FieldGroup>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <SummaryTile
-                icon={SparklesIcon}
-                label="Automation"
-                value={
-                  settingsDraft.cloud_automation_available
-                    ? settingsDraft.automated_improvement_bundles_enabled
-                      ? "Enabled"
-                      : "Disabled"
-                    : "Unavailable"
-                }
-              />
-              <SummaryTile
-                icon={GaugeIcon}
-                label="Sensitivity"
-                value={
-                  settingsDraft.cloud_automation_available
-                    ? formatSensitivityLabel(settingsDraft.improvement_bundle_sensitivity)
-                    : "Balanced"
-                }
-              />
-            </div>
-          )}
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent position="popper">
+                    <SelectGroup>
+                      {sensitivityOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <FieldDescription>
+                  {
+                    sensitivityOptions.find(
+                      (option) => option.value === settingsDraft.improvement_bundle_sensitivity
+                    )?.description
+                  }
+                </FieldDescription>
+              </Field>
+            ) : null}
+          </FieldGroup>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <SummaryTile
+              icon={SparklesIcon}
+              label="Automation"
+              value={
+                settingsDraft.cloud_automation_available
+                  ? settingsDraft.automated_improvement_bundles_enabled
+                    ? "Enabled"
+                    : "Disabled"
+                  : "Unavailable"
+              }
+            />
+            <SummaryTile
+              icon={GaugeIcon}
+              label="Sensitivity"
+              value={
+                settingsDraft.cloud_automation_available
+                  ? formatSensitivityLabel(settingsDraft.improvement_bundle_sensitivity)
+                  : "Balanced"
+              }
+            />
+          </div>
+        )}
 
-          {showManageControls ? (
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button type="button" variant="outline" disabled={!isDirty || isSaving} onClick={handleReset}>
-                <RotateCcwIcon data-icon="inline-start" />
-                Reset
-              </Button>
-              <PendingButton pendingLabel="Saving…" pending={isSaving} type="submit" disabled={isSaveDisabled}>
-                Save improvement settings
-              </PendingButton>
-            </div>
-          ) : null}
-
-        </form>
+        {showManageControls ? (
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!isDirty || isSaving}
+              onClick={handleReset}
+            >
+              <RotateCcwIcon data-icon="inline-start" />
+              Reset
+            </Button>
+            <PendingButton
+              pendingLabel="Saving…"
+              pending={isSaving}
+              type="submit"
+              disabled={isSaveDisabled}
+            >
+              Save improvement settings
+            </PendingButton>
+          </div>
+        ) : null}
+      </form>
     </CollapsibleCard>
   );
 }

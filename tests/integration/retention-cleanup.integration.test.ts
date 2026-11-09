@@ -48,7 +48,8 @@ runIntegration("retention cleanup integration", () => {
     const fixtures = [
       { plan: "free", expiredOffsetDays: 8, retainedOffsetDays: 6 },
       { plan: "solo", expiredOffsetDays: 15, retainedOffsetDays: 13 },
-      { plan: "team", expiredOffsetDays: 31, retainedOffsetDays: 29 }
+      { plan: "team", expiredOffsetDays: 31, retainedOffsetDays: 29 },
+      { plan: "business", expiredOffsetDays: 31, retainedOffsetDays: 29 }
     ] as const;
 
     const expiredEventIds: string[] = [];
@@ -146,7 +147,8 @@ runIntegration("retention cleanup integration", () => {
     const fixtures = [
       { plan: "free", expiredOffsetDays: 8, retainedOffsetDays: 6 },
       { plan: "solo", expiredOffsetDays: 31, retainedOffsetDays: 29 },
-      { plan: "team", expiredOffsetDays: 91, retainedOffsetDays: 89 }
+      { plan: "team", expiredOffsetDays: 91, retainedOffsetDays: 89 },
+      { plan: "business", expiredOffsetDays: 91, retainedOffsetDays: 89 }
     ] as const;
 
     const expiredIncidentIds: string[] = [];
@@ -252,7 +254,7 @@ async function resetRetentionTables(pool: ReturnType<typeof createIntegrationPoo
 async function seedRetentionFixture(input: {
   pool: ReturnType<typeof createIntegrationPool>;
   objectStore: ReturnType<typeof createTestObjectStore>;
-  plan: "free" | "solo" | "team";
+  plan: "free" | "solo" | "team" | "business";
   expiredOccurredAt: string;
   retainedOccurredAt: string;
 }): Promise<{
@@ -391,7 +393,7 @@ async function seedRetentionFixture(input: {
 async function seedBundleRetentionFixture(input: {
   pool: ReturnType<typeof createIntegrationPool>;
   objectStore: ReturnType<typeof createTestObjectStore>;
-  plan: "free" | "solo" | "team";
+  plan: "free" | "solo" | "team" | "business";
   expiredBundleAt: string;
   retainedBundleAt: string;
 }): Promise<{

@@ -1,5 +1,6 @@
 import type { BillingSummaryRecord } from "../lib/api.js";
 import { getFirstPurchaseEligibility } from "../../../../packages/shared-types/src/first-purchase-eligibility.js";
+import { isPaidTier, type PaidTierName } from "../../../../packages/shared-types/src/index.js";
 
 export function getBillingFirstPurchaseEligibility(
   billing: BillingSummaryRecord,
@@ -29,7 +30,7 @@ export function formatPurchaseUnlockDate(value: string): string {
 
 export interface PendingBillingCheckout {
   previousPlan: BillingSummaryRecord["plan"];
-  targetPlan: "solo" | "team";
+  targetPlan: PaidTierName;
 }
 
 const BILLING_CHECKOUT_STORAGE_KEY = "debugbundle.billing.checkout";
@@ -52,18 +53,13 @@ export function readPendingBillingCheckout(): PendingBillingCheckout | null {
     return null;
   }
 
-  const rawValue = window.sessionStorage.getItem(BILLING_CHECKOUT_STORAGE_KEY);
-  if (rawValue === null) {
-    return null;
-  }
-
   try {
+    const rawValue = window.sessionStorage.getItem(BILLING_CHECKOUT_STORAGE_KEY);
+    if (rawValue === null) return null;
     const parsedValue = JSON.parse(rawValue) as Partial<PendingBillingCheckout>;
     if (
-      (parsedValue.previousPlan === "free" ||
-        parsedValue.previousPlan === "solo" ||
-        parsedValue.previousPlan === "team") &&
-      (parsedValue.targetPlan === "solo" || parsedValue.targetPlan === "team")
+      (parsedValue.previousPlan === "free" || isPaidTier(parsedValue.previousPlan)) &&
+      isPaidTier(parsedValue.targetPlan)
     ) {
       return {
         previousPlan: parsedValue.previousPlan,
@@ -82,7 +78,11 @@ export function writePendingBillingCheckout(checkout: PendingBillingCheckout): v
     return;
   }
 
-  window.sessionStorage.setItem(BILLING_CHECKOUT_STORAGE_KEY, JSON.stringify(checkout));
+  try {
+    window.sessionStorage.setItem(BILLING_CHECKOUT_STORAGE_KEY, JSON.stringify(checkout));
+  } catch {
+    /* Navigation markers must not block the provider-confirmed billing flow. */
+  }
 }
 
 export function clearPendingBillingCheckout(): void {
@@ -90,7 +90,11 @@ export function clearPendingBillingCheckout(): void {
     return;
   }
 
-  window.sessionStorage.removeItem(BILLING_CHECKOUT_STORAGE_KEY);
+  try {
+    window.sessionStorage.removeItem(BILLING_CHECKOUT_STORAGE_KEY);
+  } catch {
+    /* Storage is optional; live billing state remains authoritative. */
+  }
 }
 
 export function billingReflectsCheckout(
@@ -131,13 +135,17 @@ export function formatPlanName(plan: BillingSummaryRecord["plan"]): string {
       return "Solo";
     case "team":
       return "Team";
+    case "business":
+      return "Business";
     default:
       return "Free";
   }
 }
 
-export function resolveRequestedTrialPlan(value: string | null): "solo" | "team" | null {
-  return value === "solo" || value === "team" ? value : null;
+export function resolveRequestedTrialPlan(
+  value: string | null
+): "solo" | "team" | "business" | null {
+  return value === "solo" || value === "team" || value === "business" ? value : null;
 }
 
 export function formatTrialDaysRemaining(daysRemaining: number | null): string | null {

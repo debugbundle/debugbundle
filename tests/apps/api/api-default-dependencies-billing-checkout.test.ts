@@ -7,6 +7,37 @@ import { createApiDependencies } from "../../../apps/api/src/default-dependencie
 import { createBillingManagement } from "../../../apps/api/src/billing-management.ts";
 
 describe("api-default-dependency-mocks billing-checkout", () => {
+  it("keeps Business trial admission off until the composed Business readiness gate is enabled and never calls Stripe", async () => {
+    const startTrialForOrganization = vi.fn().mockResolvedValue("trial_unavailable");
+    const input = {
+      organization_id: "org_trial",
+      target_plan: "business" as const,
+      now: "2026-11-08T00:00:00.000Z"
+    };
+    const dependencies = {
+      db: { query: vi.fn() },
+      billingStore: { startTrialForOrganization } as never,
+      billingSyncStore: {} as never,
+      billingLinks: {} as never
+    };
+    expect(await createBillingManagement(dependencies).billingManagement.startTrial(input)).toBe(
+      "trial_unavailable"
+    );
+    expect(startTrialForOrganization).not.toHaveBeenCalled();
+    const stripe = vi.fn();
+    const service = createBillingManagement({
+      ...dependencies,
+      stripeConfig: { businessSalesEnabled: true, client: { request: stripe } } as never
+    });
+    await service.billingManagement.startTrial(input);
+    expect(startTrialForOrganization).toHaveBeenCalledExactlyOnceWith({
+      organization_id: input.organization_id,
+      target_plan: "business",
+      started_at: input.now,
+      ends_at: "2026-12-08T00:00:00.000Z"
+    });
+    expect(stripe).not.toHaveBeenCalled();
+  });
   it("overrides organization billing through the billing management service", async () => {
     const summary = {
       organization_id: "org_123",

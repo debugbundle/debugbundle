@@ -1,3 +1,4 @@
+import { recordReportHealthRecovery } from "./report-health-store.js";
 import { createAvailabilityCheckManagementStore } from "./availability-check-management-store.js";
 import { randomUUID } from "node:crypto";
 
@@ -320,6 +321,18 @@ export function createPostgresAvailabilityCheckStore(db: Queryable): Availabilit
           ]
         );
 
+        if (
+          claimedCheck.prior_status === "failing" &&
+          nextStatus === "passing" &&
+          input.result.status === "success"
+        ) {
+          await recordReportHealthRecovery(tx, {
+            project_id: claimedCheck.project_id,
+            result_id: resultId,
+            check_id: input.check_id,
+            occurred_at: input.completed_at
+          });
+        }
         if (!unverified) {
           const day = availabilityCheckDayBucket(input.completed_at);
           const outcomeState = deriveAvailabilityCheckDailyState(input.result);

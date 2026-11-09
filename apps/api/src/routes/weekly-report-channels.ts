@@ -1,7 +1,11 @@
+import { memberReadScope } from "../member-access-scope.js";
 import type { FastifyInstance } from "fastify";
 
 import { getTierCapabilities } from "../../../../packages/shared-types/src/index.js";
-import type { ProjectAccessRecord, ResolveMemberResult } from "../../../../packages/storage/src/index.js";
+import type {
+  ProjectAccessRecord,
+  ResolveMemberResult
+} from "../../../../packages/storage/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import { isSharedProjectAccessSuspended, requireRateLimitedMemberAuth } from "../api-helpers.js";
 import {
@@ -43,6 +47,7 @@ async function resolveWeeklyReportProjectAccess(
   }
 
   return dependencies.projectManagement.resolveProjectAccessForUser({
+    ...memberReadScope(input.member),
     user_id: input.member.member_id,
     project_id: input.project_id
   });
@@ -82,9 +87,17 @@ async function resolveEditableWeeklyReportChannel(
   return { access };
 }
 
-export function registerWeeklyReportChannelRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
+export function registerWeeklyReportChannelRoutes(
+  app: FastifyInstance,
+  dependencies: ApiDependencies
+): void {
   app.get("/v1/weekly-report-channels", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-read");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "management-read"
+    );
     if (member === null) {
       return;
     }
@@ -108,11 +121,12 @@ export function registerWeeklyReportChannelRoutes(app: FastifyInstance, dependen
       return reply.status(403).send({ error: "shared_access_suspended" });
     }
 
-    const channels = await dependencies.weeklyReportManagement.listWeeklyReportChannelsForOrganization({
-      organization_id: access.organization_id,
-      project_id: parsedQuery.data.project_id,
-      limit: parsedQuery.data.limit
-    });
+    const channels =
+      await dependencies.weeklyReportManagement.listWeeklyReportChannelsForOrganization({
+        organization_id: access.organization_id,
+        project_id: parsedQuery.data.project_id,
+        limit: parsedQuery.data.limit
+      });
     if (channels === null) {
       return reply.status(404).send({ error: "project_not_found" });
     }
@@ -121,7 +135,12 @@ export function registerWeeklyReportChannelRoutes(app: FastifyInstance, dependen
   });
 
   app.post("/v1/weekly-report-channels", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-write");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "management-write"
+    );
     if (member === null) {
       return;
     }
@@ -148,10 +167,7 @@ export function registerWeeklyReportChannelRoutes(app: FastifyInstance, dependen
       return reply.status(403).send({ error: "forbidden" });
     }
 
-    if (
-      parsedBody.data.channel === "slack" &&
-      "slack_destination_id" in parsedBody.data.config
-    ) {
+    if (parsedBody.data.channel === "slack" && "slack_destination_id" in parsedBody.data.config) {
       if (dependencies.slackManagement === undefined) {
         return reply.status(503).send({ error: "slack_not_configured" });
       }
@@ -159,11 +175,12 @@ export function registerWeeklyReportChannelRoutes(app: FastifyInstance, dependen
         return reply.status(403).send({ error: "upgrade_required" });
       }
 
-      const scopedProject = await dependencies.slackManagement.listSlackDestinationsForProjectInOrganization({
-        organization_id: access.organization_id,
-        project_id: parsedBody.data.project_id,
-        limit: 1
-      });
+      const scopedProject =
+        await dependencies.slackManagement.listSlackDestinationsForProjectInOrganization({
+          organization_id: access.organization_id,
+          project_id: parsedBody.data.project_id,
+          limit: 1
+        });
       if (scopedProject === null) {
         return reply.status(404).send({ error: "project_not_found" });
       }
@@ -177,14 +194,15 @@ export function registerWeeklyReportChannelRoutes(app: FastifyInstance, dependen
       }
     }
 
-    const channel = await dependencies.weeklyReportManagement.createWeeklyReportChannelForOrganization({
-      organization_id: access.organization_id,
-      project_id: parsedBody.data.project_id,
-      channel: parsedBody.data.channel,
-      config: parsedBody.data.config,
-      schedule: parsedBody.data.schedule,
-      is_enabled: parsedBody.data.is_enabled
-    });
+    const channel =
+      await dependencies.weeklyReportManagement.createWeeklyReportChannelForOrganization({
+        organization_id: access.organization_id,
+        project_id: parsedBody.data.project_id,
+        channel: parsedBody.data.channel,
+        config: parsedBody.data.config,
+        schedule: parsedBody.data.schedule,
+        is_enabled: parsedBody.data.is_enabled
+      });
     if (channel === null) {
       return reply.status(404).send({ error: "project_not_found" });
     }
@@ -196,7 +214,12 @@ export function registerWeeklyReportChannelRoutes(app: FastifyInstance, dependen
   });
 
   app.patch("/v1/weekly-report-channels/:id", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-write");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "management-write"
+    );
     if (member === null) {
       return;
     }
@@ -235,7 +258,9 @@ export function registerWeeklyReportChannelRoutes(app: FastifyInstance, dependen
       if (dependencies.slackManagement === undefined) {
         return reply.status(503).send({ error: "slack_not_configured" });
       }
-      if (!(await ensureSlackIntegrationEnabled(dependencies, editableChannel.access.organization_id))) {
+      if (
+        !(await ensureSlackIntegrationEnabled(dependencies, editableChannel.access.organization_id))
+      ) {
         return reply.status(403).send({ error: "upgrade_required" });
       }
 
@@ -248,13 +273,16 @@ export function registerWeeklyReportChannelRoutes(app: FastifyInstance, dependen
       }
     }
 
-    const channel = await dependencies.weeklyReportManagement.updateWeeklyReportChannelForOrganization({
-      organization_id: editableChannel.access.organization_id,
-      channel_id: parsedParams.data.id,
-      ...(parsedBody.data.config !== undefined ? { config: parsedBody.data.config } : {}),
-      ...(parsedBody.data.schedule !== undefined ? { schedule: parsedBody.data.schedule } : {}),
-      ...(parsedBody.data.is_enabled !== undefined ? { is_enabled: parsedBody.data.is_enabled } : {})
-    });
+    const channel =
+      await dependencies.weeklyReportManagement.updateWeeklyReportChannelForOrganization({
+        organization_id: editableChannel.access.organization_id,
+        channel_id: parsedParams.data.id,
+        ...(parsedBody.data.config !== undefined ? { config: parsedBody.data.config } : {}),
+        ...(parsedBody.data.schedule !== undefined ? { schedule: parsedBody.data.schedule } : {}),
+        ...(parsedBody.data.is_enabled !== undefined
+          ? { is_enabled: parsedBody.data.is_enabled }
+          : {})
+      });
     if (channel === null) {
       return reply.status(404).send({ error: "weekly_report_channel_not_found" });
     }
@@ -263,7 +291,12 @@ export function registerWeeklyReportChannelRoutes(app: FastifyInstance, dependen
   });
 
   app.delete("/v1/weekly-report-channels/:id", async (request, reply) => {
-    const member = await requireRateLimitedMemberAuth(request, reply, dependencies, "management-write");
+    const member = await requireRateLimitedMemberAuth(
+      request,
+      reply,
+      dependencies,
+      "management-write"
+    );
     if (member === null) {
       return;
     }
@@ -290,10 +323,11 @@ export function registerWeeklyReportChannelRoutes(app: FastifyInstance, dependen
       return reply.status(403).send({ error: "shared_access_suspended" });
     }
 
-    const deleted = await dependencies.weeklyReportManagement.deleteWeeklyReportChannelForOrganization({
-      organization_id: editableChannel.access.organization_id,
-      channel_id: parsedParams.data.id
-    });
+    const deleted =
+      await dependencies.weeklyReportManagement.deleteWeeklyReportChannelForOrganization({
+        organization_id: editableChannel.access.organization_id,
+        channel_id: parsedParams.data.id
+      });
     if (deleted === null) {
       return reply.status(404).send({ error: "weekly_report_channel_not_found" });
     }

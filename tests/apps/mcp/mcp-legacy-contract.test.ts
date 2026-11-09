@@ -1,3 +1,4 @@
+import memberTokenAdditions from "../../fixtures/mcp/member-token-additions.json" with { type: "json" };
 import { readFile } from "node:fs/promises";
 
 import { describe, expect, it, vi } from "vitest";
@@ -115,6 +116,41 @@ describe("legacy MCP and OpenClaw contract", () => {
       addOptionalProjectInputs(tool.name, tool.inputSchema);
     for (const tool of expected.openClaw.tools)
       addOptionalProjectInputs(tool.openClawToolName.replace(/^debugbundle_/, ""), tool.parameters);
+    // FR-BUS-07 extends only this existing selection; old choices and required
+    // fields remain identical in both ordinary automation interfaces.
+    for (const schema of [
+      expected.tools.result.tools.find((tool) => tool.name === "start_trial")!.inputSchema,
+      expected.openClaw.tools.find((tool) => tool.openClawToolName === "debugbundle_start_trial")!
+        .parameters
+    ] as unknown as Array<{ properties: { targetPlan: { enum: string[] } } }>) {
+      expect(schema.properties.targetPlan.enum).toEqual(["solo", "team"]);
+      schema.properties.targetPlan.enum.push("business");
+    }
+    // FR-BUS-03 permits only these optional inputs; all frozen required fields,
+    // historical names, envelopes and approval annotations remain protected.
+    for (const [name, fields] of Object.entries(memberTokenAdditions)) {
+      const stdio = expected.tools.result.tools.find((tool) => tool.name === name)!;
+      const claw = expected.openClaw.tools.find(
+        (tool) => tool.openClawToolName === `debugbundle_${name}`
+      )!;
+      for (const schema of [stdio.inputSchema, claw.parameters] as unknown as Array<{
+        properties: Record<string, unknown>;
+        required?: string[];
+      }>) {
+        for (const [field, definition] of Object.entries(fields)) {
+          expect(schema.properties).not.toHaveProperty(field);
+          expect(schema.required ?? []).not.toContain(field);
+          schema.properties[field] = definition;
+        }
+      }
+      if (name === "create_member_token") {
+        for (const tool of [stdio, claw]) {
+          expect(tool.description).toBe("Create a new member token.");
+          tool.description =
+            "Create a member token. New restricted scope requires verified interactive issuance; restricted credentials cannot mint credentials.";
+        }
+      }
+    }
     const successfulServer = createMcpServer({
       tools: {
         doctor: vi.fn().mockResolvedValue({ status: "healthy" })

@@ -389,8 +389,8 @@ function renderProbesSummaryBlock(
         }}
         description={
           totalActivations > 0
-            ? "Saved remote probe activations are preserved and will resume after the project returns to Solo or Team."
-            : "Always-on probe buffers still work in the SDK, but remote probe activation requires Solo or Team."
+            ? "Saved remote probe activations are preserved and will resume after the project returns to a paid plan."
+            : "Always-on probe buffers still work in the SDK, but remote probe activation requires a paid plan."
         }
       />
     );
@@ -532,8 +532,8 @@ function renderGitHubSummaryBlock(
         badge={{ label: "Upgrade required", variant: "warning" }}
         description={
           repo === null
-            ? "The GitHub App installation is preserved and will resume after the project returns to Solo or Team."
-            : `${repo.repo_owner}/${repo.repo_name} and its dispatch rules are preserved and will resume after the project returns to Solo or Team.`
+            ? "The GitHub App installation is preserved and will resume after the project returns to a paid plan."
+            : `${repo.repo_owner}/${repo.repo_name} and its dispatch rules are preserved and will resume after the project returns to a paid plan.`
         }
       />
     );

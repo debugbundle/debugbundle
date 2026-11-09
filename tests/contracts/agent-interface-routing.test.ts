@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { buildCliReference, buildSkill } from "../../apps/cli/src/local-scaffold.js";
+import { buildMachineReadableArtifacts } from "../../scripts/public-site-artifacts.js";
 
 function skillPaths(root: string): string[] {
   return readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
@@ -115,7 +116,6 @@ describe("agent-independent interface routing", () => {
 });
 
 it("keeps generated machine-readable setup guidance scoped to one project per system and prioritises the CLI", async () => {
-  const { buildMachineReadableArtifacts } = await import("../../scripts/public-site-artifacts.ts");
   const artifact = (await buildMachineReadableArtifacts()).find(
     (value) => value.routePath === "/llms.txt"
   );

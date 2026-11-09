@@ -13,6 +13,7 @@ import { createAnalyticsMocks } from "./analytics.js";
 import { createBillingMocks } from "./billing.js";
 import { createPublicStatusMocks } from "./public-status.js";
 import { createNotificationMocks } from "./notifications.js";
+import { ReportRunListQuerySchema } from "../../packages/smart-reports/src/report-run-api-contract.js";
 
 export interface MockResponse {
   status: number;
@@ -161,6 +162,17 @@ export function createDevMockApi() {
     const projectId = projectMatch?.[1] ?? query.get("project_id");
     const route = path.replace(/^\/v1\/projects\/[^/]+/, "/v1");
     const read = method === "GET";
+    const reportList = /^\/v1\/organizations\/([^/]+)\/(report-definitions|reports)$/.exec(path);
+    if (read && reportList) {
+      if (!management.isSignedIn()) return reply({ error: "unauthorized" }, 401);
+      if (reportList[1] !== data.session.organization_id) return missing();
+      if (reportList[2] === "report-definitions") return reply({ definitions: [] });
+      if (!ReportRunListQuerySchema.safeParse(Object.fromEntries(query)).success)
+        return reply({ error: "invalid_mock_pagination" }, 400);
+      return reply({ runs: [], next_cursor: null });
+    }
+    if (read && path === "/v1/organizations") return reply({ organizations: [] });
+    if (path.startsWith("/v1/referrals/")) return reply({ error: "program_unavailable" }, 503);
     const published = publicStatus.handle(method, path, query, payload, origin);
     if (published) return published;
     const notification = notifications.handle(method, path, query, payload);
@@ -169,7 +181,7 @@ export function createDevMockApi() {
     if (managed) return managed;
     const analyzed = analytics.handle(method, path, query, payload);
     if (analyzed) return analyzed;
-    const billed = billing.handle(method, path, payload);
+    const billed = billing.handle(method, path, payload, origin);
     if (billed) return billed;
     if (read && path === "/v1/projects")
       return reply({

@@ -1,11 +1,37 @@
 import type Stripe from "stripe";
-import type { TierName } from "../../shared-types/src/index.js";
+import type { BillingInterval, TierName } from "../../shared-types/src/index.js";
 
 export interface StripePriceMapping {
   plan: TierName;
   type: "plan" | "extra_capacity";
+  interval?: BillingInterval;
+  currency?: "usd";
+  amount_minor?: number;
+  /** Read retained prices without offering them for a fresh purchase. */
+  purchasable?: boolean;
+}
+
+export function stripePriceMatchesCatalog(
+  price: Stripe.Price,
+  mapping: StripePriceMapping
+): boolean {
+  const interval = mapping.interval ?? "month";
+  const currency = mapping.currency ?? "usd";
+  return (
+    (price.currency === undefined ? mapping.currency === undefined : price.currency === currency) &&
+    (price.recurring == null
+      ? mapping.interval === undefined
+      : price.recurring.interval === interval && (price.recurring.interval_count ?? 1) === 1) &&
+    (mapping.amount_minor === undefined ||
+      (price.unit_amount === mapping.amount_minor &&
+        price.tax_behavior === "exclusive" &&
+        price.recurring?.usage_type === "licensed"))
+  );
 }
 export interface StripeBillingProvider {
+  /** Admission only; retained payments and paid entitlements remain readable. */
+  businessSalesEnabled?: boolean;
+  referralCouponId?: string;
   client: Stripe;
   webhookSecret: string;
   priceMap: Map<string, StripePriceMapping>;
@@ -106,11 +132,17 @@ export function assertSupportedSubscriptionItems(
   const bases = items.filter((item) => priceMap.get(item.price.id)?.type === "plan");
   if (bases.length !== 1 || (bases[0]!.quantity ?? 1) !== 1) fail();
   const plan = priceMap.get(bases[0]!.price.id)!.plan;
+  const baseMapping = priceMap.get(bases[0]!.price.id)!;
+  const interval = baseMapping.interval ?? "month";
+  const currency = baseMapping.currency ?? "usd";
   for (const item of items) {
     const mapping = priceMap.get(item.price.id);
     if (
       !mapping ||
       mapping.plan !== plan ||
+      (mapping.interval ?? "month") !== interval ||
+      (mapping.currency ?? "usd") !== currency ||
+      !stripePriceMatchesCatalog(item.price, mapping) ||
       !Number.isSafeInteger(item.quantity ?? 1) ||
       (item.quantity ?? 1) < 1 ||
       (item.quantity ?? 1) > 99

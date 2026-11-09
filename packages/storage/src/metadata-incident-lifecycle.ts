@@ -1,3 +1,4 @@
+import { projectActorAllowedSql, projectReadScopeSql } from "./project-read-scope.js";
 import type { PostgresMetadataStore, Queryable } from "./types.js";
 import { type IncidentRetrievalRow, mapIncidentRetrievalRow } from "./metadata-incident-shared.js";
 import { mapOptionalRow } from "./metadata-shared.js";
@@ -13,6 +14,14 @@ export function createMetadataIncidentLifecycle(
 > {
   return {
     async resolveIncidentForOrganization(input) {
+      const params: unknown[] = [
+        input.organization_id,
+        input.incident_id,
+        input.resolved_by_member_id,
+        input.resolved_at,
+        input.user_id ?? null
+      ];
+      const scopeSql = projectReadScopeSql(params, input, "i.project_id");
       const result = await db.query<IncidentRetrievalRow>(
         `
           WITH updated AS (
@@ -38,16 +47,11 @@ export function createMetadataIncidentLifecycle(
                 OR (
                   $5::uuid IS NOT NULL
                   AND (
-                    p.owner_user_id = $5::uuid
-                    OR EXISTS (
-                      SELECT 1
-                      FROM project_members pm
-                      WHERE pm.project_id = p.id
-                        AND pm.user_id = $5::uuid
-                    )
+                    ${projectActorAllowedSql("p.id", "$5::uuid", input, true)}
                   )
                 )
               )
+              ${scopeSql}
               AND i.id = $2
               AND i.status <> 'resolved'
             RETURNING
@@ -108,19 +112,21 @@ export function createMetadataIncidentLifecycle(
             LIMIT 1
           ) primary_signal ON TRUE
         `,
-        [
-          input.organization_id,
-          input.incident_id,
-          input.resolved_by_member_id,
-          input.resolved_at,
-          input.user_id ?? null
-        ]
+        params
       );
 
       return mapOptionalRow(result.rows[0], mapIncidentRetrievalRow);
     },
 
     async resolveIncidentsForOrganization(input) {
+      const params: unknown[] = [
+        input.organization_id,
+        input.incident_ids,
+        input.resolved_by_member_id,
+        input.resolved_at,
+        input.user_id ?? null
+      ];
+      const scopeSql = projectReadScopeSql(params, input, "i.project_id");
       const result = await db.query<IncidentRetrievalRow & { input_order: number }>(
         `
           WITH requested AS (
@@ -141,13 +147,7 @@ export function createMetadataIncidentLifecycle(
               OR (
                 $5::uuid IS NOT NULL
                 AND (
-                  p.owner_user_id = $5::uuid
-                  OR EXISTS (
-                    SELECT 1
-                    FROM project_members pm
-                    WHERE pm.project_id = p.id
-                      AND pm.user_id = $5::uuid
-                  )
+                  ${projectActorAllowedSql("p.id", "$5::uuid", input, true)}
                 )
               )
             )
@@ -172,6 +172,7 @@ export function createMetadataIncidentLifecycle(
                 updated_at = now()
             FROM accessible a, counts c
             WHERE c.requested_count = c.accessible_count
+              ${scopeSql}
               AND i.id = a.incident_id
               AND i.status <> 'resolved'
             RETURNING
@@ -235,19 +236,15 @@ export function createMetadataIncidentLifecycle(
           ) primary_signal ON TRUE
           ORDER BY updated.input_order ASC
         `,
-        [
-          input.organization_id,
-          input.incident_ids,
-          input.resolved_by_member_id,
-          input.resolved_at,
-          input.user_id ?? null
-        ]
+        params
       );
 
       return result.rows.map((row) => mapIncidentRetrievalRow(row));
     },
 
     async reopenIncidentForOrganization(input) {
+      const params: unknown[] = [input.organization_id, input.incident_id, input.user_id ?? null];
+      const scopeSql = projectReadScopeSql(params, input, "i.project_id");
       const result = await db.query<IncidentRetrievalRow>(
         `
           WITH updated AS (
@@ -267,16 +264,11 @@ export function createMetadataIncidentLifecycle(
                 OR (
                   $3::uuid IS NOT NULL
                   AND (
-                    p.owner_user_id = $3::uuid
-                    OR EXISTS (
-                      SELECT 1
-                      FROM project_members pm
-                      WHERE pm.project_id = p.id
-                        AND pm.user_id = $3::uuid
-                    )
+                    ${projectActorAllowedSql("p.id", "$3::uuid", input, true)}
                   )
                 )
               )
+              ${scopeSql}
               AND i.id = $2
               AND i.status <> 'open'
             RETURNING
@@ -337,13 +329,15 @@ export function createMetadataIncidentLifecycle(
             LIMIT 1
           ) primary_signal ON TRUE
         `,
-        [input.organization_id, input.incident_id, input.user_id ?? null]
+        params
       );
 
       return mapOptionalRow(result.rows[0], mapIncidentRetrievalRow);
     },
 
     async reopenIncidentsForOrganization(input) {
+      const params: unknown[] = [input.organization_id, input.incident_ids, input.user_id ?? null];
+      const scopeSql = projectReadScopeSql(params, input, "i.project_id");
       const result = await db.query<IncidentRetrievalRow & { input_order: number }>(
         `
           WITH requested AS (
@@ -364,13 +358,7 @@ export function createMetadataIncidentLifecycle(
               OR (
                 $3::uuid IS NOT NULL
                 AND (
-                  p.owner_user_id = $3::uuid
-                  OR EXISTS (
-                    SELECT 1
-                    FROM project_members pm
-                    WHERE pm.project_id = p.id
-                      AND pm.user_id = $3::uuid
-                  )
+                  ${projectActorAllowedSql("p.id", "$3::uuid", input, true)}
                 )
               )
             )
@@ -389,6 +377,7 @@ export function createMetadataIncidentLifecycle(
                 updated_at = now()
             FROM accessible a, counts c
             WHERE c.requested_count = c.accessible_count
+              ${scopeSql}
               AND i.id = a.incident_id
             RETURNING
               a.input_order,
@@ -451,7 +440,7 @@ export function createMetadataIncidentLifecycle(
           ) primary_signal ON TRUE
           ORDER BY updated.input_order ASC
         `,
-        [input.organization_id, input.incident_ids, input.user_id ?? null]
+        params
       );
 
       return result.rows.map((row) => mapIncidentRetrievalRow(row));

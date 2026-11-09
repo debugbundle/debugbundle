@@ -1,3 +1,16 @@
+import { REFERRAL_BENEFIT_TABLES } from "./referral-benefit-schema.js";
+import { REPORT_HEALTH_TABLES } from "./report-health-schema.js";
+import { REPORT_COLLECTOR_TABLES } from "./report-collector-schema.js";
+import { REPORT_RUN_TABLES } from "./report-run-schema.js";
+import { REPORT_EMAIL_TABLES } from "./report-email-schema.js";
+import { REPORT_AVAILABILITY_TABLES } from "./report-availability-schema.js";
+import { REPORT_SOURCE_TEXT_TABLES } from "./report-source-text-schema.js";
+import { REPORT_DEFINITION_TABLES } from "./report-definition-schema.js";
+import { REPORT_LIFECYCLE_TABLES } from "./report-lifecycle-schema.js";
+import { REFERRAL_RECONCILIATION_TABLES } from "./referral-reconciliation-schema.js";
+import { REFERRAL_LEDGER_TABLES } from "./referral-ledger-schema.js";
+import { REFERRAL_TABLES } from "./referral-schema.js";
+import { ORGANIZATION_MANAGEMENT_TABLES } from "./organization-management-schema.js";
 import { STORAGE_BOOTSTRAP_STATEMENTS } from "./storage-bootstrap-all-statements.js";
 
 export interface Queryable {
@@ -7,7 +20,8 @@ export interface Queryable {
   ): Promise<{ rows: Row[] }>;
 }
 
-export const REQUIRED_API_TABLES = [
+/** Verified installed baseline; never extend this when adding feature tables. */
+export const INSTALLED_API_BASELINE_TABLES = [
   "service_input_aliases",
   "service_project_aliases",
   "project_merge_operations",
@@ -102,7 +116,8 @@ export const REQUIRED_API_TABLES = [
   "public_status_page_checks"
 ] as const;
 
-export const REQUIRED_WORKER_TABLES = [
+/** Verified installed worker baseline used only for unversioned upgrades. */
+export const INSTALLED_WORKER_BASELINE_TABLES = [
   "service_input_aliases",
   "service_project_aliases",
   "project_merge_operations",
@@ -174,6 +189,39 @@ export const REQUIRED_WORKER_TABLES = [
   "analytics_flow_runs",
   "analytics_flow_handoffs",
   "analytics_flow_rollups"
+] as const;
+
+export const REQUIRED_API_TABLES = [
+  ...INSTALLED_API_BASELINE_TABLES,
+  ...ORGANIZATION_MANAGEMENT_TABLES,
+  ...REFERRAL_LEDGER_TABLES,
+  ...REFERRAL_RECONCILIATION_TABLES,
+  ...REPORT_LIFECYCLE_TABLES,
+  ...REPORT_DEFINITION_TABLES,
+  ...REPORT_SOURCE_TEXT_TABLES,
+  ...REPORT_AVAILABILITY_TABLES,
+  ...REPORT_RUN_TABLES,
+  ...REPORT_EMAIL_TABLES,
+  ...REPORT_COLLECTOR_TABLES,
+  ...REPORT_HEALTH_TABLES,
+  ...REFERRAL_TABLES,
+  ...REFERRAL_BENEFIT_TABLES
+] as const;
+export const REQUIRED_WORKER_TABLES = [
+  ...INSTALLED_WORKER_BASELINE_TABLES,
+  ...ORGANIZATION_MANAGEMENT_TABLES,
+  ...REFERRAL_LEDGER_TABLES,
+  ...REFERRAL_RECONCILIATION_TABLES,
+  ...REPORT_LIFECYCLE_TABLES,
+  ...REPORT_DEFINITION_TABLES,
+  ...REPORT_SOURCE_TEXT_TABLES,
+  ...REPORT_AVAILABILITY_TABLES,
+  ...REPORT_RUN_TABLES,
+  ...REPORT_EMAIL_TABLES,
+  ...REPORT_COLLECTOR_TABLES,
+  ...REPORT_HEALTH_TABLES,
+  ...REFERRAL_TABLES,
+  ...REFERRAL_BENEFIT_TABLES
 ] as const;
 
 const LEGACY_SCHEMA_TABLE = "schema_migrations";

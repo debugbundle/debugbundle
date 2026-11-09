@@ -1,3 +1,4 @@
+import { projectActorAllowedSql } from "./project-read-scope.js";
 import type { ImprovementOpportunityStore } from "./improvement-opportunity-store.js";
 import type { PostgresMetadataStore, Queryable } from "./types.js";
 import { appendProjectReadScope, appendServiceDefinitionFilter } from "./project-read-scope.js";
@@ -25,13 +26,7 @@ export async function countIncidentsForOrganization(
       OR (
         $2::uuid IS NOT NULL
         AND (
-          p.owner_user_id = $2::uuid
-          OR EXISTS (
-            SELECT 1
-            FROM project_members pm
-            WHERE pm.project_id = p.id
-              AND pm.user_id = $2::uuid
-          )
+          ${projectActorAllowedSql("p.id", "$2::uuid", input)}
         )
       )
     )`
@@ -103,13 +98,7 @@ export async function countImprovementsForOrganization(
       OR (
         $2::uuid IS NOT NULL
         AND (
-          p.owner_user_id = $2::uuid
-          OR EXISTS (
-            SELECT 1
-            FROM project_members pm
-            WHERE pm.project_id = p.id
-              AND pm.user_id = $2::uuid
-          )
+          ${projectActorAllowedSql("p.id", "$2::uuid", input)}
         )
       )
     )`,

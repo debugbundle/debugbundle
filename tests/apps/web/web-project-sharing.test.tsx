@@ -29,7 +29,10 @@ if (typeof HTMLElement !== "undefined" && HTMLElement.prototype.setPointerCaptur
   HTMLElement.prototype.setPointerCapture = () => {};
 }
 
-if (typeof HTMLElement !== "undefined" && HTMLElement.prototype.releasePointerCapture === undefined) {
+if (
+  typeof HTMLElement !== "undefined" &&
+  HTMLElement.prototype.releasePointerCapture === undefined
+) {
   HTMLElement.prototype.releasePointerCapture = () => {};
 }
 
@@ -165,7 +168,9 @@ describe("web app — project sharing", () => {
     render(<App initialEntries={["/projects/proj_paused"]} />);
 
     expect(await screen.findByText(/shared access paused/i)).toBeInTheDocument();
-    expect(screen.getByText(/owner@example.com's current plan no longer includes project sharing/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/owner@example.com's current plan no longer includes project sharing/i)
+    ).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: /members/i })).not.toBeInTheDocument();
   });
 
@@ -255,44 +260,57 @@ describe("web app — project sharing", () => {
 
     expect(await screen.findByText(/newbie@example.com/i)).toBeInTheDocument();
 
-    await user.pointer([{ target: screen.getByLabelText(/role for casey@example.com/i), keys: "[MouseLeft]" }]);
-    await user.click(await screen.findByRole("option", { name: /^admin$/i }));
+    await user.click(
+      within(screen.getByLabelText(/role for casey@example.com/i)).getByRole("radio", {
+        name: /^admin$/i
+      })
+    );
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.some(
-          ([input, init]) => requestUrl(input).endsWith("/v1/projects/proj_123/members/usr_456") && init?.method === "PATCH"
+          ([input, init]) =>
+            requestUrl(input).endsWith("/v1/projects/proj_123/members/usr_456") &&
+            init?.method === "PATCH"
         )
       ).toBe(true);
     });
 
     const pendingInviteRow = screen.getByText(/^pending@example\.com$/i).closest("tr");
     expect(pendingInviteRow).not.toBeNull();
-    await user.click(within(pendingInviteRow as HTMLTableRowElement).getByRole("button", { name: /^cancel$/i }));
+    await user.click(
+      within(pendingInviteRow as HTMLTableRowElement).getByRole("button", { name: /^cancel$/i })
+    );
     await user.click(await screen.findByRole("button", { name: /cancel invite/i }));
 
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.some(
-          ([input, init]) => requestUrl(input).endsWith("/v1/projects/proj_123/invites/pinv_123") && init?.method === "DELETE"
+          ([input, init]) =>
+            requestUrl(input).endsWith("/v1/projects/proj_123/invites/pinv_123") &&
+            init?.method === "DELETE"
         )
       ).toBe(true);
     });
 
     const memberRow = screen.getByText(/^casey@example\.com$/i).closest("tr");
     expect(memberRow).not.toBeNull();
-    await user.click(within(memberRow as HTMLTableRowElement).getByRole("button", { name: /remove/i }));
+    await user.click(
+      within(memberRow as HTMLTableRowElement).getByRole("button", { name: /remove/i })
+    );
     await user.click(await screen.findByRole("button", { name: /remove access/i }));
 
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.some(
-          ([input, init]) => requestUrl(input).endsWith("/v1/projects/proj_123/members/usr_456") && init?.method === "DELETE"
+          ([input, init]) =>
+            requestUrl(input).endsWith("/v1/projects/proj_123/members/usr_456") &&
+            init?.method === "DELETE"
         )
       ).toBe(true);
     });
   });
 
-  it("shows the team upgrade notice on the members tab for free and solo projects", async () => {
+  it("shows the sharing upgrade notice on the members tab for free and solo projects", async () => {
     for (const plan of ["free", "solo"] as const) {
       const project = createProject({
         project_id: `proj_${plan}`,
@@ -316,13 +334,19 @@ describe("web app — project sharing", () => {
           });
         }
 
-        if (url.endsWith(`/v1/projects/${project.project_id}/members`) && init?.method === undefined) {
+        if (
+          url.endsWith(`/v1/projects/${project.project_id}/members`) &&
+          init?.method === undefined
+        ) {
           return jsonResponse(200, {
             members: [createProjectMember()]
           });
         }
 
-        if (url.endsWith(`/v1/projects/${project.project_id}/invites`) && init?.method === undefined) {
+        if (
+          url.endsWith(`/v1/projects/${project.project_id}/invites`) &&
+          init?.method === undefined
+        ) {
           return jsonResponse(200, {
             invites: []
           });
@@ -335,9 +359,14 @@ describe("web app — project sharing", () => {
 
       const view = render(<App initialEntries={[`/projects/${project.project_id}/members`]} />);
 
-      expect(await screen.findByText(/upgrade to team to share this project/i)).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: /open billing/i })).toHaveAttribute("href", "/billing");
-      expect(screen.queryByRole("button", { name: /invite collaborator/i })).not.toBeInTheDocument();
+      expect(await screen.findByText(/upgrade to share this project/i)).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /open billing/i })).toHaveAttribute(
+        "href",
+        "/billing"
+      );
+      expect(
+        screen.queryByRole("button", { name: /invite collaborator/i })
+      ).not.toBeInTheDocument();
 
       view.unmount();
       vi.unstubAllGlobals();
@@ -419,15 +448,23 @@ describe("web app — project sharing", () => {
     expect(screen.queryByRole("heading", { name: /pending invites/i })).not.toBeInTheDocument();
     expect(within(ownerRow as HTMLTableRowElement).queryByRole("button")).not.toBeInTheDocument();
 
-    const memberRow = screen.getAllByText(/^member@example\.com$/i).find((element) => element.closest("tr"))?.closest("tr") ?? null;
+    const memberRow =
+      screen
+        .getAllByText(/^member@example\.com$/i)
+        .find((element) => element.closest("tr"))
+        ?.closest("tr") ?? null;
     expect(memberRow).not.toBeNull();
-    await user.click(within(memberRow as HTMLTableRowElement).getByRole("button", { name: /leave project/i }));
+    await user.click(
+      within(memberRow as HTMLTableRowElement).getByRole("button", { name: /leave project/i })
+    );
     await user.click(await screen.findByRole("button", { name: /^leave project$/i }));
 
     await waitFor(() => {
       expect(
         fetchMock.mock.calls.some(
-          ([input, init]) => requestUrl(input).endsWith("/v1/projects/proj_shared/membership") && init?.method === "DELETE"
+          ([input, init]) =>
+            requestUrl(input).endsWith("/v1/projects/proj_shared/membership") &&
+            init?.method === "DELETE"
         )
       ).toBe(true);
     });
@@ -503,7 +540,10 @@ describe("web app — project sharing", () => {
     const view = render(<App initialEntries={["/login?next=%2Finvite%3Ftoken%3Dtok_123"]} />);
 
     expect(await screen.findByLabelText(/email address/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /sign up here/i })).toHaveAttribute("href", "/signup?next=%2Finvite%3Ftoken%3Dtok_123");
+    expect(screen.getByRole("link", { name: /sign up here/i })).toHaveAttribute(
+      "href",
+      "/signup?next=%2Finvite%3Ftoken%3Dtok_123"
+    );
 
     await user.type(screen.getByLabelText(/email/i), "invited@example.com");
     await user.click(screen.getByRole("button", { name: /^send code$/i }));

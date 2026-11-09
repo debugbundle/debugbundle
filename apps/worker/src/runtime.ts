@@ -1,4 +1,12 @@
+import { createStripeConfig } from "../../../packages/billing/src/stripe-config.js";
+import { createReferralReceiptProcessor } from "./referral-receipt-processor.js";
+import { createSmartReportProcessor } from "./smart-report-runtime.js";
+import { createBillingContactProcessor } from "./billing-contact-processor.js";
 import { createWorkerActivationState } from "./worker-activation.js";
+import {
+  isProjectJobInitiatorAuthorized,
+  type ProjectJobAuthorization
+} from "../../../packages/storage/src/project-job-authorization.js";
 import { createDurableWorkerQueue } from "./durable-queue.js";
 import { createDurableIncidentProcessing } from "./durable-incident-processing.js";
 import { createNotificationPreferencesStore } from "../../../packages/storage/src/notification-preferences-store.js";
@@ -270,6 +278,9 @@ export async function runWorkerFromEnv(
   const analyticsOpportunitySchedulerStore =
     createPostgresAnalyticsOpportunitySchedulerStore(queryable);
   const analyticsBundleGenerationStore = createPostgresAnalyticsBundleGenerationStore(queryable);
+  const projectJobAuthorization: ProjectJobAuthorization = {
+    isAuthorized: (request) => isProjectJobInitiatorAuthorized(queryable, request)
+  };
   const accountAnalyticsStore = createPostgresAccountAnalyticsStore({
     db: queryable,
     analyticsHashSecret: env.ANALYTICS_HASH_SECRET
@@ -387,6 +398,20 @@ export async function runWorkerFromEnv(
     ...(env.INTEGRATION_SECRET_ENCRYPTION_KEY === undefined
       ? {}
       : { integrationSecretEncryptionKey: env.INTEGRATION_SECRET_ENCRYPTION_KEY })
+  });
+  const syncBillingContact = createBillingContactProcessor(
+    queryable,
+    envInput["STRIPE_SECRET_KEY"]
+  );
+  const processReferralReceipts = createReferralReceiptProcessor({
+    db: queryable,
+    provider: createStripeConfig(envInput, { requireWebhookSecret: false }),
+    secret: envInput["REFERRAL_SECRET"]
+  });
+  const processSmartReports = createSmartReportProcessor({
+    db: queryable,
+    objects: objectStore,
+    env: envInput
   });
   const appBaseUrl = normalizeWorkerBaseUrl(envInput["APP_BASE_URL"]);
   const emailAssetBaseUrl = resolveWorkerEmailAssetBaseUrl(envInput);
@@ -510,6 +535,7 @@ export async function runWorkerFromEnv(
         if (!result.processed) break;
       }
     };
+    await runDeliveryProcessStep("sync-billing-contact", () => syncBillingContact(queue));
     await runDeliveryProcessStep("evaluate-alerts", async () =>
       processNextEvaluateAlertsJob({
         queue,
@@ -712,6 +738,8 @@ export async function runWorkerFromEnv(
     })
   });
   let dailyLoopPromise: Promise<void> | null = null;
+  let referralLoopPromise: Promise<void> | null = null;
+  let reportLoopPromise: Promise<void> | null = null;
   let availabilityLoopPromise: Promise<void> | null = null;
   let deliveryLoopPromise: Promise<void> | null = null;
   try {
@@ -736,6 +764,21 @@ export async function runWorkerFromEnv(
           processPass: processDailyPass
         });
       }
+      if (processReferralReceipts !== null)
+        referralLoopPromise = runWorkerLane({
+          logger,
+          name: "referral-reconciliation-lane",
+          shutdown: shutdownState,
+          idleIntervalMs: env.WORKER_POLL_INTERVAL_MS,
+          processPass: processReferralReceipts
+        });
+      reportLoopPromise = runWorkerLane({
+        logger,
+        name: "smart-report-lane",
+        shutdown: shutdownState,
+        idleIntervalMs: env.WORKER_POLL_INTERVAL_MS,
+        processPass: processSmartReports
+      });
       deliveryLoopPromise = runWorkerLane({
         logger,
         name: "delivery-lane",
@@ -780,6 +823,7 @@ export async function runWorkerFromEnv(
 
       await runClaimedProcessStep("build-bundle", async () =>
         processNextBuildBundleJob({
+          projectJobAuthorization,
           queue,
           logger,
           env: envInput,
@@ -797,6 +841,7 @@ export async function runWorkerFromEnv(
           queue: queue as unknown as ImprovementBundleJobQueue,
           logger,
           dependencies: {
+            projectJobAuthorization,
             improvementOpportunityStore,
             billingStore,
             webhookDeliveryStore,
@@ -838,6 +883,7 @@ export async function runWorkerFromEnv(
 
       await runClaimedProcessStep("build-reproduction", async () =>
         processNextBuildReproductionJob({
+          projectJobAuthorization,
           queue,
           accountAnalyticsStore,
           objectStore,
@@ -868,6 +914,13 @@ export async function runWorkerFromEnv(
       }
 
       if (env.WORKER_RUN_ONCE === "1") {
+        await runWorkerProcessStep(logger, "smart-report-lane", processSmartReports);
+        if (processReferralReceipts !== null)
+          await runWorkerProcessStep(
+            logger,
+            "referral-reconciliation-lane",
+            processReferralReceipts
+          );
         await processDeliveryPass();
         if (emailTransport !== null)
           await runWorkerProcessStep(logger, "deliver-daily-notification", processDailyPass);
@@ -887,6 +940,8 @@ export async function runWorkerFromEnv(
     }
     if (deliveryLoopPromise !== null) await deliveryLoopPromise;
     if (dailyLoopPromise !== null) await dailyLoopPromise;
+    if (referralLoopPromise !== null) await referralLoopPromise;
+    if (reportLoopPromise !== null) await reportLoopPromise;
     await deliveryQueue.close();
     if (healthServer !== null) {
       healthServer.close();

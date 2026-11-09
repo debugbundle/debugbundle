@@ -1,3 +1,4 @@
+import { getBillingCatalogPrice } from "../../../packages/shared-types/src/billing-catalog.js";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { writeFileSync } from "node:fs";
@@ -163,10 +164,10 @@ try {
   );
   const prices: Record<string, string> = {};
   for (const [name, unit_amount] of [
-    ["solo", 499],
-    ["team", 1900],
-    ["solo_extra", 99],
-    ["team_extra", 199]
+    ["solo", getBillingCatalogPrice("solo", "month", "plan").amount_minor],
+    ["team", getBillingCatalogPrice("team", "month", "plan").amount_minor],
+    ["solo_extra", getBillingCatalogPrice("solo", "month", "extra_capacity").amount_minor],
+    ["team_extra", getBillingCatalogPrice("team", "month", "extra_capacity").amount_minor]
   ] as const)
     prices[name] = record(
       "price",

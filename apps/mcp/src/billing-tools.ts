@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  OfferChangeRequestSchema,
+  type OfferChangeRequest,
+  type OfferChangeResponse
+} from "../../../packages/billing-client/src/offer-change-client.js";
 import type {
   PlanChangeRequest,
   PlanChangeResponse
@@ -6,6 +11,7 @@ import type {
 import { BillingApiError } from "../../../packages/billing-client/src/index.js";
 
 export const BILLING_MCP_TOOL_NAMES = [
+  "billing_offer_change",
   "billing_plan_change",
   "get_billing_summary",
   "start_trial",
@@ -26,9 +32,13 @@ function mapMcpError(error: unknown): never {
 }
 
 export function createBillingMcpTools(api: {
+  offerChange?(input: OfferChangeRequest): Promise<OfferChangeResponse>;
   planChange?(input: PlanChangeRequest): Promise<PlanChangeResponse>;
   getBillingSummary(input: { bearerToken: string }): Promise<unknown>;
-  startTrial(input: { bearerToken: string; targetPlan: "solo" | "team" }): Promise<unknown>;
+  startTrial(input: {
+    bearerToken: string;
+    targetPlan: "solo" | "team" | "business";
+  }): Promise<unknown>;
   increaseCapacity(input: {
     bearerToken: string;
     targetAdditionalCapacityUnits: number;
@@ -43,6 +53,16 @@ export function createBillingMcpTools(api: {
   (input: Record<string, unknown>) => Promise<unknown>
 > {
   return {
+    async billing_offer_change(input) {
+      try {
+        const parsed = OfferChangeRequestSchema.safeParse(input);
+        if (!parsed.success) throw new Error("mcp_tool_error:invalid_arguments");
+        if (!api.offerChange) throw new Error("mcp_tool_error:billing_not_configured");
+        return await api.offerChange(parsed.data);
+      } catch (error) {
+        mapMcpError(error);
+      }
+    },
     async billing_plan_change(input) {
       try {
         const parsed = z
@@ -83,7 +103,7 @@ export function createBillingMcpTools(api: {
     async start_trial(input) {
       try {
         const targetPlan = input["targetPlan"] ?? input["target_plan"];
-        if (targetPlan !== "solo" && targetPlan !== "team") {
+        if (targetPlan !== "solo" && targetPlan !== "team" && targetPlan !== "business") {
           throw new Error("mcp_tool_error:invalid_arguments");
         }
         return {

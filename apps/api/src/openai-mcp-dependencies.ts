@@ -8,6 +8,8 @@ import {
 } from "../../../packages/storage/src/index.js";
 
 import type { OpenAiHostedReadDependencies } from "./openai-mcp-operations.js";
+import { createReportRunManagementStore } from "../../../packages/storage/src/report-run-management.js";
+import { createReportContentStore } from "../../../packages/storage/src/report-content-store.js";
 
 /**
  * Builds the hosted projection from explicit read methods only. The returned object has
@@ -23,6 +25,12 @@ export function createOpenAiHostedReadDependencies(input: {
   const analytics = createPostgresAnalyticsMetricsStore(input.db);
 
   return {
+    reportReads: {
+      runs: { list: (request) => createReportRunManagementStore(input.db).list(request) },
+      content: {
+        read: (request) => createReportContentStore(input.db, input.objectStoreReader).read(request)
+      }
+    },
     projectManagement: {
       resolveProjectAccessForUser: (request) => metadata.resolveProjectAccessForUser!(request),
       listProjectsForUser: (request) => metadata.listProjectsForUser!(request)

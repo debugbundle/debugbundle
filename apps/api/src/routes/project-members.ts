@@ -1,3 +1,4 @@
+import { memberReadScope } from "../member-access-scope.js";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { rejectConsolidatedProjectWrite } from "../project-consolidation-http.js";
 
@@ -11,6 +12,7 @@ import { buildProjectMemberAvatarUrl } from "../avatar-urls.js";
 import {
   isSharedProjectAccessSuspended,
   requireRateLimitedMemberAuth,
+  enforceOrganizationInvitationRateLimit,
   resolveBrowserSession
 } from "../api-helpers.js";
 import {
@@ -42,7 +44,7 @@ function toPublicProjectMember(
   member: {
     user_id: string;
     email: string;
-    role: "owner" | "admin" | "member";
+    role: "owner" | "admin" | "member" | "viewer";
     membership_type: "owner" | "collaborator";
     created_at: string;
     avatar_object_key?: string | null;
@@ -50,7 +52,7 @@ function toPublicProjectMember(
 ): {
   user_id: string;
   email: string;
-  role: "owner" | "admin" | "member";
+  role: "owner" | "admin" | "member" | "viewer";
   membership_type: "owner" | "collaborator";
   created_at: string;
   avatar_url: string | null;
@@ -91,6 +93,7 @@ export function registerProjectMemberRoutes(
     }
 
     const access = await dependencies.projectManagement.resolveProjectAccessForUser({
+      ...memberReadScope(member),
       user_id: member.member_id,
       project_id: input.projectId
     });
@@ -135,6 +138,7 @@ export function registerProjectMemberRoutes(
     }
 
     const listed = await projectCollaboration.listMembersForProject({
+      ...memberReadScope(auth.member),
       project_id: parsedParams.data.id,
       user_id: auth.member.member_id
     });
@@ -173,6 +177,7 @@ export function registerProjectMemberRoutes(
     }
 
     const listed = await projectCollaboration.listMembersForProject({
+      ...memberReadScope(auth.member),
       project_id: parsedParams.data.id,
       user_id: auth.member.member_id
     });
@@ -235,6 +240,7 @@ export function registerProjectMemberRoutes(
     }
 
     const invites = await projectCollaboration.listPendingInvitesForProject({
+      ...memberReadScope(auth.member),
       project_id: parsedParams.data.id,
       user_id: auth.member.member_id,
       now: new Date().toISOString()
@@ -284,8 +290,18 @@ export function registerProjectMemberRoutes(
       return reply.status(400).send({ error: "invalid_payload" });
     }
 
+    if (
+      !(await enforceOrganizationInvitationRateLimit(
+        request,
+        reply,
+        dependencies,
+        auth.access.organization_id
+      ))
+    )
+      return;
     const inviteToken = generateProjectInviteToken(auth.member.member_id);
     const result = await projectCollaboration.createInviteForProject({
+      ...memberReadScope(auth.member),
       project_id: parsedParams.data.id,
       user_id: auth.member.member_id,
       email: parsedBody.data.email,
@@ -358,6 +374,7 @@ export function registerProjectMemberRoutes(
     }
 
     const invite = await projectCollaboration.cancelInviteForProject({
+      ...memberReadScope(auth.member),
       project_id: parsedParams.data.id,
       user_id: auth.member.member_id,
       invite_id: parsedParams.data.inviteId
@@ -401,6 +418,7 @@ export function registerProjectMemberRoutes(
     }
 
     const updated = await projectCollaboration.updateProjectMemberRole({
+      ...memberReadScope(auth.member),
       project_id: parsedParams.data.id,
       actor_user_id: auth.member.member_id,
       user_id: parsedParams.data.userId,
@@ -445,6 +463,7 @@ export function registerProjectMemberRoutes(
     }
 
     const removed = await projectCollaboration.removeProjectMember({
+      ...memberReadScope(auth.member),
       project_id: parsedParams.data.id,
       actor_user_id: auth.member.member_id,
       user_id: parsedParams.data.userId

@@ -13,11 +13,12 @@ export type PlanDowngradeTriggerSource =
 const PLAN_RANK: Record<TierName, number> = {
   free: 0,
   solo: 1,
-  team: 2
+  team: 2,
+  business: 3
 };
 
 export function normalizePlanForDowngradeAudit(plan: string | null | undefined): TierName {
-  return plan === "solo" || plan === "team" ? plan : "free";
+  return plan === "solo" || plan === "team" || plan === "business" ? plan : "free";
 }
 
 export function isPlanDowngrade(previousPlan: TierName, targetPlan: TierName): boolean {

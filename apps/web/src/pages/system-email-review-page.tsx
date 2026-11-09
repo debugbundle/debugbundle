@@ -3,16 +3,33 @@ import { useMemo, useState } from "react";
 
 import { CalloutCard } from "../components/system/callout-card.js";
 import { PageHeader } from "../components/system/page-header.js";
+import { TitleBadgeRow } from "../components/system/title-badge-row.js";
 import { Badge } from "../components/ui/badge.js";
 import { Button } from "../components/ui/button.js";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card.js";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "../components/ui/card.js";
 import { Notice } from "../components/ui/notice.js";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "../components/ui/table.js";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs.js";
 import { sendSystemEmailPreview } from "../lib/api.js";
 import { showErrorToast, showSuccessToast } from "../lib/notify.js";
 import { useSession } from "../lib/session.js";
-import { SYSTEM_EMAIL_REVIEW_ENTRIES, type SystemEmailReviewEntry } from "../lib/system-email-previews.js";
+import {
+  SYSTEM_EMAIL_REVIEW_ENTRIES,
+  type SystemEmailReviewEntry
+} from "../lib/system-email-previews.js";
 
 function formatCategory(category: SystemEmailReviewEntry["category"]): string {
   switch (category) {
@@ -94,7 +111,12 @@ function EmailPreviewFrame({
     return (
       <div className="rounded-lg border bg-muted/20 p-3">
         <div className="mx-auto w-full max-w-[390px] overflow-hidden rounded-md border bg-background shadow-sm">
-          <iframe title={title} srcDoc={renderPreviewDocument(html)} className="min-h-[720px] w-full bg-background" sandbox="" />
+          <iframe
+            title={title}
+            srcDoc={renderPreviewDocument(html)}
+            className="min-h-[720px] w-full bg-background"
+            sandbox=""
+          />
         </div>
       </div>
     );
@@ -112,13 +134,7 @@ function EmailPreviewFrame({
   );
 }
 
-function DetailRow({
-  label,
-  value
-}: {
-  label: string;
-  value: string | JSX.Element;
-}): JSX.Element {
+function DetailRow({ label, value }: { label: string; value: string | JSX.Element }): JSX.Element {
   return (
     <div className="space-y-1">
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
@@ -145,16 +161,23 @@ export function SystemEmailReviewPage(): JSX.Element {
   const [isSendingPreview, setIsSendingPreview] = useState(false);
 
   const selectedEntry = useMemo(
-    () => SYSTEM_EMAIL_REVIEW_ENTRIES.find((entry) => entry.id === selectedId) ?? SYSTEM_EMAIL_REVIEW_ENTRIES[0] ?? null,
+    () =>
+      SYSTEM_EMAIL_REVIEW_ENTRIES.find((entry) => entry.id === selectedId) ??
+      SYSTEM_EMAIL_REVIEW_ENTRIES[0] ??
+      null,
     [selectedId]
   );
   const selectedEntryId = selectedEntry?.id ?? "";
 
-  const implementedCount = SYSTEM_EMAIL_REVIEW_ENTRIES.filter((entry) => entry.implementationStatus === "implemented").length;
+  const implementedCount = SYSTEM_EMAIL_REVIEW_ENTRIES.filter(
+    (entry) => entry.implementationStatus === "implemented"
+  ).length;
   const missingRequiredCount = SYSTEM_EMAIL_REVIEW_ENTRIES.filter(
     (entry) => entry.requiredInV1 && entry.implementationStatus === "missing"
   ).length;
-  const configurableCount = SYSTEM_EMAIL_REVIEW_ENTRIES.filter((entry) => entry.category === "alerts").length;
+  const configurableCount = SYSTEM_EMAIL_REVIEW_ENTRIES.filter(
+    (entry) => entry.category === "alerts"
+  ).length;
 
   if (session?.role !== "owner") {
     return (
@@ -203,7 +226,8 @@ export function SystemEmailReviewPage(): JSX.Element {
         </div>
 
         <Notice title="Local review only" tone="info">
-          This route is intentionally hidden from primary navigation and only available in local dev or test builds at <code>/__dev/system-emails</code>.
+          This route is intentionally hidden from primary navigation and only available in local dev
+          or test builds at <code>/__dev/system-emails</code>.
         </Notice>
       </div>
 
@@ -229,7 +253,10 @@ export function SystemEmailReviewPage(): JSX.Element {
         <Card>
           <CardHeader>
             <CardTitle>Email inventory</CardTitle>
-            <CardDescription>Scan current coverage, select an email, and inspect the rendered copy and HTML preview.</CardDescription>
+            <CardDescription>
+              Scan current coverage, select an email, and inspect the rendered copy and HTML
+              preview.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
@@ -258,10 +285,20 @@ export function SystemEmailReviewPage(): JSX.Element {
                       </TableCell>
                       <TableCell className="align-top">
                         <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant={entry.implementationStatus === "implemented" ? "success" : "warning"}>
-                            {entry.implementationStatus === "implemented" ? "Implemented" : "Missing"}
+                          <Badge
+                            variant={
+                              entry.implementationStatus === "implemented" ? "success" : "warning"
+                            }
+                          >
+                            {entry.implementationStatus === "implemented"
+                              ? "Implemented"
+                              : "Missing"}
                           </Badge>
-                          {entry.requiredInV1 ? <Badge variant="secondary">Required</Badge> : <Badge variant="outline">Configurable</Badge>}
+                          {entry.requiredInV1 ? (
+                            <Badge variant="secondary">Required</Badge>
+                          ) : (
+                            <Badge variant="outline">Configurable</Badge>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="align-top text-right">
@@ -285,14 +322,28 @@ export function SystemEmailReviewPage(): JSX.Element {
         {selectedEntry === null ? null : (
           <Card>
             <CardHeader>
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline">{formatCategory(selectedEntry.category)}</Badge>
-                <Badge variant={selectedEntry.implementationStatus === "implemented" ? "success" : "warning"}>
-                  {selectedEntry.implementationStatus === "implemented" ? "Implemented" : "Missing"}
-                </Badge>
-                {selectedEntry.requiredInV1 ? <Badge variant="secondary">Required in v1</Badge> : <Badge variant="outline">User-configured</Badge>}
-              </div>
-              <CardTitle>{selectedEntry.title}</CardTitle>
+              <TitleBadgeRow
+                title={<CardTitle>{selectedEntry.title}</CardTitle>}
+                badges={
+                  <>
+                    <Badge variant="outline">{formatCategory(selectedEntry.category)}</Badge>
+                    <Badge
+                      variant={
+                        selectedEntry.implementationStatus === "implemented" ? "success" : "warning"
+                      }
+                    >
+                      {selectedEntry.implementationStatus === "implemented"
+                        ? "Implemented"
+                        : "Missing"}
+                    </Badge>
+                    {selectedEntry.requiredInV1 ? (
+                      <Badge variant="secondary">Required in v1</Badge>
+                    ) : (
+                      <Badge variant="outline">User-configured</Badge>
+                    )}
+                  </>
+                }
+              />
               <CardDescription>{selectedEntry.trigger}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -302,7 +353,10 @@ export function SystemEmailReviewPage(): JSX.Element {
               </div>
 
               {selectedEntry.notes === undefined ? null : (
-                <Notice title={selectedEntry.implementationStatus === "implemented" ? "Context" : "Gap"} tone={selectedEntry.implementationStatus === "implemented" ? "info" : "warning"}>
+                <Notice
+                  title={selectedEntry.implementationStatus === "implemented" ? "Context" : "Gap"}
+                  tone={selectedEntry.implementationStatus === "implemented" ? "info" : "warning"}
+                >
                   {selectedEntry.notes}
                 </Notice>
               )}
@@ -316,10 +370,15 @@ export function SystemEmailReviewPage(): JSX.Element {
                   <div className="space-y-2 rounded-lg border bg-muted/20 p-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="space-y-2">
-                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Subject</p>
-                        <p className="text-sm font-medium text-foreground">{selectedEntry.preview.subject}</p>
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          Subject
+                        </p>
+                        <p className="text-sm font-medium text-foreground">
+                          {selectedEntry.preview.subject}
+                        </p>
                         <p className="text-xs text-muted-foreground">
-                          Send this sample email to {session.email} and owenfar1@gmail.com for device testing.
+                          Send this sample email to {session.email} and owenfar1@gmail.com for
+                          device testing.
                         </p>
                       </div>
                       <Button

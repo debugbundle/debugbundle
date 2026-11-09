@@ -43,18 +43,22 @@ function fixture() {
       })
   };
 }
-it("releases only an owned final phase already applied to the subscription", async () => {
-  const f = fixture();
-  expect(await readCompletedManagedSchedule(f.client as never, f.sub as never, "org_test")).toBe(
-    "sched_test"
-  );
-  expect(await f.run()).toBe(true);
-  expect(f.client.subscriptionSchedules.release).toHaveBeenCalledExactlyOnceWith(
-    "sched_test",
-    {},
-    expect.objectContaining({ idempotencyKey: "stable" })
-  );
-});
+it.each(["plan_downgrade", "capacity_reduction", "offer_change"])(
+  "releases only an owned %s final phase already applied to the subscription",
+  async (kind) => {
+    const f = fixture();
+    f.schedule.metadata.debugbundle_change = kind;
+    expect(await readCompletedManagedSchedule(f.client as never, f.sub as never, "org_test")).toBe(
+      "sched_test"
+    );
+    expect(await f.run()).toBe(true);
+    expect(f.client.subscriptionSchedules.release).toHaveBeenCalledExactlyOnceWith(
+      "sched_test",
+      {},
+      expect.objectContaining({ idempotencyKey: "stable" })
+    );
+  }
+);
 it.each(["future", "foreign", "different_items", "cancel_end", "partial", "other_subscription"])(
   "refuses to release %s schedules",
   async (reason) => {

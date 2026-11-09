@@ -175,16 +175,19 @@ it("retains ownership on transactional failure until failure handling releases i
   await worker.close();
 });
 
-it("never asks Redis for internal jobs and rejects nontransactional configuration", async () => {
-  expect(() =>
-    createDurableWorkerQueue({ query: db.query }, redis as unknown as RedisQueueClient)
-  ).toThrow("worker_transactions_required");
-  journal.claim.mockResolvedValue(null);
-  const worker = queue();
-  await worker.transaction("evaluate-event-improvement", async (_tx, scoped) => {
-    expect(await scoped.dequeueInternal("evaluate-event-improvement")).toBeNull();
-  });
-  expect(redis.claim).not.toHaveBeenCalled();
-  expect(journal.lock).not.toHaveBeenCalled();
-  await worker.close();
-});
+it.each(["evaluate-event-improvement", "reconcile-referral-receipts"])(
+  "never asks Redis for internal job %s and rejects nontransactional configuration",
+  async (name) => {
+    expect(() =>
+      createDurableWorkerQueue({ query: db.query }, redis as unknown as RedisQueueClient)
+    ).toThrow("worker_transactions_required");
+    journal.claim.mockResolvedValue(null);
+    const worker = queue();
+    await worker.transaction(name, async (_tx, scoped) => {
+      expect(await scoped.dequeueInternal(name)).toBeNull();
+    });
+    expect(redis.claim).not.toHaveBeenCalled();
+    expect(journal.lock).not.toHaveBeenCalled();
+    await worker.close();
+  }
+);

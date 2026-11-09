@@ -1,3 +1,15 @@
+import { REFERRAL_BENEFIT_TABLES } from "./referral-benefit-schema.js";
+import { REPORT_HEALTH_TABLES } from "./report-health-schema.js";
+import { REPORT_COLLECTOR_TABLES } from "./report-collector-schema.js";
+import { REPORT_RUN_TABLES } from "./report-run-schema.js";
+import { REPORT_EMAIL_TABLES } from "./report-email-schema.js";
+import { REPORT_SOURCE_TEXT_TABLES } from "./report-source-text-schema.js";
+import { REPORT_DEFINITION_TABLES } from "./report-definition-schema.js";
+import { REPORT_LIFECYCLE_TABLES } from "./report-lifecycle-schema.js";
+import { REFERRAL_RECONCILIATION_TABLES } from "./referral-reconciliation-schema.js";
+import { REFERRAL_LEDGER_TABLES } from "./referral-ledger-schema.js";
+import { REFERRAL_TABLES } from "./referral-schema.js";
+import { ORGANIZATION_MANAGEMENT_TABLES } from "./organization-management-schema.js";
 import type { Queryable } from "./types.js";
 import { PROJECT_SCOPED_RULE_TABLES } from "./project-rule-scope-schema.js";
 
@@ -21,6 +33,9 @@ export const PROJECT_MERGE_TABLE_DISPOSITIONS = {
     "public_status_page_checks"
   ],
   retained_origin: [
+    "report_availability_days",
+    ...REPORT_HEALTH_TABLES,
+    ...REPORT_LIFECYCLE_TABLES,
     "services",
     "incidents",
     "incident_events",
@@ -74,6 +89,17 @@ export const PROJECT_MERGE_TABLE_DISPOSITIONS = {
     "analytics_visitor_first_seen"
   ],
   unchanged_account: [
+    ...REPORT_RUN_TABLES,
+    ...REPORT_EMAIL_TABLES,
+    ...REPORT_COLLECTOR_TABLES,
+    "report_collection_coverage",
+    ...REPORT_SOURCE_TEXT_TABLES,
+    ...REPORT_DEFINITION_TABLES,
+    ...ORGANIZATION_MANAGEMENT_TABLES,
+    ...REFERRAL_LEDGER_TABLES,
+    ...REFERRAL_RECONCILIATION_TABLES,
+    ...REFERRAL_TABLES,
+    ...REFERRAL_BENEFIT_TABLES,
     "account_analytics_accounts",
     "account_deletion_challenges",
     "account_metric_events",
@@ -174,6 +200,11 @@ export async function inspectProjectMergeInventory(db: Queryable): Promise<Proje
         (row.table_name === "project_legacy_bindings" &&
           ["legacy_project_id", "canonical_project_id"].includes(column)) ||
         (column === "project_id" && originTables.has(row.table_name)) ||
+        // These definition-owned references are frozen selection/origin identities.
+        // Consolidation must leave them intact rather than reparenting the cache.
+        (row.table_name === "report_collection_coverage" && column === "project_id") ||
+        (row.table_name === "report_source_text" &&
+          ["selected_project_id", "origin_project_id"].includes(column)) ||
         ((PROJECT_SCOPED_RULE_TABLES as readonly string[]).includes(row.table_name) &&
           column === "filter_project_id") ||
         (row.table_name === "public_status_pages" && column === "anchor_project_id") ||

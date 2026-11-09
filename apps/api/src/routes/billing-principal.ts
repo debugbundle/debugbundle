@@ -1,3 +1,4 @@
+import { memberReadScope } from "../member-access-scope.js";
 import type { FastifyRequest, FastifyReply } from "fastify";
 import type { ApiDependencies } from "../api-types.js";
 import {
@@ -5,6 +6,32 @@ import {
   requireOwnerMemberAuth,
   resolveBrowserSession
 } from "../api-helpers.js";
+
+/** Purchase previews/confirmation require a verified current browser Owner. */
+export async function requireInteractiveBillingOwner(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  dependencies: ApiDependencies
+): ReturnType<typeof resolveBrowserSession> {
+  if (request.headers.authorization !== undefined) {
+    await reply.status(403).send({ error: "browser_session_required" });
+    return null;
+  }
+  const session = await resolveBrowserSession(request.headers.cookie, dependencies);
+  if (!session) {
+    await reply.status(401).send({ error: "invalid_session" });
+    return null;
+  }
+  if (session.role !== "owner") {
+    await reply.status(403).send({ error: "forbidden" });
+    return null;
+  }
+  if (!session.email_verified_at) {
+    await reply.status(403).send({ error: "email_verification_required" });
+    return null;
+  }
+  return session;
+}
 
 export async function requireOwnerBillingPrincipal(
   request: FastifyRequest,
@@ -74,6 +101,7 @@ export async function requireOwnerBillingPrincipal(
   return {
     organization_id: member.organization_id,
     subject: `member:${member.member_id}`,
+    ...memberReadScope(member),
     user_id: member.member_id,
     email: member.email
   };

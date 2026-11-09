@@ -6,10 +6,18 @@ import { mockedObject, type MockedMethods } from "../../helpers/vitest.ts";
 
 type ApiServerDependencies = Parameters<typeof createApiServer>[0];
 type WebAuthDependency = MockedMethods<NonNullable<ApiServerDependencies["webAuth"]>>;
-type BillingManagementDependency = MockedMethods<NonNullable<ApiServerDependencies["billingManagement"]>>;
+type BillingManagementDependency = MockedMethods<
+  NonNullable<ApiServerDependencies["billingManagement"]>
+>;
 
 function buildBillingSummary(
-  overrides: Partial<Awaited<ReturnType<NonNullable<ApiServerDependencies["billingManagement"]>["getBillingSummaryForOrganization"]>>> = {}
+  overrides: Partial<
+    Awaited<
+      ReturnType<
+        NonNullable<ApiServerDependencies["billingManagement"]>["getBillingSummaryForOrganization"]
+      >
+    >
+  > = {}
 ) {
   return {
     plan: "free" as const,
@@ -59,10 +67,12 @@ function createOwnerSession() {
   };
 }
 
-function createServer(overrides: {
-  webAuth?: Partial<WebAuthDependency>;
-  billingManagement?: Partial<BillingManagementDependency>;
-} = {}): ReturnType<typeof createApiServer> {
+function createServer(
+  overrides: {
+    webAuth?: Partial<WebAuthDependency>;
+    billingManagement?: Partial<BillingManagementDependency>;
+  } = {}
+): ReturnType<typeof createApiServer> {
   const billingManagement = mockedObject<NonNullable<ApiServerDependencies["billingManagement"]>>({
     getBillingSummaryForOrganization:
       overrides.billingManagement?.getBillingSummaryForOrganization ??
@@ -73,14 +83,16 @@ function createServer(overrides: {
     createPortalLink:
       overrides.billingManagement?.createPortalLink ?? vi.fn().mockResolvedValue(null),
     startTrial:
-      overrides.billingManagement?.startTrial ??
-      vi.fn().mockResolvedValue(buildBillingSummary()),
+      overrides.billingManagement?.startTrial ?? vi.fn().mockResolvedValue(buildBillingSummary()),
     increaseCapacity:
-      overrides.billingManagement?.increaseCapacity ?? vi.fn().mockResolvedValue(buildBillingSummary()),
+      overrides.billingManagement?.increaseCapacity ??
+      vi.fn().mockResolvedValue(buildBillingSummary()),
     scheduleCapacityReduction:
-      overrides.billingManagement?.scheduleCapacityReduction ?? vi.fn().mockResolvedValue(buildBillingSummary()),
+      overrides.billingManagement?.scheduleCapacityReduction ??
+      vi.fn().mockResolvedValue(buildBillingSummary()),
     cancelCapacityReduction:
-      overrides.billingManagement?.cancelCapacityReduction ?? vi.fn().mockResolvedValue(buildBillingSummary())
+      overrides.billingManagement?.cancelCapacityReduction ??
+      vi.fn().mockResolvedValue(buildBillingSummary())
   });
 
   return createApiServer({
@@ -141,47 +153,104 @@ function buildBillingCookies() {
 }
 
 describe("api billing trial routes", () => {
-  it("starts a no-card trial for an owner session", async (): Promise<void> => {
-    const trialSummary = buildBillingSummary({
-      plan: "solo",
-      billing_state: "trialing",
-      trial: {
-        available: false,
-        active: true,
-        plan: "solo",
-        started_at: "2026-06-04T00:00:00.000Z",
-        ends_at: "2026-07-04T00:00:00.000Z",
-        used_at: "2026-06-04T00:00:00.000Z",
-        converted_at: null,
-        expired_at: null,
-        days_remaining: 30
+  it.each([
+    ["solo", "month"],
+    ["solo", "year"],
+    ["team", "month"],
+    ["team", "year"],
+    ["business", "month"],
+    ["business", "year"]
+  ] as const)(
+    "allows an existing %s trial to purchase Business/%s without creating another trial",
+    async (trialPlan, interval) => {
+      const createCheckoutLink = vi
+        .fn()
+        .mockResolvedValue({ url: "https://checkout.stripe.com/business" });
+      const app = createServer({
+        billingManagement: {
+          getBillingSummaryForOrganization: vi.fn().mockResolvedValue(
+            buildBillingSummary({
+              plan: trialPlan,
+              trial: {
+                ...buildBillingSummary().trial,
+                available: false,
+                active: true,
+                plan: trialPlan,
+                started_at: "2026-10-20T00:00:00.000Z",
+                ends_at: "2026-11-19T00:00:00.000Z"
+              }
+            })
+          ),
+          createCheckoutLink
+        }
+      });
+      try {
+        const response = await app.inject({
+          method: "POST",
+          url: "/v1/billing/checkout",
+          cookies: { [SESSION_COOKIE_NAME]: "session-secret" },
+          headers: { "x-csrf-token": buildCsrfToken("session-secret") },
+          payload: { target_plan: "business", interval, additional_capacity_units: 5 }
+        });
+        expect(response.statusCode).toBe(200);
+        expect(createCheckoutLink).toHaveBeenCalledExactlyOnceWith({
+          organization_id: "org_123",
+          billing_email: "owner@example.com",
+          current_plan: trialPlan,
+          target_plan: "business",
+          interval,
+          additional_capacity_units: 5,
+          actor_user_id: "usr_123"
+        });
+      } finally {
+        await app.close();
       }
-    });
-    const startTrial = vi.fn().mockResolvedValue(trialSummary);
-    const app = createServer({
-      billingManagement: {
-        startTrial
-      }
-    });
+    }
+  );
+  it.each(["solo", "team", "business"] as const)(
+    "starts a %s no-card trial for an owner session",
+    async (trialPlan): Promise<void> => {
+      const trialSummary = buildBillingSummary({
+        plan: trialPlan,
+        billing_state: "trialing",
+        trial: {
+          available: false,
+          active: true,
+          plan: trialPlan,
+          started_at: "2026-06-04T00:00:00.000Z",
+          ends_at: "2026-07-04T00:00:00.000Z",
+          used_at: "2026-06-04T00:00:00.000Z",
+          converted_at: null,
+          expired_at: null,
+          days_remaining: 30
+        }
+      });
+      const startTrial = vi.fn().mockResolvedValue(trialSummary);
+      const app = createServer({
+        billingManagement: {
+          startTrial
+        }
+      });
 
-    const response = await app.inject({
-      method: "POST",
-      url: "/v1/billing/trial/start",
-      headers: buildBillingHeaders(),
-      cookies: buildBillingCookies(),
-      payload: {
-        target_plan: "solo"
-      }
-    });
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/billing/trial/start",
+        headers: buildBillingHeaders(),
+        cookies: buildBillingCookies(),
+        payload: {
+          target_plan: trialPlan
+        }
+      });
 
-    expect(response.statusCode).toBe(200);
-    expect(response.json().billing.plan).toBe("solo");
-    expect(startTrial).toHaveBeenCalledWith({
-      organization_id: "org_123",
-      target_plan: "solo",
-      now: expect.any(String)
-    });
-  });
+      expect(response.statusCode).toBe(200);
+      expect(response.json().billing.plan).toBe(trialPlan);
+      expect(startTrial).toHaveBeenCalledWith({
+        organization_id: "org_123",
+        target_plan: trialPlan,
+        now: expect.any(String)
+      });
+    }
+  );
 
   it("returns trial_unavailable when the organization can no longer start a trial", async (): Promise<void> => {
     const app = createServer({

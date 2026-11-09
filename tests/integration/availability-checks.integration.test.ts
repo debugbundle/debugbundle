@@ -466,7 +466,9 @@ runIntegration("availability checks integration", () => {
 
   it.each([
     { plan: "free", counts: [3, 1, 1], checksPerProject: 1 },
-    { plan: "solo", counts: [10, 10, 10, 3, 3, 3, 3, 3, 3], checksPerProject: 3 }
+    { plan: "solo", counts: [10, 10, 10, 3, 3, 3, 3, 3, 3], checksPerProject: 3 },
+    { plan: "team", counts: [10, 5, 5, 5, 5, 5], checksPerProject: 5 },
+    { plan: "business", counts: [10, 10, 10, 10, 10], checksPerProject: 10 }
   ])(
     "does not let per-project-paused checks consume $plan execution capacity",
     async ({ plan, counts, checksPerProject }) => {
@@ -480,7 +482,7 @@ runIntegration("availability checks integration", () => {
         organizationSlug: `availability-downgrade-${organizationId}`,
         projectName: "Downgrade app 1",
         projectSlug: "downgrade-app-1",
-        organizationPlan: "team"
+        organizationPlan: "business"
       });
       const store = createPostgresAvailabilityCheckStore(createQueryable(pool));
       const eligibleIds: string[] = [];
@@ -574,6 +576,30 @@ runIntegration("availability checks integration", () => {
         [organizationId]
       );
       expect(Number(preserved.rows[0]?.count)).toBe(eligibleIds.length + pausedIds.length);
+      expect(
+        (
+          await pool.query(
+            "SELECT count(*)::int AS count FROM incidents WHERE project_id=ANY($1::uuid[])",
+            [projectIds]
+          )
+        ).rows[0].count
+      ).toBe(0);
+      if (plan === "team") {
+        await pool.query("UPDATE organizations SET plan='business' WHERE id=$1", [organizationId]);
+        const resumed = (
+          await Promise.all(
+            projectIds.map((project_id) =>
+              store.listChecksForProjectInOrganization({
+                organization_id: organizationId,
+                project_id,
+                limit: 100
+              })
+            )
+          )
+        ).flat();
+        expect(resumed).toHaveLength(35);
+        expect(resumed.every((check) => check?.status !== "paused")).toBe(true);
+      }
     }
   );
 });

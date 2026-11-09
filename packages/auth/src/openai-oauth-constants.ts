@@ -15,7 +15,8 @@ export const OPENAI_HOSTED_MCP_SCOPES = [
   "debugbundle:artifacts:read",
   "debugbundle:improvements:read",
   "debugbundle:analytics:read",
-  "debugbundle:health:read"
+  "debugbundle:health:read",
+  "debugbundle:reports:read"
 ] as const;
 
 export const OPENAI_OIDC_SCOPES = ["openid", "email"] as const;

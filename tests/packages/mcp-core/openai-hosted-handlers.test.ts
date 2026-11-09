@@ -3,6 +3,32 @@ import { describe, expect, it, vi } from "vitest";
 import { createOpenAiHostedToolHandlers } from "../../../packages/mcp-core/src/index.js";
 
 describe("OpenAI hosted MCP handlers", () => {
+  it("requires explicit saved-report consent without granting report generation or settings", async () => {
+    const read = vi.fn().mockResolvedValue({ reports: [], next_cursor: null });
+    const handlers = createOpenAiHostedToolHandlers({ operations: { list_reports: read } });
+    const principal = {
+      userId: "reader",
+      organizationId: "workspace",
+      grantId: "grant",
+      scopes: ["debugbundle:incidents:read"]
+    };
+    await expect(handlers.list_reports({ principal, input: {} })).rejects.toThrow("scope");
+    expect(read).not.toHaveBeenCalled();
+    const result = await handlers.list_reports({
+      principal: { ...principal, scopes: ["debugbundle:reports:read"] },
+      input: {}
+    });
+    expect(result.structuredContent).toEqual({ reports: [], next_cursor: null });
+    expect(handlers).not.toHaveProperty("generate_report");
+    expect(handlers).not.toHaveProperty("create_report_definition");
+    await expect(
+      handlers.list_reports({
+        principal: { ...principal, scopes: ["debugbundle:reports:read"] },
+        input: { organizationId: "foreign" }
+      })
+    ).rejects.toThrow("invalid_input");
+    expect(read).toHaveBeenCalledOnce();
+  });
   it("keeps consolidated analytics coverage visible without changing the frozen structured shape", async () => {
     const origin_scope = {
       origin_project_ids: [

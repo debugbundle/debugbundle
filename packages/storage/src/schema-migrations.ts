@@ -1,3 +1,68 @@
+import {
+  SELFHOST_ORGANIZATION_ACCESS_MIGRATION,
+  selfhostOrganizationAccessSchemaAvailable
+} from "./selfhost-organization-access-schema.js";
+import {
+  REPORT_TRIAL_COLLECTION_MIGRATION,
+  reportTrialCollectionSchemaAvailable
+} from "./report-trial-collection-schema.js";
+import { BUSINESS_TRIAL_MIGRATION, businessTrialSchemaAvailable } from "./business-trial-schema.js";
+import {
+  REFERRAL_BENEFIT_MIGRATION,
+  referralBenefitSchemaAvailable
+} from "./referral-benefit-schema.js";
+import { REPORT_HEALTH_MIGRATION, reportHealthSchemaAvailable } from "./report-health-schema.js";
+import {
+  REPORT_COLLECTOR_MIGRATION,
+  reportCollectorSchemaAvailable
+} from "./report-collector-schema.js";
+import { REPORT_RUN_MIGRATION, reportRunSchemaAvailable } from "./report-run-schema.js";
+import { REPORT_EMAIL_MIGRATION, reportEmailSchemaAvailable } from "./report-email-schema.js";
+import {
+  REPORT_AVAILABILITY_MIGRATION,
+  reportAvailabilitySchemaAvailable
+} from "./report-availability-schema.js";
+import {
+  REPORT_SOURCE_TEXT_MIGRATION,
+  reportSourceTextSchemaAvailable
+} from "./report-source-text-schema.js";
+import {
+  REPORT_DEFINITION_MIGRATION,
+  reportDefinitionSchemaAvailable
+} from "./report-definition-schema.js";
+import {
+  REPORT_LIFECYCLE_MIGRATION,
+  reportLifecycleSchemaAvailable
+} from "./report-lifecycle-schema.js";
+import {
+  REFERRAL_RECONCILIATION_MIGRATION,
+  referralReconciliationSchemaAvailable
+} from "./referral-reconciliation-schema.js";
+import {
+  REFERRAL_LEDGER_MIGRATION,
+  referralLedgerSchemaAvailable
+} from "./referral-ledger-schema.js";
+import { REFERRAL_MIGRATION, referralSchemaAvailable } from "./referral-schema.js";
+import {
+  ORGANIZATION_MANAGEMENT_MIGRATION,
+  organizationManagementSchemaAvailable
+} from "./organization-management-schema.js";
+import {
+  PROJECT_JOB_AUTHORITY_MIGRATION,
+  projectJobAuthoritySchemaAvailable
+} from "./project-job-authority-schema.js";
+import {
+  ORGANIZATION_ACCESS_MIGRATION,
+  organizationAccessSchemaAvailable
+} from "./organization-access-schema.js";
+import {
+  MEMBER_TOKEN_POLICY_MIGRATION,
+  memberTokenPolicySchemaAvailable
+} from "./member-token-policy-schema.js";
+import {
+  BUSINESS_BILLING_MIGRATION,
+  businessBillingSchemaAvailable
+} from "./business-billing-schema.js";
 import { BILLING_PLAN_CHANGE_MIGRATION } from "./billing-plan-change-schema.js";
 import { SERVICE_DEFINITION_MIGRATION } from "./service-definition-schema.js";
 import { PROJECT_CONSOLIDATION_MIGRATION } from "./project-consolidation-schema.js";
@@ -53,7 +118,27 @@ export const STORAGE_SCHEMA_MIGRATIONS: readonly StorageSchemaMigration[] = [
   BILLING_CHECKOUT_MIGRATION,
   BILLING_SUBSCRIPTION_OPERATION_MIGRATION,
   BILLING_NOTIFICATION_MIGRATION,
-  BILLING_PLAN_CHANGE_MIGRATION
+  BILLING_PLAN_CHANGE_MIGRATION,
+  BUSINESS_BILLING_MIGRATION,
+  MEMBER_TOKEN_POLICY_MIGRATION,
+  ORGANIZATION_ACCESS_MIGRATION,
+  ORGANIZATION_MANAGEMENT_MIGRATION,
+  PROJECT_JOB_AUTHORITY_MIGRATION,
+  REFERRAL_MIGRATION,
+  REFERRAL_LEDGER_MIGRATION,
+  REFERRAL_RECONCILIATION_MIGRATION,
+  REPORT_LIFECYCLE_MIGRATION,
+  REPORT_DEFINITION_MIGRATION,
+  REPORT_SOURCE_TEXT_MIGRATION,
+  REPORT_AVAILABILITY_MIGRATION,
+  REPORT_RUN_MIGRATION,
+  REPORT_EMAIL_MIGRATION,
+  REPORT_COLLECTOR_MIGRATION,
+  REPORT_HEALTH_MIGRATION,
+  REFERRAL_BENEFIT_MIGRATION,
+  BUSINESS_TRIAL_MIGRATION,
+  REPORT_TRIAL_COLLECTION_MIGRATION,
+  SELFHOST_ORGANIZATION_ACCESS_MIGRATION
 ].sort((left, right) => left.id.localeCompare(right.id));
 
 function validateStorageSchemaMigrations(migrations: readonly StorageSchemaMigration[]): void {
@@ -115,12 +200,58 @@ async function reconcileMigrationLedgerInTransaction(
     return "not_current_schema";
   }
 
-  await recordAppliedMigrations(db, STORAGE_SCHEMA_MIGRATIONS);
+  const businessReady = await businessBillingSchemaAvailable(db);
+  const tokenPolicyReady = await memberTokenPolicySchemaAvailable(db);
+  const orgAccessReady = await organizationAccessSchemaAvailable(db);
+  const orgManagementReady = await organizationManagementSchemaAvailable(db);
+  const projectAuthorityReady = await projectJobAuthoritySchemaAvailable(db);
+  const referralsReady = await referralSchemaAvailable(db);
+  const referralLedgerReady = await referralLedgerSchemaAvailable(db);
+  const referralReconciliationReady = await referralReconciliationSchemaAvailable(db);
+  const reportLifecycleReady = await reportLifecycleSchemaAvailable(db);
+  const reportDefinitionReady = await reportDefinitionSchemaAvailable(db);
+  const reportSourceTextReady = await reportSourceTextSchemaAvailable(db);
+  const reportAvailabilityReady = await reportAvailabilitySchemaAvailable(db);
+  const reportRunReady = await reportRunSchemaAvailable(db);
+  const referralBenefitReady = await referralBenefitSchemaAvailable(db);
+  const reportHealthReady = await reportHealthSchemaAvailable(db);
+  const reportCollectorReady = await reportCollectorSchemaAvailable(db);
+  const reportEmailReady = await reportEmailSchemaAvailable(db);
+  const businessTrialReady = await businessTrialSchemaAvailable(db);
+  const selfhostOrganizationAccessReady = await selfhostOrganizationAccessSchemaAvailable(db);
+  const reportTrialCollectionReady = await reportTrialCollectionSchemaAvailable(db);
+  const verifiedBaseline = STORAGE_SCHEMA_MIGRATIONS.filter(
+    (migration) =>
+      (migration.id !== BUSINESS_BILLING_MIGRATION.id || businessReady) &&
+      (migration.id !== MEMBER_TOKEN_POLICY_MIGRATION.id || tokenPolicyReady) &&
+      (migration.id !== ORGANIZATION_ACCESS_MIGRATION.id || orgAccessReady) &&
+      (migration.id !== ORGANIZATION_MANAGEMENT_MIGRATION.id || orgManagementReady) &&
+      (migration.id !== PROJECT_JOB_AUTHORITY_MIGRATION.id || projectAuthorityReady) &&
+      (migration.id !== REFERRAL_MIGRATION.id || referralsReady) &&
+      (migration.id !== REFERRAL_LEDGER_MIGRATION.id || referralLedgerReady) &&
+      (migration.id !== REFERRAL_RECONCILIATION_MIGRATION.id || referralReconciliationReady) &&
+      (migration.id !== REPORT_LIFECYCLE_MIGRATION.id || reportLifecycleReady) &&
+      (migration.id !== REPORT_DEFINITION_MIGRATION.id || reportDefinitionReady) &&
+      (migration.id !== REPORT_SOURCE_TEXT_MIGRATION.id || reportSourceTextReady) &&
+      (migration.id !== REPORT_AVAILABILITY_MIGRATION.id || reportAvailabilityReady) &&
+      (migration.id !== REPORT_RUN_MIGRATION.id || reportRunReady) &&
+      (migration.id !== REPORT_EMAIL_MIGRATION.id || reportEmailReady) &&
+      (migration.id !== REPORT_COLLECTOR_MIGRATION.id || reportCollectorReady) &&
+      (migration.id !== REPORT_HEALTH_MIGRATION.id || reportHealthReady) &&
+      (migration.id !== REFERRAL_BENEFIT_MIGRATION.id || referralBenefitReady) &&
+      (migration.id !== BUSINESS_TRIAL_MIGRATION.id || businessTrialReady) &&
+      (migration.id !== REPORT_TRIAL_COLLECTION_MIGRATION.id || reportTrialCollectionReady) &&
+      (migration.id !== SELFHOST_ORGANIZATION_ACCESS_MIGRATION.id ||
+        selfhostOrganizationAccessReady)
+  );
+  await recordAppliedMigrations(db, verifiedBaseline);
   appliedChecksums.clear();
-  for (const migration of STORAGE_SCHEMA_MIGRATIONS) {
+  for (const migration of verifiedBaseline) {
     appliedChecksums.set(migration.id, migration.checksum);
   }
-  return "seeded_current_schema";
+  return verifiedBaseline.length === STORAGE_SCHEMA_MIGRATIONS.length
+    ? "seeded_current_schema"
+    : "already_present";
 }
 
 async function ensureMigrationLedger(db: Queryable): Promise<void> {
@@ -287,4 +418,30 @@ export async function assertStorageSchemaMigrationsApplied(db: Queryable): Promi
   }
   if (!(await projectServiceSchemaAvailable(db)))
     throw new Error("project_service_schema_incomplete");
+  if (!(await referralSchemaAvailable(db))) throw new Error("referral_schema_incomplete");
+  if (!(await referralLedgerSchemaAvailable(db)))
+    throw new Error("referral_ledger_schema_incomplete");
+  if (!(await referralReconciliationSchemaAvailable(db)))
+    throw new Error("referral_reconciliation_schema_incomplete");
+  if (!(await reportLifecycleSchemaAvailable(db)))
+    throw new Error("report_lifecycle_schema_incomplete");
+  if (!(await reportDefinitionSchemaAvailable(db)))
+    throw new Error("report_definition_schema_incomplete");
+  if (!(await reportSourceTextSchemaAvailable(db)))
+    throw new Error("report_source_text_schema_incomplete");
+  if (!(await reportAvailabilitySchemaAvailable(db)))
+    throw new Error("report_availability_schema_incomplete");
+  if (!(await reportRunSchemaAvailable(db))) throw new Error("report_run_schema_incomplete");
+  if (!(await referralBenefitSchemaAvailable(db)))
+    throw new Error("referral_benefit_schema_incomplete");
+  if (!(await reportHealthSchemaAvailable(db))) throw new Error("report_health_schema_incomplete");
+  if (!(await reportCollectorSchemaAvailable(db)))
+    throw new Error("report_collector_schema_incomplete");
+  if (!(await reportEmailSchemaAvailable(db))) throw new Error("report_email_schema_incomplete");
+  if (!(await businessTrialSchemaAvailable(db)))
+    throw new Error("business_trial_schema_incomplete");
+  if (!(await reportTrialCollectionSchemaAvailable(db)))
+    throw new Error("report_trial_collection_schema_incomplete");
+  if (!(await selfhostOrganizationAccessSchemaAvailable(db)))
+    throw new Error("selfhost_organization_access_schema_incomplete");
 }

@@ -166,7 +166,7 @@ function installWorkspaceAnalyticsFetch(
 }
 
 describe("web app - workspace analytics", () => {
-  it("places Analytics between Improvements and Projects and opens opportunities", async () => {
+  it("places Projects between Improvements and Analytics and opens opportunities", async () => {
     const user = userEvent.setup();
     installWorkspaceAnalyticsFetch();
 
@@ -176,10 +176,10 @@ describe("web app - workspace analytics", () => {
     const analyticsLink = screen.getByRole("link", { name: "Analytics" });
     const projectsLink = screen.getByRole("link", { name: "Projects" });
     expect(
-      improvementsLink.compareDocumentPosition(analyticsLink) & Node.DOCUMENT_POSITION_FOLLOWING
+      improvementsLink.compareDocumentPosition(projectsLink) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
     expect(
-      analyticsLink.compareDocumentPosition(projectsLink) & Node.DOCUMENT_POSITION_FOLLOWING
+      projectsLink.compareDocumentPosition(analyticsLink) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
     expect(analyticsLink).toHaveAttribute("href", "/analytics/workspace");
 

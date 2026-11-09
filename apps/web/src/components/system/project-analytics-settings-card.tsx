@@ -38,7 +38,7 @@ import { ProjectAnalyticsSavedFunnelsSection } from "./project-analytics-saved-f
 
 interface ProjectAnalyticsSettingsCardProps {
   projectId: string;
-  organizationPlan: "free" | "solo" | "team";
+  organizationPlan: "free" | "solo" | "team" | "business";
   canEdit: boolean;
 }
 
@@ -495,7 +495,9 @@ export function ProjectAnalyticsSettingsCard(
               <RotateCcwIcon data-icon="inline-start" />
               Reset
             </Button>
-            <PendingButton pendingLabel="Saving…" pending={isSaving}
+            <PendingButton
+              pendingLabel="Saving…"
+              pending={isSaving}
               type="submit"
               disabled={isLoading || isSaving || !isDirty || customDimensionsInvalid}
             >

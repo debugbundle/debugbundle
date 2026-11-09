@@ -1,3 +1,4 @@
+import { projectActorRoleSql } from "./project-read-scope.js";
 import { runInTransaction } from "./transaction.js";
 import type {
   LeaveProjectMembershipResult,
@@ -21,25 +22,23 @@ export function createMetadataMembership(
       project_id: string;
       actor_user_id: string;
       user_id: string;
-      role: "admin" | "member";
+      role: "admin" | "member" | "viewer";
+      include_organization_grants?: boolean;
     }): Promise<UpdateProjectMemberRoleResult | null> {
       return runInTransaction(db, async (db) => {
         await db.query("SELECT debugbundle_begin_project_rule_write($1::uuid)", [input.project_id]);
         const scopeResult = await db.query<
-          { actor_role: "owner" | "admin" | "member" | null } & Record<string, unknown>
+          { actor_role: "owner" | "admin" | "member" | "viewer" | null } & Record<string, unknown>
         >(
           `
           SELECT
-            CASE
-              WHEN p.owner_user_id = $2::uuid THEN 'owner'
-              ELSE actor_membership.role
-            END AS actor_role
+            ${projectActorRoleSql("p.id", "$2::uuid", input)} AS actor_role
           FROM projects p
           LEFT JOIN project_members actor_membership
             ON actor_membership.project_id = p.id
            AND actor_membership.user_id = $2::uuid
           WHERE p.id = $1::uuid
-            AND (p.owner_user_id = $2::uuid OR actor_membership.user_id IS NOT NULL)
+            AND ${projectActorRoleSql("p.id", "$2::uuid", input)} IS NOT NULL
           LIMIT 1
         `,
           [input.project_id, input.actor_user_id]
@@ -116,24 +115,22 @@ export function createMetadataMembership(
       project_id: string;
       actor_user_id: string;
       user_id: string;
+      include_organization_grants?: boolean;
     }): Promise<RemoveProjectMemberResult | null> {
       return runInTransaction(db, async (db) => {
         await db.query("SELECT debugbundle_begin_project_rule_write($1::uuid)", [input.project_id]);
         const scopeResult = await db.query<
-          { actor_role: "owner" | "admin" | "member" | null } & Record<string, unknown>
+          { actor_role: "owner" | "admin" | "member" | "viewer" | null } & Record<string, unknown>
         >(
           `
           SELECT
-            CASE
-              WHEN p.owner_user_id = $2::uuid THEN 'owner'
-              ELSE actor_membership.role
-            END AS actor_role
+            ${projectActorRoleSql("p.id", "$2::uuid", input)} AS actor_role
           FROM projects p
           LEFT JOIN project_members actor_membership
             ON actor_membership.project_id = p.id
            AND actor_membership.user_id = $2::uuid
           WHERE p.id = $1::uuid
-            AND (p.owner_user_id = $2::uuid OR actor_membership.user_id IS NOT NULL)
+            AND ${projectActorRoleSql("p.id", "$2::uuid", input)} IS NOT NULL
           LIMIT 1
         `,
           [input.project_id, input.actor_user_id]
@@ -232,7 +229,7 @@ export function createMetadataMembership(
             ON actor_membership.project_id = p.id
            AND actor_membership.user_id = $2::uuid
           WHERE p.id = $1::uuid
-            AND (p.owner_user_id = $2::uuid OR actor_membership.user_id IS NOT NULL)
+            AND ${projectActorRoleSql("p.id", "$2::uuid", input)} IS NOT NULL
           LIMIT 1
         `,
           [input.project_id, input.user_id]

@@ -3,8 +3,13 @@ import type {
   BillingPlanChangeState
 } from "../../packages/billing-client/src/plan-change.js";
 import { z } from "zod";
-import { getTierCapabilities } from "../../packages/shared-types/src/index.js";
+import {
+  getBillingCatalogPrice,
+  getTierCapabilities
+} from "../../packages/shared-types/src/index.js";
 import { getFirstPurchaseEligibility } from "../../packages/shared-types/src/first-purchase-eligibility.js";
+import type { PaidTierName, TierName } from "../../packages/shared-types/src/index.js";
+import { createBillingOfferMocks } from "./billing-offers.js";
 import type { BillingSummaryRecord } from "../../apps/web/src/lib/api-types.js";
 import type { createDevMockFixtures } from "./fixtures.js";
 import type { MockResponse } from "./api.js";
@@ -17,11 +22,11 @@ const invalid = (): MockResponse => reply({ error: "invalid_mock_payload" }, 400
 export function createBillingMocks(data: ReturnType<typeof createDevMockFixtures>) {
   const now = new Date().toISOString();
   let sequence = 100;
-  const checkouts = new Map<string, "solo" | "team">();
+  const checkouts = new Map<string, PaidTierName>();
   let upgradeQuote: { token: string; expires: number; additional: number } | null = null;
   let planQuote: BillingPlanChangeQuote | null = null;
   let pendingPlan: BillingPlanChangeState["pending_change"] = null;
-  let plan: "free" | "solo" | "team" = "team";
+  let plan: TierName = "team";
   let additionalCapacity = 1;
   let pendingReduction: BillingSummaryRecord["capacity_units"]["pending_reduction"] = null;
   let trial: BillingSummaryRecord["trial"] = {
@@ -35,18 +40,39 @@ export function createBillingMocks(data: ReturnType<typeof createDevMockFixtures
     expired_at: null,
     days_remaining: null
   };
+  const offers = createBillingOfferMocks({
+    plan: () => plan,
+    setPlan,
+    capacity: () => additionalCapacity,
+    setCapacity: (value) => {
+      additionalCapacity = value;
+    },
+    trial: () => trial,
+    setTrial: (value) => {
+      trial = value;
+    },
+    reduction: () => pendingReduction,
+    reset: () => {
+      pendingReduction = null;
+      pendingPlan = null;
+      planQuote = null;
+      upgradeQuote = null;
+      checkouts.clear();
+    }
+  });
   function billing(): BillingSummaryRecord {
     const caps = getTierCapabilities(plan);
     const total = caps.included_capacity_units + additionalCapacity;
-    const start = new Date();
+    const start = new Date(offers.now);
     start.setUTCDate(1);
     start.setUTCHours(0, 0, 0, 0);
     const end = new Date(start);
     end.setUTCMonth(end.getUTCMonth() + 1);
     return {
       plan,
-      billing_state: trial.active ? "trialing" : "active",
-      stripe_customer_id: "mock_customer",
+      billing_state: offers.internal ? "admin_override" : trial.active ? "trialing" : "active",
+      stripe_customer_id:
+        offers.internal || trial.active || plan === "free" ? null : "mock_customer",
       active_projects: data.projects.length,
       capacity_units: {
         included: caps.included_capacity_units,
@@ -72,14 +98,21 @@ export function createBillingMocks(data: ReturnType<typeof createDevMockFixtures
       trial
     };
   }
-  function setPlan(next: "solo" | "team") {
+  function setPlan(next: TierName) {
     plan = next;
     data.session.organization_plan = next;
     data.projects.forEach((project) => {
       project["organization_plan"] = next;
     });
   }
-  function handle(method: string, path: string, payload: unknown): MockResponse | undefined {
+  function handle(
+    method: string,
+    path: string,
+    payload: unknown,
+    origin: string
+  ): MockResponse | undefined {
+    const offered = offers.handle(method, path, payload, origin);
+    if (offered) return offered;
     const read = method === "GET";
     if (path === "/v1/billing" && read) return reply({ billing: billing() });
     if (path === "/v1/billing/plan-change" && read) return reply({ pending_change: pendingPlan });
@@ -93,7 +126,10 @@ export function createBillingMocks(data: ReturnType<typeof createDevMockFixtures
         target_plan: "solo",
         amount_due: 0,
         currency: "usd",
-        monthly_total: 499 + additionalCapacity * 99,
+        monthly_total:
+          getBillingCatalogPrice("solo", "month", "plan").amount_minor +
+          additionalCapacity *
+            getBillingCatalogPrice("solo", "month", "extra_capacity").amount_minor,
         tax: 0,
         additional_capacity_units: additionalCapacity
       };
@@ -147,7 +183,10 @@ export function createBillingMocks(data: ReturnType<typeof createDevMockFixtures
           currency: "usd",
           amount_due: 500,
           tax: 0,
-          monthly_total: 1900 + additionalCapacity * 199,
+          monthly_total:
+            getBillingCatalogPrice("team", "month", "plan").amount_minor +
+            additionalCapacity *
+              getBillingCatalogPrice("team", "month", "extra_capacity").amount_minor,
           additional_capacity_units: additionalCapacity
         }
       });
@@ -155,7 +194,7 @@ export function createBillingMocks(data: ReturnType<typeof createDevMockFixtures
     if (method === "POST" && ["/v1/billing/checkout", "/v1/billing/trial/start"].includes(path)) {
       const input = z
         .object({
-          target_plan: z.enum(["solo", "team"]),
+          target_plan: z.enum(["solo", "team", "business"]),
           confirmation_token: z.string().optional()
         })
         .safeParse(payload);
@@ -205,6 +244,7 @@ export function createBillingMocks(data: ReturnType<typeof createDevMockFixtures
     if (path === "/v1/billing/checkout/confirm" && method === "POST") {
       const input = z.object({ session_id: z.string() }).safeParse(payload);
       if (!input.success) return invalid();
+      if (offers.hasCheckout(input.data.session_id)) return reply({ billing: billing() });
       const next = checkouts.get(input.data.session_id);
       if (!next) return missing();
       setPlan(next);
@@ -219,21 +259,23 @@ export function createBillingMocks(data: ReturnType<typeof createDevMockFixtures
         return reply({ billing: billing() });
       }
       const input = z
-        .object({ target_additional_capacity_units: z.number().int().min(0).max(100) })
+        .object({ target_additional_capacity_units: z.number().int().min(0).max(99) })
         .safeParse(payload);
       if (!input.success || method !== "POST") return invalid();
       if (path.endsWith("/increase")) {
         additionalCapacity = input.data.target_additional_capacity_units;
         pendingReduction = null;
-      } else if (path.endsWith("/scheduled-reduction"))
-        pendingReduction = {
-          additional_purchased: input.data.target_additional_capacity_units,
-          total:
-            getTierCapabilities(plan).included_capacity_units +
-            input.data.target_additional_capacity_units,
-          effective_at: billing().usage_window.ends_at
-        };
-      else return undefined;
+      } else if (path.endsWith("/scheduled-reduction")) {
+        if (offers.internal) additionalCapacity = input.data.target_additional_capacity_units;
+        else
+          pendingReduction = {
+            additional_purchased: input.data.target_additional_capacity_units,
+            total:
+              getTierCapabilities(plan).included_capacity_units +
+              input.data.target_additional_capacity_units,
+            effective_at: billing().usage_window.ends_at
+          };
+      } else return undefined;
       return reply({ billing: billing() });
     }
     return undefined;

@@ -3,7 +3,7 @@ import { gzipSync } from "node:zlib";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  OPENAI_TOOL_NAMES,
+  OPENAI_V1_TOOL_NAMES,
   createOpenAiHostedToolHandlers,
   type OpenAiMcpPrincipal
 } from "../../../packages/mcp-core/src/index.js";
@@ -417,7 +417,7 @@ function createDependencies(organizationId = "org_1") {
   };
 }
 
-const toolInputs: Record<(typeof OPENAI_TOOL_NAMES)[number], Record<string, unknown>> = {
+const toolInputs: Record<(typeof OPENAI_V1_TOOL_NAMES)[number], Record<string, unknown>> = {
   list_projects: {},
   list_services: { projectId: "project_1" },
   list_incidents: { projectId: "project_1" },
@@ -587,7 +587,7 @@ describe("dedicated OpenAI hosted readers", () => {
     const handlers = createOpenAiHostedToolHandlers({ operations });
 
     const results = await Promise.all(
-      OPENAI_TOOL_NAMES.map((name) =>
+      OPENAI_V1_TOOL_NAMES.map((name) =>
         handlers[name]({ principal: PRINCIPAL, input: toolInputs[name] })
       )
     );

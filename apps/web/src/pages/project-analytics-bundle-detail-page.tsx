@@ -7,6 +7,7 @@ import {
   formatAnalyticsLabel
 } from "../components/system/analytics-bundles-table.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
+import { TitleBadgeRow } from "../components/system/title-badge-row.js";
 import { Badge } from "../components/ui/badge.js";
 import { Button } from "../components/ui/button.js";
 import { Notice } from "../components/ui/notice.js";
@@ -127,17 +128,21 @@ function ReadyBundle({
   return (
     <div className="flex flex-col gap-8">
       <header className="flex max-w-3xl flex-col gap-3">
-        <div className="flex flex-wrap gap-1.5">
-          <Badge>Ready</Badge>
-          <Badge variant="secondary">{formatAnalyticsLabel(bundle.analysis_kind)}</Badge>
-          <Badge variant="outline">
-            {formatAnalyticsLabel(bundle.summary.confidence)} confidence
-          </Badge>
-          <Badge variant={bundle.summary.severity === "high" ? "warning" : "outline"}>
-            {formatAnalyticsLabel(bundle.summary.severity)} severity
-          </Badge>
-        </div>
-        <h2 className="text-xl font-semibold">{bundle.summary.title}</h2>
+        <TitleBadgeRow
+          title={<h2 className="text-xl font-semibold">{bundle.summary.title}</h2>}
+          badges={
+            <>
+              <Badge>Ready</Badge>
+              <Badge variant="secondary">{formatAnalyticsLabel(bundle.analysis_kind)}</Badge>
+              <Badge variant="outline">
+                {formatAnalyticsLabel(bundle.summary.confidence)} confidence
+              </Badge>
+              <Badge variant={bundle.summary.severity === "high" ? "warning" : "outline"}>
+                {formatAnalyticsLabel(bundle.summary.severity)} severity
+              </Badge>
+            </>
+          }
+        />
         <p className="text-sm leading-relaxed text-muted-foreground">
           {bundle.summary.description}
         </p>

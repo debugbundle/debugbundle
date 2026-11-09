@@ -1,11 +1,11 @@
 {
   "schema_version": "1.0.0",
-  "plugin_version": "1.0.3",
+  "plugin_version": "1.1.0",
   "evidence_state": "local_connection_ready",
   "source": {
-    "commit": "107b03bbcb8b1da3ca7b875dc47eb84a7629752a",
-    "tree_clean": true,
-    "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    "commit": "e113414540aa00ebbbac12ea0783ee0c16eacbaf",
+    "tree_clean": false,
+    "status_sha256": "7b7e00c0d41e07803cc75f73580e8f0be172aa39559e2661aa35e6f327fbf38b"
   },
   "runtime": {
     "resource_origin": "https://mcp.debugbundle.com",
@@ -15,18 +15,18 @@
   },
   "registered_connection_id": "plugin_asdk_app_6a99ba6c1e7881919091a592738692c6",
   "package": {
-    "archive_file": "debugbundle-openai-plugin-1.0.3.zip",
-    "archive_sha256": "b1bc7ee5dd3b64f46f627018a88d3bfd1afe6efc4edac5221ccd4d59a7028ede",
-    "archive_bytes": 69491,
+    "archive_file": "debugbundle-openai-plugin-1.1.0.zip",
+    "archive_sha256": "a4cb4b72d8853122b1dd016a4484e833f973f92414b0cc70d8ff454c1a71d32c",
+    "archive_bytes": 70542,
     "files": {
       "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
       "README.md": "244a6804968f43872ae3731166b2a7f9e5b7cde8fb2107839f5e89751a348a72",
       "assets/icon-512.png": "a05a29674a75a945b1a378c73c27322c9b1f14456329bec1fc1d986453696e30",
-      "skills/debugbundle/SKILL.md": "827cedffbe998e7fb3f692581eb6e0ba2d2908fdd895e5c932f832d5339d6ba1",
+      "skills/debugbundle/SKILL.md": "f4a4093ff7fac65489ee106ab9423d77d826f70e828a05cc040447bfd485295b",
       "skills/debugbundle/references/cli-handoff.md": "0327b8f03ff1d59b572fe732dfec3f6b962baec881b6a5b1c2fa848d525ca40c",
       "skills/debugbundle/references/privacy-and-safety.md": "436983b21e6570654ff18c148c1099b64f5e051353b02ac7b002b91430ce9682",
-      "skills/debugbundle/references/tools.md": "d294c7b6827baa6f8df4680434ea672f25c8a82c45e8f57ecc204fe2341fd240",
-      ".codex-plugin/plugin.json": "379a58b3c60bd452024e625590e0258671dd1c26f18389791774b460dc7e23cf",
+      "skills/debugbundle/references/tools.md": "c5e0b001f04c3925967b21a16e94d7e93e92bcf677267ae0f92a50b12fca1020",
+      ".codex-plugin/plugin.json": "7234351a6436d961166be699ab9706ed659da491e179d9d3c510276afc58ff87",
       ".mcp.json": "dab0558beb39ddbc88856d401f0caa9e135c74de8db5d123c6f881ed62b97bb4"
     }
   },
@@ -36,14 +36,14 @@
       "data-map.md": "90751261d20abbe9fcb80da3423e03927be5561f8a990bdb1734fab3c909162f",
       "demo-recording-plan.md": "643fd6fe38c47a36c33b55252b83048350b4d99f7e0c5f8d0e61a6d27ccb64f1",
       "listing.md": "d485228e02cf848689df751a1af8fa4970a01fea6af28eb686b36f853912fc3e",
-      "policy-review.md": "5cd54a159fb23d5073616894240800e82a9d2a3b1c47f1b509b690776fb43392",
+      "policy-review.md": "cd1efc36c39fd9c7918a90d521e32ac5f373e0592114b23dcba90d243b62c386",
       "portal-review.json": "250ff288f4892e7c5294d45ff57260b044dfda6d9f62873905144d35928d1b6f",
       "post-launch-article-draft.md": "6ce0f34a4ce8261eb4a0f10e0f3c5fcc89de9677ffdcd988075ed296d97db7cd",
       "registration-diagnostics.md": "33c395f732d4cdaf1b082c5131cd09ed1fd626c3e926cf68c62afe158cc8d531",
-      "release-notes.md": "44fcd9f82d2da9022919a247e9291992a07a0006c5a18b81f9f5e8c471959e7b",
+      "release-notes.md": "47b0c00693c7635edeab12229af642c886b58527ee5473397bc585d8deb03626",
       "review-checklist.md": "eba6ef8ee5167edf6f44409aba7c136e11805278d665209ac296bfea3bd6c49a",
-      "starter-prompts.json": "e9cb6d42aff8f62c1515bb6615378d921fbe948735912c80e7c1a6a84a6d7060",
-      "test-cases.json": "add13c89ff77c701c809274e3c7075b101d62b183e0bb21945c1b6fe47f07d53",
+      "starter-prompts.json": "019798ccf397653fd2d7bbd47f4392408908525885db516ed4a8939f4694dd7b",
+      "test-cases.json": "ed3945ffff384619fd63f043596dbecc3eb2c10bd76a8303bfb00912f6cc8956",
       "tool-scan.json": "ff38eb57f13fc704659de6e039c2cdcc1dddc2472a6341132cd0defbe4b8fc48"
     }
   },
@@ -71,11 +71,17 @@
       "list_health_checks",
       "get_health_check",
       "list_health_check_results",
-      "list_health_check_daily_rollups"
+      "list_health_check_daily_rollups",
+      "list_reports",
+      "get_report_content"
     ],
+    "combined_tool_contract_sha256": "6d55e01413b1def614c428b77a329f04a8acf21f4d7e8f98299651137aefa817",
+    "report_tool_contract_sha256": "33b0e3de5cc3c77ab621c95e26bdc37f7f64ba0c98326d994799ef1823080cdb",
+    "report_schema_source_sha256": "3500532c0be85b60eb2a22bbdd7a25adc0a3a332378bc070a993b18f37e522e9",
+    "report_wire_schema_sha256": "2c23a8c960b32daccff90fb7df5f8bb0006b9c49c09f210892fc71df2eafeee3",
     "tool_contract_sha256": "fcd3433e7d8ed5f3a8a743c91b0b45cd5ea330a2b13d02691144bdcbaca5aed7",
     "schemas_sha256": "f676d7a1c71e1a98c374614e011a97e219df342c7334b0eaac4da3860994d999",
-    "data_map_sha256": "25d07f2934a6ea824ab314f2e7af3d9bed024859221058207753b16deedb43f2",
+    "data_map_sha256": "e004dcc1345091d7140064b41bf72aeae5549d6bc4c0192b7d66dcf385c2b974",
     "reviewer_fixture_sha256": "7eeff32a1dd14b4cb0fe5126e04470e448cf3f73a54bfb4f7e9e8f64327c6758"
   },
   "manual_gates": [
@@ -88,6 +94,7 @@
     "portal_cimd_connection",
     "portal_domain_verification",
     "portal_current_tool_scan",
+    "saved_report_scope_connection_rescan_and_reviewer_evidence",
     "owner_submission_approval",
     "openai_review_and_approval",
     "separate_owner_publication_approval",

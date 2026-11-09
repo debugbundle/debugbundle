@@ -1,3 +1,4 @@
+import { REQUIRED_API_TABLES } from "../../../packages/storage/src/migrations.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { STORAGE_SCHEMA_MIGRATIONS } from "../../../packages/storage/src/schema-migrations.js";
 
@@ -93,106 +94,9 @@ import {
 
 function buildMigratedRuntimeSchemaRows(sql: string): { rows: Record<string, unknown>[] } {
   if (sql.includes("information_schema.tables")) {
-    return {
-      rows: [
-        { table_name: "billing_checkout_attempts" },
-        { table_name: "billing_subscription_operations" },
-        { table_name: "users" },
-        { table_name: "password_credentials" },
-        { table_name: "oauth_identities" },
-        { table_name: "sessions" },
-        { table_name: "email_auth_challenges" },
-        { table_name: "account_deletion_challenges" },
-        { table_name: "email_verification_tokens" },
-        { table_name: "password_reset_tokens" },
-        { table_name: "organizations" },
-        { table_name: "organization_members" },
-        { table_name: "projects" },
-        { table_name: "project_members" },
-        { table_name: "project_invites" },
-        { table_name: "project_tokens" },
-        { table_name: "member_tokens" },
-        { table_name: "agent_tokens" },
-        { table_name: "github_device_authorizations" },
-        { table_name: "probe_activations" },
-        { table_name: "availability_checks" },
-        { table_name: "availability_check_results" },
-        { table_name: "availability_check_daily_rollups" },
-        { table_name: "public_status_pages" },
-        { table_name: "public_status_page_projects" },
-        { table_name: "public_status_page_checks" },
-        { table_name: "services" },
-        { table_name: "service_input_aliases" },
-        { table_name: "service_project_aliases" },
-        { table_name: "project_merge_operations" },
-        { table_name: "project_merge_participants" },
-        { table_name: "project_legacy_bindings" },
-        { table_name: "service_definitions" },
-        { table_name: "deployments" },
-        { table_name: "bundle_generations" },
-        { table_name: "improvement_opportunities" },
-        { table_name: "improvement_opportunity_events" },
-        { table_name: "weekly_report_channels" },
-        { table_name: "operational_email_deliveries" },
-        { table_name: "incidents" },
-        { table_name: "incident_events" },
-        { table_name: "browser_recovery_events" },
-        { table_name: "evidence_context_events" },
-        { table_name: "evidence_ingestion_receipts" },
-        { table_name: "alert_rules" },
-        { table_name: "notification_preferences" },
-        { table_name: "notification_daily_batches" },
-        { table_name: "notification_daily_items" },
-        { table_name: "notification_daily_allowance_usage" },
-        { table_name: "alert_delivery_members" },
-        { table_name: "agent_webhooks" },
-        { table_name: "webhook_deliveries" },
-        { table_name: "slack_destinations" },
-        { table_name: "capture_policies" },
-        { table_name: "capture_rules" },
-        { table_name: "project_analytics_settings" },
-        { table_name: "analytics_ingestion_ledger" },
-        { table_name: "analytics_usage_counters" },
-        { table_name: "analytics_rollup_uniques" },
-        { table_name: "analytics_session_rollups" },
-        { table_name: "analytics_route_rollups" },
-        { table_name: "analytics_action_rollups" },
-        { table_name: "analytics_funnel_definitions" },
-        { table_name: "analytics_funnel_rollups" },
-        { table_name: "analytics_transition_rollups" },
-        { table_name: "analytics_journey_samples" },
-        { table_name: "analytics_opportunities" },
-        { table_name: "analytics_bundle_generations" },
-        { table_name: "analytics_incident_correlations" },
-        { table_name: "analytics_incident_session_links" },
-        { table_name: "analytics_flow_definitions" },
-        { table_name: "analytics_flow_runs" },
-        { table_name: "analytics_flow_handoffs" },
-        { table_name: "analytics_flow_rollups" },
-        { table_name: "audit_logs" },
-        { table_name: "processed_billing_events" },
-        { table_name: "account_analytics_accounts" },
-        { table_name: "account_metric_periods" },
-        { table_name: "account_metric_events" },
-        { table_name: "account_payment_retention_records" },
-        { table_name: "account_payment_provider_events" },
-        { table_name: "trial_lifecycle_events" },
-        { table_name: "plan_cleanup_tasks" },
-        { table_name: "project_usage_counters" },
-        { table_name: "ingestion_rejection_diagnostic_periods" },
-        { table_name: "processed_github_marketplace_events" },
-        { table_name: "github_installations" },
-        { table_name: "github_marketplace_accounts" },
-        { table_name: "project_github_repos" },
-        { table_name: "github_dispatch_rules" },
-        { table_name: "github_dispatch_deliveries" },
-        { table_name: "oauth_authorization_grants" },
-        { table_name: "oauth_authorization_codes" },
-        { table_name: "oauth_refresh_tokens" },
-        { table_name: "oauth_provider_artifacts" }
-      ]
-    };
+    return { rows: REQUIRED_API_TABLES.map((table_name) => ({ table_name })) };
   }
+  if (sql.includes("AS available")) return { rows: [{ available: true }] };
 
   if (sql.includes("AS project_service_schema_available")) {
     return { rows: [{ project_service_schema_available: true }] };
@@ -259,7 +163,25 @@ describe("api runtime start", () => {
       API_PORT: "3010"
     });
 
-    expect(queryMock).toHaveBeenCalledTimes(4);
+    // The current runtime validates additive access, financial and report
+    // structures as well as the installed table/ledger and project-scope guards.
+    expect(queryMock).toHaveBeenCalledTimes(19);
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining("organizations_trial_plan_check"),
+      expect.any(Array)
+    );
+    for (const table of [
+      "referral_reconciliation_events",
+      "referral_invoice_benefits",
+      "report_email_deliveries",
+      "report_collection_progress",
+      "report_health_recoveries"
+    ]) {
+      expect(queryMock).toHaveBeenCalledWith(
+        expect.stringContaining(`public.${table}`),
+        expect.any(Array)
+      );
+    }
     expect(queryMock).toHaveBeenCalledWith(
       expect.stringContaining("AS project_service_schema_available"),
       expect.any(Array)
@@ -389,6 +311,7 @@ describe("api runtime start", () => {
       expect.objectContaining({
         stripeWebhook: expect.objectContaining({
           stripeConfig: expect.objectContaining({ webhookSecret: "whsec_test" }),
+          captureReferralEvent: expect.any(Function),
           billingSummaryReader,
           billingEmails,
           auditLogging

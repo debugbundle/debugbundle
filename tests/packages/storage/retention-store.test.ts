@@ -29,6 +29,51 @@ function createMockRetentionStore(overrides: Partial<RetentionStore> = {}): Rete
 }
 
 describe("retention cleanup service", () => {
+  it.each([
+    "pruneExpiredReportLifecycleFacts",
+    "pruneExpiredReportSourceText",
+    "pruneExpiredReportAvailability"
+  ] as const)(
+    "prunes %s in bounded batches even without object deletion support",
+    async (method) => {
+      const pruneExpiredReportLifecycleFacts = vi
+        .fn()
+        .mockResolvedValueOnce(10)
+        .mockResolvedValueOnce(4);
+      const cleanup = createRetentionCleanupService({
+        retentionStore: createMockRetentionStore({ [method]: pruneExpiredReportLifecycleFacts }),
+        objectStore: {},
+        batchSize: 10,
+        maxBatches: 3
+      });
+      await cleanup.runCleanup({ scheduled_at: "2026-11-07T00:00:00.000Z" });
+      expect(pruneExpiredReportLifecycleFacts).toHaveBeenCalledTimes(2);
+      expect(pruneExpiredReportLifecycleFacts).toHaveBeenNthCalledWith(1, {
+        now: "2026-11-07T00:00:00.000Z",
+        limit: 10
+      });
+    }
+  );
+  it.each([
+    "pruneExpiredReportLifecycleFacts",
+    "pruneExpiredReportSourceText",
+    "pruneExpiredReportAvailability"
+  ] as const)(
+    "requests another cleanup pass when the bounded %s backlog remains",
+    async (method) => {
+      const pruneExpiredReportLifecycleFacts = vi.fn().mockResolvedValue(10);
+      const cleanup = createRetentionCleanupService({
+        retentionStore: createMockRetentionStore({ [method]: pruneExpiredReportLifecycleFacts }),
+        objectStore: {},
+        batchSize: 10,
+        maxBatches: 2
+      });
+      await expect(
+        cleanup.runCleanup({ scheduled_at: "2026-11-07T00:00:00.000Z" })
+      ).resolves.toEqual({ has_more: true });
+      expect(pruneExpiredReportLifecycleFacts).toHaveBeenCalledTimes(2);
+    }
+  );
   it("signals continuation after a full bounded cleanup and stops after the backlog drains", async () => {
     const pruneExpiredAnalyticsRollups = vi
       .fn()

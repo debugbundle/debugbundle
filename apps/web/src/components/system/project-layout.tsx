@@ -33,7 +33,12 @@ const PROJECT_TABS = [
 
 function canViewProjectMembers(project: ProjectRecord): boolean {
   const effectiveRole = getProjectEffectiveRole(project);
-  return effectiveRole === "owner" || effectiveRole === "admin" || effectiveRole === "member";
+  return (
+    effectiveRole === "owner" ||
+    effectiveRole === "admin" ||
+    effectiveRole === "member" ||
+    effectiveRole === "viewer"
+  );
 }
 
 export type ProjectTab = (typeof PROJECT_TABS)[number]["value"];

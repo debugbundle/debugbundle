@@ -78,9 +78,9 @@ describe("tier capabilities", () => {
     expect(getTierCapabilities("solo").availability_active_checks_per_organization).toBe(30);
     expect(getTierCapabilities("solo").availability_check_min_interval_seconds).toBe(60);
     expect(getTierCapabilities("solo").availability_check_recommended_failure_threshold).toBe(3);
-    expect(getTierCapabilities("team").availability_checks_per_project).toBe(10);
+    expect(getTierCapabilities("team").availability_checks_per_project).toBe(5);
     expect(getTierCapabilities("team").availability_monitored_projects_per_organization).toBe(10);
-    expect(getTierCapabilities("team").availability_active_checks_per_organization).toBe(50);
+    expect(getTierCapabilities("team").availability_active_checks_per_organization).toBe(30);
     expect(getTierCapabilities("team").availability_check_min_interval_seconds).toBe(60);
     expect(getTierCapabilities("team").availability_check_recommended_failure_threshold).toBe(2);
   });
@@ -192,9 +192,9 @@ describe("tier capabilities", () => {
     expect(TIER_CAPABILITIES.team.monthly_remote_activations).toBe(50);
     expect(TIER_CAPABILITIES.team.monthly_alert_deliveries).toBe(300);
     expect(TIER_CAPABILITIES.team.monthly_webhook_deliveries).toBe(1_000);
-    expect(TIER_CAPABILITIES.team.monthly_analytics_events).toBe(250_000);
-    expect(TIER_CAPABILITIES.team.monthly_analytics_sessions).toBe(50_000);
-    expect(TIER_CAPABILITIES.team.monthly_analytics_journey_samples).toBe(10_000);
+    expect(TIER_CAPABILITIES.team.monthly_analytics_events).toBe(25_000);
+    expect(TIER_CAPABILITIES.team.monthly_analytics_sessions).toBe(5_000);
+    expect(TIER_CAPABILITIES.team.monthly_analytics_journey_samples).toBe(1_000);
     expect(TIER_CAPABILITIES.team.monthly_analytics_bundle_generations).toBe(100);
     expect(TIER_CAPABILITIES.team.max_analytics_saved_funnels).toBe(50);
     expect(TIER_CAPABILITIES.team.max_analytics_custom_dimensions).toBe(8);
@@ -242,6 +242,11 @@ describe("self-host mode", () => {
 
     for (const plan of ["free", "solo", "team", undefined, "enterprise"] as const) {
       const caps = getTierCapabilities(plan);
+      expect(caps.smart_reports).toBe(true);
+      expect(caps.monthly_smart_report_generations).toBe(1_000_000);
+      expect(caps.max_smart_report_definitions).toBe(100);
+      expect(caps.max_smart_report_projects).toBe(10);
+      expect(caps.max_smart_report_recipients).toBe(10);
       expect(caps.remote_probes).toBe(true);
       expect(caps.github_automation).toBe(true);
       expect(caps.slack_integration).toBe(true);
@@ -272,5 +277,23 @@ describe("self-host mode", () => {
     expect(getTierCapabilities("free")).toEqual(TIER_CAPABILITIES.free);
     expect(getTierCapabilities("solo")).toEqual(TIER_CAPABILITIES.solo);
     expect(getTierCapabilities("team")).toEqual(TIER_CAPABILITIES.team);
+  });
+});
+
+describe("Smart Report entitlement", () => {
+  it("keeps reports Business-only while using one organisation allowance", () => {
+    for (const plan of ["free", "solo", "team"] as const)
+      expect(getTierCapabilities(plan)).toMatchObject({
+        smart_reports: false,
+        monthly_smart_report_generations: 0,
+        max_smart_report_definitions: 0
+      });
+    expect(getTierCapabilities("business")).toMatchObject({
+      smart_reports: true,
+      monthly_smart_report_generations: 40,
+      max_smart_report_definitions: 5,
+      max_smart_report_projects: 10,
+      max_smart_report_recipients: 10
+    });
   });
 });

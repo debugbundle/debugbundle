@@ -4,7 +4,42 @@ import { processNextDeliverOperationalEmailJob } from "../../../apps/worker/src/
 import { scheduleTrialLifecycleEmails } from "../../../apps/worker/src/trial-lifecycle-scheduler.js";
 
 describe("worker trial lifecycle", () => {
-  function createOperationalEmailDelivery(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  it("describes Business trial expiry and its report/access suspension without changing delivery semantics", async () => {
+    const send = vi.fn().mockResolvedValue(undefined),
+      mark = vi.fn().mockResolvedValue({ status: "delivered", next_attempt: null });
+    const result = await processNextDeliverOperationalEmailJob({
+      appBaseUrl: "https://app.example.test",
+      operationalEmailDeliveryStore: {
+        claimDueOperationalEmailDeliveries: vi
+          .fn()
+          .mockResolvedValue([{ delivery_id: "business-expired", attempt: 1 }]),
+        getOperationalEmailDelivery: vi
+          .fn()
+          .mockResolvedValue(
+            createOperationalEmailDelivery({
+              delivery_id: "business-expired",
+              kind: "trial_expired",
+              payload: { trial_plan: "business", trial_ended_at: "2026-11-08T00:00:00.000Z" }
+            })
+          ),
+        resolveOperationalEmailRecipientContext: vi
+          .fn()
+          .mockResolvedValue({ organization_name: "Trial", recipient_email: "owner@example.test" }),
+        markOperationalEmailDeliveryAttempt: mark
+      },
+      emailTransport: { send }
+    });
+    expect(result).toEqual({ processed: true });
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: expect.stringContaining("New Smart Report generation and email delivery")
+      })
+    );
+    expect(mark).toHaveBeenCalledWith(expect.objectContaining({ delivered: true }));
+  });
+  function createOperationalEmailDelivery(
+    overrides: Record<string, unknown> = {}
+  ): Record<string, unknown> {
     return {
       delivery_id: "op_123",
       organization_id: "org_123",

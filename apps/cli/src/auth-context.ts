@@ -2,6 +2,10 @@ import type { AnalyticsFlowHttpClient } from "./analytics-flow-commands.js";
 import { formatMutationOutcomeError } from "../../../packages/retrieval-client/src/mutation-outcome.js";
 import { nodeFetch } from "../../../packages/node-http/src/index.js";
 import {
+  createReportBinaryTransport,
+  type ReportBinaryHttpClient
+} from "../../../packages/report-client/src/index.js";
+import {
   createRetrievalApi,
   type HttpClient as RetrievalHttpClient,
   type HttpResponse as RetrievalHttpResponse
@@ -80,11 +84,13 @@ export function createCliHttpClient(
   ProjectManagementHttpClient &
   BillingHttpClient &
   GitHubManagementHttpClient &
-  SlackHttpClient {
+  SlackHttpClient &
+  ReportBinaryHttpClient {
   const fetchImpl = dependencies?.fetchImpl ?? nodeFetch;
   const baseUrl = normalizeBaseUrl(input.baseUrl);
 
   return {
+    ...createReportBinaryTransport({ baseUrl, fetchImpl }),
     async request(
       request
     ): Promise<

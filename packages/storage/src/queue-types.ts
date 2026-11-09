@@ -6,6 +6,7 @@ import type {
   ImmediateClientErrorPathRule
 } from "../../shared-types/src/index.js";
 import type { AlertSeverityLifecycleEvent } from "./alert-lifecycle.js";
+import type { ProjectJobRequestAuthority } from "./project-job-authorization.js";
 import type { BuildAnalyticsBundleJob } from "./analytics-bundle-jobs.js";
 import type { EvaluateAnalyticsOpportunitiesJob } from "./analytics-opportunity-jobs.js";
 import type { AlertConditionType, Queryable, RegressionDeployCorrelation } from "./types.js";
@@ -138,7 +139,7 @@ export interface GroupIncidentJob {
   };
 }
 
-export interface BuildBundleJob {
+export interface BuildBundleJob extends ProjectJobRequestAuthority {
   primary_event_id?: string;
   primary_occurred_at?: string;
   project_id: string;
@@ -155,7 +156,7 @@ export interface BuildBundleJob {
     | "regeneration";
 }
 
-export interface BuildReproductionJob {
+export interface BuildReproductionJob extends ProjectJobRequestAuthority {
   project_id: string;
   incident_id: string;
   bundle_key: string;

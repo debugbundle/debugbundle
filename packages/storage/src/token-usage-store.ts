@@ -1,3 +1,4 @@
+import { MemberTokenPolicySchema } from "../../shared-types/src/index.js";
 import type { Queryable, ResolveMemberResult, ResolveProjectResult } from "./types.js";
 
 // Ingestion authenticates frequently, so keep the dashboard timestamp useful without
@@ -71,6 +72,7 @@ export async function resolveMemberTokenAndRecordUsage(
       WITH resolved_token AS MATERIALIZED (
         SELECT
           mt.id AS token_id,
+          mt.scope_policy,
           mt.user_id AS member_id,
           mt.organization_id,
           u.email,
@@ -103,6 +105,8 @@ export async function resolveMemberTokenAndRecordUsage(
         RETURNING member_tokens.id
       )
       SELECT
+        resolved_token.token_id,
+        resolved_token.scope_policy,
         resolved_token.member_id,
         resolved_token.organization_id,
         resolved_token.email,
@@ -116,5 +120,11 @@ export async function resolveMemberTokenAndRecordUsage(
     [tokenHash, LAST_USED_WRITE_INTERVAL]
   );
 
-  return result.rows[0] ?? null;
+  const row = result.rows[0];
+  if (row === undefined) return null;
+  const { scope_policy: storedPolicy, ...principal } = row;
+  if (storedPolicy === null || storedPolicy === undefined) return principal;
+  const parsed = MemberTokenPolicySchema.safeParse(storedPolicy);
+  if (!parsed.success) return null;
+  return { ...principal, token_policy: parsed.data };
 }

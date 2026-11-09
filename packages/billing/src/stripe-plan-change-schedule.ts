@@ -1,6 +1,6 @@
 import type Stripe from "stripe";
 import type { StripeBillingProvider } from "./stripe-subscription.js";
-import { assertSupportedSubscriptionItems } from "./stripe-subscription.js";
+import { readStripeSubscriptionChangeWindow } from "./stripe-subscription-window.js";
 import {
   preservedPhaseSettings,
   preservedItemSettings,
@@ -18,31 +18,10 @@ export function planChangeItems(
   quantity: number;
   items: Array<{ id: string; price: string; quantity: number }>;
 } {
-  assertSupportedSubscriptionItems(subscription, provider.priceMap);
+  const window = readStripeSubscriptionChangeWindow(subscription, provider, now);
   const items = subscription.items.data;
-  const start = items[0]!.current_period_start,
-    end = items[0]!.current_period_end;
-  if (
-    !Number.isSafeInteger(start) ||
-    !Number.isSafeInteger(end) ||
-    end <= start ||
-    end * 1000 <= now ||
-    start * 1000 > now ||
-    items.some(
-      (item) =>
-        provider.priceMap.get(item.price.id)?.plan !== "team" ||
-        item.current_period_start !== start ||
-        item.current_period_end !== end ||
-        item.price.recurring?.interval !== "month" ||
-        item.price.recurring.interval_count !== 1 ||
-        item.billing_thresholds
-    ) ||
-    subscription.transfer_data ||
-    subscription.application_fee_percent ||
-    subscription.on_behalf_of ||
-    subscription.billing_thresholds ||
-    subscription.automatic_tax?.liability?.type === "account"
-  )
+  const { start, end } = window;
+  if (window.plan !== "team" || window.interval !== "month")
     throw new Error("unsupported_plan_change");
   return {
     start,

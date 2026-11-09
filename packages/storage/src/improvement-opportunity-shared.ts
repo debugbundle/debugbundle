@@ -9,7 +9,7 @@ import type {
 import type { Queryable, ImprovementRetrievalRecord } from "./types.js";
 
 export function normalizePlan(plan: string | null | undefined): TierName {
-  if (plan === "solo" || plan === "team") {
+  if (plan === "solo" || plan === "team" || plan === "business") {
     return plan;
   }
 

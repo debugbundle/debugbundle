@@ -10,3 +10,5 @@ export * from "./openai-oidc-configuration.js";
 export * from "./openai-access-token-verifier.js";
 export * from "./openai-cimd-fetch.js";
 export * from "./openai-oidc-provider.js";
+export * from "./project-authorization.js";
+export * from "./member-token-scope.js";

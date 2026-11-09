@@ -1,4 +1,9 @@
+import { createReportHealthStore } from "./report-health-store.js";
+import { createReportLifecycleStore } from "./report-lifecycle-store.js";
+import { createReportSourceTextStore } from "./report-source-text-store.js";
+import { createReportAvailabilityStore } from "./report-availability-store.js";
 import { TIER_CAPABILITIES } from "../../shared-types/src/index.js";
+import { pruneExpiredOrganizationCredentials } from "./organization-credential-retention.js";
 import {
   createEvidenceContextRetentionStore,
   cleanupDiagnosticContextRaw
@@ -101,8 +106,23 @@ async function pruneExpiredAnalyticsRollupTable(input: {
 }
 
 export function createPostgresRetentionStore(db: Queryable): RetentionStore {
+  const reportFacts = createReportLifecycleStore(db);
+  const reportText = createReportSourceTextStore(db);
+  const reportAvailability = createReportAvailabilityStore(db);
   return {
     ...createEvidenceContextRetentionStore(db),
+    pruneExpiredReportLifecycleFacts: (input) => reportFacts.prune(input),
+    pruneExpiredReportSourceText: (input) => reportText.prune(input),
+    pruneExpiredReportAvailability: async (input) => {
+      const removed = await reportAvailability.prune(input);
+      return (
+        removed +
+        (removed < input.limit
+          ? await createReportHealthStore(db).prune({ ...input, limit: input.limit - removed })
+          : 0)
+      );
+    },
+    pruneExpiredOrganizationCredentials: (input) => pruneExpiredOrganizationCredentials(db, input),
     async pruneExpiredBrowserRecoveryEvents(input) {
       const result = await db.query(
         `DELETE FROM browser_recovery_events WHERE event_id IN (
@@ -140,6 +160,7 @@ export function createPostgresRetentionStore(db: Queryable): RetentionStore {
               $1::timestamptz - CASE COALESCE(o.plan, 'free')
                 WHEN 'solo' THEN make_interval(days => $2::int)
                 WHEN 'team' THEN make_interval(days => $3::int)
+                WHEN 'business' THEN make_interval(days => $3::int)
                 ELSE make_interval(days => $4::int)
               END
             )
@@ -471,6 +492,7 @@ export function createPostgresRetentionStore(db: Queryable): RetentionStore {
               $1::timestamptz - CASE COALESCE(o.plan, 'free')
                 WHEN 'solo' THEN make_interval(days => $2::int)
                 WHEN 'team' THEN make_interval(days => $3::int)
+                WHEN 'business' THEN make_interval(days => $3::int)
                 ELSE make_interval(days => $4::int)
               END
             )
@@ -527,8 +549,36 @@ export function createRetentionCleanupService(input: {
 
   return {
     async runCleanup(job): Promise<RetentionCleanupResult> {
+      let reportFactsHaveMore = false;
+      for (const method of [
+        "pruneExpiredReportLifecycleFacts",
+        "pruneExpiredReportAvailability",
+        "pruneExpiredReportSourceText"
+      ] as const) {
+        if (input.retentionStore[method] === undefined) continue;
+        let hasMore = false;
+        for (let index = 0; index < maxBatches; index++) {
+          const deleted =
+            (await input.retentionStore[method]?.({
+              now: job.scheduled_at,
+              limit: batchSize
+            })) ?? 0;
+          hasMore = deleted >= batchSize;
+          if (!hasMore) break;
+        }
+        reportFactsHaveMore ||= hasMore;
+      }
+      if (input.retentionStore.pruneExpiredOrganizationCredentials !== undefined) {
+        for (let batchIndex = 0; batchIndex < maxBatches; batchIndex++) {
+          const deleted = await input.retentionStore.pruneExpiredOrganizationCredentials({
+            now: job.scheduled_at,
+            limit: batchSize
+          });
+          if (deleted < batchSize) break;
+        }
+      }
       if (input.objectStore.deleteObject === undefined) {
-        return;
+        return reportFactsHaveMore ? { has_more: true } : undefined;
       }
 
       for (let batchIndex = 0; batchIndex < maxBatches; batchIndex += 1) {
@@ -579,7 +629,7 @@ export function createRetentionCleanupService(input: {
           expiredAnalyticsBundleGenerations.length === 0 &&
           expiredIncidents.length === 0
         ) {
-          return;
+          return reportFactsHaveMore ? { has_more: true } : undefined;
         }
 
         const deletedReferences: RetentionRawEventReference[] = [];
@@ -698,7 +748,7 @@ export function createRetentionCleanupService(input: {
           deletedIncidents.length === 0 &&
           prunedRecovery === 0
         ) {
-          return;
+          return reportFactsHaveMore ? { has_more: true } : undefined;
         }
 
         if (
@@ -711,7 +761,7 @@ export function createRetentionCleanupService(input: {
           expiredAnalyticsBundleGenerations.length < batchSize &&
           expiredIncidents.length < batchSize
         ) {
-          return;
+          return reportFactsHaveMore ? { has_more: true } : undefined;
         }
       }
       // Yield after bounded work; the worker schedules one durable continuation.

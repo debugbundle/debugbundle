@@ -9,8 +9,8 @@ export interface SessionRecord {
   email: string;
   email_verified_at: string | null;
   organization_id: string;
-  organization_plan: "free" | "solo" | "team";
-  role: "owner" | "member";
+  organization_plan: "free" | "solo" | "team" | "business";
+  role: "owner" | "admin" | "member";
   created_at: string;
   expires_at: string;
   revoked_at: string | null;
@@ -40,12 +40,12 @@ export interface ProjectRecord {
   slug: string;
   environment_default: string;
   color_tag: ProjectColorTag | null;
-  organization_plan: "free" | "solo" | "team";
+  organization_plan: "free" | "solo" | "team" | "business";
   owner_user_id?: string;
   owner_email?: string;
   relationship?: "owned" | "shared";
   sharing_state?: "private" | "shared_by_you" | "shared_with_you";
-  effective_role?: "owner" | "admin" | "member";
+  effective_role?: "owner" | "admin" | "member" | "viewer";
   shared_access_suspended?: boolean;
   metrics: {
     open_incidents: number;
@@ -124,7 +124,7 @@ export interface BillingUsageMetric {
 }
 
 export interface BillingSummaryRecord {
-  plan: "free" | "solo" | "team";
+  plan: "free" | "solo" | "team" | "business";
   billing_state:
     | "active"
     | "past_due"
@@ -162,7 +162,7 @@ export interface BillingSummaryRecord {
   trial: {
     available: boolean;
     active: boolean;
-    plan: "solo" | "team" | null;
+    plan: "solo" | "team" | "business" | null;
     started_at: string | null;
     ends_at: string | null;
     used_at: string | null;

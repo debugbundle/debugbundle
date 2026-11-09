@@ -43,7 +43,11 @@ function buildStrictHttpOnlyCookieAttributes(options: { secure: boolean | undefi
   return `Path=/; HttpOnly; ${options.secure === false ? "" : "Secure; "}SameSite=Strict`;
 }
 
-function buildReviewGrantCookie(secret: string, expiresAt: string, options: { secure: boolean | undefined }): string {
+function buildReviewGrantCookie(
+  secret: string,
+  expiresAt: string,
+  options: { secure: boolean | undefined }
+): string {
   const value = createHmac("sha256", secret).update(REVIEW_GRANT_SCOPE, "utf8").digest("base64url");
   return `${REVIEW_GRANT_COOKIE_NAME}=${encodeURIComponent(value)}; ${buildStrictHttpOnlyCookieAttributes(options)}; Expires=${new Date(expiresAt).toUTCString()}`;
 }
@@ -69,12 +73,19 @@ function hasValidReviewGrantCookie(cookieHeader: string | undefined, secret: str
     return false;
   }
 
-  const expected = createHmac("sha256", secret).update(REVIEW_GRANT_SCOPE, "utf8").digest("base64url");
+  const expected = createHmac("sha256", secret)
+    .update(REVIEW_GRANT_SCOPE, "utf8")
+    .digest("base64url");
   return timingSafeStringEquals(cookieValue, expected);
 }
 
 function normalizeReviewGrantRedirectPath(path: string | undefined): string {
-  if (typeof path !== "string" || path.length === 0 || !path.startsWith("/") || path.startsWith("//")) {
+  if (
+    typeof path !== "string" ||
+    path.length === 0 ||
+    !path.startsWith("/") ||
+    path.startsWith("//")
+  ) {
     return "/login";
   }
 
@@ -209,8 +220,8 @@ function buildSessionResponse(
     email: string;
     email_verified_at: string | null;
     organization_id: string;
-    organization_plan: "free" | "solo" | "team";
-    role: "owner" | "member";
+    organization_plan: "free" | "solo" | "team" | "business";
+    role: "owner" | "admin" | "member";
     created_at: string;
     expires_at: string;
     revoked_at: string | null;
@@ -223,11 +234,9 @@ function buildSessionResponse(
     avatar_url?: string | null;
   } = {}
 ): {
-    session: Omit<
-      typeof session,
-      "has_email_auth" | "has_github_oauth" | "session_auth_method"
-    > & {
+  session: Omit<typeof session, "has_email_auth" | "has_github_oauth" | "session_auth_method"> & {
     csrf_token: string;
+    self_hosted?: boolean;
     avatar_url: string | null;
     auth_methods: {
       email: boolean;
@@ -253,6 +262,7 @@ function buildSessionResponse(
   return {
     session: {
       ...publicSession,
+      ...(isSelfHostMode() ? { self_hosted: true } : {}),
       avatar_url: avatarUrl,
       auth_methods: {
         email: has_email_auth ?? true,
@@ -268,12 +278,15 @@ async function resolveOrganizationPlan(
     organization_id: string;
     user_id: string;
     email: string;
-    role: "owner" | "member";
+    role: "owner" | "admin" | "member";
     actor_type: AuditLogActorType;
     ip_address: string;
   },
-  dependencies: Pick<ApiDependencies, "auditLogging" | "billingAdmin" | "billingManagement" | "projectManagement">
-): Promise<"free" | "solo" | "team"> {
+  dependencies: Pick<
+    ApiDependencies,
+    "auditLogging" | "billingAdmin" | "billingManagement" | "projectManagement"
+  >
+): Promise<"free" | "solo" | "team" | "business"> {
   const now = new Date().toISOString();
   const adminDefault =
     input.role === "owner"
@@ -319,7 +332,11 @@ async function resolveOrganizationPlan(
     limit: 1
   });
 
-  if (projects?.[0]?.organization_plan === "solo" || projects?.[0]?.organization_plan === "team") {
+  if (
+    projects?.[0]?.organization_plan === "solo" ||
+    projects?.[0]?.organization_plan === "team" ||
+    projects?.[0]?.organization_plan === "business"
+  ) {
     return projects[0].organization_plan;
   }
 
@@ -332,10 +349,10 @@ async function applyReviewAccessGrant(
     organization_id: string;
     user_id: string;
     email: string;
-    role: "owner" | "member";
+    role: "owner" | "admin" | "member";
   },
   dependencies: Pick<ApiDependencies, "auditLogging" | "billingAdmin" | "billingManagement">
-): Promise<{ plan?: "free" | "solo" | "team"; clear_cookie: boolean }> {
+): Promise<{ plan?: "free" | "solo" | "team" | "business"; clear_cookie: boolean }> {
   const secret = readReviewAccessSecret();
   if (secret === null || !hasValidReviewGrantCookie(request.headers.cookie, secret)) {
     return { clear_cookie: false };
@@ -464,12 +481,18 @@ async function resolveOrganizationPlanForRequest(
     organization_id: string;
     user_id: string;
     email: string;
-    role: "owner" | "member";
+    role: "owner" | "admin" | "member";
     actor_type: AuditLogActorType;
     ip_address: string;
   },
-  dependencies: Pick<ApiDependencies, "auditLogging" | "billingAdmin" | "billingManagement" | "projectManagement">
-): Promise<{ organization_plan: "free" | "solo" | "team"; clear_review_cookie: boolean }> {
+  dependencies: Pick<
+    ApiDependencies,
+    "auditLogging" | "billingAdmin" | "billingManagement" | "projectManagement"
+  >
+): Promise<{
+  organization_plan: "free" | "solo" | "team" | "business";
+  clear_review_cookie: boolean;
+}> {
   const reviewGrant = await applyReviewAccessGrant(request, input, dependencies);
   if (reviewGrant.plan !== undefined) {
     return {
@@ -504,16 +527,22 @@ async function enforceAuthRateLimit(
     return true;
   }
 
-  await reply.header("Retry-After", toRetryAfterSeconds(rateLimit.retry_after_ms)).status(429).send({
-    error: "rate_limited"
-  });
+  await reply
+    .header("Retry-After", toRetryAfterSeconds(rateLimit.retry_after_ms))
+    .status(429)
+    .send({
+      error: "rate_limited"
+    });
   return false;
 }
 
 export function registerAuthRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   assertDevGithubMockNotEnabledInProduction();
 
-  const handleReviewAccess = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  const handleReviewAccess = async (
+    request: FastifyRequest,
+    reply: FastifyReply
+  ): Promise<void> => {
     const secret = readReviewAccessSecret();
     if (secret === null) {
       await reply.status(404).send({ error: "not_found" });
@@ -538,7 +567,10 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: ApiDepend
     }
 
     const expiresAt = new Date(Date.now() + REVIEW_GRANT_TTL_MS).toISOString();
-    reply.header("Set-Cookie", buildReviewGrantCookie(secret, expiresAt, { secure: shouldUseSecureCookies() }));
+    reply.header(
+      "Set-Cookie",
+      buildReviewGrantCookie(secret, expiresAt, { secure: shouldUseSecureCookies() })
+    );
     await reply.redirect(resolveAppRedirectUrl(parsedQuery.data.next));
   };
 
@@ -554,259 +586,293 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: ApiDepend
     isDevGithubMockEnabled
   });
 
-  app.post("/v1/auth/github/device/start", { bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES }, async (request, reply) => {
-    if (!(await enforceAuthRateLimit(request, reply, dependencies))) {
-      return;
-    }
+  app.post(
+    "/v1/auth/github/device/start",
+    { bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES },
+    async (request, reply) => {
+      if (!(await enforceAuthRateLimit(request, reply, dependencies))) {
+        return;
+      }
 
-    if (dependencies.githubCliAuth === undefined) {
-      return reply.status(503).send({
-        error: "auth_not_configured"
+      if (dependencies.githubCliAuth === undefined) {
+        return reply.status(503).send({
+          error: "auth_not_configured"
+        });
+      }
+
+      const parsedBody = GithubDeviceStartBodySchema.safeParse(request.body);
+      if (!parsedBody.success) {
+        return reply.status(400).send({
+          error: "invalid_payload"
+        });
+      }
+
+      const now = new Date();
+      const started = await dependencies.githubCliAuth.beginDeviceAuth({
+        accepted_terms_at: now.toISOString(),
+        now
+      });
+
+      if (!started.ok) {
+        return reply.status(503).send({
+          error:
+            started.error === "device_flow_disabled"
+              ? "github_device_flow_disabled"
+              : started.error === "provider_error"
+                ? "github_oauth_unavailable"
+                : "auth_not_configured"
+        });
+      }
+
+      return reply.status(200).send({
+        request_id: started.request_id,
+        user_code: started.user_code,
+        verification_uri: started.verification_uri,
+        interval_seconds: started.interval_seconds,
+        expires_at: started.expires_at
       });
     }
+  );
 
-    const parsedBody = GithubDeviceStartBodySchema.safeParse(request.body);
-    if (!parsedBody.success) {
-      return reply.status(400).send({
-        error: "invalid_payload"
+  app.post(
+    "/v1/auth/github/device/poll",
+    { bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES },
+    async (request, reply) => {
+      if (!(await enforceAuthRateLimit(request, reply, dependencies))) {
+        return;
+      }
+
+      if (dependencies.githubCliAuth === undefined) {
+        return reply.status(503).send({
+          error: "auth_not_configured"
+        });
+      }
+
+      const parsedBody = GithubDevicePollBodySchema.safeParse(request.body);
+      if (!parsedBody.success) {
+        return reply.status(400).send({
+          error: "invalid_payload"
+        });
+      }
+
+      const polled = await dependencies.githubCliAuth.pollDeviceAuth({
+        request_id: parsedBody.data.request_id,
+        now: new Date()
       });
-    }
 
-    const now = new Date();
-    const started = await dependencies.githubCliAuth.beginDeviceAuth({
-      accepted_terms_at: now.toISOString(),
-      now
-    });
-
-    if (!started.ok) {
-      return reply.status(503).send({
-        error:
-          started.error === "device_flow_disabled"
-            ? "github_device_flow_disabled"
-            : started.error === "provider_error"
-              ? "github_oauth_unavailable"
+      if (!polled.ok) {
+        return reply.status(polled.error === "request_not_found" ? 404 : 503).send({
+          error:
+            polled.error === "request_not_found"
+              ? "github_device_request_not_found"
               : "auth_not_configured"
+        });
+      }
+
+      if (polled.status === "pending") {
+        return reply.status(200).send({
+          status: polled.status,
+          interval_seconds: polled.interval_seconds,
+          expires_at: polled.expires_at
+        });
+      }
+
+      if (polled.status === "approved" || polled.status === "claimed") {
+        return reply.status(200).send({
+          status: polled.status,
+          expires_at: polled.expires_at
+        });
+      }
+
+      if (
+        polled.status === "denied" ||
+        polled.status === "expired" ||
+        polled.status === "rejected"
+      ) {
+        return reply.status(200).send({
+          status: polled.status,
+          reason: polled.reason,
+          expires_at: polled.expires_at
+        });
+      }
+
+      return reply.status(500).send({
+        error: "internal_error"
       });
     }
+  );
 
-    return reply.status(200).send({
-      request_id: started.request_id,
-      user_code: started.user_code,
-      verification_uri: started.verification_uri,
-      interval_seconds: started.interval_seconds,
-      expires_at: started.expires_at
-    });
-  });
+  app.post(
+    "/v1/auth/github/device/claim",
+    { bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES },
+    async (request, reply) => {
+      if (!(await enforceAuthRateLimit(request, reply, dependencies))) {
+        return;
+      }
 
-  app.post("/v1/auth/github/device/poll", { bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES }, async (request, reply) => {
-    if (!(await enforceAuthRateLimit(request, reply, dependencies))) {
-      return;
-    }
+      if (dependencies.githubCliAuth === undefined) {
+        return reply.status(503).send({
+          error: "auth_not_configured"
+        });
+      }
 
-    if (dependencies.githubCliAuth === undefined) {
-      return reply.status(503).send({
-        error: "auth_not_configured"
+      const parsedBody = GithubDeviceClaimBodySchema.safeParse(request.body);
+      if (!parsedBody.success) {
+        return reply.status(400).send({
+          error: "invalid_payload"
+        });
+      }
+
+      const claimed = await dependencies.githubCliAuth.claimDeviceAuth({
+        request_id: parsedBody.data.request_id,
+        label: parsedBody.data.label,
+        now: new Date()
       });
-    }
 
-    const parsedBody = GithubDevicePollBodySchema.safeParse(request.body);
-    if (!parsedBody.success) {
-      return reply.status(400).send({
-        error: "invalid_payload"
+      if (!claimed.ok) {
+        const statusCode =
+          claimed.error === "request_not_found"
+            ? 404
+            : claimed.error === "provider_not_configured"
+              ? 503
+              : 409;
+        const error =
+          claimed.error === "request_not_found"
+            ? "github_device_request_not_found"
+            : claimed.error === "provider_not_configured"
+              ? "auth_not_configured"
+              : claimed.error === "pending"
+                ? "github_device_auth_pending"
+                : claimed.error === "expired"
+                  ? "github_device_auth_expired"
+                  : claimed.error === "claimed"
+                    ? "github_device_auth_claimed"
+                    : "github_device_auth_rejected";
+
+        return reply.status(statusCode).send({ error });
+      }
+
+      await recordGitHubBootstrapSuccess(dependencies, request, {
+        user_id: claimed.token.user_id,
+        organization_id: claimed.token.organization_id,
+        token_id: claimed.token.token_id,
+        created_user: false,
+        authentication_method: "github_device"
       });
+
+      return reply.status(200).send(buildIssuedMemberTokenResponse(claimed.token));
     }
+  );
 
-    const polled = await dependencies.githubCliAuth.pollDeviceAuth({
-      request_id: parsedBody.data.request_id,
-      now: new Date()
-    });
+  app.post(
+    "/v1/auth/github/token/exchange",
+    { bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES },
+    async (request, reply) => {
+      if (!(await enforceAuthRateLimit(request, reply, dependencies))) {
+        return;
+      }
 
-    if (!polled.ok) {
-      return reply.status(polled.error === "request_not_found" ? 404 : 503).send({
-        error: polled.error === "request_not_found" ? "github_device_request_not_found" : "auth_not_configured"
+      if (dependencies.githubCliAuth === undefined) {
+        return reply.status(503).send({
+          error: "auth_not_configured"
+        });
+      }
+
+      const parsedBody = GithubTokenExchangeBodySchema.safeParse(request.body);
+      if (!parsedBody.success) {
+        return reply.status(400).send({
+          error: "invalid_payload"
+        });
+      }
+
+      const exchanged = await dependencies.githubCliAuth.exchangeGitHubAccessToken({
+        github_access_token: parsedBody.data.github_access_token,
+        label: parsedBody.data.label || DEFAULT_GITHUB_BOOTSTRAP_LABEL,
+        accepted_terms_at: new Date().toISOString(),
+        now: new Date()
       });
-    }
 
-    if (polled.status === "pending") {
-      return reply.status(200).send({
-        status: polled.status,
-        interval_seconds: polled.interval_seconds,
-        expires_at: polled.expires_at
-      });
-    }
+      if (!exchanged.ok) {
+        const statusCode =
+          exchanged.error === "provider_not_configured"
+            ? 503
+            : exchanged.error === "oauth_exchange_failed"
+              ? 401
+              : exchanged.error === "account_suspended"
+                ? 403
+                : 400;
 
-    if (polled.status === "approved" || polled.status === "claimed") {
-      return reply.status(200).send({
-        status: polled.status,
-        expires_at: polled.expires_at
-      });
-    }
-
-    if (polled.status === "denied" || polled.status === "expired" || polled.status === "rejected") {
-      return reply.status(200).send({
-        status: polled.status,
-        reason: polled.reason,
-        expires_at: polled.expires_at
-      });
-    }
-
-    return reply.status(500).send({
-      error: "internal_error"
-    });
-  });
-
-  app.post("/v1/auth/github/device/claim", { bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES }, async (request, reply) => {
-    if (!(await enforceAuthRateLimit(request, reply, dependencies))) {
-      return;
-    }
-
-    if (dependencies.githubCliAuth === undefined) {
-      return reply.status(503).send({
-        error: "auth_not_configured"
-      });
-    }
-
-    const parsedBody = GithubDeviceClaimBodySchema.safeParse(request.body);
-    if (!parsedBody.success) {
-      return reply.status(400).send({
-        error: "invalid_payload"
-      });
-    }
-
-    const claimed = await dependencies.githubCliAuth.claimDeviceAuth({
-      request_id: parsedBody.data.request_id,
-      label: parsedBody.data.label,
-      now: new Date()
-    });
-
-    if (!claimed.ok) {
-      const statusCode = claimed.error === "request_not_found" ? 404 : claimed.error === "provider_not_configured" ? 503 : 409;
-      const error =
-        claimed.error === "request_not_found"
-          ? "github_device_request_not_found"
-          : claimed.error === "provider_not_configured"
+        const error =
+          exchanged.error === "provider_not_configured"
             ? "auth_not_configured"
-            : claimed.error === "pending"
-              ? "github_device_auth_pending"
-              : claimed.error === "expired"
-                ? "github_device_auth_expired"
-                : claimed.error === "claimed"
-                  ? "github_device_auth_claimed"
-                  : "github_device_auth_rejected";
+            : exchanged.error === "oauth_exchange_failed"
+              ? "invalid_github_token"
+              : exchanged.error;
 
-      return reply.status(statusCode).send({ error });
-    }
-
-    await recordGitHubBootstrapSuccess(dependencies, request, {
-      user_id: claimed.token.user_id,
-      organization_id: claimed.token.organization_id,
-      token_id: claimed.token.token_id,
-      created_user: false,
-      authentication_method: "github_device"
-    });
-
-    return reply.status(200).send(buildIssuedMemberTokenResponse(claimed.token));
-  });
-
-  app.post("/v1/auth/github/token/exchange", { bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES }, async (request, reply) => {
-    if (!(await enforceAuthRateLimit(request, reply, dependencies))) {
-      return;
-    }
-
-    if (dependencies.githubCliAuth === undefined) {
-      return reply.status(503).send({
-        error: "auth_not_configured"
-      });
-    }
-
-    const parsedBody = GithubTokenExchangeBodySchema.safeParse(request.body);
-    if (!parsedBody.success) {
-      return reply.status(400).send({
-        error: "invalid_payload"
-      });
-    }
-
-    const exchanged = await dependencies.githubCliAuth.exchangeGitHubAccessToken({
-      github_access_token: parsedBody.data.github_access_token,
-      label: parsedBody.data.label || DEFAULT_GITHUB_BOOTSTRAP_LABEL,
-      accepted_terms_at: new Date().toISOString(),
-      now: new Date()
-    });
-
-    if (!exchanged.ok) {
-      const statusCode =
-        exchanged.error === "provider_not_configured"
-          ? 503
-          : exchanged.error === "oauth_exchange_failed"
-            ? 401
-            : exchanged.error === "account_suspended"
-              ? 403
-              : 400;
-
-      const error =
-        exchanged.error === "provider_not_configured"
-          ? "auth_not_configured"
-          : exchanged.error === "oauth_exchange_failed"
-            ? "invalid_github_token"
-            : exchanged.error;
-
-      return reply.status(statusCode).send({ error });
-    }
-
-    await recordGitHubBootstrapSuccess(dependencies, request, {
-      user_id: exchanged.token.user_id,
-      organization_id: exchanged.token.organization_id,
-      token_id: exchanged.token.token_id,
-      created_user: exchanged.created_user,
-      authentication_method: "github_cli"
-    });
-
-    return reply.status(200).send(buildIssuedMemberTokenResponse(exchanged.token));
-  });
-
-  app.post("/v1/auth/project-invite/accept", { bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES }, async (request, reply) => {
-    if (dependencies.webAuth === undefined) {
-      return reply.status(503).send({
-        error: "auth_not_configured"
-      });
-    }
-
-    const parsedBody = AcceptInviteBodySchema.safeParse(request.body);
-    if (!parsedBody.success) {
-      return reply.status(400).send({
-        error: "invalid_payload"
-      });
-    }
-
-    const sessionToken = readCookieValue(request.headers.cookie, SESSION_COOKIE_NAME);
-    if (sessionToken === null) {
-      return reply.status(401).send({
-        error: "invalid_session"
-      });
-    }
-
-    const accepted = await dependencies.webAuth.acceptInviteForSession(sessionToken, {
-      token: parsedBody.data.token,
-      now: new Date()
-    });
-    if (!accepted.ok) {
-      if (accepted.error === "invalid_session") {
-        return reply.status(401).send({ error: "invalid_session" });
-      }
-      if (accepted.error === "invite_email_mismatch") {
-        return reply.status(403).send({ error: "invite_email_mismatch" });
-      }
-      if (accepted.error === "shared_access_suspended") {
-        return reply.status(403).send({ error: "shared_access_suspended" });
+        return reply.status(statusCode).send({ error });
       }
 
-      return reply.status(400).send({ error: "invalid_token" });
-    }
+      await recordGitHubBootstrapSuccess(dependencies, request, {
+        user_id: exchanged.token.user_id,
+        organization_id: exchanged.token.organization_id,
+        token_id: exchanged.token.token_id,
+        created_user: exchanged.created_user,
+        authentication_method: "github_cli"
+      });
 
-    return reply.status(200).send({
-      membership: accepted.membership
-    });
-  });
+      return reply.status(200).send(buildIssuedMemberTokenResponse(exchanged.token));
+    }
+  );
+
+  app.post(
+    "/v1/auth/project-invite/accept",
+    { bodyLimit: SMALL_REQUEST_BODY_LIMIT_BYTES },
+    async (request, reply) => {
+      if (dependencies.webAuth === undefined) {
+        return reply.status(503).send({
+          error: "auth_not_configured"
+        });
+      }
+
+      const parsedBody = AcceptInviteBodySchema.safeParse(request.body);
+      if (!parsedBody.success) {
+        return reply.status(400).send({
+          error: "invalid_payload"
+        });
+      }
+
+      const sessionToken = readCookieValue(request.headers.cookie, SESSION_COOKIE_NAME);
+      if (sessionToken === null) {
+        return reply.status(401).send({
+          error: "invalid_session"
+        });
+      }
+
+      const accepted = await dependencies.webAuth.acceptInviteForSession(sessionToken, {
+        token: parsedBody.data.token,
+        now: new Date()
+      });
+      if (!accepted.ok) {
+        if (accepted.error === "collaborator_limit_reached")
+          return reply.status(409).send({ error: "collaborator_limit_reached" });
+        if (accepted.error === "invalid_session") {
+          return reply.status(401).send({ error: "invalid_session" });
+        }
+        if (accepted.error === "invite_email_mismatch") {
+          return reply.status(403).send({ error: "invite_email_mismatch" });
+        }
+        if (accepted.error === "shared_access_suspended") {
+          return reply.status(403).send({ error: "shared_access_suspended" });
+        }
+
+        return reply.status(400).send({ error: "invalid_token" });
+      }
+
+      return reply.status(200).send({
+        membership: accepted.membership
+      });
+    }
+  );
 
   app.get("/v1/auth/session", async (request, reply) => {
     if (dependencies.webAuth === undefined) {
@@ -844,7 +910,10 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: ApiDepend
       dependencies
     );
     if (plan.clear_review_cookie) {
-      appendSetCookieHeader(reply, buildClearedReviewGrantCookie({ secure: shouldUseSecureCookies() }));
+      appendSetCookieHeader(
+        reply,
+        buildClearedReviewGrantCookie({ secure: shouldUseSecureCookies() })
+      );
     }
 
     return reply.status(200).send({

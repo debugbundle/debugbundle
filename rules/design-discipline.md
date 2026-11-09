@@ -136,6 +136,11 @@ The agent must ensure:
 - related items grouped together
 - spacing used intentionally to separate and connect content
 - supporting text does not visually compete with key actions
+
+For section status/category badges, put the title first and its badges immediately
+to the right using `components/system/title-badge-row.tsx`. Keep the existing
+heading semantics and badge variants. Allow badges and actions to wrap below the
+title at narrow widths rather than clipping content or forcing horizontal scroll.
 - destructive actions are distinct and appropriately de-emphasized unless the task is explicitly destructive
 
 Avoid flat interfaces where everything has the same weight.

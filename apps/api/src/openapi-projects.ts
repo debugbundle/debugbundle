@@ -4,6 +4,7 @@ import {
   CreateProjectBodySchema,
   CreateTokenBodySchema,
   MemberTokenParamsSchema,
+  MemberTokenListQuerySchema,
   ProjectInviteParamsSchema,
   ProjectMemberParamsSchema,
   ProjectParamsSchema,
@@ -341,7 +342,7 @@ export function projectsOperations(): OperationSpec[] {
       summary: "List member tokens",
       tags: ["Tokens"],
       security: anyMemberAuth,
-      query: TokenListQuerySchema,
+      query: MemberTokenListQuerySchema,
       responses: {
         "200": { description: "Member tokens.", schema: tokenListResponse },
         "400": { description: "Invalid query parameters.", schema: apiError },
@@ -362,7 +363,8 @@ export function projectsOperations(): OperationSpec[] {
         "400": { description: "Invalid request body.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
         "403": {
-          description: "Verified email is required before creating the first member token.",
+          description:
+            "Verified email is required for first-token creation; new scoped creation requires a verified browser session. Restricted tokens cannot mint credentials.",
           schema: apiError
         }
       }

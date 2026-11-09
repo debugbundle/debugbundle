@@ -13,9 +13,6 @@ export function HostedImprovementsUpgradeCallout({
       : "Hosted automated improvement bundles are available on paid plans. Upgrade before reviewing workspace-wide deterministic hardening signals or generated improvement bundles.";
 
   return (
-    <PlanUpgradeCallout
-      title="Upgrade to Solo or Team to unlock hosted improvements"
-      description={description}
-    />
+    <PlanUpgradeCallout title="Upgrade to unlock hosted improvements" description={description} />
   );
 }

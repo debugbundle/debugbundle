@@ -1,3 +1,4 @@
+import { memberReadScope } from "../member-access-scope.js";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
@@ -56,7 +57,7 @@ export function registerProjectMergeRoutes(
         if (!member) return;
         const store = dependencies.projectMerges;
         if (!store) return reply.status(503).send({ error: "project_merges_unavailable" });
-        const scope = { user_id: member.member_id };
+        const scope = { ...memberReadScope(member), user_id: member.member_id };
         let failure: string | undefined;
         let operationId: string | undefined;
         const invalid = (): typeof reply => {

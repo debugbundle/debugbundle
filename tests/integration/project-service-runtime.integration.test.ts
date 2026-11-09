@@ -3,14 +3,17 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterAll, expect, it } from "vitest";
-import { GetObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
+import { GetObjectCommand, ListObjectsV2Command, PutObjectCommand } from "@aws-sdk/client-s3";
 import { generateMemberToken, generateProjectToken } from "../../packages/auth/src/index.js";
 import { migrateStorageSchema } from "../../packages/storage/src/schema-migrations.js";
 import type {
   ProjectMergePlan,
   ProjectMergeOperation
 } from "../../packages/shared-types/src/project-consolidation.js";
-import { restoreStoragePredecessor } from "../helpers/storage-predecessor.js";
+import {
+  restoreStoragePredecessor,
+  POST_PREDECESSOR_MIGRATION_IDS
+} from "../helpers/storage-predecessor.js";
 import {
   installRuntimeClients,
   runtimePort,
@@ -43,6 +46,14 @@ runIntegration("installed project/service runtime compatibility", () => {
     await mkdir(proofRoot, { recursive: true });
     try {
       await restoreStoragePredecessor(pool);
+      const foreignKey = `runtime-unrelated/${randomUUID()}/sentinel`;
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: s3Bucket,
+          Key: foreignKey,
+          Body: "preserve unrelated test data"
+        })
+      );
       const target = randomUUID(),
         source = randomUUID(),
         org = randomUUID(),
@@ -77,7 +88,9 @@ runIntegration("installed project/service runtime compatibility", () => {
           "INSERT INTO project_tokens(id,project_id,token_hash,label) VALUES($1,$2,$3,'Installed fixture')",
           [randomUUID(), id, token.hash]
         );
-      expect((await migrateStorageSchema(createQueryable(pool))).applied).toHaveLength(2);
+      expect((await migrateStorageSchema(createQueryable(pool))).applied).toEqual(
+        POST_PREDECESSOR_MIGRATION_IDS
+      );
       expect(
         (await pool.query("SELECT scope_origin_ids FROM project_tokens ORDER BY id")).rows
       ).toEqual([{ scope_origin_ids: null }, { scope_origin_ids: null }]);
@@ -359,9 +372,18 @@ runIntegration("installed project/service runtime compatibility", () => {
         (await pool.query("SELECT id FROM projects WHERE id=ANY($1::uuid[])", [[target, source]]))
           .rows
       ).toEqual([]);
+      const remaining =
+        (await s3.send(new ListObjectsV2Command({ Bucket: s3Bucket }))).Contents ?? [];
       expect(
-        (await s3.send(new ListObjectsV2Command({ Bucket: s3Bucket }))).Contents ?? []
+        remaining.filter((object) =>
+          new Set<string>([target, source]).has(object.Key?.split("/")[1] ?? "")
+        )
       ).toEqual([]);
+      expect(
+        await (
+          await s3.send(new GetObjectCommand({ Bucket: s3Bucket, Key: foreignKey }))
+        ).Body!.transformToString()
+      ).toBe("preserve unrelated test data");
       await writeFile(
         join(proofRoot, "receipt.json"),
         JSON.stringify(

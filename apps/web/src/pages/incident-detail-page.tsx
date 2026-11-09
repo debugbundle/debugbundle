@@ -35,6 +35,7 @@ import { formatIncidentMatchedFields } from "../lib/incident-copy.js";
 import { showErrorToast, showSuccessToast } from "../lib/notify.js";
 import { useDelayedVisibility } from "../lib/use-delayed-visibility.js";
 import { cn } from "../lib/utils.js";
+import { useProjectMutationAccess } from "../lib/use-project-mutation-access.js";
 
 const ARTIFACT_POLL_INTERVAL_MS = 2_000;
 
@@ -48,6 +49,7 @@ export function IncidentDetailPage(): JSX.Element {
   const backDestination = resolveIncidentBackDestination(location.pathname, projectId);
   const backLabel = resolveIncidentBackLabel(location.pathname, projectId);
   const showIncidentLoading = useDelayedVisibility(incident === undefined);
+  const { canMutate, canManage } = useProjectMutationAccess(incident?.project_id);
 
   const generation = useRef(0);
   useEffect(() => {
@@ -55,6 +57,7 @@ export function IncidentDetailPage(): JSX.Element {
     setIncident(undefined);
     setError(false);
     setIsResolving(false);
+    setIsCaptureRulesOpen(false);
     if (incidentId !== undefined) {
       void getIncident(incidentId)
         .then((result) => {
@@ -119,7 +122,7 @@ export function IncidentDetailPage(): JSX.Element {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {incident.status !== "resolved" ? (
+              {canMutate && incident.status !== "resolved" ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -146,14 +149,16 @@ export function IncidentDetailPage(): JSX.Element {
                   {isResolving ? "Resolving..." : "Mark resolved"}
                 </Button>
               ) : null}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setIsCaptureRulesOpen(true)}
-              >
-                Reduce noise
-              </Button>
+              {canManage ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsCaptureRulesOpen(true)}
+                >
+                  Reduce noise
+                </Button>
+              ) : null}
               <Badge variant={severityVariantMap[incident.severity]}>{incident.severity}</Badge>
               <Badge variant={statusVariantMap[incident.status]}>{incident.status}</Badge>
             </div>
@@ -227,12 +232,14 @@ export function IncidentDetailPage(): JSX.Element {
             </TabsContent>
           </Tabs>
 
-          <IncidentCaptureRuleSuggestionsDialog
-            incidentId={incident.incident_id}
-            open={isCaptureRulesOpen}
-            onOpenChange={setIsCaptureRulesOpen}
-            projectId={incident.project_id}
-          />
+          {canManage ? (
+            <IncidentCaptureRuleSuggestionsDialog
+              incidentId={incident.incident_id}
+              open={isCaptureRulesOpen}
+              onOpenChange={setIsCaptureRulesOpen}
+              projectId={incident.project_id}
+            />
+          ) : null}
         </>
       )}
     </div>

@@ -1,4 +1,5 @@
-export interface BuildImprovementBundleJob {
+import type { ProjectJobRequestAuthority } from "./project-job-authorization.js";
+export interface BuildImprovementBundleJob extends ProjectJobRequestAuthority {
   project_id: string;
   opportunity_id: string;
   event_id: string;

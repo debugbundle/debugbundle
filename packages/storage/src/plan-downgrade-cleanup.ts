@@ -4,6 +4,7 @@ import { getTierCapabilities } from "../../shared-types/src/index.js";
 import type { Queryable } from "./types.js";
 
 export interface OrganizationPlanCleanupSummary {
+  paused_business_grants?: number;
   suspended_project_invites: number;
   suspended_project_members: number;
   suspended_slack_alert_rules: number;
@@ -23,6 +24,7 @@ export interface OrganizationPlanCleanupService {
   cleanupOrganizationForPlan(input: {
     organization_id: string;
     plan: TierName;
+    previous_plan?: TierName;
     now?: string;
   }): Promise<OrganizationPlanCleanupSummary>;
 }
@@ -47,11 +49,25 @@ function getChangedRowCount(result: { rows: unknown[]; rowCount?: number | null 
   return typeof result.rowCount === "number" ? result.rowCount : result.rows.length;
 }
 
-export function createOrganizationPlanCleanupService(db: Queryable): OrganizationPlanCleanupService {
+export function createOrganizationPlanCleanupService(
+  db: Queryable
+): OrganizationPlanCleanupService {
   return {
     async cleanupOrganizationForPlan(input): Promise<OrganizationPlanCleanupSummary> {
       const capabilities = getTierCapabilities(input.plan);
       const summary: OrganizationPlanCleanupSummary = { ...EMPTY_CLEANUP_SUMMARY };
+
+      if (input.previous_plan === "business" && input.plan !== "business") {
+        // Preserve direct collaboration and saved grants. Re-upgrade requires
+        // an explicit Owner review before inherited access can return.
+        const result = await db.query(
+          `UPDATE organization_members SET grants_paused_at=COALESCE(grants_paused_at,$2::timestamptz)
+            WHERE organization_id=$1 AND role<>'owner' AND (role='admin' OR project_access='all')
+              AND grants_paused_at IS NULL RETURNING user_id`,
+          [input.organization_id, input.now ?? new Date().toISOString()]
+        );
+        summary.paused_business_grants = getChangedRowCount(result);
+      }
 
       if (!capabilities.member_invites) {
         const result = await db.query(
@@ -137,9 +153,8 @@ export function createOrganizationPlanCleanupService(db: Queryable): Organizatio
           `,
           [input.organization_id]
         );
-        summary.terminalized_slack_weekly_report_deliveries = getChangedRowCount(
-          weeklyDeliveriesResult
-        );
+        summary.terminalized_slack_weekly_report_deliveries =
+          getChangedRowCount(weeklyDeliveriesResult);
 
         const weeklyChannelsResult = await db.query(
           `

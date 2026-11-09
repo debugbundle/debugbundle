@@ -220,7 +220,7 @@ describe("web app — project improvement settings", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("heading", {
-        name: /upgrade to solo or team to unlock hosted improvements/i
+        name: /upgrade to unlock hosted improvements/i
       })
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /open billing/i })).toHaveAttribute("href", "/billing");

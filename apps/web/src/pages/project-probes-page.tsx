@@ -285,14 +285,14 @@ export function ProjectProbesPage(): JSX.Element {
               <CalloutCard
                 eyebrow="Remote probes paused"
                 title="Saved remote probes will resume after an upgrade"
-                description="This project is currently on Free, so standalone remote probe shipping is paused. The saved activations below are preserved and will start working again after the owner upgrades back to Solo or Team."
+                description="This project is currently on Free, so standalone remote probe shipping is paused. The saved activations below are preserved and will start working again after the owner returns to a paid plan."
                 tone="warning"
               />
             </div>
           ) : null}
           {!remoteProbesEnabled && activations !== null && activations.length === 0 ? (
             <PlanUpgradeCallout
-              title="Upgrade to Solo or Team to activate remote probes"
+              title="Upgrade to activate remote probes"
               description="Always-on probe buffers work on every tier, but remote probe activation and trigger tokens are paid-tier features. Upgrade before activating probes from the web app, API, CLI, or MCP."
             />
           ) : loadErrorMessage !== null ? (
@@ -390,7 +390,7 @@ async function loadActivations(
 
     setLoadErrorMessage(
       error instanceof Error && error.message === "upgrade_required"
-        ? "Remote probe activation requires a Solo or Team plan."
+        ? "Remote probe activation requires a paid plan."
         : "Refresh this page after the API connection is restored."
     );
     setActivations([]);
@@ -404,7 +404,7 @@ function getActivationErrorMessage(error: unknown): string {
 
   switch (error.message) {
     case "upgrade_required":
-      return "Upgrade to Solo or Team before activating remote probes.";
+      return "Upgrade to a paid plan before activating remote probes.";
     case "monthly_quota_exceeded":
       return "The monthly remote activation allowance is exhausted.";
     case "concurrent_activation_limit":

@@ -5,6 +5,7 @@ import { readdirSync, readFileSync, existsSync, mkdirSync, rmSync, writeFileSync
 import path from "node:path";
 import { createRequire } from "node:module";
 import { PROJECT_SERVICE_TEST_FILES } from "./project-service-test-files.mjs";
+import { BUSINESS_SERVICE_TEST_FILES } from "./business-service-test-files.mjs";
 
 const require = createRequire(import.meta.url);
 const { createCoverageMap } = require("istanbul-lib-coverage");
@@ -199,17 +200,17 @@ function main() {
     failures = [];
   const allShards = [
     ...shards,
-    { name: "project-service-postgres", files: PROJECT_SERVICE_TEST_FILES }
+    { name: "project-service-postgres", files: PROJECT_SERVICE_TEST_FILES, database: true },
+    ...Array.from({ length: Math.ceil(BUSINESS_SERVICE_TEST_FILES.length / 10) }, (_, index) => ({
+      name: `business-service-postgres-${index + 1}`,
+      files: BUSINESS_SERVICE_TEST_FILES.slice(index * 10, index * 10 + 10),
+      database: true
+    }))
   ];
   for (const [index, shard] of allShards.entries()) {
     try {
       coverageFiles.push(
-        runShard(
-          shard,
-          index + 1,
-          allShards.length,
-          shard.name === "project-service-postgres" ? { RUN_INTEGRATION: "1" } : {}
-        )
+        runShard(shard, index + 1, allShards.length, shard.database ? { RUN_INTEGRATION: "1" } : {})
       );
     } catch {
       failures.push(shard.name);

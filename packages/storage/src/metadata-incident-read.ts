@@ -1,3 +1,4 @@
+import { projectActorAllowedSql, projectReadScopeSql } from "./project-read-scope.js";
 import type {
   IncidentLogRecord,
   IncidentRetrievalRecord,
@@ -30,13 +31,7 @@ export function createMetadataIncidentRead(
           OR (
             $2::uuid IS NOT NULL
             AND (
-              p.owner_user_id = $2::uuid
-              OR EXISTS (
-                SELECT 1
-                FROM project_members pm
-                WHERE pm.project_id = p.id
-                  AND pm.user_id = $2::uuid
-              )
+              ${projectActorAllowedSql("p.id", "$2::uuid", input)}
             )
           )
         )`
@@ -205,13 +200,7 @@ export function createMetadataIncidentRead(
               OR (
                 $3::uuid IS NOT NULL
                 AND (
-                  p.owner_user_id = $3::uuid
-                  OR EXISTS (
-                    SELECT 1
-                    FROM project_members pm
-                    WHERE pm.project_id = p.id
-                      AND pm.user_id = $3::uuid
-                  )
+                  ${projectActorAllowedSql("p.id", "$3::uuid", input)}
                 )
               )
             )
@@ -229,6 +218,16 @@ export function createMetadataIncidentRead(
       const cursorEventId = input.cursor?.event_id ?? null;
       const level = input.level ?? null;
 
+      const params: unknown[] = [
+        input.incident_id,
+        input.organization_id,
+        level,
+        cursorOccurredAt,
+        cursorEventId,
+        input.limit,
+        input.user_id ?? null
+      ];
+      const scopeSql = projectReadScopeSql(params, input, "i.project_id");
       const result = await db.query<IncidentLogRecord>(
         `
           SELECT
@@ -241,6 +240,7 @@ export function createMetadataIncidentRead(
           JOIN incidents i ON i.id = ie.incident_id
           JOIN projects p ON p.id = debugbundle_canonical_project(i.project_id)
           WHERE i.id = $1
+            ${scopeSql}
             AND (
               (
                 $7::uuid IS NULL
@@ -249,13 +249,7 @@ export function createMetadataIncidentRead(
               OR (
                 $7::uuid IS NOT NULL
                 AND (
-                  p.owner_user_id = $7::uuid
-                  OR EXISTS (
-                    SELECT 1
-                    FROM project_members pm
-                    WHERE pm.project_id = p.id
-                      AND pm.user_id = $7::uuid
-                  )
+                  ${projectActorAllowedSql("p.id", "$7::uuid", input)}
                 )
               )
             )
@@ -267,15 +261,7 @@ export function createMetadataIncidentRead(
           ORDER BY ie.occurred_at DESC
           LIMIT $6
         `,
-        [
-          input.incident_id,
-          input.organization_id,
-          level,
-          cursorOccurredAt,
-          cursorEventId,
-          input.limit,
-          input.user_id ?? null
-        ]
+        params
       );
 
       return result.rows;

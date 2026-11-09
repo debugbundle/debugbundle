@@ -9,6 +9,7 @@ import {
   type ImprovementBundleWorkerDependencies
 } from "./improvement-bundles.js";
 import { getImprovementRuleThresholds } from "./improvement-rules.js";
+import { isProjectJobRequestAuthorized } from "./project-job-authorization.js";
 
 export interface ImprovementBundleJobQueue {
   dequeue(jobName: "build-improvement-bundle"): Promise<BuildImprovementBundleJob | null>;
@@ -23,13 +24,15 @@ export async function processNextBuildImprovementBundleJob(input: {
   queue: ImprovementBundleJobQueue;
   dependencies: ImprovementBundleWorkerDependencies;
   logger?: RuntimeLogger;
-}): Promise<{ processed: boolean }> {
+}): Promise<{ processed: boolean; reason?: string }> {
   const job = await input.queue.dequeue("build-improvement-bundle");
   if (job === null) {
     return { processed: false };
   }
 
   try {
+    if (!(await isProjectJobRequestAuthorized(input.dependencies.projectJobAuthorization, job)))
+      return { processed: true, reason: "initiator_access_revoked" };
     const store = input.dependencies.improvementOpportunityStore;
     if (store === undefined) {
       return { processed: true };
@@ -48,8 +51,9 @@ export async function processNextBuildImprovementBundleJob(input: {
       return { processed: true };
     }
 
-    await generateRecordedHostedImprovementBundle({
+    const outcome = await generateRecordedHostedImprovementBundle({
       project_id: job.project_id,
+      execution_authority: job,
       event_id: job.event_id,
       ...(job.event_type === undefined ? {} : { event_type: job.event_type }),
       occurred_at: job.occurred_at,
@@ -62,6 +66,7 @@ export async function processNextBuildImprovementBundleJob(input: {
       thresholds: getImprovementRuleThresholds(settings.improvement_bundle_sensitivity),
       dependencies: input.dependencies
     });
+    if (outcome === "initiator_access_revoked") return { processed: true, reason: outcome };
   } catch (error) {
     input.logger?.error(
       {

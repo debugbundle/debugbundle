@@ -260,7 +260,8 @@ vi.mock("../../packages/storage/src/index.js", async (importOriginal) => {
       s3FactoryMock(input);
       return {
         getObject: vi.fn(),
-        deleteObjectsByPrefix: vi.fn()
+        deleteObjectsByPrefix: vi.fn(),
+        deleteObject: vi.fn().mockResolvedValue(undefined)
       };
     }),
     createRedisIncidentFrequencyCounter: vi.fn().mockReturnValue({
@@ -428,6 +429,10 @@ export function buildMigratedWorkerSchemaRows(sql: string): { rows: Record<strin
   if (sql.includes("AS project_service_schema_available")) {
     return { rows: [{ project_service_schema_available: true }] };
   }
+
+  // This fixture represents every currently required forward migration.
+  // Missing-schema tests override their specific proof separately.
+  if (sql.includes("AS available")) return { rows: [{ available: true }] };
 
   if (sql.includes("to_regclass")) {
     return { rows: [{ relation_name: "storage_migration_ledger" }] };

@@ -160,9 +160,7 @@ describe("web app — project probes", () => {
 
     render(<App initialEntries={["/projects/proj_123/probes"]} />);
 
-    expect(
-      await screen.findByText(/upgrade to solo or team to activate remote probes/i)
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/upgrade to activate remote probes/i)).toBeInTheDocument();
     expect(screen.getByText(/always-on probe buffers work on every tier/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /activate probe/i })).toBeNull();
     expect(

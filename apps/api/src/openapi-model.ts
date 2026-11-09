@@ -106,6 +106,7 @@ import {
   SlackAppCallbackQuerySchema,
   SlackAppInstallUrlQuerySchema,
   TokenListQuerySchema,
+  MemberTokenListQuerySchema,
   UpdateAlertBodySchema,
   UpdateProjectMemberRoleBodySchema,
   UpdateProjectBodySchema,
@@ -215,6 +216,7 @@ export {
   SlackAppCallbackQuerySchema,
   SlackAppInstallUrlQuerySchema,
   TokenListQuerySchema,
+  MemberTokenListQuerySchema,
   UpdateAlertBodySchema,
   UpdateProjectMemberRoleBodySchema,
   UpdateProjectBodySchema,
@@ -247,6 +249,7 @@ export type SchemaSpec =
 
 export type ResponseSpec = {
   description: string;
+  mediaType?: "application/json" | "text/html" | "application/pdf";
   schema?: SchemaSpec;
   headers?: Record<string, { description: string; schema: unknown }>;
 };
@@ -283,7 +286,7 @@ export const ProjectInviteMembershipSchema = z
   .object({
     project_id: z.string(),
     user_id: z.string(),
-    role: z.enum(["owner", "admin", "member"]),
+    role: z.enum(["owner", "admin", "member", "viewer"]),
     membership_type: z.enum(["owner", "collaborator"]).optional()
   })
   .strict();
@@ -297,8 +300,9 @@ export const WebSessionSchema = z
     email: z.string().email(),
     email_verified_at: z.string().datetime().nullable(),
     organization_id: z.string(),
-    organization_plan: z.enum(["free", "solo", "team"]),
-    role: z.enum(["owner", "member"]),
+    self_hosted: z.boolean().optional(),
+    organization_plan: z.enum(["free", "solo", "team", "business"]),
+    role: z.enum(["owner", "admin", "member"]),
     created_at: z.string().datetime(),
     expires_at: z.string().datetime(),
     revoked_at: z.string().datetime().nullable(),
@@ -447,7 +451,7 @@ export const ProjectMemberSchema = z
   .object({
     user_id: z.string(),
     email: z.string().email(),
-    role: z.enum(["owner", "admin", "member"]),
+    role: z.enum(["owner", "admin", "member", "viewer"]),
     membership_type: z.enum(["owner", "collaborator"]),
     avatar_url: z.string().min(1).nullable(),
     created_at: z.string().datetime()
@@ -469,7 +473,7 @@ export const ProjectInviteSchema = z
     invite_id: z.string().guid(),
     project_id: z.string(),
     email: z.string().email(),
-    role: z.enum(["admin", "member"]),
+    role: z.enum(["admin", "member", "viewer"]),
     invited_by_user_id: z.string(),
     accepted_at: z.string().datetime().nullable(),
     canceled_at: z.string().datetime().nullable(),
@@ -626,7 +630,7 @@ export const AvailabilityCheckRecordSchema = z
     enabled: z.boolean(),
     status: AvailabilityCheckHealthStatusSchema,
     paused_reason: z.string().nullable(),
-    organization_plan: z.enum(["free", "solo", "team"]),
+    organization_plan: z.enum(["free", "solo", "team", "business"]),
     consecutive_failures: z.number().int().nonnegative(),
     consecutive_successes: z.number().int().nonnegative(),
     linked_incident_id: z.string().guid().nullable(),

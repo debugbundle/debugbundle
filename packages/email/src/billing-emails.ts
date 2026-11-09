@@ -1,4 +1,4 @@
-import type { TierName } from "../../../packages/shared-types/src/index.js";
+import type { BillingInterval, TierName } from "../../../packages/shared-types/src/index.js";
 import {
   escapeHtml,
   renderEmailBulletList,
@@ -48,6 +48,13 @@ export interface TrialConvertedEmailInput {
 }
 
 function getTrialSuspensionItems(trialPlan: TierName): string[] {
+  if (trialPlan === "business") {
+    return [
+      ...getTrialSuspensionItems("team"),
+      "Organisation-wide inherited access",
+      "New Smart Report generation and email delivery"
+    ];
+  }
   if (trialPlan === "team") {
     return [
       "Remote probe activations",
@@ -143,7 +150,9 @@ export function renderTrialEndingSoonEmail(input: TrialEndingSoonEmailInput): Bi
         ...(suspensionItems.length === 0
           ? []
           : [
-              renderEmailParagraph("If you do not convert before the trial ends, DebugBundle will pause:"),
+              renderEmailParagraph(
+                "If you do not convert before the trial ends, DebugBundle will pause:"
+              ),
               renderEmailBulletList(suspensionItems.map((item) => escapeHtml(item)))
             ]),
         renderEmailButton({
@@ -166,10 +175,7 @@ export function renderTrialExpiredEmail(input: TrialExpiredEmailInput): BillingE
       "The account is now back on the free tier. Existing projects and paid-feature setup remain saved, and you can convert to a paid plan at any time to reactivate paid features.",
       ...(suspensionItems.length === 0
         ? []
-        : [
-            "DebugBundle paused:",
-            ...suspensionItems.map((item) => `- ${item}`)
-          ]),
+        : ["DebugBundle paused:", ...suspensionItems.map((item) => `- ${item}`)]),
       "",
       `Manage billing: ${input.billingUrl}`
     ].join("\n"),
@@ -234,7 +240,22 @@ export function renderTrialConvertedEmail(input: TrialConvertedEmailInput): Bill
 
 // --- 4.4 Purchase Confirmation ---
 
-export interface PurchaseConfirmationInput {
+interface BillingTermInput {
+  billingInterval?: BillingInterval | undefined;
+}
+function billingTermText(input: BillingTermInput): string[] {
+  return input.billingInterval
+    ? [
+        `Billed ${input.billingInterval === "year" ? "yearly" : "monthly"}. Allowances reset monthly.`
+      ]
+    : [];
+}
+function billingTermHtml(input: BillingTermInput): string {
+  return billingTermText(input)
+    .map((text) => renderEmailParagraph(escapeHtml(text)))
+    .join("");
+}
+export interface PurchaseConfirmationInput extends BillingTermInput {
   organizationName: string;
   plan: TierName;
   extraCapacity: number;
@@ -242,13 +263,17 @@ export interface PurchaseConfirmationInput {
   brandMarkUrl?: string | undefined;
 }
 
-export function renderPurchaseConfirmationEmail(input: PurchaseConfirmationInput): BillingEmailRendered {
-  const capacity = input.extraCapacity > 0 ? ` + ${input.extraCapacity} extra capacity unit(s)` : "";
+export function renderPurchaseConfirmationEmail(
+  input: PurchaseConfirmationInput
+): BillingEmailRendered {
+  const capacity =
+    input.extraCapacity > 0 ? ` + ${input.extraCapacity} extra capacity unit(s)` : "";
   return {
     subject: `DebugBundle: ${input.plan} plan activated`,
     text: [
       `Your DebugBundle account "${input.organizationName}" is now on the ${input.plan} plan${capacity}.`,
       "",
+      ...billingTermText(input),
       `Manage your subscription: ${input.portalUrl}`
     ].join("\n"),
     html: renderEmailLayout({
@@ -263,6 +288,7 @@ export function renderPurchaseConfirmationEmail(input: PurchaseConfirmationInput
           { label: "Plan", valueHtml: escapeHtml(input.plan) },
           { label: "Extra capacity", valueHtml: input.extraCapacity.toString() }
         ]),
+        billingTermHtml(input),
         renderEmailButton({
           label: "Manage subscription",
           url: input.portalUrl
@@ -274,33 +300,36 @@ export function renderPurchaseConfirmationEmail(input: PurchaseConfirmationInput
 
 // --- 4.5 Renewal Success ---
 
-export interface RenewalSuccessInput {
+export interface RenewalSuccessInput extends BillingTermInput {
   organizationName: string;
   plan: TierName;
   extraCapacity: number;
-  nextRenewalDate: string;
+  nextRenewalDate: string | null;
   brandMarkUrl?: string | undefined;
 }
 
 export function renderRenewalSuccessEmail(input: RenewalSuccessInput): BillingEmailRendered {
-  const capacity = input.extraCapacity > 0 ? ` with ${input.extraCapacity} extra capacity unit(s)` : "";
+  const capacity =
+    input.extraCapacity > 0 ? ` with ${input.extraCapacity} extra capacity unit(s)` : "";
   return {
     subject: `DebugBundle: subscription renewed`,
     text: [
       `Your ${input.plan} plan${capacity} for account "${input.organizationName}" has been renewed.`,
-      `Next renewal: ${input.nextRenewalDate}.`
+      `Next renewal: ${input.nextRenewalDate ?? "unavailable"}.`,
+      ...billingTermText(input)
     ].join("\n"),
     html: renderEmailLayout({
       brandMarkUrl: input.brandMarkUrl,
       eyebrow: "Billing",
       title: "Subscription renewed",
       intro: `Your ${escapeHtml(input.plan)} plan${escapeHtml(capacity)} for account "${escapeHtml(input.organizationName)}" has been renewed.`,
-      preheader: `Your ${input.plan} plan renewed; next renewal is ${input.nextRenewalDate}.`,
-      bodyHtml: renderEmailKeyValueList([
-        { label: "Account", valueHtml: escapeHtml(input.organizationName) },
-        { label: "Plan", valueHtml: escapeHtml(input.plan) },
-        { label: "Next renewal", valueHtml: escapeHtml(input.nextRenewalDate) }
-      ])
+      preheader: `Your ${input.plan} plan renewed; next renewal is ${input.nextRenewalDate ?? "unavailable"}.`,
+      bodyHtml:
+        renderEmailKeyValueList([
+          { label: "Account", valueHtml: escapeHtml(input.organizationName) },
+          { label: "Plan", valueHtml: escapeHtml(input.plan) },
+          { label: "Next renewal", valueHtml: escapeHtml(input.nextRenewalDate ?? "unavailable") }
+        ]) + billingTermHtml(input)
     })
   };
 }
@@ -354,7 +383,9 @@ export interface PaymentFailureReminderInput {
   brandMarkUrl?: string | undefined;
 }
 
-export function renderPaymentFailureReminderEmail(input: PaymentFailureReminderInput): BillingEmailRendered {
+export function renderPaymentFailureReminderEmail(
+  input: PaymentFailureReminderInput
+): BillingEmailRendered {
   return {
     subject: `DebugBundle: payment still unresolved`,
     text: [
@@ -394,7 +425,9 @@ export interface EntitlementDowngradeWarningInput {
   brandMarkUrl?: string | undefined;
 }
 
-export function renderEntitlementDowngradeWarningEmail(input: EntitlementDowngradeWarningInput): BillingEmailRendered {
+export function renderEntitlementDowngradeWarningEmail(
+  input: EntitlementDowngradeWarningInput
+): BillingEmailRendered {
   return {
     subject: `DebugBundle: entitlement downgrade pending`,
     text: [
@@ -413,7 +446,10 @@ export function renderEntitlementDowngradeWarningEmail(input: EntitlementDowngra
       bodyHtml: [
         renderEmailKeyValueList([
           { label: "Current plan", valueHtml: escapeHtml(input.currentPlan) },
-          { label: "Current capacity", valueHtml: `${input.currentCapacityUnits} capacity unit(s)` },
+          {
+            label: "Current capacity",
+            valueHtml: `${input.currentCapacityUnits} capacity unit(s)`
+          },
           { label: "Effective date", valueHtml: escapeHtml(input.effectiveDate) }
         ]),
         renderEmailParagraph(
@@ -438,7 +474,9 @@ export interface EntitlementDowngradeConfirmationInput {
   brandMarkUrl?: string | undefined;
 }
 
-export function renderEntitlementDowngradeConfirmationEmail(input: EntitlementDowngradeConfirmationInput): BillingEmailRendered {
+export function renderEntitlementDowngradeConfirmationEmail(
+  input: EntitlementDowngradeConfirmationInput
+): BillingEmailRendered {
   return {
     subject: `DebugBundle: entitlements reduced`,
     text: [
@@ -455,7 +493,10 @@ export function renderEntitlementDowngradeConfirmationEmail(input: EntitlementDo
       bodyHtml: [
         renderEmailKeyValueList([
           { label: "Previous plan", valueHtml: escapeHtml(input.previousPlan) },
-          { label: "Previous capacity", valueHtml: `${input.previousCapacityUnits} capacity unit(s)` },
+          {
+            label: "Previous capacity",
+            valueHtml: `${input.previousCapacityUnits} capacity unit(s)`
+          },
           { label: "New capacity", valueHtml: `${input.newCapacityUnits} capacity unit(s)` }
         ]),
         renderEmailParagraph(
@@ -468,7 +509,7 @@ export function renderEntitlementDowngradeConfirmationEmail(input: EntitlementDo
 
 // --- 4.10 Plan Change Confirmation ---
 
-export interface PlanChangeConfirmationInput {
+export interface PlanChangeConfirmationInput extends BillingTermInput {
   organizationName: string;
   previousPlan: TierName;
   newPlan: TierName;
@@ -476,14 +517,18 @@ export interface PlanChangeConfirmationInput {
   brandMarkUrl?: string | undefined;
 }
 
-export function renderPlanChangeConfirmationEmail(input: PlanChangeConfirmationInput): BillingEmailRendered {
-  const capacity = input.extraCapacity > 0 ? ` with ${input.extraCapacity} extra capacity unit(s)` : "";
+export function renderPlanChangeConfirmationEmail(
+  input: PlanChangeConfirmationInput
+): BillingEmailRendered {
+  const capacity =
+    input.extraCapacity > 0 ? ` with ${input.extraCapacity} extra capacity unit(s)` : "";
   return {
     subject: `DebugBundle: plan changed to ${input.newPlan}`,
     text: [
       `Your account "${input.organizationName}" plan has been changed from ${input.previousPlan} to ${input.newPlan}${capacity}.`,
       "",
-      "Your entitlements have been updated to reflect the new plan."
+      "Your entitlements have been updated to reflect the new plan.",
+      ...billingTermText(input)
     ].join("\n"),
     html: renderEmailLayout({
       brandMarkUrl: input.brandMarkUrl,
@@ -497,7 +542,8 @@ export function renderPlanChangeConfirmationEmail(input: PlanChangeConfirmationI
           { label: "New plan", valueHtml: escapeHtml(input.newPlan) },
           { label: "Extra capacity", valueHtml: input.extraCapacity.toString() }
         ]),
-        renderEmailParagraph("Your entitlements have been updated to reflect the new plan.")
+        renderEmailParagraph("Your entitlements have been updated to reflect the new plan."),
+        billingTermHtml(input)
       ].join("")
     })
   };
@@ -505,7 +551,7 @@ export function renderPlanChangeConfirmationEmail(input: PlanChangeConfirmationI
 
 // --- 4.11 Extra Capacity Quantity Change Confirmation ---
 
-export interface CapacityQuantityChangeInput {
+export interface CapacityQuantityChangeInput extends BillingTermInput {
   organizationName: string;
   plan: TierName;
   previousCapacity: number;
@@ -514,12 +560,15 @@ export interface CapacityQuantityChangeInput {
   brandMarkUrl?: string | undefined;
 }
 
-export function renderCapacityQuantityChangeEmail(input: CapacityQuantityChangeInput): BillingEmailRendered {
+export function renderCapacityQuantityChangeEmail(
+  input: CapacityQuantityChangeInput
+): BillingEmailRendered {
   return {
     subject: `DebugBundle: capacity quantity updated`,
     text: [
       `Extra capacity units for account "${input.organizationName}" (${input.plan}) changed from ${input.previousCapacity} to ${input.newCapacity}.`,
-      `Total allowance capacity is now ${input.totalCapacityUnits}.`
+      `Total allowance capacity is now ${input.totalCapacityUnits}.`,
+      ...billingTermText(input)
     ].join("\n"),
     html: renderEmailLayout({
       brandMarkUrl: input.brandMarkUrl,
@@ -527,12 +576,13 @@ export function renderCapacityQuantityChangeEmail(input: CapacityQuantityChangeI
       title: "Capacity quantity updated",
       intro: `Extra capacity units for account "${escapeHtml(input.organizationName)}" (${escapeHtml(input.plan)}) changed from ${input.previousCapacity} to ${input.newCapacity}.`,
       preheader: `Extra capacity changed from ${input.previousCapacity} to ${input.newCapacity}; total capacity is ${input.totalCapacityUnits}.`,
-      bodyHtml: renderEmailKeyValueList([
-        { label: "Plan", valueHtml: escapeHtml(input.plan) },
-        { label: "Previous extra capacity", valueHtml: input.previousCapacity.toString() },
-        { label: "New extra capacity", valueHtml: input.newCapacity.toString() },
-        { label: "Total capacity units", valueHtml: input.totalCapacityUnits.toString() }
-      ])
+      bodyHtml:
+        renderEmailKeyValueList([
+          { label: "Plan", valueHtml: escapeHtml(input.plan) },
+          { label: "Previous extra capacity", valueHtml: input.previousCapacity.toString() },
+          { label: "New extra capacity", valueHtml: input.newCapacity.toString() },
+          { label: "Total capacity units", valueHtml: input.totalCapacityUnits.toString() }
+        ]) + billingTermHtml(input)
     })
   };
 }

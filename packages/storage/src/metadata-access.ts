@@ -1,4 +1,5 @@
-import { type TierName } from "../../shared-types/src/index.js";
+import { projectActorRoleSql } from "./project-read-scope.js";
+import { isSelfHostMode, type TierName } from "../../shared-types/src/index.js";
 import {
   resolveMemberTokenAndRecordUsage,
   resolveProjectTokenAndRecordUsage
@@ -71,10 +72,7 @@ export function createMetadataAccess(
                 THEN 'shared_by_you'
               ELSE 'private'
             END AS sharing_state,
-            CASE
-              WHEN p.owner_user_id = $1::uuid THEN 'owner'
-              ELSE pm.role
-            END AS effective_role,
+            COALESCE(debugbundle_project_actor_role(p.id,$1::uuid,$3::boolean,$4::boolean), CASE WHEN p.owner_user_id=$1::uuid THEN 'owner' ELSE pm.role END) AS effective_role,
             COALESCE(org.plan, 'free') AS organization_plan
           FROM projects p
           JOIN organizations org ON org.id = p.organization_id
@@ -83,10 +81,17 @@ export function createMetadataAccess(
             ON pm.project_id = p.id
            AND pm.user_id = $1::uuid
           WHERE p.id = debugbundle_canonical_project($2::uuid)
-            AND (p.owner_user_id = $1::uuid OR pm.user_id IS NOT NULL)
+            AND (p.owner_user_id=$1::uuid OR pm.user_id IS NOT NULL OR debugbundle_project_actor_role(p.id,$1::uuid,$3::boolean,$4::boolean) IS NOT NULL)
+            AND org.suspended_at IS NULL
+            AND NOT EXISTS(SELECT 1 FROM organization_members denied WHERE denied.organization_id=org.id AND denied.user_id=$1::uuid AND denied.suspended_at IS NOT NULL)
           LIMIT 1
         `,
-        [input.user_id, input.project_id]
+        [
+          input.user_id,
+          input.project_id,
+          input.include_organization_grants === true,
+          isSelfHostMode()
+        ]
       );
 
       const access = result.rows[0] ?? null;
@@ -96,6 +101,7 @@ export function createMetadataAccess(
     async listMembersForProject(input: {
       project_id: string;
       user_id: string;
+      include_organization_grants?: boolean;
     }): Promise<{ owner_plan: TierName; members: ProjectMemberRecord[] } | null> {
       const access = await db.query<{ owner_plan: TierName } & Record<string, unknown>>(
         `
@@ -106,10 +112,7 @@ export function createMetadataAccess(
             ON actor_membership.project_id = p.id
            AND actor_membership.user_id = $2::uuid
           WHERE p.id = debugbundle_canonical_project($1::uuid)
-            AND (
-              p.owner_user_id = $2::uuid
-              OR actor_membership.user_id IS NOT NULL
-            )
+            AND ${projectActorRoleSql("p.id", "$2::uuid", input)} IS NOT NULL
           LIMIT 1
         `,
         [input.project_id, input.user_id]
@@ -161,6 +164,7 @@ export function createMetadataAccess(
       project_id: string;
       user_id: string;
       now: string;
+      include_organization_grants?: boolean;
     }): Promise<ProjectInviteRecord[] | null> {
       const access = await db.query<{ project_id: string }>(
         `
@@ -170,10 +174,7 @@ export function createMetadataAccess(
             ON actor_membership.project_id = p.id
            AND actor_membership.user_id = $2::uuid
           WHERE p.id = debugbundle_canonical_project($1::uuid)
-            AND (
-              p.owner_user_id = $2::uuid
-              OR actor_membership.role = 'admin'
-            )
+            AND ${projectActorRoleSql("p.id", "$2::uuid", input)} IN ('owner','admin')
           LIMIT 1
         `,
         [input.project_id, input.user_id]

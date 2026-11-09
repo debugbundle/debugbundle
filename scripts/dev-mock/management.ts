@@ -45,7 +45,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
     {
       token_id: "mock_agent_credential",
       issuer_user_id: "usr_123",
-      organization_id: "org_123",
+      organization_id: data.session.organization_id,
       project_id: "00000000-0000-4000-8000-000000000001",
       label: "Preview agent",
       scope: "incident:read-minimized",
@@ -126,7 +126,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
       ...tokenTemplate,
       token_id: "mock_member_cli",
       user_id: "usr_123",
-      organization_id: "org_123",
+      organization_id: data.session.organization_id,
       label: "Local CLI and MCP"
     }
   ];
@@ -208,7 +208,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
     {
       slack_destination_id: "slack_demo",
       project_id: "00000000-0000-4000-8000-000000000001",
-      organization_id: "org_123",
+      organization_id: data.session.organization_id,
       slack_team_id: "mock_team",
       slack_team_name: "Demo workspace",
       slack_channel_id: "mock_channel",
@@ -301,7 +301,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
       return reply({
         account: {
           deleted_at: new Date().toISOString(),
-          organization_id: "org_123",
+          organization_id: data.session.organization_id,
           user_deleted: true
         }
       });
@@ -387,7 +387,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
           token_id: `mock_token_${sequence++}`,
           label: input.data.label,
           ...(personal
-            ? { user_id: "usr_123", organization_id: "org_123" }
+            ? { user_id: "usr_123", organization_id: data.session.organization_id }
             : { project_id: projectId, allowed_origins: input.data.allowed_origins })
         };
         rows.push(token);

@@ -1,3 +1,5 @@
+import { createReferralReconciliationStore } from "../../../packages/storage/src/referral-reconciliation-store.js";
+import { referralEventFromStripe } from "../../../packages/referrals/src/stripe-referral-events.js";
 import { HeadBucketCommand, S3Client } from "@aws-sdk/client-s3";
 import { Pool } from "pg";
 import { Redis } from "ioredis";
@@ -329,9 +331,18 @@ export async function startApiServerFromEnv(
     const syncPool = createApiPool(env);
     webhookPools.push(syncPool);
     const billingSyncStore = createPostgresBillingSyncStore(createPoolQueryable(syncPool));
+    const referralSecret = z.string().min(32).max(4096).safeParse(envInput["REFERRAL_SECRET"]);
+    const referralReceipts = createReferralReconciliationStore(
+      createPoolQueryable(syncPool),
+      referralSecret.success ? { identityHashSecret: referralSecret.data } : {}
+    );
     serverOptions.stripeWebhook = {
       stripeConfig,
       billingSyncStore,
+      async captureReferralEvent(event) {
+        const receipt = referralEventFromStripe(event);
+        if (receipt) await referralReceipts.capture(receipt);
+      },
       eventTransaction: createBillingWebhookTransaction(createPoolQueryable(syncPool)),
       ...(dependencies.auditLogging === undefined
         ? {}

@@ -1,11 +1,12 @@
 // Synthetic local UI records. No customer data or usable credentials.
+const organizationId = "00000000-0000-4000-8000-000000000000";
 export const base = {
   session: {
     session_id: "ses_123",
     user_id: "usr_123",
     email: "review@example.test",
     email_verified_at: "2026-03-17T00:00:00.000Z",
-    organization_id: "org_123",
+    organization_id: organizationId,
     organization_plan: "team",
     role: "owner",
     created_at: "2026-03-17T00:00:00.000Z",
@@ -20,7 +21,7 @@ export const base = {
   },
   projects: {
     project_id: "00000000-0000-4000-8000-000000000001",
-    organization_id: "org_123",
+    organization_id: organizationId,
     owner_user_id: "usr_123",
     owner_email: "owner@example.com",
     relationship: "owned",

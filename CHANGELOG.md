@@ -6,6 +6,40 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.23.0] - 2026-11-09
+
+- Set Solo to $5/month or $48/year, Team to $19/month or $192/year and Business
+  to $59/month or $588/year. Extra units are $1/$10 for Solo and $3/$30 for
+  Team/Business (monthly/yearly). Annual plan headlines are exactly $4/$16/$49 per month.
+
+### Added
+
+- Business at $59/month or $588/year, monthly/yearly offers and matching capacity,
+  fixed organisation roles, scoped member credentials and account-wide people limits.
+- Business-only referral attribution, first eligible base-invoice benefit,
+  collected-cash commission accounting, reversal/availability holds and manual
+  payout records; no automatic transfers.
+- Opt-in Smart Reports with bounded consented history, shared monthly generation
+  and AI budgets, scheduled runs, private canonical HTML/PDF and receipt-backed
+  email overviews. Add the same management operations to API, CLI and ordinary MCP.
+- Additive forward migrations, safe account export/deletion, Business-aware hosted
+  rollback guards and documented local qualification. Sales, generation and email
+  remain default-off until separately authorised release configuration.
+
+### Changed
+
+- Include Business in the existing one-time 30-day trial and add explicitly
+  consented read-only saved reports to ChatGPT without changing existing grants.
+- Enforce trial deadlines in report collection and preserve self-hosted
+  organisation/report features through forward migrations and live role checks.
+- Refine pricing with an annual default, monthly equivalents, grouped comparison
+  and collapsible FAQs backed by the canonical catalogue.
+- Apply conservative Team/Business analytics and tier-specific health limits;
+  preserve saved history, legacy monthly billing, existing SDK interfaces and
+  ordinary debugging/weekly digest behaviour outside the approved scope.
+- Extend mandatory acceptance-credential redaction across maintained SDK source
+  candidates without automatically publishing or updating any consumer.
+
 ## [1.22.1] - 2026-11-06
 
 ### Fixed
@@ -59,7 +93,6 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 - Extend emitted/installed plugin regressions to malicious local metadata and links;
   align the distribution ledger and developer pins, including Gemini 1.4.4.
 
-
 ### CLI/MCP/OpenClaw 1.19.3 — 2026-11-05
 
 - Fix cloud artifact cache path traversal: validate incident IDs before requests
@@ -68,7 +101,6 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
   confirmed remote mutation outcomes. This supersedes 1.19.2 and earlier clients.
 - Qualify unsafe IDs in the emitted and normally installed OpenClaw artifact.
   Align developer integrations with the corrected MCP package, including Gemini 1.4.3.
-
 
 ### CLI/MCP/OpenClaw 1.19.2 — 2026-11-05
 

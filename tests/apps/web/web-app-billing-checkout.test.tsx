@@ -58,7 +58,7 @@ describe("billing checkout", () => {
 
       if (url.endsWith("/v1/billing/checkout") && init?.method === "POST") {
         expect(init.credentials).toBe("include");
-        expect(init.body).toBe(JSON.stringify({ target_plan: "solo" }));
+        expect(init.body).toBe(JSON.stringify({ target_plan: "solo", interval: "month" }));
 
         return jsonResponse(200, {
           url: "https://billing.stripe.com/checkout/solo"
@@ -82,6 +82,8 @@ describe("billing checkout", () => {
     ).toBeInTheDocument();
 
     await user.click(await screen.findByRole("button", { name: /upgrade to solo/i }));
+
+    await user.click(await screen.findByRole("button", { name: "Continue to Stripe" }));
 
     expect(locationAssign).toHaveBeenCalledWith("https://billing.stripe.com/checkout/solo");
   });

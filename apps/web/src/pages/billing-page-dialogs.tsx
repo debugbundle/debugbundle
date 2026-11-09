@@ -1,6 +1,14 @@
 import { CheckCircle2Icon, InfoIcon, LoaderCircleIcon, XCircleIcon } from "lucide-react";
 import { useEffect, useState } from "react";
-import { MAX_BILLING_ADDITIONAL_CAPACITY_UNITS } from "../../../../packages/shared-types/src/index.js";
+import {
+  MAX_BILLING_ADDITIONAL_CAPACITY_UNITS,
+  getBillingCatalogPrice,
+  type BillingSubscriptionOffer
+} from "../../../../packages/shared-types/src/index.js";
+import {
+  formatBillingAmount,
+  formatBillingTerm
+} from "../components/system/billing-offer-summary.js";
 import { BillingPaymentContinuation } from "../components/system/billing-payment-continuation.js";
 import { CalloutCard } from "../components/system/callout-card.js";
 import { Button } from "../components/ui/button.js";
@@ -35,6 +43,7 @@ export type CapacityManagementMode = "stripe" | "internal";
 
 interface CapacityDialogProps {
   billing: BillingSummaryRecord;
+  subscription?: BillingSubscriptionOffer | null;
   canChangeBilling: boolean;
   managementMode: CapacityManagementMode;
   open: boolean;
@@ -82,11 +91,21 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
   const currentAdditionalCapacityUnits = props.billing.capacity_units.additional_purchased;
   const pendingReduction = props.billing.capacity_units.pending_reduction ?? null;
   const isInternalManagement = props.managementMode === "internal";
-  const parsedIncreaseTarget = Number.parseInt(increaseTarget, 10);
-  const parsedReductionTarget = Number.parseInt(reductionTarget, 10);
+  const parsedIncreaseTarget = increaseTarget.trim() === "" ? NaN : Number(increaseTarget);
+  const parsedReductionTarget = reductionTarget.trim() === "" ? NaN : Number(reductionTarget);
+  const subscription = props.subscription;
+  const unitPrice = subscription
+    ? (subscription.capacity_unit_amount_minor ??
+      getBillingCatalogPrice(subscription.plan, subscription.interval, "extra_capacity")
+        .amount_minor)
+    : null;
 
   async function handleIncrease(): Promise<void> {
-    if (!props.canChangeBilling) {
+    if (
+      !props.canChangeBilling ||
+      activeAction !== null ||
+      !Number.isSafeInteger(parsedIncreaseTarget)
+    ) {
       return;
     }
 
@@ -114,7 +133,11 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
   }
 
   async function handleScheduleReduction(): Promise<void> {
-    if (!props.canChangeBilling) {
+    if (
+      !props.canChangeBilling ||
+      activeAction !== null ||
+      !Number.isSafeInteger(parsedReductionTarget)
+    ) {
       return;
     }
 
@@ -173,6 +196,13 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
           </DialogDescription>
         </DialogHeader>
 
+        {!isInternalManagement && subscription && unitPrice !== null ? (
+          <p>
+            Extra units: {formatBillingAmount(unitPrice)}/
+            {subscription.interval === "year" ? "year" : "month"} each, before tax. Allowances reset
+            monthly.
+          </p>
+        ) : null}
         <div className="grid gap-3 sm:grid-cols-3">
           <Card>
             <CardContent className="space-y-1 p-4">
@@ -261,7 +291,7 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
                   pendingReduction !== null ||
                   activeAction !== null ||
                   paymentUrl !== null ||
-                  Number.isNaN(parsedIncreaseTarget) ||
+                  !Number.isSafeInteger(parsedIncreaseTarget) ||
                   parsedIncreaseTarget > MAX_BILLING_ADDITIONAL_CAPACITY_UNITS ||
                   parsedIncreaseTarget <= currentAdditionalCapacityUnits
                 }
@@ -285,7 +315,9 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
               <CardDescription>
                 {isInternalManagement
                   ? "Lower the purchased extra-unit count immediately for this internally managed account."
-                  : `Keep your current allowance until ${formatDate(props.billing.usage_window.ends_at)}, then lower it at renewal.`}
+                  : subscription?.term_ends_at
+                    ? `Keep your current allowance until ${formatBillingTerm(subscription.term_ends_at)}, then lower it at renewal.`
+                    : "Keep your current allowance until the paid term ends, then lower it at renewal."}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -322,7 +354,7 @@ export function CapacityDialog(props: CapacityDialogProps): JSX.Element {
                     currentAdditionalCapacityUnits === 0 ||
                     activeAction !== null ||
                     paymentUrl !== null ||
-                    Number.isNaN(parsedReductionTarget) ||
+                    !Number.isSafeInteger(parsedReductionTarget) ||
                     parsedReductionTarget < 0 ||
                     parsedReductionTarget >= currentAdditionalCapacityUnits
                   }

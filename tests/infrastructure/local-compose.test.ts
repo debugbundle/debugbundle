@@ -54,3 +54,15 @@ describe("local Docker Compose development stack", () => {
     expect(compose).toContain("  node-corepack-cache:");
   });
 });
+
+it("uses the exposed local API port for referral links while keeping enrolment opt-in", () => {
+  const compose = readFileSync(composePath, "utf8");
+  const example = readFileSync(join(process.cwd(), ".env.example"), "utf8");
+  expect(getServiceBlock(compose, "api")).toContain(
+    "REFERRAL_API_BASE_URL: ${REFERRAL_API_BASE_URL:-http://localhost:3003}"
+  );
+  expect(getServiceBlock(compose, "api")).toContain(
+    "REFERRAL_ENROLLMENT_ENABLED: ${REFERRAL_ENROLLMENT_ENABLED:-false}"
+  );
+  expect(example).toContain("REFERRAL_API_BASE_URL=http://localhost:3003");
+});

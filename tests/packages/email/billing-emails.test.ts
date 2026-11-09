@@ -15,6 +15,28 @@ import {
   renderCapacityQuantityChangeEmail
 } from "../../../packages/email/src/billing-emails.js";
 
+it("states annual billing independently from monthly allowances and never invents a renewal date", () => {
+  const purchase = renderPurchaseConfirmationEmail({
+    organizationName: "Business account",
+    plan: "business",
+    extraCapacity: 2,
+    portalUrl: "https://app.example.test/billing",
+    billingInterval: "year"
+  });
+  expect(purchase.text).toContain("Billed yearly. Allowances reset monthly.");
+  expect(purchase.html).toContain("Billed yearly. Allowances reset monthly.");
+  const renewal = renderRenewalSuccessEmail({
+    organizationName: "Business account",
+    plan: "business",
+    extraCapacity: 2,
+    nextRenewalDate: null,
+    billingInterval: "year"
+  });
+  expect(renewal.text).toContain("Billed yearly. Allowances reset monthly.");
+  expect(renewal.text).toContain("Next renewal: unavailable");
+  expect(renewal.html).not.toContain("null");
+});
+
 describe("billing email templates", () => {
   describe("trial lifecycle emails", () => {
     it("renders trial started email", () => {
@@ -91,8 +113,12 @@ describe("billing email templates", () => {
       expect(result.text).toContain("team");
       expect(result.text).toContain("3 extra capacity unit(s)");
       expect(result.text).toContain("https://billing.stripe.com/session/abc");
-      expect(result.html).toContain("Your team plan is active for Acme Corp + 3 extra capacity unit(s).");
-      expect(result.html.indexOf("Your team plan is active")).toBeLessThan(result.html.indexOf('class="db-email-frame"'));
+      expect(result.html).toContain(
+        "Your team plan is active for Acme Corp + 3 extra capacity unit(s)."
+      );
+      expect(result.html.indexOf("Your team plan is active")).toBeLessThan(
+        result.html.indexOf('class="db-email-frame"')
+      );
       expect(result.html).toContain("Acme Corp");
       expect(result.html).toContain("team");
       expect(result.html).toContain("<svg");
@@ -139,7 +165,9 @@ describe("billing email templates", () => {
       });
 
       expect(result.subject).toContain("payment failed");
-      expect(result.html).toContain("Payment failed for Acme Corp; paid features remain active while Stripe retries.");
+      expect(result.html).toContain(
+        "Payment failed for Acme Corp; paid features remain active while Stripe retries."
+      );
       expect(result.text).toContain("remain active");
       expect(result.text).toContain("free tier");
       expect(result.text).toContain("https://billing.stripe.com/session/fail");
@@ -173,7 +201,9 @@ describe("billing email templates", () => {
       });
 
       expect(result.subject).toContain("downgrade pending");
-      expect(result.html).toContain("Acme Corp will move from team to the free tier on 2026-04-15.");
+      expect(result.html).toContain(
+        "Acme Corp will move from team to the free tier on 2026-04-15."
+      );
       expect(result.text).toContain("team");
       expect(result.text).toContain("5 capacity unit(s)");
       expect(result.text).toContain("2026-04-15");
@@ -193,13 +223,17 @@ describe("billing email templates", () => {
       });
 
       expect(result.subject).toContain("reduced");
-      expect(result.html).toContain("Acme Corp moved from team to the free tier with 1 capacity unit(s).");
+      expect(result.html).toContain(
+        "Acme Corp moved from team to the free tier with 1 capacity unit(s)."
+      );
       expect(result.text).toContain("team");
       expect(result.text).toContain("5 capacity unit(s)");
       expect(result.text).toContain("1 capacity unit(s)");
       expect(result.text).toContain("allowance capacity");
       expect(result.text).not.toContain("archived");
-      expect(result.html).toContain('src="https://app.debugbundle.test/email/debugbundle-mark.png"');
+      expect(result.html).toContain(
+        'src="https://app.debugbundle.test/email/debugbundle-mark.png"'
+      );
     });
   });
 
@@ -214,11 +248,15 @@ describe("billing email templates", () => {
       });
 
       expect(result.subject).toContain("team");
-      expect(result.html).toContain("Acme Corp changed from solo to team with 2 extra capacity unit(s).");
+      expect(result.html).toContain(
+        "Acme Corp changed from solo to team with 2 extra capacity unit(s)."
+      );
       expect(result.text).toContain("solo");
       expect(result.text).toContain("team");
       expect(result.text).toContain("2 extra capacity unit(s)");
-      expect(result.html).toContain('src="https://app.debugbundle.test/email/debugbundle-mark.png"');
+      expect(result.html).toContain(
+        'src="https://app.debugbundle.test/email/debugbundle-mark.png"'
+      );
     });
 
     it("should render plan change without extra slots", () => {

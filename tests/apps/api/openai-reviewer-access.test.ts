@@ -16,7 +16,7 @@ beforeAll(async () => {
   credentialHash = await hashPassword(CREDENTIAL);
 });
 
-function interaction(prompt: "login" | "consent"): Record<string, unknown> {
+function interaction(prompt: "login" | "consent", includeReports = false): Record<string, unknown> {
   return {
     uid: "reviewer-interaction",
     prompt: { name: prompt, details: {} },
@@ -26,7 +26,8 @@ function interaction(prompt: "login" | "consent"): Record<string, unknown> {
       resource: "https://mcp.debugbundle.com",
       response_type: "code",
       scope:
-        "openid email debugbundle:projects:read debugbundle:incidents:read debugbundle:artifacts:read debugbundle:improvements:read debugbundle:analytics:read debugbundle:health:read",
+        "openid email debugbundle:projects:read debugbundle:incidents:read debugbundle:artifacts:read debugbundle:improvements:read debugbundle:analytics:read debugbundle:health:read" +
+        (includeReports ? " debugbundle:reports:read" : ""),
       code_challenge: "a".repeat(43),
       code_challenge_method: "S256"
     },
@@ -34,7 +35,7 @@ function interaction(prompt: "login" | "consent"): Record<string, unknown> {
   };
 }
 
-function createProvider(prompt: "login" | "consent") {
+function createProvider(prompt: "login" | "consent", includeReports = false) {
   const interactionResult = vi.fn(async () => "https://api.debugbundle.com/oauth/authorize/resume");
   const grantSave = vi.fn(async () => "provider-grant-id");
   class Grant {
@@ -45,7 +46,7 @@ function createProvider(prompt: "login" | "consent") {
   return {
     provider: {
       Grant,
-      interactionDetails: vi.fn(async () => interaction(prompt)),
+      interactionDetails: vi.fn(async () => interaction(prompt, includeReports)),
       interactionResult
     } as unknown as Provider,
     interactionResult,
@@ -95,55 +96,59 @@ describe("OpenAI synthetic reviewer authorization", () => {
     );
   });
 
-  it("creates the exact eight-scope synthetic grant and backing revocable record", async () => {
-    const provider = createProvider("consent");
-    const createGrant = vi.fn(async () => "domain-grant-id");
-    const authorization = createOpenAiReviewerAuthorization({
-      provider: provider.provider,
-      oauthStore: { createGrant, revokeGrant: vi.fn() },
-      boundary: {
-        assertSyntheticBoundary: vi.fn(async () => undefined),
-        audit: vi.fn(async () => undefined)
-      },
-      credentialHash,
-      expiresAt: "2027-08-30T00:00:00.000Z",
-      userId: REVIEWER_USER_ID,
-      organizationId: REVIEWER_ORGANIZATION_ID
-    });
+  it.each([false, true])(
+    "creates only requested synthetic scopes and a revocable record (reports: %s)",
+    async (includeReports) => {
+      const provider = createProvider("consent", includeReports);
+      const createGrant = vi.fn(async () => "domain-grant-id");
+      const authorization = createOpenAiReviewerAuthorization({
+        provider: provider.provider,
+        oauthStore: { createGrant, revokeGrant: vi.fn() },
+        boundary: {
+          assertSyntheticBoundary: vi.fn(async () => undefined),
+          audit: vi.fn(async () => undefined)
+        },
+        credentialHash,
+        expiresAt: "2027-08-30T00:00:00.000Z",
+        userId: REVIEWER_USER_ID,
+        organizationId: REVIEWER_ORGANIZATION_ID
+      });
 
-    await authorization.complete({
-      interactionId: "reviewer-interaction",
-      credential: CREDENTIAL,
-      now: new Date("2026-08-30T00:00:00.000Z"),
-      ...transport()
-    });
+      await authorization.complete({
+        interactionId: "reviewer-interaction",
+        credential: CREDENTIAL,
+        now: new Date("2026-08-30T00:00:00.000Z"),
+        ...transport()
+      });
 
-    expect(createGrant).toHaveBeenCalledWith({
-      providerGrantId: "provider-grant-id",
-      userId: REVIEWER_USER_ID,
-      organizationId: REVIEWER_ORGANIZATION_ID,
-      clientId: "https://chatgpt.com/oauth/client.json",
-      resource: "https://mcp.debugbundle.com",
-      scopes: [
-        "openid",
-        "email",
-        "debugbundle:projects:read",
-        "debugbundle:incidents:read",
-        "debugbundle:artifacts:read",
-        "debugbundle:improvements:read",
-        "debugbundle:analytics:read",
-        "debugbundle:health:read"
-      ],
-      consentedAt: "2026-08-30T00:00:00.000Z",
-      expiresAt: "2026-09-29T00:00:00.000Z"
-    });
-    expect(provider.interactionResult).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.anything(),
-      { consent: { grantId: "provider-grant-id" } },
-      { mergeWithLastSubmission: true }
-    );
-  });
+      expect(createGrant).toHaveBeenCalledWith({
+        providerGrantId: "provider-grant-id",
+        userId: REVIEWER_USER_ID,
+        organizationId: REVIEWER_ORGANIZATION_ID,
+        clientId: "https://chatgpt.com/oauth/client.json",
+        resource: "https://mcp.debugbundle.com",
+        scopes: [
+          "openid",
+          "email",
+          "debugbundle:projects:read",
+          "debugbundle:incidents:read",
+          "debugbundle:artifacts:read",
+          "debugbundle:improvements:read",
+          "debugbundle:analytics:read",
+          "debugbundle:health:read",
+          ...(includeReports ? ["debugbundle:reports:read"] : [])
+        ],
+        consentedAt: "2026-08-30T00:00:00.000Z",
+        expiresAt: "2026-09-29T00:00:00.000Z"
+      });
+      expect(provider.interactionResult).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        { consent: { grantId: "provider-grant-id" } },
+        { mergeWithLastSubmission: true }
+      );
+    }
+  );
 
   it("fails closed for invalid, expired, or boundary-breaking reviewer access", async () => {
     const provider = createProvider("login");

@@ -1,6 +1,6 @@
 # OpenAI Plugin V1 Tools
 
-Only these twenty-three read-only remote tools exist in v1:
+The 1.1 local candidate adds two saved-report readers to the original twenty-three read-only tools:
 
 | Tool                              | Use                                                  | Required product scope                                     |
 | --------------------------------- | ---------------------------------------------------- | ---------------------------------------------------------- |
@@ -28,6 +28,11 @@ Only these twenty-three read-only remote tools exist in v1:
 | `list_health_check_results`       | Read bounded recent endpoint outcomes                | `debugbundle:health:read`                                  |
 | `list_health_check_daily_rollups` | Read bounded daily health aggregates                 | `debugbundle:health:read`                                  |
 
+| `list_reports` | List saved report runs in the linked workspace | `debugbundle:reports:read` |
+| `get_report_content` | Read canonical saved facts, resolutions, priorities and coverage | `debugbundle:reports:read` |
+
 All tools advertise `readOnlyHint: true`, `openWorldHint: false`, and `destructiveHint: false`. Tool inputs reject unknown fields and never accept source selection, local paths, bearer/member/project tokens, arbitrary URLs, organization IDs, sample IDs, or custom dimensions. Analytics lookbacks are fixed to 24 hours, 7 days, 30 days, or 90 days and result lists are capped at 25.
 
 There are no tools for incident or configuration mutation, artifact generation, individual journey samples, analytics opportunities/bundles/settings, probes, alerts, webhooks, notifications, credential or member management, billing, local files, setup, or verification in this plugin.
+
+Saved-report access requires new explicit OAuth consent. Existing grants remain unchanged. Reports require current access to every frozen project/origin; incomplete access withholds the whole report. Report reads preserve canonical narrative, expire with the archive, disclose unavailable/oversized content and never generate AI, prepare PDF, send email or return storage keys/internal request hashes.

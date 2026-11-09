@@ -7,6 +7,7 @@ import {
 import { GITHUB_OAUTH_ISSUER } from "../../../packages/auth/src/index.js";
 import {
   MAX_BILLING_ADDITIONAL_CAPACITY_UNITS,
+  MemberTokenScopeDeclarationSchema,
   ProjectColorTagSchema
 } from "../../../packages/shared-types/src/index.js";
 import { z } from "zod";
@@ -18,7 +19,7 @@ function thirdPartyCallbackQuerySchema<Shape extends z.ZodRawShape>(
   return z.object(shape).strip();
 }
 
-export const RequestedTrialPlanSchema = z.enum(["solo", "team"]);
+export const RequestedTrialPlanSchema = z.enum(["solo", "team", "business"]);
 
 export const IngestionRequestSchema = z
   .object({
@@ -726,6 +727,10 @@ export const TokenListQuerySchema = z
   })
   .strict();
 
+export const MemberTokenListQuerySchema = TokenListQuerySchema.extend({
+  include_scope: z.enum(["true", "false"]).optional()
+});
+
 const AvailabilityCheckBodyShape = {
   name: z.string().min(1).max(120),
   url: z.string().url(),
@@ -795,9 +800,17 @@ export const ProjectsQuerySchema = TokenListQuerySchema.extend({
 export const BillingCheckoutBodySchema = z
   .object({
     confirmation_token: z.string().min(1).max(8192).optional(),
-    target_plan: RequestedTrialPlanSchema
+    target_plan: z.enum(["solo", "team", "business"]),
+    interval: z.enum(["month", "year"]).optional(),
+    additional_capacity_units: z.number().int().min(0).max(99).optional()
   })
-  .strict();
+  .strict()
+  .refine(
+    (value) =>
+      value.interval !== undefined ||
+      (value.target_plan !== "business" && value.additional_capacity_units === undefined),
+    { message: "billing_interval_required" }
+  );
 
 export const BillingTrialStartBodySchema = z
   .object({
@@ -824,7 +837,7 @@ export const BillingCapacityChangeBodySchema = z
 export const AdminBillingOverrideBodySchema = z
   .object({
     organization_id: z.string().guid().optional(),
-    plan: z.enum(["free", "solo", "team"]),
+    plan: z.enum(["free", "solo", "team", "business"]),
     additional_capacity_units: z.coerce
       .number()
       .int()
@@ -872,19 +885,21 @@ export const UpdateProjectBodySchema = z
 export const CreateProjectInviteBodySchema = z
   .object({
     email: z.string().email(),
-    role: z.enum(["admin", "member"]).default("member")
+    role: z.enum(["admin", "member", "viewer"]).default("member")
   })
   .strict();
 
 export const UpdateProjectMemberRoleBodySchema = z
   .object({
-    role: z.enum(["admin", "member"])
+    role: z.enum(["admin", "member", "viewer"])
   })
   .strict();
 
 export const CreateTokenBodySchema = z
   .object({
-    label: z.string().min(1).max(120)
+    label: z.string().min(1).max(120),
+    scope: MemberTokenScopeDeclarationSchema.optional(),
+    expires_at: z.string().datetime().optional()
   })
   .strict();
 

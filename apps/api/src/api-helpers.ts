@@ -1,6 +1,9 @@
+import { memberReadScope } from "./member-access-scope.js";
 import type { FastifyReply, FastifyRequest } from "fastify";
 
 import {
+  canPerformProjectAction,
+  tokenAllowsProject,
   SESSION_COOKIE_NAME,
   readCookieValue,
   requireMemberToken
@@ -24,6 +27,21 @@ export type RequestRateLimitBucket =
   | "management-write"
   | "billing-checkout-account"
   | "billing-checkout-ip";
+
+const requestMembers = new WeakMap<FastifyRequest, Promise<ResolveMemberResult | null>>();
+
+/** Reuse the authenticated principal between the scope gate and route guards. */
+export function requireRequestMemberAuth(
+  request: FastifyRequest,
+  dependencies: Pick<ApiDependencies, "memberAuth" | "webAuth">
+): Promise<ResolveMemberResult | null> {
+  let pending = requestMembers.get(request);
+  if (pending === undefined) {
+    pending = requireMemberAuth(request.headers, dependencies);
+    requestMembers.set(request, pending);
+  }
+  return pending;
+}
 
 const REQUEST_RATE_LIMIT_PER_MINUTE: Record<RequestRateLimitBucket, number> = {
   "retrieval-read": 300,
@@ -166,6 +184,7 @@ export async function requireMemberAuth(
     const browserAuth = await resolveBrowserSession(headers.cookie, dependencies);
     if (browserAuth !== null) {
       return {
+        credential_kind: "browser_session",
         member_id: browserAuth.user_id,
         organization_id: browserAuth.organization_id,
         email: browserAuth.email,
@@ -225,11 +244,25 @@ export async function requireRateLimitedMemberAuth(
   dependencies: Pick<ApiDependencies, "memberAuth" | "webAuth" | "authRateLimiter">,
   bucket: RequestRateLimitBucket
 ): Promise<ResolveMemberResult | null> {
-  const member = await requireMemberAuth(request.headers, dependencies);
+  const member = await requireRequestMemberAuth(request, dependencies);
   if (member === null) {
     await reply.status(401).send({
       error: "invalid_member_token"
     });
+    return null;
+  }
+
+  if (
+    bucket.endsWith("-write") &&
+    member.token_policy !== undefined &&
+    !member.token_policy.permissions.some(
+      (permission) =>
+        permission === "project:write" ||
+        permission === "project:admin" ||
+        permission === "organization:admin"
+    )
+  ) {
+    await reply.status(403).send({ error: "token_permission_denied" });
     return null;
   }
 
@@ -243,6 +276,20 @@ export async function requireRateLimitedMemberAuth(
   }
 
   return member;
+}
+
+/** Account-wide mail admission keeps many delegated admins from multiplying
+ * the hosted invitation egress budget. Self-hosting retains its own limits. */
+export function enforceOrganizationInvitationRateLimit(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  dependencies: Pick<ApiDependencies, "authRateLimiter">,
+  organizationId: string
+): Promise<boolean> {
+  return enforceRequestRateLimit(request, reply, dependencies, {
+    bucket: "management-write",
+    subject: `organization-invitation-email:${organizationId}`
+  });
 }
 
 export async function requireRateLimitedOwnerMemberAuth(
@@ -288,7 +335,8 @@ export async function requireRateLimitedProjectAccess(
 
   const access = await dependencies.projectManagement.resolveProjectAccessForUser({
     user_id: member.member_id,
-    project_id: input.projectId
+    project_id: input.projectId,
+    ...memberReadScope(member)
   });
   if (access === null) {
     await reply.status(404).send({ error: "project_not_found" });
@@ -296,6 +344,22 @@ export async function requireRateLimitedProjectAccess(
   }
   if (isSharedProjectAccessSuspended(access)) {
     await reply.status(403).send({ error: "shared_access_suspended" });
+    return null;
+  }
+  const action = input.bucket.endsWith("-write") ? "write" : "read";
+  if (
+    !tokenAllowsProject(member.token_policy, {
+      project_id: input.projectId,
+      organization_id: access.organization_id,
+      origin_project_ids: access.origin_project_ids ?? [input.projectId],
+      action
+    })
+  ) {
+    await reply.status(404).send({ error: "project_not_found" });
+    return null;
+  }
+  if (!canPerformProjectAction(access.effective_role, action)) {
+    await reply.status(403).send({ error: "forbidden" });
     return null;
   }
   if (
@@ -323,7 +387,7 @@ export async function resolveBrowserSession(
   email: string;
   organization_id: string;
   email_verified_at: string | null;
-  role: "owner" | "member";
+  role: "owner" | "admin" | "member";
 } | null> {
   if (dependencies.webAuth === undefined) {
     return null;

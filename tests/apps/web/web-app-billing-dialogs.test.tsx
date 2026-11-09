@@ -36,6 +36,27 @@ afterEach(() => {
 });
 
 describe("billing helper and dialog behavior", () => {
+  it("retains Business checkout identity and its display label", () => {
+    writePendingBillingCheckout({ previousPlan: "team", targetPlan: "business" });
+    expect(readPendingBillingCheckout()).toEqual({ previousPlan: "team", targetPlan: "business" });
+    expect(formatPlanName("business")).toBe("Business");
+  });
+  it("keeps checkout markers best-effort when browser storage rejects access", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("storage_denied");
+    });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("storage_denied");
+    });
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+      throw new Error("storage_denied");
+    });
+    expect(readPendingBillingCheckout()).toBeNull();
+    expect(() =>
+      writePendingBillingCheckout({ previousPlan: "team", targetPlan: "business" })
+    ).not.toThrow();
+    expect(() => clearPendingBillingCheckout()).not.toThrow();
+  });
   it("reads, writes, and clears pending billing checkout state", () => {
     expect(readPendingBillingCheckout()).toBeNull();
 
@@ -190,6 +211,83 @@ describe("billing helper and dialog behavior", () => {
 
     rerender(<CheckoutReturnDialog state={{ status: "error" }} onOpenChange={() => {}} />);
     expect(screen.getByText(/could not confirm billing yet/i)).toBeInTheDocument();
+  });
+
+  it("rejects blank and fractional capacity quantities without billing requests", async () => {
+    const user = userEvent.setup();
+    const increase = vi.spyOn(api, "increaseBillingCapacity");
+    const reduce = vi.spyOn(api, "scheduleBillingCapacityReduction");
+    render(
+      <CapacityDialog
+        billing={createBillingSummary({
+          plan: "team",
+          capacity_units: {
+            included: 15,
+            total: 17,
+            additional_purchased: 2,
+            pending_reduction: null
+          }
+        })}
+        canChangeBilling
+        managementMode="stripe"
+        open
+        onOpenChange={() => {}}
+        onBillingChange={() => {}}
+      />
+    );
+    const increaseInput = screen.getByLabelText(/^purchased extra units$/i);
+    const reductionInput = screen.getByLabelText(/purchased extra units after renewal/i);
+    for (const value of ["", "3.5"]) {
+      await user.clear(increaseInput);
+      if (value) await user.type(increaseInput, value);
+      expect(screen.getByRole("button", { name: /increase capacity now/i })).toBeDisabled();
+    }
+    for (const value of ["", "0.5"]) {
+      await user.clear(reductionInput);
+      if (value) await user.type(reductionInput, value);
+      expect(screen.getByRole("button", { name: /schedule reduction/i })).toBeDisabled();
+    }
+    expect(increase).not.toHaveBeenCalled();
+    expect(reduce).not.toHaveBeenCalled();
+  });
+
+  it("shows retained annual capacity pricing and the paid renewal date separately from allowances", () => {
+    render(
+      <CapacityDialog
+        billing={createBillingSummary({
+          plan: "team",
+          stripe_customer_id: "cus_test",
+          capacity_units: {
+            included: 15,
+            total: 17,
+            additional_purchased: 2,
+            pending_reduction: null
+          },
+          usage_window: {
+            starts_at: "2026-11-01T00:00:00.000Z",
+            ends_at: "2026-12-01T00:00:00.000Z"
+          }
+        })}
+        subscription={{
+          plan: "team",
+          interval: "year",
+          currency: "usd",
+          base_amount_minor: 19000,
+          capacity_unit_amount_minor: 1990,
+          additional_capacity_units: 2,
+          term_starts_at: "2026-01-31T00:00:00.000Z",
+          term_ends_at: "2027-01-31T00:00:00.000Z"
+        }}
+        canChangeBilling
+        managementMode="stripe"
+        open
+        onOpenChange={() => {}}
+        onBillingChange={() => {}}
+      />
+    );
+    expect(screen.getByText(/extra units.*19.90.*year/i)).toBeInTheDocument();
+    expect(screen.getByText(/keep your current allowance until.*2027/i)).toBeInTheDocument();
+    expect(screen.getByText(/allowances reset monthly/i)).toBeInTheDocument();
   });
 
   it("surfaces billing capacity dialog error and cancel paths", async () => {

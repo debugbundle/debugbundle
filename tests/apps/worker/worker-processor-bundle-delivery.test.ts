@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import type { BuildBundleWorkerDependencies } from "../../../apps/worker/src/processor-shared.js";
+import { mockedObject } from "../../helpers/vitest.js";
 import {
   processNextBuildBundleJob,
   processNextBuildReproductionJob,
@@ -7,6 +9,59 @@ import {
 } from "../../../apps/worker/src/processor.js";
 
 describe("worker processor bundle delivery", () => {
+  it.each([false, true])(
+    "withholds bound bundle work when live authority is unavailable (checker present: %s)",
+    async (hasChecker) => {
+      const read = vi.fn(),
+        putObject = vi.fn();
+      const job = {
+        project_id: "11111111-1111-4111-8111-111111111111",
+        initiating_authority: {
+          version: 1,
+          kind: "member_token",
+          user_id: "22222222-2222-4222-8222-222222222222",
+          token_id: "33333333-3333-4333-8333-333333333333"
+        },
+        scope_origin_ids: ["11111111-1111-4111-8111-111111111111"]
+      };
+      const result = await processNextBuildBundleJob({
+        queue: { dequeue: vi.fn().mockResolvedValue(job), enqueue: vi.fn() },
+        incidentStore: mockedObject<BuildBundleWorkerDependencies["incidentStore"]>({
+          getBundleBuildContext: read
+        }),
+        objectStore: { putObject },
+        ...(hasChecker
+          ? { projectJobAuthorization: { isAuthorized: vi.fn().mockResolvedValue(false) } }
+          : {})
+      });
+      expect(result).toEqual({ processed: true, reason: "initiator_access_revoked" });
+      expect(read).not.toHaveBeenCalled();
+      expect(putObject).not.toHaveBeenCalled();
+    }
+  );
+  it("withholds reproduction reads after the requesting credential is revoked", async () => {
+    const read = vi.fn(),
+      putObject = vi.fn();
+    const result = await processNextBuildReproductionJob({
+      queue: {
+        enqueue: vi.fn(),
+        dequeue: vi.fn().mockResolvedValue({
+          project_id: "11111111-1111-4111-8111-111111111111",
+          initiating_authority: {
+            version: 1,
+            kind: "browser_session",
+            user_id: "22222222-2222-4222-8222-222222222222"
+          },
+          scope_origin_ids: ["11111111-1111-4111-8111-111111111111"]
+        })
+      },
+      objectStore: { getObject: read, putObject },
+      projectJobAuthorization: { isAuthorized: vi.fn().mockResolvedValue(false) }
+    });
+    expect(result).toEqual({ processed: true, reason: "initiator_access_revoked" });
+    expect(read).not.toHaveBeenCalled();
+    expect(putObject).not.toHaveBeenCalled();
+  });
   it("should deliver a queued operational allowance email and mark it delivered", async (): Promise<void> => {
     const markOperationalEmailDeliveryAttempt = vi
       .fn()

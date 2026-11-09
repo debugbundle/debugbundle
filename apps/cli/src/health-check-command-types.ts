@@ -51,7 +51,7 @@ export interface AvailabilityCheckRecord {
   enabled: boolean;
   status: AvailabilityCheckHealthStatus;
   paused_reason: string | null;
-  organization_plan: "free" | "solo" | "team";
+  organization_plan: "free" | "solo" | "team" | "business";
   consecutive_failures: number;
   consecutive_successes: number;
   linked_incident_id: string | null;

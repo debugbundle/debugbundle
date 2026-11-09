@@ -36,6 +36,12 @@ import {
   verifyEmailCode
 } from "../../../apps/web/src/lib/api.ts";
 import { createSession } from "./web-test-helpers.js";
+import {
+  reportErrorMessage,
+  reportApi,
+  reportScope
+} from "../../../apps/web/src/lib/report-api.js";
+import { ReportApiError } from "../../../packages/report-client/src/index.js";
 
 afterEach(() => {
   resetBrowserSessionClientState();
@@ -44,6 +50,23 @@ afterEach(() => {
 });
 
 describe("web api client", () => {
+  it("maps report policy failures to safe actionable copy and uses only the browser session for report requests", async () => {
+    expect(reportErrorMessage(new ReportApiError(409, "report_version_conflict"))).toContain(
+      "changed. Reload"
+    );
+    expect(reportErrorMessage(new ReportApiError(500, "private_provider_details"))).not.toContain(
+      "private_provider_details"
+    );
+    expect(reportErrorMessage(new Error("secret transport text"))).toBe(
+      "The report service could not be reached. Try again."
+    );
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ definitions: [] })));
+    vi.stubGlobal("fetch", fetchMock);
+    await reportApi.definitions.list(reportScope("11111111-1111-4111-8111-111111111111"));
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(request.credentials).toBe("include");
+    expect(new Headers(request.headers).has("authorization")).toBe(false);
+  });
   it("requests the exact project view for retained deep links", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ projects: [] })));
     vi.stubGlobal("fetch", fetchMock);

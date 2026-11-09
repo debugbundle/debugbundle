@@ -104,7 +104,8 @@ export function createDefaultGitHubManagement(input: {
         organization_id: requestInput.organization_id,
         now: new Date().toISOString()
       });
-      const ruleLimit = billingSummary?.plan === "team" ? 20 : 3;
+      const ruleLimit =
+        billingSummary?.plan === "team" || billingSummary?.plan === "business" ? 20 : 3;
       const existingRules =
         (await input.githubStore.listProjectGitHubRulesForOrganization({
           organization_id: requestInput.organization_id,

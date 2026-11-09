@@ -1,3 +1,4 @@
+import { MemberTokenScopeDeclarationSchema } from "../../../packages/shared-types/src/index.js";
 import { z } from "zod";
 
 const optionalBearerTokenSchema = z.string().optional();
@@ -434,16 +435,20 @@ export const MCP_TOOL_CATALOG_FOUNDATION = [
     description: "List member tokens for the authenticated member.",
     inputSchema: z.object({
       bearerToken: z.string(),
-      limit: z.number().optional()
+      limit: z.number().optional(),
+      includeScope: z.boolean().optional()
     })
   },
   {
     name: "create_member_token",
     group: "tokens",
-    description: "Create a new member token.",
+    description:
+      "Create a member token. New restricted scope requires verified interactive issuance; restricted credentials cannot mint credentials.",
     inputSchema: z.object({
       bearerToken: z.string(),
-      label: z.string()
+      label: z.string(),
+      scope: MemberTokenScopeDeclarationSchema.optional(),
+      expiresAt: z.string().datetime().optional()
     })
   },
   {

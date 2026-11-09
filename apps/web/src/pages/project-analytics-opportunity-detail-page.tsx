@@ -9,6 +9,7 @@ import {
   formatAnalyticsLabel
 } from "../components/system/analytics-opportunities-table.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
+import { TitleBadgeRow } from "../components/system/title-badge-row.js";
 import { Badge } from "../components/ui/badge.js";
 import { Button } from "../components/ui/button.js";
 import { Notice } from "../components/ui/notice.js";
@@ -133,7 +134,9 @@ function OpportunityDetailContent({
         setGenerationError(result.bundle.reason.replaceAll("_", " "));
       }
     } catch (error) {
-      setGenerationError(error instanceof Error ? error.message : "Analytics bundle generation failed.");
+      setGenerationError(
+        error instanceof Error ? error.message : "Analytics bundle generation failed."
+      );
     } finally {
       generatingRef.current = false;
       setIsGenerating(false);
@@ -143,17 +146,21 @@ function OpportunityDetailContent({
   return (
     <div className="flex flex-col gap-8">
       <header className="flex flex-col gap-3">
-        <div className="flex flex-wrap gap-1.5">
-          <Badge variant={opportunity.severity === "high" ? "warning" : "outline"}>
-            {formatAnalyticsLabel(opportunity.severity)} severity
-          </Badge>
-          <Badge variant="outline">{formatAnalyticsLabel(opportunity.status)}</Badge>
-          <Badge variant="secondary">{formatAnalyticsLabel(opportunity.kind)}</Badge>
-        </div>
-        <div className="flex max-w-3xl flex-col gap-2">
-          <h2 className="text-xl font-semibold">{opportunity.title}</h2>
-          <p className="text-sm leading-relaxed text-muted-foreground">{opportunity.summary}</p>
-        </div>
+        <TitleBadgeRow
+          title={<h2 className="text-xl font-semibold">{opportunity.title}</h2>}
+          badges={
+            <>
+              <Badge variant={opportunity.severity === "high" ? "warning" : "outline"}>
+                {formatAnalyticsLabel(opportunity.severity)} severity
+              </Badge>
+              <Badge variant="outline">{formatAnalyticsLabel(opportunity.status)}</Badge>
+              <Badge variant="secondary">{formatAnalyticsLabel(opportunity.kind)}</Badge>
+            </>
+          }
+        />
+        <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
+          {opportunity.summary}
+        </p>
       </header>
 
       <section aria-labelledby="opportunity-context-heading" className="flex flex-col gap-4">
@@ -245,7 +252,8 @@ function OpportunityDetailContent({
             </Button>
           </div>
         )}
-        {opportunity.bundle_generation_id !== null && opportunity.bundle_status !== "failed" ? null : (
+        {opportunity.bundle_generation_id !== null &&
+        opportunity.bundle_status !== "failed" ? null : (
           <div>
             <Button
               type="button"
@@ -254,7 +262,9 @@ function OpportunityDetailContent({
               disabled={isGenerating}
               onClick={() => void generateBundle()}
             >
-              {isGenerating ? <LoaderCircleIcon className="animate-spin" aria-hidden="true" /> : null}
+              {isGenerating ? (
+                <LoaderCircleIcon className="animate-spin" aria-hidden="true" />
+              ) : null}
               {isGenerating
                 ? "Generating..."
                 : opportunity.bundle_status === "failed"

@@ -62,7 +62,7 @@ import {
 
 interface ProjectWeeklyReportSettingsCardProps {
   projectId: string;
-  organizationPlan: "free" | "solo" | "team";
+  organizationPlan: "free" | "solo" | "team" | "business";
   canEdit: boolean;
 }
 
@@ -575,12 +575,12 @@ export function ProjectWeeklyReportSettingsCard({
             ) : (
               <>
                 <CalloutCard
-                  eyebrow="Team tier only"
+                  eyebrow="Team or Business"
                   title="Slack weekly reports are paused on the current plan"
                   description={
                     slackChannels.length > 0
-                      ? "Saved Slack weekly reports are preserved and will resume after the owner upgrades back to Team."
-                      : "Upgrade to Team to deliver weekly reports into connected Slack channels."
+                      ? "Saved Slack weekly reports are preserved and will resume after the owner upgrades to a plan with Slack integration."
+                      : "Upgrade your plan to deliver weekly reports into connected Slack channels."
                   }
                   tone="warning"
                 />
@@ -640,7 +640,8 @@ export function ProjectWeeklyReportSettingsCard({
             }
             description="Choose a connected Slack channel and schedule for this weekly project summary."
             footer={
-              <PendingButton pending={isSavingSlack}
+              <PendingButton
+                pending={isSavingSlack}
                 type="submit"
                 disabled={
                   isSavingSlack ||

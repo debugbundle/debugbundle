@@ -1,4 +1,6 @@
 import { requireOwnerBillingPrincipal } from "./billing-principal.js";
+import { registerBillingOfferChangeRoutes } from "./billing-offers.js";
+import { canCheckoutToBillingPlan } from "../../../../packages/billing/src/billing-offer-admission.js";
 import { registerBillingPlanChangeRoutes } from "./billing-plan-change.js";
 import { registerBillingUpgradeRoutes } from "./billing-upgrade.js";
 import type { FastifyInstance, FastifyRequest } from "fastify";
@@ -14,28 +16,6 @@ import {
   BillingTrialStartBodySchema
 } from "../schemas.js";
 
-function canUpgrade(currentPlan: "free" | "solo" | "team", targetPlan: "solo" | "team"): boolean {
-  if (currentPlan === "free") {
-    return true;
-  }
-
-  if (currentPlan === "solo") {
-    return targetPlan === "team";
-  }
-
-  return false;
-}
-
-function getTrialPlan(billing: {
-  trial?: {
-    plan?: "solo" | "team" | null;
-  };
-}): "solo" | "team" | null {
-  return billing.trial?.plan === "solo" || billing.trial?.plan === "team"
-    ? billing.trial.plan
-    : null;
-}
-
 function hasActiveTrial(billing: {
   trial?: {
     active?: boolean;
@@ -44,35 +24,13 @@ function hasActiveTrial(billing: {
   return billing.trial?.active === true;
 }
 
-function canCheckoutToTargetPlan(
-  billing: {
-    plan: "free" | "solo" | "team";
-    trial?: {
-      active?: boolean;
-      plan?: "solo" | "team" | null;
-    };
-  },
-  targetPlan: "solo" | "team"
-): boolean {
-  if (hasActiveTrial(billing)) {
-    const trialPlan = getTrialPlan(billing);
-    if (trialPlan === "solo") {
-      return targetPlan === "solo" || targetPlan === "team";
-    }
-
-    return trialPlan === "team" && targetPlan === "team";
-  }
-
-  return canUpgrade(billing.plan, targetPlan);
-}
-
 async function recordBillingAdminOverrideAudit(
   dependencies: Pick<ApiDependencies, "auditLogging">,
   request: FastifyRequest,
   input: {
     organization_id: string;
     user_id: string;
-    plan: "free" | "solo" | "team";
+    plan: "free" | "solo" | "team" | "business";
     additional_capacity_units: number;
     reason: string;
     status: "success" | "failure";
@@ -98,6 +56,7 @@ async function recordBillingAdminOverrideAudit(
 }
 
 export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
+  registerBillingOfferChangeRoutes(app, dependencies);
   registerBillingUpgradeRoutes(app, dependencies);
   registerBillingPlanChangeRoutes(app, dependencies);
   app.get("/v1/billing", async (request, reply) => {
@@ -282,7 +241,7 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
 
       return reply.status(404).send({ error: "billing_not_found" });
     }
-    if (!canCheckoutToTargetPlan(billing, parsedBody.data.target_plan)) {
+    if (!canCheckoutToBillingPlan(billing, parsedBody.data.target_plan)) {
       await recordAuditLog(dependencies.auditLogging, {
         organization_id: session.organization_id,
         actor_user_id: session.user_id,
@@ -307,6 +266,12 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
       billing_email: session.email,
       current_plan: billing.plan,
       target_plan: parsedBody.data.target_plan,
+      ...(parsedBody.data.interval === undefined
+        ? {}
+        : { interval: parsedBody.data.interval, actor_user_id: session.user_id }),
+      ...(parsedBody.data.additional_capacity_units === undefined
+        ? {}
+        : { additional_capacity_units: parsedBody.data.additional_capacity_units }),
       ...(parsedBody.data.confirmation_token
         ? { confirmation_token: parsedBody.data.confirmation_token }
         : {})
@@ -324,7 +289,9 @@ export function registerBillingRoutes(app: FastifyInstance, dependencies: ApiDep
         metadata: { reason: checkout, target_plan: parsedBody.data.target_plan }
       });
       return reply
-        .status(checkout === "billing_service_error" ? 503 : 409)
+        .status(
+          checkout === "billing_service_error" || checkout === "billing_not_configured" ? 503 : 409
+        )
         .send({ error: checkout });
     }
     if (checkout === null) {

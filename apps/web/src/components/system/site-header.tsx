@@ -19,12 +19,15 @@ const routeTitles: Record<string, string> = {
   "/incidents": "Incidents",
   "/health-status": "Health Status",
   "/improvements": "Improvements",
+  "/reports": "Reports",
   "/analytics/workspace": "Analytics",
   "/analytics/workspace/bundles": "Analytics",
   "/projects": "Projects",
   "/billing": "Billing",
   "/member-tokens": "Member Tokens",
-  "/settings": "Settings"
+  "/settings": "Settings",
+  "/settings/people": "People",
+  "/settings/referrals": "Referrals"
 };
 
 function resolveTitle(pathname: string): string {
@@ -65,6 +68,21 @@ function resolveProjectTab(pathname: string): string {
 
 export function SiteHeader(): JSX.Element {
   const location = useLocation();
+  const pathname = location.pathname.replace(/\/$/, "");
+  const childPage = pathname.startsWith("/reports/")
+    ? {
+        parent: "Reports",
+        href: "/reports",
+        title:
+          pathname === "/reports/definitions/new"
+            ? "Create report"
+            : pathname.startsWith("/reports/definitions/")
+              ? "Report settings"
+              : "Report"
+      }
+    : pathname === "/settings/referrals/payouts"
+      ? { parent: "Referrals", href: "/settings/referrals", title: "Payouts" }
+      : null;
   const isProjectRoute = /^\/projects\/[^/]+/.test(location.pathname);
   const { activeProject } = useProjectRoute();
   const { action } = useHeaderActions();
@@ -123,8 +141,22 @@ export function SiteHeader(): JSX.Element {
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
+        ) : childPage ? (
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link to={childPage.href}>{childPage.parent}</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>{childPage.title}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
         ) : (
-          <h1 className="m-0 text-base font-medium leading-none">{resolveTitle(location.pathname)}</h1>
+          <h1 className="m-0 text-base font-medium leading-none">{resolveTitle(pathname)}</h1>
         )}
       </div>
       {action?.pathname === location.pathname ? (

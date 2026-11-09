@@ -641,7 +641,8 @@ describe("worker processor - build-analytics-bundle", () => {
       project_id: PROJECT_ID,
       generation_id: GENERATION_ID,
       failed_at: expect.any(String),
-      reason: "build_error"
+      reason: "build_error",
+      object_write_attempted: true
     });
   });
 });

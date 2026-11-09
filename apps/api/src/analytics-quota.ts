@@ -71,7 +71,9 @@ function buildAnalyticsLimits(input: {
 } {
   const caps = getTierCapabilities(input.organization_plan);
   const capacityUnits =
-    input.organization_plan === "solo" || input.organization_plan === "team"
+    input.organization_plan === "solo" ||
+    input.organization_plan === "team" ||
+    input.organization_plan === "business"
       ? getCapacityUnits(input.billingSummary)
       : 1;
 
@@ -196,7 +198,9 @@ export async function claimAnalyticsIngestionQuota(input: {
   });
 }
 
-export async function claimAnalyticsIngestionQuotaAtBoundary<TEvent extends AnalyticsQuotaEvent>(input: {
+export async function claimAnalyticsIngestionQuotaAtBoundary<
+  TEvent extends AnalyticsQuotaEvent
+>(input: {
   dependencies: ApiDependencies;
   organization_id: string | undefined;
   organization_plan: string | undefined;

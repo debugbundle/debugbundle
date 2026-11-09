@@ -39,14 +39,7 @@ import {
 } from "../components/ui/empty.js";
 import { Field, FieldGroup, FieldLabel } from "../components/ui/field.js";
 import { Input } from "../components/ui/input.js";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "../components/ui/select.js";
+import { ToggleGroup, ToggleGroupItem } from "../components/ui/toggle-group.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import {
   Table,
@@ -80,11 +73,13 @@ export function ProjectMembersPage(): JSX.Element {
   const [invites, setInvites] = useState<ProjectInviteRecord[] | null>(null);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<"admin" | "member">("member");
+  const [inviteRole, setInviteRole] = useState<"admin" | "member" | "viewer">("member");
 
   const effectiveRole = getProjectEffectiveRole(project);
   const canManage = effectiveRole === "owner" || effectiveRole === "admin";
-  const canInvite = canManage && project.organization_plan === "team";
+  const sharingAvailable =
+    project.organization_plan === "team" || project.organization_plan === "business";
+  const canInvite = canManage && sharingAvailable;
 
   useEffect(() => {
     let isCancelled = false;
@@ -130,7 +125,7 @@ export function ProjectMembersPage(): JSX.Element {
         showSuccessToast("Invite sent successfully.");
       } catch (error) {
         if (error instanceof Error && error.message === "upgrade_required") {
-          showErrorToast("Upgrade to Team to invite collaborators.");
+          showErrorToast("Upgrade to Team or Business to invite collaborators.");
           return;
         }
 
@@ -139,7 +134,10 @@ export function ProjectMembersPage(): JSX.Element {
     });
   }
 
-  async function handleRoleChange(userId: string, role: "admin" | "member"): Promise<void> {
+  async function handleRoleChange(
+    userId: string,
+    role: "admin" | "member" | "viewer"
+  ): Promise<void> {
     try {
       const updated = await updateProjectMemberRole(projectId, userId, role);
       setMembers((current) =>
@@ -240,25 +238,22 @@ export function ProjectMembersPage(): JSX.Element {
                     <FieldLabel id="project-invite-role-label" htmlFor="project-invite-role">
                       Role
                     </FieldLabel>
-                    <Select
+                    <ToggleGroup
+                      type="single"
+                      variant="outline"
+                      id="project-invite-role"
+                      aria-labelledby="project-invite-role-label"
                       disabled={isInviting}
                       value={inviteRole}
-                      onValueChange={(value) => setInviteRole(value as "admin" | "member")}
+                      onValueChange={(value) => {
+                        if (value === "admin" || value === "member" || value === "viewer")
+                          setInviteRole(value);
+                      }}
                     >
-                      <SelectTrigger
-                        id="project-invite-role"
-                        aria-labelledby="project-invite-role-label project-invite-role"
-                        className="w-full"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent position="popper">
-                        <SelectGroup>
-                          <SelectItem value="member">Member</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
+                      <ToggleGroupItem value="viewer">Viewer</ToggleGroupItem>
+                      <ToggleGroupItem value="member">Member</ToggleGroupItem>
+                      <ToggleGroupItem value="admin">Admin</ToggleGroupItem>
+                    </ToggleGroup>
                   </Field>
                 </FieldGroup>
               </DialogFormContent>
@@ -276,10 +271,11 @@ export function ProjectMembersPage(): JSX.Element {
         />
       ) : null}
 
-      {canManage && project.organization_plan !== "team" ? (
+      {canManage && !sharingAvailable ? (
         <PlanUpgradeCallout
-          title="Upgrade to Team to share this project"
-          description="Project sharing is available on Team. Upgrade before inviting collaborators or managing shared access from this project."
+          eyebrow="Team or Business"
+          title="Upgrade to share this project"
+          description="Project sharing is available on Team and Business. Upgrade before inviting collaborators or managing shared access from this project."
         />
       ) : null}
 
@@ -288,7 +284,8 @@ export function ProjectMembersPage(): JSX.Element {
           <CardHeader>
             <CardTitle>People with access</CardTitle>
             <CardDescription>
-              Project owners and collaborators who can open this project.
+              Direct project roles. Inherited organisation access is managed in People; removing a
+              direct role does not remove an inherited grant.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -331,26 +328,21 @@ export function ProjectMembersPage(): JSX.Element {
                         </TableCell>
                         <TableCell>
                           {canEditRole ? (
-                            <Select
+                            <ToggleGroup
+                              type="single"
+                              variant="outline"
+                              size="sm"
+                              aria-label={`role for ${member.email}`}
                               value={member.role}
-                              onValueChange={(value) =>
-                                void handleRoleChange(member.user_id, value as "admin" | "member")
-                              }
+                              onValueChange={(value) => {
+                                if (value === "admin" || value === "member" || value === "viewer")
+                                  void handleRoleChange(member.user_id, value);
+                              }}
                             >
-                              <SelectTrigger
-                                aria-label={`role for ${member.email}`}
-                                className="min-w-28"
-                                size="sm"
-                              >
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent position="popper">
-                                <SelectGroup>
-                                  <SelectItem value="member">member</SelectItem>
-                                  <SelectItem value="admin">admin</SelectItem>
-                                </SelectGroup>
-                              </SelectContent>
-                            </Select>
+                              <ToggleGroupItem value="viewer">viewer</ToggleGroupItem>
+                              <ToggleGroupItem value="member">member</ToggleGroupItem>
+                              <ToggleGroupItem value="admin">admin</ToggleGroupItem>
+                            </ToggleGroup>
                           ) : (
                             member.role
                           )}

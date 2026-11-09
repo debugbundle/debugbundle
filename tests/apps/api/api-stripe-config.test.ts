@@ -59,8 +59,14 @@ describe("createStripeConfig", () => {
     expect(config!.priceMap.size).toBe(4);
     expect(config!.priceMap.get("price_solo")).toEqual({ plan: "solo", type: "plan" });
     expect(config!.priceMap.get("price_team")).toEqual({ plan: "team", type: "plan" });
-    expect(config!.priceMap.get("price_solo_capacity")).toEqual({ plan: "solo", type: "extra_capacity" });
-    expect(config!.priceMap.get("price_team_capacity")).toEqual({ plan: "team", type: "extra_capacity" });
+    expect(config!.priceMap.get("price_solo_capacity")).toEqual({
+      plan: "solo",
+      type: "extra_capacity"
+    });
+    expect(config!.priceMap.get("price_team_capacity")).toEqual({
+      plan: "team",
+      type: "extra_capacity"
+    });
   });
 
   it("should trim whitespace from env var values", () => {
@@ -78,6 +84,39 @@ describe("createStripeConfig", () => {
     expect(config).not.toBeNull();
     expect(config!.webhookSecret).toBe("whsec_test");
     expect(config!.soloPriceId).toBe("price_solo");
+  });
+
+  it("adds optional annual/Business offers and retains the old Team capacity identifier", () => {
+    const env = {
+      STRIPE_SECRET_KEY: "sk_test_123",
+      STRIPE_WEBHOOK_SECRET: "whsec_test",
+      STRIPE_SOLO_PRICE_ID: "price_solo",
+      STRIPE_TEAM_PRICE_ID: "price_team",
+      STRIPE_SOLO_EXTRA_CAPACITY_PRICE_ID: "price_solo_capacity",
+      STRIPE_TEAM_EXTRA_CAPACITY_PRICE_ID: "price_team_capacity",
+      STRIPE_TEAM_EXTRA_CAPACITY_CURRENT_PRICE_ID: "price_team_capacity_current",
+      STRIPE_BUSINESS_PRICE_ID: "price_business",
+      STRIPE_BUSINESS_EXTRA_CAPACITY_PRICE_ID: "price_business_capacity",
+      STRIPE_BUSINESS_ANNUAL_PRICE_ID: "price_business_year",
+      STRIPE_BUSINESS_EXTRA_CAPACITY_ANNUAL_PRICE_ID: "price_business_capacity_year"
+    };
+    const config = createStripeConfig(env)!;
+    expect(config.teamExtraCapacityPriceId).toBe("price_team_capacity_current");
+    expect(config.priceMap.get("price_team_capacity")).toEqual({
+      plan: "team",
+      type: "extra_capacity",
+      purchasable: false
+    });
+    expect(config.priceMap.get("price_business_year")).toEqual({
+      plan: "business",
+      type: "plan",
+      interval: "year",
+      currency: "usd",
+      amount_minor: 58800
+    });
+    expect(
+      createStripeConfig({ ...env, STRIPE_BUSINESS_ANNUAL_PRICE_ID: "price_solo" })
+    ).toBeNull();
   });
 });
 
@@ -111,29 +150,20 @@ describe("derivePlanFromSubscriptionItems", () => {
   });
 
   it("should detect solo plan from subscription items", () => {
-    const result = derivePlanFromSubscriptionItems(
-      [buildItem("price_solo", 1)],
-      buildPriceMap()
-    );
+    const result = derivePlanFromSubscriptionItems([buildItem("price_solo", 1)], buildPriceMap());
 
     expect(result).toEqual({ plan: "solo", extraCapacityQuantity: 0 });
   });
 
   it("should detect team plan from subscription items", () => {
-    const result = derivePlanFromSubscriptionItems(
-      [buildItem("price_team", 1)],
-      buildPriceMap()
-    );
+    const result = derivePlanFromSubscriptionItems([buildItem("price_team", 1)], buildPriceMap());
 
     expect(result).toEqual({ plan: "team", extraCapacityQuantity: 0 });
   });
 
-    it("should detect plan with extra capacity", () => {
+  it("should detect plan with extra capacity", () => {
     const result = derivePlanFromSubscriptionItems(
-      [
-        buildItem("price_team", 1),
-          buildItem("price_team_capacity", 3)
-      ],
+      [buildItem("price_team", 1), buildItem("price_team_capacity", 3)],
       buildPriceMap()
     );
 
@@ -141,7 +171,9 @@ describe("derivePlanFromSubscriptionItems", () => {
   });
 
   it("should handle items with missing quantity as 0 extra capacity", () => {
-    const item = { price: { id: "price_solo_capacity" } as Stripe.Price } as Stripe.SubscriptionItem;
+    const item = {
+      price: { id: "price_solo_capacity" } as Stripe.Price
+    } as Stripe.SubscriptionItem;
     // quantity is undefined
     const result = derivePlanFromSubscriptionItems([item], buildPriceMap());
 

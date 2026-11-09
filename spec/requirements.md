@@ -7,6 +7,14 @@ Last updated: 2026-11-01
 
 ## 1. Functional Requirements
 
+**FR-DEV-01:** Local tier testing must support Free, Solo, Team and Business through
+an operator command against this checkout's local Compose database only. Inspect
+by default; require an exact organisation when ambiguous. Refuse remote Docker
+contexts, foreign checkouts, linked Stripe identities, trials and pending billing
+operations. Test base tiers without provider calls, usage resets or automatic
+report-schedule resumption. Explicit administrative entitlements take precedence
+over an operator's initial automatic Team default, including an explicit Free tier.
+
 ### Bundle evidence quality
 
 The tracked [evidence specification](bundle-evidence-quality.md) defines the
@@ -260,7 +268,7 @@ Public status visibility changes save immediately from the enable switch. First 
 
 **FR-BND-10:** One active bundle per incident. When significant new events arrive for an existing incident, the bundle is regenerated (not appended). A version counter increments on each regeneration (v1, v2, v3). `bundle.updated` webhook fires on regeneration. Retention cleanup deletes the incident + all associated bundles + reproduction artifacts atomically. No historical bundle snapshots in V1 — only the latest bundle is kept.
 
-**FR-BND-08:** Improvement bundle generation is available at all tiers. Free tier: user/agent triggers local analysis via `debugbundle analyze` using local bundles + profile + codebase (agent uses own LLM). Solo and Team tiers: hosted cloud automation is available for deterministic improvement analysis, controlled by per-project improvement settings and backed by the shared bundle allowance.
+**FR-BND-08:** Improvement bundle generation is available at all tiers. Free tier: user/agent triggers local analysis via `debugbundle analyze` using local bundles + profile + codebase (agent uses own LLM). Paid tiers: hosted cloud automation is available for deterministic improvement analysis, controlled by per-project improvement settings and backed by the shared bundle allowance.
 
 **FR-BND-09:** `debugbundle analyze [--type failure|improvement|performance] [--local]` generates analysis bundles locally by reading `.debugbundle/bundles/local/`, `profile.json`, and relevant source code. Output follows the standard bundle schema. The skill layer provides structured analysis recipes (schemas + examples) that any AI agent can follow.
 
@@ -453,7 +461,7 @@ Internal registration diagnostics may build a separately named compatibility pac
 
 **FR-BIL-05:** A dedicated Stripe webhook sync path and a separate support/admin override path must exist; the admin path is for controlled exceptions and must not become the primary recurring-billing source of truth.
 
-**FR-BIL-06:** The V1 Solo base subscription price is `$4.99/month`. New Solo Checkout Sessions must use the one active monthly-recurring Stripe Price configured by `STRIPE_SOLO_PRICE_ID`; no alternate Solo base price may remain advertised or active in the launch catalog. Solo extra capacity remains `$0.99/unit/month`, and Team remains `$19/month`. All advertised paid prices are denominated in USD and exclude VAT or other applicable taxes, which Stripe calculates and applies at Checkout using `tax_behavior: exclusive` Prices.
+**FR-BIL-06:** The current Solo base subscription price is `$5/month` or `$48/year`; Solo extra capacity is `$1/unit/month` or `$10/unit/year`. Team is `$19/month` or `$192/year`; Business is `$59/month` or `$588/year`. Team/Business extra units are `$3/month` or `$30/year`. New Checkout Sessions must use the configured current Price for the selected tier, kind and interval. All advertised paid prices are denominated in USD and exclude VAT or other applicable taxes, which Stripe calculates and applies at Checkout using `tax_behavior: exclusive` Prices. The complete catalogue and allowance rules are specified by FR-BUS-01 in [the Business contract](business-tier.md). Replace deployed price references before archiving superseded prices; historical invoice/subscription facts remain readable.
 
 **FR-BIL-07:** Hosted Checkout creation must reserve one durable attempt per organization before calling Stripe, reuse an open session, replay identical persisted parameters and an idempotency key after uncertain responses, and replace only a Stripe-confirmed expired session or a completed session whose exact subscription is provider-confirmed terminal. New sessions expire after one hour and request supported 3D Secure authentication. Owner/member limits are supplemented by organization and trusted-client-IP admission limits. Suspended accounts and accounts with non-terminal subscriptions cannot create another recurring subscription. Cancellation events must not erase newer ambiguous attempts.
 
@@ -473,9 +481,17 @@ See `/spec/billing.md` and `/spec/system-emails.md` for the detailed source-of-t
 
 **FR-WEB-08:** In project settings and collaboration surfaces, role-based visibility must match server authorization: plain members do not see the members-management tab, receive only the resolved capture-policy preview, and do not see destructive settings sections; owner/admin callers receive the corresponding management affordances allowed by their role.
 
-**FR-WEB-09:** Web list pagination displays the current page and exact filtered total page count. Text actions use the shared Button primitive with centered icons and labels; table Edit/Delete and capture-rule Pause/Enable actions use accessible icon buttons with tooltips. Paired Slack weekly report Edit/Delete actions use the same ghost variant. Enabled switches in their off state are distinguishable from disabled controls and contrast against surrounding surfaces in both themes. The analytics-disabled settings action sits at the right of its callout title row and wraps at narrow widths.
+**FR-WEB-09:** Web list pagination displays the current page and exact filtered total page count. Text actions use the shared Button primitive with centered icons and labels; table Edit/Delete and capture-rule Pause/Enable actions use accessible icon buttons with tooltips. Paired Slack weekly report Edit/Delete actions use the same ghost variant. Enabled switches in their off state are distinguishable from disabled controls and contrast against surrounding surfaces in both themes. Section status/category badges follow their title inline to the right, with wrapping on narrow screens. The analytics-disabled settings action sits at the right of its callout title row and wraps at narrow widths.
 
 **FR-WEB-10:** An explicitly opted-in local UI preview must populate the ordinary dashboard and related review surfaces with synthetic data. Simulated edits are held in memory, never forwarded to real services, and reset on preview restart. The preview is development-only, loopback-only, excluded from production builds, and disables frontend telemetry.
+
+Billing preview includes Free/Solo/Team/Business, month/year and paid/complimentary/
+trial-day-1/trial-day-8 fixtures through existing form primitives. Ordinary paid
+offer dialogs support upgrades after confirmation and reductions/interval switches
+at simulated renewal, retaining extra capacity. Local cancellation can simulate
+returning to Free. Private scenario controls never enter production bundles or
+change real accounts. Synthetic quotes/payment results do not qualify provider
+tax, payment authentication, invoice or portal behaviour.
 
 **FR-WEB-11:** Primary asynchronous create/save forms show request-specific pending feedback using the shared button pattern: visible spinner, accessible busy state and disabled submission until completion. Validation/permission-disabled buttons must not look busy. Project/token/invitation/probe creation prevents overlapping submits, retains failed drafts and supports retry. Project notification settings use the existing collapsible section pattern, closed by default; account notification settings remain expanded.
 
@@ -501,22 +517,22 @@ DebugBundle must preserve anonymized account-level aggregate usage metrics and r
 
 **FR-AUTH-05:** Agent-assisted signup flow supported (agent orchestrates, human completes trust step).
 
-**FR-AUTH-06:** Three effective project roles exist in V1: **Owner** (billing owner, delete project, manage all project resources), **Admin** (manage collaborators, capture policy, shared integrations, and all project-scoped automation resources except project deletion/billing takeover), and **Member** (all project data access plus normal project-scoped writes, but no collaborator management, no capture-policy edits, no shared integration management, and no mutation of another collaborator's project-scoped automation resources). Fine-grained RBAC beyond these role semantics is deferred to Enterprise.
+**FR-AUTH-06:** Fixed project roles are Owner (billing owner, destructive project authority), Admin (current project-local collaborator/configuration/automation management), Member (current operational data/writes without administrator powers), and Viewer (read-only). Business adds fixed organisation Owner/Admin/Member with explicit selected/all-project grants as specified in FR-BUS-02. Org Admin cannot bill, transfer ownership, delete the account or administer Owner/peer Org Admins. No custom-role engine.
 
 **FR-AUTH-07:** Agents modeled as project members (no separate permissions model).
 
 **FR-AUTH-08:** Anti-abuse: email-code verification (see FR-AUTH-04), rate limiting (see NFR-RATE-\*), signup throttling, and CAPTCHA on browser email-code requests.
 
-**FR-AUTH-09:** Project-sharing invite model: project owners and project admins can invite collaborators to a specific project by email. Invited identity accepts via link into their own DebugBundle account. Collaborator roles are `admin` and `member`. Agent members may still be added through direct member-token generation without email invite.
+**FR-AUTH-09:** Project-sharing invite model: project owners and project admins can invite collaborators to a specific project by email. Invited identity accepts via link into their own DebugBundle account. Collaborator roles are `admin`, `member` and `viewer`. Agent members may still be added through direct member-token generation without email invite.
 
-**FR-AUTH-10:** V1 project access is explicit and project-scoped. A user may access a project only when they own it or have an active `project_members` row for it. Shared access must never imply visibility into other projects owned by the same billing account.
+**FR-AUTH-10:** Legacy project access remains ownership or active explicit project membership. Shared project access never implies another project's access. Business can explicitly grant organisation-wide access under FR-BUS-02; only that grant includes future projects. Legacy token authority remains ownership/direct-sharing and cannot expand through new inherited grants.
 
 **FR-AUTH-10a:** Collaborator-management surfaces are admin-only. Plain members must not be able to list pending invites, invite collaborators, cancel invites, change collaborator roles, remove collaborators, or see the members-management surface in the web app.
 
 **FR-AUTH-10b:** For project-scoped automation resources that members may create in shared projects, including alert rules, webhooks, and GitHub dispatch rules, owner and admin may manage every resource while member-role collaborators may mutate only the resources they created themselves.
 When a collaborator is removed from a project or leaves a shared project, DebugBundle must remove only that collaborator's project-scoped automation resources for that project, including alert rules, webhooks, and GitHub dispatch rules. Project resources owned by other collaborators or the project owner must remain.
 
-**FR-AUTH-11:** Member-authorized API operations must accept either a valid browser session or a valid member token. After principal resolution, both auth paths must run through the same authorization and domain logic.
+**FR-AUTH-11:** Member-authorized API operations must accept either a valid browser session or a valid member token. After principal resolution, both auth paths must run through the same authorization and domain logic. Scoped member-token permissions intersect live user access under FR-BUS-03, so a restricted token may intentionally allow less than a browser session.
 
 **FR-AUTH-12:** CLI and MCP must reuse member-token auth through the API. The SPA must use cookie-backed sessions. SDK ingestion must use project tokens only.
 
@@ -568,7 +584,7 @@ When a collaborator is removed from a project or leaves a shared project, DebugB
 
 **FR-PROF-06:** Profile validation via `debugbundle profile validate`.
 
-**FR-PROF-07:** Profile exists for all tiers; Team tier uses it for deeper cloud-automated analysis.
+**FR-PROF-07:** Profile exists for all tiers; Paid tiers use it for deeper cloud-automated analysis.
 
 **FR-PROF-08:** `debugbundle setup` must update or create a DebugBundle-specific section in the repository's `AGENTS.md` if it exists, pointing to `.agents/skills/debugbundle/SKILL.md`.
 
@@ -660,7 +676,7 @@ All eight canonical event types (FR-SDK-05) are assigned to one of three event c
 
 **FR-EVT-01:** Every event persisted through ingestion must carry an `event_class` classification (`incident_signal`, `context_signal`, or `operational_signal`). Classification is determined at the worker normalization stage based on event type and project capture policy.
 
-**FR-EVT-02:** Free tier billing must primarily meter Class A (incident signal) events. Class B and Class C events must not count against the primary `monthly_raw_ingested_events` allowance on Free. On paid tiers (Solo, Team), Class A and Class B events count against the allowance; Class C operational signals are excluded on every tier.
+**FR-EVT-02:** Free tier billing must primarily meter Class A (incident signal) events. Class B and Class C events must not count against the primary `monthly_raw_ingested_events` allowance on Free. On paid tiers, Class A and Class B events count against the allowance; Class C operational signals are excluded on every tier.
 
 **FR-EVT-02a:** Hosted allowance enforcement must make every whole unit in the active tier-and-capacity limit usable. A valid operation that brings usage exactly to the limit is allowed; only work beyond the limit is rejected or suppressed. When a debug or analytics ingestion batch exceeds the remaining monthly allowance, the API must admit eligible events in input order through the exact remaining boundary, return indexed quota errors only for the surplus, and leave events excluded from that meter unaffected. Non-reservation counters must not reserve a conservative margin below the limit; concurrent requests may produce a small visible overage instead of an early rejection. A limit-reached notification must never report usage below its limit.
 
@@ -676,7 +692,7 @@ All eight canonical event types (FR-SDK-05) are assigned to one of three event c
 | `balanced`      | Default hosted behavior                   | On         | Warning+    | Immediate failures: 5xx plus 408/423/424/425/429                                               | Local ring buffer + exception flush only | Paid-tier only |
 | `investigative` | Short-term deep debugging                 | On         | Info+       | Immediate failures: balanced set plus 409, with optional broader request capture via overrides | Optional standalone                      | Paid-tier only |
 
-**FR-EVT-05:** New Free, Solo, and Team projects must default to the `balanced` preset. Presets are changeable by the project owner via API, CLI, MCP, and web app (interface parity per INV-5). Existing projects retain their persisted preset across upgrades; changing this default must never rewrite an installed project's policy implicitly.
+**FR-EVT-05:** New hosted projects must default to the `balanced` preset. Presets are changeable by the project owner via API, CLI, MCP, and web app (interface parity per INV-5). Existing projects retain their persisted preset across upgrades; changing this default must never rewrite an installed project's policy implicitly.
 
 **FR-EVT-06:** Each project may override individual capture dimensions beyond the preset via advanced controls:
 
@@ -753,7 +769,7 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **FR-ANL-04b:** DebugBundle incident/debug capture must not depend on AnalyticsBundle being enabled. Existing frontend exceptions, breadcrumbs, route changes, request events, and debug bundles must continue to work when analytics is disabled, unavailable on the current tier, blocked by consent, sampled out, or failing internally.
 
-**FR-ANL-05:** Analytics events must have separate usage accounting from debug incident ingestion. Analytics event/session allowances, retained journey samples, saved funnels, custom dimensions, and AnalyticsBundle generations must be meterable independently from existing incident event and failure bundle allowances. Hosted Free includes a bounded monthly preview of 5,000 analytics events, 1,000 sessions, 100 retained journey samples, 3 AnalyticsBundle generations, and 1 active saved funnel. Hosted monthly analytics event, session, retained-journey-sample, and AnalyticsBundle-generation allowances on paid tiers must scale with the organization's total included plus purchased capacity units. Hosted analytics event/session ingestion and on-demand AnalyticsBundle generation quota checks use durable analytics-specific internal counters and must not require adding analytics keys to the public billing summary `allowances` response until public billing clients are migrated to a compatible shape. A batch that cannot be claimed as a whole must fall back to atomic event-by-event claims so otherwise-eligible events can use the exact remaining event and session units without exceeding either meter. Saved funnels and custom dimensions are fixed tier capabilities rather than capacity-unit multipliers: active saved-funnel caps are 1 on Free, 10 on Solo, and 50 on Team, while controlled custom-dimension caps are 1 on Free, 3 on Solo, and 8 on Team; self-host supports up to 100 saved funnels and 20 custom dimensions. Project settings may deliberately lower a tier cap, and settings plus ingestion boundaries must reject values above the current tier capability.
+**FR-ANL-05:** Analytics events must have separate usage accounting from debug incident ingestion. Analytics event/session allowances, retained journey samples, saved funnels, custom dimensions, and AnalyticsBundle generations must be meterable independently from existing incident event and failure bundle allowances. Hosted Free includes a bounded monthly preview of 5,000 analytics events, 1,000 sessions, 100 retained journey samples, 3 AnalyticsBundle generations, and 1 active saved funnel. Hosted monthly analytics event, session, retained-journey-sample, and AnalyticsBundle-generation allowances on paid tiers must scale with the organization's total included plus purchased capacity units. Hosted analytics event/session ingestion and on-demand AnalyticsBundle generation quota checks use durable analytics-specific internal counters and must not require adding analytics keys to the public billing summary `allowances` response until public billing clients are migrated to a compatible shape. A batch that cannot be claimed as a whole must fall back to atomic event-by-event claims so otherwise-eligible events can use the exact remaining event and session units without exceeding either meter. Saved funnels and custom dimensions are fixed tier capabilities rather than capacity-unit multipliers: active saved-funnel caps are 1 on Free, 10 on Solo, and 50 on Team and Business, while controlled custom-dimension caps are 1 on Free, 3 on Solo, and 8 on Team and Business; self-host supports up to 100 saved funnels and 20 custom dimensions. Project settings may deliberately lower a tier cap, and settings plus ingestion boundaries must reject values above the current tier capability.
 
 **FR-ANL-06:** Analytics ingestion must remain lightweight: authenticate, validate, apply analytics enablement/quota checks, persist short-lived raw input when accepted, enqueue analytics processing, and return. No aggregation, bundle generation, or heavy analysis may run synchronously in the API request path.
 
@@ -789,7 +805,7 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **FR-ANL-15:** Analytics rollups must support direct metrics retrieval for humans and agents. Required metric families include usage summary, route/page metrics, device/browser/OS/language breakdown, referrer/UTM metrics, funnel conversion/dropoff, journey patterns, feature/custom-event usage, deploy comparison inputs, and incident impact inputs.
 
-**FR-ANL-16:** Long-term analytics storage must be aggregate-first. Raw analytics event objects and representative journey samples must have bounded retention; hourly detail must expire independently through a bounded project setting (hosted defaults/caps: 7 days Free, 30 Solo, 90 Team; self-host up to 365); daily and longer-horizon visits must remain aggregates governed by the longer aggregate-retention window.
+**FR-ANL-16:** Long-term analytics storage must be aggregate-first. Raw analytics event objects and representative journey samples must have bounded retention; hourly detail must expire independently through a bounded project setting (hosted defaults/caps: 7 days Free, 30 Solo, 90 Team and Business; self-host up to 365); daily and longer-horizon visits must remain aggregates governed by the longer aggregate-retention window.
 
 **FR-ANL-17:** Journey replay for AnalyticsBundle must be structured timeline replay, not video replay. Representative journeys may include route changes, semantic actions, funnel steps, conversion markers, friction markers, linked debug incidents, and timing/click counts, but must exclude raw user text and sensitive payload data.
 
@@ -891,7 +907,7 @@ This ensures Free behaves as **failure-first, not telemetry-first**.
 
 **FR-GHA-16:** If the GitHub installation becomes suspended or removed, show a "GitHub connection lost" banner in the project GitHub tab with a "Reconnect" action.
 
-**FR-GHA-17:** Enforce tier gating from the target project's owner plan: GitHub automation use (App connection, repo assignment, dispatch rule creation/update, dispatch publishing, and manual retry) is available on Solo and Team tiers only. After a downgrade, preserved GitHub setup and delivery history remain readable and delete-only cleanup remains available, but Free-tier projects see an upgrade prompt for new use even when the acting collaborator personally pays for a higher plan. Shared projects owned by Solo/Team accounts remain eligible even when the acting collaborator's own account is Free.
+**FR-GHA-17:** Enforce tier gating from the target project's owner plan: GitHub automation use (App connection, repo assignment, dispatch rule creation/update, dispatch publishing, and manual retry) is available on paid tiers. After a downgrade, preserved GitHub setup and delivery history remain readable and delete-only cleanup remains available, but Free-tier projects see an upgrade prompt for new use even when the acting collaborator personally pays for a higher plan. Shared projects owned by paid accounts remain eligible even when the acting collaborator's own account is Free.
 
 **FR-GHA-18:** All GitHub automation management operations must be available through API, CLI, and MCP (INV-5 interface parity). Member token or browser session required; project tokens rejected.
 
@@ -984,9 +1000,9 @@ Self-hosted deployments have no enforced rate limits (configurable via environme
 
 ### 2.5 Data Retention
 
-**NFR-RET-01:** Raw events: 7 days (Free), 14 days (Solo), 30 days (Team).
+**NFR-RET-01:** Raw events: 7 days (Free), 14 days (Solo), 30 days (Team and Business).
 
-**NFR-RET-02:** Bundles: 7 days (Free), 30 days (Solo), 90 days (Team).
+**NFR-RET-02:** Bundles: 7 days (Free), 30 days (Solo), 90 days (Team and Business).
 
 **NFR-RET-03:** Metadata: longer-lived.
 
@@ -1061,3 +1077,9 @@ installation disconnect is active-organization owner-only across its adapters;
 browser installation state validation and existing tier/quota gates remain intact.
 
 FR-BIL-08 confirmation/recovery: require an explicit signed Stripe quote before a new paid upgrade; preserve tax/discounts on reductions and applied-payment gating on capacity purchases. FR-BIL-04 notification state and queued delivery must commit atomically. FR-AUTH-04 verified-owner enforcement applies at Checkout and upgrade-preview boundaries.
+
+## Business tier extension
+
+FR-BUS-01–08 in [spec/business-tier.md](business-tier.md) define the approved catalogue, monthly/yearly allowance semantics, fixed organisation/project access, scoped tokens, Business-only referrals and Smart Reports. Existing weekly reports remain unchanged. The bounded analytics fallback and central limits are authoritative; broader cost certification and customer grandfathering workflows are excluded.
+
+FR-BUS-07–08 add the owner-approved Business no-card trial and separately consented read-only ChatGPT saved-report extension; the original twenty-three OpenAI declarations remain unchanged.

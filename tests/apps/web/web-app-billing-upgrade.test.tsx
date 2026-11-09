@@ -49,7 +49,21 @@ function setup(
             }
           })
         });
-      if (url.endsWith("/v1/billing/upgrade/preview")) {
+      if (url.endsWith("/v1/billing/offers/change"))
+        return jsonResponse(200, {
+          pending_change: null,
+          subscription: {
+            plan: paid ? "team" : "solo",
+            interval: "month",
+            currency: "usd",
+            additional_capacity_units: 7,
+            base_amount_minor: paid ? 1900 : 499,
+            capacity_unit_amount_minor: 99,
+            term_starts_at: "2026-11-01T00:00:00.000Z",
+            term_ends_at: "2026-12-01T00:00:00.000Z"
+          }
+        });
+      if (url.endsWith("/v1/billing/offers/upgrade-preview")) {
         preview();
         if (options.previewError) return jsonResponse(503, { error: "billing_service_error" });
         if (options.pendingPayment)
@@ -61,7 +75,11 @@ function setup(
             currency: "usd",
             amount_due: 824,
             tax: 61,
-            monthly_total: 4252,
+            target_plan: "team",
+            interval: "month",
+            action: "upgrade",
+            effective_at: "2026-11-07T00:00:00.000Z",
+            recurring_total: 4252,
             additional_capacity_units: 7
           }
         });
@@ -90,10 +108,16 @@ function setup(
     user: userEvent.setup()
   };
 }
+async function reviewUpgrade(f: ReturnType<typeof setup>): Promise<void> {
+  await f.user.click(await screen.findByRole("button", { name: "Upgrade to Team" }));
+  const review = await screen.findByRole("button", { name: "Review change" });
+  await waitFor(() => expect(review).toBeEnabled());
+  await f.user.click(review);
+}
 it("requires confirmation, shows tax and retained units, and Cancel never charges", async () => {
   const f = setup();
-  await f.user.click(await screen.findByRole("button", { name: "Upgrade to Team" }));
-  expect(await screen.findByRole("dialog", { name: "Upgrade to Team" })).toBeInTheDocument();
+  await reviewUpgrade(f);
+  expect(await screen.findByRole("dialog", { name: "Change subscription" })).toBeInTheDocument();
   expect(screen.getByText(/8\.24/)).toBeInTheDocument();
   expect(screen.getByText(/0\.61/)).toBeInTheDocument();
   expect(screen.getByText(/42\.52/)).toBeInTheDocument();
@@ -105,11 +129,12 @@ it("requires confirmation, shows tax and retained units, and Cancel never charge
 });
 it("submits the exact quote once and keeps billing open while payment continues in a separate tab", async () => {
   const f = setup();
-  await f.user.click(await screen.findByRole("button", { name: "Upgrade to Team" }));
+  await reviewUpgrade(f);
   await f.user.click(await screen.findByRole("button", { name: "Confirm upgrade" }));
   await waitFor(() =>
     expect(f.checkout).toHaveBeenCalledExactlyOnceWith({
       target_plan: "team",
+      interval: "month",
       confirmation_token: "signed_test_quote"
     })
   );
@@ -132,7 +157,7 @@ it("submits the exact quote once and keeps billing open while payment continues 
 
 it("resumes the saved invoice in a separate tab without confirming another upgrade", async () => {
   const f = setup({ pendingPayment: true });
-  await f.user.click(await screen.findByRole("button", { name: "Upgrade to Team" }));
+  await reviewUpgrade(f);
   const link = await screen.findByRole("link", { name: /continue payment on stripe/i });
   expect(link).toHaveAttribute("href", "https://invoice.stripe.com/i/synthetic");
   await f.user.click(link);
@@ -143,7 +168,7 @@ it("resumes the saved invoice in a separate tab without confirming another upgra
 
 it("preserves the existing return flow when Stripe already completed the upgrade", async () => {
   const f = setup({ paidImmediately: true });
-  await f.user.click(await screen.findByRole("button", { name: "Upgrade to Team" }));
+  await reviewUpgrade(f);
   await f.user.click(await screen.findByRole("button", { name: "Confirm upgrade" }));
   await waitFor(() =>
     expect(f.assign).toHaveBeenCalledWith("http://localhost:5173/billing?checkout=success")
@@ -154,11 +179,11 @@ it("preserves the existing return flow when Stripe already completed the upgrade
 });
 it("keeps the dialog open and requires a refreshed quote when the confirmed amount changes", async () => {
   const f = setup({ confirmError: "upgrade_confirmation_required" });
-  await f.user.click(await screen.findByRole("button", { name: "Upgrade to Team" }));
+  await reviewUpgrade(f);
   await f.user.click(await screen.findByRole("button", { name: "Confirm upgrade" }));
   expect(await screen.findByText(/quote.*changed or expired/i)).toBeInTheDocument();
   expect(f.assign).not.toHaveBeenCalled();
-  await f.user.click(screen.getByRole("button", { name: "Refresh quote" }));
+  await f.user.click(screen.getByRole("button", { name: "Review change" }));
   expect(f.preview).toHaveBeenCalledTimes(2);
   expect(f.checkout).toHaveBeenCalledTimes(1);
 });
@@ -174,27 +199,27 @@ it("does not mistake trial or incomplete base access for a paid checkout", () =>
 
 it("keeps an unavailable preview retryable without sending a payment request", async () => {
   const f = setup({ previewError: true });
-  await f.user.click(await screen.findByRole("button", { name: "Upgrade to Team" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("Could not prepare this upgrade");
-  await f.user.click(screen.getByRole("button", { name: "Refresh quote" }));
+  await reviewUpgrade(f);
+  expect(await screen.findByRole("alert")).toHaveTextContent("Could not prepare this change");
+  await f.user.click(screen.getByRole("button", { name: "Review change" }));
   await waitFor(() => expect(f.preview).toHaveBeenCalledTimes(2));
   expect(f.checkout).not.toHaveBeenCalled();
 });
 
 it("does not submit an expired quote", async () => {
   const f = setup({ expired: true });
-  await f.user.click(await screen.findByRole("button", { name: "Upgrade to Team" }));
+  await reviewUpgrade(f);
   await f.user.click(await screen.findByRole("button", { name: "Confirm upgrade" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("quote has changed or expired");
+  expect(await screen.findByRole("alert")).toHaveTextContent("quote expired");
   expect(f.checkout).not.toHaveBeenCalled();
 });
 
 it("retries an uncertain confirmation with the same confirmed quote", async () => {
   const f = setup({ confirmError: "billing_service_error" });
-  await f.user.click(await screen.findByRole("button", { name: "Upgrade to Team" }));
+  await reviewUpgrade(f);
   await f.user.click(await screen.findByRole("button", { name: "Confirm upgrade" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Retry to check the same payment attempt"
+    "Retry to check the same saved request"
   );
   await f.user.click(screen.getByRole("button", { name: "Confirm upgrade" }));
   await waitFor(() => expect(f.checkout).toHaveBeenCalledTimes(2));

@@ -1,6 +1,12 @@
+import type { ResolveMemberResult } from "../../../../packages/storage/src/index.js";
 import type { FastifyInstance } from "fastify";
 
-import { generateMemberToken, generateProjectToken } from "../../../../packages/auth/src/index.js";
+import {
+  buildMemberTokenPolicy,
+  generateMemberToken,
+  generateProjectToken
+} from "../../../../packages/auth/src/index.js";
+import type { MemberTokenPolicy } from "../../../../packages/shared-types/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import { recordAuditLog, resolveAuditActorType } from "../audit-logging.js";
 import {
@@ -14,6 +20,7 @@ import {
   ProjectParamsSchema,
   ProjectTokenParamsSchema,
   MemberTokenParamsSchema,
+  MemberTokenListQuerySchema,
   TokenListQuerySchema,
   CreateProjectTokenBodySchema,
   CreateTokenBodySchema
@@ -86,6 +93,9 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
     }
     if (auth.access.effective_role !== "owner" && auth.access.effective_role !== "admin") {
       return reply.status(403).send({ error: "forbidden" });
+    }
+    if (auth.member.token_policy !== undefined) {
+      return reply.status(403).send({ error: "credential_issuance_forbidden" });
     }
 
     const parsedBody = CreateProjectTokenBodySchema.safeParse(request.body);
@@ -238,7 +248,7 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
       return;
     }
 
-    const parsedQuery = TokenListQuerySchema.safeParse(request.query);
+    const parsedQuery = MemberTokenListQuerySchema.safeParse(request.query);
     if (!parsedQuery.success) {
       return reply.status(400).send({
         error: "invalid_query"
@@ -248,7 +258,8 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
     const tokens = await dependencies.tokenManagement.listMemberTokensForOrganization({
       organization_id: member.organization_id,
       user_id: member.member_id,
-      limit: parsedQuery.data.limit
+      limit: parsedQuery.data.limit,
+      ...(parsedQuery.data.include_scope === "true" ? { include_scope: true } : {})
     });
 
     return reply.status(200).send({ tokens });
@@ -259,7 +270,7 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
       request.headers.authorization === undefined
         ? await resolveBrowserSession(request.headers.cookie, dependencies)
         : null;
-    const member =
+    const member: ResolveMemberResult | null =
       browserSession !== null
         ? {
             member_id: browserSession.user_id,
@@ -270,6 +281,9 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
       return reply.status(401).send({
         error: "invalid_member_token"
       });
+    }
+    if (member.token_policy !== undefined) {
+      return reply.status(403).send({ error: "credential_issuance_forbidden" });
     }
 
     if (
@@ -286,6 +300,37 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
       return reply.status(400).send({
         error: "invalid_payload"
       });
+    }
+
+    let scope: MemberTokenPolicy | undefined;
+    let expiresAt: string | undefined;
+    if (parsedBody.data.scope !== undefined) {
+      if (browserSession === null || browserSession.email_verified_at === null) {
+        return reply.status(403).send({ error: "interactive_verification_required" });
+      }
+      const policy = await buildMemberTokenPolicy({
+        declaration: parsedBody.data.scope,
+        organization_id: browserSession.organization_id,
+        organization_role: browserSession.role,
+        resolve_project: async (id) =>
+          (await dependencies.projectManagement?.resolveProjectAccessForUser?.({
+            user_id: browserSession.user_id,
+            project_id: id,
+            include_organization_grants: true
+          })) ?? null
+      });
+      if (policy === null) return reply.status(403).send({ error: "token_scope_forbidden" });
+      scope = policy;
+      const now = Date.now();
+      const expiry =
+        parsedBody.data.expires_at === undefined
+          ? now + 90 * 86_400_000
+          : Date.parse(parsedBody.data.expires_at);
+      if (expiry <= now || expiry > now + 365 * 86_400_000)
+        return reply.status(400).send({ error: "invalid_token_expiry" });
+      expiresAt = new Date(expiry).toISOString();
+    } else if (parsedBody.data.expires_at !== undefined) {
+      return reply.status(400).send({ error: "token_scope_required" });
     }
 
     if (browserSession?.email_verified_at === null) {
@@ -322,7 +367,8 @@ export function registerTokenRoutes(app: FastifyInstance, dependencies: ApiDepen
       organization_id: member.organization_id,
       user_id: member.member_id,
       label: parsedBody.data.label,
-      token_hash: generated.hash
+      token_hash: generated.hash,
+      ...(scope === undefined ? {} : { scope, expires_at: expiresAt! })
     });
 
     await recordAuditLog(dependencies.auditLogging, {

@@ -1,6 +1,7 @@
 import { ChevronRightIcon, SparklesIcon } from "lucide-react";
 import { useMemo, useState, type MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { getTierCapabilities } from "../../../../packages/shared-types/src/index.js";
 
 import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
 import { BoundedTableTitle } from "../components/system/bounded-table-title.js";
@@ -68,8 +69,9 @@ export function ImprovementsPage(): JSX.Element {
     direction: "desc"
   });
   const [bulkAction, setBulkAction] = useState<"resolved" | "unresolved" | null>(null);
-  const hostedImprovementsEnabled =
-    session?.organization_plan === "solo" || session?.organization_plan === "team";
+  const hostedImprovementsEnabled = getTierCapabilities(
+    session?.organization_plan ?? "free"
+  ).cloud_improvement_bundles;
   const {
     items: improvements,
     isLoading,

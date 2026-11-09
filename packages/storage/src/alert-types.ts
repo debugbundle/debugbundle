@@ -69,7 +69,7 @@ export interface AlertManagementStore {
     alert_id: string;
     project_id?: string;
     actor_user_id?: string;
-    actor_role?: "owner" | "admin" | "member";
+    actor_role?: "owner" | "admin" | "member" | "viewer";
     service_id?: string | null;
     channel?: AlertChannel;
     condition_type?: AlertConditionType;
@@ -85,7 +85,7 @@ export interface AlertManagementStore {
     project_id?: string;
     alert_id: string;
     actor_user_id?: string;
-    actor_role?: "owner" | "admin" | "member";
+    actor_role?: "owner" | "admin" | "member" | "viewer";
   }): Promise<DeleteAlertResult | null>;
 }
 

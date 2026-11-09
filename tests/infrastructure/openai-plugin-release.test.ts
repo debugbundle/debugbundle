@@ -1,7 +1,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -147,8 +147,8 @@ describe("OpenAI plugin release automation", () => {
       };
     };
     const manifest = JSON.parse(
-      readFileSync(join(repoRoot, "apps/mcp/openai/release-manifest.json"), "utf8")
-    ) as { contract: { tools_in_scan_order: string[] } };
+      readFileSync(join(repoRoot, "tests/fixtures/openai-plugin-v1/tool-contracts.json"), "utf8")
+    ) as { tools: Array<{ name: string }> };
 
     expect(scan.plugin_version).toBe("1.0.0");
     expect(scan.client).toEqual({
@@ -157,7 +157,7 @@ describe("OpenAI plugin release automation", () => {
     });
     expect(scan.catalog).toEqual({
       count: 23,
-      tools: manifest.contract.tools_in_scan_order,
+      tools: manifest.tools.map((tool) => tool.name),
       matches_frozen_contract: true
     });
     expect(scan.corpus).toEqual({
@@ -190,7 +190,7 @@ describe("OpenAI plugin release automation", () => {
       prohibited_actions: string[];
     };
 
-    expect(plan.version).toBe("1.0.3");
+    expect(plan.version).toBe("1.1.0");
     expect(plan.independent_from_npm_mcp_version).toBe(true);
     expect(plan.allowed_actions).toEqual([
       "validate_source",
@@ -236,8 +236,8 @@ describe("OpenAI plugin release automation", () => {
   it("fails closed when generated release artifacts drift", () => {
     const outputRoot = mkdtempSync(join(tmpdir(), "debugbundle-openai-artifacts-"));
     try {
-      writeFileSync(join(outputRoot, "debugbundle-openai-plugin-1.0.3.zip"), "stale-plugin");
-      writeFileSync(join(outputRoot, "debugbundle-openai-submission-1.0.3.zip"), "stale-packet");
+      writeFileSync(join(outputRoot, "debugbundle-openai-plugin-1.1.0.zip"), "stale-plugin");
+      writeFileSync(join(outputRoot, "debugbundle-openai-submission-1.1.0.zip"), "stale-packet");
       writeFileSync(join(outputRoot, "SHA256SUMS"), "stale-checksums\n");
 
       const completed = spawnSync(
@@ -352,6 +352,62 @@ describe("OpenAI plugin release automation", () => {
     expect(result.manifest.manual_gates).not.toContain(
       "owner_approval_and_implementation_of_consent_ui_design"
     );
+  });
+
+  it("retains exact additive report-contract and schema hashes in a local candidate and detects later drift", () => {
+    withCommittedSource((sourceRoot) => {
+      const paths = [
+        "scripts/openai-plugin-release-lib.mjs",
+        "scripts/release-openai-plugin.mjs",
+        "contracts/openai-plugin-v1-data-map.md",
+        "packages/mcp-core/src/openai-report-contract.ts",
+        "packages/mcp-core/src/contracts/report-schemas.json",
+        "packages/mcp-core/src/contracts/report-tool-contracts.json",
+        "tests/fixtures/openai-plugin-reports/tool-contracts.json",
+        "apps/mcp/openai/debugbundle",
+        "apps/mcp/openai/submission"
+      ];
+      for (const path of paths) {
+        const target = join(sourceRoot, path);
+        mkdirSync(dirname(target), { recursive: true });
+        cpSync(join(repoRoot, path), target, { recursive: true });
+      }
+      runJson(["prepare"], sourceRoot);
+      const result = runJson(["verify"], sourceRoot) as {
+        ok: boolean;
+        manifest: {
+          plugin_version: string;
+          contract: {
+            tools_in_scan_order: string[];
+            report_tool_contract_sha256: string;
+            report_schema_source_sha256: string;
+          };
+        };
+      };
+      expect(result.ok).toBe(true);
+      expect(result.manifest.plugin_version).toBe("1.1.0");
+      expect(result.manifest.contract.tools_in_scan_order).toHaveLength(25);
+      expect(result.manifest.contract.tools_in_scan_order.slice(-2)).toEqual([
+        "list_reports",
+        "get_report_content"
+      ]);
+      expect(result.manifest.contract.report_tool_contract_sha256).toMatch(/^[a-f0-9]{64}$/);
+      expect(result.manifest.contract.report_schema_source_sha256).toMatch(/^[a-f0-9]{64}$/);
+      const schemaPath = join(sourceRoot, "packages/mcp-core/src/openai-report-contract.ts");
+      writeFileSync(
+        schemaPath,
+        readFileSync(schemaPath, "utf8") + "\n// changed candidate schema\n"
+      );
+      const failed = spawnSync(
+        process.execPath,
+        ["scripts/release-openai-plugin.mjs", "verify", "--json"],
+        { cwd: sourceRoot, encoding: "utf8" }
+      );
+      expect(failed.status).toBe(1);
+      expect((JSON.parse(failed.stdout) as { failures: string[] }).failures).toContain(
+        "release_manifest_drift"
+      );
+    });
   });
 
   it("rejects release provenance after a tracked source edit", () => {

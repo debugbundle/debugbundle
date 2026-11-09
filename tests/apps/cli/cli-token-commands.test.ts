@@ -18,6 +18,23 @@ import {
 } from "../../../apps/cli/src/token-commands.js";
 
 describe("cli token commands", () => {
+  it("preserves the shared interactive-verification boundary for scoped issuance", async () => {
+    const createMemberToken = vi
+      .fn()
+      .mockRejectedValue(new TokenManagementApiError(403, "interactive_verification_required"));
+    const scope = {
+      mode: "projects" as const,
+      project_ids: ["11111111-1111-4111-8111-111111111111"],
+      permissions: ["project:read" as const]
+    };
+    const result = await createMemberTokenCommand(
+      { bearerToken: "member", label: "read", scope },
+      { createMemberToken }
+    );
+    expect(createMemberToken).toHaveBeenCalledWith({ bearerToken: "member", label: "read", scope });
+    expect(result.exitCode).not.toBe(0);
+    expect(result.output).toContain("interactive_verification_required");
+  });
   it("renders list output in human mode", async () => {
     const result = await listProjectTokensCommand(
       {
@@ -268,7 +285,9 @@ describe("cli token commands", () => {
         projectId: "proj_1"
       },
       {
-        readAuthState: vi.fn().mockRejectedValue(new CliAuthStateError("auth_state_missing", "Not logged in."))
+        readAuthState: vi
+          .fn()
+          .mockRejectedValue(new CliAuthStateError("auth_state_missing", "Not logged in."))
       }
     );
 
@@ -311,7 +330,9 @@ describe("cli token commands", () => {
         tokenId: "mtok_1"
       },
       {
-        revokeMemberToken: vi.fn().mockRejectedValue(new TokenManagementApiError(401, "invalid_member_token"))
+        revokeMemberToken: vi
+          .fn()
+          .mockRejectedValue(new TokenManagementApiError(401, "invalid_member_token"))
       }
     );
 
@@ -427,7 +448,9 @@ describe("cli token commands", () => {
         projectId: "proj_1"
       },
       {
-        listProjectTokens: vi.fn().mockRejectedValue(new TokenManagementApiError(404, "project_not_found"))
+        listProjectTokens: vi
+          .fn()
+          .mockRejectedValue(new TokenManagementApiError(404, "project_not_found"))
       }
     );
 
@@ -437,7 +460,9 @@ describe("cli token commands", () => {
         label: "ci"
       },
       {
-        createMemberToken: vi.fn().mockRejectedValue(new TokenManagementApiError(400, "invalid_payload"))
+        createMemberToken: vi
+          .fn()
+          .mockRejectedValue(new TokenManagementApiError(400, "invalid_payload"))
       }
     );
 

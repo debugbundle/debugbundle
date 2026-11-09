@@ -1,3 +1,8 @@
+import {
+  organizationAdmissionCountSql,
+  ORGANIZATION_PERSON_LIMIT
+} from "./organization-person-cap.js";
+import { projectActorRoleSql } from "./project-read-scope.js";
 import { runInTransaction } from "./transaction.js";
 import { randomUUID } from "node:crypto";
 import { getTierCapabilities, type TierName } from "../../shared-types/src/index.js";
@@ -21,27 +26,24 @@ export function createMetadataInvitations(
       project_id: string;
       user_id: string;
       email: string;
-      role: "admin" | "member";
+      role: "admin" | "member" | "viewer";
       invited_by_user_id: string;
       invite_token_hash: string;
       expires_at: string;
+      include_organization_grants?: boolean;
     }): Promise<CreateProjectInviteResult | null> {
       return runInTransaction(db, async (db) => {
-        await db.query("SELECT debugbundle_begin_project_rule_write($1::uuid)", [input.project_id]);
         const scopeResult = await db.query<
           {
             owner_plan: TierName;
-            actor_role: "owner" | "admin" | "member" | null;
+            actor_role: "owner" | "admin" | "member" | "viewer" | null;
             actor_membership_type: "owner" | "collaborator";
           } & Record<string, unknown>
         >(
           `
           SELECT
             COALESCE(org.plan, 'free') AS owner_plan,
-            CASE
-              WHEN p.owner_user_id = $2::uuid THEN 'owner'
-              ELSE actor_membership.role
-            END AS actor_role,
+            ${projectActorRoleSql("p.id", "$2::uuid", input)} AS actor_role,
             CASE
               WHEN p.owner_user_id = $2::uuid THEN 'owner'
               ELSE 'collaborator'
@@ -52,8 +54,9 @@ export function createMetadataInvitations(
             ON actor_membership.project_id = p.id
            AND actor_membership.user_id = $2::uuid
           WHERE p.id = $1::uuid
-            AND (p.owner_user_id = $2::uuid OR actor_membership.user_id IS NOT NULL)
+            AND ${projectActorRoleSql("p.id", "$2::uuid", input)} IS NOT NULL
           LIMIT 1
+          FOR UPDATE OF org
         `,
           [input.project_id, input.user_id]
         );
@@ -63,6 +66,8 @@ export function createMetadataInvitations(
           return null;
         }
 
+        await db.query("SELECT debugbundle_begin_project_rule_write($1::uuid)", [input.project_id]);
+
         if (!getTierCapabilities(scope.owner_plan).member_invites) {
           return {
             kind: "upgrade_required",
@@ -71,15 +76,20 @@ export function createMetadataInvitations(
         }
 
         const collaboratorCountResult = await db.query<{ collaborator_count: string }>(
-          `
-          SELECT COUNT(*)::text AS collaborator_count
-          FROM project_members
-          WHERE project_id = $1::uuid
-        `,
-          [input.project_id]
+          organizationAdmissionCountSql(
+            "(SELECT organization_id FROM projects WHERE id=$1::uuid)",
+            "$2::text",
+            "collaborator_count"
+          ),
+          [input.project_id, input.email.trim().toLowerCase()]
         );
 
-        if (Number(collaboratorCountResult.rows[0]?.collaborator_count ?? "0") >= 1000) {
+        if (
+          Number(
+            collaboratorCountResult.rows[0]?.collaborator_count ??
+              String(ORGANIZATION_PERSON_LIMIT + 1)
+          ) > ORGANIZATION_PERSON_LIMIT
+        ) {
           return {
             kind: "collaborator_limit_reached",
             owner_plan: scope.owner_plan
@@ -197,24 +207,22 @@ export function createMetadataInvitations(
       project_id: string;
       user_id: string;
       invite_id: string;
+      include_organization_grants?: boolean;
     }): Promise<ProjectInviteRecord | null> {
       return runInTransaction(db, async (db) => {
         await db.query("SELECT debugbundle_begin_project_rule_write($1::uuid)", [input.project_id]);
         const scopeResult = await db.query<
-          { actor_role: "owner" | "admin" | "member" | null } & Record<string, unknown>
+          { actor_role: "owner" | "admin" | "member" | "viewer" | null } & Record<string, unknown>
         >(
           `
           SELECT
-            CASE
-              WHEN p.owner_user_id = $2::uuid THEN 'owner'
-              ELSE actor_membership.role
-            END AS actor_role
+            ${projectActorRoleSql("p.id", "$2::uuid", input)} AS actor_role
           FROM projects p
           LEFT JOIN project_members actor_membership
             ON actor_membership.project_id = p.id
            AND actor_membership.user_id = $2::uuid
           WHERE p.id = $1::uuid
-            AND (p.owner_user_id = $2::uuid OR actor_membership.user_id IS NOT NULL)
+            AND ${projectActorRoleSql("p.id", "$2::uuid", input)} IS NOT NULL
           LIMIT 1
         `,
           [input.project_id, input.user_id]
@@ -260,6 +268,12 @@ export function createMetadataInvitations(
     }) {
       return runInTransaction(db, async (db) => {
         await db.query(
+          `/* organization invitation lock */ SELECT o.id FROM organizations o
+          JOIN projects p ON p.organization_id=o.id JOIN project_invites i ON i.project_id=p.id
+          WHERE i.invite_token_hash=$1 AND o.suspended_at IS NULL FOR UPDATE OF o`,
+          [input.invite_token_hash]
+        );
+        await db.query(
           "SELECT debugbundle_begin_project_rule_write((SELECT project_id FROM project_invites WHERE invite_token_hash=$1 LIMIT 1))",
           [input.invite_token_hash]
         );
@@ -268,7 +282,7 @@ export function createMetadataInvitations(
             invite_id: string;
             project_id: string;
             email: string;
-            role: "admin" | "member";
+            role: "admin" | "member" | "viewer";
             owner_plan: TierName;
           } & Record<string, unknown>
         >(
@@ -286,10 +300,12 @@ export function createMetadataInvitations(
             AND invites.accepted_at IS NULL
             AND invites.canceled_at IS NULL
             AND invites.expires_at > $2::timestamptz
+            AND o.suspended_at IS NULL
+            AND NOT EXISTS(SELECT 1 FROM organization_members om WHERE om.organization_id=o.id AND om.user_id=$3::uuid AND om.suspended_at IS NOT NULL)
           LIMIT 1
           FOR UPDATE OF invites
         `,
-          [input.invite_token_hash, input.accepted_at]
+          [input.invite_token_hash, input.accepted_at, input.user_id]
         );
 
         const invite = inviteResult.rows[0];
@@ -345,6 +361,19 @@ export function createMetadataInvitations(
             }
           } as const;
         }
+
+        const admission = await db.query<{ people: number }>(
+          "/* acceptance admission */" +
+            organizationAdmissionCountSql(
+              "(SELECT organization_id FROM projects WHERE id=$1::uuid)",
+              "$2::text"
+            ),
+          [invite.project_id, input.email.trim().toLowerCase()]
+        );
+        if (
+          (admission.rows[0]?.people ?? ORGANIZATION_PERSON_LIMIT + 1) > ORGANIZATION_PERSON_LIMIT
+        )
+          return { kind: "collaborator_limit_reached" } as const;
 
         const createdMembershipResult = await db.query<
           ProjectMemberRecord & Record<string, unknown>

@@ -73,7 +73,7 @@ Every capability must be available through all applicable interfaces. Operations
 | List project members                         | `GET /v1/projects/{id}/members`                                     | `project members list`                    | `list_project_members`                                                                                               | Browser Session or Member Token, any authorized project member                                                                                                                  |
 | Get project member avatar                    | `GET /v1/projects/{id}/members/{userId}/avatar`                     | —                                         | —                                                                                                                    | Browser session or member token, authorized project viewers only                                                                                                                |
 | List pending project invites                 | `GET /v1/projects/{id}/invites`                                     | `project members invites`                 | `list_project_member_invites`                                                                                        | Browser Session or Member Token, owner/admin only                                                                                                                               |
-| Invite project member                        | `POST /v1/projects/{id}/invite`                                     | `project members invite`                  | `invite_project_member`                                                                                              | Browser Session or Member Token, owner/admin only, Team tier                                                                                                                    |
+| Invite project member                        | `POST /v1/projects/{id}/invite`                                     | `project members invite`                  | `invite_project_member`                                                                                              | Browser Session or Member Token, owner/admin only, Team or Business                                                                                                                    |
 | Cancel project invite                        | `DELETE /v1/projects/{id}/invites/{inviteId}`                       | `project members cancel-invite`           | `cancel_project_member_invite`                                                                                       | Browser Session or Member Token, owner/admin only                                                                                                                               |
 | Update project member role                   | `PATCH /v1/projects/{id}/members/{userId}`                          | `project members update-role`             | `update_project_member_role`                                                                                         | Browser Session or Member Token, owner/admin only                                                                                                                               |
 | Remove project member                        | `DELETE /v1/projects/{id}/members/{userId}`                         | `project members remove`                  | `remove_project_member`                                                                                              | Browser Session or Member Token, owner/admin only                                                                                                                               |
@@ -99,7 +99,7 @@ Every capability must be available through all applicable interfaces. Operations
 | Alert CRUD                                   | `POST/GET/PATCH/DELETE /v1/alerts`                                  | `alert list/create/update/delete`         | `list_alerts/create_alert/update_alert/delete_alert`                                                                 | Browser Session or Member Token, scoped to project; member may mutate only self-created rules                                                                                   |
 | Alert group inspection                       | `GET /v1/alert-groups`, `GET /v1/alert-groups/{kind}/{id}`          | `alert groups/group`                      | `list_alert_groups/get_alert_group`                                                                                  | Browser Session or Member Token, scoped to project; safe metadata and paginated incident identities only                                                                        |
 | Project Slack destinations                   | `GET /v1/projects/{id}/slack/destinations`                          | `slack list`                              | `list_slack_destinations`                                                                                            | Browser Session or Member Token, reusable Slack channel list for alert setup; preserved destinations remain readable while paused on Free                                       |
-| Test Slack destination                       | `POST /v1/projects/{id}/slack/destinations/{destinationId}/test`    | `slack test`                              | `test_slack_destination`                                                                                             | Browser Session or Member Token, owner/admin only, Team tier                                                                                                                    |
+| Test Slack destination                       | `POST /v1/projects/{id}/slack/destinations/{destinationId}/test`    | `slack test`                              | `test_slack_destination`                                                                                             | Browser Session or Member Token, owner/admin only, Team or Business                                                                                                                    |
 | Delete Slack destination                     | `DELETE /v1/projects/{id}/slack/destinations/{destinationId}`       | `slack delete`                            | `delete_slack_destination`                                                                                           | Browser Session or Member Token, owner/admin cleanup action; allowed after downgrade                                                                                            |
 | Weekly report channel CRUD                   | `POST/GET/PATCH/DELETE /v1/weekly-report-channels`                  | `weekly-report list/create/update/delete` | `list_weekly_report_channels/create_weekly_report_channel/update_weekly_report_channel/delete_weekly_report_channel` | Browser Session or Member Token, scoped to organization/project; preserved Slack channels remain readable while paused                                                          |
 | List webhooks                                | `GET /v1/webhooks`                                                  | `webhook list`                            | `list_webhooks`                                                                                                      | Browser Session or Member Token, scoped to project                                                                                                                              |
@@ -213,6 +213,48 @@ Member-authorized routes accept either a valid browser session or a valid member
 
 Stripe checkout and customer-portal billing routes remain browser-session-only interactive surfaces. Upgrade preview accepts `{}` and returns `{ quote: { confirmation_token, expires_at, currency, amount_due, tax, monthly_total, additional_capacity_units } }` (monetary amounts are Stripe minor units), or `{ payment_url }` for an existing unpaid upgrade. It makes no payment mutation. Confirm through `/v1/billing/checkout` with `target_plan: "team"` and `confirmation_token`. Missing/expired/changed quotes return `409 upgrade_confirmation_required`; an already prepared request resumes the same confirmed attempt. Checkout and preview require a verified email. Tokens bind the owner organization and exact subscription/items; responses must not be cached.
 
+The opt-in interval contract adds browser-only `POST /v1/billing/offers/upgrade-preview`
+with `{target_plan:"solo"|"team"|"business",interval:"month"|"year"}`. Its quote
+uses `recurring_total` and an explicit interval, action, target plan, effective
+date and expiry; all monetary amounts remain USD minor units. It never puts a
+yearly amount into `monthly_total`. The quote binds the current verified Owner,
+organisation, subscription source/items and operation revision. Same-interval
+tier increases use the existing pending-payment path; interval switches and
+reductions use the renewal flow. A prepared uncertain quote may be returned with
+`resume_required:true`; finishing it reuses its original command, not a new quote.
+An existing `payment_url` means an already prepared payment, not completion of
+the newly requested offer. Owner/member tokens cannot execute purchase previews.
+
+`POST /v1/billing/checkout` preserves legacy monthly request/response shapes and
+accepts explicit `interval` for new offers, plus optional initial
+`additional_capacity_units` (integer 0–99). Business or initial capacity selection
+requires an explicit interval. Paid upgrades omit initial capacity selection and
+preserve the purchased quantity; capacity changes remain separate operations.
+Confirm an interval-aware upgrade using its same target, interval and
+`confirmation_token`. New offers have no static-link fallback. Missing configured
+prices return `503 billing_not_configured`; uncertain attempts remain reserved.
+
+Interval-aware renewal management preserves Owner browser/member-token access:
+
+| Method | Path                                | Result                                                                                                                                                                                                                                    |
+| ------ | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/v1/billing/offers/change`         | `{subscription,pending_change}`; subscription is null before a linked paid subscription, otherwise explicit tier/interval/currency, retained current unit prices and paid-term dates. Missing unit amounts are null, never inferred zero. |
+| POST   | `/v1/billing/offers/change/preview` | Body `{target_plan,interval}`; returns `{quote}` with `action:"renewal"`, no charge/schedule mutation.                                                                                                                                    |
+| POST   | `/v1/billing/offers/change`         | Body `{confirmation_token}`; confirms the exact prepared future offer.                                                                                                                                                                    |
+| DELETE | `/v1/billing/offers/change`         | Body `{schedule_id}`; releases only the verified owned future schedule.                                                                                                                                                                   |
+
+The new strict contract uses `recurring_total`, explicit interval and full
+effective date. Current unit prices describe retained provider items before tax;
+new-purchase defaults remain in the shared catalogue. The legacy
+`/v1/billing/plan-change` contract remains monthly Team-to-Solo. New ordinary CLI
+`billing offer-change status|preview|schedule|cancel` and MCP
+`billing_offer_change` call the same domain service through the validated billing
+client. Preview requires `--target-plan solo|team|business --interval month|year`;
+schedule requires the exact `--confirmation-token`, cancel the exact
+`--schedule-id`. Show amount/date/feature loss and obtain explicit user confirmation
+before scheduling. This does not expand hosted/restricted MCP catalogues or permit
+immediate purchases with member tokens.
+
 Capacity-increase success remains `{ billing }` when Stripe confirms payment and applied items. `200 { payment_required: { url } }` means an existing hosted Stripe invoice needs payment/authentication; current entitlements stay unchanged. The web app offers the saved invoice in a separate tab, closes the dialog and refreshes billing on return/focus; CLI returns exit 5 and the URL (JSON retains the payment_required object), and MCP returns the same object. Do not describe that result as a completed capacity increase.
 
 Billing summary, no-card trial start, and allowance-capacity management routes now accept owner-scoped member tokens so CLI and MCP can reuse the same domain behavior.
@@ -279,6 +321,32 @@ When GitHub sign-in returns a profile image URL, the API may fetch and cache tha
 The CLI bootstrap flow is additive and issues the same member-token credential used by normal CLI/MCP auth. `POST /v1/auth/github/device/start` plus `poll`/`claim` implement the official GitHub device flow. `POST /v1/auth/github/token/exchange` accepts an already-authenticated GitHub access token such as the output of `gh auth token`.
 
 `GET /v1/account/export` returns a JSON attachment with top-level `export_version: 1` plus the retained organization-account record set, including organization and project members, projects, tokens, capture policies, probes, hosted improvement opportunities, reusable Slack destinations, alerts, weekly reports, webhooks, GitHub automation, incidents, audit logs, billing-processing rows, retryable plan-cleanup rows, operational email rows, notification preferences and scoped daily-delivery metadata, and retained raw-event, bundle, improvement-bundle, and reproduction artifacts when present in object storage. Stored debugging artifacts are bounded and projected through the current telemetry privacy policy before inclusion, including artifacts captured before an SDK upgrade; missing or unprojectable objects receive a fixed artifact error. Account-administration records remain owner-only export data and may contain personal or operational details, so this browser-session export is not part of the restricted agent read surface.
+
+The default attachment also includes `business_data_exports`, a fixed list of
+browser-Owner section links. Use `GET /v1/account/export?section=<section>&limit=1-100`
+and follow `next_cursor` with the same section. Pages return `section`, `as_of`,
+`items` and `next_cursor`; cursors are bounded and section-specific. Sections are
+`report_definitions`, `report_runs`, `report_deliveries`, `report_lifecycle`,
+`report_availability`, `report_health`, `report_coverage`, `referral_partner`,
+`referral_commissions`, `referral_payouts` and `customer_referral`. The existing
+browser-session/Owner restriction applies to every page, with fresh domain Owner
+and project-origin checks before returning data. This account-administration
+exception remains outside the CLI, ordinary MCP and restricted-token surfaces.
+
+Report pages contain closed metadata and authenticated canonical document/HTML/PDF
+links when currently available. Those downloads recheck the actual reader's whole
+saved scope and privacy settings. Pages never expose private object keys, model
+request/response receipts, worker leases, provider message IDs or recipient
+addresses. Numeric lifecycle/availability/health pages enforce the twelve-month
+retention boundary and origin access. Internal processing caches are represented
+by their definitions, coverage, original retained sources and canonical report
+exports; they are not a second bulk copy of model input or captured text.
+Personal referral sections use only the exporting user's partner identity,
+balance, commission and payout records; customer attribution is limited to the
+selected account's public referral status. Provider receipts, protected identity
+hashes and other partners' financial data remain excluded. Missing or changed
+access withholds the page. Invalid sections, limits and cursors return 400;
+unavailable export processing returns a fixed 503 error.
 
 `GET /v1/account/avatar` returns the signed-in user's cached avatar bytes with a first-party URL shape of `/v1/account/avatar`. `POST /v1/account/avatar/import-gravatar` performs a server-side fetch against Gravatar only after explicit user action, stores the resulting avatar in object storage, and returns:
 
@@ -815,7 +883,7 @@ The implemented aggregate metrics read surface includes `GET /v1/analytics/summa
 
 `GET /v1/analytics/opportunities` and `GET /v1/analytics/bundles` accept optional `include_total=true|false` (default false). Initial requests with `include_total=true` include `total_pages` for the filtered result set; cursor requests omit it and avoid recounting. Requests without this opt-in retain the original response keys for installed clients with strict response schemas. The dashboard requests totals on the first page; deploy the API before the web assets.
 
-Saved funnel definitions are project-scoped configuration, not one bundle per visit. Each definition contains a stable `funnel_key`, display name, and 2-20 ordered unique `{ step_key, display_name }` entries. Active definitions are limited independently from analytics event/session, retained-journey-sample, and AnalyticsBundle-generation allowances. The default active cap is derived from the current tier (1 Free, 10 Solo, 50 Team, 100 self-host), and creation enforces the lesser of any deliberately stored project override and the current tier cap under a project transaction lock. Paid included and purchased capacity units multiply the monthly analytics allowances but do not multiply saved funnels or custom-dimension slots. Archive is soft so historical aggregates remain interpretable; recreating an archived key reactivates it when capacity permits. Members may list definitions, while owner/admin role is required to create, update, or archive. Matching CLI commands are `debugbundle analytics saved-funnels list|create|update|archive`; matching MCP tools are `list_saved_analytics_funnels`, `create_saved_analytics_funnel`, `update_saved_analytics_funnel`, and `archive_saved_analytics_funnel`.
+Saved funnel definitions are project-scoped configuration, not one bundle per visit. Each definition contains a stable `funnel_key`, display name, and 2-20 ordered unique `{ step_key, display_name }` entries. Active definitions are limited independently from analytics event/session, retained-journey-sample, and AnalyticsBundle-generation allowances. The default active cap is derived from the current tier (1 Free, 10 Solo, 50 Team and Business, 100 self-host), and creation enforces the lesser of any deliberately stored project override and the current tier cap under a project transaction lock. Paid included and purchased capacity units multiply the monthly analytics allowances but do not multiply saved funnels or custom-dimension slots. Archive is soft so historical aggregates remain interpretable; recreating an archived key reactivates it when capacity permits. Members may list definitions, while owner/admin role is required to create, update, or archive. Matching CLI commands are `debugbundle analytics saved-funnels list|create|update|archive`; matching MCP tools are `list_saved_analytics_funnels`, `create_saved_analytics_funnel`, `update_saved_analytics_funnel`, and `archive_saved_analytics_funnel`.
 
 The aggregate opportunity evaluator also creates `journey_friction` records from only the fixed browser friction-marker action rollups (`friction.repeated_click`, `friction.dead_click`, and `friction.backtrack`) once conservative aggregate event/session thresholds are met. Their evidence is limited to the fixed marker key, normalized route, analysis window, and aggregate counts.
 
@@ -1377,7 +1445,7 @@ Project `metrics.attention_incidents_today` counts incidents first opened today 
 | Method | Path                                       | Auth                                         | Description                                                                                                                  |
 | ------ | ------------------------------------------ | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | GET    | `/v1/billing`                              | Browser Session or Member Token (owner only) | Return billing summary, plan state, and allowance usage for the current organization                                         |
-| POST   | `/v1/billing/trial/start`                  | Browser Session or Member Token (owner only) | Start an eligible 30-day no-card Solo or Team trial for the current organization                                             |
+| POST   | `/v1/billing/trial/start`                  | Browser Session or Member Token (owner only) | Start an eligible 30-day no-card Solo, Team or Business trial for the current organization                                   |
 | POST   | `/v1/billing/upgrade/preview`              | Verified Browser Session (owner only)        | Return a signed upgrade quote or existing hosted payment recovery URL                                                        |
 | POST   | `/v1/billing/checkout`                     | Browser Session (owner only)                 | Create a hosted purchase URL or same-subscription paid-upgrade invoice URL                                                   |
 | POST   | `/v1/billing/checkout/confirm`             | Browser Session (owner only)                 | Verify a returned Stripe Checkout Session and sync the organization billing snapshot from Stripe                             |
@@ -1482,7 +1550,7 @@ Checkout safety candidate (local, not released): successful `200 {url}` is uncha
 }
 ```
 
-`target_plan` must be `solo` or `team`. The route starts a 30-day no-card trial only when the organization is still eligible. Response is the updated billing summary.
+`target_plan` must be `solo`, `team` or `business`. The route starts a 30-day no-card trial only when the organization is still eligible. Response is the updated billing summary.
 
 **Checkout request:**
 
@@ -2645,7 +2713,7 @@ Response `200`:
 }
 ```
 
-`cloud_automation_available` is capability-derived from the caller's effective plan (`false` on Free, `true` on Solo/Team/self-host). The stored `settings` object is project-backed and is returned to authorized viewers even when hosted automation is not available for the current tier.
+`cloud_automation_available` is capability-derived from the caller's effective plan (`false` on Free, `true` on paid plans and self-hosted installations). The stored `settings` object is project-backed and is returned to authorized viewers even when hosted automation is not available for the current tier.
 
 **Update improvement settings:**
 
@@ -2710,7 +2778,7 @@ Response `200`:
 }
 ```
 
-`analytics_available` is capability-derived from the caller's effective plan and is `true` on Free, Solo, Team, and self-host. Free uses bounded preview allowances and one saved funnel. When a project has no stored analytics settings, `max_saved_funnels`, `max_custom_dimensions`, and `hourly_retention_days` default to the current tier capabilities. Hosted hourly-rollup caps/defaults are 7 days on Free, 30 on Solo, and 90 on Team; self-host may configure up to 365 days. Hosted custom-dimension caps are 1 on Free, 3 on Solo, and 8 on Team; self-host supports up to 20. The stored settings object is project-backed and remains readable to authorized viewers even when analytics is disabled.
+`analytics_available` is capability-derived from the caller's effective plan and is `true` on all hosted plans and self-host. Free uses bounded preview allowances and one saved funnel. When a project has no stored analytics settings, `max_saved_funnels`, `max_custom_dimensions`, and `hourly_retention_days` default to the current tier capabilities. Hosted hourly-rollup caps/defaults are 7 days on Free, 30 on Solo, and 90 on Team and Business; self-host may configure up to 365 days. Hosted custom-dimension caps are 1 on Free, 3 on Solo, and 8 on Team and Business; self-host supports up to 20. The stored settings object is project-backed and remains readable to authorized viewers even when analytics is disabled.
 
 **Update analytics settings:**
 
@@ -3370,7 +3438,7 @@ debugbundle improvements settings set --project <id> [--enabled <true|false>] [-
 
 ```
 debugbundle billing get [--json]
-debugbundle billing trial start --plan <solo|team> [--json]
+debugbundle billing trial start --plan <solo|team|business> [--json]
 debugbundle billing capacity increase --target-additional-capacity-units <n> [--json]
 debugbundle billing capacity schedule-reduction --target-additional-capacity-units <n> [--json]
 debugbundle billing capacity cancel-reduction [--json]
@@ -3378,7 +3446,7 @@ debugbundle billing capacity cancel-reduction [--json]
 
 `billing get` retrieves the organization's billing summary, plan state, trial state, active-project counts, capacity units, and allowance metrics. Requires owner-scoped member token authentication.
 
-`billing trial start --plan <solo|team>` starts an eligible 30-day no-card trial and returns the updated billing summary. During an active trial, Stripe checkout remains browser-only; the CLI reports `trial_conversion_required` and directs the operator to the billing page when capacity changes require paid conversion first.
+`billing trial start --plan <solo|team|business>` starts an eligible 30-day no-card trial and returns the updated billing summary. During an active trial, Stripe checkout remains browser-only; the CLI reports `trial_conversion_required` and directs the operator to the billing page when capacity changes require paid conversion first.
 
 `billing capacity increase --target-additional-capacity-units <n>` immediately increases the additional capacity-unit count to `<n>` via Stripe subscription update with proration. Target must be greater than current additional purchased units. Fails if a pending scheduled reduction exists.
 
@@ -3413,7 +3481,7 @@ debugbundle project members remove <user-id> --project-id <id> [--auth-file <pat
 debugbundle project members leave --project-id <id> [--auth-file <path>] [--json]
 ```
 
-`project members list` lists the owner and collaborators for one project. `project members invites` lists pending invitations for that project. `project members invite` sends a collaborator invitation to the specified email (Team tier). `project members cancel-invite` cancels a pending invitation. `project members update-role` changes a collaborator's role. `project members remove` removes another collaborator from the project. `project members leave` removes the authenticated collaborator's own membership from that project. Member removal and self-leave remove only that collaborator's project-scoped automation resources for that project, such as alert rules, webhooks, and GitHub dispatch rules; other project resources remain. Listing is available to any authorized project member, while invite visibility and management remain owner/admin-only.
+`project members list` lists the owner and collaborators for one project. `project members invites` lists pending invitations for that project. `project members invite` sends a collaborator invitation to the specified email (Team or Business). `project members cancel-invite` cancels a pending invitation. `project members update-role` changes a collaborator's role. `project members remove` removes another collaborator from the project. `project members leave` removes the authenticated collaborator's own membership from that project. Member removal and self-leave remove only that collaborator's project-scoped automation resources for that project, such as alert rules, webhooks, and GitHub dispatch rules; other project resources remain. Listing is available to any authorized project member, while invite visibility and management remain owner/admin-only.
 
 ### 2.16 GitHub Commands
 
@@ -3633,7 +3701,7 @@ schedule_capacity_reduction              → same result as POST /v1/billing/cap
 cancel_capacity_reduction                → same result as DELETE /v1/billing/capacity/scheduled-reduction
 ```
 
-These tools manage organization billing summary, no-card trial start, and capacity lifecycle. All require owner-scoped member token authentication. `get_billing_summary` includes the `billing_state` field plus the normalized `trial` object. `start_trial` accepts `targetPlan: "solo" | "team"`. Capacity tools return `trial_conversion_required` while an active no-card trial still requires paid conversion.
+These tools manage organization billing summary, no-card trial start, and capacity lifecycle. All require owner-scoped member token authentication. `get_billing_summary` includes the `billing_state` field plus the normalized `trial` object. `start_trial` accepts `targetPlan: "solo" | "team" | "business"`. Capacity tools return `trial_conversion_required` while an active no-card trial still requires paid conversion.
 
 ### 3.7 Project Tools
 
@@ -3659,7 +3727,7 @@ remove_project_member        → same result as DELETE /v1/projects/{id}/members
 leave_project                → same result as DELETE /v1/projects/{id}/membership
 ```
 
-These tools manage project collaboration lifecycle. Listing is available to any authorized project member. Invite, cancel, role update, and removal require owner/admin authorization. `leave_project` is for collaborators leaving their own membership. `invite_project_member` requires Team tier.
+These tools manage project collaboration lifecycle. Listing is available to any authorized project member. Invite, cancel, role update, and removal require owner/admin authorization. `leave_project` is for collaborators leaving their own membership. `invite_project_member` requires Team or Business.
 
 ### 3.9 GitHub Tools
 
@@ -4163,3 +4231,140 @@ underscores or hyphens. Paths are relative and canonical. Invalid metadata retur
 `invalid_local_artifact_path`; reads, rebuilds and cleanup reject links and preserve
 invalid retained state. Local state/processing writes use guarded atomic replacement;
 file reads are bounded to the opened file's size without lowering existing state allowances.
+
+## Business extension contract
+
+The approved [Business contract](../spec/business-tier.md) governs additive tier/interval, organisation access, member-token scope, referral and report data/interfaces. Implementations use shared domain services and ordered forward migrations before runtime activation. Legacy monthly request/response defaults, project tokens, artifact schemas and restricted MCP/OAuth profiles remain supported. New interval-aware responses never place annual totals in monthly-specific fields. Business-only referral operations distinguish partner, customer owner and DebugBundle operator authority.
+
+### Business referral attribution
+
+The [referral accounting contract](referral-accounting.md) specifies the verified identity/Owner boundaries, Business-only eligibility, public-link cookie, shared API/CLI/ordinary MCP interfaces and minimal partner projection. Public codes grant no data access. Partner enrolment requires explicit versioned terms acceptance; replacing customer attribution requires explicit confirmation before checkout freezes the offer.
+
+### Smart Report definitions
+
+The Smart Report domain and source rules are in [smart-report-facts.md](smart-report-facts.md). Definition management is separate from existing weekly digest settings. The following member/session routes call the same `ReportDefinitionStore`; no request accepts actor identity, original-origin claims or arbitrary recipient email addresses.
+
+| Method | Path                                                                   | Request / response                                                             |
+| ------ | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| GET    | `/v1/organizations/{organizationId}/report-definitions`                | `{definitions:[...]}`; whole-scope readable records only                       |
+| POST   | `/v1/organizations/{organizationId}/report-definitions`                | `{request_id:<UUID>,definition:<CreateReportDefinition>}` → `201 {definition}` |
+| GET    | `/v1/organizations/{organizationId}/report-definitions/{definitionId}` | `{definition}` or scoped `404`                                                 |
+| PATCH  | `/v1/organizations/{organizationId}/report-definitions/{definitionId}` | Full replacement with `expected_version` → `{definition}`                      |
+| DELETE | `/v1/organizations/{organizationId}/report-definitions/{definitionId}` | `{expected_version,expected_organization_id?}` → `{deleted:true}`              |
+
+Create/replacement fields are `name`, `cadence` (`daily`, `weekly`, `monthly`), explicit `project_ids`, verified `recipient_user_ids` (default empty), `privacy_mode` (`full` default or `restricted`), `source_collection_consent`, nullable `{time,timezone}` schedule and `enabled` (default false). Full mode requires explicit source consent; enabled schedules require a schedule. Weekly overlap requires `weekly_overlap:"keep_existing"`. Replacement additionally accepts `resume_after_review` (default false); only a current Owner can explicitly clear a plan-loss review pause. Browser submissions may include `expected_organization_id`; it must match both the selected target and the current browser workspace. Other authorised direct project administration does not require an organisation membership.
+
+Creation is idempotent under the same organisation/request UUID/actor/parsed command. Reusing a UUID for changed input returns `409 report_request_conflict`. Concurrent creates share the five-definition account cap. Stale edits/deletions return `409 report_version_conflict`. Wrong workspace, definition cap and missing weekly-overlap confirmation are `409`; invalid scope/recipient input is `400`; insufficient current role/verification/credential/plan is `403`. Unreadable definitions return scoped `404`. Responses are `no-store` and omit private credential metadata.
+
+The shared validated transport is `packages/report-client`. CLI commands are `reports list <org>`, `reports get <org> <definition>`, `reports create <org> --request-id <stable-uuid> --definition-json <json>`, `reports update <org> <definition> --definition-json <json-with-expected_version>` and `reports delete <org> <definition> --expected-version <n>`. All support existing `--auth-file` and `--json`. Reuse the same creation request UUID after a lost acknowledgement; obtain the saved version before replacing/deleting.
+
+Ordinary MCP operations are `list_report_definitions`, `get_report_definition`, `create_report_definition`, `update_report_definition` and `delete_report_definition`. Inputs use the same validated definitions, explicit organisation and resource IDs, creation request UUID and expected versions. Creation/update annotations disclose future scheduled model/email egress. Restricted hosted/OAuth catalogues gain no operations. Generation, completed report reads, rendering and delivery remain separate work in progress; saving a definition does not establish that those paths are qualified.
+
+### Smart Report runs
+
+The following authenticated routes share `ReportRunAdmissionStore` and `ReportRunManagementStore`. New generation is enabled only by the server's explicit Smart Report configuration; retained content and cleanup keep their separate access/retention rules. All responses are private/no-store. Expanded storage records, provider requests and financial receipts are never public DTOs.
+
+| Method | Path                                                        | Request/result                                                               |
+| ------ | ----------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| GET    | `/v1/organizations/{organizationId}/reports`                | `limit=1..100` (default 25), optional opaque `cursor` → `{runs,next_cursor}` |
+| GET    | `/v1/organizations/{organizationId}/reports/{runId}`        | `{run}` under current access to every frozen origin                          |
+| POST   | `/v1/organizations/{organizationId}/reports`                | `ReportRunCommand` → `202 {run}`                                             |
+| POST   | `/v1/organizations/{organizationId}/reports/{runId}/cancel` | Optional `{expected_organization_id}` → `{run}`                              |
+| DELETE | `/v1/organizations/{organizationId}/reports/{runId}`        | Optional `{expected_organization_id}` → `{deleted:true}`                     |
+
+`ReportRunCommand` requires a stable UUID `request_id`, `definition_id`, positive `expected_version` and an explicit completed UTC `period` matching the definition cadence. Optional `regenerate_from_run_id` creates a new, charged generation. Optional `send_email` defaults to false. Browser mutations may bind the reviewed workspace with `expected_organization_id`. Reuse the identical command/UUID for transport retries; changing it under the same UUID conflicts. The server derives manual/regeneration kind and the actual member/session credential, model profile, budget, scope and recipients. Requests claiming those fields are rejected.
+
+Metadata history requires current access to the entire frozen origin set. Generation/cancellation/deletion require current administration of every origin; organisation membership alone does not replace project administration. A scoped read token cannot mutate. A history page can contain no readable records and still return a cursor; continue until `next_cursor` is null. Cursors must come from an earlier response. Malformed input returns 400, unavailable scope 404, policy refusal 403, stale context/version/identity/state 409 and exhausted quotas 429. Error bodies contain stable safe codes.
+
+CLI: `debugbundle report-runs list|get|generate|cancel|delete <organization-id> [<run-id>]`. Listing supports `--limit` and `--cursor`; generation accepts `--command-json` with the exact command above. All commands support `--auth-file` and `--json`. Definition commands remain `debugbundle reports ...`.
+
+Ordinary MCP: `list_reports`, `get_report`, `generate_report`, `cancel_report`, `delete_report`, using the same shared HTTP client. Generation is explicitly an external-effect operation and command-idempotent; deletion is destructive. These tools do not widen restricted read-only/OpenAI tool catalogues.
+
+Deleting a definition also removes its retained run history and schedules private-object cleanup. Disable a definition to stop future schedules while retaining history. Cancelling/deleting work does not recall delivered email or erase already paid/uncertain provider costs; minimal financial receipts remain under the financial retention contract.
+
+### Smart Report content and HTML
+
+`GET /v1/organizations/{organizationId}/reports/{runId}/document` returns the strict `{document,available_source_refs}` canonical content view. `GET .../{runId}/html` returns static escaped `text/html` under a restrictive CSP, with no scripts, remote assets or untrusted generated URLs. Both are authenticated, rate-limited and `Cache-Control: no-store`. They do not call a model, consume a generation or extend retention. Storage reads have a one-MiB body limit and fifteen-second deadline, verify the content-addressed hash and bind run, organisation, definition, scope, period, mode and expiry before use. A current mandatory-redaction failure withholds the whole document. The current reader's entire saved origin scope is checked again after object IO; archived reading does not impersonate or depend on the departed creator and remains available after downgrade until report expiry.
+
+The content view's source availability comes from bounded primary-key reads of currently retained incident/improvement evidence under its current governing retention. It does not change frozen numbers or narrative. Authenticated `GET .../{runId}/sources/{reference}` rechecks the complete report and source retention, then returns `303 Location` with the trusted configured dashboard origin and a validated DebugBundle project detail path. Unavailable/expired evidence returns `404 {error:"report_source_unavailable"}`; links are never public bearer URLs.
+
+CLI `report-runs content` returns the same canonical JSON; `report-runs html` returns the shared renderer's HTML (or `{html}` with `--json`). Ordinary MCP `get_report_content` and `get_report_html` use the same authenticated client and renderer. Restricted/OpenAI tool catalogues remain unchanged. All formats retain server-computed metric comparisons, explicit partial/unavailable coverage, recorded resolutions, selected urgent work, qualitative analysis when available, and its absence when unavailable. Generated prose never supplies arithmetic or source URLs.
+
+### Smart Report PDF
+
+Authenticated member/session endpoints share `ReportPdfStore` and the canonical document used by HTML. Every operation requires current reader access to the entire frozen scope; retained archives remain readable after downgrade. All responses are private/no-store.
+
+| Endpoint                                                        | Behaviour                                                                                                                                                                                                                                                            |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /v1/organizations/:organizationId/reports/:runId/pdf`      | `{pdf:{run_id,status,retry_after_seconds}}`; status is `not_requested`, `queued`, `processing`, `ready` or `failed`.                                                                                                                                                 |
+| `POST /v1/organizations/:organizationId/reports/:runId/pdf`     | Optional strict `{expected_organization_id}`. Returns 202 while preparing or 200 for cached output. Coalesces live requests; no AI call or logical generation charge. Requires a read grant, CSRF for browser sessions and the management write request-rate budget. |
+| `GET /v1/organizations/:organizationId/reports/:runId/pdf/file` | Authenticated `application/pdf` attachment, server-generated UUID filename, at most five MiB. Returns 409 `report_pdf_not_ready` until ready; expiry/privacy/access rules are checked again before returning bytes.                                                  |
+
+CLI commands are `report-runs pdf-status`, `report-runs pdf-prepare` and `report-runs pdf-download <organization-id> <run-id> --output <new-file.pdf>`. Downloads validate the complete bounded response, use private file permissions and atomically refuse overwrites, including concurrent creation. There is no force option.
+
+Ordinary MCP `prepare_report_pdf` and `get_report_pdf` return `{pdf,download_url,requires_authentication:true}`. The location is null until ready and otherwise uses the configured API origin. It contains no bearer token, object-store key or public signature. Download requires an authenticated HTTP client; binary content is not embedded in model context. Restricted/OpenAI catalogues remain unchanged.
+
+The dashboard uses `/reports` for definitions and retained history, `/reports/definitions/new` and `/reports/definitions/:definitionId/edit` for the approved full-page editor, and `/reports/:organizationId/:runId` for a canonical report. Full mode starts selected with collection consent unchecked. The editor retains a failed draft, requires explicit projects and accepts only people returned through existing authorised people/member interfaces; the domain verifies recipients against the whole scope. Manual generation defaults to no email, retries retain the exact command identity, and regeneration explicitly confirms another allowance charge. Definition deletion confirms that its history cascades; disabling schedules preserves archives. Viewers have no report mutation controls, but may prepare/read PDF archives under their current whole-scope grant.
+
+Report PDF hyperlinks use only the configured dashboard origin and the validated saved organisation/run path. The fixed child receives this optional location in its closed input envelope; it cannot accept a credential-bearing, query-bearing, fragment-bearing or mismatched report destination. HTML and dashboard source links continue through authenticated current-evidence gateways.
+
+### Smart Report email states
+
+`GET /v1/organizations/:organizationId/reports/:runId/deliveries` returns `{deliveries:[{id,run_id,recipient_user_id,status,reason,created_at,updated_at,accepted_at}]}`. The array has at most ten records. This private/no-store read requires current access to the whole published scope, including for retained archives after downgrade. Deleted recipients are null. Provider message IDs, email addresses, attempt identities, job payloads and report bodies are excluded.
+
+States are `queued`, `sending`, `accepted`, `failed`, `uncertain`, `suppressed` and `cancelled`. Accepted means the provider accepted the message; it does not claim inbox delivery. Sending and uncertain outcomes hold their notification allowance conservatively. Definite rejection may retry through the existing bounded job backoff without AI or another generation. Uncertain sends never repeat automatically. This endpoint does not send, retry or reconcile mail.
+
+CLI: `debugbundle report-runs deliveries <organization-id> <run-id> [--auth-file <path>] [--json]`. Ordinary MCP: `list_report_deliveries`, with strict bearer/organisation/run identity only and read-only annotations. Restricted/OpenAI catalogues remain unchanged. The dashboard shows the same safe states and distinguishes provider acceptance from uncertain outcomes; format/status failures do not remove otherwise readable canonical content.
+
+## Shared report allowance forecast
+
+`GET /v1/organizations/:organizationId/report-definitions/:definitionId/allowance`,
+`debugbundle reports allowance <organization-id> <definition-id>` and ordinary
+MCP `get_report_allowance` use the same validated allowance reader. A currently
+readable whole-scope definition anchors access. The private/no-store response
+contains the current anchored monthly billing window, quota, used/remaining
+logical generations and upcoming configured schedule demand. Annual billing and
+capacity units never multiply the pool. A partial-scope flag means only readable
+schedules were included; no hidden definition names, origins or creators are
+returned. Runnable schedules require their own saved creator's current authority.
+One persisted overdue period is forecast per definition, followed by actual IANA
+local delivery times up to the exclusive allowance end. DST does not duplicate
+an occurrence. The forecast is bounded and read-only, changes no schedule and
+reserves no quota. Only atomic generation admission determines actual acceptance;
+excess scheduled runs retain their visible skipped-quota outcome.
+
+The Reports overview shows this shared pool and warns when upcoming schedules
+exceed the remaining generations. Manual requests and schedule changes can alter
+demand. A failed allowance read does not hide saved definitions or report history.
+The ordinary MCP capability does not expand restricted/OpenAI catalogues.
+
+New Business purchase admission defaults closed. `BUSINESS_SALES_ENABLED=true`
+also requires reporting to be enabled and its selected AI provider/profile to be
+configured in API composition. Fresh Business checkout, upgrade preview/confirmation
+and a new scheduled move to Business share this gate. Solo/Team admission and
+existing Business interval changes, subscriptions, renewals, capacity, report
+archives, accepted payment recovery and financial reconciliation remain available.
+The switch does not revoke entitlements, cancel provider checkouts, invalidate
+already admitted payments or alter scheduled operations. No provider catalogue
+or live setting is changed by this local implementation.
+
+Hosted Business launch compatibility: immutable API/worker images advertise a
+verified `business-tier-v1` runtime contract. Hosted rollout preflight requires
+Business-aware candidates and, after a Business-aware active release, a compatible
+selected previous stable release even when sales are disabled. New sales also
+require that retained rollback compatibility on environment-only activation.
+The first bridge stays sales-disabled until a second verified code rollout has
+made the rollback pair compatible. Existing installed databases still upgrade
+through forward migrations before candidate startup; old binaries that map
+Business to Free are not a valid post-activation rollback.
+
+The local OpenAI 1.1 candidate adds `list_reports` and `get_report_content` under explicit `debugbundle:reports:read` consent. Their organisation is taken from the current grant, never an argument; existing grants and the original twenty-three declarations stay unchanged. Report content shares the existing artifact-read rate budget. See [the report-read contract](chatgpt-saved-reports.md).
+
+### Self-hosted browser entitlement hint
+
+`GET /v1/auth/session` and successful browser sign-in responses may include
+`session.self_hosted: true` when the server runs with `SELFHOST_MODE=true`.
+Hosted responses retain the previous shape. The optional hint lets the dashboard
+show unlocked organisation administration and Smart Reports without relabelling
+an account's billing plan. It grants no authority: live role, suspension, credential
+scope, whole-report scope and consent checks remain mandatory server-side.

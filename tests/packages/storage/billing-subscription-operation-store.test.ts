@@ -34,6 +34,16 @@ function fixture() {
 }
 
 describe("Postgres subscription operation adapter", () => {
+  it("fences a new owner-bound operation before reserving after ownership changed", async () => {
+    const { query, store } = fixture();
+    query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ ...organization, primary_owner_user_id: "new_owner" }] });
+    expect(await store.claim({ ...request, expected_owner_user_id: "former_owner" })).toBe(
+      "no_active_subscription"
+    );
+    expect(query.mock.calls.some(([sql]) => String(sql).startsWith("INSERT"))).toBe(false);
+  });
   it("reads the durable operation and preserves absence", async () => {
     const { query, store } = fixture();
     query.mockResolvedValueOnce({ rows: [operation] });

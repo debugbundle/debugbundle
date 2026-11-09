@@ -43,6 +43,10 @@ function setup() {
   const stripe = {
     soloPriceId: "price_solo",
     teamPriceId: "price_team",
+    priceMap: new Map([
+      ["price_solo", { type: "plan", plan: "solo" }],
+      ["price_team", { type: "plan", plan: "team" }]
+    ]),
     client: { checkout: { sessions: { create, retrieve } } }
   } as unknown as StripeConfig;
   const input = {

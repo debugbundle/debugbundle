@@ -49,7 +49,7 @@ describe("Codex developer plugin distribution", () => {
       mcpServers: {
         debugbundle: {
           command: "npx",
-          args: ["-y", "@debugbundle/mcp@1.19.4", "--local-auth"]
+          args: ["-y", "@debugbundle/mcp@1.21.0", "--local-auth"]
         }
       }
     });

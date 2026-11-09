@@ -42,6 +42,11 @@ const SCOPE_COPY: Record<OpenAiProductScope, { label: string; description: strin
   "debugbundle:health:read": {
     label: "Read endpoint checks and bounded health results",
     description: "Sanitized check targets, status, latency, and recent outcomes."
+  },
+  "debugbundle:reports:read": {
+    label: "Read saved Smart Reports",
+    description:
+      "Existing report facts, recorded resolutions, analysis and priorities, only when you can read every included project. No report generation or email."
   }
 };
 
@@ -137,8 +142,9 @@ export function OAuthDataTransferNotice(): JSX.Element {
       </Notice>
       <Notice title="Data sent to OpenAI">
         Selected tools may return incident summaries, existing redacted artifacts and reproductions,
-        improvements, aggregate product analytics, and bounded endpoint-health evidence. Raw logs,
-        individual journey samples, and custom analytics dimensions are excluded.
+        improvements, aggregate product analytics, bounded endpoint-health evidence, and saved Smart
+        Reports when you explicitly allow report access. Raw logs, individual journey samples, and
+        custom analytics dimensions are excluded.
       </Notice>
     </>
   );

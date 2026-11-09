@@ -99,9 +99,7 @@ describe("web app — improvements", () => {
 
     render(<App initialEntries={["/improvements"]} />);
 
-    expect(
-      await screen.findByText(/upgrade to solo or team to unlock hosted improvements/i)
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/upgrade to unlock hosted improvements/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /open billing/i })).toHaveAttribute("href", "/billing");
     expect(
       fetchMock.mock.calls.some(([input]) => requestUrl(input).includes("/v1/improvements"))
@@ -325,9 +323,7 @@ describe("web app — improvements", () => {
 
     render(<App initialEntries={["/projects/proj_123/improvements"]} />);
 
-    expect(
-      await screen.findByText(/upgrade to solo or team to unlock hosted improvements/i)
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/upgrade to unlock hosted improvements/i)).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /improvements/i })).toHaveAttribute(
       "data-state",
       "active"

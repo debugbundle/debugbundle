@@ -1,4 +1,4 @@
-import type { TierName } from "../../../packages/shared-types/src/index.js";
+import type { BillingInterval, TierName } from "../../../packages/shared-types/src/index.js";
 
 import type { AccountAnalyticsStore } from "./account-analytics-store.js";
 import {
@@ -21,6 +21,8 @@ export interface BillingEntitlementUpdate {
   stripe_subscription_id: string;
   billing_period_starts_at: string | null;
   billing_period_ends_at: string | null;
+  billing_interval?: BillingInterval;
+  billing_allowance_anchor_at?: string | null;
   last_billing_sync_at: string;
   last_billing_event_id: string;
 }
@@ -53,6 +55,8 @@ type PostgresBillingSyncStoreOptions = {
 
 function planRank(plan: TierName): number {
   switch (plan) {
+    case "business":
+      return 3;
     case "team":
       return 2;
     case "solo":
@@ -196,11 +200,28 @@ export function createPostgresBillingSyncStore(
           ]
         );
 
+        if (update.billing_interval !== undefined) {
+          // Keep the first allowance anchor across same-subscription changes and
+          // renewals. A replacement subscription establishes its own anchor.
+          await tx.query(
+            `UPDATE organizations SET billing_interval=$2,
+              billing_allowance_anchor_at=CASE WHEN $4::boolean THEN $3::timestamptz
+                ELSE COALESCE(billing_allowance_anchor_at,$3::timestamptz) END WHERE id=$1`,
+            [
+              update.organization_id,
+              update.billing_interval,
+              update.billing_allowance_anchor_at ?? update.billing_period_starts_at,
+              linkedSubscription !== update.stripe_subscription_id
+            ]
+          );
+        }
+
         const cleanupSummary = await createOrganizationPlanCleanupService(
           tx
         ).cleanupOrganizationForPlan({
           organization_id: update.organization_id,
           plan: targetPlan,
+          previous_plan: previousPlan,
           now: update.last_billing_sync_at
         });
 
@@ -338,7 +359,8 @@ export function createPostgresBillingSyncStore(
           tx
         ).cleanupOrganizationForPlan({
           organization_id: organizationId,
-          plan: "free"
+          plan: "free",
+          previous_plan: previousPlan
         });
 
         if (isPlanDowngrade(previousPlan, "free")) {

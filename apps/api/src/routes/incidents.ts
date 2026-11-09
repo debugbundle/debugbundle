@@ -1,3 +1,5 @@
+import { memberReadScope, memberJobRequest } from "../member-access-scope.js";
+import type { ProjectJobInitiator } from "../../../../packages/storage/src/project-job-authorization.js";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { projectEvidenceView } from "../../../../packages/storage/src/project-evidence-projection.js";
 
@@ -8,10 +10,12 @@ import {
   buildIncidentContextRecord,
   buildReproductionObjectKey,
   type IncidentContextArtifactRecord,
+  type ResolveMemberResult,
   type IncidentRetrievalRecord
 } from "../../../../packages/storage/src/index.js";
 import { readSanitizedArtifact } from "../../../../packages/storage/src/artifact-privacy.js";
 import { TELEMETRY_PRIVACY_POLICY_VERSION } from "../../../../packages/redaction/src/index.js";
+import { tokenAllowsProject } from "../../../../packages/auth/src/project-authorization.js";
 import type { ApiDependencies } from "../api-types.js";
 import {
   isObjectNotFoundError,
@@ -35,6 +39,7 @@ function sendSafeIncidentResponse(reply: FastifyReply, value: unknown): FastifyR
 }
 
 async function readBundleArtifactForIncident(input: {
+  initiating_authority?: ProjectJobInitiator;
   dependencies: ApiDependencies;
   organizationId: string;
   incidentId: string;
@@ -65,6 +70,9 @@ async function readBundleArtifactForIncident(input: {
 
       if (input.dependencies.bundleRegeneration !== undefined) {
         const regenerationQueued = await input.dependencies.bundleRegeneration.requestRegeneration({
+          ...(input.initiating_authority === undefined
+            ? {}
+            : { initiating_authority: input.initiating_authority }),
           organization_id: input.organizationId,
           project_id: input.projectId,
           incident_id: input.incidentId
@@ -119,15 +127,27 @@ async function readReproductionArtifactForIncident(input: {
 
 async function resolveProjectOrganizationId(input: {
   dependencies: ApiDependencies;
-  memberId: string;
+  member: ResolveMemberResult;
   fallbackOrganizationId: string;
   projectId: string;
-}): Promise<string> {
+}): Promise<string | null> {
   const access = await input.dependencies.projectManagement?.resolveProjectAccessForUser?.({
-    user_id: input.memberId,
+    user_id: input.member.member_id,
+    ...memberReadScope(input.member),
     project_id: input.projectId
   });
 
+  if (
+    input.member.token_policy !== undefined &&
+    (access == null ||
+      !tokenAllowsProject(input.member.token_policy, {
+        project_id: input.projectId,
+        organization_id: access.organization_id,
+        origin_project_ids: access.origin_project_ids ?? [input.projectId],
+        action: "read"
+      }))
+  )
+    return null;
   return access?.organization_id ?? input.fallbackOrganizationId;
 }
 
@@ -137,7 +157,7 @@ function dedupeIncidentIds(incidentIds: string[]): string[] {
 
 async function resolveBulkIncidentOrganizationGroups(input: {
   dependencies: ApiDependencies;
-  member: { member_id: string; organization_id: string };
+  member: ResolveMemberResult;
   incidentIds: string[];
 }): Promise<{ incidents: IncidentRetrievalRecord[]; groups: Map<string, string[]> } | null> {
   const incidents = await Promise.all(
@@ -145,6 +165,7 @@ async function resolveBulkIncidentOrganizationGroups(input: {
       input.dependencies.incidentRetrieval.getIncidentForOrganization({
         organization_id: input.member.organization_id,
         incident_id: incidentId,
+        ...memberReadScope(input.member),
         user_id: input.member.member_id
       })
     )
@@ -159,7 +180,7 @@ async function resolveBulkIncidentOrganizationGroups(input: {
     resolvedIncidents.map((incident) =>
       resolveProjectOrganizationId({
         dependencies: input.dependencies,
-        memberId: input.member.member_id,
+        member: input.member,
         fallbackOrganizationId: input.member.organization_id,
         projectId: incident.project_id
       })
@@ -168,6 +189,7 @@ async function resolveBulkIncidentOrganizationGroups(input: {
 
   const groups = new Map<string, string[]>();
   for (const [index, organizationId] of organizationIds.entries()) {
+    if (organizationId === null) return null;
     const incidentId = resolvedIncidents[index]!.incident_id;
     const current = groups.get(organizationId);
     if (current === undefined) {
@@ -220,6 +242,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
       limit: number;
     } = {
       organization_id: member.organization_id,
+      ...memberReadScope(member),
       user_id: member.member_id,
       limit: parsedQuery.data.limit
     };
@@ -316,6 +339,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
       const incidents = await dependencies.incidentRetrieval.resolveIncidentsForOrganization({
         organization_id: organizationId,
         incident_ids: groupedIncidentIds,
+        ...memberReadScope(member),
         user_id: member.member_id,
         resolved_by_member_id: member.member_id,
         resolved_at: resolvedAt
@@ -379,6 +403,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
       const incidents = await dependencies.incidentRetrieval.reopenIncidentsForOrganization({
         organization_id: organizationId,
         incident_ids: groupedIncidentIds,
+        ...memberReadScope(member),
         user_id: member.member_id
       });
       for (const incident of incidents) {
@@ -420,6 +445,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
     const incident = await dependencies.incidentRetrieval.getIncidentForOrganization({
       organization_id: member.organization_id,
       incident_id: parsedParams.data.id,
+      ...memberReadScope(member),
       user_id: member.member_id
     });
 
@@ -455,6 +481,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
     const incident = await dependencies.incidentRetrieval.getIncidentForOrganization({
       organization_id: member.organization_id,
       incident_id: parsedParams.data.id,
+      ...memberReadScope(member),
       user_id: member.member_id
     });
 
@@ -466,13 +493,16 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
 
     const projectOrganizationId = await resolveProjectOrganizationId({
       dependencies,
-      memberId: member.member_id,
+      member: member,
       fallbackOrganizationId: member.organization_id,
       projectId: incident.project_id
     });
+    if (projectOrganizationId === null)
+      return reply.status(404).send({ error: "incident_not_found" });
 
     const [bundle, reproduction, logs] = await Promise.all([
       readBundleArtifactForIncident({
+        ...memberJobRequest(member),
         dependencies,
         organizationId: projectOrganizationId,
         incidentId: incident.incident_id,
@@ -485,6 +515,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
       }),
       dependencies.incidentRetrieval.listIncidentLogsForOrganization({
         organization_id: member.organization_id,
+        ...memberReadScope(member),
         user_id: member.member_id,
         incident_id: incident.incident_id,
         limit: 20
@@ -532,6 +563,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
     const existingIncident = await dependencies.incidentRetrieval.getIncidentForOrganization({
       organization_id: member.organization_id,
       incident_id: parsedParams.data.id,
+      ...memberReadScope(member),
       user_id: member.member_id
     });
 
@@ -543,14 +575,17 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
 
     const projectOrganizationId = await resolveProjectOrganizationId({
       dependencies,
-      memberId: member.member_id,
+      member: member,
       fallbackOrganizationId: member.organization_id,
       projectId: existingIncident.project_id
     });
+    if (projectOrganizationId === null)
+      return reply.status(404).send({ error: "incident_not_found" });
 
     const incident = await dependencies.incidentRetrieval.resolveIncidentForOrganization({
       organization_id: projectOrganizationId,
       incident_id: parsedParams.data.id,
+      ...memberReadScope(member),
       user_id: member.member_id,
       resolved_by_member_id: member.member_id,
       resolved_at: new Date().toISOString()
@@ -594,6 +629,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
     const existingIncident = await dependencies.incidentRetrieval.getIncidentForOrganization({
       organization_id: member.organization_id,
       incident_id: parsedParams.data.id,
+      ...memberReadScope(member),
       user_id: member.member_id
     });
 
@@ -605,14 +641,17 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
 
     const projectOrganizationId = await resolveProjectOrganizationId({
       dependencies,
-      memberId: member.member_id,
+      member: member,
       fallbackOrganizationId: member.organization_id,
       projectId: existingIncident.project_id
     });
+    if (projectOrganizationId === null)
+      return reply.status(404).send({ error: "incident_not_found" });
 
     const incident = await dependencies.incidentRetrieval.reopenIncidentForOrganization({
       organization_id: projectOrganizationId,
       incident_id: parsedParams.data.id,
+      ...memberReadScope(member),
       user_id: member.member_id
     });
 
@@ -648,6 +687,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
     const incident = await dependencies.incidentRetrieval.getIncidentForOrganization({
       organization_id: member.organization_id,
       incident_id: parsedParams.data.id,
+      ...memberReadScope(member),
       user_id: member.member_id
     });
 
@@ -659,10 +699,12 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
 
     const projectOrganizationId = await resolveProjectOrganizationId({
       dependencies,
-      memberId: member.member_id,
+      member: member,
       fallbackOrganizationId: member.organization_id,
       projectId: incident.project_id
     });
+    if (projectOrganizationId === null)
+      return reply.status(404).send({ error: "incident_not_found" });
 
     const key = buildBundleObjectKey(incident.project_id, incident.incident_id);
 
@@ -688,6 +730,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
         // Attempt auto-regeneration: the events still exist, so re-enqueue a build.
         if (dependencies.bundleRegeneration !== undefined) {
           const regenerationQueued = await dependencies.bundleRegeneration.requestRegeneration({
+            ...memberJobRequest(member),
             organization_id: projectOrganizationId,
             project_id: incident.project_id,
             incident_id: incident.incident_id
@@ -748,6 +791,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
     const incident = await dependencies.incidentRetrieval.getIncidentForOrganization({
       organization_id: member.organization_id,
       incident_id: parsedParams.data.id,
+      ...memberReadScope(member),
       user_id: member.member_id
     });
 
@@ -757,6 +801,16 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
       });
     }
 
+    if (
+      member.token_policy !== undefined &&
+      (await resolveProjectOrganizationId({
+        dependencies,
+        member,
+        fallbackOrganizationId: member.organization_id,
+        projectId: incident.project_id
+      })) === null
+    )
+      return reply.status(404).send({ error: "incident_not_found" });
     const key = buildReproductionObjectKey(incident.project_id, incident.incident_id);
 
     try {
@@ -814,6 +868,7 @@ export function registerIncidentRoutes(app: FastifyInstance, dependencies: ApiDe
       cursor?: { occurred_at: string; event_id: string };
     } = {
       organization_id: member.organization_id,
+      ...memberReadScope(member),
       user_id: member.member_id,
       incident_id: parsedQuery.data.incident_id,
       limit: parsedQuery.data.limit

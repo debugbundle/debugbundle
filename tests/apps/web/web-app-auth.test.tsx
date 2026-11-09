@@ -503,7 +503,7 @@ describe("web app - auth routes", () => {
         });
       }
 
-      if (url.endsWith("/v1/member/tokens")) {
+      if (url.split("?")[0]?.endsWith("/v1/member/tokens")) {
         return jsonResponse(200, { tokens: [] });
       }
 
@@ -534,11 +534,11 @@ describe("web app - auth routes", () => {
 
       if (url.endsWith("/v1/auth/session")) {
         return jsonResponse(200, {
-          session: createSession()
+          session: createSession({ organization_id: "11111111-1111-4111-8111-111111111111" })
         });
       }
 
-      if (url.endsWith("/v1/member/tokens") && init?.method === undefined) {
+      if (url.split("?")[0]?.endsWith("/v1/member/tokens") && init?.method === undefined) {
         return jsonResponse(200, {
           tokens: [createMemberTokenRecord()]
         });
@@ -546,7 +546,15 @@ describe("web app - auth routes", () => {
 
       if (url.endsWith("/v1/member/tokens") && init?.method === "POST") {
         expect(init.credentials).toBe("include");
-        expect(init.body).toBe(JSON.stringify({ label: "CI automation" }));
+        expect(JSON.parse(init.body as string)).toEqual({
+          label: "CI automation",
+          scope: {
+            mode: "organization",
+            organization_id: "11111111-1111-4111-8111-111111111111",
+            permissions: ["project:read"]
+          },
+          expires_at: expect.any(String)
+        });
 
         return jsonResponse(201, {
           token: {
@@ -568,6 +576,7 @@ describe("web app - auth routes", () => {
 
     await user.click(screen.getByRole("button", { name: /create member token/i }));
     await user.type(await screen.findByLabelText(/token label/i), "CI automation");
+    await user.click(screen.getByRole("radio", { name: /current organisation/i }));
     await user.click(screen.getByRole("button", { name: /^create token$/i }));
 
     const revealRegion = await screen.findByRole("region", { name: /new token secret/i });
@@ -876,7 +885,7 @@ describe("web app - auth routes", () => {
         return jsonResponse(200, { session: createSession() });
       }
 
-      if (url.endsWith("/v1/member/tokens") && init?.method === undefined) {
+      if (url.split("?")[0]?.endsWith("/v1/member/tokens") && init?.method === undefined) {
         return jsonResponse(200, { tokens: [createMemberTokenRecord()] });
       }
 

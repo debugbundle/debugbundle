@@ -55,6 +55,8 @@ export function registerAgentTokenRoutes(
     if (auth.access.effective_role !== "owner" && auth.access.effective_role !== "admin") {
       return reply.status(403).send({ error: "forbidden" });
     }
+    if (auth.member.token_policy !== undefined)
+      return reply.status(403).send({ error: "credential_issuance_forbidden" });
     if (!issuanceEnabled)
       return reply.status(503).send({ error: "agent_token_issuance_unavailable" });
     if (dependencies.agentTokens === undefined)

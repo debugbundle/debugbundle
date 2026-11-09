@@ -47,7 +47,7 @@ describe("OpenAI plugin registration diagnostics", () => {
     const files = entriesFor("isolated-compatibility");
     const manifest = readJson<PluginManifest>(files, "debugbundle/.codex-plugin/plugin.json");
     expect(manifest.name).toBe("debugbundle-cimd-isolated");
-    expect(manifest.version).toBe("1.0.3");
+    expect(manifest.version).toBe("1.1.0");
     expect(manifest.interface?.displayName).toBe("DebugBundle");
     expect(manifest.mcpServers).toBe("./.mcp.json");
     expect(manifest.apps).toBeUndefined();

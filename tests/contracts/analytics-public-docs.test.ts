@@ -189,53 +189,37 @@ describeSiteDocs("public site AnalyticsBundle documentation", () => {
     expect(quickstart).toContain("<OptionalAgentImprovements />");
   });
 
-  it("publishes tier totals and extra-capacity increments for analytics", () => {
-    const pricingPage = readFileSync(
-      join(siteRoot, "app", "(site)", "pricing", "page.tsx"),
-      "utf8"
-    );
+  it("documents extra-capacity increments and links to the public tier comparison", () => {
     const pricingDoc = readDoc("pricing.mdx");
-    const formatCount = (value: number): string => new Intl.NumberFormat("en-US").format(value);
-    const free = TIER_CAPABILITIES.free;
-    const solo = TIER_CAPABILITIES.solo;
-    const team = TIER_CAPABILITIES.team;
-
-    for (const value of [
-      `${formatCount(free.monthly_analytics_events)} analytics events /month`,
-      `${formatCount(free.monthly_analytics_sessions)} analytics sessions /month`,
-      `${formatCount(free.monthly_analytics_journey_samples)} retained journey samples /month`,
-      `${formatCount(free.monthly_analytics_bundle_generations)} generated analytics bundles /month`,
-      `${formatCount(free.max_analytics_saved_funnels)} saved funnel`,
-      `${formatCount(free.max_analytics_custom_dimensions)} custom dimension`,
-      `${formatCount(solo.monthly_analytics_events * solo.included_capacity_units)} analytics events /month`,
-      `${formatCount(solo.monthly_analytics_sessions * solo.included_capacity_units)} analytics sessions /month`,
-      `${formatCount(solo.monthly_analytics_journey_samples * solo.included_capacity_units)} retained journey samples`,
-      `${formatCount(solo.monthly_analytics_bundle_generations * solo.included_capacity_units)} generated analytics bundles /month`,
-      `${formatCount(solo.max_analytics_saved_funnels)} saved funnels`,
-      `${formatCount(solo.max_analytics_custom_dimensions)} custom dimensions`,
-      `${formatCount(team.monthly_analytics_events * team.included_capacity_units)} analytics events /month`,
-      `${formatCount(team.monthly_analytics_sessions * team.included_capacity_units)} analytics sessions /month`,
-      `${formatCount(team.monthly_analytics_journey_samples * team.included_capacity_units)} retained journey samples`,
-      `${formatCount(team.monthly_analytics_bundle_generations * team.included_capacity_units)} generated analytics bundles /month`,
-      `${formatCount(team.max_analytics_saved_funnels)} saved funnels`,
-      `${formatCount(team.max_analytics_custom_dimensions)} custom dimensions`,
-      `+${formatCount(solo.monthly_analytics_events)} analytics events /month`,
-      `+${formatCount(solo.monthly_analytics_sessions)} analytics sessions /month`,
-      `+${formatCount(solo.monthly_analytics_journey_samples)} retained journey samples`,
-      `+${formatCount(solo.monthly_analytics_bundle_generations)} generated analytics bundles /month`,
-      `+${formatCount(team.monthly_analytics_events)} analytics events /month`,
-      `+${formatCount(team.monthly_analytics_sessions)} analytics sessions /month`,
-      `+${formatCount(team.monthly_analytics_journey_samples)} retained journey samples`,
-      `+${formatCount(team.monthly_analytics_bundle_generations)} generated analytics bundles /month`
-    ]) {
-      expect(pricingPage).toContain(value);
-    }
-
-    expect(pricingPage).toContain("Saved funnels and custom dimensions remain fixed by tier");
-    expect(pricingDoc).toContain("Analytics events / month");
-    expect(pricingDoc).toContain("Generated analytics bundles / month");
-    expect(pricingDoc).toContain("| **Product analytics** | Preview | Included | Included |");
-    expect(pricingDoc).toContain("do not increase saved funnels or custom-dimension slots");
+    expect(pricingDoc).toContain("/pricing/#compare-plans");
+    const extras = pricingDoc.split("## Extra capacity")[1]!.split("## Business Smart Reports")[0]!;
+    const cells = (text: string, label: string): string[] => {
+      const row = text
+        .split("\n")
+        .map((line) =>
+          line
+            .split("|")
+            .slice(1, -1)
+            .map((cell) => cell.replaceAll("**", "").trim())
+        )
+        .find((parts) => parts[0] === label);
+      expect(row, label).toBeDefined();
+      return row!.slice(1);
+    };
+    const count = (value: number): string => new Intl.NumberFormat("en-US").format(value);
+    for (const [label, key] of [
+      ["Analytics events /month", "monthly_analytics_events"],
+      ["Analytics sessions /month", "monthly_analytics_sessions"],
+      ["Journey samples /month", "monthly_analytics_journey_samples"],
+      ["Analytics bundles /month", "monthly_analytics_bundle_generations"]
+    ] as const)
+      expect(cells(extras, label)).toEqual([
+        count(TIER_CAPABILITIES.solo[key]),
+        count(TIER_CAPABILITIES.team[key])
+      ]);
+    expect(pricingDoc).toMatch(
+      /Saved funnels, custom dimensions, people, health checks, Smart Report generations\s+and retention remain fixed by tier/u
+    );
   });
 
   it("registers AnalyticsBundle pages in content navigation and agent discovery", () => {

@@ -1,5 +1,9 @@
 import { isObjectMissing } from "../../../packages/storage/src/object-store-errors.js";
 import {
+  createOpenAiReportOperations,
+  type OpenAiReportReadDependencies
+} from "./openai-mcp-report-operations.js";
+import {
   projectEvidenceView,
   projectImprovementView
 } from "../../../packages/storage/src/project-evidence-projection.js";
@@ -44,6 +48,7 @@ import {
 } from "./openai-mcp-analytics-operations.js";
 
 export interface OpenAiHostedReadDependencies {
+  reportReads?: OpenAiReportReadDependencies;
   projectManagement: Pick<
     DefaultApiDependencies["projectManagement"],
     "resolveProjectAccessForUser" | "listProjectsForUser"
@@ -309,6 +314,7 @@ export function createOpenAiHostedOperations(input: {
   }
 
   return {
+    ...createOpenAiReportOperations(dependencies.reportReads),
     ...createOpenAiAnalyticsOperations({
       analyticsMetrics: dependencies.analyticsMetrics,
       incidentRetrieval: dependencies.incidentRetrieval,

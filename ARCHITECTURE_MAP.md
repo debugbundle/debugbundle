@@ -1,3 +1,49 @@
+Local tier tooling: `scripts/dev-tier.sh` verifies local Docker/checkout identity;
+`scripts/dev-tier.sql` atomically selects one unlinked organisation and sets a base
+tier. `billing-admin-helpers.ts` respects explicit administrative Free rather than
+applying the initial Team default. No API route or production configuration is added.
+
+Business extension implementation boundaries (see `spec/business-tier.md` and STATUS.md):
+
+- `packages/shared-types/src/billing-catalog.ts` and storage
+  `billing-allowance-window.ts` own fixed offers and anchored monthly usage.
+  Billing provider adapters own full-offer reservations, quotes, renewal scheduling
+  and owner-contact synchronisation; API/browser adapters do not own that policy.
+- `packages/auth/src/project-authorization.ts`, scoped member policy and storage
+  actor-role services own effective permissions. Organisation management composes
+  fixed people/invitation/transfer services under an organisation admission lock.
+  SDK-only routes remain outside member authentication.
+- `packages/referrals` owns validated receipt, discount and cash policy; storage
+  owns immutable attribution/benefit/ledger/outbox and manual payout state. The
+  independent financial worker performs external provider I/O outside locks.
+- `packages/smart-reports` owns periods, canonical facts/output, model budgets and
+  trusted renderers. Storage `report-*` modules own consented bounded collection,
+  scope, admission, leases, artifacts, forecasts, retention and delivery receipts.
+  `apps/worker/src/smart-report-runtime.ts` rotates PDF, generation and email in
+  one independent serial lane; all workers share existing pools/object clients.
+- `packages/report-client`, `organization-client` and `referral-client` serve API,
+  CLI, ordinary MCP and approved dashboard components. Restricted agent catalogues stay frozen. The OpenAI report extension exposes
+  list/read only through a distinct live OAuth report reader; existing grants and
+  original tool schemas stay unchanged. Public site pricing/docs consume generated interface artifacts and fixed
+  published offer data generated from the shared catalogue/capabilities, without
+  importing server runtime modules.
+- `storage/business-account-export.ts` supplies bounded private export sections;
+  canonical report readers protect whole-scope document/HTML/PDF downloads. Account
+  deletion clears report data and leaves protected financial obligations intact.
+- Additive forward migrations and exact readiness precede consuming API/worker
+  code. The private cloud companion owns Business-aware image/rollback guards,
+  environment preparation and eventual separately authorised rollout.
+
+Business trial selection reuses the existing signup/billing/CLI/MCP trial flow,
+with a forward trial-plan constraint migration and database-deadline report fences.
+Business-trial-aware immutable runtime/rollback images declare `business-tier-v2`.
+The report-trial collection and self-hosted access forward migrations preserve
+prior checksums. Browser sessions expose only a server-owned optional
+`self_hosted` entitlement hint; live backend roles and token scope remain authoritative.
+
+All implementation candidates remain local. Sales/generation/email switches
+remain default-off; final combined qualification is recorded in STATUS.md.
+
 Multiline exception release (6 November 2026): core 1.22.1 is live from
 `8daab4acf3ca36c0c425aab455959c1bb7ae9a0d`. Java stderr assembly belongs to
 the Java SDK; legacy continuation classification belongs to
@@ -234,11 +280,18 @@ and `analytics.ts` cover dashboard management/provider fixtures, local billing
 simulation and analytics definitions/reports/artifacts respectively.
 `public-status.ts` owns ephemeral publication metadata and paginated
 choices, delegating safe output to the production `public-status-projection.ts`.
-Fixture and newly created project/check IDs are UUIDs for strict form parity.
+Workspace fixtures and fixture/new project/check IDs are UUIDs for strict client/form parity.
 Mock credentials are invalid and provider/checkout navigation stays local. `apps/web/dev-mock-plugin.ts`
 is the opt-in development middleware adapter; `vite.config.ts` excludes it from builds
 and disables real API routing/telemetry in mock mode. `make dev-mock` recreates only
 the loopback-bound web container. No runtime API, storage or worker domain path changes.
+
+`scripts/dev-mock/billing-offers.ts` extends the retained legacy billing fixtures
+with all paid tiers/intervals, exact synthetic quote confirmation, local checkout,
+scheduled changes and simulated renewal/cancellation. Private simulator schemas
+and controls live in `apps/web/src/dev/billing-preview-*`; the dev-gated lazy wrapper
+is stripped from production. `/v1/__dev/billing` exists only in the loopback Vite
+mock adapter. It changes fixture memory, never entitlements in real storage.
 
 > Module boundary map for agent navigation.
 > If this file conflicts with `/spec/architecture.md` or `/contracts/*`, those win.
@@ -521,6 +574,16 @@ Detailed implementation plans live in `spec/sdks/`. Current published lines are 
 
 The public documentation/marketing/blog site lives in the standalone public repo `github.com/debugbundle/site` and is cloned locally at the root `site/` path when documentation work is needed.
 
+**Pricing documentation:** `/pricing/` owns public prices and plan comparisons. The
+existing `/docs/pricing/` route is the Plans and capacity guide; it explains shared
+allowances and links to the comparison. Billing docs cover subscription workflows.
+
+**Agent setup guidance:** `site/src/lib/agent-assist-prompts.ts` owns the shared
+prompt catalogue. `agent-assist-prompt-card.tsx` and the existing prompt dialog
+serve Quickstart's optional workflows and the corresponding feature guides.
+Smart Report guidance uses existing authenticated management operations and
+preserves project scope, consent, schedule and delivery approval boundaries.
+
 **Build-time boundary:** The standalone site repo no longer imports core apps/packages. Core now owns `scripts/public-site-artifacts.ts`, which generates vendorable static JSON artifacts into `site/public/` before the site build runs. The site-owned `generate:artifacts` script is limited to search-index generation. At runtime (after `next build`), the site has zero workspace dependencies — it's a fully static Next.js export.
 
 **Core-owned artifact inputs (build-time only):**
@@ -683,6 +746,8 @@ The public documentation/marketing/blog site lives in the standalone public repo
 - **Key constraint:** Web is NOT the product core. Agent/CLI/API are primary interfaces. UI must stay reusable, shadcn-based, theme-capable, and use cookie-backed session auth. The public site remains a separate static-exported Next.js + Fumadocs deployment on `debugbundle.com` with marketing pages, `/docs`, and `/blog`. Focused frontend validation runs through `make web-check`.
 - **Dogfooding note:** Dogfooding runs against published `@debugbundle/sdk-browser@1.7.0`. `src/main.tsx` optionally initializes the npm-published browser SDK during startup when `VITE_DEBUGBUNDLE_DOGFOOD_PROJECT_TOKEN` is present, and the manual dev-only console bridge `window.__DEBUGBUNDLE_DOGFOOD__.triggerFrontendException()` remains gated by `VITE_DEBUGBUNDLE_DOGFOOD_EXPOSE_TRIGGERS=true`.
 - **Internal structure:** `src/app.tsx` owns protected/public-auth route composition while `src/app-project-routes.tsx` owns the single project route tree reused by browser and memory routers. `src/components/system/auth-layout.tsx` is the shared auth shell; `src/pages/openai-consent-page.tsx`, `src/pages/openai-reviewer-page.tsx`, `src/lib/openai-oauth-api.ts`, and `src/components/system/openai-connections-section.tsx` own the UID-only interaction, exact disclosure/scope selection, credential clearing, API continuation, and responsive Settings revocation surfaces. The OpenAI section is full-width after the primary Settings cards; active grants render immediately while retained revoked/expired grants remain in a collapsed keyboard-accessible history disclosure until automatic physical cleanup. `src/lib/openai-plugin-preview-gate.ts` owns the production-deny routing gate without importing preview fixtures; `src/openai-plugin-preview-route.tsx`, `src/pages/openai-plugin-preview-page.tsx`, and `src/lib/openai-plugin-previews.ts` lazy-load and compose the production view components with deterministic non-customer fixtures for the explicit development/test-only state and iframe-width matrix. The preview modules own no OAuth client and cannot mount in production. `src/lib/dogfooding.ts` owns fail-closed app route templating and records only path templates, never interaction UIDs or OAuth state. Analytics page/component ownership remains under its existing focused modules. `src/lib/api.ts` remains the compatibility barrel over focused browser adapters. `src/components/ui/*` holds shadcn primitives and `src/components/system/*` holds reusable product components.
+
+Web heading layout: `apps/web/src/components/system/title-badge-row.tsx` composes existing headings, badges, optional title accessories and actions in reading order with responsive wrapping. Callout cards, analytics detail headers and system-email previews reuse it; heading semantics and badge tones stay with callers.
 
 Web list ownership: `apps/web/src/lib/api-artifacts.ts` holds incident/improvement list clients behind the unchanged `lib/api.ts` exports. `lib/use-cursor-pagination.ts` caches first-page totals, ignores obsolete filter requests, and refreshes counts after mutations. A changed first-page cursor resets the cached page chain to prevent skipped rows; a stable cursor preserves the current page. `components/system/cursor-pagination-controls.tsx` renders the shared page count and navigation.
 
@@ -1125,9 +1190,9 @@ test service. `test_webhook_event` is additive in ordinary MCP/OpenClaw; frozen
 `test_webhook` metadata and restricted profiles remain unchanged. Behavioral tests
 live in `tests/contracts/webhook-test-event-parity.test.ts`.
 
-Billing confirmation and recovery live in packages/billing/src: stripe-upgrade-quote/preview, stripe-capacity-payment, stripe-checkout-confirmation and stripe-operation-reconciliation. stripe-webhook-transaction coordinates storage and notification outbox; billing-email-payload is shared with the operational-email worker. The existing web billing page composes billing-upgrade-dialog; billing-upgrade routes expose owner preview. Shared billing-client carries payment_required to CLI/MCP.
+Billing confirmation and recovery live in packages/billing/src: stripe-upgrade-quote/preview, stripe-capacity-payment, stripe-checkout-confirmation and stripe-operation-reconciliation. stripe-webhook-transaction coordinates storage and notification outbox; billing-email-payload is shared with the operational-email worker. The web billing page composes the shared `billing-subscription-control` and interval-aware quote summary; billing-upgrade routes expose owner preview. Shared billing-client carries payment_required to CLI/MCP.
 
-Scheduled plan changes: `packages/billing/src/stripe-plan-change.ts` coordinates persisted requests, `stripe-plan-change-quote.ts` signs/revalidates forecasts, `stripe-plan-change-schedule.ts` preserves and checks phases, and `stripe-completed-schedule.ts` handles subsequent mutations after the final phase applies. `apps/api/src/routes/billing-plan-change.ts` reuses owner admission from `billing-principal.ts`; `packages/billing-client/src/plan-change*.ts` owns additive contracts shared by web, CLI and MCP. The billing page composes `billing-plan-change-control.tsx`. Migration 202610220004 expands the shared reservation kinds. `make billing-stripe-test` executes the explicit disposable provider validation script; it is never part of ordinary tests or a production canary.
+Scheduled plan changes: `packages/billing/src/stripe-plan-change.ts` coordinates persisted requests, `stripe-plan-change-quote.ts` signs/revalidates forecasts, `stripe-plan-change-schedule.ts` preserves and checks phases, and `stripe-completed-schedule.ts` handles subsequent mutations after the final phase applies. `apps/api/src/routes/billing-plan-change.ts` reuses owner admission from `billing-principal.ts`; `packages/billing-client/src/plan-change*.ts` owns additive contracts shared by web, CLI and MCP. The billing page composes `billing-subscription-control.tsx`; the legacy monthly API/CLI/MCP remain supported. Migration 202610220004 expands the shared reservation kinds. `make billing-stripe-test` executes the explicit disposable provider validation script; it is never part of ordinary tests or a production canary.
 
 First-purchase restriction: `packages/shared-types/src/first-purchase-eligibility.ts` owns the pure elapsed-time rule; `packages/storage/src/billing-checkout-store.ts` enforces it with authoritative trial data and processed paid-invoice history under the organisation lock. Web presentation uses `billing-page-helpers.ts` and the reusable `components/system/billing-purchase-notice.tsx`, with the existing billing refresh lifecycle. Provider confirmation/webhooks remain separate from purchase admission. No response schema or database migration is added for the wait.
 
@@ -1192,3 +1257,62 @@ Retained local artifact boundaries live in `apps/cli/src/local-artifact-paths.ts
 Retrieval, processing/rebuilds and cleanup validate canonical bundle/reproduction
 metadata and reject symbolic links. Local state/event IO reuses managed file
 helpers with allocation bounded to the opened file and atomic state/processing writes.
+
+Referral finance uses `referral-ledger-schema.ts` / `referral-ledger-store.ts` for immutable canonical receipts, frozen service anchors, cumulative target deltas and manual payout claims. `packages/referrals/src/referral-finance.ts` separates verified personal partner reads from configured DebugBundle operators, using the existing `BILLING_ADMIN_OVERRIDE_EMAILS` allowlist. The optional API factory is `default-referrals.ts`; absent/invalid dedicated configuration disables referrals independently of authentication and debugging. New enrolment defaults off while retained finance reads stay available with the stable secret.
+
+Referral routes share the validated `packages/referral-client` with CLI and ordinary MCP, including explicit external-payment recording confirmation. The browser uses its session/CSRF context; `/settings/referrals` provides versioned joining, public link/code, earnings and paginated minimal histories, while `/settings/referrals/payouts` is operator-only. Billing's code form includes an expected-workspace guard. Provider cash/line/refund/dispute adapters and the retained reconciliation outbox are now connected to an independent worker lane. The exact first-eligible-invoice benefit/recovery, early/deleted customer reconciliation and personal export are implemented; combined qualification remains in progress and does not activate the programme.
+
+Financial handoffs use `referral-reconciliation-schema.ts` / `referral-reconciliation-store.ts` (candidate forward migration `202611070008_add_referral_reconciliation_outbox`). The signed webhook saves minimal resource/customer identity and a durable job together, before billing dedupe; failed handoffs request provider redelivery after ordinary entitlement reconciliation. The same event can fill its original customer binding after Checkout links the customer. No provider read runs in that transaction. `stripe-receipt-snapshot.ts` validates complete original invoice lines, allocated captured cash, linked credit-note/refund identities and dispute outcomes. It keeps unknown allocations held and waits for the triggering adjustment to appear in provider lists. Settlement currency does not change USD commission.
+
+`referral-receipt-processor.ts` runs one financial job per pass in its own lane using existing worker claims. Bounded provider reads precede a fenced transaction committing the canonical ledger, retained event completion and job completion together. Expired/exhausted execution jobs cannot erase the retained financial intent; the outbox can dispatch a fresh attempt. Pending known events hold the relevant customer's positive earnings, and unknown scope conservatively holds all positive payouts until verified binding. Source identity survives account deletion. The shared Stripe factory now lives in `packages/billing/src/stripe-config.ts`; the API path re-exports it, and the worker can read the same price map without requiring a webhook secret. No provider/account configuration has changed.
+
+Smart Report facts are separate from the existing weekly digest. `packages/smart-reports/src/report-period.ts` defines complete UTC days, Monday–Sunday weeks, calendar months and honest adjacent comparisons. `contracts/smart-report-facts.md` records source units, scope, coverage and sampling rules. `report-lifecycle-schema.ts` (candidate forward migration `202611070009_add_report_lifecycle_facts`) appends numeric incident/improvement transitions in the same transaction as each actual status/severity change. It retains no captured text and has no cascading incident FK: routine source pruning cannot erase a recorded resolution or invent one. Explicit project/account deletion removes its dependent facts. Original project/service IDs preserve merge-origin boundaries.
+
+`report-lifecycle-store.ts` reads only accepted explicit origins, distinguishes resolution events from distinct resolved entities, and marks periods before the collection watermark or twelve-month cutoff incomplete. Separate bounded retained-history backfill deduplicates known source timestamps without claiming complete transition history or historical severity. Numeric cleanup uses the existing retention runner, UTC calendar-month cutoffs and bounded continuation. `report-source-text-store.ts` adds bounded full-consent redacted summaries, independent lifecycle refresh, original-content expiry and required privacy deletion guards. Numeric and text cleanup share the existing bounded retention runner with continuation. Bounded bundle-context collection, availability/analytics coverage, complete fact selection, durable generation, rendering and receipt-backed delivery use the report modules described below. The capped synthetic model evaluation is recorded in `evals/smart-reports/results-20261107.md`; it is separate from production activation.
+
+Report collection uses `storage/report-collector-store.ts` and the additive
+`report-collector-schema.ts` forward migration. The existing serial report lane
+runs at most one SQL-only batch every five seconds while reporting is enabled,
+resumes saved bounded cursors and checks the saved creator and frozen origins.
+Initial numeric backfill gives way to five-minute bounded redacted summary
+refreshes. This lane holds no locks over provider or object-storage work.
+
+`storage/report-health-store.ts` records numeric observed recovery inside the
+existing health executor's result transaction after a threshold-backed real
+failing-to-passing transition. Its additive schema and bounded period reader feed
+canonical report health evidence without URLs or raw retention extensions.
+
+`storage/report-allowance-store.ts` and `smart-reports/report-allowance.ts` own
+anchored monthly generation usage and bounded current-schedule forecasts. API,
+CLI, ordinary MCP and the reusable Reports allowance Card share the same reader.
+`billing/business-sales-policy.ts` separately gates fresh Business admission;
+API composition requires an explicit launch switch and configured reporting/AI,
+while existing paid subscription and reconciliation readers retain access.
+
+`storage/referral-benefit-store.ts` and its additive forward schema retain the
+identity-fenced first eligible customer invoice reservation. The pure decision
+lives in `referrals/customer-benefit.ts`; read-only provider coupon validation is
+in `referrals/stripe-referral-coupon.ts`. Current Owner/attribution checks and
+provider/customer identity fences apply before reservation. Checkout preserves
+its exact coupon/attribution request. Verified finalisation facts consume the
+benefit independently of collected cash. `referral-benefit-reconciliation.ts`
+prepares a persisted exact-draft intent after a zero/trial bill;
+`referrals/stripe-benefit-recovery.ts` validates and updates only that invoice
+outside locks. Lost acknowledgements read back/replay the same invoice. Missing
+finalised discounts remain held for reconciliation. No provider programme is
+activated by these local changes.
+
+`storage/business-account-export.ts` adds fixed, bounded pages to the existing
+browser-Owner account export. It reuses current report scope readers, exposes
+only closed delivery/financial projections and keeps canonical report downloads
+on their authenticated paths. Numeric pages preserve origin identity and current
+retention. Default export data and artifact handling remain intact with an added
+section manifest. Report-history and export cursors preserve database timestamp
+precision so adjacent records cannot be skipped within a millisecond.
+
+The private cloud companion verifies `business-tier-v1` image labels before
+hosted migration/startup and protects the selected previous stable API/worker.
+A sales-disabled bridge precedes a second verified image rollout and separately
+authorised Business activation. Environment-only activation checks the retained
+rollback pair; legacy source rollouts cannot replace a Business-aware runtime.
+The helper is read-only and performs no deployment or provider mutation itself.

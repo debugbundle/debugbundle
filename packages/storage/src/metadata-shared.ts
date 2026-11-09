@@ -37,7 +37,7 @@ export function mapAlertRuleRow(row: {
 }
 
 export function normalizeOrganizationPlan(value: unknown): TierName {
-  return value === "solo" ? "solo" : value === "team" ? "team" : "free";
+  return value === "solo" || value === "team" || value === "business" ? value : "free";
 }
 
 export function mapOptionalRow<TInput, TOutput>(

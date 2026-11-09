@@ -94,7 +94,14 @@ export async function processNextBuildAnalyticsBundleJob(
     return { processed: true, reason: "analytics_bundle_generation_claim_conflict" };
   }
 
+  let objectWriteAttempted = false;
+  const authorized = (): Promise<boolean> =>
+    dependencies.analyticsBundleGenerationStore.isAnalyticsBundleGenerationAuthorized?.({
+      project_id: job.project_id,
+      generation_id: job.generation_id
+    }) ?? Promise.resolve(claimedGeneration.initiating_authority == null);
   try {
+    if (!(await authorized())) throw new Error("initiator_access_revoked");
     const buildInput = await buildAnalyticsBundleInput({
       generation: claimedGeneration,
       metricsStore: dependencies.analyticsMetricsStore,
@@ -105,6 +112,8 @@ export async function processNextBuildAnalyticsBundleJob(
     const bundle = buildAnalyticsBundle(buildInput);
     const objectKey = buildAnalyticsBundleObjectKey(job.project_id, job.generation_id);
 
+    if (!(await authorized())) throw new Error("initiator_access_revoked");
+    objectWriteAttempted = true;
     await dependencies.objectStore.putObject({
       key: objectKey,
       body: gzipSync(Buffer.from(stableSerializeAnalyticsBundle(bundle), "utf8")),
@@ -119,11 +128,21 @@ export async function processNextBuildAnalyticsBundleJob(
         completed_at: new Date().toISOString()
       });
     if (completed === null) {
+      if (!(await authorized())) throw new Error("initiator_access_revoked");
       throw new Error("analytics_bundle_generation_missing_after_write");
     }
 
     return { processed: true };
   } catch (error) {
+    if (objectWriteAttempted) {
+      try {
+        await dependencies.objectStore.deleteObject?.({
+          key: buildAnalyticsBundleObjectKey(job.project_id, job.generation_id)
+        });
+      } catch {
+        /* Failed metadata retains the exact key for bounded retention cleanup. */
+      }
+    }
     dependencies.logger?.error?.(
       {
         error_message: getAnalyticsBundleWorkerErrorMessage(error),
@@ -138,7 +157,11 @@ export async function processNextBuildAnalyticsBundleJob(
       project_id: job.project_id,
       generation_id: job.generation_id,
       failed_at: new Date().toISOString(),
-      reason: "build_error"
+      reason:
+        error instanceof Error && error.message === "initiator_access_revoked"
+          ? "initiator_access_revoked"
+          : "build_error",
+      ...(objectWriteAttempted ? { object_write_attempted: true } : {})
     });
     return { processed: true, reason: "analytics_bundle_generation_failed" };
   }

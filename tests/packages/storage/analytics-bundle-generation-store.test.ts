@@ -204,7 +204,8 @@ describe("analytics bundle generation store", () => {
           GENERATION_ID,
           USER_ID,
           OPPORTUNITY_ID,
-          JSON.stringify({ funnel_key: "checkout", step_key: "payment" })
+          JSON.stringify({ funnel_key: "checkout", step_key: "payment" }),
+          null
         ]);
         return { rows: [retriedRow] };
       }
@@ -494,6 +495,10 @@ describe("analytics bundle generation store", () => {
 
   it("marks a generation completed and records the deterministic artifact key", async (): Promise<void> => {
     const queryMock = vi.fn(async (sqlText: string, params: unknown[]) => {
+      if (sqlText.startsWith("SELECT initiating_authority,")) {
+        expect(params).toEqual([PROJECT_ID, GENERATION_ID]);
+        return { rows: [{ initiating_authority: null, scope_origin_ids: [PROJECT_ID] }] };
+      }
       if (sqlText.includes("UPDATE analytics_bundle_generations")) {
         expect(sqlText).toContain("status = 'completed'");
         expect(params).toEqual([
@@ -540,7 +545,7 @@ describe("analytics bundle generation store", () => {
       status: "completed",
       object_key: `analytics-bundles/${PROJECT_ID}/${GENERATION_ID}/analytics-bundle.json.gz`
     });
-    expect(queryMock).toHaveBeenCalledTimes(2);
+    expect(queryMock).toHaveBeenCalledTimes(3);
   });
 
   it("marks a generation failed and stores the failure reason on the linked opportunity", async (): Promise<void> => {
@@ -551,7 +556,9 @@ describe("analytics bundle generation store", () => {
           PROJECT_ID,
           GENERATION_ID,
           "insufficient aggregate inputs",
-          "2026-07-08T10:15:00.000Z"
+          "2026-07-08T10:15:00.000Z",
+          false,
+          `analytics-bundles/${PROJECT_ID}/${GENERATION_ID}/analytics-bundle.json.gz`
         ]);
         return {
           rows: [

@@ -1,4 +1,5 @@
 import { assertSupportedSubscriptionItems } from "../../../../packages/billing/src/stripe-subscription.js";
+import { stripeAllowanceSnapshot } from "../../../../packages/billing/src/stripe-allowance-snapshot.js";
 import {
   readBillingSnapshot,
   sendBillingEmail,
@@ -40,6 +41,7 @@ export interface StripeWebhookDependencies {
   stripeConfig: StripeConfig;
   billingSyncStore: BillingSyncStore;
   eventTransaction?: BillingWebhookTransaction;
+  captureReferralEvent?(event: Stripe.Event): Promise<void>;
   subscriptionOperationStore?: BillingSubscriptionOperationStore;
   billingSummaryReader?: BillingSummaryReader;
   billingEmails?: BillingEmailService;
@@ -104,6 +106,23 @@ export function registerStripeWebhookRoute(
         logger: logger.child({ stripe_event_id: event.id, stripe_event_type: event.type })
       };
 
+      // Financial persistence has its own transaction. A failure still permits
+      // entitlement reconciliation, then requests redelivery. Duplicate billing
+      // events must retry this handoff rather than lose an owed receipt.
+      let financialHandoffFailed = false;
+      const captureFinancialEvent = async (): Promise<void> => {
+        try {
+          await dependencies.captureReferralEvent?.(event);
+          financialHandoffFailed = false;
+        } catch {
+          financialHandoffFailed = true;
+          scopedDependencies.logger?.warn(
+            { reason: "financial_handoff_unavailable" },
+            "referral_reconciliation_enqueue_failed"
+          );
+        }
+      };
+      await captureFinancialEvent();
       const alreadyProcessed = await dependencies.billingSyncStore.isEventProcessed(event.id);
       if (alreadyProcessed) {
         await recordAuditLog(
@@ -125,7 +144,9 @@ export function registerStripeWebhookRoute(
           scopedDependencies.logger
         );
 
-        return reply.status(200).send({ received: true, duplicate: true });
+        return financialHandoffFailed
+          ? reply.status(500).send({ error: "financial_handoff_unavailable" })
+          : reply.status(200).send({ received: true, duplicate: true });
       }
 
       try {
@@ -181,9 +202,12 @@ export function registerStripeWebhookRoute(
             }
           );
           if (outcome === "duplicate")
-            return reply.status(200).send({ received: true, duplicate: true });
+            return financialHandoffFailed
+              ? reply.status(500).send({ error: "financial_handoff_unavailable" })
+              : reply.status(200).send({ received: true, duplicate: true });
           organizationId = outcome;
         } else organizationId = await processStripeEvent(event, scopedDependencies);
+        await captureFinancialEvent();
 
         await recordAuditLog(
           dependencies.auditLogging,
@@ -230,7 +254,9 @@ export function registerStripeWebhookRoute(
         return reply.status(500).send({ error: "processing_failed" });
       }
 
-      return reply.status(200).send({ received: true });
+      return financialHandoffFailed
+        ? reply.status(500).send({ error: "financial_handoff_unavailable" })
+        : reply.status(200).send({ received: true });
     });
   });
 }
@@ -326,6 +352,7 @@ async function handleCheckoutSessionCompleted(
         renderPurchaseConfirmationEmail({
           organizationName: contact.organizationName,
           plan: entitlements.effectivePlan,
+          billingInterval: entitlements.billingInterval,
           extraCapacity: entitlements.extraCapacityQuantity,
           portalUrl: dependencies.billingEmails?.managementUrl ?? fallbackManagementUrl(),
           brandMarkUrl: resolveBillingEmailBrandMarkUrl()
@@ -499,8 +526,9 @@ async function handleInvoicePaid(
         renderRenewalSuccessEmail({
           organizationName: contact.organizationName,
           plan: entitlements.effectivePlan,
+          billingInterval: entitlements.billingInterval,
           extraCapacity: entitlements.extraCapacityQuantity,
-          nextRenewalDate: entitlements.billingPeriodEndsAt ?? new Date().toISOString(),
+          nextRenewalDate: entitlements.billingPeriodEndsAt,
           brandMarkUrl: resolveBillingEmailBrandMarkUrl()
         }),
       dependencies.logger
@@ -659,6 +687,7 @@ async function recomputeEntitlements(
     stripe_subscription_id: subscription.id,
     billing_period_starts_at: periodStartsAt,
     billing_period_ends_at: periodEndsAt,
+    ...stripeAllowanceSnapshot(subscription, dependencies.stripeConfig.priceMap, periodStartsAt),
     last_billing_sync_at: new Date().toISOString(),
     last_billing_event_id: eventId
   });
@@ -678,6 +707,11 @@ async function recomputeEntitlements(
     extraCapacityQuantity: effectiveExtraCapacity,
     billingPeriodStartsAt: periodStartsAt,
     billingPeriodEndsAt: periodEndsAt,
+    billingInterval: stripeAllowanceSnapshot(
+      subscription,
+      dependencies.stripeConfig.priceMap,
+      periodStartsAt
+    ).billing_interval,
     totalCapacityUnits:
       getTierCapabilities(effectivePlan).included_capacity_units + effectiveExtraCapacity
   };

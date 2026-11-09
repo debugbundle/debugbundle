@@ -1,4 +1,5 @@
 import { Pool } from "pg";
+import { configureSmartReports } from "../../../packages/smart-reports/src/report-runtime-config.js";
 
 import {
   createRedisAuthRateLimiter,
@@ -29,6 +30,7 @@ import {
 } from "./default-dependency-helpers.js";
 import { createGitHubAppClientFromEnv } from "./github-app.js";
 import { createStripeConfig } from "./stripe-config.js";
+import { referralConfigFromEnv } from "./default-referrals.js";
 
 function createPoolQueryable(pool: Pool): Queryable {
   return {
@@ -146,6 +148,7 @@ export function createApiDependenciesFromEnv(
         });
 
   const stripeConfig = createStripeConfig(env) ?? undefined;
+  const referralConfig = referralConfigFromEnv(env);
   const githubAppClient = createGitHubAppClientFromEnv(env);
   const lifecycleWebhookFallbackTargetUrl = readNonEmptyEnv(env, "LIFECYCLE_WEBHOOK_TARGET_URL");
   const lifecycleWebhookFallbackSigningSecret = readNonEmptyEnv(env, "LIFECYCLE_WEBHOOK_SECRET");
@@ -161,6 +164,7 @@ export function createApiDependenciesFromEnv(
   });
 
   const dependencies = createApiDependencies({
+    smartReportConfig: configureSmartReports(env),
     projectMergesEnabled: env["PROJECT_MERGES_ENABLED"] === "true",
     db,
     queue,
@@ -183,6 +187,7 @@ export function createApiDependenciesFromEnv(
       ? {}
       : { billingAdminEmails: billingAdminEmails ?? [] }),
     ...(stripeConfig === undefined ? {} : { stripeConfig }),
+    ...(referralConfig === undefined ? {} : { referralConfig }),
     ...(lifecycleWebhookFallbackTargetUrl === undefined
       ? {}
       : { lifecycleWebhookFallbackTargetUrl }),

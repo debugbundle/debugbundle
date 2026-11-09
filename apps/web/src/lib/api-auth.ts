@@ -6,10 +6,7 @@ import {
   readJson,
   rememberSession
 } from "./api-client.js";
-import type {
-  ImportedAccountAvatarRecord,
-  SessionRecord
-} from "./api-types.js";
+import type { ImportedAccountAvatarRecord, SessionRecord } from "./api-types.js";
 
 export async function getSession(): Promise<SessionRecord | null> {
   const response = await fetch(`${API_BASE}/v1/auth/session`, {
@@ -28,7 +25,7 @@ export async function getSession(): Promise<SessionRecord | null> {
 export async function requestEmailCode(payload: {
   email: string;
   accepted_terms: true;
-  requested_trial_plan?: "solo" | "team";
+  requested_trial_plan?: "solo" | "team" | "business";
 }): Promise<void> {
   await readJson(
     await fetch(`${API_BASE}/v1/auth/request-code`, {
@@ -45,7 +42,7 @@ export async function requestEmailCode(payload: {
 export async function verifyEmailCode(payload: {
   email: string;
   code: string;
-  requested_trial_plan?: "solo" | "team";
+  requested_trial_plan?: "solo" | "team" | "business";
 }): Promise<SessionRecord> {
   const body = await readJson<{ session: SessionRecord }>(
     await fetch(`${API_BASE}/v1/auth/verify-code`, {

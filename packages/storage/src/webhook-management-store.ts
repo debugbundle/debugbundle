@@ -405,7 +405,7 @@ export function createWebhookManagementStore(
       webhook_id: string;
       delivery_id: string;
       actor_user_id?: string;
-      actor_role?: "owner" | "admin" | "member";
+      actor_role?: "owner" | "admin" | "member" | "viewer";
     }): Promise<{ delivery_id: string; event_type: WebhookEventType } | null> {
       return runInTransaction(db, async (tx) => {
         await tx.query(

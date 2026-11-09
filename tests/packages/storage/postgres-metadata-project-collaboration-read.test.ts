@@ -51,7 +51,9 @@ describe("postgres metadata project collaboration reads", () => {
 
       if (
         sql.includes("SELECT p.id AS project_id") &&
-        sql.includes("actor_membership.role = 'admin'")
+        sql.includes(
+          "debugbundle_project_actor_role(p.id,$2::uuid,false,false) IN ('owner','admin')"
+        )
       ) {
         return { rows: [{ project_id: "proj_123" }] };
       }
@@ -107,7 +109,9 @@ describe("postgres metadata project collaboration reads", () => {
 
       if (
         sql.includes("json_build_object") &&
-        sql.includes("WHERE (canonical_project.owner_user_id = $1::uuid OR pm.user_id IS NOT NULL)")
+        sql.includes(
+          "WHERE (canonical_project.owner_user_id = $1::uuid OR pm.user_id IS NOT NULL OR false)"
+        )
       ) {
         return {
           rows: [
@@ -279,7 +283,9 @@ describe("postgres metadata project collaboration reads", () => {
 
       if (
         sql.includes("json_build_object") &&
-        sql.includes("WHERE (canonical_project.owner_user_id = $1::uuid OR pm.user_id IS NOT NULL)")
+        sql.includes(
+          "WHERE (canonical_project.owner_user_id = $1::uuid OR pm.user_id IS NOT NULL OR false)"
+        )
       ) {
         return {
           rows: [
@@ -422,23 +428,24 @@ describe("postgres metadata project collaboration reads", () => {
     const incidentListSql = String(query.mock.calls[0]?.[0] ?? "");
     expect(incidentListSql).toContain("$2::uuid IS NULL");
     expect(incidentListSql).toContain("$2::uuid IS NOT NULL");
-    expect(incidentListSql).toContain("FROM project_members pm");
+    expect(incidentListSql).toContain(
+      "debugbundle_project_actor_role(p.id,$2::uuid,false,false) IS NOT NULL"
+    );
 
-    expect(query).toHaveBeenNthCalledWith(1, expect.stringContaining("FROM project_members pm"), [
-      "org_collaborator",
-      "usr_collaborator",
-      "proj_shared",
-      20
-    ]);
-    expect(query).toHaveBeenNthCalledWith(2, expect.stringContaining("FROM project_members pm"), [
-      "org_collaborator",
-      "inc_shared",
-      "usr_collaborator"
-    ]);
-    expect(query).toHaveBeenNthCalledWith(3, expect.stringContaining("FROM project_members pm"), [
-      "proj_shared",
-      "org_collaborator",
-      "usr_collaborator"
-    ]);
+    expect(query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining("debugbundle_project_actor_role(p.id,$2::uuid,false,false)"),
+      ["org_collaborator", "usr_collaborator", "proj_shared", 20]
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("debugbundle_project_actor_role(p.id,$3::uuid,false,false)"),
+      ["org_collaborator", "inc_shared", "usr_collaborator"]
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining("debugbundle_project_actor_role(projects.id,$3::uuid,false,false)"),
+      ["proj_shared", "org_collaborator", "usr_collaborator"]
+    );
   });
 });

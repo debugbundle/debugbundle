@@ -73,6 +73,14 @@ describe("billing capacity", () => {
 
     expect(await screen.findByRole("heading", { name: /billing/i, level: 1 })).toBeInTheDocument();
     expect(await screen.findByText(/billing is managed internally/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /view plans/i })).toHaveAttribute(
+      "href",
+      "http://localhost:5292/pricing/"
+    );
+    expect(screen.getByRole("link", { name: /view plans/i })).toHaveAttribute("target", "_blank");
+    expect(
+      screen.queryByRole("button", { name: /change plan or billing interval/i })
+    ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /manage capacity/i }));
     expect(

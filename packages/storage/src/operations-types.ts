@@ -1,3 +1,4 @@
+import type { MemberTokenPolicy } from "../../shared-types/src/index.js";
 import type { ProjectColorTag, TierName } from "../../shared-types/src/index.js";
 import type {
   AccountDataExportRecord,
@@ -231,12 +232,15 @@ export interface TokenManagementStore {
     organization_id: string;
     user_id: string;
     limit: number;
+    include_scope?: boolean;
   }): Promise<MemberTokenRecord[]>;
   createMemberTokenForOrganization(input: {
     organization_id: string;
     user_id: string;
     label: string;
     token_hash: string;
+    scope?: MemberTokenPolicy;
+    expires_at?: string;
   }): Promise<MemberTokenRecord>;
   revokeMemberTokenForOrganization(input: {
     organization_id: string;
@@ -252,6 +256,9 @@ export interface ProjectManagementStore {
     now: string;
     limit: number;
     project_id?: string;
+    include_organization_grants?: boolean;
+    origin_project_ids?: string[];
+    organization_scope_id?: string;
   }): Promise<ProjectRecord[]>;
   createProjectForUser?(input: {
     user_id: string;
@@ -261,6 +268,7 @@ export interface ProjectManagementStore {
     environment_default: string;
     color_tag?: ProjectColorTag | null;
     weekly_report_timezone: string;
+    include_organization_grants?: boolean;
   }): Promise<ProjectRecord | null>;
   updateProjectForUser?(input: {
     user_id: string;
@@ -269,6 +277,7 @@ export interface ProjectManagementStore {
     slug?: string;
     environment_default?: string;
     color_tag?: ProjectColorTag | null;
+    include_organization_grants?: boolean;
   }): Promise<ProjectRecord | "slug_taken" | null>;
   deleteProjectForUser?(input: {
     user_id: string;
@@ -336,25 +345,29 @@ export interface ProjectCollaborationStore {
   listMembersForProject?(input: {
     project_id: string;
     user_id: string;
+    include_organization_grants?: boolean;
   }): Promise<{ owner_plan: TierName; members: ProjectMemberRecord[] } | null>;
   listPendingInvitesForProject?(input: {
     project_id: string;
     user_id: string;
     now: string;
+    include_organization_grants?: boolean;
   }): Promise<ProjectInviteRecord[] | null>;
   createInviteForProject?(input: {
     project_id: string;
     user_id: string;
     email: string;
-    role: "admin" | "member";
+    role: "admin" | "member" | "viewer";
     invited_by_user_id: string;
     invite_token_hash: string;
     expires_at: string;
+    include_organization_grants?: boolean;
   }): Promise<CreateProjectInviteResult | null>;
   cancelInviteForProject?(input: {
     project_id: string;
     user_id: string;
     invite_id: string;
+    include_organization_grants?: boolean;
   }): Promise<ProjectInviteRecord | null>;
   acceptProjectInviteForUser?(input: {
     invite_token_hash: string;
@@ -367,19 +380,25 @@ export interface ProjectCollaborationStore {
         membership: ProjectMemberRecord & { project_id: string };
       }
     | {
-        kind: "invalid_token" | "email_mismatch" | "shared_access_suspended";
+        kind:
+          | "invalid_token"
+          | "email_mismatch"
+          | "shared_access_suspended"
+          | "collaborator_limit_reached";
       }
   >;
   updateProjectMemberRole?(input: {
     project_id: string;
     actor_user_id: string;
     user_id: string;
-    role: "admin" | "member";
+    role: "admin" | "member" | "viewer";
+    include_organization_grants?: boolean;
   }): Promise<UpdateProjectMemberRoleResult | null>;
   removeProjectMember?(input: {
     project_id: string;
     actor_user_id: string;
     user_id: string;
+    include_organization_grants?: boolean;
   }): Promise<RemoveProjectMemberResult | null>;
   leaveProjectMembership?(input: {
     project_id: string;

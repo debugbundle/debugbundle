@@ -1,7 +1,9 @@
+import { hasBusinessEntitlement } from "../../../../../packages/shared-types/src/tier-capabilities.js";
 import {
   CreditCardIcon,
   BarChart3Icon,
   FolderKanbanIcon,
+  FileTextIcon,
   HeartPulseIcon,
   HomeIcon,
   KeySquareIcon,
@@ -13,6 +15,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import type { SessionRecord } from "../../lib/api.js";
 import { BrandLockup } from "./brand-lockup.js";
 import { NavUser } from "./nav-user.js";
+import { OrganizationSwitcher } from "./organization-switcher.js";
 import {
   Sidebar,
   SidebarContent,
@@ -31,8 +34,9 @@ const navMain = [
   { to: "/incidents", label: "Incidents", icon: SirenIcon },
   { to: "/health-status", label: "Health Status", icon: HeartPulseIcon },
   { to: "/improvements", label: "Improvements", icon: SparklesIcon },
-  { to: "/analytics/workspace", label: "Analytics", icon: BarChart3Icon },
   { to: "/projects", label: "Projects", icon: FolderKanbanIcon },
+  { to: "/analytics/workspace", label: "Analytics", icon: BarChart3Icon },
+  { to: "/reports", label: "Reports", icon: FileTextIcon },
   { to: "/billing", label: "Billing", icon: CreditCardIcon },
   { to: "/member-tokens", label: "Member tokens", icon: KeySquareIcon }
 ] as const;
@@ -51,11 +55,19 @@ export function AppSidebar({ session, onSignOut, ...props }: AppSidebarProps): J
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:!p-1.5 group-data-[collapsible=icon]:!p-1.5">
-              <BrandLockup href="/dashboard" imageClassName="size-5" labelClassName="text-base font-semibold" />
+            <SidebarMenuButton
+              asChild
+              className="data-[slot=sidebar-menu-button]:!p-1.5 group-data-[collapsible=icon]:!p-1.5"
+            >
+              <BrandLockup
+                href="/dashboard"
+                imageClassName="size-5"
+                labelClassName="text-base font-semibold"
+              />
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        <OrganizationSwitcher />
       </SidebarHeader>
 
       <SidebarContent>
@@ -66,7 +78,9 @@ export function AppSidebar({ session, onSignOut, ...props }: AppSidebarProps): J
                 <SidebarMenuItem key={item.to}>
                   <SidebarMenuButton
                     asChild
-                    isActive={location.pathname === item.to || location.pathname.startsWith(item.to + "/")}
+                    isActive={
+                      location.pathname === item.to || location.pathname.startsWith(item.to + "/")
+                    }
                     tooltip={item.label}
                   >
                     <NavLink
@@ -94,6 +108,10 @@ export function AppSidebar({ session, onSignOut, ...props }: AppSidebarProps): J
           role={session.role}
           avatarUrl={session.avatar_url}
           onSignOut={onSignOut}
+          canManagePeople={
+            hasBusinessEntitlement(session.organization_plan, session.self_hosted) &&
+            (session.role === "owner" || session.role === "admin")
+          }
         />
       </SidebarFooter>
     </Sidebar>

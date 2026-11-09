@@ -1,4 +1,4 @@
-import { BillingApiError } from "../../../packages/billing-client/src/index.js";
+import { runBillingJsonCommand } from "./billing-command-result.js";
 import type {
   PlanChangeRequest,
   PlanChangeResponse
@@ -19,23 +19,7 @@ export async function billingPlanChangeCommand(
   input: PlanChangeRequest,
   api: { planChange(input: PlanChangeRequest): Promise<PlanChangeResponse> }
 ): Promise<CliCommandResult> {
-  try {
-    return { exitCode: 0, output: JSON.stringify(await api.planChange(input), null, 2) };
-  } catch (error) {
-    return {
-      exitCode:
-        error instanceof BillingApiError
-          ? error.status === 401
-            ? 2
-            : error.status === 400
-              ? 4
-              : error.status === 409 || error.status === 403
-                ? 5
-                : 1
-          : 1,
-      output: error instanceof Error ? error.message : "billing_service_error"
-    };
-  }
+  return runBillingJsonCommand(() => api.planChange(input));
 }
 export async function handleBillingPlanChange(parsed: ParsedArgv): Promise<CliCommandResult> {
   const action = requirePositional(parsed, 2, "plan-change-action");

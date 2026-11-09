@@ -249,6 +249,7 @@ function toNumber(value: unknown): number {
 }
 
 function parseTierName(value: unknown): TierName {
-  if (value === "free" || value === "solo" || value === "team") return value;
+  if (value === "free" || value === "solo" || value === "team" || value === "business")
+    return value;
   throw new Error("analytics_saved_funnel_invalid_organization_plan");
 }

@@ -2,7 +2,7 @@
   "id": "debugbundle",
   "name": "DebugBundle",
   "description": "Use DebugBundle for runtime error reporting, incident response, live app monitoring, health checks, debug bundles, and product analytics.",
-  "version": "1.20.0",
+  "version": "1.21.0",
   "configSchema": {
     "type": "object",
     "properties": {
@@ -18,6 +18,48 @@
   },
   "contracts": {
     "tools": [
+      "debugbundle_list_report_deliveries",
+      "debugbundle_prepare_report_pdf",
+      "debugbundle_get_report_pdf",
+      "debugbundle_get_report_allowance",
+      "debugbundle_list_report_definitions",
+      "debugbundle_get_report_definition",
+      "debugbundle_create_report_definition",
+      "debugbundle_update_report_definition",
+      "debugbundle_delete_report_definition",
+      "debugbundle_list_reports",
+      "debugbundle_get_report",
+      "debugbundle_generate_report",
+      "debugbundle_cancel_report",
+      "debugbundle_delete_report",
+      "debugbundle_get_report_content",
+      "debugbundle_get_report_html",
+      "debugbundle_get_referral_partner",
+      "debugbundle_join_referral_program",
+      "debugbundle_list_referral_clients",
+      "debugbundle_get_customer_referral",
+      "debugbundle_apply_customer_referral",
+      "debugbundle_get_referral_earnings",
+      "debugbundle_list_referral_payouts",
+      "debugbundle_list_referral_operator_balances",
+      "debugbundle_list_referral_operator_payouts",
+      "debugbundle_claim_referral_payout",
+      "debugbundle_mark_referral_payout_uncertain",
+      "debugbundle_record_referral_payout",
+      "debugbundle_list_organizations",
+      "debugbundle_list_organization_people",
+      "debugbundle_list_organization_invites",
+      "debugbundle_invite_organization_member",
+      "debugbundle_cancel_organization_invite",
+      "debugbundle_update_organization_member",
+      "debugbundle_remove_organization_member",
+      "debugbundle_get_organization_ownership_transfer",
+      "debugbundle_request_organization_ownership_transfer",
+      "debugbundle_cancel_organization_ownership_transfer",
+      "debugbundle_accept_organization_invite",
+      "debugbundle_accept_organization_ownership_transfer",
+      "debugbundle_switch_organization",
+      "debugbundle_resend_organization_invite",
       "debugbundle_preview_project_merge",
       "debugbundle_apply_project_merge",
       "debugbundle_get_project_merge",
@@ -153,6 +195,7 @@
       "debugbundle_test_health_check",
       "debugbundle_list_health_check_results",
       "debugbundle_list_health_check_daily_rollups",
+      "debugbundle_billing_offer_change",
       "debugbundle_billing_plan_change",
       "debugbundle_get_billing_summary",
       "debugbundle_start_trial",
@@ -170,6 +213,132 @@
     ]
   },
   "toolMetadata": {
+    "debugbundle_list_report_deliveries": {
+      "optional": true
+    },
+    "debugbundle_prepare_report_pdf": {
+      "optional": true
+    },
+    "debugbundle_get_report_pdf": {
+      "optional": true
+    },
+    "debugbundle_get_report_allowance": {
+      "optional": true
+    },
+    "debugbundle_list_report_definitions": {
+      "optional": true
+    },
+    "debugbundle_get_report_definition": {
+      "optional": true
+    },
+    "debugbundle_create_report_definition": {
+      "optional": true
+    },
+    "debugbundle_update_report_definition": {
+      "optional": true
+    },
+    "debugbundle_delete_report_definition": {
+      "optional": true
+    },
+    "debugbundle_list_reports": {
+      "optional": true
+    },
+    "debugbundle_get_report": {
+      "optional": true
+    },
+    "debugbundle_generate_report": {
+      "optional": true
+    },
+    "debugbundle_cancel_report": {
+      "optional": true
+    },
+    "debugbundle_delete_report": {
+      "optional": true
+    },
+    "debugbundle_get_report_content": {
+      "optional": true
+    },
+    "debugbundle_get_report_html": {
+      "optional": true
+    },
+    "debugbundle_get_referral_partner": {
+      "optional": true
+    },
+    "debugbundle_join_referral_program": {
+      "optional": true
+    },
+    "debugbundle_list_referral_clients": {
+      "optional": true
+    },
+    "debugbundle_get_customer_referral": {
+      "optional": true
+    },
+    "debugbundle_apply_customer_referral": {
+      "optional": true
+    },
+    "debugbundle_get_referral_earnings": {
+      "optional": true
+    },
+    "debugbundle_list_referral_payouts": {
+      "optional": true
+    },
+    "debugbundle_list_referral_operator_balances": {
+      "optional": true
+    },
+    "debugbundle_list_referral_operator_payouts": {
+      "optional": true
+    },
+    "debugbundle_claim_referral_payout": {
+      "optional": true
+    },
+    "debugbundle_mark_referral_payout_uncertain": {
+      "optional": true
+    },
+    "debugbundle_record_referral_payout": {
+      "optional": true
+    },
+    "debugbundle_list_organizations": {
+      "optional": true
+    },
+    "debugbundle_list_organization_people": {
+      "optional": true
+    },
+    "debugbundle_list_organization_invites": {
+      "optional": true
+    },
+    "debugbundle_invite_organization_member": {
+      "optional": true
+    },
+    "debugbundle_cancel_organization_invite": {
+      "optional": true
+    },
+    "debugbundle_update_organization_member": {
+      "optional": true
+    },
+    "debugbundle_remove_organization_member": {
+      "optional": true
+    },
+    "debugbundle_get_organization_ownership_transfer": {
+      "optional": true
+    },
+    "debugbundle_request_organization_ownership_transfer": {
+      "optional": true
+    },
+    "debugbundle_cancel_organization_ownership_transfer": {
+      "optional": true
+    },
+    "debugbundle_accept_organization_invite": {
+      "optional": true
+    },
+    "debugbundle_accept_organization_ownership_transfer": {
+      "optional": true
+    },
+    "debugbundle_switch_organization": {
+      "optional": true
+    },
+    "debugbundle_resend_organization_invite": {
+      "optional": true
+    },
     "debugbundle_preview_project_merge": {
       "optional": true
     },
@@ -399,6 +568,9 @@
       "optional": true
     },
     "debugbundle_delete_health_check": {
+      "optional": true
+    },
+    "debugbundle_billing_offer_change": {
       "optional": true
     },
     "debugbundle_billing_plan_change": {

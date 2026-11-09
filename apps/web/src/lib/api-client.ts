@@ -1,8 +1,4 @@
-import type {
-  BillingSummaryRecord,
-  BillingUsageMetric,
-  SessionRecord
-} from "./api-types.js";
+import type { BillingSummaryRecord, BillingUsageMetric, SessionRecord } from "./api-types.js";
 
 interface WebApiEnv {
   VITE_API_URL?: string;
@@ -162,7 +158,9 @@ export function normalizeBillingSummary(
       available: billing.trial?.available ?? true,
       active: billing.trial?.active ?? false,
       plan:
-        billing.trial?.plan === "solo" || billing.trial?.plan === "team"
+        billing.trial?.plan === "solo" ||
+        billing.trial?.plan === "team" ||
+        billing.trial?.plan === "business"
           ? billing.trial.plan
           : null,
       started_at: billing.trial?.started_at ?? null,
@@ -203,9 +201,7 @@ export function rememberSession<T extends SessionRecord | null>(session: T): T {
   return session;
 }
 
-export function buildBrowserSessionHeaders(
-  includeJsonContentType = false
-): Record<string, string> {
+export function buildBrowserSessionHeaders(includeJsonContentType = false): Record<string, string> {
   const headers: Record<string, string> = {};
 
   if (includeJsonContentType) {
