@@ -3,9 +3,9 @@
   "plugin_version": "1.1.0",
   "evidence_state": "local_connection_ready",
   "source": {
-    "commit": "e113414540aa00ebbbac12ea0783ee0c16eacbaf",
-    "tree_clean": false,
-    "status_sha256": "7b7e00c0d41e07803cc75f73580e8f0be172aa39559e2661aa35e6f327fbf38b"
+    "commit": "d9326b8e27a7d781c5a0a60253ac7915bfd3fb50",
+    "tree_clean": true,
+    "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "runtime": {
     "resource_origin": "https://mcp.debugbundle.com",
