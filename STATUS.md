@@ -5,10 +5,10 @@ The owner authorised the complete DebugBundle release train on 9 November.
 version/order decisions, audit findings and rollout evidence. Initial source/ref
 inventories and live runtime/Stripe baselines are in `.tmp/release-20261109/`.
 All pending core/site/cloud and eleven SDK repositories are included; no consumer
-product or installation is authorised for modification. No release publication,
-deployment or activation has happened in this run yet. A compatible backend-first
-checkpoint, migration/backup protection and exact source/package gates precede
-feature activation and public assets.
+product or installation is authorised for modification. Package publication and the
+default-off backend bridge are complete. Final feature activation and public assets
+remain pending the complete CI coverage gate; migration/backup protection and
+exact source/package verification are already recorded.
 
 # Reports tier gate and sidebar — ready locally
 
@@ -709,6 +709,14 @@ release train, including own dogfooding and WordPress distribution. Accepting co
 JS SDK, CLI and MCP publication gates pass. Remaining SDK/plugin, own-consumer and
 final hosted/site gates are tracked in the local handoff. Other products and existing
 WordPress-site installations require separate consent. Existing-component design is approved.
+
+## Release checkpoint - 9 November 2026
+
+- All affected SDK/shared/CLI/MCP packages and standalone Gemini are published and qualified.
+- Business-aware core 1.23.0 bridge is live with activation switches off; additive migrations and protected-data hashes verified.
+- Final full tests pass; three UI coverage paths require focused additions and a complete CI rerun before public core/assets/activation.
+- ClawHub strict acceptance remains partial: final antivirus results unavailable, skill discovery 5/7. Do not mark the ecosystem release complete.
+- See [release record](spec/business-release-20261109.md) for exact stage boundaries.
 
 ## Release versions
 

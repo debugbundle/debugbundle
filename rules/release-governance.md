@@ -281,7 +281,7 @@ Validation fails before any external action for placeholders, missing assets, pa
 An OpenAI candidate is not submission-ready until all of the following are independently evidenced:
 
 1. contract/data-map/privacy/threat-model review is complete;
-2. all twenty-three dedicated readers prove zero customer-state mutation and schema-valid bounded results, including no retained-sample or AnalyticsBundle-state query from the aggregate-only OpenAI analytics readers;
+2. all twenty-five dedicated readers prove zero customer-state mutation and schema-valid bounded results, including no retained-sample or AnalyticsBundle-state query from the aggregate-only OpenAI analytics readers;
 3. OAuth/OIDC conformance, CIMD/client-auth, revocation, retention, reviewer isolation, host isolation, and negative security suites pass;
 4. stdio, CLI/member auth, OpenClaw, installed project, SDK ingestion, and existing API compatibility suites pass;
 5. the universal production MCP endpoint is deployed at the exact permanent origin with immutable digest evidence;

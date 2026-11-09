@@ -89,3 +89,13 @@ it("selecting Free clears paid-only capacity and disables irrelevant scenario co
   await waitFor(() => expect(f.reload).toHaveBeenCalledOnce());
   expect(f.api.handle("GET", "/v1/__dev/billing").body).toHaveProperty("scenario.plan", "free");
 });
+
+it("loads the local preview only when the development mock is explicitly enabled", async () => {
+  const f = setup();
+  vi.stubEnv("DEV", true);
+  vi.stubEnv("VITE_DEBUGBUNDLE_DEV_MOCK", "true");
+  render(<LocalBillingPreview />);
+  await f.user.click(await screen.findByRole("button", { name: "Local billing preview" }));
+  expect(await screen.findByRole("radio", { name: "Business" })).toBeVisible();
+  expect(f.fetchMock.mock.calls.every(([input]) => input === "/v1/__dev/billing")).toBe(true);
+});

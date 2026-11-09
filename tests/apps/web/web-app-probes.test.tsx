@@ -211,3 +211,27 @@ describe("web app — project probes", () => {
     expect(screen.queryByRole("button", { name: /deactivate/i })).toBeNull();
   });
 });
+
+it.each([
+  [403, "upgrade_required", "Remote probe activation requires a paid plan."],
+  [503, "unavailable", "Refresh this page after the API connection is restored."]
+])(
+  "keeps a failed probe list readable with the appropriate %s guidance",
+  async (status, error, message) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = requestUrl(input);
+        if (url.endsWith("/v1/auth/session"))
+          return jsonResponse(200, { session: createSession({ organization_plan: "solo" }) });
+        if (url.endsWith("/v1/projects"))
+          return jsonResponse(200, { projects: [createProject({ organization_plan: "solo" })] });
+        if (url.endsWith("/v1/projects/proj_123/probes")) return jsonResponse(status, { error });
+        return jsonResponse(404, { error: "not_found" });
+      })
+    );
+    render(<App initialEntries={["/projects/proj_123/probes"]} />);
+    expect(await screen.findByText(message)).toBeVisible();
+    expect(screen.getByRole("tab", { name: /probes/i })).toBeVisible();
+  }
+);

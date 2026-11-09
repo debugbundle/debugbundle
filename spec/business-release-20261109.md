@@ -1,8 +1,10 @@
 # Business and UI release — 9 November 2026
 
-Status: authorised; package publication and exact-candidate qualification in progress.
-Core candidate is committed on `release/business-20261109`; no hosted runtime or
-public asset rollout has occurred, and Business activation switches remain off.
+Status: package publications complete; final activation and public assets pending.
+The Business-aware backend bridge is live and healthy with all four activation
+switches off. The core release remains on `release/business-20261109` pending the
+complete CI coverage gate; the public dashboard and website remain on their prior
+release. This record distinguishes those stages from a completed launch.
 
 The owner explicitly authorised the final cross-repository audit, production
 rollout, Stripe pricing/configuration completion, appropriate version upgrades and
@@ -41,11 +43,11 @@ secret. No key is reproduced in release records.
 
 ## Version and ordering decisions
 
-Planned versions, subject to exact manifest/registry validation:
+Selected independent versions:
 
 - Core 1.23.0, shared types 3.3.0, redaction 2.7.1.
 - CLI/MCP/OpenClaw/related skill 1.21.0; update developer-plugin pins with their
-  own semver (current Codex 1.5.1, Gemini 1.4.4, Claude 1.19.4).
+  own semver (Codex 1.6.0, Gemini 1.5.0, Claude 1.21.0).
 - Site 1.8.0; OpenAI package 1.1.0 remains its independently qualified candidate.
 - Patch each changed SDK: JS 3.2.2; Java/Android/Go/RN 3.1.2; Swift 3.1.3;
   Python/PHP/Ruby/.NET/WordPress 2.1.2. Preserve unchanged package contracts and
@@ -131,3 +133,52 @@ inferred from hosting or package preparation.
   capacity units pass exact paid totals, base-only ten-percent coupon validation,
   complete cash receipts and referral-benefit projections through production
   adapters. All recorded test fixtures cleaned up with zero errors; no live charges.
+
+## Published and deployed evidence
+
+All twelve maintained SDK capture surfaces have passed their registry/native
+consumer gates: JS Node and Browser 3.2.2; Java, Android, Go and React Native
+3.1.2; Swift 3.1.3; Python, PHP, Ruby, .NET and WordPress 2.1.2. Android API
+23/36/37, Swift immutable Git/SPM/CocoaPods, React Native bare/Expo runtime and
+WordPress.org's exact downloadable ZIP are independently qualified. No consumer
+application was installed or upgraded.
+
+Shared types 3.3.0, redaction 2.7.1, CLI 1.21.0 and MCP 1.21.0 are published with
+clean registry installs. Gemini 1.5.0 is published from standalone source
+`fbec2285e02330af752ad91ccf91980c054cc3c9`; native Node 22/24/26 checks pass.
+Codex/Claude source promotion and public marketplace checks follow the final core
+CI gate. The official MCP Registry resolves the exact 1.21.0 server.
+
+ClawHub accepted the exact 1.21.0 skill and OpenClaw plugin, and a normal public
+plugin install on OpenClaw 2026.11.2 passes. Platform reviews are clean, but the
+strict release verifier still lacks final antivirus results and the skill passes
+only five of seven bounded discovery checks. These are external acceptance gaps;
+publication and installation do not satisfy or waive them. Retired Smithery
+publication channels are excluded explicitly.
+
+Backend bridge workflow [42622578010](https://github.com/debugbundle/debugbundle-cloud/actions/runs/42622578010)
+deployed core 1.23.0 from `c4111cc6c475b365db80ff2b53e5f2f3ef32765d` with
+`business-tier-v2` API/worker images. Both are healthy with zero restarts. Twenty
+additive migrations preserve all 66 prior ledger entries, yielding 86 total.
+Aggregate hashes of existing project/member tokens, alerts and service definitions
+are unchanged. The pre-migration managed snapshot is available. All eight
+installed alarms and three saved public health checks pass.
+
+All twelve approved Stripe prices and six product default prices are verified in
+the running API and worker. The once-only ten-percent referral coupon is restricted
+to Business base subscriptions. Superseded prices remain active until the final
+rollout and a fresh dependent-object check permit their safe archival.
+
+The loaded report key has free model-metadata access to `gpt-6.1-terra`; no new
+inference was run. Current official API pricing still fits the existing reserved
+maximum of $0.99 for forty bounded paid attempts, including the ten-percent regional
+reserve. The $1 monthly account budget and explicit project/consent requirements
+remain enforced. Existing startup reviewer-expiry and older OAuth warning records
+are distinguished from new runtime failures; neither was suppressed or resolved.
+
+Final full CI at `19bffd8d` passed all 128 test groups and merged overall coverage
+(lines 88.08%, functions 89.67%, statements 86.72%). Its changed-file gate correctly
+identified three uncovered UI paths: lazy local billing preview, privacy-safe saved
+recipient labels and probe-list error guidance. Focused regression coverage is
+added without changing runtime behaviour or weakening coverage policy. A new full
+CI result is required before public core promotion and activation.
