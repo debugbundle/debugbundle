@@ -54,3 +54,22 @@ restricted-output name guarantee is not claimed by this release.
 
 Sanitised local receipts and logs: `.tmp/release-20261110/`. Exact source refs,
 workflow results, publications and live verification will be recorded below.
+
+- The 173 audited core files and seven site files matched their final audit
+  hashes before release metadata changes. The existing API/worker were healthy,
+  with zero restarts and 44.6 GiB free disk. Protected baselines include 62 project
+  tokens, 12 member tokens, 17 alert rules, 33 service definitions, the original
+  factual report, its settled AI receipt and all 86 migration entries.
+- Shared types 3.4.0 published through workflow `42830821448`; exact registry
+  consumer smoke passed. The unchanged redaction publication was retained.
+  Internal adoption changes only that package pin and its lockfile integrity.
+- Native OpenClaw emitted checks and the current 2026.11.2 installed fixture
+  pass. The local archive fixture requires the documented explicit source-trust
+  and capability acknowledgements; remote publication/install policies remain
+  unchanged. All 45 release-distribution regressions pass.
+- Final packaging found a repeated filter-options entry in CLI help/generated
+  references. A failing public-help regression demonstrated the duplication;
+  remove only the repeated entry and regenerate the reference before final CI.
+- Existing Codex, Claude and Gemini packages retain their already-published MCP
+  1.21.0 pins and existing contracts. This optional additive read does not require
+  a developer-package republish; direct npm MCP/CLI and OpenClaw receive 1.22.0.

@@ -1,8 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { runCli } from "../../../apps/cli/src/main.js";
+import { CLI_USAGE_LINES } from "../../../apps/cli/src/usage.js";
 
 describe("cli main analytics routing", () => {
+  it("lists the analytics filter-options command once in public help", () => {
+    expect(
+      CLI_USAGE_LINES.filter((line) => line.startsWith("  debugbundle analytics filter-options "))
+    ).toHaveLength(1);
+  });
+
   it("routes filter options as a bounded context read and rejects metric dimensions", async () => {
     const getAnalyticsFilterOptionsCommand = vi
       .fn()

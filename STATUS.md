@@ -1,3 +1,15 @@
+# Smart Report and dashboard release - authorised, in progress
+
+10 November: Owner authorised publication and production deployment of the audited
+candidate. Release record: `spec/smart-report-release-20261110.md`. Shared types
+3.4.0 is published with registry-consumer checks; the internal pin is adopted
+without other dependency changes. Core 1.24.0, CLI/MCP/OpenClaw 1.22.0 and site
+1.8.1 are prepared. Existing developer-plugin pins, SDKs and OpenAI release remain
+unchanged. Final packaging reproduced a duplicate filter-options CLI help entry;
+the narrow correction and generated-reference update have a regression test.
+Production rollout, remaining publication gates and live acceptance are pending.
+The additional restricted-output project-name safeguard remains deferred.
+
 # Combined production-readiness review - locally qualified, release withheld
 
 10 November: Owner requested a final combined audit and explicitly withheld release.
