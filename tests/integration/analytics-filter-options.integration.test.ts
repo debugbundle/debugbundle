@@ -25,6 +25,10 @@ runIntegration("observed analytics filter options", () => {
     granularity: "day" as const
   };
   beforeAll(async () => {
+    // Own the disposable schema: earlier readiness tests deliberately leave
+    // invalid constraints/ledger entries that bootstrap must never repair.
+    await pool.query("DROP SCHEMA public CASCADE");
+    await pool.query("CREATE SCHEMA public");
     await bootstrapStorageSchema(db);
     await migrateStorageSchema(db);
   });

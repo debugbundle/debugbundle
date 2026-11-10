@@ -73,3 +73,15 @@ workflow results, publications and live verification will be recorded below.
 - Existing Codex, Claude and Gemini packages retain their already-published MCP
   1.21.0 pins and existing contracts. This optional additive read does not require
   a developer-package republish; direct npm MCP/CLI and OpenClaw receive 1.22.0.
+- Final-source CI `42831838655` passed unit, project-scope and other Business
+  groups but failed the analytics-choice suite setup. The referral readiness
+  regression deliberately removes its commission constraint and ledger entry;
+  the new choice fixture then reused that invalid schema. Running those suites
+  sequentially in an owned tmpfs database reproduced `referral_schema_incomplete`.
+  The choice fixture now resets its own disposable schema before bootstrap and
+  migration, matching the existing integration pattern. Production readiness,
+  migration SQL/checksums and all behavioural assertions remain unchanged.
+  The exact failing order is now Green: nine referral cases and six choice cases
+  pass, including the deliberate fail-closed checks. Fixture lint/format pass.
+  Minimum-host OpenClaw installation and all 45 distribution cases also pass.
+  Full exact-source CI is required again before production rollout.
