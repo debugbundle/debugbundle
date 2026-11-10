@@ -373,6 +373,13 @@ rebuild from preserved event files.
 
 ## Business, referrals and Smart Reports
 
+- **Report model diagnostic:** An allowlisted operator code for a model rejection
+  or uncertain outcome, stored separately from the immutable AI receipt hash.
+  Missing historical codes mean unknown; raw provider text is not a diagnostic.
+- **Observed filter choices:** Bounded distinct values present in an authorised
+  analytics project/window and service/environment scope. Truncation, privacy
+  omission and unavailable data do not establish a complete inventory.
+
 - **Organisation grant:** A fixed Owner/Admin/Member relationship. A Business grant may explicitly include current and future projects; suspension denies access from every grant.
 - **Project Viewer:** A read-only project role. Credential permissions can narrow the holder's current authority, never expand it.
 - **Monthly allowance window:** The shared usage period, including a monthly sub-window inside an annual paid term. Capacity purchases and upgrades do not reset consumed usage.

@@ -1,5 +1,15 @@
 # Agent distribution ledger
 
+## Analytics choices pin review - 10 November 2026
+
+CLI/MCP 1.22.0 add the optional observed-filter read. Codex 1.6.0, Claude Code
+1.21.0 and Gemini 1.5.0 retain their verified MCP 1.21.0 pins; existing calls and
+installations remain compatible, so no developer-package republish is required.
+Direct npm CLI/MCP 1.22.0 and the optional OpenClaw tool expose the new capability.
+The official Registry resolves 1.22.0. ClawHub exact versions are public and a
+normal public plugin install passes, but strict antivirus/card/discovery acceptance
+is incomplete. See [release evidence](smart-report-release-20261110.md).
+
 ## Business release - 9 November 2026
 
 Codex 1.6.0 and Claude Code 1.21.0 are public from core

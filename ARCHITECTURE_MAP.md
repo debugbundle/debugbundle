@@ -1,3 +1,12 @@
+Released boundary (core 1.24.0, 10 November 2026): storage
+`report-model-diagnostic-schema.ts` adds the nullable allowlisted operator code
+through its own forward migration; `report-model-attempt-store.ts` keeps that code
+outside the immutable receipt hash. Kind-specific evidence constraints in the
+provider schema complement the unchanged canonical narrative validator. Model
+failures preserve readable facts without another paid attempt. The API/worker
+run the exact qualified `78783e7c` image; later evidence commits do not replace it.
+Release and remaining external acceptance: `spec/smart-report-release-20261110.md`.
+
 `apps/web/src/components/system/resource-empty-state.tsx` composes the existing
 Empty primitives for project/workspace/public resource lists and data panels.
 `project-resource-empty-state.tsx` preserves the old component/type export as an

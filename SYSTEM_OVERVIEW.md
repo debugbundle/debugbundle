@@ -1,3 +1,12 @@
+Release state (10 November 2026): core 1.24.0 and site 1.8.1 are live from
+`78783e7c` / `2245639a`; CLI/MCP/OpenClaw 1.22.0 and shared types 3.4.0 are
+published. The diagnostic migration precedes API/worker startup; old receipt
+hashes, factual reports, access/configuration and budgets are preserved. API,
+worker, served assets and authenticated reads pass live verification. ClawHub's
+strict antivirus/card/discovery acceptance remains partial despite benign reviews
+and a passing normal public install. See `spec/smart-report-release-20261110.md`.
+The additional restricted-output project-name safeguard remains deferred.
+
 Dashboard empty resource lists and data panels reuse `ResourceEmptyState` with
 the existing Empty primitives, scoped help and permitted actions. The former
 `ProjectResourceEmptyState` name remains a compatible alias; loading, errors and

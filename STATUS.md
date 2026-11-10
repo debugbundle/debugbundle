@@ -1,14 +1,39 @@
-# Smart Report and dashboard release - authorised, in progress
+# Smart Report and dashboard release - live; external acceptance partial
 
-10 November: Owner authorised publication and production deployment of the audited
-candidate. Release record: `spec/smart-report-release-20261110.md`. Shared types
-3.4.0 is published with registry-consumer checks; the internal pin is adopted
-without other dependency changes. Core 1.24.0, CLI/MCP/OpenClaw 1.22.0 and site
-1.8.1 are prepared. Existing developer-plugin pins, SDKs and OpenAI release remain
-unchanged. Final packaging reproduced a duplicate filter-options CLI help entry;
-the narrow correction and generated-reference update have a regression test.
-Production rollout, remaining publication gates and live acceptance are pending.
-The additional restricted-output project-name safeguard remains deferred.
+10 November: core 1.24.0 is live from `78783e7cb12b6f0c49e874e1287236e317c9f995`;
+site 1.8.1 is live from `2245639aab088292370ed7a58355e43ba08b314f`.
+CLI/MCP 1.22.0 and shared types 3.4.0 are published with registry/native checks.
+The official MCP Registry resolves 1.22.0. ClawHub accepted and exposes the 1.22.0
+skill/OpenClaw package; normal public installation on OpenClaw 2026.11.2 passes.
+Its strict acceptance remains partial: antivirus evidence is missing for both,
+the provider skill verification reports `card.missing`, and discovery passes five
+of seven queries. These gates remain open; upload/install/review success does not
+waive them. Developer-plugin pins, SDK versions and the OpenAI release are unchanged.
+
+Full source CI `42841110248` passed 6,367 main-lane cases plus 16 required PDF
+cases, the unchanged 90-source coverage gate and native Node jobs. Initial CI
+caught shared integration-fixture state: a referral readiness test intentionally
+removed a constraint/ledger entry, which the choice fixture reused. The failing
+order was reproduced and fixed by resetting only that fixture's disposable schema;
+all behavioural assertions and production migration validation remain intact.
+
+Backend `42848814140`, app `42852886471` and site `42852895723` passed. The 87-entry
+ledger retains all 86 prior entries; the nullable diagnostic and allowlist
+constraint are present. Exact image/source hashes, API/worker readiness, retained
+rollback pair, report/receipt/allowance hashes and environment hashes pass.
+Authenticated choices/private reports work; anonymous choices are denied with
+no-store. All 26 checked CDN resources match S3, including the exact app build,
+generated references and cache policy. All eight alarms and three saved checks
+pass. No new active incident IDs appeared; the pre-existing reviewer credential
+expiry warning increased from 36 to 38 occurrences and remains open.
+
+No new paid report, automatic retry, email resend or consumer-product action was
+performed. Existing factual content and the historical unknown rejection reason
+remain unchanged. The stronger restricted-output project-name safeguard and the
+new product/tier/marketing proposals remain deferred. Release evidence:
+`spec/smart-report-release-20261110.md`, `.tmp/release-20261110/`, and the private
+cloud runbook `runbooks/smart-report-release-2026-11-10.json`. Later documentation
+commits do not identify another deployed runtime revision.
 
 # Combined production-readiness review - locally qualified, release withheld
 
