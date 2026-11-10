@@ -1,6 +1,7 @@
-// Database-only Business, access, billing and report rehearsals.
+// Database-only Business, access, billing, analytics choices and report rehearsals.
 // General Redis/object-store integration remains a separate qualification lane.
 export const BUSINESS_SERVICE_TEST_FILES = [
+  "tests/integration/analytics-filter-options.integration.test.ts",
   "tests/integration/analytics-job-authorization.integration.test.ts",
   "tests/integration/billing-checkout-safety.integration.test.ts",
   "tests/integration/business-billing-migration.integration.test.ts",
@@ -24,6 +25,7 @@ export const BUSINESS_SERVICE_TEST_FILES = [
   "tests/integration/report-generation.integration.test.ts",
   "tests/integration/report-health.integration.test.ts",
   "tests/integration/report-lifecycle.integration.test.ts",
+  "tests/integration/report-model-diagnostics.integration.test.ts",
   "tests/integration/report-pdf.integration.test.ts",
   "tests/integration/report-project-privacy.integration.test.ts",
   "tests/integration/report-resources.integration.test.ts",

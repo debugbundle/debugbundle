@@ -1,6 +1,7 @@
+import { ResourceEmptyState } from "./resource-empty-state.js";
 import { PendingButton } from "./pending-button.js";
 import { useEffect, useRef, useState } from "react";
-import { PlusIcon } from "lucide-react";
+import { KeyRoundIcon, PlusIcon } from "lucide-react";
 import { z } from "zod";
 import {
   createAgentCredential,
@@ -184,7 +185,11 @@ export function ProjectAgentCredentialsCard({ projectId }: { projectId: string }
             </Button>
           </Notice>
         ) : tokens.length === 0 ? (
-          <Notice>No agent credentials issued for this project.</Notice>
+          <ResourceEmptyState
+            icon={KeyRoundIcon}
+            title="No agent credentials yet"
+            description="Scoped agent credentials appear here after they are issued for this project."
+          />
         ) : (
           <Table>
             <TableHeader>

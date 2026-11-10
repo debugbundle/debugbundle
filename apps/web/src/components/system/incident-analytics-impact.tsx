@@ -1,3 +1,4 @@
+import { formatAnalyticsDimensionValue } from "../../lib/analytics-presentation.js";
 import { ArrowRightIcon, LoaderCircleIcon, RefreshCwIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -202,7 +203,7 @@ export function IncidentAnalyticsImpact({
             title="Top device types"
             keyLabel="Device"
             items={impact.top_device_types.map((item) => ({
-              key: item.value,
+              key: formatAnalyticsDimensionValue("device_type", item.value),
               count: item.affected_sessions
             }))}
           />
@@ -210,7 +211,7 @@ export function IncidentAnalyticsImpact({
             title="Top browsers"
             keyLabel="Browser"
             items={impact.top_browsers.map((item) => ({
-              key: item.value,
+              key: formatAnalyticsDimensionValue("browser", item.value),
               count: item.affected_sessions
             }))}
           />

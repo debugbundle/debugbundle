@@ -108,7 +108,7 @@ export function WorkspaceAnalyticsFilters({
     <div
       role="group"
       aria-label="Analytics filter controls"
-      className="flex min-w-0 flex-wrap items-center justify-start gap-2 sm:justify-end"
+      className="flex w-fit min-w-0 flex-wrap items-center gap-2"
     >
       <AnalyticsFilterPanel
         triggerLabel="Filters"
@@ -116,12 +116,12 @@ export function WorkspaceAnalyticsFilters({
         description="Limit the inventory by project, scope, analysis details, or date range."
         activeFilterCount={activeFilterCount}
         scrollable
-        desktopSize="wide"
+        triggerSize="sm"
         onApply={onApply}
         onReset={onReset}
         onDismiss={onDismiss}
       >
-        <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <FieldGroup className="gap-4">
           {fixedScope ? null : (
             <>
               <FilterSelect

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createDevMockApi } from "../../scripts/dev-mock/api.js";
 import {
+  AnalyticsFilterOptionsResponseSchema,
   AnalyticsActionMetricsResponseSchema,
   AnalyticsJourneySamplesListResponseSchema,
   AnalyticsJourneySampleResponseSchema
@@ -19,7 +20,7 @@ import {
   type ReportHttpClient
 } from "../../packages/report-client/src/index.js";
 describe("opt-in parity preview fixtures", () => {
-  it("serves contract-valid empty report inventories through the real report clients", async () => {
+  it("serves contract-valid sample report inventories through the real report clients", async () => {
     const api = createDevMockApi();
     const organizationId = (
       api.handle("GET", "/v1/auth/session").body as { session: { organization_id: string } }
@@ -28,20 +29,16 @@ describe("opt-in parity preview fixtures", () => {
       request: async ({ method, path, body }) => api.handle(method, path, body)
     };
     const scope = { organizationId, bearerToken: "mock_not_a_credential" };
-    await expect(createReportApi(client).list(scope)).resolves.toEqual([]);
-    await expect(createReportRunApi(client).list(scope)).resolves.toEqual({
-      runs: [],
-      next_cursor: null
-    });
+    expect((await createReportApi(client).list(scope)).length).toBeGreaterThan(0);
+    expect((await createReportRunApi(client).list(scope)).runs.length).toBeGreaterThan(0);
     const definitions = api.handle("GET", `/v1/organizations/${organizationId}/report-definitions`);
     const history = api.handle("GET", `/v1/organizations/${organizationId}/reports?limit=20`);
     expect(definitions.status).toBe(200);
     expect(history.status).toBe(200);
-    expect(ReportDefinitionListSchema.parse(definitions.body)).toEqual({ definitions: [] });
-    expect(ReportRunListResponseSchema.parse(history.body)).toEqual({
-      runs: [],
-      next_cursor: null
-    });
+    expect(ReportDefinitionListSchema.parse(definitions.body).definitions.length).toBeGreaterThan(
+      0
+    );
+    expect(ReportRunListResponseSchema.parse(history.body).runs.length).toBeGreaterThan(0);
     expect(api.handle("GET", "/v1/organizations/another/reports?limit=20").status).not.toBe(200);
     expect(api.handle("GET", `/v1/organizations/${organizationId}/reports?limit=101`).status).toBe(
       400
@@ -49,6 +46,23 @@ describe("opt-in parity preview fixtures", () => {
     api.handle("POST", "/v1/auth/logout");
     expect(api.handle("GET", `/v1/organizations/${organizationId}/reports?limit=20`).status).toBe(
       401
+    );
+  });
+  it("offers contract-valid observed choices and empty unavailable fields in the preview", () => {
+    const api = createDevMockApi();
+    const query = "project_id=00000000-0000-4000-8000-000000000001&last=30d&limit=1";
+    const response = api.handle("GET", `/v1/analytics/filter-options?${query}`);
+    expect(response.status).toBe(200);
+    const choices = AnalyticsFilterOptionsResponseSchema.parse(response.body);
+    expect(choices.options.browser).toEqual({ values: ["Chrome"], truncated: true });
+    expect(choices.options.utm_source).toEqual({ values: [], truncated: false });
+    expect(choices.window.environment).toBeNull();
+    const empty = AnalyticsFilterOptionsResponseSchema.parse(
+      api.handle("GET", `/v1/analytics/filter-options?${query}&service=missing`).body
+    );
+    expect(empty.options.browser.values).toEqual([]);
+    expect(api.handle("GET", `/v1/analytics/filter-options?${query}&browser=Chrome`).status).toBe(
+      400
     );
   });
   it("serves contract-valid actions, retained samples and sample artifacts", () => {

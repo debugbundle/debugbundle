@@ -11,7 +11,7 @@ describe("canonical Smart Report email overview", () => {
     const result = renderSmartReportEmail({ document, appBaseUrl: "https://app.example.test" });
     expect(result.html).toContain("&lt;script&gt;Report &amp; review&lt;/script&gt;");
     expect(result.html).not.toContain("<script>");
-    expect(result.text).toContain("AI analysis unavailable");
+    expect(result.text).toContain("AI analysis is unavailable");
     expect(result.text).toContain("Recorded resolutions");
     expect(result.text).toContain("Focus for the coming month");
     expect(result.text).toContain("end exclusive, UTC");
@@ -37,6 +37,21 @@ describe("canonical Smart Report email overview", () => {
     expect(result.text).toContain("Neither establishes causation");
     expect(result.text).toContain("separate report retention");
   });
+  it.each(["model_rejected", "model_uncertain"] as const)(
+    "uses the same safe factual fallback explanation for %s",
+    (reason) => {
+      const document = reportDocumentFixture();
+      document.analysis.reason = reason;
+      const result = renderSmartReportEmail({ document, appBaseUrl: "https://app.example.test" });
+      for (const body of [result.html, result.text]) {
+        expect(body).toContain(
+          "The recorded facts, resolutions and selected outstanding work remain available."
+        );
+        expect(body).toContain("No automatic paid retry will be made.");
+        expect(body).not.toContain(reason);
+      }
+    }
+  );
   it("rejects a credential-bearing or non-HTTP dashboard configuration rather than publishing a caller URL", () => {
     for (const appBaseUrl of [
       "javascript:alert(1)",

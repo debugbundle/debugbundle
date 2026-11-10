@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import { App } from "../../../apps/web/src/app.js";
@@ -14,6 +14,7 @@ function setup(
     viewer?: boolean;
     reportFailure?: boolean;
     mutationFailure?: boolean;
+    saveResponse?: Promise<Response>;
   } = {}
 ) {
   let flows = input.empty ? [] : [flowDefinition];
@@ -47,6 +48,7 @@ function setup(
         ? jsonResponse(500, { error: "unavailable" })
         : jsonResponse(200, flowReport);
     if (init?.method === "PUT") {
+      if (input.saveResponse) return input.saveResponse;
       if (input.mutationFailure) return jsonResponse(500, { error: "unavailable" });
       flows = [
         { ...flowDefinition, ...JSON.parse(typeof init.body === "string" ? init.body : "{}") }
@@ -85,6 +87,7 @@ it("creates a project flow with the existing form primitives and ordered origin 
   const user = userEvent.setup();
   await screen.findByText("No flows yet");
   await user.click(screen.getByRole("button", { name: "Create flow" }));
+  expect(screen.getByRole("dialog", { name: "Create flow" })).toBeInTheDocument();
   await user.type(screen.getByLabelText("Flow name"), flowInput.display_name);
   await user.type(screen.getByLabelText("Flow key"), flowInput.flow_key);
   for (const [index, step] of flowInput.steps.entries()) {
@@ -98,6 +101,45 @@ it("creates a project flow with the existing form primitives and ordered origin 
     expect.stringContaining(`/analytics/flows/${flowInput.flow_key}`),
     expect.objectContaining({ method: "PUT", body: JSON.stringify(flowInput) })
   );
+});
+it("uses a modal for create and edit, restores focus, and displays readable purpose labels", async () => {
+  setup();
+  const user = userEvent.setup();
+  await screen.findByText("newsletter");
+  expect(screen.getByText(/^Acquisition · Version/)).toBeInTheDocument();
+  const create = screen.getByRole("button", { name: "Create flow" });
+  await user.click(create);
+  const dialog = screen.getByRole("dialog", { name: "Create flow" });
+  await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  await waitFor(() => expect(create).toHaveFocus());
+  const edit = screen.getByRole("button", { name: "Edit flow" });
+  await user.click(edit);
+  expect(screen.getByRole("dialog", { name: "Edit flow" })).toBeInTheDocument();
+  await user.keyboard("{Escape}");
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  await waitFor(() => expect(edit).toHaveFocus());
+});
+it("keeps a saving flow modal open and submits only one mutation", async () => {
+  let finish!: (response: Response) => void;
+  const saveResponse = new Promise<Response>((resolve) => {
+    finish = resolve;
+  });
+  const request = setup({ saveResponse });
+  const user = userEvent.setup();
+  await screen.findByText("newsletter");
+  await user.click(screen.getByRole("button", { name: "Edit flow" }));
+  const dialog = screen.getByRole("dialog", { name: "Edit flow" });
+  const form = within(dialog).getByRole("form", { name: "Edit flow" });
+  fireEvent.submit(form);
+  fireEvent.submit(form);
+  expect(within(dialog).getByRole("button", { name: "Close" })).toBeDisabled();
+  expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeDisabled();
+  await user.keyboard("{Escape}");
+  expect(screen.getByRole("dialog", { name: "Edit flow" })).toBeInTheDocument();
+  expect(request.mock.calls.filter(([, init]) => init?.method === "PUT")).toHaveLength(1);
+  finish(jsonResponse(200, { flow: flowDefinition }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 });
 it("archives a definition while keeping its retained report readable", async () => {
   const request = setup();

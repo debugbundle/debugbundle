@@ -80,10 +80,12 @@ describe("bounded canonical PDF renderer", () => {
       const text = extract(body);
       expect(text).toContain("Plačila 日本語");
       expect(text).toContain("[U+1F527]");
-      expect(text).toContain("AI analysis unavailable");
-      expect(text).toContain("2026-10-01");
-      expect(text).toContain("2026-11-01");
-      expect(text).toContain("Recorded resolutions");
+      expect(text).toContain("AI analysis is unavailable");
+      expect(text).toContain("1–31 Oct 2026 UTC");
+      expect(text).toContain("Resolutions and recoveries");
+      expect(text.indexOf("Focus for the coming")).toBeLessThan(
+        text.indexOf("Resolutions and recoveries")
+      );
       expect(text).toContain("Focus for the coming month");
       expect(text).toContain("Unsupported characters");
       const count = pageCount(body),

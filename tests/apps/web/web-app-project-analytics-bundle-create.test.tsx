@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -46,7 +46,8 @@ async function chooseSelectOption(
   label: string,
   optionName: string | RegExp
 ): Promise<void> {
-  const trigger = screen.getByLabelText(label);
+  const dialog = screen.queryByRole("dialog", { name: "Generate analytics bundle" });
+  const trigger = dialog ? within(dialog).getByLabelText(label) : screen.getByLabelText(label);
   trigger.focus();
   fireEvent.keyDown(trigger, { key: "ArrowDown", code: "ArrowDown" });
   await user.click(await screen.findByRole("option", { name: optionName }));
@@ -70,6 +71,7 @@ function installCreateFetch(
     createBody?: Record<string, unknown>;
     includeGenerationHeader?: boolean;
     failIncidentsOnce?: boolean;
+    createResponse?: Promise<Response>;
   } = {}
 ): { createBodies: () => Array<Record<string, unknown>> } {
   const createBodies: Array<Record<string, unknown>> = [];
@@ -129,6 +131,7 @@ function installCreateFetch(
       if (url.endsWith("/v1/analytics/bundles") && init?.method === "POST") {
         if (typeof init.body !== "string") throw new Error("expected_json_request_body");
         createBodies.push(JSON.parse(init.body) as Record<string, unknown>);
+        if (input.createResponse) return input.createResponse;
         const headers = new Headers({ "Content-Type": "application/json" });
         if (input.includeGenerationHeader ?? true) {
           headers.set("X-DebugBundle-Generation-Id", GENERATION_ID);
@@ -142,6 +145,9 @@ function installCreateFetch(
           ),
           { status: input.createStatus ?? 200, headers }
         );
+      }
+      if (url.includes("/v1/analytics/bundles?")) {
+        return jsonResponse(200, { bundles: [], next_cursor: null, total_pages: 1 });
       }
       if (url.includes(`/v1/analytics/bundles/${GENERATION_ID}?`)) {
         return jsonResponse(
@@ -159,6 +165,56 @@ function installCreateFetch(
 }
 
 describe("web app - project AnalyticsBundle generation", () => {
+  it("opens generation in a modal over the inventory and retains list controls on cancel", async () => {
+    const user = userEvent.setup();
+    const state = installCreateFetch();
+    render(<App initialEntries={[`/projects/${PROJECT_ID}/analytics/bundles`]} />);
+    await screen.findByText("No analytics bundles in this project");
+    const limit = screen.getByLabelText("Inventory page limit");
+    fireEvent.change(limit, { target: { value: "40" } });
+    await user.click(screen.getByRole("button", { name: "Apply inventory page limit" }));
+    await user.click(screen.getByRole("button", { name: "Filters" }));
+    await chooseSelectOption(user, "Status", "Failed");
+    await user.click(screen.getByRole("button", { name: "Apply filters" }));
+    const timeWindow = screen.getByLabelText("Time window");
+    const moreFilters = screen.getByRole("button", { name: "More filters" });
+    const trigger = screen.getByRole("link", { name: "Generate analytics bundle" });
+    await user.click(trigger);
+    const dialog = await screen.findByRole("dialog", { name: "Generate analytics bundle" });
+    expect(document.getElementById("analytics-window")).toBe(timeWindow);
+    expect(moreFilters.isConnected).toBe(true);
+    expect(within(dialog).queryByRole("link", { name: "Back to analytics bundles" })).toBeNull();
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.getByLabelText("Inventory page limit")).toHaveValue(40);
+    expect(screen.getByLabelText("1 active filters")).toBeInTheDocument();
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(state.createBodies()).toHaveLength(0);
+  });
+
+  it("blocks dismissal and duplicate submission while modal generation is pending", async () => {
+    let finish!: (response: Response) => void;
+    const createResponse = new Promise<Response>((resolve) => {
+      finish = resolve;
+    });
+    const user = userEvent.setup();
+    const state = installCreateFetch({ createResponse });
+    render(<App initialEntries={[`/projects/${PROJECT_ID}/analytics/bundles/new`]} />);
+    const dialog = await screen.findByRole("dialog", { name: "Generate analytics bundle" });
+    const form = within(dialog).getByRole("form", { name: "Generate analytics bundle" });
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: "Close" })).toBeDisabled();
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("dialog", { name: "Generate analytics bundle" })).toBeInTheDocument();
+    expect(state.createBodies()).toHaveLength(1);
+    finish(jsonResponse(429, { error: "analytics_quota_exceeded" }));
+    expect(await screen.findByText("Analytics bundle limit reached")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Generate analytics bundle" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeEnabled();
+  });
+
   it("submits a bounded funnel analysis and opens its generation detail", async () => {
     const user = userEvent.setup();
     const state = installCreateFetch();

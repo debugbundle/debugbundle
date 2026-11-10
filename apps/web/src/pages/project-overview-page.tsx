@@ -1,10 +1,19 @@
-import { BellRingIcon, DownloadIcon, HeartPulseIcon, PackageIcon, RotateCcwIcon, SirenIcon } from "lucide-react";
-import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import { IncidentTable } from "../components/system/project-incident-table.js";
+import {
+  formatDate,
+  formatServiceName,
+  severityVariantMap,
+  statusVariantMap,
+  type ProjectIncidentSortField
+} from "../lib/project-presentation.js";
+export { IncidentTable } from "../components/system/project-incident-table.js";
+export { ProjectOverviewPage } from "./project-overview-summary.js";
+import { DownloadIcon, PackageIcon, SirenIcon } from "lucide-react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate, useOutletContext } from "react-router-dom";
 
 import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
 import { BoundedTableTitle } from "../components/system/bounded-table-title.js";
-import { ProjectSetupSummaryGrid } from "../components/system/project-setup-summary-grid.js";
 import { ResourceListState } from "../components/system/resource-list-state.js";
 import {
   SelectableTableActions,
@@ -12,184 +21,55 @@ import {
   shouldIgnoreTableRowActivation,
   useVisibleRowSelection
 } from "../components/system/selectable-table-actions.js";
-import { SortableTableHead, toggleSort, type SortState } from "../components/system/sortable-table-head.js";
+import {
+  SortableTableHead,
+  toggleSort,
+  type SortState
+} from "../components/system/sortable-table-head.js";
 import { TableRefreshButton } from "../components/system/table-refresh-button.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
 import { Badge } from "../components/ui/badge.js";
 import { Button } from "../components/ui/button.js";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card.js";
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../components/ui/empty.js";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "../components/ui/card.js";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle
+} from "../components/ui/empty.js";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "../components/ui/select.js";
 import { Skeleton } from "../components/ui/skeleton.js";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "../components/ui/table.js";
 import {
   bulkReopenIncidents,
   bulkResolveIncidents,
   getIncidentBundle,
-  listProjectAvailabilityCheckDailyRollups,
-  listProjectAvailabilityChecks,
-  type AvailabilityCheckDailyRollupRecord,
   listProjectIncidents,
-  type IncidentRecord,
-  type ProjectRecord
+  type IncidentRecord
 } from "../lib/api.js";
-import { summarizeHealthStatusToday, type HealthStatusTodaySummary } from "../lib/health-status-summary.js";
-import { formatIncidentMatchedFields } from "../lib/incident-copy.js";
-import { formatProjectRelationship, getProjectEffectiveRole, getProjectOwnerEmail, isSharedProject } from "../lib/project-access.js";
-import { getActiveIncidentCount } from "../lib/project-metrics.js";
 import { showErrorToast, showInfoToast, showSuccessToast } from "../lib/notify.js";
 import { useCursorPagination } from "../lib/use-cursor-pagination.js";
-
-const HEALTH_STATUS_HISTORY_DAYS = 30;
-
-export function ProjectOverviewPage(): JSX.Element {
-  const { project } = useOutletContext<ProjectContext>();
-
-  return (
-    <div className="space-y-6">
-      <ProjectStatCards project={project} />
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Project details</CardTitle>
-          <CardDescription>Project identity, access, and the default environment.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <DetailRow label="Access" value={formatProjectRelationship(project)} />
-          <DetailRow label="Your role" value={getProjectEffectiveRole(project)} />
-          {isSharedProject(project) && getProjectOwnerEmail(project) !== null ? (
-            <DetailRow label="Owner" value={getProjectOwnerEmail(project)!} />
-          ) : null}
-          <DetailRow label="Slug" value={project.slug} />
-          <DetailRow label="Project default environment" value={project.environment_default} />
-          <DetailRow label="Created" value={formatDate(project.created_at)} />
-
-          <div className="space-y-4 border-t border-border/80 pt-4">
-            <div className="space-y-1">
-              <h3 className="text-sm font-medium text-foreground">Setup at a glance</h3>
-              <p className="text-sm text-muted-foreground">
-                Current counts and enabled states for the main automation and capture surfaces on this project.
-              </p>
-            </div>
-            <ProjectSetupSummaryGrid project={project} />
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function ProjectStatCards({ project }: { project: ProjectRecord }): JSX.Element {
-  const [healthStatusToday, setHealthStatusToday] = useState<HealthStatusTodaySummary | null>(null);
-  const activeIncidents = getActiveIncidentCount(project.metrics);
-  const attentionToday = project.metrics.attention_incidents_today;
-  const regressedIncidents = project.metrics.regressed_incidents;
-
-  useEffect(() => {
-    let canceled = false;
-
-    void (async () => {
-      setHealthStatusToday(null);
-
-      try {
-        const response = await listProjectAvailabilityChecks(project.project_id, 100);
-        const rollupEntries = await Promise.all(
-          response.checks.map(async (check) => {
-            try {
-              return [
-                check.check_id,
-                await listProjectAvailabilityCheckDailyRollups(
-                  project.project_id,
-                  check.check_id,
-                  HEALTH_STATUS_HISTORY_DAYS
-                )
-              ] as const;
-            } catch {
-              return [check.check_id, [] as AvailabilityCheckDailyRollupRecord[]] as const;
-            }
-          })
-        );
-        if (!canceled) {
-          setHealthStatusToday(
-            summarizeHealthStatusToday(
-              response.checks,
-              new Map<string, AvailabilityCheckDailyRollupRecord[]>(rollupEntries),
-              "project"
-            )
-          );
-        }
-      } catch {
-        if (!canceled) {
-          setHealthStatusToday(summarizeHealthStatusToday([], new Map(), "project"));
-        }
-      }
-    })();
-
-    return () => {
-      canceled = true;
-    };
-  }, [project.project_id]);
-
-  return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardDescription>Active incidents</CardDescription>
-          <SirenIcon className="size-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <CardTitle className="text-2xl tabular-nums">{activeIncidents.toLocaleString()}</CardTitle>
-          <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-            <Badge variant="outline" className="text-xs">Current</Badge>
-            Open or regressed incidents in this project
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardDescription>Incidents today</CardDescription>
-          <BellRingIcon className="size-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <CardTitle className="text-2xl tabular-nums">{attentionToday.toLocaleString()}</CardTitle>
-          <p className="mt-1 text-xs text-muted-foreground">Opened or regressed today in this project</p>
-        </CardContent>
-      </Card>
-
-      <Link
-        to={`/projects/${project.project_id}/health`}
-        className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-      >
-        <Card className="h-full cursor-pointer transition-colors hover:bg-muted/30">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardDescription>Health status today</CardDescription>
-            <HeartPulseIcon className="size-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <CardTitle className="text-2xl">
-              {healthStatusToday !== null ? healthStatusToday.value : "\u2014"}
-            </CardTitle>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {healthStatusToday !== null ? healthStatusToday.description : "Loading\u2026"}
-            </p>
-          </CardContent>
-        </Card>
-      </Link>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardDescription>Regressed incidents</CardDescription>
-          <RotateCcwIcon className="size-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <CardTitle className="text-2xl tabular-nums">{regressedIncidents.toLocaleString()}</CardTitle>
-          <p className="mt-1 text-xs text-muted-foreground">Current regressed incidents in this project</p>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
 
 export function ProjectIncidentsPage(): JSX.Element {
   const navigate = useNavigate();
@@ -200,9 +80,23 @@ export function ProjectIncidentsPage(): JSX.Element {
     direction: "desc"
   });
   const [bulkAction, setBulkAction] = useState<"resolved" | "unresolved" | null>(null);
-  const { items: incidents, isLoading, page, totalPages, hasNextPage, goToNextPage, goToPreviousPage, refreshPage } = useCursorPagination(
+  const {
+    items: incidents,
+    isLoading,
+    page,
+    totalPages,
+    hasNextPage,
+    goToNextPage,
+    goToPreviousPage,
+    refreshPage
+  } = useCursorPagination(
     async (cursor) => {
-      const response = await listProjectIncidents(projectId, 20, cursor ?? undefined, statusFilter === "all" ? undefined : statusFilter);
+      const response = await listProjectIncidents(
+        projectId,
+        20,
+        cursor ?? undefined,
+        statusFilter === "all" ? undefined : statusFilter
+      );
       return {
         items: response.incidents,
         nextCursor: response.nextCursor,
@@ -213,7 +107,9 @@ export function ProjectIncidentsPage(): JSX.Element {
   );
   const sortedIncidents = useMemo(() => sortProjectIncidents(incidents, sort), [incidents, sort]);
   const emptyState = getProjectIncidentEmptyState(statusFilter);
-  const selection = useVisibleRowSelection(useMemo(() => sortedIncidents.map((incident) => incident.incident_id), [sortedIncidents]));
+  const selection = useVisibleRowSelection(
+    useMemo(() => sortedIncidents.map((incident) => incident.incident_id), [sortedIncidents])
+  );
   const selectedIncidents = useMemo(
     () => sortedIncidents.filter((incident) => selection.selectedIdSet.has(incident.incident_id)),
     [sortedIncidents, selection.selectedIdSet]
@@ -241,7 +137,9 @@ export function ProjectIncidentsPage(): JSX.Element {
         await refreshPage();
       }
 
-      showSuccessToast(`Marked ${updatedIncidents.length} incident${updatedIncidents.length === 1 ? "" : "s"} as ${action}.`);
+      showSuccessToast(
+        `Marked ${updatedIncidents.length} incident${updatedIncidents.length === 1 ? "" : "s"} as ${action}.`
+      );
     } catch {
       showErrorToast(`Could not mark the selected incidents as ${action}.`);
     } finally {
@@ -258,14 +156,30 @@ export function ProjectIncidentsPage(): JSX.Element {
               <CardTitle>Project incidents</CardTitle>
               <CardDescription>Grouped failures for this project.</CardDescription>
             </div>
-            <TableRefreshButton isLoading={isLoading} onRefresh={() => void refreshPage()} mobileIconOnly className="shrink-0 sm:hidden" />
+            <TableRefreshButton
+              isLoading={isLoading}
+              onRefresh={() => void refreshPage()}
+              mobileIconOnly
+              className="shrink-0 sm:hidden"
+            />
           </div>
           <div className="flex w-full items-center gap-2 sm:w-auto sm:justify-end">
-            <TableRefreshButton isLoading={isLoading} onRefresh={() => void refreshPage()} className="hidden sm:inline-flex" />
-            <label id="project-incidents-status-filter-label" htmlFor="project-incidents-status-filter" className="sr-only sm:not-sr-only sm:text-sm sm:font-medium sm:text-foreground">
+            <TableRefreshButton
+              isLoading={isLoading}
+              onRefresh={() => void refreshPage()}
+              className="hidden sm:inline-flex"
+            />
+            <label
+              id="project-incidents-status-filter-label"
+              htmlFor="project-incidents-status-filter"
+              className="sr-only sm:not-sr-only sm:text-sm sm:font-medium sm:text-foreground"
+            >
               Status
             </label>
-            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as ProjectIncidentStatusFilter)}>
+            <Select
+              value={statusFilter}
+              onValueChange={(value) => setStatusFilter(value as ProjectIncidentStatusFilter)}
+            >
               <SelectTrigger
                 id="project-incidents-status-filter"
                 aria-labelledby="project-incidents-status-filter-label project-incidents-status-filter"
@@ -315,10 +229,22 @@ export function ProjectIncidentsPage(): JSX.Element {
                     selectedCount={selection.selectedCount}
                     allSelected={selection.allSelected}
                     isBusy={bulkAction !== null}
-                    primaryActionLabel={bulkAction === "resolved" ? "Marking resolved..." : "Mark selected resolved"}
-                    secondaryActionLabel={bulkAction === "unresolved" ? "Marking unresolved..." : "Mark selected unresolved"}
-                    primaryActionDisabled={selection.selectedCount === 0 || selectedIncidents.every((incident) => incident.status === "resolved")}
-                    secondaryActionDisabled={selection.selectedCount === 0 || selectedIncidents.every((incident) => incident.status !== "resolved")}
+                    primaryActionLabel={
+                      bulkAction === "resolved" ? "Marking resolved..." : "Mark selected resolved"
+                    }
+                    secondaryActionLabel={
+                      bulkAction === "unresolved"
+                        ? "Marking unresolved..."
+                        : "Mark selected unresolved"
+                    }
+                    primaryActionDisabled={
+                      selection.selectedCount === 0 ||
+                      selectedIncidents.every((incident) => incident.status === "resolved")
+                    }
+                    secondaryActionDisabled={
+                      selection.selectedCount === 0 ||
+                      selectedIncidents.every((incident) => incident.status !== "resolved")
+                    }
                     onToggleSelectAll={selection.toggleSelectAll}
                     onClearSelection={selection.clearSelection}
                     onPrimaryAction={() => {
@@ -340,7 +266,9 @@ export function ProjectIncidentsPage(): JSX.Element {
                       return;
                     }
 
-                    void navigate(`/projects/${incident.project_id}/incidents/${incident.incident_id}`);
+                    void navigate(
+                      `/projects/${incident.project_id}/incidents/${incident.incident_id}`
+                    );
                   }}
                 />
                 <CursorPaginationControls
@@ -370,9 +298,17 @@ export function ProjectIncidentsPage(): JSX.Element {
         allSelected={selection.allSelected}
         isBusy={bulkAction !== null}
         primaryActionLabel={bulkAction === "resolved" ? "Marking resolved..." : "Mark resolved"}
-        secondaryActionLabel={bulkAction === "unresolved" ? "Marking unresolved..." : "Mark unresolved"}
-        primaryActionDisabled={selection.selectedCount === 0 || selectedIncidents.every((incident) => incident.status === "resolved")}
-        secondaryActionDisabled={selection.selectedCount === 0 || selectedIncidents.every((incident) => incident.status !== "resolved")}
+        secondaryActionLabel={
+          bulkAction === "unresolved" ? "Marking unresolved..." : "Mark unresolved"
+        }
+        primaryActionDisabled={
+          selection.selectedCount === 0 ||
+          selectedIncidents.every((incident) => incident.status === "resolved")
+        }
+        secondaryActionDisabled={
+          selection.selectedCount === 0 ||
+          selectedIncidents.every((incident) => incident.status !== "resolved")
+        }
         onToggleSelectAll={selection.toggleSelectAll}
         onClearSelection={selection.clearSelection}
         onPrimaryAction={() => {
@@ -393,9 +329,23 @@ export function ProjectBundlesPage(): JSX.Element {
     field: "last_seen_at",
     direction: "desc"
   });
-  const { items: incidents, isLoading, page, totalPages, hasNextPage, goToNextPage, goToPreviousPage, refreshPage } = useCursorPagination(
+  const {
+    items: incidents,
+    isLoading,
+    page,
+    totalPages,
+    hasNextPage,
+    goToNextPage,
+    goToPreviousPage,
+    refreshPage
+  } = useCursorPagination(
     async (cursor) => {
-      const response = await listProjectIncidents(projectId, 20, cursor ?? undefined, statusFilter === "all" ? undefined : statusFilter);
+      const response = await listProjectIncidents(
+        projectId,
+        20,
+        cursor ?? undefined,
+        statusFilter === "all" ? undefined : statusFilter
+      );
       return {
         items: response.incidents,
         nextCursor: response.nextCursor,
@@ -418,14 +368,30 @@ export function ProjectBundlesPage(): JSX.Element {
                 Open or download bundles for incidents in this project.
               </CardDescription>
             </div>
-            <TableRefreshButton isLoading={isLoading} onRefresh={() => void refreshPage()} mobileIconOnly className="shrink-0 sm:hidden" />
+            <TableRefreshButton
+              isLoading={isLoading}
+              onRefresh={() => void refreshPage()}
+              mobileIconOnly
+              className="shrink-0 sm:hidden"
+            />
           </div>
           <div className="flex w-full items-center gap-2 sm:w-auto sm:justify-end">
-            <TableRefreshButton isLoading={isLoading} onRefresh={() => void refreshPage()} className="hidden sm:inline-flex" />
-            <label id="project-bundles-status-filter-label" htmlFor="project-bundles-status-filter" className="sr-only sm:not-sr-only sm:text-sm sm:font-medium sm:text-foreground">
+            <TableRefreshButton
+              isLoading={isLoading}
+              onRefresh={() => void refreshPage()}
+              className="hidden sm:inline-flex"
+            />
+            <label
+              id="project-bundles-status-filter-label"
+              htmlFor="project-bundles-status-filter"
+              className="sr-only sm:not-sr-only sm:text-sm sm:font-medium sm:text-foreground"
+            >
               Status
             </label>
-            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as ProjectIncidentStatusFilter)}>
+            <Select
+              value={statusFilter}
+              onValueChange={(value) => setStatusFilter(value as ProjectIncidentStatusFilter)}
+            >
               <SelectTrigger
                 id="project-bundles-status-filter"
                 aria-labelledby="project-bundles-status-filter-label project-bundles-status-filter"
@@ -466,58 +432,90 @@ export function ProjectBundlesPage(): JSX.Element {
               </Empty>
             }
           >
-              {() => (
-                <div className="space-y-4">
-              <Table className="min-w-[920px]">
-                <TableHeader>
-                  <TableRow>
-                      <SortableTableHead label="Incident" field="title" sort={sort} onSortChange={(field) => setSort((current) => toggleSort(current, field))} />
-                      <SortableTableHead label="Severity" field="severity" sort={sort} onSortChange={(field) => setSort((current) => toggleSort(current, field))} />
-                      <SortableTableHead label="Status" field="status" sort={sort} onSortChange={(field) => setSort((current) => toggleSort(current, field))} />
-                      <SortableTableHead label="Last seen" field="last_seen_at" sort={sort} onSortChange={(field) => setSort((current) => toggleSort(current, field))} />
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {sortedIncidents.map((incident) => (
-                    <TableRow key={incident.incident_id}>
-                      <TableCell>
-                        <BoundedTableTitle
-                          title={incident.title}
-                          to={`/projects/${incident.project_id}/bundles/${incident.incident_id}`}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={severityVariantMap[incident.severity]}>{incident.severity}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={statusVariantMap[incident.status]}>{incident.status}</Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{formatDate(incident.last_seen_at)}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button asChild variant="ghost" size="sm">
-                            <Link to={`/projects/${incident.project_id}/bundles/${incident.incident_id}`}>
-                              View bundle
-                            </Link>
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => downloadBundle(incident.incident_id)}>
-                            <DownloadIcon className="size-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+            {() => (
+              <div className="space-y-4">
+                <Table className="min-w-[920px]">
+                  <TableHeader>
+                    <TableRow>
+                      <SortableTableHead
+                        label="Incident"
+                        field="title"
+                        sort={sort}
+                        onSortChange={(field) => setSort((current) => toggleSort(current, field))}
+                      />
+                      <SortableTableHead
+                        label="Severity"
+                        field="severity"
+                        sort={sort}
+                        onSortChange={(field) => setSort((current) => toggleSort(current, field))}
+                      />
+                      <SortableTableHead
+                        label="Status"
+                        field="status"
+                        sort={sort}
+                        onSortChange={(field) => setSort((current) => toggleSort(current, field))}
+                      />
+                      <SortableTableHead
+                        label="Last seen"
+                        field="last_seen_at"
+                        sort={sort}
+                        onSortChange={(field) => setSort((current) => toggleSort(current, field))}
+                      />
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              <CursorPaginationControls
-                page={page}
+                  </TableHeader>
+                  <TableBody>
+                    {sortedIncidents.map((incident) => (
+                      <TableRow key={incident.incident_id}>
+                        <TableCell>
+                          <BoundedTableTitle
+                            title={incident.title}
+                            to={`/projects/${incident.project_id}/bundles/${incident.incident_id}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={severityVariantMap[incident.severity]}>
+                            {incident.severity}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={statusVariantMap[incident.status]}>
+                            {incident.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {formatDate(incident.last_seen_at)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button asChild variant="ghost" size="sm">
+                              <Link
+                                to={`/projects/${incident.project_id}/bundles/${incident.incident_id}`}
+                              >
+                                View bundle
+                              </Link>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => downloadBundle(incident.incident_id)}
+                            >
+                              <DownloadIcon className="size-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                <CursorPaginationControls
+                  page={page}
                   totalPages={totalPages}
-                hasNextPage={hasNextPage}
-                isLoading={isLoading}
-                onPreviousPage={goToPreviousPage}
-                onNextPage={() => void goToNextPage()}
-              />
+                  hasNextPage={hasNextPage}
+                  isLoading={isLoading}
+                  onPreviousPage={goToPreviousPage}
+                  onNextPage={() => void goToNextPage()}
+                />
               </div>
             )}
           </ResourceListState>
@@ -527,188 +525,98 @@ export function ProjectBundlesPage(): JSX.Element {
   );
 }
 
-export function IncidentTable({
-  incidents,
-  sort,
-  onSortChange,
-  selectedIncidentIds,
-  onToggleIncidentSelection,
-  onIncidentRowClick
-}: {
-  incidents: IncidentRecord[];
-  sort: SortState<ProjectIncidentSortField>;
-  onSortChange: (field: ProjectIncidentSortField) => void;
-  selectedIncidentIds: Set<string>;
-  onToggleIncidentSelection: (incidentId: string) => void;
-  onIncidentRowClick: (event: MouseEvent<HTMLTableRowElement>, incident: IncidentRecord) => void;
-}): JSX.Element {
-  return (
-    <Table className="min-w-[900px] md:min-w-0 md:table-fixed">
-      <TableHeader>
-        <TableRow>
-          <TableHead className="w-8">
-            <span className="sr-only">Select incidents</span>
-          </TableHead>
-          <SortableTableHead label="Incident" field="title" sort={sort} onSortChange={onSortChange} className="w-[34%]" />
-          <SortableTableHead label="Service" field="service_name" sort={sort} onSortChange={onSortChange} className="w-[16%]" />
-          <SortableTableHead label="Environment" field="environment" sort={sort} onSortChange={onSortChange} className="w-[14%]" />
-          <SortableTableHead label="Severity" field="severity" sort={sort} onSortChange={onSortChange} />
-          <SortableTableHead label="Status" field="status" sort={sort} onSortChange={onSortChange} />
-          <SortableTableHead label="Occurrences" field="occurrence_count" sort={sort} onSortChange={onSortChange} className="whitespace-nowrap" />
-          <SortableTableHead label="Last seen" field="last_seen_at" sort={sort} onSortChange={onSortChange} className="text-right whitespace-nowrap" align="right" />
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {incidents.map((incident) => (
-          <TableRow
-            key={incident.incident_id}
-            className="cursor-pointer"
-            data-state={selectedIncidentIds.has(incident.incident_id) ? "selected" : undefined}
-            onClick={(event) => {
-              onIncidentRowClick(event, incident);
-            }}
-          >
-            <TableCell className="align-middle" data-row-interactive="true">
-              <input
-                type="checkbox"
-                aria-label={`Select incident ${incident.title}`}
-                checked={selectedIncidentIds.has(incident.incident_id)}
-                onChange={() => {
-                  onToggleIncidentSelection(incident.incident_id);
-                }}
-                onClick={(event) => {
-                  event.stopPropagation();
-                }}
-              />
-            </TableCell>
-            <TableCell className="align-top whitespace-normal">
-              <BoundedTableTitle
-                title={incident.title}
-                to={`/projects/${incident.project_id}/incidents/${incident.incident_id}`}
-                rowInteractive
-              />
-              <p className="mt-1 text-xs text-muted-foreground whitespace-normal break-words">
-                {formatIncidentMatchedFields(incident.matched_fields)}
-              </p>
-            </TableCell>
-            <TableCell className="text-sm text-muted-foreground whitespace-normal break-words align-middle">
-              {formatServiceName(incident.service_name)}
-            </TableCell>
-            <TableCell className="text-sm text-muted-foreground whitespace-normal break-words align-middle">
-              {incident.environment}
-            </TableCell>
-            <TableCell>
-              <Badge variant={severityVariantMap[incident.severity]}>{incident.severity}</Badge>
-            </TableCell>
-            <TableCell>
-              <Badge variant={statusVariantMap[incident.status]}>{incident.status}</Badge>
-            </TableCell>
-            <TableCell className="whitespace-nowrap">{incident.occurrence_count}</TableCell>
-            <TableCell className="text-right text-sm text-muted-foreground whitespace-nowrap">{formatDate(incident.last_seen_at)}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
-}
-
-const severityVariantMap: Record<IncidentRecord["severity"], "secondary" | "warning" | "destructive"> = {
-  low: "secondary",
-  medium: "secondary",
-  high: "warning",
-  critical: "destructive"
-};
-
-const statusVariantMap: Record<IncidentRecord["status"], "destructive" | "warning" | "success"> = {
-  open: "warning",
-  resolved: "success",
-  regressed: "destructive"
-};
-
-function formatDate(value: string): string {
-  return new Date(value).toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short"
-  });
-}
-
-function formatServiceName(value: string | null): string {
-  return value ?? "Unknown service";
-}
-
-type ProjectIncidentSortField = "title" | "service_name" | "environment" | "severity" | "status" | "occurrence_count" | "last_seen_at";
 type ProjectBundleSortField = "title" | "severity" | "status" | "last_seen_at";
 type ProjectIncidentStatusFilter = "active" | IncidentRecord["status"] | "all";
 
-const INCIDENT_STATUS_FILTER_OPTIONS: Array<{ value: ProjectIncidentStatusFilter; label: string }> = [
-  { value: "active", label: "Needs attention" },
-  { value: "open", label: "Open" },
-  { value: "regressed", label: "Regressed" },
-  { value: "all", label: "All statuses" },
-  { value: "resolved", label: "Resolved" }
-];
+const INCIDENT_STATUS_FILTER_OPTIONS: Array<{ value: ProjectIncidentStatusFilter; label: string }> =
+  [
+    { value: "active", label: "Needs attention" },
+    { value: "open", label: "Open" },
+    { value: "regressed", label: "Regressed" },
+    { value: "all", label: "All statuses" },
+    { value: "resolved", label: "Resolved" }
+  ];
 
-function getProjectIncidentEmptyState(statusFilter: ProjectIncidentStatusFilter): { title: string; description: string } {
+function getProjectIncidentEmptyState(statusFilter: ProjectIncidentStatusFilter): {
+  title: string;
+  description: string;
+} {
   switch (statusFilter) {
     case "active":
       return {
         title: "No incidents need attention for this project",
-        description: "Open and regressed incidents will appear here when this project has grouped failures that need attention."
+        description:
+          "Open and regressed incidents will appear here when this project has grouped failures that need attention."
       };
     case "open":
       return {
         title: "No open incidents for this project",
-        description: "Open incidents will appear here once the SDK starts sending grouped failures for this project."
+        description:
+          "Open incidents will appear here once the SDK starts sending grouped failures for this project."
       };
     case "resolved":
       return {
         title: "No resolved incidents for this project",
-        description: "Resolved incidents will appear here after this project’s grouped failures have been reviewed and marked resolved."
+        description:
+          "Resolved incidents will appear here after this project’s grouped failures have been reviewed and marked resolved."
       };
     case "regressed":
       return {
         title: "No regressed incidents for this project",
-        description: "Regressed incidents will appear here when a resolved issue starts happening again in this project."
+        description:
+          "Regressed incidents will appear here when a resolved issue starts happening again in this project."
       };
     case "all":
       return {
         title: "No incidents for this project",
-        description: "Incidents will appear here once the SDK starts sending events for this project."
+        description:
+          "Incidents will appear here once the SDK starts sending events for this project."
       };
   }
 }
 
-function getProjectBundleEmptyState(statusFilter: ProjectIncidentStatusFilter): { title: string; description: string } {
+function getProjectBundleEmptyState(statusFilter: ProjectIncidentStatusFilter): {
+  title: string;
+  description: string;
+} {
   switch (statusFilter) {
     case "active":
       return {
         title: "No bundles need attention",
-        description: "Bundles for open and regressed incidents will appear here once this project has processed grouped failures."
+        description:
+          "Bundles for open and regressed incidents will appear here once this project has processed grouped failures."
       };
     case "open":
       return {
         title: "No bundles for open incidents",
-        description: "Bundles for open incidents will appear here once this project has processed grouped failures."
+        description:
+          "Bundles for open incidents will appear here once this project has processed grouped failures."
       };
     case "resolved":
       return {
         title: "No bundles for resolved incidents",
-        description: "Bundles for resolved incidents will appear here after this project’s incidents have been processed and marked resolved."
+        description:
+          "Bundles for resolved incidents will appear here after this project’s incidents have been processed and marked resolved."
       };
     case "regressed":
       return {
         title: "No bundles for regressed incidents",
-        description: "Bundles for regressed incidents will appear here when a resolved issue starts happening again in this project."
+        description:
+          "Bundles for regressed incidents will appear here when a resolved issue starts happening again in this project."
       };
     case "all":
       return {
         title: "No bundles available",
-        description: "Bundles are generated when incidents are processed. Start sending events to see bundles here."
+        description:
+          "Bundles are generated when incidents are processed. Start sending events to see bundles here."
       };
   }
 }
 
-function sortProjectIncidents(incidents: IncidentRecord[] | null, sort: SortState<ProjectIncidentSortField>): IncidentRecord[] {
+function sortProjectIncidents(
+  incidents: IncidentRecord[] | null,
+  sort: SortState<ProjectIncidentSortField>
+): IncidentRecord[] {
   if (incidents === null) {
     return [];
   }
@@ -717,7 +625,10 @@ function sortProjectIncidents(incidents: IncidentRecord[] | null, sort: SortStat
   return sort.direction === "asc" ? sorted : sorted.reverse();
 }
 
-function sortProjectBundles(incidents: IncidentRecord[] | null, sort: SortState<ProjectBundleSortField>): IncidentRecord[] {
+function sortProjectBundles(
+  incidents: IncidentRecord[] | null,
+  sort: SortState<ProjectBundleSortField>
+): IncidentRecord[] {
   if (incidents === null) {
     return [];
   }
@@ -747,7 +658,9 @@ function compareIncidentLike(
     case "title":
       return left.title.localeCompare(right.title);
     case "service_name":
-      return formatServiceName(left.service_name).localeCompare(formatServiceName(right.service_name));
+      return formatServiceName(left.service_name).localeCompare(
+        formatServiceName(right.service_name)
+      );
     case "environment":
       return left.environment.localeCompare(right.environment);
     case "severity":
@@ -761,15 +674,6 @@ function compareIncidentLike(
     default:
       return 0;
   }
-}
-
-function DetailRow({ label, value }: { label: string; value: string }): JSX.Element {
-  return (
-    <div className="flex items-center justify-between gap-4 text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium">{value}</span>
-    </div>
-  );
 }
 
 function downloadBundle(incidentId: string): void {
@@ -800,9 +704,31 @@ function downloadBundle(incidentId: string): void {
 }
 
 function exportIncidentsAsCsv(incidents: IncidentRecord[]): void {
-  const headers = ["incident_id", "title", "project_id", "service_id", "severity", "status", "environment", "occurrence_count", "first_seen_at", "last_seen_at"];
+  const headers = [
+    "incident_id",
+    "title",
+    "project_id",
+    "service_id",
+    "severity",
+    "status",
+    "environment",
+    "occurrence_count",
+    "first_seen_at",
+    "last_seen_at"
+  ];
   const rows = incidents.map((i) =>
-    [i.incident_id, `"${i.title.replace(/"/g, '""')}"`, i.project_id, i.service_id, i.severity, i.status, i.environment, String(i.occurrence_count), i.first_seen_at, i.last_seen_at].join(",")
+    [
+      i.incident_id,
+      `"${i.title.replace(/"/g, '""')}"`,
+      i.project_id,
+      i.service_id,
+      i.severity,
+      i.status,
+      i.environment,
+      String(i.occurrence_count),
+      i.first_seen_at,
+      i.last_seen_at
+    ].join(",")
   );
   const csv = [headers.join(","), ...rows].join("\n");
   const blob = new Blob([csv], { type: "text/csv" });

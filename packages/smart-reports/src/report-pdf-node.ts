@@ -6,6 +6,9 @@ import { type ReportContentView } from "./report-content.js";
 import { ReportPdfRenderInputSchema } from "./report-pdf-input.js";
 import {
   reportEvidenceSections,
+  reportAnalysisExplanation,
+  reportPeriodLabel,
+  reportTimeLabel,
   reportMetricLabels,
   reportMetricComparison,
   formatReportValue
@@ -158,11 +161,9 @@ export async function renderReportPdf(
           underline: true
         });
       }
+      paragraph(reportPeriodLabel(facts.period));
       paragraph(
-        `${facts.period.starts_at.slice(0, 10)} to ${facts.period.ends_at.slice(0, 10)} (end exclusive, UTC)`
-      );
-      paragraph(
-        `Previous: ${facts.previous_period.starts_at.slice(0, 10)} to ${facts.previous_period.ends_at.slice(0, 10)} UTC. Data cutoff: ${facts.cutoff_at}`,
+        `Previous: ${reportPeriodLabel(facts.previous_period)}. Data cutoff: ${reportTimeLabel(facts.cutoff_at)}`,
         8,
         "#737373"
       );
@@ -170,7 +171,7 @@ export async function renderReportPdf(
       paragraph(
         doc.narrative
           ? `${doc.narrative.overview.text} ${references(doc.narrative.overview.evidence_refs)}`
-          : "AI analysis unavailable. This report retains its recorded facts, resolutions and selected outstanding work. No generated explanation is available for this run."
+          : reportAnalysisExplanation(doc.analysis.reason)
       );
       heading("What happened");
       if (doc.narrative?.highlights.length)
@@ -189,27 +190,28 @@ export async function renderReportPdf(
             "No selected evidence in this category; missing observations require coverage review."
           );
       }
-      heading("Recorded resolutions");
-      for (const item of solved)
-        paragraph(
-          `${item.title} (${item.type}, ${item.status.replaceAll("_", " ")}) ${references([item.ref])}`
-        );
-      if (solved.length === 0)
-        paragraph(
-          "No selected recorded resolutions or observed recoveries. See coverage before interpreting missing observations."
-        );
       heading(`Focus for the coming ${coming}`);
+      for (const item of urgent)
+        paragraph(
+          `${facts.projects.find((project) => project.ref === item.project_ref)?.name}: ${item.title} (${item.severity}, ${item.status}) ${references([item.ref])}`
+        );
       if (doc.narrative?.priorities.length)
         for (const item of doc.narrative.priorities) {
           paragraph(item.title, 12);
           paragraph(`${item.action} ${item.rationale} ${references(item.evidence_refs)}`);
         }
-      else if (urgent.length)
-        for (const item of urgent)
-          paragraph(`${item.title} (${item.severity}, ${item.status}) ${references([item.ref])}`);
-      else
+      else if (!urgent.length)
         paragraph(
           "No selected high or critical work is recorded. Incomplete coverage does not establish that no issues exist."
+        );
+      heading("Resolutions and recoveries");
+      for (const item of solved)
+        paragraph(
+          `${facts.projects.find((project) => project.ref === item.project_ref)?.name}: ${item.title} (${item.type}, ${item.status.replaceAll("_", " ")}) ${references([item.ref])}`
+        );
+      if (solved.length === 0)
+        paragraph(
+          "No selected recorded resolutions or observed recoveries. See coverage before interpreting missing observations."
         );
       heading("Period comparison");
       paragraph(
@@ -281,7 +283,7 @@ export async function renderReportPdf(
       for (const item of facts.evidence) {
         heading(`${item.title} [${item.ref}]`, 12);
         paragraph(
-          `${item.type} · ${item.severity} · ${item.status.replaceAll("_", " ")} · ${item.project_ref}`,
+          `${item.type} · ${item.severity} · ${item.status.replaceAll("_", " ")} · ${facts.projects.find((project) => project.ref === item.project_ref)?.name} · ${item.project_ref}`,
           9,
           "#737373"
         );
@@ -309,7 +311,7 @@ export async function renderReportPdf(
           "#737373"
         );
       paragraph(
-        `Report expires ${doc.report.expires_at}. Version ${doc.version}, template ${doc.template_version}.`,
+        `Report expires ${reportTimeLabel(doc.report.expires_at)}. Version ${doc.version}, template ${doc.template_version}.`,
         8,
         "#737373"
       );

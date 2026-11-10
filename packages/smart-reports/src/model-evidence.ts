@@ -150,6 +150,21 @@ export type ReportModelFacts = z.infer<typeof ReportModelFactsSchema>;
 export type ReportModelEvidence = z.infer<typeof ReportModelEvidenceSchema>;
 export type ReportModelMetric = z.infer<typeof ReportModelMetricSchema>;
 
+/** A report is a bounded collection, not a single telemetry event. Apply the
+ * same mandatory policy to each validated row so full multilingual evidence
+ * does not exhaust the event sanitizer's byte/node budget. Canonical document
+ * and provider request limits remain independent and unchanged. */
+export function redactReportModelFacts(raw: unknown): ReportModelFacts {
+  const facts = ReportModelFactsSchema.parse(raw);
+  const { projects, metrics, evidence, ...metadata } = facts;
+  return ReportModelFactsSchema.parse({
+    ...(redactReportData(metadata) as typeof metadata),
+    projects: projects.map((item) => redactReportData(item)),
+    metrics: metrics.map((item) => redactReportData(item)),
+    evidence: evidence.map((item) => redactReportData(item))
+  });
+}
+
 /** This is an egress projection, never authority or raw captured input. It has
  * opaque references only; authenticated source links stay with the server. */
 export function prepareReportModelInput(raw: unknown): ReportModelFacts {
@@ -209,5 +224,5 @@ export function prepareReportModelInput(raw: unknown): ReportModelFacts {
       context: null
     }));
   }
-  return ReportModelFactsSchema.parse(redactReportData(input));
+  return redactReportModelFacts(input);
 }

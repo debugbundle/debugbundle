@@ -1,3 +1,29 @@
+Dashboard empty resource lists and data panels reuse `ResourceEmptyState` with
+the existing Empty primitives, scoped help and permitted actions. The former
+`ProjectResourceEmptyState` name remains a compatible alias; loading, errors and
+factual evidence caveats keep their distinct feedback patterns.
+
+Analytics flows and bundle generation reuse the standard form dialog, pending
+controls and compact toolbars. Bundle creation keeps its existing URL as a nested
+modal over the inventory, retaining list state on cancellation. Shared analytics
+presentation formats system categories while preserving source identifiers and
+query values; filter menus use a bounded desktop popover and the mobile Sheet.
+
+Metric filters use observed dropdown choices from the bounded, project-authorised
+`GET /v1/analytics/filter-options` read, with CLI and ordinary MCP parity. The
+storage reader reuses rollup time/scope/origin fences, approved custom keys and
+privacy omission; empty/unavailable choices are disabled, and stale client reads
+are aborted. This read uses no generation allowance and leaves restricted tool
+catalogues unchanged. Project overview metadata uses a responsive definition grid;
+summary, incident table and presentation modules retain their former exports.
+
+The opt-in `make dev-mock` frontend includes schema-validated sample Smart
+Reports, recipient choices and in-memory create/edit/generate/cancel/delete flows.
+Its HTML/PDF use the production renderers, with PDF in the bounded child; no
+provider, email, database, quota ledger or production receipt is touched. Mock
+billing controls select Business for fresh generation; saved examples remain
+readable on other mock tiers under the normal archive UI.
+
 Local tier review uses `make dev-tier` (inspect) or `TIER=free|solo|team|business`
 against the checkout-owned Compose Postgres socket. It refuses provider-linked,
 trial and pending-billing accounts; explicit administrative Free stays selected.
@@ -38,6 +64,27 @@ Smart Reports retain bounded consented facts/context, fair durable run admission
 a shared monthly quota/budget and one conservative paid attempt. The existing
 worker has an independent serial PDF/generation/email lane with shared clients.
 One canonical private report supplies HTML, cached bounded PDF and email overview.
+Model-attempt diagnostics retain only allowlisted internal codes outside the
+immutable receipt hash; legacy codes remain unknown. Nullable forward migration
+`202611090001_add_report_model_diagnostics` precedes dependent runtime. Recovery
+retains the original uncertainty diagnostic and never buys another response.
+The model decoder binds highlight kinds to supporting references; unsupported
+resolution/recovery/outstanding combinations are excluded during generation.
+The canonical narrative schema and final publication validator stay compatible.
+Generated prose must pass the mandatory privacy policy before successful settlement;
+unsafe output leaves a readable factual fallback. Row-bounded redaction supports
+maximum multilingual facts without relaxing document or paid-input budgets.
+Overdue schedules admit one persisted period, then advance to a future delivery,
+preventing a historical catch-up burst against the shared allowance. Reports put
+history and useful content first; explicit generation confirmation and bounded
+read-only status polling preserve paid-attempt and access controls. Generating
+reports show the shared pending Notice and automatically display canonical content
+when readable. Serial reads pause when hidden/offline and use connection backoff;
+access errors and terminal states stop progress without buying another response.
+PDF download is one explicit action: the shared pending button waits for cached
+output, retrieves bounded validated bytes with session cookies and saves once.
+Only the click owns download intent; navigation clears it. History status details
+use accessible badge tooltips so explanations cannot dominate column sizing.
 Current whole-scope authority is checked at generation and egress. Receipt-backed
 email distinguishes acceptance from uncertainty and never blindly resends.
 Disabling generation preserves archive reads and exact-key cleanup. Account export

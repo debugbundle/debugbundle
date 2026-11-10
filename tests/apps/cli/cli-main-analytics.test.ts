@@ -3,6 +3,38 @@ import { describe, expect, it, vi } from "vitest";
 import { runCli } from "../../../apps/cli/src/main.js";
 
 describe("cli main analytics routing", () => {
+  it("routes filter options as a bounded context read and rejects metric dimensions", async () => {
+    const getAnalyticsFilterOptionsCommand = vi
+      .fn()
+      .mockResolvedValue({ exitCode: 0, output: "choices" });
+    const args = [
+      "analytics",
+      "filter-options",
+      "--project",
+      "00000000-0000-0000-0000-000000000001",
+      "--last",
+      "30d",
+      "--service",
+      "web",
+      "--limit",
+      "50",
+      "--json"
+    ];
+    await expect(runCli(args, { getAnalyticsFilterOptionsCommand })).resolves.toEqual({
+      exitCode: 0,
+      output: "choices"
+    });
+    expect(getAnalyticsFilterOptionsCommand).toHaveBeenCalledWith(
+      expect.objectContaining({ last: "30d", service: "web", limit: 50, json: true })
+    );
+    getAnalyticsFilterOptionsCommand.mockClear();
+    expect(
+      (await runCli([...args, "--browser", "Chrome"], { getAnalyticsFilterOptionsCommand }))
+        .exitCode
+    ).not.toBe(0);
+    expect(getAnalyticsFilterOptionsCommand).not.toHaveBeenCalled();
+  });
+
   it("routes analytics summary arguments into the summary command", async () => {
     const getAnalyticsSummaryCommand = vi.fn().mockResolvedValue({
       exitCode: 0,

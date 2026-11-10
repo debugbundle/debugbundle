@@ -27,7 +27,7 @@ describe("canonical report HTML", () => {
     expect(html).toContain("Monthly review");
     expect(html).toContain("2026-10-01");
     expect(html).toContain("2026-11-01");
-    expect(html).toContain("AI analysis unavailable");
+    expect(html).toContain("AI analysis is unavailable");
     expect(html).toContain("No selected high or critical work");
     expect(html).toContain('scope="col"');
     expect(html).toContain('id="main"');
@@ -35,6 +35,20 @@ describe("canonical report HTML", () => {
     expect(html).not.toMatch(/<script|<iframe|<img|https?:\/\//i);
     expect(html).toBe(renderReportHtml(doc));
   });
+  it.each(["model_rejected", "model_uncertain"] as const)(
+    "explains %s without exposing internal codes or suggesting a free retry",
+    (reason) => {
+      const doc = reportDocumentFixture();
+      doc.analysis.reason = reason;
+      const html = renderReportHtml(doc);
+      expect(html).toContain(
+        "The recorded facts, resolutions and selected outstanding work remain available."
+      );
+      expect(html).toContain("No automatic paid retry will be made.");
+      expect(html).not.toContain(reason);
+      expect(html).not.toContain("model rejected");
+    }
+  );
   it("escapes source and project labels, keeps Unicode and wraps print tables", () => {
     const doc = reportDocumentFixture();
     doc.name = '"><script>alert(1)</script>';
@@ -76,7 +90,10 @@ describe("canonical report HTML", () => {
       text_expires_at: null
     });
     const html = renderReportHtml(doc);
-    expect(html).toContain("Recorded resolutions");
+    expect(html).toContain("Resolutions and recoveries");
+    expect(html.indexOf("Focus for the coming")).toBeLessThan(
+      html.indexOf("Resolutions and recoveries")
+    );
     expect(html).toContain(evidence.title);
     expect(html).toContain("Source evidence unavailable");
     doc.report.facts.evidence[0] = {

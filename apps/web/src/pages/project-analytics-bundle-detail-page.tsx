@@ -1,3 +1,4 @@
+import { formatAnalyticsDimensionValue } from "../lib/analytics-presentation.js";
 import { ArrowLeftIcon, RefreshCwIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, Navigate, useOutletContext, useParams } from "react-router-dom";
@@ -277,7 +278,9 @@ function SegmentsSection({
             key={`${item.dimension}-${item.value}-${index}`}
             className="border-l-2 border-border pl-3"
           >
-            <p className="text-sm font-medium">{item.value}</p>
+            <p className="text-sm font-medium">
+              {formatAnalyticsDimensionValue(item.dimension, item.value)}
+            </p>
             <p className="text-xs text-muted-foreground">{formatAnalyticsLabel(item.dimension)}</p>
             <p className="mt-1 text-sm text-muted-foreground">{item.metrics.join(" · ")}</p>
           </div>

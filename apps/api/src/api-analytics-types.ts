@@ -1,3 +1,5 @@
+import type { AnalyticsFilterOptionsInput } from "../../../packages/storage/src/analytics-filter-options-store.js";
+import type { AnalyticsFilterOptionsResponse } from "../../../packages/shared-types/src/analytics-filter-options.js";
 import type { ProjectActorReadScope } from "../../../packages/storage/src/project-read-scope.js";
 import type { ProjectJobInitiator } from "../../../packages/storage/src/project-job-authorization.js";
 import type { AnalyticsFlowStore } from "../../../packages/storage/src/analytics-flow-store.js";
@@ -35,6 +37,13 @@ import type {
 } from "../../../packages/storage/src/index.js";
 
 export interface ApiAnalyticsDependencies {
+  analyticsFilterOptions?:
+    | {
+        getFilterOptionsForProject(
+          input: AnalyticsFilterOptionsInput & { organization_id: string }
+        ): Promise<AnalyticsFilterOptionsResponse>;
+      }
+    | undefined;
   analyticsFlows?: AnalyticsFlowStore | undefined;
   analyticsSavedFunnels?:
     | {

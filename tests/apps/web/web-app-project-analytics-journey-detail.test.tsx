@@ -103,13 +103,7 @@ describe("web app - project analytics journey detail", () => {
   it("renders a privacy-safe structured timeline without internal identifiers or raw data", async () => {
     const state = installJourneyDetailFetch();
 
-    render(
-      <App
-        initialEntries={[
-          `/projects/${PROJECT_ID}/analytics/journeys/${SAMPLE_ID}`
-        ]}
-      />
-    );
+    render(<App initialEntries={[`/projects/${PROJECT_ID}/analytics/journeys/${SAMPLE_ID}`]} />);
 
     expect(await screen.findByRole("heading", { name: "Journey sample" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Back to journeys" })).toHaveAttribute(
@@ -122,9 +116,9 @@ describe("web app - project analytics journey detail", () => {
     expect(within(timeline).getByText("/pricing")).toBeInTheDocument();
     expect(within(timeline).getByText("/checkout")).toBeInTheDocument();
     expect(within(timeline).getByText("checkout / shipping")).toBeInTheDocument();
-    expect(screen.getByText("mobile")).toBeInTheDocument();
-    expect(screen.getByText("chrome")).toBeInTheDocument();
-    expect(screen.getByText("authenticated")).toBeInTheDocument();
+    expect(screen.getByText("Mobile")).toBeInTheDocument();
+    expect(screen.getByText("Chrome")).toBeInTheDocument();
+    expect(screen.getByText("Authenticated")).toBeInTheDocument();
 
     for (const sensitiveValue of [
       "sha256:internal-session-hash",
@@ -137,11 +131,13 @@ describe("web app - project analytics journey detail", () => {
       expect(screen.queryByText(sensitiveValue)).not.toBeInTheDocument();
     }
     expect(
-      state.requestedUrls().some(
-        (url) =>
-          url.includes(`/v1/analytics/journey-samples/${SAMPLE_ID}?`) &&
-          url.includes(`project_id=${PROJECT_ID}`)
-      )
+      state
+        .requestedUrls()
+        .some(
+          (url) =>
+            url.includes(`/v1/analytics/journey-samples/${SAMPLE_ID}?`) &&
+            url.includes(`project_id=${PROJECT_ID}`)
+        )
     ).toBe(true);
   });
 
@@ -149,16 +145,12 @@ describe("web app - project analytics journey detail", () => {
     const user = userEvent.setup();
     installJourneyDetailFetch(true);
 
-    render(
-      <App
-        initialEntries={[
-          `/projects/${PROJECT_ID}/analytics/journeys/${SAMPLE_ID}`
-        ]}
-      />
-    );
+    render(<App initialEntries={[`/projects/${PROJECT_ID}/analytics/journeys/${SAMPLE_ID}`]} />);
 
     expect(await screen.findByText(/could not load journey sample/i)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Retry journey sample" }));
-    expect(await screen.findByRole("list", { name: "Structured journey timeline" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("list", { name: "Structured journey timeline" })
+    ).toBeInTheDocument();
   });
 });

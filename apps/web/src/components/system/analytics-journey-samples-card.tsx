@@ -1,3 +1,5 @@
+import { RouteIcon } from "lucide-react";
+import { ResourceEmptyState } from "./resource-empty-state.js";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { listProjectAnalyticsJourneySamples } from "../../lib/api-analytics.js";
@@ -81,17 +83,20 @@ export function AnalyticsJourneySamplesCard({
       <CardContent className="flex flex-col gap-4">
         <Field>
           <FieldLabel htmlFor="analytics-sample-tag">Sample tag</FieldLabel>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Input
               id="analytics-sample-tag"
               value={tagDraft}
               disabled={loading}
               maxLength={120}
+              className="w-48 max-w-full"
+              placeholder="e.g. loop"
               onChange={(event) => setTagDraft(event.currentTarget.value)}
             />
             <Button
               type="button"
               variant="outline"
+              size="sm"
               disabled={loading}
               onClick={() => {
                 setTag(tagDraft.trim());
@@ -127,7 +132,11 @@ export function AnalyticsJourneySamplesCard({
             </Button>
           </Notice>
         ) : samples?.samples.length === 0 ? (
-          <Notice>No retained journey samples for this scope.</Notice>
+          <ResourceEmptyState
+            icon={RouteIcon}
+            title="No retained journey samples"
+            description="No samples match this scope and tag filter. Sampling and retention can limit the journeys available here."
+          />
         ) : (
           <Table>
             <TableHeader>

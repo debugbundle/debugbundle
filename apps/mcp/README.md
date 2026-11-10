@@ -8,14 +8,12 @@ rewriting or deleting unrelated files. Symlinked files/directories fail closed.
 Normal local stores and their existing size allowance are preserved; local state
 and processing writes use guarded atomic replacement. This supersedes earlier clients.
 
-
 ## Cloud cache safety in 1.19.4
 
 Upgrade to 1.19.4 for incident-ID validation before cloud requests and cache writes.
 Unsafe IDs return `invalid_incident_id`; UUIDs and existing opaque IDs remain supported.
 Cloud cache reads, writes and retention reject symbolic links; writes use guarded
 atomic replacement. This corrects a path traversal present in earlier clients.
-
 
 ## Installation guidance in 1.19.4
 
@@ -30,7 +28,6 @@ then explicitly rebuild from its retained event files using
 `debugbundle process --preset <minimal|balanced|investigative>` with the desired
 capture preset. This rebuild regenerates local incident/artifact state; it does
 not change cloud records or the retained event files.
-
 
 ## Project/service consolidation 1.19.1
 
@@ -104,7 +101,7 @@ Use `npx -y @debugbundle/mcp` in clients that require noninteractive package exe
 | Claude Desktop local MCP      | local MCP server config                                                    | uses local machine auth/config                       |
 | Claude Code plugin            | `/plugin marketplace add debugbundle/debugbundle`                          | installs bundled MCP config and DebugBundle skill    |
 | Codex developer plugin        | `codex plugin add debugbundle-codex@debugbundle`                           | repository marketplace; local MCP and workflow skill |
-| Codex direct MCP              | `codex mcp add debugbundle -- npx -y @debugbundle/mcp@1.21.0 --local-auth` | app, CLI, and IDE on the same host                   |
+| Codex direct MCP              | `codex mcp add debugbundle -- npx -y @debugbundle/mcp@1.22.0 --local-auth` | app, CLI, and IDE on the same host                   |
 | Cursor                        | MCP config with `npx @debugbundle/mcp`                                     | stdio transport                                      |
 | VS Code / GitHub MCP Registry | `com.debugbundle/mcp`                                                      | official registry metadata                           |
 | OpenClaw / ClawHub            | DebugBundle skill plus MCP config                                          | use the published skill for workflow guidance        |
@@ -171,6 +168,7 @@ The plugin package lives at `apps/mcp/claude-code/debugbundle` and bundles a Cla
 
 - List active incidents and fetch full incident context.
 - Fetch deterministic debug bundles and reproduction artifacts.
+- Discover observed filter choices with `get_analytics_filter_options` for an authorised project, period, granularity and service/environment. Bounded sets expose `values` and `truncated`, with approved custom keys and no generation quota. Empty/unavailable choices must not be replaced with invented defaults. This tool is ordinary MCP only; restricted agent/OpenAI catalogues stay unchanged.
 - Query aggregate usage, routes, device/browser/OS/language segments, referrers, actions, funnels, and journey patterns without waiting for an analysis artifact through `get_usage_summary`, `get_route_metrics`, `get_device_breakdown`, `get_action_metrics`, `get_funnel_analysis`, and related reads.
 - Inspect retained redacted journey samples, analytics opportunities, and generated AnalyticsBundles; request a bounded analysis artifact when aggregate metrics alone are insufficient.
 - Read analytics settings before proposing privacy, retention, consent, capture, or approved custom-dimension changes; update them only with explicit owner/admin intent.

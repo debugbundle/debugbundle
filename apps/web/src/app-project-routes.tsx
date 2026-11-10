@@ -58,8 +58,9 @@ export function createProjectRoutes(): JSX.Element {
         <Route path="audiences" element={<ProjectAnalyticsAudiencesPage />} />
         <Route path="journeys" element={<ProjectAnalyticsJourneysPage />} />
         <Route path="opportunities" element={<ProjectAnalyticsOpportunitiesPage />} />
-        <Route path="bundles/new" element={<ProjectAnalyticsBundleCreatePage />} />
-        <Route path="bundles" element={<ProjectAnalyticsBundlesPage />} />
+        <Route path="bundles" element={<ProjectAnalyticsBundlesPage />}>
+          <Route path="new" element={<ProjectAnalyticsBundleCreatePage />} />
+        </Route>
       </Route>
       <Route path="bundles" element={<ProjectBundlesPage />} />
       <Route path="bundles/:incidentId" element={<IncidentDetailPage />} />

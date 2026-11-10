@@ -5,12 +5,14 @@ import { TableRefreshButton } from "./table-refresh-button.js";
 
 export function AnalyticsSectionHeader({
   title,
+  headingId,
   description,
   isLoading,
   onRefresh,
   actions
 }: {
   title: string;
+  headingId?: string;
   description: string;
   isLoading: boolean;
   onRefresh: () => Promise<void> | void;
@@ -18,18 +20,20 @@ export function AnalyticsSectionHeader({
 }): JSX.Element {
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
-      <div className="min-w-0 space-y-1">
-        <h2 className="text-lg font-medium">{title}</h2>
+      <div className="flex min-w-0 flex-col gap-1">
+        <h2 id={headingId} className="text-lg font-medium">
+          {title}
+        </h2>
         <p className="text-sm text-muted-foreground">{description}</p>
       </div>
       <div
         className={cn(
           "flex shrink-0 flex-wrap items-center justify-end gap-2",
-          actions === undefined ? null : "col-span-2 sm:col-auto"
+          actions === undefined ? null : "col-span-2 lg:col-auto"
         )}
       >
-        {actions}
         <TableRefreshButton isLoading={isLoading} onRefresh={onRefresh} mobileIconOnly />
+        {actions}
       </div>
     </div>
   );

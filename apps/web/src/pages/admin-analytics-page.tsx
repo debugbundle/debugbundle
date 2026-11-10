@@ -1,11 +1,25 @@
-import { ActivityIcon, GaugeIcon, HeartPulseIcon, LoaderCircleIcon, PackageIcon, UsersIcon } from "lucide-react";
+import {
+  ActivityIcon,
+  GaugeIcon,
+  HeartPulseIcon,
+  LoaderCircleIcon,
+  PackageIcon,
+  UsersIcon
+} from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { PageHeader } from "../components/system/page-header.js";
+import { ResourceEmptyState } from "../components/system/resource-empty-state.js";
 import { Badge } from "../components/ui/badge.js";
 import { Button } from "../components/ui/button.js";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card.js";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "../components/ui/card.js";
 import { Field, FieldDescription, FieldLabel } from "../components/ui/field.js";
 import { Input } from "../components/ui/input.js";
 import { Notice } from "../components/ui/notice.js";
@@ -25,7 +39,11 @@ import { useSession } from "../lib/session.js";
 
 type AdminAnalyticsState =
   | { status: "loading" }
-  | { status: "ready"; summary: AdminAnalyticsSummary; malformedBreakdown: AdminMalformedRejectionBreakdown | null }
+  | {
+      status: "ready";
+      summary: AdminAnalyticsSummary;
+      malformedBreakdown: AdminMalformedRejectionBreakdown | null;
+    }
   | { status: "email_auth_required" }
   | { status: "redirecting" }
   | { status: "error" };
@@ -309,7 +327,9 @@ export function AdminAnalyticsPage(): JSX.Element {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="outline">UTC windows</Badge>
-          <Badge variant="secondary">Generated {DATE_TIME_FORMAT.format(new Date(summary.generated_at))}</Badge>
+          <Badge variant="secondary">
+            Generated {DATE_TIME_FORMAT.format(new Date(summary.generated_at))}
+          </Badge>
         </div>
       </div>
 
@@ -318,8 +338,8 @@ export function AdminAnalyticsPage(): JSX.Element {
           <div>
             <CardTitle>Window scope</CardTitle>
             <CardDescription>
-              Collection starts at {DATE_FORMAT.format(new Date(summary.collection_started_at))}. All numbers on this
-              page are aggregate-only and use UTC boundaries.
+              Collection starts at {DATE_FORMAT.format(new Date(summary.collection_started_at))}.
+              All numbers on this page are aggregate-only and use UTC boundaries.
             </CardDescription>
           </div>
           <div className="grid gap-2 text-sm text-muted-foreground sm:text-right">
@@ -362,20 +382,46 @@ export function AdminAnalyticsPage(): JSX.Element {
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <div>
             <CardTitle>Health detail</CardTitle>
-            <CardDescription>Lower-level rejection and delivery counters for the current month.</CardDescription>
+            <CardDescription>
+              Lower-level rejection and delivery counters for the current month.
+            </CardDescription>
           </div>
           <GaugeIcon className="size-4 text-muted-foreground" />
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <DetailRow label="Malformed rejections" value={summary.health.malformed_rejections_this_month} />
-          <DetailRow label="Rate limited rejections" value={summary.health.rate_limited_rejections_this_month} />
+          <DetailRow
+            label="Malformed rejections"
+            value={summary.health.malformed_rejections_this_month}
+          />
+          <DetailRow
+            label="Rate limited rejections"
+            value={summary.health.rate_limited_rejections_this_month}
+          />
           <DetailRow label="Quota rejections" value={summary.health.quota_rejections_this_month} />
-          <DetailRow label="Capture policy rejections" value={summary.health.capture_policy_rejections_this_month} />
-          <DetailRow label="Capture rule rejections" value={summary.health.capture_rule_rejections_this_month} />
-          <DetailRow label="Weekly report failures" value={summary.health.weekly_reports_failed_this_month} />
-          <DetailRow label="GitHub dispatch failures" value={summary.health.github_dispatches_failed_this_month} />
-          <DetailRow label="Auto-disabled webhooks" value={summary.health.webhooks_auto_disabled_this_month} />
-          <DetailRow label="Operational emails sent" value={summary.health.operational_emails_sent_this_month} />
+          <DetailRow
+            label="Capture policy rejections"
+            value={summary.health.capture_policy_rejections_this_month}
+          />
+          <DetailRow
+            label="Capture rule rejections"
+            value={summary.health.capture_rule_rejections_this_month}
+          />
+          <DetailRow
+            label="Weekly report failures"
+            value={summary.health.weekly_reports_failed_this_month}
+          />
+          <DetailRow
+            label="GitHub dispatch failures"
+            value={summary.health.github_dispatches_failed_this_month}
+          />
+          <DetailRow
+            label="Auto-disabled webhooks"
+            value={summary.health.webhooks_auto_disabled_this_month}
+          />
+          <DetailRow
+            label="Operational emails sent"
+            value={summary.health.operational_emails_sent_this_month}
+          />
           <DetailRow
             label="Allowance warning emails"
             value={summary.health.allowance_warning_emails_sent_this_month}
@@ -408,7 +454,9 @@ function AnalyticsSection({
     <section className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">{title}</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            {title}
+          </h2>
           <p className="mt-1 text-sm text-muted-foreground">{description}</p>
         </div>
         {icon}
@@ -429,7 +477,9 @@ function StatCard({ entry }: { entry: StatCardEntry }): JSX.Element {
         <CardDescription>{entry.label}</CardDescription>
       </CardHeader>
       <CardContent>
-        <CardTitle className="text-2xl tabular-nums">{formatValue(entry.value, entry.tone)}</CardTitle>
+        <CardTitle className="text-2xl tabular-nums">
+          {formatValue(entry.value, entry.tone)}
+        </CardTitle>
         <p className="mt-1 text-xs text-muted-foreground">{entry.description}</p>
       </CardContent>
     </Card>
@@ -463,7 +513,9 @@ function MalformedRejectionBreakdownCard({
           <GaugeIcon className="size-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <Notice tone="info">Malformed rejection diagnostics are not available for this environment yet.</Notice>
+          <Notice tone="info">
+            Malformed rejection diagnostics are not available for this environment yet.
+          </Notice>
         </CardContent>
       </Card>
     );
@@ -504,9 +556,10 @@ function MalformedRejectionBreakdownCard({
       failure.sdk_version ?? "version"
     ].join(":"),
     title: failure.validation_path ?? "Unknown validation path",
-    subtitle: [failure.validation_code ?? "unknown validation code", failure.event_type ?? "unknown event type"].join(
-      " • "
-    ),
+    subtitle: [
+      failure.validation_code ?? "unknown validation code",
+      failure.event_type ?? "unknown event type"
+    ].join(" • "),
     metadata: [
       failure.sdk_name ?? "unknown SDK",
       failure.sdk_version ?? "unknown version",
@@ -532,7 +585,9 @@ function MalformedRejectionBreakdownCard({
         <div className="grid gap-3 rounded-lg border bg-muted/20 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
           <div className="space-y-1">
             <p className="text-sm font-medium">Month-to-date malformed rejects</p>
-            <p className="text-xs text-muted-foreground">UTC window {formatRange(breakdown.window)}</p>
+            <p className="text-xs text-muted-foreground">
+              UTC window {formatRange(breakdown.window)}
+            </p>
           </div>
           <p className="text-3xl font-semibold tabular-nums">
             {INTEGER_FORMAT.format(breakdown.total_malformed_rejections_this_month)}
@@ -575,11 +630,17 @@ function BreakdownSection({
     <section className="space-y-3 rounded-lg border p-4">
       <div>
         <h3 className="text-sm font-semibold">{title}</h3>
-        <p className="text-xs text-muted-foreground">Highest-volume malformed rejection signatures this month.</p>
+        <p className="text-xs text-muted-foreground">
+          Highest-volume malformed rejection signatures this month.
+        </p>
       </div>
 
       {items.length === 0 ? (
-        <Notice tone="info">{emptyLabel}</Notice>
+        <ResourceEmptyState
+          icon={ActivityIcon}
+          title={emptyLabel}
+          description="No retained rejection signatures are available for this breakdown this month."
+        />
       ) : (
         <div className="space-y-3">
           {items.map((item) => (
@@ -592,7 +653,9 @@ function BreakdownSection({
                 <p className="text-xs text-muted-foreground">{item.subtitle}</p>
                 <p className="text-xs text-muted-foreground">{item.metadata}</p>
               </div>
-              <p className="text-lg font-semibold tabular-nums">{INTEGER_FORMAT.format(item.count)}</p>
+              <p className="text-lg font-semibold tabular-nums">
+                {INTEGER_FORMAT.format(item.count)}
+              </p>
             </div>
           ))}
         </div>
@@ -657,12 +720,14 @@ function AdminAnalyticsEmailGate(input: {
       <CardHeader>
         <CardTitle>Continue with email</CardTitle>
         <CardDescription>
-          Analytics access requires an email-authenticated session, even when you already signed in with GitHub.
+          Analytics access requires an email-authenticated session, even when you already signed in
+          with GitHub.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <Notice tone="info">
-          We&apos;ll send a six-digit sign-in code to <span className="font-medium">{input.email}</span>.
+          We&apos;ll send a six-digit sign-in code to{" "}
+          <span className="font-medium">{input.email}</span>.
         </Notice>
 
         {step === "verify" ? (
@@ -689,13 +754,21 @@ function AdminAnalyticsEmailGate(input: {
 
         <div className="flex flex-col gap-3 sm:flex-row">
           {step === "request" ? (
-            <Button className="sm:w-auto" disabled={isSubmitting} onClick={() => void handleSendCode()}>
+            <Button
+              className="sm:w-auto"
+              disabled={isSubmitting}
+              onClick={() => void handleSendCode()}
+            >
               {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
               Send code
             </Button>
           ) : (
             <>
-              <Button className="sm:w-auto" disabled={isSubmitting} onClick={() => void handleVerifyCode()}>
+              <Button
+                className="sm:w-auto"
+                disabled={isSubmitting}
+                onClick={() => void handleVerifyCode()}
+              >
                 {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
                 Verify code
               </Button>

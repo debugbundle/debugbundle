@@ -1,4 +1,6 @@
 import {
+  AnalyticsFilterOptionsResponseSchema,
+  type AnalyticsFilterOptionsResponse,
   AnalyticsActionMetricsResponseSchema,
   AnalyticsDeviceBreakdownResponseSchema,
   AnalyticsFunnelAnalysisResponseSchema,
@@ -54,6 +56,7 @@ export class AnalyticsMetricsApiError extends Error {
 export function createAnalyticsMetricsApi(httpClient: {
   request(request: AnalyticsMetricsHttpRequest): Promise<AnalyticsMetricsHttpResponse>;
 }): {
+  getFilterOptions(input: AnalyticsMetricQueryInput): Promise<AnalyticsFilterOptionsResponse>;
   getUsageSummary(input: AnalyticsMetricQueryInput): Promise<AnalyticsUsageSummaryResponse>;
   getRouteMetrics(input: AnalyticsMetricQueryInput): Promise<AnalyticsRouteMetricsResponse>;
   getJourneyPatterns(input: AnalyticsMetricQueryInput): Promise<AnalyticsJourneyPatternsResponse>;
@@ -75,6 +78,14 @@ export function createAnalyticsMetricsApi(httpClient: {
   ): Promise<AnalyticsOpportunityResponse>;
 } {
   return {
+    getFilterOptions: (input) =>
+      requestMetric(
+        httpClient,
+        `/v1/analytics/filter-options?${buildMetricsQueryString(input)}`,
+        input.bearerToken,
+        AnalyticsFilterOptionsResponseSchema,
+        "filter options"
+      ),
     getUsageSummary: (input) =>
       requestMetric(
         httpClient,

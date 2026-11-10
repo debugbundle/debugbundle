@@ -1,3 +1,5 @@
+import { MailIcon } from "lucide-react";
+import { ResourceEmptyState } from "./resource-empty-state.js";
 import { useState } from "react";
 import type { OrganizationInvite } from "../../../../../packages/shared-types/src/index.js";
 import { Button } from "../ui/button.js";
@@ -32,7 +34,11 @@ export function OrganizationPendingInvites({
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {invites.length === 0 ? (
-          <p>No pending invitations.</p>
+          <ResourceEmptyState
+            icon={MailIcon}
+            title="No pending invitations"
+            description="Invitations awaiting acceptance will appear here."
+          />
         ) : (
           <ul className="flex flex-col gap-4">
             {invites.slice(current * 25, current * 25 + 25).map((invite) => (

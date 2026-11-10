@@ -2,7 +2,10 @@ import {
   reportMetricLabels,
   reportMetricComparison,
   formatReportValue,
-  reportEvidenceSections
+  reportEvidenceSections,
+  reportAnalysisExplanation,
+  reportPeriodLabel,
+  reportTimeLabel
 } from "./report-presentation.js";
 import { ReportDocumentSchema, type ReportDocument } from "./report-document.js";
 import { reportLinkLocation } from "./report-content.js";
@@ -25,10 +28,10 @@ function metrics(items: ReportModelMetric[]): string {
     })
     .join("")}</tbody></table></div>`;
 }
-function evidence(items: ReportModelEvidence[]): string {
+function evidence(items: ReportModelEvidence[], doc: ReportDocument): string {
   return items.length === 0
     ? '<p class="muted">No selected evidence in this category; see coverage before interpreting missing observations.</p>'
-    : `<ul>${items.map((item) => `<li><strong>${escape(item.title)}</strong> <span class="meta">${escape(item.severity)} · ${escape(item.status.replaceAll("_", " "))}</span> ${refs([item.ref])}</li>`).join("")}</ul>`;
+    : `<ul>${items.map((item) => `<li><span class="meta">${escape(doc.report.facts.projects.find((project) => project.ref === item.project_ref)?.name ?? "")} · </span><strong>${escape(item.title)}</strong> <span class="meta">${escape(item.severity)} · ${escape(item.status.replaceAll("_", " "))}</span> ${refs([item.ref])}</li>`).join("")}</ul>`;
 }
 /** Static semantic HTML shares the immutable facts/narrative used by PDF and
  * email. It has no script, remote assets or model-provided URLs/HTML. Source
@@ -42,19 +45,24 @@ export function renderReportHtml(
     narrative = doc.narrative;
   const available = new Set(options.available_source_refs ?? []);
   const { urgent, solved, coming } = reportEvidenceSections(doc);
-  const period = `${facts.period.starts_at.slice(0, 10)} to ${facts.period.ends_at.slice(0, 10)} (end exclusive, UTC)`;
+  const period = reportPeriodLabel(facts.period);
   const overview = narrative
     ? `<p>${escape(narrative.overview.text)} ${refs(narrative.overview.evidence_refs)}</p>`
-    : `<div class="notice"><strong>AI analysis unavailable</strong><p>This report retains its recorded facts, resolutions and selected outstanding work. No generated explanation is available for this run.</p></div>`;
+    : `<div class="notice"><strong>Factual report</strong><p>${escape(reportAnalysisExplanation(doc.analysis.reason))}</p></div>`;
   const highlights =
     narrative && narrative.highlights.length
       ? `<h2>What happened</h2><ul>${narrative.highlights.map((item) => `<li><span class="meta">${escape(item.kind.replaceAll("_", " "))}</span> — ${escape(item.text)} ${refs(item.evidence_refs)}</li>`).join("")}</ul>`
-      : `<h2>What happened</h2>${evidence(facts.evidence.filter((item) => item.period_events.some((event) => ["new", "regressed", "reopened"].includes(event))))}`;
+      : `<h2>What happened</h2>${evidence(
+          facts.evidence.filter((item) =>
+            item.period_events.some((event) => ["new", "regressed", "reopened"].includes(event))
+          ),
+          doc
+        )}`;
   const priorities =
     narrative && narrative.priorities.length
-      ? `<ol>${narrative.priorities.map((item) => `<li><strong>${escape(item.title)}</strong><p>${escape(item.action)}</p><p class="muted">${escape(item.rationale)} ${refs(item.evidence_refs)}</p></li>`).join("")}</ol>`
+      ? `${urgent.length ? evidence(urgent, doc) : ""}<ol>${narrative.priorities.map((item) => `<li><strong>${escape(item.title)}</strong><p>${escape(item.action)}</p><p class="muted">${escape(item.rationale)} ${refs(item.evidence_refs)}</p></li>`).join("")}</ol>`
       : urgent.length
-        ? evidence(urgent)
+        ? evidence(urgent, doc)
         : "<p>No selected high or critical work is recorded. Incomplete coverage does not establish that no issues exist.</p>";
   const projects = facts.projects
     .map(
@@ -69,12 +77,12 @@ export function renderReportHtml(
         `/v1/organizations/${doc.report.organization_id}/reports/${doc.run_id}/sources/${item.ref}`,
         options.source_base_url
       );
-      return `<article class="source" id="ref-${escape(item.ref)}"><h3>${escape(item.title)}</h3><p class="meta">${escape(item.type)} · ${escape(item.severity)} · ${escape(item.status.replaceAll("_", " "))} · ${escape(item.ref)}</p>${item.context === null ? "" : `<p class="context">${escape(item.context)}</p>`}<p>${source && available.has(item.ref) ? `<a href="${escape(href)}">Open source evidence</a>` : "Source evidence unavailable"}</p></article>`;
+      return `<article class="source" id="ref-${escape(item.ref)}"><h3>${escape(item.title)}</h3><p class="meta">${escape(facts.projects.find((project) => project.ref === item.project_ref)?.name ?? "")} · ${escape(item.type)} · ${escape(item.severity)} · ${escape(item.status.replaceAll("_", " "))} · ${escape(item.ref)}</p>${item.context === null ? "" : `<p class="context">${escape(item.context)}</p>`}<p>${source && available.has(item.ref) ? `<a href="${escape(href)}">Open source evidence</a>` : "Source evidence unavailable"}</p></article>`;
     })
     .join("");
   const limitations = [
     ...facts.selection_notes,
     ...(narrative?.limitations.map((item) => item.text) ?? [])
   ];
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(doc.name)} · DebugBundle</title><style>${css}</style></head><body><a class="skip" href="#main">Skip to report</a><main id="main"><header><p class="meta">DebugBundle · ${escape(facts.period.kind)} report · ${escape(facts.privacy_mode)} evidence mode</p><h1>${escape(doc.name)}</h1><p>${escape(period)}</p><p class="meta">Previous: ${escape(facts.previous_period.starts_at.slice(0, 10))} to ${escape(facts.previous_period.ends_at.slice(0, 10))} UTC · Data cutoff: ${escape(facts.cutoff_at)}</p></header><section aria-label="Overview">${overview}</section>${highlights}<section><h2>Recorded resolutions</h2>${evidence(solved)}</section><section><h2>Focus for the coming ${coming}</h2>${priorities}</section><section><h2>Period comparison</h2><p class="muted">Period totals can have unequal lengths. Compare daily rates where available; open-issue counts are period-end snapshots. Partial observations are not complete totals, and missing data is unknown.</p>${projects}</section><section><h2>Selected evidence</h2>${sourceDetails || "<p>No source details were selected.</p>"}</section><section><h2>Coverage and limitations</h2>${limitations.length ? `<ul>${limitations.map((item) => `<li>${escape(item)}</li>`).join("")}</ul>` : "<p>Use the per-project coverage and metric notes when interpreting these observations.</p>"}</section><footer>Recorded resolution is a saved workflow action; observed recovery is a successful monitored response. Neither establishes causation. Source links require current access and retained evidence. This report expires ${escape(doc.report.expires_at)}. Version ${doc.version}, template ${doc.template_version}.</footer></main></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(doc.name)} · DebugBundle</title><style>${css}</style></head><body><a class="skip" href="#main">Skip to report</a><main id="main"><header><p class="meta">DebugBundle · ${escape(facts.period.kind)} report · ${escape(facts.privacy_mode)} evidence mode</p><h1>${escape(doc.name)}</h1><p data-period-start="${escape(facts.period.starts_at)}" data-period-end="${escape(facts.period.ends_at)}">${escape(period)}</p><p class="meta">Previous: ${escape(reportPeriodLabel(facts.previous_period))} · Data cutoff: ${escape(reportTimeLabel(facts.cutoff_at))}</p></header><section aria-label="Overview">${overview}</section>${highlights}<section><h2>Focus for the coming ${coming}</h2>${priorities}</section><section><h2>Resolutions and recoveries</h2>${evidence(solved, doc)}</section><section><h2>Period comparison</h2><p class="muted">Period totals can have unequal lengths. Compare daily rates where available; open-issue counts are period-end snapshots. Partial observations are not complete totals, and missing data is unknown.</p>${projects}</section><section><h2>Selected evidence</h2>${sourceDetails || "<p>No source details were selected.</p>"}</section><section><h2>Coverage and limitations</h2>${limitations.length ? `<ul>${limitations.map((item) => `<li>${escape(item)}</li>`).join("")}</ul>` : "<p>Use the per-project coverage and metric notes when interpreting these observations.</p>"}</section><footer>Recorded resolution is a saved workflow action; observed recovery is a successful monitored response. Neither establishes causation. Source links require current access and retained evidence. This report expires ${escape(reportTimeLabel(doc.report.expires_at))}. Version ${doc.version}, template ${doc.template_version}.</footer></main></body></html>`;
 }

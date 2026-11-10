@@ -1,4 +1,5 @@
-import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { ResourceEmptyState } from "./resource-empty-state.js";
+import { GitBranchIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import type { GitHubDispatchRuleRecord } from "../../lib/api.js";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
@@ -33,7 +34,7 @@ export function GitHubRulesPanel({
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline">{rules.length}</Badge>
-          {!canCreate ? null : (
+          {!canCreate || rules.length === 0 ? null : (
             <Button type="button" size="sm" variant="outline" onClick={() => onCreate()}>
               <PlusIcon data-icon="inline-start" />
               Create rule
@@ -42,9 +43,16 @@ export function GitHubRulesPanel({
         </div>
       </div>
       {rules.length === 0 ? (
-        <p className="mt-3 text-sm text-muted-foreground">
-          No GitHub dispatch rules are configured yet.
-        </p>
+        <ResourceEmptyState
+          icon={GitBranchIcon}
+          title="No dispatch rules yet"
+          description={
+            canCreate
+              ? "Create a rule to send matching incident or improvement events to GitHub."
+              : "Dispatch rules appear here after a repository is connected and a rule is created."
+          }
+          {...(canCreate ? { actionLabel: "Create rule", onAction: onCreate } : {})}
+        />
       ) : (
         <div className="mt-3 space-y-3">
           {rules.map((rule) => (

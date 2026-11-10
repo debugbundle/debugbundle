@@ -10,6 +10,7 @@ import { reportModelProfile } from "../../smart-reports/src/model-request.js";
 import { ReportNarrativeSchema } from "../../smart-reports/src/model-narrative.js";
 import { SmartReportError } from "../../smart-reports/src/report-errors.js";
 import type { ReportModelAttemptOutcome } from "../../smart-reports/src/model-client.js";
+import { safeReportModelDiagnostic } from "../../smart-reports/src/model-diagnostics.js";
 import { authorizeStoredReportRun, lockReportRunClaim } from "./report-run-execution.js";
 import { runInTransaction } from "./transaction.js";
 import type { WorkerJobClaim } from "./worker-job-store.js";
@@ -117,7 +118,10 @@ export function createReportModelAttemptStore(db: Queryable): ReportModelAttempt
           if (!["sending", "uncertain"].includes(String(attempt["state"]))) return;
           if (outcome.maximum_nano_usd !== nano(attempt["principal_nano_usd"]))
             throw new Error("report_attempt_allocation_mismatch");
-          await tx.query("UPDATE report_model_attempts SET state='uncertain' WHERE id=$1", [id]);
+          await tx.query(
+            "UPDATE report_model_attempts SET state='uncertain',diagnostic_code=COALESCE(diagnostic_code,$2) WHERE id=$1",
+            [id, safeReportModelDiagnostic(outcome.reason)]
+          );
           await tx.query(
             "UPDATE report_runs SET ai_status='uncertain',updated_at=clock_timestamp() WHERE id=$1",
             [attempt["run_id"]]
@@ -148,6 +152,8 @@ export function createReportModelAttemptStore(db: Queryable): ReportModelAttempt
         });
         if (cost !== known.cost_nano_usd || cost > nano(attempt["principal_nano_usd"]))
           throw new Error("report_attempt_cost_mismatch");
+        // Preserve the released projection byte-for-byte. Diagnostics are not
+        // billing evidence; duplicate settlement never rewrites them or old NULLs.
         const receiptHash = createHash("sha256").update(JSON.stringify(known)).digest("hex");
         if (["succeeded", "rejected"].includes(String(attempt["state"]))) {
           if (attempt["outcome_sha256"] !== receiptHash)
@@ -186,7 +192,7 @@ export function createReportModelAttemptStore(db: Queryable): ReportModelAttempt
         if (narrative !== null && Buffer.byteLength(narrative) > 60000)
           throw new Error("report_attempt_narrative_too_large");
         await tx.query(
-          `UPDATE report_model_attempts SET state=$2,outcome_sha256=$3,usage=$4::jsonb,cost_nano_usd=$5,provider_response_id=$6,narrative_json=$7::jsonb,settled_at=clock_timestamp() WHERE id=$1`,
+          `UPDATE report_model_attempts SET state=$2,outcome_sha256=$3,usage=$4::jsonb,cost_nano_usd=$5,provider_response_id=$6,narrative_json=$7::jsonb,diagnostic_code=$8,settled_at=clock_timestamp() WHERE id=$1`,
           [
             id,
             known.state,
@@ -194,7 +200,8 @@ export function createReportModelAttemptStore(db: Queryable): ReportModelAttempt
             JSON.stringify(usage),
             cost,
             known.provider_response_id,
-            narrative
+            narrative,
+            outcome.state === "rejected" ? safeReportModelDiagnostic(outcome.reason) : null
           ]
         );
         await tx.query(

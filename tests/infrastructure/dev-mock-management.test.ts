@@ -1,3 +1,4 @@
+import { base } from "../../scripts/dev-mock/base.js";
 import { describe, expect, it, vi } from "vitest";
 import { createDevMockApi } from "../../scripts/dev-mock/api.js";
 
@@ -254,8 +255,10 @@ describe("local preview management data", () => {
       ).body
     ).toHaveProperty("member.role", "admin");
     expect(
-      api.handle("DELETE", "/v1/projects/00000000-0000-4000-8000-000000000001/members/usr_123")
-        .status
+      api.handle(
+        "DELETE",
+        `/v1/projects/00000000-0000-4000-8000-000000000001/members/${base.session.user_id}`
+      ).status
     ).toBe(400);
   });
 

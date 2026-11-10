@@ -1,5 +1,8 @@
-import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
+import { sanitizeTelemetry } from "../../../../packages/redaction/src/index.js";
+import { sendProjectedAnalyticsRead } from "./analytics-read-projection.js";
+import { registerAnalyticsFilterOptionsRoutes } from "./analytics-filter-options.js";
+import type { FastifyInstance } from "fastify";
 
 import {
   AnalyticsActionMetricsResponseSchema,
@@ -17,7 +20,6 @@ import {
   getTierCapabilities
 } from "../../../../packages/shared-types/src/index.js";
 import { buildAnalyticsBundleInputFingerprint } from "../../../../packages/storage/src/index.js";
-import { sanitizeTelemetry } from "../../../../packages/redaction/src/index.js";
 import type { ApiDependencies } from "../api-types.js";
 import {
   claimAnalyticsBundleGenerationQuota,
@@ -59,29 +61,9 @@ import {
   type AnalyticsBundleOpportunityContext
 } from "./analytics-route-services.js";
 
-function projectAnalyticsRead<T>(value: unknown, schema: z.ZodType<T>): T | null {
-  const projected = sanitizeTelemetry(value, { maxTotalBytes: 512 * 1024 });
-  if (!projected.ok) return null;
-  const parsed = schema.safeParse(projected.value);
-  return parsed.success ? parsed.data : null;
-}
-
-function sendProjectedAnalyticsRead<T>(
-  reply: FastifyReply,
-  value: unknown,
-  schema: z.ZodType<T>
-): FastifyReply {
-  const projected = projectAnalyticsRead(value, schema);
-  return projected === null
-    ? reply.status(503).send({ error: "privacy_projection_unavailable" })
-    : reply
-        .header("x-debugbundle-privacy-policy", "telemetry-privacy-v1")
-        .status(200)
-        .send(projected);
-}
-
 export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiDependencies): void {
   registerAnalyticsJourneySampleRoutes(app, dependencies);
+  registerAnalyticsFilterOptionsRoutes(app, dependencies);
 
   app.get("/v1/analytics/opportunities", async (request, reply) => {
     const parsedQuery = AnalyticsOpportunitiesQuerySchema.safeParse(request.query);

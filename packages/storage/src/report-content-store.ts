@@ -12,6 +12,7 @@ import {
   type ReportContentView
 } from "../../smart-reports/src/report-content.js";
 import { ReportReferenceSchema } from "../../smart-reports/src/model-evidence.js";
+import { redactReportModelFacts } from "../../smart-reports/src/model-evidence.js";
 import { reportRunRecord } from "./report-run-record.js";
 import { reportArtifactDigest } from "./report-artifact-key.js";
 import type { ObjectStoreReader, Queryable } from "./types.js";
@@ -118,7 +119,12 @@ export function createReportContentStore(
       const safe = { facts: document.report.facts, narrative: document.narrative };
       // A strengthened mandatory sanitizer withholds the complete older report.
       // Never silently post-filter prose generated from a wider evidence set.
-      if (JSON.stringify(redactReportData(safe, 512 * 1024)) !== JSON.stringify(safe))
+      if (
+        JSON.stringify({
+          facts: redactReportModelFacts(safe.facts),
+          narrative: redactReportData(safe.narrative)
+        }) !== JSON.stringify(safe)
+      )
         throw new SmartReportError("report_not_found");
       const current = await readPublishedReportRun(db, input);
       if (

@@ -1,3 +1,5 @@
+import { formatAnalyticsDimensionValue } from "../lib/analytics-presentation.js";
+import { ResourceEmptyState } from "../components/system/resource-empty-state.js";
 import { UsersIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
@@ -121,9 +123,21 @@ export function ProjectAnalyticsAudiencesPage(): JSX.Element {
             <UnavailableSection message="Device and platform metrics unavailable." />
           ) : (
             <>
-              <AudienceSection title="Device types" segments={data.devices.device_types} />
-              <AudienceSection title="Browsers" segments={data.devices.browsers} />
-              <AudienceSection title="Operating systems" segments={data.devices.os} />
+              <AudienceSection
+                title="Device types"
+                segments={data.devices.device_types}
+                formatValue={(value) => formatAnalyticsDimensionValue("device_type", value)}
+              />
+              <AudienceSection
+                title="Browsers"
+                segments={data.devices.browsers}
+                formatValue={(value) => formatAnalyticsDimensionValue("browser", value)}
+              />
+              <AudienceSection
+                title="Operating systems"
+                segments={data.devices.os}
+                formatValue={(value) => formatAnalyticsDimensionValue("os", value)}
+              />
               <AudienceSection title="Languages" segments={data.devices.languages} />
             </>
           )}
@@ -161,10 +175,12 @@ function audienceSegments(data: {
 
 function AudienceSection({
   title,
-  segments
+  segments,
+  formatValue = (value) => value
 }: {
   title: string;
   segments: AnalyticsMetricsSegment[];
+  formatValue?: (value: string) => string;
 }): JSX.Element {
   const headingId = `analytics-audience-${title.toLowerCase().replaceAll(" ", "-")}`;
   return (
@@ -173,7 +189,11 @@ function AudienceSection({
         {title}
       </h3>
       {segments.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No data in this window.</p>
+        <ResourceEmptyState
+          icon={UsersIcon}
+          title="No data in this window"
+          description="No captured audience data matches this breakdown, period and filters."
+        />
       ) : (
         <Table aria-label={title}>
           <TableHeader>
@@ -186,7 +206,7 @@ function AudienceSection({
           <TableBody>
             {segments.map((segment) => (
               <TableRow key={segment.value}>
-                <TableCell className="max-w-64 truncate">{segment.value}</TableCell>
+                <TableCell className="max-w-64 truncate">{formatValue(segment.value)}</TableCell>
                 <TableCell className="text-right tabular-nums">
                   {INTEGER_FORMAT.format(segment.sessions)}
                 </TableCell>

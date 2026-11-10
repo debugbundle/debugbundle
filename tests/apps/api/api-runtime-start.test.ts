@@ -165,7 +165,11 @@ describe("api runtime start", () => {
 
     // The current runtime validates additive access, financial and report
     // structures as well as the installed table/ledger and project-scope guards.
-    expect(queryMock).toHaveBeenCalledTimes(19);
+    expect(queryMock).toHaveBeenCalledTimes(20);
+    expect(queryMock).toHaveBeenCalledWith(
+      expect.stringContaining("report_model_attempts_diagnostic_code_check"),
+      []
+    );
     expect(queryMock).toHaveBeenCalledWith(
       expect.stringContaining("organizations_trial_plan_check"),
       expect.any(Array)
@@ -190,6 +194,21 @@ describe("api runtime start", () => {
     expect(s3SendMock).toHaveBeenCalledOnce();
     expect(endMock).toHaveBeenCalledOnce();
     expect(listenMock).toHaveBeenCalledWith({ host: "0.0.0.0", port: 3010 });
+  });
+
+  it("refuses to listen when model diagnostic storage is missing despite a complete ledger", async () => {
+    queryMock.mockImplementation(async (sql: string) =>
+      sql.includes("report_model_attempts_diagnostic_code_check")
+        ? { rows: [{ available: false }] }
+        : buildMigratedRuntimeSchemaRows(sql)
+    );
+    await expect(
+      startApiServerFromEnv({
+        DEBUGBUNDLE_PROBE_TRIGGER_SECRET: "test-probe-secret",
+        ANALYTICS_HASH_SECRET: "test-analytics-secret"
+      })
+    ).rejects.toThrow("report_model_diagnostic_schema_incomplete");
+    expect(listenMock).not.toHaveBeenCalled();
   });
 
   it("should report not-ready after draining starts", async (): Promise<void> => {

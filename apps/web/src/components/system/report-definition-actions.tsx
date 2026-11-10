@@ -12,6 +12,10 @@ import { PendingButton } from "./pending-button.js";
 import { Notice } from "../ui/notice.js";
 import { Checkbox } from "../ui/checkbox.js";
 import { Field, FieldLabel, FieldDescription } from "../ui/field.js";
+import { Dialog, DialogTrigger, DialogClose } from "../ui/dialog.js";
+import { DialogFormContent } from "./dialog-form-content.js";
+import { Button } from "../ui/button.js";
+import { reportPeriodLabel } from "../../../../../packages/smart-reports/src/report-presentation.js";
 
 /** One stable command survives a lost acknowledgement; a successful request navigates to its run. */
 export function ReportDefinitionActions({
@@ -24,6 +28,9 @@ export function ReportDefinitionActions({
     { pending, run } = usePendingAction(),
     [error, setError] = useState<string | null>(null),
     [send, setSend] = useState(false),
+    [period, setPeriod] = useState(() =>
+      lastCompletedReportPeriod(definition.cadence, new Date().toISOString())
+    ),
     command = useRef<z.input<typeof ReportRunCommandSchema> | null>(null);
   const key = `${session?.user_id}:${session?.organization_id}:${definition.id}`,
     current = useReportContext(key);
@@ -41,7 +48,7 @@ export function ReportDefinitionActions({
             request_id: crypto.randomUUID(),
             definition_id: definition.id,
             expected_version: definition.version,
-            period: lastCompletedReportPeriod(definition.cadence, new Date().toISOString()),
+            period,
             send_email: send,
             expected_organization_id: definition.organization_id
           };
@@ -57,33 +64,61 @@ export function ReportDefinitionActions({
     });
   };
   return (
-    <div className="flex flex-col gap-3">
-      <p className="text-sm text-muted-foreground">
-        Generate the latest complete UTC {definition.cadence} period. Each generation or
-        regeneration uses one of the workspace’s forty monthly reports.
-      </p>
-      {definition.recipient_user_ids.length ? (
-        <Field orientation="horizontal">
-          <Checkbox
-            id={`send-${definition.id}`}
-            checked={send}
-            disabled={pending}
-            onCheckedChange={(value) => setSend(value === true)}
-          />
-          <div>
-            <FieldLabel htmlFor={`send-${definition.id}`}>Email the saved recipients</FieldLabel>
-            <FieldDescription>
-              Off by default for manual generation. Current access is checked again before delivery.
-            </FieldDescription>
-          </div>
-        </Field>
-      ) : null}
-      <div>
-        <PendingButton pending={pending} pendingLabel="Queueing report" onClick={generate}>
+    <Dialog
+      onOpenChange={(open) => {
+        if (open && !command.current)
+          setPeriod(lastCompletedReportPeriod(definition.cadence, new Date().toISOString()));
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button variant="outline" disabled={pending}>
           Generate report
-        </PendingButton>
-      </div>
-      {error ? <Notice tone="destructive">{error}</Notice> : null}
-    </div>
+        </Button>
+      </DialogTrigger>
+      <DialogFormContent
+        title="Generate report"
+        description={definition.name}
+        busy={pending}
+        onSubmit={(event) => {
+          event.preventDefault();
+          generate();
+        }}
+        footer={
+          <>
+            <DialogClose asChild>
+              <Button variant="outline" type="button" disabled={pending}>
+                Cancel
+              </Button>
+            </DialogClose>
+            <PendingButton type="submit" pending={pending} pendingLabel="Queueing report">
+              Generate report
+            </PendingButton>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-2">
+          <p className="font-medium">{reportPeriodLabel(command.current?.period ?? period)}</p>
+          <p className="text-sm text-muted-foreground">
+            Uses one report from your workspace allowance. The selected evidence may be sent for AI
+            analysis.
+          </p>
+        </div>
+        {definition.recipient_user_ids.length ? (
+          <Field orientation="horizontal">
+            <Checkbox
+              id={`send-${definition.id}`}
+              checked={send}
+              disabled={pending}
+              onCheckedChange={(value) => setSend(value === true)}
+            />
+            <div>
+              <FieldLabel htmlFor={`send-${definition.id}`}>Email the saved recipients</FieldLabel>
+              <FieldDescription>Current access is checked again before delivery.</FieldDescription>
+            </div>
+          </Field>
+        ) : null}
+        {error ? <Notice tone="destructive">{error}</Notice> : null}
+      </DialogFormContent>
+    </Dialog>
   );
 }

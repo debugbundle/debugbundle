@@ -683,7 +683,7 @@ export function ProjectAlertsPage(): JSX.Element {
           </Button>
         </div>
       )}
-      <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+      <div className="flex flex-col gap-4">
         <Card>
           <CardHeader>
             <CardTitle>Alert rules</CardTitle>
@@ -740,62 +740,39 @@ export function ProjectAlertsPage(): JSX.Element {
           </CardContent>
         </Card>
 
-        <div className="space-y-4">
+        {!slackEnabled && slackDestinationsLoaded && slackDestinations.length > 0 ? (
           <Card>
             <CardHeader>
-              <CardTitle>Alert rule guidance</CardTitle>
+              <CardTitle>Connected Slack destinations</CardTitle>
               <CardDescription>
-                Use a small set of clear rules with specific conditions and destinations.
+                Preserved Slack channel setup saved for this project organization.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="rounded-lg border border-border/80 bg-background/60 p-4 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2 font-medium text-foreground">
-                  <BellRingIcon className="size-4" />
-                  Getting started
-                </div>
-                <p className="mt-2 leading-6">
-                  Start with the key incident events and add more rules only when they map to a
-                  clear response path.
-                </p>
+            <CardContent className="space-y-4">
+              <CalloutCard
+                eyebrow="Slack delivery paused"
+                title="Saved Slack channels will resume after an upgrade"
+                description="This project is currently on Free, so Slack alert delivery and channel management are paused. The connected destinations below are preserved and will become usable again after the owner upgrades back to Team."
+                tone="warning"
+              />
+              <div className="space-y-2">
+                {slackDestinations.map((destination) => (
+                  <div
+                    key={destination.slack_destination_id}
+                    className="rounded-lg border border-border/80 bg-background/60 px-3 py-2"
+                  >
+                    <div className="font-medium text-foreground">
+                      {formatSlackDestinationLabel(destination)}
+                    </div>
+                    <div className="mt-1 text-sm text-muted-foreground">
+                      Saved destination ID: {destination.slack_destination_id}
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
-
-          {!slackEnabled && slackDestinationsLoaded && slackDestinations.length > 0 ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Connected Slack destinations</CardTitle>
-                <CardDescription>
-                  Preserved Slack channel setup saved for this project organization.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <CalloutCard
-                  eyebrow="Slack delivery paused"
-                  title="Saved Slack channels will resume after an upgrade"
-                  description="This project is currently on Free, so Slack alert delivery and channel management are paused. The connected destinations below are preserved and will become usable again after the owner upgrades back to Team."
-                  tone="warning"
-                />
-                <div className="space-y-2">
-                  {slackDestinations.map((destination) => (
-                    <div
-                      key={destination.slack_destination_id}
-                      className="rounded-lg border border-border/80 bg-background/60 px-3 py-2"
-                    >
-                      <div className="font-medium text-foreground">
-                        {formatSlackDestinationLabel(destination)}
-                      </div>
-                      <div className="mt-1 text-sm text-muted-foreground">
-                        Saved destination ID: {destination.slack_destination_id}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ) : null}
-        </div>
+        ) : null}
       </div>
       <AlertGroupsCard key={projectId} projectId={projectId} />
     </div>

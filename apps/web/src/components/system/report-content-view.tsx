@@ -1,9 +1,15 @@
+import type { ReactNode } from "react";
+import { TitleBadgeRow } from "./title-badge-row.js";
+import { ReportEvidenceList, ReportReferences as References } from "./report-evidence-list.js";
 import type { ReportContentView as Content } from "../../../../../packages/smart-reports/src/report-content.js";
 import {
   formatReportValue,
   reportMetricComparison,
   reportMetricLabels,
-  reportEvidenceSections
+  reportEvidenceSections,
+  reportAnalysisExplanation,
+  reportPeriodLabel,
+  reportTimeLabel
 } from "../../../../../packages/smart-reports/src/report-presentation.js";
 import { buildApiUrl } from "../../lib/api-client.js";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../ui/card.js";
@@ -18,44 +24,14 @@ import {
 } from "../ui/table.js";
 import { Notice } from "../ui/notice.js";
 import { Badge } from "../ui/badge.js";
-type Evidence = Content["document"]["report"]["facts"]["evidence"];
-function EvidenceList({ items }: { items: Evidence }): JSX.Element {
-  return items.length ? (
-    <ul className="flex flex-col gap-3">
-      {items.map((item) => (
-        <li key={item.ref}>
-          <a className="underline underline-offset-4" href={`#ref-${item.ref}`}>
-            {item.title}
-          </a>{" "}
-          <Badge variant="outline">
-            {item.severity} · {item.status.replaceAll("_", " ")}
-          </Badge>
-        </li>
-      ))}
-    </ul>
-  ) : (
-    <p className="text-sm text-muted-foreground">
-      No selected evidence in this category. Check coverage before interpreting missing
-      observations.
-    </p>
-  );
-}
-function References({ values }: { values: string[] }): JSX.Element {
-  return (
-    <span className="text-xs text-muted-foreground">
-      {values.map((value, index) => (
-        <span key={value}>
-          {index ? " · " : " "}
-          <a className="underline underline-offset-4" href={`#ref-${value}`}>
-            {value}
-          </a>
-        </span>
-      ))}
-    </span>
-  );
-}
 /** React escapes all source/model prose. Links use server identities, never prose URLs. */
-export function ReportContentView({ view }: { view: Content }): JSX.Element {
+export function ReportContentView({
+  view,
+  actions
+}: {
+  view: Content;
+  actions?: ReactNode;
+}): JSX.Element {
   const doc = view.document,
     { facts } = doc.report,
     { narrative } = doc,
@@ -63,16 +39,23 @@ export function ReportContentView({ view }: { view: Content }): JSX.Element {
   return (
     <article className="flex min-w-0 flex-col gap-6">
       <header className="flex flex-col gap-2">
-        <h2 className="text-2xl font-semibold">{doc.name}</h2>
+        <TitleBadgeRow
+          title={<h2 className="text-2xl font-semibold">{doc.name}</h2>}
+          badges={
+            <Badge variant={narrative ? "success" : "outline"}>
+              {narrative ? "Ready" : "Facts only"}
+            </Badge>
+          }
+          actions={actions}
+        />
         <p>
-          {facts.period.starts_at.slice(0, 10)} to {facts.period.ends_at.slice(0, 10)} UTC (end
-          exclusive)
+          {reportPeriodLabel(facts.period)} · {facts.projects.length}{" "}
+          {facts.projects.length === 1 ? "project" : "projects"}
         </p>
         <p className="text-sm text-muted-foreground">
-          Previous: {facts.previous_period.starts_at.slice(0, 10)} to{" "}
-          {facts.previous_period.ends_at.slice(0, 10)} · Data cutoff: {facts.cutoff_at}
+          Compared with {reportPeriodLabel(facts.previous_period)} · Data cutoff{" "}
+          {reportTimeLabel(facts.cutoff_at)} · {facts.privacy_mode} evidence
         </p>
-        <Badge variant="outline">{facts.privacy_mode} evidence mode</Badge>
       </header>
       {narrative ? (
         <section aria-label="Overview">
@@ -92,22 +75,8 @@ export function ReportContentView({ view }: { view: Content }): JSX.Element {
           ) : null}
         </section>
       ) : (
-        <Notice title="Factual report">
-          AI analysis is unavailable ({doc.analysis.reason?.replaceAll("_", " ")}). The recorded
-          facts below remain available.
-        </Notice>
+        <Notice title="Factual report">{reportAnalysisExplanation(doc.analysis.reason)}</Notice>
       )}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recorded resolutions</CardTitle>
-          <CardDescription>
-            Saved workflow resolutions and observed health recoveries are different signals.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <EvidenceList items={solved} />
-        </CardContent>
-      </Card>
       <Card>
         <CardHeader>
           <CardTitle>Focus for the coming {coming}</CardTitle>
@@ -116,7 +85,7 @@ export function ReportContentView({ view }: { view: Content }): JSX.Element {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <EvidenceList items={urgent} />
+          <ReportEvidenceList items={urgent} projects={facts.projects} />
           {narrative?.priorities.map((item, index) => (
             <section key={index}>
               <h3 className="font-medium">{item.title}</h3>
@@ -129,12 +98,25 @@ export function ReportContentView({ view }: { view: Content }): JSX.Element {
           ))}
         </CardContent>
       </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Resolutions and recoveries</CardTitle>
+          <CardDescription>
+            Saved workflow resolutions and observed health recoveries are different signals.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ReportEvidenceList items={solved} projects={facts.projects} />
+        </CardContent>
+      </Card>
       <section className="flex flex-col gap-4" aria-label="Period comparison">
-        <h2 className="text-xl font-semibold">Period comparison</h2>
-        <p className="text-sm text-muted-foreground">
-          Compare daily rates for unequal periods. Open issue counts are snapshots. Partial
-          observations are not complete totals; missing data is unknown.
-        </p>
+        <header className="flex flex-col gap-1">
+          <h2 className="text-xl font-semibold">Period comparison</h2>
+          <p className="text-sm text-muted-foreground">
+            Compare daily rates for unequal periods. Open issue counts are snapshots. Partial
+            observations are not complete totals; missing data is unknown.
+          </p>
+        </header>
         {facts.projects.map((project) => (
           <Card key={project.ref}>
             <CardHeader>
@@ -198,16 +180,26 @@ export function ReportContentView({ view }: { view: Content }): JSX.Element {
         {facts.evidence.map((item) => {
           const source = doc.report.sources.find((source) => source.ref === item.ref);
           return (
-            <Card id={`ref-${item.ref}`} key={item.ref}>
-              <CardHeader>
-                <CardTitle>{item.title}</CardTitle>
-                <CardDescription>
+            <section
+              id={`ref-${item.ref}`}
+              key={item.ref}
+              className="flex min-w-0 flex-col gap-3 border-b pb-4"
+            >
+              <header className="flex flex-col gap-1">
+                <h3 className="break-words font-medium">{item.title}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {facts.projects.find((project) => project.ref === item.project_ref)?.name} ·{" "}
                   {item.type} · {item.severity} · {item.status.replaceAll("_", " ")} · {item.ref}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-3">
+                </p>
+              </header>
+              <div className="flex flex-col gap-3">
                 {item.context ? (
-                  <p className="whitespace-pre-wrap break-words">{item.context}</p>
+                  <details>
+                    <summary className="cursor-pointer text-sm focus-visible:outline-ring">
+                      Source context
+                    </summary>
+                    <p className="mt-3 whitespace-pre-wrap break-words text-sm">{item.context}</p>
+                  </details>
                 ) : null}
                 {source && view.available_source_refs.includes(item.ref) ? (
                   <a
@@ -221,8 +213,8 @@ export function ReportContentView({ view }: { view: Content }): JSX.Element {
                 ) : (
                   <p className="text-sm text-muted-foreground">Source evidence unavailable</p>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </section>
           );
         })}
         {!facts.evidence.length ? (
@@ -242,7 +234,7 @@ export function ReportContentView({ view }: { view: Content }): JSX.Element {
         <p className="text-sm text-muted-foreground">
           Recorded resolution is a saved workflow action; observed recovery is a successful
           monitored response. Neither establishes causation. Source links require current access and
-          retained evidence. This report expires {doc.report.expires_at}.
+          retained evidence. This report expires {reportTimeLabel(doc.report.expires_at)}.
         </p>
       </section>
     </article>

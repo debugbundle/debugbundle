@@ -54,10 +54,17 @@ export function createDevMockMiddleware() {
     }
     const send = (status: number, body: unknown): void => {
       response.writeHead(status, {
-        "content-type": "application/json",
+        "content-type": String(response.getHeader("content-type") ?? "application/json"),
         "cache-control": "no-store"
       });
-      response.end(JSON.stringify(body));
+      response.end(
+        body instanceof Uint8Array
+          ? body
+          : typeof body === "string" &&
+              String(response.getHeader("content-type")).startsWith("text/html")
+            ? body
+            : JSON.stringify(body)
+      );
     };
     if (!isLocalRequest(request)) {
       send(403, { error: "local_mock_only" });
@@ -74,8 +81,9 @@ export function createDevMockMiddleware() {
         payload,
         `http://${req.headers.host}`
       );
+      const body = result.resolveBody ? await result.resolveBody() : result.body;
       for (const [key, value] of Object.entries(result.headers ?? {})) res.setHeader(key, value);
-      if (!res.destroyed) send(result.status, result.body);
+      if (!res.destroyed) send(result.status, body);
     }
   };
 }

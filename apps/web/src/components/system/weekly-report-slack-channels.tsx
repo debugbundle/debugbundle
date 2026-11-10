@@ -1,4 +1,5 @@
-import { PencilIcon } from "lucide-react";
+import { ResourceEmptyState } from "./resource-empty-state.js";
+import { CalendarDaysIcon, PencilIcon } from "lucide-react";
 import type { WeeklyReportChannelRecord } from "../../lib/api.js";
 import type { SlackDestinationRecord } from "../../lib/slack-api.js";
 import {
@@ -26,7 +27,11 @@ export function WeeklyReportSlackChannels({
   onDelete: (channelId: string) => void;
 }): JSX.Element {
   return channels.length === 0 ? (
-    <p className="text-sm text-muted-foreground">No Slack weekly reports configured.</p>
+    <ResourceEmptyState
+      icon={CalendarDaysIcon}
+      title="No Slack weekly reports yet"
+      description="Configured Slack report schedules will appear here."
+    />
   ) : (
     <div className="flex flex-col gap-3">
       {channels.map((channel) => (

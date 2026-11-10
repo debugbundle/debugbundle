@@ -30,6 +30,7 @@ import {
 import {
   getAnalyticsActionsWithAuthCommand as defaultGetAnalyticsActionsCommand,
   getAnalyticsDevicesWithAuthCommand as defaultGetAnalyticsDevicesCommand,
+  getAnalyticsFilterOptionsWithAuthCommand as defaultGetAnalyticsFilterOptionsCommand,
   getAnalyticsFunnelWithAuthCommand as defaultGetAnalyticsFunnelCommand,
   getAnalyticsIncidentImpactWithAuthCommand as defaultGetAnalyticsIncidentImpactCommand,
   getAnalyticsJourneysWithAuthCommand as defaultGetAnalyticsJourneysCommand,
@@ -364,6 +365,7 @@ export async function handleAnalyticsCommand(
     );
   }
   if (
+    resource === "filter-options" ||
     resource === "summary" ||
     resource === "routes" ||
     resource === "journeys" ||
@@ -381,7 +383,7 @@ export async function handleAnalyticsCommand(
       "granularity",
       "service",
       "environment",
-      ...ANALYTICS_METRIC_FILTER_OPTIONS,
+      ...(resource === "filter-options" ? [] : ANALYTICS_METRIC_FILTER_OPTIONS),
       "limit",
       "auth-file",
       "json"
@@ -404,20 +406,23 @@ export async function handleAnalyticsCommand(
       limit: readIntegerOption(parsedArgv, "limit")
     });
     const command =
-      resource === "summary"
-        ? (dependencies.getAnalyticsSummaryCommand ?? defaultGetAnalyticsSummaryCommand)
-        : resource === "routes"
-          ? (dependencies.getAnalyticsRoutesCommand ?? defaultGetAnalyticsRoutesCommand)
-          : resource === "journeys"
-            ? (dependencies.getAnalyticsJourneysCommand ?? defaultGetAnalyticsJourneysCommand)
-            : resource === "devices"
-              ? (dependencies.getAnalyticsDevicesCommand ?? defaultGetAnalyticsDevicesCommand)
-              : resource === "referrers"
-                ? (dependencies.getAnalyticsReferrersCommand ?? defaultGetAnalyticsReferrersCommand)
-                : resource === "actions"
-                  ? (dependencies.getAnalyticsActionsCommand ?? defaultGetAnalyticsActionsCommand)
-                  : (dependencies.listAnalyticsFunnelsCommand ??
-                    defaultListAnalyticsFunnelsCommand);
+      resource === "filter-options"
+        ? (dependencies.getAnalyticsFilterOptionsCommand ?? defaultGetAnalyticsFilterOptionsCommand)
+        : resource === "summary"
+          ? (dependencies.getAnalyticsSummaryCommand ?? defaultGetAnalyticsSummaryCommand)
+          : resource === "routes"
+            ? (dependencies.getAnalyticsRoutesCommand ?? defaultGetAnalyticsRoutesCommand)
+            : resource === "journeys"
+              ? (dependencies.getAnalyticsJourneysCommand ?? defaultGetAnalyticsJourneysCommand)
+              : resource === "devices"
+                ? (dependencies.getAnalyticsDevicesCommand ?? defaultGetAnalyticsDevicesCommand)
+                : resource === "referrers"
+                  ? (dependencies.getAnalyticsReferrersCommand ??
+                    defaultGetAnalyticsReferrersCommand)
+                  : resource === "actions"
+                    ? (dependencies.getAnalyticsActionsCommand ?? defaultGetAnalyticsActionsCommand)
+                    : (dependencies.listAnalyticsFunnelsCommand ??
+                      defaultListAnalyticsFunnelsCommand);
 
     return await command(input);
   }

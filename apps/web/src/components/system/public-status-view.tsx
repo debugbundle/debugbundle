@@ -1,3 +1,5 @@
+import { ActivityIcon } from "lucide-react";
+import { ResourceEmptyState } from "./resource-empty-state.js";
 import { useState } from "react";
 import type { PublicStatusPage } from "../../../../../packages/shared-types/src/public-status.js";
 import { HealthStatusProjectRow } from "./health-status-view.js";
@@ -13,7 +15,11 @@ export function PublicStatusPageView({ page }: { page: PublicStatusPage }): JSX.
       </CardHeader>
       <CardContent>
         {page.projects.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No published health checks are available.</p>
+          <ResourceEmptyState
+            icon={ActivityIcon}
+            title="No published health checks"
+            description="This status page has no published checks to display. Health and availability cannot be determined from this page yet."
+          />
         ) : (
           <div className="flex flex-col divide-y divide-border">
             {page.projects.map((project) => (

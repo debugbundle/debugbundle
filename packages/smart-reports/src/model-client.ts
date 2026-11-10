@@ -8,6 +8,7 @@ import {
 } from "./model-cost.js";
 import { validateReportNarrative, type ReportNarrative } from "./model-narrative.js";
 import { buildReportModelRequest } from "./model-request.js";
+import { redactReportData } from "./report-redaction.js";
 
 type Usage = z.infer<typeof ReportModelUsageSchema>;
 type Settled = {
@@ -206,13 +207,34 @@ export function createReportModelClient(input: {
           )
             return { ...settled, state: "rejected", reason: "report_unexpected_model_output" };
           const message = messageSchema.safeParse(messages[0]);
+          const refusal = messageSchema
+            .extend({
+              content: z
+                .array(
+                  z
+                    .object({ type: z.literal("refusal"), refusal: z.string().max(128 * 1024) })
+                    .passthrough()
+                )
+                .length(1)
+            })
+            .safeParse(messages[0]);
+          if (refusal.success)
+            return { ...settled, state: "rejected", reason: "report_model_refused" };
           if (!message.success)
             return { ...settled, state: "rejected", reason: "report_invalid_model_message" };
+          let parsedNarrative: unknown;
           try {
-            const narrative = validateReportNarrative(
-              prepared.facts,
-              JSON.parse(message.data.content[0]!.text)
-            );
+            parsedNarrative = JSON.parse(message.data.content[0]!.text);
+          } catch {
+            return { ...settled, state: "rejected", reason: "report_invalid_json" };
+          }
+          try {
+            const narrative = validateReportNarrative(prepared.facts, parsedNarrative);
+            // Readers withhold a whole report if mandatory privacy projection
+            // changes its prose. Reject before persisting a successful receipt,
+            // so unsafe output leaves a readable factual report, never a false ready.
+            if (JSON.stringify(redactReportData(narrative)) !== JSON.stringify(narrative))
+              throw new Error("report_unsafe_prose");
             return { ...settled, state: "succeeded", narrative };
           } catch (error) {
             return {

@@ -1,3 +1,4 @@
+import { formatAnalyticsLabel as formatLabel } from "../../lib/analytics-presentation.js";
 import { Link } from "react-router-dom";
 
 import type { AnalyticsBundleGenerationRecord } from "../../lib/api.js";
@@ -124,9 +125,10 @@ export function formatAnalyticsDate(value: string): string {
 }
 
 export function formatAnalyticsLabel(value: string): string {
-  return value
-    .split(/[._-]/u)
-    .filter((part) => part.length > 0)
-    .map((part) => `${part[0]!.toUpperCase()}${part.slice(1)}`)
-    .join(" ");
+  return formatLabel(
+    value
+      .split(/[._-]/u)
+      .filter((part) => part.length > 0)
+      .join("_")
+  );
 }

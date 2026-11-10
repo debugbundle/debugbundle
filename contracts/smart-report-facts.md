@@ -176,7 +176,11 @@ the entire accepted scope before assembly or egress.
 
 `model-evidence.ts` owns a bounded egress projection: at most ten opaque project labels, two hundred metric facts, one hundred selected evidence summaries and ten summaries per project. Original database identities, recipient emails and authenticated source URLs stay on the server. The projection validates period adjacency, source/metric semantics, reference uniqueness, project ownership of references and cutoff times. It reuses mandatory telemetry sanitisation before egress and withholds URLs/free-text emails. Restricted mode replaces project/source labels with generic labels and removes source narratives. This projection cannot authorise access; the report service must check the entire accepted scope before preflight and before every paid send.
 
+The mandatory privacy policy is applied to each schema-bounded project, metric and evidence row and to bounded report metadata. A maximum multilingual report must not be treated as one telemetry event and rejected by that event's byte/node budget. Canonical document, input-token and provider-request limits remain unchanged. AI-only selection notes are bounded to twenty, retaining per-project selection caveats and explicitly disclosing any further caveats left in the full canonical report. Canonical notes and facts remain intact.
+
 `model-narrative.ts` validates one qualitative narrative with linked overview, typed highlights, bounded priorities and coverage notes. Numeric tables and dates come directly from immutable server facts in every format. Generated prose cannot insert numeric quantities or URLs. Resolution/recovery/outstanding highlight kinds must have eligible supporting evidence; priorities cite active sources, include selected critical work and represent each project with high/critical work. Partial coverage and bounded/restricted selection require limitations. These deterministic checks are supplemented by factual review of free prose; they are not a complete semantic verifier.
+
+After narrative validation, generated prose must also survive the mandatory privacy projection unchanged before a successful receipt is persisted. Otherwise the known paid attempt settles as rejected with safe `report_unsafe_prose`, and generation publishes factual fallback. A response buffered by an older worker is rechecked before new canonical publication; unsafe prose is omitted with factual fallback without changing that settled receipt, hash or cost. The private reader still applies mandatory privacy checks to the complete canonical facts and narrative; no unsafe older report is grandfathered in.
 
 `model-client.ts` uses a fixed OpenAI origin, exact candidate models, complete-input token preflight, Standard service, no tools/conversation/storage, explicit-only thirty-minute caching, bounded bodies and deadlines. A prepared attempt is single-use and requires an awaited durable-admission callback before its paid request. Known validated usage settles even a rejected response; missing/uncertain usage retains its full worst-case reservation. There is no automatic retry or larger-model fallback. Candidate profiles and prompt/schema are in `model-request.ts`; they are not activated production selections until the evaluation gate passes.
 
@@ -190,9 +194,35 @@ Outstanding high/critical incident counts are point-in-time snapshots. Their dai
 
 ## Run execution and canonical artifacts
 
+Scheduler recovery admits at most the one persisted overdue period for each definition, then atomically moves its next delivery beyond the database check time. It does not drain the shared allowance by automatically replaying every missed historical period. This matches the allowance forecast's one-overdue-run count; explicit manual generation of a historical period still uses ordinary access, quota, budget and idempotency rules.
+
 Candidate migration `202611070013_add_report_run_admission` also binds each run to its actual durable generation job. Run/job/reservation creation is atomic. A worker must own the live job lease before binding or advancing a run. Ordinary definition edits affect later admissions; accepted scope/name/actor/privacy remain frozen, subject to current whole-scope authority, entitlement, explicit privacy narrowing and Owner review. Before source reads, object acceptance, preflight, paid admission and publication, recheck the relevant live fences. Do not substitute an Owner for a revoked actor.
 
 `report-model-attempt-store.ts` commits a sending receipt before HTTP. The fixed selected Terra profile reserves USD 0.02475/run, USD 0.99 for forty. Generic job retries cannot admit a second paid call. Sending/uncertain outcomes keep the complete hold. Known validated usage settles independently of permission to publish and releases only unused money, including after run deletion. Successful small narrative buffers are retained only under a live lease/current authority, reused after output failure and cleared after canonical publication or deletion.
+
+Attempt diagnostics are internal allowlisted codes, stored separately from the
+established immutable receipt hash. They distinguish incomplete/refused/unexpected
+output, malformed JSON, narrative validation and provider uncertainty; arbitrary
+provider text, prompts and exception messages are never retained. The first
+uncertain diagnostic survives crash recovery; a later known settlement records
+its definitive result. Duplicate settled receipts preserve their original code,
+including legacy NULL, and use exactly the original hash projection. Never infer
+or backfill a reason for an old receipt. Public report documents and API/CLI/MCP/
+OpenAI schemas retain their existing coarse analysis reasons. Dashboard, HTML/PDF
+and email share fixed customer explanations and retain the recorded factual report.
+Migration `202611090001_add_report_model_diagnostics` is additive, nullable and
+must run before dependent API/worker activation; readiness requires its ledger
+checksum, column and validated constraint. Empty-schema bootstrap includes the
+column separately without changing preceding migration inputs/checksums.
+
+New model requests additionally constrain each highlight kind's references:
+recorded resolution uses positive resolution metrics or currently resolved
+sources with a period resolution event; observed recovery uses period health
+recovery evidence; outstanding uses active open/regressed sources. Unsupported
+kinds are absent from the provider decoder schema. General happened/inference
+entries retain admitted references. These restrictions prevent schema-valid but
+unsupported claim/reference combinations before local validation; they do not
+relax that validator or change previously saved canonical documents.
 
 `report-generation.ts` produces a versioned private canonical document. It resumes exact hash-checked facts and a saved response; renderer recovery cannot call the model again. The model receives a disclosed per-view subset and compact lossless transport while HTML/PDF retain the full canonical tables. Missing model/preflight/rejected/uncertain responses have explicit degraded reasons. Factual reports still consume their logical generation; unused AI reservations are released. Definite pre-generation cancellation releases that generation once. Paid or uncertain calls are never refunded by cancellation.
 

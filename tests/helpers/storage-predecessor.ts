@@ -28,7 +28,8 @@ export const POST_PREDECESSOR_MIGRATION_IDS = [
   "202611070017_add_referral_invoice_benefit",
   "202611080001_add_business_trial_plan",
   "202611080002_guard_report_trial_collection",
-  "202611080003_unlock_selfhost_organization_access"
+  "202611080003_unlock_selfhost_organization_access",
+  "202611090001_add_report_model_diagnostics"
 ];
 
 /** Historical migration fixtures must start before the candidate, rather than

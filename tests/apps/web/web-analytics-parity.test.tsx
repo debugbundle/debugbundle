@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
+import { createAnalyticsFilterOptions } from "../../helpers/analytics-filter-options.js";
 import { App } from "../../../apps/web/src/app.js";
 import { resetBrowserSessionClientState } from "../../../apps/web/src/lib/api.js";
 import { createProject, createSession, jsonResponse, requestUrl } from "./web-test-helpers.js";
@@ -54,6 +55,18 @@ function setup(actionsFailOnce = false, emptyActions = false) {
         });
       if (url.endsWith("/analytics-settings"))
         return jsonResponse(200, { access_mode: "manage", analytics_available: true, settings });
+      if (url.includes("/analytics/filter-options?")) {
+        const response = createAnalyticsFilterOptions(projectId);
+        const params = new URL(url, "http://localhost").searchParams;
+        Object.assign(response.window, {
+          from: params.get("from") ?? response.window.from,
+          to: params.get("to") ?? response.window.to,
+          granularity: params.get("granularity") ?? "day",
+          service: params.get("service"),
+          environment: params.get("environment")
+        });
+        return jsonResponse(200, response);
+      }
       if (url.includes("/analytics/bundles?"))
         return jsonResponse(200, { bundles: [], next_cursor: null, total_pages: 1 });
       if (url.includes("/analytics/opportunities?"))
@@ -112,8 +125,55 @@ it("adds action metrics within existing analytics navigation", async () => {
     "active"
   );
   expect(await screen.findByText("checkout.submit")).toBeInTheDocument();
+  expect(screen.getByText("Conversion")).toBeInTheDocument();
   expect(requests.some((url) => url.includes("/analytics/actions?"))).toBe(true);
 });
+it.each(["Opportunities", "Bundles"])(
+  "keeps metrics-only filters out of the %s inventory without losing metric choices",
+  async (section) => {
+    const requests = setup();
+    const user = userEvent.setup();
+    render(<App initialEntries={[`/projects/${projectId}/analytics/actions`]} />);
+    await screen.findByText("checkout.submit");
+    await user.click(screen.getByRole("button", { name: "More filters" }));
+    await waitFor(() => expect(screen.getByLabelText("Device type")).toBeEnabled());
+    await chooseSelectOption(user, "Device type", "Mobile");
+    await user.click(screen.getByRole("button", { name: "Apply filters" }));
+    await waitFor(() => expect(requests.at(-1)).toContain("device_type=mobile"));
+    await user.click(
+      within(screen.getByRole("tablist", { name: "Analytics sections" })).getByRole("tab", {
+        name: section
+      })
+    );
+    await screen.findByRole("heading", {
+      name: section === "Bundles" ? "Generated analytics bundles" : "Analytics opportunities"
+    });
+    expect(screen.queryByRole("button", { name: "Remove Device type: Mobile filter" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "More filters" }));
+    const panel = screen.getByRole("dialog");
+    expect(within(panel).getByLabelText("Service")).toBeInTheDocument();
+    expect(within(panel).getByLabelText("Environment")).toBeInTheDocument();
+    expect(within(panel).queryByLabelText("Device type")).toBeNull();
+    expect(within(panel).queryByLabelText("Metric limit")).toBeNull();
+    await user.click(within(panel).getByRole("button", { name: /^Reset( filters)?$/ }));
+    if (section === "Bundles") {
+      await user.click(screen.getByRole("link", { name: "Generate analytics bundle" }));
+      const formDialog = await screen.findByRole("dialog", { name: "Generate analytics bundle" });
+      expect(within(formDialog).getByLabelText("Additional filters (JSON)")).toHaveValue("");
+      await user.click(within(formDialog).getByRole("button", { name: "Cancel" }));
+    }
+    await user.click(
+      within(screen.getByRole("tablist", { name: "Analytics sections" })).getByRole("tab", {
+        name: "Actions"
+      })
+    );
+    await screen.findByText("checkout.submit");
+    expect(
+      screen.getByRole("button", { name: "Remove Device type: Mobile filter" })
+    ).toBeInTheDocument();
+    await waitFor(() => expect(requests.at(-1)).toContain("device_type=mobile"));
+  }
+);
 it("applies custom UTC windows, hourly granularity and all supported dimension filters to metric requests", async () => {
   const requests = setup();
   const user = userEvent.setup();
@@ -125,9 +185,10 @@ it("applies custom UTC windows, hourly granularity and all supported dimension f
   await user.click(screen.getByRole("button", { name: "Apply time window" }));
   await user.click(screen.getByRole("button", { name: /^More filters/ }));
   const panel = screen.getByRole("dialog");
+  await waitFor(() => expect(screen.getByLabelText("Device type")).toBeEnabled());
   for (const [label, value] of Object.entries({
     Route: "/checkout",
-    "Device type": "mobile",
+    "Device type": "Mobile",
     "Operating system": "Linux",
     Language: "sl",
     Referrer: "direct",
@@ -135,14 +196,12 @@ it("applies custom UTC windows, hourly granularity and all supported dimension f
     "UTM medium": "email",
     "UTM campaign": "launch"
   }))
-    fireEvent.change(within(panel).getByLabelText(label), { target: { value } });
+    await chooseSelectOption(user, label, value);
   fireEvent.change(within(panel).getByLabelText("Metric limit"), { target: { value: "50" } });
   await chooseSelectOption(user, "Authentication state", "Authenticated");
-  fireEvent.change(within(panel).getByLabelText("Browser"), { target: { value: "Firefox" } });
-  fireEvent.change(within(panel).getByLabelText("Country"), { target: { value: "SI" } });
-  fireEvent.change(within(panel).getByLabelText("Custom dimensions (JSON)"), {
-    target: { value: '{"plan":"team"}' }
-  });
+  await chooseSelectOption(user, "Browser", "Firefox");
+  await chooseSelectOption(user, "Country", "SI");
+  await chooseSelectOption(user, "Custom dimension: plan", "team");
   await chooseSelectOption(user, "Granularity", "Hourly");
   await user.click(within(panel).getByRole("button", { name: "Apply filters" }));
   await waitFor(() => expect(requests.at(-1)).toContain("browser=Firefox"));
@@ -159,6 +218,12 @@ it("applies custom UTC windows, hourly granularity and all supported dimension f
   expect(params.get("language")).toBe("sl");
   expect(params.get("referrer")).toBe("direct");
   expect(params.get("auth_state")).toBe("authenticated");
+  expect(
+    screen.getByRole("button", { name: "Remove Authentication state: Authenticated filter" })
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Remove Device type: Mobile filter" })
+  ).toBeInTheDocument();
   expect(params.get("utm_source")).toBe("mail");
   expect(params.get("utm_medium")).toBe("email");
   expect(params.get("utm_campaign")).toBe("launch");

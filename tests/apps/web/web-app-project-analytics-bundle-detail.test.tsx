@@ -181,7 +181,7 @@ describe("web app - project AnalyticsBundle detail", () => {
     expect(screen.getByText("Ready")).toBeInTheDocument();
     expect(screen.getByText("1,200")).toBeInTheDocument();
     expect(screen.getByText("230")).toBeInTheDocument();
-    expect(screen.getByText("mobile")).toBeInTheDocument();
+    expect(screen.getByText("Mobile")).toBeInTheDocument();
     expect(screen.getByText("42%")).toBeInTheDocument();
     expect(screen.getByText("Inspect Highest Dropoff Step")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Checkout API errors" })).toHaveAttribute(

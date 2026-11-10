@@ -1,5 +1,6 @@
+import { DialogFormContent } from "./dialog-form-content.js";
 import { PendingButton } from "./pending-button.js";
-import { useId, useState } from "react";
+import { useId, useState, type ComponentProps } from "react";
 import {
   AnalyticsFlowDefinitionInputSchema,
   type AnalyticsFlowDefinitionInput
@@ -8,7 +9,14 @@ import { Button } from "../ui/button.js";
 import { Field, FieldLabel } from "../ui/field.js";
 import { Input } from "../ui/input.js";
 import { Notice } from "../ui/notice.js";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select.js";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "../ui/select.js";
 const emptyStep = (): AnalyticsFlowDefinitionInput["steps"][number] => ({
   step_key: "",
   display_name: "",
@@ -19,13 +27,15 @@ export function AnalyticsFlowForm({
   onSave,
   onCancel,
   busy,
-  error
+  error,
+  onCloseAutoFocus
 }: {
   initial?: AnalyticsFlowDefinitionInput;
   onSave: (definition: AnalyticsFlowDefinitionInput) => void;
   onCancel: () => void;
   busy: boolean;
   error: string | null;
+  onCloseAutoFocus?: ComponentProps<typeof DialogFormContent>["onCloseAutoFocus"];
 }): JSX.Element {
   const id = useId();
   const [draft, setDraft] = useState<AnalyticsFlowDefinitionInput>(
@@ -50,11 +60,26 @@ export function AnalyticsFlowForm({
     }));
   }
   return (
-    <form
-      className="flex flex-col gap-4"
+    <DialogFormContent
+      title={initial ? "Edit flow" : "Create flow"}
+      description="Define the ordered steps and origins your integration will record."
+      size="lg"
+      busy={busy}
+      onCloseAutoFocus={onCloseAutoFocus}
+      footer={
+        <>
+          <Button type="button" variant="outline" disabled={busy} onClick={onCancel}>
+            Cancel
+          </Button>
+          <PendingButton pending={busy} type="submit" disabled={busy}>
+            {busy ? "Saving…" : "Save flow"}
+          </PendingButton>
+        </>
+      }
       aria-label={initial ? "Edit flow" : "Create flow"}
       onSubmit={(event) => {
         event.preventDefault();
+        if (busy) return;
         const parsed = AnalyticsFlowDefinitionInputSchema.safeParse(draft);
         if (!parsed.success) {
           setValidation(parsed.error.issues[0]?.message ?? "Check the flow fields.");
@@ -64,8 +89,11 @@ export function AnalyticsFlowForm({
         onSave(parsed.data);
       }}
     >
-      <fieldset disabled={busy} className="flex flex-col gap-4">
-        <legend className="mb-3 font-medium">{initial ? "Edit flow" : "Create flow"}</legend>
+      <fieldset
+        disabled={busy}
+        aria-label="Flow definition"
+        className="flex min-w-0 flex-col gap-4"
+      >
         {initial && (
           <Notice tone="info" title="New report version">
             Changing a definition starts a new report version. Existing runs cannot advance in the
@@ -107,8 +135,10 @@ export function AnalyticsFlowForm({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="acquisition">Acquisition</SelectItem>
-                <SelectItem value="activation">Activation</SelectItem>
+                <SelectGroup>
+                  <SelectItem value="acquisition">Acquisition</SelectItem>
+                  <SelectItem value="activation">Activation</SelectItem>
+                </SelectGroup>
               </SelectContent>
             </Select>
           </Field>
@@ -208,15 +238,7 @@ export function AnalyticsFlowForm({
             {validation ?? error}
           </Notice>
         )}
-        <div className="flex gap-2">
-          <PendingButton pending={busy} type="submit" disabled={busy}>
-            {busy ? "Saving…" : "Save flow"}
-          </PendingButton>
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-        </div>
       </fieldset>
-    </form>
+    </DialogFormContent>
   );
 }

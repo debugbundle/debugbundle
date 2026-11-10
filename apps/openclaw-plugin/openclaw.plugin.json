@@ -2,7 +2,7 @@
   "id": "debugbundle",
   "name": "DebugBundle",
   "description": "Use DebugBundle for runtime error reporting, incident response, live app monitoring, health checks, debug bundles, and product analytics.",
-  "version": "1.21.0",
+  "version": "1.22.0",
   "configSchema": {
     "type": "object",
     "properties": {
@@ -158,6 +158,7 @@
       "debugbundle_delete_capture_rule",
       "debugbundle_suggest_capture_rules_from_incident",
       "debugbundle_create_capture_rule_from_incident_suggestion",
+      "debugbundle_get_analytics_filter_options",
       "debugbundle_get_usage_summary",
       "debugbundle_get_route_metrics",
       "debugbundle_get_journey_patterns",
@@ -532,6 +533,9 @@
       "optional": true
     },
     "debugbundle_create_capture_rule_from_incident_suggestion": {
+      "optional": true
+    },
+    "debugbundle_get_analytics_filter_options": {
       "optional": true
     },
     "debugbundle_generate_analytics_bundle": {

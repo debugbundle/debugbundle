@@ -4,6 +4,7 @@ import type { ReportModelClient } from "../../packages/smart-reports/src/model-c
 import { ReportDocumentSchema } from "../../packages/smart-reports/src/report-document.js";
 import { createSmartReportProcessor } from "../../apps/worker/src/smart-report-runtime.js";
 import { createReportRunManagementStore } from "../../packages/storage/src/report-run-management.js";
+import { createReportContentStore } from "../../packages/storage/src/report-content-store.js";
 import { reportModelProfile } from "../../packages/smart-reports/src/model-request.js";
 import {
   resetReportRunFixture,
@@ -42,82 +43,111 @@ runIntegration("canonical report generation and recovery", () => {
       })
     };
   }
-  it("resumes a paid canonical response after an output-storage failure without calling AI again", async () => {
-    const run = await admit(),
-      storage = objects();
-    let failReady = true;
-    storage.putObject.mockImplementation(async (input) => {
-      if (input.key.includes("/ready-") && failReady) {
-        failReady = false;
-        throw new Error("storage_unavailable");
-      }
-      storage.saved.set(input.key, Buffer.from(input.body));
-    });
-    const outcome = {
-      ...receipt(),
-      state: "succeeded" as const,
-      narrative: {
-        version: 1 as const,
-        overview: { text: "Available observations are incomplete.", evidence_refs: ["c1"] },
-        highlights: [],
-        priorities: [],
-        limitations: [{ text: "Source coverage is partial.", evidence_refs: ["c1"] }]
-      }
-    };
-    const paid = vi.fn(async (before: () => Promise<void>) => {
-      await before();
-      return outcome;
-    });
-    const prepare = vi.fn<ReportModelClient["prepare"]>().mockResolvedValue({
-      input_tokens: 100,
-      profile: reportModelProfile("gpt-6.1-terra"),
-      request_hash: "b".repeat(64),
-      maximum_nano_usd: 24750000,
-      run: paid
-    });
-    await expect(
-      processNextSmartReportJob({ db, objects: storage, model: { prepare } })
-    ).rejects.toThrow("report_generation_unavailable");
-    expect(
-      (
+  it.each([
+    { status: "ready", text: "Available observations are incomplete." },
+    { status: "factual_only", text: "Contact owner@example.test about the observations." }
+  ])(
+    "resumes a saved paid response as $status after storage failure without another AI call",
+    async ({ status, text }) => {
+      const run = await admit(),
+        storage = objects();
+      let failReady = true;
+      storage.putObject.mockImplementation(async (input) => {
+        if (input.key.includes("/ready-") && failReady) {
+          failReady = false;
+          throw new Error("storage_unavailable");
+        }
+        storage.saved.set(input.key, Buffer.from(input.body));
+      });
+      const outcome = {
+        ...receipt(),
+        state: "succeeded" as const,
+        narrative: {
+          version: 1 as const,
+          overview: { text, evidence_refs: ["c1"] },
+          highlights: [],
+          priorities: [],
+          limitations: [{ text: "Source coverage is partial.", evidence_refs: ["c1"] }]
+        }
+      };
+      const paid = vi.fn(async (before: () => Promise<void>) => {
+        await before();
+        return outcome;
+      });
+      const prepare = vi.fn<ReportModelClient["prepare"]>().mockResolvedValue({
+        input_tokens: 100,
+        profile: reportModelProfile("gpt-6.1-terra"),
+        request_hash: "b".repeat(64),
+        maximum_nano_usd: 24750000,
+        run: paid
+      });
+      await expect(
+        processNextSmartReportJob({ db, objects: storage, model: { prepare } })
+      ).rejects.toThrow("report_generation_unavailable");
+      expect(
+        (
+          await pool.query(
+            "SELECT state,narrative_json IS NOT NULL AS saved FROM report_model_attempts"
+          )
+        ).rows
+      ).toEqual([{ state: "succeeded", saved: true }]);
+      const originalReceipt = (
         await pool.query(
-          "SELECT state,narrative_json IS NOT NULL AS saved FROM report_model_attempts"
+          "SELECT state,outcome_sha256,cost_nano_usd,diagnostic_code FROM report_model_attempts"
         )
-      ).rows
-    ).toEqual([{ state: "succeeded", saved: true }]);
-    await pool.query(
-      "UPDATE worker_jobs SET available_at=now()-interval '1 second' WHERE job_name='generate-smart-report'"
-    );
-    expect(await processNextSmartReportJob({ db, objects: storage, model: { prepare } })).toEqual({
-      processed: true
-    });
-    expect(prepare).toHaveBeenCalledTimes(1);
-    expect(paid).toHaveBeenCalledTimes(1);
-    const stored = (
-      await pool.query<{ status: string; ready_object_key: string }>(
-        "SELECT status,ready_object_key FROM report_runs WHERE id=$1",
-        [run.id]
-      )
-    ).rows[0]!;
-    expect(stored.status).toBe("ready");
-    expect(
-      ReportDocumentSchema.parse(JSON.parse(storage.saved.get(stored.ready_object_key)!.toString()))
-        .analysis.status
-    ).toBe("available");
-    expect((await pool.query("SELECT narrative_json FROM report_model_attempts")).rows).toEqual([
-      { narrative_json: null }
-    ]);
-    expect(
-      (
-        await pool.query(
-          "SELECT generations,held_nano_usd,spent_nano_usd FROM report_allowance_windows"
+      ).rows;
+      await pool.query(
+        "UPDATE worker_jobs SET available_at=now()-interval '1 second' WHERE job_name='generate-smart-report'"
+      );
+      expect(await processNextSmartReportJob({ db, objects: storage, model: { prepare } })).toEqual(
+        {
+          processed: true
+        }
+      );
+      expect(prepare).toHaveBeenCalledTimes(1);
+      expect(paid).toHaveBeenCalledTimes(1);
+      const stored = (
+        await pool.query<{ status: string; ready_object_key: string }>(
+          "SELECT status,ready_object_key FROM report_runs WHERE id=$1",
+          [run.id]
         )
-      ).rows[0]
-    ).toMatchObject({ generations: 1, held_nano_usd: "0", spent_nano_usd: String(cost) });
-    expect(await processNextSmartReportJob({ db, objects: storage, model: { prepare } })).toEqual({
-      processed: false
-    });
-  });
+      ).rows[0]!;
+      expect(stored.status).toBe(status);
+      expect(
+        ReportDocumentSchema.parse(
+          JSON.parse(storage.saved.get(stored.ready_object_key)!.toString())
+        ).analysis.status
+      ).toBe(status === "ready" ? "available" : "unavailable");
+      const readable = await createReportContentStore(db, storage).read({
+        organization_id: run.organization_id,
+        id: run.id,
+        initiator: { version: 1, kind: "browser_session", user_id: owner }
+      });
+      expect(readable.narrative?.overview.text ?? null).toBe(status === "ready" ? text : null);
+      expect(
+        (
+          await pool.query(
+            "SELECT state,outcome_sha256,cost_nano_usd,diagnostic_code FROM report_model_attempts"
+          )
+        ).rows
+      ).toEqual(originalReceipt);
+      expect((await pool.query("SELECT narrative_json FROM report_model_attempts")).rows).toEqual([
+        { narrative_json: null }
+      ]);
+      expect(
+        (
+          await pool.query(
+            "SELECT generations,held_nano_usd,spent_nano_usd FROM report_allowance_windows"
+          )
+        ).rows[0]
+      ).toMatchObject({ generations: 1, held_nano_usd: "0", spent_nano_usd: String(cost) });
+      expect(await processNextSmartReportJob({ db, objects: storage, model: { prepare } })).toEqual(
+        {
+          processed: false
+        }
+      );
+    }
+  );
   it("publishes an explicit factual-only report when AI is unavailable without reserving a second generation", async () => {
     const run = await admit(),
       storage = objects();

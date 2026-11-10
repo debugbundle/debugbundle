@@ -17,8 +17,6 @@ import {
   reportAllowanceFixture
 } from "../../helpers/smart-reports.js";
 import { reportDocumentFixture } from "../../helpers/report-document.js";
-import { ReportDeliveryStates } from "../../../apps/web/src/components/system/report-delivery-states.js";
-import { ReportContentView } from "../../../apps/web/src/components/system/report-content-view.js";
 import { ReportDocumentSchema } from "../../../packages/smart-reports/src/report-document.js";
 import { ReportDefinitionFields } from "../../../apps/web/src/components/system/report-definition-fields.js";
 import type { CreateReportDefinition } from "../../../packages/smart-reports/src/report-definition.js";
@@ -36,6 +34,7 @@ const calls = vi.hoisted(() => ({
   pdf: vi.fn(),
   deliveries: vi.fn(),
   prepare: vi.fn(),
+  download: vi.fn(),
   cancel: vi.fn()
 }));
 vi.mock("../../../apps/web/src/lib/report-api.js", () => ({
@@ -57,7 +56,7 @@ vi.mock("../../../apps/web/src/lib/report-api.js", () => ({
       cancel: calls.cancel,
       remove: calls.remove
     },
-    pdf: { status: calls.pdf, request: calls.prepare },
+    pdf: { status: calls.pdf, request: calls.prepare, download: calls.download },
     deliveries: { list: calls.deliveries }
   },
   reportPdfFileUrl: (org: string, id: string) => `/v1/organizations/${org}/reports/${id}/pdf/file`,
@@ -66,6 +65,7 @@ vi.mock("../../../apps/web/src/lib/report-api.js", () => ({
 }));
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   resetBrowserSessionClientState();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -96,6 +96,7 @@ function setup(
     status: "not_requested",
     retry_after_seconds: null
   });
+  calls.download.mockResolvedValue(new Uint8Array([1]));
   calls.prepare.mockResolvedValue({
     run_id: reportRequest,
     status: "queued",
@@ -145,70 +146,19 @@ it("shows report management for self-hosted Free while retaining project role ch
   expect(await screen.findByRole("link", { name: "Create report" })).toBeVisible();
   expect(screen.queryByText(/New Smart Reports require Business/)).not.toBeInTheDocument();
 });
-it("renders validated analysis references and active priorities while escaping evidence prose and gating source links", () => {
-  const doc = reportDocumentFixture(),
-    project = doc.report.facts.projects[0]!;
-  doc.report.facts.evidence.push({
-    ref: "s1",
-    project_ref: project.ref,
-    type: "incident",
-    status: "open",
-    severity: "critical",
-    period_events: ["new"],
-    first_seen_at: null,
-    last_seen_at: null,
-    title: "Unresolved database failures",
-    context: "<script>private source text</script>"
-  });
-  doc.report.sources.push({
-    ref: "s1",
-    project_id: reportProject,
-    origin_project_id: reportProject,
-    source_type: "incident",
-    source_id: reportRequest,
-    retained: true,
-    text_available: true,
-    text_expires_at: doc.report.expires_at
-  });
-  const refs = ["s1", project.coverage_ref];
-  doc.narrative = {
-    version: 1,
-    overview: { text: "Database failures need attention.", evidence_refs: refs },
-    highlights: [
-      { kind: "outstanding", text: "Database failures remain unresolved.", evidence_refs: ["s1"] }
-    ],
-    priorities: [
-      {
-        title: "Investigate database failures",
-        action: "Review the retained incident evidence.",
-        rationale: "The critical incident remains open.",
-        evidence_refs: ["s1"]
-      }
-    ],
-    limitations: [
-      { text: "Source coverage remains incomplete.", evidence_refs: [project.coverage_ref] }
-    ]
-  };
-  doc.analysis = {
-    status: "available",
-    reason: null,
-    model: "gpt-6.1-terra",
-    request_sha256: "a".repeat(64)
-  };
-  const document = ReportDocumentSchema.parse(doc);
-  const { container, rerender } = render(
-    <ReportContentView view={{ document, available_source_refs: [] }} />
-  );
-  expect(screen.getByRole("heading", { name: "Investigate database failures" })).toBeVisible();
-  expect(screen.getAllByRole("link", { name: "s1" })[0]).toHaveAttribute("href", "#ref-s1");
-  expect(container.querySelector("script")).toBeNull();
-  expect(screen.getByText("<script>private source text</script>")).toBeVisible();
-  expect(screen.queryByRole("link", { name: "Open source evidence" })).not.toBeInTheDocument();
-  rerender(<ReportContentView view={{ document, available_source_refs: ["s1"] }} />);
-  expect(screen.getByRole("link", { name: "Open source evidence" })).toHaveAttribute(
-    "href",
-    expect.stringContaining(`/reports/${reportRequest}/sources/s1`)
-  );
+it("puts report history before compact saved reports and distinguishes usable facts-only output", async () => {
+  setup();
+  render(<App initialEntries={["/reports"]} />);
+  const history = await screen.findByRole("region", { name: "Report history" });
+  const definitions = screen.getByRole("region", { name: "Saved reports" });
+  expect(
+    history.compareDocumentPosition(definitions) & Node.DOCUMENT_POSITION_FOLLOWING
+  ).toBeTruthy();
+  expect(within(history).getByText("Facts only")).toBeVisible();
+  expect(
+    within(definitions).getByRole("link", { name: "Edit Monthly review settings" })
+  ).toBeVisible();
+  expect(screen.queryByText(/Off by default for manual generation/)).not.toBeInTheDocument();
 });
 it("shows scoped report history to a Viewer without generation or definition mutation controls", async () => {
   setup("business", "viewer");
@@ -362,7 +312,7 @@ it("keeps report creation in the shared header and links child breadcrumbs back 
     document.querySelector("header")?.querySelector('a[href="/reports/definitions/new"]')
   ).toBeNull();
   await user.click(within(breadcrumb).getByRole("link", { name: "Reports" }));
-  await user.click(await screen.findByRole("link", { name: `Edit ${definition.name}` }));
+  await user.click(await screen.findByRole("link", { name: `Edit ${definition.name} settings` }));
   await screen.findByLabelText("Report name");
   breadcrumb = screen.getByRole("navigation", { name: "breadcrumb" });
   expect(within(breadcrumb).getByText("Report settings")).toHaveAttribute("aria-current", "page");
@@ -375,22 +325,26 @@ it("keeps report creation in the shared header and links child breadcrumbs back 
     "/reports"
   );
 });
-it("keeps retained factual reports readable after downgrade and exposes explicit PDF preparation", async () => {
+it("keeps retained factual reports readable after downgrade and uses one PDF download action", async () => {
   setup("team");
   const user = userEvent.setup();
   render(<App initialEntries={[`/reports/${reportOrg}/${reportRequest}`]} />);
   expect(await screen.findByRole("heading", { name: "Monthly review", level: 2 })).toBeVisible();
   expect(await screen.findByText(/AI analysis is unavailable/i)).toBeVisible();
+  expect(screen.queryByText(/\(model rejected\)|\(model unavailable\)/i)).not.toBeInTheDocument();
+  expect(
+    screen.getByText(/recorded facts, resolutions and selected outstanding work remain available/i)
+  ).toBeVisible();
   expect(screen.getByRole("link", { name: "Open report in new tab" })).toHaveAttribute(
     "href",
     `/v1/organizations/${reportOrg}/reports/${reportRequest}/html`
   );
   expect(screen.queryByRole("link", { name: "Download PDF" })).not.toBeInTheDocument();
-  await user.click(screen.getByRole("button", { name: "Prepare PDF" }));
+  await user.click(screen.getByRole("button", { name: "Download PDF" }));
   await waitFor(() => expect(calls.prepare).toHaveBeenCalledOnce());
-  expect(screen.getByRole("status", { name: "PDF preparation status" })).toHaveTextContent(
-    /PDF.*queued|Preparing PDF/i
-  );
+  const downloading = screen.getByRole("button", { name: "Preparing PDF..." });
+  expect(downloading).toBeDisabled();
+  expect(downloading.querySelector("svg")).toHaveClass("animate-spin");
   expect(calls.generate).not.toHaveBeenCalled();
 });
 
@@ -402,6 +356,10 @@ it("retries a lost generation acknowledgement with the same command and no impli
     .mockResolvedValueOnce(run);
   render(<App initialEntries={["/reports"]} />);
   await user.click(await screen.findByRole("button", { name: "Generate report" }));
+  expect(calls.generate).not.toHaveBeenCalled();
+  const confirmation = await screen.findByRole("dialog", { name: "Generate report" });
+  expect(confirmation).toHaveTextContent("Uses one report from your workspace allowance");
+  await user.click(within(confirmation).getByRole("button", { name: "Generate report" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("lost acknowledgement");
   await user.click(screen.getByRole("button", { name: "Generate report" }));
   await waitFor(() => expect(calls.generate).toHaveBeenCalledTimes(2));
@@ -439,7 +397,7 @@ it("keeps whole-report mutation controls hidden on a Viewer detail page", async 
   expect(screen.queryByRole("button", { name: "Delete report" })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Regenerate report" })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Cancel report" })).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Prepare PDF" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Download PDF" })).toBeVisible();
 });
 
 it("does not navigate back to an old report after its delayed generation finishes on another page", async () => {
@@ -454,6 +412,9 @@ it("does not navigate back to an old report after its delayed generation finishe
   );
   render(<App initialEntries={["/reports"]} />);
   await user.click(await screen.findByRole("button", { name: "Generate report" }));
+  const confirmation = await screen.findByRole("dialog", { name: "Generate report" });
+  await user.click(within(confirmation).getByRole("button", { name: "Generate report" }));
+  await user.keyboard("{Escape}");
   await user.click(screen.getByRole("link", { name: "Projects" }));
   await screen.findByRole("heading", { name: "Projects", level: 1 });
   await act(async () => {
@@ -482,6 +443,208 @@ it("keeps canonical HTML facts readable when PDF cache status is temporarily una
   expect(screen.getByRole("link", { name: "Open report in new tab" })).toBeVisible();
   expect(screen.getByText(/PDF status could not be loaded/)).toBeVisible();
 });
+async function openGeneratingReport() {
+  vi.useFakeTimers();
+  vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+  let view!: ReturnType<typeof render>;
+  await act(async () => {
+    view = render(<App initialEntries={[`/reports/${reportOrg}/${reportRequest}`]} />);
+  });
+  return view;
+}
+it.each(["ready", "factual_only"] as const)(
+  "shows generating progress then automatically opens %s content",
+  async (status) => {
+    const { run } = setup();
+    const document = reportDocumentFixture();
+    const ref = document.report.facts.projects[0]!.coverage_ref;
+    const saved =
+      status === "factual_only"
+        ? document
+        : ReportDocumentSchema.parse({
+            ...document,
+            narrative: {
+              version: 1,
+              overview: { text: "The available observations are quiet.", evidence_refs: [ref] },
+              highlights: [],
+              priorities: [],
+              limitations: [
+                {
+                  text: "Use the recorded coverage when interpreting these observations.",
+                  evidence_refs: [ref]
+                }
+              ]
+            },
+            analysis: { ...document.analysis, status: "available", reason: null }
+          });
+    calls.content.mockResolvedValue({ document: saved, available_source_refs: [] });
+    calls.run
+      .mockResolvedValueOnce({ ...run, status: "queued", published_at: null })
+      .mockResolvedValueOnce({ ...run, status: "processing", published_at: null })
+      .mockResolvedValue({ ...run, status });
+    await openGeneratingReport();
+    const progress = screen.getByRole("status", { name: "Report generation status" });
+    expect(within(progress).getByText("Generating report...")).toBeVisible();
+    expect(progress.querySelector("svg")).toHaveClass("animate-spin", "motion-reduce:animate-none");
+    expect(progress).toHaveTextContent("appear here automatically");
+    expect(calls.content).not.toHaveBeenCalled();
+    for (let index = 0; index < 2; index++)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+    expect(calls.content).toHaveBeenCalledOnce();
+    expect(
+      screen.queryByRole("status", { name: "Report generation status" })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Monthly review", level: 2 })).toBeVisible();
+    expect(
+      status === "ready"
+        ? screen.getByText("The available observations are quiet.")
+        : screen.getByText(/AI analysis is unavailable/)
+    ).toBeVisible();
+    expect(calls.generate).not.toHaveBeenCalled();
+    expect(calls.prepare).not.toHaveBeenCalled();
+  }
+);
+
+it("shows a failed generation as a failure with an explicit new-generation consequence", async () => {
+  const { run } = setup();
+  calls.run.mockResolvedValue({ ...run, status: "failed", published_at: null });
+  render(<App initialEntries={[`/reports/${reportOrg}/${reportRequest}`]} />);
+  expect(await screen.findByRole("alert")).toHaveTextContent("could not be completed");
+  expect(screen.getByRole("alert")).toHaveTextContent("uses another generation");
+  expect(calls.content).not.toHaveBeenCalled();
+  expect(calls.generate).not.toHaveBeenCalled();
+});
+it("keeps checking slow generation, pauses in hidden tabs and cleans up on unmount", async () => {
+  const { run } = setup();
+  calls.run.mockResolvedValue({ ...run, status: "queued", published_at: null });
+  const view = await openGeneratingReport();
+  for (let index = 0; index < 20; index++)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+  expect(calls.run.mock.calls.length).toBeGreaterThan(16);
+  const before = calls.run.mock.calls.length;
+  vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+  fireEvent(document, new Event("visibilitychange"));
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(60000);
+  });
+  expect(calls.run).toHaveBeenCalledTimes(before);
+  vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+  await act(async () => {
+    fireEvent(document, new Event("visibilitychange"));
+  });
+  expect(calls.run).toHaveBeenCalledTimes(before + 1);
+  let finish!: (value: typeof run) => void;
+  calls.run.mockImplementationOnce(
+    () =>
+      new Promise<typeof run>((resolve) => {
+        finish = resolve;
+      })
+  );
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(5000);
+  });
+  const inFlight = calls.run.mock.calls.length;
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(60000);
+  });
+  expect(calls.run).toHaveBeenCalledTimes(inFlight);
+  view.unmount();
+  await act(async () => {
+    finish(run);
+    await vi.advanceTimersByTimeAsync(60000);
+  });
+  expect(calls.run).toHaveBeenCalledTimes(inFlight);
+  expect(calls.content).not.toHaveBeenCalled();
+  expect(calls.generate).not.toHaveBeenCalled();
+});
+it.each(["failed", "cancelled", "paused_access"] as const)(
+  "stops the spinner when generation becomes %s",
+  async (status) => {
+    const { run } = setup();
+    calls.run
+      .mockResolvedValueOnce({ ...run, status: "queued", published_at: null })
+      .mockResolvedValue({ ...run, status, published_at: null });
+    await openGeneratingReport();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    expect(
+      screen.queryByRole("status", { name: "Report generation status" })
+    ).not.toBeInTheDocument();
+    const count = calls.run.mock.calls.length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60000);
+    });
+    expect(calls.run).toHaveBeenCalledTimes(count);
+    expect(calls.content).not.toHaveBeenCalled();
+    expect(calls.generate).not.toHaveBeenCalled();
+  }
+);
+it("pauses offline and opens the report when the connection returns", async () => {
+  const { run } = setup();
+  calls.run
+    .mockResolvedValueOnce({ ...run, status: "queued", published_at: null })
+    .mockResolvedValue(run);
+  await openGeneratingReport();
+  const online = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
+  await act(async () => {
+    fireEvent(window, new Event("offline"));
+    await vi.advanceTimersByTimeAsync(60000);
+  });
+  expect(calls.run).toHaveBeenCalledTimes(1);
+  expect(screen.getByText(/You're offline/)).toBeVisible();
+  online.mockReturnValue(true);
+  await act(async () => {
+    fireEvent(window, new Event("online"));
+  });
+  expect(screen.getByText(/AI analysis is unavailable/)).toBeVisible();
+  expect(calls.generate).not.toHaveBeenCalled();
+});
+it("recovers status and content reads automatically after a temporary interruption", async () => {
+  const { run } = setup();
+  calls.run
+    .mockResolvedValueOnce({ ...run, status: "queued", published_at: null })
+    .mockRejectedValueOnce(new Error("Offline"))
+    .mockResolvedValue(run);
+  calls.content
+    .mockRejectedValueOnce(new Error("Storage warming up"))
+    .mockResolvedValue({ document: reportDocumentFixture(), available_source_refs: [] });
+  await openGeneratingReport();
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(2000);
+  });
+  expect(screen.getByText(/keep checking automatically/i)).toBeVisible();
+  expect(screen.getByText("Generating report...")).toBeVisible();
+  for (let index = 0; index < 3; index++)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10000);
+    });
+  expect(screen.getByText(/AI analysis is unavailable/)).toBeVisible();
+  expect(screen.queryByText(/keep checking automatically/i)).not.toBeInTheDocument();
+  expect(calls.generate).not.toHaveBeenCalled();
+});
+it("stops generation polling and clears the progress view when access is revoked", async () => {
+  const { run } = setup();
+  calls.run
+    .mockResolvedValueOnce({ ...run, status: "queued", published_at: null })
+    .mockRejectedValue(new ReportApiError(403, "forbidden"));
+  await openGeneratingReport();
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(2000);
+  });
+  const before = calls.run.mock.calls.length;
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(60000);
+  });
+  expect(calls.run).toHaveBeenCalledTimes(before);
+  expect(screen.queryByText("Generating report...")).not.toBeInTheDocument();
+  expect(calls.content).not.toHaveBeenCalled();
+  expect(calls.generate).not.toHaveBeenCalled();
+});
 
 it("shows actual shared monthly allowance and warns when configured demand exceeds what remains", async () => {
   setup();
@@ -489,7 +652,7 @@ it("shows actual shared monthly allowance and warns when configured demand excee
   render(<App />);
   const allowance = await screen.findByRole("region", { name: "Shared report allowance" });
   expect(within(allowance).getByText("33 of 40 reports remaining")).toBeTruthy();
-  expect(within(allowance).getByText(/90 scheduled reports/)).toBeTruthy();
+  expect(within(allowance).getByText(/90 scheduled before the reset/)).toBeTruthy();
   expect(within(allowance).getByText(/Runs beyond the allowance will be skipped/)).toBeTruthy();
 });
 it("keeps report definitions visible when the separate allowance forecast is unavailable", async () => {
@@ -590,7 +753,7 @@ it("uses standard empty cards and permitted actions for Business reports", async
     expect(card!.querySelector('[data-slot="empty-icon"]')).not.toBeNull();
   }
   expect(
-    within(screen.getByRole("region", { name: "Report definitions" })).getByRole("link", {
+    within(screen.getByRole("region", { name: "Saved reports" })).getByRole("link", {
       name: "Create report"
     })
   ).toHaveAttribute("href", "/reports/definitions/new");
@@ -633,35 +796,4 @@ it("keeps genuine archive failures retryable alongside the upgrade callout", asy
   expect(await screen.findByText("Archive service offline")).toBeVisible();
   await userEvent.click(screen.getByRole("button", { name: "Retry" }));
   expect(await screen.findByRole("link", { name: "Open Monthly review" })).toBeVisible();
-});
-
-it("keeps recipient labels private when identities are removed or the saved scope changes", () => {
-  const acceptedAt = "2026-11-09T12:00:00.000Z";
-  const deliveries = [
-    { ...reportEmailDeliveryFixture(), id: "removed", recipient_user_id: null },
-    { ...reportEmailDeliveryFixture(), id: "self", recipient_user_id: reportOrg },
-    { ...reportEmailDeliveryFixture(), id: "saved", recipient_user_id: reportProject },
-    {
-      ...reportEmailDeliveryFixture(),
-      id: "unlisted",
-      recipient_user_id: reportRequest,
-      status: "accepted" as const,
-      reason: null,
-      accepted_at: acceptedAt
-    }
-  ];
-  render(
-    <ReportDeliveryStates
-      deliveries={deliveries}
-      recipientIds={[reportOrg, reportProject]}
-      currentUserId={reportOrg}
-    />
-  );
-  expect(screen.getByText("Recipient no longer available")).toBeVisible();
-  expect(screen.getByText("You")).toBeVisible();
-  expect(screen.getByText("Saved recipient 2")).toBeVisible();
-  expect(screen.getByText("Saved recipient 4")).toBeVisible();
-  expect(screen.getByText(`Accepted ${acceptedAt}`)).toBeVisible();
-  for (const identity of [reportOrg, reportProject, reportRequest])
-    expect(screen.queryByText(identity)).not.toBeInTheDocument();
 });

@@ -18,6 +18,7 @@ export interface DialogFormContentProps extends React.ComponentProps<"form"> {
   footer: React.ReactNode;
   size?: "sm" | "md" | "lg" | "xl";
   busy?: boolean;
+  onCloseAutoFocus?: React.ComponentProps<typeof DialogContent>["onCloseAutoFocus"];
 }
 
 export function DialogFormContent({
@@ -26,6 +27,7 @@ export function DialogFormContent({
   footer,
   size = "md",
   busy = false,
+  onCloseAutoFocus,
   className,
   children,
   ...props
@@ -36,6 +38,7 @@ export function DialogFormContent({
       padding="none"
       showCloseButton={false}
       className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden"
+      onCloseAutoFocus={onCloseAutoFocus}
     >
       <DialogHeader className="shrink-0 border-b bg-muted/50 px-6 pt-6 pb-4">
         <div className="flex items-start justify-between gap-4">

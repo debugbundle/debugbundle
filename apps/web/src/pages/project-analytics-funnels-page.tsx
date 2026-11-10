@@ -1,3 +1,4 @@
+import { ResourceEmptyState } from "../components/system/resource-empty-state.js";
 import { ChevronDownIcon, ChevronRightIcon, FunnelIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
@@ -263,7 +264,11 @@ function FunnelStepAnalysis({
         </Notice>
       ) : null}
       {response !== null && response.steps.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No captured steps in this window.</p>
+        <ResourceEmptyState
+          icon={FunnelIcon}
+          title="No captured steps in this window"
+          description="Captured funnel steps matching this period and filters will appear here."
+        />
       ) : null}
       {response !== null && response.steps.length > 0 ? (
         <FunnelStepsTable title={title} steps={response.steps} />

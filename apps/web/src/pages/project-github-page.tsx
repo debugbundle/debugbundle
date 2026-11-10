@@ -1,3 +1,5 @@
+import { EyeOffIcon, SendIcon } from "lucide-react";
+import { ResourceEmptyState } from "../components/system/resource-empty-state.js";
 import { PendingButton } from "../components/system/pending-button.js";
 import { useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
@@ -734,13 +736,17 @@ export function ProjectGitHubPage(): JSX.Element {
                   ) : null}
                 </div>
                 {githubSettings.deliveries.length === 0 ? (
-                  <p className="mt-3 text-sm text-muted-foreground">
-                    No GitHub delivery attempts yet.
-                  </p>
+                  <ResourceEmptyState
+                    icon={SendIcon}
+                    title="No delivery attempts yet"
+                    description="Dispatch attempts appear here when an enabled rule matches an event."
+                  />
                 ) : visibleDeliveries.length === 0 ? (
-                  <p className="mt-3 text-sm text-muted-foreground">
-                    All recent failed deliveries are cleared from this view.
-                  </p>
+                  <ResourceEmptyState
+                    icon={EyeOffIcon}
+                    title="All recent failures are hidden"
+                    description="Use Show cleared to review them. Clearing only changes this browser view; delivery history is preserved."
+                  />
                 ) : (
                   <div className="mt-3 overflow-x-auto">
                     <Table>

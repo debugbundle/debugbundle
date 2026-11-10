@@ -1,3 +1,4 @@
+import { ANALYTICS_METRICS_MCP_TOOL_CATALOG } from "../../../apps/mcp/src/analytics-metrics-tool-catalog.js";
 import { describe, expect, it, vi } from "vitest";
 
 import { AnalyticsMetricsApiError } from "../../../apps/cli/src/analytics-metrics-commands.js";
@@ -9,6 +10,7 @@ import {
 describe("mcp analytics metrics tools", () => {
   it("declares analytics metrics tool parity", () => {
     expect(ANALYTICS_METRICS_MCP_TOOL_NAMES).toEqual([
+      "get_analytics_filter_options",
       "get_usage_summary",
       "get_route_metrics",
       "get_journey_patterns",
@@ -26,6 +28,50 @@ describe("mcp analytics metrics tools", () => {
       "generate_analytics_bundle",
       "get_analytics_bundle"
     ]);
+  });
+
+  it("exposes observed choices as a scoped read-only tool", async () => {
+    const api = {
+      getFilterOptions: vi.fn().mockResolvedValue({ options: {} }),
+      getUsageSummary: vi.fn(),
+      getRouteMetrics: vi.fn(),
+      getJourneyPatterns: vi.fn(),
+      listJourneySamples: vi.fn(),
+      getJourneySample: vi.fn(),
+      getDeviceBreakdown: vi.fn(),
+      getReferrerMetrics: vi.fn(),
+      getActionMetrics: vi.fn(),
+      listFunnels: vi.fn(),
+      getFunnelAnalysis: vi.fn(),
+      getIncidentImpact: vi.fn(),
+      listOpportunities: vi.fn(),
+      getOpportunity: vi.fn(),
+      listBundles: vi.fn(),
+      createBundle: vi.fn(),
+      getBundle: vi.fn()
+    };
+    const input = {
+      bearerToken: "test_member",
+      projectId: "00000000-0000-0000-0000-000000000001",
+      last: "30d",
+      service: "web",
+      limit: 100
+    };
+    const tool = ANALYTICS_METRICS_MCP_TOOL_CATALOG.find(
+      (entry) => entry.name === "get_analytics_filter_options"
+    )!;
+    expect(tool.inputSchema.safeParse(input).success).toBe(true);
+    expect(tool.inputSchema.safeParse({ ...input, browser: "Chrome" }).success).toBe(false);
+    expect(tool.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
+    const tools = createAnalyticsMetricsMcpTools(api);
+    await expect(tools.get_analytics_filter_options(input)).resolves.toEqual({ options: {} });
+    expect(api.getFilterOptions).toHaveBeenCalledWith(expect.objectContaining(input));
+    api.getFilterOptions.mockRejectedValueOnce(
+      new AnalyticsMetricsApiError(503, "analytics_filter_options_unavailable")
+    );
+    await expect(tools.get_analytics_filter_options(input)).rejects.toThrow(
+      "mcp_tool_error:analytics_filter_options_unavailable"
+    );
   });
 
   it("returns analytics summary payloads", async () => {
@@ -103,13 +149,19 @@ describe("mcp analytics metrics tools", () => {
       getRouteMetrics: vi.fn().mockResolvedValue({ routes: [] }),
       getJourneyPatterns: vi.fn().mockResolvedValue({ patterns: [] }),
       listJourneySamples: vi.fn().mockResolvedValue({ samples: [], next_cursor: null }),
-      getJourneySample: vi.fn().mockResolvedValue({ sample: { sample_id: "sample_1" }, journey: {} }),
+      getJourneySample: vi
+        .fn()
+        .mockResolvedValue({ sample: { sample_id: "sample_1" }, journey: {} }),
       getDeviceBreakdown: vi.fn().mockResolvedValue({ device_types: [] }),
       getReferrerMetrics: vi.fn().mockResolvedValue({ referrers: [] }),
       getActionMetrics: vi.fn().mockResolvedValue({ actions: [] }),
       listFunnels: vi.fn().mockResolvedValue({ funnels: [] }),
-      getFunnelAnalysis: vi.fn().mockResolvedValue({ funnel: { funnel_key: "checkout" }, steps: [] }),
-      getIncidentImpact: vi.fn().mockResolvedValue({ incident_id: "incident_1", affected_sessions: 2 }),
+      getFunnelAnalysis: vi
+        .fn()
+        .mockResolvedValue({ funnel: { funnel_key: "checkout" }, steps: [] }),
+      getIncidentImpact: vi
+        .fn()
+        .mockResolvedValue({ incident_id: "incident_1", affected_sessions: 2 }),
       listOpportunities: vi.fn().mockResolvedValue({ opportunities: [], next_cursor: null }),
       getOpportunity: vi.fn().mockResolvedValue({ opportunity: { opportunity_id: "opp_1" } }),
       listBundles: vi.fn().mockResolvedValue({ bundles: [], next_cursor: null }),
@@ -118,8 +170,12 @@ describe("mcp analytics metrics tools", () => {
     };
     const tools = createAnalyticsMetricsMcpTools(api);
 
-    await expect(tools.get_route_metrics({ bearerToken: "token", projectId: "proj_1" })).resolves.toEqual({ routes: [] });
-    await expect(tools.get_journey_patterns({ bearerToken: "token", projectId: "proj_1" })).resolves.toEqual({ patterns: [] });
+    await expect(
+      tools.get_route_metrics({ bearerToken: "token", projectId: "proj_1" })
+    ).resolves.toEqual({ routes: [] });
+    await expect(
+      tools.get_journey_patterns({ bearerToken: "token", projectId: "proj_1" })
+    ).resolves.toEqual({ patterns: [] });
     await expect(
       tools.list_analytics_journey_samples({
         bearerToken: "token",
@@ -138,15 +194,35 @@ describe("mcp analytics metrics tools", () => {
         sampleId: "sample_1"
       })
     ).resolves.toEqual({ sample: { sample_id: "sample_1" }, journey: {} });
-    await expect(tools.get_device_breakdown({ bearerToken: "token", projectId: "proj_1" })).resolves.toEqual({ device_types: [] });
-    await expect(tools.get_referrer_metrics({ bearerToken: "token", projectId: "proj_1" })).resolves.toEqual({ referrers: [] });
-    await expect(tools.get_action_metrics({ bearerToken: "token", projectId: "proj_1" })).resolves.toEqual({ actions: [] });
-    await expect(tools.list_funnel_metrics({ bearerToken: "token", projectId: "proj_1" })).resolves.toEqual({ funnels: [] });
-    await expect(tools.get_funnel_analysis({ bearerToken: "token", projectId: "proj_1", funnelKey: "checkout" })).resolves.toEqual({
+    await expect(
+      tools.get_device_breakdown({ bearerToken: "token", projectId: "proj_1" })
+    ).resolves.toEqual({ device_types: [] });
+    await expect(
+      tools.get_referrer_metrics({ bearerToken: "token", projectId: "proj_1" })
+    ).resolves.toEqual({ referrers: [] });
+    await expect(
+      tools.get_action_metrics({ bearerToken: "token", projectId: "proj_1" })
+    ).resolves.toEqual({ actions: [] });
+    await expect(
+      tools.list_funnel_metrics({ bearerToken: "token", projectId: "proj_1" })
+    ).resolves.toEqual({ funnels: [] });
+    await expect(
+      tools.get_funnel_analysis({
+        bearerToken: "token",
+        projectId: "proj_1",
+        funnelKey: "checkout"
+      })
+    ).resolves.toEqual({
       funnel: { funnel_key: "checkout" },
       steps: []
     });
-    await expect(tools.get_incident_impact({ bearerToken: "token", projectId: "proj_1", incidentId: "incident_1" })).resolves.toEqual({
+    await expect(
+      tools.get_incident_impact({
+        bearerToken: "token",
+        projectId: "proj_1",
+        incidentId: "incident_1"
+      })
+    ).resolves.toEqual({
       incident_id: "incident_1",
       affected_sessions: 2
     });
@@ -220,28 +296,38 @@ describe("mcp analytics metrics tools", () => {
       })
     ).resolves.toEqual({ status: "pending", bundle_generation_id: "gen_1" });
 
-    expect(api.getFunnelAnalysis).toHaveBeenCalledWith(expect.objectContaining({
-      bearerToken: "token",
-      projectId: "proj_1",
-      funnelKey: "checkout"
-    }));
-    expect(api.getIncidentImpact).toHaveBeenCalledWith(expect.objectContaining({
-      bearerToken: "token",
-      projectId: "proj_1",
-      incidentId: "incident_1"
-    }));
-    expect(api.listFunnels).toHaveBeenCalledWith(expect.objectContaining({
-      bearerToken: "token",
-      projectId: "proj_1"
-    }));
-    expect(api.getActionMetrics).toHaveBeenCalledWith(expect.objectContaining({
-      bearerToken: "token",
-      projectId: "proj_1"
-    }));
-    expect(api.getJourneyPatterns).toHaveBeenCalledWith(expect.objectContaining({
-      bearerToken: "token",
-      projectId: "proj_1"
-    }));
+    expect(api.getFunnelAnalysis).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bearerToken: "token",
+        projectId: "proj_1",
+        funnelKey: "checkout"
+      })
+    );
+    expect(api.getIncidentImpact).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bearerToken: "token",
+        projectId: "proj_1",
+        incidentId: "incident_1"
+      })
+    );
+    expect(api.listFunnels).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bearerToken: "token",
+        projectId: "proj_1"
+      })
+    );
+    expect(api.getActionMetrics).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bearerToken: "token",
+        projectId: "proj_1"
+      })
+    );
+    expect(api.getJourneyPatterns).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bearerToken: "token",
+        projectId: "proj_1"
+      })
+    );
     expect(api.listJourneySamples).toHaveBeenCalledWith({
       bearerToken: "token",
       projectId: "proj_1",
@@ -350,7 +436,9 @@ describe("mcp analytics metrics tools", () => {
 
   it("maps analytics metrics API and unknown errors to MCP tool errors", async () => {
     const tools = createAnalyticsMetricsMcpTools({
-      getUsageSummary: vi.fn().mockRejectedValue(new AnalyticsMetricsApiError(401, "invalid_member_token")),
+      getUsageSummary: vi
+        .fn()
+        .mockRejectedValue(new AnalyticsMetricsApiError(401, "invalid_member_token")),
       getRouteMetrics: vi.fn(),
       getJourneyPatterns: vi.fn(),
       listJourneySamples: vi.fn(),

@@ -247,6 +247,28 @@ Saved/manual schedule values and recipient selections, including an empty list,
 are preserved when editing. API defaults remain unchanged. Report fact periods
 remain UTC regardless of delivery timezone.
 
+The Reports landing page leads with retained history and a compact shared allowance,
+followed by saved settings. Manual generation confirms the exact completed UTC
+period and allowance use; email remains opt-in. Report states distinguish usable
+facts-only content from failed/skipped work. Bounded read-only status polling never
+generates or prepares output. Queued/processing reports show Generating report...
+with a reduced-motion-aware spinner and automatically display the saved document
+when readable. Serial status reads continue for slow work, pause when hidden or
+offline, back off on temporary failures and stop on lost access or terminal states.
+History status explanations use focusable badge tooltips, with balanced desktop
+columns and stacked mobile rows. Comparison headings group their supporting text;
+metric table captions have internal bottom padding. Download PDF is a single
+explicit action with Preparing PDF... progress and automatic file save when
+ready. Cached output skips preparation, and leaving the page cancels download
+intent. The browser retrieves bounded validated PDF bytes using session cookies
+without sending the internal browser-scope marker as a bearer token.
+Web, HTML and PDF lead with summary and priorities,
+retain canonical urgent work alongside AI recommendations, and identify each source
+project. Friendly dates show included UTC days without changing half-open facts.
+After a prolonged scheduling interruption, admit the persisted overdue period once
+and advance to a future delivery; do not replay the entire historical backlog
+against the shared allowance. See the approved [reliability audit](smart-report-reliability-audit.md).
+
 ## Acceptance
 
 - AC-BUS-01: Exact catalogue, included/0–99 extra capacity, monthly/annual totals,

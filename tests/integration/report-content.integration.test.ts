@@ -181,94 +181,102 @@ runIntegration("authenticated canonical report content", () => {
       "report_not_found"
     );
   });
-  it("reads every metric and source in a ten-project report and uses current retained source links", async () => {
-    const document = maximumReportDocumentFixture();
-    for (const view of document.report.scope)
-      await pool.query(
-        "INSERT INTO projects(id,organization_id,owner_user_id,name,slug) VALUES($1::uuid,$2,$3,'Maximum',$1::text)",
-        [view.project_id, fixture.org, fixture.owner]
+  it.each([false, true])(
+    "reads every metric and source in a ten-project report, multilingual=%s",
+    async (multilingual) => {
+      const document = maximumReportDocumentFixture();
+      if (multilingual)
+        for (const item of document.report.facts.evidence) {
+          item.title = "調査対象".repeat(30);
+          item.context = "障害原因".repeat(400);
+        }
+      for (const view of document.report.scope)
+        await pool.query(
+          "INSERT INTO projects(id,organization_id,owner_user_id,name,slug) VALUES($1::uuid,$2,$3,'Maximum',$1::text)",
+          [view.project_id, fixture.org, fixture.owner]
+        );
+      const initiator = {
+        version: 1 as const,
+        kind: "browser_session" as const,
+        user_id: fixture.owner
+      };
+      await createReportDefinitionStore(db).replace({
+        organization_id: fixture.org,
+        id: fixture.definition,
+        initiator,
+        definition: {
+          name: document.name,
+          cadence: "monthly",
+          project_ids: document.report.scope.map((view) => view.project_id),
+          recipient_user_ids: [],
+          privacy_mode: "full",
+          source_collection_consent: true,
+          schedule: null,
+          enabled: false,
+          expected_version: 1
+        }
+      });
+      const run = await createReportRunAdmissionStore(db, { profile: null }).admit({
+        organization_id: fixture.org,
+        initiator,
+        definition_id: fixture.definition,
+        request_id: randomUUID(),
+        expected_version: 2,
+        period: document.report.facts.period,
+        kind: "manual"
+      });
+      document.run_id = run.id;
+      document.report.organization_id = fixture.org;
+      document.report.definition_id = fixture.definition;
+      document.report.facts.cutoff_at = new Date().toISOString();
+      document.report.expires_at = new Date(Date.now() + 90 * 86400000).toISOString();
+      for (const source of document.report.sources)
+        if (source.text_available) source.text_expires_at = document.report.expires_at;
+      const execution = createReportRunExecutionStore(db),
+        claim = await execution.claimNext();
+      await execution.bind(claim!);
+      const artifacts = createReportArtifactStore(db);
+      await artifacts.persist(
+        claim!,
+        {
+          kind: "facts",
+          body: Buffer.from(JSON.stringify(document.report)),
+          expires_at: document.report.expires_at
+        },
+        objects
       );
-    const initiator = {
-      version: 1 as const,
-      kind: "browser_session" as const,
-      user_id: fixture.owner
-    };
-    await createReportDefinitionStore(db).replace({
-      organization_id: fixture.org,
-      id: fixture.definition,
-      initiator,
-      definition: {
-        name: document.name,
-        cadence: "monthly",
-        project_ids: document.report.scope.map((view) => view.project_id),
-        recipient_user_ids: [],
-        privacy_mode: "full",
-        source_collection_consent: true,
-        schedule: null,
-        enabled: false,
-        expected_version: 1
-      }
-    });
-    const run = await createReportRunAdmissionStore(db, { profile: null }).admit({
-      organization_id: fixture.org,
-      initiator,
-      definition_id: fixture.definition,
-      request_id: randomUUID(),
-      expected_version: 2,
-      period: document.report.facts.period,
-      kind: "manual"
-    });
-    document.run_id = run.id;
-    document.report.organization_id = fixture.org;
-    document.report.definition_id = fixture.definition;
-    document.report.facts.cutoff_at = new Date().toISOString();
-    document.report.expires_at = new Date(Date.now() + 90 * 86400000).toISOString();
-    for (const source of document.report.sources)
-      if (source.text_available) source.text_expires_at = document.report.expires_at;
-    const execution = createReportRunExecutionStore(db),
-      claim = await execution.claimNext();
-    await execution.bind(claim!);
-    const artifacts = createReportArtifactStore(db);
-    await artifacts.persist(
-      claim!,
-      {
-        kind: "facts",
-        body: Buffer.from(JSON.stringify(document.report)),
-        expires_at: document.report.expires_at
-      },
-      objects
-    );
-    await artifacts.persist(
-      claim!,
-      {
-        kind: "ready",
-        body: Buffer.from(JSON.stringify(document)),
-        expires_at: document.report.expires_at
-      },
-      objects
-    );
-    await createReportRunManagementStore(db).complete(claim!);
-    const result = await read(run.id);
-    expect(result.report.facts.metrics).toHaveLength(140);
-    expect(result.report.sources).toHaveLength(100);
-    const source = document.report.sources.find((source) => source.source_type === "incident")!,
-      content = createReportContentStore(db, objects),
-      input = { organization_id: fixture.org, id: run.id, initiator };
-    await pool.query(
-      "INSERT INTO incidents(id,project_id,fingerprint,title,severity,status,first_seen_at,last_seen_at,bundle_created_at) VALUES($1,$2,'retained','Retained incident','high','open',now(),now(),now())",
-      [source.source_id, source.origin_project_id]
-    );
-    expect((await content.view(input)).available_source_refs).toEqual([source.ref]);
-    expect(await content.source({ ...input, reference: source.ref })).toBe(
-      `/projects/${source.origin_project_id}/incidents/${source.source_id}`
-    );
-    await pool.query(
-      "UPDATE incidents SET bundle_created_at=now()-interval '100 days' WHERE id=$1",
-      [source.source_id]
-    );
-    expect((await content.view(input)).available_source_refs).toEqual([]);
-    expect(await content.source({ ...input, reference: source.ref })).toBeNull();
-  });
+      await artifacts.persist(
+        claim!,
+        {
+          kind: "ready",
+          body: Buffer.from(JSON.stringify(document)),
+          expires_at: document.report.expires_at
+        },
+        objects
+      );
+      await createReportRunManagementStore(db).complete(claim!);
+      const result = await read(run.id);
+      expect(result.report.facts.metrics).toHaveLength(140);
+      expect(result.report.sources).toHaveLength(100);
+      const source = document.report.sources.find((source) => source.source_type === "incident")!,
+        content = createReportContentStore(db, objects),
+        input = { organization_id: fixture.org, id: run.id, initiator };
+      await pool.query(
+        "INSERT INTO incidents(id,project_id,fingerprint,title,severity,status,first_seen_at,last_seen_at,bundle_created_at) VALUES($1,$2,'retained','Retained incident','high','open',now(),now(),now())",
+        [source.source_id, source.origin_project_id]
+      );
+      expect((await content.view(input)).available_source_refs).toEqual([source.ref]);
+      expect(await content.source({ ...input, reference: source.ref })).toBe(
+        `/projects/${source.origin_project_id}/incidents/${source.source_id}`
+      );
+      await pool.query(
+        "UPDATE incidents SET bundle_created_at=now()-interval '100 days' WHERE id=$1",
+        [source.source_id]
+      );
+      expect((await content.view(input)).available_source_refs).toEqual([]);
+      expect(await content.source({ ...input, reference: source.ref })).toBeNull();
+    }
+  );
   it("reads the same immutable canonical document after downgrade without buying AI or renewing source retention", async () => {
     const run = await fixture.admit();
     await processNextSmartReportJob({ db, objects, model: null });

@@ -17,6 +17,7 @@ import type {
   PreparedReportModelAttempt
 } from "./model-client.js";
 import type { ReportRunRecord } from "./report-run.js";
+import { redactReportData } from "./report-redaction.js";
 
 export interface ReportGenerationPorts {
   state(): Promise<ReportProcessingState>;
@@ -138,6 +139,16 @@ export async function generateSmartReport(
       } else reason = outcome.state === "uncertain" ? "model_uncertain" : "model_rejected";
       state = ReportProcessingStateSchema.parse(await ports.state());
     }
+  }
+  // A response buffered by an older worker may predate the client privacy gate.
+  // Keep its settled receipt/cost immutable and publish usable facts without
+  // unsafe prose; recovery must not buy a replacement response.
+  if (
+    narrative !== null &&
+    JSON.stringify(redactReportData(narrative)) !== JSON.stringify(narrative)
+  ) {
+    narrative = null;
+    reason = "model_rejected";
   }
   const document = ReportDocumentSchema.parse({
     version: 1,

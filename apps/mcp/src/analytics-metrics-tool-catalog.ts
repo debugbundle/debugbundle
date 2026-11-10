@@ -8,6 +8,31 @@ import {
 
 export const ANALYTICS_METRICS_MCP_TOOL_CATALOG = [
   {
+    name: "get_analytics_filter_options",
+    group: "analytics_metrics",
+    description:
+      "List bounded observed analytics filter values for an authorised project, period and scope. Empty sets mean no usable choices; truncated sets omit additional values. Does not generate a bundle or consume generation quota.",
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true
+    },
+    inputSchema: z
+      .object({
+        bearerToken: z.string(),
+        projectId: z.string().guid(),
+        from: z.string().datetime().optional(),
+        to: z.string().datetime().optional(),
+        last: z.string().optional(),
+        granularity: z.enum(["hour", "day"]).optional(),
+        service: z.string().max(120).optional(),
+        environment: z.string().max(120).optional(),
+        limit: z.number().int().min(1).max(100).optional()
+      })
+      .strict()
+  },
+  {
     name: "get_usage_summary",
     group: "analytics_metrics",
     description: "Get aggregate AnalyticsBundle usage summary metrics for a project.",

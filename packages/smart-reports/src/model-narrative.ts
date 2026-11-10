@@ -46,8 +46,8 @@ export const ReportNarrativeSchema = z
   })
   .strict();
 export type ReportNarrative = z.infer<typeof ReportNarrativeSchema>;
-/** Constrain the provider's decoder to admitted references. Local validation
- * still rechecks claim kinds, coverage and priorities before publication. */
+/** Constrain the provider's decoder to admitted references for each claim kind.
+ * Local validation independently rechecks claims, coverage and priorities. */
 export function reportNarrativeSchemaForFacts(raw: ReportModelFacts): z.ZodType<ReportNarrative> {
   const facts = ReportModelFactsSchema.parse(raw);
   const allowed = [
@@ -61,22 +61,66 @@ export function reportNarrativeSchemaForFacts(raw: ReportModelFacts): z.ZodType<
     .filter((item) => item.status === "open" || item.status === "regressed")
     .map((item) => item.ref)
     .sort();
-  const references = z
-    .array(z.enum(allowed as [string, ...string[]]))
-    .min(1)
-    .max(10);
-  const priorityReferences =
-    activeIds.length === 0
-      ? references
-      : z
-          .array(z.enum(activeIds as [string, ...string[]]))
-          .min(1)
-          .max(10);
+  const referencesFor = (values: string[]): z.ZodType<string[]> =>
+    z
+      .array(z.enum(values as [string, ...string[]]))
+      .min(1)
+      .max(10);
+  const references = referencesFor(allowed);
+  const priorityReferences = activeIds.length === 0 ? references : referencesFor(activeIds);
   const pattern = /^[^0-9<>]*$/;
   const boundedLine = line.extend({
     text: line.shape.text.regex(pattern),
     evidence_refs: references
   });
+  type Highlight = ReportNarrative["highlights"][number];
+  const observed = boundedLine.extend({ kind: z.enum(["happened", "inference"]) });
+  const claimVariants: z.ZodType<Highlight>[] = [observed];
+  function admitClaim(
+    kind: "recorded_resolution" | "observed_recovery" | "outstanding",
+    values: string[]
+  ): void {
+    // With no supporting evidence, omit the claim kind entirely. An empty enum
+    // is not a usable provider schema and coverage alone cannot support a claim.
+    if (values.length > 0)
+      claimVariants.push(
+        boundedLine.extend({
+          kind: z.literal(kind),
+          evidence_refs: referencesFor(values.sort())
+        })
+      );
+  }
+  admitClaim("recorded_resolution", [
+    ...facts.evidence
+      .filter((item) => item.status === "resolved" && item.period_events.includes("resolved"))
+      .map((item) => item.ref),
+    ...facts.metrics
+      .filter(
+        (metric) =>
+          ["resolution_events", "distinct_resolved_incidents", "resolved_improvements"].includes(
+            metric.key
+          ) && (metric.current ?? 0) > 0
+      )
+      .map((metric) => metric.ref)
+  ]);
+  admitClaim(
+    "observed_recovery",
+    facts.evidence
+      .filter(
+        (item) =>
+          item.type === "health" &&
+          item.status === "observed_recovery" &&
+          item.period_events.includes("observed_recovery")
+      )
+      .map((item) => item.ref)
+  );
+  admitClaim("outstanding", activeIds);
+  const highlight =
+    claimVariants.length === 1
+      ? observed
+      : z.union(
+          claimVariants as [z.ZodType<Highlight>, z.ZodType<Highlight>, ...z.ZodType<Highlight>[]]
+        );
   const limitations = z.array(boundedLine).max(10);
   const needsCoverageNote =
     facts.selection_notes.length > 0 ||
@@ -87,11 +131,7 @@ export function reportNarrativeSchemaForFacts(raw: ReportModelFacts): z.ZodType<
   const priority = ReportNarrativeSchema.shape.priorities.element;
   return ReportNarrativeSchema.extend({
     overview: boundedLine,
-    highlights: z
-      .array(
-        boundedLine.extend({ kind: ReportNarrativeSchema.shape.highlights.element.shape.kind })
-      )
-      .max(10),
+    highlights: z.array(highlight).max(10),
     priorities: z
       .array(
         priority.extend({

@@ -1,4 +1,5 @@
-import { ChevronRightIcon, LoaderCircleIcon } from "lucide-react";
+import { ResourceEmptyState } from "./resource-empty-state.js";
+import { ChevronRightIcon, LinkIcon, LoaderCircleIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { OpenAiConnectionRecord, OpenAiProductScope } from "../../lib/api-types.js";
@@ -294,13 +295,19 @@ export function OpenAiConnectionsSectionView({
               Loading OpenAI connections
             </div>
           ) : connections.length === 0 ? (
-            <p className="py-4 text-sm text-muted-foreground">
-              No OpenAI connections are active or retained for this organization.
-            </p>
+            <ResourceEmptyState
+              icon={LinkIcon}
+              title="No OpenAI connections"
+              description="Connections appear here after someone authorises ChatGPT or Codex to access this workspace."
+            />
           ) : (
             <>
               {activeConnections?.length === 0 ? (
-                <p className="py-4 text-sm text-muted-foreground">No active OpenAI connections.</p>
+                <ResourceEmptyState
+                  icon={LinkIcon}
+                  title="No active OpenAI connections"
+                  description="Previous connections are available in the retained history below."
+                />
               ) : (
                 <OpenAiConnectionRecords
                   connections={activeConnections ?? []}

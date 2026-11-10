@@ -1,5 +1,8 @@
 import { z } from "zod";
 import {
+  AnalyticsFilterOptionsQuerySchema,
+  AnalyticsFilterOptionsResponseSchema,
+  ANALYTICS_FILTER_OPTION_FIELDS,
   AnalyticsFlowDefinitionInputSchema,
   AnalyticsSavedFunnelCreateSchema,
   AnalyticsSavedFunnelUpdateSchema,
@@ -168,6 +171,47 @@ export function createAnalyticsMocks(data: ReturnType<typeof createDevMockFixtur
       service: query.get("service") ?? null,
       environment: query.get("environment") ?? "production"
     };
+    if (read && route === "/v1/analytics/filter-options") {
+      const parsed = AnalyticsFilterOptionsQuerySchema.safeParse(Object.fromEntries(query));
+      if (!parsed.success) return invalid();
+      if (!project || !projectId) return missing();
+      const matches =
+        projectId === "00000000-0000-4000-8000-000000000001" &&
+        (!parsed.data.service || parsed.data.service === "saycheese-frontend") &&
+        (!parsed.data.environment || parsed.data.environment === "production");
+      const observed: Record<string, string[]> = {
+        route: ["/", "/events", "/checkout"],
+        device_type: ["desktop", "mobile"],
+        browser: ["Chrome", "Safari"],
+        os: ["macOS", "iOS"],
+        language: ["en"],
+        country: ["SI", "US"],
+        auth_state: ["anonymous"],
+        referrer: ["direct", "search"]
+      };
+      return reply(
+        AnalyticsFilterOptionsResponseSchema.parse({
+          window: {
+            ...metricsWindow,
+            project_id: projectId,
+            environment: parsed.data.environment ?? null
+          },
+          options: Object.fromEntries(
+            ANALYTICS_FILTER_OPTION_FIELDS.map((key) => {
+              const values = matches ? (observed[key] ?? []) : [];
+              return [
+                key,
+                {
+                  values: values.slice(0, parsed.data.limit),
+                  truncated: values.length > parsed.data.limit
+                }
+              ];
+            })
+          ),
+          custom_dimensions: []
+        })
+      );
+    }
     const flowMatch = /^\/v1\/analytics\/flows(?:\/([^/]+)(\/report)?)?$/.exec(route);
     if (flowMatch) {
       if (!project || !projectId) return missing();

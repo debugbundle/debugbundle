@@ -1,3 +1,4 @@
+import { formatAnalyticsDimensionValue } from "../lib/analytics-presentation.js";
 import { ArrowLeftIcon, WaypointsIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, Navigate, useOutletContext, useParams } from "react-router-dom";
@@ -182,7 +183,10 @@ function JourneySampleContent({
         ) : (
           <ol aria-label="Structured journey timeline" className="divide-y border-y">
             {timeline.map((entry, index) => (
-              <li key={`${entry.occurredAt ?? "event"}:${index}`} className="grid gap-3 py-4 sm:grid-cols-[9rem_1fr]">
+              <li
+                key={`${entry.occurredAt ?? "event"}:${index}`}
+                className="grid gap-3 py-4 sm:grid-cols-[9rem_1fr]"
+              >
                 <div className="flex flex-col gap-1">
                   <span className="text-sm font-medium">{formatEventKind(entry.kind)}</span>
                   {entry.occurredAt === null ? null : (
@@ -278,7 +282,7 @@ function readSafeDimensions(
 ): Array<{ label: string; value: string }> {
   return SAFE_DIMENSIONS.flatMap(([key, label]) => {
     const value = readString(dimensions[key]);
-    return value === null ? [] : [{ label, value }];
+    return value === null ? [] : [{ label, value: formatAnalyticsDimensionValue(key, value) }];
   });
 }
 

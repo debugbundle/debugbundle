@@ -1,3 +1,5 @@
+import { SearchIcon } from "lucide-react";
+import { ResourceEmptyState } from "../components/system/resource-empty-state.js";
 import { hasBusinessEntitlement } from "../../../../packages/shared-types/src/tier-capabilities.js";
 import { useEffect, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
@@ -15,7 +17,6 @@ import { PendingButton } from "../components/system/pending-button.js";
 import { Button } from "../components/ui/button.js";
 import { Badge } from "../components/ui/badge.js";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../components/ui/empty.js";
 import { Field, FieldLabel, FieldError } from "../components/ui/field.js";
 import { Input } from "../components/ui/input.js";
 import { Skeleton } from "../components/ui/skeleton.js";
@@ -181,12 +182,11 @@ export function OrganizationPeoplePage(): JSX.Element {
           {people === null ? (
             <Skeleton className="h-24 w-full" />
           ) : matches.length === 0 ? (
-            <Empty>
-              <EmptyHeader>
-                <EmptyTitle>No matching people</EmptyTitle>
-                <EmptyDescription>Try a different email address.</EmptyDescription>
-              </EmptyHeader>
-            </Empty>
+            <ResourceEmptyState
+              icon={SearchIcon}
+              title="No matching people"
+              description="Try a different email address."
+            />
           ) : (
             <Table>
               <TableHeader className="hidden md:table-header-group">

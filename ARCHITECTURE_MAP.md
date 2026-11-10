@@ -1,3 +1,52 @@
+`apps/web/src/components/system/resource-empty-state.tsx` composes the existing
+Empty primitives for project/workspace/public resource lists and data panels.
+`project-resource-empty-state.tsx` preserves the old component/type export as an
+alias. Consumers own their scoped copy and existing action permissions; the
+composition does not load data or grant capabilities.
+
+Analytics UI: `AnalyticsSectionHeader` composes compact inventory actions and
+`AnalyticsFilterPanel` owns the bounded desktop popover/mobile Sheet. Flow forms
+use `DialogFormContent` with the existing schema and guarded writes. The nested
+`analytics/bundles/new` route renders the same dialog shell over
+`ProjectAnalyticsBundlesPage`, preserving its filter/pagination state and passing
+the initiating link for focus restoration. `lib/analytics-presentation.ts` shares
+system-label/category presentation without modifying transport or evidence.
+`ProjectAnalyticsLayout` retains metric choices across tabs while exposing only
+supported scope/time filters to inventory views and their generation defaults.
+
+Smart Report rejection diagnostics: `smart-reports/model-diagnostics.ts` owns
+allowlisted operator codes. `storage/report-model-attempt-store.ts` persists them
+outside immutable receipt hashes; `report-model-diagnostic-schema.ts` supplies
+the nullable forward migration and readiness gate. `report-presentation.ts`
+shares fixed factual-fallback explanations across dashboard, HTML/PDF and email.
+`smart-reports/model-narrative.ts` restricts provider-decoded highlight references
+by claim kind while retaining the canonical schema and local safety validation.
+`model-evidence.ts` applies mandatory privacy per bounded fact row; the model
+client checks prose privacy before success and the content store rechecks it on
+egress. `model-projection.ts` bounds AI-only caveats without changing canonical
+facts. `report-scheduler-store.ts` resumes one overdue period before advancing
+to a future delivery. Shared `report-presentation.ts`, `ReportRunStatus` and
+`ReportEvidenceList` supply readable states, periods and project-labelled evidence;
+the reports page owns history/settings layout and the report page bounds read-only
+status polling with hidden/offline pausing, transient read recovery and automatic
+canonical display. The reusable Notice pending variant supplies reduced-motion
+loading feedback for generation and PDF preparation.
+`ReportPdfDownloadButton` owns the user download intent, status reads and bounded
+binary save through `report-api.ts`; the browser binary adapter strips the internal
+authority marker and sends HttpOnly session cookies. `ReportRunStatus` uses the
+shared Tooltip for focus/hover/tap details; history uses fixed desktop fractions
+and mobile stacked rows. TableCaption provides standard internal bottom padding. CI includes all report database regressions in its isolated coverage shards and
+requires PDF text extraction. The local `smart-report-coverage` target combines
+real storage and adapter tests for the changed-file coverage gate.
+
+Local report previews: `scripts/dev-mock/report-fixtures.ts` builds fictional
+canonical facts and narratives with current UTC periods and the production
+validators. `scripts/dev-mock/reports.ts` simulates scoped definitions, history,
+recipients, allowance and run progression entirely in memory. The existing
+loopback-only Vite middleware serves trusted HTML and bounded child-rendered PDF
+downloads; it never proxies unsupported routes. Synthetic identity uses a valid
+UUID consistently across session, ownership and preview management fixtures.
+
 Local tier tooling: `scripts/dev-tier.sh` verifies local Docker/checkout identity;
 `scripts/dev-tier.sql` atomically selects one unlinked organisation and sets a base
 tier. `billing-admin-helpers.ts` respects explicit administrative Free rather than
@@ -632,6 +681,7 @@ preserves project scope, consent, schedule and delivery approval boundaries.
   - `routes/incidents.ts` — incident retrieval, bundle, reproduction, logs
   - `routes/analytics-settings.ts` — project AnalyticsBundle settings read/update surface over shared analytics settings schemas, member preview, owner/admin mutation, all-tier analytics availability including the bounded Free preview, and fixed tier-bounded controlled custom dimensions
   - `routes/analytics-saved-funnels.ts` — all-tier project saved-funnel list/create/update/archive surface with member reads, owner/admin mutations, fixed tier-bounded active-definition limits, shared schemas, and configuration audit records
+  - `routes/analytics-filter-options.ts` / `routes/analytics-read-projection.ts` — bounded observed-choice read over existing project access/rate limits; shared analytics privacy projection preserves legacy behaviour and rejects changed selectable literals
   - `routes/analytics.ts` — thin Analytics HTTP registration for aggregate metrics, opportunity/bundle inventory, generation, and artifact/status retrieval
   - `routes/analytics-visit-flows.ts` — configured source/destination project-token handoff writes plus two operator-gated aggregate reads; current signup consent (signed for GitHub OAuth) gates account linking after response completion; withdrawal remains available with capture disabled; bundle outcomes link best-effort after core success
   - `routes/analytics-contracts.ts` — shared analytics HTTP request schemas, cursor parsing, and bounded time-window resolution
@@ -725,7 +775,7 @@ preserves project scope, consent, schedule and delivery approval boundaries.
 - **Key constraint:** Thin adapter only — no unique business logic. Must support local-store reads when cloud is unavailable.
 - **OpenAI boundary:** the split `tool-catalog*` modules remain authoritative only for stdio and the full OpenClaw projection. The official OpenAI catalog is a separate twenty-three-tool contract under `tests/fixtures/openai-plugin-v1/`, implemented by `packages/mcp-core`, with distribution source under `apps/mcp/openai/`; it is not implemented by pruning or mutating the legacy catalog. `apps/api/src/openai-mcp-analytics-operations.ts` owns the fixed-window aggregate projection; `packages/storage/src/analytics-metrics-store.ts` and `analytics-incident-impact-metrics.ts` expose explicit suppression options so OpenAI never reads retained samples or bundle-generation state.
 - **Internal structure:** `main.ts` owns the external stdio entrypoint for the publishable `@debugbundle/mcp` package; `server.ts` owns MCP JSON-RPC request handling for initialize, tool listing, and tool calls; `default-tools.ts` composes the default runtime tool registry over shared HTTP clients, environment-provided `DEBUGBUNDLE_MEMBER_TOKEN` / `DEBUGBUNDLE_API_URL`, CLI auth state, and local CLI modules; `server.json` owns MCP Registry metadata for the npm package; `ecosystem-release-manifest.json`, `scripts/release-mcp-ecosystem.mjs`, `scripts/mcp-ecosystem-verification.mjs`, `scripts/mcp-ecosystem-target-verification.mjs`, and `scripts/mcp-ecosystem-publication.mjs` own the host-side post-npm ecosystem release workflow that rebuilds the MCPB bundle from the published npm artifact, smoke-tests the staged stdio server, publishes official-registry/Smithery MCP/Smithery skill/ClawHub skill metadata, builds/validates/publishes the OpenClaw plugin package, verifies bounded ClawHub capability-query ranks after index propagation, and emits Glama/LobeHub discovery follow-up checks; `retrieval-tools.ts`, `token-tools.ts`, `project-tools.ts`, `services-tools.ts`, `setup-tools.ts`, `analyze-tools.ts`, `alert-tools.ts`, `slack-tools.ts`, `webhook-tools.ts`, `weekly-report-tools.ts`, `billing-tools.ts`, `capture-policy-tools.ts`, `probe-tools.ts`, `health-check-tools.ts`, `member-tools.ts`, `github-tools.ts`, `improvement-tools.ts`, `improvement-settings-tools.ts`, and `analytics-settings-tools.ts` expose thin MCP tool factories over shared clients or existing CLI modules; `analytics-settings-tool-catalog.ts` owns the catalog entries for `get_analytics_settings` and `update_analytics_settings`. GitHub MCP coverage now includes installation status, repository listing, project repo assignment/removal, dispatch-rule CRUD, and delivery history/retry. `tool-catalog.ts` owns the source-of-truth MCP tool catalog with Zod input schemas for all shipped tools, used by the public-site artifact pipeline to generate `/schemas/mcp-tools.json` and by `apps/openclaw-plugin` to generate OpenClaw `debugbundle_*` tool metadata; retrieval tools now reuse the CLI local-store reader plus `retrieval-source.ts` helpers for merged connected-mode incident listing, local-first detail/artifact/lifecycle lookup, explicit source tagging, collapse of multi-id cloud resolve/reopen into hosted bulk mutation routes, and `cloud-artifact-cache.ts` persistence so cloud bundle/reproduction fetches refresh `.debugbundle/bundles/cloud/`, cloud resolve updates cached status snapshots, and stale cloud-cache files are pruned during explicit cache activity
-- **Analytics MCP ownership:** `analytics-metrics-tools.ts` exposes `get_usage_summary`, `get_route_metrics`, `get_journey_patterns`, `get_device_breakdown`, `get_referrer_metrics`, `get_action_metrics`, `list_funnel_metrics`, `get_funnel_analysis`, `list_analytics_opportunities`, and `get_analytics_opportunity` over the shared CLI HTTP client, and `analytics-metrics-tool-catalog.ts` owns their published tool metadata. Settings remain in `analytics-settings-tools.ts` / `analytics-settings-tool-catalog.ts`.
+- **Analytics MCP ownership:** `analytics-metrics-tools.ts` exposes `get_analytics_filter_options`, `get_usage_summary`, `get_route_metrics`, `get_journey_patterns`, `get_device_breakdown`, `get_referrer_metrics`, `get_action_metrics`, `list_funnel_metrics`, `get_funnel_analysis`, `list_analytics_opportunities`, and `get_analytics_opportunity` over the shared CLI HTTP client, and `analytics-metrics-tool-catalog.ts` owns their published tool metadata. Settings remain in `analytics-settings-tools.ts` / `analytics-settings-tool-catalog.ts`.
 - **OpenAI distribution ownership:** `apps/mcp/openai/debugbundle/` owns the independently versioned combined skill and local Developer Mode source, including its non-secret `.app.json` mapping. `apps/mcp/openai/submission/portal-review.json` selects the exact five positive and three negative portal cases from the larger corpus. `scripts/openai-plugin-release-lib.mjs` builds the separate ZIP-first portal artifact from that source for a new initial upload: it removes `.app.json`/`apps`, adds the hosted remote `.mcp.json`/`mcpServers`, retains internal `name` `debugbundle` and public `interface.displayName` `DebugBundle`, and imports listing/review metadata. The old form-created draft requires publication before a ZIP update and routes a main-page upload back to its name-mismatch check; the owner should delete only that obsolete unpublished Platform draft before the fresh upload. `release-manifest.json` records the generated ZIP's hashes, while the submission folder retains non-secret review evidence. The owner-visible ChatGPT App ID and Version ID are not substituted for the `plugin_asdk_app...` technical Developer Mode connection ID. `tests/fixtures/openai-plugin-v1/implementation-gaps.json` preserves the live/manual evidence boundary.
 
 ### `apps/openclaw-plugin`
@@ -786,6 +836,7 @@ Health history ownership: `apps/web/src/pages/health-status-page-utils.ts` build
   - `analytics-schema-migrations.ts` / `analytics-bootstrap-statements.ts` — production migration and clean-bootstrap SQL for project analytics settings, analytics ingestion ledgers, durable analytics usage counters including retained journey samples, aggregate rollups, journey sample indexes, analytics opportunities, and AnalyticsBundle generation metadata
   - `analytics-ingestion-jobs.ts` — narrow analytics aggregation job and persistence contracts kept outside oversized shared storage type files
   - `analytics-bundle-jobs.ts` — internal AnalyticsBundle build job contract used by the Redis queue lane for on-demand and scheduled generation work
+  - `analytics-filter-options-store.ts` — observed route/dimension choices from scoped aggregate rollups; accepted-origin intersection, approved custom keys, per-field and total byte bounds, and omission of unsafe literals
   - `analytics-metrics-store.ts` / `analytics-incident-impact-metrics.ts` — Postgres aggregate AnalyticsBundle summary, route, journey-pattern, device, referrer, action, funnel, and incident-impact queries for API/CLI/MCP retrieval; incident impact reads only hashed incident/session links and aggregate ledgers, and reports unavailable conversion deltas explicitly
   - `analytics-visit-flow-store.ts` / `visit-flow-schema.ts` — bounded site-to-app handoff and arrival storage, source attribution, committed-account link, first bundle receipt, and shared acquisition/activation reports; forward migration and readiness gate keep existing installations compatible
   - `analytics-journey-sample-store.ts` — retained redacted journey sample metadata reservation, internal project-scoped correlation subject persistence, artifact-complete marking, list/detail reads, and project-scoped cleanup helpers; public reads only expose rows after artifact persistence completes
@@ -1316,3 +1367,16 @@ A sales-disabled bridge precedes a second verified image rollout and separately
 authorised Business activation. Environment-only activation checks the retained
 rollback pair; legacy source rollouts cannot replace a Business-aware runtime.
 The helper is read-only and performs no deployment or provider mutation itself.
+
+### Dashboard metadata and filter-choice composition
+
+`pages/project-overview-page.tsx` retains the public ProjectOverviewPage and
+IncidentTable exports; `project-overview-summary.tsx`,
+`components/system/project-incident-table.tsx` and `lib/project-presentation.ts`
+own the extracted summary, table and shared presentation. Existing incident and
+bundle pages keep their handlers and imports. Analytics dimensions compose
+`ObservedAnalyticsSelect` through `analytics-dimension-fields.tsx`;
+`use-analytics-filter-options.ts` owns cancellable context reads through the
+schema-validating browser adapter. `AnalyticsFilterPanel` exposes open changes
+so only an open metric panel loads choices. Generation dialogs retain the
+background filter container and never change its layout.

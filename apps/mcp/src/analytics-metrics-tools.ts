@@ -9,6 +9,7 @@ import {
 } from "../../../packages/shared-types/src/index.js";
 
 export const ANALYTICS_METRICS_MCP_TOOL_NAMES = [
+  "get_analytics_filter_options",
   "get_usage_summary",
   "get_route_metrics",
   "get_journey_patterns",
@@ -49,6 +50,7 @@ function readGranularity(input: Record<string, unknown>): "hour" | "day" | undef
 }
 
 export function createAnalyticsMetricsMcpTools(api: {
+  getFilterOptions?(input: AnalyticsMetricsToolInput): Promise<unknown>;
   getUsageSummary(input: AnalyticsMetricsToolInput): Promise<unknown>;
   getRouteMetrics(input: AnalyticsMetricsToolInput): Promise<unknown>;
   getJourneyPatterns(input: AnalyticsMetricsToolInput): Promise<unknown>;
@@ -70,6 +72,15 @@ export function createAnalyticsMetricsMcpTools(api: {
   (input: Record<string, unknown>) => Promise<unknown>
 > {
   return {
+    async get_analytics_filter_options(input) {
+      try {
+        if (api.getFilterOptions === undefined)
+          throw new AnalyticsMetricsApiError(503, "analytics_filter_options_unavailable");
+        return await api.getFilterOptions(readMetricsInput(input));
+      } catch (error) {
+        mapMcpError(error);
+      }
+    },
     async get_usage_summary(input) {
       try {
         return await api.getUsageSummary(readMetricsInput(input));

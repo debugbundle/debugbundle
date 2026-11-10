@@ -1,6 +1,7 @@
+import { ResourceEmptyState } from "../components/system/resource-empty-state.js";
 import { PendingButton } from "../components/system/pending-button.js";
 import { usePendingAction } from "../lib/use-pending-action.js";
-import { MailCheckIcon, PlusIcon } from "lucide-react";
+import { MailCheckIcon, PlusIcon, UsersIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 
@@ -295,7 +296,11 @@ export function ProjectMembersPage(): JSX.Element {
                 <Skeleton className="h-12 w-full" />
               </div>
             ) : members.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No members found.</p>
+              <ResourceEmptyState
+                icon={UsersIcon}
+                title="No direct project members"
+                description="Direct project roles appear here. People may still have inherited workspace access."
+              />
             ) : (
               <Table>
                 <TableHeader>

@@ -36,6 +36,29 @@ list response omits those scopes; the editor labels every null service filter
 
 ## Compatibility and implementation boundaries
 
+### Alert list layout follow-up (10 November, owner requested)
+
+Remove the generic Alert rule guidance card and the split-column layout so the
+rules table, including its row actions, uses the available content width. Keep
+the existing Card/Table primitives, tokens and responsive table overflow. Retained
+Slack destinations, when applicable, remain below the rules as a separate section;
+grouped deliveries follow. Keep the same create/edit/delete controls, permission
+checks, scope summaries, and loading/empty/error states. No new component or
+interaction is needed. This applies FR-WEB-06/08/09 and AC-WEB-09 alongside the
+existing alert CRUD and scope acceptance. The user's removal request approves
+this layout simplification.
+
+Local qualification: 32 existing alert management, editing, options, concurrent
+scope, scope-summary/editor and grouped-delivery cases pass. Root typecheck,
+page lint/format, the production web build and whitespace checks pass. HTTP
+confirms the existing mock preview serves the revised page. Pre-ship review found
+no changed data, authority, effect, cleanup or schema paths: only the static guide
+and split layout were removed, with the retained Slack section preserved. No
+browser inspection, production write, commit or deployment. Evidence:
+`.tmp/alert-rules-layout-20261110/`.
+
+### Interface compatibility
+
 Scope metadata is opt-in on the existing alert-list read. Default response shapes
 must remain byte-shape compatible with installed strict clients. API, typed
 client, CLI and ordinary MCP expose the same read option. The dashboard requests

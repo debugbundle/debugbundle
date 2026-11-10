@@ -44,7 +44,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
   const agentTokens: MockRecord[] = [
     {
       token_id: "mock_agent_credential",
-      issuer_user_id: "usr_123",
+      issuer_user_id: base.session.user_id,
       organization_id: data.session.organization_id,
       project_id: "00000000-0000-4000-8000-000000000001",
       label: "Preview agent",
@@ -61,7 +61,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
       String(project["project_id"]),
       [
         {
-          user_id: "usr_123",
+          user_id: base.session.user_id,
           email: "demo@example.test",
           role: "owner",
           membership_type: "owner",
@@ -96,7 +96,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
       project_id: "00000000-0000-4000-8000-000000000001",
       email: "pending@example.test",
       role: "member",
-      invited_by_user_id: "usr_123",
+      invited_by_user_id: base.session.user_id,
       accepted_at: null,
       canceled_at: null,
       expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
@@ -125,7 +125,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
     {
       ...tokenTemplate,
       token_id: "mock_member_cli",
-      user_id: "usr_123",
+      user_id: base.session.user_id,
       organization_id: data.session.organization_id,
       label: "Local CLI and MCP"
     }
@@ -146,7 +146,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
     {
       webhook_id: "wh_demo",
       project_id: "00000000-0000-4000-8000-000000000001",
-      created_by_user_id: "usr_123",
+      created_by_user_id: base.session.user_id,
       url: "https://hooks.example.test/debugbundle",
       events: ["bundle.created", "verification.passed"],
       filters: {},
@@ -213,7 +213,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
       slack_team_name: "Demo workspace",
       slack_channel_id: "mock_channel",
       slack_channel_name: "alerts",
-      installed_by_member_id: "usr_123",
+      installed_by_member_id: base.session.user_id,
       is_active: true,
       created_at: now,
       updated_at: now
@@ -328,7 +328,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
       data.projects.push(record);
       members.set(record.project_id, [
         {
-          user_id: "usr_123",
+          user_id: base.session.user_id,
           email: "demo@example.test",
           role: "owner",
           membership_type: "owner",
@@ -387,7 +387,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
           token_id: `mock_token_${sequence++}`,
           label: input.data.label,
           ...(personal
-            ? { user_id: "usr_123", organization_id: data.session.organization_id }
+            ? { user_id: base.session.user_id, organization_id: data.session.organization_id }
             : { project_id: projectId, allowed_origins: input.data.allowed_origins })
         };
         rows.push(token);
@@ -410,7 +410,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
         ...input.data,
         invite_id: `mock_invite_${sequence++}`,
         project_id: projectId,
-        invited_by_user_id: "usr_123",
+        invited_by_user_id: base.session.user_id,
         accepted_at: null,
         canceled_at: null,
         expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
@@ -552,7 +552,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
         const created = {
           ...input.data,
           webhook_id: `mock_webhook_${sequence++}`,
-          created_by_user_id: "usr_123",
+          created_by_user_id: base.session.user_id,
           created_at: now,
           updated_at: now
         };
@@ -624,7 +624,7 @@ export function createManagementMocks(data: ReturnType<typeof createDevMockFixtu
           ...channels[0],
           ...input.data,
           channel_id: `mock_weekly_${sequence++}`,
-          created_by_user_id: "usr_123",
+          created_by_user_id: base.session.user_id,
           created_at: now,
           updated_at: now
         };

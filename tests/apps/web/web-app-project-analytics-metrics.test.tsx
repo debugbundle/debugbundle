@@ -356,6 +356,8 @@ describe("web app - project analytics metrics", () => {
 
     await user.click(within(sectionTabs).getByRole("tab", { name: "Audiences" }));
     expect(await screen.findByRole("heading", { name: "Audience analytics" })).toBeInTheDocument();
+    const devices = await screen.findByRole("table", { name: "Device types" });
+    expect(within(devices).getByText("Mobile")).toBeInTheDocument();
     expect(within(sectionTabs).getByRole("tab", { name: "Audiences" })).toHaveAttribute(
       "data-state",
       "active"

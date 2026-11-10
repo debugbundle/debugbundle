@@ -295,7 +295,7 @@ describe("web page helper coverage", () => {
 
     renderProjectMembersPage(createProject({ organization_plan: "team" }));
 
-    expect(await screen.findByText(/no members found/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no direct project members/i)).toBeInTheDocument();
   });
 
   it("formats organization overview summaries", () => {

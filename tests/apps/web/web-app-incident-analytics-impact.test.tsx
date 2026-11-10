@@ -136,7 +136,7 @@ describe("web app - incident analytics impact", () => {
     expect(within(panel).getByText("18")).toBeInTheDocument();
     expect(within(panel).getByText("/checkout")).toBeInTheDocument();
     expect(within(panel).getByText("checkout")).toBeInTheDocument();
-    expect(within(panel).getByText("mobile")).toBeInTheDocument();
+    expect(within(panel).getByText("Mobile")).toBeInTheDocument();
     expect(within(panel).getByText("Chrome")).toBeInTheDocument();
     expect(within(panel).getByText("-8.4 pp")).toBeInTheDocument();
     expect(within(panel).getByText("/cart to /checkout")).toBeInTheDocument();
@@ -221,7 +221,9 @@ describe("web app - incident analytics impact", () => {
 
     await user.click(await screen.findByRole("button", { name: "Generate analytics bundle" }));
     await waitFor(() => {
-      expect(state.requestedUrls.some((url) => url.includes(`/v1/analytics/bundles/${GENERATION_ID}?`))).toBe(true);
+      expect(
+        state.requestedUrls.some((url) => url.includes(`/v1/analytics/bundles/${GENERATION_ID}?`))
+      ).toBe(true);
     });
     expect(state.createBodies).toEqual([
       {

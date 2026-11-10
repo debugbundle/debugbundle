@@ -272,6 +272,17 @@ Avoid burying important destinations behind weak labels or layered menus.
 
 No interface is complete without states.
 
+Empty resource lists and standalone data panels use the shared
+`components/system/resource-empty-state.tsx` composition: a relevant decorative
+icon, a short title, scoped help and an optional existing permitted action.
+`ProjectResourceEmptyState` remains a compatible alias. Reuse the existing
+`Empty` primitives directly when richer content is needed. Avoid bare empty-list
+paragraphs or informational alerts in these panels. Keep field hints, counters,
+factual evidence caveats, loading, access failures and errors in their appropriate
+compact feedback patterns. Missing retained observations must not imply absence
+of activity or successful health. Never add an action that bypasses a section's
+existing permission or billing gate.
+
 Every relevant UI should account for:
 
 - default

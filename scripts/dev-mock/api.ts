@@ -13,12 +13,14 @@ import { createAnalyticsMocks } from "./analytics.js";
 import { createBillingMocks } from "./billing.js";
 import { createPublicStatusMocks } from "./public-status.js";
 import { createNotificationMocks } from "./notifications.js";
-import { ReportRunListQuerySchema } from "../../packages/smart-reports/src/report-run-api-contract.js";
+import { createReportMocks } from "./reports.js";
 
 export interface MockResponse {
   status: number;
   body: unknown;
   headers?: Record<string, string>;
+  /** Trusted local renderers may produce bounded binary downloads on demand. */
+  resolveBody?: () => Promise<Uint8Array>;
 }
 const objectSchema = z.record(z.string(), z.unknown());
 const pageSchema = z.object({
@@ -36,6 +38,7 @@ export function createDevMockApi() {
   const billing = createBillingMocks(data);
   const publicStatus = createPublicStatusMocks(data, management.isSignedIn);
   const notifications = createNotificationMocks(data, management.isSignedIn);
+  const reports = createReportMocks(data, management.isSignedIn);
   const capturePolicies = new Map(
     data.projects.map((project) => [
       String(project["project_id"]),
@@ -162,15 +165,8 @@ export function createDevMockApi() {
     const projectId = projectMatch?.[1] ?? query.get("project_id");
     const route = path.replace(/^\/v1\/projects\/[^/]+/, "/v1");
     const read = method === "GET";
-    const reportList = /^\/v1\/organizations\/([^/]+)\/(report-definitions|reports)$/.exec(path);
-    if (read && reportList) {
-      if (!management.isSignedIn()) return reply({ error: "unauthorized" }, 401);
-      if (reportList[1] !== data.session.organization_id) return missing();
-      if (reportList[2] === "report-definitions") return reply({ definitions: [] });
-      if (!ReportRunListQuerySchema.safeParse(Object.fromEntries(query)).success)
-        return reply({ error: "invalid_mock_pagination" }, 400);
-      return reply({ runs: [], next_cursor: null });
-    }
+    const report = reports.handle(method, path, query, payload);
+    if (report) return report;
     if (read && path === "/v1/organizations") return reply({ organizations: [] });
     if (path.startsWith("/v1/referrals/")) return reply({ error: "program_unavailable" }, 503);
     const published = publicStatus.handle(method, path, query, payload, origin);

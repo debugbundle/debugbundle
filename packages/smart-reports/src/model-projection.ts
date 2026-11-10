@@ -84,13 +84,22 @@ export function projectReportNarrativeFacts(raw: unknown): ReportModelFacts {
     ...project,
     name: prefix(project.name, 120)
   }));
-  facts.selection_notes = [
-    ...facts.selection_notes,
-    ...facts.projects.flatMap((project) => {
-      const unique = [...new Set(notes.get(project.ref))];
-      return unique.length === 0 ? [] : [prefix(unique.join(" "), 300)];
-    })
-  ];
+  const projectionNotes = facts.projects.flatMap((project) => {
+    const unique = [...new Set(notes.get(project.ref))];
+    return unique.length === 0 ? [] : [prefix(unique.join(" "), 300)];
+  });
+  // Preserve the usual request byte-for-byte. At the valid note ceiling, retain
+  // per-view projection caveats and disclose bounded input notes explicitly.
+  // The immutable canonical report keeps every original note.
+  const availableNotes = 20 - projectionNotes.length;
+  const originalNotes =
+    facts.selection_notes.length <= availableNotes
+      ? facts.selection_notes
+      : [
+          ...facts.selection_notes.slice(0, availableNotes - 1),
+          "AI input notes are a bounded selection; additional source caveats remain in the full report. Do not assume complete coverage."
+        ];
+  facts.selection_notes = [...originalNotes, ...projectionNotes];
   return ReportModelFactsSchema.parse(facts);
 }
 

@@ -127,6 +127,11 @@ become public; endpoint URLs and diagnostics remain private.
 
 For product-usage questions, start with aggregate reads such as `debugbundle_get_usage_summary`, then narrow to routes, actions, funnels, or bounded journey samples. Generate an analytics bundle only when a specific analysis question needs a durable artifact; DebugBundle does not create one per visit.
 
+The prepared candidate also provides `debugbundle_get_analytics_filter_options`
+for observed choices within an authorised project, time window and scope. It uses
+no generation quota. It remains optional under the existing new-tool policy;
+enable it explicitly when configuring this capability. Requires a compatible API.
+
 Mutation tools are marked optional in OpenClaw metadata and should be explicitly allowlisted by the operator before use. Analytics bundle generation, settings updates, and saved-funnel create/update/archive operations are mutations. Read the current analytics settings and funnel definitions first, explain the intended change, and proceed only when the user asks.
 
 This is a full DebugBundle integration, including optional administration tools for project deletion, billing/trials/capacity, membership, project/member/agent token creation and revocation, alert signing-secret rotation, webhook/Slack/GitHub automation, capture rules, probes, and public status publication. Those tools are disabled by default. Allow only the specific tools needed; allowing the entire `debugbundle` plugin enables all its optional tools. New capabilities default to optional until reviewed.

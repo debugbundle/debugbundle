@@ -3,6 +3,7 @@ import {
   createReportRunApi,
   createReportPdfApi,
   createReportDeliveryApi,
+  createReportBinaryTransport,
   reportPdfDownloadPath,
   ReportApiError
 } from "../../../../packages/report-client/src/index.js";
@@ -40,7 +41,22 @@ export const reportScope = (
 export const reportApi = {
   definitions: createReportApi(client),
   runs: createReportRunApi(client),
-  pdf: createReportPdfApi(client),
+  pdf: createReportPdfApi({
+    ...client,
+    // Browser authority is exclusively the HttpOnly session. Never transmit
+    // reportScope's internal marker as a bearer token in binary requests.
+    requestBinary: (input) => {
+      const base = buildApiUrl("");
+      return createReportBinaryTransport({
+        // Preserve same-origin/relative reverse-proxy prefixes as well as
+        // absolute API origins; the shared transport validates the result.
+        baseUrl:
+          base && !/^https?:\/\//i.test(base) ? new URL(base, window.location.href).href : base,
+        fetchImpl: (...args) => fetch(...args),
+        credentials: "include"
+      }).requestBinary({ ...input, bearerToken: "" });
+    }
+  }),
   deliveries: createReportDeliveryApi(client)
 };
 export const reportPdfFileUrl = (organizationId: string, runId: string): string =>

@@ -107,9 +107,7 @@ describe("github rules", () => {
 
     render(<App initialEntries={["/projects/proj_123/github"]} />);
 
-    expect(
-      await screen.findByText(/no github dispatch rules are configured yet/i)
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/no dispatch rules yet/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /create rule/i }));
     await user.type(screen.getByLabelText(/^rule name$/i), "Hosted improvements");
@@ -202,9 +200,7 @@ describe("github rules", () => {
 
     render(<App initialEntries={["/projects/proj_123/github"]} />);
 
-    expect(
-      await screen.findByText(/no github dispatch rules are configured yet/i)
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/no dispatch rules yet/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /create rule/i }));
     await user.type(screen.getByLabelText(/^rule name$/i), "Critical incidents");
@@ -242,9 +238,7 @@ describe("github rules", () => {
       ).toBe(true);
     });
 
-    expect(
-      await screen.findByText(/no github dispatch rules are configured yet/i)
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/no dispatch rules yet/i)).toBeInTheDocument();
   });
 
   it("lets owners edit a github dispatch rule from the project github page", async () => {

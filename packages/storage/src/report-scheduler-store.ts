@@ -22,7 +22,9 @@ const iso = (value: unknown): string =>
 /** Claim one due period, retaining UTC identity beside local delivery time.
  * Organisations with no recent admission go first; busy organisation locks are
  * skipped. One transaction owns admission and period advancement, with no
- * provider work. Restart/repeated local DST minutes cannot duplicate a period. */
+ * provider work. Restart/repeated local DST minutes cannot duplicate a period.
+ * Resume the one persisted overdue period, then move to a future delivery;
+ * outage recovery must not consume the allowance in a historical catch-up burst. */
 export function createReportSchedulerStore(
   db: Queryable,
   options: { profile: ReportAttemptProfile | null; monthly_budget_nano_usd?: number }
@@ -45,7 +47,7 @@ export function createReportSchedulerStore(
         if (!candidate) return { processed: false };
         const definition = (
           await tx.query<Record<string, unknown>>(
-            `SELECT * FROM report_definitions WHERE id=$1 AND organization_id=$2 AND enabled AND paused_at IS NULL AND NOT requires_owner_review AND next_due_at<=clock_timestamp() FOR UPDATE`,
+            `SELECT *,clock_timestamp() AS checked_at FROM report_definitions WHERE id=$1 AND organization_id=$2 AND enabled AND paused_at IS NULL AND NOT requires_owner_review AND next_due_at<=clock_timestamp() FOR UPDATE`,
             [candidate.id, candidate.organization_id]
           )
         ).rows[0];
@@ -97,7 +99,12 @@ export function createReportSchedulerStore(
         const next = nextReportSchedule({
           cadence,
           schedule: NotificationScheduleSchema.parse(definition["schedule"]),
-          after: iso(definition["next_due_at"])
+          after: new Date(
+            Math.max(
+              Date.parse(iso(definition["next_due_at"])),
+              Date.parse(iso(definition["checked_at"]))
+            )
+          ).toISOString()
         });
         if (Date.parse(next.period.ends_at) <= Date.parse(period.ends_at))
           throw new Error("report_schedule_not_advanced");

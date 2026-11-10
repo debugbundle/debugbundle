@@ -25,6 +25,13 @@ import {
 } from "../components/ui/card.js";
 import { Button } from "../components/ui/button.js";
 import { Badge } from "../components/ui/badge.js";
+import { TitleBadgeRow } from "../components/system/title-badge-row.js";
+import { ReportRunStatus } from "../components/system/report-run-status.js";
+import {
+  reportPeriodLabel,
+  reportDateLabel,
+  reportTimeLabel
+} from "../../../../packages/smart-reports/src/report-presentation.js";
 import {
   Table,
   TableHeader,
@@ -189,10 +196,85 @@ export function ReportsPage(): JSX.Element {
             value={allowance?.key === key ? allowance.value : null}
             error={allowance?.key === key && allowance.error}
           />
+          {hasReportAccess || visible.runs.length > 0 || visible.cursor ? (
+            <Card role="region" aria-label="Report history">
+              <CardHeader>
+                <CardTitle>Report history</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                {visible.runs.length ? (
+                  <Table className="max-sm:block sm:table-fixed">
+                    <TableHeader className="max-sm:sr-only">
+                      <TableRow>
+                        <TableHead className="sm:w-5/12">Report</TableHead>
+                        <TableHead className="sm:w-1/4">Period (UTC)</TableHead>
+                        <TableHead className="sm:w-1/6">Status</TableHead>
+                        <TableHead className="sm:w-1/6">Expiry</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody className="max-sm:block">
+                      {visible.runs.map((run) => (
+                        <TableRow
+                          key={run.id}
+                          className="max-sm:flex max-sm:flex-col max-sm:gap-1 max-sm:py-3"
+                        >
+                          <TableCell className="break-words whitespace-normal max-sm:block max-sm:py-1">
+                            <Link
+                              className="underline underline-offset-4"
+                              aria-label={`Open ${run.name}`}
+                              to={`/reports/${run.organization_id}/${run.id}`}
+                            >
+                              {run.name}
+                            </Link>
+                          </TableCell>
+                          <TableCell className="whitespace-normal max-sm:block max-sm:py-1">
+                            {reportPeriodLabel(run.period)}
+                          </TableCell>
+                          <TableCell className="whitespace-normal max-sm:block max-sm:py-1">
+                            <ReportRunStatus
+                              run={run}
+                              description={
+                                ["skipped_quota", "paused_access", "failed"].includes(run.status)
+                                  ? "tooltip"
+                                  : "none"
+                              }
+                            />
+                          </TableCell>
+                          <TableCell className="whitespace-normal max-sm:block max-sm:py-1">
+                            {run.expires_at
+                              ? `Expires ${reportDateLabel(run.expires_at)}`
+                              : "Not published"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <Empty>
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon">
+                        <HistoryIcon />
+                      </EmptyMedia>
+                      <EmptyTitle>No retained reports</EmptyTitle>
+                      <EmptyDescription>
+                        Completed reports appear here when your current access covers their entire
+                        saved scope.
+                      </EmptyDescription>
+                    </EmptyHeader>
+                  </Empty>
+                )}
+                {visible.cursor ? (
+                  <Button variant="outline" onClick={more} disabled={loadingMore}>
+                    {loadingMore ? "Loading reports" : "Load more reports"}
+                  </Button>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : null}
           {hasReportAccess || visible.definitions.length > 0 ? (
-            <section className="flex flex-col gap-4" aria-label="Report definitions">
+            <section className="flex flex-col gap-4" aria-label="Saved reports">
               {visible.definitions.length ? (
-                <h2 className="text-xl font-semibold">Report definitions</h2>
+                <h2 className="text-xl font-semibold">Saved reports</h2>
               ) : null}
               {visible.definitions.map((definition) => {
                 const manage =
@@ -203,33 +285,54 @@ export function ReportsPage(): JSX.Element {
                 return (
                   <Card key={definition.id}>
                     <CardHeader>
-                      <CardTitle>{definition.name}</CardTitle>
+                      <TitleBadgeRow
+                        title={<CardTitle>{definition.name}</CardTitle>}
+                        badges={
+                          <Badge variant="outline">
+                            {definition.pause_reason || definition.requires_owner_review
+                              ? "Paused"
+                              : definition.enabled
+                                ? "Scheduled"
+                                : "Manual"}
+                          </Badge>
+                        }
+                        actions={
+                          manage ? (
+                            <>
+                              <ReportDefinitionActions definition={definition} />
+                              <Button asChild variant="ghost">
+                                <Link
+                                  aria-label={`Edit ${definition.name} settings`}
+                                  to={`/reports/definitions/${definition.id}/edit`}
+                                >
+                                  Edit settings
+                                </Link>
+                              </Button>
+                            </>
+                          ) : null
+                        }
+                      />
                       <CardDescription>
-                        {definition.cadence} · {definition.scope.length} selected projects ·{" "}
-                        {definition.privacy_mode} evidence ·{" "}
-                        {definition.enabled ? "Scheduled" : "Manual"}
-                        {definition.next_due_at ? ` · Next delivery ${definition.next_due_at}` : ""}
+                        {definition.cadence.charAt(0).toUpperCase() + definition.cadence.slice(1)} ·{" "}
+                        {definition.scope.length}{" "}
+                        {definition.scope.length === 1 ? "project" : "projects"} ·{" "}
+                        {definition.privacy_mode === "full"
+                          ? "Full evidence"
+                          : "Restricted evidence"}
+                        {definition.next_due_at && !definition.pause_reason
+                          ? ` · Next delivery ${reportTimeLabel(definition.next_due_at)}`
+                          : ""}
                       </CardDescription>
                     </CardHeader>
-                    <CardContent className="flex flex-col gap-4">
-                      {definition.pause_reason || definition.requires_owner_review ? (
+                    {definition.pause_reason || definition.requires_owner_review ? (
+                      <CardContent className="flex flex-col gap-4">
                         <Notice tone="warning">
                           Paused:{" "}
                           {definition.pause_reason?.replaceAll("_", " ") ?? "Owner review required"}
                           . The Owner must review access and resume this schedule.
                         </Notice>
-                      ) : null}
-                      {manage ? (
-                        <>
-                          <Button asChild variant="outline">
-                            <Link to={`/reports/definitions/${definition.id}/edit`}>
-                              Edit {definition.name}
-                            </Link>
-                          </Button>
-                          <ReportDefinitionActions definition={definition} />
-                        </>
-                      ) : null}
-                    </CardContent>
+                      </CardContent>
+                    ) : null}
                   </Card>
                 );
               })}
@@ -270,72 +373,6 @@ export function ReportsPage(): JSX.Element {
                 </Card>
               ) : null}
             </section>
-          ) : null}
-          {hasReportAccess || visible.runs.length > 0 || visible.cursor ? (
-            <Card role="region" aria-label="Report history">
-              <CardHeader>
-                <CardTitle>Report history</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-4">
-                {visible.runs.length ? (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Report</TableHead>
-                        <TableHead>Period (UTC)</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Expiry</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {visible.runs.map((run) => (
-                        <TableRow key={run.id}>
-                          <TableCell>
-                            <Link
-                              className="underline underline-offset-4"
-                              aria-label={`Open ${run.name}`}
-                              to={`/reports/${run.organization_id}/${run.id}`}
-                            >
-                              {run.name}
-                            </Link>
-                          </TableCell>
-                          <TableCell>
-                            {run.period.starts_at.slice(0, 10)} to {run.period.ends_at.slice(0, 10)}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{run.status.replaceAll("_", " ")}</Badge>
-                            {run.skip_reason ? (
-                              <p className="text-xs text-muted-foreground">
-                                {run.skip_reason.replaceAll("_", " ")}
-                              </p>
-                            ) : null}
-                          </TableCell>
-                          <TableCell>{run.expires_at?.slice(0, 10) ?? "Not published"}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <Empty>
-                    <EmptyHeader>
-                      <EmptyMedia variant="icon">
-                        <HistoryIcon />
-                      </EmptyMedia>
-                      <EmptyTitle>No retained reports</EmptyTitle>
-                      <EmptyDescription>
-                        Completed reports appear here when your current access covers their entire
-                        saved scope.
-                      </EmptyDescription>
-                    </EmptyHeader>
-                  </Empty>
-                )}
-                {visible.cursor ? (
-                  <Button variant="outline" onClick={more} disabled={loadingMore}>
-                    {loadingMore ? "Loading reports" : "Load more reports"}
-                  </Button>
-                ) : null}
-              </CardContent>
-            </Card>
           ) : null}
         </>
       ) : null}

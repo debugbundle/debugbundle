@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -51,8 +51,33 @@ describe("release governance baseline", () => {
     expect(ciWorkflow).toContain("BASE_SHA:");
     expect(ciWorkflow).toContain("HEAD_SHA:");
     expect(ciWorkflow).toContain("pnpm build");
+    expect(ciWorkflow).toContain("poppler-utils");
+    expect(ciWorkflow).toContain('REPORT_PDF_TEXT_CHECK_REQUIRED: "true"');
+    expect(ciWorkflow).toContain("tests/packages/smart-reports/report-pdf.test.ts");
+    expect(ciWorkflow).toContain("tests/packages/smart-reports/report-pdf-child.test.ts");
+    expect(ciWorkflow).not.toContain("smart-report-model-evaluate");
+    expect(ciWorkflow).not.toContain("SMART_REPORT_AI_API_KEY");
     expect(ciWorkflow).not.toContain("configure-aws-credentials");
     expect(ciWorkflow).not.toContain("HOSTED_DEPLOY_ROLE_ARN");
+  });
+
+  it("includes every Smart Report database regression in the isolated coverage registry", () => {
+    const registry = readFileSync(
+      join(repoRoot, "scripts/business-service-test-files.mjs"),
+      "utf8"
+    );
+    const tests = readdirSync(join(repoRoot, "tests/integration")).filter((name) =>
+      /^report-.*\.integration\.test\.ts$/.test(name)
+    );
+    for (const name of tests) expect(registry).toContain(`tests/integration/${name}`);
+  });
+
+  it("runs observed analytics choice isolation and privacy regressions in CI", () => {
+    const registry = readFileSync(
+      join(repoRoot, "scripts/business-service-test-files.mjs"),
+      "utf8"
+    );
+    expect(registry).toContain("tests/integration/analytics-filter-options.integration.test.ts");
   });
 
   it("ships the required public repository files and templates", () => {

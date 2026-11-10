@@ -65,6 +65,16 @@ jobs:
           HEAD_SHA: ${{ github.sha }}
         run: pnpm test
 
+      # Database regressions are included in pnpm test's isolated coverage
+      # shards. PDF text extraction needs Poppler, without any provider key.
+      - name: Install PDF inspection tools
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y poppler-utils
+
+      - name: Smart Report PDF regressions
+        env:
+          REPORT_PDF_TEXT_CHECK_REQUIRED: "true"
+        run: pnpm exec vitest run tests/packages/smart-reports/report-pdf.test.ts tests/packages/smart-reports/report-pdf-child.test.ts tests/packages/smart-reports/report-html.test.ts
+
       - name: Build
         run: pnpm build
 

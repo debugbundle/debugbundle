@@ -1,3 +1,4 @@
+import { base } from "../../scripts/dev-mock/base.js";
 import { once } from "node:events";
 import { createServer } from "node:http";
 import { describe, expect, it } from "vitest";
@@ -57,11 +58,11 @@ describe("local public status preview", () => {
     expect(call("PUT", path, settings).status).toBe(403);
     expect(call("GET", `${path}/options`).status).toBe(403);
     expect(call("GET", `${path}/preview`).status).toBe(403);
-    data.session.user_id = "usr_123";
+    data.session.user_id = base.session.user_id;
     expect(call("PUT", path, { ...settings, enabled: false }).status).toBe(200);
     data.session.user_id = "usr_collaborator";
     expect(PublicStatusManagementSchema.parse(call("GET", path).body).public_url).toBeNull();
-    data.session.user_id = "usr_123";
+    data.session.user_id = base.session.user_id;
     expect(call("PUT", path, settings).status).toBe(200);
     data.projects[0]!["owner_user_id"] = "usr_new_owner";
     expect(call("GET", publicPath).status).toBe(404);

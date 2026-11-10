@@ -6,6 +6,34 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.24.0] - 2026-11-10
+
+### Added
+
+- Observed analytics filter choices through the dashboard, API, CLI and ordinary
+  MCP, scoped to the authorised project, time window and service/environment.
+  Empty or unavailable choices stay disabled; existing selections are retained.
+- Allowlisted Smart Report rejection diagnostics stored separately from immutable
+  AI receipt hashes. Apply `202611090001_add_report_model_diagnostics` before
+  starting the updated API and worker; historical unknown reasons remain unknown.
+
+### Fixed
+
+- Match generated Smart Report claims to supporting evidence in the provider
+  schema while retaining strict validation, factual fallback, access controls and
+  AI budgets. Unsafe narrative falls back to facts without an automatic paid retry.
+- Preserve bounded multilingual report evidence and avoid a burst of scheduled
+  reports when the scheduler resumes after an outage.
+- Automatically display completed reports, explain factual-only and failed states,
+  and prepare/download PDFs through one button with inline progress.
+
+### Changed
+
+- Put report history and priorities first, with compact status details and clearer
+  comparison spacing. Reuse shared empty states and responsive project details.
+- Use consistent analytics flow and bundle dialogs, compact filters and aligned
+  actions while preserving background list state and existing permissions.
+
 ## [1.23.0] - 2026-11-09
 
 - Set Solo to $5/month or $48/year, Team to $19/month or $192/year and Business

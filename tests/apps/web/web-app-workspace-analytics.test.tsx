@@ -212,11 +212,11 @@ describe("web app - workspace analytics", () => {
     const filterDialog = await screen.findByRole("dialog", {
       name: "Filter analytics opportunities"
     });
-    expect(filterDialog).toHaveClass("w-[min(48rem,calc(100vw-2rem))]");
+    expect(filterDialog).toHaveClass("w-96", "max-w-[calc(100vw-2rem)]");
     const fieldGroup = within(filterDialog)
       .getByLabelText("Project")
       .closest('[data-slot="field-group"]');
-    expect(fieldGroup).toHaveClass("lg:grid-cols-3");
+    expect(fieldGroup).toHaveClass("flex-col");
     for (const label of [
       "Project",
       "Service",

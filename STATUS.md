@@ -1,3 +1,274 @@
+# Combined production-readiness review - locally qualified, release withheld
+
+10 November: Owner requested a final combined audit and explicitly withheld release.
+Review and evidence: `spec/production-readiness-smart-reports-ui-20261110.md` and
+`.tmp/production-review-20261110/`. Added the missing analytics-choice DB suite to
+CI and reproduced/fixed its registry omission. The full unit pass found two
+distribution/documentation failures: the public MCP count and generated OpenClaw
+manifest lagged the new tool. Both are corrected; existing targeted regressions
+and Node 22/24/26 offline OpenClaw runtime checks pass. The new tool remains
+optional. Added release notes and synchronised the private site companion's
+API/CLI/MCP guides and generated references; its 72 tests, typecheck and 145-page
+production build pass. The hosted companion remains unchanged (33 workflow tests).
+
+Final API review also reproduced a missing explicit cache policy on the new
+private choices route. It now sends no-store; the real HTTP/default-adapter/
+Postgres regression verifies scoped choices, privacy/no-store headers and no job.
+
+All 132 CI-equivalent coverage groups pass: 6,382 tests across 804 files,
+including 390 database cases. The unchanged coverage gate passes all 90 changed
+source files. Root types, 148-file scoped lint/format, final fix regressions,
+the separate 200-case report/access/migration database run, 16 required PDF cases,
+candidate builds, synthetic report resource bounds and the high-severity dependency
+policy also pass. The final site build passes after generated-reference refresh.
+No known blocker remains in the reviewed changes. Apply the diagnostic migration
+before the new API/worker, preserve existing flags/budgets/receipts, and verify
+actual deployed revisions/readiness after a separately authorised release.
+No commit, publication, deployment, browser review, paid request or production/
+consumer mutation was performed. Disposable test services were cleaned up.
+
+# Project details and observed-filter UI follow-up - locally qualified and served
+
+10 November: project identity fields use a responsive definition grid, with labels
+above wrapping values. The existing combined overview module was split into
+summary/table/presentation modules below the source limit with old exports retained.
+Sample tag is a compact input/Apply row with an example placeholder. Create flow
+has the standard Plus icon. Bundle generation leaves background time/scope
+controls mounted; cancel/list state and focus restoration stay intact.
+
+Metric More filters now offers observed dropdown choices, including countries and
+approved custom dimensions, through the bounded project-authorised options read.
+Loading, unavailable and empty states disable the affected choices; current
+selections survive, stale reads are cancelled/ignored, and retry is read-only.
+API, CLI and ordinary MCP parity are documented; existing endpoints, restricted
+catalogues, accepted-origin access fences, receipts and generation/AI budgets are
+preserved. Privacy changes omit literals rather than rewrite selectable values.
+The final review reproduced and fixed an order-only rejection in the new guard.
+
+Qualification: 220 unique regression/interface tests plus five real PostgreSQL
+integration tests pass; root types, scoped lint/format, Docker dashboard build,
+source-size checks and diff checks pass. The local mock serves observed options
+and explicit empty fields at localhost:5291. Evidence and pre-ship review are in
+`spec/analytics-filter-choices.md`, `spec/project-details-layout.md` and
+`.tmp/analytics-ui-consistency-20261110/` (76-case focused run, 149-case compatible
+run with six repeated UI cases, plus the new ordering case and five DB cases).
+No browser review, production write, paid request, commit, publication or deployment.
+No migration is needed for this aggregate-read/UI follow-up; prior report diagnostic
+migration/deploy requirements below remain unchanged.
+
+# Analytics UI consistency - locally qualified and served
+
+10 November: the requested analytics changes reuse the existing section header,
+small buttons and form dialogs. Flow edit/archive actions align right and wrap
+on narrow screens; create/edit flow and analytics-bundle generation use modal
+forms with persistent footers. The existing bundles/new URL is a nested modal
+over the retained inventory; cancel restores focus and keeps filters/page size.
+Pending guards prevent duplicate writes/dismissal, and drafts survive errors.
+Filter menus are bounded single-column popovers with the existing mobile Sheet;
+inventory filters sit beside Refresh/generation instead of a separate blank row.
+Shared category labels cover flow purpose, action kinds, devices/platforms and
+related summaries without changing customer keys, names, routes or query values.
+
+The audit also found metric-only filters offered on inventories that ignored
+them. Inventory scope controls/chips and generation defaults now reflect their
+supported time/service/environment fields; metric choices survive tab switching
+and inventory scope reset. The status/kind filters and pagination stay intact.
+
+Qualification: four modal regressions and two inventory-scope regressions were
+Red before their fixes. The full web run passed 917/918 (one old wide-layout
+assertion); the final affected run passes 103/103 across 14 files, including the
+updated layout assertion and new scope cases. Together they qualify all 920 web
+cases. Final root types, lint/format for 29 source/test files, production build
+and whitespace checks pass. Source comparison retains bundle form fields and
+validation helpers; HTTP confirms seven updated preview modules. Pre-ship review
+and decisions: `spec/analytics-ui-consistency.md`; evidence:
+`.tmp/analytics-ui-consistency-20261110/`. No browser review, provider/runtime data
+write, commit, publication, deployment or consumer-product change.
+
+# Alert rules full-width layout - locally qualified and served
+
+10 November: removed the Owner-requested generic Alert rule guidance card and
+split layout. The rules card now uses the available width; retained Slack
+destinations remain below it when applicable, followed by grouped deliveries.
+Existing table actions, role gates, scope summaries, forms and empty/error/loading
+states remain in place. All 32 related web tests, root types, page lint/format,
+production web build and whitespace checks pass. HTTP confirms the existing mock
+preview serves the update. Pre-ship review covers this static presentation-only
+change; no new effects, API, data, schema or cleanup paths. Decision and evidence:
+`spec/alert-rule-scope-display.md`, `.tmp/alert-rules-layout-20261110/`. No browser
+review, production write, commit, deployment or consumer-product change.
+
+# Empty-state consistency - locally qualified and served
+
+10 November: replaced bare empty-list paragraphs/informational notices across
+GitHub rules/deliveries, access and OpenAI connections, alert groups, Slack report
+channels, analytics previews/details, incident logs and public status with the
+existing icon/title/help pattern. The shared `ResourceEmptyState` composition
+retains `ProjectResourceEmptyState` and its prop type as compatible exports.
+GitHub creation moves into the empty body only when already permitted; hidden
+failures explain browser-only visibility and remain reversible. Loading/errors,
+access/upgrade gates, field hints and factual evidence caveats retain their
+separate meanings. No backend, schema, dependency, data, access or budget change.
+
+Qualification: two new regressions were Red before implementation. Full dashboard
+run: 910/914 passed; three old-label assertions and one overbroad new test
+assertion were corrected. Final affected rerun: 17/17 passed across four files,
+qualifying all 914 cases across the runs. Final root types, scoped lint/format for
+26 source/test files, production dashboard build and whitespace checks pass.
+HTTP confirms the existing mock preview serves the updated modules. Pre-ship
+review and audit inventory: `spec/empty-state-consistency.md`; evidence:
+`.tmp/empty-state-consistency-20261110/`. No browser review, paid call, email,
+commit, deployment or consumer-product change. Prior Smart Report work remains
+uncommitted and unchanged by this presentation slice.
+
+# Report table spacing and single PDF action - locally qualified and served
+
+10 November: implemented the Owner-requested balanced history columns (5/12,
+1/4, 1/6, 1/6 on desktop; mobile remains stacked). Long report names wrap. Failed,
+skipped and paused details are now accessible badge tooltips on hover, focus or
+activation, with Escape dismissal. Comparison heading/description uses gap-1;
+shared table captions have pb-4 inside their border.
+
+PDF is one Download PDF button: Preparing PDF... and the existing left spinner
+cover preparation/file retrieval, then the file saves once and the label returns.
+Cached PDFs skip preparation. Visiting an already queued PDF does not create a
+download intent. Read failures restore an actionable button; leaving the report
+suppresses late file saves. The browser uses the existing bounded PDF transport
+and session cookies, never sending the internal browser-scope marker. Same-origin,
+absolute and relative reverse-proxy API bases are supported. Backend access,
+expiry, derivative caching, model budgets and factual receipts remain unchanged.
+
+Qualification: six initial UI regressions failed before implementation. Focused
+UI tests: 47 passed; final transport/browser-client cases: 19 passed. Complete
+Smart Report coverage: 416 passed, three conditional extraction skips, all 27
+changed-source gates green. The coverage target now includes both .ts/.tsx report
+adapter tests. Final types/lint/format and production dashboard build pass. Local
+HTTP confirms five updated preview modules and a valid cached 23,459-byte PDF.
+No browser/screenshot inspection, paid provider call, email, commit or deployment.
+Evidence: `.tmp/report-reliability-20261110/table-pdf-*.log`. Existing checkpoints
+and the approved design/reliability record remain below.
+
+# Report generation progress - locally qualified and served in preview
+
+10 November: implemented the Owner-requested Generating report... live status
+with a reduced-motion-aware spinner, using a reusable pending Notice variant
+also consumed by PDF preparation. Slow generation keeps serial read-only checks
+(two seconds initially, five seconds later) instead of stopping after thirty
+seconds. Hidden/offline tabs pause; transient status/canonical reads use backoff.
+Published ready or factual-only content replaces progress in place. Access errors
+clear private progress; failed/cancelled/paused states and navigation stop checks.
+No status read admits generation, prepares PDF, sends email or calls the provider.
+
+Four new progress regressions were Red before the change. Final qualification:
+52 focused UI/presentation/mock cases; full Smart Report gate 403 passed and three
+conditional PDF extraction skips, with all 24 changed-source coverage gates green.
+Types/lint/format and the production dashboard build pass. Component-only content
+and delivery tests were moved into their owning functional files, and the report
+coverage target includes all three files. Existing receipt/access/budget and
+real-storage tests remain green. No schema, API contract or quota was changed.
+
+HTTP checks confirm the running mock preview serves the new label/spinner and
+automatic loading code. A fresh queued synthetic example is recorded in
+`.tmp/report-reliability-20261110/generation-preview.json`; opening it demonstrates
+queued-to-processing-to-report in memory. No browser/screenshot review or
+production deployment was performed. Current evidence: `generation-red.log`,
+`generation-final.log`, `generation-coverage.log` and `generation-build-final.log`.
+
+# Smart Report local samples - running in the isolated preview
+
+10 November: the Owner requested mock reports to review the approved UI without
+local backend setup. Added four sample definitions and seven runs to the existing
+loopback-only Vite simulator: ready multi-project, factual-only, restricted, quiet,
+queued/processing, failed and skipped examples. Current complete UTC periods and
+production fact/narrative/API schemas are used. Create/edit/generate/regenerate,
+cancel/delete, pagination and simulated allowance work in memory; the recipient
+warning was fixed with the missing people mock and a consistent UUID demo owner.
+No production component or layout was changed in this follow-up.
+
+`make dev-mock` refreshed only the mock frontend. The running preview at
+`http://localhost:5291/reports` has synthetic Business selected for fresh actions.
+HTTP checks confirm sample documents, recipients, escaped HTML and a 23,475-byte
+real PDF from the bounded child renderer. Local API/worker/Postgres container
+identities are unchanged. Simulated edits reset when mock mode restarts.
+
+Qualification: 123 mock/report interface tests; final types/lint/format and the
+dashboard production build pass. The final quiet example has no invented
+resolution/priority. No browser or screenshot review was performed. No AI call,
+email, production data, quota, receipt, schema, commit or deployment was changed.
+Details: `spec/smart-report-reliability-audit.md`, Local sample report preview;
+command evidence: `.tmp/report-reliability-20261110/mock-*.log` and `mock-live.json`.
+
+# Smart Reports reliability and approved UI - qualified locally; not deployed
+
+10 November: completed a further reliability audit and the Owner-approved UI
+proposal in `spec/smart-report-reliability-audit.md`. Reproduced and fixed unsafe
+narrative publication (including old buffered-response recovery), maximum
+multilingual fact redaction, overflowing AI-only selection notes and historical
+schedule catch-up draining the allowance. Factual output, final validation,
+existing paid receipts/hashes, one-attempt policy, access and budgets are preserved.
+
+Reports now lead with history and compact saved settings/allowance; generation
+confirms the UTC period and quota use. Saved reports lead with summary/priorities,
+retain canonical urgent work with project labels and use clear states, readable
+UTC dates, source disclosures and bounded read-only polling. Existing components
+and tokens are reused; no browser or screenshot check was requested/performed.
+
+Full unit run: 5,932 passed (574 conditional skips). Final combined coverage after
+recovery changes: 396 passed, including 169 real-storage report cases, plus all
+23 changed source coverage gates. The three conditional PDF cases pass in the
+separate sixteen-case Poppler/HTML/PDF gate. The matrix exercises 2,160 deterministic
+input combinations, not provider responses. Nine previous synthetic request
+hashes/budgets are unchanged. Type/lint/format, dashboard build and the bounded
+synthetic PDF resource check pass. CI now includes the new diagnostics in its
+existing isolated coverage registry and explicitly requires PDF text extraction.
+
+No new paid provider request, production mutation, commit, push or deployment.
+The earlier additive diagnostic migration must precede new API/worker activation;
+no further migration was added. Provider outages/invalid prose can still yield
+facts-only reports. Monitoring and authorised deployed acceptance remain release
+work, not evidence established by local tests. See the audit for exact scope,
+limits, repeatable targets and `.tmp/report-reliability-20261110/` evidence.
+Earlier local rejection-fix and original handoff checkpoints are retained below.
+
+# Smart Report AI rejection - fix qualified locally and with provider; not deployed
+
+9–10 November: the explicitly approved exact-payload diagnostic reproduced
+`report_claim_not_supported`. The provider schema admitted highlight references
+that did not support their claim kind; correct local validation rejected them.
+The decoder now restricts resolution, health recovery and outstanding claims to
+supporting references, retaining the canonical schema and local validator
+byte-for-byte. A separately approved fixed-schema request succeeded and passed
+canonical validation. Two paid local calls total USD 0.0095392 by the application's
+cost calculation. Nine token-only fixture checks pass, maximum 10,930/12,000 input
+tokens. Model/profile/token limits, the USD 1 account budget and production quotas
+are unchanged; there were no automatic paid retries or production mutations.
+
+Allowlisted diagnostics persist outside the existing receipt hash, with nullable
+forward migration `202611090001_add_report_model_diagnostics`, legacy NULL/hash
+compatibility and fail-closed readiness. Shared dashboard/HTML/PDF/email copy
+explains factual fallback. Final focused qualification: 179 report/interface
+tests, 46 report integration tests plus 17 storage migration cases, sixteen
+PDF/rendering checks, types/lint/format. An earlier full unit run had 5,895 passes,
+two timeouts and one stale startup fixture; all three files passed isolated reruns
+at unchanged time limits, including the added refusal-to-listen regression.
+Authenticated readback confirms the original canonical report is unchanged.
+The original report and paid receipt are preserved; its discarded reason remains
+unknown and is not backfilled. No commit, publication or deployment occurred.
+See `spec/smart-report-ai-rejection.md` and private receipts under
+`.tmp/report-model-rejection-20261109/`. Earlier handoff checkpoint retained below.
+
+# Smart Report AI rejection - diagnosis complete, fix pending
+
+9 November: the owner's October monthly report received a Terra response
+(2,444 input / 370 output tokens), then fell back to facts because the report
+client rejected the output. The exact branch is unknown: settlement drops the
+safe rejection reason and presentation collapses it to `model_rejected`.
+No fix or new model call was performed. The next thread should preserve bounded
+diagnostics, identify the actual cause and fix it without weakening validation,
+changing immutable receipts or retrying paid work implicitly. Local handoff:
+`spec/local/handoffs/smart-report-ai-rejection-20261109.md`; private receipts:
+`.tmp/report-model-rejection-20261109/`. This checkpoint is a handoff-only edit.
+
 # Business/UI release - live, external acceptance partial
 
 9 November: core 1.23.0 and site 1.8.0 are deployed from the exact tested refs.

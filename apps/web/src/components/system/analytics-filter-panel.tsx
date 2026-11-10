@@ -37,10 +37,11 @@ export function AnalyticsFilterPanel({
   activeFilterCount,
   canApply = true,
   scrollable = false,
-  desktopSize = "default",
+  triggerSize = "default",
   onApply,
   onReset,
   onDismiss,
+  onOpenChange,
   children
 }: {
   triggerLabel: string;
@@ -49,10 +50,11 @@ export function AnalyticsFilterPanel({
   activeFilterCount: number;
   canApply?: boolean;
   scrollable?: boolean;
-  desktopSize?: "default" | "wide";
+  triggerSize?: "default" | "sm";
   onApply: () => void;
   onReset: () => void;
   onDismiss: () => void;
+  onOpenChange?: (open: boolean) => void;
   children: ReactNode;
 }): JSX.Element {
   const isMobile = useIsMobile();
@@ -64,20 +66,23 @@ export function AnalyticsFilterPanel({
     event.preventDefault();
     onApply();
     setOpen(false);
+    onOpenChange?.(false);
   }
 
   function resetFilters(): void {
     onReset();
     setOpen(false);
+    onOpenChange?.(false);
   }
 
   function changeOpen(nextOpen: boolean): void {
     if (open && !nextOpen) onDismiss();
     setOpen(nextOpen);
+    onOpenChange?.(nextOpen);
   }
 
   const trigger = (
-    <Button type="button" variant="outline" className="w-fit">
+    <Button type="button" variant="outline" size={triggerSize} className="w-fit">
       <ListFilterIcon data-icon="inline-start" />
       {triggerLabel}
       {activeFilterCount > 0 ? (
@@ -122,7 +127,7 @@ export function AnalyticsFilterPanel({
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
         align="end"
-        className={cn("p-0", desktopSize === "wide" ? "w-[min(48rem,calc(100vw-2rem))]" : "w-96")}
+        className="w-96 max-w-[calc(100vw-2rem)] p-0"
       >
         <form
           className={cn("flex flex-col", scrollable && "max-h-[min(42rem,calc(100vh-2rem))]")}

@@ -1,4 +1,9 @@
-import { useEffect, useState } from "react";
+import { AnalyticsSectionHeader } from "../components/system/analytics-section-header.js";
+import { Dialog } from "../components/ui/dialog.js";
+import { formatAnalyticsLabel } from "../lib/analytics-presentation.js";
+import { PlusIcon, WorkflowIcon } from "lucide-react";
+import { ResourceEmptyState } from "../components/system/resource-empty-state.js";
+import { useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import type {
   AnalyticsFlowDefinition,
@@ -6,15 +11,21 @@ import type {
   AnalyticsFlowReport
 } from "../../../../packages/shared-types/src/index.js";
 import { AnalyticsFlowForm } from "../components/system/analytics-flow-form.js";
-import { TableRefreshButton } from "../components/system/table-refresh-button.js";
 import { Button } from "../components/ui/button.js";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../components/ui/empty.js";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "../components/ui/card.js";
 import { Notice } from "../components/ui/notice.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue
@@ -55,10 +66,21 @@ export function ProjectAnalyticsFlowsPage(): JSX.Element {
   const [editing, setEditing] = useState<AnalyticsFlowDefinitionInput | "new" | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const generation = useRef(0);
+  // Guard submit and dismiss events before React commits the pending state.
+  const mutationPending = useRef(false);
+  const editorTrigger = useRef<HTMLElement | null>(null);
   useEffect(() => {
+    generation.current += 1;
+    mutationPending.current = false;
+    setSaving(false);
+    setSaveError(null);
     setSelected("");
     setEditing(null);
     setReport(null);
+    return () => {
+      generation.current += 1;
+    };
   }, [projectId]);
   useEffect(() => {
     let active = true;
@@ -112,79 +134,106 @@ export function ProjectAnalyticsFlowsPage(): JSX.Element {
   }, [projectId, selected, window, attempt, loading]);
   const current = flows.find((flow) => flow.flow_key === selected);
   async function save(definition: AnalyticsFlowDefinitionInput): Promise<void> {
+    if (mutationPending.current || !canManageFlows) return;
+    mutationPending.current = true;
+    const requestGeneration = generation.current;
     setSaving(true);
     setSaveError(null);
     try {
       await saveProjectAnalyticsFlow(projectId, definition);
+      if (generation.current !== requestGeneration) return;
       setSelected(definition.flow_key);
       setEditing(null);
       setAttempt((n) => n + 1);
     } catch (reason) {
-      setSaveError(message(reason));
+      if (generation.current === requestGeneration) setSaveError(message(reason));
     } finally {
-      setSaving(false);
+      if (generation.current === requestGeneration) {
+        mutationPending.current = false;
+        setSaving(false);
+      }
     }
   }
   async function archive(): Promise<void> {
-    if (!current) return;
+    if (!current || mutationPending.current || !canManageFlows) return;
+    mutationPending.current = true;
+    const requestGeneration = generation.current;
     setSaving(true);
     setSaveError(null);
     try {
       await archiveProjectAnalyticsFlow(projectId, current.flow_key);
+      if (generation.current !== requestGeneration) return;
       setAttempt((n) => n + 1);
     } catch (reason) {
-      setSaveError(message(reason));
+      if (generation.current === requestGeneration) setSaveError(message(reason));
     } finally {
-      setSaving(false);
+      if (generation.current === requestGeneration) {
+        mutationPending.current = false;
+        setSaving(false);
+      }
     }
   }
   return (
     <section aria-labelledby="analytics-flows-heading" className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 id="analytics-flows-heading" className="text-xl font-semibold">
-            Acquisition and activation flows
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Ordered steps across your sites, authentication pages and app. Reports use full UTC
-            days.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <TableRefreshButton
-            isLoading={loading || reportLoading}
-            onRefresh={() => setAttempt((n) => n + 1)}
-          />
-          {canManageFlows && (
+      <AnalyticsSectionHeader
+        headingId="analytics-flows-heading"
+        title="Acquisition and activation flows"
+        description="Ordered steps across your sites, authentication pages and app. Reports use full UTC days."
+        isLoading={loading || reportLoading || saving}
+        onRefresh={() => setAttempt((n) => n + 1)}
+        actions={
+          canManageFlows ? (
             <Button
-              onClick={() => {
+              type="button"
+              size="sm"
+              disabled={saving}
+              onClick={(event) => {
+                editorTrigger.current = event.currentTarget;
                 setEditing("new");
                 setSaveError(null);
               }}
             >
+              <PlusIcon data-icon="inline-start" />
               Create flow
             </Button>
-          )}
-        </div>
-      </div>
+          ) : undefined
+        }
+      />
       <Notice tone="info" title="Partial observation">
         Your integration records steps explicitly. Missing capture, expired continuity and unlinked
         arrivals are unknown; a redirect alone does not prove successful login. Reports group
         conversions by the date the flow started and compare the current definition version.
       </Notice>
       {editing !== null && canManageFlows && (
-        <Card>
-          <CardContent className="pt-6">
-            <AnalyticsFlowForm
-              key={editing === "new" ? "new" : editing.flow_key}
-              {...(editing === "new" ? {} : { initial: editing })}
-              busy={saving}
-              error={saveError}
-              onCancel={() => setEditing(null)}
-              onSave={(definition) => void save(definition)}
-            />
-          </CardContent>
-        </Card>
+        <Dialog
+          open
+          onOpenChange={(open) => {
+            if (!open && !mutationPending.current) {
+              setEditing(null);
+              setSaveError(null);
+            }
+          }}
+        >
+          <AnalyticsFlowForm
+            key={editing === "new" ? "new" : editing.flow_key}
+            {...(editing === "new" ? {} : { initial: editing })}
+            busy={saving}
+            error={saveError}
+            onCancel={() => {
+              if (!mutationPending.current) {
+                setEditing(null);
+                setSaveError(null);
+              }
+            }}
+            onSave={(definition) => void save(definition)}
+            onCloseAutoFocus={(event) => {
+              if (editorTrigger.current?.isConnected) {
+                event.preventDefault();
+                editorTrigger.current.focus();
+              }
+            }}
+          />
+        </Dialog>
       )}
       {loading ? (
         <Skeleton className="h-40 w-full" aria-label="Loading flows" />
@@ -196,16 +245,15 @@ export function ProjectAnalyticsFlowsPage(): JSX.Element {
           </Button>
         </Notice>
       ) : flows.length === 0 ? (
-        <Empty>
-          <EmptyHeader>
-            <EmptyTitle>No flows yet</EmptyTitle>
-            <EmptyDescription>
-              {canManageFlows
-                ? "Create a flow, then instrument its steps with the Browser SDK or capture API."
-                : "A project owner or admin can create a flow."}
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <ResourceEmptyState
+          icon={WorkflowIcon}
+          title="No flows yet"
+          description={
+            canManageFlows
+              ? "Create a flow, then instrument its steps with the Browser SDK or capture API."
+              : "A project owner or admin can create a flow."
+          }
+        />
       ) : (
         <>
           <Select
@@ -220,27 +268,35 @@ export function ProjectAnalyticsFlowsPage(): JSX.Element {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {flows.map((flow) => (
-                <SelectItem key={flow.flow_key} value={flow.flow_key}>
-                  {flow.display_name}
-                  {flow.archived_at ? " (archived)" : ""}
-                </SelectItem>
-              ))}
+              <SelectGroup>
+                {flows.map((flow) => (
+                  <SelectItem key={flow.flow_key} value={flow.flow_key}>
+                    {flow.display_name}
+                    {flow.archived_at ? " (Archived)" : ""}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
             </SelectContent>
           </Select>
           {current && (
             <Card>
-              <CardHeader>
-                <CardTitle>{current.display_name}</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  {current.kind} · Version {current.version} · Expires after{" "}
-                  {current.timeout_minutes} minutes
-                </p>
+              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex min-w-0 flex-col gap-1">
+                  <CardTitle>{current.display_name}</CardTitle>
+                  <CardDescription>
+                    {formatAnalyticsLabel(current.kind)} · Version {current.version} · Expires after{" "}
+                    {current.timeout_minutes} minutes
+                  </CardDescription>
+                </div>
                 {canManageFlows && !current.archived_at && (
-                  <div className="flex gap-2">
+                  <CardAction className="flex flex-wrap justify-end gap-2 self-end sm:shrink-0 sm:self-start">
                     <Button
+                      type="button"
                       variant="outline"
-                      onClick={() => {
+                      size="sm"
+                      disabled={saving}
+                      onClick={(event) => {
+                        editorTrigger.current = event.currentTarget;
                         setEditing({
                           flow_key: current.flow_key,
                           display_name: current.display_name,
@@ -253,10 +309,16 @@ export function ProjectAnalyticsFlowsPage(): JSX.Element {
                     >
                       Edit flow
                     </Button>
-                    <Button variant="outline" disabled={saving} onClick={() => void archive()}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={saving}
+                      onClick={() => void archive()}
+                    >
                       Archive flow
                     </Button>
-                  </div>
+                  </CardAction>
                 )}
               </CardHeader>
               <CardContent className="flex flex-col gap-4">

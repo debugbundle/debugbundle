@@ -313,6 +313,7 @@ export function createAnalyticsSettingsManagementDependency(
 export function createDependencies(
   overrides: {
     analyticsMetrics?: ApiDependencies["analyticsMetrics"];
+    analyticsFilterOptions?: ApiDependencies["analyticsFilterOptions"];
     analyticsJourneySamples?: ApiDependencies["analyticsJourneySamples"];
     analyticsOpportunities?: ApiDependencies["analyticsOpportunities"];
     analyticsBundles?: ApiDependencies["analyticsBundles"];
@@ -356,13 +357,16 @@ export function createDependencies(
     projectManagement: {
       resolveProjectAccessForUser: vi
         .fn()
-        .mockResolvedValue(overrides.projectAccess ?? createProjectAccess()),
+        .mockResolvedValue(
+          overrides.projectAccess === undefined ? createProjectAccess() : overrides.projectAccess
+        ),
       listProjectsForOrganization: vi.fn().mockResolvedValue([]),
       createProjectForOrganization: vi.fn(),
       updateProjectForOrganization: vi.fn(),
       deleteProjectForOrganization: vi.fn()
     },
     analyticsMetrics: overrides.analyticsMetrics,
+    analyticsFilterOptions: overrides.analyticsFilterOptions,
     analyticsJourneySamples: overrides.analyticsJourneySamples,
     analyticsOpportunities: overrides.analyticsOpportunities,
     analyticsBundles: overrides.analyticsBundles,

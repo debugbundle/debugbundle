@@ -104,7 +104,7 @@ it("shows a retryable unavailable state and ignores reads after unmount", async 
   unavailable = false;
   const user = userEvent.setup();
   await user.click(screen.getByRole("button", { name: /retry grouped deliveries/i }));
-  expect(await screen.findByText("No grouped deliveries yet.")).toBeInTheDocument();
+  expect(await screen.findByText("No grouped deliveries yet")).toBeInTheDocument();
   view.unmount();
   await waitFor(() => expect(screen.queryByRole("table")).toBeNull());
 });

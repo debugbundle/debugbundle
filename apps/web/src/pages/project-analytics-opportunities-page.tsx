@@ -83,27 +83,32 @@ export function ProjectAnalyticsOpportunitiesPage(): JSX.Element {
         description="Review deterministic improvement signals found in aggregate product usage."
         isLoading={pagination.isLoading}
         onRefresh={pagination.refreshPage}
+        actions={
+          <WorkspaceAnalyticsFilters
+            mode="opportunities"
+            fixedScope
+            projects={[]}
+            value={draftFilters}
+            activeFilterCount={
+              [filters.status, filters.kind, filters.severity, filters.bundleStatus].filter(
+                (value) => value !== "all"
+              ).length
+            }
+            onChange={setDraftFilters}
+            onApply={() => setFilters(draftFilters)}
+            onReset={() => {
+              const defaults = {
+                ...createWorkspaceAnalyticsFilters("opportunities"),
+                status: "all"
+              };
+              setFilters(defaults);
+              setDraftFilters(defaults);
+            }}
+            onDismiss={() => setDraftFilters(filters)}
+          />
+        }
       />
 
-      <WorkspaceAnalyticsFilters
-        mode="opportunities"
-        fixedScope
-        projects={[]}
-        value={draftFilters}
-        activeFilterCount={
-          [filters.status, filters.kind, filters.severity, filters.bundleStatus].filter(
-            (value) => value !== "all"
-          ).length
-        }
-        onChange={setDraftFilters}
-        onApply={() => setFilters(draftFilters)}
-        onReset={() => {
-          const defaults = { ...createWorkspaceAnalyticsFilters("opportunities"), status: "all" };
-          setFilters(defaults);
-          setDraftFilters(defaults);
-        }}
-        onDismiss={() => setDraftFilters(filters)}
-      />
       <BoundedListLimit
         id="analytics-opportunities-limit"
         label="Inventory page limit"

@@ -1,6 +1,7 @@
 import type { ReportAllowance } from "../../../../../packages/smart-reports/src/report-allowance.js";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../ui/card.js";
 import { Notice } from "../ui/notice.js";
+import { reportTimeLabel } from "../../../../../packages/smart-reports/src/report-presentation.js";
 export function ReportAllowanceCard({
   value,
   error = false
@@ -9,7 +10,6 @@ export function ReportAllowanceCard({
   error?: boolean;
 }): JSX.Element | null {
   if (!value && !error) return null;
-  const time = (at: string): string => `${at.slice(0, 16).replace("T", " ")} UTC`;
   return (
     <Card role="region" aria-label="Shared report allowance">
       <CardHeader>
@@ -19,30 +19,31 @@ export function ReportAllowanceCard({
             : "Shared report allowance"}
         </CardTitle>
         <CardDescription>
-          One pool for scheduled and manual reports. Annual billing uses monthly allowances.
+          {value
+            ? `${value.used} used · ${value.scope_complete ? "" : "At least "}${value.scheduled_remaining} scheduled before the reset · Resets ${reportTimeLabel(value.window.ends_at)}`
+            : "Scheduled and manual reports share this allowance."}
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="flex flex-col gap-3">
         {value ? (
           <>
-            <p>
-              {value.used} used. {value.scope_complete ? "" : "At least "}
-              {value.scheduled_remaining} scheduled reports are expected before this window ends.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              {time(value.window.starts_at)} to {time(value.window.ends_at)}.
-            </p>
             {!value.scope_complete ? (
               <p className="text-sm text-muted-foreground">
                 This forecast covers schedules you can read. Other schedules and manual reports can
                 also use the shared pool.
               </p>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                This is a forecast of current schedules; manual reports and schedule changes can
-                alter demand.
+            ) : null}
+            <details className="text-sm text-muted-foreground">
+              <summary className="cursor-pointer focus-visible:outline-ring">
+                How the allowance works
+              </summary>
+              <p className="mt-2">
+                Scheduled and manual reports share this pool. Annual billing uses monthly
+                allowances. This window runs from {reportTimeLabel(value.window.starts_at)} to{" "}
+                {reportTimeLabel(value.window.ends_at)}. Scheduled demand is a forecast; manual
+                reports and schedule changes can alter it.
               </p>
-            )}
+            </details>
             {value.schedule_exceeds_remaining ? (
               <Notice>
                 Scheduled demand exceeds the remaining allowance. Runs beyond the allowance will be

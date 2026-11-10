@@ -124,6 +124,109 @@ describe("budgeted report model client", () => {
     });
     expect(request).toHaveBeenCalledTimes(2);
   });
+  it.each([
+    "Contact private@example.test for the evidence.",
+    "The captured password=orchid needs review.",
+    "The captured Bearer abcdefgh needs review."
+  ])("rejects prose that the private report reader would withhold: %s", async (text) => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(response({ object: "response.input_tokens", input_tokens: 1000 }))
+      .mockResolvedValueOnce(
+        response(
+          completed({
+            output: [
+              {
+                type: "message",
+                role: "assistant",
+                status: "completed",
+                content: [
+                  {
+                    type: "output_text",
+                    annotations: [],
+                    text: JSON.stringify({
+                      ...narrative,
+                      overview: { ...narrative.overview, text }
+                    })
+                  }
+                ]
+              }
+            ]
+          })
+        )
+      );
+    const prepared = await createReportModelClient({
+      apiKey: "sk-synthetic-evaluation",
+      fetch: request
+    }).prepare({ model: "gpt-6-luna", facts: cases.cases[0]!.facts });
+    const outcome = await prepared.run(async () => {});
+    expect(outcome).toMatchObject({ state: "rejected", reason: "report_unsafe_prose", usage });
+    expect(outcome).not.toHaveProperty("narrative");
+    expect(JSON.stringify(outcome)).not.toContain(text);
+    await expect(prepared.run(async () => {})).rejects.toThrow("report_attempt_already_used");
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+  it.each([
+    [
+      {
+        type: "output_text",
+        text: JSON.stringify({
+          ...narrative,
+          highlights: [
+            {
+              kind: "outstanding",
+              text: "The linked observation describes active work.",
+              evidence_refs: ["p01_coverage"]
+            }
+          ]
+        }),
+        annotations: []
+      },
+      "report_claim_not_supported"
+    ],
+    [{ type: "refusal", refusal: "private refusal text" }, "report_model_refused"],
+    [
+      { type: "output_text", text: "not JSON: private text", annotations: [] },
+      "report_invalid_json"
+    ],
+    [{ type: "output_text", text: "{}", annotations: [] }, "report_invalid_narrative"],
+    [
+      {
+        type: "output_text",
+        text: JSON.stringify({
+          ...narrative,
+          overview: { text: "Untrusted fact.", evidence_refs: ["unknown"] }
+        }),
+        annotations: []
+      },
+      "report_unknown_reference"
+    ]
+  ])(
+    "classifies unusable paid output without retaining its text or retrying",
+    async (content, reason) => {
+      const request = vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(response({ object: "response.input_tokens", input_tokens: 1000 }))
+        .mockResolvedValueOnce(
+          response(
+            completed({
+              output: [
+                { type: "message", role: "assistant", status: "completed", content: [content] }
+              ]
+            })
+          )
+        );
+      const prepared = await createReportModelClient({
+        apiKey: "sk-synthetic-evaluation",
+        fetch: request
+      }).prepare({ model: "gpt-6-luna", facts: cases.cases[0]!.facts });
+      const result = await prepared.run(async () => {});
+      expect(result).toMatchObject({ state: "rejected", reason, usage });
+      expect(JSON.stringify(result)).not.toContain("private");
+      await expect(prepared.run(async () => {})).rejects.toThrow("report_attempt_already_used");
+      expect(request).toHaveBeenCalledTimes(2);
+    }
+  );
   it("retains an uncertain reservation for missing usage, transport failures and unexpected tools", async () => {
     for (const result of [
       completed({ usage: null }),

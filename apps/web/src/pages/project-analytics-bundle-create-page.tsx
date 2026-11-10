@@ -1,10 +1,13 @@
+import { DialogFormContent } from "../components/system/dialog-form-content.js";
+import { PendingButton } from "../components/system/pending-button.js";
+import { Dialog } from "../components/ui/dialog.js";
 import { z } from "zod";
 import { analyticsBundleSpecificationFilters } from "../lib/analytics-filter-form.js";
 import { parseAnalyticsRelativeDurationMs } from "../../../../packages/shared-types/src/analytics-query.js";
 import { Textarea } from "../components/ui/textarea.js";
-import { ArrowLeftIcon, LoaderCircleIcon, RefreshCwIcon } from "lucide-react";
+import { RefreshCwIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useOutletContext } from "react-router-dom";
+import { useNavigate, useOutletContext } from "react-router-dom";
 
 import {
   toAnalyticsDateEnd,
@@ -41,7 +44,7 @@ import {
   type AnalyticsBundleAnalysisKind,
   type IncidentRecord
 } from "../lib/api.js";
-import type { ProjectAnalyticsContext } from "./project-analytics-layout.js";
+import type { AnalyticsBundlesOutletContext } from "./project-analytics-bundles-page.js";
 
 type TimeWindow = "7d" | "30d" | "90d" | "custom" | "exact" | "relative";
 type FormField =
@@ -98,7 +101,8 @@ const routeContextKinds = new Set<AnalyticsBundleAnalysisKind>([
 ]);
 
 export function ProjectAnalyticsBundleCreatePage(): JSX.Element {
-  const { projectId, environmentDefault, query } = useOutletContext<ProjectAnalyticsContext>();
+  const { projectId, environmentDefault, query, createTriggerRef } =
+    useOutletContext<AnalyticsBundlesOutletContext>();
   const navigate = useNavigate();
   const [draft, setDraft] = useState<FormDraft>(() => ({
     analysisKind: "usage_summary",
@@ -212,332 +216,350 @@ export function ProjectAnalyticsBundleCreatePage(): JSX.Element {
   const showsRoute = routeContextKinds.has(draft.analysisKind);
   const showsIncident = draft.analysisKind === "incident_impact";
 
+  function close(): void {
+    if (!submittingRef.current) {
+      void navigate(`/projects/${projectId}/analytics/bundles`, { replace: true });
+    }
+  }
+
   return (
-    <div className="flex max-w-4xl flex-col gap-6">
-      <div>
-        <Button asChild variant="ghost" size="sm">
-          <Link to={`/projects/${projectId}/analytics/bundles`}>
-            <ArrowLeftIcon data-icon="inline-start" />
-            Back to analytics bundles
-          </Link>
-        </Button>
-      </div>
-
-      <header className="flex max-w-2xl flex-col gap-2">
-        <h2 className="text-xl font-semibold">Generate analytics bundle</h2>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          Create a deterministic analysis artifact from aggregate analytics and bounded journey
-          evidence.
-        </p>
-      </header>
-
-      {submitError === null ? null : (
-        <Notice
-          title={
-            submitError === "analytics_quota_exceeded"
-              ? "Analytics bundle limit reached"
-              : "Could not generate analytics bundle"
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) close();
+      }}
+    >
+      <DialogFormContent
+        title="Generate analytics bundle"
+        description="Create a deterministic analysis artifact from aggregate analytics and bounded journey evidence."
+        size="lg"
+        busy={isSubmitting}
+        aria-label="Generate analytics bundle"
+        aria-busy={isSubmitting}
+        onSubmit={(event) => void submit(event)}
+        onCloseAutoFocus={(event) => {
+          if (createTriggerRef.current?.isConnected) {
+            event.preventDefault();
+            createTriggerRef.current.focus();
           }
-          tone="destructive"
+        }}
+        footer={
+          <>
+            <Button type="button" variant="outline" disabled={isSubmitting} onClick={close}>
+              Cancel
+            </Button>
+            <PendingButton type="submit" pending={isSubmitting} disabled={isSubmitting}>
+              {isSubmitting ? "Generating..." : "Generate analytics bundle"}
+            </PendingButton>
+          </>
+        }
+      >
+        {submitError === null ? null : (
+          <Notice
+            title={
+              submitError === "analytics_quota_exceeded"
+                ? "Analytics bundle limit reached"
+                : "Could not generate analytics bundle"
+            }
+            tone="destructive"
+          >
+            {submitError === "analytics_quota_exceeded"
+              ? "The monthly analytics bundle generation allowance is exhausted."
+              : submitError}
+          </Notice>
+        )}
+
+        <fieldset
+          disabled={isSubmitting}
+          aria-label="Analytics bundle specification"
+          className="flex min-w-0 flex-col gap-6"
         >
-          {submitError === "analytics_quota_exceeded"
-            ? "The monthly analytics bundle generation allowance is exhausted."
-            : submitError}
-        </Notice>
-      )}
-
-      <form className="flex flex-col gap-8" onSubmit={(event) => void submit(event)}>
-        <FieldSet>
-          <FieldLegend>Analysis</FieldLegend>
-          <FieldGroup className="grid gap-5 md:grid-cols-2">
-            <Field>
-              <FieldLabel htmlFor="analytics-bundle-kind">Analysis kind</FieldLabel>
-              <Select
-                value={draft.analysisKind}
-                onValueChange={(value) =>
-                  update("analysisKind", value as AnalyticsBundleAnalysisKind)
-                }
-              >
-                <SelectTrigger id="analytics-bundle-kind" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent position="popper">
-                  <SelectGroup>
-                    {analysisKindOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="analytics-bundle-window">Time window</FieldLabel>
-              <Select
-                value={draft.timeWindow}
-                onValueChange={(value) => update("timeWindow", value as TimeWindow)}
-              >
-                <SelectTrigger id="analytics-bundle-window" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent position="popper">
-                  <SelectGroup>
-                    {timeWindowOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
-            {draft.timeWindow === "relative" ? (
-              <Field data-invalid={errors.relative !== undefined || undefined}>
-                <FieldLabel htmlFor="analytics-bundle-relative">Relative window</FieldLabel>
-                <Input
-                  id="analytics-bundle-relative"
-                  value={draft.relative}
-                  onChange={(event) => update("relative", event.currentTarget.value)}
-                />
-                {errors.relative === undefined ? (
-                  <FieldDescription>
-                    Use hours, days or weeks, such as 24h or 2w, up to 370 days.
-                  </FieldDescription>
-                ) : (
-                  <FieldError>{errors.relative}</FieldError>
-                )}
-              </Field>
-            ) : null}
-            {draft.timeWindow === "exact" ? (
-              <>
-                {(["from", "to"] as const).map((key) => (
-                  <Field key={key} data-invalid={errors[key] !== undefined || undefined}>
-                    <FieldLabel htmlFor={`analytics-bundle-exact-${key}`}>
-                      {key === "from" ? "From (UTC)" : "To (UTC)"}
-                    </FieldLabel>
-                    <Input
-                      id={`analytics-bundle-exact-${key}`}
-                      value={draft[key]}
-                      placeholder="2026-10-01T00:00:00Z"
-                      onChange={(event) => update(key, event.currentTarget.value)}
-                    />
-                    {errors[key] === undefined ? (
-                      <FieldDescription>ISO 8601 UTC timestamp.</FieldDescription>
-                    ) : (
-                      <FieldError>{errors[key]}</FieldError>
-                    )}
-                  </Field>
-                ))}
-              </>
-            ) : null}
-            {draft.timeWindow === "custom" ? (
-              <>
-                <DateField
-                  id="analytics-bundle-from"
-                  label="From"
-                  value={draft.from}
-                  max={draft.to || undefined}
-                  error={errors.from}
-                  onChange={(value) => update("from", value)}
-                />
-                <DateField
-                  id="analytics-bundle-to"
-                  label="To"
-                  value={draft.to}
-                  min={draft.from || undefined}
-                  error={errors.to}
-                  onChange={(value) => update("to", value)}
-                />
-              </>
-            ) : null}
-          </FieldGroup>
-        </FieldSet>
-
-        {draft.analysisKind === "funnel_dropoff" ? (
           <FieldSet>
-            <FieldLegend>Funnel context</FieldLegend>
-            <Field data-invalid={errors.funnel !== undefined || undefined}>
-              <FieldLabel htmlFor="analytics-bundle-funnel">Funnel key</FieldLabel>
-              <Input
-                id="analytics-bundle-funnel"
-                value={draft.funnel}
-                maxLength={120}
-                aria-invalid={errors.funnel !== undefined || undefined}
-                onChange={(event) => update("funnel", event.currentTarget.value)}
-              />
-              {errors.funnel === undefined ? null : <FieldError>{errors.funnel}</FieldError>}
-            </Field>
-          </FieldSet>
-        ) : null}
-
-        {showsRoute ? (
-          <FieldSet>
-            <FieldLegend>Route context</FieldLegend>
-            <Field data-invalid={errors.route !== undefined || undefined}>
-              <FieldLabel htmlFor="analytics-bundle-route">Route</FieldLabel>
-              <Input
-                id="analytics-bundle-route"
-                value={draft.route}
-                maxLength={2048}
-                placeholder="/checkout"
-                aria-invalid={errors.route !== undefined || undefined}
-                onChange={(event) => update("route", event.currentTarget.value)}
-              />
-              <FieldDescription>Optional normalized path without a query string.</FieldDescription>
-              {errors.route === undefined ? null : <FieldError>{errors.route}</FieldError>}
-            </Field>
-          </FieldSet>
-        ) : null}
-
-        {showsIncident ? (
-          <FieldSet>
-            <FieldLegend>Incident context</FieldLegend>
-            {incidentsError ? (
-              <Notice title="Could not load project incidents" tone="destructive">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIncidentsAttempt((current) => current + 1)}
-                >
-                  <RefreshCwIcon data-icon="inline-start" />
-                  Retry incidents
-                </Button>
-              </Notice>
-            ) : (
-              <Field data-invalid={errors.incident !== undefined || undefined}>
-                <FieldLabel htmlFor="analytics-bundle-incident">Incident</FieldLabel>
+            <FieldLegend>Analysis</FieldLegend>
+            <FieldGroup className="grid gap-5 md:grid-cols-2">
+              <Field>
+                <FieldLabel htmlFor="analytics-bundle-kind">Analysis kind</FieldLabel>
                 <Select
-                  value={draft.incidentId}
-                  disabled={incidents === null}
-                  onValueChange={(value) => update("incidentId", value)}
+                  value={draft.analysisKind}
+                  onValueChange={(value) =>
+                    update("analysisKind", value as AnalyticsBundleAnalysisKind)
+                  }
                 >
-                  <SelectTrigger
-                    id="analytics-bundle-incident"
-                    className="w-full"
-                    aria-invalid={errors.incident !== undefined || undefined}
-                  >
-                    <SelectValue
-                      placeholder={incidents === null ? "Loading incidents" : "Select incident"}
-                    />
+                  <SelectTrigger id="analytics-bundle-kind" className="w-full">
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent position="popper">
                     <SelectGroup>
-                      {(incidents ?? []).map((incident) => (
-                        <SelectItem key={incident.incident_id} value={incident.incident_id}>
-                          {incident.title}
+                      {analysisKindOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
                         </SelectItem>
                       ))}
                     </SelectGroup>
                   </SelectContent>
                 </Select>
-                {incidents?.length === 0 ? (
-                  <FieldDescription>
-                    No accessible project incidents are available.
-                  </FieldDescription>
-                ) : null}
-                {errors.incident === undefined ? null : <FieldError>{errors.incident}</FieldError>}
               </Field>
-            )}
+              <Field>
+                <FieldLabel htmlFor="analytics-bundle-window">Time window</FieldLabel>
+                <Select
+                  value={draft.timeWindow}
+                  onValueChange={(value) => update("timeWindow", value as TimeWindow)}
+                >
+                  <SelectTrigger id="analytics-bundle-window" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent position="popper">
+                    <SelectGroup>
+                      {timeWindowOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+              {draft.timeWindow === "relative" ? (
+                <Field data-invalid={errors.relative !== undefined || undefined}>
+                  <FieldLabel htmlFor="analytics-bundle-relative">Relative window</FieldLabel>
+                  <Input
+                    id="analytics-bundle-relative"
+                    value={draft.relative}
+                    onChange={(event) => update("relative", event.currentTarget.value)}
+                  />
+                  {errors.relative === undefined ? (
+                    <FieldDescription>
+                      Use hours, days or weeks, such as 24h or 2w, up to 370 days.
+                    </FieldDescription>
+                  ) : (
+                    <FieldError>{errors.relative}</FieldError>
+                  )}
+                </Field>
+              ) : null}
+              {draft.timeWindow === "exact" ? (
+                <>
+                  {(["from", "to"] as const).map((key) => (
+                    <Field key={key} data-invalid={errors[key] !== undefined || undefined}>
+                      <FieldLabel htmlFor={`analytics-bundle-exact-${key}`}>
+                        {key === "from" ? "From (UTC)" : "To (UTC)"}
+                      </FieldLabel>
+                      <Input
+                        id={`analytics-bundle-exact-${key}`}
+                        value={draft[key]}
+                        placeholder="2026-10-01T00:00:00Z"
+                        onChange={(event) => update(key, event.currentTarget.value)}
+                      />
+                      {errors[key] === undefined ? (
+                        <FieldDescription>ISO 8601 UTC timestamp.</FieldDescription>
+                      ) : (
+                        <FieldError>{errors[key]}</FieldError>
+                      )}
+                    </Field>
+                  ))}
+                </>
+              ) : null}
+              {draft.timeWindow === "custom" ? (
+                <>
+                  <DateField
+                    id="analytics-bundle-from"
+                    label="From"
+                    value={draft.from}
+                    max={draft.to || undefined}
+                    error={errors.from}
+                    onChange={(value) => update("from", value)}
+                  />
+                  <DateField
+                    id="analytics-bundle-to"
+                    label="To"
+                    value={draft.to}
+                    min={draft.from || undefined}
+                    error={errors.to}
+                    onChange={(value) => update("to", value)}
+                  />
+                </>
+              ) : null}
+            </FieldGroup>
           </FieldSet>
-        ) : null}
 
-        {draft.analysisKind === "deploy_comparison" ? (
-          <FieldSet>
-            <FieldLegend>Deploy context</FieldLegend>
-            <Field data-invalid={errors.deploy !== undefined || undefined}>
-              <FieldLabel htmlFor="analytics-bundle-deploy">Deploy ID</FieldLabel>
-              <Input
-                id="analytics-bundle-deploy"
-                value={draft.deployId}
-                maxLength={120}
-                aria-invalid={errors.deploy !== undefined || undefined}
-                onChange={(event) => update("deployId", event.currentTarget.value)}
-              />
-              {errors.deploy === undefined ? null : <FieldError>{errors.deploy}</FieldError>}
-            </Field>
-          </FieldSet>
-        ) : null}
+          {draft.analysisKind === "funnel_dropoff" ? (
+            <FieldSet>
+              <FieldLegend>Funnel context</FieldLegend>
+              <Field data-invalid={errors.funnel !== undefined || undefined}>
+                <FieldLabel htmlFor="analytics-bundle-funnel">Funnel key</FieldLabel>
+                <Input
+                  id="analytics-bundle-funnel"
+                  value={draft.funnel}
+                  maxLength={120}
+                  aria-invalid={errors.funnel !== undefined || undefined}
+                  onChange={(event) => update("funnel", event.currentTarget.value)}
+                />
+                {errors.funnel === undefined ? null : <FieldError>{errors.funnel}</FieldError>}
+              </Field>
+            </FieldSet>
+          ) : null}
 
-        <FieldSet>
-          <FieldLegend>Scope</FieldLegend>
-          <FieldGroup className="grid gap-5 md:grid-cols-2">
-            <Field>
-              <FieldLabel htmlFor="analytics-bundle-service">Service</FieldLabel>
-              <ProjectScopeSelect
-                id="analytics-bundle-service"
-                label="Service"
-                value={draft.service}
-                options={scopeOptions.services}
-                allLabel="All services"
-                onValueChange={(service) => update("service", service)}
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="analytics-bundle-environment">Environment</FieldLabel>
-              <ProjectScopeSelect
-                id="analytics-bundle-environment"
-                label="Environment"
-                value={draft.environment}
-                options={scopeOptions.environments}
-                allLabel="All environments"
-                onValueChange={(environment) => update("environment", environment)}
-              />
-            </Field>
-          </FieldGroup>
-        </FieldSet>
+          {showsRoute ? (
+            <FieldSet>
+              <FieldLegend>Route context</FieldLegend>
+              <Field data-invalid={errors.route !== undefined || undefined}>
+                <FieldLabel htmlFor="analytics-bundle-route">Route</FieldLabel>
+                <Input
+                  id="analytics-bundle-route"
+                  value={draft.route}
+                  maxLength={2048}
+                  placeholder="/checkout"
+                  aria-invalid={errors.route !== undefined || undefined}
+                  onChange={(event) => update("route", event.currentTarget.value)}
+                />
+                <FieldDescription>
+                  Optional normalized path without a query string.
+                </FieldDescription>
+                {errors.route === undefined ? null : <FieldError>{errors.route}</FieldError>}
+              </Field>
+            </FieldSet>
+          ) : null}
 
-        <FieldSet>
-          <FieldLegend>Additional analysis context</FieldLegend>
-          <FieldGroup>
-            <Field data-invalid={errors.opportunity !== undefined || undefined}>
-              <FieldLabel htmlFor="analytics-bundle-opportunity">Opportunity ID</FieldLabel>
-              <Input
-                id="analytics-bundle-opportunity"
-                value={draft.opportunityId}
-                onChange={(event) => update("opportunityId", event.currentTarget.value)}
-              />
-              <FieldDescription>
-                Optional. The server derives the authorized opportunity's scope and evidence, and
-                rejects conflicting analysis context.
-              </FieldDescription>
-              {errors.opportunity === undefined ? null : (
-                <FieldError>{errors.opportunity}</FieldError>
+          {showsIncident ? (
+            <FieldSet>
+              <FieldLegend>Incident context</FieldLegend>
+              {incidentsError ? (
+                <Notice title="Could not load project incidents" tone="destructive">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIncidentsAttempt((current) => current + 1)}
+                  >
+                    <RefreshCwIcon data-icon="inline-start" />
+                    Retry incidents
+                  </Button>
+                </Notice>
+              ) : (
+                <Field data-invalid={errors.incident !== undefined || undefined}>
+                  <FieldLabel htmlFor="analytics-bundle-incident">Incident</FieldLabel>
+                  <Select
+                    value={draft.incidentId}
+                    disabled={incidents === null}
+                    onValueChange={(value) => update("incidentId", value)}
+                  >
+                    <SelectTrigger
+                      id="analytics-bundle-incident"
+                      className="w-full"
+                      aria-invalid={errors.incident !== undefined || undefined}
+                    >
+                      <SelectValue
+                        placeholder={incidents === null ? "Loading incidents" : "Select incident"}
+                      />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      <SelectGroup>
+                        {(incidents ?? []).map((incident) => (
+                          <SelectItem key={incident.incident_id} value={incident.incident_id}>
+                            {incident.title}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  {incidents?.length === 0 ? (
+                    <FieldDescription>
+                      No accessible project incidents are available.
+                    </FieldDescription>
+                  ) : null}
+                  {errors.incident === undefined ? null : (
+                    <FieldError>{errors.incident}</FieldError>
+                  )}
+                </Field>
               )}
-            </Field>
-            <Field data-invalid={errors.filters !== undefined || undefined}>
-              <FieldLabel htmlFor="analytics-bundle-filters">Additional filters (JSON)</FieldLabel>
-              <Textarea
-                id="analytics-bundle-filters"
-                value={draft.filters}
-                onChange={(event) => update("filters", event.currentTarget.value)}
-                placeholder="{}"
-                aria-invalid={errors.filters !== undefined || undefined}
-              />
-              <FieldDescription>
-                Optional analysis-specification fields. Use the Scope controls for service and
-                environment. Other keys are retained in the specification; they do not add aggregate
-                dimension filtering.
-              </FieldDescription>
-              {errors.filters === undefined ? null : <FieldError>{errors.filters}</FieldError>}
-            </Field>
-          </FieldGroup>
-        </FieldSet>
+            </FieldSet>
+          ) : null}
 
-        <div className="flex flex-wrap items-center gap-2 border-t pt-5">
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? (
-              <LoaderCircleIcon className="animate-spin" data-icon="inline-start" />
-            ) : null}
-            Generate analytics bundle
-          </Button>
-          <Button asChild type="button" variant="outline">
-            <Link to={`/projects/${projectId}/analytics/bundles`}>Cancel</Link>
-          </Button>
-        </div>
-      </form>
-    </div>
+          {draft.analysisKind === "deploy_comparison" ? (
+            <FieldSet>
+              <FieldLegend>Deploy context</FieldLegend>
+              <Field data-invalid={errors.deploy !== undefined || undefined}>
+                <FieldLabel htmlFor="analytics-bundle-deploy">Deploy ID</FieldLabel>
+                <Input
+                  id="analytics-bundle-deploy"
+                  value={draft.deployId}
+                  maxLength={120}
+                  aria-invalid={errors.deploy !== undefined || undefined}
+                  onChange={(event) => update("deployId", event.currentTarget.value)}
+                />
+                {errors.deploy === undefined ? null : <FieldError>{errors.deploy}</FieldError>}
+              </Field>
+            </FieldSet>
+          ) : null}
+
+          <FieldSet>
+            <FieldLegend>Scope</FieldLegend>
+            <FieldGroup className="grid gap-5 md:grid-cols-2">
+              <Field>
+                <FieldLabel htmlFor="analytics-bundle-service">Service</FieldLabel>
+                <ProjectScopeSelect
+                  id="analytics-bundle-service"
+                  label="Service"
+                  value={draft.service}
+                  options={scopeOptions.services}
+                  allLabel="All services"
+                  onValueChange={(service) => update("service", service)}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="analytics-bundle-environment">Environment</FieldLabel>
+                <ProjectScopeSelect
+                  id="analytics-bundle-environment"
+                  label="Environment"
+                  value={draft.environment}
+                  options={scopeOptions.environments}
+                  allLabel="All environments"
+                  onValueChange={(environment) => update("environment", environment)}
+                />
+              </Field>
+            </FieldGroup>
+          </FieldSet>
+
+          <FieldSet>
+            <FieldLegend>Additional analysis context</FieldLegend>
+            <FieldGroup>
+              <Field data-invalid={errors.opportunity !== undefined || undefined}>
+                <FieldLabel htmlFor="analytics-bundle-opportunity">Opportunity ID</FieldLabel>
+                <Input
+                  id="analytics-bundle-opportunity"
+                  value={draft.opportunityId}
+                  onChange={(event) => update("opportunityId", event.currentTarget.value)}
+                />
+                <FieldDescription>
+                  Optional. The server derives the authorized opportunity's scope and evidence, and
+                  rejects conflicting analysis context.
+                </FieldDescription>
+                {errors.opportunity === undefined ? null : (
+                  <FieldError>{errors.opportunity}</FieldError>
+                )}
+              </Field>
+              <Field data-invalid={errors.filters !== undefined || undefined}>
+                <FieldLabel htmlFor="analytics-bundle-filters">
+                  Additional filters (JSON)
+                </FieldLabel>
+                <Textarea
+                  id="analytics-bundle-filters"
+                  value={draft.filters}
+                  onChange={(event) => update("filters", event.currentTarget.value)}
+                  placeholder="{}"
+                  aria-invalid={errors.filters !== undefined || undefined}
+                />
+                <FieldDescription>
+                  Optional analysis-specification fields. Use the Scope controls for service and
+                  environment. Other keys are retained in the specification; they do not add
+                  aggregate dimension filtering.
+                </FieldDescription>
+                {errors.filters === undefined ? null : <FieldError>{errors.filters}</FieldError>}
+              </Field>
+            </FieldGroup>
+          </FieldSet>
+        </fieldset>
+      </DialogFormContent>
+    </Dialog>
   );
 }
 

@@ -73,6 +73,22 @@ runIntegration("durable report due scheduler", () => {
       (await pool.query("SELECT id FROM worker_jobs WHERE job_name='generate-smart-report'")).rows
     ).toEqual([]);
   });
+  it("resumes one persisted overdue period after a long outage without draining the allowance on a catch-up burst", async () => {
+    await pool.query(
+      "UPDATE report_definitions SET next_due_at=next_due_at-interval '45 days',next_period_ends_at=next_period_ends_at-interval '45 days' WHERE id=$1",
+      [fixture.definition]
+    );
+    expect(await scheduler.scheduleNext()).toEqual({ processed: true });
+    expect(await scheduler.scheduleNext()).toEqual({ processed: false });
+    expect((await pool.query("SELECT id FROM report_runs")).rows).toHaveLength(1);
+    expect(
+      (await pool.query("SELECT generations FROM report_allowance_windows")).rows[0]
+    ).toMatchObject({ generations: 1 });
+    expect(
+      (await pool.query("SELECT next_due_at>clock_timestamp() AS future FROM report_definitions"))
+        .rows[0]
+    ).toEqual({ future: true });
+  });
   it("records a visible generation-quota skip and advances without enqueuing unpaid work", async () => {
     for (let index = 0; index < 40; index++) await fixture.admit();
     await scheduler.scheduleNext();

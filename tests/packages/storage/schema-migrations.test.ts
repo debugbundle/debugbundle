@@ -442,6 +442,8 @@ describe("storage schema migrations", () => {
       .mockResolvedValueOnce({ rows: [{ available: true }] })
       // Numeric history enforces the trial deadline before lifecycle cleanup.
       .mockResolvedValueOnce({ rows: [{ available: true }] })
+      // Current bootstrap includes allowlisted model diagnostics outside receipts.
+      .mockResolvedValueOnce({ rows: [{ available: true }] })
       .mockResolvedValue({ rows: [] });
 
     const result = await migrateStorageSchema({ query } as Queryable);

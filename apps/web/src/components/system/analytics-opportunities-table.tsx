@@ -1,15 +1,9 @@
+import { formatAnalyticsLabel } from "../../lib/analytics-presentation.js";
 import { Link } from "react-router-dom";
 
 import type { AnalyticsOpportunityRecord } from "../../lib/api.js";
 import { Badge } from "../ui/badge.js";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from "../ui/table.js";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table.js";
 import { ProjectColorTagDot } from "./project-color-tag-dot.js";
 
 const PERCENT_FORMAT = new Intl.NumberFormat(undefined, {
@@ -120,12 +114,7 @@ export function analyticsBundleStateVariant(
   return "outline";
 }
 
-export function formatAnalyticsLabel(value: string): string {
-  return value
-    .split("_")
-    .map((part) => (part.length === 0 ? part : `${part[0]!.toUpperCase()}${part.slice(1)}`))
-    .join(" ");
-}
+export { formatAnalyticsLabel } from "../../lib/analytics-presentation.js";
 
 export function formatAnalyticsDate(value: string): string {
   const date = new Date(value);

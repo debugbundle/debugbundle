@@ -166,7 +166,7 @@ describe("organisation people controls", () => {
     await user.click(await screen.findByRole("button", { name: "Cancel invitation" }));
     await screen.findByText(/Could not complete the change/);
     await user.click(screen.getByRole("button", { name: "Cancel invitation" }));
-    await screen.findByText("No pending invitations.");
+    await screen.findByText("No pending invitations");
     expect(cancel).toHaveBeenCalledTimes(2);
   });
   it("keeps an invitation draft after mail failure and defaults to selected access", async () => {

@@ -1,3 +1,4 @@
+import { formatAnalyticsLabel } from "../lib/analytics-presentation.js";
 import { WaypointsIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
@@ -121,7 +122,7 @@ export function ProjectAnalyticsActionsPage(): JSX.Element {
             {response.actions.map((action) => (
               <TableRow key={`${action.kind}:${action.action_key}`}>
                 <TableCell>{action.action_key}</TableCell>
-                <TableCell>{action.kind}</TableCell>
+                <TableCell>{formatAnalyticsLabel(action.kind)}</TableCell>
                 <TableCell>{INTEGER_FORMAT.format(action.event_count)}</TableCell>
                 <TableCell>{INTEGER_FORMAT.format(action.unique_sessions)}</TableCell>
               </TableRow>

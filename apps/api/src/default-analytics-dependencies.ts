@@ -1,3 +1,4 @@
+import { createPostgresAnalyticsFilterOptionsStore } from "../../../packages/storage/src/analytics-filter-options-store.js";
 import type { AnalyticsSettingsUpdate } from "../../../packages/shared-types/src/index.js";
 import {
   createPostgresAnalyticsBundleGenerationStore,
@@ -14,6 +15,7 @@ import type { ApiDependencies } from "./api-types.js";
 
 type ProjectScoped<T> = T & { organization_id: string };
 type DefaultAnalyticsDependencies = {
+  analyticsFilterOptions: NonNullable<ApiDependencies["analyticsFilterOptions"]>;
   analyticsBundles: NonNullable<ApiDependencies["analyticsBundles"]>;
   analyticsJourneySamples: NonNullable<ApiDependencies["analyticsJourneySamples"]>;
   analyticsMetrics: NonNullable<ApiDependencies["analyticsMetrics"]>;
@@ -30,11 +32,15 @@ export function createDefaultAnalyticsDependencies(input: {
   const bundleGenerationStore = createPostgresAnalyticsBundleGenerationStore(input.db);
   const journeySampleStore = createPostgresAnalyticsJourneySampleStore(input.db);
   const metricsStore = createPostgresAnalyticsMetricsStore(input.db);
+  const filterOptionsStore = createPostgresAnalyticsFilterOptionsStore(input.db);
   const opportunityStore = createPostgresAnalyticsOpportunityStore(input.db);
   const savedFunnelStore = createPostgresAnalyticsSavedFunnelStore(input.db);
   const settingsStore = createPostgresAnalyticsSettingsStore(input.db);
 
   return {
+    analyticsFilterOptions: {
+      getFilterOptionsForProject: (request) => filterOptionsStore.getFilterOptions(request)
+    },
     analyticsSettingsManagement: {
       getAnalyticsSettingsForProject: (request: {
         organization_id: string;

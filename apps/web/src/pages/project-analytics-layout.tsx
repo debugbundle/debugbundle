@@ -1,3 +1,8 @@
+import {
+  formatAnalyticsLabel,
+  formatAnalyticsDimensionValue
+} from "../lib/analytics-presentation.js";
+import { useAnalyticsFilterOptions } from "../hooks/use-analytics-filter-options.js";
 import { getProjectEffectiveRole } from "../lib/project-access.js";
 import { RotateCcwIcon, Settings2Icon } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -16,6 +21,7 @@ import {
 import type { ProjectContext } from "../components/system/project-layout.js";
 import { AnalyticsDimensionFields } from "../components/system/analytics-dimension-fields.js";
 import {
+  ANALYTICS_DIMENSION_FIELDS,
   defaultAnalyticsFilters,
   analyticsQueryFromDraft,
   type AnalyticsFilterDraft as AnalyticsFilters
@@ -79,6 +85,7 @@ export function ProjectAnalyticsLayout(): JSX.Element {
   const [settingsAttempt, setSettingsAttempt] = useState(0);
   const [draftFilters, setDraftFilters] = useState(defaultFilters);
   const [filters, setFilters] = useState(defaultFilters);
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const scopeOptions = useProjectScopeOptions(projectId, project.environment_default);
 
   useEffect(() => {
@@ -100,9 +107,26 @@ export function ProjectAnalyticsLayout(): JSX.Element {
   }, [projectId, settingsAttempt]);
 
   const activeSection = resolveAnalyticsSection(location.pathname);
+  const isInventory = activeSection === "opportunities" || activeSection === "bundles";
+  const filterChoices = useAnalyticsFilterOptions(
+    projectId,
+    draftFilters,
+    filterPanelOpen &&
+      !isInventory &&
+      activeSection !== "flows" &&
+      settings?.settings.enabled === true
+  );
+  function filterDraftForSection(value: AnalyticsFilters): AnalyticsFilters {
+    // Inventories support time and scope, not aggregate metric dimensions. Keep
+    // metric choices in state for their tabs without leaking them into creation defaults.
+    return isInventory
+      ? { ...value, granularity: "day", limit: "", dimensions: {}, customDimensions: "" }
+      : value;
+  }
   const query: AnalyticsMetricsQuery =
-    analyticsQueryFromDraft(filters, activeSection === "overview" ? 5 : 100).query ?? {};
-  const draftValidation = analyticsQueryFromDraft(draftFilters);
+    analyticsQueryFromDraft(filterDraftForSection(filters), activeSection === "overview" ? 5 : 100)
+      .query ?? {};
+  const draftValidation = analyticsQueryFromDraft(filterDraftForSection(draftFilters));
   useEffect(() => {
     setFilters(defaultFilters);
     setDraftFilters(defaultFilters);
@@ -110,13 +134,22 @@ export function ProjectAnalyticsLayout(): JSX.Element {
 
   function applyScopeFilters(): void {
     if (draftValidation.error !== null) return;
-    setFilters(draftFilters);
+    setFilters((current) =>
+      isInventory
+        ? { ...current, service: draftFilters.service, environment: draftFilters.environment }
+        : draftFilters
+    );
   }
   function changeTimeWindow(last: AnalyticsFilters["last"]): void {
     setDraftFilters((current) => ({ ...current, last }));
     if (last !== "custom" && last !== "relative") setFilters((current) => ({ ...current, last }));
   }
   function resetScopeFilters(): void {
+    if (isInventory) {
+      setDraftFilters((current) => ({ ...current, service: "", environment: "" }));
+      setFilters((current) => ({ ...current, service: "", environment: "" }));
+      return;
+    }
     setDraftFilters((current) => ({
       ...defaultFilters,
       last: current.last,
@@ -210,10 +243,10 @@ export function ProjectAnalyticsLayout(): JSX.Element {
           }
         ]),
     ...Object.entries(filters.dimensions)
-      .filter(([, value]) => value)
+      .filter(([, value]) => !isInventory && value)
       .map(([key, value]) => ({
         key,
-        label: `${key.replaceAll("_", " ")}: ${value}`,
+        label: `${key === "auth_state" ? "Authentication state" : (ANALYTICS_DIMENSION_FIELDS.find((field) => field.key === key)?.label ?? formatAnalyticsLabel(key))}: ${formatAnalyticsDimensionValue(key, value)}`,
         onRemove: () => {
           setFilters((current) => ({
             ...current,
@@ -225,7 +258,7 @@ export function ProjectAnalyticsLayout(): JSX.Element {
           }));
         }
       })),
-    ...(filters.customDimensions.trim()
+    ...(!isInventory && filters.customDimensions.trim()
       ? [
           {
             key: "custom_dimensions",
@@ -257,182 +290,185 @@ export function ProjectAnalyticsLayout(): JSX.Element {
         </div>
       </Tabs>
 
-      {location.pathname.endsWith("/bundles/new") ? null : (
+      <div
+        role="group"
+        aria-label="Project analytics filter controls"
+        className="flex w-full min-w-0 flex-col gap-2"
+      >
         <div
           role="group"
-          aria-label="Project analytics filter controls"
-          className="flex w-full min-w-0 flex-col gap-2"
+          aria-label="Primary project analytics filters"
+          className="flex w-full flex-wrap items-end gap-2"
         >
-          <div
-            role="group"
-            aria-label="Primary project analytics filters"
-            className="flex w-full flex-wrap items-end gap-2"
-          >
-            <Field className="w-full sm:w-48">
-              <FieldLabel id="analytics-window-label" htmlFor="analytics-window">
-                Time window
-              </FieldLabel>
-              <Select
-                value={
-                  activeSection === "flows" &&
-                  (draftFilters.last === "custom" || draftFilters.last === "relative")
-                    ? "30d"
-                    : draftFilters.last
-                }
-                onValueChange={(last) => changeTimeWindow(last as AnalyticsFilters["last"])}
+          <Field className="w-full sm:w-48">
+            <FieldLabel id="analytics-window-label" htmlFor="analytics-window">
+              Time window
+            </FieldLabel>
+            <Select
+              value={
+                activeSection === "flows" &&
+                (draftFilters.last === "custom" || draftFilters.last === "relative")
+                  ? "30d"
+                  : draftFilters.last
+              }
+              onValueChange={(last) => changeTimeWindow(last as AnalyticsFilters["last"])}
+            >
+              <SelectTrigger
+                id="analytics-window"
+                aria-labelledby="analytics-window-label analytics-window"
+                className="w-full"
               >
-                <SelectTrigger
-                  id="analytics-window"
-                  aria-labelledby="analytics-window-label analytics-window"
-                  className="w-full"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent position="popper">
-                  <SelectGroup>
-                    {timeWindowOptions
-                      .filter(
-                        (option) =>
-                          activeSection !== "flows" ||
-                          (option.value !== "custom" && option.value !== "relative")
-                      )
-                      .map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
-            {activeSection !== "flows" &&
-            (draftFilters.last === "custom" || draftFilters.last === "relative") ? (
-              <>
-                {draftFilters.last === "custom" ? (
-                  <>
-                    {(["from", "to"] as const).map((key) => (
-                      <Field key={key}>
-                        <FieldLabel htmlFor={`analytics-${key}`}>
-                          {key === "from" ? "From (UTC)" : "To (UTC)"}
-                        </FieldLabel>
-                        <Input
-                          id={`analytics-${key}`}
-                          value={draftFilters[key]}
-                          aria-describedby="analytics-time-validation"
-                          placeholder="2026-10-01T00:00:00Z"
-                          onChange={(event) =>
-                            setDraftFilters((current) => ({
-                              ...current,
-                              [key]: event.currentTarget.value
-                            }))
-                          }
-                        />
-                      </Field>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent position="popper">
+                <SelectGroup>
+                  {timeWindowOptions
+                    .filter(
+                      (option) =>
+                        activeSection !== "flows" ||
+                        (option.value !== "custom" && option.value !== "relative")
+                    )
+                    .map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
                     ))}
-                  </>
-                ) : (
-                  <Field>
-                    <FieldLabel htmlFor="analytics-relative">Relative window</FieldLabel>
-                    <Input
-                      id="analytics-relative"
-                      value={draftFilters.relative}
-                      aria-describedby="analytics-time-validation"
-                      onChange={(event) =>
-                        setDraftFilters((current) => ({
-                          ...current,
-                          relative: event.currentTarget.value
-                        }))
-                      }
-                      placeholder="24h, 7d or 2w"
-                    />
-                  </Field>
-                )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={draftValidation.error !== null}
-                  onClick={() =>
-                    setFilters((current) => ({
-                      ...current,
-                      last: draftFilters.last,
-                      from: draftFilters.from,
-                      to: draftFilters.to,
-                      relative: draftFilters.relative
-                    }))
-                  }
-                >
-                  Apply time window
-                </Button>
-                {draftValidation.error === null ? null : (
-                  <Notice id="analytics-time-validation" tone="warning">
-                    {draftValidation.error}
-                  </Notice>
-                )}
-              </>
-            ) : null}
-            {activeSection === "flows" ? null : (
-              <AnalyticsFilterPanel
-                triggerLabel="More filters"
-                title="More analytics filters"
-                description="Filter aggregate metrics by scope, device, acquisition and approved dimensions."
-                scrollable
-                desktopSize="wide"
-                canApply={draftValidation.error === null}
-                activeFilterCount={appliedFilters.length}
-                onApply={applyScopeFilters}
-                onReset={resetScopeFilters}
-                onDismiss={() => setDraftFilters(filters)}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </Field>
+          {activeSection !== "flows" &&
+          (draftFilters.last === "custom" || draftFilters.last === "relative") ? (
+            <>
+              {draftFilters.last === "custom" ? (
+                <>
+                  {(["from", "to"] as const).map((key) => (
+                    <Field key={key}>
+                      <FieldLabel htmlFor={`analytics-${key}`}>
+                        {key === "from" ? "From (UTC)" : "To (UTC)"}
+                      </FieldLabel>
+                      <Input
+                        id={`analytics-${key}`}
+                        value={draftFilters[key]}
+                        aria-describedby="analytics-time-validation"
+                        placeholder="2026-10-01T00:00:00Z"
+                        onChange={(event) =>
+                          setDraftFilters((current) => ({
+                            ...current,
+                            [key]: event.currentTarget.value
+                          }))
+                        }
+                      />
+                    </Field>
+                  ))}
+                </>
+              ) : (
+                <Field>
+                  <FieldLabel htmlFor="analytics-relative">Relative window</FieldLabel>
+                  <Input
+                    id="analytics-relative"
+                    value={draftFilters.relative}
+                    aria-describedby="analytics-time-validation"
+                    onChange={(event) =>
+                      setDraftFilters((current) => ({
+                        ...current,
+                        relative: event.currentTarget.value
+                      }))
+                    }
+                    placeholder="24h, 7d or 2w"
+                  />
+                </Field>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                disabled={draftValidation.error !== null}
+                onClick={() =>
+                  setFilters((current) => ({
+                    ...current,
+                    last: draftFilters.last,
+                    from: draftFilters.from,
+                    to: draftFilters.to,
+                    relative: draftFilters.relative
+                  }))
+                }
               >
-                <FieldGroup className="gap-4">
+                Apply time window
+              </Button>
+              {draftValidation.error === null ? null : (
+                <Notice id="analytics-time-validation" tone="warning">
+                  {draftValidation.error}
+                </Notice>
+              )}
+            </>
+          ) : null}
+          {activeSection === "flows" ? null : (
+            <AnalyticsFilterPanel
+              triggerLabel="More filters"
+              title={isInventory ? "Project scope filters" : "More analytics filters"}
+              description={
+                isInventory
+                  ? "Filter this inventory by service and environment."
+                  : "Filter aggregate metrics by scope, device, acquisition and approved dimensions."
+              }
+              scrollable
+              canApply={draftValidation.error === null}
+              activeFilterCount={appliedFilters.length}
+              onApply={applyScopeFilters}
+              onReset={resetScopeFilters}
+              onDismiss={() => setDraftFilters(filters)}
+              onOpenChange={setFilterPanelOpen}
+            >
+              <FieldGroup className="gap-4">
+                {isInventory ? null : (
                   <AnalyticsDimensionFields
+                    choices={filterChoices}
                     id="analytics-filter"
                     value={draftFilters}
                     onChange={setDraftFilters}
                   />
-                  {draftValidation.error === null ? null : (
-                    <Notice tone="warning">{draftValidation.error}</Notice>
-                  )}
-                  <Field>
-                    <FieldLabel htmlFor="analytics-service">Service</FieldLabel>
-                    <ProjectScopeSelect
-                      id="analytics-service"
-                      label="Service"
-                      value={draftFilters.service}
-                      options={scopeOptions.services}
-                      allLabel="All services"
-                      onValueChange={(service) =>
-                        setDraftFilters((current) => ({ ...current, service }))
-                      }
-                    />
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="analytics-environment">Environment</FieldLabel>
-                    <ProjectScopeSelect
-                      id="analytics-environment"
-                      label="Environment"
-                      value={draftFilters.environment}
-                      options={scopeOptions.environments}
-                      allLabel="All environments"
-                      onValueChange={(environment) =>
-                        setDraftFilters((current) => ({ ...current, environment }))
-                      }
-                    />
-                  </Field>
-                </FieldGroup>
-              </AnalyticsFilterPanel>
-            )}
-            {activeSection === "flows" || appliedFilters.length === 0 ? null : (
-              <Button type="button" variant="outline" onClick={resetScopeFilters}>
-                <RotateCcwIcon data-icon="inline-start" />
-                Reset filters
-              </Button>
-            )}
-          </div>
-          {activeSection === "flows" ? null : (
-            <AppliedAnalyticsFilterList filters={appliedFilters} />
+                )}
+                {draftValidation.error === null ? null : (
+                  <Notice tone="warning">{draftValidation.error}</Notice>
+                )}
+                <Field>
+                  <FieldLabel htmlFor="analytics-service">Service</FieldLabel>
+                  <ProjectScopeSelect
+                    id="analytics-service"
+                    label="Service"
+                    value={draftFilters.service}
+                    options={scopeOptions.services}
+                    allLabel="All services"
+                    onValueChange={(service) =>
+                      setDraftFilters((current) => ({ ...current, service }))
+                    }
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="analytics-environment">Environment</FieldLabel>
+                  <ProjectScopeSelect
+                    id="analytics-environment"
+                    label="Environment"
+                    value={draftFilters.environment}
+                    options={scopeOptions.environments}
+                    allLabel="All environments"
+                    onValueChange={(environment) =>
+                      setDraftFilters((current) => ({ ...current, environment }))
+                    }
+                  />
+                </Field>
+              </FieldGroup>
+            </AnalyticsFilterPanel>
+          )}
+          {activeSection === "flows" || appliedFilters.length === 0 ? null : (
+            <Button type="button" variant="outline" onClick={resetScopeFilters}>
+              <RotateCcwIcon data-icon="inline-start" />
+              Reset filters
+            </Button>
           )}
         </div>
-      )}
+        {activeSection === "flows" ? null : <AppliedAnalyticsFilterList filters={appliedFilters} />}
+      </div>
 
       <Outlet
         key={projectId}

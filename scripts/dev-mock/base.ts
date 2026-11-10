@@ -1,9 +1,10 @@
 // Synthetic local UI records. No customer data or usable credentials.
 const organizationId = "00000000-0000-4000-8000-000000000000";
+const userId = "90000000-0000-4000-8000-000000000001";
 export const base = {
   session: {
     session_id: "ses_123",
-    user_id: "usr_123",
+    user_id: userId,
     email: "review@example.test",
     email_verified_at: "2026-03-17T00:00:00.000Z",
     organization_id: organizationId,
@@ -22,7 +23,7 @@ export const base = {
   projects: {
     project_id: "00000000-0000-4000-8000-000000000001",
     organization_id: organizationId,
-    owner_user_id: "usr_123",
+    owner_user_id: userId,
     owner_email: "owner@example.com",
     relationship: "owned",
     sharing_state: "private",
@@ -161,7 +162,7 @@ export const base = {
   githubRules: {
     rule_id: "ghr_123",
     project_id: "00000000-0000-4000-8000-000000000001",
-    created_by_user_id: "usr_123",
+    created_by_user_id: userId,
     name: "Default triage rule",
     enabled: true,
     event_types: ["bundle.created", "bundle.reopened"],
@@ -263,7 +264,7 @@ export const base = {
   alerts: {
     alert_id: "alert_0",
     project_id: "00000000-0000-4000-8000-000000000001",
-    created_by_user_id: "usr_123",
+    created_by_user_id: userId,
     service_id: null,
     channel: "email",
     condition_type: "new_incident",

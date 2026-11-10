@@ -631,6 +631,7 @@ INTEGRATION_FLOW_SDK_MODULE ?=
 # artifact generation. Keep their test budget separate from unit-test defaults;
 # transport and deadline assertions retain their own explicit bounds.
 INTEGRATION_TEST_TIMEOUT ?= 15000
+INTEGRATION_COVERAGE ?= 0
 test-integration:
 	@set -e; \
 	trap 'POSTGRES_PORT=$(INTEGRATION_POSTGRES_PORT) REDIS_PORT=$(INTEGRATION_REDIS_PORT) LOCALSTACK_PORT=$(INTEGRATION_LOCALSTACK_PORT) API_PORT=$(INTEGRATION_API_PORT) WEB_PORT=$(INTEGRATION_WEB_PORT) APP_BASE_URL=$(INTEGRATION_APP_BASE_URL) VITE_API_URL=$(INTEGRATION_WEB_API_URL) CONTAINER_PREFIX=$(INTEGRATION_CONTAINER_PREFIX) DEBUGBUNDLE_PROBE_TRIGGER_SECRET=$(INTEGRATION_PROBE_TRIGGER_SECRET) ANALYTICS_HASH_SECRET=$(INTEGRATION_ANALYTICS_HASH_SECRET) $(INTEGRATION_COMPOSE) down -v' EXIT; \
@@ -640,6 +641,7 @@ test-integration:
 		-v "$(PWD):$(WORKDIR)" \
 		-w "$(WORKDIR)" \
 		-e RUN_INTEGRATION=1 \
+		-e VITEST_COVERAGE_SHARD=$(INTEGRATION_COVERAGE) \
 		-e INTEGRATION_FLOW_SDK_MODULE="$(INTEGRATION_FLOW_SDK_MODULE)" \
 		-e DB_HOST=postgres \
 		-e DB_PORT=5432 \
@@ -650,7 +652,7 @@ test-integration:
 		-e S3_ENDPOINT=http://localstack:4566 \
 		-e S3_REGION=us-east-1 \
 		-e S3_BUCKET=debugbundle-raw-events \
-		$(NODE_IMAGE) sh -lc "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm db:bootstrap && corepack pnpm db:migrate && corepack pnpm vitest run --no-file-parallelism --maxWorkers=1 --testTimeout=$(INTEGRATION_TEST_TIMEOUT) $(INTEGRATION_TEST_FILES)"
+		$(NODE_IMAGE) sh -lc "corepack enable && $(PNPM_INSTALL_RELAXED) && corepack pnpm db:bootstrap && corepack pnpm db:migrate && corepack pnpm vitest run --no-file-parallelism --maxWorkers=1 --testTimeout=$(INTEGRATION_TEST_TIMEOUT) $(if $(filter 1,$(INTEGRATION_COVERAGE)),--coverage,) $(INTEGRATION_TEST_FILES)"
 
 .PHONY: test-mixed-version-api
 test-mixed-version-api: install
@@ -876,8 +878,17 @@ business-referral-integration:
 	$(MAKE) test-integration INTEGRATION_PROJECT=debugbundle-referral-test INTEGRATION_CONTAINER_PREFIX=debugbundle-referral-test INTEGRATION_POSTGRES_PORT=25436 INTEGRATION_REDIS_PORT=26383 INTEGRATION_LOCALSTACK_PORT=24570 INTEGRATION_API_PORT=23004 INTEGRATION_WEB_PORT=25295 INTEGRATION_TEST_FILES="tests/integration/referral-attribution.integration.test.ts tests/integration/referral-ledger.integration.test.ts"
 
 .PHONY: smart-report-integration
+SMART_REPORT_TEST_FILES ?= $(wildcard tests/integration/report-*.integration.test.ts)
 smart-report-integration:
-	$(MAKE) test-integration INTEGRATION_PROJECT=debugbundle-report-test INTEGRATION_CONTAINER_PREFIX=debugbundle-report-test INTEGRATION_POSTGRES_PORT=25437 INTEGRATION_REDIS_PORT=26384 INTEGRATION_LOCALSTACK_PORT=24571 INTEGRATION_API_PORT=23005 INTEGRATION_WEB_PORT=25296 INTEGRATION_TEST_FILES="$(wildcard tests/integration/report-*.integration.test.ts)"
+	$(MAKE) test-integration INTEGRATION_PROJECT=debugbundle-report-test INTEGRATION_CONTAINER_PREFIX=debugbundle-report-test INTEGRATION_POSTGRES_PORT=25437 INTEGRATION_REDIS_PORT=26384 INTEGRATION_LOCALSTACK_PORT=24571 INTEGRATION_API_PORT=23005 INTEGRATION_WEB_PORT=25296 INTEGRATION_TEST_FILES="$(SMART_REPORT_TEST_FILES)"
+
+# Combine real-storage and adapter tests before evaluating changed-file coverage.
+# The provider is mocked and the existing disposable integration stack is owned
+# and cleaned by test-integration. No production credentials are passed through.
+.PHONY: smart-report-coverage
+smart-report-coverage:
+	$(MAKE) smart-report-integration INTEGRATION_COVERAGE=1 SMART_REPORT_TEST_FILES="$(wildcard tests/integration/report-*.integration.test.ts) tests/packages/smart-reports tests/packages/email/smart-report-email.test.ts tests/packages/storage/schema-migrations.test.ts tests/apps/api/api-runtime-start.test.ts tests/apps/api/api-report-content.test.ts tests/apps/api/api-report-allowance.test.ts $(wildcard tests/apps/web/web-report*.test.ts*) tests/infrastructure/release-governance.test.ts"
+	$(NODE_RUN) "apk add --no-cache git >/dev/null && node scripts/check-changed-file-coverage.mjs"
 
 .PHONY: smart-report-model-evaluate
 .PHONY: smart-report-pdf-dependency-info

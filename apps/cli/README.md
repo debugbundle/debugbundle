@@ -8,14 +8,12 @@ rewriting or deleting unrelated files. Symlinked files/directories fail closed.
 Normal local stores and their existing size allowance are preserved; local state
 and processing writes use guarded atomic replacement. This supersedes earlier clients.
 
-
 ## Cloud cache safety in 1.19.3
 
 Upgrade to 1.19.3 for incident-ID validation before cloud requests and cache writes.
 Unsafe IDs return `invalid_incident_id`; UUIDs and existing opaque IDs remain supported.
 Cloud cache reads, writes and retention reject symbolic links; writes use guarded
 atomic replacement. This corrects a path traversal present in earlier clients.
-
 
 ## Installation guidance in 1.19.2
 
@@ -30,7 +28,6 @@ then explicitly rebuild from its retained event files using
 `debugbundle process --preset <minimal|balanced|investigative>` with the desired
 capture preset. This rebuild regenerates local incident/artifact state; it does
 not change cloud records or the retained event files.
-
 
 Connected `doctor` diagnostics check API health and saved member authentication with a one-incident probe restricted to `cloud_project_id`. Missing or blank connected project scope fails before any request. Incident contents are discarded and are not included in the report. Local-only diagnostics make no cloud request.
 
@@ -145,6 +142,7 @@ for definitions, capture, full UTC day report windows, and partial coverage.
 Analytics commands require connected member authentication and a project with AnalyticsBundle enabled. They query aggregate rollups or request an asynchronous analysis artifact; they do not read raw analytics events.
 
 ```sh
+debugbundle analytics filter-options --project <project-id> --last 7d --json
 debugbundle analytics summary --project <project-id> --last 7d
 debugbundle analytics devices --project <project-id> --last 7d
 debugbundle analytics journeys --project <project-id> --last 7d
@@ -156,6 +154,8 @@ debugbundle analytics bundle list --all-projects
 debugbundle analytics saved-funnels list --project <project-id>
 debugbundle analytics saved-funnels create --project <project-id> --key signup --name "Signup" --steps-json '[{"step_key":"landing","display_name":"Landing"},{"step_key":"complete","display_name":"Complete"}]'
 ```
+
+`analytics filter-options` lists observed route/dimension choices for the selected time, granularity and service/environment. Each set has bounded `values` and a `truncated` marker; current approved custom keys are included. Empty sets have no usable choices. Unsafe literals are omitted instead of changed. This read does not generate a bundle or consume generation quota.
 
 Use `debugbundle analytics settings get --project <project-id>` to inspect availability and capture/retention settings. Owners and admins can enable it with `debugbundle analytics settings set --project <project-id> --enabled true`; Team projects can additionally manage approved custom dimensions. Saved funnels are reusable project definitions, not per-visit bundles; members can list them and owners/admins can create, update, or archive them within the independent tier cap. Project tokens remain SDK-ingestion-only and cannot read analytics.
 

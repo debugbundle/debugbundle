@@ -7,7 +7,8 @@ import {
   formatReportValue,
   reportMetricComparison,
   reportMetricLabels,
-  reportEvidenceSections
+  reportEvidenceSections,
+  reportAnalysisExplanation
 } from "../../smart-reports/src/report-presentation.js";
 import {
   escapeHtml,
@@ -33,9 +34,7 @@ export function renderSmartReportEmail(input: {
     { solved, urgent, coming } = reportEvidenceSections(doc),
     location = reportDashboardLocation(doc.report.organization_id, doc.run_id, input.appBaseUrl);
   const period = `${facts.period.starts_at.slice(0, 10)} to ${facts.period.ends_at.slice(0, 10)} (end exclusive, UTC)`,
-    overview =
-      narrative?.overview.text ??
-      "AI analysis unavailable. This report retains its recorded facts, resolutions and selected outstanding work.",
+    overview = narrative?.overview.text ?? reportAnalysisExplanation(doc.analysis.reason),
     scope = `${facts.projects.length} selected projects · ${facts.privacy_mode} evidence mode`,
     text: string[] = [
       `DebugBundle ${facts.period.kind} report`,

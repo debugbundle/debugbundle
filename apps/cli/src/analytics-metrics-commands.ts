@@ -2,6 +2,7 @@ import {
   AnalyticsOpportunityBundleStatusSchema,
   AnalyticsBundleSeveritySchema,
   AnalyticsOpportunityStatusSchema,
+  type AnalyticsFilterOptionsResponse,
   type AnalyticsActionMetricsResponse,
   type AnalyticsBundleAnalysisKind,
   type AnalyticsBundleSeverity,
@@ -377,6 +378,29 @@ export async function getAnalyticsJourneysCommand(
   );
 }
 
+export async function getAnalyticsFilterOptionsCommand(
+  input: AnalyticsSummaryCommandInput,
+  api: {
+    getFilterOptions(input: AnalyticsMetricQueryInput): Promise<AnalyticsFilterOptionsResponse>;
+  }
+): Promise<CliCommandResult> {
+  return runAnalyticsMetricCommand(
+    input,
+    (request) => api.getFilterOptions(request),
+    (response) =>
+      [
+        ...Object.entries(response.options).map(
+          ([key, set]) =>
+            `${key}: ${set.values.map((value) => JSON.stringify(value)).join(", ")}${set.truncated ? " (more values omitted)" : ""}`
+        ),
+        ...response.custom_dimensions.map(
+          (set) =>
+            `custom.${set.key}: ${set.values.map((value) => JSON.stringify(value)).join(", ")}${set.truncated ? " (more values omitted)" : ""}`
+        )
+      ].join("\n")
+  );
+}
+
 export async function getAnalyticsDevicesCommand(
   input: AnalyticsSummaryCommandInput,
   api: {
@@ -702,6 +726,15 @@ export async function getAnalyticsJourneysWithAuthCommand(
 ): Promise<CliCommandResult> {
   return runAnalyticsMetricWithAuthCommand(input, dependencies, (authState, api) =>
     getAnalyticsJourneysCommand(withBearerToken(authState, input), api)
+  );
+}
+
+export async function getAnalyticsFilterOptionsWithAuthCommand(
+  input: AnalyticsMetricWithAuthInput,
+  dependencies?: Parameters<typeof createAuthenticatedAnalyticsMetricsApi>[1]
+): Promise<CliCommandResult> {
+  return runAnalyticsMetricWithAuthCommand(input, dependencies, (authState, api) =>
+    getAnalyticsFilterOptionsCommand(withBearerToken(authState, input), api)
   );
 }
 

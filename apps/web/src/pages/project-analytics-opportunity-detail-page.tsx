@@ -1,4 +1,5 @@
-import { ArrowLeftIcon, LoaderCircleIcon } from "lucide-react";
+import { ResourceEmptyState } from "../components/system/resource-empty-state.js";
+import { ArrowLeftIcon, Link2Icon, LoaderCircleIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useNavigate, useOutletContext, useParams } from "react-router-dom";
 
@@ -199,7 +200,11 @@ function OpportunityDetailContent({
         </h3>
         {opportunity.related_incident_ids.length === 0 &&
         opportunity.related_deploy_ids.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No incidents or deploys are linked.</p>
+          <ResourceEmptyState
+            icon={Link2Icon}
+            title="No linked incidents or deploys"
+            description="Related context will appear here when incidents or deploys are linked to this opportunity."
+          />
         ) : (
           <div className="flex flex-col gap-4">
             {opportunity.related_incident_ids.length === 0 ? null : (

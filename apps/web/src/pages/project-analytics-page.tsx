@@ -1,4 +1,9 @@
-import { BarChart3Icon } from "lucide-react";
+import {
+  formatAnalyticsLabel,
+  formatAnalyticsDimensionValue
+} from "../lib/analytics-presentation.js";
+import { ResourceEmptyState } from "../components/system/resource-empty-state.js";
+import { BarChart3Icon, LightbulbIcon, MonitorSmartphoneIcon, RouteIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 
@@ -191,7 +196,11 @@ function AnalyticsOverviewContent({ overview }: { overview: AnalyticsOverviewDat
           {overview.routes === null ? (
             <p className="text-sm text-muted-foreground">Route preview unavailable.</p>
           ) : overview.routes.routes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No route activity in this window.</p>
+            <ResourceEmptyState
+              icon={RouteIcon}
+              title="No route activity in this window"
+              description="Captured routes matching the selected period and filters will appear here."
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -222,7 +231,11 @@ function AnalyticsOverviewContent({ overview }: { overview: AnalyticsOverviewDat
 
         <MetricTableSection title="Top devices" id="analytics-top-devices-title">
           {overview.summary.breakdowns.device_types.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No device activity in this window.</p>
+            <ResourceEmptyState
+              icon={MonitorSmartphoneIcon}
+              title="No device activity in this window"
+              description="Device breakdowns appear when eligible analytics events match the selected period and filters."
+            />
           ) : (
             <SegmentTable segments={overview.summary.breakdowns.device_types} />
           )}
@@ -241,9 +254,11 @@ function AnalyticsOverviewContent({ overview }: { overview: AnalyticsOverviewDat
         {overview.opportunities === null ? (
           <p className="text-sm text-muted-foreground">Opportunity preview unavailable.</p>
         ) : overview.opportunities.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No open analytics opportunities in this project.
-          </p>
+          <ResourceEmptyState
+            icon={LightbulbIcon}
+            title="No open analytics opportunities"
+            description="Open opportunities for this project will appear here when detected from eligible captured activity."
+          />
         ) : (
           <Table>
             <TableHeader>
@@ -330,7 +345,7 @@ function SegmentTable({
       <TableBody>
         {segments.map((segment) => (
           <TableRow key={segment.value}>
-            <TableCell>{formatAnalyticsLabel(segment.value)}</TableCell>
+            <TableCell>{formatAnalyticsDimensionValue("device_type", segment.value)}</TableCell>
             <TableCell className="text-right tabular-nums">
               {INTEGER_FORMAT.format(segment.sessions)}
             </TableCell>
@@ -368,9 +383,4 @@ function AnalyticsOverviewSkeleton(): JSX.Element {
   );
 }
 
-export function formatAnalyticsLabel(value: string): string {
-  return value
-    .split("_")
-    .map((part) => (part.length === 0 ? part : `${part[0]!.toUpperCase()}${part.slice(1)}`))
-    .join(" ");
-}
+export { formatAnalyticsLabel } from "../lib/analytics-presentation.js";

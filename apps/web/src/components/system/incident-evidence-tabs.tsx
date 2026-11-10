@@ -1,3 +1,5 @@
+import { ScrollTextIcon } from "lucide-react";
+import { ResourceEmptyState } from "./resource-empty-state.js";
 import { useEffect, useState } from "react";
 import { getIncidentContext, listIncidentLogs } from "../../lib/api-incident-evidence.js";
 import { HighlightedCodeBlock } from "./highlighted-code-block.js";
@@ -201,7 +203,11 @@ export function IncidentLogsTab({ incidentId }: { incidentId: string }): JSX.Ele
             </Button>
           </Notice>
         ) : records?.logs.length === 0 ? (
-          <Notice>No matching incident logs.</Notice>
+          <ResourceEmptyState
+            icon={ScrollTextIcon}
+            title="No matching incident logs"
+            description="No retained logs match these filters. Capture settings and retention can limit the evidence available here."
+          />
         ) : (
           <Table>
             <TableHeader>

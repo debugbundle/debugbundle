@@ -4,6 +4,7 @@ import { REFERRAL_BENEFIT_BOOTSTRAP } from "./referral-benefit-schema.js";
 import { REPORT_HEALTH_BOOTSTRAP } from "./report-health-schema.js";
 import { REPORT_COLLECTOR_BOOTSTRAP } from "./report-collector-schema.js";
 import { REPORT_RUN_BOOTSTRAP } from "./report-run-schema.js";
+import { REPORT_MODEL_DIAGNOSTIC_COLUMN } from "./report-model-diagnostic-schema.js";
 import { REPORT_EMAIL_BOOTSTRAP } from "./report-email-schema.js";
 import { REPORT_AVAILABILITY_BOOTSTRAP } from "./report-availability-schema.js";
 import { REPORT_SOURCE_TEXT_BOOTSTRAP } from "./report-source-text-schema.js";
@@ -85,10 +86,15 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
   ORGANIZATION_CONFIGURATION_GUARD_STATEMENT,
   ...PROJECT_JOB_AUTHORITY_BOOTSTRAP,
   ...REPORT_RUN_BOOTSTRAP.map((statement) =>
-    statement.replace(
-      "CREATE TABLE report_runs (",
-      "CREATE TABLE report_runs (email_scheduled_at timestamptz,"
-    )
+    statement
+      .replace(
+        "CREATE TABLE report_model_attempts (",
+        () => `CREATE TABLE report_model_attempts (${REPORT_MODEL_DIAGNOSTIC_COLUMN},`
+      )
+      .replace(
+        "CREATE TABLE report_runs (",
+        "CREATE TABLE report_runs (email_scheduled_at timestamptz,"
+      )
   ),
   ...REPORT_EMAIL_BOOTSTRAP,
   ...REPORT_COLLECTOR_BOOTSTRAP,

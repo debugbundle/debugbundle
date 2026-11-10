@@ -1,3 +1,8 @@
+export {
+  createPostgresAnalyticsFilterOptionsStore,
+  type AnalyticsFilterOptionsStore,
+  type AnalyticsFilterOptionsInput
+} from "./analytics-filter-options-store.js";
 // Barrel re-export — all public symbols from sub-modules.
 // External consumers continue importing from this file unchanged.
 

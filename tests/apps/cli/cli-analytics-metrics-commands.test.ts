@@ -1,7 +1,9 @@
+import { createAnalyticsFilterOptions } from "../../helpers/analytics-filter-options.js";
 import { describe, expect, it, vi } from "vitest";
 
 import { CliAuthStateError } from "../../../apps/cli/src/auth-state.js";
 import {
+  getAnalyticsFilterOptionsCommand,
   AnalyticsMetricsApiError,
   createAnalyticsMetricsApi,
   getAnalyticsDevicesCommand,
@@ -705,16 +707,10 @@ describe("cli analytics metrics commands", () => {
     const api = { listOpportunities };
 
     await expect(
-      listAnalyticsOpportunitiesCommand(
-        { bearerToken: "token", status: "invalid" as never },
-        api
-      )
+      listAnalyticsOpportunitiesCommand({ bearerToken: "token", status: "invalid" as never }, api)
     ).resolves.toEqual({ exitCode: 4, output: "Invalid value for --status." });
     await expect(
-      listAnalyticsOpportunitiesCommand(
-        { bearerToken: "token", severity: "invalid" as never },
-        api
-      )
+      listAnalyticsOpportunitiesCommand({ bearerToken: "token", severity: "invalid" as never }, api)
     ).resolves.toEqual({ exitCode: 4, output: "Invalid value for --severity." });
     await expect(
       listAnalyticsOpportunitiesCommand(
@@ -946,5 +942,54 @@ describe("cli analytics metrics commands", () => {
       path: `/v1/analytics/incidents/${incidentImpactResponse.incident_id}/impact?project_id=${PROJECT_ID}`,
       bearerToken: "dbundle_mem_x"
     });
+  });
+});
+
+describe("observed analytics filter choices", () => {
+  it("validates options responses and preserves raw choices through CLI output", async () => {
+    const fixture = createAnalyticsFilterOptions(PROJECT_ID);
+    fixture.options.browser.truncated = true;
+    const request = vi
+      .fn<
+        (request: {
+          method: "GET";
+          path: string;
+          bearerToken: string;
+        }) => Promise<{ status: number; body: unknown }>
+      >()
+      .mockResolvedValue({ status: 200, body: fixture });
+    const api = createAnalyticsMetricsApi({ request });
+    const input = {
+      bearerToken: "test_member",
+      projectId: PROJECT_ID,
+      last: "30d",
+      service: "web",
+      limit: 100
+    };
+    const human = await getAnalyticsFilterOptionsCommand(input, api);
+    expect(human.exitCode).toBe(0);
+    expect(human.output).toContain('browser: "Chrome", "Firefox" (more values omitted)');
+    expect(human.output).toContain('custom.plan: "team"');
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: "GET",
+        path: expect.stringContaining("/v1/analytics/filter-options?")
+      })
+    );
+    const params = new URL(request.mock.calls[0]![0].path, "https://example.test").searchParams;
+    expect(params.get("service")).toBe("web");
+    expect(params.get("limit")).toBe("100");
+    expect(
+      JSON.parse((await getAnalyticsFilterOptionsCommand({ ...input, json: true }, api)).output)
+    ).toEqual(fixture);
+    request.mockResolvedValueOnce({ status: 200, body: { options: {} } });
+    await expect(api.getFilterOptions(input)).rejects.toThrow(
+      "Invalid analytics filter options response."
+    );
+    request.mockResolvedValueOnce({
+      status: 503,
+      body: { error: "analytics_filter_options_unavailable" }
+    });
+    expect((await getAnalyticsFilterOptionsCommand(input, api)).exitCode).not.toBe(0);
   });
 });

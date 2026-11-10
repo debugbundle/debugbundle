@@ -1,3 +1,5 @@
+import { BellRingIcon, ListIcon } from "lucide-react";
+import { ResourceEmptyState } from "./resource-empty-state.js";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type {
@@ -142,7 +144,11 @@ export function AlertGroupsCard({ projectId }: { projectId: string }): JSX.Eleme
           </p>
         ) : selected === null ? (
           groups?.groups.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No grouped deliveries yet.</p>
+            <ResourceEmptyState
+              icon={BellRingIcon}
+              title="No grouped deliveries yet"
+              description="Grouped alert deliveries will appear here when matching notifications are grouped."
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -200,7 +206,11 @@ export function AlertGroupsCard({ projectId }: { projectId: string }): JSX.Eleme
               {detail?.group.member_count} members · {detail?.group.status}
             </p>
             {detail?.members.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No members on this page.</p>
+              <ResourceEmptyState
+                icon={ListIcon}
+                title="No members on this page"
+                description="This page has no retained group members. Use the page controls to review other pages."
+              />
             ) : (
               <Table>
                 <TableHeader>

@@ -1,6 +1,6 @@
 import { PackageIcon, PlusIcon } from "lucide-react";
-import { useMemo, useState } from "react";
-import { Link, useOutletContext } from "react-router-dom";
+import { useMemo, useRef, useState, type RefObject } from "react";
+import { Link, Outlet, useOutletContext } from "react-router-dom";
 
 import { AnalyticsBundlesTable } from "../components/system/analytics-bundles-table.js";
 import {
@@ -28,8 +28,14 @@ import type { ProjectAnalyticsContext } from "./project-analytics-layout.js";
 
 import { analyticsInventoryWindow } from "../lib/analytics-filter-form.js";
 
+export interface AnalyticsBundlesOutletContext extends ProjectAnalyticsContext {
+  createTriggerRef: RefObject<HTMLAnchorElement | null>;
+}
+
 export function ProjectAnalyticsBundlesPage(): JSX.Element {
-  const { projectId, query } = useOutletContext<ProjectAnalyticsContext>();
+  const context = useOutletContext<ProjectAnalyticsContext>();
+  const { projectId, query } = context;
+  const createTriggerRef = useRef<HTMLAnchorElement>(null);
   const [draftFilters, setDraftFilters] = useState(() => ({
     ...createWorkspaceAnalyticsFilters("bundles"),
     status: "all"
@@ -70,28 +76,32 @@ export function ProjectAnalyticsBundlesPage(): JSX.Element {
         isLoading={pagination.isLoading}
         onRefresh={pagination.refreshPage}
         actions={
-          <Button asChild>
-            <Link to={`/projects/${projectId}/analytics/bundles/new`}>
-              <PlusIcon data-icon="inline-start" />
-              Generate analytics bundle
-            </Link>
-          </Button>
+          <>
+            <WorkspaceAnalyticsFilters
+              mode="bundles"
+              fixedScope
+              projects={[]}
+              value={draftFilters}
+              activeFilterCount={
+                [filters.status, filters.kind].filter((value) => value !== "all").length
+              }
+              onChange={setDraftFilters}
+              onApply={() => setFilters(draftFilters)}
+              onReset={() => {
+                const defaults = { ...createWorkspaceAnalyticsFilters("bundles"), status: "all" };
+                setFilters(defaults);
+                setDraftFilters(defaults);
+              }}
+              onDismiss={() => setDraftFilters(filters)}
+            />
+            <Button asChild size="sm">
+              <Link ref={createTriggerRef} to={`/projects/${projectId}/analytics/bundles/new`}>
+                <PlusIcon data-icon="inline-start" />
+                Generate analytics bundle
+              </Link>
+            </Button>
+          </>
         }
-      />
-      <WorkspaceAnalyticsFilters
-        mode="bundles"
-        fixedScope
-        projects={[]}
-        value={draftFilters}
-        activeFilterCount={[filters.status, filters.kind].filter((value) => value !== "all").length}
-        onChange={setDraftFilters}
-        onApply={() => setFilters(draftFilters)}
-        onReset={() => {
-          const defaults = { ...createWorkspaceAnalyticsFilters("bundles"), status: "all" };
-          setFilters(defaults);
-          setDraftFilters(defaults);
-        }}
-        onDismiss={() => setDraftFilters(filters)}
       />
       <BoundedListLimit
         id="analytics-bundles-limit"
@@ -152,6 +162,7 @@ export function ProjectAnalyticsBundlesPage(): JSX.Element {
           )}
         </ResourceListState>
       )}
+      <Outlet context={{ ...context, createTriggerRef } satisfies AnalyticsBundlesOutletContext} />
     </div>
   );
 }

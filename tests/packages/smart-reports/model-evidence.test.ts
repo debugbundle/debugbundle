@@ -6,8 +6,24 @@ import {
 } from "../../../packages/smart-reports/src/model-evidence.js";
 import {
   reportNarrativeSchemaForFacts,
+  reportNarrativeJsonSchema,
   validateReportNarrative
 } from "../../../packages/smart-reports/src/model-narrative.js";
+import { projectReportNarrativeFacts } from "../../../packages/smart-reports/src/model-projection.js";
+
+function schemaNode(root: Record<string, unknown>, raw: unknown): Record<string, unknown> {
+  let value = raw as Record<string, unknown>;
+  for (let depth = 0; depth < 10 && typeof value["$ref"] === "string"; depth++) {
+    const ref = value["$ref"];
+    expect(ref).toMatch(/^#\//);
+    let target: unknown = root;
+    for (const key of ref.slice(2).split("/"))
+      target = (target as Record<string, unknown>)[key.replaceAll("~1", "/").replaceAll("~0", "~")];
+    value = target as Record<string, unknown>;
+  }
+  expect(value["$ref"]).toBeUndefined();
+  return value;
+}
 function output(ref = "p01_coverage") {
   return {
     version: 1,
@@ -171,6 +187,178 @@ describe("Smart Report model boundary", () => {
       })
     ).toThrow("report_claim_not_supported");
   });
+  it.each(["recorded_resolution", "observed_recovery", "outstanding"] as const)(
+    "excludes unsupported %s reference combinations from the provider schema as well as local validation",
+    (kind) => {
+      const facts = prepareReportModelInput(cases.cases[0]!.facts);
+      for (const ref of ["p01_coverage", "p01_sessions", "p01_resolved"]) {
+        const response = {
+          ...output(),
+          highlights: [
+            { kind, text: "The linked observation describes the state.", evidence_refs: [ref] }
+          ]
+        };
+        expect(() => validateReportNarrative(facts, response)).toThrow(
+          "report_claim_not_supported"
+        );
+        expect(reportNarrativeSchemaForFacts(facts).safeParse(response).success).toBe(false);
+      }
+    }
+  );
+  it("admits only current period resolutions, observed health recoveries and active outstanding sources for their claim kinds", () => {
+    const facts = prepareReportModelInput(
+      cases.cases.find((fixture) => fixture.id === "resolution-regression")!.facts
+    );
+    const health = prepareReportModelInput(
+      cases.cases.find((fixture) => fixture.id === "health-gaps")!.facts
+    ).evidence[0]!;
+    facts.evidence.push(health);
+    const schema = reportNarrativeSchemaForFacts(facts);
+    const highlight = (kind: string, evidence_refs: string[]) => ({
+      ...output(),
+      highlights: [
+        { kind, text: "The linked observations describe the recorded state.", evidence_refs }
+      ]
+    });
+    expect(schema.safeParse(highlight("recorded_resolution", ["p01_solved"])).success).toBe(true);
+    expect(
+      schema.safeParse(highlight("recorded_resolution", ["p01_resolution_events"])).success
+    ).toBe(true);
+    expect(schema.safeParse(highlight("observed_recovery", [health.ref])).success).toBe(true);
+    expect(
+      schema.safeParse(highlight("outstanding", ["p01_old_critical", "p01_resolve_regress"]))
+        .success
+    ).toBe(true);
+    for (const [kind, refs] of [
+      ["recorded_resolution", ["p01_resolve_regress"]],
+      ["recorded_resolution", ["p01_resolution_events", "p01_resolve_regress"]],
+      ["observed_recovery", ["p01_solved"]],
+      ["outstanding", ["p01_solved"]],
+      ["outstanding", ["p01_coverage", "p01_resolution_events"]]
+    ] as const)
+      expect(schema.safeParse(highlight(kind, [...refs])).success).toBe(false);
+    // Historical documents keep their existing validator and canonical schema.
+    expect(
+      validateReportNarrative(facts, {
+        ...highlight("recorded_resolution", ["p01_solved", "p01_coverage"]),
+        priorities: [
+          {
+            title: "Review active work",
+            action: "Investigate the retained evidence.",
+            rationale: "The sources remain active.",
+            evidence_refs: ["p01_old_critical"]
+          }
+        ]
+      }).version
+    ).toBe(1);
+    // The actual wire schema must retain kind-dependent alternatives.
+    expect(JSON.stringify(reportNarrativeJsonSchema(facts))).toContain('"anyOf"');
+  });
+  it("does not enable resolution or recovery claims from unknown counts or observations outside the period", () => {
+    for (const current of [0, null]) {
+      const raw = ReportModelFactsSchema.parse(cases.cases[0]!.facts);
+      const metric = raw.metrics.find((item) => item.ref === "p01_resolved")!;
+      metric.current = current;
+      metric.current_complete = current !== null;
+      const facts = prepareReportModelInput(raw);
+      const result = {
+        ...output(),
+        highlights: [
+          {
+            kind: "recorded_resolution",
+            text: "A workflow resolution was recorded.",
+            evidence_refs: ["p01_resolved"]
+          }
+        ]
+      };
+      expect(reportNarrativeSchemaForFacts(facts).safeParse(result).success).toBe(false);
+      expect(() => validateReportNarrative(facts, result)).toThrow("report_claim_not_supported");
+    }
+    const health = prepareReportModelInput(
+      cases.cases.find((fixture) => fixture.id === "health-gaps")!.facts
+    );
+    health.evidence[0]!.period_events = [];
+    expect(
+      reportNarrativeSchemaForFacts(health).safeParse({
+        ...output(),
+        highlights: [
+          {
+            kind: "observed_recovery",
+            text: "A recovery was observed.",
+            evidence_refs: ["p01_recovery"]
+          }
+        ],
+        limitations: [{ text: "Coverage is partial.", evidence_refs: ["p01_coverage"] }]
+      }).success
+    ).toBe(false);
+  });
+  it.each(cases.cases)(
+    "every special claim/reference admitted by the emitted provider schema is supported in $id",
+    (fixture) => {
+      const facts = projectReportNarrativeFacts(fixture.facts);
+      const json = reportNarrativeJsonSchema(facts);
+      const root = schemaNode(json, json);
+      const properties = root["properties"] as Record<string, unknown>;
+      const highlights = schemaNode(json, properties["highlights"]);
+      const item = schemaNode(json, highlights["items"]);
+      const variants = Array.isArray(item["anyOf"]) ? (item["anyOf"] as unknown[]) : [item];
+      const base = {
+        ...output(facts.projects[0]!.coverage_ref),
+        limitations: facts.projects.map((project) => ({
+          text: "Read the recorded coverage before interpreting observations.",
+          evidence_refs: [project.coverage_ref]
+        })),
+        priorities: facts.projects.flatMap((project) => {
+          const refs = facts.evidence
+            .filter(
+              (source) =>
+                source.project_ref === project.ref && ["open", "regressed"].includes(source.status)
+            )
+            .map((source) => source.ref);
+          return refs.length
+            ? [
+                {
+                  title: "Review active work",
+                  action: "Investigate the retained evidence.",
+                  rationale: "The sources remain active.",
+                  evidence_refs: refs
+                }
+              ]
+            : [];
+        })
+      };
+      for (const raw of variants) {
+        const variant = schemaNode(json, raw);
+        expect(variant["additionalProperties"]).toBe(false);
+        const fields = variant["properties"] as Record<string, unknown>;
+        const kindSchema = schemaNode(json, fields["kind"]);
+        const kinds = (kindSchema["enum"] ?? [kindSchema["const"]]) as string[];
+        const references = schemaNode(json, fields["evidence_refs"]);
+        const reference = schemaNode(json, references["items"]);
+        const admitted = (reference["enum"] ?? [reference["const"]]) as string[];
+        expect(admitted.length).toBeGreaterThan(0);
+        for (const kind of kinds.filter((kind) =>
+          ["recorded_resolution", "observed_recovery", "outstanding"].includes(kind)
+        ))
+          for (const ref of admitted) {
+            const response = {
+              ...base,
+              highlights: [
+                {
+                  kind,
+                  text: "The linked evidence supports the recorded state.",
+                  evidence_refs: [ref]
+                }
+              ]
+            };
+            expect(
+              () => validateReportNarrative(facts, response),
+              `${fixture.id}:${kind}:${ref}`
+            ).not.toThrow();
+          }
+      }
+    }
+  );
   it("places critical actions first while preserving equal-severity model ordering", () => {
     const facts = prepareReportModelInput(
       cases.cases.find((fixture) => fixture.id === "ten-project-full-month")!.facts

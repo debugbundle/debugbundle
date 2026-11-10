@@ -74,6 +74,7 @@ export interface DefaultApiDependencies extends Omit<
   | "analyticsSettingsManagement"
   | "analyticsBundles"
   | "analyticsJourneySamples"
+  | "analyticsFilterOptions"
   | "analyticsMetrics"
   | "analyticsUsage"
   | "availabilityCheckManagement"
@@ -173,6 +174,7 @@ export interface DefaultApiDependencies extends Omit<
   analyticsBundles: NonNullable<ApiDependencies["analyticsBundles"]>;
   analyticsJourneySamples: NonNullable<ApiDependencies["analyticsJourneySamples"]>;
   analyticsMetrics: NonNullable<ApiDependencies["analyticsMetrics"]>;
+  analyticsFilterOptions: NonNullable<ApiDependencies["analyticsFilterOptions"]>;
   analyticsUsage: NonNullable<ApiDependencies["analyticsUsage"]>;
   improvementSettingsManagement: NonNullable<ApiDependencies["improvementSettingsManagement"]>;
   improvementManagement: Pick<

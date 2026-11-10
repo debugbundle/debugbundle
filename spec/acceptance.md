@@ -2533,6 +2533,20 @@ Mapped requirements: FR-PJS-01/04. Explicit roots, secret-free manifest/diff, re
 - **Then** the tab shows project-scoped summary, routes, funnels, devices, referrers, opportunities, and generated AnalyticsBundles as internal sub-tabs or same-page sections
 - **And** no additional top-level project tabs are created for routes, funnels, devices, referrers, opportunities, or bundles
 
+### Observed analytics filter choice acceptance
+
+- Opening a metric filter panel reads bounded observed values for its draft
+  project, UTC/relative window, granularity and service/environment, without
+  dimension filters or generation. Changing context cancels/ignores old reads.
+- Fields with no usable values or an unavailable read are disabled with explicit
+  help; failure offers a read-only retry. Current selections remain visible and
+  can be removed/reset. Literal `all` and empty custom values stay distinct from
+  clearing a filter; Apply preserves exact query values.
+- The options read excludes other projects/origins, unapproved custom keys and
+  unsafe literals. Per-field truncation and total byte bounds remain explicit.
+  API/CLI/ordinary MCP agree; restricted catalogues and generation budgets stay
+  unchanged. Bundle modals retain the background controls and list state.
+
 ### AC-WEB-09: List Pagination and Action Alignment
 
 - **Given** a filtered incidents, improvements, analytics opportunities, AnalyticsBundle generations, or capture-rules list with multiple pages

@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import {
+  AnalyticsFilterOptionsQuerySchema,
+  AnalyticsFilterOptionsResponseSchema,
   AnalyticsActionMetricsResponseSchema,
   AnalyticsBundleV1Schema,
   AnalyticsBundleGenerationsListResponseSchema,
@@ -429,6 +431,28 @@ export function createAnalyticsMetricOpenApiOperations(options: {
         "200": {
           description: "Retained analytics journey artifact.",
           schema: analyticsJourneySampleResponse
+        },
+        ...responses
+      }
+    },
+    {
+      method: "get",
+      path: "/v1/analytics/filter-options",
+      operationId: "getAnalyticsFilterOptions",
+      summary:
+        "List bounded observed analytics filter choices for a project and time/scope context",
+      tags: ["Analytics"],
+      security: options.anyMemberAuth,
+      query: AnalyticsFilterOptionsQuerySchema,
+      responses: {
+        "200": {
+          description:
+            "Private/no-store observed values, with per-field omission markers and current approved custom keys. No generation quota is consumed.",
+          schema: component("AnalyticsFilterOptionsResponse", AnalyticsFilterOptionsResponseSchema)
+        },
+        "503": {
+          description: "Filter choices are unavailable or cannot be safely projected.",
+          schema: options.apiError
         },
         ...responses
       }

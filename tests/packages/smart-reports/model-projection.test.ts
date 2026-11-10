@@ -78,3 +78,52 @@ it("never restores restricted text and keeps the complete prompt/schema in the s
   expect(JSON.parse(request.counter_body).text).toEqual(JSON.parse(request.body).text);
   expect(prepareReportModelInput(maximum.facts).evidence).toHaveLength(100);
 });
+it("handles bounded multilingual source text without exhausting the pre-compaction privacy pass", () => {
+  const source = structuredClone(maximum.facts);
+  source.evidence.forEach((item) => {
+    item.title = "調査対象".repeat(30);
+    item.context = "障害原因".repeat(400);
+  });
+  const facts = projectReportNarrativeFacts(source);
+  expect(facts.metrics).toHaveLength(140);
+  expect(facts.evidence).toHaveLength(30);
+  expect(
+    facts.evidence.reduce((sum, item) => sum + Buffer.byteLength(item.context ?? ""), 0)
+  ).toBeLessThanOrEqual(4500);
+});
+it("can project a valid fact set with the full selection-note allowance", () => {
+  const source = structuredClone(maximum.facts);
+  source.selection_notes = Array.from(
+    { length: 20 },
+    (_, index) =>
+      `Selection caveat ${index}: retained coverage does not establish complete history.`
+  );
+  const facts = projectReportNarrativeFacts(source);
+  expect(facts.selection_notes.length).toBeLessThanOrEqual(20);
+  expect(facts.metrics).toHaveLength(140);
+  expect(facts.selection_notes).toContain(
+    "AI input notes are a bounded selection; additional source caveats remain in the full report. Do not assume complete coverage."
+  );
+  expect(source.selection_notes).toHaveLength(20);
+});
+
+it("preserves the nine previously token-counted request hashes and budgets for unchanged fixtures", () => {
+  const qualified = {
+    "quiet-complete": "83f9a9a62838a54a06c43e67c131c92ac581e9eba2dca72d62ffcc84ab43c056",
+    "ten-project-full-month": "cfcd8033f601b0bd89b128ddd0405f82c1ec5e6ff232848d97a0659ddfe61d25",
+    "resolution-regression": "fc7c2b476c474008ec34fd1468b8200c60b8a09e0fd48057663d9121ed819355",
+    "health-gaps": "6315071eb056a4dc6e4f74882a4df0c1b591825cb5b408e40ed2667e45beb6c2",
+    "analytics-gaps": "5795e306d86706f5107a8f5598b685f0adf19b37906bad8dfe875a2194278900",
+    "adversarial-context": "397e4a82ea5557d7ee97c4083eb70862f4cc5b6de6363a81fe95f88ce9233bbe",
+    restricted: "b8781d3a0e71e5ee9ef2d76331e6c38c942ac2a2a9c9fb2a8db0318efc952d1a",
+    "retention-partial": "927884be4c5530ad0945538604725be263c66a58b64b2ea275a7aac404f44703",
+    "production-maximum-month": "eb3406febdf4aa1901575d61ceee98b502b23b6a9ef94437081c1ecaeb7515d0"
+  } as const;
+  for (const [id, hash] of Object.entries(qualified)) {
+    const fixture = cases.cases.find((item) => item.id === id)!;
+    const request = buildReportModelRequest({ model: "gpt-6.1-terra", facts: fixture.facts });
+    expect(request.request_hash, id).toBe(hash);
+    expect(request.maximum_nano_usd).toBe(24750000);
+    expect(request.profile.max_paid_attempts).toBe(1);
+  }
+});
