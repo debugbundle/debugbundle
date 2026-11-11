@@ -4,7 +4,7 @@
   "provider": "OpenAI",
   "model": "gpt-6.1-terra",
   "model_client_sha256": "416d57b6cc02b22c3f36f8053a8570e943ce0e2f1706c1151ad36dc63cd77701",
-  "fixtures_sha256": "b9cc0e28b32a4e2a5fb9aba198108aad37a4ff302ee6008543874fdc2f445d35",
+  "fixtures_sha256": "cf2d4b3bc93bd0c7304e2624e2216da41ecf26682157cbf3a385b5be7ecf0307",
   "paid_attempts": 16,
   "maximum_reserved_nano_usd": 396000000,
   "actual_cost_nano_usd": 22039600,
