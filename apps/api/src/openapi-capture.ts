@@ -34,7 +34,7 @@ export function captureOperations(): OperationSpec[] {
       responses: {
         "201": { description: "Probe activation created.", schema: probeActivationResponse },
         "400": { description: "Invalid project id or request body.", schema: apiError },
-        "401": { description: "Member token is invalid.", schema: apiError },
+        "401": { description: "Access token is invalid.", schema: apiError },
         "403": {
           description: "Paused shared collaborator access cannot manage probes.",
           schema: apiError
@@ -69,7 +69,7 @@ export function captureOperations(): OperationSpec[] {
       responses: {
         "200": { description: "Active probe activations.", schema: probeActivationListResponse },
         "400": { description: "Invalid project id.", schema: apiError },
-        "401": { description: "Member token is invalid.", schema: apiError },
+        "401": { description: "Access token is invalid.", schema: apiError },
         "403": {
           description: "Paused shared collaborator access cannot view preserved probe activations.",
           schema: apiError
@@ -90,7 +90,7 @@ export function captureOperations(): OperationSpec[] {
       responses: {
         "200": { description: "Probe activation deactivated.", schema: probeDeactivationResponse },
         "400": { description: "Invalid project id or request body.", schema: apiError },
-        "401": { description: "Member token is invalid.", schema: apiError },
+        "401": { description: "Access token is invalid.", schema: apiError },
         "403": {
           description:
             "Remote probes are not available for the caller tier, and paused shared collaborator access cannot manage probes.",

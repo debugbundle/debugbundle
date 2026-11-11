@@ -16,7 +16,7 @@ const path = "/v1/organizations/{organizationId}/report-definitions";
 const metadata = { tags: ["Smart Reports"], security: anyMemberAuth };
 const failures = {
   "400": { description: "Invalid definition, consent, scope or recipient.", schema: apiError },
-  "401": { description: "Member authentication required.", schema: apiError },
+  "401": { description: "Browser session or access token required.", schema: apiError },
   "403": {
     description: "Current role, credential, verification or Business entitlement is insufficient.",
     schema: apiError

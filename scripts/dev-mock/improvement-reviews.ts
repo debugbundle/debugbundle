@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  ReviewContextSchema,
+  ReviewPlanDocumentSchema
+} from "../../packages/smart-improvements/src/review-planning-contract.js";
+import { planReview } from "../../packages/smart-improvements/src/review-planning.js";
 import type { createDevMockFixtures } from "./fixtures.js";
 import type { MockResponse } from "./api.js";
 import {
@@ -145,7 +150,7 @@ export function createImprovementReviewMocks(
       payload: unknown
     ): MockResponse | null {
       const match =
-        /^\/v1\/organizations\/([^/]+)\/improvements\/reviews(?:\/([^/]+))?(?:\/(bundle))?$/.exec(
+        /^\/v1\/organizations\/([^/]+)\/improvements\/reviews(?:\/([^/]+))?(?:\/(bundle|plan))?$/.exec(
           path
         );
       if (!match) return null;
@@ -241,8 +246,57 @@ export function createImprovementReviewMocks(
       }
       const row = rows.find((item) => item.record.id === resource);
       if (!row) return reply({ error: "improvement_review_not_found" }, 404);
+      if (match[3]) {
+        if (match[3] === "plan" && row.bundle && row.record.status === "ready") {
+          const facts = structuredClone(row.bundle.facts);
+          if (facts.sources[0]) {
+            facts.sources[0].severity = "low";
+            facts.sources[0].title = "Repeated warning needs review";
+          }
+          const context = ReviewContextSchema.parse({
+            version: 1,
+            signals: facts.sources.map((s) => ({
+              source_ref: s.ref,
+              detector: "warning_hotspot",
+              first_observed_at: null,
+              last_observed_at: facts.cutoff_at,
+              confidence: 0.8,
+              measurements: [],
+              related_refs: []
+            })),
+            configuration: {
+              coverage: "partial",
+              origins: [],
+              rules: [],
+              alerts: [],
+              active_probes: null,
+              sdk_local: "not_observed"
+            }
+          });
+          return reply({
+            bundle: ReviewPlanDocumentSchema.parse({
+              schema_version: "improvement_review.v1",
+              facts,
+              context,
+              plans: planReview(facts, context),
+              priorities: [],
+              guidance: null,
+              analysis: "unavailable"
+            }),
+            status: "factual_only"
+          });
+        }
+      }
       return reply(
-        match[3] ? { bundle: row.bundle, status: row.record.status } : { review: row.record }
+        match[3]
+          ? {
+              bundle:
+                row.bundle && match[3] === "plan"
+                  ? ReviewPlanDocumentSchema.parse({ ...row.bundle, context: null, plans: [] })
+                  : row.bundle,
+              status: row.record.status
+            }
+          : { review: row.record }
       );
     }
   };

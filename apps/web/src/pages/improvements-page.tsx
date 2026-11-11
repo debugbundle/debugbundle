@@ -1,3 +1,4 @@
+import { inventoryTitle } from "../lib/inventory-title.js";
 import { ChevronRightIcon, SparklesIcon } from "lucide-react";
 import { useMemo, useState, type MouseEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -81,6 +82,7 @@ export function ImprovementsPage(): JSX.Element {
     isLoading,
     page,
     totalPages,
+    totalCount,
     hasNextPage,
     goToNextPage,
     goToPreviousPage,
@@ -103,7 +105,8 @@ export function ImprovementsPage(): JSX.Element {
       return {
         items: response.improvements,
         nextCursor: response.nextCursor,
-        totalPages: response.totalPages
+        totalPages: response.totalPages,
+        totalCount: response.totalCount
       };
     },
     [statusFilter, hostedImprovementsEnabled]
@@ -174,7 +177,7 @@ export function ImprovementsPage(): JSX.Element {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader description="Improvement opportunities and weekly evidence-backed priorities across this workspace. Review the recorded signals and investigate with the available bundles." />
+      <PageHeader description="Improvement opportunities and weekly evidence-backed priorities across this workspace." />
       <Tabs
         value={activeView}
         onValueChange={(value) => {
@@ -193,7 +196,7 @@ export function ImprovementsPage(): JSX.Element {
             <Card className="min-w-0">
               <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex w-full items-center justify-between gap-3 sm:w-auto">
-                  <CardTitle>Improvement inventory</CardTitle>
+                  <CardTitle>{inventoryTitle("Improvement inventory", totalCount)}</CardTitle>
                   <TableRefreshButton
                     isLoading={isLoading}
                     onRefresh={refreshPage}

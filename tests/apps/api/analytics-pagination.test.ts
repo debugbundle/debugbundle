@@ -8,6 +8,29 @@ import {
 } from "../../helpers/analytics-route-fixtures.js";
 
 describe("analytics pagination compatibility", () => {
+  it("returns the exact opportunity count only for the new first-page count opt-in", async () => {
+    const analyticsOpportunities = createAnalyticsOpportunitiesDependency({
+      listAnalyticsOpportunitiesForProject: vi.fn().mockResolvedValue({
+        opportunities: [],
+        next_cursor: null,
+        total_pages: 3,
+        total_count: 21
+      })
+    });
+    const app = createDependencies({ analyticsOpportunities });
+    for (const include of [false, true]) {
+      const response = await app.inject({
+        method: "GET",
+        url: `/v1/analytics/opportunities?project_id=${PROJECT_ID}&include_total=true${include ? "&include_total_count=true" : ""}`,
+        headers: { authorization: "Bearer dbundle_mem_test_token" }
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json().total_pages).toBe(3);
+      if (include) expect(response.json().total_count).toBe(21);
+      else expect(response.json()).not.toHaveProperty("total_count");
+    }
+    await app.close();
+  });
   it("preserves the filtered total pages in bundle list responses", async () => {
     const analyticsBundles = createAnalyticsBundlesDependency({
       listAnalyticsBundleGenerationsForProject: vi.fn().mockResolvedValue({

@@ -1,3 +1,4 @@
+import { MetadataSeparator } from "./metadata-separator.js";
 import { useEffect, useState } from "react";
 import { CheckIcon, ChevronsUpDownIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -61,7 +62,7 @@ export function OrganizationSwitcher(): JSX.Element | null {
             <SidebarMenuButton
               size="lg"
               disabled={pending}
-              aria-label={`Workspace: ${current?.name ?? "current organisation"}, ${session.role}`}
+              aria-label={`Workspace: ${current?.name ?? "current workspace"}, ${session.role}`}
             >
               <span className="grid min-w-0 flex-1 text-left text-sm leading-tight">
                 <span className="truncate">{current?.name ?? "Workspace"}</span>
@@ -123,7 +124,9 @@ export function OrganizationSwitcher(): JSX.Element | null {
                     setRevision((value) => value + 1);
                   }}
                 >
-                  Could not load workspaces · retry
+                  Could not load workspaces
+                  <MetadataSeparator />
+                  retry
                 </DropdownMenuItem>
               ) : null}
             </DropdownMenuGroup>

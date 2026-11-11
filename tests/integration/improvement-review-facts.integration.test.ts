@@ -15,6 +15,7 @@ import { createImprovementReviewStore } from "../../packages/storage/src/improve
 import { processNextImprovementReview } from "../../packages/storage/src/improvement-review-processor.js";
 import { upsertAnalyticsOpportunity } from "../../packages/storage/src/analytics-opportunity-recording.js";
 import { createPostgresImprovementOpportunityStore } from "../../packages/storage/src/improvement-opportunity-store.js";
+import { createPostgresCapturePolicyStore } from "../../packages/storage/src/capture-policy-store.js";
 runIntegration("weekly review retained evidence and privacy", () => {
   const pool = createIntegrationPool(),
     db = createQueryable(pool);
@@ -142,7 +143,12 @@ runIntegration("weekly review retained evidence and privacy", () => {
       settings = createImprovementReviewSettingsStore(db);
     const selected = await settings.replace({
       ...actor,
-      command: { expected_version: 0, enabled: true, project_ids: [f.source], source_consent: true }
+      command: {
+        expected_version: 0,
+        enabled: true,
+        project_ids: [f.source],
+        source_consent: true
+      }
     });
     await pool.query(
       "UPDATE improvement_review_settings SET next_due_at=clock_timestamp()-interval '1 day' WHERE organization_id=$1",
@@ -170,7 +176,7 @@ runIntegration("weekly review retained evidence and privacy", () => {
     await createImprovementReviewScheduler(db).scheduleNext();
     expect(await settings.get(actor)).toMatchObject({ enabled: false, requires_review: true });
   });
-  it("irreversibly invalidates older reviews when a newly inserted governing privacy policy is narrower", async () => {
+  it("irreversibly invalidates reviews when a newly inserted governing privacy policy is narrower", async () => {
     const actor = {
       organization_id: fixture.org,
       initiator: { version: 1 as const, kind: "browser_session" as const, user_id: fixture.owner }
@@ -211,9 +217,18 @@ runIntegration("weekly review retained evidence and privacy", () => {
     };
     await createImprovementReviewSettingsStore(db).replace({
       ...actor,
-      command: { expected_version: 0, enabled: true, project_ids: [f.source], source_consent: true }
+      command: {
+        expected_version: 0,
+        enabled: true,
+        project_ids: [f.source],
+        source_consent: true
+      }
     });
     await f.consolidate();
+    await createPostgresCapturePolicyStore(db).upsertCapturePolicy({
+      project_id: f.target,
+      preset: "investigative"
+    });
     await pool.query(
       "INSERT INTO project_analytics_settings(project_id,enabled,privacy_mode) VALUES($1,true,'standard') ON CONFLICT(project_id) DO UPDATE SET enabled=true,privacy_mode='standard'",
       [f.target]
@@ -227,6 +242,13 @@ runIntegration("weekly review retained evidence and privacy", () => {
     const store = createImprovementReviewStore(db),
       id = (await store.list(actor)).items[0]!.id;
     expect((await store.bundle({ ...actor, id })).bundle?.facts.project_id).toBe(f.source);
+    const retained = (await store.plan({ ...actor, id })).bundle;
+    if (retained?.context) {
+      expect(retained.context.configuration.origins).toEqual([
+        expect.objectContaining({ origin_project_id: f.source, preset: null })
+      ]);
+      expect(JSON.stringify(retained.context)).not.toContain(f.target);
+    }
     await pool.query(
       "UPDATE project_analytics_settings SET privacy_mode='strict' WHERE project_id=$1",
       [f.target]

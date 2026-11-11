@@ -34,7 +34,7 @@ function discloseConnectedDoctor(tool: { description: string }): void {
   // incomplete metadata; retain the historical schema, name and approval flags.
   expect(tool.description).toBe("Run local DebugBundle environment diagnostics.");
   tool.description =
-    "Run DebugBundle environment diagnostics. Connected mode checks API health and saved member authentication with one incident request restricted to the connected project; incident contents are not returned.";
+    "Run DebugBundle environment diagnostics. Connected mode checks API health and saved access-token authentication with one incident request restricted to the connected project; incident contents are not returned.";
 }
 
 function addOptionalProjectInputs(name: string, schema: unknown): void {
@@ -147,8 +147,27 @@ describe("legacy MCP and OpenClaw contract", () => {
         for (const tool of [stdio, claw]) {
           expect(tool.description).toBe("Create a new member token.");
           tool.description =
-            "Create a member token. New restricted scope requires verified interactive issuance; restricted credentials cannot mint credentials.";
+            "Create an access token. New restricted scope requires verified interactive issuance; restricted credentials cannot mint credentials.";
         }
+      }
+    }
+    // Approved public terminology changes only these descriptions. Keep the
+    // frozen names, credential inputs and all other contract fields intact.
+    for (const [name, before, after] of [
+      [
+        "list_member_tokens",
+        "List member tokens for the authenticated member.",
+        "List access tokens for the authenticated user."
+      ],
+      ["revoke_member_token", "Revoke a member token.", "Revoke an access token."]
+    ]) {
+      const stdio = expected.tools.result.tools.find((tool) => tool.name === name)!;
+      const claw = expected.openClaw.tools.find(
+        (tool) => tool.openClawToolName === `debugbundle_${name}`
+      )!;
+      for (const tool of [stdio, claw]) {
+        expect(tool.description).toBe(before);
+        tool.description = after!;
       }
     }
     const successfulServer = createMcpServer({

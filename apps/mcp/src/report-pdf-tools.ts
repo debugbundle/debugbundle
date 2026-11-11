@@ -17,7 +17,7 @@ export const REPORT_PDF_MCP_TOOL_CATALOG = [
     name: REPORT_PDF_MCP_TOOL_NAMES[0],
     inputSchema: mutation,
     description:
-      "Prepare or reuse a private PDF of the canonical Smart Report. Coalesces concurrent requests without another AI call or generation charge. Requires current read access to every frozen origin. Poll get_report_pdf; download links require authentication and expire with the report.",
+      "Prepare or reuse a private PDF of the canonical report. Coalesces concurrent requests without another AI call or generation charge. Requires current read access to every frozen origin. Poll get_report_pdf; download links require authentication and expire with the report.",
     read: false
   },
   {

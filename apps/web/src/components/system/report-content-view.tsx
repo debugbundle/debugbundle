@@ -1,3 +1,4 @@
+import { MetadataSeparator } from "./metadata-separator.js";
 import type { ReactNode } from "react";
 import { TitleBadgeRow } from "./title-badge-row.js";
 import { ReportEvidenceList, ReportReferences as References } from "./report-evidence-list.js";
@@ -51,12 +52,16 @@ export function ReportContentView({
           actions={actions}
         />
         <p>
-          {reportPeriodLabel(facts.period)} · {facts.projects.length}{" "}
-          {facts.projects.length === 1 ? "project" : "projects"}
+          {reportPeriodLabel(facts.period)}
+          <MetadataSeparator />
+          {facts.projects.length} {facts.projects.length === 1 ? "project" : "projects"}
         </p>
         <p className="text-sm text-muted-foreground">
-          Compared with {reportPeriodLabel(facts.previous_period)} · Data cutoff{" "}
-          {reportTimeLabel(facts.cutoff_at)} · {facts.privacy_mode} evidence
+          Compared with {reportPeriodLabel(facts.previous_period)}
+          <MetadataSeparator />
+          Data cutoff {reportTimeLabel(facts.cutoff_at)}
+          <MetadataSeparator />
+          {facts.privacy_mode} evidence
         </p>
       </header>
       {narrative ? (
@@ -140,7 +145,10 @@ export function ReportContentView({
             <CardHeader>
               <CardTitle>{project.name}</CardTitle>
               <CardDescription id={`ref-${project.coverage_ref}`}>
-                Lifecycle: {project.coverage.lifecycle} · Health: {project.coverage.availability} ·
+                Lifecycle: {project.coverage.lifecycle}
+                <MetadataSeparator />
+                Health: {project.coverage.availability}
+                <MetadataSeparator />
                 Analytics: {project.coverage.analytics}
                 {project.notes.map((note, index) => (
                   <span className="block" key={index}>
@@ -206,8 +214,15 @@ export function ReportContentView({
               <header className="flex flex-col gap-1">
                 <h3 className="break-words font-medium">{item.title}</h3>
                 <p className="text-sm text-muted-foreground">
-                  {facts.projects.find((project) => project.ref === item.project_ref)?.name} ·{" "}
-                  {item.type} · {item.severity} · {item.status.replaceAll("_", " ")} · {item.ref}
+                  {facts.projects.find((project) => project.ref === item.project_ref)?.name}
+                  <MetadataSeparator />
+                  {item.type}
+                  <MetadataSeparator />
+                  {item.severity}
+                  <MetadataSeparator />
+                  {item.status.replaceAll("_", " ")}
+                  <MetadataSeparator />
+                  {item.ref}
                 </p>
               </header>
               <div className="flex flex-col gap-3">

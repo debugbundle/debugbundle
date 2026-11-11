@@ -1,3 +1,67 @@
+# Smart improvement guidance follow-up — simplified local implementation
+
+The Owner approved implementation, then requested removal of unnecessary format
+versioning on 11 November 2026, reporting that the just-launched feature is not
+yet in use.
+The local change now has one schedule, one AI configuration and the existing saved
+bundle/export shape. A normal `/plan` read (CLI `improvements reviews plan`, MCP
+`get_improvement_review_plan`) exposes richer checks through the same domain read.
+The client falls back to the export on an older server. No format selector,
+per-review format/profile columns, extra enablement flags, image labels or staged
+reader rollout remain. Migration `202611110001_add_improvement_review_planning`
+adds only the bounded nullable context snapshot and its readiness constraint.
+
+Guidance covers recurrence, measured analytics and capture policy/rules, alert
+delivery, sensitivity, temporary diagnostics and unobserved SDK-local filters.
+Typed next steps distinguish investigation, noise review, measured flow and
+missing evidence; every control keeps separate effects and verification safeguards.
+The original export continues to include validated AI investigations.
+
+Earlier baseline verification passed a 193-test combined
+cohort and 122 focused tests. All 134 regression shards ran; two stale
+metadata checks were corrected and their exact shards pass (66 tests). The normal
+80% changed-source gate passes for all 23 changed source files. Types, lint,
+formatting, application/public-site builds and freshly installed CLI/MCP checks
+on Node 22/24/26 pass. Source/public docs and generated agent metadata are synced.
+See `spec/smart-improvements-guidance-verification-20261111.md` for the precise
+receipts, coverage reconciliation and limits of these local checks.
+
+Final local completion (11 November): the Owner approved finishing the remaining
+health/specificity work and extended the cumulative evaluation cap from 66 to 102
+requests, retaining USD 1 overall. The final prompt asks for recorded retry/no-retry
+comparisons, failing/last-successful monitor windows, independent recovery and
+previously successful-check regressions. Identical investigation checks under
+different source labels are rejected to factual plans without a paid retry; the
+model can omit redundant prose while all server plans remain available. Factual
+monitor plans now provide the same concrete comparison and verification task.
+
+The final bounded check **passes**: all 18 paid cases validate and meet the 7/8
+agent usefulness threshold, including overlapping health (8/8); both no-request
+cases abstain. It used 36 additional HTTP requests and USD 0.0389609. All runs total
+102 requests / 51 paid attempts, USD 0.1056066, with no uncertain holds. Initial
+fixture mistakes, failed quality review and exact original outcomes remain
+preserved. Final evidence is
+`evals/smart-improvements/guidance-qualification-final-20261111.json`; the earlier
+failed receipt does not qualify current inputs.
+
+The final deep audit closes cross-rule repeated notification detection, reordered
+duplicate AI checks and input-order-dependent selection of large linked groups.
+All 213 tests across 22 files pass with real storage, including exact-hash replay
+of all final provider responses and newly expired factual rule plans. The prompt
+and qualified requests remain unchanged; no further provider calls were made.
+The normal changed-source coverage gate, typecheck, lint and formatting pass.
+All earlier migration, public-site/app build and installed-client receipts remain
+applicable to their unchanged surfaces. The planned implementation is ready for
+Owner review/testing; agent qualification is not human acceptance or a universal
+quality guarantee. The approved request cap is exhausted.
+
+No activation, commit, push, publication, deployment or consumer change occurred.
+The Owner subsequently requested the article prepared for the next release:
+`site/content/blog/weekly-smart-improvements-recurring-incidents.mdx` is now ready
+with the planned 12 November 2026 date. The next site build includes it; coordinate
+publication with the guidance release. Production configuration is unchanged. Release and activation are separate later actions. Earlier
+pre-simplification/failed-prompt receipts are historical only.
+
 # Smart Products production release — verified; external marketplace gate open
 
 Core 1.25.0 and the app are live from `5662ecfa9c4d317af1bb88a6dffc900f282da449`.

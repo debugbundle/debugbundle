@@ -1,3 +1,4 @@
+import { inventoryTitle } from "../../lib/inventory-title.js";
 import { LightbulbIcon } from "lucide-react";
 import { useState } from "react";
 import {
@@ -42,7 +43,8 @@ export function WorkspaceAnalyticsOpportunities({
       return {
         items: response.opportunities,
         nextCursor: response.next_cursor,
-        totalPages: response.total_pages
+        totalPages: response.total_pages,
+        totalCount: response.total_count
       };
     },
     [filters]
@@ -70,7 +72,7 @@ export function WorkspaceAnalyticsOpportunities({
   return (
     <Card className="w-full min-w-0">
       <CardHeader className="grid grid-cols-1 items-center gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
-        <CardTitle>Analytics opportunities</CardTitle>
+        <CardTitle>{inventoryTitle("Analytics opportunities", pagination.totalCount)}</CardTitle>
         <div
           role="group"
           aria-label="Analytics inventory controls"

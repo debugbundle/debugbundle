@@ -1,3 +1,4 @@
+import { MetadataSeparator } from "./metadata-separator.js";
 import { MailIcon } from "lucide-react";
 import { ResourceEmptyState } from "./resource-empty-state.js";
 import { useState } from "react";
@@ -49,9 +50,21 @@ export function OrganizationPendingInvites({
                 <div className="flex min-w-0 flex-col gap-1">
                   <span className="break-all">{invite.email}</span>
                   <span>
-                    {invite.role === "admin"
-                      ? "Admin · all current and future projects"
-                      : `${invite.default_project_role} · ${invite.project_access === "all" ? "all current and future projects" : `${invite.project_ids.length} selected projects`}`}
+                    {invite.role === "admin" ? (
+                      <>
+                        Admin
+                        <MetadataSeparator />
+                        all current and future projects
+                      </>
+                    ) : (
+                      <>
+                        {invite.default_project_role}
+                        <MetadataSeparator />
+                        {invite.project_access === "all"
+                          ? "all current and future projects"
+                          : `${invite.project_ids.length} selected projects`}
+                      </>
+                    )}
                   </span>
                 </div>
                 {invite.role === "admin" && !canManageAdmin ? (

@@ -90,9 +90,7 @@ describe("web app - OpenAI OAuth", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: /see projects available/i })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: /read incident summaries/i })).toBeChecked();
-    expect(
-      screen.queryByRole("checkbox", { name: /read saved smart reports/i })
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: /read saved reports/i })).not.toBeInTheDocument();
     expect(
       screen.getByText(/incident severity, status, timing, and bounded context/i)
     ).toBeInTheDocument();
@@ -267,7 +265,7 @@ describe("web app - OpenAI OAuth", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     render(<App initialEntries={["/oauth/consent?interaction=interaction_123"]} />);
-    const reportScope = await screen.findByRole("checkbox", { name: /read saved smart reports/i });
+    const reportScope = await screen.findByRole("checkbox", { name: /read saved reports/i });
     expect(reportScope).toBeChecked();
     expect(screen.getByText(/no report generation or email/i)).toBeInTheDocument();
     await user.click(reportScope);

@@ -13,10 +13,6 @@ import {
 } from "../../../apps/web/src/pages/management-pages.tsx";
 import { RecentProjectsTable } from "../../../apps/web/src/components/system/recent-projects-table.tsx";
 import {
-  HeaderActionsProvider,
-  useHeaderActions
-} from "../../../apps/web/src/components/system/header-actions-context.tsx";
-import {
   OrganizationOverviewPage,
   formatActiveProjects,
   formatAllowanceUnits,
@@ -60,11 +56,6 @@ function renderProjectTokensPage(): ReturnType<typeof render> {
       </routerDom.Routes>
     </MemoryRouter>
   );
-}
-
-function HeaderActionHost(): JSX.Element {
-  const { action } = useHeaderActions();
-  return <header>{action?.content}</header>;
 }
 
 function renderProjectMembersPage(project = createProject()): ReturnType<typeof render> {
@@ -198,14 +189,16 @@ describe("web page helper coverage", () => {
 
     render(
       <MemoryRouter>
-        <HeaderActionsProvider>
-          <HeaderActionHost />
-          <ProjectsPage />
-        </HeaderActionsProvider>
+        <ProjectsPage />
       </MemoryRouter>
     );
 
-    await user.click(screen.getByRole("button", { name: /create project/i }));
+    const createAction = screen.getByRole("button", { name: /create project/i });
+    expect(createAction).toHaveAttribute("data-size", "default");
+    expect(createAction.closest('[data-slot="page-header"]')).toHaveTextContent(
+      "Create and manage projects in this workspace."
+    );
+    await user.click(createAction);
     const createProjectDialog = screen.getByRole("dialog", { name: /create project/i });
     expect(createProjectDialog).toHaveClass("max-h-[calc(100dvh-2rem)]");
     const createProjectScrollPanel = createProjectDialog.querySelector("form > div");

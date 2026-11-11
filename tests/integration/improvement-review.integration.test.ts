@@ -737,7 +737,8 @@ runIntegration("consented weekly improvement reviews", () => {
     await pool.query("DROP TRIGGER projects_improvement_reviews_guard ON projects");
     await pool.query("DROP TRIGGER organizations_improvement_reviews_guard ON organizations");
     await pool.query(
-      "DELETE FROM storage_migration_ledger WHERE id='202611100003_add_weekly_improvement_reviews'"
+      // Recreating the old table also removes the later planning columns.
+      "DELETE FROM storage_migration_ledger WHERE id IN ('202611100003_add_weekly_improvement_reviews','202611110001_add_improvement_review_planning')"
     );
     await migrateStorageSchema(db);
     await assertStorageSchemaMigrationsApplied(db);

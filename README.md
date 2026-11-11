@@ -373,7 +373,7 @@ After `make install`, run `make dev-mock` and open <http://localhost:5291/dashbo
 It restarts only the web container and automatically signs the preview in as
 `demo@example.test`. Synthetic projects, incidents, improvements, 30-day health
 history, alert/capture rules, webhook endpoints and delivery history, project and
-member tokens, members/invitations, billing, provider connections, and GitHub
+access tokens, members/invitations, billing, provider connections, and GitHub
 deliveries are served locally, so the data works in your ordinary browser.
 SayCheese has analytics enabled with sample funnels, flows, journeys, opportunities
 and generated artifacts. TaskTime includes empty and analytics-disabled states.
@@ -398,10 +398,27 @@ return to the demo account; the same code is used for simulated account deletion
 
 - Run `make dev-mock` again to reset the simulated server data. Browser preferences
   and cleared-delivery IDs remain in local storage; use **Show cleared** to inspect them.
+- Open <http://localhost:5291/dashboard?welcome=1> to replay the dashboard welcome
+  in the local demo. Reload that link to replay it again. **Account menu → Setup
+  guide** opens the ongoing checklist. Progress still reflects the populated demo
+  data; the link does not reset projects/tokens or operate against the real API.
+- To review the whole onboarding layout, open
+  <http://localhost:5291/dashboard?welcome=1&setup=empty> and dismiss the welcome:
+  the sidebar reminder shows **0 of 3** above the account menu. Open
+  <http://localhost:5291/dashboard?setup=started> for **1 of 3** with no modal.
+  These local-only display scenarios last until the next full page load and do
+  not overwrite saved setup preferences or change demo projects/tokens. Reload
+  <http://localhost:5291/dashboard> to return to observed demo progress.
 - Run `make dev-mock-off` to return the frontend to your real local API.
 - The preview binds to loopback, blocks foreign origins and intercepts unknown API
   paths rather than forwarding them. It requires development serve mode, is absent
   from production builds and disables frontend telemetry even if local env enables it.
+
+For the existing nginx static public preview at <http://localhost:5292>, use
+`make dev-public-refresh`. It checks the preview's source mount, rebuilds the site,
+restarts the preview container and checks its HTTP response. Rebuilding `site/out`
+alone can leave nginx attached to the previous directory and returning 403.
+This command is local only; it does not publish or deploy the site.
 
 ## Self-Hosting
 

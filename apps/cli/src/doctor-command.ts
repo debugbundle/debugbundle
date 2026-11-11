@@ -1,5 +1,17 @@
-import { manageAgentSetup, projectRoot, readManaged, type Report } from "../../../packages/agent-setup/src/index.js";
-import { agentChecks, appendAgentReport, localScaffoldFailure, buildManagedAgentsSection, legacyHashes, canonicalFiles } from "./agent-setup.js";
+import {
+  manageAgentSetup,
+  projectRoot,
+  readManaged,
+  type Report
+} from "../../../packages/agent-setup/src/index.js";
+import {
+  agentChecks,
+  appendAgentReport,
+  localScaffoldFailure,
+  buildManagedAgentsSection,
+  legacyHashes,
+  canonicalFiles
+} from "./agent-setup.js";
 import { nodeFetch } from "../../../packages/node-http/src/index.js";
 import { readdir as readdirFromFs, stat as statFromFs } from "node:fs/promises";
 import { join, relative } from "node:path";
@@ -17,7 +29,11 @@ import { CliAuthStateError, readCliAuthState } from "./auth-state.js";
 import type { CliAuthState } from "./auth-state.js";
 import { ConnectionConfigSchema } from "./connection-config.js";
 import { CONNECTION_FILE_PATH, PROFILE_FILE_PATH, SKILL_FILE_PATH } from "./local-scaffold.js";
-import { ProfileSchema, profileIssueMessage, type ProfileValidationError } from "./profile-validation.js";
+import {
+  ProfileSchema,
+  profileIssueMessage,
+  type ProfileValidationError
+} from "./profile-validation.js";
 import type { CliCommandResult } from "./token-commands.js";
 
 type FileReader = (path: string) => Promise<string>;
@@ -117,7 +133,11 @@ function resolveOverallStatus(checks: DoctorCheck[]): "healthy" | "warning" | "e
   return "healthy";
 }
 
-function formatDoctorOutput(status: "healthy" | "warning" | "error", checks: DoctorCheck[], privacyPreview?: DoctorPrivacyPreview): string {
+function formatDoctorOutput(
+  status: "healthy" | "warning" | "error",
+  checks: DoctorCheck[],
+  privacyPreview?: DoctorPrivacyPreview
+): string {
   return [
     "DebugBundle doctor report.",
     `Status: ${status}`,
@@ -147,11 +167,16 @@ function formatDoctorOutput(status: "healthy" | "warning" | "error", checks: Doc
   ].join("\n");
 }
 
-function buildDoctorJsonOutput(checks: DoctorCheck[], privacyPreview?: DoctorPrivacyPreview): string {
+function buildDoctorJsonOutput(
+  checks: DoctorCheck[],
+  privacyPreview?: DoctorPrivacyPreview
+): string {
   return JSON.stringify({
     status: resolveOverallStatus(checks),
     checks,
-    warnings: checks.filter((check) => check.status === "warning" || check.status === "missing").map((check) => check.message),
+    warnings: checks
+      .filter((check) => check.status === "warning" || check.status === "missing")
+      .map((check) => check.message),
     errors: checks.filter((check) => check.status === "error").map((check) => check.message),
     ...(privacyPreview === undefined ? {} : { privacy_preview: privacyPreview }),
     suggested_actions: [...SUGGESTED_ACTIONS],
@@ -220,13 +245,30 @@ function buildPrivacyPreview(): DoctorPrivacyPreview {
     throw new Error("invalid_privacy_preview_sample_event");
   }
 
-  const projected = sanitizeTelemetry({ payload: sampleEvent.payload, context: sampleEvent.context });
+  const projected = sanitizeTelemetry({
+    payload: sampleEvent.payload,
+    context: sampleEvent.context
+  });
   if (!projected.ok) throw new Error("privacy_preview_unavailable");
   const protectedEvent = sanitizeEvent(sampleEvent);
   const redacted_fields = [
-    "headers.authorization", "headers.cookie", "body.password", "body.card_number", "body.otp", "context.apiKey"
+    "headers.authorization",
+    "headers.cookie",
+    "body.password",
+    "body.card_number",
+    "body.otp",
+    "context.apiKey"
   ];
-  const sampleEventClass = classifyEvent(sampleEvent.event_type, undefined, undefined, sampleEvent.payload as Record<string, unknown>, "minimal", [], [], sampleEvent.service.runtime);
+  const sampleEventClass = classifyEvent(
+    sampleEvent.event_type,
+    undefined,
+    undefined,
+    sampleEvent.payload as Record<string, unknown>,
+    "minimal",
+    [],
+    [],
+    sampleEvent.service.runtime
+  );
 
   return {
     policy_version: TELEMETRY_PRIVACY_POLICY_VERSION,
@@ -254,7 +296,12 @@ function buildPrivacyPreview(): DoctorPrivacyPreview {
   };
 }
 
-async function buildFileCheck(rootDirectory: string, name: string, filePath: string, stat: StatReader): Promise<DoctorCheck> {
+async function buildFileCheck(
+  rootDirectory: string,
+  name: string,
+  filePath: string,
+  stat: StatReader
+): Promise<DoctorCheck> {
   const exists = await pathExists(join(rootDirectory, filePath), stat);
   return {
     name,
@@ -270,7 +317,10 @@ function formatZodErrors(error: z.ZodError, input: unknown): ProfileValidationEr
   }));
 }
 
-async function loadProfile(rootDirectory: string, dependencies: { readFile: FileReader; stat: StatReader }): Promise<{
+async function loadProfile(
+  rootDirectory: string,
+  dependencies: { readFile: FileReader; stat: StatReader }
+): Promise<{
   check: DoctorCheck;
   profile: DoctorProfile | null;
   validationErrors: ProfileValidationError[];
@@ -324,11 +374,16 @@ async function loadProfile(rootDirectory: string, dependencies: { readFile: File
       message: `Found ${PROFILE_FILE_PATH}`
     },
     profile: parsedDoctorProfile.data,
-    validationErrors: parsedFullProfile.success ? [] : formatZodErrors(parsedFullProfile.error, parsedJson)
+    validationErrors: parsedFullProfile.success
+      ? []
+      : formatZodErrors(parsedFullProfile.error, parsedJson)
   };
 }
 
-async function loadConnection(rootDirectory: string, dependencies: { readFile: FileReader; stat: StatReader }): Promise<{ check: DoctorCheck; connection: z.infer<typeof ConnectionConfigSchema> | null }> {
+async function loadConnection(
+  rootDirectory: string,
+  dependencies: { readFile: FileReader; stat: StatReader }
+): Promise<{ check: DoctorCheck; connection: z.infer<typeof ConnectionConfigSchema> | null }> {
   const connectionPath = join(rootDirectory, CONNECTION_FILE_PATH);
   if (!(await pathExists(connectionPath, dependencies.stat))) {
     return {
@@ -342,7 +397,9 @@ async function loadConnection(rootDirectory: string, dependencies: { readFile: F
   }
 
   try {
-    const parsedConnection = ConnectionConfigSchema.parse(JSON.parse(await dependencies.readFile(connectionPath)));
+    const parsedConnection = ConnectionConfigSchema.parse(
+      JSON.parse(await dependencies.readFile(connectionPath))
+    );
     return {
       check: {
         name: "connection-config",
@@ -367,7 +424,9 @@ function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
 }
 
-function buildProjectModeCheck(connection: z.infer<typeof ConnectionConfigSchema> | null): DoctorCheck {
+function buildProjectModeCheck(
+  connection: z.infer<typeof ConnectionConfigSchema> | null
+): DoctorCheck {
   if (connection === null) {
     return {
       name: "project-mode",
@@ -390,7 +449,10 @@ function formatProfileValidationError(errors: ProfileValidationError[]): string 
   return `Profile schema validation failed at ${path}: ${firstError.message}${totalErrors}.`;
 }
 
-function buildProfileValidationCheck(profile: DoctorProfile | null, validationErrors: ProfileValidationError[]): DoctorCheck {
+function buildProfileValidationCheck(
+  profile: DoctorProfile | null,
+  validationErrors: ProfileValidationError[]
+): DoctorCheck {
   if (validationErrors.length > 0) {
     return {
       name: "profile-validation",
@@ -440,7 +502,9 @@ function buildProfileFreshnessCheck(profile: DoctorProfile | null, now: Date): D
     };
   }
 
-  const ageInDays = Math.floor((now.getTime() - lastReviewedDate.getTime()) / (1000 * 60 * 60 * 24));
+  const ageInDays = Math.floor(
+    (now.getTime() - lastReviewedDate.getTime()) / (1000 * 60 * 60 * 24)
+  );
   if (ageInDays > PROFILE_STALENESS_THRESHOLD_DAYS) {
     return {
       name: "profile-freshness",
@@ -522,11 +586,14 @@ async function buildConnectedApiCheck(input: {
     return {
       name: "connected-api",
       status: "error",
-      message: `Invalid connected project scope in ${CONNECTION_FILE_PATH}; run debugbundle connect before verifying member-token auth.`
+      message: `Invalid connected project scope in ${CONNECTION_FILE_PATH}; run debugbundle connect before verifying access-token auth.`
     };
   }
 
-  const connectionBaseUrl = input.connection.cloud_base_url === null ? null : normalizeBaseUrl(input.connection.cloud_base_url);
+  const connectionBaseUrl =
+    input.connection.cloud_base_url === null
+      ? null
+      : normalizeBaseUrl(input.connection.cloud_base_url);
   const authBaseUrl = input.authState === null ? null : normalizeBaseUrl(input.authState.base_url);
   const baseUrl = authBaseUrl ?? connectionBaseUrl;
 
@@ -575,7 +642,7 @@ async function buildConnectedApiCheck(input: {
     return {
       name: "connected-api",
       status: "warning",
-      message: `Connected API ${baseUrl} is reachable, but member-token auth could not be verified without auth state.`
+      message: `Connected API ${baseUrl} is reachable, but access-token auth could not be verified without auth state.`
     };
   }
 
@@ -593,7 +660,7 @@ async function buildConnectedApiCheck(input: {
     return {
       name: "connected-api",
       status: "error",
-      message: `Connected API ${baseUrl} could not verify member-token auth: ${error instanceof Error ? error.message : String(error)}`
+      message: `Connected API ${baseUrl} could not verify access-token auth: ${error instanceof Error ? error.message : String(error)}`
     };
   }
 
@@ -602,7 +669,7 @@ async function buildConnectedApiCheck(input: {
     return {
       name: "connected-api",
       status: "error",
-      message: `Connected API ${baseUrl} failed member-token validation (HTTP ${incidentsResponse.status}).`
+      message: `Connected API ${baseUrl} failed access-token validation (HTTP ${incidentsResponse.status}).`
     };
   }
 
@@ -618,14 +685,14 @@ async function buildConnectedApiCheck(input: {
     return {
       name: "connected-api",
       status: "warning",
-      message: `Connected API ${authBaseUrl} is reachable and member-token auth succeeded, but connection config expects ${connectionBaseUrl}.`
+      message: `Connected API ${authBaseUrl} is reachable and access-token auth succeeded, but connection config expects ${connectionBaseUrl}.`
     };
   }
 
   return {
     name: "connected-api",
     status: "ok",
-    message: `Connected API ${baseUrl} is reachable and member-token auth succeeded.`
+    message: `Connected API ${baseUrl} is reachable and access-token auth succeeded.`
   };
 }
 
@@ -701,17 +768,27 @@ async function runDoctorCommand(
   const fetchImpl = dependencies.fetchImpl ?? nodeFetch;
   const readAuthStateImpl = dependencies.readAuthState ?? readCliAuthState;
   const readdir = dependencies.readdir ?? readdirFromFs;
-  const readFile = dependencies.readFile ?? (async (filePath: string) => {
-    const content = await readManaged(rootDirectory, relative(rootDirectory, filePath));
-    if (content === undefined) throw Object.assign(new Error("Missing local scaffold file."), { code: "ENOENT" });
-    return content;
-  });
+  const readFile =
+    dependencies.readFile ??
+    (async (filePath: string) => {
+      const content = await readManaged(rootDirectory, relative(rootDirectory, filePath));
+      if (content === undefined)
+        throw Object.assign(new Error("Missing local scaffold file."), { code: "ENOENT" });
+      return content;
+    });
   const stat = dependencies.stat ?? statFromFs;
   const rootDirectory = await projectRoot(cwd());
   const currentTime = now();
 
-  const { check: profileCheck, profile, validationErrors } = await loadProfile(rootDirectory, { readFile, stat });
-  const { check: connectionCheck, connection } = await loadConnection(rootDirectory, { readFile, stat });
+  const {
+    check: profileCheck,
+    profile,
+    validationErrors
+  } = await loadProfile(rootDirectory, { readFile, stat });
+  const { check: connectionCheck, connection } = await loadConnection(rootDirectory, {
+    readFile,
+    stat
+  });
   const { check: authCheck, authState } = await buildAuthCheck(input, readAuthStateImpl);
   const connectedApiCheck = await buildConnectedApiCheck({
     connection,
@@ -728,25 +805,45 @@ async function runDoctorCommand(
     ...(connectedApiCheck === null ? [] : [connectedApiCheck]),
     buildProfileValidationCheck(profile, validationErrors),
     buildProfileFreshnessCheck(profile, currentTime),
-    ...(input.checkRelay === true ? [await buildRelaySpoolCheck(rootDirectory, currentTime, { readdir, stat })] : [])
+    ...(input.checkRelay === true
+      ? [await buildRelaySpoolCheck(rootDirectory, currentTime, { readdir, stat })]
+      : [])
   ] satisfies DoctorCheck[];
   let agentReport: Report | undefined;
   try {
-    agentReport = await manageAgentSetup({ root: rootDirectory, files: canonicalFiles(), legacyHashes, instruction: buildManagedAgentsSection() });
+    agentReport = await manageAgentSetup({
+      root: rootDirectory,
+      files: canonicalFiles(),
+      legacyHashes,
+      instruction: buildManagedAgentsSection()
+    });
     if (agentReport.selection_declared) checks.push(...agentChecks(agentReport));
   } catch {
-    checks.push({ name: "agent-setup", status: "error", message: "Cannot safely read agent setup metadata; review .debugbundle/agent-setup.json and directory links." });
+    checks.push({
+      name: "agent-setup",
+      status: "error",
+      message:
+        "Cannot safely read agent setup metadata; review .debugbundle/agent-setup.json and directory links."
+    });
   }
   const privacyPreview = input.privacy === true ? buildPrivacyPreview() : undefined;
 
-  const output = input.json ? buildDoctorJsonOutput(checks, privacyPreview) : formatDoctorOutput(resolveOverallStatus(checks), checks, privacyPreview);
+  const output = input.json
+    ? buildDoctorJsonOutput(checks, privacyPreview)
+    : formatDoctorOutput(resolveOverallStatus(checks), checks, privacyPreview);
   return {
     exitCode: resolveOverallStatus(checks) === "error" ? 1 : 0,
     output: agentReport ? appendAgentReport(output, agentReport, input.json === true) : output
   };
 }
 
-export async function doctorCommand(input: { json?: boolean; authFilePath?: string; checkRelay?: boolean; privacy?: boolean }, dependencies: DoctorCommandDependencies = {}): Promise<CliCommandResult> {
-  try { return await runDoctorCommand(input, dependencies); }
-  catch (error) { return localScaffoldFailure(error, input.json); }
+export async function doctorCommand(
+  input: { json?: boolean; authFilePath?: string; checkRelay?: boolean; privacy?: boolean },
+  dependencies: DoctorCommandDependencies = {}
+): Promise<CliCommandResult> {
+  try {
+    return await runDoctorCommand(input, dependencies);
+  } catch (error) {
+    return localScaffoldFailure(error, input.json);
+  }
 }

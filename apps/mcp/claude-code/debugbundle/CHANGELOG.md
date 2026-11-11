@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.24.0] - 2026-11-12
+
+- Adopt MCP 1.24.0 for saved weekly-review plans and align Access token/Reports guidance, preserving scope, consent and existing authentication.
+
 ## [1.23.0] - 2026-11-11
 
 - Adopt verified MCP 1.23.0 for factual report reads and weekly improvement reviews. Explain explicit Owner consent, selected projects, privacy, cadence and separate AI allowances; preserve existing authentication and investigation workflows.

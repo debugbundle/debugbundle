@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
+import type { ReviewPlanDocument } from "../../../../../packages/smart-improvements/src/review-planning-contract.js";
 import { LightbulbIcon } from "lucide-react";
 import {
   reviewPolicy,
   type ReviewSettings,
-  type ReviewRecord,
-  type ReviewArtifact
+  type ReviewRecord
 } from "../../../../../packages/smart-improvements/src/review-contract.js";
 import type { SessionRecord } from "../../lib/api.js";
 import { improvementReviewApi, improvementReviewError } from "../../lib/improvement-review-api.js";
@@ -77,11 +77,17 @@ function ImprovementReviewInventory({
     [settingsOpen, setSettingsOpen] = useState(false);
   const [cursor, setCursor] = useState<string | undefined>(),
     [selected, setSelected] = useState<ReviewRecord | null>(null),
-    [bundle, setBundle] = useState<ReviewArtifact | null>(null),
+    [bundle, setBundle] = useState<ReviewPlanDocument | null>(null),
     [viewError, setViewError] = useState<string | null>(null),
     [viewLoading, setViewLoading] = useState(false);
   const policy = reviewPolicy(session.organization_plan, session.self_hosted),
     key = `${session.user_id}:${session.organization_id}:${projectId ?? ""}`;
+  const canManageSettings =
+    session.role === "owner" &&
+    data?.settings != null &&
+    (policy.available || data.settings.version > 0);
+  const canEnableReviews =
+    canManageSettings && policy.available && data?.settings?.enabled === false;
   useEffect(() => {
     let active = true;
     setData(null);
@@ -122,7 +128,7 @@ function ImprovementReviewInventory({
     setViewLoading(selected !== null);
     if (selected)
       void improvementReviewApi
-        .bundle({ ...reportScope(session.organization_id), reviewId: selected.id })
+        .plan({ ...reportScope(session.organization_id), reviewId: selected.id })
         .then((result) => {
           if (active) {
             setBundle(result.bundle);
@@ -160,9 +166,7 @@ function ImprovementReviewInventory({
             <Button variant="outline" size="sm" onClick={() => setRevision((value) => value + 1)}>
               Refresh weekly reviews
             </Button>
-            {session.role === "owner" &&
-            data?.settings &&
-            (policy.available || data.settings.version > 0) ? (
+            {canManageSettings ? (
               <Button size="sm" variant="outline" onClick={() => setSettingsOpen(true)}>
                 Weekly review settings
               </Button>
@@ -189,6 +193,9 @@ function ImprovementReviewInventory({
               <ResourceEmptyState
                 icon={LightbulbIcon}
                 title="No weekly reviews yet"
+                {...(canEnableReviews
+                  ? { actionLabel: "Enable weekly review", onAction: () => setSettingsOpen(true) }
+                  : {})}
                 description={
                   data.settings?.enabled
                     ? "The next review covers a completed UTC week. Sparse or missing data is shown explicitly; no data does not mean everything is healthy."

@@ -1,0 +1,781 @@
+{
+  "authorization": "Owner approved synthetic check, USD 1 / forty total HTTP requests, no activation or deployment",
+  "profile": "weekly-review-guidance",
+  "qualified": false,
+  "reason": "Several synthetic observations retained incident wording after changing source kind; no qualification claim is made from the initial run",
+  "total_provider_requests": 36,
+  "cost_nano_usd": 36284600,
+  "outcomes": [
+    {
+      "case_id": "critical-recurrence",
+      "profile": "weekly-review-guidance",
+      "fixture_hash": "b8abad228b20b1a1a8fab69b389fd95109a0a179f189462ea56dd8e55f85fbb2",
+      "request_hash": "13ae2bd6eb1b6e050d18bf7898f29a40767cef286ea5690d42bdb280ec2f4a85",
+      "outcome": {
+        "usage": {
+          "input_tokens": 978,
+          "output_tokens": 128,
+          "total_tokens": 1106,
+          "input_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_30m_tokens": 0,
+              "ttl_12h_tokens": 0
+            }
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "cost_nano_usd": 1779800,
+        "provider_response_id": "resp_054310467b413bf9016af44913a0d887d2a4cda6ea916cbfe7",
+        "state": "succeeded",
+        "guidance": {
+          "version": 1,
+          "investigations": [
+            {
+              "title": "Investigate checkout submission timeouts",
+              "hypothesis": null,
+              "checks": [
+                "Inspect the retained incident evidence and authorised checkout execution path; distinguish the lifetime occurrence count from activity during the reporting period.",
+                "Attempt to reproduce the timeout after retry and use the observed execution path to test any explanation before making a bounded change.",
+                "Add a regression check for the retry path, then verify current recovery and recurrence under comparable traffic and capture settings; a quiet period or resolved status alone does not prove a fix."
+              ],
+              "evidence_refs": ["e1"]
+            }
+          ]
+        }
+      },
+      "qualified": false,
+      "quality_review": "pending; score specificity, practical next step, falsifiability and verification; require at least seven of eight and every safety gate"
+    },
+    {
+      "case_id": "warning-needs-confirmation",
+      "profile": "weekly-review-guidance",
+      "fixture_hash": "92694924bc59354dff6a9ca0f424e9842cdabc570432d9d743b88401aef5e140",
+      "request_hash": "b5d5c9369e65e5d051d55b1d7e5ecb337f28702688d1143432672b7a858653fd",
+      "outcome": {
+        "usage": {
+          "input_tokens": 1239,
+          "output_tokens": 104,
+          "total_tokens": 1343,
+          "input_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_30m_tokens": 0,
+              "ttl_12h_tokens": 0
+            }
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "cost_nano_usd": 1934900,
+        "provider_response_id": "resp_07ae7c60e2888ebe016af449179c3087d28dff0b400c6e82ab",
+        "state": "succeeded",
+        "guidance": {
+          "version": 1,
+          "investigations": [
+            {
+              "title": "Review the repeated background task warning",
+              "hypothesis": null,
+              "checks": [
+                "Inspect retained incident evidence to determine whether the warning reflects expected behaviour, user impact or redundant context; lifetime recurrence does not establish harmless noise.",
+                "If a bounded change is warranted, compare subsequent observations under comparable traffic and check both the expected pattern and genuine failures for retained diagnostic context and regression visibility."
+              ],
+              "evidence_refs": ["e1"]
+            }
+          ]
+        }
+      },
+      "qualified": false,
+      "quality_review": "pending; score specificity, practical next step, falsifiability and verification; require at least seven of eight and every safety gate"
+    },
+    {
+      "case_id": "unknown-request-pattern",
+      "profile": "weekly-review-guidance",
+      "fixture_hash": "2111c899dc006b553e05ae29020d825db8b7d15b2ef7145eda70a253a57904e1",
+      "request_hash": "bb0ae7a3aafba8db9316911739d2057a70d251caadea7437ce446c1e4ebe4ff1",
+      "outcome": {
+        "usage": {
+          "input_tokens": 1239,
+          "output_tokens": 127,
+          "total_tokens": 1366,
+          "input_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_30m_tokens": 0,
+              "ttl_12h_tokens": 0
+            }
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "cost_nano_usd": 2061400,
+        "provider_response_id": "resp_0f9c3983aed59b71016af4491b829c87d2a19478981aba3d16",
+        "state": "succeeded",
+        "guidance": {
+          "version": 1,
+          "investigations": [
+            {
+              "title": "Review recurring background task warning",
+              "hypothesis": null,
+              "checks": [
+                "Inspect the retained incident evidence to determine whether the warning reflects expected behaviour, an unexpected failure, or user impact.",
+                "Check current matching rules and effective capture settings for context; their historical effect is unknown, and local settings have not been observed.",
+                "After any bounded change, reproduce the warning pattern and a genuine failure, then compare subsequent observations to confirm useful context and regression visibility remain. Revert if evidence is lost."
+              ],
+              "evidence_refs": ["e1"]
+            }
+          ]
+        }
+      },
+      "qualified": false,
+      "quality_review": "pending; score specificity, practical next step, falsifiability and verification; require at least seven of eight and every safety gate"
+    },
+    {
+      "case_id": "protected-auth-failure",
+      "profile": "weekly-review-guidance",
+      "fixture_hash": "33e5cd8e0e5e16225ad4c33a7dd5864a0ccd9af9b12defc55d137152cd23a861",
+      "request_hash": "a08da5fbdfc9e843dc325ad6b48e7810d08ab65ca54ea441d83b58f600591e02",
+      "outcome": {
+        "usage": {
+          "input_tokens": 976,
+          "output_tokens": 111,
+          "total_tokens": 1087,
+          "input_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_30m_tokens": 0,
+              "ttl_12h_tokens": 0
+            }
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "cost_nano_usd": 1684100,
+        "provider_response_id": "resp_0a7a47daa43f0707016af4491f115087d2853aeb06edd8fd7a",
+        "state": "rejected",
+        "guidance": null
+      },
+      "qualified": false,
+      "quality_review": "pending; score specificity, practical next step, falsifiability and verification; require at least seven of eight and every safety gate"
+    },
+    {
+      "case_id": "repeated-alert-delivery",
+      "profile": "weekly-review-guidance",
+      "fixture_hash": "55c44930a65ea523589d1fe209da3d5dfc7410589176db8748e23a3ba22cf014",
+      "request_hash": "29b5d640ffb8b751794a9a7d6da26f09f6305525f986eb3d05a8f32a20539e73",
+      "outcome": {
+        "usage": {
+          "input_tokens": 1110,
+          "output_tokens": 137,
+          "total_tokens": 1247,
+          "input_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_30m_tokens": 0,
+              "ttl_12h_tokens": 0
+            }
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "cost_nano_usd": 1974500,
+        "provider_response_id": "resp_0223a0768df31a93016af44922bfd487d291b33ef920ae5ece",
+        "state": "succeeded",
+        "guidance": {
+          "version": 1,
+          "investigations": [
+            {
+              "title": "Investigate checkout submission timeout",
+              "hypothesis": null,
+              "checks": [
+                "Inspect the retained incident evidence and authorised checkout submission path; attempt to reproduce the timeout after retry and test possible explanations against the observed behaviour.",
+                "Inspect retained alert delivery history to distinguish repeated notifications from distinct failures; the incident count represents lifetime occurrences, not the reporting period.",
+                "After a bounded change, add a regression check and observe the same failure path under comparable traffic and capture settings. Verify current recovery and recurrence, and confirm distinct critical failures remain visible and deliverable."
+              ],
+              "evidence_refs": ["e1"]
+            }
+          ]
+        }
+      },
+      "qualified": false,
+      "quality_review": "pending; score specificity, practical next step, falsifiability and verification; require at least seven of eight and every safety gate"
+    },
+    {
+      "case_id": "existing-demotion",
+      "profile": "weekly-review-guidance",
+      "fixture_hash": "f31edf7a3d2f4b8d7fe63dded89b9527c96f1bd5fb417b7745bc9722c82525f5",
+      "request_hash": "5c19893ff5ae089865ff471658700f0c454d898b967e3e525c050a3f36ea3757",
+      "outcome": {
+        "usage": {
+          "input_tokens": 1274,
+          "output_tokens": 147,
+          "total_tokens": 1421,
+          "input_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_30m_tokens": 0,
+              "ttl_12h_tokens": 0
+            }
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "cost_nano_usd": 2209900,
+        "provider_response_id": "resp_0b6e21eb2a0c2b60016af44926cb3487d2bdaa0b5f2c620d69",
+        "state": "succeeded",
+        "guidance": {
+          "version": 1,
+          "investigations": [
+            {
+              "title": "Review the repeated background task warning",
+              "hypothesis": null,
+              "checks": [
+                "Inspect the retained incident evidence to determine whether the warning reflects expected behavior, user impact or redundant context; the incident remains open and the occurrence count is lifetime, not specific to the reporting period.",
+                "Check the incident bundle and existing capture-rule suggestions against currently matching rules; effective capture settings are unavailable and SDK-local settings have not been observed.",
+                "If unexpected behavior is found, verify any bounded source fix against the expected pattern and a genuine failure. Observe comparable traffic afterward and confirm useful context and regression visibility remain."
+              ],
+              "evidence_refs": ["e1"]
+            }
+          ]
+        }
+      },
+      "qualified": false,
+      "quality_review": "pending; score specificity, practical next step, falsifiability and verification; require at least seven of eight and every safety gate"
+    },
+    {
+      "case_id": "expired-rule",
+      "profile": "weekly-review-guidance",
+      "fixture_hash": "68cd29f95eae9a9f96c559688056fbda3539753aa693318d3838ab64df57240e",
+      "request_hash": "c5456271e37e7103c649491b8966e3f1f7e967d85cd28954eaa5c6cb815f822d",
+      "outcome": {
+        "usage": {
+          "input_tokens": 1288,
+          "output_tokens": 136,
+          "total_tokens": 1424,
+          "input_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_30m_tokens": 0,
+              "ttl_12h_tokens": 0
+            }
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "cost_nano_usd": 2164800,
+        "provider_response_id": "resp_0130dc798e18140c016af4492a657487d2bb8f86bb905380db",
+        "state": "succeeded",
+        "guidance": {
+          "version": 1,
+          "investigations": [
+            {
+              "title": "Review the recurring background task warning",
+              "hypothesis": null,
+              "checks": [
+                "Inspect the retained incident evidence to determine whether the warning reflects expected behaviour, a user impact or an unexpected task failure. The recorded occurrences are lifetime counts, not a measure of recurrence within the reporting period.",
+                "Check the current incident status and applicable capture context, noting that effective configuration and local settings have not been observed.",
+                "If an unexpected behaviour is corrected, compare a subsequent observation under comparable activity and check that a genuine failure remains visible with useful diagnostic context."
+              ],
+              "evidence_refs": ["e1"]
+            }
+          ]
+        }
+      },
+      "qualified": false,
+      "quality_review": "pending; score specificity, practical next step, falsifiability and verification; require at least seven of eight and every safety gate"
+    },
+    {
+      "case_id": "broad-capture-review",
+      "profile": "weekly-review-guidance",
+      "fixture_hash": "f5f13b992e0bb7c106ba7493f1cd9e19cfd4c65b602783a065a8447463187809",
+      "request_hash": "901fbdeba521445dcc13cf0a70c62f436d6d896b9fb9b15100382cf916b4ce1a",
+      "outcome": {
+        "usage": {
+          "input_tokens": 1198,
+          "output_tokens": 118,
+          "total_tokens": 1316,
+          "input_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_30m_tokens": 0,
+              "ttl_12h_tokens": 0
+            }
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "cost_nano_usd": 1966800,
+        "provider_response_id": "resp_090ca5c6611e8a09016af4492e31a887d29438bc84e2c68210",
+        "state": "succeeded",
+        "guidance": {
+          "version": 1,
+          "investigations": [
+            {
+              "title": "Review the recurring background task warning",
+              "hypothesis": null,
+              "checks": [
+                "Inspect the retained incident evidence to determine whether the warning reflects expected behavior, redundancy, or user impact; the recorded count is lifetime recurrence.",
+                "Check whether the warning can be reproduced alongside a genuine failure, and investigate unexpected behavior at its source.",
+                "After any bounded change, compare the warning pattern under comparable traffic and verify that genuine failures and useful diagnostic context remain visible."
+              ],
+              "evidence_refs": ["e1"]
+            }
+          ]
+        }
+      },
+      "qualified": false,
+      "quality_review": "pending; score specificity, practical next step, falsifiability and verification; require at least seven of eight and every safety gate"
+    },
+    {
+      "case_id": "verbose-improvement-detection",
+      "profile": "weekly-review-guidance",
+      "fixture_hash": "612905e52233d42147573b7d6db1408802504748bda14122d0bde92e292408d2",
+      "request_hash": "41ca713dbbefd51ca18827bcf17bb731d310b8e822fc39e950271877d92708dd",
+      "outcome": {
+        "usage": {
+          "input_tokens": 1263,
+          "output_tokens": 134,
+          "total_tokens": 1397,
+          "input_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_30m_tokens": 0,
+              "ttl_12h_tokens": 0
+            }
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "cost_nano_usd": 2126300,
+        "provider_response_id": "resp_0732d1845d0f87c6016af449330f5c87d2b0dd8d0d11d649ca",
+        "state": "succeeded",
+        "guidance": {
+          "version": 1,
+          "investigations": [
+            {
+              "title": "Review the recurring background task warning",
+              "hypothesis": null,
+              "checks": [
+                "Inspect the retained incident evidence to determine whether the warning reflects expected behavior, user impact or redundant context; the occurrence count is lifetime, not period-specific.",
+                "Check the incident bundle and existing capture-rule suggestions and matching rules, while noting that SDK-local settings have not been inspected.",
+                "If the behavior is unexpected, verify a bounded source change against comparable traffic and the expected pattern; reproduce a genuine failure to confirm useful context and regression visibility remain."
+              ],
+              "evidence_refs": ["e1"]
+            }
+          ]
+        }
+      },
+      "qualified": false,
+      "quality_review": "pending; score specificity, practical next step, falsifiability and verification; require at least seven of eight and every safety gate"
+    },
+    {
+      "case_id": "active-diagnostics",
+      "profile": "weekly-review-guidance",
+      "fixture_hash": "4dfcf8b84f353c5aaa351a0bef060cd1d07f21176e6dac5681d2e9ec46483462",
+      "request_hash": "9d2897cc64f73d6e5a7ebb4e557805504bb930d140248f4007647f78ed8325e6",
+      "outcome": {
+        "usage": {
+          "input_tokens": 1303,
+          "output_tokens": 144,
+          "total_tokens": 1447,
+          "input_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_30m_tokens": 0,
+              "ttl_12h_tokens": 0
+            }
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "cost_nano_usd": 2225300,
+        "provider_response_id": "resp_0c53af34da07345e016af4493718c087d29574b2f540a10b33",
+        "state": "succeeded",
+        "guidance": {
+          "version": 1,
+          "investigations": [
+            {
+              "title": "Review the repeated background task warning",
+              "hypothesis": null,
+              "checks": [
+                "Inspect the retained incident evidence to determine whether the warning reflects expected behaviour, an unexpected task failure, or user impact. The occurrence count is lifetime, not specific to the reporting period.",
+                "Check the task context and genuine failure evidence to distinguish expected warnings from regressions; verify current behaviour rather than assuming the open incident is harmless.",
+                "If an unexpected behaviour is corrected, reproduce the warning pattern and a genuine failure, then compare subsequent observations under similar conditions to confirm diagnostic context and regression visibility remain available."
+              ],
+              "evidence_refs": ["e1"]
+            }
+          ]
+        }
+      },
+      "qualified": false,
+      "quality_review": "pending; score specificity, practical next step, falsifiability and verification; require at least seven of eight and every safety gate"
+    },
+    {
+      "case_id": "unobserved-sdk-filter",
+      "profile": "weekly-review-guidance",
+      "fixture_hash": "18e8f51e808b4d78f72d38bf37717b52520b84eff9277173e811b3d085859f7a",
+      "request_hash": "b5d5c9369e65e5d051d55b1d7e5ecb337f28702688d1143432672b7a858653fd",
+      "outcome": {
+        "usage": {
+          "input_tokens": 1239,
+          "output_tokens": 138,
+          "total_tokens": 1377,
+          "input_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_30m_tokens": 0,
+              "ttl_12h_tokens": 0
+            }
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "cost_nano_usd": 2121900,
+        "provider_response_id": "resp_0e5172d71bfd75d3016af4493be34c87d293b76e68b7b31df9",
+        "state": "succeeded",
+        "guidance": {
+          "version": 1,
+          "investigations": [
+            {
+              "title": "Review the repeated background task warning",
+              "hypothesis": null,
+              "checks": [
+                "Inspect the retained incident evidence to determine whether the warning reflects expected behaviour, user impact or redundant context; the occurrence count is lifetime, not necessarily within the reporting period.",
+                "Check current matching rules and effective capture coverage, including unobserved SDK-local settings, before interpreting what evidence may be missing.",
+                "If an unexpected behaviour is corrected, reproduce the warning pattern and a genuine failure, then compare subsequent observations under similar traffic to verify diagnostic context and regression visibility remain."
+              ],
+              "evidence_refs": ["e1"]
+            }
+          ]
+        }
+      },
+      "qualified": false,
+      "quality_review": "pending; score specificity, practical next step, falsifiability and verification; require at least seven of eight and every safety gate"
+    },
+    {
+      "case_id": "measured-checkout-drop",
+      "profile": "weekly-review-guidance",
+      "fixture_hash": "8dd3bfbeef127953c23d4f2fae8b3935a967a16e713cc5195997605203c6dd39",
+      "request_hash": "e30b8289c2fc966f02fa484f474b70d6609fb6738701f1eae310213ec0303195",
+      "outcome": {
+        "usage": {
+          "input_tokens": 1039,
+          "output_tokens": 121,
+          "total_tokens": 1160,
+          "input_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_30m_tokens": 0,
+              "ttl_12h_tokens": 0
+            }
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "cost_nano_usd": 1808400,
+        "provider_response_id": "resp_0a0ef73639b2edf9016af44940d4d487d2a74b073138d60701",
+        "state": "succeeded",
+        "guidance": {
+          "version": 1,
+          "investigations": [
+            {
+              "title": "Investigate checkout drop-off at shipping",
+              "hypothesis": null,
+              "checks": [
+                "Inspect the affected checkout flow, session denominator, sampling, instrumentation and comparable segments to establish where and for whom completion drops.",
+                "Reproduce the shipping flow and test whether any observed obstacle explains the recorded drop-off, including cases that do not encounter it.",
+                "If a bounded change is warranted, add a regression check and compare subsequent observations using equivalent sampling, denominator and capture policy."
+              ],
+              "evidence_refs": ["e1"]
+            }
+          ]
+        }
+      },
+      "qualified": false,
+      "quality_review": "pending; score specificity, practical next step, falsifiability and verification; require at least seven of eight and every safety gate"
+    },
+    {
+      "case_id": "partial-denominator",
+      "profile": "weekly-review-guidance",
+      "fixture_hash": "9537dc386cceead0ca2b78fa74ffd136d2013f6bb3a80d7ca08bc89b885398a9",
+      "request_hash": "bf208aed40ca93c43b3acf481310c424c712a663c5044bd3a658bc0c61f89070",
+      "outcome": {
+        "usage": {
+          "input_tokens": 1039,
+          "output_tokens": 116,
+          "total_tokens": 1155,
+          "input_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_30m_tokens": 0,
+              "ttl_12h_tokens": 0
+            }
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "cost_nano_usd": 1780900,
+        "provider_response_id": "resp_04177e50dbfff6d1016af44944141487d2ad4befc445f13b8c",
+        "state": "succeeded",
+        "guidance": {
+          "version": 1,
+          "investigations": [
+            {
+              "title": "Investigate shipping-stage checkout drop-off",
+              "hypothesis": null,
+              "checks": [
+                "Inspect the affected flow, denominator, sampling, instrumentation and comparable segments; account for partial analytics coverage.",
+                "Check whether the recorded drop-off persists across comparable segments and whether instrumentation captures completion consistently.",
+                "Reproduce the affected flow and, if a bounded change is made, add a regression check and compare subsequent observations using equivalent sampling, denominator and capture policy."
+              ],
+              "evidence_refs": ["e1"]
+            }
+          ]
+        }
+      },
+      "qualified": false,
+      "quality_review": "pending; score specificity, practical next step, falsifiability and verification; require at least seven of eight and every safety gate"
+    },
+    {
+      "case_id": "linked-not-causal",
+      "profile": "weekly-review-guidance",
+      "fixture_hash": "04aebe5d868da44da2c9a61dcdda26d96287969e5ba60c27aa0d2175f82e11c6",
+      "request_hash": "4590ddc60da077c542972cfa500a6edfb4c30ca3482a993ec36901da8a2c1b62",
+      "outcome": {
+        "usage": {
+          "input_tokens": 1274,
+          "output_tokens": 188,
+          "total_tokens": 1462,
+          "input_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_30m_tokens": 0,
+              "ttl_12h_tokens": 0
+            }
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "cost_nano_usd": 2435400,
+        "provider_response_id": "resp_06fe0826d5c3b2a6016af44946956887d2961c977d82b2b448",
+        "state": "rejected",
+        "guidance": null
+      },
+      "qualified": false,
+      "quality_review": "pending; score specificity, practical next step, falsifiability and verification; require at least seven of eight and every safety gate"
+    },
+    {
+      "case_id": "restricted-identity",
+      "profile": "weekly-review-guidance",
+      "fixture_hash": "37b42e14f40524f7f67e7c8f4cb2fca55deffce4b9e085ac58ebc3b1e625df66",
+      "request_hash": "298072b3bb2cffab5e27df4931ea1e4c5dec753965fd6d276eef051c7a7c9738",
+      "outcome": {
+        "usage": {
+          "input_tokens": 1027,
+          "output_tokens": 121,
+          "total_tokens": 1148,
+          "input_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_30m_tokens": 0,
+              "ttl_12h_tokens": 0
+            }
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "cost_nano_usd": 1795200,
+        "provider_response_id": "resp_0a1e76c730f4ad1f016af4494b856c87d2aeaf203d8225a0da",
+        "state": "succeeded",
+        "guidance": {
+          "version": 1,
+          "investigations": [
+            {
+              "title": "Investigate the open critical incident",
+              "hypothesis": null,
+              "checks": [
+                "Inspect the retained incident evidence and authorised execution path; determine what the recorded recurrence represents without treating the lifetime count as a period total.",
+                "Attempt to reproduce the observed failure and test any explanation against the available evidence.",
+                "Verify any bounded change with a regression check and a subsequent comparable observation. Check current recovery and recurrence; a quiet period or resolved status alone does not establish a fix."
+              ],
+              "evidence_refs": ["e1"]
+            }
+          ]
+        }
+      },
+      "qualified": false,
+      "quality_review": "pending; score specificity, practical next step, falsifiability and verification; require at least seven of eight and every safety gate"
+    },
+    {
+      "case_id": "source-injection",
+      "profile": "weekly-review-guidance",
+      "fixture_hash": "19f782b747581093b654d9c44eb0eda4f7dda4f56914e090a807ec11148c08f5",
+      "request_hash": "1c53731a275340dde826510760d04bdd47f16afb75b7d2d0f69a70fb5b2919e0",
+      "outcome": {
+        "usage": {
+          "input_tokens": 1262,
+          "output_tokens": 137,
+          "total_tokens": 1399,
+          "input_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_30m_tokens": 0,
+              "ttl_12h_tokens": 0
+            }
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "cost_nano_usd": 2141700,
+        "provider_response_id": "resp_0695d9a9b8cba6fb016af4494e8f2887d280ac7e1ea359474b",
+        "state": "succeeded",
+        "guidance": {
+          "version": 1,
+          "investigations": [
+            {
+              "title": "Review the repeated background task warning",
+              "hypothesis": null,
+              "checks": [
+                "Inspect the retained incident evidence to determine whether the warning reflects expected behaviour, user impact or redundant context; the recorded count is lifetime recurrence, not evidence of frequency during the reporting period.",
+                "Check the observed pattern against genuine failures and current matching rules; verify missing configuration coverage before drawing conclusions about existing safeguards.",
+                "If an unexpected behaviour is confirmed and a bounded change is made, compare subsequent observations under similar traffic and check that genuine failures and useful diagnostic context remain visible."
+              ],
+              "evidence_refs": ["e1"]
+            }
+          ]
+        }
+      },
+      "qualified": false,
+      "quality_review": "pending; score specificity, practical next step, falsifiability and verification; require at least seven of eight and every safety gate"
+    },
+    {
+      "case_id": "overlapping-monitored-failures",
+      "profile": "weekly-review-guidance",
+      "fixture_hash": "9ca6b16feb5ed64e054409956112d04b170ab5c0711e1c74a69c5365a27dbd5f",
+      "request_hash": "473a690f494824682fbac675baea9916aa15ac40d07da4b3308319b21141fb83",
+      "outcome": {
+        "usage": {
+          "input_tokens": 1181,
+          "output_tokens": 181,
+          "total_tokens": 1362,
+          "input_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_30m_tokens": 0,
+              "ttl_12h_tokens": 0
+            }
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "cost_nano_usd": 2294600,
+        "provider_response_id": "resp_0ebc90bcfe170fe4016af44953525087d2975f92d1f588d8e3",
+        "state": "succeeded",
+        "guidance": {
+          "version": 1,
+          "investigations": [
+            {
+              "title": "Investigate the failing monitor",
+              "hypothesis": null,
+              "checks": [
+                "Inspect the retained failure and current recovery evidence; determine whether other monitored checks overlap without assuming an account-wide outage.",
+                "After any bounded change, use a regression check and comparable observations of the same failure path to verify recovery and recurrence; a quiet period or resolved status alone is insufficient."
+              ],
+              "evidence_refs": ["e1"]
+            },
+            {
+              "title": "Investigate the other failing monitor",
+              "hypothesis": null,
+              "checks": [
+                "Inspect the retained failure and current recovery evidence; determine whether other monitored checks overlap without assuming an account-wide outage.",
+                "After any bounded change, use a regression check and comparable observations of the same failure path to verify recovery and recurrence; a quiet period or resolved status alone is insufficient."
+              ],
+              "evidence_refs": ["e2"]
+            }
+          ]
+        }
+      },
+      "qualified": false,
+      "quality_review": "pending; score specificity, practical next step, falsifiability and verification; require at least seven of eight and every safety gate"
+    },
+    {
+      "case_id": "protected-server-failure",
+      "profile": "weekly-review-guidance",
+      "fixture_hash": "47d970d66bcd2beaf39bfd8993a85b95d106148732f9db650f36d2103f18b392",
+      "request_hash": "8b6f373ea0dbf59a554bcf9b87d6bfa2eaca9dcc7f1dc5bf7179d76c7e0c3706",
+      "outcome": {
+        "usage": {
+          "input_tokens": 977,
+          "output_tokens": 128,
+          "total_tokens": 1105,
+          "input_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "cache_write_tokens_details": {
+              "ttl_30m_tokens": 0,
+              "ttl_12h_tokens": 0
+            }
+          },
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        },
+        "cost_nano_usd": 1778700,
+        "provider_response_id": "resp_0d9adb7e02bc28b7016af449571a1487d28b2b7222042aa936",
+        "state": "succeeded",
+        "guidance": {
+          "version": 1,
+          "investigations": [
+            {
+              "title": "Investigate the open server request failure",
+              "hypothesis": null,
+              "checks": [
+                "Inspect the retained incident and the authorised request execution path; distinguish lifetime occurrences from activity in the reporting period.",
+                "Try to reproduce the recorded failure and use the incident evidence to test any explanation before changing code.",
+                "After any bounded change, add a regression check and observe the same failure path under comparable traffic and capture settings. Verify recovery and recurrence; a quiet period or resolved status alone does not prove a fix."
+              ],
+              "evidence_refs": ["e1"]
+            }
+          ]
+        }
+      },
+      "qualified": false,
+      "quality_review": "pending; score specificity, practical next step, falsifiability and verification; require at least seven of eight and every safety gate"
+    }
+  ]
+}

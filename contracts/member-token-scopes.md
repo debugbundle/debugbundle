@@ -1,4 +1,14 @@
-# Member token scopes
+<a id="member-token-scopes"></a>
+
+# Access token scopes
+
+The public name is **Access tokens** (formerly member tokens), for CLI, API and
+agent credentials bound to the issuing user's current authority. This naming
+change preserves `dbundle_mem_`, `/v1/member/tokens`, `token member`, MCP tool
+names, `DEBUGBUNDLE_MEMBER_TOKEN`, configuration keys, error codes, schemas and
+stored values. OAuth access tokens and restricted agent-read credentials remain
+separate. Existing tokens need no replacement or migration. The dashboard route is
+`/access-tokens`; the former `/member-tokens` route is not registered or redirected.
 
 Implements FR-BUS-03 and AC-BUS-03 in [the Business contract](../spec/business-tier.md).
 Project ingestion, agent tokens, OpenAI OAuth and the hosted/restricted MCP
@@ -43,7 +53,12 @@ CLI `token member list --include-scope` and `token member create --scope-json
 '<declaration>' [--expires-at <iso>]` expose the same declarations. Ordinary MCP
 `list_member_tokens` accepts `includeScope`; `create_member_token` accepts `scope`
 and `expiresAt`. Both retain the verified-interactive issuance boundary. The
-dashboard's new form defaults to selected projects and read-only permissions.
+dashboard calls organisation scope **Current workspace** on every tier and selects it
+by default. New and replacement forms preselect `project:read`, `project:write` and
+`project:admin` for workspace Owners/Admins. For workspace Members, read/write are
+preselected; workspace-wide project settings remain unavailable under the existing
+issuance policy, with selected-project scope available for projects they administer.
+`organization:admin` is never selected by default. Existing tokens are unchanged.
 
 New interactive and token-identified artifact requests retain only the user ID
 and initiating token ID, plus accepted origin scope. No bearer/session plaintext

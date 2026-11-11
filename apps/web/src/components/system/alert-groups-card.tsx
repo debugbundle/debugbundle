@@ -1,3 +1,4 @@
+import { MetadataSeparator } from "./metadata-separator.js";
 import { BellRingIcon, ListIcon } from "lucide-react";
 import { ResourceEmptyState } from "./resource-empty-state.js";
 import { useEffect, useState } from "react";
@@ -203,7 +204,9 @@ export function AlertGroupsCard({ projectId }: { projectId: string }): JSX.Eleme
         ) : (
           <>
             <p className="text-sm text-muted-foreground">
-              {detail?.group.member_count} members · {detail?.group.status}
+              {detail?.group.member_count} members
+              <MetadataSeparator />
+              {detail?.group.status}
             </p>
             {detail?.members.length === 0 ? (
               <ResourceEmptyState

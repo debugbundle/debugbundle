@@ -25,21 +25,21 @@ export const REPORT_RUN_MCP_TOOL_CATALOG = [
     name: REPORT_RUN_MCP_TOOL_NAMES[0],
     inputSchema: listing,
     description:
-      "List retained Smart Report runs under current access to every frozen origin. Follow next_cursor even when an authorised page is empty.",
+      "List retained report runs under current access to every frozen origin. Follow next_cursor even when an authorised page is empty.",
     read: true
   },
   {
     name: REPORT_RUN_MCP_TOOL_NAMES[1],
     inputSchema: identity,
     description:
-      "Read a Smart Report's status, period, scope and expiry. This returns metadata, never private model requests or provider receipts.",
+      "Read a report's status, period, scope and expiry. This returns metadata, never private model requests or provider receipts.",
     read: true
   },
   {
     name: REPORT_RUN_MCP_TOOL_NAMES[2],
     inputSchema: generation,
     description:
-      "Queue a Business Smart Report for an explicit completed UTC period and expected definition version. Reuse the stable request UUID and identical command after a lost acknowledgement. Regeneration consumes another shared monthly generation. May send bounded redacted evidence to the configured provider; email is false unless explicitly requested. Cannot choose models, budgets or authority.",
+      "Queue a report for an explicit completed UTC period and expected definition version. Reuse the stable request UUID and identical command after a lost acknowledgement. Regeneration consumes another shared monthly generation. Solo and Team factual reports make no AI requests. Business Smart Reports may send bounded redacted evidence to the configured provider; email is false unless explicitly requested. Cannot choose models, budgets or authority.",
     read: false
   },
   {
@@ -60,7 +60,7 @@ export const REPORT_RUN_MCP_TOOL_CATALOG = [
     name: REPORT_RUN_MCP_TOOL_NAMES[5],
     inputSchema: identity,
     description:
-      "Read the immutable canonical Smart Report facts, qualitative narrative and current retained-source availability. Requires current read access to every frozen origin, including after downgrade. Does not call AI or consume another generation.",
+      "Read the immutable canonical report facts, any available qualitative narrative and current retained-source availability. Requires current read access to every frozen origin, including after downgrade. Does not call AI or consume another generation.",
     read: true
   },
   {

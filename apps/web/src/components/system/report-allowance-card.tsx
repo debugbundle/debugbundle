@@ -1,3 +1,4 @@
+import { MetadataSeparator } from "./metadata-separator.js";
 import type { ReportAllowance } from "../../../../../packages/smart-reports/src/report-allowance.js";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../ui/card.js";
 import { Notice } from "../ui/notice.js";
@@ -19,9 +20,18 @@ export function ReportAllowanceCard({
             : "Shared report allowance"}
         </CardTitle>
         <CardDescription>
-          {value
-            ? `${value.used} used · ${value.scope_complete ? "" : "At least "}${value.scheduled_remaining} scheduled before the reset · Resets ${reportTimeLabel(value.window.ends_at)}`
-            : "Scheduled and manual reports share this allowance."}
+          {value ? (
+            <>
+              {value.used} used
+              <MetadataSeparator />
+              {value.scope_complete ? "" : "At least "}
+              {value.scheduled_remaining} scheduled before the reset
+              <MetadataSeparator />
+              Resets {reportTimeLabel(value.window.ends_at)}
+            </>
+          ) : (
+            "Scheduled and manual reports share this allowance."
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">

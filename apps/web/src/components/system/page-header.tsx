@@ -20,9 +20,22 @@ export function PageHeader({
   }
 
   return (
-    <div className={cn("flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between", className)} {...props}>
-      {!hasDescription ? null : <p className="max-w-2xl text-sm text-muted-foreground">{description}</p>}
-      {actions === undefined ? null : <div className="flex flex-wrap items-center gap-3">{actions}</div>}
+    <div
+      data-slot="page-header"
+      className={cn(
+        "flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between",
+        className
+      )}
+      {...props}
+    >
+      {!hasDescription ? null : (
+        <p className="max-w-2xl text-sm text-muted-foreground">{description}</p>
+      )}
+      {actions === undefined ? null : (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 lg:ml-auto lg:justify-end">
+          {actions}
+        </div>
+      )}
     </div>
   );
 }

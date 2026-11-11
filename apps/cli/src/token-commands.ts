@@ -479,7 +479,7 @@ export async function createMemberTokenCommand(
 
     return {
       exitCode: 0,
-      output: `Member token created: ${token.token_id}\nPlaintext: ${token.plaintext ?? "<none>"}`
+      output: `Access token created: ${token.token_id}\nPlaintext: ${token.plaintext ?? "<none>"}`
     };
   } catch (error) {
     return {
@@ -548,7 +548,7 @@ export async function revokeMemberTokenCommand(
 
     return {
       exitCode: 0,
-      output: `Member token revoked: ${token.token_id}`
+      output: `Access token revoked: ${token.token_id}`
     };
   } catch (error) {
     return {

@@ -6,6 +6,13 @@ authoritative when a term's behavior is specified in more detail.
 
 ## Project and Service Terms
 
+### Weekly improvement plan
+
+A bounded server-owned next step linked to retained evidence, with an action class,
+priority reason, inspection and verification condition. A noise review can suggest
+which existing configuration workflow to inspect; it does not establish harmlessness,
+apply a rule or prove a fix. A plan read adds these checks while the saved bundle export stays compatible.
+
 ### Project
 
 The system investigated together and its shared access/settings boundary. Its
@@ -371,7 +378,20 @@ environment. A trace can cross services; its reuse cannot combine projects or
 environments. Mixed retained local source evidence is refused until an explicit
 rebuild from preserved event files.
 
-## Business, referrals and Smart Reports
+## Business, referrals and reports
+
+- **Access token:** A user-bound credential for CLI, API and ordinary MCP access,
+  formerly called a member token. Current user permissions and any saved token
+  policy limit its authority. Existing `dbundle_mem_`, `member_token` identifiers,
+  API/CLI/MCP names and environment/configuration keys remain compatible.
+  OAuth access tokens, Project tokens and Agent Read tokens are separate types.
+
+- **Reports:** The reporting feature available on all paid hosted plans. Solo and
+  Team include factual reports; Business adds Smart Reports with AI analysis.
+- **Smart Reports:** Business reports with optional AI analysis and safe factual
+  fallback. Use this name for the AI product, not the all-plan reporting category.
+  Self-hosted AI requires explicit operator configuration. Existing `smart_reports`
+  capability fields and `/docs/smart-reports/` URLs remain compatible identifiers.
 
 - **Report model diagnostic:** An allowlisted operator code for a model rejection
   or uncertain outcome, stored separately from the immutable AI receipt hash.
@@ -385,12 +405,12 @@ rebuild from preserved event files.
 - **Monthly allowance window:** The shared usage period, including a monthly sub-window inside an annual paid term. Capacity purchases and upgrades do not reset consumed usage.
 - **First eligible referral invoice:** The first finalised, positive Business base invoice carrying the verified referral benefit. A retry of that invoice keeps its discount; trial/zero invoices do not consume it and a later invoice does not receive another benefit.
 - **Collected base cash:** Verified, allocated payment for eligible Business base service, excluding tax, capacity and non-cash credit. Referral commission follows this cash and the paid-service period, with refund/dispute reversals and availability holds.
-- **Canonical Smart Report:** One immutable, private structured report. HTML, PDF and email overview use its same facts and analysis; formatting retries do not generate more AI analysis.
+- **Canonical report:** One immutable, private structured report. HTML, PDF and email overview use its same facts and any available analysis; formatting retries do not generate more AI analysis.
 - **Whole report scope:** Every frozen project and original origin selected for that report. Reading or delivering the report requires current authority for the entire scope; AI prose is never made shareable by filtering out projects afterward.
 - **Factual-only report:** A canonical report containing authoritative observations and explicit analysis unavailability when optional AI cannot safely complete.
 - **Uncertain delivery:** A provider request whose acceptance cannot be established. It retains a conservative receipt and is not blindly resent.
 
-- **Saved-report consent:** Explicit OAuth permission `debugbundle:reports:read` to list and read existing whole-scope Smart Reports. It does not authorise report generation, delivery or editing and is not added to an older connection automatically.
+- **Saved-report consent:** Explicit OAuth permission `debugbundle:reports:read` to list and read existing whole-scope reports. It does not authorise report generation, delivery or editing and is not added to an older connection automatically.
 - **Trial report window:** One allowance/budget window spanning the existing thirty-day Business trial. Calendar month changes do not reset it; new collection, generation and delivery stop at the database expiry deadline.
 
 - **Weekly improvement review**: a separate consented, versioned project/week artifact of bounded retained evidence, deterministic priorities and optional AI investigation guidance. It does not replace an ordinary opportunity or BundleV1.

@@ -448,6 +448,8 @@ describe("storage schema migrations", () => {
       .mockResolvedValueOnce({ rows: [{ available: true }] })
       .mockResolvedValueOnce({ rows: [{ available: true }] })
       .mockResolvedValueOnce({ rows: [{ available: true }] })
+      // Current bootstrap freezes review planning versions and bounded context.
+      .mockResolvedValueOnce({ rows: [{ available: true }] })
       .mockResolvedValue({ rows: [] });
 
     const result = await migrateStorageSchema({ query } as Queryable);

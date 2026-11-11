@@ -10,6 +10,7 @@ Last updated: 2026-03-19
 This file defines the public web-surface structure for DebugBundle v1 so routing, hosting, and content architecture are agreed before UI design and implementation begin.
 
 It captures the current decisions for:
+
 - the authenticated app host
 - the public site host
 - the blog location
@@ -34,11 +35,13 @@ This is the intended default structure for v1.
 ### Why this split
 
 **Keep the app on `app.`**
+
 - The authenticated SPA has a different security, cookie, cache, and deployment profile than marketing/docs.
 - It should be isolated from public content concerns.
 - It keeps auth/session handling cleaner and avoids mixing product-app behavior into the apex domain.
 
 **Keep docs and blog on the apex domain**
+
 - Blog content should strengthen the main brand/domain.
 - Product, company, legal, and launch content belongs naturally on `debugbundle.com`.
 - Docs belong at `debugbundle.com/docs` so the public site, blog, machine-readable artifacts, and documentation ship from one static deployment artifact.
@@ -60,11 +63,13 @@ This is the intended default structure for v1.
 ### Public Site, Docs, and Blog
 
 Preferred direction:
+
 - **One Next.js app** for the full public site
 - **Fumadocs** for both `/docs` and `/blog` content
 - Normal static Next.js pages for marketing, legal, and trust routes
 
 Why:
+
 - one static deployment artifact for all public content
 - `output: 'export'` keeps the public site compatible with S3 + CloudFront and removes any Node.js server requirement
 - Next.js metadata, sitemap, and robots support preserve SEO-friendly behavior on static routes
@@ -196,7 +201,7 @@ app.debugbundle.com
 │   ├── Current capture preset and resolved policy
 │   ├── Preset selection (minimal / balanced / investigative, owner/admin only)
 │   └── Advanced override controls (owner/admin only; members see preview only)
-├── /member-tokens
+├── /access-tokens
 │   ├── Member token list
 │   ├── Create token
 │   ├── Show plaintext once state
@@ -248,7 +253,7 @@ The tree above breaks into five UX zones:
    - login, signup, shared email-code verification, and GitHub callback under `app.`
 
 3. Signed-in app shell
-   - a minimal operational surface rooted at `/dashboard`, `/billing`, `/projects`, `/member-tokens`, and `/settings`
+   - a minimal operational surface rooted at `/dashboard`, `/billing`, `/projects`, `/access-tokens`, and `/settings`
 
 4. Documentation product
    - concepts, install guides, versioned product docs, reference docs, and agent workflow docs under `/docs`
@@ -261,6 +266,7 @@ The tree above breaks into five UX zones:
 ## Scope Guardrails
 
 Included in V1:
+
 - public landing page
 - pricing page
 - blog index and article pages
@@ -275,6 +281,7 @@ Included in V1:
 - public site generated as a static export suitable for S3 + CloudFront deployment
 
 Explicitly not a V1 page direction:
+
 - placing docs inside the SPA app
 - placing blog inside the SPA app
 - using the apex domain as the authenticated app shell
@@ -284,6 +291,7 @@ Explicitly not a V1 page direction:
 - hosted MCP control plane UI
 
 Low-priority or optional in V1:
+
 - public changelog page
 - richer project overview pages beyond what is required for setup and management
 - basic incident browser refinements inside the signed-in app
@@ -302,9 +310,14 @@ Low-priority or optional in V1:
 ## Source Alignment
 
 This proposed tree is aligned with the current product and architecture direction, including:
+
 - `tech-stack.md`
 - `tiers.md`
 - auth/session decisions for the SPA app
 - public content/docs separation decisions made after review
 
 If a later route or page design conflicts with the source-of-truth architecture documents, the architecture documents win.
+
+The dashboard Access tokens route is `/access-tokens`. The former `/member-tokens`
+route is not registered and has no dedicated redirect. Credential API paths and
+CLI/MCP identifiers retain their existing names.

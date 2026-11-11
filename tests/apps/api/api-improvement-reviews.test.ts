@@ -1,5 +1,7 @@
 import { buildCsrfToken, SESSION_COOKIE_NAME } from "../../../packages/auth/src/index.js";
 import { expect, it, vi } from "vitest";
+import { runCli } from "../../../apps/cli/src/main.js";
+import { reviewPlanningFixture } from "../../helpers/improvement-reviews.js";
 import { createTokenApiServer } from "../../helpers/api-tokens.js";
 import { mockedObject } from "../../helpers/vitest.js";
 import type { ApiDependencies } from "../../../apps/api/src/api-types.js";
@@ -44,7 +46,8 @@ function setup(enabled = true): {
         created_at: "2026-11-09T09:00:00.000Z",
         expires_at: "2027-02-01T00:00:00.000Z"
       }),
-      bundle: vi.fn().mockResolvedValue({ bundle: null, status: "queued" })
+      bundle: vi.fn().mockResolvedValue({ bundle: null, status: "queued" }),
+      plan: vi.fn().mockResolvedValue({ bundle: null, status: "queued" })
     },
     settings: { get: vi.fn().mockResolvedValue(settings), replace },
     allowance: vi.fn().mockResolvedValue({
@@ -262,4 +265,76 @@ it("enforces browser CSRF and rejects a stale workspace before replacing consent
   expect(f.replace).toHaveBeenCalledOnce();
   await app.close();
   await f.app.close();
+});
+
+it("reads the saved plan through API, CLI and ordinary MCP without format switches or mutations", async () => {
+  const { app, reviews, replace } = setup(),
+    bundle = reviewPlanningFixture();
+  vi.mocked(reviews.store.plan).mockResolvedValue({ bundle, status: "factual_only" });
+  const request: Parameters<typeof createImprovementReviewApi>[0]["request"] = async (input) => {
+    const response = await app.inject({ method: input.method, url: input.path, headers });
+    expect(response.headers["cache-control"]).toBe("no-store");
+    return { status: response.statusCode, body: response.json<unknown>() };
+  };
+  const api = createImprovementReviewApi({ request }),
+    scope = {
+      organizationId: reportOrg,
+      bearerToken: "dbundle_mem_reader",
+      reviewId: reportRequest
+    };
+  expect(await api.plan(scope)).toMatchObject({ bundle });
+  const tools = createImprovementReviewMcpTools(api);
+  expect(await tools.get_improvement_review_plan(scope)).toMatchObject({ bundle });
+  await expect(tools.get_improvement_review_plan({ ...scope, version: 2 })).rejects.toThrow(
+    "invalid_payload"
+  );
+  const command = vi.fn(async (input: Parameters<typeof improvementReviewsWithAuthCommand>[0]) =>
+    improvementReviewsWithAuthCommand(input, {
+      readAuthState: async () => ({
+        base_url: "http://local.test",
+        bearer_token: scope.bearerToken
+      }),
+      createHttpClient: () => ({ request })
+    })
+  );
+  expect(
+    (
+      await runCli(["improvements", "reviews", "plan", reportOrg, reportRequest, "--json"], {
+        improvementReviewsCommand: command
+      })
+    ).exitCode
+  ).toBe(0);
+  expect(command).toHaveBeenCalledWith(expect.objectContaining({ action: "plan" }));
+  command.mockClear();
+  expect(
+    (
+      await runCli(
+        ["improvements", "reviews", "bundle", reportOrg, reportRequest, "--artifact-version", "2"],
+        { improvementReviewsCommand: command }
+      )
+    ).exitCode
+  ).not.toBe(0);
+  expect(command).not.toHaveBeenCalled();
+  expect(reviews.store.plan).toHaveBeenCalledTimes(3);
+  expect(replace).not.toHaveBeenCalled();
+  await app.close();
+});
+it("reads the existing export when a rollback server has no plan route", async () => {
+  const { context: _context, plans: _plans, ...bundle } = reviewPlanningFixture();
+  void _context;
+  void _plans;
+  const request = vi
+    .fn<Parameters<typeof createImprovementReviewApi>[0]["request"]>()
+    .mockResolvedValueOnce({ status: 404, body: { error: "not_found" } })
+    .mockResolvedValueOnce({ status: 200, body: { bundle, status: "factual_only" } });
+  const result = await createImprovementReviewApi({ request }).plan({
+    organizationId: reportOrg,
+    bearerToken: "synthetic",
+    reviewId: reportRequest
+  });
+  expect(result.bundle).toEqual({ ...bundle, context: null, plans: [] });
+  expect(request.mock.calls.map(([input]) => input.path.split("/").at(-1))).toEqual([
+    "plan",
+    "bundle"
+  ]);
 });

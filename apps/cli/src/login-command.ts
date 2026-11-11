@@ -6,7 +6,11 @@ import { z } from "zod";
 
 import { buildTokenPreview, persistCliAuthState } from "./auth-state.js";
 import type { CliAuthState } from "./auth-state.js";
-import { isInteractiveTerminal, promptForInteractiveLoginSelection, type InteractiveLoginSelection } from "./interactive-auth.js";
+import {
+  isInteractiveTerminal,
+  promptForInteractiveLoginSelection,
+  type InteractiveLoginSelection
+} from "./interactive-auth.js";
 import type { CliCommandResult } from "./token-commands.js";
 
 const execFile = promisify(execFileFromNode);
@@ -24,7 +28,9 @@ const LoginCommandInputSchema = z
     label: z.string().trim().min(1).max(120).default(DEFAULT_GITHUB_BOOTSTRAP_LABEL)
   })
   .superRefine((value, context) => {
-    const githubModeCount = [value.github, value.githubCli, value.githubDevice].filter((flag) => flag === true).length;
+    const githubModeCount = [value.github, value.githubCli, value.githubDevice].filter(
+      (flag) => flag === true
+    ).length;
     if (githubModeCount > 1) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -134,7 +140,10 @@ type LoginCommandInput = {
 
 type LoginCommandDependencies = {
   fetchImpl?: typeof fetch;
-  writeAuthState?: (input: { authFilePath?: string; authState: CliAuthState }) => Promise<string | void>;
+  writeAuthState?: (input: {
+    authFilePath?: string;
+    authState: CliAuthState;
+  }) => Promise<string | void>;
   readGitHubAccessToken?: () => Promise<string | null>;
   sleep?: (ms: number) => Promise<void>;
   reportProgress?: (text: string) => void;
@@ -174,7 +183,12 @@ function resolveLoginMode(input: z.infer<typeof LoginCommandInputSchema>): Login
 }
 
 function hasExplicitLoginMode(input: LoginCommandInput): boolean {
-  return input.bearerToken !== undefined || input.github === true || input.githubCli === true || input.githubDevice === true;
+  return (
+    input.bearerToken !== undefined ||
+    input.github === true ||
+    input.githubCli === true ||
+    input.githubDevice === true
+  );
 }
 
 async function maybePromptForLoginInput(
@@ -190,7 +204,9 @@ async function maybePromptForLoginInput(
     return input;
   }
 
-  const selection = await (dependencies?.promptForInteractiveLogin ?? promptForInteractiveLoginSelection)();
+  const selection = await (
+    dependencies?.promptForInteractiveLogin ?? promptForInteractiveLoginSelection
+  )();
   if (selection.kind === "cancel") {
     return {
       exitCode: 4,
@@ -223,10 +239,10 @@ function mapInputValidationError(parsedInput: z.ZodSafeParseError<unknown>): str
     return "Choose only one of --github, --github-cli, or --github-device.";
   }
   if (parsedInput.error.issues.some((issue) => issue.message === "login_mode_conflict")) {
-    return "Use either a member token or a GitHub login mode, not both.";
+    return "Use either an access token or a GitHub login mode, not both.";
   }
   if (parsedInput.error.issues.some((issue) => issue.message === "login_mode_missing")) {
-    return "Provide either a member token or one of --github, --github-cli, or --github-device.";
+    return "Provide either an access token or one of --github, --github-cli, or --github-device.";
   }
 
   return "Invalid login options.";
@@ -298,7 +314,10 @@ async function requestJson(
 
   if (response.status < 200 || response.status >= 300) {
     const parsedError = ApiErrorResponseSchema.safeParse(body);
-    throw new LoginApiError(response.status, parsedError.success ? parsedError.data.error : "unknown_error");
+    throw new LoginApiError(
+      response.status,
+      parsedError.success ? parsedError.data.error : "unknown_error"
+    );
   }
 
   return body;
@@ -408,7 +427,10 @@ function formatPersistedSuccess(
     bearerToken: string;
   },
   dependencies: {
-    writeAuthState: (input: { authFilePath?: string; authState: CliAuthState }) => Promise<string | void>;
+    writeAuthState: (input: {
+      authFilePath?: string;
+      authState: CliAuthState;
+    }) => Promise<string | void>;
   }
 ): Promise<CliCommandResult> {
   const authState: CliAuthState = {
@@ -416,30 +438,30 @@ function formatPersistedSuccess(
     base_url: input.baseUrl
   };
 
-  return dependencies.writeAuthState({
-    ...(input.authFilePath === undefined ? {} : { authFilePath: input.authFilePath }),
-    authState
-  }).then((persistedPath) => {
-    const authFilePath = persistedPath ?? input.authFilePath ?? "";
-    const payload = {
-      authenticated: true,
-      auth: {
-        base_url: authState.base_url,
-        token_preview: buildTokenPreview(authState.bearer_token)
-      },
-      auth_file_path: authFilePath
-    };
+  return dependencies
+    .writeAuthState({
+      ...(input.authFilePath === undefined ? {} : { authFilePath: input.authFilePath }),
+      authState
+    })
+    .then((persistedPath) => {
+      const authFilePath = persistedPath ?? input.authFilePath ?? "";
+      const payload = {
+        authenticated: true,
+        auth: {
+          base_url: authState.base_url,
+          token_preview: buildTokenPreview(authState.bearer_token)
+        },
+        auth_file_path: authFilePath
+      };
 
-    return {
-      exitCode: 0,
-      output: input.json ? JSON.stringify(payload) : formatLoginOutput(authState, authFilePath)
-    };
-  });
+      return {
+        exitCode: 0,
+        output: input.json ? JSON.stringify(payload) : formatLoginOutput(authState, authFilePath)
+      };
+    });
 }
 
-function buildProgressReporter(
-  dependency?: (text: string) => void
-): (text: string) => void {
+function buildProgressReporter(dependency?: (text: string) => void): (text: string) => void {
   if (dependency !== undefined) {
     return dependency;
   }
@@ -479,30 +501,38 @@ export async function loginCommand(
   const normalizedInput = parsedInput.data;
   const writeAuthState =
     dependencies?.writeAuthState ??
-    (persistCliAuthState as (input: { authFilePath?: string; authState: CliAuthState }) => Promise<string | void>);
+    (persistCliAuthState as (input: {
+      authFilePath?: string;
+      authState: CliAuthState;
+    }) => Promise<string | void>);
 
   try {
     if (resolveLoginMode(normalizedInput) === "token") {
       if (!validateMemberToken(normalizedInput.bearerToken!)) {
         return {
           exitCode: 4,
-          output: "Invalid member token."
+          output: "Invalid access token."
         };
       }
 
       return await formatPersistedSuccess(
-          {
-            baseUrl: normalizedInput.baseUrl,
-            bearerToken: normalizedInput.bearerToken!,
-            ...(promptedInput.json === undefined ? {} : { json: promptedInput.json }),
-            ...(promptedInput.authFilePath === undefined ? {} : { authFilePath: promptedInput.authFilePath })
-          },
-          { writeAuthState }
-        );
+        {
+          baseUrl: normalizedInput.baseUrl,
+          bearerToken: normalizedInput.bearerToken!,
+          ...(promptedInput.json === undefined ? {} : { json: promptedInput.json }),
+          ...(promptedInput.authFilePath === undefined
+            ? {}
+            : { authFilePath: promptedInput.authFilePath })
+        },
+        { writeAuthState }
+      );
     }
 
-    const readGitHubAccessToken = dependencies?.readGitHubAccessToken ?? readGitHubAccessTokenFromGh;
-    const sleep = dependencies?.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+    const readGitHubAccessToken =
+      dependencies?.readGitHubAccessToken ?? readGitHubAccessTokenFromGh;
+    const sleep =
+      dependencies?.sleep ??
+      ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
     const reportProgress = buildProgressReporter(dependencies?.reportProgress);
     const loginMode = resolveLoginMode(normalizedInput);
 
@@ -526,7 +556,9 @@ export async function loginCommand(
               baseUrl: normalizedInput.baseUrl,
               bearerToken: exchanged.token.plaintext,
               ...(promptedInput.json === undefined ? {} : { json: promptedInput.json }),
-              ...(promptedInput.authFilePath === undefined ? {} : { authFilePath: promptedInput.authFilePath })
+              ...(promptedInput.authFilePath === undefined
+                ? {}
+                : { authFilePath: promptedInput.authFilePath })
             },
             { writeAuthState }
           );
@@ -542,7 +574,9 @@ export async function loginCommand(
             };
           }
 
-          reportProgress("The local GitHub CLI token was not accepted. Falling back to device flow.");
+          reportProgress(
+            "The local GitHub CLI token was not accepted. Falling back to device flow."
+          );
         }
       } else if (loginMode === "github-cli") {
         return {
@@ -597,7 +631,9 @@ export async function loginCommand(
             baseUrl: normalizedInput.baseUrl,
             bearerToken: claimed.token.plaintext,
             ...(promptedInput.json === undefined ? {} : { json: promptedInput.json }),
-            ...(promptedInput.authFilePath === undefined ? {} : { authFilePath: promptedInput.authFilePath })
+            ...(promptedInput.authFilePath === undefined
+              ? {}
+              : { authFilePath: promptedInput.authFilePath })
           },
           { writeAuthState }
         );
@@ -610,7 +646,11 @@ export async function loginCommand(
         };
       }
 
-      if (polled.status === "denied" || polled.status === "expired" || polled.status === "rejected") {
+      if (
+        polled.status === "denied" ||
+        polled.status === "expired" ||
+        polled.status === "rejected"
+      ) {
         return {
           exitCode: 4,
           output:
@@ -630,7 +670,13 @@ export async function loginCommand(
   } catch (error) {
     if (error instanceof LoginApiError) {
       return {
-        exitCode: error.status === 400 || error.status === 401 || error.status === 403 || error.status === 409 ? 4 : 1,
+        exitCode:
+          error.status === 400 ||
+          error.status === 401 ||
+          error.status === 403 ||
+          error.status === 409
+            ? 4
+            : 1,
         output: mapApiErrorToMessage(error)
       };
     }

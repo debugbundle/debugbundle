@@ -1,3 +1,4 @@
+import { MetadataSeparator } from "./metadata-separator.js";
 import { useId } from "react";
 import { Field, FieldDescription, FieldLabel } from "../ui/field.js";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group.js";
@@ -85,7 +86,11 @@ export function OrganizationGrantFields({
               }}
             >
               <ToggleGroupItem value="member">Member</ToggleGroupItem>
-              <ToggleGroupItem value="viewer">Viewer · read only</ToggleGroupItem>
+              <ToggleGroupItem value="viewer">
+                Viewer
+                <MetadataSeparator />
+                read only
+              </ToggleGroupItem>
             </ToggleGroup>
             <FieldDescription>
               A stronger direct project role still applies. Suspension denies all access.

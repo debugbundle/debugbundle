@@ -101,11 +101,19 @@ deletion, not a workspace-only action.
 
 ## FR-BUS-03: Scoped member tokens
 
+The user-facing name is **Access tokens**. Copy and documentation use that name
+while retaining existing credential prefixes, API/CLI/MCP identifiers, settings,
+stored values and the authority described below. No token migration is required.
+
 Effective authority = live holder permissions intersected with credential scope,
 permission set, current plan/status and accepted origin scope. Preserve credential
 kind/ID/policy throughout the principal. Apply to lists, detail, changes, exports,
-artifacts and queued execution. New interactive defaults are selected projects
-and read-only. Explicit org-wide mode names one org and includes future projects;
+artifacts and queued execution. New interactive and replacement forms default to
+**Current workspace** (organisation scope), with Read, Write and Project settings
+preselected for Owners/Admins. Members default to Read/Write; workspace-wide Project
+settings remain unavailable under the existing issuance policy. People management
+is always opt-in. Workspace wording applies on every tier. Explicit org-wide mode
+names one org and includes future projects;
 selected mode validates each selected project, including legitimate cross-org
 shares. All token issuers use the same versioned policy.
 
@@ -120,7 +128,7 @@ suspension and role/plan loss at use and before asynchronous egress.
 
 The web token list keeps legacy-token `Create replacement` beside `Revoke` in the
 Actions column. It opens the normal scoped creation form with a replacement label,
-selected-project/read-only defaults and a 90-day expiry. The dialog explains the
+the same current-workspace/project-permission defaults and a 90-day expiry. The dialog explains the
 manual handover: create the token, update the CLI or MCP connection, then separately
 revoke the old token. Opening or submitting this form never automatically revokes
 or modifies the existing token.

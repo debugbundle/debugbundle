@@ -19,7 +19,7 @@ export function reportDeliveryOperations(): OperationSpec[] {
           schema: component("ReportEmailDeliveries", ReportEmailDeliveriesSchema)
         },
         "400": { description: "Invalid identity.", schema: apiError },
-        "401": { description: "Member authentication required.", schema: apiError },
+        "401": { description: "Browser session or access token required.", schema: apiError },
         "403": {
           description: "Current whole-scope reader or credential access denied.",
           schema: apiError

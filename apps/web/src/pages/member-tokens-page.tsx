@@ -1,3 +1,4 @@
+import { MetadataSeparator } from "../components/system/metadata-separator.js";
 import { PendingButton } from "../components/system/pending-button.js";
 import { usePendingAction } from "../lib/use-pending-action.js";
 import { KeySquareIcon, PlusIcon } from "lucide-react";
@@ -74,9 +75,9 @@ export function MemberTokensPage(): JSX.Element {
   const [label, setLabel] = useState("");
   const [createdToken, setCreatedToken] = useState<CreatedMemberToken | null>(null);
   const [scope, setScope] = useState<MemberTokenScopeDeclaration>({
-    mode: "projects",
-    project_ids: [],
-    permissions: ["project:read"]
+    mode: "organization",
+    organization_id: session?.organization_id ?? "",
+    permissions: defaultProjectPermissions(session?.role)
   });
   const [expiryDays, setExpiryDays] = useState(90);
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
@@ -123,9 +124,14 @@ export function MemberTokensPage(): JSX.Element {
   const canCreate = isVerified;
 
   function openCreation(replacementTokenLabel: string | null = null): void {
+    if (session === null) return;
     setReplacementFor(replacementTokenLabel);
     setLabel(replacementTokenLabel === null ? "" : `${replacementTokenLabel} replacement`);
-    setScope({ mode: "projects", project_ids: [], permissions: ["project:read"] });
+    setScope({
+      mode: "organization",
+      organization_id: session.organization_id,
+      permissions: defaultProjectPermissions(session.role)
+    });
     setExpiryDays(90);
     setFormError(null);
     setIsCreateOpen(true);
@@ -142,7 +148,7 @@ export function MemberTokensPage(): JSX.Element {
       expiryDays > 365
     ) {
       setFormError(
-        "Enter a label, choose at least one project or the current organisation, and set an expiry from 1 to 365 days."
+        "Enter a label, choose at least one project or the current workspace, and set an expiry from 1 to 365 days."
       );
       return;
     }
@@ -164,7 +170,7 @@ export function MemberTokensPage(): JSX.Element {
         setLabel("");
         setIsCreateOpen(false);
         setReplacementFor(null);
-        showSuccessToast("Member token created successfully.");
+        showSuccessToast("Access token created successfully.");
       } catch {
         if (currentContext.current === issuedContext)
           setFormError(
@@ -178,16 +184,16 @@ export function MemberTokensPage(): JSX.Element {
     try {
       await revokeMemberToken(tokenId);
       setTokens((current) => (current ?? []).filter((token) => token.token_id !== tokenId));
-      showSuccessToast("Member token revoked successfully.");
+      showSuccessToast("Access token revoked successfully.");
     } catch {
-      showErrorToast("Could not revoke member token.");
+      showErrorToast("Could not revoke access token.");
     }
   }
 
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
-        description="Issue member-scoped credentials for CLI and MCP access. Plaintext token material is shown once and should move straight into a secret manager."
+        description="Create scoped access tokens for CLI, API and agent integrations. Tokens are limited by your account's permissions. Store the secret securely; it is shown once."
         actions={
           <Dialog
             open={isCreateOpen}
@@ -204,7 +210,7 @@ export function MemberTokensPage(): JSX.Element {
             <DialogTrigger asChild>
               <Button type="button" disabled={!canCreate}>
                 <PlusIcon data-icon="inline-start" />
-                Create member token
+                Create access token
               </Button>
             </DialogTrigger>
             <DialogFormContent
@@ -271,9 +277,12 @@ export function MemberTokensPage(): JSX.Element {
                 <FieldDescription>
                   {scope.mode === "projects"
                     ? `${scope.project_ids.length} selected projects`
-                    : "Current and future authorised projects in this organisation"}{" "}
-                  · {scope.permissions.join(", ")} · {expiryDays} days. Restricted tokens cannot
-                  issue other credentials or manage billing.
+                    : "Current and future authorised projects in this workspace"}{" "}
+                  <MetadataSeparator />
+                  {scope.permissions.join(", ")}
+                  <MetadataSeparator />
+                  {expiryDays} days. Restricted tokens cannot issue other credentials or manage
+                  billing.
                 </FieldDescription>
                 {formError === null ? null : <FieldError>{formError}</FieldError>}
               </FieldGroup>
@@ -286,7 +295,7 @@ export function MemberTokensPage(): JSX.Element {
         <CalloutCard
           eyebrow="Verification required"
           title="Token issuance paused"
-          description="Complete email sign-in again to verify this address before creating a scoped member token."
+          description="Complete email sign-in again to verify this address before creating a scoped access token."
           tone="warning"
         />
       ) : null}
@@ -327,16 +336,16 @@ export function MemberTokensPage(): JSX.Element {
                   <EmptyMedia variant="icon">
                     <KeySquareIcon />
                   </EmptyMedia>
-                  <EmptyTitle>No member tokens yet</EmptyTitle>
+                  <EmptyTitle>No access tokens yet</EmptyTitle>
                   <EmptyDescription>
-                    Issue a member token when you need CLI or MCP access outside the signed-in
+                    Issue an access token when you need CLI or MCP access outside the signed-in
                     browser workspace.
                   </EmptyDescription>
                 </EmptyHeader>
                 <EmptyContent>
                   <Button type="button" onClick={() => openCreation()} disabled={!canCreate}>
                     <PlusIcon data-icon="inline-start" />
-                    Create member token
+                    Create access token
                   </Button>
                 </EmptyContent>
               </Empty>
@@ -365,7 +374,7 @@ export function MemberTokensPage(): JSX.Element {
                               ? "Legacy broad access"
                               : token.scope.mode === "projects"
                                 ? `${token.scope.projects.length} selected projects`
-                                : "Named organisation"}
+                                : "Workspace access"}
                           </span>
                           <span>{token.scope?.permissions.join(", ")}</span>
                           <span>
@@ -399,7 +408,7 @@ export function MemberTokensPage(): JSX.Element {
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Revoke member token</AlertDialogTitle>
+                                <AlertDialogTitle>Revoke access token</AlertDialogTitle>
                                 <AlertDialogDescription>
                                   This will immediately invalidate the token for CLI and MCP
                                   authentication.
@@ -427,6 +436,14 @@ export function MemberTokensPage(): JSX.Element {
       </Card>
     </div>
   );
+}
+
+function defaultProjectPermissions(
+  role: string | undefined
+): MemberTokenScopeDeclaration["permissions"] {
+  return role === "owner" || role === "admin"
+    ? ["project:read", "project:write", "project:admin"]
+    : ["project:read", "project:write"];
 }
 
 function formatDate(value: string): string {

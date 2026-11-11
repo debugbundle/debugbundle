@@ -1,3 +1,4 @@
+import { MetadataSeparator } from "../components/system/metadata-separator.js";
 import { useEffect, useRef, useState } from "react";
 import { WalletIcon } from "lucide-react";
 import type {
@@ -287,7 +288,10 @@ export function ReferralPayoutsPage(): JSX.Element {
           <CardHeader>
             <CardTitle>Review manual payment</CardTitle>
             <CardDescription>
-              {formatReferralAmount(selected.amount_minor)} USD · {selected.batch_id} ·{" "}
+              {formatReferralAmount(selected.amount_minor)} USD
+              <MetadataSeparator />
+              {selected.batch_id}
+              <MetadataSeparator />
               {selected.status}
             </CardDescription>
           </CardHeader>

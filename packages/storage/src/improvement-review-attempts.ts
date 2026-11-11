@@ -1,14 +1,11 @@
 import { createHash, randomUUID } from "node:crypto";
+import { validateRowReviewGuidance } from "./improvement-review-planning.js";
 import { z } from "zod";
 import type {
   PreparedReviewAttempt,
   ReviewModelOutcome
 } from "../../smart-improvements/src/model-client.js";
-import {
-  ReviewFactsSchema,
-  validateReviewGuidance,
-  type ReviewGuidance
-} from "../../smart-improvements/src/review.js";
+import { type ReviewGuidance } from "../../smart-improvements/src/review.js";
 import {
   actualReportAttemptCost,
   maximumReportRunCost,
@@ -170,11 +167,7 @@ export function createImprovementReviewAttemptStore(db: Queryable): ImprovementR
                   ...(await readReportIdentities(tx, row["accepted_scope"]))
                 ])
               ];
-              guidance = validateReviewGuidance(
-                ReviewFactsSchema.parse(row["facts"]),
-                outcome.guidance,
-                identities
-              );
+              guidance = validateRowReviewGuidance(row, outcome.guidance, identities);
             } catch {
               state = "rejected";
             }

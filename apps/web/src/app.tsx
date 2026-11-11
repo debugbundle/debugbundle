@@ -17,6 +17,8 @@ import {
 import { Toaster } from "sonner";
 
 import { AppSidebar } from "./components/system/app-sidebar.js";
+import { DashboardSetupProvider } from "./components/system/dashboard-setup-context.js";
+import { WorkspaceHealthAlertProvider } from "./components/system/workspace-health-alert-context.js";
 import { OrganizationPeoplePage } from "./pages/organization-people-page.js";
 import { ReferralsPage } from "./pages/referrals-page.js";
 import { ReportsPage } from "./pages/reports-page.js";
@@ -32,7 +34,6 @@ import { LoadErrorCallout } from "./components/system/load-error-callout.js";
 import { DashboardIncidentsToday } from "./components/system/dashboard-incidents-today.js";
 import { RecentProjectsTable } from "./components/system/recent-projects-table.js";
 import { GitHubMark } from "./components/system/github-mark.js";
-import { HeaderActionsProvider } from "./components/system/header-actions-context.js";
 import {
   ProjectRouteProvider,
   type ActiveProjectRoute
@@ -221,7 +222,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
               <Route path="/reports/:organizationId/:runId" element={<ReportPage />} />
               <Route path="/settings/referrals" element={<ReferralsPage />} />
               <Route path="/settings/referrals/payouts" element={<ReferralPayoutsPage />} />
-              <Route path="/member-tokens" element={<MemberTokensPage />} />
+              <Route path="/access-tokens" element={<MemberTokensPage />} />
             </Route>
             <Route path="*" element={<RootRedirect />} />
           </Route>
@@ -269,7 +270,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
               <Route path="/reports/:organizationId/:runId" element={<ReportPage />} />
               <Route path="/settings/referrals" element={<ReferralsPage />} />
               <Route path="/settings/referrals/payouts" element={<ReferralPayoutsPage />} />
-              <Route path="/member-tokens" element={<MemberTokensPage />} />
+              <Route path="/access-tokens" element={<MemberTokensPage />} />
             </Route>
             <Route path="*" element={<RootRedirect />} />
           </Route>
@@ -430,24 +431,28 @@ function ProtectedShell({
   }
 
   return (
-    <ProjectRouteProvider value={{ activeProject, setActiveProject }}>
-      <HeaderActionsProvider>
-        <SidebarProvider
-          style={
-            {
-              "--sidebar-width": "calc(var(--spacing) * 72)",
-              "--header-height": "calc(var(--spacing) * 12)"
-            } as React.CSSProperties
-          }
-        >
-          <AppSidebar variant="inset" session={session} onSignOut={handleSignOut} />
-          <SidebarInset>
-            <SiteHeader />
-            <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-hidden p-6">{children}</div>
-          </SidebarInset>
-        </SidebarProvider>
-      </HeaderActionsProvider>
-    </ProjectRouteProvider>
+    <DashboardSetupProvider session={session}>
+      <WorkspaceHealthAlertProvider session={session}>
+        <ProjectRouteProvider value={{ activeProject, setActiveProject }}>
+          <SidebarProvider
+            style={
+              {
+                "--sidebar-width": "calc(var(--spacing) * 72)",
+                "--header-height": "calc(var(--spacing) * 12)"
+              } as React.CSSProperties
+            }
+          >
+            <AppSidebar variant="inset" session={session} onSignOut={handleSignOut} />
+            <SidebarInset>
+              <SiteHeader />
+              <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-hidden p-6">
+                {children}
+              </div>
+            </SidebarInset>
+          </SidebarProvider>
+        </ProjectRouteProvider>
+      </WorkspaceHealthAlertProvider>
+    </DashboardSetupProvider>
   );
 }
 

@@ -19,6 +19,7 @@ function PaginationHarness(input: {
     isLoading,
     page,
     totalPages,
+    totalCount,
     hasNextPage,
     goToNextPage,
     goToPreviousPage,
@@ -30,6 +31,7 @@ function PaginationHarness(input: {
       <p data-testid="loading-state">{isLoading ? "loading" : "idle"}</p>
       <p data-testid="page-number">{page}</p>
       <p data-testid="total-pages">{totalPages}</p>
+      <p data-testid="total-count">{totalCount ?? "unknown"}</p>
       <p data-testid="next-page-available">{String(hasNextPage)}</p>
       <ul aria-label="items">
         {(items ?? []).map((item) => (
@@ -54,6 +56,36 @@ afterEach(() => {
 });
 
 describe("useCursorPagination", () => {
+  it("retains exact first-page totals across navigation and refresh instead of counting visible rows", async () => {
+    const user = userEvent.setup();
+    let count = 42;
+    const loadPage = vi.fn(async (cursor: string | null) =>
+      cursor === null
+        ? { items: ["First", "Second"], nextCursor: "next", totalPages: 21, totalCount: count }
+        : { items: ["Third"], nextCursor: null }
+    );
+    render(<PaginationHarness loadPage={loadPage} />);
+    await screen.findByText("First");
+    expect(screen.getByTestId("total-count")).toHaveTextContent("42");
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await screen.findByText("Third");
+    expect(screen.getByTestId("total-count")).toHaveTextContent("42");
+    count = 43;
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(screen.getByTestId("total-count")).toHaveTextContent("43"));
+  });
+  it("does not invent totals for incomplete or failed inventories and shows zero for a known empty list", async () => {
+    const loadPage = vi.fn().mockResolvedValue({ items: ["First"], nextCursor: "next" });
+    const view = render(<PaginationHarness loadPage={loadPage} filter="first" />);
+    await screen.findByText("First");
+    expect(screen.getByTestId("total-count")).toHaveTextContent("unknown");
+    loadPage.mockResolvedValue({ items: [], nextCursor: null, totalCount: 0 });
+    view.rerender(<PaginationHarness loadPage={loadPage} filter="empty" />);
+    await waitFor(() => expect(screen.getByTestId("total-count")).toHaveTextContent("0"));
+    loadPage.mockRejectedValue(new Error("offline"));
+    view.rerender(<PaginationHarness loadPage={loadPage} filter="failed" />);
+    await waitFor(() => expect(screen.getByTestId("total-count")).toHaveTextContent("unknown"));
+  });
   it("restarts from the refreshed first page when its cursor changes so rows are not skipped", async () => {
     const user = userEvent.setup();
     let inserted = false;

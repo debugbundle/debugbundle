@@ -145,9 +145,11 @@ describe("project creation", () => {
     expect(within(mainAppRow as HTMLTableRowElement).getByText("12")).toBeInTheDocument();
     expect(within(mainAppRow as HTMLTableRowElement).getByText("120")).toBeInTheDocument();
 
-    const createProjectButton = within(screen.getByRole("banner")).getByRole("button", {
+    const createProjectButton = screen.getByRole("button", {
       name: /create project/i
     });
+    expect(createProjectButton.closest('[data-slot="page-header"]')).not.toBeNull();
+    expect(createProjectButton).toHaveAttribute("data-size", "default");
     await user.click(createProjectButton);
     expect((await screen.findByRole("dialog")).className.includes("sm:max-w-2xl")).toBe(true);
     await user.type(await screen.findByLabelText(/project name/i), "Ops API");

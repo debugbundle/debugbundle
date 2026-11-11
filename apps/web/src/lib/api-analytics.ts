@@ -281,7 +281,10 @@ export async function listAnalyticsOpportunities(
   query: AnalyticsOpportunityInventoryQuery
 ): Promise<AnalyticsOpportunitiesListResponse> {
   const searchParams = buildAnalyticsInventorySearchParams(query);
-  if (query.cursor === undefined) searchParams.set("include_total", "true");
+  if (query.cursor === undefined) {
+    searchParams.set("include_total", "true");
+    searchParams.set("include_total_count", "true");
+  }
   if (query.severity !== undefined) searchParams.set("severity", query.severity);
   if (query.bundleStatus !== undefined) searchParams.set("bundle_status", query.bundleStatus);
   return readJson<AnalyticsOpportunitiesListResponse>(

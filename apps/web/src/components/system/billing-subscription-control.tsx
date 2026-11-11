@@ -1,3 +1,4 @@
+import { MetadataSeparator } from "./metadata-separator.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   classifyBillingOfferChange,
@@ -368,9 +369,15 @@ export function BillingSubscriptionControl(props: Props): JSX.Element {
         <div className="flex flex-col gap-1 text-sm">
           <p>
             Billed {subscription.interval === "year" ? "yearly" : "monthly"}
-            {subscription.base_amount_minor === null
-              ? ""
-              : ` · ${formatBillingAmount(subscription.base_amount_minor)}/${subscription.interval === "year" ? "year" : "month"} base`}
+            {subscription.base_amount_minor === null ? (
+              ""
+            ) : (
+              <>
+                <MetadataSeparator />
+                {formatBillingAmount(subscription.base_amount_minor)}/
+                {subscription.interval === "year" ? "year" : "month"} base
+              </>
+            )}
           </p>
           <p className="text-muted-foreground">
             Paid term: {formatBillingTerm(subscription.term_starts_at)} –{" "}
@@ -475,9 +482,14 @@ export function BillingSubscriptionControl(props: Props): JSX.Element {
                 <div className="flex flex-col gap-2">
                   <p className="font-medium">
                     {formatBillingAmount(price.amount_minor)}/{intervalWord} base
-                    {selection.interval === "year"
-                      ? ` · equivalent to ${formatBillingAmount(price.amount_minor / 12)}/month`
-                      : ""}
+                    {selection.interval === "year" ? (
+                      <>
+                        <MetadataSeparator />
+                        equivalent to {formatBillingAmount(price.amount_minor / 12)}/month
+                      </>
+                    ) : (
+                      ""
+                    )}
                   </p>
                   <p>
                     {getTierCapabilities(selection.target_plan).included_capacity_units} included

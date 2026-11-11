@@ -176,6 +176,7 @@ export async function listIncidents(
   incidents: IncidentRecord[];
   nextCursor: string | null;
   totalPages?: number | undefined;
+  totalCount?: number | undefined;
 }> {
   const input =
     typeof inputOrLimit === "number"
@@ -189,6 +190,7 @@ export async function listIncidents(
     limit: String(input.limit ?? 20)
   });
 
+  if (input.cursor === undefined) searchParams.set("include_total_count", "true");
   if (input.cursor !== undefined) {
     searchParams.set("cursor", input.cursor);
   }
@@ -218,6 +220,7 @@ export async function listIncidents(
     incidents: IncidentRecord[];
     next_cursor: string | null;
     total_pages?: number;
+    total_count?: number;
   }>(
     await fetch(`${API_BASE}/v1/incidents?${searchParams.toString()}`, {
       credentials: "include"
@@ -227,7 +230,8 @@ export async function listIncidents(
   return {
     incidents: body.incidents.map(normalizeIncidentRecord),
     nextCursor: body.next_cursor,
-    ...(body.total_pages === undefined ? {} : { totalPages: body.total_pages })
+    ...(body.total_pages === undefined ? {} : { totalPages: body.total_pages }),
+    ...(body.total_count === undefined ? {} : { totalCount: body.total_count })
   };
 }
 
@@ -246,11 +250,13 @@ export async function listImprovements(
   improvements: ImprovementRecord[];
   nextCursor: string | null;
   totalPages?: number | undefined;
+  totalCount?: number | undefined;
 }> {
   const searchParams = new URLSearchParams({
     limit: String(input.limit ?? 20)
   });
 
+  if (input.cursor === undefined) searchParams.set("include_total_count", "true");
   if (input.cursor !== undefined) {
     searchParams.set("cursor", input.cursor);
   }
@@ -277,6 +283,7 @@ export async function listImprovements(
     improvements: ImprovementRecord[];
     next_cursor: string | null;
     total_pages?: number;
+    total_count?: number;
   }>(
     await fetch(`${API_BASE}/v1/improvements?${searchParams.toString()}`, {
       credentials: "include"
@@ -286,7 +293,8 @@ export async function listImprovements(
   return {
     improvements: body.improvements.map(normalizeImprovementRecord),
     nextCursor: body.next_cursor,
-    ...(body.total_pages === undefined ? {} : { totalPages: body.total_pages })
+    ...(body.total_pages === undefined ? {} : { totalPages: body.total_pages }),
+    ...(body.total_count === undefined ? {} : { totalCount: body.total_count })
   };
 }
 
@@ -312,7 +320,11 @@ export async function listProjectIncidents(
       credentials: "include"
     })
   );
-  return { incidents: body.incidents, nextCursor: body.next_cursor, ...(body.total_pages === undefined ? {} : { totalPages: body.total_pages }) };
+  return {
+    incidents: body.incidents,
+    nextCursor: body.next_cursor,
+    ...(body.total_pages === undefined ? {} : { totalPages: body.total_pages })
+  };
 }
 
 export async function listProjectImprovements(

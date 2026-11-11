@@ -7,6 +7,11 @@ their portable JSON schemas are generated into `report-schemas.json` and checked
 against runtime declarations. The local package records both contract/schema
 hashes and keeps provider re-scan/reviewer acceptance as separate release gates.
 
+Tool display titles and descriptions use **saved reports**, covering authorised
+factual reports and Business Smart Reports. This copy-only naming update preserves
+tool names, contract version, schemas, scopes and annotations. The report metadata
+fixture follows those labels; the original twenty-three declarations stay frozen.
+
 | Tool                 | Input                                      | Output                                                                                                                       |
 | -------------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
 | `list_reports`       | Optional `limit` 1–25 and bounded `cursor` | Whole-scope-readable saved runs with name, status, UTC period, privacy mode, dates and project count; cursor.                |

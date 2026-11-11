@@ -11,12 +11,14 @@ export function TableRefreshButton({
   onRefresh,
   label = "Refresh",
   className,
+  size = "sm",
   mobileIconOnly = false
 }: {
   isLoading: boolean;
   onRefresh: () => Promise<void> | void;
   label?: string;
   className?: string;
+  size?: "sm" | "default";
   mobileIconOnly?: boolean;
 }): JSX.Element {
   const [refreshStartedAt, setRefreshStartedAt] = useState<number | null>(null);
@@ -69,11 +71,11 @@ export function TableRefreshButton({
     <Button
       type="button"
       variant="outline"
-      size="sm"
+      size={size}
       className={cn(
         "gap-1.5",
         mobileIconOnly &&
-          "size-7 px-0 sm:w-auto sm:px-2.5 [&_svg]:translate-y-0 sm:[&_svg]:-translate-y-px",
+          "size-7 px-0 has-data-[icon=inline-start]:pl-0 sm:w-auto sm:px-2.5 sm:has-data-[icon=inline-start]:pl-1.5 [&_svg]:translate-y-0 sm:[&_svg]:-translate-y-px",
         className
       )}
       disabled={isLoading || isSpinning}
@@ -81,7 +83,11 @@ export function TableRefreshButton({
       aria-label={label}
       onClick={() => void handleRefreshClick()}
     >
-      <RefreshCwIcon className={cn("size-4", isSpinning && "animate-spin")} aria-hidden="true" />
+      <RefreshCwIcon
+        data-icon="inline-start"
+        className={cn(isSpinning && "animate-spin motion-reduce:animate-none")}
+        aria-hidden="true"
+      />
       <span className={mobileIconOnly ? "sr-only sm:not-sr-only" : undefined}>{label}</span>
     </Button>
   );

@@ -1,12 +1,18 @@
 import { AcceptedReportScopeSchema } from "../../smart-reports/src/report-definition.js";
+import {
+  ReviewPlanDocumentSchema,
+  type ReviewPlanDocument,
+  type ReviewContext
+} from "../../smart-improvements/src/review-planning-contract.js";
+import { planReview } from "../../smart-improvements/src/review-planning.js";
+import { reviewContext, validateRowReviewGuidance } from "./improvement-review-planning.js";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import {
   ReviewArtifactSchema,
+  type ReviewArtifact,
   ReviewFactsSchema,
   ReviewRecordSchema,
-  validateReviewGuidance,
-  type ReviewArtifact,
   type ReviewRecord
 } from "../../smart-improvements/src/review.js";
 import { lastCompletedReportPeriod } from "../../smart-reports/src/report-period.js";
@@ -51,6 +57,9 @@ export interface ImprovementReviewStore {
   bundle(
     raw: ReviewActor & { id: string }
   ): Promise<{ bundle: ReviewArtifact | null; status: ReviewRecord["status"] }>;
+  plan(
+    raw: ReviewActor & { id: string }
+  ): Promise<{ bundle: ReviewPlanDocument | null; status: ReviewRecord["status"] }>;
 }
 export function createImprovementReviewStore(db: Queryable): ImprovementReviewStore {
   async function load(
@@ -66,6 +75,68 @@ export function createImprovementReviewStore(db: Queryable): ImprovementReviewSt
     if (!row) throw new SmartReportError("report_not_found");
     await requireReviewRead(db, row, input.initiator);
     return { input, row };
+  }
+  async function loadBundle(raw: ReviewActor & { id: string }): Promise<{
+    bundle: ReviewArtifact | null;
+    context: ReviewContext | null;
+    status: ReviewRecord["status"];
+  }> {
+    const { input, row } = await load({
+      organization_id: raw.organization_id,
+      initiator: raw.initiator,
+      id: raw.id
+    });
+    if (row["artifact"] === null)
+      return { bundle: null, context: null, status: improvementReviewRecord(row).status };
+    const bundle = ReviewArtifactSchema.parse(row["artifact"]);
+    const origins = new Set(
+      AcceptedReportScopeSchema.parse(row["accepted_scope"]).flatMap(
+        (view) => view.origin_project_ids
+      )
+    );
+    if (
+      createHash("sha256").update(JSON.stringify(bundle)).digest("hex") !==
+        row["artifact_sha256"] ||
+      bundle.facts.project_id !== row["project_id"] ||
+      bundle.facts.privacy_mode !== row["privacy_mode"] ||
+      bundle.facts.cutoff_at !== reviewDate(row["cutoff_at"]).toISOString() ||
+      JSON.stringify(bundle.facts) !== JSON.stringify(ReviewFactsSchema.parse(row["facts"])) ||
+      bundle.facts.sources.some((source) => !origins.has(source.origin_project_id)) ||
+      JSON.stringify(bundle.facts.period) !== JSON.stringify(improvementReviewRecord(row).period)
+    )
+      throw new Error("review_artifact_integrity_failed");
+    const context = reviewContext(row);
+    if (
+      context &&
+      [
+        ...context.configuration.origins,
+        ...context.configuration.rules,
+        ...context.configuration.alerts
+      ].some((item) => !origins.has(item.origin_project_id))
+    )
+      throw new Error("review_artifact_integrity_failed");
+    if (JSON.stringify(redactReportData(bundle.facts)) !== JSON.stringify(bundle.facts))
+      throw new SmartReportError("report_not_found");
+    if (bundle.guidance) {
+      try {
+        const identities = [
+          ...new Set([
+            ...z.array(z.string()).parse(row["identities"]),
+            ...(await readReportIdentities(db, row["accepted_scope"]))
+          ])
+        ];
+        bundle.guidance = validateRowReviewGuidance(row, bundle.guidance, identities);
+      } catch {
+        bundle.guidance = null;
+        bundle.analysis = "unavailable";
+      }
+    }
+    await load(input);
+    return {
+      bundle,
+      context,
+      status: improvementReviewRecord(row).status
+    };
   }
   return {
     async list(
@@ -123,47 +194,22 @@ export function createImprovementReviewStore(db: Queryable): ImprovementReviewSt
     async get(raw: ReviewActor & { id: string }): Promise<ReviewRecord> {
       return improvementReviewRecord((await load(raw)).row);
     },
-    async bundle(
-      raw: ReviewActor & { id: string }
-    ): Promise<{ bundle: ReviewArtifact | null; status: ReviewRecord["status"] }> {
-      const { input, row } = await load(raw);
-      if (row["artifact"] === null)
-        return { bundle: null, status: improvementReviewRecord(row).status };
-      const bundle = ReviewArtifactSchema.parse(row["artifact"]);
-      const origins = new Set(
-        AcceptedReportScopeSchema.parse(row["accepted_scope"]).flatMap(
-          (view) => view.origin_project_ids
-        )
-      );
-      if (
-        createHash("sha256").update(JSON.stringify(bundle)).digest("hex") !==
-          row["artifact_sha256"] ||
-        bundle.facts.project_id !== row["project_id"] ||
-        bundle.facts.privacy_mode !== row["privacy_mode"] ||
-        bundle.facts.cutoff_at !== reviewDate(row["cutoff_at"]).toISOString() ||
-        JSON.stringify(bundle.facts) !== JSON.stringify(ReviewFactsSchema.parse(row["facts"])) ||
-        bundle.facts.sources.some((source) => !origins.has(source.origin_project_id)) ||
-        JSON.stringify(bundle.facts.period) !== JSON.stringify(improvementReviewRecord(row).period)
-      )
-        throw new Error("review_artifact_integrity_failed");
-      if (JSON.stringify(redactReportData(bundle.facts)) !== JSON.stringify(bundle.facts))
-        throw new SmartReportError("report_not_found");
-      if (bundle.guidance) {
-        try {
-          const identities = [
-            ...new Set([
-              ...z.array(z.string()).parse(row["identities"]),
-              ...(await readReportIdentities(db, row["accepted_scope"]))
-            ])
-          ];
-          bundle.guidance = validateReviewGuidance(bundle.facts, bundle.guidance, identities);
-        } catch {
-          bundle.guidance = null;
-          bundle.analysis = "unavailable";
-        }
-      }
-      await load(input);
-      return { bundle, status: improvementReviewRecord(row).status };
+    async bundle(raw: ReviewActor & { id: string }) {
+      const { bundle, status } = await loadBundle(raw);
+      return { bundle, status };
+    },
+    async plan(raw: ReviewActor & { id: string }) {
+      const { bundle, context, status } = await loadBundle(raw);
+      return {
+        bundle: bundle
+          ? ReviewPlanDocumentSchema.parse({
+              ...bundle,
+              context,
+              plans: context ? planReview(bundle.facts, context) : []
+            })
+          : null,
+        status
+      };
     }
   };
 }

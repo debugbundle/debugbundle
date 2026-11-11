@@ -42,7 +42,7 @@ export function notificationPreferencesOperations(): OperationSpec[] {
             description: "Invalid scope, channel, timezone, mode or pause end.",
             schema: apiError
           },
-          "401": { description: "Member authentication required.", schema: apiError },
+          "401": { description: "Browser session or access token required.", schema: apiError },
           "403": {
             description: "Shared management permission or session CSRF token required.",
             schema: apiError

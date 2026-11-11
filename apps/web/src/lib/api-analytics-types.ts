@@ -243,6 +243,7 @@ export interface AnalyticsOpportunitiesListResponse {
   opportunities: AnalyticsOpportunityRecord[];
   next_cursor: string | null;
   total_pages?: number;
+  total_count?: number;
 }
 
 export interface AnalyticsOpportunityResponse {

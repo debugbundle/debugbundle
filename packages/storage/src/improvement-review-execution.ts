@@ -1,4 +1,11 @@
 import { createHash } from "node:crypto";
+import { planningDigest } from "../../smart-improvements/src/review-planning.js";
+import { collectImprovementReviewContext } from "./improvement-review-context.js";
+import {
+  reviewContext,
+  reviewContextSnapshot,
+  validateRowReviewGuidance
+} from "./improvement-review-planning.js";
 import { z } from "zod";
 import {
   ReviewArtifactSchema,
@@ -6,7 +13,6 @@ import {
   reviewEvidenceDigest,
   reviewPolicy,
   reviewPriorities,
-  validateReviewGuidance,
   type ReviewArtifact,
   type ReviewGuidance
 } from "../../smart-improvements/src/review.js";
@@ -145,6 +151,14 @@ export function createImprovementReviewExecutionStore(
         return {
           ...row,
           facts,
+          review_context: reviewContextSnapshot(
+            facts,
+            await collectImprovementReviewContext(
+              tx,
+              facts,
+              scope.flatMap((view) => view.origin_project_ids)
+            )
+          ),
           privacy_snapshot: await reviewPrivacySnapshot(
             tx,
             scope.flatMap((view) => view.origin_project_ids)
@@ -153,32 +167,42 @@ export function createImprovementReviewExecutionStore(
       });
       const facts = ReviewFactsSchema.parse(collected["facts"]),
         digest = reviewEvidenceDigest(facts);
+      reviewContext(collected);
       return runInTransaction(db, async (tx) => {
         const row = await readReviewClaim(tx, claim, true);
         if (row["facts"] !== null) {
+          reviewContext(row);
           if (reviewEvidenceDigest(ReviewFactsSchema.parse(row["facts"])) !== row["facts_digest"])
             throw new Error("review_facts_integrity_failed");
           return row;
         }
         return (
           await tx.query<ReviewRow>(
-            "UPDATE improvement_reviews SET facts=$2::jsonb,facts_digest=$3,privacy_snapshot=$4::jsonb WHERE id=$1 RETURNING *",
+            "UPDATE improvement_reviews SET facts=$2::jsonb,facts_digest=$3,privacy_snapshot=$4::jsonb,review_context=$5::jsonb WHERE id=$1 RETURNING *",
             [
               row["id"],
               JSON.stringify(facts),
               digest,
-              JSON.stringify(collected["privacy_snapshot"])
+              JSON.stringify(collected["privacy_snapshot"]),
+              JSON.stringify(collected["review_context"])
             ]
           )
         ).rows[0]!;
       });
     },
     async unchanged(row: ReviewRow): Promise<boolean> {
+      const context = reviewContext(row);
       return (
         (
           await db.query(
-            "SELECT id FROM improvement_reviews WHERE organization_id=$1 AND project_id=$2 AND id<>$3 AND facts_digest=$4 AND status IN ('ready','factual_only','no_change') AND artifact IS NOT NULL AND NOT privacy_invalidated AND expires_at>clock_timestamp() LIMIT 1",
-            [row["organization_id"], row["project_id"], row["id"], row["facts_digest"]]
+            "SELECT id FROM improvement_reviews WHERE organization_id=$1 AND project_id=$2 AND id<>$3 AND facts_digest=$4 AND (review_context->>'digest') IS NOT DISTINCT FROM $5::text AND status IN ('ready','factual_only','no_change') AND artifact IS NOT NULL AND NOT privacy_invalidated AND expires_at>clock_timestamp() LIMIT 1",
+            [
+              row["organization_id"],
+              row["project_id"],
+              row["id"],
+              row["facts_digest"],
+              context ? planningDigest(ReviewFactsSchema.parse(row["facts"]), context) : null
+            ]
           )
         ).rows.length > 0
       );
@@ -246,11 +270,7 @@ export function createImprovementReviewExecutionStore(
                 ...(await readReportIdentities(tx, row["accepted_scope"]))
               ])
             ];
-            guidance = validateReviewGuidance(
-              ReviewFactsSchema.parse(row["facts"]),
-              guidance,
-              identities
-            );
+            guidance = validateRowReviewGuidance(row, guidance, identities);
           } catch {
             guidance = null;
             status = "factual_only";

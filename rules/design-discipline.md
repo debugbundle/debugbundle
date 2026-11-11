@@ -77,6 +77,7 @@ If a framework, component library, or design system is already in use, the agent
 Do not rebuild existing patterns without a strong reason.
 
 Do not introduce:
+
 - ad hoc spacing values
 - one-off colors
 - one-off shadows
@@ -92,6 +93,7 @@ The agent must choose the UI pattern that best fits the user's task, not the pat
 Examples:
 
 ### Good
+
 - Use a modal for a short focused confirmation or small form.
 - Use a drawer/sheet for contextual editing without losing page context.
 - Use a full page when the task is complex, multi-step, or deserves navigation depth.
@@ -99,6 +101,7 @@ Examples:
 - Use progressive disclosure when the advanced options are secondary.
 
 ### Bad
+
 - Putting a long complicated workflow in a modal.
 - Using tabs for steps in a process that should be sequential.
 - Hiding critical actions in kebab menus.
@@ -141,6 +144,7 @@ For section status/category badges, put the title first and its badges immediate
 to the right using `components/system/title-badge-row.tsx`. Keep the existing
 heading semantics and badge variants. Allow badges and actions to wrap below the
 title at narrow widths rather than clipping content or forcing horizontal scroll.
+
 - destructive actions are distinct and appropriately de-emphasized unless the task is explicitly destructive
 
 Avoid flat interfaces where everything has the same weight.
@@ -220,6 +224,7 @@ The agent must:
 - use sensible defaults when safe
 
 ### Prefer
+
 - radio groups for a small mutually exclusive set
 - select/combobox only when the choice set or search warrants it
 - segmented controls for a few high-frequency options
@@ -227,6 +232,7 @@ The agent must:
 - inline validation for fast correction
 
 ### Avoid
+
 - placeholder-only labels
 - overly long forms in cramped modals
 - ambiguous required indicators
@@ -238,15 +244,18 @@ The agent must:
 Choose the structure that best matches the information.
 
 ### Use tables when
+
 - comparison across rows and columns matters
 - users need scanning, sorting, filtering, or bulk actions
 
 ### Use lists when
+
 - the main unit is content or activity
 - comparison is light
 - rows may vary in height or metadata
 
 ### Use cards when
+
 - content is heterogeneous
 - preview and visual grouping matter
 - strict comparability is not the main need
@@ -338,11 +347,13 @@ Interface copy must be:
 - consistent with product terminology
 
 Prefer:
+
 - "Save changes"
 - "Delete project"
 - "Invite teammate"
 
 Avoid:
+
 - "Submit"
 - "Confirm"
 - "Proceed"
@@ -353,6 +364,7 @@ Avoid:
 The agent must remain inside the current visual system unless explicitly told otherwise.
 
 Use existing:
+
 - color tokens
 - spacing scale
 - typography scale
@@ -364,6 +376,15 @@ Use existing:
 - responsive breakpoints
 
 Never drift from the existing palette or token strategy with arbitrary values.
+
+### Selection and metadata clarity
+
+Shared Toggle and ToggleGroup choices show a Check icon only for the selected state,
+alongside their existing colour and accessible pressed/checked state. Unselected
+choices use normal label spacing without a reserved blank icon slot.
+Groups wrap on narrow screens. Keep icons decorative and preserve keyboard navigation.
+Use `components/system/metadata-separator.tsx` for metadata dots so both sides use
+the same spacing token; avoid embedding tight dot separators in display strings.
 
 ## AI-specific anti-patterns to avoid
 
@@ -409,12 +430,14 @@ When asked to review or create UI, the agent should respond with:
 ### Example: dangerous action in a settings page
 
 Bad:
+
 - small trash icon only
 - hidden in overflow menu
 - no confirmation copy
 - destructive action styled like a neutral action
 
 Better:
+
 - clear "Delete project" action in a danger zone
 - separated from routine settings
 - short consequence text
@@ -424,12 +447,14 @@ Better:
 ### Example: dashboard data display
 
 Bad:
+
 - every metric shown as a separate card
 - charts mixed with controls
 - no clear primary KPI
 - inconsistent spacing and titles
 
 Better:
+
 - top-level KPI group with obvious primary metric
 - filters near the data they affect
 - table for comparable records
@@ -439,11 +464,13 @@ Better:
 ### Example: long create/edit workflow
 
 Bad:
+
 - cram entire form into modal
 - nested accordions inside tabs
 - unclear save behavior
 
 Better:
+
 - full page or step flow
 - persistent primary action
 - grouped sections

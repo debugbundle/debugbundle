@@ -89,7 +89,9 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
         : { bundle_status: parsedQuery.data.bundle_status }),
       ...(parsedQuery.data.from === undefined ? {} : { from: parsedQuery.data.from }),
       ...(parsedQuery.data.to === undefined ? {} : { to: parsedQuery.data.to }),
-      ...(parsedQuery.data.include_total === "true" && parsedCursor === null
+      ...((parsedQuery.data.include_total === "true" ||
+        parsedQuery.data.include_total_count === "true") &&
+      parsedCursor === null
         ? { include_total: true }
         : {}),
       ...(parsedCursor === null ? {} : { cursor: parsedCursor }),
@@ -117,6 +119,11 @@ export function registerAnalyticsRoutes(app: FastifyInstance, dependencies: ApiD
         next_cursor: opportunities.next_cursor,
         ...(filters.include_total && opportunities.total_pages !== undefined
           ? { total_pages: opportunities.total_pages }
+          : {}),
+        ...(parsedQuery.data.include_total_count === "true" &&
+        parsedCursor === null &&
+        opportunities.total_count !== undefined
+          ? { total_count: opportunities.total_count }
           : {})
       },
       AnalyticsOpportunitiesListResponseSchema

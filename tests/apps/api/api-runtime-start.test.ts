@@ -165,11 +165,12 @@ describe("api runtime start", () => {
 
     // The current runtime validates additive access, financial and report
     // structures as well as the installed table/ledger and project-scope guards.
-    expect(queryMock).toHaveBeenCalledTimes(23);
+    expect(queryMock).toHaveBeenCalledTimes(24);
     for (const guard of [
       "report_identity_snapshots",
       "report_runs_factual_no_ai",
-      "project_analytics_review_privacy_guard"
+      "project_analytics_review_privacy_guard",
+      "improvement_reviews_context_size_check"
     ])
       expect(queryMock).toHaveBeenCalledWith(expect.stringContaining(guard), []);
     expect(queryMock).toHaveBeenCalledWith(

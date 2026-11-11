@@ -8,7 +8,7 @@ const identity = z.object({ organizationId: z.uuid(), runId: z.uuid() }).strict(
 const metadata = { tags: ["Smart Reports"], security: anyMemberAuth };
 const failures = {
   "400": { description: "Invalid identity or reference.", schema: apiError },
-  "401": { description: "Member authentication required.", schema: apiError },
+  "401": { description: "Browser session or access token required.", schema: apiError },
   "403": { description: "Credential or current whole-scope access denied.", schema: apiError },
   "404": {
     description: "Report/source unavailable, expired, deleted or invalidated by privacy policy.",

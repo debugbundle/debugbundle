@@ -53,7 +53,7 @@ export function billingOfferOperations(): OperationSpec[] {
         )
       },
       "400": { description: "Invalid or incomplete offer selection.", schema: apiError },
-      "401": { description: "Invalid session or member token.", schema: apiError },
+      "401": { description: "Invalid session or access token.", schema: apiError },
       "403": {
         description: "Current Owner required; browser writes require verified email and CSRF.",
         schema: apiError

@@ -157,6 +157,10 @@ runIntegration("filtered pagination counts", () => {
     const opportunityPage = await opportunities.listAnalyticsOpportunitiesForProject(filters);
     expect(opportunityPage.opportunities).toHaveLength(2);
     expect(opportunityPage.total_pages).toBe(2);
+    expect(opportunityPage.total_count).toBe(3);
+    expect(
+      (await opportunities.listAnalyticsOpportunitiesForOrganization(filters)).total_count
+    ).toBe(3);
     expect(
       (await opportunities.listAnalyticsOpportunitiesForOrganization(filters)).total_pages
     ).toBe(2);

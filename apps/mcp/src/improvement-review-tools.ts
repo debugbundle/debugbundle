@@ -15,9 +15,16 @@ export const IMPROVEMENT_REVIEW_MCP_TOOL_NAMES = [
   "get_improvement_review_bundle",
   "get_improvement_review_settings",
   "update_improvement_review_settings",
-  "get_improvement_review_allowance"
+  "get_improvement_review_allowance",
+  "get_improvement_review_plan"
 ] as const;
 export const IMPROVEMENT_REVIEW_MCP_TOOL_CATALOG = [
+  {
+    name: IMPROVEMENT_REVIEW_MCP_TOOL_NAMES[6],
+    inputSchema: identity,
+    description:
+      "Read the saved weekly review plan with evidence-linked failure, noise, flow or evidence checks and verification. Inspect current settings and linked bundles before an authorised change. Capture policy/rules, alert delivery, sensitivity and diagnostics have different effects. SDK-local settings are unobserved. Never suppress genuine failures or treat a quiet period as a verified fix. Reading never generates or changes anything."
+  },
   {
     name: IMPROVEMENT_REVIEW_MCP_TOOL_NAMES[0],
     inputSchema: list,
@@ -85,6 +92,7 @@ export function createImprovementReviewMcpTools(
     list_improvement_reviews: run(list, (input) => api.list(input)),
     get_improvement_review: run(identity, async (input) => ({ review: await api.get(input) })),
     get_improvement_review_bundle: run(identity, (input) => api.bundle(input)),
+    get_improvement_review_plan: run(identity, (input) => api.plan(input)),
     get_improvement_review_settings: run(scope, async (input) => ({
       settings: await api.settings(input)
     })),

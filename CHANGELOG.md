@@ -6,6 +6,57 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.26.0] - 2026-11-12
+
+- Show a right-aligned red `!` beside Health Status for current confirmed outages,
+  with visible background refresh, recovery clearing and account/workspace isolation.
+
+- Show the shared success toast after weekly-review settings are persisted, without
+  false success on failed validation, failed saves or stale view completions.
+
+- Keep report history as a scrollable table on phones, improve saved-report action/date
+  wrapping and remove blank checkmark space from unselected toggles.
+
+- Move dashboard Access tokens to `/access-tokens` without a legacy route alias.
+  Align page actions with descriptions and default button sizing, append exact
+  filtered totals to inventory titles, and offer weekly-review enablement in the
+  eligible Owner empty state through the existing consent/settings flow.
+- Add first-page `include_total_count=true` metadata to incident, improvement and
+  analytics-opportunity reads while preserving default installed-client responses.
+
+- Prevent welcome dismissal from flashing the setup guide during its exit animation,
+  and use standard small-button icon metrics for shared Refresh controls.
+
+- Simplify dashboard setup modals to the copy action and shared Refresh control.
+  Show a bordered, shaded Setup guide sidebar row with centred progress and no next-step subtitle.
+
+- Default new/replacement Access tokens to Current workspace with Read, Write and
+  Project settings selected where the issuing role permits; keep People management opt-in.
+  Add optional analytics setup, clearer selected-toggle checkmarks and consistent
+  metadata-dot spacing across the dashboard.
+
+- Add a first-visit dashboard welcome with a copyable agent prompt, Access tokens
+  link and dismissible setup progress. Keep the guide in the account menu, show
+  eligible optional improvements/report steps, and preserve existing CLI/auth flows.
+
+- Rename public Member token wording to Access tokens across the dashboard,
+  CLI and integration descriptions. Preserve existing credentials, commands,
+  configuration keys, schemas and permissions; no token replacement is needed.
+
+- Distinguish paid-plan Reports from Business Smart Reports in dashboard labels
+  and agent guidance, preserving existing report interfaces and entitlements.
+
+- Extend weekly improvement reviews with bounded capture/configuration evidence,
+  recurring-failure priorities, safe noise checks, measured flow investigations
+  and explicit verification. Reviews guide changes without applying them.
+- Add a saved plan read through API, CLI, ordinary MCP and the existing review
+  view. Preserve the released bundle export, schedule, consent and separate budget.
+- Add the forward migration for the bounded evidence snapshot. Qualify the
+  changed prompt through the existing quality gate with concrete monitor/retry
+  comparisons and rejection of duplicated investigation checks.
+- Include repeated incident delivery across accepted alert rules, keep large
+  linked groups deterministic, and reject reordered duplicate AI checks.
+
 ## [1.25.0] - 2026-11-11
 
 - Refine Improvements navigation, member and People actions, role labels, token

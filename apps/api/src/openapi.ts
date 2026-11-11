@@ -171,8 +171,8 @@ export function buildPublicOpenApiSpec(): Record<string, unknown> {
         memberBearerToken: {
           type: "http",
           scheme: "bearer",
-          bearerFormat: "Opaque member token",
-          description: "Bearer member token used by the CLI, MCP, and automation."
+          bearerFormat: "Opaque access token",
+          description: "Bearer access token used by the CLI, MCP, and automation."
         },
         agentBearerToken: {
           type: "http",

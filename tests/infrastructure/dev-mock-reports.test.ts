@@ -13,6 +13,7 @@ import { createImprovementReviewApi } from "../../packages/improvement-review-cl
 import { createOrganizationApi } from "../../packages/organization-client/src/index.js";
 import { ReportContentViewSchema } from "../../packages/smart-reports/src/report-content.js";
 import { isReportPdfBytes } from "../../packages/smart-reports/src/report-pdf.js";
+import { ReviewPlanDocumentSchema } from "../../packages/smart-improvements/src/review-planning-contract.js";
 
 afterEach(() => vi.restoreAllMocks());
 function setup() {
@@ -289,6 +290,14 @@ it("exercises weekly review states and consent withdrawal without external work"
     ])
   );
   for (const review of history.reviews) await f.reviews.bundle({ ...f.scope, reviewId: review.id });
+  const ready = history.reviews.find((review) => review.status === "ready")!;
+  const planned = ReviewPlanDocumentSchema.parse(
+    (await f.reviews.plan({ ...f.scope, reviewId: ready.id })).bundle
+  );
+  expect(planned.plans[0]).toMatchObject({ action: "review_noise" });
+  expect((await f.reviews.bundle({ ...f.scope, reviewId: ready.id })).bundle?.schema_version).toBe(
+    "improvement_review.v1"
+  );
   expect((await f.reviews.settings(f.scope)).enabled).toBe(false);
   await f.reviews.update({
     ...f.scope,

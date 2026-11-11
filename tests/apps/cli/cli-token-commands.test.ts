@@ -230,7 +230,7 @@ describe("cli token commands", () => {
     });
   });
 
-  it("loads stored auth state and forwards it into member token creation", async () => {
+  it("loads stored auth state and forwards it into access token creation", async () => {
     const readAuthState = vi.fn().mockResolvedValue({
       bearer_token: "dbundle_mem_saved",
       base_url: "https://selfhost.debugbundle.test"
@@ -565,7 +565,7 @@ describe("cli token commands", () => {
         plaintext: "dbundle_proj_secret"
       }
     });
-    expect(createMemberHuman.output).toContain("Member token created: mtok_10");
+    expect(createMemberHuman.output).toContain("Access token created: mtok_10");
     expect(JSON.parse(revokeMemberJson.output)).toEqual({
       token: {
         token_id: "mtok_10",
@@ -601,7 +601,7 @@ describe("cli token commands", () => {
 
     expect(listMemberError.exitCode).toBe(1);
     expect(listMemberError.output).toContain("network_down");
-    expect(revokeMemberHuman.output).toBe("Member token revoked: mtok_11");
+    expect(revokeMemberHuman.output).toBe("Access token revoked: mtok_11");
   });
 
   it("covers create project error catch and unmapped API status fallback", async () => {
@@ -798,7 +798,7 @@ describe("cli token commands", () => {
     expect(revoked.output).toBe("Project token revoked: ptok_21");
   });
 
-  it("forwards auth state into member token list and revoke wrappers", async () => {
+  it("forwards auth state into access token list and revoke wrappers", async () => {
     const readAuthState = vi.fn().mockResolvedValue({
       bearer_token: "dbundle_mem_saved",
       base_url: "https://selfhost.debugbundle.test"

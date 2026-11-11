@@ -25,7 +25,7 @@ Then reload plugins if Claude Code does not connect the bundled MCP server immed
 The plugin ships a bundled MCP server definition that runs:
 
 ```bash
-npx -y @debugbundle/mcp@1.23.0 --local-auth
+npx -y @debugbundle/mcp@1.24.0 --local-auth
 ```
 
 ## CLI-first workflow
@@ -40,9 +40,9 @@ Use one of these auth paths:
 - Claude Code plugin config: set the optional `member_token` value when enabling the plugin.
 - Self-hosted or non-default API host: set the optional `api_url` value when enabling the plugin.
 
-Use member tokens for MCP read and management tools. Project tokens are SDK write-only ingestion credentials and are not valid for incident retrieval, bundle access, billing, project management, or other MCP workflows.
+Use access tokens for MCP read and management tools. Project tokens are SDK write-only ingestion credentials and are not valid for incident retrieval, bundle access, billing, project management, or other MCP workflows.
 
-Plugin 1.23.0 retains the local-auth profile with MCP 1.23.0: tools use saved CLI login or the configured member token without exposing a `bearerToken` argument. Restart the connection after login or credential changes. Never paste credentials into chat or tool arguments.
+Plugin 1.24.0 retains the local-auth profile with MCP 1.24.0: tools use saved CLI login or the configured access token without exposing a `bearerToken` argument. Restart the connection after login or credential changes. Never paste credentials into chat or tool arguments.
 
 ## Update
 

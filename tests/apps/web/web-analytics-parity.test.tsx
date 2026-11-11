@@ -132,6 +132,7 @@ it.each(["Opportunities", "Bundles"])(
   "keeps metrics-only filters out of the %s inventory without losing metric choices",
   async (section) => {
     const requests = setup();
+    const actionRequests = () => requests.filter((url) => url.includes("/analytics/actions?"));
     const user = userEvent.setup();
     render(<App initialEntries={[`/projects/${projectId}/analytics/actions`]} />);
     await screen.findByText("checkout.submit");
@@ -139,14 +140,14 @@ it.each(["Opportunities", "Bundles"])(
     await waitFor(() => expect(screen.getByLabelText("Device type")).toBeEnabled());
     await chooseSelectOption(user, "Device type", "Mobile");
     await user.click(screen.getByRole("button", { name: "Apply filters" }));
-    await waitFor(() => expect(requests.at(-1)).toContain("device_type=mobile"));
+    await waitFor(() => expect(actionRequests().at(-1)).toContain("device_type=mobile"));
     await user.click(
       within(screen.getByRole("tablist", { name: "Analytics sections" })).getByRole("tab", {
         name: section
       })
     );
     await screen.findByRole("heading", {
-      name: section === "Bundles" ? "Generated analytics bundles" : "Analytics opportunities"
+      name: section === "Bundles" ? "Generated analytics bundles" : "Analytics opportunities (0)"
     });
     expect(screen.queryByRole("button", { name: "Remove Device type: Mobile filter" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "More filters" }));
@@ -162,6 +163,7 @@ it.each(["Opportunities", "Bundles"])(
       expect(within(formDialog).getByLabelText("Additional filters (JSON)")).toHaveValue("");
       await user.click(within(formDialog).getByRole("button", { name: "Cancel" }));
     }
+    const previousActionRequests = actionRequests().length;
     await user.click(
       within(screen.getByRole("tablist", { name: "Analytics sections" })).getByRole("tab", {
         name: "Actions"
@@ -171,7 +173,10 @@ it.each(["Opportunities", "Bundles"])(
     expect(
       screen.getByRole("button", { name: "Remove Device type: Mobile filter" })
     ).toBeInTheDocument();
-    await waitFor(() => expect(requests.at(-1)).toContain("device_type=mobile"));
+    await waitFor(() => {
+      expect(actionRequests().length).toBeGreaterThan(previousActionRequests);
+      expect(actionRequests().at(-1)).toContain("device_type=mobile");
+    });
   }
 );
 it("applies custom UTC windows, hourly granularity and all supported dimension filters to metric requests", async () => {

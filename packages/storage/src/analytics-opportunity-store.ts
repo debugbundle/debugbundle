@@ -107,7 +107,8 @@ export function createPostgresAnalyticsOpportunityStore(db: Queryable): Analytic
         input.cursor === undefined &&
         (result.rows.length === 0 || result.rows[0]?.total_count !== undefined)
           ? {
-              total_pages: Math.max(1, Math.ceil(Number(result.rows[0]?.total_count ?? 0) / limit))
+              total_pages: Math.max(1, Math.ceil(Number(result.rows[0]?.total_count ?? 0) / limit)),
+              total_count: Number(result.rows[0]?.total_count ?? 0)
             }
           : {})
       });
@@ -138,7 +139,8 @@ export function createPostgresAnalyticsOpportunityStore(db: Queryable): Analytic
         input.cursor === undefined &&
         (result.rows.length === 0 || result.rows[0]?.total_count !== undefined)
           ? {
-              total_pages: Math.max(1, Math.ceil(Number(result.rows[0]?.total_count ?? 0) / limit))
+              total_pages: Math.max(1, Math.ceil(Number(result.rows[0]?.total_count ?? 0) / limit)),
+              total_count: Number(result.rows[0]?.total_count ?? 0)
             }
           : {})
       });

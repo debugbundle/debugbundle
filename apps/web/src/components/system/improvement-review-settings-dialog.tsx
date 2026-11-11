@@ -9,6 +9,8 @@ import { reportScope } from "../../lib/report-api.js";
 import { listProjects, type ProjectRecord, type SessionRecord } from "../../lib/api.js";
 import { reportManageableProjects } from "../../lib/report-access.js";
 import { usePendingAction } from "../../lib/use-pending-action.js";
+import { useReportContext } from "../../lib/use-report-context.js";
+import { showSuccessToast } from "../../lib/notify.js";
 import { Dialog, DialogClose } from "../ui/dialog.js";
 import { Field, FieldGroup, FieldLabel, FieldDescription } from "../ui/field.js";
 import { Checkbox } from "../ui/checkbox.js";
@@ -42,6 +44,8 @@ export function ImprovementReviewSettingsDialog({
     [loaded, setLoaded] = useState(false);
   const { pending, run } = usePendingAction(),
     policy = reviewPolicy(session.organization_plan, session.self_hosted);
+  const contextKey = `${session.user_id}:${session.organization_id}:${session.role}:${session.organization_plan}:${Boolean(session.self_hosted)}`;
+  const currentContext = useReportContext(contextKey);
   useEffect(() => {
     let active = true;
     if (open) {
@@ -114,10 +118,12 @@ export function ImprovementReviewSettingsDialog({
                 ...reportScope(session.organization_id),
                 command: command.data
               });
+              if (currentContext.current !== contextKey) return;
+              showSuccessToast("Weekly review settings saved successfully.");
               onSaved();
               onOpenChange(false);
             } catch (reason) {
-              setError(improvementReviewError(reason));
+              if (currentContext.current === contextKey) setError(improvementReviewError(reason));
             }
           });
         }}
@@ -215,8 +221,9 @@ export function ImprovementReviewSettingsDialog({
               onCheckedChange={(value) => setDraft({ ...draft, source_consent: value === true })}
             />
             <FieldLabel htmlFor="weekly-review-consent">
-              Allow the selected retained evidence to be used for reviews and sent to the configured
-              AI provider when qualified AI is available.
+              Allow the selected retained evidence and bounded derived capture diagnostics to be
+              used for reviews and sent to the configured AI provider when qualified AI is
+              available.
             </FieldLabel>
           </Field>
           <FieldDescription>

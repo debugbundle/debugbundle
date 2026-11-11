@@ -1,3 +1,4 @@
+import { MetadataSeparator } from "../components/system/metadata-separator.js";
 import { AnalyticsSectionHeader } from "../components/system/analytics-section-header.js";
 import { Dialog } from "../components/ui/dialog.js";
 import { formatAnalyticsLabel } from "../lib/analytics-presentation.js";
@@ -284,8 +285,11 @@ export function ProjectAnalyticsFlowsPage(): JSX.Element {
                 <div className="flex min-w-0 flex-col gap-1">
                   <CardTitle>{current.display_name}</CardTitle>
                   <CardDescription>
-                    {formatAnalyticsLabel(current.kind)} · Version {current.version} · Expires after{" "}
-                    {current.timeout_minutes} minutes
+                    {formatAnalyticsLabel(current.kind)}
+                    <MetadataSeparator />
+                    Version {current.version}
+                    <MetadataSeparator />
+                    Expires after {current.timeout_minutes} minutes
                   </CardDescription>
                 </div>
                 {canManageFlows && !current.archived_at && (

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ReviewPlanDocumentSchema } from "../../../../packages/smart-improvements/src/review-planning-contract.js";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
   ReviewSettingsCommandSchema,
@@ -45,14 +46,14 @@ function guard(
   };
 }
 export function registerImprovementReviewRoutes(app: FastifyInstance, deps: ApiDependencies): void {
-  for (const operation of ["settings", "allowance", "list", "get", "bundle"] as const) {
+  for (const operation of ["settings", "allowance", "list", "get", "bundle", "plan"] as const) {
     const path =
       operation === "list"
         ? base
         : operation === "get"
           ? `${base}/:reviewId`
-          : operation === "bundle"
-            ? `${base}/:reviewId/bundle`
+          : operation === "bundle" || operation === "plan"
+            ? `${base}/:reviewId/${operation}`
             : `${base}/${operation}`;
     app.get(
       path,
@@ -87,6 +88,15 @@ export function registerImprovementReviewRoutes(app: FastifyInstance, deps: ApiD
           return reply.send({
             review: ReviewRecordSchema.parse(await deps.improvementReviews.store.get(input))
           });
+        if (operation === "plan") {
+          z.object({}).strict().parse(req.query);
+          return reply.send(
+            z
+              .object({ bundle: ReviewPlanDocumentSchema.nullable(), status: ReviewStatusSchema })
+              .strict()
+              .parse(await deps.improvementReviews.store.plan(input))
+          );
+        }
         const result = await deps.improvementReviews.store.bundle(input);
         return reply.send(
           z

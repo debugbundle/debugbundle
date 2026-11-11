@@ -7,6 +7,7 @@ interface TitleBadgeRowProps extends Omit<HTMLAttributes<HTMLDivElement>, "title
   badges?: ReactNode;
   titleAccessory?: ReactNode;
   actions?: ReactNode;
+  actionsClassName?: string;
 }
 
 export function TitleBadgeRow({
@@ -14,6 +15,7 @@ export function TitleBadgeRow({
   badges,
   titleAccessory,
   actions,
+  actionsClassName,
   className,
   ...props
 }: TitleBadgeRowProps): JSX.Element {
@@ -29,7 +31,13 @@ export function TitleBadgeRow({
       </div>
       {badges}
       {actions == null ? null : (
-        <div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center gap-2">
+        <div
+          data-slot="title-badge-row-actions"
+          className={cn(
+            "ml-auto flex min-w-0 max-w-full flex-wrap items-center gap-2",
+            actionsClassName
+          )}
+        >
           {actions}
         </div>
       )}

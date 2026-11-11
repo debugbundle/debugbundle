@@ -339,12 +339,12 @@ export function projectsOperations(): OperationSpec[] {
       method: "get",
       path: "/v1/member/tokens",
       operationId: "listMemberTokens",
-      summary: "List member tokens",
+      summary: "List access tokens",
       tags: ["Tokens"],
       security: anyMemberAuth,
       query: MemberTokenListQuerySchema,
       responses: {
-        "200": { description: "Member tokens.", schema: tokenListResponse },
+        "200": { description: "Access tokens.", schema: tokenListResponse },
         "400": { description: "Invalid query parameters.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError }
       }
@@ -354,12 +354,12 @@ export function projectsOperations(): OperationSpec[] {
       method: "post",
       path: "/v1/member/tokens",
       operationId: "createMemberToken",
-      summary: "Create a member token",
+      summary: "Create an access token",
       tags: ["Tokens"],
       security: anyMemberAuth,
       requestBody: component("CreateTokenBody", CreateTokenBodySchema),
       responses: {
-        "201": { description: "Member token created.", schema: tokenResponse },
+        "201": { description: "Access token created.", schema: tokenResponse },
         "400": { description: "Invalid request body.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
         "403": {
@@ -374,12 +374,12 @@ export function projectsOperations(): OperationSpec[] {
       method: "post",
       path: "/v1/member/tokens/{tokenId}/revoke",
       operationId: "revokeMemberToken",
-      summary: "Revoke a member token",
+      summary: "Revoke an access token",
       tags: ["Tokens"],
       security: anyMemberAuth,
       params: MemberTokenParamsSchema,
       responses: {
-        "200": { description: "Revoked member token.", schema: tokenResponse },
+        "200": { description: "Revoked access token.", schema: tokenResponse },
         "400": { description: "Invalid token id.", schema: apiError },
         "401": { description: "Authentication is invalid.", schema: apiError },
         "404": { description: "Token was not found.", schema: apiError }

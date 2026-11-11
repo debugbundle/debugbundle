@@ -1,10 +1,11 @@
+import { MetadataSeparator } from "../components/system/metadata-separator.js";
 import { FileTextIcon, HistoryIcon, ChevronRightIcon, PlusIcon } from "lucide-react";
 import { hasReportEntitlement } from "../../../../packages/shared-types/src/tier-capabilities.js";
 import { ReportAllowanceCard } from "../components/system/report-allowance-card.js";
 import type { ReportAllowance } from "../../../../packages/smart-reports/src/report-allowance.js";
 import { useReportContext } from "../lib/use-report-context.js";
 import { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import type { ReportDefinitionRecord } from "../../../../packages/smart-reports/src/report-definition.js";
 import type { ReportRunRecord } from "../../../../packages/smart-reports/src/report-run.js";
 import { reportApi, reportScope, reportErrorMessage } from "../lib/report-api.js";
@@ -12,7 +13,6 @@ import { useSession } from "../lib/session.js";
 import { listProjects, type ProjectRecord } from "../lib/api.js";
 import { reportManageableProjects } from "../lib/report-access.js";
 import { PageHeader } from "../components/system/page-header.js";
-import { useHeaderActions } from "../components/system/header-actions-context.js";
 import { LoadErrorCallout } from "../components/system/load-error-callout.js";
 import { PlanUpgradeCallout } from "../components/system/plan-upgrade-callout.js";
 import { ReportDefinitionActions } from "../components/system/report-definition-actions.js";
@@ -58,8 +58,6 @@ type Data = {
   projects: ProjectRecord[];
 };
 export function ReportsPage(): JSX.Element {
-  const { pathname } = useLocation();
-  const { setAction: setHeaderAction } = useHeaderActions();
   const { session } = useSession(),
     hasReportAccess = hasReportEntitlement(session?.organization_plan, session?.self_hosted),
     key = `${session?.user_id}:${session?.organization_id}:${session?.organization_plan}:${Boolean(session?.self_hosted)}`,
@@ -106,21 +104,7 @@ export function ReportsPage(): JSX.Element {
       ? { to: "/billing", label: "View plans" }
       : { to: "/projects", label: "Open projects" };
   const firstDefinition = visible?.definitions[0]?.id;
-  useEffect(() => {
-    if (!canCreate) return;
-    setHeaderAction({
-      pathname,
-      content: (
-        <Button size="sm" asChild>
-          <Link to="/reports/definitions/new">
-            <PlusIcon data-icon="inline-start" />
-            Create report
-          </Link>
-        </Button>
-      )
-    });
-    return () => setHeaderAction(null);
-  }, [canCreate, pathname, setHeaderAction]);
+
   useEffect(() => {
     let active = true;
     setAllowance(null);
@@ -174,12 +158,24 @@ export function ReportsPage(): JSX.Element {
   };
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader description="Review completed periods, resolved work and next priorities across your selected projects." />
+      <PageHeader
+        description="Review completed periods, resolved work and next priorities across your selected projects."
+        actions={
+          canCreate ? (
+            <Button asChild>
+              <Link to="/reports/definitions/new">
+                <PlusIcon data-icon="inline-start" />
+                Create report
+              </Link>
+            </Button>
+          ) : undefined
+        }
+      />
       {!hasReportAccess ? (
         <PlanUpgradeCallout
           eyebrow="Paid plans"
-          title="Upgrade to unlock Smart Reports"
-          description="Reports are available on Solo, Team and Business. Review recorded facts on Solo and Team, with AI analysis on Business. Authorised saved reports remain available until their expiry."
+          title="Upgrade to unlock reports"
+          description="Reports are available on Solo, Team and Business. Solo and Team include factual reports; Business adds Smart Reports with AI analysis. Authorised saved reports remain available until their expiry."
         />
       ) : null}
       {error ? (
@@ -203,22 +199,19 @@ export function ReportsPage(): JSX.Element {
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
                 {visible.runs.length ? (
-                  <Table className="max-sm:block sm:table-fixed">
-                    <TableHeader className="max-sm:sr-only">
+                  <Table className="min-w-160 table-fixed">
+                    <TableHeader>
                       <TableRow>
-                        <TableHead className="sm:w-5/12">Report</TableHead>
-                        <TableHead className="sm:w-1/4">Period (UTC)</TableHead>
-                        <TableHead className="sm:w-1/6">Status</TableHead>
-                        <TableHead className="sm:w-1/6">Expiry</TableHead>
+                        <TableHead className="w-5/12">Report</TableHead>
+                        <TableHead className="w-1/4">Period (UTC)</TableHead>
+                        <TableHead className="w-1/6">Status</TableHead>
+                        <TableHead className="w-1/6">Expiry</TableHead>
                       </TableRow>
                     </TableHeader>
-                    <TableBody className="max-sm:block">
+                    <TableBody>
                       {visible.runs.map((run) => (
-                        <TableRow
-                          key={run.id}
-                          className="max-sm:flex max-sm:flex-col max-sm:gap-1 max-sm:py-3"
-                        >
-                          <TableCell className="break-words whitespace-normal max-sm:block max-sm:py-1">
+                        <TableRow key={run.id}>
+                          <TableCell className="break-words whitespace-normal">
                             <Link
                               className="underline underline-offset-4"
                               aria-label={`Open ${run.name}`}
@@ -227,10 +220,10 @@ export function ReportsPage(): JSX.Element {
                               {run.name}
                             </Link>
                           </TableCell>
-                          <TableCell className="whitespace-normal max-sm:block max-sm:py-1">
+                          <TableCell className="whitespace-normal">
                             {reportPeriodLabel(run.period)}
                           </TableCell>
-                          <TableCell className="whitespace-normal max-sm:block max-sm:py-1">
+                          <TableCell className="whitespace-normal">
                             <ReportRunStatus
                               run={run}
                               description={
@@ -240,7 +233,7 @@ export function ReportsPage(): JSX.Element {
                               }
                             />
                           </TableCell>
-                          <TableCell className="whitespace-normal max-sm:block max-sm:py-1">
+                          <TableCell className="whitespace-normal">
                             {run.expires_at
                               ? `Expires ${reportDateLabel(run.expires_at)}`
                               : "Not published"}
@@ -286,6 +279,7 @@ export function ReportsPage(): JSX.Element {
                   <Card key={definition.id}>
                     <CardHeader>
                       <TitleBadgeRow
+                        actionsClassName="ml-0 basis-full justify-start sm:ml-auto sm:basis-auto sm:justify-end"
                         title={<CardTitle>{definition.name}</CardTitle>}
                         badges={
                           <Badge variant="outline">
@@ -313,15 +307,26 @@ export function ReportsPage(): JSX.Element {
                         }
                       />
                       <CardDescription>
-                        {definition.cadence.charAt(0).toUpperCase() + definition.cadence.slice(1)} ·{" "}
+                        {definition.cadence.charAt(0).toUpperCase() + definition.cadence.slice(1)}
+                        <MetadataSeparator />
                         {definition.scope.length}{" "}
-                        {definition.scope.length === 1 ? "project" : "projects"} ·{" "}
+                        {definition.scope.length === 1 ? "project" : "projects"}
+                        <MetadataSeparator />
                         {definition.privacy_mode === "full"
                           ? "Full evidence"
                           : "Restricted evidence"}
-                        {definition.next_due_at && !definition.pause_reason
-                          ? ` · Next delivery ${reportTimeLabel(definition.next_due_at)}`
-                          : ""}
+                        {definition.next_due_at && !definition.pause_reason ? (
+                          <>
+                            <span className="mt-1 block sm:mt-0 sm:inline">
+                              <span className="hidden sm:inline">
+                                <MetadataSeparator />
+                              </span>
+                              Next delivery {reportTimeLabel(definition.next_due_at)}
+                            </span>
+                          </>
+                        ) : (
+                          ""
+                        )}
                       </CardDescription>
                     </CardHeader>
                     {definition.pause_reason || definition.requires_owner_review ? (
@@ -353,7 +358,7 @@ export function ReportsPage(): JSX.Element {
                             ? "Create a report to review resolved work and priorities across your selected projects."
                             : hasReportEntitlement(session?.organization_plan, session?.self_hosted)
                               ? "No report definitions are available for your projects yet."
-                              : "Smart Reports bring together completed work and next priorities. Create reports on a paid plan."}
+                              : "Reports bring together completed work and next priorities. Create reports on a paid plan."}
                         </EmptyDescription>
                       </EmptyHeader>
                       <EmptyContent>

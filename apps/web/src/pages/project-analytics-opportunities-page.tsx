@@ -1,3 +1,4 @@
+import { inventoryTitle } from "../lib/inventory-title.js";
 import { LightbulbIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
@@ -70,7 +71,8 @@ export function ProjectAnalyticsOpportunitiesPage(): JSX.Element {
       return {
         items: response.opportunities,
         nextCursor: response.next_cursor,
-        totalPages: response.total_pages
+        totalPages: response.total_pages,
+        totalCount: response.total_count
       };
     },
     [projectId, queryKey, detectedWindow, filters, limit]
@@ -79,7 +81,7 @@ export function ProjectAnalyticsOpportunitiesPage(): JSX.Element {
   return (
     <div className="flex flex-col gap-6">
       <AnalyticsSectionHeader
-        title="Analytics opportunities"
+        title={inventoryTitle("Analytics opportunities", pagination.totalCount)}
         description="Review deterministic improvement signals found in aggregate product usage."
         isLoading={pagination.isLoading}
         onRefresh={pagination.refreshPage}

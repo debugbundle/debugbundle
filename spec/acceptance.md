@@ -493,6 +493,8 @@ Native logger level/silent/processor filtering runs before SDK capture; enabled-
 - **And** shorter interruptions retain amber impact, and multiple short check interruptions are not promoted to an outage merely because their summed duration reaches one hour
 - **And** both Health Status and the project Health history show precise durations such as `1h 25m`, with project tooltips identifying summed durations as `total check downtime`
 - **And** explicitly daily dashboard health summaries continue to use the latest measured day
+- **And** a current enabled, unpaused failing check displays a red `!` badge at the right of the Health Status sidebar item, with an accessible description; historical failures, disabled/paused checks and suspended shares do not trigger it
+- **And** visible background refresh runs every minute and on focus/visibility return; Health Status refresh also updates the marker, recovery clears it, unavailable reads cannot invent an outage, and late responses from another account/workspace are discarded
 
 ---
 
@@ -1755,6 +1757,18 @@ Mapped requirements: FR-PJS-01/04. Explicit roots, secret-free manifest/diff, re
 
 ---
 
+### AC-DOC-18: On-Demand Public Support and Hero Discovery
+
+- **Given** a fresh public-site document, including one with a previous Crisp session cookie
+- **When** it renders, hydrates, receives ordinary navigation/hover/scroll or remains idle
+- **Then** support does not initialise Crisp, inject its script or contact its provider until an explicit chat activation
+- **And** the shared keyboard-accessible control provides loading feedback, a bounded timeout, retry and an email fallback; provider errors remain contained
+- **And** the compact "Chat" launcher and Contact's inline action share that lifecycle; the inline action can reopen an existing conversation without creating another loader
+- **And** repeated clicks and client navigation preserve one loader/session, while a full reload requires activation again
+- **And** an opened-chat event or Crisp's reported open state, rather than the loader download alone, hands control to Crisp; state reconciliation runs only during the bounded opening attempt and updates every shared control; a late event can recover a timeout without injecting another executing provider
+- **And** the homepage exports one high-priority preload for its exact hero background, while unrelated pages do not preload that image
+- **And** privacy documentation matches this lifecycle; hosted desktop/mobile Lighthouse and provider interaction acceptance are recorded separately from local tests/build checks
+
 ## 17. End-to-End Agent Workflow Acceptance
 
 ### AC-E2E-01: Full Agent Loop
@@ -1855,6 +1869,17 @@ Mapped requirements: FR-PJS-01/04. Explicit roots, secret-free manifest/diff, re
 - **Given** `debugbundle setup` runs
 - **Then** `.gitignore` contains entries for `.debugbundle/local/events/`, `.debugbundle/local/state.json`, `.debugbundle/bundles/`
 - **And** `.debugbundle/profile.json`, `.debugbundle/local/connection.json`, and `.agents/skills/debugbundle/` are NOT gitignored
+
+### AC-ONB-08: Dashboard Welcome and Setup Progress
+
+- An empty account's first dashboard visit opens the welcome only after successful project/token reads; established accounts, failed reads, billing and directly opened management screens are not interrupted.
+- Copying the prompt exposes no token or browser session and does not complete a milestone. Both modals omit View/Hide prompt actions; clipboard denial alone reveals a selectable prompt.
+- Closing, Escape and the token link dismiss the modal. The outgoing view remains unchanged throughout its exit animation; closing the welcome never flashes the guide. Its dismissal is remembered per user/workspace in this browser; hiding the sidebar reminder still leaves Setup guide in the account menu.
+- Three essential steps derive from current scoped read results. A previously observed incident remains a completed milestone after retention. Optional analytics, Smart Improvements and Reports steps use current plan/role eligibility and actual enabled, unpaused settings. Analytics requires at least one enabled manageable current-workspace project and links to its expanded settings; failures stay unknown and no capture is enabled automatically.
+- Account/workspace changes discard stale reads and reset context. Unknown states remain unknown, and blocked browser storage never prevents use of the app.
+- Reopening, refreshing or navigating the guide never creates credentials/projects, sends events, starts trials, generates AI work or enables reports. Ordinary management routes retain their existing controls.
+- The bordered, subtly shaded sidebar row is labelled Setup guide, shows its essential-step count without a next-step subtitle, and vertically centres its controls. Progress refresh uses the shared small outline Refresh control. The existing Dialog and Sidebar primitives provide keyboard operation, focus handling, collapsed-sidebar access and bounded mobile scrolling. Source/component tests are the acceptance gate; browser screenshots are not required.
+- The welcome is wider and centred without header/footer bands. Decorative metadata dots have shared spacing on both sides; selected toggle choices have a checkmark as well as colour, retain keyboard/accessible state and wrap on narrow screens. Its copy/refresh button icons occupy the shared component's icon slot. Local-only empty/started previews expose the sidebar reminder and its dismiss/reopen flow without changing saved account preferences; real-API and production modes ignore them.
 
 ---
 
@@ -2549,6 +2574,11 @@ Mapped requirements: FR-PJS-01/04. Explicit roots, secret-free manifest/diff, re
 
 ### AC-WEB-09: List Pagination and Action Alignment
 
+- Access-token navigation, setup links and both dashboard routers use `/access-tokens`; there is no legacy `/member-tokens` route or dedicated redirect.
+- Page actions sit in the PageHeader description row rather than the shell header, align right/centre on desktop, wrap on mobile and use the shared default button size.
+- Incident inventory, Improvement inventory, Project inventory and Analytics opportunities show exact filtered totals inline as `(x)`. The total remains stable across cursor navigation and updates on refresh/filter changes; missing/failed reads do not invent a count, while known empty lists show `(0)`.
+- Disabled weekly reviews with an empty inventory show Enable weekly review only to eligible Owners with known settings. It opens the existing project-selection/consent form and performs no write or generation until explicit save.
+
 - **Given** a filtered incidents, improvements, analytics opportunities, AnalyticsBundle generations, or capture-rules list with multiple pages
 - **When** the member opens its first page or navigates by cursor
 - **Then** the pagination control reads `Page N of X` with the exact filtered page count from the initial list response
@@ -2556,6 +2586,8 @@ Mapped requirements: FR-PJS-01/04. Explicit roots, secret-free manifest/diff, re
 - **And** changing filters ignores pending responses for the previous filters, and refreshing updates totals and recovers from a removed page
 - **And** refreshing a later page resets to the refreshed first page if its continuation cursor changed, so cached pages cannot skip rows across the new boundary; a stable cursor preserves the current page
 - **And** analytics totals are opt-in so installed clients retain their existing strict response shape
+- **And** report history remains a horizontally scrollable table with column headers on phones; saved-report actions wrap below the title with left alignment and next delivery on its own line
+- **And** unselected toggle choices do not reserve checkmark space; selected choices alone display the icon
 - **And** text actions use the shared Button primitive with their icons centered beside labels
 - **And** table Edit/Delete actions use shared icon buttons with accessible names and hover/keyboard tooltips; their handlers, disabled states and confirmation dialogs remain functional
 - **And** capture-rule Pause/Enable controls use pause/play icons with the same accessible labels, tooltips and disabled states
@@ -3031,3 +3063,15 @@ Synthetic JBoss LoggingOutputStream/LogManager output for six ExecutionException
 ## Approved Smart Products extension (core 1.25.0)
 
 AC-SMI-01 through AC-SMI-04 and the AC-BUS-05/06 extension are specified in [smart-products.md](smart-products.md). This adds bounded weekly reviews, factual Solo/Team reports, restricted identity protection and public Analytics discovery while preserving the released contracts.
+
+AC-SMI-05: exact-origin, bounded configuration/analytics collectors with honest
+windows, truncation, privacy and no raw/recipient/destination leakage.
+AC-SMI-06: deterministic linked-work grouping, priority reasons and four action
+classes; every control family has evidence/verification checks, with protected
+failure visibility and no automatic configuration changes.
+AC-SMI-07: additive plan reads, unchanged saved exports/archives, frozen evidence
+and paid request recovery, forward migration/readiness and compatible rollback.
+AC-SMI-08: API/CLI/ordinary MCP/web parity; offline safety matrix and separately
+approved bounded provider qualification before changed-prompt activation. Require useful
+checks scoring at least seven of eight with every safety gate passing. See
+[the planning contract](../contracts/improvement-review-planning.md).

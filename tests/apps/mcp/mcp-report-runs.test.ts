@@ -13,6 +13,14 @@ import {
   reportRunFixture
 } from "../../helpers/smart-reports.js";
 describe("report run MCP", () => {
+  it("describes factual generation on paid plans and Business-only Smart Reports", () => {
+    const description = REPORT_RUN_MCP_TOOL_CATALOG.find(
+      (tool) => tool.name === "generate_report"
+    )!.description;
+    expect(description).toContain("Solo and Team factual reports make no AI requests");
+    expect(description).toContain("Business Smart Reports");
+    expect(description).not.toContain("Queue a Business Smart Report");
+  });
   it("reads canonical content and produces the same private HTML without a generation call", async () => {
     const view = { document: reportDocumentFixture(), available_source_refs: [] },
       content = vi.fn().mockResolvedValue(view),

@@ -8,7 +8,7 @@ const params = z.object({ organizationId: z.uuid(), runId: z.uuid() }).strict();
 const metadata = { tags: ["Smart Reports"], security: anyMemberAuth, params };
 const failures = {
   "400": { description: "Invalid identity or expected organisation.", schema: apiError },
-  "401": { description: "Member authentication required.", schema: apiError },
+  "401": { description: "Browser session or access token required.", schema: apiError },
   "403": {
     description: "Current whole-scope reader or credential access denied.",
     schema: apiError

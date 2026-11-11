@@ -1,3 +1,4 @@
+import { inventoryTitle } from "../lib/inventory-title.js";
 import { CreditCardIcon, FolderKanbanIcon, ShieldCheckIcon, UsersRoundIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -6,9 +7,21 @@ import { CalloutCard } from "../components/system/callout-card.js";
 import { PageHeader } from "../components/system/page-header.js";
 import { PlanBadge } from "../components/system/plan-badge.js";
 import { Button } from "../components/ui/button.js";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card.js";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "../components/ui/card.js";
 import { Skeleton } from "../components/ui/skeleton.js";
-import { getBillingSummary, isInvalidSessionError, listProjects, type BillingSummaryRecord, type ProjectRecord } from "../lib/api.js";
+import {
+  getBillingSummary,
+  isInvalidSessionError,
+  listProjects,
+  type BillingSummaryRecord,
+  type ProjectRecord
+} from "../lib/api.js";
 import { isSharedProject } from "../lib/project-access.js";
 import { useSession } from "../lib/session.js";
 
@@ -107,11 +120,15 @@ export function OrganizationOverviewPage(): JSX.Element {
 
         <Card>
           <CardHeader>
-            <CardTitle>Project inventory</CardTitle>
+            <CardTitle>{inventoryTitle("Project inventory", projects?.length ?? null)}</CardTitle>
             <CardDescription>Projects currently available in this organization.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {projectSummaryText === null ? <Skeleton className="h-6 w-32" /> : <p className="text-sm font-medium">{projectSummaryText}</p>}
+            {projectSummaryText === null ? (
+              <Skeleton className="h-6 w-32" />
+            ) : (
+              <p className="text-sm font-medium">{projectSummaryText}</p>
+            )}
             <Button asChild variant="outline">
               <Link to="/projects">
                 <FolderKanbanIcon data-icon="inline-start" />
@@ -124,20 +141,34 @@ export function OrganizationOverviewPage(): JSX.Element {
         <Card>
           <CardHeader>
             <CardTitle>Access scope</CardTitle>
-            <CardDescription>What this signed-in role can manage across the workspace.</CardDescription>
+            <CardDescription>
+              What this signed-in role can manage across the workspace.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             <div className="flex items-center gap-3">
               <ShieldCheckIcon className="size-4 text-muted-foreground" />
-              <p>{session.role === "owner" ? "Owner controls are available." : "Project and token routes are available."}</p>
+              <p>
+                {session.role === "owner"
+                  ? "Owner controls are available."
+                  : "Project and token routes are available."}
+              </p>
             </div>
             <div className="flex items-center gap-3">
               <UsersRoundIcon className="size-4 text-muted-foreground" />
-              <p>{session.role === "owner" ? "Project sharing is managed from each project." : "Shared projects appear in the project inventory."}</p>
+              <p>
+                {session.role === "owner"
+                  ? "Project sharing is managed from each project."
+                  : "Shared projects appear in the project inventory."}
+              </p>
             </div>
             <div className="flex items-center gap-3">
               <CreditCardIcon className="size-4 text-muted-foreground" />
-              <p>{session.role === "owner" ? "Billing management is available." : "Billing changes are owner-only."}</p>
+              <p>
+                {session.role === "owner"
+                  ? "Billing management is available."
+                  : "Billing changes are owner-only."}
+              </p>
             </div>
           </CardContent>
         </Card>

@@ -331,14 +331,14 @@ export function SettingsPage(): JSX.Element {
                 <CalloutCard
                   eyebrow="Pending"
                   title="Verification required"
-                  description="Verify your email before creating your first member token."
+                  description="Verify your email before creating your first access token."
                   tone="warning"
                 />
               ) : (
                 <CalloutCard
                   eyebrow="Ready"
                   title="Verified"
-                  description="This account can issue member tokens for CLI and MCP access."
+                  description="This account can issue access tokens for CLI and MCP access."
                   tone="neutral"
                 />
               )}

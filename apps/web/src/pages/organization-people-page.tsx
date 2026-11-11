@@ -1,3 +1,4 @@
+import { MetadataSeparator } from "../components/system/metadata-separator.js";
 import { PencilIcon, PlusIcon, SearchIcon, Trash2Icon } from "lucide-react";
 import { ResourceEmptyState } from "../components/system/resource-empty-state.js";
 import { hasBusinessEntitlement } from "../../../../packages/shared-types/src/tier-capabilities.js";
@@ -210,13 +211,25 @@ export function OrganizationPeoplePage(): JSX.Element {
                     <TableCell>
                       <div className="flex flex-col gap-1">
                         <span>
-                          {person.role === null
-                            ? "Direct collaborator"
-                            : person.role === "owner"
-                              ? "Owner"
-                              : person.role === "admin"
-                                ? "Admin · all current and future projects"
-                                : `Member · ${person.project_access === "all" ? `${person.default_project_role} on current and future projects` : "selected projects"}`}
+                          {person.role === null ? (
+                            "Direct collaborator"
+                          ) : person.role === "owner" ? (
+                            "Owner"
+                          ) : person.role === "admin" ? (
+                            <>
+                              Admin
+                              <MetadataSeparator />
+                              all current and future projects
+                            </>
+                          ) : (
+                            <>
+                              Member
+                              <MetadataSeparator />
+                              {person.project_access === "all"
+                                ? `${person.default_project_role} on current and future projects`
+                                : "selected projects"}
+                            </>
+                          )}
                         </span>
                         <span>
                           {person.direct_project_count} direct project{" "}

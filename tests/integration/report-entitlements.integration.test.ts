@@ -99,7 +99,8 @@ runIntegration("factual report entitlements and isolation", () => {
     expect((await migrateStorageSchema(db)).applied).toEqual([
       "202611100001_add_report_identity_snapshots",
       "202611100002_add_factual_report_products",
-      "202611100003_add_weekly_improvement_reviews"
+      "202611100003_add_weekly_improvement_reviews",
+      "202611110001_add_improvement_review_planning"
     ]);
     await expect(assertStorageSchemaMigrationsApplied(db)).resolves.toBeUndefined();
     expect(await snapshot()).toEqual(before);

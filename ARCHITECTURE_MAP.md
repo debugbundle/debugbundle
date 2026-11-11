@@ -1,3 +1,49 @@
+Dashboard health alert: `workspace-health-alert.ts` reads existing project/check
+APIs in batches of four and reuses shared current-state derivation, excluding
+disabled/paused checks and suspended shares. `workspace-health-alert-context.tsx`
+owns visible-only polling, focus/manual refresh and account/workspace request
+fencing. The protected shell shares it with AppSidebar and HealthStatusPage;
+SidebarMenuBadge and the destructive Badge variant render the accessible `!`.
+
+Dashboard presentation: PageHeader owns description/action alignment; SiteHeader
+owns navigation/title only. Access-token navigation uses `/access-tokens`.
+`use-cursor-pagination` carries optional first-page total counts, and `inventory-title`
+formats known totals. Incident/improvement routes and analytics opportunity reads
+expose exact counts only under the new opt-in, reusing existing authorised count
+queries. Shared schemas/OpenAPI describe the additive metadata. Review empty-state
+enablement reuses the existing consent/settings dialog.
+
+Dashboard setup guidance: `packages/shared-types/src/dashboard-setup.ts` owns
+the presentation model and credential-free prompt. Web `dashboard-setup-data.ts`
+observes existing read APIs (including bounded optional project analytics settings),
+`dashboard-setup-preferences.ts` owns versioned
+browser display preferences, and `dashboard-setup-context.tsx` fences asynchronous
+work by account/workspace. The shared dialog and sidebar progress component are
+mounted in the protected shell; the account menu reopens the guide. No CLI, auth,
+server interface or database boundary changes. See `spec/dashboard-welcome.md`.
+
+The local guidance follow-up passed its final bounded synthetic qualification:
+all eighteen paid cases and two no-request abstentions, including concrete monitor
+recovery comparisons and duplicate-prose rejection. Exact evidence is in
+`evals/smart-improvements/guidance-qualification-final-20261111.json`. This is ready
+for Owner review; no production activation or deployment occurred.
+The final deep audit also closes cross-rule delivery detection, reordered duplicate
+checks and linked-group ordering; 213 affected regression tests pass. The qualified
+requests remain byte-identical and no additional provider calls were made.
+
+Weekly guidance: `smart-improvements/review-planning-contract` owns bounded
+context and the plan document; `review-planning` owns deterministic grouping,
+control checks, digest and guidance validation. Storage collects exact-origin
+configuration/numeric evidence and freezes one context snapshot with facts. The
+existing store provides the unchanged export plus an additive plan read to the
+shared client, API, CLI, ordinary MCP and existing UI. No new worker/service,
+format flags or SDK collection is added.
+
+Access tokens is the public label for the existing member-token credential family.
+Dashboard, CLI and integration copy use that label while the existing token client,
+routes, schemas and storage retain their identifiers and authority checks. See
+`contracts/member-token-scopes.md`; no new authentication or migration path is added.
+
 Smart Products backend/app released in core 1.25.0 and public site 1.9.0
 (`spec/smart-products.md`; distribution acceptance and the remaining external
 marketplace gate are in `spec/smart-products-release-20261111.md`):
@@ -69,8 +115,8 @@ loading feedback for generation and PDF preparation.
 `ReportPdfDownloadButton` owns the user download intent, status reads and bounded
 binary save through `report-api.ts`; the browser binary adapter strips the internal
 authority marker and sends HttpOnly session cookies. `ReportRunStatus` uses the
-shared Tooltip for focus/hover/tap details; history uses fixed desktop fractions
-and mobile stacked rows. TableCaption provides standard internal bottom padding. CI includes all report database regressions in its isolated coverage shards and
+shared Tooltip for focus/hover/tap details; history uses fixed column fractions in a horizontally scrollable table on all
+screen sizes. Saved-report card actions wrap below their titles on phones. TableCaption provides standard internal bottom padding. CI includes all report database regressions in its isolated coverage shards and
 requires PDF text extraction. The local `smart-report-coverage` target combines
 real storage and adapter tests for the changed-file coverage gate.
 
@@ -658,12 +704,23 @@ Detailed implementation plans live in `spec/sdks/`. Current published lines are 
 
 The public documentation/marketing/blog site lives in the standalone public repo `github.com/debugbundle/site` and is cloned locally at the root `site/` path when documentation work is needed.
 
-**Public support chat:** `site/app/layout.tsx` mounts the Owner-provided Crisp
-bootstrap through Next.js Script (`afterInteractive`) once for marketing, docs and
-blog routes. The loader preserves existing commands/API state, inserts one async
-provider script and does not pass account/project data. `site/app/(site)/privacy`
-discloses support-chat processing separately from first-party analytics. The
-authenticated web app and core runtime are outside this integration.
+**Public support chat:** `site/app/layout.tsx` mounts the reusable first-party
+`src/components/support-chat.tsx` control across marketing, docs and blog routes.
+The Contact page reuses its inline variant beside email; both share one controller
+and the inline action remains available after opening or closing a conversation.
+Its `src/lib/support-chat.ts` controller loads Crisp only on explicit activation,
+preserves existing commands/API state and one loader during client navigation,
+and bounds opening feedback with retry/email recovery. Pending controls also check
+Crisp's reported open state to recover missed startup events; these checks stop on
+success, failure or timeout. A full document reload starts uninitialised.
+No account/project data is forwarded. The privacy page
+discloses this lifecycle separately from first-party analytics; the authenticated
+web app and core runtime are outside this integration. This on-demand follow-up
+is local, following the automatic bootstrap released in site 1.9.0.
+
+**Homepage hero discovery:** `src/components/hero-signal-field.tsx` emits a
+high-priority image preload for the exact CSS background when the hero is rendered.
+The shared root layout does not preload that artwork on unrelated pages.
 
 **Pricing documentation:** `/pricing/` owns public prices and plan comparisons. The
 existing `/docs/pricing/` route is the Plans and capacity guide; it explains shared
@@ -672,8 +729,10 @@ allowances and links to the comparison. Billing docs cover subscription workflow
 **Agent setup guidance:** `site/src/lib/agent-assist-prompts.ts` owns the shared
 prompt catalogue. `agent-assist-prompt-card.tsx` and the existing prompt dialog
 serve Quickstart's optional workflows and the corresponding feature guides.
-Smart Report guidance uses existing authenticated management operations and
+Reports guidance distinguishes factual Solo/Team reports from Business Smart
+Reports with AI analysis. It uses existing authenticated management operations and
 preserves project scope, consent, schedule and delivery approval boundaries.
+Public Reports labels retain existing `smart-reports` routes and capability names.
 
 **Build-time boundary:** The standalone site repo no longer imports core apps/packages. Core now owns `scripts/public-site-artifacts.ts`, which generates vendorable static JSON artifacts into `site/public/` before the site build runs. The site-owned `generate:artifacts` script is limited to search-index generation. At runtime (after `next build`), the site has zero workspace dependencies — it's a fully static Next.js export.
 
