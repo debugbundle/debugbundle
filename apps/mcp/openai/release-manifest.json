@@ -3,7 +3,7 @@
   "plugin_version": "1.1.0",
   "evidence_state": "local_connection_ready",
   "source": {
-    "commit": "05c4e33f09793c60674ea9dd109e612d4c28878f",
+    "commit": "ede2a732d337e604eced3420cea15ee61253c238",
     "tree_clean": true,
     "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
@@ -11,18 +11,18 @@
     "resource_origin": "https://mcp.debugbundle.com",
     "mcp_endpoint": "https://mcp.debugbundle.com/mcp",
     "oauth_issuer": "https://api.debugbundle.com",
-    "api_image_digest": "sha256:a809c861ce1d294ac6e320a4a9263f5a56143415f9ee880815029a6fabf1eac3"
+    "api_image_digest": "sha256:ebecb1d82dbf7d0f3632ad298f275cde201f55b29c697f8b2dab8149120608cb"
   },
   "registered_connection_id": "plugin_asdk_app_6a99ba6c1e7881919091a592738692c6",
   "package": {
     "archive_file": "debugbundle-openai-plugin-1.1.0.zip",
-    "archive_sha256": "a4cb4b72d8853122b1dd016a4484e833f973f92414b0cc70d8ff454c1a71d32c",
-    "archive_bytes": 70542,
+    "archive_sha256": "85a9350d0faf0c71fd4a2bb619c996e1cffc38f9ff5551886c891926dc25497c",
+    "archive_bytes": 71692,
     "files": {
       "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
       "README.md": "244a6804968f43872ae3731166b2a7f9e5b7cde8fb2107839f5e89751a348a72",
       "assets/icon-512.png": "a05a29674a75a945b1a378c73c27322c9b1f14456329bec1fc1d986453696e30",
-      "skills/debugbundle/SKILL.md": "f4a4093ff7fac65489ee106ab9423d77d826f70e828a05cc040447bfd485295b",
+      "skills/debugbundle/SKILL.md": "21afb43f76b2030a0b8ae8056d3af4d756975e2db5d2cfcfda17e52812a0f787",
       "skills/debugbundle/references/cli-handoff.md": "0327b8f03ff1d59b572fe732dfec3f6b962baec881b6a5b1c2fa848d525ca40c",
       "skills/debugbundle/references/privacy-and-safety.md": "436983b21e6570654ff18c148c1099b64f5e051353b02ac7b002b91430ce9682",
       "skills/debugbundle/references/tools.md": "c5e0b001f04c3925967b21a16e94d7e93e92bcf677267ae0f92a50b12fca1020",
@@ -32,8 +32,8 @@
   },
   "submission": {
     "files": {
-      "cli-handoff-cases.json": "af939c6aa2c3f2f263c985068702d06b68e7eaeaa422ac6e32688a828a29190b",
-      "data-map.md": "90751261d20abbe9fcb80da3423e03927be5561f8a990bdb1734fab3c909162f",
+      "cli-handoff-cases.json": "b0aa611a768b4ad4a270c33d0cfa7b8c947fa2b7c5dfe27b2d6bdb7ca1bc48d7",
+      "data-map.md": "19a9b89b2b03f1f375526baf4a29eecb3f0dd4055dcf2deaed98dca10c45e927",
       "demo-recording-plan.md": "643fd6fe38c47a36c33b55252b83048350b4d99f7e0c5f8d0e61a6d27ccb64f1",
       "listing.md": "d485228e02cf848689df751a1af8fa4970a01fea6af28eb686b36f853912fc3e",
       "policy-review.md": "cd1efc36c39fd9c7918a90d521e32ac5f373e0592114b23dcba90d243b62c386",
@@ -75,9 +75,9 @@
       "list_reports",
       "get_report_content"
     ],
-    "combined_tool_contract_sha256": "6d55e01413b1def614c428b77a329f04a8acf21f4d7e8f98299651137aefa817",
-    "report_tool_contract_sha256": "33b0e3de5cc3c77ab621c95e26bdc37f7f64ba0c98326d994799ef1823080cdb",
-    "report_schema_source_sha256": "3500532c0be85b60eb2a22bbdd7a25adc0a3a332378bc070a993b18f37e522e9",
+    "combined_tool_contract_sha256": "6032eccbb2a5165b56d882a3b2425335ee2e37b17a8394b7f3d4914ad6920da9",
+    "report_tool_contract_sha256": "05d089195ca21aaabcbd62072df6e6f8bebd152fa40b1d914fae7257680b0d0b",
+    "report_schema_source_sha256": "98e9a0b8d0aa4c3e3d860f9955d1790df92d764d59fbb97a716501913520dde5",
     "report_wire_schema_sha256": "2c23a8c960b32daccff90fb7df5f8bb0006b9c49c09f210892fc71df2eafeee3",
     "tool_contract_sha256": "fcd3433e7d8ed5f3a8a743c91b0b45cd5ea330a2b13d02691144bdcbaca5aed7",
     "schemas_sha256": "f676d7a1c71e1a98c374614e011a97e219df342c7334b0eaac4da3860994d999",
