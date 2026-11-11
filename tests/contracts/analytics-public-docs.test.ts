@@ -218,7 +218,7 @@ describeSiteDocs("public site AnalyticsBundle documentation", () => {
         count(TIER_CAPABILITIES.team[key])
       ]);
     expect(pricingDoc).toMatch(
-      /Saved funnels, custom dimensions, people, health checks, Smart Report generations\s+and retention remain fixed by tier/u
+      /Saved funnels, custom dimensions, people, health checks, Smart Report generations,\s+weekly smart review project and AI allowances, and retention remain fixed by tier/u
     );
   });
 

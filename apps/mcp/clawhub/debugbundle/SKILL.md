@@ -149,7 +149,7 @@ Prefer CLI `debugbundle capture-rule suggest <incident-id> --json` and an author
 
 ## Operations Surfaces
 
-The MCP server also exposes product analytics, project, token, member, alert, Slack destination, webhook, weekly report, GitHub dispatch, billing, capture-policy, capture-rule, and improvement-settings tools. Treat management operations as read-first: explain the intended change and mutate only when the user explicitly asks.
+The MCP server also exposes product analytics, project, token, member, alert, Slack destination, webhook, scheduled report, weekly project review, GitHub dispatch, billing, capture-policy, capture-rule, and improvement-settings tools. Treat management operations as read-first: explain the intended change and mutate only when the user explicitly asks.
 
 Use GitHub dispatch tools for DebugBundle-managed repository automation, not general GitHub work. Use member-token credentials for management actions. Project-token credentials are write-only ingestion credentials and must never be used for retrieval, billing, project/member administration, GitHub automation, Slack, webhook, or MCP management operations.
 
@@ -158,3 +158,20 @@ Use GitHub dispatch tools for DebugBundle-managed repository automation, not gen
 Never print credential values, signed session material, webhook signing material, or raw sensitive payloads. Keep project-token credentials limited to SDK ingestion; use member-token credentials for CLI, API, and MCP management workflows.
 
 Full analytics behavior and tool inputs are documented at `https://debugbundle.com/docs/analytics`, `https://debugbundle.com/docs/cli/analytics`, and `https://debugbundle.com/docs/mcp/tools`.
+
+## Reports and weekly project reviews
+
+An ordinary connected agent can ask for explicit consent in chat and configure
+reports or weekly project reviews with the user's actual credential. Read current
+settings and allowances first. Confirm the selected projects, privacy mode,
+recurring cadence, provider use and allowance; reports also require confirmed
+recipients. Save with the current version and read back the result.
+
+Weekly reviews require the current workspace Owner and explicit source consent.
+They cover selected projects once per completed UTC week, with a separate bounded
+AI pool and no manual paid regeneration. Factual Solo/Team reports make no AI
+request; Business Smart Reports use separately configured AI with factual fallback.
+Never infer consent, add future projects, substitute an Owner identity or promise
+that account consent bypasses operator enablement or provider qualification.
+Read-only/restricted connectors cannot enable either product. Reviews suggest
+investigations; they never perform fixes, create posts or dispatch automation.
