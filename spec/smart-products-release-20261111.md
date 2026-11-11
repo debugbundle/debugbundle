@@ -3,7 +3,7 @@
 Owner authorised publication, the usual release train and production deployment
 of the approved Smart Products, public-site and app refinements. A separate
 approval authorises synthetic weekly-review model qualification using the existing
-DebugBundle report credential, capped at USD 1 / 40 paid requests, and activation
+DebugBundle report credential, capped at USD 1 / 40 provider requests, and activation
 only if safety and usefulness pass. No other product is included.
 
 ## Version selection
@@ -32,13 +32,59 @@ until each Owner selects projects and grants consent.
 
 The unchanged weekly-review profile passed the synthetic evaluation in
 `evals/smart-improvements/qualification-20261111.json`: sixteen paid attempts,
-USD 0.0220396 actual cost, USD 0.396 maximum reserved, no customer data.
+USD 0.0220396 actual cost, USD 0.396 maximum reserved, no customer data. Sixteen
+input-token counter calls plus sixteen paid attempts total 32 provider requests.
 Five inconsistent synthetic fixtures were corrected and rechecked, with all
 original spend retained in the ledger. No-data and invalid-output safety paths
 were checked without paid calls. Full guidance uses source symptoms and links;
 restricted guidance avoids guessed detail. No UI inspection, action execution,
 marketing recommendation or causal guarantee is claimed.
 
-Release workflow receipts, exact commits, migrations and runtime checks will be
-recorded here as each stage completes. Until then this document is release prep,
-not a claim that deployment has completed.
+## Verified gates and first backend pass
+
+Core source `5662ecfa9c4d317af1bb88a6dffc900f282da449` passes
+[full CI](https://github.com/debugbundle/debugbundle/actions/runs/42933424182):
+134 coverage shards, dependency audit, lint, types, PDF regressions and build.
+The separate CLI compatibility matrix is green. The local complete Smart Products
+suite passes 864 tests across 114 files; explicit baseline-to-candidate coverage
+passes all 92 changed source files. Poppler-backed PDF checks pass 18 tests.
+
+Shared types 3.5.0 was published and passed clean registry installation in
+[the shared release workflow](https://github.com/debugbundle/debugbundle/actions/runs/42929270703).
+Unchanged redaction 2.7.1 was verified by exact artifact integrity and retained.
+
+The first paused backend pass completed on 11 November. Both serving images
+report core 1.25.0 and the v2 reader contract. The migration ledger contains 90
+entries, with all 87 previous checksums preserved and exactly the three approved
+new migrations. Project, token, alert, service, report-definition, report-run and
+model-attempt counts match the pre-deploy snapshot. This is aggregate preservation
+evidence, not a claim of a byte-level database comparison.
+
+Authenticated reads confirm the existing ready report remains available through
+both default legacy and opt-in canonical document endpoints. Review settings,
+allowance and the DebugBundle project's empty archive pass their response schemas.
+The account remains disabled with no selected projects or source consent. These
+checks generate no reports, send no messages and make no provider request.
+
+The second backend pass also completed. Reports are restored and the qualified
+weekly-review service is enabled. Active and retained rollback API/worker images
+both support v2; the same 90-entry ledger and aggregate counts are preserved.
+Authenticated reads pass again, and public readiness is healthy. A bounded read
+of DebugBundle's own project found no new attention since rollout began. Existing
+account opt-in settings were not changed. No consumer product was modified.
+
+## Client and app release
+
+[CLI 1.23.0](https://github.com/debugbundle/debugbundle/actions/runs/42939747992)
+and [MCP 1.23.0](https://github.com/debugbundle/debugbundle/actions/runs/42939751580)
+are published and pass their full release workflows, including fresh registry
+installs and native client checks. Exact npm metadata is independently visible.
+The app deployment is green and serves the new weekly-review route and People
+controls from `index-I-IC5Zfb.js`, SHA-256
+`50af24355b3ba7f7eb1aa1b074c597db76ae6a2062f57e378db4994e59d2d93e`.
+
+Codex 1.7.0, Claude Code 1.23.0 and Gemini 1.6.0 adopt verified MCP 1.23.0.
+Their package contracts and fresh native source installations pass, including
+199-tool discovery, authentication boundaries, local evidence, updates and
+removal. Public installation checks, site rollout and final external marketplace
+acceptance follow separately; publication alone is not security-scan acceptance.

@@ -52,3 +52,20 @@ Use captured runtime evidence to investigate failures and guide a focused, teste
 Use returned incident evidence and CLI `debugbundle capture-rule suggest <incident-id> --json` before proposing a capture rule; `suggest_capture_rules_from_incident` is the alternative when MCP is selected. Keep the exact resource host/path/type, service, environment and opacity, or the returned exact fingerprint when evidence is incomplete; never widen a suggestion to an entire host. All resource incidents can offer explicit controls, regardless of provider recognition. Use the returned suggestion ID for an authorized application. Authentication resources, application assets, and unknown dependencies must not be suppressed automatically.
 
 Provider recognition does not prove privacy-tool blocking or optionality. Demotion retains diagnostic context and may remain billable; dropping discards future matching evidence. Neither removes history. Empty suggestions and missing/failed artifacts do not justify broader suppression. The read-only OpenAI connection cannot apply these changes.
+
+## Reports and weekly project reviews
+
+An ordinary connected agent can ask for explicit consent in chat and configure
+reports or weekly project reviews with the user's actual credential. Read current
+settings and allowances first. Confirm the selected projects, privacy mode,
+recurring cadence, provider use and allowance; reports also require confirmed
+recipients. Save with the current version and read back the result.
+
+Weekly reviews require the current workspace Owner and explicit source consent.
+They cover selected projects once per completed UTC week, with a separate bounded
+AI pool and no manual paid regeneration. Factual Solo/Team reports make no AI
+request; Business Smart Reports use separately configured AI with factual fallback.
+Never infer consent, add future projects, substitute an Owner identity or promise
+that account consent bypasses operator enablement or provider qualification.
+Read-only/restricted connectors cannot enable either product. Reviews suggest
+investigations; they never perform fixes, create posts or dispatch automation.

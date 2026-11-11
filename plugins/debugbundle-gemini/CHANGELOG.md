@@ -1,5 +1,9 @@
 # DebugBundle for Gemini CLI changelog
 
+## [1.6.0] - 2026-11-11
+
+- Adopt verified MCP 1.23.0 for factual report reads and weekly improvement reviews. Explain explicit Owner consent, selected projects, privacy, cadence and separate AI allowances; preserve existing authentication and investigation workflows.
+
 ## [1.4.4] - 2026-11-05
 
 - Adopt MCP 1.19.4: constrain retained local artifact paths, reject symlinks across reads/rebuilds/cleanup and preserve existing valid local stores and authentication.

@@ -1,3 +1,29 @@
+# Smart Products production release — in progress, 11 November 2026
+
+Owner authorised the full DebugBundle release train and bounded synthetic weekly
+AI qualification. No consumer products are in scope. Core 1.25.0 and app source
+`5662ecfa9c4d317af1bb88a6dffc900f282da449` are live. Full CI 42933424182 passes
+134 shards, PDF checks, audit, lint, types and build. Backend bridge 42938121962
+and activation 42938941486 pass: 90 migrations, all 87 prior checksums and checked
+aggregate counts preserved. Active and rollback images both support v2. Report
+and qualified weekly AI flags are enabled; account settings stay opt-in/off. Live
+legacy/canonical saved-report reads and new settings/allowance/archive checks pass.
+No new attention in DebugBundle's own incidents since rollout. App run 42939755311
+is green and production asset bytes contain the approved UI updates.
+
+Shared types 3.5.0, CLI 1.23.0 (42939747992) and MCP 1.23.0 (42939751580) are public
+with registry/native release checks green. Official Registry 1.23.0 published.
+ClawHub skill/plugin publication is running; strict security/discovery acceptance
+must remain explicit. Developer packages now pin verified MCP 1.23.0: Codex 1.7.0,
+Claude 1.23.0 and Gemini 1.6.0. Source contracts and native local installations pass.
+Remaining: commit/push developer sources, public installs, standalone Gemini tag/
+Release/archive, site guides and 1.9.0 rollout/tag, canonical core 1.25.0 Release,
+final documentation and latest-main CI. Do not claim external scans green until
+actual verification passes. Details: `spec/smart-products-release-20261111.md`,
+`.tmp/release-20261111/state.json` and private cloud runbook.
+
+Earlier sections below are historical local-phase records.
+
 # Business article draft and Invite person icon — local review ready, 11 November 2026
 
 Invite person now has the shared inline + icon. Core typecheck, focused lint/format

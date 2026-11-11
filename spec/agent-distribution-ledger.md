@@ -1,5 +1,12 @@
 # Agent distribution ledger
 
+## Smart Products pin adoption - 11 November 2026
+
+MCP 1.23.0 has passed npm publication, fresh registry installation and native Codex
+checks. Codex 1.7.0, Claude Code 1.23.0 and Gemini 1.6.0 adopt that exact pin with
+explicit report/review consent guidance. Package and public-install verification
+are in progress; final receipts are tracked in [the release record](smart-products-release-20261111.md).
+
 ## Analytics choices pin review - 10 November 2026
 
 CLI/MCP 1.22.0 add the optional observed-filter read. Codex 1.6.0, Claude Code
@@ -59,9 +66,9 @@ This is the maintained inventory for first-party developer agent packages that b
 
 | Host        | Package version | MCP pin  | Maintained source                                                           | Public channel                                                                                                  | Release and update route                                                                                                                                                                                                            |
 | ----------- | --------------- | -------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Codex       | `1.6.0`         | `1.21.0` | [`plugins/debugbundle-codex/`](../plugins/debugbundle-codex/)               | core Git marketplace in [`debugbundle/debugbundle`](https://github.com/debugbundle/debugbundle)                 | Publish the reviewed plugin and [catalog](../.agents/plugins/marketplace.json) on core `main`; verify a public Git marketplace install and upgrade.                                                                                 |
-| Claude Code | `1.21.0`        | `1.21.0` | [`apps/mcp/claude-code/debugbundle/`](../apps/mcp/claude-code/debugbundle/) | core Git marketplace in [`debugbundle/debugbundle`](https://github.com/debugbundle/debugbundle)                 | Publish the reviewed plugin and [catalog](../.claude-plugin/marketplace.json) on core `main`; verify a public marketplace install and update.                                                                                       |
-| Gemini CLI  | `1.5.0`         | `1.21.0` | [`plugins/debugbundle-gemini/`](../plugins/debugbundle-gemini/)             | standalone Git repository [`debugbundle/debugbundle-gemini`](https://github.com/debugbundle/debugbundle-gemini) | Copy the validated package to public `main`, tag the version, publish a GitHub Release with the validated ZIP, run `make gemini-extension-verify-public`, verify a fresh Git install/update, and check gallery indexing separately. |
+| Codex       | `1.7.0`         | `1.23.0` | [`plugins/debugbundle-codex/`](../plugins/debugbundle-codex/)               | core Git marketplace in [`debugbundle/debugbundle`](https://github.com/debugbundle/debugbundle)                 | Publish the reviewed plugin and [catalog](../.agents/plugins/marketplace.json) on core `main`; verify a public Git marketplace install and upgrade.                                                                                 |
+| Claude Code | `1.23.0`        | `1.23.0` | [`apps/mcp/claude-code/debugbundle/`](../apps/mcp/claude-code/debugbundle/) | core Git marketplace in [`debugbundle/debugbundle`](https://github.com/debugbundle/debugbundle)                 | Publish the reviewed plugin and [catalog](../.claude-plugin/marketplace.json) on core `main`; verify a public marketplace install and update.                                                                                       |
+| Gemini CLI  | `1.6.0`         | `1.23.0` | [`plugins/debugbundle-gemini/`](../plugins/debugbundle-gemini/)             | standalone Git repository [`debugbundle/debugbundle-gemini`](https://github.com/debugbundle/debugbundle-gemini) | Copy the validated package to public `main`, tag the version, publish a GitHub Release with the validated ZIP, run `make gemini-extension-verify-public`, verify a fresh Git install/update, and check gallery indexing separately. |
 
 ## Earlier release evidence
 

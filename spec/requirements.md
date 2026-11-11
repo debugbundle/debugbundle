@@ -1084,6 +1084,6 @@ FR-BUS-01–08 in [spec/business-tier.md](business-tier.md) define the approved 
 
 FR-BUS-07–08 add the owner-approved Business no-card trial and separately consented read-only ChatGPT saved-report extension; the original twenty-three OpenAI declarations remain unchanged.
 
-## Approved Smart Products extension (local candidate)
+## Approved Smart Products extension (core 1.25.0)
 
 FR-SMI-01 through FR-SMI-04 and the FR-BUS-05/06 extension are specified in [smart-products.md](smart-products.md). This adds bounded weekly reviews, factual Solo/Team reports, restricted identity protection and public Analytics discovery while preserving the released contracts.

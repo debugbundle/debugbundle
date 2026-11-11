@@ -1,4 +1,5 @@
-Local Smart Products candidate (not deployed; `spec/smart-products.md`):
+Smart Products backend/app released in core 1.25.0 (`spec/smart-products.md`;
+public-site and distribution acceptance in `spec/smart-products-release-20261111.md`):
 - `packages/smart-improvements`: browser-safe closed contracts/policy, server-side
   deterministic priorities/digest and bounded provider client/qualification config.
 - `packages/storage/improvement-review-*`: scope/consent, fair scheduler, frozen

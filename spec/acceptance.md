@@ -3028,6 +3028,6 @@ Synthetic JBoss LoggingOutputStream/LogManager output for six ExecutionException
 
 [AC-BUS-01–10](business-tier.md#acceptance) are required for the Business extension: catalogue/reset boundaries, access/token isolation and races, Business-only financial lifecycle, historical report correctness, secure delivery and forward migration readiness. Existing legacy monthly/digest/SDK fixtures remain regression gates.
 
-## Approved Smart Products extension (local candidate)
+## Approved Smart Products extension (core 1.25.0)
 
 AC-SMI-01 through AC-SMI-04 and the AC-BUS-05/06 extension are specified in [smart-products.md](smart-products.md). This adds bounded weekly reviews, factual Solo/Team reports, restricted identity protection and public Analytics discovery while preserving the released contracts.

@@ -1,22 +1,24 @@
-Local candidate (not deployed): [spec/smart-products.md](spec/smart-products.md)
-records the approved restricted-identity guard, zero-AI Solo/Team factual reports,
-explicitly consented weekly improvement reviews and public Analytics page.
+Smart Products backend and app released in core 1.25.0:
+[spec/smart-products.md](spec/smart-products.md) records the restricted-identity
+guard, zero-AI Solo/Team factual reports, explicitly consented weekly improvement
+reviews and the prepared public Analytics page.
 Reviews reuse the serial worker lane with an independent budget and one paid
-intent; new AI is default-off and requires separate provider qualification.
+intent. The weekly AI profile passed separate qualification and is enabled in
+the hosted runtime; account settings remain default-off and require Owner consent.
 Factual overviews and focus share saved-metric presentation across web/HTML/PDF;
 review guidance carries recorded source relationships and investigation checks.
 Three additive forward migrations gate API/worker readiness. Report document v2
 is opt-in; legacy/OpenAI report projections and restricted catalogs stay fixed.
-New domain boundaries are in ARCHITECTURE_MAP.md. No release operation is implied.
+New domain boundaries are in ARCHITECTURE_MAP.md.
 
-Release state (10 November 2026): core 1.24.0 and site 1.8.1 are live from
-`78783e7c` / `2245639a`; CLI/MCP/OpenClaw 1.22.0 and shared types 3.4.0 are
-published. The diagnostic migration precedes API/worker startup; old receipt
-hashes, factual reports, access/configuration and budgets are preserved. API,
-worker, served assets and authenticated reads pass live verification. ClawHub's
-strict antivirus/card/discovery acceptance remains partial despite benign reviews
-and a passing normal public install. See `spec/smart-report-release-20261110.md`.
-That release predates the local Smart Products candidate below.
+Release state (11 November 2026): core 1.25.0 and the app are live from
+`5662ecfa`; CLI/MCP 1.23.0 and shared types 3.5.0 are published. All 90 migrations
+are applied, with all prior checksums preserved. Active and retained rollback
+readers support v2; existing report reads, account consent and the report AI budget
+are preserved. Site 1.9.0 and developer-plugin public-install checks are completing.
+Registry and marketplace acceptance is tracked separately in
+`spec/smart-products-release-20261111.md`. The previous release remains recorded in
+`spec/smart-report-release-20261110.md`.
 
 Workspace Improvements reuses Analytics-style line tabs: the existing
 `/improvements` inventory is Opportunities and `/improvements/reviews` opens

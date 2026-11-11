@@ -537,7 +537,7 @@ evidence-core-pack:
 
 .PHONY: build
 build:
-	$(NODE_RUN) "corepack enable && corepack pnpm build"
+	$(NODE_RUN) "corepack enable && NODE_OPTIONS=$(TYPECHECK_NODE_OPTIONS) corepack pnpm build"
 
 .PHONY: license-check license-prepare-shared npm-publishing-check
 npm-publishing-check:

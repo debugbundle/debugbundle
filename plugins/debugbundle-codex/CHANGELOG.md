@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.7.0] - 2026-11-11
+
+- Adopt verified MCP 1.23.0 for factual report reads and weekly improvement reviews. Explain explicit Owner consent, selected projects, privacy, cadence and separate AI allowances; preserve existing authentication and investigation workflows.
+
 ## [1.6.0] - 2026-11-09
 
 - Adopt MCP 1.21.0 with organisation access, billing/referrals and Smart Report automation while preserving local-auth and existing incident workflows.

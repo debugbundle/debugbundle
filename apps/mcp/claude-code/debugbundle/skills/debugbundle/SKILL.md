@@ -54,3 +54,20 @@ Prefer CLI `debugbundle capture-rule suggest <incident-id> --json` and an explic
 - The official OpenAI connection cannot suggest or apply rules. Check the separately authenticated CLI before declaring the action unavailable. When neither path can perform it, review returned evidence and offer a returned safe dashboard URL; never invent tools or bypass access restrictions.
 
 If a repository-local DebugBundle skill or instructions file exists, treat it as project-specific documentation from the current workspace. Review it before applying project-specific paths or validation recipes, and keep the credential rules above in force.
+
+## Reports and weekly project reviews
+
+An ordinary connected agent can ask for explicit consent in chat and configure
+reports or weekly project reviews with the user's actual credential. Read current
+settings and allowances first. Confirm the selected projects, privacy mode,
+recurring cadence, provider use and allowance; reports also require confirmed
+recipients. Save with the current version and read back the result.
+
+Weekly reviews require the current workspace Owner and explicit source consent.
+They cover selected projects once per completed UTC week, with a separate bounded
+AI pool and no manual paid regeneration. Factual Solo/Team reports make no AI
+request; Business Smart Reports use separately configured AI with factual fallback.
+Never infer consent, add future projects, substitute an Owner identity or promise
+that account consent bypasses operator enablement or provider qualification.
+Read-only/restricted connectors cannot enable either product. Reviews suggest
+investigations; they never perform fixes, create posts or dispatch automation.
