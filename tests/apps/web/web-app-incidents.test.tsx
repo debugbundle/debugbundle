@@ -332,7 +332,7 @@ describe("web app — incidents", () => {
       fetchMock.mock.calls.filter(
         ([input]) =>
           !["/v1/organizations", "/v1/projects", "/v1/member/tokens"].includes(
-            new URL(requestUrl(input)).pathname
+            new URL(requestUrl(input), "http://localhost").pathname
           )
       )
     ).toHaveLength(2);
