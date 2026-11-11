@@ -24,6 +24,7 @@ import {
   formatProjectSharingSummary
 } from "../../../apps/web/src/pages/organization-overview-page.tsx";
 import { ProjectMembersPage } from "../../../apps/web/src/pages/project-members-page.tsx";
+import { TooltipProvider } from "../../../apps/web/src/components/ui/tooltip.js";
 import {
   buildAlertConfig,
   describeAlertChannel,
@@ -68,20 +69,22 @@ function HeaderActionHost(): JSX.Element {
 
 function renderProjectMembersPage(project = createProject()): ReturnType<typeof render> {
   return render(
-    <MemoryRouter initialEntries={["/"]}>
-      <routerDom.Routes>
-        <routerDom.Route
-          path="/"
-          element={
-            <routerDom.Outlet
-              context={{ projectId: project.project_id, project, onProjectUpdated: vi.fn() }}
-            />
-          }
-        >
-          <routerDom.Route index element={<ProjectMembersPage />} />
-        </routerDom.Route>
-      </routerDom.Routes>
-    </MemoryRouter>
+    <TooltipProvider>
+      <MemoryRouter initialEntries={["/"]}>
+        <routerDom.Routes>
+          <routerDom.Route
+            path="/"
+            element={
+              <routerDom.Outlet
+                context={{ projectId: project.project_id, project, onProjectUpdated: vi.fn() }}
+              />
+            }
+          >
+            <routerDom.Route index element={<ProjectMembersPage />} />
+          </routerDom.Route>
+        </routerDom.Routes>
+      </MemoryRouter>
+    </TooltipProvider>
   );
 }
 
