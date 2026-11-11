@@ -229,7 +229,9 @@ runIntegration("authenticated canonical report content", () => {
       document.report.organization_id = fixture.org;
       document.report.definition_id = fixture.definition;
       document.report.facts.cutoff_at = new Date().toISOString();
-      document.report.expires_at = new Date(Date.now() + 90 * 86400000).toISOString();
+      document.report.expires_at = new Date(
+        Date.parse(document.report.facts.cutoff_at) + 90 * 86400000
+      ).toISOString();
       for (const source of document.report.sources)
         if (source.text_available) source.text_expires_at = document.report.expires_at;
       const execution = createReportRunExecutionStore(db),

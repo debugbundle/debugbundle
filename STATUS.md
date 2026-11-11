@@ -32,6 +32,14 @@ full release and bounded evaluation; the evaluation used 32 provider requests an
 USD 0.0220396, with no customer data. Operational evidence is retained under
 `.tmp/release-20261111/` and in the private cloud runbook.
 
+Final developer-source CI exposed a clock race in the ten-project report-content
+test fixture: separately sampled expiry could exceed cutoff plus 90 days by one
+millisecond. A deterministic reproduction confirms the retention validator is
+correct; production already derives expiry from the saved cutoff. The fixture
+now does the same, and its complete disposable-Postgres integration file passes.
+No runtime or published-artifact change is needed. Final source CI covers this
+test-only correction; historical failed run 42941119042 is retained as evidence.
+
 Earlier sections below are historical local-phase records.
 
 # Business article draft and Invite person icon — local review ready, 11 November 2026

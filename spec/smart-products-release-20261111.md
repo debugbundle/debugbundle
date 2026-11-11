@@ -131,3 +131,14 @@ A normal public install of exact OpenClaw plugin 1.23.0 on qualified host
 capability consent and retains registry security enforcement, with no force flag.
 This installation result does not substitute for the missing antivirus results
 or the stricter discovery gate.
+
+## Final CI fixture correction
+
+The later developer-source CI found an intermittent ten-project content fixture
+failure. The fixture sampled the clock separately for cutoff and expiry; a
+one-millisecond advance violated the existing maximum 90-day retention contract.
+A deterministic reproduction rejects the extra millisecond and accepts expiry
+derived from the saved cutoff. Production already uses that saved cutoff.
+The integration fixture now follows the same rule, with no runtime, schema,
+validation or published-artifact change. The complete report-content integration
+file passes against disposable Postgres; final source CI checks this correction.
