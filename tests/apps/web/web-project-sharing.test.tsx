@@ -5,6 +5,7 @@ import { userEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../../../apps/web/src/app.tsx";
+import { createDevMockApi } from "../../../scripts/dev-mock/api.js";
 import { resetBrowserSessionClientState } from "../../../apps/web/src/lib/api.ts";
 import {
   createProject,
@@ -37,6 +38,34 @@ if (
 }
 
 describe("web app — project sharing", () => {
+  it("saves Viewer access through the local preview and retains it when revisiting Members", async () => {
+    const api = createDevMockApi();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const result = api.handle(
+          init?.method ?? "GET",
+          requestUrl(input),
+          typeof init?.body === "string" ? JSON.parse(init.body) : undefined
+        );
+        return jsonResponse(result.status, result.body);
+      })
+    );
+    const user = userEvent.setup();
+    const path = "/projects/00000000-0000-4000-8000-000000000001/members";
+    const view = render(<App initialEntries={[path]} />);
+    const roles = await screen.findByLabelText("role for developer@example.test");
+    await user.click(within(roles).getByRole("radio", { name: /^viewer$/i }));
+    await waitFor(() =>
+      expect(within(roles).getByRole("radio", { name: /^viewer$/i })).toBeChecked()
+    );
+    expect(screen.queryByText("Could not update access.")).not.toBeInTheDocument();
+    view.unmount();
+    render(<App initialEntries={[path]} />);
+    const savedRoles = await screen.findByLabelText("role for developer@example.test");
+    expect(within(savedRoles).getByRole("radio", { name: /^viewer$/i })).toBeChecked();
+  });
+
   it("renders shared project icons in project tables and project breadcrumbs", async () => {
     const sharedProject = createProject({
       project_id: "proj_shared",
@@ -278,7 +307,9 @@ describe("web app — project sharing", () => {
     const pendingInviteRow = screen.getByText(/^pending@example\.com$/i).closest("tr");
     expect(pendingInviteRow).not.toBeNull();
     await user.click(
-      within(pendingInviteRow as HTMLTableRowElement).getByRole("button", { name: /^cancel$/i })
+      within(pendingInviteRow as HTMLTableRowElement).getByRole("button", {
+        name: /^cancel invite$/i
+      })
     );
     await user.click(await screen.findByRole("button", { name: /cancel invite/i }));
 

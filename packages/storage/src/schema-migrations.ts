@@ -3,6 +3,15 @@ import {
   selfhostOrganizationAccessSchemaAvailable
 } from "./selfhost-organization-access-schema.js";
 import {
+  REPORT_IDENTITY_MIGRATION,
+  reportIdentitySchemaAvailable
+} from "./report-identity-schema.js";
+import {
+  IMPROVEMENT_REVIEW_MIGRATION,
+  improvementReviewSchemaAvailable
+} from "./improvement-review-schema.js";
+import { REPORT_PRODUCT_MIGRATION, reportProductSchemaAvailable } from "./report-product-schema.js";
+import {
   REPORT_TRIAL_COLLECTION_MIGRATION,
   reportTrialCollectionSchemaAvailable
 } from "./report-trial-collection-schema.js";
@@ -143,7 +152,10 @@ export const STORAGE_SCHEMA_MIGRATIONS: readonly StorageSchemaMigration[] = [
   BUSINESS_TRIAL_MIGRATION,
   REPORT_TRIAL_COLLECTION_MIGRATION,
   SELFHOST_ORGANIZATION_ACCESS_MIGRATION,
-  REPORT_MODEL_DIAGNOSTIC_MIGRATION
+  REPORT_MODEL_DIAGNOSTIC_MIGRATION,
+  REPORT_IDENTITY_MIGRATION,
+  REPORT_PRODUCT_MIGRATION,
+  IMPROVEMENT_REVIEW_MIGRATION
 ].sort((left, right) => left.id.localeCompare(right.id));
 
 function validateStorageSchemaMigrations(migrations: readonly StorageSchemaMigration[]): void {
@@ -226,8 +238,14 @@ async function reconcileMigrationLedgerInTransaction(
   const selfhostOrganizationAccessReady = await selfhostOrganizationAccessSchemaAvailable(db);
   const reportTrialCollectionReady = await reportTrialCollectionSchemaAvailable(db);
   const reportModelDiagnosticReady = await reportModelDiagnosticSchemaAvailable(db);
+  const reportIdentityReady = await reportIdentitySchemaAvailable(db);
+  const reportProductReady = await reportProductSchemaAvailable(db);
+  const improvementReviewReady = await improvementReviewSchemaAvailable(db);
   const verifiedBaseline = STORAGE_SCHEMA_MIGRATIONS.filter(
     (migration) =>
+      (migration.id !== REPORT_IDENTITY_MIGRATION.id || reportIdentityReady) &&
+      (migration.id !== REPORT_PRODUCT_MIGRATION.id || reportProductReady) &&
+      (migration.id !== IMPROVEMENT_REVIEW_MIGRATION.id || improvementReviewReady) &&
       (migration.id !== BUSINESS_BILLING_MIGRATION.id || businessReady) &&
       (migration.id !== MEMBER_TOKEN_POLICY_MIGRATION.id || tokenPolicyReady) &&
       (migration.id !== ORGANIZATION_ACCESS_MIGRATION.id || orgAccessReady) &&
@@ -441,6 +459,12 @@ export async function assertStorageSchemaMigrationsApplied(db: Queryable): Promi
   if (!(await reportRunSchemaAvailable(db))) throw new Error("report_run_schema_incomplete");
   if (!(await reportModelDiagnosticSchemaAvailable(db)))
     throw new Error("report_model_diagnostic_schema_incomplete");
+  if (!(await reportIdentitySchemaAvailable(db)))
+    throw new Error("report_identity_schema_incomplete");
+  if (!(await reportProductSchemaAvailable(db)))
+    throw new Error("report_product_schema_incomplete");
+  if (!(await improvementReviewSchemaAvailable(db)))
+    throw new Error("improvement_review_schema_incomplete");
   if (!(await referralBenefitSchemaAvailable(db)))
     throw new Error("referral_benefit_schema_incomplete");
   if (!(await reportHealthSchemaAvailable(db))) throw new Error("report_health_schema_incomplete");

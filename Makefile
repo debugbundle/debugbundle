@@ -363,7 +363,7 @@ format-check-focused:
 
 project-service-check:
 	test -n "$(LINT_FILES)"
-	$(NODE_RUN) "node_modules/.bin/tsc --noEmit -p tsconfig.json && node_modules/.bin/eslint $(LINT_FILES) && node_modules/.bin/prettier --check $(LINT_FILES)"
+	$(NODE_RUN) "NODE_OPTIONS=$(TYPECHECK_NODE_OPTIONS) node_modules/.bin/tsc --noEmit -p tsconfig.json && node_modules/.bin/eslint $(LINT_FILES) && node_modules/.bin/prettier --check $(LINT_FILES)"
 
 project-service-integration:
 	sh scripts/test-project-services-integration.sh
@@ -913,3 +913,12 @@ smart-report-pdf-test:
 smart-report-model-evaluate:
 	test -n "$(REPORT_EVAL_KEY_FILE)"
 	docker run --rm -v "$(PWD):/workspace" -v "$(REPORT_EVAL_KEY_FILE):/run/report-evaluation-key:ro" -w /workspace $(NODE_IMAGE) sh -lc 'node_modules/.bin/tsx scripts/evaluate-smart-reports.ts /run/report-evaluation-key'
+
+# Fresh combined evidence for the report/review boundaries, adapters and UI.
+# Providers are mocked; the existing disposable stack owns all runtime data.
+SMART_PRODUCTS_TEST_FILES = tests/apps/worker/worker-smart-report-runtime.test.ts tests/integration/storage-migrations.integration.test.ts tests/integration/worker-job-migration.integration.test.ts tests/integration/typed-evidence-context.integration.test.ts $(wildcard tests/integration/report-*.integration.test.ts) $(wildcard tests/integration/improvement-review*.integration.test.ts) tests/integration/project-services.integration.test.ts tests/integration/analytics-filter-options.integration.test.ts tests/integration/organization-management.integration.test.ts tests/packages/smart-reports tests/packages/smart-improvements tests/packages/shared-types/tier-capabilities.test.ts tests/packages/mcp-core/openai-report-contract.test.ts tests/packages/email/smart-report-email.test.ts tests/packages/storage/schema-migrations.test.ts $(wildcard tests/apps/api/api-report*.test.ts) $(wildcard tests/apps/api/api-default*.test.ts) tests/apps/api/api-improvement-reviews.test.ts tests/apps/api/api-openapi.test.ts tests/apps/api/api-runtime-start.test.ts tests/apps/api/openai-mcp-report-operations.test.ts $(wildcard tests/apps/cli/cli-report*.test.ts) tests/apps/cli/cli-main-improvements.test.ts $(wildcard tests/apps/mcp/mcp-report*.test.ts) tests/apps/mcp/mcp-default-tools.test.ts $(wildcard tests/apps/web/web-report*.test.ts*) $(wildcard tests/apps/web/web-improvement-review*.test.ts*) tests/apps/web/web-billing-offers.test.tsx tests/apps/web/web-app-improvements.test.tsx tests/apps/web/web-app-improvements-interactions.test.tsx tests/apps/web/web-referrals.test.tsx tests/infrastructure/dev-mock-reports.test.ts tests/infrastructure/openai-plugin-release.test.ts tests/infrastructure/release-governance.test.ts
+.PHONY: smart-products-coverage
+smart-products-coverage:
+	docker build --build-arg "NODE_IMAGE=$(NODE_IMAGE)" -t debugbundle-qualified-unit:local -f deploy/test/qualified-unit.Dockerfile deploy/test
+	$(MAKE) smart-report-integration NODE_IMAGE=debugbundle-qualified-unit:local INTEGRATION_COVERAGE=1 SMART_REPORT_TEST_FILES="$(SMART_PRODUCTS_TEST_FILES) --reporter=dot"
+	$(NODE_RUN) "apk add --no-cache git >/dev/null && node scripts/check-changed-file-coverage.mjs"

@@ -1,4 +1,4 @@
-import { SearchIcon } from "lucide-react";
+import { PencilIcon, PlusIcon, SearchIcon, Trash2Icon } from "lucide-react";
 import { ResourceEmptyState } from "../components/system/resource-empty-state.js";
 import { hasBusinessEntitlement } from "../../../../packages/shared-types/src/tier-capabilities.js";
 import { useEffect, useRef, useState } from "react";
@@ -14,11 +14,12 @@ import { OrganizationPendingInvites } from "../components/system/organization-pe
 import { OrganizationOwnershipCard } from "../components/system/organization-ownership-card.js";
 import { PageHeader } from "../components/system/page-header.js";
 import { PendingButton } from "../components/system/pending-button.js";
+import { TableActionButton } from "../components/system/table-action-button.js";
 import { Button } from "../components/ui/button.js";
 import { Badge } from "../components/ui/badge.js";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
-import { Field, FieldLabel, FieldError } from "../components/ui/field.js";
-import { Input } from "../components/ui/input.js";
+import { FieldError } from "../components/ui/field.js";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "../components/ui/input-group.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import {
   Table,
@@ -138,6 +139,7 @@ export function OrganizationPeoplePage(): JSX.Element {
         description="Manage organisation access and direct collaborators together. The account supports up to 1,000 unique people, including the Owner and pending invitations."
         actions={
           <Button disabled={people === null || loadError} onClick={() => setEditor("invite")}>
+            <PlusIcon data-icon="inline-start" />
             Invite person
           </Button>
         }
@@ -163,22 +165,26 @@ export function OrganizationPeoplePage(): JSX.Element {
         />
       ) : null}
       <Card>
-        <CardHeader>
-          <CardTitle>People ({people?.length ?? "…"})</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <Field>
-            <FieldLabel htmlFor="organization-people-search">Find a person</FieldLabel>
-            <Input
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
+          <CardTitle className="shrink-0">People ({people?.length ?? "…"})</CardTitle>
+          <InputGroup className="w-64 max-w-full">
+            <InputGroupInput
               id="organization-people-search"
               type="search"
+              aria-label="Search a person"
+              placeholder="Search a person..."
               value={query}
               onChange={(event) => {
                 setQuery(event.currentTarget.value);
                 setPage(0);
               }}
             />
-          </Field>
+            <InputGroupAddon align="inline-end">
+              <SearchIcon aria-hidden="true" />
+            </InputGroupAddon>
+          </InputGroup>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
           {people === null ? (
             <Skeleton className="h-24 w-full" />
           ) : matches.length === 0 ? (
@@ -194,7 +200,7 @@ export function OrganizationPeoplePage(): JSX.Element {
                   <TableHead>Person</TableHead>
                   <TableHead>Access sources</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -227,31 +233,27 @@ export function OrganizationPeoplePage(): JSX.Element {
                             : "Active"}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-2">
+                    <TableCell className="text-right">
+                      <div className="flex flex-wrap items-center justify-end gap-1">
                         {canEdit(person) ? (
                           <>
-                            <Button
-                              variant="outline"
-                              size="sm"
+                            <TableActionButton
+                              label="Edit access"
+                              icon={PencilIcon}
                               aria-label={`Edit ${person.email}`}
                               disabled={pending || loadError}
                               onClick={() => setEditor(person)}
-                            >
-                              Edit access
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
+                            />
+                            <TableActionButton
+                              label="Remove access"
+                              icon={Trash2Icon}
                               aria-label={`Remove ${person.email}`}
                               disabled={pending || loadError}
                               onClick={() => {
                                 setError(null);
                                 setRemoval(person);
                               }}
-                            >
-                              Remove
-                            </Button>
+                            />
                           </>
                         ) : (
                           <span>

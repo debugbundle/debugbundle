@@ -411,6 +411,7 @@ export {
   getTierCapabilities,
   isSelfHostMode,
   hasBusinessEntitlement,
+  hasReportEntitlement,
   type TierName,
   type TierCapabilities
 } from "./tier-capabilities.js";

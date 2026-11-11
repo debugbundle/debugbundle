@@ -33,6 +33,8 @@ export const PROJECT_MERGE_TABLE_DISPOSITIONS = {
     "public_status_page_checks"
   ],
   retained_origin: [
+    // Review project/week identity and accepted origins remain frozen at cutover.
+    "improvement_reviews",
     "report_availability_days",
     ...REPORT_HEALTH_TABLES,
     ...REPORT_LIFECYCLE_TABLES,
@@ -89,6 +91,11 @@ export const PROJECT_MERGE_TABLE_DISPOSITIONS = {
     "analytics_visitor_first_seen"
   ],
   unchanged_account: [
+    "improvement_review_settings",
+    "improvement_review_usage",
+    "improvement_review_attempts",
+    "report_identity_snapshots",
+    "report_pdf_projections",
     ...REPORT_RUN_TABLES,
     ...REPORT_EMAIL_TABLES,
     ...REPORT_COLLECTOR_TABLES,

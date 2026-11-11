@@ -89,3 +89,12 @@ export function maximumReportDocumentFixture(): ReportDocument {
     }
   });
 }
+
+export function factualReportDocumentFixture(): ReportDocument {
+  const doc = reportDocumentFixture();
+  return ReportDocumentSchema.parse({
+    ...doc,
+    version: 2,
+    analysis: { status: "not_requested", reason: null, model: null, request_sha256: null }
+  });
+}

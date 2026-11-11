@@ -14,6 +14,7 @@ import { createBillingMocks } from "./billing.js";
 import { createPublicStatusMocks } from "./public-status.js";
 import { createNotificationMocks } from "./notifications.js";
 import { createReportMocks } from "./reports.js";
+import { createImprovementReviewMocks } from "./improvement-reviews.js";
 
 export interface MockResponse {
   status: number;
@@ -39,6 +40,7 @@ export function createDevMockApi() {
   const publicStatus = createPublicStatusMocks(data, management.isSignedIn);
   const notifications = createNotificationMocks(data, management.isSignedIn);
   const reports = createReportMocks(data, management.isSignedIn);
+  const improvementReviews = createImprovementReviewMocks(data, management.isSignedIn);
   const capturePolicies = new Map(
     data.projects.map((project) => [
       String(project["project_id"]),
@@ -165,6 +167,8 @@ export function createDevMockApi() {
     const projectId = projectMatch?.[1] ?? query.get("project_id");
     const route = path.replace(/^\/v1\/projects\/[^/]+/, "/v1");
     const read = method === "GET";
+    const review = improvementReviews.handle(method, path, query, payload);
+    if (review) return review;
     const report = reports.handle(method, path, query, payload);
     if (report) return report;
     if (read && path === "/v1/organizations") return reply({ organizations: [] });

@@ -392,3 +392,6 @@ rebuild from preserved event files.
 
 - **Saved-report consent:** Explicit OAuth permission `debugbundle:reports:read` to list and read existing whole-scope Smart Reports. It does not authorise report generation, delivery or editing and is not added to an older connection automatically.
 - **Trial report window:** One allowance/budget window spanning the existing thirty-day Business trial. Calendar month changes do not reset it; new collection, generation and delivery stop at the database expiry deadline.
+
+- **Weekly improvement review**: a separate consented, versioned project/week artifact of bounded retained evidence, deterministic priorities and optional AI investigation guidance. It does not replace an ordinary opportunity or BundleV1.
+- **Intentional factual report**: a Solo/Team report whose saved product mode excludes AI entirely, completing successfully with `analysis.status=not_requested`; distinct from a degraded Business AI result.

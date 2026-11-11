@@ -3,7 +3,7 @@
 Applies to FR-BUS-05 and AC-BUS report delivery. This is a separate path from the existing weekly digest; its recipients and settings are unchanged.
 
 - The only body is a bounded overview rendered from the saved, validated canonical report. Templates escape all text. There are no AI calls, PDF attachments, public artifact links, model-provided destinations or arbitrary email recipients.
-- Each frozen recipient identity has one durable delivery per run. The actual saved creator must retain Business entitlement, current management of every frozen origin and valid privacy/Owner-review state. The recipient must be verified and currently read every frozen origin. A combined report is either sent whole or withheld.
+- Each frozen recipient identity has one durable delivery per run. The actual saved creator must retain the accepted report product entitlement, current management of every frozen origin and valid privacy/Owner-review state. The recipient must be verified and currently read every frozen origin. A combined report is either sent whole or withheld.
 - Recheck current shared and recipient personal email suppression, pauses and discarded history for every selected project immediately before sending. Reports use their own saved schedule; generic alert daily grouping does not alter a report's facts or produce another report.
 - Reserve one existing notification allowance unit for each recipient send under the current monthly billing allowance window. Confirmation charges it once; definite rejection releases it. Sending and uncertain outcomes hold it conservatively. Deleting the report does not refund a provider-accepted or uncertain delivery. Report generations remain a separate allowance.
 - Reuse the existing Postgres worker job mechanism and the bounded report lane. Persist a send intent before the provider call. Use one SDK attempt and a maximum twenty-second provider wait, without holding a database lock across object reads, rendering or sending.
@@ -22,3 +22,5 @@ archives, accepted payment recovery and financial reconciliation remain availabl
 The switch does not revoke entitlements, cancel provider checkouts, invalidate
 already admitted payments or alter scheduled operations. No provider catalogue
 or live setting is changed by this local implementation.
+
+Intentional Solo/Team factual reports use the same delivery path and show that AI analysis is not included. Their generation reserves no AI money or provider request; email still uses the existing notification allowance and single-send receipts. Upgrades retain saved factual mode. See [Smart Products](../spec/smart-products.md).

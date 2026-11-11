@@ -77,6 +77,7 @@ export function buildPublicOpenApiSpec(): Record<string, unknown> {
     ...reportDefinitionOperations(),
     ...reportRunOperations(),
     ...reportContentOperations(),
+    ...improvementReviewOperations(),
     ...reportPdfOperations(),
     ...reportDeliveryOperations(),
     ...projectServicesOperations(),
@@ -194,5 +195,6 @@ export function buildPublicOpenApiSpec(): Record<string, unknown> {
 import { reportDefinitionOperations } from "./openapi-report-definitions.js";
 import { reportRunOperations } from "./openapi-report-runs.js";
 import { reportContentOperations } from "./openapi-report-content.js";
+import { improvementReviewOperations } from "./openapi-improvement-reviews.js";
 import { reportPdfOperations } from "./openapi-report-pdf.js";
 import { reportDeliveryOperations } from "./openapi-report-delivery.js";

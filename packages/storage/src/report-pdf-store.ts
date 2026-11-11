@@ -64,6 +64,22 @@ export function createReportPdfStore(
   const jobs = createWorkerJobStore(db),
     artifacts = createReportArtifactStore(db),
     content = createReportContentStore(db, objects);
+  async function currentProjection(input: ReportContentInput, row: Row): Promise<boolean> {
+    if (row["privacy_mode"] !== "restricted" || row["pdf_object_key"] === null) return true;
+    const document = await content.read(input);
+    const digest = reportArtifactDigest(Buffer.from(JSON.stringify(document)));
+    const projection = (
+      await db.query<{ document_sha256: string; pdf_sha256: string }>(
+        "SELECT document_sha256,pdf_sha256 FROM report_pdf_projections WHERE run_id=$1",
+        [input.id]
+      )
+    ).rows[0];
+    // Legacy caches are usable only if the current private reader returns the
+    // original canonical document unchanged. A safe fallback needs a fresh PDF.
+    return projection
+      ? projection.document_sha256 === digest && projection.pdf_sha256 === row["pdf_sha256"]
+      : digest === row["ready_sha256"];
+  }
   async function state(tx: Queryable, row: Row): Promise<ReportPdfState> {
     if (await pdfReference(tx, row))
       return { run_id: String(row["id"]), status: "ready", retry_after_seconds: null };
@@ -119,6 +135,11 @@ export function createReportPdfStore(
   return {
     async request(raw) {
       const input = ReportContentInputSchema.parse(raw);
+      const saved = await readPublishedReportRun(db, input);
+      if (!(await currentProjection(input, saved))) {
+        const reference = await pdfReference(db, saved);
+        if (reference) await invalidate(input, reference);
+      }
       return runInTransaction(db, async (tx) => {
         await lockOrganization(tx, input.organization_id);
         const row = await readPublishedReportRun(tx, input, true),
@@ -149,7 +170,10 @@ export function createReportPdfStore(
     },
     async status(raw) {
       const input = ReportContentInputSchema.parse(raw);
-      return state(db, await readPublishedReportRun(db, input));
+      const row = await readPublishedReportRun(db, input);
+      if (!(await currentProjection(input, row)))
+        return { run_id: input.id, status: "not_requested", retry_after_seconds: null };
+      return state(db, row);
     },
     async download(raw) {
       const input = ReportContentInputSchema.parse(raw),
@@ -184,6 +208,12 @@ export function createReportPdfStore(
       const current = await readPublishedReportRun(db, input);
       if (current["pdf_object_key"] !== reference.key || current["pdf_sha256"] !== reference.sha256)
         throw new Error("report_pdf_unavailable");
+      // The private fetch can overlap an identity change. Check the current safe
+      // projection after that IO, before cached bytes cross the response boundary.
+      if (!(await currentProjection(input, current))) {
+        await invalidate(input, reference);
+        throw new Error("report_pdf_not_ready");
+      }
       return body;
     },
     async processNext(render) {
@@ -223,6 +253,18 @@ export function createReportPdfStore(
             { kind: "pdf", body, expires_at: view.document.report.expires_at },
             objects
           );
+          await runInTransaction(db, async (tx) => {
+            const current = await lockReportPdfClaim(tx, claim);
+            await tx.query(
+              `INSERT INTO report_pdf_projections(run_id,document_sha256,pdf_sha256) VALUES($1,$2,$3)
+              ON CONFLICT(run_id) DO UPDATE SET document_sha256=EXCLUDED.document_sha256,pdf_sha256=EXCLUDED.pdf_sha256`,
+              [
+                payload.run_id,
+                reportArtifactDigest(Buffer.from(JSON.stringify(view.document))),
+                current["pdf_sha256"]
+              ]
+            );
+          });
         }
         await runInTransaction(db, async (tx) => {
           const current = await lockReportPdfClaim(tx, claim);

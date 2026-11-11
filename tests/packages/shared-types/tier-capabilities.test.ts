@@ -281,13 +281,26 @@ describe("self-host mode", () => {
 });
 
 describe("Smart Report entitlement", () => {
-  it("keeps reports Business-only while using one organisation allowance", () => {
-    for (const plan of ["free", "solo", "team"] as const)
-      expect(getTierCapabilities(plan)).toMatchObject({
-        smart_reports: false,
-        monthly_smart_report_generations: 0,
-        max_smart_report_definitions: 0
-      });
+  it("uses the approved per-organisation report pools without capacity multiplication", () => {
+    expect(getTierCapabilities("free")).toMatchObject({
+      smart_reports: false,
+      monthly_smart_report_generations: 0,
+      max_smart_report_definitions: 0
+    });
+    expect(getTierCapabilities("solo")).toMatchObject({
+      smart_reports: true,
+      monthly_smart_report_generations: 2,
+      max_smart_report_definitions: 1,
+      max_smart_report_projects: 3,
+      max_smart_report_recipients: 1
+    });
+    expect(getTierCapabilities("team")).toMatchObject({
+      smart_reports: true,
+      monthly_smart_report_generations: 8,
+      max_smart_report_definitions: 2,
+      max_smart_report_projects: 5,
+      max_smart_report_recipients: 5
+    });
     expect(getTierCapabilities("business")).toMatchObject({
       smart_reports: true,
       monthly_smart_report_generations: 40,

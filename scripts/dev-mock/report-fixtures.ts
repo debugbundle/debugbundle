@@ -30,7 +30,8 @@ type Data = ReturnType<typeof createDevMockFixtures>;
 export function previewReportDocument(
   data: Data,
   run: ReportRunRecord,
-  quiet = false
+  quiet = false,
+  factual = false
 ): ReportDocument {
   const cutoff = new Date(Math.max(Date.now(), Date.parse(run.period.ends_at))).toISOString();
   const selected = [...run.scope].sort((a, b) => a.project_id.localeCompare(b.project_id));
@@ -154,7 +155,7 @@ export function previewReportDocument(
   });
   const coverage = facts.projects.map((project) => project.coverage_ref);
   const narrative =
-    run.status === "factual_only"
+    factual || run.status === "factual_only"
       ? null
       : {
           version: 1,
@@ -205,7 +206,7 @@ export function previewReportDocument(
         };
   const expires = new Date(Date.parse(cutoff) + 90 * 86400000).toISOString();
   return ReportDocumentSchema.parse({
-    version: 1,
+    version: factual ? 2 : 1,
     template_version: 1,
     run_id: run.id,
     name: run.name,
@@ -228,12 +229,14 @@ export function previewReportDocument(
       expires_at: expires
     },
     narrative,
-    analysis: {
-      status: narrative === null ? "unavailable" : "available",
-      reason: narrative === null ? "model_rejected" : null,
-      model: null,
-      request_sha256: null
-    }
+    analysis: factual
+      ? { status: "not_requested", reason: null, model: null, request_sha256: null }
+      : {
+          status: narrative === null ? "unavailable" : "available",
+          reason: narrative === null ? "model_rejected" : null,
+          model: null,
+          request_sha256: null
+        }
   });
 }
 export function previewReportRun(
@@ -300,6 +303,13 @@ export function createReportPreviewFixtures(data: Data) {
       privacy: "full",
       count: 1,
       enabled: false
+    },
+    {
+      name: "Sample · Monthly factual report",
+      cadence: "monthly",
+      privacy: "restricted",
+      count: 1,
+      enabled: false
     }
   ].map((example, i) => {
     const schedule = example.enabled ? { time: "09:00", timezone: "Europe/Ljubljana" } : null;
@@ -353,5 +363,14 @@ export function createReportPreviewFixtures(data: Data) {
       new Date(Date.parse(now) - i * 60000).toISOString()
     )
   );
+  runs.push({
+    ...previewReportRun(
+      definitions[4]!,
+      reportPreviewId(108),
+      "ready",
+      new Date(Date.parse(now) - 35 * 86400000).toISOString()
+    ),
+    ai_status: "unavailable"
+  });
   return { definitions, runs };
 }

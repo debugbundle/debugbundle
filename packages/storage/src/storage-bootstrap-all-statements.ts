@@ -1,4 +1,11 @@
 import { SELFHOST_PROJECT_ACTOR_ROLE_STATEMENT } from "./selfhost-organization-access-schema.js";
+import { REPORT_IDENTITY_BOOTSTRAP } from "./report-identity-schema.js";
+import { IMPROVEMENT_REVIEW_BOOTSTRAP } from "./improvement-review-schema.js";
+import {
+  REPORT_PRODUCT_MODE_COLUMN,
+  REPORT_PRODUCT_GUARD,
+  REPORT_PRODUCT_RUN_CONSTRAINT
+} from "./report-product-schema.js";
 import { REPORT_TRIAL_COLLECTION_BOOTSTRAP } from "./report-trial-collection-schema.js";
 import { REFERRAL_BENEFIT_BOOTSTRAP } from "./referral-benefit-schema.js";
 import { REPORT_HEALTH_BOOTSTRAP } from "./report-health-schema.js";
@@ -50,7 +57,12 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
   ...REFERRAL_LEDGER_BOOTSTRAP,
   ...REFERRAL_RECONCILIATION_BOOTSTRAP,
   ...REPORT_LIFECYCLE_BOOTSTRAP,
-  ...REPORT_DEFINITION_BOOTSTRAP,
+  ...REPORT_DEFINITION_BOOTSTRAP.map((statement) =>
+    statement.replace(
+      "CREATE TABLE report_definitions (",
+      `CREATE TABLE report_definitions (${REPORT_PRODUCT_MODE_COLUMN},`
+    )
+  ),
   ...REPORT_SOURCE_TEXT_BOOTSTRAP,
   ...EVIDENCE_CONTEXT_BOOTSTRAP_STATEMENTS,
   ...BROWSER_RECOVERY_BOOTSTRAP_STATEMENTS,
@@ -93,13 +105,16 @@ export const STORAGE_BOOTSTRAP_STATEMENTS = [
       )
       .replace(
         "CREATE TABLE report_runs (",
-        "CREATE TABLE report_runs (email_scheduled_at timestamptz,"
+        `CREATE TABLE report_runs (${REPORT_PRODUCT_MODE_COLUMN},${REPORT_PRODUCT_RUN_CONSTRAINT},email_scheduled_at timestamptz,`
       )
   ),
   ...REPORT_EMAIL_BOOTSTRAP,
+  ...REPORT_IDENTITY_BOOTSTRAP,
   ...REPORT_COLLECTOR_BOOTSTRAP,
   ...REPORT_HEALTH_BOOTSTRAP,
   ...REFERRAL_BENEFIT_BOOTSTRAP,
   ...REPORT_TRIAL_COLLECTION_BOOTSTRAP,
+  REPORT_PRODUCT_GUARD,
+  ...IMPROVEMENT_REVIEW_BOOTSTRAP,
   SELFHOST_PROJECT_ACTOR_ROLE_STATEMENT
 ] as const;

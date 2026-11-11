@@ -13,6 +13,11 @@ import {
 } from "../../smart-reports/src/report-content.js";
 import { ReportReferenceSchema } from "../../smart-reports/src/model-evidence.js";
 import { redactReportModelFacts } from "../../smart-reports/src/model-evidence.js";
+import {
+  containsReportIdentity,
+  protectRestrictedReportFacts
+} from "../../smart-reports/src/report-identity.js";
+import { readReportIdentities } from "./report-identity-store.js";
 import { reportRunRecord } from "./report-run-record.js";
 import { reportArtifactDigest } from "./report-artifact-key.js";
 import type { ObjectStoreReader, Queryable } from "./types.js";
@@ -126,6 +131,24 @@ export function createReportContentStore(
         }) !== JSON.stringify(safe)
       )
         throw new SmartReportError("report_not_found");
+      if (run.privacy_mode === "restricted") {
+        const identities = await readReportIdentities(db, run.scope, run.id);
+        if (
+          JSON.stringify(protectRestrictedReportFacts(document.report.facts, identities)) !==
+          JSON.stringify(document.report.facts)
+        )
+          throw new SmartReportError("report_not_found");
+        if (document.narrative !== null && containsReportIdentity(document.narrative, identities)) {
+          // A read projection cannot rewrite historical facts, attempt receipts or
+          // hashes. Keep authorised safe facts while withholding legacy prose.
+          document.narrative = null;
+          document.analysis = {
+            ...document.analysis,
+            status: "unavailable",
+            reason: "model_rejected"
+          };
+        }
+      }
       const current = await readPublishedReportRun(db, input);
       if (
         current["ready_object_key"] !== row["ready_object_key"] ||

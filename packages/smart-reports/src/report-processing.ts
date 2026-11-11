@@ -2,12 +2,15 @@ import { z } from "zod";
 import { ReportRunRecordSchema } from "./report-run.js";
 import { ReportAttemptProfileSchema } from "./model-cost.js";
 import { ReportNarrativeSchema } from "./model-narrative.js";
+import { ReportIdentitySetSchema } from "./report-identity.js";
 export const ReportArtifactReferenceSchema = z
   .object({ key: z.string().min(1).max(1024), sha256: z.string().regex(/^[a-f0-9]{64}$/) })
   .strict();
 export const ReportProcessingStateSchema = z
   .object({
     run: ReportRunRecordSchema,
+    identities: ReportIdentitySetSchema.default([]),
+    mode: z.enum(["factual", "ai"]).default("ai"),
     profile: ReportAttemptProfileSchema.nullable(),
     paid_attempts: z.number().int().min(0).max(2),
     facts: ReportArtifactReferenceSchema.nullable(),

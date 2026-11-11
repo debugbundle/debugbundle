@@ -1,5 +1,5 @@
 import { FileTextIcon, HistoryIcon, ChevronRightIcon, PlusIcon } from "lucide-react";
-import { hasBusinessEntitlement } from "../../../../packages/shared-types/src/tier-capabilities.js";
+import { hasReportEntitlement } from "../../../../packages/shared-types/src/tier-capabilities.js";
 import { ReportAllowanceCard } from "../components/system/report-allowance-card.js";
 import type { ReportAllowance } from "../../../../packages/smart-reports/src/report-allowance.js";
 import { useReportContext } from "../lib/use-report-context.js";
@@ -61,7 +61,7 @@ export function ReportsPage(): JSX.Element {
   const { pathname } = useLocation();
   const { setAction: setHeaderAction } = useHeaderActions();
   const { session } = useSession(),
-    hasReportAccess = hasBusinessEntitlement(session?.organization_plan, session?.self_hosted),
+    hasReportAccess = hasReportEntitlement(session?.organization_plan, session?.self_hosted),
     key = `${session?.user_id}:${session?.organization_id}:${session?.organization_plan}:${Boolean(session?.self_hosted)}`,
     [data, setData] = useState<Data | null>(null),
     [error, setError] = useState<string | null>(null),
@@ -102,7 +102,7 @@ export function ReportsPage(): JSX.Element {
   const emptyAction = canCreate
     ? { to: "/reports/definitions/new", label: "Create report" }
     : session?.role === "owner" &&
-        !hasBusinessEntitlement(session.organization_plan, session.self_hosted)
+        !hasReportEntitlement(session.organization_plan, session.self_hosted)
       ? { to: "/billing", label: "View plans" }
       : { to: "/projects", label: "Open projects" };
   const firstDefinition = visible?.definitions[0]?.id;
@@ -127,7 +127,7 @@ export function ReportsPage(): JSX.Element {
     if (
       !firstDefinition ||
       !session ||
-      !hasBusinessEntitlement(session.organization_plan, session.self_hosted)
+      !hasReportEntitlement(session.organization_plan, session.self_hosted)
     )
       return;
     void reportApi.definitions
@@ -177,9 +177,9 @@ export function ReportsPage(): JSX.Element {
       <PageHeader description="Review completed periods, resolved work and next priorities across your selected projects." />
       {!hasReportAccess ? (
         <PlanUpgradeCallout
-          eyebrow="Business plan"
+          eyebrow="Paid plans"
           title="Upgrade to unlock Smart Reports"
-          description="Smart Reports are available on Business. Upgrade to review completed work, major issues and next priorities across your projects. Authorised saved reports remain available until their expiry."
+          description="Reports are available on Solo, Team and Business. Review recorded facts on Solo and Team, with AI analysis on Business. Authorised saved reports remain available until their expiry."
         />
       ) : null}
       {error ? (
@@ -278,7 +278,7 @@ export function ReportsPage(): JSX.Element {
               ) : null}
               {visible.definitions.map((definition) => {
                 const manage =
-                  hasBusinessEntitlement(session?.organization_plan, session?.self_hosted) &&
+                  hasReportEntitlement(session?.organization_plan, session?.self_hosted) &&
                   definition.scope.every((item) =>
                     manageable.some((project) => project.project_id === item.project_id)
                   );
@@ -351,12 +351,9 @@ export function ReportsPage(): JSX.Element {
                         <EmptyDescription>
                           {canCreate
                             ? "Create a report to review resolved work and priorities across your selected projects."
-                            : hasBusinessEntitlement(
-                                  session?.organization_plan,
-                                  session?.self_hosted
-                                )
+                            : hasReportEntitlement(session?.organization_plan, session?.self_hosted)
                               ? "No report definitions are available for your projects yet."
-                              : "Smart Reports bring together completed work and next priorities. Create new reports on Business."}
+                              : "Smart Reports bring together completed work and next priorities. Create reports on a paid plan."}
                         </EmptyDescription>
                       </EmptyHeader>
                       <EmptyContent>

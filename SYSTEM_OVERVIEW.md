@@ -1,3 +1,14 @@
+Local candidate (not deployed): [spec/smart-products.md](spec/smart-products.md)
+records the approved restricted-identity guard, zero-AI Solo/Team factual reports,
+explicitly consented weekly improvement reviews and public Analytics page.
+Reviews reuse the serial worker lane with an independent budget and one paid
+intent; new AI is default-off and requires separate provider qualification.
+Factual overviews and focus share saved-metric presentation across web/HTML/PDF;
+review guidance carries recorded source relationships and investigation checks.
+Three additive forward migrations gate API/worker readiness. Report document v2
+is opt-in; legacy/OpenAI report projections and restricted catalogs stay fixed.
+New domain boundaries are in ARCHITECTURE_MAP.md. No release operation is implied.
+
 Release state (10 November 2026): core 1.24.0 and site 1.8.1 are live from
 `78783e7c` / `2245639a`; CLI/MCP/OpenClaw 1.22.0 and shared types 3.4.0 are
 published. The diagnostic migration precedes API/worker startup; old receipt
@@ -5,7 +16,17 @@ hashes, factual reports, access/configuration and budgets are preserved. API,
 worker, served assets and authenticated reads pass live verification. ClawHub's
 strict antivirus/card/discovery acceptance remains partial despite benign reviews
 and a passing normal public install. See `spec/smart-report-release-20261110.md`.
-The additional restricted-output project-name safeguard remains deferred.
+That release predates the local Smart Products candidate below.
+
+Workspace Improvements reuses Analytics-style line tabs: the existing
+`/improvements` inventory is Opportunities and `/improvements/reviews` opens
+Weekly reviews. Shared settings/consent and archive access remain unchanged.
+
+Local public-site support chat: the shared `site/app/layout.tsx` loads the
+Owner-provided Crisp widget after hydration across marketing, docs and blog pages.
+It preserves a single loader/session during navigation and adds no app integration
+or identity forwarding. The public privacy page discloses the separate provider.
+This local addition is not deployed.
 
 Dashboard empty resource lists and data panels reuse `ResourceEmptyState` with
 the existing Empty primitives, scoped help and permitted actions. The former
@@ -30,7 +51,7 @@ The opt-in `make dev-mock` frontend includes schema-validated sample Smart
 Reports, recipient choices and in-memory create/edit/generate/cancel/delete flows.
 Its HTML/PDF use the production renderers, with PDF in the bounded child; no
 provider, email, database, quota ledger or production receipt is touched. Mock
-billing controls select Business for fresh generation; saved examples remain
+billing controls select Solo/Team for factual reports or Business for AI samples; saved examples remain
 readable on other mock tiers under the normal archive UI.
 
 Local tier review uses `make dev-tier` (inspect) or `TIER=free|solo|team|business`

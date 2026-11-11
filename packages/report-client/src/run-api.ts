@@ -78,7 +78,7 @@ export function createReportRunApi(client: ReportHttpClient): ReportRunApi {
       return request(
         input,
         "GET",
-        `${base(input)}/${reportResourceId(input.runId)}/document`,
+        `${base(input)}/${reportResourceId(input.runId)}/document?version=2`,
         ReportContentViewSchema
       );
     },

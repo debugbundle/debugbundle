@@ -1,10 +1,50 @@
 import { expect, it } from "vitest";
+import {
+  reportPolicy,
+  requireReportPolicy
+} from "../../../packages/smart-reports/src/report-policy.js";
 import { AcceptedReportScopeSchema } from "../../../packages/smart-reports/src/report-definition.js";
 import {
   CreateReportDefinitionSchema,
   ReplaceReportDefinitionSchema
 } from "../../../packages/smart-reports/src/report-definition.js";
 const id = "11111111-1111-4111-8111-111111111111";
+it("keeps factual report cadences, selections and allowances bounded by the approved plan", () => {
+  expect(reportPolicy("free").available).toBe(false);
+  expect(reportPolicy("solo")).toMatchObject({
+    ai: false,
+    cadences: ["monthly"],
+    monthly_smart_report_generations: 2,
+    max_smart_report_definitions: 1,
+    max_smart_report_projects: 3,
+    max_smart_report_recipients: 1
+  });
+  expect(reportPolicy("team")).toMatchObject({
+    ai: false,
+    cadences: ["weekly", "monthly"],
+    monthly_smart_report_generations: 8,
+    max_smart_report_definitions: 2,
+    max_smart_report_projects: 5,
+    max_smart_report_recipients: 5
+  });
+  expect(reportPolicy("business")).toMatchObject({
+    ai: true,
+    cadences: ["daily", "weekly", "monthly"],
+    monthly_smart_report_generations: 40
+  });
+  expect(() =>
+    requireReportPolicy("solo", { cadence: "weekly", projects: 1, recipients: 0 })
+  ).toThrow("upgrade_required");
+  expect(() =>
+    requireReportPolicy("team", { cadence: "monthly", projects: 6, recipients: 0 })
+  ).toThrow("upgrade_required");
+  expect(() =>
+    requireReportPolicy("team", { cadence: "weekly", projects: 1, recipients: 1, mode: "ai" })
+  ).toThrow("upgrade_required");
+  expect(() =>
+    requireReportPolicy("team", { cadence: "weekly", projects: 5, recipients: 5, mode: "factual" })
+  ).not.toThrow();
+});
 const request = {
   name: "Monthly engineering review",
   cadence: "monthly",

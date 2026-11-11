@@ -59,6 +59,23 @@ runIntegration("durable report due scheduler", () => {
       (await pool.query("SELECT id FROM worker_jobs WHERE job_name='generate-smart-report'")).rows
     ).toHaveLength(1);
   });
+  it("pauses an unbounded restricted identity scope without leaving a reservation or blocking later schedules", async () => {
+    await pool.query("UPDATE report_definitions SET privacy_mode='restricted' WHERE id=$1", [
+      fixture.definition
+    ]);
+    await pool.query("UPDATE projects SET name=repeat('x',321) WHERE id=$1", [fixture.project]);
+    await expect(scheduler.scheduleNext()).resolves.toEqual({ processed: true });
+    expect(
+      (
+        await pool.query(
+          "SELECT pause_reason,paused_at IS NOT NULL AS paused FROM report_definitions"
+        )
+      ).rows[0]
+    ).toEqual({ pause_reason: "scope_unavailable", paused: true });
+    expect((await pool.query("SELECT id FROM report_runs")).rows).toHaveLength(0);
+    expect((await pool.query("SELECT * FROM report_allowance_windows")).rows).toHaveLength(0);
+    await expect(scheduler.scheduleNext()).resolves.toEqual({ processed: false });
+  });
   it("rolls back the complete admission if advancement fails", async () => {
     await pool.query(
       `CREATE FUNCTION reject_report_advance() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.next_due_at>OLD.next_due_at THEN RAISE EXCEPTION 'test_report_advance_failed'; END IF; RETURN NEW; END $$`

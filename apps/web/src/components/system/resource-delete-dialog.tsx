@@ -13,12 +13,14 @@ import {
 } from "../ui/alert-dialog.js";
 export function ResourceDeleteDialog({
   label,
+  triggerLabel = label,
   description,
   disabled = false,
   variant = "outline",
   onConfirm
 }: {
   label: string;
+  triggerLabel?: string;
   description: string;
   disabled?: boolean;
   variant?: "outline" | "ghost";
@@ -27,9 +29,9 @@ export function ResourceDeleteDialog({
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button type="button" variant={variant} size="sm" disabled={disabled}>
+        <Button type="button" variant={variant} size="sm" disabled={disabled} aria-label={label}>
           <Trash2Icon data-icon="inline-start" />
-          {label}
+          {triggerLabel}
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>

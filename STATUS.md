@@ -1,3 +1,163 @@
+# Business article draft and Invite person icon — local review ready, 11 November 2026
+
+Invite person now has the shared inline + icon. Core typecheck, focused lint/format
+and ten People interaction tests pass. The unpublished article **Smart Reports and
+team access in DebugBundle Business** follows the existing practical blog style.
+The Owner explicitly chose released Business updates only; upcoming Solo/Team
+factual reports, weekly reviews and stronger restricted-name protection are excluded.
+Search-intent research and claim sources are in
+`site/docs/smart-reports-business-post-editorial.md`; no measured volume/trend claims.
+
+All 74 site tests, typecheck and static build pass. Article metadata, sitemap/archive,
+hero and seven internal links are verified. Local article and archive HTTP bytes
+match export at `http://localhost:5292/blog/smart-reports-engineering-reports-team-access/`.
+No publish or deploy. The blog has no draft filter: the MDX would enter a later
+site deployment, whose full scope and actual publication date still require review.
+
+# Members, tokens and People refinements — local review ready, 11 November 2026
+
+Project Members now uses a wider 3:2 left column, capitalised roles and shared
+Alerts-style icon actions; its introductory text is removed. Both token tables
+have matching right-aligned Revoke buttons with retained confirmations. Viewer
+failed because the local mock omitted it from its role validator; the mock is
+fixed, and the existing API accepts all three roles in regression tests. Vite
+automatically reloaded the mock, resetting synthetic demo edits only.
+
+People and Referrals now match user-menu row spacing. People has a compact search
+beside the title with a trailing icon, the requested placeholder and no visible
+label. Its table actions align right and reuse the shared icon buttons, preserving
+permissions, accessible names and confirmation behaviour.
+
+Core typecheck and focused ESLint/Prettier pass; 95 tests pass across 11 files.
+Local HTTP reads confirm updated source and project routes on 5291. No browser
+visual acceptance, real membership/token operation, publish or deploy occurred.
+Details: `spec/local/handoffs/access-ui-refinements-20261111.md`.
+
+# Improvements tabs and compact header — local review ready, 11 November 2026
+
+Improvements now reuses Analytics' line tabs: Opportunities at `/improvements`
+and Weekly reviews at `/improvements/reviews`. Filters persist between views;
+inactive panels and their bulk actions are hidden. Saved-review access and Owner
+consent controls retain their existing checks. The weekly header is shorter,
+limited to the existing `max-w-lg` token, with the AI allowance on its own line
+and wrapping actions. Opportunities omits the empty-selection instruction while
+retaining counts and controls once rows are selected.
+
+Final core typecheck, focused ESLint/Prettier and 28 Improvements/review tests pass.
+The earlier tab-route/navigation check passed 9 cases, and the public guide change
+passed all 74 site tests, typecheck and build. Both local tab routes and changed
+source modules are served on 5291 without resetting the synthetic preview.
+No browser/visual acceptance or release occurred. Evidence and review scenarios:
+`spec/local/handoffs/ui-refinements-20261111.md` and
+`spec/local/handoffs/smart-products-review-20261110.md`.
+
+# Public UI and app navigation refinements — local review ready, 11 November 2026
+
+All four Owner-requested refinements are implemented: the Contact security card
+uses the shared card action to `/security/`; testimonial figures retain native
+figure/caption semantics without the invalid `group` role; phones use naturally
+wrapping bundle-title text with decorative braces around the title only, while
+desktop keeps its whole-section framing; Health Status now follows Improvements
+in the shared app sidebar.
+
+Verification: 74 site tests, site typecheck and static build; core typecheck,
+focused sidebar lint/format and 22 navigation/health/improvement tests all passed.
+The first export retained stale CSS; a clean build after preserving `.next` fixed
+it. Final HTTP readback matches 3 exported pages and both linked stylesheets,
+including the new mobile rules and existing Crisp bootstrap. The synthetic app
+preview serves the new order without being restarted/reset. Public preview is
+healthy at `http://localhost:5292/`; the source preview on 5293 is resumed.
+No browser/screenshots or fresh Lighthouse score were taken. No publish or deploy.
+Evidence and details: `spec/local/handoffs/ui-refinements-20261111.md`.
+
+# Public-site Crisp chat — locally implemented, 11 November 2026
+
+The Owner-supplied Crisp website ID is mounted in the shared public root layout
+through Next.js Script after hydration. Marketing, documentation and blog share
+one asynchronous loader; repeated bootstrap preserves queued commands and the
+loaded API. No new package, app/account identity wiring or core runtime changes.
+The privacy page discloses support-chat processing and links to Crisp's policy.
+
+Verification: all 74 existing site tests, typecheck and bounded static build pass.
+An isolated fake-DOM check verifies the ID is set before loading, one script on
+re-entry and preserved queue/API state without contacting Crisp. All 145 exported
+HTML files contain the bootstrap; seven local routes return 200 and exactly match
+the export. Public preview refreshed at `http://localhost:5292/`. No browser/widget
+interaction or chat message was performed; no commit, publish or deploy.
+Details: `spec/local/handoffs/crisp-public-site-20261111.md`.
+
+# Smart products - deep audit complete; local review ready
+
+All four approved workstreams are implemented as an uncommitted local candidate.
+The final deep audit fixed scheduler/housekeeping starvation, identity-bound
+pausing, canonical retention after consolidation, and cached-PDF identity changes
+during fetch. Intentional factual reports now share useful linked summaries and
+severity-ordered focus across web/HTML/PDF. Weekly reviews retain recorded source
+relationships and stronger investigation/verification instructions. Agent-facing
+consent, permissions and readback are documented for ordinary MCP/CLI.
+
+Final gate: 780 tests across 103 files passed; all 82 changed production source
+files meet the unchanged coverage policy. Four tool-gated PDF skips pass in the
+separate 18-test real PDF run. The broad sweep passed all 133 test groups (6,474
+tests); its aggregate coverage failed on two files during ongoing edits, and the
+subsequent frozen-source combined gate passed those files and the full changed
+surface. General integration passed 182 cases (one unselected external SDK artifact
+variant skipped); full consolidation passed 111. Historical and populated upgrade,
+readiness, receipts, frozen OpenAI, static/build/OpenClaw and site gates passed.
+The 142-file deep-audit fingerprint records that tested snapshot; the subsequent
+public-copy follow-up below has its own site verification.
+
+Contract: `spec/smart-products.md`. Detailed final evidence and known boundaries:
+`spec/local/handoffs/smart-products-deep-audit-20261110.md`. Owner scenarios:
+`spec/local/handoffs/smart-products-review-20261110.md`. Previous evidence in that
+guide is explicitly historical; the deep audit supersedes it.
+
+Ready for Owner local review/testing. New review AI remains default-off and
+unqualified; actual provider usefulness requires separately authorised paid
+qualification. Release requires migrations before new readers/workers, generation
+pause during mixed-reader rollout, and a v2-capable rollback. No commit, push,
+publication, deployment, production/consumer mutation or paid provider call occurred.
+
+Public-copy follow-up: Team/Business weekly smart reviews now appear in pricing
+cards, comparison and FAQs, with fixed 5/25 and 10/50 project/AI-review limits.
+Priority support remains last on Team. Homepage, Analytics, pricing/billing/report/
+improvement/MCP docs and privacy/terms disclosures distinguish factual reports,
+Business AI reports and separately consented weekly reviews. The billing guide now
+uses catalogue per-unit analytics limits. No feature, dependency or schema changes.
+Site verification: 66 site tests plus 8 dependency-policy tests, typecheck and bounded
+static build passed. Eleven public preview routes returned 200 with bytes matching
+the export; the local public container is healthy. Evidence: `.tmp/smart-products-public-copy-green.log` and `.tmp/smart-products-public-copy-http.log`.
+
+Documentation grouping follow-up (11 November): the landing page now matches the
+sidebar: Capture Policy, Reducing Ingested Events and Managing Noise under
+Configuration; Availability Checks, Smart Reports, Probes and GitHub Automation
+under Advanced Features. GitHub is no longer duplicated under Agent Workflows.
+Existing SurfaceGrid/SurfaceCard styles, keyboard states and canonical paths are
+reused; icon choices match the sidebar. Corrected the GitHub guide's incomplete
+plan-availability sentence. All 74 site tests, typecheck and static build passed;
+31 local docs routes returned 200 and matched the export. The local public preview
+was refreshed; no publication or deployment. Evidence:
+`.tmp/docs-navigation-reconciliation-20261110.log` and
+`.tmp/docs-navigation-reconciliation-http-20261110.log`.
+
+App synthetic preview: localhost:5291; public static preview: localhost:5292;
+Analytics source preview: localhost:5293. Only the local public preview was restarted
+for this follow-up. No browser/screenshot acceptance was performed; real API, worker
+and database containers remain unchanged.
+The historical handoff below remains unchanged for continuity.
+
+# Next-thread handoff - four deferred product proposals
+
+The 10 November production release is live. The next-thread handoff is
+`spec/local/handoffs/smart-products-next-20261110.md` (local/ignored): Team/Business
+Smart Improvements, stronger restricted-report project-identity protection,
+deterministic Solo/Team reports with Business AI reports, and public Analytics
+navigation/marketing. These remain proposals; no implementation or activation was
+performed in the handoff turn. It records the released sources, existing gaps,
+material decisions, code paths and acceptance expectations. A new release and
+fresh paid evaluation require separate instructions. Preserve this uncommitted
+documentation pointer and the local handoff when starting the next thread.
+
 # Smart Report and dashboard release - live; external acceptance partial
 
 10 November: core 1.24.0 is live from `78783e7cb12b6f0c49e874e1287236e317c9f995`;

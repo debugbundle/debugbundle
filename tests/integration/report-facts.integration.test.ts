@@ -124,7 +124,7 @@ runIntegration("whole-scope report fact assembly", () => {
     await pool.query("UPDATE users SET email_verified_at=NULL WHERE id=$1", [owner]);
     await expect(read()).rejects.toThrow("forbidden");
     await pool.query("UPDATE users SET email_verified_at=now() WHERE id=$1", [owner]);
-    await pool.query("UPDATE organizations SET plan='team' WHERE id=$1", [org]);
+    await pool.query("UPDATE organizations SET plan='free' WHERE id=$1", [org]);
     await expect(read(2)).rejects.toThrow("upgrade_required");
   });
   it("keeps the oldest critical source through both bounded storage and canonical selection", async () => {

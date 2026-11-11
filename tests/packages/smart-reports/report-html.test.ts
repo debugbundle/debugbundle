@@ -1,8 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { renderReportHtml } from "../../../packages/smart-reports/src/report-html.js";
 import { reportLinkLocation } from "../../../packages/smart-reports/src/report-content.js";
-import { reportDocumentFixture } from "../../helpers/report-document.js";
+import {
+  reportDocumentFixture,
+  factualReportDocumentFixture
+} from "../../helpers/report-document.js";
+import { reportFactualHighlights } from "../../../packages/smart-reports/src/report-presentation.js";
 describe("canonical report HTML", () => {
+  it("includes the shared linked factual overview and does not describe intentional reports as failed AI", () => {
+    const doc = factualReportDocumentFixture(),
+      html = renderReportHtml(doc);
+    for (const item of reportFactualHighlights(doc)) {
+      expect(html).toContain(item.text);
+      for (const ref of item.evidence_refs) expect(html).toContain(`href="#ref-${ref}"`);
+    }
+    expect(html).not.toContain("AI analysis is unavailable");
+    expect(html).toContain("No selected outstanding work");
+  });
   it("resolves configured API/dashboard hosts without accepting report-provided or credential-bearing URL bases", () => {
     const path =
       "/projects/22222222-2222-4222-8222-222222222222/incidents/44444444-4444-4444-8444-444444444444";

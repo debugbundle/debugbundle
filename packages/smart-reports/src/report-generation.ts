@@ -18,6 +18,7 @@ import type {
 } from "./model-client.js";
 import type { ReportRunRecord } from "./report-run.js";
 import { redactReportData } from "./report-redaction.js";
+import { containsReportIdentity, protectRestrictedReportFacts } from "./report-identity.js";
 
 export interface ReportGenerationPorts {
   state(): Promise<ReportProcessingState>;
@@ -84,6 +85,7 @@ export async function generateSmartReport(
   else {
     await ports.check();
     report = CanonicalReportFactsSchema.parse(await ports.context(await ports.facts()));
+    report.facts = protectRestrictedReportFacts(report.facts, state.identities);
     bindFacts(state, report);
     await ports.check();
     await ports.persist("facts", bytes(report), report.expires_at);
@@ -112,11 +114,15 @@ export async function generateSmartReport(
       reason = "model_uncertain";
     } else
       reason = state.attempt.state === "rejected" ? "model_rejected" : "saved_response_unavailable";
-  } else if (model !== null && state.profile?.model === "gpt-6.1-terra") {
+  } else if (state.mode === "ai" && model !== null && state.profile?.model === "gpt-6.1-terra") {
     await ports.check();
     let prepared: PreparedReportModelAttempt | null = null;
     try {
-      prepared = await model.prepare({ model: "gpt-6.1-terra", facts: report.facts });
+      prepared = await model.prepare({
+        model: "gpt-6.1-terra",
+        facts: report.facts,
+        identities: state.identities
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       if (message === "report_input_limit_exceeded") reason = "input_limit";
@@ -145,24 +151,29 @@ export async function generateSmartReport(
   // unsafe prose; recovery must not buy a replacement response.
   if (
     narrative !== null &&
-    JSON.stringify(redactReportData(narrative)) !== JSON.stringify(narrative)
+    (JSON.stringify(redactReportData(narrative)) !== JSON.stringify(narrative) ||
+      (report.facts.privacy_mode === "restricted" &&
+        containsReportIdentity(narrative, state.identities)))
   ) {
     narrative = null;
     reason = "model_rejected";
   }
   const document = ReportDocumentSchema.parse({
-    version: 1,
+    version: state.mode === "factual" ? 2 : 1,
     template_version: 1,
     run_id: state.run.id,
     name: state.run.name,
     report,
     narrative,
-    analysis: {
-      status: narrative === null ? "unavailable" : "available",
-      reason,
-      model: state.attempt === null ? null : (state.profile?.model ?? null),
-      request_sha256: state.attempt?.request_sha256 ?? null
-    }
+    analysis:
+      state.mode === "factual"
+        ? { status: "not_requested", reason: null, model: null, request_sha256: null }
+        : {
+            status: narrative === null ? "unavailable" : "available",
+            reason,
+            model: state.attempt === null ? null : (state.profile?.model ?? null),
+            request_sha256: state.attempt?.request_sha256 ?? null
+          }
   });
   await ports.check();
   await ports.persist("ready", bytes(document), report.expires_at);

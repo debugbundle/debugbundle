@@ -1,6 +1,6 @@
 import { PendingButton } from "../components/system/pending-button.js";
 import { usePendingAction } from "../lib/use-pending-action.js";
-import { FolderIcon, KeyRoundIcon, PlusIcon } from "lucide-react";
+import { FolderIcon, KeyRoundIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { CreateProjectDialog } from "../components/system/create-project-dialog.js";
@@ -414,7 +414,8 @@ export function ProjectTokensPage(): JSX.Element {
                       <TableCell className="text-right">
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button type="button" variant="ghost" size="sm">
+                            <Button type="button" variant="outline" size="sm">
+                              <Trash2Icon data-icon="inline-start" />
                               Revoke
                             </Button>
                           </AlertDialogTrigger>

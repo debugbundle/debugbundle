@@ -8,7 +8,7 @@ const reply = (body: unknown, status = 200): MockResponse => ({ status, body });
 const missing = (): MockResponse => reply({ error: "mock_record_not_found" }, 404);
 const invalid = (): MockResponse => reply({ error: "invalid_mock_payload" }, 400);
 const label = z.string().trim().min(1).max(120);
-const role = z.enum(["admin", "member"]);
+const role = z.enum(["admin", "member", "viewer"]);
 const webhookEvents = z.enum([
   "bundle.created",
   "bundle.updated",

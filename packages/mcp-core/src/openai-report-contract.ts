@@ -3,7 +3,8 @@ import { z } from "zod";
 import { sanitizeTelemetry } from "../../redaction/src/index.js";
 import { ReportModelFactsSchema } from "../../smart-reports/src/model-evidence.js";
 import {
-  ReportDocumentSchema,
+  LegacyReportDocumentBase,
+  legacyReportDocument,
   type ReportDocument
 } from "../../smart-reports/src/report-document.js";
 import { ReportRunRecordSchema, type ReportRunRecord } from "../../smart-reports/src/report-run.js";
@@ -37,7 +38,7 @@ const document = z
     expires_at: z.string().datetime(),
     facts: ReportModelFactsSchema,
     narrative: ReportNarrativeSchema.nullable(),
-    analysis: ReportDocumentSchema.shape.analysis.omit({ request_sha256: true }).strict()
+    analysis: LegacyReportDocumentBase.shape.analysis.omit({ request_sha256: true }).strict()
   })
   .strict();
 const inputs = { list_reports: listing, get_report_content: identity };
@@ -96,6 +97,7 @@ export function projectOpenAiReportSummary(run: ReportRunRecord): z.infer<typeof
   });
 }
 export function projectOpenAiReportDocument(value: ReportDocument): z.infer<typeof document> {
+  value = legacyReportDocument(value);
   return document.parse({
     report_id: value.run_id,
     name: value.name,

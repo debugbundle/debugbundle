@@ -38,6 +38,9 @@ const calls = vi.hoisted(() => ({
   cancel: vi.fn()
 }));
 vi.mock("../../../apps/web/src/lib/report-api.js", () => ({
+  reportHttpClient: {
+    request: async () => ({ status: 404, body: { error: "improvement_reviews_unavailable" } })
+  },
   reportScope: (organizationId: string) => ({ organizationId, bearerToken: "browser-session" }),
   reportApi: {
     definitions: {
@@ -759,7 +762,7 @@ it("uses standard empty cards and permitted actions for Business reports", async
   ).toHaveAttribute("href", "/reports/definitions/new");
 });
 
-it.each(["free", "solo", "team"] as const)(
+it.each(["free"] as const)(
   "uses the shared upgrade callout rather than empty report inventories on %s",
   async (plan) => {
     setup(plan);
@@ -775,12 +778,16 @@ it.each(["free", "solo", "team"] as const)(
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     const links = screen.getAllByRole("link").map((link) => link.getAttribute("href"));
     const improvements = links.indexOf("/improvements");
-    expect(links[improvements + 1]).toBe("/projects");
+    expect(links.slice(improvements, improvements + 3)).toEqual([
+      "/improvements",
+      "/health-status",
+      "/projects"
+    ]);
   }
 );
 
 it("keeps authorised saved definitions and report history visible below the upgrade callout", async () => {
-  setup("team");
+  setup("free");
   render(<App initialEntries={["/reports"]} />);
   expect(await screen.findByText("Upgrade to unlock Smart Reports")).toBeVisible();
   expect(await screen.findByRole("link", { name: "Open Monthly review" })).toBeVisible();
@@ -797,3 +804,15 @@ it("keeps genuine archive failures retryable alongside the upgrade callout", asy
   await userEvent.click(screen.getByRole("button", { name: "Retry" }));
   expect(await screen.findByRole("link", { name: "Open Monthly review" })).toBeVisible();
 });
+
+it.each(["solo", "team"] as const)(
+  "allows %s to create intentional factual reports",
+  async (plan) => {
+    setup(plan);
+    calls.list.mockResolvedValue([]);
+    calls.history.mockResolvedValue({ runs: [], next_cursor: null });
+    render(<App initialEntries={["/reports"]} />);
+    expect(await screen.findByRole("link", { name: "Create report" })).toBeVisible();
+    expect(screen.queryByText("Upgrade to unlock Smart Reports")).not.toBeInTheDocument();
+  }
+);

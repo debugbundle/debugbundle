@@ -32,7 +32,11 @@ export const reportTestReceipt = () => ({
   elapsed_ms: 50
 });
 
-export async function resetReportRunFixture(pool: Pool, db: Queryable) {
+export async function resetReportRunFixture(
+  pool: Pool,
+  db: Queryable,
+  options: { privacy_mode?: "full" | "restricted"; plan?: "solo" | "team" | "business" } = {}
+) {
   const definitions = createReportDefinitionStore(db);
   await pool.query("DROP SCHEMA public CASCADE");
   await pool.query("CREATE SCHEMA public");
@@ -45,8 +49,8 @@ export async function resetReportRunFixture(pool: Pool, db: Queryable) {
     `${owner}@example.test`
   ]);
   await pool.query(
-    "INSERT INTO organizations(id,name,slug,plan,additional_capacity_units) VALUES($1::uuid,'Reports',$1::text,'business',99)",
-    [org]
+    "INSERT INTO organizations(id,name,slug,plan,additional_capacity_units) VALUES($1::uuid,'Reports',$1::text,$2,99)",
+    [org, options.plan ?? "business"]
   );
   await pool.query(
     "INSERT INTO organization_members(id,organization_id,user_id,role) VALUES($1,$2,$3,'owner')",
@@ -68,6 +72,7 @@ export async function resetReportRunFixture(pool: Pool, db: Queryable) {
         project_ids: [project],
         recipient_user_ids: [],
         source_collection_consent: true,
+        privacy_mode: options.privacy_mode ?? "full",
         schedule: { time: "09:00", timezone: "UTC" },
         enabled: true
       }

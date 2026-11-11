@@ -1,6 +1,6 @@
 # Smart Report facts
 
-Maps to FR-BUS-05/06 and AC-BUS-05/06 in [the Business specification](../spec/business-tier.md). Local implementation is qualified in [the qualification record](../spec/business-tier-qualification-20261108.md). The existing deterministic weekly digest keeps its current contracts; these facts belong to the separately opted-in Business reports.
+Maps to FR-BUS-05/06 and AC-BUS-05/06 in [the Business specification](../spec/business-tier.md). Local implementation is qualified in [the qualification record](../spec/business-tier-qualification-20261108.md). The existing deterministic weekly digest keeps its current contracts; these facts belong to the separately opted-in reports.
 
 ## Period and coverage
 
@@ -44,15 +44,15 @@ Report definitions accept explicit project IDs and current verified-user recipie
 
 Accepted project views must have disjoint original-origin sets; selecting overlapping canonical/legacy views cannot count evidence twice. Capturing management authority uses the existing job initiator checks with `manage_settings`, requiring both the holder's live admin/Owner role and any credential's project-admin permission. A write-only project permission is insufficient. Existing read/write job producers retain their current capture default.
 
-`smart-report-limits.ts` and `TierCapabilities` are the shared source for report availability and limits. Hosted Free/Solo/Team do not receive Smart Reports; Business receives five definitions, forty monthly organisation generations, ten selected projects and ten verified recipients. Purchased capacity units do not multiply these pools. Self-host keeps unlocked availability with generous definition/generation caps while sharing the bounded selection sizes; paid AI still needs explicit operator key/budget configuration. These capabilities do not activate a model or establish its evaluation gate.
+`smart-report-limits.ts` and `TierCapabilities` are the shared source for report availability and limits. Hosted Free has no reports. Solo receives two factual monthly generations, one definition, three projects and one recipient; Team receives eight factual weekly/monthly generations, two definitions, five projects and five recipients. Business retains five definitions, forty monthly organisation generations, ten selected projects and ten verified recipients. Purchased capacity units do not multiply these pools. Self-host keeps unlocked availability with generous definition/generation caps while sharing the bounded selection sizes; paid AI still needs explicit operator key/budget configuration. These capabilities do not activate a model or establish its evaluation gate.
 
 `report-authorization.ts` resolves fresh current origins only at admission, freezes them, and checks the entire saved scope at later uses. It reuses `ProjectJobInitiatorSchema` and the existing live role/token checks; revoked/expired credentials and suspended membership cannot keep authorising report work. Managing the scope requires settings administration; reading needs evidence access. Verified recipients are checked as human identities against every saved constituent. Current canonical project ownership must still match the report organisation, while the saved origin set is never automatically expanded after consolidation. Storage read failures propagate for retry rather than becoming permanent access loss.
 
 ## Saved definition lifecycle
 
-`report-definition-store.ts` owns definition creation, reads, replacement and removal. Creation uses an organisation-scoped request UUID and a canonical digest of the actor and parsed command; a lost acknowledgement does not create another schedule. Changed commands cannot reuse the UUID. The organisation row lock serialises the shared five-definition limit and reads current entitlement after waiting. Purchased capacity never expands this limit. Public records omit private initiating credential metadata.
+`report-definition-store.ts` owns definition creation, reads, replacement and removal. Creation uses an organisation-scoped request UUID and a canonical digest of the actor and parsed command; a lost acknowledgement does not create another schedule. Changed commands cannot reuse the UUID. The organisation row lock serialises the shared plan-specific definition limit and reads current entitlement after waiting. Purchased capacity never expands this limit. Public records omit private initiating credential metadata.
 
-Candidate forward migration `202611070010_add_smart_report_definitions` adds the definition table and required downgrade/deletion guards. API/worker readiness validates its columns, indexes, unique request constraint and exact enabled triggers in addition to ledger checksums. Empty bootstrap creates the shape directly; installed databases use the ordered migration. A Business downgrade pauses definitions and increments their version. Re-upgrade leaves the Owner-review flag set; only a current Owner's explicit reviewed replacement clears it. Retained reads and authorised version-fenced deletion remain available after downgrade. Explicit deletion or workspace transfer of any selected project/origin deletes the whole dependent definition rather than shrinking a mixed scope or retaining foreign-workspace report content.
+Candidate forward migration `202611070010_add_smart_report_definitions` adds the definition table and required downgrade/deletion guards. API/worker readiness validates its columns, indexes, unique request constraint and exact enabled triggers in addition to ledger checksums. Empty bootstrap creates the shape directly; installed databases use the ordered migration. Downgrades pause incompatible definitions and increment their version; compatible factual definitions retain their saved scope and mode. Re-upgrade leaves the Owner-review flag set; only a current Owner's explicit reviewed replacement clears it. Retained reads and authorised version-fenced deletion remain available after downgrade. Explicit deletion or workspace transfer of any selected project/origin deletes the whole dependent definition rather than shrinking a mixed scope or retaining foreign-workspace report content.
 
 All mutations validate current full-scope settings authority and verified recipient access. Replacement requires the saved version, and unchanged project selections keep their frozen origins. A plain name/schedule/recipient edit cannot absorb new merge origins. Saved recipients are revalidated on every edit and must be rechecked before sending. Weekly overlap requires the explicit `keep_existing` choice and never changes the existing channel.
 
@@ -333,3 +333,31 @@ independently of asynchronous billing cleanup. A paid conversion after that dead
 starts a new coverage epoch; the missed interval is not presented as continuous
 collection. Self-hosted opt-in collection, observed recovery and report management
 remain unlocked without changing role, source consent or whole-scope checks.
+
+## Approved factual products and restricted identity (local candidate)
+
+[Smart Products](../spec/smart-products.md) extends this contract with Solo 2/1/3/1
+and Team 8/2/5/5 run/definition/project/recipient limits. Solo monthly and Team
+weekly/monthly definitions freeze factual mode; upgrading never silently converts
+them to AI. They reserve no AI profile/money and make no token-count/provider
+request. Intentional success is `ready` with canonical `report_document.v2`, null
+narrative and `not_requested` analysis. `/document?version=2` opts in; default/v1
+and the frozen OpenAI reader project the exact legacy unavailable-analysis shape.
+Historical degraded Business results retain their meaning.
+
+Restricted provider input and prose exclude accepted/current known identities;
+private snapshots never enter model requests or diagnostics. Local authorised
+titles/navigation retain names. Safe legacy factual projection never rewrites
+stored facts or receipts. Cached PDFs require current projection and PDF hash
+provenance; reprepare saved facts without AI when the old cache is unsafe.
+The three `20261110` forward migrations and readiness gates precede runtime use.
+The numeric/source retention, coverage and whole-scope access rules above apply
+on all newly entitled tiers.
+
+Intentional factual presentation derives a linked per-project overview directly
+from saved metrics and coverage. Daily-rate comparisons require complete comparable
+periods; partial and absent observations remain labelled. Successful monitored
+checks are not account uptime. Focus retains every selected urgent item and fills
+up to five positions with other selected open/regressed work in severity order.
+Web, HTML and PDF share these helpers; Business AI/fallback presentation remains
+unchanged. No new provider request, mutable fact or schema field is introduced.

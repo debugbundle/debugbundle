@@ -1,4 +1,7 @@
 import { businessSalesReady } from "../../../packages/billing/src/business-sales-policy.js";
+import { createImprovementReviewSettingsStore } from "../../../packages/storage/src/improvement-review-settings.js";
+import { createImprovementReviewStore } from "../../../packages/storage/src/improvement-review-store.js";
+import { createImprovementReviewAllowance } from "../../../packages/storage/src/improvement-review-allowance.js";
 import { createReportAllowanceStore } from "../../../packages/storage/src/report-allowance-store.js";
 import { createCaptureRuleManagement } from "../../../packages/storage/src/capture-rule-management.js";
 import { createPostgresOrganizationManagementStore } from "../../../packages/storage/src/organization-management-store.js";
@@ -294,6 +297,12 @@ export function createApiDependencies(input: CreateApiDependenciesInput): Defaul
     notificationPreferences: createNotificationPreferencesStore(input.db),
     organizationManagement: createPostgresOrganizationManagementStore(input.db),
     reportGenerationEnabled: input.smartReportConfig?.enabled === true,
+    improvementReviewsEnabled: input.smartImprovementReviewsEnabled === true,
+    improvementReviews: {
+      settings: createImprovementReviewSettingsStore(input.db),
+      store: createImprovementReviewStore(input.db),
+      allowance: createImprovementReviewAllowance(input.db)
+    },
     reportDefinitions: createReportDefinitionStore(input.db),
     reportAllowance: createReportAllowanceStore(input.db),
     reportContent: createReportContentStore(input.db, input.objectStore),

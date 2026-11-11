@@ -444,6 +444,10 @@ describe("storage schema migrations", () => {
       .mockResolvedValueOnce({ rows: [{ available: true }] })
       // Current bootstrap includes allowlisted model diagnostics outside receipts.
       .mockResolvedValueOnce({ rows: [{ available: true }] })
+      // Additive identity/PDF projection, factual mode and weekly review guards.
+      .mockResolvedValueOnce({ rows: [{ available: true }] })
+      .mockResolvedValueOnce({ rows: [{ available: true }] })
+      .mockResolvedValueOnce({ rows: [{ available: true }] })
       .mockResolvedValue({ rows: [] });
 
     const result = await migrateStorageSchema({ query } as Queryable);

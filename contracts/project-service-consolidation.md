@@ -343,3 +343,16 @@ Preview bounds historical service metadata to 4 MiB before transferring names
 from Postgres, in addition to row/resource limits. Request/hash key ordering is
 ordinal and independent of host locale. Invalid operation selectors return a
 stable input error before a database UUID cast or lookup.
+
+## Smart Products candidate inventory
+
+Weekly review artifacts retain their selected project/week identity and original
+accepted scope at cutover; they never absorb incoming origins. Review settings,
+allowances and minimal paid receipts remain account-owned. Report identity
+snapshots and PDF projection provenance follow the existing account report runs.
+These seven tables have explicit inventory dispositions. Current canonical
+project improvement opt-outs and analytics privacy still govern retained views;
+privacy-driven source invalidation can remove derived reviews. Restricted identity
+checks include current canonical project and service-definition aliases without
+sending that private set to the provider. No merge credential or ingestion
+semantics change.

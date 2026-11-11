@@ -2,7 +2,9 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 
 function gitOutput(repoRoot, args) {
-  return execFileSync("git", args, { cwd: repoRoot, encoding: "utf8" }).trim();
+  // Status columns are significant: stripping the first record's leading space
+  // makes adding the excluded manifest appear to change unrelated source state.
+  return execFileSync("git", args, { cwd: repoRoot, encoding: "utf8" }).trimEnd();
 }
 
 function gitSucceeds(repoRoot, args) {

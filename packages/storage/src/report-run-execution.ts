@@ -1,4 +1,7 @@
 import { REPORT_TRIAL_ENTITLEMENT_SQL } from "./report-trial-entitlement.js";
+import { readReportIdentities } from "./report-identity-store.js";
+import { requireReportPolicy } from "../../smart-reports/src/report-policy.js";
+import { AcceptedReportScopeSchema } from "../../smart-reports/src/report-definition.js";
 import { z } from "zod";
 import { getTierCapabilities } from "../../shared-types/src/index.js";
 import { SmartReportError } from "../../smart-reports/src/report-errors.js";
@@ -64,6 +67,12 @@ export async function authorizeStoredReportRun(tx: Queryable, run: StoredReportR
   if (!current) throw new SmartReportError("report_not_found");
   if (!getTierCapabilities(z.string().parse(current["plan"])).smart_reports)
     throw new SmartReportError("upgrade_required");
+  requireReportPolicy(String(current["plan"]), {
+    cadence: z.enum(["daily", "weekly", "monthly"]).parse(run["period_kind"]),
+    projects: AcceptedReportScopeSchema.parse(run["accepted_scope"]).length,
+    recipients: z.array(z.uuid()).parse(run["recipient_user_ids"]).length,
+    mode: z.enum(["factual", "ai"]).parse(run["report_mode"] ?? "ai")
+  });
   if (
     run["privacy_invalidated_at"] !== null ||
     current["suspended_at"] !== null ||
@@ -194,6 +203,11 @@ export function createReportRunExecutionStore(db: Queryable): ReportRunExecution
           ).rows[0];
         return ReportProcessingStateSchema.parse({
           run: reportRunRecord(row),
+          mode: row["report_mode"] ?? "ai",
+          identities:
+            row["privacy_mode"] === "restricted"
+              ? await readReportIdentities(tx, row["accepted_scope"], String(row["id"]))
+              : [],
           profile: row["ai_profile"],
           paid_attempts: row["paid_attempts"],
           facts:

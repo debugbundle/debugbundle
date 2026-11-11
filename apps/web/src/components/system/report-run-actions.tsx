@@ -1,4 +1,5 @@
-import { hasBusinessEntitlement } from "../../../../../packages/shared-types/src/tier-capabilities.js";
+import { reportPolicy } from "../../../../../packages/smart-reports/src/report-policy.js";
+import { hasReportEntitlement } from "../../../../../packages/shared-types/src/tier-capabilities.js";
 import { useReportContext } from "../../lib/use-report-context.js";
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -95,7 +96,7 @@ export function ReportRunActions({
             Cancel report
           </PendingButton>
         ) : null}
-        {hasBusinessEntitlement(session?.organization_plan, session?.self_hosted) &&
+        {hasReportEntitlement(session?.organization_plan, session?.self_hosted) &&
         !["queued", "processing", "expired"].includes(record.status) ? (
           <AlertDialog>
             <AlertDialogTrigger asChild>
@@ -108,8 +109,11 @@ export function ReportRunActions({
                 <AlertDialogTitle>Regenerate report</AlertDialogTitle>
                 <AlertDialogDescription>
                   This creates another report for the same completed UTC period using the current
-                  definition’s scope and settings. It consumes another monthly generation and may
-                  send the bounded evidence to AI. It does not email recipients automatically.
+                  definition’s scope and settings. It consumes another monthly generation.
+                  {reportPolicy(session?.organization_plan, session?.self_hosted ?? false).ai
+                    ? " AI definitions may send bounded evidence for analysis; saved factual definitions stay factual."
+                    : " This factual report makes no AI request."}{" "}
+                  It does not email recipients automatically.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

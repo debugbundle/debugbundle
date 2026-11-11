@@ -4255,7 +4255,7 @@ The Smart Report domain and source rules are in [smart-report-facts.md](smart-re
 
 Create/replacement fields are `name`, `cadence` (`daily`, `weekly`, `monthly`), explicit `project_ids`, verified `recipient_user_ids` (default empty), `privacy_mode` (`full` default or `restricted`), `source_collection_consent`, nullable `{time,timezone}` schedule and `enabled` (default false). Full mode requires explicit source consent; enabled schedules require a schedule. Weekly overlap requires `weekly_overlap:"keep_existing"`. Replacement additionally accepts `resume_after_review` (default false); only a current Owner can explicitly clear a plan-loss review pause. Browser submissions may include `expected_organization_id`; it must match both the selected target and the current browser workspace. Other authorised direct project administration does not require an organisation membership.
 
-Creation is idempotent under the same organisation/request UUID/actor/parsed command. Reusing a UUID for changed input returns `409 report_request_conflict`. Concurrent creates share the five-definition account cap. Stale edits/deletions return `409 report_version_conflict`. Wrong workspace, definition cap and missing weekly-overlap confirmation are `409`; invalid scope/recipient input is `400`; insufficient current role/verification/credential/plan is `403`. Unreadable definitions return scoped `404`. Responses are `no-store` and omit private credential metadata.
+Creation is idempotent under the same organisation/request UUID/actor/parsed command. Reusing a UUID for changed input returns `409 report_request_conflict`. Concurrent creates share the current plan-specific definition cap. Stale edits/deletions return `409 report_version_conflict`. Wrong workspace, definition cap and missing weekly-overlap confirmation are `409`; invalid scope/recipient input is `400`; insufficient current role/verification/credential/plan is `403`. Unreadable definitions return scoped `404`. Responses are `no-store` and omit private credential metadata.
 
 The shared validated transport is `packages/report-client`. CLI commands are `reports list <org>`, `reports get <org> <definition>`, `reports create <org> --request-id <stable-uuid> --definition-json <json>`, `reports update <org> <definition> --definition-json <json-with-expected_version>` and `reports delete <org> <definition> --expected-version <n>`. All support existing `--auth-file` and `--json`. Reuse the same creation request UUID after a lost acknowledgement; obtain the saved version before replacing/deleting.
 
@@ -4396,3 +4396,73 @@ or unsafe response projection return 503; existing metric reads remain available
 The operation generates no artifact and consumes no AI or generation allowance.
 Responses use `Cache-Control: no-store`; choices require fresh live access and
 approved-key evaluation when read again.
+
+## Weekly improvement reviews (local candidate)
+
+The approved [Smart Products contract](../spec/smart-products.md) adds a namespace
+alongside existing deterministic opportunities. Every route uses member/session
+authentication, actual credential identity, current complete saved origin access,
+closed bounded payloads and `Cache-Control: no-store`. Reads never enqueue work.
+
+| Method | Organization review path | Result |
+| --- | --- | --- |
+| GET | `/v1/organizations/{organizationId}/improvements/reviews` | `{reviews, next_cursor}`; optional `project_id`, `limit` 1–50, opaque `cursor` |
+| GET | `…/reviews/{reviewId}` | `{review}` safe period/project/status metadata |
+| GET | `…/reviews/{reviewId}/bundle` | `{bundle: improvement_review.v1 \| null, status}`; null while pending/unavailable |
+| GET | `…/reviews/settings` | `{settings}` explicit scope/version/consent/privacy/due/review state |
+| PATCH | `…/reviews/settings` | `{settings}`; current Owner only, expected version and optional workspace fence |
+| GET | `…/reviews/allowance` | `{allowance}` separate anchored-month limit/used/remaining/period |
+
+Settings replacement requires `expected_version`, `enabled`, `project_ids` (up to
+10 UUIDs), `source_consent`; `privacy_mode` defaults `restricted`, with `full` also
+accepted. Optional `expected_organization_id` fences browser workspace changes.
+Enabled requires nonempty explicit selection and consent; plan caps are Team 5
+projects/25 paid reviews and Business 10/50. Existing customers are off. Removing
+scope/consent or narrowing privacy removes affected derived content; disabling
+only the schedule preserves history. Uncertain paid holds remain. No arbitrary
+actor, origin claims, destinations or recipient addresses are accepted.
+
+Safe statuses: `queued`, `processing`, `ready`, `factual_only`, `no_data`,
+`no_change`, `skipped_quota`, `paused_access`, `failed`. Bundle facts link retained
+sources; source access/retention still govern navigation. Optional hypotheses are
+unverified investigation suggestions. Minimal errors: invalid input 400,
+unauthenticated 401, authority/plan 403, unavailable/expired 404, version/workspace
+conflict 409, rate limiting 429, disabled new enablement 503 and safe failure 500.
+No provider receipt, identity set or request hash appears in these responses.
+Each source may include `related_refs` (up to eight distinct selected source
+references). These carry recorded opportunity-to-incident relationships only;
+unknown or self-references are invalid. Linkage is not a causal conclusion.
+
+```text
+debugbundle improvements reviews list ORGANIZATION_ID [--project-id UUID] [--limit 1..50] [--cursor CURSOR] [--json]
+debugbundle improvements reviews get ORGANIZATION_ID REVIEW_ID [--json]
+debugbundle improvements reviews bundle ORGANIZATION_ID REVIEW_ID [--json]
+debugbundle improvements reviews settings ORGANIZATION_ID [--json]
+debugbundle improvements reviews configure ORGANIZATION_ID --settings-json JSON [--json]
+debugbundle improvements reviews allowance ORGANIZATION_ID [--json]
+```
+
+All commands support the existing `--auth-file`. Ordinary MCP equivalents are
+`list_improvement_reviews`, `get_improvement_review`,
+`get_improvement_review_bundle`, `get_improvement_review_settings`,
+`update_improvement_review_settings`, `get_improvement_review_allowance`.
+The settings mutation declares destructive/open-world effects because it grants
+recurring evidence processing and can delete derived content. Restricted agent,
+OpenAI catalogs and OAuth grants do not expand. No manual paid regeneration,
+email, webhook or code-edit operation exists in this version.
+An ordinary MCP/CLI agent can ask for explicit consent in chat and configure the
+weekly schedule using the actual Owner credential. It must present scope, privacy,
+recurrence and allowance/provider effects first, save using `expected_version`,
+then read back. Report definition create/replace follows the same consent/readback
+pattern with cadence, time and recipients and current whole-scope administration.
+Chat consent never grants permissions or bypasses operator/qualification gates.
+
+Account export adds `improvement_review_settings` and `improvement_reviews`
+sections, with safe bounded metadata and authenticated bundle URLs. Current Owner
+and whole-scope privacy/access checks apply; private identity and financial attempt
+metadata are excluded.
+
+Report content adds `/v1/organizations/{organizationId}/reports/{runId}/document?version=2`
+for intentional factual `report_document.v2` (`not_requested` analysis). Default
+and `version=1` retain exact legacy v1 projection; existing strict clients and the
+fixed OpenAI report reader remain compatible. Other report routes are unchanged.

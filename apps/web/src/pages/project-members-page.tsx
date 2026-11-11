@@ -1,7 +1,7 @@
 import { ResourceEmptyState } from "../components/system/resource-empty-state.js";
 import { PendingButton } from "../components/system/pending-button.js";
 import { usePendingAction } from "../lib/use-pending-action.js";
-import { MailCheckIcon, PlusIcon, UsersIcon } from "lucide-react";
+import { LogOutIcon, MailCheckIcon, PlusIcon, Trash2Icon, UsersIcon, XIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 
@@ -11,6 +11,7 @@ import { PageHeader } from "../components/system/page-header.js";
 import { PlanUpgradeCallout } from "../components/system/plan-upgrade-callout.js";
 import type { ProjectContext } from "../components/system/project-layout.js";
 import { UserAvatar } from "../components/system/user-avatar.js";
+import { TableActionButton } from "../components/system/table-action-button.js";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -64,6 +65,14 @@ import {
   type ProjectMemberRecord
 } from "../lib/project-sharing-api.js";
 import { useSession } from "../lib/session.js";
+import { cn } from "../lib/utils.js";
+
+const roleLabels: Record<ProjectMemberRecord["role"], string> = {
+  owner: "Owner",
+  admin: "Admin",
+  member: "Member",
+  viewer: "Viewer"
+};
 
 export function ProjectMembersPage(): JSX.Element {
   const { project, projectId } = useOutletContext<ProjectContext>();
@@ -198,7 +207,7 @@ export function ProjectMembersPage(): JSX.Element {
   return (
     <div className="space-y-8">
       <PageHeader
-        description="Manage who can access this project and review pending invites."
+        className="items-end lg:justify-end"
         actions={
           canInvite ? (
             <Dialog
@@ -280,7 +289,7 @@ export function ProjectMembersPage(): JSX.Element {
         />
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className={cn("grid gap-4", canManage && "xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]")}>
         <Card>
           <CardHeader>
             <CardTitle>People with access</CardTitle>
@@ -344,12 +353,12 @@ export function ProjectMembersPage(): JSX.Element {
                                   void handleRoleChange(member.user_id, value);
                               }}
                             >
-                              <ToggleGroupItem value="viewer">viewer</ToggleGroupItem>
-                              <ToggleGroupItem value="member">member</ToggleGroupItem>
-                              <ToggleGroupItem value="admin">admin</ToggleGroupItem>
+                              <ToggleGroupItem value="viewer">Viewer</ToggleGroupItem>
+                              <ToggleGroupItem value="member">Member</ToggleGroupItem>
+                              <ToggleGroupItem value="admin">Admin</ToggleGroupItem>
                             </ToggleGroup>
                           ) : (
-                            member.role
+                            roleLabels[member.role]
                           )}
                         </TableCell>
                         <TableCell>{formatDate(member.created_at)}</TableCell>
@@ -357,9 +366,7 @@ export function ProjectMembersPage(): JSX.Element {
                           {canRemove ? (
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button type="button" variant="ghost" size="sm">
-                                  Remove
-                                </Button>
+                                <TableActionButton label="Remove access" icon={Trash2Icon} />
                               </AlertDialogTrigger>
                               <AlertDialogContent>
                                 <AlertDialogHeader>
@@ -381,9 +388,7 @@ export function ProjectMembersPage(): JSX.Element {
                           ) : canLeave ? (
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button type="button" variant="ghost" size="sm">
-                                  Leave project
-                                </Button>
+                                <TableActionButton label="Leave project" icon={LogOutIcon} />
                               </AlertDialogTrigger>
                               <AlertDialogContent>
                                 <AlertDialogHeader>
@@ -456,14 +461,12 @@ export function ProjectMembersPage(): JSX.Element {
                     {invites.map((invite) => (
                       <TableRow key={invite.invite_id}>
                         <TableCell className="font-medium">{invite.email}</TableCell>
-                        <TableCell>{invite.role}</TableCell>
+                        <TableCell>{roleLabels[invite.role]}</TableCell>
                         <TableCell>{formatDate(invite.expires_at)}</TableCell>
                         <TableCell className="text-right">
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button type="button" variant="ghost" size="sm">
-                                Cancel
-                              </Button>
+                              <TableActionButton label="Cancel invite" icon={XIcon} />
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>

@@ -6,6 +6,24 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [Unreleased]
 
+## [1.25.0] - 2026-11-11
+
+- Refine Improvements navigation, member and People actions, role labels, token
+  actions and the sidebar; correct Viewer changes in the local preview fixture.
+
+- Add intentional factual Solo monthly and Team weekly/monthly reports, with
+  zero AI requests/spend and explicit v2 document negotiation for new clients.
+- Protect restricted report input/prose against known project identity and prevent
+  older cached PDFs from bypassing the current safe content projection.
+- Add opt-in Team/Business weekly project improvement reviews with bounded linked
+  evidence, independent quotas, durable single-attempt accounting, Owner consent,
+  API/CLI/ordinary MCP parity and a compact Improvements view. New review AI
+  requires the separately qualified operator profile; existing customers remain
+  opt-in with explicit Owner consent.
+- Add the public Analytics page and navigation. Existing Business report/digest,
+  opportunity and restricted-agent contracts remain supported. See
+  [Smart Products](spec/smart-products.md) for migrations, limits and compatibility.
+
 ## [1.24.0] - 2026-11-10
 
 ### Added

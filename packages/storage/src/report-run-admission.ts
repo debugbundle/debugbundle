@@ -1,4 +1,6 @@
 import { REPORT_TRIAL_ENTITLEMENT_SQL } from "./report-trial-entitlement.js";
+import { captureReportIdentities } from "./report-identity-store.js";
+import { requireReportPolicy } from "../../smart-reports/src/report-policy.js";
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { getTierCapabilities, isSelfHostMode } from "../../shared-types/src/index.js";
@@ -48,9 +50,8 @@ export function createReportRunAdmissionStore(
     record_scheduled_quota_skips?: boolean;
   }
 ): ReportRunAdmissionStore {
-  const profile =
-      options.profile === null ? null : ReportAttemptProfileSchema.parse(options.profile),
-    allocation = profile === null ? 0 : maximumReportRunCost(profile).run_nano_usd;
+  const configuredProfile =
+    options.profile === null ? null : ReportAttemptProfileSchema.parse(options.profile);
   const budget = safeNano
     .max(1_000_000_000_000)
     .parse(options.monthly_budget_nano_usd ?? REPORT_AI_MONTHLY_BUDGET_NANO_USD);
@@ -133,6 +134,15 @@ export function createReportRunAdmissionStore(
         )
           throw new SmartReportError("forbidden");
         const scope = AcceptedReportScopeSchema.parse(definition["accepted_scope"]);
+        const mode = z.enum(["factual", "ai"]).parse(definition["report_mode"] ?? "ai");
+        requireReportPolicy(plan, {
+          cadence: input.period.kind,
+          projects: scope.length,
+          recipients: z.array(z.uuid()).parse(definition["recipient_user_ids"]).length,
+          mode
+        });
+        const profile = mode === "factual" ? null : configuredProfile;
+        const allocation = profile === null ? 0 : maximumReportRunCost(profile).run_nano_usd;
         const initiator =
           input.kind === "scheduled"
             ? ProjectJobInitiatorSchema.parse(definition["initiating_authority"])
@@ -232,7 +242,7 @@ export function createReportRunAdmissionStore(
           await tx.query<Record<string, unknown>>(
             `INSERT INTO report_runs(id,organization_id,definition_id,definition_version,request_id,request_digest,requested_by_user_id,initiating_authority,
  name,accepted_scope,recipient_user_ids,privacy_mode,source_collection_consent,send_email,period_kind,period_starts_at,period_ends_at,period_duration_days,generation_kind,regenerate_from_run_id,
- window_starts_at,ai_status,ai_profile,ai_reserved_nano_usd,generation_counted,status,skip_reason,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10::jsonb,$11::uuid[],$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23::jsonb,$24,$25,$26,$27,clock_timestamp()+interval '90 days') RETURNING *`,
+ window_starts_at,ai_status,ai_profile,ai_reserved_nano_usd,generation_counted,status,skip_reason,expires_at,report_mode) VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10::jsonb,$11::uuid[],$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23::jsonb,$24,$25,$26,$27,clock_timestamp()+interval '90 days',$28) RETURNING *`,
             [
               randomUUID(),
               input.organization_id,
@@ -260,10 +270,13 @@ export function createReportRunAdmissionStore(
               skipped ? 0 : allocation,
               !skipped,
               skipped ? "skipped_quota" : "queued",
-              skipped ? (generationQuota ? "generation_quota" : "ai_budget") : null
+              skipped ? (generationQuota ? "generation_quota" : "ai_budget") : null,
+              mode
             ]
           )
         ).rows[0]!;
+        if (run["privacy_mode"] === "restricted")
+          await captureReportIdentities(tx, String(run["id"]), scope);
         if (skipped) return reportRunRecord(run);
         const jobId = await createWorkerJobStore(tx).enqueue("generate-smart-report", {
           run_id: run["id"],

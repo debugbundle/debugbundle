@@ -31,6 +31,7 @@ const client = {
     return { status: response.status, body: await readJson<unknown>(response) };
   }
 };
+export const reportHttpClient = client;
 /** Browser authority stays in the HttpOnly session; this marker is never sent. */
 export const reportScope = (
   organizationId: string
@@ -81,7 +82,7 @@ const messages: Record<string, string> = {
     "Each recipient must be verified and have current read access to every selected project.",
   forbidden: "You do not currently have access to the entire report scope.",
   upgrade_required:
-    "New Smart Reports require Business. Authorised retained reports remain available until expiry.",
+    "New reports require an eligible paid plan and reporting period. Authorised retained reports remain available until expiry.",
   report_not_found:
     "This report is unavailable, expired or disabled. Retained archives require access to every original project."
 };

@@ -7,6 +7,7 @@ import {
   reportMetricComparison,
   reportMetricLabels,
   reportEvidenceSections,
+  reportFactualHighlights,
   reportAnalysisExplanation,
   reportPeriodLabel,
   reportTimeLabel
@@ -35,7 +36,8 @@ export function ReportContentView({
   const doc = view.document,
     { facts } = doc.report,
     { narrative } = doc,
-    { solved, urgent, coming } = reportEvidenceSections(doc);
+    { solved, focus, happened, coming } = reportEvidenceSections(doc),
+    factual = reportFactualHighlights(doc);
   return (
     <article className="flex min-w-0 flex-col gap-6">
       <header className="flex flex-col gap-2">
@@ -43,7 +45,7 @@ export function ReportContentView({
           title={<h2 className="text-2xl font-semibold">{doc.name}</h2>}
           badges={
             <Badge variant={narrative ? "success" : "outline"}>
-              {narrative ? "Ready" : "Facts only"}
+              {narrative || doc.analysis.status === "not_requested" ? "Ready" : "Facts only"}
             </Badge>
           }
           actions={actions}
@@ -75,17 +77,33 @@ export function ReportContentView({
           ) : null}
         </section>
       ) : (
-        <Notice title="Factual report">{reportAnalysisExplanation(doc.analysis.reason)}</Notice>
+        <Notice title="Factual report">
+          {reportAnalysisExplanation(doc.analysis.reason, doc.analysis.status)}
+        </Notice>
       )}
+      {factual.length ? (
+        <section aria-label="Overview" className="flex flex-col gap-3">
+          {factual.map((item, index) => (
+            <p key={index}>
+              {item.text}
+              <References values={item.evidence_refs} />
+            </p>
+          ))}
+          <h2 className="text-xl font-semibold">What happened</h2>
+          <ReportEvidenceList items={happened} projects={facts.projects} />
+        </section>
+      ) : null}
       <Card>
         <CardHeader>
           <CardTitle>Focus for the coming {coming}</CardTitle>
           <CardDescription>
-            Prioritise outstanding high and critical issues using the retained evidence.
+            {doc.analysis.status === "not_requested"
+              ? "Review outstanding work in severity order, verify the linked evidence and check for recurrence after a bounded change."
+              : "Prioritise outstanding high and critical issues using the retained evidence."}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <ReportEvidenceList items={urgent} projects={facts.projects} />
+          <ReportEvidenceList items={focus} projects={facts.projects} />
           {narrative?.priorities.map((item, index) => (
             <section key={index}>
               <h3 className="font-medium">{item.title}</h3>

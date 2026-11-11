@@ -1,3 +1,4 @@
+import { ReportDocumentSchema } from "../../../packages/smart-reports/src/report-document.js";
 import { expect, it } from "vitest";
 import frozen from "../../fixtures/openai-plugin-v1/tool-contracts.json" with { type: "json" };
 import reports from "../../../packages/mcp-core/src/contracts/report-schemas.json" with { type: "json" };
@@ -56,4 +57,23 @@ it("returns full canonical facts without internal hashes, source identities or s
   expect(() =>
     projectOpenAiToolOutput("get_report_content", { report: projectOpenAiReportDocument(large) })
   ).toThrow("output_too_large");
+});
+
+it("projects intentional v2 factual reports through the unchanged released OpenAI output schema", () => {
+  const canonical = ReportDocumentSchema.parse({
+    ...reportDocumentFixture(),
+    version: 2,
+    narrative: null,
+    analysis: { status: "not_requested", reason: null, model: null, request_sha256: null }
+  });
+  const projected = projectOpenAiToolOutput("get_report_content", {
+    report: projectOpenAiReportDocument(canonical)
+  }) as { report: { analysis: unknown; facts: unknown; narrative: unknown } };
+  expect(projected.report.analysis).toEqual({
+    status: "unavailable",
+    reason: "model_unavailable",
+    model: null
+  });
+  expect(projected.report.facts).toEqual(canonical.report.facts);
+  expect(projected.report.narrative).toBeNull();
 });

@@ -1,4 +1,7 @@
 import type { ReportAllowanceStore } from "../../../packages/storage/src/report-allowance-store.js";
+import type { createImprovementReviewSettingsStore } from "../../../packages/storage/src/improvement-review-settings.js";
+import type { createImprovementReviewStore } from "../../../packages/storage/src/improvement-review-store.js";
+import type { createImprovementReviewAllowance } from "../../../packages/storage/src/improvement-review-allowance.js";
 import type { ReferralManagement } from "../../../packages/referrals/src/referral-management.js";
 import type { ReportRunAdmissionStore } from "../../../packages/storage/src/report-run-admission.js";
 import type { ReportRunManagementStore } from "../../../packages/storage/src/report-run-management.js";
@@ -132,6 +135,12 @@ export interface ApiDependencies extends ApiAnalyticsDependencies, ApiManagement
   organizationManagement?: OrganizationManagementStore;
   referrals?: ReferralManagement;
   reportDefinitions?: ReportDefinitionStore;
+  improvementReviewsEnabled?: boolean;
+  improvementReviews?: {
+    settings: ReturnType<typeof createImprovementReviewSettingsStore>;
+    store: ReturnType<typeof createImprovementReviewStore>;
+    allowance: ReturnType<typeof createImprovementReviewAllowance>;
+  };
   reportAllowance?: ReportAllowanceStore;
   reportGenerationEnabled?: boolean;
   reportContent?: ReportContentStore;

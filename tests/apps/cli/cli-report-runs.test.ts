@@ -42,7 +42,7 @@ describe("report run CLI", () => {
     expect(html.output).toContain("<!doctype html>");
     expect(request).toHaveBeenLastCalledWith({
       method: "GET",
-      path: `/v1/organizations/${reportOrg}/reports/${reportRequest}/document`,
+      path: `/v1/organizations/${reportOrg}/reports/${reportRequest}/document?version=2`,
       bearerToken: "member"
     });
   });

@@ -36,6 +36,8 @@ import { nextReportSchedule } from "../../packages/smart-reports/src/report-sche
 import { renderReportHtml } from "../../packages/smart-reports/src/report-html.js";
 import { renderReportPdfInChild } from "../../packages/smart-reports/src/report-pdf-process.js";
 import { OrganizationPersonSchema } from "../../packages/shared-types/src/organization.js";
+import { reportPolicy } from "../../packages/smart-reports/src/report-policy.js";
+import { legacyReportDocument } from "../../packages/smart-reports/src/report-document.js";
 
 const reply = (body: unknown, status = 200): MockResponse => ({
   status,
@@ -52,8 +54,15 @@ export function createReportMocks(
   const seed = createReportPreviewFixtures(data);
   const definitions = new Map(seed.definitions.map((item) => [item.id, item]));
   const runs = new Map(seed.runs.map((item) => [item.id, item]));
-  const charges = new Map(
-    seed.runs.filter((item) => item.generation_counted).map((item) => [item.id, item.created_at])
+  // Fictional retained examples are unbilled; only explicit preview generations
+  // consume the in-memory plan pool. No production allowance exists here.
+  const charges = new Map<string, string>();
+  const modes = new Map(
+    seed.definitions.map((item, index) => [item.id, index === 4 ? "factual" : "ai"])
+  );
+  const sampleDefinitions = new Set(seed.definitions.map((item) => item.id));
+  const factualRuns = new Set(
+    seed.runs.filter((item) => item.ai_status === "unavailable").map((item) => item.id)
   );
   const documents = new Map<string, ReportContentView>();
   const commands = new Map<string, { payload: string; id: string }>();
@@ -64,7 +73,12 @@ export function createReportMocks(
     let view = documents.get(run.id);
     if (!view) {
       view = ReportContentViewSchema.parse({
-        document: previewReportDocument(data, run, run.definition_id === seed.definitions[3]!.id),
+        document: previewReportDocument(
+          data,
+          run,
+          run.definition_id === seed.definitions[3]!.id,
+          factualRuns.has(run.id)
+        ),
         available_source_refs: []
       });
       documents.set(run.id, view);
@@ -91,12 +105,20 @@ export function createReportMocks(
       organization_id: data.session.organization_id,
       as_of: now.toISOString(),
       window: { starts_at: start.toISOString(), ends_at: end.toISOString() },
-      limit: 40,
+      limit: reportPolicy(data.session.organization_plan).monthly_smart_report_generations,
       used,
-      remaining: Math.max(0, 40 - used),
+      remaining: Math.max(
+        0,
+        reportPolicy(data.session.organization_plan).monthly_smart_report_generations - used
+      ),
       scheduled_remaining: scheduled,
       scope_complete: true,
-      schedule_exceeds_remaining: scheduled > Math.max(0, 40 - used)
+      schedule_exceeds_remaining:
+        scheduled >
+        Math.max(
+          0,
+          reportPolicy(data.session.organization_plan).monthly_smart_report_generations - used
+        )
     });
   }
   function scopeValid(input: { project_ids: string[]; recipient_user_ids: string[] }): boolean {
@@ -192,8 +214,8 @@ export function createReportMocks(
       const admission =
         (group === "report-definitions" && ["POST", "PATCH"].includes(method)) ||
         (group === "reports" && !id && method === "POST");
-      if (admission && data.session.organization_plan !== "business")
-        return error("upgrade_required", 403);
+      const policy = reportPolicy(data.session.organization_plan);
+      if (admission && !policy.available) return error("upgrade_required", 403);
       if (group === "report-definitions") {
         const saved = id ? definitions.get(id) : undefined;
         if (id && !saved) return error("report_not_found", 404);
@@ -219,9 +241,20 @@ export function createReportMocks(
                 ? reply({ definition: definitions.get(prior.id) })
                 : error("report_not_found", 404);
           if (!scopeValid(input)) return error("forbidden", 403);
-          if (definitions.size >= 100) return error("report_definition_limit_reached");
+          if (
+            !policy.cadences.includes(input.cadence) ||
+            input.project_ids.length > policy.max_smart_report_projects ||
+            input.recipient_user_ids.length > policy.max_smart_report_recipients
+          )
+            return error("upgrade_required", 403);
+          if (
+            [...definitions.keys()].filter((key) => !sampleDefinitions.has(key)).length >=
+            policy.max_smart_report_definitions
+          )
+            return error("report_definition_limit_reached");
           const definition = definitionRecord(input);
           definitions.set(definition.id, definition);
+          modes.set(definition.id, policy.ai ? "ai" : "factual");
           commands.set(parsed.data.request_id, { payload: encoded, id: definition.id });
           return reply({ definition });
         }
@@ -231,11 +264,18 @@ export function createReportMocks(
           if (parsed.data.expected_version !== saved.version)
             return error("report_version_conflict", 409);
           if (!scopeValid(parsed.data)) return error("forbidden", 403);
+          if (
+            !policy.cadences.includes(parsed.data.cadence) ||
+            parsed.data.project_ids.length > policy.max_smart_report_projects ||
+            parsed.data.recipient_user_ids.length > policy.max_smart_report_recipients
+          )
+            return error("upgrade_required", 403);
           const definition = definitionRecord(parsed.data, saved);
           if (saved.privacy_mode === "full" && definition.privacy_mode === "restricted")
             for (const run of runs.values())
               if (run.definition_id === saved.id && run.privacy_mode === "full") removeRun(run.id);
           definitions.set(saved.id, definition);
+          if (parsed.data.resume_after_review && !policy.ai) modes.set(saved.id, "factual");
           return reply({ definition });
         }
         if (method === "DELETE" && saved) {
@@ -292,6 +332,11 @@ export function createReportMocks(
                 : error("report_not_found", 404);
           const definition = definitions.get(input.definition_id);
           if (!definition) return error("report_not_found", 404);
+          if (
+            !policy.cadences.includes(input.period.kind) ||
+            (modes.get(definition.id) === "ai" && !policy.ai)
+          )
+            return error("upgrade_required", 403);
           if (input.expected_version !== definition.version)
             return error("report_version_conflict", 409);
           if (
@@ -317,6 +362,10 @@ export function createReportMocks(
             send_email: input.send_email
           });
           runs.set(run.id, run);
+          if (modes.get(definition.id) === "factual") {
+            factualRuns.add(run.id);
+            run.ai_status = "unavailable";
+          }
           charges.set(run.id, run.created_at);
           commands.set(input.request_id, { payload: encoded, id: run.id });
           return reply({ run });
@@ -351,7 +400,7 @@ export function createReportMocks(
             if (count >= 3) {
               Object.assign(run, {
                 status: "ready",
-                ai_status: "succeeded",
+                ai_status: factualRuns.has(run.id) ? "unavailable" : "succeeded",
                 published_at: new Date().toISOString(),
                 expires_at: new Date(Date.now() + 90 * 86400000).toISOString()
               });
@@ -361,7 +410,14 @@ export function createReportMocks(
           return reply({ run });
         }
         if (!["ready", "factual_only"].includes(run.status)) return error("report_not_found", 404);
-        if (method === "GET" && action === "document") return reply(content(run));
+        if (method === "GET" && action === "document") {
+          const view = content(run);
+          return reply(
+            query.get("version") === "2"
+              ? view
+              : { ...view, document: legacyReportDocument(view.document) }
+          );
+        }
         if (method === "GET" && action === "deliveries")
           return reply({
             deliveries: run.send_email

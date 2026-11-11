@@ -165,6 +165,7 @@ export function createApiDependenciesFromEnv(
 
   const dependencies = createApiDependencies({
     smartReportConfig: configureSmartReports(env),
+    smartImprovementReviewsEnabled: env["SMART_IMPROVEMENTS_ENABLED"] === "true",
     projectMergesEnabled: env["PROJECT_MERGES_ENABLED"] === "true",
     db,
     queue,

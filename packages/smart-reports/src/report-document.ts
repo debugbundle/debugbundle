@@ -3,7 +3,7 @@ import { CanonicalReportFactsSchema } from "./report-facts.js";
 import { ReportNarrativeSchema, validateReportNarrative } from "./model-narrative.js";
 import { ReportModelIdSchema } from "./model-cost.js";
 import { projectReportNarrativeFacts } from "./model-projection.js";
-export const ReportDocumentSchema = z
+export const LegacyReportDocumentBase = z
   .object({
     version: z.literal(1),
     template_version: z.literal(1),
@@ -32,8 +32,23 @@ export const ReportDocumentSchema = z
       })
       .strict()
   })
-  .strict()
+  .strict();
+export const FactualReportDocumentSchema = LegacyReportDocumentBase.extend({
+  version: z.literal(2),
+  narrative: z.null(),
+  analysis: z
+    .object({
+      status: z.literal("not_requested"),
+      reason: z.null(),
+      model: z.null(),
+      request_sha256: z.null()
+    })
+    .strict()
+});
+export const ReportDocumentSchema = z
+  .discriminatedUnion("version", [LegacyReportDocumentBase, FactualReportDocumentSchema])
   .superRefine((value, ctx) => {
+    if (value.version === 2) return;
     if (
       (value.analysis.status === "available") !== (value.narrative !== null) ||
       (value.analysis.status === "available") !== (value.analysis.reason === null)
@@ -48,4 +63,22 @@ export const ReportDocumentSchema = z
     }
   });
 export type ReportDocument = z.infer<typeof ReportDocumentSchema>;
+/** Old readers retain the exact v1 shape and truthful AI-unavailable semantics.
+ * New clients explicitly request v2 to distinguish intended factual success. */
+export function legacyReportDocument(
+  document: ReportDocument
+): z.infer<typeof LegacyReportDocumentBase> {
+  return document.version === 1
+    ? document
+    : LegacyReportDocumentBase.parse({
+        ...document,
+        version: 1,
+        analysis: {
+          status: "unavailable",
+          reason: "model_unavailable",
+          model: null,
+          request_sha256: null
+        }
+      });
+}
 export const MAX_REPORT_JSON_BYTES = 1024 * 1024;

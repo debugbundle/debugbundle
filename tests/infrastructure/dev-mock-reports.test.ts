@@ -9,6 +9,7 @@ import {
   createReportPdfApi,
   createReportDeliveryApi
 } from "../../packages/report-client/src/index.js";
+import { createImprovementReviewApi } from "../../packages/improvement-review-client/src/index.js";
 import { createOrganizationApi } from "../../packages/organization-client/src/index.js";
 import { ReportContentViewSchema } from "../../packages/smart-reports/src/report-content.js";
 import { isReportPdfBytes } from "../../packages/smart-reports/src/report-pdf.js";
@@ -39,6 +40,7 @@ function setup() {
     api,
     session,
     scope,
+    reviews: createImprovementReviewApi(client),
     definitions: createReportApi(client),
     runs: createReportRunApi(client),
     pdf: createReportPdfApi(client),
@@ -269,4 +271,37 @@ it("serves escaped HTML and a real PDF from the local middleware", async () => {
       server.close((error) => (error ? reject(error) : resolve()))
     );
   }
+});
+
+it("exercises weekly review states and consent withdrawal without external work", async () => {
+  const f = setup(),
+    history = await f.reviews.list(f.scope);
+  expect(history.reviews.map((review) => review.status)).toEqual(
+    expect.arrayContaining([
+      "ready",
+      "factual_only",
+      "no_data",
+      "no_change",
+      "queued",
+      "skipped_quota",
+      "paused_access",
+      "failed"
+    ])
+  );
+  for (const review of history.reviews) await f.reviews.bundle({ ...f.scope, reviewId: review.id });
+  expect((await f.reviews.settings(f.scope)).enabled).toBe(false);
+  await f.reviews.update({
+    ...f.scope,
+    command: {
+      expected_version: 0,
+      enabled: true,
+      project_ids: [history.reviews[0]!.project_id],
+      source_consent: true
+    }
+  });
+  await f.reviews.update({
+    ...f.scope,
+    command: { expected_version: 1, enabled: false, project_ids: [], source_consent: false }
+  });
+  expect((await f.reviews.list(f.scope)).reviews).toEqual([]);
 });

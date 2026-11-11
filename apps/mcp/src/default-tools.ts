@@ -52,6 +52,8 @@ import { createCaptureRuleMcpTools } from "./capture-rule-tools.js";
 import { createCapturePolicyMcpTools } from "./capture-policy-tools.js";
 import { createGitHubMcpTools } from "./github-tools.js";
 import { createImprovementMcpTools } from "./improvement-tools.js";
+import { createImprovementReviewMcpTools } from "./improvement-review-tools.js";
+import { createImprovementReviewApi } from "../../../packages/improvement-review-client/src/index.js";
 import { createImprovementSettingsMcpTools } from "./improvement-settings-tools.js";
 import { createMemberMcpTools } from "./member-tools.js";
 import { createProbeMcpTools } from "./probe-tools.js";
@@ -188,6 +190,7 @@ export async function createDefaultMcpTools(
         getLogs: (requestInput) => retrievalApi.listLogs(requestInput)
       }),
       ...createImprovementMcpTools(retrievalApi),
+      ...createImprovementReviewMcpTools(createImprovementReviewApi(httpClient)),
       ...createServicesMcpTools(retrievalApi),
       ...createTokenMcpTools(createTokenManagementApi(httpClient)),
       ...createOrganizationMcpTools(createOrganizationApi(httpClient)),

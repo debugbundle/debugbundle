@@ -26,11 +26,12 @@ export function reportContentOperations(): OperationSpec[] {
       operationId: "getReportContent",
       summary: "Read canonical report facts/narrative and current retained-source availability",
       params: identity,
+      query: z.object({ version: z.enum(["1", "2"]).default("1") }).strict(),
       responses: {
         ...failures,
         "200": {
           description:
-            "Private/no-store canonical content. Current reader access to every origin is required; generation disablement or plan downgrade does not hide authorised archives.",
+            "Private/no-store content. The default v1 representation preserves released clients; version=2 distinguishes intentionally factual success. Current reader access to every origin is required; generation disablement or plan downgrade does not hide authorised archives.",
           schema: component("ReportContentView", ReportContentViewSchema)
         }
       }

@@ -57,8 +57,9 @@ export function BillingOfferSummary({
       )}
       {currentPlan === "business" && quote.target_plan !== "business" ? (
         <p>
-          Organisation-wide grants and Smart Reports will pause. Saved grants need Owner review
-          before they resume on a later Business upgrade.
+          Organisation-wide grants and AI reports will pause. Factual reports and weekly reviews
+          follow the new plan limits; incompatible schedules need Owner review. Saved grants need
+          Owner review before they resume on a later Business upgrade.
         </p>
       ) : null}
       {currentPlan !== "free" && currentPlan !== "solo" && quote.target_plan === "solo" ? (

@@ -121,6 +121,7 @@ export function NavUser({
               </DropdownMenuItem>
               {canManagePeople ? (
                 <DropdownMenuItem
+                  className="py-2"
                   onSelect={() =>
                     runAfterOverlayClose(() => {
                       void navigate("/settings/people");
@@ -132,6 +133,7 @@ export function NavUser({
                 </DropdownMenuItem>
               ) : null}
               <DropdownMenuItem
+                className="py-2"
                 onSelect={() =>
                   runAfterOverlayClose(() => {
                     void navigate("/settings/referrals");

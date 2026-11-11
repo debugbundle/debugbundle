@@ -7,19 +7,25 @@ import { Field, FieldGroup, FieldLabel, FieldDescription, FieldContent } from ".
 import { Input } from "../ui/input.js";
 import { Checkbox } from "../ui/checkbox.js";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group.js";
+import { reportPolicy } from "../../../../../packages/smart-reports/src/report-policy.js";
 export function ReportDefinitionFields({
   value,
   onChange,
   projects,
   recipients,
-  disabled
+  disabled,
+  plan = "business",
+  selfHosted = false
 }: {
   value: CreateReportDefinition;
   onChange: (value: CreateReportDefinition) => void;
   projects: MultiSelectOption[];
   recipients: MultiSelectOption[];
   disabled: boolean;
+  plan?: string;
+  selfHosted?: boolean;
 }): JSX.Element {
+  const policy = reportPolicy(plan, selfHosted);
   const id = useId(),
     change = (patch: Partial<CreateReportDefinition>): void => onChange({ ...value, ...patch });
   return (
@@ -49,7 +55,11 @@ export function ReportDefinitionFields({
           }}
         >
           {["daily", "weekly", "monthly"].map((cadence) => (
-            <ToggleGroupItem key={cadence} value={cadence}>
+            <ToggleGroupItem
+              key={cadence}
+              value={cadence}
+              disabled={!policy.cadences.includes(cadence as CreateReportDefinition["cadence"])}
+            >
               {cadence[0]?.toUpperCase()}
               {cadence.slice(1)}
             </ToggleGroupItem>
@@ -68,14 +78,16 @@ export function ReportDefinitionFields({
           value={value.project_ids}
           options={projects.map((option) => ({
             ...option,
-            disabled: !value.project_ids.includes(option.value) && value.project_ids.length >= 10
+            disabled:
+              !value.project_ids.includes(option.value) &&
+              value.project_ids.length >= policy.max_smart_report_projects
           }))}
           disabled={disabled}
           onValueChange={(project_ids) => change({ project_ids })}
         />
         <FieldDescription>
-          Choose up to ten explicit projects in this workspace. Future projects are never added
-          automatically.
+          Choose up to {policy.max_smart_report_projects} explicit projects in this workspace.
+          Future projects are never added automatically.
         </FieldDescription>
       </Field>
       <Field>
@@ -88,18 +100,18 @@ export function ReportDefinitionFields({
             ...option,
             disabled:
               !value.recipient_user_ids.includes(option.value) &&
-              value.recipient_user_ids.length >= 10
+              value.recipient_user_ids.length >= policy.max_smart_report_recipients
           }))}
           disabled={disabled}
           onValueChange={(recipient_user_ids) => change({ recipient_user_ids })}
         />
         <FieldDescription>
-          Choose up to ten verified people who can access all selected projects. Access is checked
-          again before each email.
+          Choose up to {policy.max_smart_report_recipients} verified people who can access all
+          selected projects. Access is checked again before each email.
         </FieldDescription>
       </Field>
       <Field className="lg:col-span-2">
-        <FieldLabel id={`${id}-privacy`}>Evidence sent for analysis</FieldLabel>
+        <FieldLabel id={`${id}-privacy`}>Report evidence</FieldLabel>
         <ToggleGroup
           type="single"
           variant="outline"
@@ -117,7 +129,7 @@ export function ReportDefinitionFields({
         <FieldDescription>
           {value.privacy_mode === "full"
             ? "Recommended: redacted incident details, context, improvements, downtime and trends. Raw logs, request bodies, headers, stack traces and secrets are excluded."
-            : "Trends and counts with generic project labels. Incident details and context are excluded, so analysis is more limited."}{" "}
+            : "Trends and counts with generic project labels. Incident details and context are excluded, so analysis is more limited. Report titles and source links retain their names."}{" "}
           Reports are retained for 90 days. Source evidence may expire sooner.
         </FieldDescription>
       </Field>
@@ -130,8 +142,9 @@ export function ReportDefinitionFields({
             onCheckedChange={(checked) => change({ source_collection_consent: checked === true })}
           />
           <FieldLabel htmlFor={`${id}-consent`}>
-            I agree to collect bounded redacted source summaries and send this report’s selected
-            evidence to the configured AI provider.
+            {policy.ai
+              ? "I agree to collect bounded redacted source summaries and, for an AI report, send selected evidence to the configured AI provider."
+              : "I agree to collect bounded redacted source summaries for this factual report. No selected evidence is sent to AI."}
           </FieldLabel>
         </Field>
       ) : null}

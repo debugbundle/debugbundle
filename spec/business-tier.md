@@ -163,6 +163,9 @@ This policy does not add automated refund rejection or change ledger calculation
 
 ## FR-BUS-05: Smart Report facts and content
 
+The [approved Smart Products extension](smart-products.md) adds Solo (2 factual
+monthly runs, 1 definition, 3 projects/1 recipient) and Team (8 factual weekly or
+monthly runs, 2 definitions, 5 projects/5 recipients), with zero AI work.
 Business: 40 admitted generations/month, 5 definitions, up to 10 explicitly chosen
 same-org projects and 10 verified authorised recipients/report. Full bounded
 redacted evidence is default after opt-in; restricted aggregate mode is optional.
@@ -190,8 +193,9 @@ access, privacy and explicit deletion. No raw-retention extension. Project/accou
 removal invalidates dependent access/delivery and removes associated report data.
 
 The hosted Reports landing page uses the shared plan-upgrade callout on Free,
-Solo and Team, with Open billing. Empty Business-only inventories stay hidden on
-these tiers; authorised saved definitions and report history remain visible.
+with Open billing. Solo supports monthly factual reports and Team supports weekly
+and monthly factual reports under the approved [Smart Products extension](smart-products.md).
+Business retains AI reports. Authorised saved definitions and history remain visible.
 Self-hosted entitlement and live whole-scope archive access rules are unchanged.
 
 ## FR-BUS-06: Report safety, delivery and cost

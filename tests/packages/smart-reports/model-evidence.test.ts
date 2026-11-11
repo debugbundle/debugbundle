@@ -10,6 +10,10 @@ import {
   validateReportNarrative
 } from "../../../packages/smart-reports/src/model-narrative.js";
 import { projectReportNarrativeFacts } from "../../../packages/smart-reports/src/model-projection.js";
+import {
+  containsReportIdentity,
+  protectRestrictedReportFacts
+} from "../../../packages/smart-reports/src/report-identity.js";
 
 function schemaNode(root: Record<string, unknown>, raw: unknown): Record<string, unknown> {
   let value = raw as Record<string, unknown>;
@@ -37,6 +41,35 @@ function output(ref = "p01_coverage") {
   };
 }
 describe("Smart Report model boundary", () => {
+  it("protects every restricted free-text field without sending the private identity set", () => {
+    const facts = ReportModelFactsSchema.parse(cases.cases[0]!.facts);
+    facts.privacy_mode = "restricted";
+    facts.projects[0]!.name = "HiddenAcme";
+    facts.projects[0]!.notes = ["HiddenAcme coverage is partial."];
+    facts.metrics[0]!.notes = ["hidden-acme.example checkout observations."];
+    facts.selection_notes = ["The PAYMENTS-PRIVATE service has incomplete coverage."];
+    const identities = ["HiddenAcme", "hidden-acme.example", "payments-private"];
+    const safe = protectRestrictedReportFacts(facts, identities);
+    expect(safe.projects[0]!.name).toBe("Project A");
+    expect(containsReportIdentity(safe, identities)).toBe(false);
+    expect(safe.projects[0]!.coverage).toEqual(facts.projects[0]!.coverage);
+    expect(safe.metrics[0]!.current).toBe(facts.metrics[0]!.current);
+    expect(facts.projects[0]!.name).toBe("HiddenAcme");
+  });
+  it("detects Unicode, case, punctuation and overlapping identifiers without substring false positives", () => {
+    expect(containsReportIdentity("ＡＣＭＥ—PAY is affected", ["Acme Pay"])).toBe(true);
+    expect(containsReportIdentity("HIDDENACME is affected", ["HiddenAcme"])).toBe(true);
+    expect(containsReportIdentity("hiddenacme is affected", ["HiddenAcme"])).toBe(true);
+    expect(containsReportIdentity("商店東京 needs review", ["商店東京"])).toBe(true);
+    expect(containsReportIdentity("CAFÉ SHOP needs review", ["Café-Shop"])).toBe(true);
+    expect(
+      containsReportIdentity("Review cartography and team workflows", ["Art", "Team", "A"])
+    ).toBe(false);
+    expect(containsReportIdentity("Project API needs review", ["API"])).toBe(true);
+    expect(containsReportIdentity("Review the API response", ["API"])).toBe(false);
+    expect(containsReportIdentity("Project A has partial coverage", ["A"])).toBe(false);
+    expect(containsReportIdentity("Acme Plus is affected", ["Acme", "Acme Plus"])).toBe(true);
+  });
   it("accepts every fixed synthetic fact case before a paid evaluation", () => {
     for (const fixture of cases.cases)
       expect(ReportModelFactsSchema.safeParse(fixture.facts).success, fixture.id).toBe(true);
@@ -380,4 +413,10 @@ describe("Smart Report model boundary", () => {
       "p02_old"
     ]);
   });
+});
+
+it("protects emoji-only and mixed-symbol project identities without treating ordinary punctuation as an identity", () => {
+  expect(containsReportIdentity("The 🚀 project needs review.", ["🚀"])).toBe(true);
+  expect(containsReportIdentity("🔥Team needs review.", ["🔥 Team"])).toBe(true);
+  expect(containsReportIdentity("The plain project needs review.", ["++"])).toBe(false);
 });

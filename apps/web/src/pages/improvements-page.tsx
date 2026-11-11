@@ -1,9 +1,10 @@
 import { ChevronRightIcon, SparklesIcon } from "lucide-react";
 import { useMemo, useState, type MouseEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { getTierCapabilities } from "../../../../packages/shared-types/src/index.js";
 
 import { CursorPaginationControls } from "../components/system/cursor-pagination-controls.js";
+import { ImprovementReviewSection } from "../components/system/improvement-review-section.js";
 import { BoundedTableTitle } from "../components/system/bounded-table-title.js";
 import { ProjectColorTagDot } from "../components/system/project-color-tag-dot.js";
 import { HostedImprovementsUpgradeCallout } from "../components/system/hosted-improvements-upgrade-callout.js";
@@ -41,6 +42,7 @@ import {
   SelectValue
 } from "../components/ui/select.js";
 import { Skeleton } from "../components/ui/skeleton.js";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs.js";
 import {
   Table,
   TableBody,
@@ -62,6 +64,8 @@ import { useSession } from "../lib/session.js";
 
 export function ImprovementsPage(): JSX.Element {
   const navigate = useNavigate();
+  const location = useLocation();
+  const activeView = location.pathname.endsWith("/reviews") ? "reviews" : "opportunities";
   const { session } = useSession();
   const [statusFilter, setStatusFilter] = useState<ImprovementStatusFilter>("open");
   const [sort, setSort] = useState<SortState<ImprovementSortField>>({
@@ -169,181 +173,207 @@ export function ImprovementsPage(): JSX.Element {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader description="Improvement opportunities across this workspace. Review deterministic hardening signals and open the generated bundle when one is available." />
-
-      {!hostedImprovementsEnabled ? (
-        <HostedImprovementsUpgradeCallout scope="workspace" />
-      ) : (
-        <Card className="min-w-0">
-          <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex w-full items-center justify-between gap-3 sm:w-auto">
-              <CardTitle>Improvement inventory</CardTitle>
-              <TableRefreshButton
-                isLoading={isLoading}
-                onRefresh={refreshPage}
-                mobileIconOnly
-                className="shrink-0 sm:hidden"
-              />
-            </div>
-            <div className="flex w-full items-center gap-2 sm:w-auto sm:justify-end">
-              <TableRefreshButton
-                isLoading={isLoading}
-                onRefresh={refreshPage}
-                className="hidden sm:inline-flex"
-              />
-              <label
-                id="workspace-improvements-status-filter-label"
-                htmlFor="workspace-improvements-status-filter"
-                className="sr-only sm:not-sr-only sm:text-sm sm:font-medium sm:text-foreground"
-              >
-                Status
-              </label>
-              <Select
-                value={statusFilter}
-                onValueChange={(value) => setStatusFilter(value as ImprovementStatusFilter)}
-              >
-                <SelectTrigger
-                  id="workspace-improvements-status-filter"
-                  aria-labelledby="workspace-improvements-status-filter-label workspace-improvements-status-filter"
-                  className="w-full sm:w-fit sm:min-w-40"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {IMPROVEMENT_STATUS_FILTER_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardHeader>
-          <CardContent className={selection.selectedCount > 0 ? "pb-28 sm:pb-6" : undefined}>
-            <ResourceListState
-              items={improvements}
-              loading={
-                <div className="space-y-3">
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
-                </div>
-              }
-              empty={
-                <Empty>
-                  <EmptyHeader>
-                    <EmptyMedia variant="icon">
-                      <SparklesIcon />
-                    </EmptyMedia>
-                    <EmptyTitle>{emptyState.title}</EmptyTitle>
-                    <EmptyDescription>{emptyState.description}</EmptyDescription>
-                  </EmptyHeader>
-                  <EmptyContent>
-                    <Button asChild type="button" variant="outline">
-                      <Link to="/projects">
-                        Open projects
-                        <ChevronRightIcon data-icon="inline-end" />
-                      </Link>
-                    </Button>
-                  </EmptyContent>
-                </Empty>
-              }
-            >
-              {() => (
-                <div className="space-y-4">
-                  <div className="hidden sm:block">
-                    <SelectableTableActions
-                      itemLabel="improvement"
-                      totalCount={sortedImprovements.length}
-                      selectedCount={selection.selectedCount}
-                      allSelected={selection.allSelected}
-                      isBusy={bulkAction !== null}
-                      primaryActionLabel={
-                        bulkAction === "resolved" ? "Marking resolved..." : "Mark selected resolved"
-                      }
-                      secondaryActionLabel={
-                        bulkAction === "unresolved"
-                          ? "Marking unresolved..."
-                          : "Mark selected unresolved"
-                      }
-                      primaryActionDisabled={
-                        selection.selectedCount === 0 ||
-                        selectedImprovements.every(
-                          (improvement) => improvement.status === "resolved"
-                        )
-                      }
-                      secondaryActionDisabled={
-                        selection.selectedCount === 0 ||
-                        selectedImprovements.every((improvement) => improvement.status === "open")
-                      }
-                      onToggleSelectAll={selection.toggleSelectAll}
-                      onClearSelection={selection.clearSelection}
-                      onPrimaryAction={() => {
-                        void handleBulkImprovementAction("resolved");
-                      }}
-                      onSecondaryAction={() => {
-                        void handleBulkImprovementAction("unresolved");
-                      }}
-                    />
-                  </div>
-                  <ImprovementsTable
-                    improvements={sortedImprovements}
-                    sort={sort}
-                    onSortChange={(field) => setSort((current) => toggleSort(current, field))}
-                    selectedImprovementIds={selection.selectedIdSet}
-                    onToggleImprovementSelection={selection.toggleId}
-                    onImprovementRowClick={(event, improvement) => {
-                      if (shouldIgnoreTableRowActivation(event.target)) {
-                        return;
-                      }
-
-                      void navigate(
-                        `/projects/${improvement.project_id}/improvements/${improvement.improvement_id}`
-                      );
-                    }}
-                  />
-                  <CursorPaginationControls
-                    page={page}
-                    totalPages={totalPages}
-                    hasNextPage={hasNextPage}
+    <div className="flex flex-col gap-6">
+      <PageHeader description="Improvement opportunities and weekly evidence-backed priorities across this workspace. Review the recorded signals and investigate with the available bundles." />
+      <Tabs
+        value={activeView}
+        onValueChange={(value) => {
+          void navigate(value === "reviews" ? "/improvements/reviews" : "/improvements");
+        }}
+        className="gap-6"
+      >
+        <TabsList variant="line" aria-label="Workspace improvement views">
+          <TabsTrigger value="opportunities">Opportunities</TabsTrigger>
+          <TabsTrigger value="reviews">Weekly reviews</TabsTrigger>
+        </TabsList>
+        <TabsContent value="opportunities" className="min-w-0">
+          {!hostedImprovementsEnabled ? (
+            <HostedImprovementsUpgradeCallout scope="workspace" />
+          ) : (
+            <Card className="min-w-0">
+              <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex w-full items-center justify-between gap-3 sm:w-auto">
+                  <CardTitle>Improvement inventory</CardTitle>
+                  <TableRefreshButton
                     isLoading={isLoading}
-                    onPreviousPage={goToPreviousPage}
-                    onNextPage={() => void goToNextPage()}
+                    onRefresh={refreshPage}
+                    mobileIconOnly
+                    className="shrink-0 sm:hidden"
                   />
                 </div>
-              )}
-            </ResourceListState>
-          </CardContent>
-        </Card>
-      )}
-      <StickyMobileTableActions
-        selectedCount={selection.selectedCount}
-        totalCount={sortedImprovements.length}
-        allSelected={selection.allSelected}
-        isBusy={bulkAction !== null}
-        primaryActionLabel={bulkAction === "resolved" ? "Marking resolved..." : "Mark resolved"}
-        secondaryActionLabel={
-          bulkAction === "unresolved" ? "Marking unresolved..." : "Mark unresolved"
-        }
-        primaryActionDisabled={
-          selection.selectedCount === 0 ||
-          selectedImprovements.every((improvement) => improvement.status === "resolved")
-        }
-        secondaryActionDisabled={
-          selection.selectedCount === 0 ||
-          selectedImprovements.every((improvement) => improvement.status === "open")
-        }
-        onToggleSelectAll={selection.toggleSelectAll}
-        onClearSelection={selection.clearSelection}
-        onPrimaryAction={() => {
-          void handleBulkImprovementAction("resolved");
-        }}
-        onSecondaryAction={() => {
-          void handleBulkImprovementAction("unresolved");
-        }}
-      />
+                <div className="flex w-full items-center gap-2 sm:w-auto sm:justify-end">
+                  <TableRefreshButton
+                    isLoading={isLoading}
+                    onRefresh={refreshPage}
+                    className="hidden sm:inline-flex"
+                  />
+                  <label
+                    id="workspace-improvements-status-filter-label"
+                    htmlFor="workspace-improvements-status-filter"
+                    className="sr-only sm:not-sr-only sm:text-sm sm:font-medium sm:text-foreground"
+                  >
+                    Status
+                  </label>
+                  <Select
+                    value={statusFilter}
+                    onValueChange={(value) => setStatusFilter(value as ImprovementStatusFilter)}
+                  >
+                    <SelectTrigger
+                      id="workspace-improvements-status-filter"
+                      aria-labelledby="workspace-improvements-status-filter-label workspace-improvements-status-filter"
+                      className="w-full sm:w-fit sm:min-w-40"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {IMPROVEMENT_STATUS_FILTER_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardHeader>
+              <CardContent className={selection.selectedCount > 0 ? "pb-28 sm:pb-6" : undefined}>
+                <ResourceListState
+                  items={improvements}
+                  loading={
+                    <div className="space-y-3">
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-full" />
+                    </div>
+                  }
+                  empty={
+                    <Empty>
+                      <EmptyHeader>
+                        <EmptyMedia variant="icon">
+                          <SparklesIcon />
+                        </EmptyMedia>
+                        <EmptyTitle>{emptyState.title}</EmptyTitle>
+                        <EmptyDescription>{emptyState.description}</EmptyDescription>
+                      </EmptyHeader>
+                      <EmptyContent>
+                        <Button asChild type="button" variant="outline">
+                          <Link to="/projects">
+                            Open projects
+                            <ChevronRightIcon data-icon="inline-end" />
+                          </Link>
+                        </Button>
+                      </EmptyContent>
+                    </Empty>
+                  }
+                >
+                  {() => (
+                    <div className="space-y-4">
+                      <div className="hidden sm:block">
+                        <SelectableTableActions
+                          itemLabel="improvement"
+                          showEmptySelectionHint={false}
+                          totalCount={sortedImprovements.length}
+                          selectedCount={selection.selectedCount}
+                          allSelected={selection.allSelected}
+                          isBusy={bulkAction !== null}
+                          primaryActionLabel={
+                            bulkAction === "resolved"
+                              ? "Marking resolved..."
+                              : "Mark selected resolved"
+                          }
+                          secondaryActionLabel={
+                            bulkAction === "unresolved"
+                              ? "Marking unresolved..."
+                              : "Mark selected unresolved"
+                          }
+                          primaryActionDisabled={
+                            selection.selectedCount === 0 ||
+                            selectedImprovements.every(
+                              (improvement) => improvement.status === "resolved"
+                            )
+                          }
+                          secondaryActionDisabled={
+                            selection.selectedCount === 0 ||
+                            selectedImprovements.every(
+                              (improvement) => improvement.status === "open"
+                            )
+                          }
+                          onToggleSelectAll={selection.toggleSelectAll}
+                          onClearSelection={selection.clearSelection}
+                          onPrimaryAction={() => {
+                            void handleBulkImprovementAction("resolved");
+                          }}
+                          onSecondaryAction={() => {
+                            void handleBulkImprovementAction("unresolved");
+                          }}
+                        />
+                      </div>
+                      <ImprovementsTable
+                        improvements={sortedImprovements}
+                        sort={sort}
+                        onSortChange={(field) => setSort((current) => toggleSort(current, field))}
+                        selectedImprovementIds={selection.selectedIdSet}
+                        onToggleImprovementSelection={selection.toggleId}
+                        onImprovementRowClick={(event, improvement) => {
+                          if (shouldIgnoreTableRowActivation(event.target)) {
+                            return;
+                          }
+
+                          void navigate(
+                            `/projects/${improvement.project_id}/improvements/${improvement.improvement_id}`
+                          );
+                        }}
+                      />
+                      <CursorPaginationControls
+                        page={page}
+                        totalPages={totalPages}
+                        hasNextPage={hasNextPage}
+                        isLoading={isLoading}
+                        onPreviousPage={goToPreviousPage}
+                        onNextPage={() => void goToNextPage()}
+                      />
+                    </div>
+                  )}
+                </ResourceListState>
+              </CardContent>
+            </Card>
+          )}
+          <StickyMobileTableActions
+            selectedCount={selection.selectedCount}
+            totalCount={sortedImprovements.length}
+            allSelected={selection.allSelected}
+            isBusy={bulkAction !== null}
+            primaryActionLabel={bulkAction === "resolved" ? "Marking resolved..." : "Mark resolved"}
+            secondaryActionLabel={
+              bulkAction === "unresolved" ? "Marking unresolved..." : "Mark unresolved"
+            }
+            primaryActionDisabled={
+              selection.selectedCount === 0 ||
+              selectedImprovements.every((improvement) => improvement.status === "resolved")
+            }
+            secondaryActionDisabled={
+              selection.selectedCount === 0 ||
+              selectedImprovements.every((improvement) => improvement.status === "open")
+            }
+            onToggleSelectAll={selection.toggleSelectAll}
+            onClearSelection={selection.clearSelection}
+            onPrimaryAction={() => {
+              void handleBulkImprovementAction("resolved");
+            }}
+            onSecondaryAction={() => {
+              void handleBulkImprovementAction("unresolved");
+            }}
+          />
+        </TabsContent>
+        <TabsContent value="reviews" className="min-w-0">
+          {session ? (
+            <ImprovementReviewSection
+              key={`${session.user_id}:${session.organization_id}`}
+              session={session}
+            />
+          ) : null}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

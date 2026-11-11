@@ -492,6 +492,7 @@ export function createApiServer(
   registerOrganizationRoutes(app, dependencies);
   registerReferralRoutes(app, dependencies);
   registerReportDefinitionRoutes(app, dependencies);
+  registerImprovementReviewRoutes(app, dependencies);
   registerReportRunRoutes(app, dependencies);
   registerReportContentRoutes(app, dependencies);
   registerReportPdfRoutes(app, dependencies);
@@ -557,6 +558,7 @@ export function createApiServer(
   return app;
 }
 import { registerReportDefinitionRoutes } from "./routes/report-definitions.js";
+import { registerImprovementReviewRoutes } from "./routes/improvement-reviews.js";
 import { registerReportRunRoutes } from "./routes/report-runs.js";
 import { registerReportContentRoutes } from "./routes/report-content.js";
 import { registerReportPdfRoutes } from "./routes/report-pdf.js";

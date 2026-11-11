@@ -2212,7 +2212,7 @@ failing-to-passing health executor transitions. A successful result must satisfy
 the existing configured recovery threshold. An internal monitor error, manual
 check edit, absence of failures or improved aggregate totals cannot create this
 evidence. The fact commits with the existing check result/state transaction only
-for an enabled, unsuspended Business report scope. It is idempotent by original
+for an enabled, unsuspended, currently entitled report scope. It is idempotent by original
 project/result and contains no endpoint name, URL, error or response body.
 
 Generation selects at most ten period-bounded recovery observations per selected
@@ -2240,3 +2240,35 @@ coupon or provider binding. Runtime readiness verifies this shape, index and
 enabled trigger. The new table has an explicit unchanged-account consolidation
 disposition. See [referral accounting](referral-accounting.md) for the approved
 first-eligible-invoice benefit and pending provider integration.
+
+## Smart Products candidate schemas
+
+[Smart Products](../spec/smart-products.md) extends the report document with an
+opt-in `report_document.v2` discriminated branch. It requires null narrative and
+`{status:"not_requested", reason:null, model:null, request_sha256:null}`. Existing
+v1 AI available/unavailable documents remain valid and are the default wire shape.
+Private definition/run `report_mode` freezes factual versus AI admission; a DB
+constraint makes factual profiles/reservations/paid attempts impossible.
+
+`improvement_review.v1` is separate from BundleV1 and AnalyticsBundle. Closed
+facts contain weekly UTC period/cutoff, privacy mode, project ID, at most 25 typed
+source references, aggregate analytics/monitored health coverage and limitations.
+Optional `related_refs` on a source contains at most eight distinct references to
+other selected sources, derived from recorded opportunity-to-incident links.
+Unknown, duplicate and self-references are invalid. Provider input carries these
+opaque relationships without private source or project identifiers.
+At most 5 server priorities and 5 optional qualitative investigations reference
+those actual sources. Guidance never replaces facts and `analysis=available`
+requires it. Saved artifact hashes bind facts and guidance; private identities,
+accepted authority/scope, budgets and immutable provider receipts are not public
+artifact fields. Source payload, validation and bounded limits are defined in
+`packages/smart-improvements/src/review-contract.ts`.
+
+Forward migrations `202611100001_add_report_identity_snapshots`,
+`202611100002_add_factual_report_products`, and
+`202611100003_add_weekly_improvement_reviews` add identity/PDF projection
+provenance, report mode and separate review settings/usage/content/attempts.
+Readiness checks plus the ordered checksum ledger fail closed before runtime.
+No previous migration or persisted settled receipt is rewritten. Content deletion
+clears temporary guidance and invalidates queued work while retaining paid or
+uncertain financial metadata/holds independently. Bootstrap is for empty schemas.

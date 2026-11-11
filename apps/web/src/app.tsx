@@ -200,6 +200,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
               <Route path="/incidents/:incidentId" element={<IncidentDetailPage />} />
               <Route path="/health-status" element={<HealthStatusPage />} />
               <Route path="/improvements" element={<ImprovementsPage />} />
+              <Route path="/improvements/reviews" element={<ImprovementsPage />} />
               <Route path="/analytics/workspace" element={<WorkspaceAnalyticsPage />} />
               <Route path="/analytics/workspace/bundles" element={<WorkspaceAnalyticsPage />} />
               <Route path="/billing" element={<BillingPage />} />
@@ -247,6 +248,7 @@ export function App({ initialEntries }: AppProps): JSX.Element {
               <Route path="/incidents/:incidentId" element={<IncidentDetailPage />} />
               <Route path="/health-status" element={<HealthStatusPage />} />
               <Route path="/improvements" element={<ImprovementsPage />} />
+              <Route path="/improvements/reviews" element={<ImprovementsPage />} />
               <Route path="/analytics/workspace" element={<WorkspaceAnalyticsPage />} />
               <Route path="/analytics/workspace/bundles" element={<WorkspaceAnalyticsPage />} />
               <Route path="/billing" element={<BillingPage />} />

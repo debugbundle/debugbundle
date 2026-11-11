@@ -242,7 +242,7 @@ it("shows payouts as a child of Referrals and hides pagination for an empty firs
   );
   render(<App initialEntries={["/settings/referrals/payouts"]} />);
   await screen.findByText("No earned commissions yet");
-  expect(screen.getByText("No payments yet")).toBeVisible();
+  expect(await screen.findByText("No payments yet")).toBeVisible();
   expect(screen.queryByRole("button", { name: "Previous" })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
   const breadcrumb = screen.getByRole("navigation", { name: "breadcrumb" });

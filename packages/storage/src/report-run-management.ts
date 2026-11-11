@@ -194,7 +194,10 @@ export function createReportRunManagementStore(db: Queryable): ReportRunManageme
           published_at=clock_timestamp(),updated_at=clock_timestamp(),lease_token=NULL,lease_expires_at=NULL WHERE id=$1 RETURNING *`,
             [
               row["id"],
-              aiStatus === "succeeded" && options.has_narrative ? "ready" : "factual_only",
+              row["report_mode"] === "factual" ||
+              (aiStatus === "succeeded" && options.has_narrative)
+                ? "ready"
+                : "factual_only",
               aiStatus,
               noPaid
             ]

@@ -1,7 +1,7 @@
 import { REPORT_TRIAL_ENTITLEMENT_SQL } from "./report-trial-entitlement.js";
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
-import { getTierCapabilities } from "../../shared-types/src/index.js";
+import { reportPolicy } from "../../smart-reports/src/report-policy.js";
 import {
   CreateReportDefinitionSchema,
   ReplaceReportDefinitionSchema,
@@ -37,7 +37,7 @@ type DefinitionRow = Record<string, unknown> & {
 const columns = `id,organization_id,created_by_user_id,initiating_authority,creation_digest,
   name,cadence,accepted_scope,recipient_user_ids,privacy_mode,source_collection_consent,schedule,
   enabled,version,next_due_at,next_period_ends_at,requires_owner_review,pause_reason,paused_at,
-  weekly_overlap,created_at,updated_at`;
+  weekly_overlap,created_at,updated_at,report_mode`;
 function iso(value: unknown): string | null {
   if (value === null) return null;
   return (value instanceof Date ? value : new Date(z.string().parse(value))).toISOString();
@@ -105,7 +105,7 @@ async function lockOrganization(tx: Queryable, organizationId: string): Promise<
 async function requirePlan(
   tx: Queryable,
   organizationId: string
-): Promise<ReturnType<typeof getTierCapabilities>> {
+): Promise<ReturnType<typeof reportPolicy>> {
   // Read after the lock wait, so an entitlement change cannot use an old statement snapshot.
   const row = (
     await tx.query<{ plan: string; suspended_at: unknown }>(
@@ -114,9 +114,20 @@ async function requirePlan(
     )
   ).rows[0];
   if (!row || row.suspended_at !== null) throw new SmartReportError("forbidden");
-  const caps = getTierCapabilities(row.plan);
+  const caps = reportPolicy(row.plan);
   if (!caps.smart_reports) throw new SmartReportError("upgrade_required");
   return caps;
+}
+function requireSelection(
+  caps: ReturnType<typeof reportPolicy>,
+  definition: CreateReportDefinition
+): void {
+  if (
+    !caps.cadences.includes(definition.cadence) ||
+    definition.project_ids.length > caps.max_smart_report_projects ||
+    definition.recipient_user_ids.length > caps.max_smart_report_recipients
+  )
+    throw new SmartReportError("upgrade_required");
 }
 async function requireManagement(tx: Queryable, input: Actor, scope: unknown): Promise<void> {
   if (
@@ -214,6 +225,7 @@ export function createReportDefinitionStore(db: Queryable): ReportDefinitionStor
           return record(prior);
         }
         const caps = await requirePlan(tx, input.organization_id);
+        requireSelection(caps, definition);
         const scope = await captureReportScope(tx, {
           organization_id: input.organization_id,
           initiator: input.initiator,
@@ -239,8 +251,8 @@ export function createReportDefinitionStore(db: Queryable): ReportDefinitionStor
             `INSERT INTO report_definitions(
           id,organization_id,created_by_user_id,initiating_authority,creation_request_id,creation_digest,
           name,cadence,privacy_mode,source_collection_consent,accepted_scope,recipient_user_ids,schedule,
-          enabled,next_due_at,next_period_ends_at,weekly_overlap)
-          VALUES($1,$2,$3,$4::jsonb,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::uuid[],$13::jsonb,$14,$15,$16,$17)
+          enabled,next_due_at,next_period_ends_at,weekly_overlap,report_mode)
+          VALUES($1,$2,$3,$4::jsonb,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::uuid[],$13::jsonb,$14,$15,$16,$17,$18)
           RETURNING ${columns}`,
             [
               randomUUID(),
@@ -259,7 +271,8 @@ export function createReportDefinitionStore(db: Queryable): ReportDefinitionStor
               definition.enabled,
               next.due_at,
               next.period_ends_at,
-              definition.weekly_overlap ?? null
+              definition.weekly_overlap ?? null,
+              caps.ai ? "ai" : "factual"
             ]
           )
         ).rows[0];
@@ -319,12 +332,23 @@ export function createReportDefinitionStore(db: Queryable): ReportDefinitionStor
         const previous = record(row);
         if (previous.version !== definition.expected_version)
           throw new SmartReportError("report_version_conflict");
-        await requirePlan(tx, input.organization_id);
+        const caps = await requirePlan(tx, input.organization_id);
+        requireSelection(caps, definition);
         if (
           definition.resume_after_review &&
           !(await isCurrentBillingOwner(tx, input.organization_id, input.initiator.user_id))
         )
           throw new SmartReportError("forbidden");
+        if (
+          definition.enabled &&
+          (
+            await tx.query<{ count: string }>(
+              "SELECT count(*)::text AS count FROM report_definitions WHERE organization_id=$1 AND id<>$2 AND enabled AND paused_at IS NULL AND NOT requires_owner_review",
+              [input.organization_id, input.id]
+            )
+          ).rows.some((item) => Number(item.count) >= caps.max_smart_report_definitions)
+        )
+          throw new SmartReportError("report_definition_limit_reached");
         // A title, cadence or recipient edit does not expand a frozen merge scope.
         const sameSelection =
           [...definition.project_ids].sort().join() ===
@@ -350,6 +374,7 @@ export function createReportDefinitionStore(db: Queryable): ReportDefinitionStor
           await tx.query<DefinitionRow>(
             `UPDATE report_definitions SET name=$3,cadence=$4,
           privacy_mode=$5,source_collection_consent=$6,accepted_scope=$7::jsonb,recipient_user_ids=$8::uuid[],
+          report_mode=CASE WHEN $15 AND NOT $17 THEN 'factual' ELSE report_mode END,
           schedule=$9::jsonb,enabled=$10,next_due_at=$11,next_period_ends_at=$12,weekly_overlap=$13,
           initiating_authority=$14::jsonb,version=version+1,updated_at=now(),
           requires_owner_review=CASE WHEN $15 THEN false ELSE requires_owner_review END,
@@ -372,7 +397,8 @@ export function createReportDefinitionStore(db: Queryable): ReportDefinitionStor
               definition.weekly_overlap ?? null,
               JSON.stringify(input.initiator),
               definition.resume_after_review,
-              definition.expected_version
+              definition.expected_version,
+              caps.ai
             ]
           )
         ).rows[0];

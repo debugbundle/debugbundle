@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { legacyReportDocument } from "../../../../packages/smart-reports/src/report-document.js";
 import {
   ReportContentViewSchema,
   reportLinkLocation
@@ -55,8 +56,19 @@ export function registerReportContentRoutes(
           const destination = reportLinkLocation(path, dependencies.reportDashboardBaseUrl);
           return reply.code(303).redirect(destination);
         }
+        const query = z
+          .object({ version: z.enum(["1", "2"]).default("1") })
+          .strict()
+          .safeParse(format === "document" ? request.query : {});
+        if (!query.success) return reply.code(400).send({ error: "invalid_report_query" });
         const view = ReportContentViewSchema.parse(await dependencies.reportContent.view(input));
-        if (format === "document") return reply.send(view);
+        if (format === "document") {
+          return reply.send(
+            query.data.version === "2"
+              ? view
+              : { ...view, document: legacyReportDocument(view.document) }
+          );
+        }
         reply.header(
           "Content-Security-Policy",
           "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"

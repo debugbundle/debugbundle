@@ -6,6 +6,7 @@ import { type ReportContentView } from "./report-content.js";
 import { ReportPdfRenderInputSchema } from "./report-pdf-input.js";
 import {
   reportEvidenceSections,
+  reportFactualHighlights,
   reportAnalysisExplanation,
   reportPeriodLabel,
   reportTimeLabel,
@@ -144,7 +145,7 @@ export async function renderReportPdf(
         paragraph(value, size);
       };
       const references = (items: string[]): string => `[${items.join(", ")}]`;
-      const { urgent, solved, coming } = reportEvidenceSections(doc);
+      const { focus, solved, coming } = reportEvidenceSections(doc);
       paragraph(
         `DebugBundle · ${facts.period.kind} report · ${facts.privacy_mode} evidence mode`,
         9,
@@ -171,9 +172,11 @@ export async function renderReportPdf(
       paragraph(
         doc.narrative
           ? `${doc.narrative.overview.text} ${references(doc.narrative.overview.evidence_refs)}`
-          : reportAnalysisExplanation(doc.analysis.reason)
+          : reportAnalysisExplanation(doc.analysis.reason, doc.analysis.status)
       );
       heading("What happened");
+      for (const item of reportFactualHighlights(doc))
+        paragraph(`${item.text} ${references(item.evidence_refs)}`);
       if (doc.narrative?.highlights.length)
         for (const highlight of doc.narrative.highlights)
           paragraph(
@@ -191,7 +194,11 @@ export async function renderReportPdf(
           );
       }
       heading(`Focus for the coming ${coming}`);
-      for (const item of urgent)
+      if (doc.analysis.status === "not_requested" && focus.length)
+        paragraph(
+          "Review outstanding work in severity order, verify the linked evidence and check for recurrence after a bounded change."
+        );
+      for (const item of focus)
         paragraph(
           `${facts.projects.find((project) => project.ref === item.project_ref)?.name}: ${item.title} (${item.severity}, ${item.status}) ${references([item.ref])}`
         );
@@ -200,9 +207,9 @@ export async function renderReportPdf(
           paragraph(item.title, 12);
           paragraph(`${item.action} ${item.rationale} ${references(item.evidence_refs)}`);
         }
-      else if (!urgent.length)
+      else if (!focus.length)
         paragraph(
-          "No selected high or critical work is recorded. Incomplete coverage does not establish that no issues exist."
+          `No selected ${doc.analysis.status === "not_requested" ? "outstanding" : "high or critical"} work is recorded. Incomplete coverage does not establish that no issues exist.`
         );
       heading("Resolutions and recoveries");
       for (const item of solved)

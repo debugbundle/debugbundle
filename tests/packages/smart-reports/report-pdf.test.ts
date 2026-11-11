@@ -4,6 +4,7 @@ import { renderReportPdf } from "../../../packages/smart-reports/src/report-pdf-
 import { renderReportPdfInChild } from "../../../packages/smart-reports/src/report-pdf-process.js";
 import {
   reportDocumentFixture,
+  factualReportDocumentFixture,
   maximumReportDocumentFixture
 } from "../../helpers/report-document.js";
 const hasTextTool = spawnSync("pdftotext", ["-v"]).status === 0;
@@ -26,6 +27,20 @@ function pageCount(body: Buffer): number {
   return Number(text.match(/^Pages:\s+(\d+)$/m)?.[1]);
 }
 describe("bounded canonical PDF renderer", () => {
+  it.skipIf(!hasTextTool)(
+    "includes intentional factual highlights and preserves their evidence references in PDF",
+    async () => {
+      const document = factualReportDocumentFixture();
+      const text = extract(await renderReportPdf({ document, available_source_refs: [] })).replace(
+        /\s+/g,
+        " "
+      );
+      expect(text).toContain("New incidents: 0");
+      expect(text).toContain("Coverage: lifecycle");
+      expect(text).toContain(document.report.facts.projects[0]!.coverage_ref);
+      expect(text).not.toContain("AI analysis is unavailable");
+    }
+  );
   it("links only to the configured authenticated online report and rejects a mismatched report location", async () => {
     const document = reportDocumentFixture(),
       url = `https://app.example.test/reports/${document.report.organization_id}/${document.run_id}`,

@@ -70,25 +70,31 @@ export function createReportSchedulerStore(
             kind: "scheduled"
           });
         } catch (error) {
+          const identityLimit =
+            error instanceof Error && error.message === "report_identity_limit_exceeded";
           if (
-            !(error instanceof SmartReportError) ||
-            ![
-              "forbidden",
-              "email_verification_required",
-              "invalid_report_scope",
-              "invalid_report_recipient",
-              "upgrade_required"
-            ].includes(error.code)
+            !identityLimit &&
+            (!(error instanceof SmartReportError) ||
+              ![
+                "forbidden",
+                "email_verification_required",
+                "invalid_report_scope",
+                "invalid_report_recipient",
+                "upgrade_required"
+              ].includes(error.code))
           )
             throw error;
-          const planLost = error.code === "upgrade_required";
+          const code = error instanceof SmartReportError ? error.code : null;
+          const planLost = code === "upgrade_required";
           await tx.query(
             `UPDATE report_definitions SET paused_at=clock_timestamp(),pause_reason=$2,requires_owner_review=$3,version=version+1,updated_at=clock_timestamp() WHERE id=$1`,
             [
               candidate.id,
               planLost
                 ? "plan_lost"
-                : error.code === "invalid_report_scope" || error.code === "invalid_report_recipient"
+                : identityLimit ||
+                    code === "invalid_report_scope" ||
+                    code === "invalid_report_recipient"
                   ? "scope_unavailable"
                   : "creator_access_lost",
               planLost

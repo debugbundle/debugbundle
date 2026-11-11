@@ -33,6 +33,26 @@ function fixture() {
   return { app, view, source };
 }
 describe("authenticated report output", () => {
+  it("negotiates intended factual success while retaining the exact legacy document shape", async () => {
+    const { app, view } = fixture();
+    const document = {
+      ...reportDocumentFixture(),
+      version: 2,
+      analysis: { status: "not_requested", reason: null, model: null, request_sha256: null }
+    };
+    view.mockResolvedValue({ document, available_source_refs: [] });
+    const path = `/v1/organizations/${reportOrg}/reports/${reportRequest}/document`;
+    const legacy = await app.inject({ method: "GET", url: path, headers });
+    expect(legacy.statusCode).toBe(200);
+    expect(legacy.json().document).toEqual(reportDocumentFixture());
+    const current = await app.inject({ method: "GET", url: `${path}?version=2`, headers });
+    expect(current.statusCode).toBe(200);
+    expect(current.json().document).toEqual(document);
+    expect(
+      (await app.inject({ method: "GET", url: `${path}?version=3`, headers })).statusCode
+    ).toBe(400);
+    await app.close();
+  });
   it("uses current actual reader scope with generation disabled and returns only the closed canonical view", async () => {
     const { app, view } = fixture();
     const response = await app.inject({

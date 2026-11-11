@@ -56,6 +56,7 @@ export interface CreateApiDependenciesInput {
   stripeConfig?: StripeConfig;
   referralConfig?: ReferralConfig;
   smartReportConfig?: ReportRuntimeConfiguration;
+  smartImprovementReviewsEnabled?: boolean;
   appBaseUrl?: string;
   publicStatusBaseUrl?: string;
   publicStatusTrustProxy?: boolean;

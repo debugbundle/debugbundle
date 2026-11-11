@@ -174,7 +174,7 @@ describeSiteDocs("public site AnalyticsBundle documentation", () => {
     expect(homepage).toContain(
       "Use opt-in analytics to understand affected journeys and friction."
     );
-    expect(homepage).toContain("href: '/docs/analytics/'");
+    expect(homepage).toContain("href: '/analytics/'");
     expect(homepage).toContain("promptId: 'product-analytics-workflow'");
     expect(prompts).toContain("'product-analytics-workflow'");
     expect(prompts).toContain("https://debugbundle.com/docs/analytics");

@@ -1,3 +1,5 @@
+import { REPORT_IDENTITY_MIGRATION } from "../../packages/storage/src/report-identity-schema.js";
+import { REPORT_PRODUCT_MIGRATION } from "../../packages/storage/src/report-product-schema.js";
 import { REPORT_COLLECTOR_MIGRATION } from "../../packages/storage/src/report-collector-schema.js";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeEach, expect, it } from "vitest";
@@ -165,7 +167,7 @@ runIntegration("organisation report definitions", () => {
     });
     expect(resumed).toMatchObject({ requires_owner_review: false, pause_reason: null });
   });
-  it("rejects new hosted definitions outside Business and a mismatched expected workspace", async () => {
+  it("rejects new hosted definitions on Free and a mismatched expected workspace", async () => {
     await expect(
       store.create({
         organization_id: org,
@@ -174,7 +176,7 @@ runIntegration("organisation report definitions", () => {
         definition: { ...definition(), expected_organization_id: randomUUID() }
       })
     ).rejects.toThrow("organization_context_changed");
-    await pool.query("UPDATE organizations SET plan='team' WHERE id=$1", [org]);
+    await pool.query("UPDATE organizations SET plan='free' WHERE id=$1", [org]);
     await expect(create()).rejects.toThrow("upgrade_required");
   });
   it.each(["deletion", "transfer"])(
@@ -296,7 +298,7 @@ runIntegration("organisation report definitions", () => {
       "DROP FUNCTION debugbundle_pause_report_definitions(),debugbundle_delete_source_report_definitions()"
     );
     await pool.query(
-      "DROP TABLE report_collection_progress,report_email_deliveries,report_runs,report_collection_coverage,report_source_text,report_definitions"
+      "DROP TABLE report_pdf_projections,report_identity_snapshots,report_collection_progress,report_email_deliveries,report_runs,report_collection_coverage,report_source_text,report_definitions"
     );
     await pool.query("DELETE FROM storage_migration_ledger WHERE id=ANY($1::text[])", [
       [
@@ -305,7 +307,9 @@ runIntegration("organisation report definitions", () => {
         REPORT_AVAILABILITY_MIGRATION.id,
         REPORT_RUN_MIGRATION.id,
         REPORT_EMAIL_MIGRATION.id,
-        REPORT_COLLECTOR_MIGRATION.id
+        REPORT_COLLECTOR_MIGRATION.id,
+        REPORT_IDENTITY_MIGRATION.id,
+        REPORT_PRODUCT_MIGRATION.id
       ]
     ]);
     await expect(assertStorageSchemaMigrationsApplied(db)).rejects.toThrow(
@@ -317,7 +321,9 @@ runIntegration("organisation report definitions", () => {
       REPORT_AVAILABILITY_MIGRATION.id,
       REPORT_RUN_MIGRATION.id,
       REPORT_EMAIL_MIGRATION.id,
-      REPORT_COLLECTOR_MIGRATION.id
+      REPORT_COLLECTOR_MIGRATION.id,
+      REPORT_IDENTITY_MIGRATION.id,
+      REPORT_PRODUCT_MIGRATION.id
     ]);
     await create();
     expect((await migrateStorageSchema(db)).applied).toEqual([]);

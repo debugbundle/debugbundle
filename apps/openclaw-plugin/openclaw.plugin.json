@@ -2,7 +2,7 @@
   "id": "debugbundle",
   "name": "DebugBundle",
   "description": "Use DebugBundle for runtime error reporting, incident response, live app monitoring, health checks, debug bundles, and product analytics.",
-  "version": "1.22.0",
+  "version": "1.23.0",
   "configSchema": {
     "type": "object",
     "properties": {
@@ -18,6 +18,12 @@
   },
   "contracts": {
     "tools": [
+      "debugbundle_list_improvement_reviews",
+      "debugbundle_get_improvement_review",
+      "debugbundle_get_improvement_review_bundle",
+      "debugbundle_get_improvement_review_settings",
+      "debugbundle_update_improvement_review_settings",
+      "debugbundle_get_improvement_review_allowance",
       "debugbundle_list_report_deliveries",
       "debugbundle_prepare_report_pdf",
       "debugbundle_get_report_pdf",
@@ -214,6 +220,24 @@
     ]
   },
   "toolMetadata": {
+    "debugbundle_list_improvement_reviews": {
+      "optional": true
+    },
+    "debugbundle_get_improvement_review": {
+      "optional": true
+    },
+    "debugbundle_get_improvement_review_bundle": {
+      "optional": true
+    },
+    "debugbundle_get_improvement_review_settings": {
+      "optional": true
+    },
+    "debugbundle_update_improvement_review_settings": {
+      "optional": true
+    },
+    "debugbundle_get_improvement_review_allowance": {
+      "optional": true
+    },
     "debugbundle_list_report_deliveries": {
       "optional": true
     },

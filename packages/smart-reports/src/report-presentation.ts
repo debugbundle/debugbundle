@@ -25,7 +25,9 @@ export function reportPeriodLabel(period: ReportPeriod): string {
     end = new Date(Date.parse(period.ends_at) - 1);
   return `${date.format(start) === date.format(end) ? date.format(start) : date.formatRange(start, end).replace(/\s*–\s*/g, "–")} UTC`;
 }
-export function reportRunPresentation(run: Pick<ReportRunRecord, "status" | "skip_reason">): {
+export function reportRunPresentation(
+  run: Pick<ReportRunRecord, "status" | "skip_reason"> & Partial<Pick<ReportRunRecord, "ai_status">>
+): {
   label: string;
   description: string;
   tone: "info" | "warning" | "destructive" | "success";
@@ -34,7 +36,10 @@ export function reportRunPresentation(run: Pick<ReportRunRecord, "status" | "ski
     case "ready":
       return {
         label: "Ready",
-        description: "Recorded facts and AI analysis are available.",
+        description:
+          run.ai_status === "unavailable"
+            ? "Your factual report is ready."
+            : "Recorded facts and AI analysis are available.",
         tone: "success"
       };
     case "factual_only":
@@ -96,7 +101,12 @@ export function reportRunPresentation(run: Pick<ReportRunRecord, "status" | "ski
   }
 }
 /** Fixed customer copy; internal diagnostics never cross the report boundary. */
-export function reportAnalysisExplanation(reason: ReportDocument["analysis"]["reason"]): string {
+export function reportAnalysisExplanation(
+  reason: ReportDocument["analysis"]["reason"],
+  status?: ReportDocument["analysis"]["status"]
+): string {
+  if (status === "not_requested")
+    return "This report is generated from recorded facts. AI analysis is not included.";
   const explanations = {
     model_unavailable: "AI analysis is unavailable for this report.",
     input_limit:
@@ -149,18 +159,28 @@ export function reportMetricComparison(item: ReportModelMetric): { change: strin
 }
 export function reportEvidenceSections(doc: ReportDocument): {
   urgent: ReportDocument["report"]["facts"]["evidence"];
+  focus: ReportDocument["report"]["facts"]["evidence"];
+  happened: ReportDocument["report"]["facts"]["evidence"];
   solved: ReportDocument["report"]["facts"]["evidence"];
   coming: string;
 } {
-  const facts = doc.report.facts;
+  const facts = doc.report.facts,
+    severity = { critical: 0, high: 1, medium: 2, low: 3, unknown: 4 },
+    outstanding = facts.evidence
+      .filter((item) => item.status === "open" || item.status === "regressed")
+      .sort((a, b) => severity[a.severity] - severity[b.severity]),
+    urgent = outstanding.filter((item) => item.severity === "critical" || item.severity === "high");
   return {
-    urgent: facts.evidence
-      .filter(
-        (item) =>
-          (item.status === "open" || item.status === "regressed") &&
-          (item.severity === "high" || item.severity === "critical")
-      )
-      .sort((a, b) => Number(b.severity === "critical") - Number(a.severity === "critical")),
+    urgent,
+    // Keep every selected urgent item; use remaining focus slots for concrete
+    // lower-severity work in intentional factual reports. Business stays fixed.
+    focus:
+      doc.analysis.status === "not_requested"
+        ? outstanding.slice(0, Math.max(5, urgent.length))
+        : urgent,
+    happened: facts.evidence.filter((item) =>
+      item.period_events.some((event) => ["new", "regressed", "reopened"].includes(event))
+    ),
     solved: facts.evidence.filter(
       (item) =>
         (item.status === "resolved" && item.period_events.includes("resolved")) ||
@@ -169,4 +189,61 @@ export function reportEvidenceSections(doc: ReportDocument): {
     coming:
       facts.period.kind === "daily" ? "day" : facts.period.kind === "weekly" ? "week" : "month"
   };
+}
+
+/** A concise per-project digest of saved facts, shared by web/HTML/PDF. Never
+ * pool visitor identities or check downtime across projects, infer a cause, or
+ * interpret missing/partial observations as healthy or comparable trends. */
+export function reportFactualHighlights(
+  doc: ReportDocument
+): Array<{ text: string; evidence_refs: string[] }> {
+  if (doc.analysis.status !== "not_requested") return [];
+  return doc.report.facts.projects.map((project) => {
+    const selected = doc.report.facts.metrics.filter(
+        (metric) => metric.project_ref === project.ref
+      ),
+      refs = [project.coverage_ref],
+      statements: string[] = [];
+    for (const key of [
+      "new_incidents",
+      "regressions",
+      "distinct_resolved_incidents",
+      "analytics_sessions"
+    ] as const) {
+      const metric = selected.find((item) => item.key === key);
+      if (!metric) continue;
+      refs.push(metric.ref);
+      let line = `${reportMetricLabels[key]}: ${formatReportValue(metric.current, metric.current_complete)}`;
+      if (
+        (key === "new_incidents" || key === "analytics_sessions") &&
+        metric.current_complete &&
+        metric.previous_complete &&
+        metric.comparison?.comparison_available &&
+        metric.comparison.current_per_day !== null &&
+        metric.comparison.previous_per_day !== null
+      )
+        line += ` (daily rate ${reportNumber.format(metric.comparison.current_per_day)} vs ${reportNumber.format(metric.comparison.previous_per_day)})`;
+      statements.push(line);
+    }
+    const total = selected.find((item) => item.key === "total_checks"),
+      successful = selected.find((item) => item.key === "successful_checks");
+    if (
+      total?.current !== null &&
+      total?.current !== undefined &&
+      total.current > 0 &&
+      successful?.current !== null &&
+      successful?.current !== undefined
+    ) {
+      refs.push(total.ref, successful.ref);
+      statements.push(
+        `Successful health checks: ${reportNumber.format(successful.current)} of ${reportNumber.format(total.current)} observed${total.current_complete && successful.current_complete ? "" : " (partial)"}; this is monitored-check coverage, not account uptime`
+      );
+    }
+    if (!statements.length)
+      statements.push("No selected metric observations; missing data is unknown");
+    statements.push(
+      `Coverage: lifecycle ${project.coverage.lifecycle}, availability ${project.coverage.availability}, analytics ${project.coverage.analytics}`
+    );
+    return { text: `${project.name} — ${statements.join(". ")}.`, evidence_refs: refs };
+  });
 }

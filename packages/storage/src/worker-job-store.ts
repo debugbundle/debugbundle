@@ -9,6 +9,7 @@ export const WorkerJobNameSchema = z.enum([
   "sync-billing-contact",
   "reconcile-referral-receipts",
   "generate-smart-report",
+  "generate-improvement-review",
   "render-smart-report-pdf",
   "deliver-smart-report-email",
   "normalize-events",

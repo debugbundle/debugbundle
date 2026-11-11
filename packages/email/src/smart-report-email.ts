@@ -34,7 +34,9 @@ export function renderSmartReportEmail(input: {
     { solved, urgent, coming } = reportEvidenceSections(doc),
     location = reportDashboardLocation(doc.report.organization_id, doc.run_id, input.appBaseUrl);
   const period = `${facts.period.starts_at.slice(0, 10)} to ${facts.period.ends_at.slice(0, 10)} (end exclusive, UTC)`,
-    overview = narrative?.overview.text ?? reportAnalysisExplanation(doc.analysis.reason),
+    overview =
+      narrative?.overview.text ??
+      reportAnalysisExplanation(doc.analysis.reason, doc.analysis.status),
     scope = `${facts.projects.length} selected projects · ${facts.privacy_mode} evidence mode`,
     text: string[] = [
       `DebugBundle ${facts.period.kind} report`,

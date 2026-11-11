@@ -3,9 +3,21 @@ import { afterEach, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { ReportContentView } from "../../../apps/web/src/components/system/report-content-view.js";
 import { ReportDocumentSchema } from "../../../packages/smart-reports/src/report-document.js";
-import { reportDocumentFixture } from "../../helpers/report-document.js";
+import {
+  reportDocumentFixture,
+  factualReportDocumentFixture
+} from "../../helpers/report-document.js";
 import { reportProject, reportRequest } from "../../helpers/smart-reports.js";
 afterEach(cleanup);
+
+it("presents intentional factual reports as ready with a linked deterministic overview", () => {
+  const document = factualReportDocumentFixture();
+  render(<ReportContentView view={{ document, available_source_refs: [] }} />);
+  expect(screen.getByText("Ready")).toBeVisible();
+  expect(screen.getByRole("region", { name: "Overview" })).toHaveTextContent("Coverage:");
+  expect(screen.getByRole("heading", { name: "What happened" })).toBeVisible();
+  expect(screen.queryByText("Facts only")).not.toBeInTheDocument();
+});
 
 it("renders validated analysis references and active priorities while escaping evidence prose and gating source links", () => {
   const doc = reportDocumentFixture(),

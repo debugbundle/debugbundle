@@ -28,7 +28,7 @@ export async function recordReportHealthRecovery(
     `INSERT INTO report_health_recoveries(project_id,result_id,check_id,occurred_at)
  SELECT $1,$2,$3,$4 WHERE EXISTS(SELECT 1 FROM report_collection_coverage c
  JOIN report_definitions d ON d.id=c.definition_id JOIN organizations o ON o.id=d.organization_id
- WHERE c.project_id=$1 AND d.enabled AND d.paused_at IS NULL AND NOT d.requires_owner_review AND (o.plan='business' OR $5::boolean) AND o.suspended_at IS NULL AND ${REPORT_TRIAL_ENTITLEMENT_SQL})
+ WHERE c.project_id=$1 AND d.enabled AND d.paused_at IS NULL AND NOT d.requires_owner_review AND (o.plan IN ('solo','team','business') OR $5::boolean) AND o.suspended_at IS NULL AND ${REPORT_TRIAL_ENTITLEMENT_SQL})
  ON CONFLICT(project_id,result_id) DO NOTHING`,
     [input.project_id, input.result_id, input.check_id, input.occurred_at, isSelfHostMode()]
   );

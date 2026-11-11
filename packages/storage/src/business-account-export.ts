@@ -1,3 +1,6 @@
+import { createImprovementReviewStore } from "./improvement-review-store.js";
+import { createImprovementReviewSettingsStore } from "./improvement-review-settings.js";
+import { ReviewListQuerySchema } from "../../smart-improvements/src/review-contract.js";
 import { z } from "zod";
 import { isCurrentBillingOwner } from "./billing-owner.js";
 import { createReportDefinitionStore } from "./report-definition-store.js";
@@ -11,6 +14,8 @@ import { SmartReportError } from "../../smart-reports/src/report-errors.js";
 import { ReportRunCursorSchema } from "../../smart-reports/src/report-run-api-contract.js";
 import type { Queryable } from "./types.js";
 export const BusinessAccountExportSectionSchema = z.enum([
+  "improvement_review_settings",
+  "improvement_reviews",
   "report_definitions",
   "report_runs",
   "report_deliveries",
@@ -141,7 +146,11 @@ export function createBusinessAccountExportStore(db: Queryable): {
         }
       }
       if (cursor) {
-        if (["referral_partner", "customer_referral"].includes(query.section))
+        if (
+          ["referral_partner", "customer_referral", "improvement_review_settings"].includes(
+            query.section
+          )
+        )
           throw new Error("invalid_account_export_cursor");
         if (
           ["report_definitions", "referral_commissions", "referral_payouts"].includes(
@@ -176,7 +185,32 @@ export function createBusinessAccountExportStore(db: Queryable): {
       const egressChecks: Array<() => Promise<boolean>> = [];
       let items: Record<string, unknown>[] = [],
         next: string | null = null;
-      if (query.section === "report_definitions") {
+      if (query.section === "improvement_review_settings") {
+        const settings = await createImprovementReviewSettingsStore(db).get(scope);
+        items = [{ ...settings }];
+        egressChecks.push(async () => {
+          const current = await createImprovementReviewSettingsStore(db).get(scope);
+          return current.version === settings.version;
+        });
+      } else if (query.section === "improvement_reviews") {
+        const store = createImprovementReviewStore(db);
+        const page = await store.list({
+          ...scope,
+          limit: Math.min(query.limit, 50),
+          ...(cursor ? { cursor: ReviewListQuerySchema.shape.cursor.parse(cursor.after) } : {})
+        });
+        next = page.next_cursor;
+        for (const review of page.items) {
+          items.push({
+            ...review,
+            bundle_url: `/v1/organizations/${input.organization_id}/improvements/reviews/${review.id}/bundle`
+          });
+          egressChecks.push(async () => {
+            await store.get({ ...scope, id: review.id });
+            return true;
+          });
+        }
+      } else if (query.section === "report_definitions") {
         const definitions = (await createReportDefinitionStore(db).list(scope))
           .sort((a, b) => a.id.localeCompare(b.id))
           .filter((d) => !cursor || d.id > z.uuid().parse(cursor.after));

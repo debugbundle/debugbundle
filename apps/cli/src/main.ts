@@ -1,3 +1,7 @@
+import {
+  handleImprovementReviewCommand,
+  type improvementReviewsWithAuthCommand
+} from "./improvement-review-commands.js";
 import { handleReferralCommand, type referralsWithAuthCommand } from "./referral-commands.js";
 import {
   handleOrganizationCommand,
@@ -93,6 +97,7 @@ export type CliDependencies = ManagementCommandDependencies &
     notificationCommand?: typeof notificationWithAuthCommand;
     organizationCommand?: typeof organizationWithAuthCommand;
     referralsCommand?: typeof referralsWithAuthCommand;
+    improvementReviewsCommand?: typeof improvementReviewsWithAuthCommand;
     reportsCommand?: typeof reportsWithAuthCommand;
     reportRunsCommand?: typeof reportRunsWithAuthCommand;
     agentReadCommand?: typeof defaultAgentReadCommand;
@@ -889,6 +894,11 @@ export async function runCli(
     }
 
     if (command === "improvements") {
+      if (parsedArgv.positionals[1] === "reviews")
+        return await handleImprovementReviewCommand(
+          parsedArgv,
+          dependencies.improvementReviewsCommand
+        );
       return await handleImprovementsCommand(parsedArgv, dependencies);
     }
 

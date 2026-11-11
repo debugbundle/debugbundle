@@ -39,6 +39,8 @@ export function createTokenApiServer(
     reportDefinitions?: ApiServerDependencies["reportDefinitions"];
     reportAllowance?: ApiServerDependencies["reportAllowance"];
     reportRuns?: ApiServerDependencies["reportRuns"];
+    improvementReviews?: ApiServerDependencies["improvementReviews"];
+    improvementReviewsEnabled?: boolean;
     reportGenerationEnabled?: boolean;
     reportContent?: ApiServerDependencies["reportContent"];
     reportPdf?: ApiServerDependencies["reportPdf"];
@@ -77,6 +79,12 @@ export function createTokenApiServer(
     ...(overrides.organizationEmails === undefined
       ? {}
       : { organizationEmails: overrides.organizationEmails }),
+    ...(overrides.improvementReviews === undefined
+      ? {}
+      : { improvementReviews: overrides.improvementReviews }),
+    ...(overrides.improvementReviewsEnabled === undefined
+      ? {}
+      : { improvementReviewsEnabled: overrides.improvementReviewsEnabled }),
     ingestionPersistence: {
       persistAndEnqueue: vi.fn()
     },

@@ -46,7 +46,9 @@ export function useVisibleRowSelection(ids: string[]): {
       setSelectedIds([]);
     },
     toggleId: (id) => {
-      setSelectedIds((current) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id]));
+      setSelectedIds((current) =>
+        current.includes(id) ? current.filter((value) => value !== id) : [...current, id]
+      );
     },
     toggleSelectAll: () => {
       setSelectedIds((current) => {
@@ -64,6 +66,7 @@ export function SelectableTableActions(input: {
   selectedCount: number;
   allSelected: boolean;
   isBusy?: boolean;
+  showEmptySelectionHint?: boolean;
   primaryActionLabel: string;
   secondaryActionLabel: string;
   primaryActionDisabled?: boolean;
@@ -79,6 +82,7 @@ export function SelectableTableActions(input: {
     selectedCount,
     allSelected,
     isBusy = false,
+    showEmptySelectionHint = true,
     primaryActionLabel,
     secondaryActionLabel,
     primaryActionDisabled = false,
@@ -96,29 +100,55 @@ export function SelectableTableActions(input: {
   return (
     <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-        <p className="text-sm text-muted-foreground">
-          {hasSelection
-            ? `${selectedCount} ${itemLabel}${selectedCount === 1 ? "" : "s"} selected on this page.`
-            : `Select ${itemLabelPlural} on this page to apply a bulk action.`}
-        </p>
+        {hasSelection || showEmptySelectionHint ? (
+          <p className="text-sm text-muted-foreground">
+            {hasSelection
+              ? `${selectedCount} ${itemLabel}${selectedCount === 1 ? "" : "s"} selected on this page.`
+              : `Select ${itemLabelPlural} on this page to apply a bulk action.`}
+          </p>
+        ) : null}
         <div className="flex flex-wrap items-center gap-2">
           {!allSelected && hasItems ? (
-            <Button type="button" variant="ghost" size="sm" disabled={isBusy} onClick={onToggleSelectAll}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={isBusy}
+              onClick={onToggleSelectAll}
+            >
               {`Select all visible ${itemLabelPlural}`}
             </Button>
           ) : null}
           {hasSelection ? (
-            <Button type="button" variant="ghost" size="sm" disabled={isBusy} onClick={onClearSelection}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={isBusy}
+              onClick={onClearSelection}
+            >
               Clear selection
             </Button>
           ) : null}
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" variant="outline" size="sm" disabled={primaryActionDisabled || isBusy} onClick={onPrimaryAction}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={primaryActionDisabled || isBusy}
+          onClick={onPrimaryAction}
+        >
           {primaryActionLabel}
         </Button>
-        <Button type="button" variant="outline" size="sm" disabled={secondaryActionDisabled || isBusy} onClick={onSecondaryAction}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={secondaryActionDisabled || isBusy}
+          onClick={onSecondaryAction}
+        >
           {secondaryActionLabel}
         </Button>
       </div>
@@ -168,11 +198,23 @@ export function StickyMobileTableActions(input: {
         <p className="text-sm font-medium text-foreground">{selectedCount} selected</p>
         <div className="flex items-center gap-2">
           {!allSelected && totalCount > 0 ? (
-            <Button type="button" variant="ghost" size="sm" disabled={isBusy} onClick={onToggleSelectAll}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={isBusy}
+              onClick={onToggleSelectAll}
+            >
               Select all
             </Button>
           ) : null}
-          <Button type="button" variant="ghost" size="sm" disabled={isBusy} onClick={onClearSelection}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={isBusy}
+            onClick={onClearSelection}
+          >
             Clear
           </Button>
         </div>

@@ -1,4 +1,8 @@
 import { createReportCollectorStore } from "../../../packages/storage/src/report-collector-store.js";
+import { createImprovementReviewScheduler } from "../../../packages/storage/src/improvement-review-scheduler.js";
+import { maintainImprovementReviews } from "../../../packages/storage/src/improvement-review-retention.js";
+import { configureImprovementReviews } from "../../../packages/smart-improvements/src/runtime-config.js";
+import { processNextImprovementReview } from "./improvement-review-processor.js";
 import { configureSmartReports } from "../../../packages/smart-reports/src/report-runtime-config.js";
 import { createReportSchedulerStore } from "../../../packages/storage/src/report-scheduler-store.js";
 import { createReportArtifactStore } from "../../../packages/storage/src/report-artifact-store.js";
@@ -24,6 +28,9 @@ export function createSmartReportProcessor(input: {
   emailSend?: ReportEmailSend | null;
 }): () => Promise<{ processed: boolean }> {
   const config = configureSmartReports(input.env);
+  const reviews = configureImprovementReviews(input.env),
+    reviewScheduler = createImprovementReviewScheduler(input.db);
+  let nextReviewScheduleAt = 0;
   const scheduler = createReportSchedulerStore(input.db, {
       profile: config.profile,
       monthly_budget_nano_usd: config.monthly_budget_nano_usd
@@ -51,41 +58,63 @@ export function createSmartReportProcessor(input: {
     return result;
   }
   const generate = (): Promise<{ processed: boolean }> =>
-    processNextSmartReportJob({ db: input.db, objects: input.objects, model: config.model });
+    config.enabled
+      ? processNextSmartReportJob({ db: input.db, objects: input.objects, model: config.model })
+      : Promise.resolve({ processed: false });
   async function email(): Promise<{ processed: boolean }> {
-    if (!emailSend || Date.now() < nextEmailAt) return { processed: false };
+    if (!config.enabled || !emailSend || Date.now() < nextEmailAt) return { processed: false };
     const result = await emails.processNext(emailSend);
     nextEmailAt = result.processed ? 0 : Date.now() + 5000;
     return result;
   }
-  const tasks = [pdf, generate, email];
+  async function review(): Promise<{ processed: boolean }> {
+    if (!reviews.enabled) return { processed: false };
+    let scheduled = false;
+    if (Date.now() >= nextReviewScheduleAt) {
+      scheduled = (await reviewScheduler.scheduleNext()).processed;
+      nextReviewScheduleAt = Date.now() + 5000;
+    }
+    return {
+      processed:
+        (await processNextImprovementReview({ db: input.db, model: reviews.model })).processed ||
+        scheduled
+    };
+  }
+  const tasks = [pdf, generate, email, review];
   return async () => {
     try {
       let maintained = false,
         cleaned = false,
         pruned = 0;
       if (Date.now() >= nextMaintenanceAt) {
+        // A housekeeping failure still surfaces, but must not starve existing
+        // PDF/report work on every pass. Reads independently enforce expiry.
+        nextMaintenanceAt = Date.now() + 60000;
         maintained = await maintainNextReportRun(input.db);
+        maintained = (await maintainImprovementReviews(input.db)) || maintained;
         cleaned = await artifacts.cleanupNext(input.objects);
         pruned = await emails.prune();
         nextMaintenanceAt = maintained || cleaned || pruned > 0 ? 0 : Date.now() + 60000;
       }
-      if (!config.enabled) {
+      if (!config.enabled && !reviews.enabled) {
         const prepared = await pdf();
         return { processed: maintained || cleaned || pruned > 0 || prepared.processed };
       }
       let collected = false;
-      if (Date.now() >= nextCollectionAt) {
+      if (config.enabled && Date.now() >= nextCollectionAt) {
         collected = (await collector.processNext({ now: new Date().toISOString() })).processed;
         nextCollectionAt = Date.now() + 5000;
       }
-      const scheduled = await scheduler.scheduleNext();
-      const scheduledEmail = await emails.scheduleNext();
+      const scheduled = config.enabled ? await scheduler.scheduleNext() : { processed: false };
+      const scheduledEmail = config.enabled ? await emails.scheduleNext() : { processed: false };
+      const start = nextWork;
       for (let offset = 0; offset < tasks.length; offset++) {
-        const index = (nextWork + offset) % tasks.length,
-          result = await tasks[index]!();
+        const index = (start + offset) % tasks.length;
+        // Advance before awaiting: a failing optional task must not repeatedly
+        // prevent the other report/PDF/email tasks from getting their next turn.
+        nextWork = (index + 1) % tasks.length;
+        const result = await tasks[index]!();
         if (result.processed) {
-          nextWork = (index + 1) % tasks.length;
           return { processed: true };
         }
       }

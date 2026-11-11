@@ -198,7 +198,7 @@ export function ProjectAgentCredentialsCard({ projectId }: { projectId: string }
                 <TableHead>Scope</TableHead>
                 <TableHead>Expires</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Action</TableHead>
+                <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -216,10 +216,11 @@ export function ProjectAgentCredentialsCard({ projectId }: { projectId: string }
                           : "Active"}
                     </Badge>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-right">
                     {token.revoked_at === null ? (
                       <ResourceDeleteDialog
                         label="Revoke agent credential"
+                        triggerLabel="Revoke"
                         description={`Revoke ${token.label}. Any assistant using this credential will lose incident evidence access for this project.`}
                         disabled={pending}
                         onConfirm={() => void revoke(token)}

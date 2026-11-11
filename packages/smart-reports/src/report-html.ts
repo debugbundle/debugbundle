@@ -3,6 +3,7 @@ import {
   reportMetricComparison,
   formatReportValue,
   reportEvidenceSections,
+  reportFactualHighlights,
   reportAnalysisExplanation,
   reportPeriodLabel,
   reportTimeLabel
@@ -44,11 +45,15 @@ export function renderReportHtml(
     facts = doc.report.facts,
     narrative = doc.narrative;
   const available = new Set(options.available_source_refs ?? []);
-  const { urgent, solved, coming } = reportEvidenceSections(doc);
+  const { urgent, focus, solved, coming } = reportEvidenceSections(doc);
   const period = reportPeriodLabel(facts.period);
   const overview = narrative
     ? `<p>${escape(narrative.overview.text)} ${refs(narrative.overview.evidence_refs)}</p>`
-    : `<div class="notice"><strong>Factual report</strong><p>${escape(reportAnalysisExplanation(doc.analysis.reason))}</p></div>`;
+    : `<div class="notice"><strong>Factual report</strong><p>${escape(reportAnalysisExplanation(doc.analysis.reason, doc.analysis.status))}</p></div>${reportFactualHighlights(
+        doc
+      )
+        .map((item) => `<p>${escape(item.text)} ${refs(item.evidence_refs)}</p>`)
+        .join("")}`;
   const highlights =
     narrative && narrative.highlights.length
       ? `<h2>What happened</h2><ul>${narrative.highlights.map((item) => `<li><span class="meta">${escape(item.kind.replaceAll("_", " "))}</span> — ${escape(item.text)} ${refs(item.evidence_refs)}</li>`).join("")}</ul>`
@@ -61,9 +66,9 @@ export function renderReportHtml(
   const priorities =
     narrative && narrative.priorities.length
       ? `${urgent.length ? evidence(urgent, doc) : ""}<ol>${narrative.priorities.map((item) => `<li><strong>${escape(item.title)}</strong><p>${escape(item.action)}</p><p class="muted">${escape(item.rationale)} ${refs(item.evidence_refs)}</p></li>`).join("")}</ol>`
-      : urgent.length
-        ? evidence(urgent, doc)
-        : "<p>No selected high or critical work is recorded. Incomplete coverage does not establish that no issues exist.</p>";
+      : focus.length
+        ? `${doc.analysis.status === "not_requested" ? "<p>Review outstanding work in severity order, verify the linked evidence and check for recurrence after a bounded change.</p>" : ""}${evidence(focus, doc)}`
+        : `<p>No selected ${doc.analysis.status === "not_requested" ? "outstanding" : "high or critical"} work is recorded. Incomplete coverage does not establish that no issues exist.</p>`;
   const projects = facts.projects
     .map(
       (project) =>

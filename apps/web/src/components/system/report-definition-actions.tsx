@@ -1,3 +1,4 @@
+import { reportPolicy } from "../../../../../packages/smart-reports/src/report-policy.js";
 import { useReportContext } from "../../lib/use-report-context.js";
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -99,8 +100,10 @@ export function ReportDefinitionActions({
         <div className="flex flex-col gap-2">
           <p className="font-medium">{reportPeriodLabel(command.current?.period ?? period)}</p>
           <p className="text-sm text-muted-foreground">
-            Uses one report from your workspace allowance. The selected evidence may be sent for AI
-            analysis.
+            Uses one report from your workspace allowance.{" "}
+            {reportPolicy(session?.organization_plan, session?.self_hosted ?? false).ai
+              ? "AI definitions may send selected evidence for analysis; saved factual definitions stay factual."
+              : "This factual report makes no AI request."}
           </p>
         </div>
         {definition.recipient_user_ids.length ? (

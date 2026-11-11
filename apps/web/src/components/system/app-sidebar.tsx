@@ -32,8 +32,8 @@ import {
 const navMain = [
   { to: "/dashboard", label: "Dashboard", icon: HomeIcon },
   { to: "/incidents", label: "Incidents", icon: SirenIcon },
-  { to: "/health-status", label: "Health Status", icon: HeartPulseIcon },
   { to: "/improvements", label: "Improvements", icon: SparklesIcon },
+  { to: "/health-status", label: "Health Status", icon: HeartPulseIcon },
   { to: "/projects", label: "Projects", icon: FolderKanbanIcon },
   { to: "/analytics/workspace", label: "Analytics", icon: BarChart3Icon },
   { to: "/reports", label: "Reports", icon: FileTextIcon },

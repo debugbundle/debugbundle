@@ -59,7 +59,7 @@ export function createReportCollectorStore(db: Queryable): ReportCollectorStore 
             `SELECT d.id,d.organization_id
     FROM report_definitions d JOIN organizations o ON o.id=d.organization_id
     LEFT JOIN report_collection_progress p ON p.definition_id=d.id
-    WHERE d.enabled AND d.paused_at IS NULL AND NOT d.requires_owner_review AND (o.plan='business' OR $2::boolean) AND o.suspended_at IS NULL AND ${REPORT_TRIAL_ENTITLEMENT_SQL}
+    WHERE d.enabled AND d.paused_at IS NULL AND NOT d.requires_owner_review AND (o.plan IN ('solo','team','business') OR $2::boolean) AND o.suspended_at IS NULL AND ${REPORT_TRIAL_ENTITLEMENT_SQL}
       AND (p.definition_id IS NULL OR p.definition_version<>d.version OR p.next_due_at<=$1::timestamptz)
     ORDER BY COALESCE(p.last_processed_at,'-infinity'::timestamptz),d.id
     LIMIT 1 FOR UPDATE OF o SKIP LOCKED`,

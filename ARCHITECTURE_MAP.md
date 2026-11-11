@@ -1,3 +1,20 @@
+Local Smart Products candidate (not deployed; `spec/smart-products.md`):
+- `packages/smart-improvements`: browser-safe closed contracts/policy, server-side
+  deterministic priorities/digest and bounded provider client/qualification config.
+- `packages/storage/improvement-review-*`: scope/consent, fair scheduler, frozen
+  facts, independent allowance, lease-fenced paid intents/settlement, publication,
+  current-access reads, export links and bounded retention. Worker is a thin adapter
+  in the existing serial report lane; no new service or ingestion work.
+- `packages/improvement-review-client`, API review routes, CLI review commands and
+  ordinary MCP tools share the same domain path. Restricted/OpenAI catalogs stay fixed.
+- Report identity snapshots/PDF projection provenance and frozen factual product
+  modes use separate forward migrations; startup requires every new schema guard.
+- `smart-reports/report-presentation` owns deterministic factual highlights/focus
+  shared by web/HTML/PDF. Review source relationships are scoped/validated before
+  the separate provider projection; ordinary MCP documents explicit chat consent.
+- Shared Improvements review primitives and the existing Reports UI reuse current
+  design tokens; `site/app/(site)/analytics` uses the public site primitives.
+
 Released boundary (core 1.24.0, 10 November 2026): storage
 `report-model-diagnostic-schema.ts` adds the nullable allowlisted operator code
 through its own forward migration; `report-model-attempt-store.ts` keeps that code
@@ -6,6 +23,12 @@ provider schema complement the unchanged canonical narrative validator. Model
 failures preserve readable facts without another paid attempt. The API/worker
 run the exact qualified `78783e7c` image; later evidence commits do not replace it.
 Release and remaining external acceptance: `spec/smart-report-release-20261110.md`.
+
+`apps/web/src/pages/improvements-page.tsx` owns the URL-selected Opportunities
+and Weekly reviews panels, using shared Tabs primitives. Both browser and memory
+routers register `/improvements/reviews`; the existing review section owns all
+review loading, consent and permissions. Opportunity filter/selection state stays
+in the page while inactive tab content and actions unmount.
 
 `apps/web/src/components/system/resource-empty-state.tsx` composes the existing
 Empty primitives for project/workspace/public resource lists and data panels.
@@ -631,6 +654,13 @@ Detailed implementation plans live in `spec/sdks/`. Current published lines are 
 ### Public Site
 
 The public documentation/marketing/blog site lives in the standalone public repo `github.com/debugbundle/site` and is cloned locally at the root `site/` path when documentation work is needed.
+
+**Public support chat:** `site/app/layout.tsx` mounts the Owner-provided Crisp
+bootstrap through Next.js Script (`afterInteractive`) once for marketing, docs and
+blog routes. The loader preserves existing commands/API state, inserts one async
+provider script and does not pass account/project data. `site/app/(site)/privacy`
+discloses support-chat processing separately from first-party analytics. The
+authenticated web app and core runtime are outside this integration.
 
 **Pricing documentation:** `/pricing/` owns public prices and plan comparisons. The
 existing `/docs/pricing/` route is the Plans and capacity guide; it explains shared

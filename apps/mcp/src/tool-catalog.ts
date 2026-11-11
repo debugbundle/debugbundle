@@ -55,6 +55,7 @@ import { WEBHOOK_MCP_TOOL_NAMES } from "./webhook-tools.js";
 import { WEEKLY_REPORT_MCP_TOOL_NAMES } from "./weekly-report-tools.js";
 
 type McpToolName =
+  | (typeof IMPROVEMENT_REVIEW_MCP_TOOL_NAMES)[number]
   | (typeof REPORT_DELIVERY_MCP_TOOL_NAMES)[number]
   | (typeof REPORT_PDF_MCP_TOOL_NAMES)[number]
   | (typeof REPORT_RUN_MCP_TOOL_NAMES)[number]
@@ -135,6 +136,7 @@ import { MCP_TOOL_CATALOG_FOUNDATION } from "./tool-catalog-foundation.js";
 import { MCP_TOOL_CATALOG_OPERATIONS } from "./tool-catalog-operations.js";
 
 export const MCP_TOOL_CATALOG = [
+  ...IMPROVEMENT_REVIEW_MCP_TOOL_CATALOG,
   ...REPORT_DELIVERY_MCP_TOOL_CATALOG,
   ...REPORT_PDF_MCP_TOOL_CATALOG,
   ...REPORT_MCP_TOOL_CATALOG,
@@ -314,6 +316,10 @@ export const MCP_TOOL_NAMES = MCP_TOOL_CATALOG.map((tool) => tool.name);
 
 export type { McpToolCatalogEntry, McpToolGroup, McpToolName };
 import { REPORT_MCP_TOOL_NAMES, REPORT_MCP_TOOL_CATALOG } from "./report-tools.js";
+import {
+  IMPROVEMENT_REVIEW_MCP_TOOL_NAMES,
+  IMPROVEMENT_REVIEW_MCP_TOOL_CATALOG
+} from "./improvement-review-tools.js";
 import { REPORT_RUN_MCP_TOOL_NAMES, REPORT_RUN_MCP_TOOL_CATALOG } from "./report-run-tools.js";
 import { REPORT_PDF_MCP_TOOL_NAMES, REPORT_PDF_MCP_TOOL_CATALOG } from "./report-pdf-tools.js";
 import {

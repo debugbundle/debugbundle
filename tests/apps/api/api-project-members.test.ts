@@ -7,34 +7,48 @@ const PROJECT_ID = "550e8400-e29b-41d4-a716-446655440000";
 const INVITE_ID = "550e8400-e29b-41d4-a716-446655440001";
 const USER_ID = "660e8400-e29b-41d4-a716-446655440000";
 
-function createServer(overrides: {
-  auditLogging?: { createAuditLog: ReturnType<typeof vi.fn> } | undefined;
-  memberAuth?: { resolveMemberByTokenHash: ReturnType<typeof vi.fn> } | undefined;
-  webAuth?: { resolveSessionByToken: ReturnType<typeof vi.fn> } | undefined;
-  inviteEmails?: { sendProjectInviteEmail: ReturnType<typeof vi.fn> } | undefined;
-  authRateLimiter?: Parameters<typeof createApiServer>[0]["authRateLimiter"];
-  accountManagement?: {
-    getUserAvatar: ReturnType<typeof vi.fn>;
-    saveUserAvatar: ReturnType<typeof vi.fn>;
-    exportAccountForOrganization?: ReturnType<typeof vi.fn>;
-    deleteAccountForOrganization?: ReturnType<typeof vi.fn>;
-  } | undefined;
-  objectStoreReader?: Parameters<typeof createApiServer>[0]["objectStoreReader"];
-  projectManagement?: {
-    resolveProjectAccessForUser: ReturnType<typeof vi.fn>;
-  } | undefined;
-  projectCollaboration?: {
-    listMembersForProject: ReturnType<typeof vi.fn>;
-    listPendingInvitesForProject: ReturnType<typeof vi.fn>;
-    createInviteForProject: ReturnType<typeof vi.fn>;
-    cancelInviteForProject: ReturnType<typeof vi.fn>;
-    updateProjectMemberRole: ReturnType<typeof vi.fn>;
-    removeProjectMember: ReturnType<typeof vi.fn>;
-    leaveProjectMembership: ReturnType<typeof vi.fn>;
-  } | undefined;
-} = {}): ReturnType<typeof createApiServer> {
-  const hasProjectManagementOverride = Object.prototype.hasOwnProperty.call(overrides, "projectManagement");
-  const hasProjectCollaborationOverride = Object.prototype.hasOwnProperty.call(overrides, "projectCollaboration");
+function createServer(
+  overrides: {
+    auditLogging?: { createAuditLog: ReturnType<typeof vi.fn> } | undefined;
+    memberAuth?: { resolveMemberByTokenHash: ReturnType<typeof vi.fn> } | undefined;
+    webAuth?: { resolveSessionByToken: ReturnType<typeof vi.fn> } | undefined;
+    inviteEmails?: { sendProjectInviteEmail: ReturnType<typeof vi.fn> } | undefined;
+    authRateLimiter?: Parameters<typeof createApiServer>[0]["authRateLimiter"];
+    accountManagement?:
+      | {
+          getUserAvatar: ReturnType<typeof vi.fn>;
+          saveUserAvatar: ReturnType<typeof vi.fn>;
+          exportAccountForOrganization?: ReturnType<typeof vi.fn>;
+          deleteAccountForOrganization?: ReturnType<typeof vi.fn>;
+        }
+      | undefined;
+    objectStoreReader?: Parameters<typeof createApiServer>[0]["objectStoreReader"];
+    projectManagement?:
+      | {
+          resolveProjectAccessForUser: ReturnType<typeof vi.fn>;
+        }
+      | undefined;
+    projectCollaboration?:
+      | {
+          listMembersForProject: ReturnType<typeof vi.fn>;
+          listPendingInvitesForProject: ReturnType<typeof vi.fn>;
+          createInviteForProject: ReturnType<typeof vi.fn>;
+          cancelInviteForProject: ReturnType<typeof vi.fn>;
+          updateProjectMemberRole: ReturnType<typeof vi.fn>;
+          removeProjectMember: ReturnType<typeof vi.fn>;
+          leaveProjectMembership: ReturnType<typeof vi.fn>;
+        }
+      | undefined;
+  } = {}
+): ReturnType<typeof createApiServer> {
+  const hasProjectManagementOverride = Object.prototype.hasOwnProperty.call(
+    overrides,
+    "projectManagement"
+  );
+  const hasProjectCollaborationOverride = Object.prototype.hasOwnProperty.call(
+    overrides,
+    "projectCollaboration"
+  );
 
   return createApiServer({
     ingestionPersistence: {
@@ -84,68 +98,66 @@ function createServer(overrides: {
       createMemberTokenForOrganization: vi.fn().mockResolvedValue(null),
       revokeMemberTokenForOrganization: vi.fn().mockResolvedValue(null)
     },
-    projectManagement:
-      hasProjectManagementOverride
-        ? ({
-            resolveProjectAccessForUser: overrides.projectManagement?.resolveProjectAccessForUser,
-            listProjectsForOrganization: vi.fn().mockResolvedValue([]),
-            createProjectForOrganization: vi.fn().mockResolvedValue(null),
-            updateProjectForOrganization: vi.fn().mockResolvedValue(null),
-            deleteProjectForOrganization: vi.fn().mockResolvedValue(null)
-          } as Parameters<typeof createApiServer>[0]["projectManagement"])
-        : ({
-            resolveProjectAccessForUser: vi.fn().mockResolvedValue({
-              project_id: PROJECT_ID,
-              project_name: "Checkout API",
-              organization_id: "org_123",
-              owner_user_id: "usr_123",
-              owner_email: "owner@example.com",
-              relationship: "owned",
-              effective_role: "owner",
-              organization_plan: "team"
-            }),
-            listProjectsForOrganization: vi.fn().mockResolvedValue([]),
-            createProjectForOrganization: vi.fn().mockResolvedValue(null),
-            updateProjectForOrganization: vi.fn().mockResolvedValue(null),
-            deleteProjectForOrganization: vi.fn().mockResolvedValue(null)
-          } as Parameters<typeof createApiServer>[0]["projectManagement"]),
-    projectCollaboration:
-      hasProjectCollaborationOverride
-        ? overrides.projectCollaboration
-        : ({
-            listMembersForProject: vi.fn().mockResolvedValue({
-              owner_plan: "team",
-              members: []
-            }),
-            listPendingInvitesForProject: vi.fn().mockResolvedValue([]),
-            createInviteForProject: vi.fn().mockResolvedValue({
-              kind: "created",
-              owner_plan: "team",
-              invite: {
-                invite_id: INVITE_ID,
-                project_id: PROJECT_ID,
-                email: "new@example.com",
-                role: "member",
-                invited_by_user_id: "usr_123",
-                accepted_at: null,
-                canceled_at: null,
-                expires_at: "2026-03-23T00:00:00.000Z",
-                created_at: "2026-03-16T00:00:00.000Z"
-              }
-            }),
-            cancelInviteForProject: vi.fn().mockResolvedValue(null),
-            updateProjectMemberRole: vi.fn().mockResolvedValue(null),
-            removeProjectMember: vi.fn().mockResolvedValue(null),
-            leaveProjectMembership: vi.fn().mockResolvedValue(null)
-          } as {
-            listMembersForProject: ReturnType<typeof vi.fn>;
-            listPendingInvitesForProject: ReturnType<typeof vi.fn>;
-            createInviteForProject: ReturnType<typeof vi.fn>;
-            cancelInviteForProject: ReturnType<typeof vi.fn>;
-            updateProjectMemberRole: ReturnType<typeof vi.fn>;
-            removeProjectMember: ReturnType<typeof vi.fn>;
-            leaveProjectMembership: ReturnType<typeof vi.fn>;
+    projectManagement: hasProjectManagementOverride
+      ? ({
+          resolveProjectAccessForUser: overrides.projectManagement?.resolveProjectAccessForUser,
+          listProjectsForOrganization: vi.fn().mockResolvedValue([]),
+          createProjectForOrganization: vi.fn().mockResolvedValue(null),
+          updateProjectForOrganization: vi.fn().mockResolvedValue(null),
+          deleteProjectForOrganization: vi.fn().mockResolvedValue(null)
+        } as Parameters<typeof createApiServer>[0]["projectManagement"])
+      : ({
+          resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+            project_id: PROJECT_ID,
+            project_name: "Checkout API",
+            organization_id: "org_123",
+            owner_user_id: "usr_123",
+            owner_email: "owner@example.com",
+            relationship: "owned",
+            effective_role: "owner",
+            organization_plan: "team"
           }),
+          listProjectsForOrganization: vi.fn().mockResolvedValue([]),
+          createProjectForOrganization: vi.fn().mockResolvedValue(null),
+          updateProjectForOrganization: vi.fn().mockResolvedValue(null),
+          deleteProjectForOrganization: vi.fn().mockResolvedValue(null)
+        } as Parameters<typeof createApiServer>[0]["projectManagement"]),
+    projectCollaboration: hasProjectCollaborationOverride
+      ? overrides.projectCollaboration
+      : ({
+          listMembersForProject: vi.fn().mockResolvedValue({
+            owner_plan: "team",
+            members: []
+          }),
+          listPendingInvitesForProject: vi.fn().mockResolvedValue([]),
+          createInviteForProject: vi.fn().mockResolvedValue({
+            kind: "created",
+            owner_plan: "team",
+            invite: {
+              invite_id: INVITE_ID,
+              project_id: PROJECT_ID,
+              email: "new@example.com",
+              role: "member",
+              invited_by_user_id: "usr_123",
+              accepted_at: null,
+              canceled_at: null,
+              expires_at: "2026-03-23T00:00:00.000Z",
+              created_at: "2026-03-16T00:00:00.000Z"
+            }
+          }),
+          cancelInviteForProject: vi.fn().mockResolvedValue(null),
+          updateProjectMemberRole: vi.fn().mockResolvedValue(null),
+          removeProjectMember: vi.fn().mockResolvedValue(null),
+          leaveProjectMembership: vi.fn().mockResolvedValue(null)
+        } as {
+          listMembersForProject: ReturnType<typeof vi.fn>;
+          listPendingInvitesForProject: ReturnType<typeof vi.fn>;
+          createInviteForProject: ReturnType<typeof vi.fn>;
+          cancelInviteForProject: ReturnType<typeof vi.fn>;
+          updateProjectMemberRole: ReturnType<typeof vi.fn>;
+          removeProjectMember: ReturnType<typeof vi.fn>;
+          leaveProjectMembership: ReturnType<typeof vi.fn>;
+        }),
     incidentRetrieval: {
       listIncidentsForOrganization: vi.fn().mockResolvedValue([]),
       getIncidentForOrganization: vi.fn().mockResolvedValue(null),
@@ -159,8 +171,12 @@ function createServer(overrides: {
       ? {}
       : {
           accountManagement: {
-            exportAccountForOrganization: overrides.accountManagement.exportAccountForOrganization ?? vi.fn().mockResolvedValue(null),
-            deleteAccountForOrganization: overrides.accountManagement.deleteAccountForOrganization ?? vi.fn().mockResolvedValue(null),
+            exportAccountForOrganization:
+              overrides.accountManagement.exportAccountForOrganization ??
+              vi.fn().mockResolvedValue(null),
+            deleteAccountForOrganization:
+              overrides.accountManagement.deleteAccountForOrganization ??
+              vi.fn().mockResolvedValue(null),
             getUserAvatar: overrides.accountManagement.getUserAvatar,
             saveUserAvatar: overrides.accountManagement.saveUserAvatar
           }
@@ -438,7 +454,12 @@ describe("api project member routes", () => {
     const objectStoreReader = {
       getObject: vi.fn().mockResolvedValue(Buffer.from("avatar-body"))
     };
-    const app = createServer({ projectManagement, projectCollaboration, accountManagement, objectStoreReader });
+    const app = createServer({
+      projectManagement,
+      projectCollaboration,
+      accountManagement,
+      objectStoreReader
+    });
 
     const response = await app.inject({
       method: "GET",
@@ -607,78 +628,81 @@ describe("api project member routes", () => {
     });
   });
 
-  it("updates project member roles and preserves owner-role protections", async (): Promise<void> => {
-    const projectManagement = {
-      resolveProjectAccessForUser: vi.fn().mockResolvedValue({
-        project_id: PROJECT_ID,
-        organization_id: "org_123",
-        owner_user_id: "usr_123",
-        owner_email: "owner@example.com",
-        relationship: "owned",
-        effective_role: "admin",
-        organization_plan: "team"
-      })
-    };
-    const projectCollaboration = {
-      listMembersForProject: vi.fn().mockResolvedValue({ owner_plan: "team", members: [] }),
-      listPendingInvitesForProject: vi.fn().mockResolvedValue([]),
-      createInviteForProject: vi.fn().mockResolvedValue(null),
-      cancelInviteForProject: vi.fn().mockResolvedValue(null),
-      updateProjectMemberRole: vi
-        .fn()
-        .mockResolvedValueOnce({
-          kind: "updated",
-          member: {
-            user_id: USER_ID,
-            email: "alice@example.com",
-            role: "admin",
-            membership_type: "collaborator",
-            created_at: "2026-03-16T01:00:00.000Z"
-          }
+  it.each(["admin", "member", "viewer"] as const)(
+    "updates project member roles to %s and preserves owner-role protections",
+    async (role): Promise<void> => {
+      const projectManagement = {
+        resolveProjectAccessForUser: vi.fn().mockResolvedValue({
+          project_id: PROJECT_ID,
+          organization_id: "org_123",
+          owner_user_id: "usr_123",
+          owner_email: "owner@example.com",
+          relationship: "owned",
+          effective_role: "admin",
+          organization_plan: "team"
         })
-        .mockResolvedValueOnce({
-          kind: "owner_role_change_forbidden"
-        }),
-      removeProjectMember: vi.fn().mockResolvedValue(null),
-      leaveProjectMembership: vi.fn().mockResolvedValue(null)
-    };
-    const app = createServer({ projectManagement, projectCollaboration });
+      };
+      const projectCollaboration = {
+        listMembersForProject: vi.fn().mockResolvedValue({ owner_plan: "team", members: [] }),
+        listPendingInvitesForProject: vi.fn().mockResolvedValue([]),
+        createInviteForProject: vi.fn().mockResolvedValue(null),
+        cancelInviteForProject: vi.fn().mockResolvedValue(null),
+        updateProjectMemberRole: vi
+          .fn()
+          .mockResolvedValueOnce({
+            kind: "updated",
+            member: {
+              user_id: USER_ID,
+              email: "alice@example.com",
+              role,
+              membership_type: "collaborator",
+              created_at: "2026-03-16T01:00:00.000Z"
+            }
+          })
+          .mockResolvedValueOnce({
+            kind: "owner_role_change_forbidden"
+          }),
+        removeProjectMember: vi.fn().mockResolvedValue(null),
+        leaveProjectMembership: vi.fn().mockResolvedValue(null)
+      };
+      const app = createServer({ projectManagement, projectCollaboration });
 
-    const success = await app.inject({
-      method: "PATCH",
-      url: `/v1/projects/${PROJECT_ID}/members/${USER_ID}`,
-      headers: {
-        authorization: "Bearer dbundle_mem_test"
-      },
-      payload: {
-        role: "admin"
-      }
-    });
-    const conflict = await app.inject({
-      method: "PATCH",
-      url: `/v1/projects/${PROJECT_ID}/members/${USER_ID}`,
-      headers: {
-        authorization: "Bearer dbundle_mem_test"
-      },
-      payload: {
-        role: "member"
-      }
-    });
+      const success = await app.inject({
+        method: "PATCH",
+        url: `/v1/projects/${PROJECT_ID}/members/${USER_ID}`,
+        headers: {
+          authorization: "Bearer dbundle_mem_test"
+        },
+        payload: {
+          role
+        }
+      });
+      const conflict = await app.inject({
+        method: "PATCH",
+        url: `/v1/projects/${PROJECT_ID}/members/${USER_ID}`,
+        headers: {
+          authorization: "Bearer dbundle_mem_test"
+        },
+        payload: {
+          role: "member"
+        }
+      });
 
-    expect(success.statusCode).toBe(200);
-    expect(success.json()).toEqual({
-      member: {
-        user_id: USER_ID,
-        email: "alice@example.com",
-        role: "admin",
-        membership_type: "collaborator",
-        avatar_url: null,
-        created_at: "2026-03-16T01:00:00.000Z"
-      }
-    });
-    expect(conflict.statusCode).toBe(409);
-    expect(conflict.json()).toEqual({ error: "owner_role_change_not_allowed" });
-  });
+      expect(success.statusCode).toBe(200);
+      expect(success.json()).toEqual({
+        member: {
+          user_id: USER_ID,
+          email: "alice@example.com",
+          role,
+          membership_type: "collaborator",
+          avatar_url: null,
+          created_at: "2026-03-16T01:00:00.000Z"
+        }
+      });
+      expect(conflict.statusCode).toBe(409);
+      expect(conflict.json()).toEqual({ error: "owner_role_change_not_allowed" });
+    }
+  );
 
   it("removes project members and preserves owner-removal protections", async (): Promise<void> => {
     const projectCollaboration = {
@@ -774,18 +798,16 @@ describe("api project member routes", () => {
       cancelInviteForProject: vi.fn().mockResolvedValue(null),
       updateProjectMemberRole: vi.fn().mockResolvedValue(null),
       removeProjectMember: vi.fn().mockResolvedValue(null),
-      leaveProjectMembership: vi
-        .fn()
-        .mockResolvedValueOnce({
-          kind: "left",
-          member: {
-            user_id: "usr_123",
-            email: "member@example.com",
-            role: "member",
-            membership_type: "collaborator",
-            created_at: "2026-03-16T01:00:00.000Z"
-          }
-        })
+      leaveProjectMembership: vi.fn().mockResolvedValueOnce({
+        kind: "left",
+        member: {
+          user_id: "usr_123",
+          email: "member@example.com",
+          role: "member",
+          membership_type: "collaborator",
+          created_at: "2026-03-16T01:00:00.000Z"
+        }
+      })
     };
     const app = createServer({
       memberAuth: {

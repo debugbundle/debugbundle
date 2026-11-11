@@ -28,6 +28,11 @@ const NO_SMART_REPORT_CAPABILITIES = {
 
 const TEAM_CAPABILITIES = {
   ...NO_SMART_REPORT_CAPABILITIES,
+  smart_reports: true,
+  monthly_smart_report_generations: 8,
+  max_smart_report_definitions: 2,
+  max_smart_report_projects: 5,
+  max_smart_report_recipients: 5,
   remote_probes: true,
   github_automation: true,
   slack_integration: true,
@@ -100,6 +105,11 @@ export const TIER_CAPABILITIES = {
   },
   solo: {
     ...NO_SMART_REPORT_CAPABILITIES,
+    smart_reports: true,
+    monthly_smart_report_generations: 2,
+    max_smart_report_definitions: 1,
+    max_smart_report_projects: 3,
+    max_smart_report_recipients: 1,
     remote_probes: true,
     github_automation: true,
     slack_integration: false,
@@ -252,4 +262,8 @@ export function getTierCapabilities(plan: string | undefined): TierCapabilities 
 /** Business product features are unlocked on self-host; roles and scope still apply. */
 export function hasBusinessEntitlement(plan: string | undefined, selfHosted = false): boolean {
   return plan === "business" || selfHosted;
+}
+/** Reports are available on paid plans; AI remains separately Business-only. */
+export function hasReportEntitlement(plan: string | undefined, selfHosted = false): boolean {
+  return selfHosted || plan === "solo" || plan === "team" || plan === "business";
 }

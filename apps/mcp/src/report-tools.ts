@@ -43,14 +43,14 @@ export const REPORT_MCP_TOOL_CATALOG = [
     name: REPORT_MCP_TOOL_NAMES[2],
     inputSchema: create,
     description:
-      "Save a Business Smart Report definition with explicit project selection and source consent. Enabled schedules may send bounded redacted evidence to the configured model and email verified recipients. Reuse the same request UUID and command after a lost acknowledgement. Capacity does not multiply the five-definition limit.",
+      "Save a report definition with explicit projects and evidence consent. Before enabling, obtain explicit chat confirmation of workspace, selected projects, cadence/time, evidence mode, verified email recipients and recurring allowance/provider use. Solo includes monthly factual reports; Team weekly/monthly factual reports; Business daily/weekly/monthly AI reports with safe factual fallback. Only AI definitions may send redacted evidence to a configured model. Reuse the request UUID after a lost acknowledgement and read the saved definition back. Capacity does not multiply plan limits.",
     read: false
   },
   {
     name: REPORT_MCP_TOOL_NAMES[3],
     inputSchema: replace,
     description:
-      "Replace a Smart Report definition using expected_version and current administration of all selected projects. Changes affect future unclaimed work and may alter scheduled AI/email delivery. Unchanged selections keep frozen origins; only the current Owner may explicitly clear a plan-loss review pause.",
+      "Replace a Smart Report definition using expected_version and current administration of all selected projects. Confirm the proposed scope, cadence, evidence consent and AI/email changes in chat before saving, then read the saved definition back. Changes affect future unclaimed work and may alter scheduled AI/email delivery. Unchanged selections keep frozen origins; only the current Owner may explicitly clear a plan-loss review pause.",
     read: false
   },
   {

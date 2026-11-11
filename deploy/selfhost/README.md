@@ -326,3 +326,23 @@ Rollback may retain the additive tables, but older application code will resume 
 previous alert behavior and will not enforce these new preferences. Keep this in
 mind when validating a rollback; saved preferences become effective again only
 when a compatible API/worker is active.
+
+### Smart Products candidate
+
+Run the ordered `db-migrate` dependency before starting API/worker code requiring
+`202611100001_add_report_identity_snapshots`,
+`202611100002_add_factual_report_products` and
+`202611100003_add_weekly_improvement_reviews`. Startup/readiness fails closed when
+the ledger or required shape/guards is missing. Do not use bootstrap to upgrade
+an installed schema. These are additive changes; no destructive cleanup deploy.
+
+Existing report switches/budget remain independent. Optional weekly reviews use
+`SMART_IMPROVEMENTS_ENABLED=false` by default. New AI additionally requires
+`SMART_IMPROVEMENTS_AI_ENABLED`, dedicated `SMART_IMPROVEMENTS_AI_API_KEY`, and
+`SMART_IMPROVEMENTS_AI_QUALIFIED_PROFILE=weekly-review-terra-v1` after separately
+authorised provider qualification. No qualified result ships with this candidate.
+Missing AI configuration produces factual evidence without provider requests;
+maintenance/archive/privacy checks continue with generation disabled. The review
+pool is independent of reports (bounded self-host profile: 50 attempts / USD 1.50
+per anchored month, maximum USD 0.025 per attempt). Owner scope and consent still
+apply. See [Smart Products](../../spec/smart-products.md) for lifecycle and limits.

@@ -1,4 +1,4 @@
-import { hasBusinessEntitlement } from "../../../../packages/shared-types/src/tier-capabilities.js";
+import { hasReportEntitlement } from "../../../../packages/shared-types/src/tier-capabilities.js";
 import { useReportContext } from "../lib/use-report-context.js";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -145,7 +145,7 @@ export function ReportEditorPage(): JSX.Element {
   const visible = data?.key === key ? data : null,
     projects = session && visible ? reportManageableProjects(visible.projects, session) : [],
     allowed =
-      hasBusinessEntitlement(session?.organization_plan, session?.self_hosted) &&
+      hasReportEntitlement(session?.organization_plan, session?.self_hosted) &&
       projects.length > 0 &&
       (!visible?.definition ||
         visible.definition.scope.every((item) =>
@@ -240,7 +240,7 @@ export function ReportEditorPage(): JSX.Element {
       {!visible && !loadError ? <Skeleton className="h-48 w-full" /> : null}
       {visible && !allowed ? (
         <Notice tone="warning">
-          Report editing requires Business and administration of every selected project. Existing
+          Report editing requires a paid plan and administration of every selected project. Existing
           archives remain subject to their own read access.
         </Notice>
       ) : null}
@@ -250,12 +250,15 @@ export function ReportEditorPage(): JSX.Element {
             <CardTitle>{visible.definition ? "Edit report" : "New report"}</CardTitle>
             <CardDescription>
               Save these settings to reuse them. Full evidence is recommended and requires your
-              consent.
+              consent. Reports created on Solo or Team stay factual after an upgrade; create a new
+              Business report when you want AI analysis.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form className="flex flex-col gap-6" onSubmit={save}>
               <ReportDefinitionFields
+                plan={session?.organization_plan ?? "free"}
+                selfHosted={session?.self_hosted ?? false}
                 value={value}
                 onChange={setValue}
                 projects={projects.map((project) => ({

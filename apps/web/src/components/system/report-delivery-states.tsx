@@ -24,7 +24,7 @@ const reasons: Record<string, string> = {
   recipient_unavailable: "The saved recipient is unavailable or their email is no longer verified.",
   recipient_access_lost: "The recipient can no longer read every project in this report.",
   creator_access_lost: "The saved creator can no longer manage the entire report scope.",
-  plan_lost: "Email delivery requires current Business entitlement.",
+  plan_lost: "Email delivery requires current report entitlement.",
   report_unavailable: "The report was removed or its privacy/access requirements changed.",
   delivery_expired:
     "The delivery window expired. The report may still be readable until its separate expiry."

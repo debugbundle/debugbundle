@@ -41,6 +41,58 @@ function completed(overrides: Record<string, unknown> = {}) {
   };
 }
 describe("budgeted report model client", () => {
+  it("keeps restricted identity metadata out of both requests and rejects an identity-bearing response once", async () => {
+    const facts = structuredClone(cases.cases[0]!.facts);
+    facts.privacy_mode = "restricted";
+    facts.projects[0]!.notes = ["HiddenAcme has partial coverage."];
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(response({ object: "response.input_tokens", input_tokens: 1000 }))
+      .mockResolvedValueOnce(
+        response(
+          completed({
+            output: [
+              {
+                type: "message",
+                role: "assistant",
+                status: "completed",
+                content: [
+                  {
+                    type: "output_text",
+                    annotations: [],
+                    text: JSON.stringify({
+                      ...narrative,
+                      overview: {
+                        ...narrative.overview,
+                        text: "HiddenAcme observations need review."
+                      },
+                      limitations: [
+                        {
+                          text: "Restricted evidence limits interpretation.",
+                          evidence_refs: ["p01_coverage"]
+                        }
+                      ]
+                    })
+                  }
+                ]
+              }
+            ]
+          })
+        )
+      );
+    const attempt = await createReportModelClient({
+      apiKey: "sk-synthetic-evaluation",
+      fetch: request
+    }).prepare({ model: "gpt-6-luna", facts, identities: ["HiddenAcme"] });
+    expect(await attempt.run(async () => {})).toMatchObject({
+      state: "rejected",
+      reason: "report_unsafe_prose",
+      usage
+    });
+    for (const [, init] of request.mock.calls) expect(init?.body).not.toContain("HiddenAcme");
+    expect(request).toHaveBeenCalledTimes(2);
+    await expect(attempt.run(async () => {})).rejects.toThrow("report_attempt_already_used");
+  });
   it("preflights the full prompt/schema then requires a durable admission before a single paid request", async () => {
     const order: string[] = [],
       request = vi.fn<typeof fetch>().mockImplementation(async (url) => {

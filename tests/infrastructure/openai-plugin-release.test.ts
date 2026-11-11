@@ -360,6 +360,7 @@ describe("OpenAI plugin release automation", () => {
   it("retains exact additive report-contract and schema hashes in a local candidate and detects later drift", () => {
     withCommittedSource((sourceRoot) => {
       const paths = [
+        "scripts/openai-plugin-source-state.mjs",
         "scripts/openai-plugin-release-lib.mjs",
         "scripts/release-openai-plugin.mjs",
         "contracts/openai-plugin-v1-data-map.md",

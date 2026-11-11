@@ -1,5 +1,11 @@
 export const CLI_USAGE_LINES = [
   "Usage:",
+  "  debugbundle improvements reviews list <organization-id> [--project-id <id>] [--limit <1-50>] [--cursor <saved-cursor>] [--auth-file <path>] [--json]",
+  "  debugbundle improvements reviews get <organization-id> <review-id> [--auth-file <path>] [--json]",
+  "  debugbundle improvements reviews bundle <organization-id> <review-id> [--auth-file <path>] [--json]",
+  "  debugbundle improvements reviews settings <organization-id> [--auth-file <path>] [--json]",
+  "  debugbundle improvements reviews allowance <organization-id> [--auth-file <path>] [--json]",
+  "  debugbundle improvements reviews configure <organization-id> --settings-json <json-with-expected_version-project_ids-source_consent> [--auth-file <path>] [--json]",
   "  debugbundle report-runs list <organization-id> [--limit <1-100>] [--cursor <saved-cursor>] [--auth-file <path>] [--json]",
   "  debugbundle report-runs get <organization-id> <run-id> [--auth-file <path>] [--json]",
   "  debugbundle report-runs content <organization-id> <run-id> [--auth-file <path>] [--json]",

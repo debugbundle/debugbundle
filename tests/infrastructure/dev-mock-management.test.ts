@@ -3,6 +3,42 @@ import { describe, expect, it, vi } from "vitest";
 import { createDevMockApi } from "../../scripts/dev-mock/api.js";
 
 describe("local preview management data", () => {
+  it.each(["viewer", "member", "admin"])(
+    "persists %s project roles and invites in the local preview",
+    (role) => {
+      const api = createDevMockApi();
+      const projectPath = "/v1/projects/00000000-0000-4000-8000-000000000001";
+      expect(
+        api.handle("PATCH", `${projectPath}/members/usr_collaborator`, { role })
+      ).toMatchObject({
+        status: 200,
+        body: { member: { user_id: "usr_collaborator", role } }
+      });
+      expect(api.handle("GET", `${projectPath}/members`).body).toMatchObject({
+        members: expect.arrayContaining([
+          expect.objectContaining({ user_id: "usr_collaborator", role })
+        ])
+      });
+      expect(
+        api.handle("POST", `${projectPath}/invite`, { email: "viewer@example.test", role })
+      ).toMatchObject({
+        status: 200,
+        body: { invite: { email: "viewer@example.test", role } }
+      });
+      expect(api.handle("GET", `${projectPath}/invites`).body).toMatchObject({
+        invites: expect.arrayContaining([
+          expect.objectContaining({ email: "viewer@example.test", role })
+        ])
+      });
+      expect(
+        api.handle("PATCH", `${projectPath}/members/${base.session.user_id}`, { role }).status
+      ).toBe(400);
+      expect(
+        api.handle("PATCH", `${projectPath}/members/usr_collaborator`, { role: "owner" }).status
+      ).toBe(400);
+    }
+  );
+
   it("keeps the first-purchase trial wait in the local simulation", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     try {
