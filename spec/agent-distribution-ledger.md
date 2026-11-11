@@ -3,9 +3,14 @@
 ## Smart Products pin adoption - 11 November 2026
 
 MCP 1.23.0 has passed npm publication, fresh registry installation and native Codex
-checks. Codex 1.7.0, Claude Code 1.23.0 and Gemini 1.6.0 adopt that exact pin with
-explicit report/review consent guidance. Package and public-install verification
-are in progress; final receipts are tracked in [the release record](smart-products-release-20261111.md).
+checks. Codex 1.7.0 and Claude Code 1.23.0 publish from core `5a1c3eb0`; Gemini 1.6.0
+publishes from standalone `bfba800993d5e4a0f8e57a8765c1b9524a6c4a4c` with a matching
+tag and release archive. All adopt exact MCP 1.23.0 with explicit report/review
+consent guidance. Package contracts, public installs, 199-tool discovery, local
+evidence, authentication boundaries, updates and removal pass; Gemini also passes
+Node 22/24/26 and exact public-file/archive parity. ClawHub antivirus/discovery
+acceptance remains incomplete and gallery indexing is separate. See
+[the release record](smart-products-release-20261111.md).
 
 ## Analytics choices pin review - 10 November 2026
 

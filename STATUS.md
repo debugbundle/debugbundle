@@ -1,26 +1,36 @@
-# Smart Products production release — in progress, 11 November 2026
+# Smart Products production release — verified; external marketplace gate open
 
-Owner authorised the full DebugBundle release train and bounded synthetic weekly
-AI qualification. No consumer products are in scope. Core 1.25.0 and app source
-`5662ecfa9c4d317af1bb88a6dffc900f282da449` are live. Full CI 42933424182 passes
-134 shards, PDF checks, audit, lint, types and build. Backend bridge 42938121962
-and activation 42938941486 pass: 90 migrations, all 87 prior checksums and checked
-aggregate counts preserved. Active and rollback images both support v2. Report
-and qualified weekly AI flags are enabled; account settings stay opt-in/off. Live
-legacy/canonical saved-report reads and new settings/allowance/archive checks pass.
-No new attention in DebugBundle's own incidents since rollout. App run 42939755311
-is green and production asset bytes contain the approved UI updates.
+Core 1.25.0 and the app are live from `5662ecfa9c4d317af1bb88a6dffc900f282da449`.
+Runtime CI 42933424182 passes all 134 shards, PDF regressions, audit, lint, types
+and build. Bridge 42938121962 and activation 42938941486 pass: all 90 migrations,
+all 87 prior checksums and checked aggregate counts are preserved. Both retained
+image pairs support v2. Reports and separately qualified weekly AI are enabled;
+account settings stay opt-in. Existing report and new settings/allowance/archive
+reads pass. DebugBundle's own incident check found no new attention since rollout.
 
-Shared types 3.5.0, CLI 1.23.0 (42939747992) and MCP 1.23.0 (42939751580) are public
-with registry/native release checks green. Official Registry 1.23.0 published.
-ClawHub skill/plugin publication is running; strict security/discovery acceptance
-must remain explicit. Developer packages now pin verified MCP 1.23.0: Codex 1.7.0,
-Claude 1.23.0 and Gemini 1.6.0. Source contracts and native local installations pass.
-Remaining: commit/push developer sources, public installs, standalone Gemini tag/
-Release/archive, site guides and 1.9.0 rollout/tag, canonical core 1.25.0 Release,
-final documentation and latest-main CI. Do not claim external scans green until
-actual verification passes. Details: `spec/smart-products-release-20261111.md`,
-`.tmp/release-20261111/state.json` and private cloud runbook.
+App 42939755311 and site 42941740400 pass. Site 1.9.0 serves the Analytics page,
+approved pricing/docs, Crisp support chat, UI fixes and the Business-only article.
+Nine live pages and the sitemap pass content/canonical checks; no new visual or
+Lighthouse score is claimed. Core 1.25.0 and site 1.9.0 canonical releases pass.
+Shared types 3.5.0 and CLI/MCP 1.23.0 are public with registry/native checks green.
+Codex 1.7.0, Claude Code 1.23.0 and Gemini 1.6.0 pass public installation, local
+evidence, authentication, update and removal checks. Gemini Node 22/24/26 and its
+exact five-file source/tag/downloaded archive pass. The official Registry resolves
+1.23.0. Normal public OpenClaw 1.23.0 installation passes on host 2026.11.3.
+
+ClawHub skill/plugin 1.23.0 are public with clean final platform reviews, but their
+required antivirus results are absent and two skill discovery queries miss rank.
+Strict acceptance remains incomplete: no force/security bypass, threshold change
+or repeat upload. Final findings are preserved in
+`spec/smart-products-marketplace-20261111.json`. External gallery indexing remains
+separate. Final source CI is visible in GitHub Actions; deployed artifact and
+successful release receipts are in `spec/smart-products-release-20261111.md`.
+
+Retention is clean: only active plus verified previous remain, containers are
+healthy and 45 GiB is free. No consumer product was changed. Owner authorised the
+full release and bounded evaluation; the evaluation used 32 provider requests and
+USD 0.0220396, with no customer data. Operational evidence is retained under
+`.tmp/release-20261111/` and in the private cloud runbook.
 
 Earlier sections below are historical local-phase records.
 

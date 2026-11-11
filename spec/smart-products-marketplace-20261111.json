@@ -1,0 +1,236 @@
+{
+  "version": "1.23.0",
+  "source_implementation_commit": "5662ecfa9c4d317af1bb88a6dffc900f282da449",
+  "verified_at": "2026-11-11T01:56:32.335Z",
+  "preflight": {
+    "status": "passed",
+    "checkedAt": "2026-11-11T01:43:28.813Z"
+  },
+  "publication": {
+    "officialRegistry": {
+      "status": "published",
+      "receipt": "Publishing to https://registry.modelcontextprotocol.io...\n\u2713 Successfully published\n\u2713 Server com.debugbundle/mcp version 1.23.0"
+    },
+    "clawhub": {
+      "status": "published",
+      "receipt": "- Preparing debugbundle\n\u2714 OK. Published debugbundle@1.23.0 (k9705pzcsc3rdwxn5tmf2k1jsx8j0dj0)"
+    },
+    "clawhubPlugin": {
+      "status": "published",
+      "receipt": "Update submitted for @debugbundle/openclaw-plugin@1.23.0; pending security scans before it becomes public."
+    }
+  },
+  "verification": {
+    "officialRegistry": {
+      "status": "found",
+      "version": "1.23.0"
+    },
+    "clawhub": {
+      "status": "partial",
+      "security": {
+        "version": "1.23.0",
+        "passed": false,
+        "review": {
+          "status": "clean",
+          "hasWarnings": true,
+          "checkedAt": 1794361861123,
+          "model": null,
+          "hasScanResult": true,
+          "sha256hash": "cdb54af66d7cb686479ca3937728130c11bbae2674990f857fd669a9f40db9a2",
+          "scanners": {
+            "skillspector": {
+              "status": "suspicious",
+              "normalizedStatus": "suspicious",
+              "score": 7,
+              "severity": "LOW",
+              "recommendation": "CAUTION",
+              "issueCount": 2,
+              "checkedAt": 1794361861123
+            },
+            "llm": {
+              "status": "clean",
+              "verdict": "benign",
+              "normalizedStatus": "clean",
+              "confidence": "medium",
+              "summary": "The skill is rated benign with medium confidence: the reported findings were judged expected for its purpose, though one referenced local path could not be resolved and the scan is marked partial.",
+              "dimensions": [
+                {
+                  "detail": "Status: ok. The scanner reported no AIG findings, and the verdict treats the two low severity Skillspector flags as expected for the stated purpose.",
+                  "label": "Purpose & Capability",
+                  "name": "purpose_capability",
+                  "rating": "ok"
+                },
+                {
+                  "detail": "Status: ok. The scope creep flag came from license wording and was judged expected for the purpose, so it does not change this dimension's ok status.",
+                  "label": "Instruction Scope",
+                  "name": "instruction_scope",
+                  "rating": "ok"
+                },
+                {
+                  "detail": "Status: ok. The verdict raises no install mechanism concern; the available results do not report an install-related finding.",
+                  "label": "Install Mechanism",
+                  "name": "install_mechanism",
+                  "rating": "ok"
+                },
+                {
+                  "detail": "Status: note. The verdict marks this as a note, but the provided results do not identify a specific environment proportionality issue. Skillspector was partial because a local path-like reference in SKILL.md could not be matched to a bundled artifact.",
+                  "label": "Credentials",
+                  "name": "environment_proportionality",
+                  "rating": "note"
+                },
+                {
+                  "detail": "Status: ok. The permissions flag was judged expected for the purpose, and the verdict reports no persistence concern.",
+                  "label": "Persistence & Privilege",
+                  "name": "persistence_privilege",
+                  "rating": "ok"
+                }
+              ],
+              "guidance": "The verdict is benign, but not risk-free, and confidence is medium. Consider the partial scan when deciding whether to install: Skillspector could not resolve one local path-like reference, so the evidence is incomplete.",
+              "findings": null,
+              "agenticRiskFindings": null,
+              "riskSummary": null,
+              "model": null,
+              "checkedAt": 1794361861123
+            }
+          }
+        },
+        "moderation": {
+          "isSuspicious": false,
+          "isMalwareBlocked": false,
+          "verdict": "clean",
+          "reasonCodes": [],
+          "summary": "No suspicious patterns detected.",
+          "engineVersion": "v2.4.27",
+          "updatedAt": 1794361863912,
+          "evidence": [],
+          "legacyReason": "scanner.llm.clean"
+        }
+      },
+      "slug": "debugbundle",
+      "pageUrl": "https://clawhub.ai/debugbundle/skills/debugbundle",
+      "owner": "debugbundle",
+      "expectedVersion": "1.23.0",
+      "latestVersion": "1.23.0",
+      "license": "MIT-0",
+      "expectedCatalog": {
+        "categories": ["Operations", "Development", "Agents"],
+        "topics": [
+          "debugging",
+          "incident-response",
+          "observability",
+          "developer-tools",
+          "health-checks"
+        ]
+      },
+      "moderationVerdict": "clean",
+      "moderationSummary": "No suspicious patterns detected.",
+      "discoveryChecks": [
+        {
+          "query": "error reporting incident monitoring live apps",
+          "maxRank": 10,
+          "rank": null,
+          "passed": false
+        },
+        {
+          "query": "runtime error reporting",
+          "maxRank": 10,
+          "rank": 1,
+          "passed": true
+        },
+        {
+          "query": "crash reporting",
+          "maxRank": 10,
+          "rank": 1,
+          "passed": true
+        },
+        {
+          "query": "incident response",
+          "maxRank": 10,
+          "rank": 17,
+          "passed": false
+        },
+        {
+          "query": "production monitoring",
+          "maxRank": 10,
+          "rank": 1,
+          "passed": true
+        },
+        {
+          "query": "health checks",
+          "maxRank": 10,
+          "rank": 3,
+          "passed": true
+        },
+        {
+          "query": "debug bundles",
+          "maxRank": 10,
+          "rank": 1,
+          "passed": true
+        }
+      ]
+    },
+    "clawhubPlugin": {
+      "status": "partial",
+      "packageName": "@debugbundle/openclaw-plugin",
+      "pluginId": "debugbundle",
+      "latestVersion": "1.23.0",
+      "security": {
+        "version": "1.23.0",
+        "passed": false,
+        "scanStatus": "clean",
+        "review": {
+          "checkedAt": 1794362091189,
+          "confidence": "high",
+          "dimensions": [
+            {
+              "detail": "Status: ok. The verdict rates this dimension positively, and the scan reported no findings; the results do not describe the plugin\u2019s specific purpose or capabilities.",
+              "label": "Purpose & Capability",
+              "name": "purpose_capability",
+              "rating": "ok"
+            },
+            {
+              "detail": "Status: ok. The verdict rates this dimension positively, and the scan reported no findings related to its checks; the results provide no further detail about the plugin\u2019s instructions.",
+              "label": "Instruction Scope",
+              "name": "instruction_scope",
+              "rating": "ok"
+            },
+            {
+              "detail": "Status: ok. The verdict rates this dimension positively, and the scan reported no findings; the results do not specify how the plugin is installed.",
+              "label": "Install Mechanism",
+              "name": "install_mechanism",
+              "rating": "ok"
+            },
+            {
+              "detail": "Status: ok. The verdict rates this dimension positively, and the scan reported no findings; the results do not describe the plugin\u2019s environment access.",
+              "label": "Credentials",
+              "name": "environment_proportionality",
+              "rating": "ok"
+            },
+            {
+              "detail": "Status: ok. The verdict rates this dimension positively, and the scan reported no findings; the results do not provide specific details about persistence or privilege use.",
+              "label": "Persistence & Privilege",
+              "name": "persistence_privilege",
+              "rating": "ok"
+            }
+          ],
+          "guidance": "The scanner reported no findings and the verdict is benign, but benign does not mean risk-free. Review the publisher and whether the plugin suits your needs before installing.",
+          "status": "clean",
+          "summary": "The verdict is benign with high confidence: the completed AIG-MCP scan reported no findings, and all five assessed dimensions are marked ok.",
+          "verdict": "benign"
+        },
+        "antivirus": null,
+        "staticScan": null,
+        "skillSpector": null
+      },
+      "files": [
+        "LICENSE",
+        "dist/index.js",
+        "openclaw.plugin.json",
+        "package.json",
+        "README.md",
+        "dist/index.d.ts"
+      ]
+    }
+  },
+  "disposition": "Published and exact versions visible. Strict ClawHub acceptance remains incomplete: required antivirus results are absent and two capability-first skill discovery queries miss their required rank. No security bypass or threshold change was used."
+}

@@ -1,7 +1,7 @@
 Smart Products backend and app released in core 1.25.0:
 [spec/smart-products.md](spec/smart-products.md) records the restricted-identity
 guard, zero-AI Solo/Team factual reports, explicitly consented weekly improvement
-reviews and the prepared public Analytics page.
+reviews and the released public Analytics page.
 Reviews reuse the serial worker lane with an independent budget and one paid
 intent. The weekly AI profile passed separate qualification and is enabled in
 the hosted runtime; account settings remain default-off and require Owner consent.
@@ -15,8 +15,9 @@ Release state (11 November 2026): core 1.25.0 and the app are live from
 `5662ecfa`; CLI/MCP 1.23.0 and shared types 3.5.0 are published. All 90 migrations
 are applied, with all prior checksums preserved. Active and retained rollback
 readers support v2; existing report reads, account consent and the report AI budget
-are preserved. Site 1.9.0 and developer-plugin public-install checks are completing.
-Registry and marketplace acceptance is tracked separately in
+are preserved. Site 1.9.0 is live from `a8ca5de8`; Codex 1.7.0, Claude Code 1.23.0
+and Gemini 1.6.0 pass public-install checks with MCP 1.23.0. ClawHub's exact uploads
+are public, but antivirus/discovery acceptance remains incomplete. Details are in
 `spec/smart-products-release-20261111.md`. The previous release remains recorded in
 `spec/smart-report-release-20261110.md`.
 
@@ -24,11 +25,11 @@ Workspace Improvements reuses Analytics-style line tabs: the existing
 `/improvements` inventory is Opportunities and `/improvements/reviews` opens
 Weekly reviews. Shared settings/consent and archive access remain unchanged.
 
-Local public-site support chat: the shared `site/app/layout.tsx` loads the
+Released public-site support chat: the shared `site/app/layout.tsx` loads the
 Owner-provided Crisp widget after hydration across marketing, docs and blog pages.
 It preserves a single loader/session during navigation and adds no app integration
 or identity forwarding. The public privacy page discloses the separate provider.
-This local addition is not deployed.
+This is live in site 1.9.0.
 
 Dashboard empty resource lists and data panels reuse `ResourceEmptyState` with
 the existing Empty primitives, scoped help and permitted actions. The former

@@ -84,7 +84,50 @@ controls from `index-I-IC5Zfb.js`, SHA-256
 `50af24355b3ba7f7eb1aa1b074c597db76ae6a2062f57e378db4994e59d2d93e`.
 
 Codex 1.7.0, Claude Code 1.23.0 and Gemini 1.6.0 adopt verified MCP 1.23.0.
-Their package contracts and fresh native source installations pass, including
-199-tool discovery, authentication boundaries, local evidence, updates and
-removal. Public installation checks, site rollout and final external marketplace
-acceptance follow separately; publication alone is not security-scan acceptance.
+Their package contracts and fresh native source and public Git installations pass,
+including 199-tool discovery, authentication boundaries, local evidence, updates
+and removal. Codex and Claude publish from core `5a1c3eb0`; Gemini publishes from
+standalone `bfba800993d5e4a0f8e57a8765c1b9524a6c4a4c`, with native Node 22/24/26
+checks green. Its [1.6.0 release](https://github.com/debugbundle/debugbundle-gemini/releases/tag/v1.6.0)
+has a downloaded archive matching SHA-256
+`459ee59fa8394c4d2f6c189cfcad123695de5ed0918f3abf5f2d355235ca6886`.
+All five public files and the version tag match core. Gallery indexing remains
+separate from public installation acceptance.
+
+## Public site and canonical release
+
+Site 1.9.0 is deployed from `a8ca5de80cec218da27358a058ce17974deec754`, using
+product source `5a1c3eb0`. Site CI and its canonical tag/release workflow pass.
+Live checks verify nine pages, canonical links, Crisp bootstrap, developer MCP
+1.23.0 guides and sitemap entries for Analytics and the Business article. Pricing
+serves Team's five selected projects / 25 reviews and Business's ten / 50; all five
+testimonial figures retain native semantics. These are served-content and source
+checks, not a new browser/device or Lighthouse score claim.
+
+The [core 1.25.0 release](https://github.com/debugbundle/debugbundle/releases/tag/v1.25.0)
+passes [its release workflow](https://github.com/debugbundle/debugbundle/actions/runs/42941747240)
+at `5a1c3eb0`. Later documentation and developer-package commits do not replace
+the separately recorded deployed runtime source `5662ecfa`. Runtime retention's
+final dry run finds zero deletion candidates: active plus one verified previous
+release remain, all containers are healthy and 45 GiB is free.
+
+## External acceptance remains open
+
+The official MCP Registry resolves exact version 1.23.0. ClawHub accepted both
+the skill and OpenClaw plugin, and both exact versions are public. Final platform
+reviews are clean/benign and skill moderation is clean, but required antivirus
+results are absent. The skill also misses the required rank for two discovery
+queries. Its low-severity heuristic warnings were adjudicated as expected by the
+platform review; the unresolved local-reference coverage note is preserved.
+Complete returned findings, receipts and disposition are retained in
+[`smart-products-marketplace-20261111.json`](smart-products-marketplace-20261111.json).
+Strict marketplace acceptance is **not complete**; no security bypass, threshold
+change or automatic repeat upload was used. Smithery remains a retired publication
+channel. This external gap does not change the verified production deployment or
+the successful npm and developer-plugin installation results.
+
+A normal public install of exact OpenClaw plugin 1.23.0 on qualified host
+2026.11.3 passes installed native scoped requests. It uses the host's standard
+capability consent and retains registry security enforcement, with no force flag.
+This installation result does not substitute for the missing antivirus results
+or the stricter discovery gate.
