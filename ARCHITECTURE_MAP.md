@@ -1,3 +1,8 @@
+MCP ecosystem verification owns exact-version ClawScan security acceptance and
+separate discovery checks. Its report preserves findings and ClawHub's verified
+VirusTotal retirement without inventing an antivirus pass; active audits and
+moderation remain fail-closed.
+
 Dashboard health alert: `workspace-health-alert.ts` reads existing project/check
 APIs in batches of four and reuses shared current-state derivation, excluding
 disabled/paused checks and suspended shares. `workspace-health-alert-context.tsx`

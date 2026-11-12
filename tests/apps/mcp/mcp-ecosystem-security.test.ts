@@ -39,9 +39,7 @@ function pluginRecord() {
       version,
       files: [],
       verification: { scanStatus: "clean" },
-      llmAnalysis: { status: "clean", verdict: "benign" },
-      vtAnalysis: { status: "clean" },
-      staticScan: { status: "clean", findings: [] }
+      llmAnalysis: { status: "clean", verdict: "benign" }
     }
   };
 }
@@ -56,7 +54,7 @@ function skillRecord() {
       security: {
         status: "clean",
         hasScanResult: true,
-        scanners: { vt: { status: "clean" }, llm: { status: "clean", verdict: "benign" } }
+        scanners: { llm: { status: "clean", verdict: "benign" } }
       }
     }
   };
@@ -71,7 +69,7 @@ describe("ClawHub release security acceptance", () => {
       payload.version.verification.scanStatus = status;
       expect(verifyClawHubPluginRecord(payload, target, version).status).toBe("partial");
     }
-    for (const field of ["verification", "llmAnalysis", "vtAnalysis"]) {
+    for (const field of ["verification", "llmAnalysis"]) {
       const payload = pluginRecord();
       Reflect.deleteProperty(payload.version, field);
       expect(verifyClawHubPluginRecord(payload, target, version).status).toBe("partial");
@@ -82,6 +80,83 @@ describe("ClawHub release security acceptance", () => {
     const flagged = pluginRecord();
     flagged.version.llmAnalysis.status = "suspicious";
     expect(verifyClawHubPluginRecord(flagged, target, version).status).toBe("partial");
+  });
+
+  it("records provider retirement without fabricating an antivirus pass", async () => {
+    const { verifyClawHubPluginRecord, verifyClawHubSkillRecord } = (await import(
+      helperUrl
+    )) as VerificationHelpers;
+    for (const result of [
+      verifyClawHubPluginRecord(pluginRecord(), target, version),
+      verifyClawHubSkillRecord(skillRecord(), version)
+    ]) {
+      expect(result).toMatchObject({
+        status: "found",
+        security: {
+          auditProvider: "ClawScan",
+          antivirusRetirement: {
+            provider: "VirusTotal",
+            status: "retired",
+            verifiedAt: "2026-11-12"
+          }
+        }
+      });
+    }
+  });
+
+  it("retains fail-closed handling for adverse historical antivirus evidence", async () => {
+    const { verifyClawHubPluginRecord, verifyClawHubSkillRecord } = (await import(
+      helperUrl
+    )) as VerificationHelpers;
+    for (const status of ["suspicious", "pending", "malicious", "failed", "unknown"]) {
+      const plugin = pluginRecord();
+      const skill = skillRecord();
+      expect(
+        verifyClawHubPluginRecord(
+          { ...plugin, version: { ...plugin.version, vtAnalysis: { status } } },
+          target,
+          version
+        ).status
+      ).toBe("partial");
+      expect(
+        verifyClawHubSkillRecord(
+          {
+            ...skill,
+            version: {
+              ...skill.version,
+              security: {
+                ...skill.version.security,
+                scanners: { ...skill.version.security.scanners, vt: { status } }
+              }
+            }
+          },
+          version
+        ).status
+      ).toBe("partial");
+    }
+  });
+
+  it("requires active final reviews and moderation even after antivirus retirement", async () => {
+    const { verifyClawHubPluginRecord, verifyClawHubSkillRecord } = (await import(
+      helperUrl
+    )) as VerificationHelpers;
+    for (const status of ["pending", "suspicious", "failed", "unknown"]) {
+      const plugin = pluginRecord();
+      plugin.version.llmAnalysis.status = status;
+      expect(verifyClawHubPluginRecord(plugin, target, version).status).toBe("partial");
+      const skill = skillRecord();
+      skill.version.security.scanners.llm.status = status;
+      expect(verifyClawHubSkillRecord(skill, version).status).toBe("partial");
+    }
+    const missingReview = skillRecord();
+    Reflect.deleteProperty(missingReview.version.security.scanners, "llm");
+    expect(verifyClawHubSkillRecord(missingReview, version).status).toBe("partial");
+    const missingModeration = skillRecord();
+    Reflect.deleteProperty(missingModeration, "moderation");
+    expect(verifyClawHubSkillRecord(missingModeration, version).status).toBe("partial");
+    const rejected = pluginRecord();
+    rejected.version.llmAnalysis.verdict = "malicious";
+    expect(verifyClawHubPluginRecord(rejected, target, version).status).toBe("partial");
   });
 
   it("requires a completed clean exact-version skill review and unblocked moderation", async () => {

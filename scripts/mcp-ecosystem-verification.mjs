@@ -214,6 +214,20 @@ export function smitheryStdioDirectoryUrl(namespace) {
   return `https://api.smithery.ai/servers?namespace=${encodeURIComponent(namespace)}&remote=false`;
 }
 
+// ClawHub retired VirusTotal from its API and scan pipeline. Keep that retirement
+// explicit in receipts, while preserving any adverse historical evidence.
+const antivirusRetirement = {
+  provider: "VirusTotal",
+  status: "retired",
+  verifiedAt: "2026-11-12",
+  noticeUrl:
+    "https://github.com/openclaw/clawhub/blob/23840e2772a12cdda7ac12f07c4e647792a52dfe/CHANGELOG.md"
+};
+
+function retiredScanHasNoAdverseResult(result) {
+  return result == null || result.status === "clean";
+}
+
 export function verifyClawHubPluginRecord(payload, target, expectedVersion) {
   const packageRecord = payload.package;
   const latestVersion =
@@ -223,6 +237,8 @@ export function verifyClawHubPluginRecord(payload, target, expectedVersion) {
     null;
   const release = payload.version;
   const security = {
+    auditProvider: "ClawScan",
+    antivirusRetirement,
     version: release?.version ?? null,
     passed:
       release?.version === expectedVersion &&
@@ -230,7 +246,7 @@ export function verifyClawHubPluginRecord(payload, target, expectedVersion) {
       release?.verification?.scanStatus === "clean" &&
       release?.llmAnalysis?.status === "clean" &&
       ["benign", "clean"].includes(release?.llmAnalysis?.verdict) &&
-      release?.vtAnalysis?.status === "clean",
+      retiredScanHasNoAdverseResult(release?.vtAnalysis),
     scanStatus: release?.verification?.scanStatus ?? null,
     review: release?.llmAnalysis ?? null,
     antivirus: release?.vtAnalysis ?? null,
@@ -274,12 +290,14 @@ export function verifyClawHubSkillRecord(payload, expectedVersion) {
   const moderation = payload.moderation;
   const review = release?.security;
   const security = {
+    auditProvider: "ClawScan",
+    antivirusRetirement,
     version: release?.version ?? null,
     passed:
       release?.version === expectedVersion &&
       review?.hasScanResult === true &&
       review?.status === "clean" &&
-      review?.scanners?.vt?.status === "clean" &&
+      retiredScanHasNoAdverseResult(review?.scanners?.vt) &&
       review?.scanners?.llm?.status === "clean" &&
       ["benign", "clean"].includes(review?.scanners?.llm?.verdict) &&
       moderation?.verdict === "clean" &&

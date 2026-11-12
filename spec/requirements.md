@@ -439,6 +439,8 @@ Internal registration diagnostics may build a separately named compatibility pac
 
 **FR-MCP-18:** Release acceptance requires both the portable ClawHub skill and OpenClaw plugin to have completed, clean security outcomes for their exact expected published versions. Missing, pending, blocked, suspicious/Review, failed, stale, or unavailable results fail closed. Record underlying scanner findings and final review dispositions; publication acknowledgements, hashes, and search visibility alone do not establish security acceptance. Partial ClawHub publication still verifies both distributions. OpenClaw capabilities default to optional unless explicitly reviewed for default exposure; optional tools require native per-call approval before execution.
 
+ClawHub's current security provider is ClawScan. Its [VirusTotal retirement](https://github.com/openclaw/clawhub/blob/23840e2772a12cdda7ac12f07c4e647792a52dfe/CHANGELOG.md), verified on 12 November 2026 against the exact-version public responses, removes antivirus results from the provider API. Record that retired signal explicitly; require all active overall/final-review and skill-moderation outcomes, and retain fail-closed handling of any returned adverse historical antivirus evidence. Retirement is not an antivirus pass.
+
 ### 1.11 Web App
 
 **FR-WEB-01:** Signup/login/logout plus session-aware account bootstrap using first-party auth, with passwordless email-code auth and GitHub sign-in in V1.

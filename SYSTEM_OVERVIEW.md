@@ -1,3 +1,8 @@
+MCP ecosystem security verifies exact-version clean ClawScan audits and final
+reviews, with clean skill moderation. ClawHub's verified VirusTotal retirement is
+explicit in receipts; active missing/adverse audits and returned adverse historical
+antivirus evidence still fail closed. Discovery remains a separate release gate.
+
 Dashboard health navigation: a red `!` badge at the right of Health Status reflects
 any accessible enabled, unpaused check's recorded current failure. A protected-shell
 provider reads existing APIs with bounded concurrency, refreshes every minute while

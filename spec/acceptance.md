@@ -1173,7 +1173,8 @@ If CLI says something is healthy and MCP says something different, that is a pro
 
 - **Given** a full ecosystem release or a partial ClawHub skill/plugin publication
 - **When** post-publication verification runs
-- **Then** both exact expected versions have completed clean ClawHub overall security and final reviewer/antivirus results, with unblocked skill moderation
+- **Then** both exact expected versions have completed clean ClawScan overall security and final reviewer results, with unblocked skill moderation
+- **And** the report explicitly records ClawHub's verified 12 November 2026 VirusTotal retirement; no antivirus pass is fabricated, and any returned adverse historical antivirus evidence still fails closed
 - **And** missing, pending, suspicious/Review, blocked, stale, failed, or unavailable results fail the release command; an old publication-only report cannot pass
 - **And** scanner details, including findings adjudicated benign by ClawHub, remain in the report; there is no local bypass or conversion of warnings into passes
 - **And** a partial publication verifies its unchanged companion without republishing it
