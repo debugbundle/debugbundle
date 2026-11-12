@@ -8,6 +8,10 @@ The format is based on Keep a Changelog and this project follows Semantic Versio
 
 ## [1.26.0] - 2026-11-12
 
+- Align MCP ecosystem verification with ClawHub's documented VirusTotal retirement.
+  Require completed clean ClawScan outcomes and moderation, record the retired
+  signal explicitly, and preserve adverse historical evidence and discovery gates.
+
 - Show a right-aligned red `!` beside Health Status for current confirmed outages,
   with visible background refresh, recovery clearing and account/workspace isolation.
 

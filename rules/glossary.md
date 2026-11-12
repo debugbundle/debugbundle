@@ -69,7 +69,7 @@ A tool disabled by default until an operator explicitly allows it. DebugBundle a
 
 ### ClawHub Security Acceptance
 
-Completed clean overall, final-review and antivirus outcomes for the exact expected skill and plugin versions, plus unblocked skill moderation. Publication receipts, artifact integrity and search visibility are separate evidence. Scanner warnings adjudicated benign by the platform remain recorded.
+Completed clean overall and final ClawScan review outcomes for the exact expected skill and plugin versions, plus unblocked skill moderation. ClawScan is ClawHub's current artifact security audit. The provider's VirusTotal retirement is recorded explicitly rather than represented as an antivirus pass; any returned adverse historical result still fails closed. Publication receipts, artifact integrity and search visibility are separate evidence. Scanner warnings adjudicated benign by the platform remain recorded.
 
 ### Local Authentication Profile
 
